@@ -1,0 +1,12 @@
+build/
+build-*/
+dist/
+CMakeUserPresets.json
+
+TODO.md
+.vscode/
+.venv/
+
+__pycache__/
+*.pyc
+.pytest_cache/
