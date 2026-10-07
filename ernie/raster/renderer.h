@@ -146,6 +146,12 @@ class RasterRenderer {
     /// @throws std::invalid_argument for the default material or an unknown one.
     void RemoveMaterial(std::uint32_t id);
 
+    /// Counts additions and removals of materials, so drawables that resolve material ids
+    /// (`HasMaterial`) know when to again.
+    std::uint64_t MaterialSetVersion() const {
+        return materialSetVersion_;
+    }
+
     /// The material drawables should use for `id`: that material, or the default one if it is gone.
     const RasterMaterial& MaterialOrDefault(std::uint32_t id) const;
 
@@ -303,6 +309,7 @@ class RasterRenderer {
     mutable FrameUploads uploads_;
     std::map<std::uint32_t, std::unique_ptr<RasterMaterial>> materials_;
     std::uint32_t nextMaterial_ = 1;
+    std::uint64_t materialSetVersion_ = 0;
 
     GpuBuffer uniforms_;
     GpuBuffer shadowUniforms_;

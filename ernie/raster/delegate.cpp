@@ -546,8 +546,22 @@ void RasterDelegate::Sync(const Scene& scene) {
     if (scene.Id() != sceneId_) {
         sceneId_ = scene.Id();
         cursor_.version = scene.Version();
-    } else if (scene.Changes(cursor_).empty()) {
-        return;
+    } else {
+        const std::vector<Change> changes = scene.Changes(cursor_);
+        // Changes only to cameras and render prims, such as a batch's poses and worlds every
+        // step, leave the synced materials, terrain, meshes and draws as they are (lights and
+        // settings resolve every frame).
+        const auto view = [&scene](const Change& change) {
+            if (Any(change.bits, Dirty::Removed) || !scene.Has(change.path)) {
+                return false;
+            }
+            const std::string_view type = scene.TypeOf(change.path);
+            return type == tokens::kCamera || type == tokens::kRenderSettings ||
+                   type == tokens::kRenderProduct || type == tokens::kRenderVar;
+        };
+        if (std::all_of(changes.begin(), changes.end(), view)) {
+            return;
+        }
     }
     std::vector<std::string> errors;
     const auto attempt = [&errors](auto&& step) {

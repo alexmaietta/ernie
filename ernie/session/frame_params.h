@@ -5,6 +5,7 @@
 
 #include <glm/glm.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -45,8 +46,20 @@ struct ShadowSettings {
     bool showCascades = false;             ///< Tint fragments by cascade, for tuning.
     std::uint32_t lightResolution = 1024;  ///< Texels along each side of other lights' maps.
     /// Texels along each side of the sun's map of each world in a batch of views of several
-    /// worlds; smaller than `resolution`, as a batch holds one map per world.
-    std::uint32_t worldResolution = 1024;
+    /// worlds, as a batch holds one map per world; 0 for automatic, `AutoWorldResolution` of the
+    /// image size.
+    std::uint32_t worldResolution = 0;
+
+    /// The automatic `worldResolution` for images of `width` by `height`: four texels per pixel
+    /// along the larger side, as a power of two from 256 to 2048, so small RL observations of
+    /// many worlds do not each clear and render a large map.
+    static std::uint32_t AutoWorldResolution(std::uint32_t width, std::uint32_t height) {
+        std::uint32_t texels = 256;
+        while (texels < 4 * std::max(width, height) && texels < 2048) {
+            texels *= 2;
+        }
+        return texels;
+    }
     WorldShadows worlds = WorldShadows::Separate;  ///< Which casters a batch's worlds' maps hold.
     WorldShadowFit worldFit = WorldShadowFit::Scene;  ///< What each world's map covers.
     float worldMargin = 1.0f;  ///< Metres a world-fitted map reaches past the world's casters.

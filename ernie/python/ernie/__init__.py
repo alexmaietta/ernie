@@ -42,6 +42,9 @@ its device) and commits the writes on exit, so renderers read it again; the stre
 stream the writes are queued on, and renderers copy the array in order after them, without the
 host. scene.write(path, attribute, array, stream=...) replaces an array the same way.
 
+For reinforcement learning, ernie.batch.BatchCamera renders a view per environment through one
+camera, poses and worlds in and GPU observations out, without the host waiting.
+
 render(scene, device="cuda") returns a CudaArray in GPU memory shared with Vulkan. It returns as
 soon as the render is submitted; torch.from_dlpack(result) (or CuPy, JAX) makes the consumer's
 stream wait for the render on the GPU, so the host never blocks.

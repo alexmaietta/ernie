@@ -244,7 +244,8 @@ inline constexpr std::string_view kTwoPass = "twoPass";
 inline constexpr std::string_view kClearColor = "ernie:clearColor";                ///< vec3 linear.
 inline constexpr std::string_view kShadowCascades = "ernie:shadows:cascades";      ///< int.
 inline constexpr std::string_view kShadowResolution = "ernie:shadows:resolution";  ///< int.
-/// int: texels along each side of the sun's map of each world in a batch of views.
+/// int: texels along each side of the sun's map of each world in a batch of views; 0 or unset for
+/// automatic, four per pixel of the image's larger side from 256 to 2048.
 inline constexpr std::string_view kShadowWorldResolution = "ernie:shadows:worldResolution";
 /// token: which casters shadow a batch of views of several worlds: "separate" (a map per world,
 /// the default), "shared" (one map of what the worlds share) or "merged" (one map of every

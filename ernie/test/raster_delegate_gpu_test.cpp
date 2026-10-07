@@ -2216,6 +2216,15 @@ TEST_F(RasterDelegateTest, WorldFittedShadowMapsKeepSmallShadowsInLargeScenes) {
         << "a 64-texel map over 2 km misses the roof's shadow; one fitted to world 0 keeps it";
 }
 
+TEST(ShadowSettings, SizesWorldMapsToTheImageByDefault) {
+    using ernie::ShadowSettings;
+    EXPECT_EQ(ShadowSettings{}.worldResolution, 0u) << "automatic";
+    EXPECT_EQ(ShadowSettings::AutoWorldResolution(64, 64), 256u);
+    EXPECT_EQ(ShadowSettings::AutoWorldResolution(48, 100), 512u);
+    EXPECT_EQ(ShadowSettings::AutoWorldResolution(256, 128), 1024u);
+    EXPECT_EQ(ShadowSettings::AutoWorldResolution(4096, 2160), 2048u);
+}
+
 TEST(FrameParamsOf, RejectsUnknownWorldShadowOptions) {
     Scene scene = RoofScene(false);
     const ernie::RenderPrims prims = ernie::ResolveRenderPrims(scene, "/Render/Settings");

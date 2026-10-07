@@ -18,6 +18,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -263,6 +264,8 @@ class MeshDrawable : public RasterDrawable {
     };
 
     void CreateGBufferPipeline();
+    /// Writes every draw's GPU record and instance ids, and their pipelines and id offsets.
+    void WriteDraws();
     void RebuildGeometry();
     void RebuildInstances();
     void WriteInstancer(const Instancer& instancer);
@@ -322,6 +325,8 @@ class MeshDrawable : public RasterDrawable {
     std::vector<std::int32_t> viewWorlds_;              ///< The world each view of the frame sees.
     std::vector<std::vector<VisibleRange>> viewDraws_;  ///< Per view, the ranges it sees.
     std::vector<std::vector<VisibleRange>> shadowDraws_;  ///< Per shadow view, likewise.
+    /// Per shadow view, its draws by world (-1 shared), for passes of one world's casters.
+    std::vector<std::unordered_map<std::int32_t, std::vector<VisibleRange>>> shadowWorldDraws_;
     mutable std::vector<std::size_t> viewCalls_;  ///< Per view, the draw calls it recorded last.
     std::vector<const GraphicsPipeline*> itemPipelines_;
 
@@ -339,6 +344,9 @@ class MeshDrawable : public RasterDrawable {
     std::vector<std::uint32_t> itemIdOffsets_;  ///< Per draw, its first entry in `instanceIds_`.
 
     Culling culling_ = Culling::Gpu;
+    bool drawsDirty_ = true;  ///< Whether the draws changed since `WriteDraws`.
+    /// The renderer's `MaterialSetVersion` at `WriteDraws`, which resolves material ids.
+    std::uint64_t drawsMaterials_ = 0;
     bool posesOnGpu_ = false;  ///< Whether the views' cull planes come from the GPU poses.
     Occlusion occlusion_ = Occlusion::Off;
     std::vector<std::uint32_t> viewJobStarts_;  ///< Per view, its first job; then the job count.

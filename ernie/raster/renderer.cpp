@@ -447,6 +447,7 @@ std::uint32_t RasterRenderer::AddMaterial(const MaterialSettings& settings) {
     }
     const std::uint32_t id = nextMaterial_++;
     materials_.emplace(id, std::make_unique<RasterMaterial>(context_, uploads_));
+    ++materialSetVersion_;
     SetMaterial(id, settings);
     return id;
 }
@@ -483,6 +484,7 @@ void RasterRenderer::RemoveMaterial(std::uint32_t id) {
     if (it == materials_.end()) {
         throw std::invalid_argument("Unknown material " + std::to_string(id));
     }
+    ++materialSetVersion_;
     vkDeviceWaitIdle(context_.Device());
     materials_.erase(it);
 }
@@ -717,8 +719,12 @@ void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable*
                                                      : ShadowCasters::kNoWorld};
     if (shadowsEnabled_ && batch) {
         // A batch's per-world maps use their own, smaller resolution.
+        const std::uint32_t worldResolution =
+            shadows.worldResolution > 0
+                ? shadows.worldResolution
+                : ShadowSettings::AutoWorldResolution(params.camera.width, params.camera.height);
         const std::uint32_t resolution =
-            shadows.worlds == WorldShadows::Separate ? shadows.worldResolution : shadows.resolution;
+            shadows.worlds == WorldShadows::Separate ? worldResolution : shadows.resolution;
         if (resolution != shadowResolution_) {
             CreateShadowMaps(resolution, kMaxCascades);
         }

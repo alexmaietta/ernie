@@ -10,10 +10,12 @@
 #include <algorithm>
 #include <bit>
 #include <cstring>
+#include <iterator>
 #include <limits>
 #include <map>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <utility>
 
 namespace ernie {
@@ -530,6 +532,7 @@ void MeshDrawable::SetItems(std::vector<MeshItem> items) {
     items_ = std::move(items);
     itemRanges_ = std::move(ranges);
     itemPipelines_.clear();
+    drawsDirty_ = true;
 }
 
 void MeshDrawable::RebuildGeometry() {
@@ -643,6 +646,12 @@ void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCasc
     for (std::size_t v = 0; v < params.Views(); ++v) {
         viewWorlds_.push_back(params.ViewWorld(v));
     }
+    // The per-draw data changes only with the draws, meshes or instancers, not every frame.
+    bool drawsChanged = drawsDirty_ || geometryDirty_ || instancesDirty_ ||
+                        renderer_.MaterialSetVersion() != drawsMaterials_;
+    for (const auto& [handle, instancer] : instancers_) {
+        drawsChanged = drawsChanged || instancer.dirty;
+    }
     if (geometryDirty_) {
         RebuildGeometry();
     } else {
@@ -670,6 +679,16 @@ void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCasc
         }
     }
 
+    if (drawsChanged) {
+        WriteDraws();
+        drawsDirty_ = false;
+        drawsMaterials_ = renderer_.MaterialSetVersion();
+    }
+    Cull(params, cascades);
+}
+
+void MeshDrawable::WriteDraws() {
+    ERNIE_ZONE("Mesh write draws");
     itemIdOffsets_.clear();
     std::vector<GpuDraw> draws(items_.size());
     std::vector<std::uint32_t> instanceIds;
@@ -727,7 +746,6 @@ void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCasc
     } else if (!instanceIds.empty()) {
         renderer_.Uploads().Write(*instanceIds_, std::as_bytes(std::span(instanceIds)));
     }
-    Cull(params, cascades);
 }
 
 std::optional<Bounds3> MeshDrawable::Bounds() const {
@@ -888,6 +906,37 @@ void MeshDrawable::Cull(const FrameParams& params, std::span<const ShadowCascade
     const auto pyramidHeight = static_cast<float>(std::bit_floor(params.camera.height));
     const auto pyramidMips = static_cast<float>(std::bit_width(
         std::max(std::bit_floor(params.camera.width), std::bit_floor(params.camera.height))));
+    // The draw ranges a view or shadow view may see, in item order: every one, or for one world
+    // its own and (unless it skips them) the shared ones, so a view of one of many worlds looks
+    // at its world's ranges only.
+    using RangeIndex = std::pair<std::size_t, std::size_t>;
+    std::vector<RangeIndex> everyRange;
+    std::unordered_map<std::int32_t, std::vector<RangeIndex>> rangesOfWorld;
+    for (std::size_t i = 0; i < items_.size(); ++i) {
+        for (std::size_t r = 0; r < itemRanges_[i].size(); ++r) {
+            everyRange.emplace_back(i, r);
+            rangesOfWorld[itemRanges_[i][r].world].emplace_back(i, r);
+        }
+    }
+    std::map<std::pair<std::int32_t, bool>, std::vector<RangeIndex>> seenRanges;
+    const std::vector<RangeIndex> none;
+    const auto candidates = [&](const ShadowCasters* seen) -> const std::vector<RangeIndex>& {
+        if (seen == nullptr || seen->world == ShadowCasters::kAllWorlds) {
+            return everyRange;
+        }
+        const std::pair key{seen->world, seen->shared};
+        auto [it, added] = seenRanges.try_emplace(key);
+        if (added) {
+            const auto shared = rangesOfWorld.find(-1);
+            const auto own = rangesOfWorld.find(seen->world);
+            const std::vector<RangeIndex>& a =
+                seen->shared && shared != rangesOfWorld.end() ? shared->second : none;
+            const std::vector<RangeIndex>& b =
+                seen->world >= 0 && own != rangesOfWorld.end() ? own->second : none;
+            std::merge(a.begin(), a.end(), b.begin(), b.end(), std::back_inserter(it->second));
+        }
+        return it->second;
+    };
     // `pixelsPerUnit`: how many pixels (or shadow map texels) a world unit spans at w = 1.
     // Without `posed`, the view's pose is only an estimate (`FrameParams::posesOnGpu`): it tests
     // no bounds, and its cull view's planes and matrix come from the GPU (`RecordViewPoses`).
@@ -905,37 +954,35 @@ void MeshDrawable::Cull(const FrameParams& params, std::span<const ShadowCascade
         views.emplace_back(pyramid ? pyramidWidth : 0.0f, pyramid ? pyramidHeight : 0.0f,
                            pyramid ? pyramidMips : 0.0f, 0.0f);
         std::vector<VisibleRange> ranges;
-        for (std::size_t i = 0; i < items_.size(); ++i) {
-            for (std::size_t r = 0; r < itemRanges_[i].size(); ++r) {
-                const WorldRange& range = itemRanges_[i][r];
-                if (range.count == 0 || (seen != nullptr && !seen->Draws(range.world))) {
-                    continue;
-                }
-                const std::optional<Bounds3>& box = bounds[i][r];
-                if (posed && box && !frustum.Intersects(box->first, box->second)) {
-                    continue;
-                }
-                VisibleRange entry{static_cast<std::uint32_t>(i), static_cast<std::uint32_t>(r)};
-                if (culling_ == Culling::Gpu && items_[i].instancer) {
-                    entry.job = static_cast<std::int32_t>(jobs.size());
-                    GpuCullJob job{};
-                    job.range[0] = entry.item;
-                    job.range[1] = itemIdOffsets_[i] + range.first;
-                    job.range[2] = range.count;
-                    job.range[3] = slot;
-                    // A run of the range's count of ids and an indirect draw per level.
-                    const auto levels =
-                        static_cast<std::uint32_t>(meshes_.at(items_[i].mesh).levels.size());
-                    job.output[0] = visible;
-                    job.output[1] = draws;
-                    jobs.push_back(job);
-                    addRecords(entry.item, visible, range.count);
-                    cullDrawCounts_.push_back(levels);
-                    visible += range.count * levels;
-                    draws += levels;
-                }
-                ranges.push_back(entry);
+        for (const auto [i, r] : candidates(seen)) {
+            const WorldRange& range = itemRanges_[i][r];
+            if (range.count == 0 || (seen != nullptr && !seen->Draws(range.world))) {
+                continue;
             }
+            const std::optional<Bounds3>& box = bounds[i][r];
+            if (posed && box && !frustum.Intersects(box->first, box->second)) {
+                continue;
+            }
+            VisibleRange entry{static_cast<std::uint32_t>(i), static_cast<std::uint32_t>(r)};
+            if (culling_ == Culling::Gpu && items_[i].instancer) {
+                entry.job = static_cast<std::int32_t>(jobs.size());
+                GpuCullJob job{};
+                job.range[0] = entry.item;
+                job.range[1] = itemIdOffsets_[i] + range.first;
+                job.range[2] = range.count;
+                job.range[3] = slot;
+                // A run of the range's count of ids and an indirect draw per level.
+                const auto levels =
+                    static_cast<std::uint32_t>(meshes_.at(items_[i].mesh).levels.size());
+                job.output[0] = visible;
+                job.output[1] = draws;
+                jobs.push_back(job);
+                addRecords(entry.item, visible, range.count);
+                cullDrawCounts_.push_back(levels);
+                visible += range.count * levels;
+                draws += levels;
+            }
+            ranges.push_back(entry);
         }
         return ranges;
     };
@@ -972,6 +1019,13 @@ void MeshDrawable::Cull(const FrameParams& params, std::span<const ShadowCascade
         shadowDraws_.push_back(list(cascade.lightViewProjection,
                                     1.0f / std::max(cascade.texelWorldSize, 1e-30f), false, nullptr,
                                     true));
+    }
+    // A world's shadow pass draws its world's casters and the shared ones, not every world's.
+    shadowWorldDraws_.assign(shadowDraws_.size(), {});
+    for (std::size_t c = 0; c < shadowDraws_.size(); ++c) {
+        for (const VisibleRange& visible : shadowDraws_[c]) {
+            shadowWorldDraws_[c][itemRanges_[visible.item][visible.range].world].push_back(visible);
+        }
     }
     WriteCullJobs(jobs, views, visible, draws);
     if (!records.empty()) {
@@ -1302,9 +1356,23 @@ std::size_t MeshDrawable::Record(VkCommandBuffer commands, const RasterFrame& fr
 void MeshDrawable::RecordShadow(VkCommandBuffer commands, const RasterFrame& frame,
                                 std::size_t cascade, const glm::mat4& lightViewProjection,
                                 const ShadowCasters& casters) const {
-    if (cascade < shadowDraws_.size()) {
+    if (cascade >= shadowDraws_.size()) {
+        return;
+    }
+    if (casters.world == ShadowCasters::kAllWorlds) {
         Record(commands, frame, shadowDraws_[cascade], lightViewProjection, &casters, true, true,
                0);
+        return;
+    }
+    const auto& byWorld = shadowWorldDraws_[cascade];
+    for (const std::int32_t world : {std::int32_t{-1}, casters.world}) {
+        const auto draws = byWorld.find(world);
+        if (draws != byWorld.end() && casters.Draws(world)) {
+            Record(commands, frame, draws->second, lightViewProjection, &casters, true, true, 0);
+        }
+        if (casters.world < 0) {
+            break;  // the shared casters only
+        }
     }
 }
 
