@@ -31,6 +31,12 @@ class FakeDelegate : public RenderDelegate {
     const ernie::BrdfRegistry& Brdfs() const override {
         return brdfs_;
     }
+    void AddSensorFilter(ernie::SensorFilterModel) override {
+        throw std::invalid_argument("The fake delegate runs no custom filters");
+    }
+    const ernie::SensorFilterRegistry& SensorFilters() const override {
+        return filters_;
+    }
     void Sync(const Scene&) override {}
     void Update(const Scene&, const Path&, VkExtent2D) override {}
     std::vector<ernie::TimelinePoint> SubmitWaits() const override {
@@ -59,6 +65,7 @@ class FakeDelegate : public RenderDelegate {
     using RenderDelegate::NextFrame;
 
   private:
+    ernie::SensorFilterRegistry filters_;
     ernie::BrdfRegistry brdfs_ = ernie::BrdfRegistry::WithBuiltins();
 };
 

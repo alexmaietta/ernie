@@ -584,16 +584,31 @@ ResolveRenderProducts(const Scene& scene, std::span<const Path> products, const 
             if (!scene.Has(filter) || scene.TypeOf(filter) != kSensorFilter) {
                 throw std::invalid_argument("'" + filter.String() + "' is not a SensorFilter prim");
             }
-            const std::string type = GetToken(scene, filter, kFilterType, "");
-            const std::optional<SensorFilter> known = SensorFilterNamed(type);
-            if (!known) {
-                throw std::invalid_argument("Sensor filter '" + filter.String() +
-                                            "' has unknown type '" + type + "'");
+            SensorFilterStep step;
+            step.type = GetToken(scene, filter, kFilterType, "");
+            if (step.type.empty()) {
+                throw std::invalid_argument("Sensor filter '" + filter.String() + "' has no '" +
+                                            std::string(kFilterType) + "'");
             }
-            spec.filters.push_back(*known);
+            // Its parameters: every number under inputs:.
+            constexpr std::string_view kInputs = "inputs:";
+            for (const std::string& attribute : scene.Attributes(filter)) {
+                if (attribute.starts_with(kInputs)) {
+                    step.inputs[attribute.substr(kInputs.size())] =
+                        static_cast<float>(GetNumber(scene, filter, attribute, 0.0));
+                }
+            }
+            spec.filters.push_back(std::move(step));
+        }
+        // The built-in filters decide which vars the chain writes; custom ones write none.
+        std::vector<SensorFilter> builtins;
+        for (const SensorFilterStep& step : spec.filters) {
+            if (const std::optional<SensorFilter> builtin = step.Builtin()) {
+                builtins.push_back(*builtin);
+            }
         }
         const std::vector<SensorFilter> chain =
-            CheckFilterChain(spec.filters.empty() ? DefaultFilterChain() : spec.filters);
+            CheckFilterChain(spec.filters.empty() ? DefaultFilterChain() : builtins);
         const std::vector<std::string_view> written = VarsWrittenBy(chain);
         for (const auto& [var, name] : spec.vars) {
             const auto& names = kRenderVarNames;

@@ -70,6 +70,10 @@ class RasterDelegate : public RenderDelegate {
 
     const RendererInfo& Info() const override;
     const BrdfRegistry& Brdfs() const override;
+    void AddSensorFilter(SensorFilterModel model) override;
+    const SensorFilterRegistry& SensorFilters() const override {
+        return renderer_.SensorFilters();
+    }
 
     /// Uploads the materials, terrain, meshes and instances that changed since the last call, or
     /// all of them when `scene` is not the scene of the last call.
@@ -167,8 +171,9 @@ class RasterDelegate : public RenderDelegate {
 
     CudaInterop& RequireCuda();
     void UpdatePrims(const Scene& scene, const RenderPrims& prims, VkExtent2D extent, FrameId frame,
-                     std::span<const SensorFilter> filters = {}, std::vector<glm::dmat4> poses = {},
-                     std::vector<std::int32_t> worlds = {}, std::vector<std::string_view> vars = {},
+                     std::span<const SensorFilterStep> filters = {},
+                     std::vector<glm::dmat4> poses = {}, std::vector<std::int32_t> worlds = {},
+                     std::vector<std::string_view> vars = {},
                      std::optional<glm::dmat4> posesParent = std::nullopt);
     /// Takes the next `FrameUploads` slot for a frame, once the frame that last used it has
     /// finished; returns it.

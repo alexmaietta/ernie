@@ -96,7 +96,8 @@ struct SensorUniforms {
     float clear[4];
     float colour[SpectralBands::kMaxBands][4];
     float qe[SpectralBands::kMaxBands][4];
-    float padding[8];  ///< To the views' stride, so the filters read them as one array.
+    float range[4];    ///< First band's lower wavelength and band width (nm).
+    float padding[4];  ///< To the views' stride, so the filters read them as one array.
 };
 static_assert(sizeof(SensorUniforms) == 2304, "SensorUniforms must match sensor.slang");
 
@@ -151,7 +152,51 @@ constexpr DescriptorBinding kFilterBindings[] = {
     {12, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {13, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {14, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
+
+/// A plan that runs custom filter `model`, with the built-in filters its domain needs, and holds a
+/// var downstream of it: for checking the filter compiles.
+SensorPlan ProbePlan(const SensorFilterModel& model, const SensorFilterRegistry& registry) {
+    std::vector<SensorFilter> before;
+    std::string_view held = render_vars::kHdrColor;
+    switch (model.domain) {
+    case FilterDomain::Spectrum:
+        break;
+    case FilterDomain::Electrons:
+        before = {SensorFilter::Qe};
+        held = render_vars::kElectrons;
+        break;
+    case FilterDomain::Digital:
+        before = {SensorFilter::Qe, SensorFilter::Adc};
+        held = render_vars::kRawDn;
+        break;
+    case FilterDomain::Rgb:
+        before = {SensorFilter::Cie};
+        break;
+    case FilterDomain::Display:
+        before = {SensorFilter::Cie, SensorFilter::Exposure};
+        held = render_vars::kLdrColor;
+        break;
+    }
+    std::vector<SensorFilterStep> chain = StepsOf(before);
+    chain.push_back({model.id, {}});
+    if (model.domain == FilterDomain::Spectrum) {
+        chain.push_back({std::string(NameOf(SensorFilter::Cie)), {}});
+    }
+    const std::string_view vars[] = {held};
+    return PlanSensor(chain, vars, registry);
+}
+
+/// The modules of `plan`'s kernel: the sensor, its custom filters' and its entry point.
+std::vector<ShaderModuleSource> SensorModules(const SensorPlan& plan) {
+    std::vector<ShaderModuleSource> modules{{"sensor", shaders::kSensorSlang}};
+    for (auto& [name, source] : plan.Modules()) {
+        modules.push_back({name, source});
+    }
+    modules.push_back({"sensorPlan", plan.Source()});
+    return modules;
+}
 
 /// hzb.slang: the source level and the destination level.
 constexpr DescriptorBinding kHzbBindings[] = {
@@ -358,6 +403,7 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
                                          VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 1.0f, false}),
       shadingUniforms_(context, kShadingStride, kViewUniformUsage, BufferMemory::Device),
       sensorUniforms_(context, kSensorStride, kViewUniformUsage, BufferMemory::Device),
+      filterParams_(context, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device),
       lightTable_(context, kMaxLights * sizeof(LightGpu), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                   BufferMemory::Device),
       lightViewMatrices_(context, kMaxLightShadowViews * sizeof(glm::mat4),
@@ -419,6 +465,19 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
 
 RasterRenderer::~RasterRenderer() {
     vkDeviceWaitIdle(context_.Device());
+}
+
+void RasterRenderer::AddSensorFilter(SensorFilterModel model) {
+    SensorFilterRegistry candidate = sensorFilters_;
+    candidate.Add(model);
+    try {
+        const SensorPlan probe = ProbePlan(model, candidate);
+        compiler_.CompileSpirv(SensorModules(probe), "sensorMain");
+    } catch (const std::invalid_argument& error) {
+        throw std::invalid_argument("Sensor filter " + model.id +
+                                    " failed to compile: " + error.what());
+    }
+    sensorFilters_ = std::move(candidate);
 }
 
 void RasterRenderer::AddBrdf(BrdfModel model) {
@@ -820,7 +879,17 @@ void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable*
     // Only the filters producing the wanted vars run, fused into one kernel that writes only them.
     requiredVars_ = RequiredVars(params.vars);
     sensorPlan_ =
-        PlanSensor(params.filters.empty() ? DefaultFilterChain() : params.filters, requiredVars_);
+        PlanSensor(params.filters.empty() ? StepsOf(DefaultFilterChain()) : params.filters,
+                   requiredVars_, sensorFilters_);
+    if (!sensorPlan_.params.empty()) {
+        const VkDeviceSize bytes = sensorPlan_.params.size() * sizeof(float);
+        if (filterParams_.Size() < bytes) {
+            vkDeviceWaitIdle(context_.Device());
+            filterParams_ = GpuBuffer(context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                      BufferMemory::Device);
+        }
+        uploads_.Write(filterParams_, std::as_bytes(std::span(sensorPlan_.params)));
+    }
     filters_ = sensorPlan_.filters;
     SensorPipeline(sensorPlan_);
     bands_ = params.camera.bands;
@@ -992,6 +1061,8 @@ void RasterRenderer::WriteSensor(const FrameParams& params) {
     sensor.clear[0] = params.clearColor.r;
     sensor.clear[1] = params.clearColor.g;
     sensor.clear[2] = params.clearColor.b;
+    sensor.range[0] = static_cast<float>(bands_.minNm);
+    sensor.range[1] = static_cast<float>(bands_.Width());
     const std::vector<glm::dvec3> weights = CieWeights(bands_);
     for (int i = 0; i < bands_.count; ++i) {
         const glm::dvec3 rgb =
@@ -1379,6 +1450,7 @@ void RasterRenderer::ShadeAndFilter(VkCommandBuffer commands, RenderTargets& tar
     for (const std::string_view name : RenderTargets::VarNames()) {
         filters.push_back(general(targets.Bound(name)));
     }
+    filters.push_back(DescriptorResource::Of(filterParams_));
     const std::uint32_t constants[4] = {firstView, 0, 0, 0};
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                       sensorPipelines_.at(sensorPlan_.Key())->Handle());
@@ -1393,13 +1465,10 @@ const ComputePipeline& RasterRenderer::SensorPipeline(const SensorPlan& plan) {
     auto it = sensorPipelines_.find(key);
     if (it == sensorPipelines_.end()) {
         ERNIE_ZONE("Compile sensor kernel");
-        const std::string source = plan.Source();
-        const std::vector<ShaderModuleSource> modules{{"sensor", shaders::kSensorSlang},
-                                                      {"sensorPlan", source}};
         it = sensorPipelines_
                  .emplace(key, std::make_unique<ComputePipeline>(
                                    context_, filterLayout_,
-                                   compiler_.CompileSpirv(modules, "sensorMain")))
+                                   compiler_.CompileSpirv(SensorModules(plan), "sensorMain")))
                  .first;
     }
     return *it->second;

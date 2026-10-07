@@ -54,3 +54,32 @@ TEST(PlanSensor, RejectsChainsThatReadBeforeWriting) {
     const std::string_view held[] = {kLdrColor};
     EXPECT_THROW(PlanSensor(chain, held), std::invalid_argument);
 }
+
+TEST(PlanSensor, CallsCustomFiltersWithTheirStepsInputs) {
+    ernie::SensorFilterModel hot;
+    hot.id = "hotPixels";
+    hot.kind = ernie::FilterKind::Pixel;
+    hot.domain = ernie::FilterDomain::Electrons;
+    hot.params = {{"fraction", 1e-4f, ""}, {"electrons", 2000.0f, ""}};
+    hot.typeName = "HotPixels";
+    hot.slang = "import sensor; struct HotPixels : IPixelFilter { /* ... */ }";
+    ernie::SensorFilterRegistry registry;
+    registry.Add(hot);
+
+    const ernie::SensorFilterStep chain[] = {
+        {"qe", {}}, {"hotPixels", {{"electrons", 500.0f}}}, {"noise", {}}, {"adc", {}}};
+    const std::string_view raw[] = {kRawDn};
+    const ernie::SensorPlan plan = PlanSensor(chain, raw, registry);
+    EXPECT_EQ(plan.params, (std::vector<float>{1e-4f, 500.0f})) << "defaults, then inputs";
+    const std::string source = plan.Source();
+    EXPECT_NE(source.find("import filter_hotPixels;"), std::string::npos);
+    EXPECT_NE(source.find("params2.electrons = filterParams[1];"), std::string::npos);
+    EXPECT_LT(source.find("HotPixels.apply(value, pixel, params2)"), source.find("Noise.apply"));
+    ASSERT_EQ(plan.Modules().size(), 1u);
+    EXPECT_EQ(plan.Modules().front().first, "filter_hotPixels");
+    EXPECT_NE(plan.Key().find("hotPixels"), std::string::npos);
+
+    const std::string_view colour[] = {kLdrColor};
+    EXPECT_TRUE(PlanSensor(chain, colour, registry).params.empty())
+        << "a filter on electrons does not run for colour alone";
+}

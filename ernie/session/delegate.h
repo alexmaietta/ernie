@@ -76,6 +76,15 @@ class RenderDelegate {
     /// The reflectance models materials may name in `ernie:brdf`.
     virtual const BrdfRegistry& Brdfs() const = 0;
 
+    /// Registers custom sensor filter `model` for SensorFilter prims to name in
+    /// `ernie:filter:type`.
+    /// @throws std::invalid_argument if the model is invalid or fails to compile, or the backend
+    /// runs no custom filters.
+    virtual void AddSensorFilter(SensorFilterModel model) = 0;
+
+    /// The custom sensor filters registered so far.
+    virtual const SensorFilterRegistry& SensorFilters() const = 0;
+
     /// Uploads what changed in `scene` since the last call, or everything when `scene` is not the
     /// scene of the last call. An upload that fails is not retried until its attributes change
     /// again.

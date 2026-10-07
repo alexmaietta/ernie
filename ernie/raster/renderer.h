@@ -126,6 +126,16 @@ class RasterRenderer {
     /// its module fails to compile; the message includes the compiler's diagnostics.
     void AddBrdf(BrdfModel model);
 
+    /// Registers custom sensor filter `model` after checking that its Slang module compiles in a
+    /// sensor kernel, so render products' chains can use it by id.
+    /// @throws std::invalid_argument if the registry rejects the model (`SensorFilterRegistry::
+    /// Add`) or its module fails to compile; the message includes the compiler's diagnostics.
+    void AddSensorFilter(SensorFilterModel model);
+
+    const SensorFilterRegistry& SensorFilters() const {
+        return sensorFilters_;
+    }
+
     /// Adds a material with `settings` and returns its id.
     /// @throws std::invalid_argument as `SetMaterial`.
     std::uint32_t AddMaterial(const MaterialSettings& settings = {});
@@ -354,6 +364,7 @@ class RasterRenderer {
     /// The fused sensor kernel of each plan used so far, by `SensorPlan::Key`.
     std::map<std::string, std::unique_ptr<ComputePipeline>> sensorPipelines_;
     SensorPlan sensorPlan_;  ///< The last `Update`'s.
+    SensorFilterRegistry sensorFilters_;
     PipelineLayout presentLayout_;
     PipelineLayout hzbLayout_;
     std::unique_ptr<ComputePipeline> hzbPipeline_;
@@ -370,6 +381,7 @@ class RasterRenderer {
     Sampler tableSampler_;
     GpuBuffer shadingUniforms_;
     GpuBuffer sensorUniforms_;
+    GpuBuffer filterParams_;  ///< The plan's custom filter parameters (sensor.slang's binding 15).
     GpuBuffer lightTable_;
     GpuBuffer lightViewMatrices_;
     std::unique_ptr<GpuBuffer> materialTable_;

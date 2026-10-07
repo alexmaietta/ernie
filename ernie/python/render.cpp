@@ -325,6 +325,90 @@ void BindRender(nb::module_& m) {
             "progressive", [](const Renderer& r) { return r.Delegate().Info().progressive; },
             "Whether consecutive steps of an unchanged scene refine one image.")
         .def_prop_ro("device_name", [](const Renderer& r) { return r.Context().DeviceName(); })
+        .def(
+            "add_sensor_filter",
+            [](Renderer& r, const std::string& id, const std::string& typeName,
+               const std::string& slang, const std::string& kind, nb::object domain,
+               nb::object params, const std::string& name, const std::string& description) {
+                SensorFilterModel model;
+                model.id = id;
+                model.typeName = typeName;
+                model.slang = slang;
+                model.name = name.empty() ? id : name;
+                model.description = description;
+                if (kind == "band") {
+                    model.kind = FilterKind::Band;
+                } else if (kind == "pixel") {
+                    model.kind = FilterKind::Pixel;
+                } else {
+                    throw std::invalid_argument("kind must be \"band\" or \"pixel\", not \"" +
+                                                kind + "\"");
+                }
+                const std::string on = domain.is_none()
+                                           ? (model.kind == FilterKind::Band ? "spectrum" : "")
+                                           : nb::cast<std::string>(domain);
+                const std::pair<const char*, FilterDomain> domains[] = {
+                    {"spectrum", FilterDomain::Spectrum},
+                    {"electrons", FilterDomain::Electrons},
+                    {"digital", FilterDomain::Digital},
+                    {"rgb", FilterDomain::Rgb},
+                    {"display", FilterDomain::Display}};
+                const auto found =
+                    std::find_if(std::begin(domains), std::end(domains),
+                                 [&on](const auto& entry) { return on == entry.first; });
+                if (found == std::end(domains)) {
+                    throw std::invalid_argument(
+                        "domain must be \"spectrum\", \"electrons\", \"digital\", \"rgb\" or "
+                        "\"display\", not \"" +
+                        on + "\"");
+                }
+                model.domain = found->second;
+                // Parameters as {name: default} in order, or [{"name", "default", "description"}].
+                if (nb::isinstance<nb::dict>(params)) {
+                    for (const auto& [key, value] : nb::cast<nb::dict>(params)) {
+                        model.params.push_back(
+                            {nb::cast<std::string>(key), nb::cast<float>(value), {}});
+                    }
+                } else if (!params.is_none()) {
+                    for (const nb::handle entry : params) {
+                        const nb::dict param = nb::cast<nb::dict>(entry);
+                        model.params.push_back(
+                            {nb::cast<std::string>(param["name"]),
+                             param.contains("default") ? nb::cast<float>(param["default"]) : 0.0f,
+                             param.contains("description")
+                                 ? nb::cast<std::string>(param["description"])
+                                 : std::string()});
+                    }
+                }
+                nb::gil_scoped_release release;
+                r.Delegate().AddSensorFilter(std::move(model));
+            },
+            nb::arg("id"), nb::arg("type_name"), nb::arg("slang"), nb::arg("kind") = "pixel",
+            nb::arg("domain").none() = nb::none(), nb::arg("params").none() = nb::none(),
+            nb::arg("name") = "", nb::arg("description") = "",
+            "Registers a sensor filter written in Slang, for SensorFilter prims to name in "
+            "ernie:filter:type: struct `type_name` in module `slang` implementing IBandFilter "
+            "(kind=\"band\", on the spectrum) or IPixelFilter (kind=\"pixel\", domain "
+            "\"electrons\", \"digital\", \"rgb\" or \"display\"), with a nested Params "
+            "struct of one float per parameter. `params` is {name: default} in order, or a list "
+            "of {\"name\", \"default\", \"description\"}; prims set them as inputs:<name>. "
+            "Raises ValueError for an invalid filter or one that fails to compile, with the "
+            "compiler's diagnostics.")
+        .def_prop_ro(
+            "sensor_filters",
+            [](const Renderer& r) {
+                std::vector<std::string> ids;
+                for (const std::string_view name :
+                     {"lens", "qe", "noise", "adc", "cie", "exposure"}) {
+                    ids.emplace_back(name);
+                }
+                for (const SensorFilterModel& model : r.Delegate().SensorFilters().Models()) {
+                    ids.push_back(model.id);
+                }
+                return ids;
+            },
+            "The sensor filter types render products may use: the built-in ones, then the "
+            "registered ones.")
         .def_prop_ro("brdfs",
                      [](const Renderer& r) {
                          std::vector<std::string> ids;

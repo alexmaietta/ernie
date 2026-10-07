@@ -216,7 +216,8 @@ inline constexpr std::string_view kOrderedVars = "orderedVars";  ///< Paths of R
 /// Sensor filter chain of a RenderProduct (Ernie): paths of SensorFilter prims in order.
 inline constexpr std::string_view kFilters = "ernie:filters";
 inline constexpr std::string_view kSensorFilter = "SensorFilter";  ///< Prim type.
-/// A SensorFilter prim's filter: "lens", "qe", "noise", "adc", "cie" or "exposure".
+/// A SensorFilter prim's filter: "lens", "qe", "noise", "adc", "cie", "exposure", or the id of a
+/// custom filter (`SensorFilterModel`), whose parameters are the prim's inputs:* attributes.
 inline constexpr std::string_view kFilterType = "ernie:filter:type";
 inline constexpr std::string_view kSourceName = "sourceName";  ///< RenderVar name, e.g. "LdrColor".
 inline constexpr std::string_view kAmbient = "ernie:ambient";  ///< float fraction of sunlight.

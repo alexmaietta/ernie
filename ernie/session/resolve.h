@@ -64,8 +64,10 @@ struct RenderProductSpec {
     VkExtent2D resolution{2048, 1080};
     /// Render vars as (path, sourceName).
     std::vector<std::pair<Path, std::string>> vars;
-    /// The product's sensor filter chain; empty for `DefaultFilterChain`.
-    std::vector<SensorFilter> filters;
+    /// The product's sensor filter chain, with each filter's inputs; empty for
+    /// `DefaultFilterChain`. Custom filter types are checked when rendering, against the
+    /// renderer's registry.
+    std::vector<SensorFilterStep> filters;
 };
 
 /// The views a render product draws through `cameras` (`RenderProductSpec::cameras`), for

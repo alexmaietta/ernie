@@ -205,6 +205,10 @@ std::optional<Bounds3> RasterDelegate::SceneBounds() const {
     return bounds;
 }
 
+void RasterDelegate::AddSensorFilter(SensorFilterModel model) {
+    renderer_.AddSensorFilter(std::move(model));
+}
+
 const BrdfRegistry& RasterDelegate::Brdfs() const {
     return renderer_.Brdfs();
 }
@@ -670,7 +674,7 @@ void RasterDelegate::Update(const Scene& scene, const Path& settings, VkExtent2D
 }
 
 void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, VkExtent2D extent,
-                                 FrameId id, std::span<const SensorFilter> filters,
+                                 FrameId id, std::span<const SensorFilterStep> filters,
                                  std::vector<glm::dmat4> poses, std::vector<std::int32_t> worlds,
                                  std::vector<std::string_view> vars,
                                  std::optional<glm::dmat4> posesParent) {

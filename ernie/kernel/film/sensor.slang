@@ -5,9 +5,10 @@
 // into channels (electrons, linear colour), and pixel filters run on those, in chain order, in
 // registers. Only the vars a frame holds are written, so intermediates never touch memory.
 //
-// Filters implement one of the interfaces below. The built-in ones (`Lens`, `Qe`, `Noise`, `Adc`,
-// `Cie`, `Exposure`) read the view's SensorUniforms; parameters of other filters will come from
-// their prims' inputs:* attributes.
+// Custom filters (`SensorFilterModel`) implement `IBandFilter` or `IPixelFilter`, in modules that
+// import this one and have no `module` declaration; their `Params` struct holds one float per
+// declared parameter, filled from their prims' inputs:* attributes. The built-in filters (`Lens`,
+// `Qe`, `Noise`, `Adc`, `Cie`, `Exposure`) read the view's SensorUniforms instead.
 //
 // One dispatch filters every view of a set of render targets, view `z` of the dispatch in their
 // layer `z` (a group of `bands` layers of the spectral images) with the uniforms of view
@@ -16,7 +17,8 @@
 // Bindings: 0 every view's SensorUniforms; inputs 1 spectral radiance (raster pixels),
 // 2 G-buffer normal, 3 G-buffer ids, 4 depth; outputs 5 SpectralRadiance (sensor pixels, one layer
 // per band), 6 Electrons, 7 RawDN, 8 HdrColor, 9 LdrColor, 10 DistanceToImagePlane,
-// 11 DistanceToCamera, 12 Normal, 13 PrimId, 14 InstanceId; every image one layer per view.
+// 11 DistanceToCamera, 12 Normal, 13 PrimId, 14 InstanceId, every image one layer per view;
+// 15 the custom filters' parameters.
 //
 // References:
 // - D. C. Brown, "Decentering Distortion of Lenses", Photogrammetric Engineering 32(3):444-462,
@@ -63,8 +65,10 @@ public struct SensorUniforms {
     public float4 colour[64];
     // Per band: mean electrons per unit radiance for each channel.
     public float4 qe[64];
+    // First band's lower wavelength and band width (nm), unused.
+    public float4 range;
     // To the views' stride in the buffer, 2304 bytes.
-    float4 padding[2];
+    float4 padding;
 }
 
 public struct SensorConstants {
@@ -88,6 +92,8 @@ public struct SensorConstants {
 [[vk::image_format("rgba32f")]] [[vk::binding(12, 0)]] RWTexture2DArray<float4> normalOut;
 [[vk::image_format("r32ui")]] [[vk::binding(13, 0)]] RWTexture2DArray<uint> primId;
 [[vk::image_format("r32ui")]] [[vk::binding(14, 0)]] RWTexture2DArray<uint> instanceId;
+// The custom filters' parameters, packed in chain order (`SensorPlan::params`).
+[[vk::binding(15, 0)]] public StructuredBuffer<float> filterParams;
 
 // The render vars a plan writes, one bit each in `kRenderVarNames` order (sensor_filters.h).
 public static const uint kHoldsSpectral = 1u << 0;
@@ -120,6 +126,28 @@ public struct PixelContext {
     public int slice(uint band) {
         return int(id.z * sensorViews[view].size.z + band);
     }
+
+    // The centre of band `band`, in nanometres.
+    public float wavelength(uint band) {
+        let range = sensorViews[view].range;
+        return range.x + (float(band) + 0.5) * range.y;
+    }
+
+    // A uniform number in (0, 1] for this pixel and `salt`, the same every frame (from the
+    // sensor's seed alone): for fixed patterns, such as hot pixels.
+    public float fixedRandom(uint salt) {
+        let seed = sensorViews[view].noise.y;
+        return uniform01(pcg3d(uint3(id.x, id.y, seed * 4u + salt * 2654435761u)).x);
+    }
+
+    // A uniform number in (0, 1] for this pixel and `salt`, new every frame (from the frame
+    // seed, which also differs per view): for temporal noise.
+    public float random(uint salt) {
+        let frame = sensorViews[view].noise.z;
+        return uniform01(
+            pcg3d(uint3(id.x ^ (frame * 9781u), id.y + frame * 6271u, salt * 2654435761u + 977u))
+                .x);
+    }
 }
 
 // The pixel at dispatch thread `id`, or false past the image.
@@ -139,14 +167,17 @@ public struct SensorPixel {
     public bool background;   // no prim at the pixel (prim id 0), or its ray leaves the image
 }
 
-// A filter on each band's radiance before integration, such as a transmission filter.
+// A filter on each band's radiance before integration, such as a transmission filter; band
+// `band` is centred on `pixel.wavelength(band)` nanometres.
 public interface IBandFilter {
-    static float apply(float radiance, uint band, PixelContext pixel, SensorPixel value);
+    associatedtype Params;
+    static float apply(float radiance, uint band, PixelContext pixel, Params params);
 }
 
-// A filter on one pixel's values after integration, in chain order.
+// A filter on one pixel's values of its domain after integration, in chain order.
 public interface IPixelFilter {
-    static void apply(inout SensorPixel value, PixelContext pixel);
+    associatedtype Params;
+    static void apply(inout SensorPixel value, PixelContext pixel, Params params);
 }
 
 // Folds the bands into channels: `accumulate` once per band in order, then `finish`.
@@ -362,7 +393,7 @@ float poisson(float mean, uint3 seed) {
 
 // Noise: per-pixel fixed patterns (PRNU gain and DSNU offset, from the seed alone) and temporal
 // photon shot noise and read noise (from the frame seed), clipped at the full well.
-public struct Noise : IPixelFilter {
+public struct Noise {
     public static void apply(inout SensorPixel value, PixelContext pixel) {
         let cam = pixel.uniforms();
         if (cam.noise.x == 0) {
@@ -386,7 +417,7 @@ public struct Noise : IPixelFilter {
 
 // ADC: digital numbers, electrons over the ISO-dependent electrons per DN plus the black level,
 // rounded and clipped to the ADC range.
-public struct Adc : IPixelFilter {
+public struct Adc {
     public static void apply(inout SensorPixel value, PixelContext pixel) {
         let cam = pixel.uniforms();
         let dn = clamp(floor(value.electrons / cam.adc.y + cam.adc.z + 0.5), float4(0.0),
@@ -416,7 +447,7 @@ float encodeSrgb(float linear) {
 
 // Exposure: the photographic output, HDR colour times USD's linear exposure scale, clipped to
 // [0, 1] and sRGB-encoded; background pixels show the clear colour.
-public struct Exposure : IPixelFilter {
+public struct Exposure {
     public static void apply(inout SensorPixel value, PixelContext pixel) {
         let cam = pixel.uniforms();
         let linear =

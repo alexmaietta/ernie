@@ -187,8 +187,9 @@ struct FrameParams {
     float meshLodError = 1.0f;
     Wireframe wireframe = Wireframe::Off;  ///< How triangle edges are drawn.
     ShadowSettings shadows;
-    /// The sensor filters to run (`CheckFilterChain`); empty runs `DefaultFilterChain`.
-    std::vector<SensorFilter> filters;
+    /// The sensor filters to run, with their inputs (`CheckFilterChain`); empty runs
+    /// `DefaultFilterChain`.
+    std::vector<SensorFilterStep> filters;
     /// The render vars wanted from the frame; empty for all. Only they are held, and filters
     /// that produce none of them do not run (the sensor fuses the rest, `PlanSensor`).
     std::vector<std::string_view> vars;

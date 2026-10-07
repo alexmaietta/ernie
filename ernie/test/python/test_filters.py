@@ -1,0 +1,65 @@
+import numpy as np
+import pytest
+
+import ernie
+from ernie import tokens
+
+GAIN = """
+import sensor;
+struct Gain : IPixelFilter {
+    struct Params { float scale; }
+    static void apply(inout SensorPixel value, PixelContext pixel, Params params) {
+        value.rgb *= params.scale;
+    }
+}
+"""
+
+
+def hdr_through(renderer, scene, types, inputs=None):
+    """HdrColor of the scene's camera through SensorFilter prims of `types`."""
+    paths = []
+    for i, kind in enumerate(types):
+        path = f"/Render/Filters/F{i}"
+        prim = scene.define(path, tokens.SENSOR_FILTER).set(tokens.FILTER_TYPE, kind)
+        for name, value in (inputs or {}).items():
+            if kind != "cie":
+                prim.set(f"inputs:{name}", value)
+        paths.append(ernie.Path(path))
+    scene.define("/Render/Vars/Hdr", tokens.RENDER_VAR).set(tokens.SOURCE_NAME, "HdrColor")
+    scene.define("/Render/Hdr", tokens.RENDER_PRODUCT).set(
+        tokens.CAMERA_REL, ernie.Path("/World/Camera")
+    ).set(tokens.RESOLUTION, (48, 48)).set(
+        tokens.ORDERED_VARS, [ernie.Path("/Render/Vars/Hdr")]
+    ).set(tokens.FILTERS, paths)
+    frame = renderer.step(scene, render_products=["/Render/Hdr"])["/Render/Hdr"].frames[0]
+    return np.array(frame.render_vars["/Render/Vars/Hdr"].map())
+
+
+def test_custom_filters_registered_from_python_run_in_chains(renderer, terrain_scene):
+    if "gain" not in renderer.sensor_filters:
+        renderer.add_sensor_filter(
+            "gain", "Gain", GAIN, kind="pixel", domain="rgb", params={"scale": 2.0}
+        )
+    assert renderer.sensor_filters[:6] == ["lens", "qe", "noise", "adc", "cie", "exposure"]
+    assert "gain" in renderer.sensor_filters
+    base = hdr_through(renderer, terrain_scene, ["cie"])
+    assert base[..., :3].max() > 0
+    expected = base.copy()
+    expected[..., :3] *= np.float32(3.0)
+    np.testing.assert_array_equal(
+        hdr_through(renderer, terrain_scene, ["cie", "gain"], {"scale": 3.0}), expected
+    )
+    assert renderer.take_validation_messages() == []
+
+
+def test_add_sensor_filter_rejects_bad_filters(renderer):
+    with pytest.raises(ValueError):
+        renderer.add_sensor_filter("bad1", "Gain", GAIN, kind="spatial")
+    with pytest.raises(ValueError):
+        renderer.add_sensor_filter("bad2", "Gain", GAIN, kind="pixel", domain="spectrum")
+    with pytest.raises(ValueError, match="failed to compile"):
+        renderer.add_sensor_filter(
+            "bad3", "Gain", GAIN.replace("params.scale", "nothing"), domain="rgb",
+            params={"scale": 1.0},
+        )
+    assert "bad3" not in renderer.sensor_filters
