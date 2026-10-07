@@ -141,6 +141,10 @@ void Camera::SetVerticalFov(double radians) {
 }
 
 CameraView Camera::RasterView(double overscan) const {
+    return RasterView(transform, overscan);
+}
+
+CameraView Camera::RasterView(const glm::dmat4& pose, double overscan) const {
     const double w = width;
     const double h = height;
     const double focal = FocalLengthPixels() / overscan;
@@ -150,9 +154,9 @@ CameraView Camera::RasterView(double overscan) const {
     view.aspect = static_cast<float>(w / h);
     view.nearPlane = static_cast<float>(nearPlane);
     view.farPlane = static_cast<float>(farPlane);
-    view.eye = glm::vec3(Eye());
-    view.forward = glm::vec3(Forward());
-    view.view = glm::mat4(glm::inverse(transform));
+    view.eye = glm::vec3(pose[3]);
+    view.forward = glm::vec3(glm::normalize(-glm::dvec3(pose[2])));
+    view.view = glm::mat4(glm::inverse(pose));
     view.projection =
         glm::perspectiveRH_ZO(view.verticalFov, view.aspect, view.nearPlane, view.farPlane);
     view.projection[2][0] = static_cast<float>(1.0 - 2.0 * centre.x / w);

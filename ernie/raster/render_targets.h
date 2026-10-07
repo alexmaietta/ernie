@@ -63,9 +63,10 @@ class RenderTargets : public FrameImages {
     /// Records the transitions that make the G-buffer and depth attachments.
     void PrepareGBuffer(VkCommandBuffer commands);
 
-    /// View `view`'s G-buffer and depth attachments for `BeginRendering`, clearing the ids to
-    /// "background", or keeping what an earlier pass drew with `load`.
-    RenderingTarget GBufferTarget(std::uint32_t view, bool load = false) const;
+    /// Every view's G-buffer and depth attachments for one layered `BeginRendering`, each view
+    /// drawing into its layer, clearing the ids to "background", or keeping what an earlier pass
+    /// drew with `load`.
+    RenderingTarget GBufferTarget(bool load = false) const;
 
     /// The views' hierarchical depth (Hi-Z) for occlusion culling, created on first use: per view,
     /// mips of the farthest depth below each texel, level 0 the largest power-of-two size within

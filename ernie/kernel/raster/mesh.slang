@@ -146,12 +146,27 @@ struct VertexOutput {
     nointerpolation uint item : ITEM;
 }
 
+// The vertex stage's outputs: the fragment stage's inputs (`VertexOutput`, in the same order)
+// and the view's layer of the G-buffer, for one layered pass over every view
+// (Uniforms.flags.z).
+struct LayeredVertexOutput {
+    float4 position : SV_Position;
+    float3 world : WORLD;
+    float3 normal : NORMAL;
+    float3 color : COLOR;
+    float3 barycentric : BARYCENTRIC;
+    nointerpolation uint instance : INSTANCE;
+    nointerpolation uint item : ITEM;
+    uint layer : SV_RenderTargetArrayIndex;
+}
+
 [shader("vertex")]
-VertexOutput meshVertexMain(uint vertexIndex : SV_VertexID, uint instanceIndex : SV_InstanceID,
+LayeredVertexOutput meshVertexMain(uint vertexIndex : SV_VertexID, uint instanceIndex : SV_InstanceID,
                             uint drawIndex : SV_DrawIndex) {
     let barycentric = float3[3](float3(1, 0, 0), float3(0, 1, 0), float3(0, 0, 1));
     let v = meshVertex(vertexIndex, instanceIndex, drawCall(drawIndex));
-    VertexOutput out;
+    LayeredVertexOutput out;
+    out.layer = u.flags.z;
     out.position = mul(u.viewProj, float4(v.world, 1.0));
     out.world = v.world;
     out.normal = v.normal;

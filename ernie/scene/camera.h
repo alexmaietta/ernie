@@ -156,6 +156,10 @@ struct Camera {
     /// the principal point and the clipping range.
     CameraView RasterView(double overscan = 1.0) const;
 
+    /// `RasterView` from camera-to-world `pose` in place of `transform`, such as one view of a
+    /// batch, without copying the camera.
+    CameraView RasterView(const glm::dmat4& pose, double overscan) const;
+
     /// USD's ratio between incident luminance and the normalised photographic output:
     /// responsivity * time * (iso / 100) * 2^exposure / fStop^2.
     double LinearExposureScale() const;

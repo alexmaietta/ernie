@@ -57,8 +57,9 @@ struct ShadingUniforms {
     float domeSh[9][4];
     float dome[SpectralBands::kMaxBands];
     std::uint32_t view[4];
+    float padding[20];  ///< To the views' stride, so shading reads them as one array.
 };
-static_assert(sizeof(ShadingUniforms) == 944, "ShadingUniforms must match shading.slang");
+static_assert(sizeof(ShadingUniforms) == 1024, "ShadingUniforms must match shading.slang");
 
 struct LightGpu {
     float position[4];
@@ -95,8 +96,9 @@ struct SensorUniforms {
     float clear[4];
     float colour[SpectralBands::kMaxBands][4];
     float qe[SpectralBands::kMaxBands][4];
+    float padding[8];  ///< To the views' stride, so the filters read them as one array.
 };
-static_assert(sizeof(SensorUniforms) == 2272, "SensorUniforms must match filters.slang");
+static_assert(sizeof(SensorUniforms) == 2304, "SensorUniforms must match filters.slang");
 
 /// Per-view uniforms sit in one buffer at multiples of this, the largest
 /// `minUniformBufferOffsetAlignment` Vulkan allows.
@@ -109,6 +111,8 @@ constexpr VkDeviceSize Aligned(VkDeviceSize bytes) {
 constexpr VkDeviceSize kUniformsStride = Aligned(sizeof(Uniforms));
 constexpr VkDeviceSize kShadingStride = Aligned(sizeof(ShadingUniforms));
 constexpr VkDeviceSize kSensorStride = Aligned(sizeof(SensorUniforms));
+static_assert(kShadingStride == sizeof(ShadingUniforms) && kSensorStride == sizeof(SensorUniforms),
+              "Shading and the filters index the views' uniforms as arrays");
 
 /// Samples per axis of the RGB-to-spectrum coefficient table.
 constexpr std::uint32_t kTableResolution = 17;
@@ -116,7 +120,7 @@ constexpr std::uint32_t kTableResolution = 17;
 constexpr VkShaderStageFlags kCompute = VK_SHADER_STAGE_COMPUTE_BIT;
 
 constexpr DescriptorBinding kShadingBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kCompute},
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {3, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
@@ -132,7 +136,7 @@ constexpr DescriptorBinding kShadingBindings[] = {
 };
 
 constexpr DescriptorBinding kFilterBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kCompute},
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {3, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
@@ -347,7 +351,7 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
       shadowSampler_(context, SamplerDesc{VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST,
                                           VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 1.0f, true}),
       poisson_(PoissonDisk(16)), shadingLayout_(context, kShadingBindings, 16),
-      filterLayout_(context, kFilterBindings), presentLayout_(context, kPresentBindings, 32),
+      filterLayout_(context, kFilterBindings, 16), presentLayout_(context, kPresentBindings, 32),
       hzbLayout_(context, kHzbBindings, 16), viewsLayout_(context, kViewsBindings, 48),
       poseCamera_(context, kPoseCameraBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                   BufferMemory::Device),
@@ -674,6 +678,8 @@ void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable*
         throw std::invalid_argument("The dome's radiance needs one value per camera band");
     }
     views_ = static_cast<std::uint32_t>(params.Views());
+    const std::uint32_t viewsPerTargets =
+        RenderTargets::MaxViews(context_, params.camera.bands.count);
     EnsureViewBuffers(views_);
     posesOnGpu_ = params.posesOnGpu;
     if (posesOnGpu_) {
@@ -767,6 +773,9 @@ void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable*
             uniforms.eye[3] = params.exposure;
             uniforms.flags[0] = static_cast<std::uint32_t>(params.wireframe);
             uniforms.flags[1] = viewShadowLayers_[v];
+            // Its layer of the render targets it draws into: a frame of more views renders them in
+            // chunks of `RenderTargets::MaxViews`.
+            uniforms.flags[2] = v % viewsPerTargets;
             if (viewSunCascades_[v] >= 0) {
                 // A view of a world with its own fitted map samples it in place of cascade 0.
                 const ShadowCascade& own = cascades_[static_cast<std::size_t>(viewSunCascades_[v])];
@@ -1183,16 +1192,17 @@ void RasterRenderer::RecordViews(VkCommandBuffer commands, RenderTargets& target
     const bool occlusion =
         std::any_of(drawables.begin(), drawables.end(),
                     [](const RasterDrawable* drawable) { return drawable->CullsOcclusion(); });
+    // One layered pass for all the views: each view's draws go to its layer (`Uniforms::flags`).
     const auto draw = [&](DrawPhase phase, bool load) {
         targets.PrepareGBuffer(commands);
+        BeginRendering(commands, targets.GBufferTarget(load));
         for (std::uint32_t v = 0; v < targets.Views(); ++v) {
-            BeginRendering(commands, targets.GBufferTarget(v, load));
             const RasterFrame frame = Frame(firstView + v);
             for (const RasterDrawable* drawable : drawables) {
                 drawable->RecordColor(commands, frame, firstView + v, phase);
             }
-            vkCmdEndRendering(commands);
         }
+        vkCmdEndRendering(commands);
     };
     ERNIE_ZONE("RecordViews");
     if (!occlusion) {
@@ -1344,67 +1354,57 @@ void RasterRenderer::ShadeAndFilter(VkCommandBuffer commands, RenderTargets& tar
                          &zero, 1, &all);
     ShaderBarrier(commands);
 
-    // Every pass reads and writes view `v`'s layers: one layer of the G-buffer, depth and the
-    // single-layer vars, one group of a layer per band of the spectral images.
-    const auto sampled = [](const GpuImage& image, std::uint32_t v) {
-        return DescriptorResource::Of(image.LayerView(v), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    // Every pass covers all the views in one dispatch, view `z` in layer `z` of each image (a
+    // group of a layer per band of the spectral ones) with uniforms `firstView + z`.
+    const auto sampled = [](const GpuImage& image) {
+        return DescriptorResource::Of(image.View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     };
-    const auto general = [](VkImageView view) {
-        return DescriptorResource::Of(view, VK_IMAGE_LAYOUT_GENERAL);
+    const auto general = [](const GpuImage& image) {
+        return DescriptorResource::Of(image.View(), VK_IMAGE_LAYOUT_GENERAL);
     };
     const std::uint32_t groupsX = Groups(extent_.width);
     const std::uint32_t groupsY = Groups(extent_.height);
     const std::uint32_t views = targets.Views();
     {
         ERNIE_GPU_ZONE(context_, commands, "Shading");
+        const DescriptorResource shading[] = {DescriptorResource::Of(shadingUniforms_),
+                                              sampled(targets.GBuffer(0)),
+                                              sampled(targets.GBuffer(1)),
+                                              sampled(targets.GBuffer(2)),
+                                              sampled(targets.Depth()),
+                                              DescriptorResource::Of(*materialTable_),
+                                              DescriptorResource::Of(sigmoidTable_.View()),
+                                              DescriptorResource::Of(tableSampler_),
+                                              general(targets.RasterRadiance()),
+                                              DescriptorResource::Of(lightTable_),
+                                              DescriptorResource::Of(lightShadowMaps_->View()),
+                                              DescriptorResource::Of(shadowSampler_),
+                                              DescriptorResource::Of(lightViewMatrices_)};
         for (const std::size_t model : modelsInUse_) {
             vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                               shadingPipelines_.at(model)->Handle());
-            const std::uint32_t constants[4] = {static_cast<std::uint32_t>(model), 0, 0, 0};
+            shadingLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, shading);
+            const std::uint32_t constants[4] = {static_cast<std::uint32_t>(model), firstView, 0, 0};
             shadingLayout_.PushConstants(commands, constants, sizeof(constants));
-            for (std::uint32_t v = 0; v < views; ++v) {
-                const std::vector<DescriptorResource> shading{
-                    DescriptorResource::Of(shadingUniforms_, (firstView + v) * kShadingStride,
-                                           sizeof(ShadingUniforms)),
-                    sampled(targets.GBuffer(0), v),
-                    sampled(targets.GBuffer(1), v),
-                    sampled(targets.GBuffer(2), v),
-                    sampled(targets.Depth(), v),
-                    DescriptorResource::Of(*materialTable_),
-                    DescriptorResource::Of(sigmoidTable_.View()),
-                    DescriptorResource::Of(tableSampler_),
-                    general(targets.RasterRadiance().GroupView(v)),
-                    DescriptorResource::Of(lightTable_),
-                    DescriptorResource::Of(lightShadowMaps_->View()),
-                    DescriptorResource::Of(shadowSampler_),
-                    DescriptorResource::Of(lightViewMatrices_)};
-                shadingLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, shading);
-                vkCmdDispatch(commands, groupsX, groupsY, 1);
-            }
+            vkCmdDispatch(commands, groupsX, groupsY, views);
         }
         ShaderBarrier(commands);
     }
 
     ERNIE_GPU_ZONE(context_, commands, "Sensor filters");
-
+    std::vector<DescriptorResource> filters{
+        DescriptorResource::Of(sensorUniforms_), general(targets.RasterRadiance()),
+        sampled(targets.GBuffer(0)), sampled(targets.GBuffer(2)), sampled(targets.Depth())};
+    for (const std::string_view name : RenderTargets::VarNames()) {
+        filters.push_back(general(targets.Bound(name)));
+    }
+    const std::uint32_t constants[4] = {firstView, 0, 0, 0};
     for (const SensorFilter filter : filters_) {
         vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                           filterPipelines_[static_cast<std::size_t>(filter)]->Handle());
-        for (std::uint32_t v = 0; v < views; ++v) {
-            std::vector<DescriptorResource> filters{
-                DescriptorResource::Of(sensorUniforms_, (firstView + v) * kSensorStride,
-                                       sizeof(SensorUniforms)),
-                general(targets.RasterRadiance().GroupView(v)), sampled(targets.GBuffer(0), v),
-                sampled(targets.GBuffer(2), v), sampled(targets.Depth(), v)};
-            for (const std::string_view name : RenderTargets::VarNames()) {
-                const GpuImage& image = targets.Bound(name);
-                filters.push_back(general(name == render_vars::kSpectralRadiance
-                                              ? image.GroupView(v)
-                                              : image.LayerView(v)));
-            }
-            filterLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, filters);
-            vkCmdDispatch(commands, groupsX, groupsY, 1);
-        }
+        filterLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, filters);
+        filterLayout_.PushConstants(commands, constants, sizeof(constants));
+        vkCmdDispatch(commands, groupsX, groupsY, views);
         ShaderBarrier(commands);
     }
 }

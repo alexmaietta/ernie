@@ -30,6 +30,14 @@ struct VertexOutput {
     float4 position : SV_Position;
 }
 
+// The vertex stage's outputs: the fragment stage's inputs (`VertexOutput`, in the same order)
+// and the view's layer of the G-buffer, for one layered pass over every view
+// (Uniforms.flags.z).
+struct LayeredVertexOutput {
+    float4 position : SV_Position;
+    uint layer : SV_RenderTargetArrayIndex;
+}
+
 struct GroundOutput {
     float4 normal : SV_Target0;
     float4 albedo : SV_Target1;
@@ -38,9 +46,10 @@ struct GroundOutput {
 }
 
 [shader("vertex")]
-VertexOutput vertexMain(uint vertexIndex : SV_VertexID) {
+LayeredVertexOutput vertexMain(uint vertexIndex : SV_VertexID) {
     let uv = float2(float((vertexIndex << 1) & 2), float(vertexIndex & 2));
-    VertexOutput out;
+    LayeredVertexOutput out;
+    out.layer = u.flags.z;
     out.position = float4(uv * 2.0 - 1.0, 0.5, 1.0);
     return out;
 }

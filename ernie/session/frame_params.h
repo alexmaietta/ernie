@@ -223,9 +223,10 @@ struct FrameParams {
         return result;
     }
 
-    /// The raster view the passes draw view `view` with, `ViewCamera(view).RasterView(overscan)`.
+    /// The raster view the passes draw view `view` with, `ViewCamera(view).RasterView(overscan)`
+    /// without copying the camera.
     CameraView View(std::size_t view = 0) const {
-        return ViewCamera(view).RasterView(overscan);
+        return camera.RasterView(poses.empty() ? camera.transform : poses.at(view), overscan);
     }
 };
 

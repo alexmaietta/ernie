@@ -12,7 +12,8 @@ public struct Uniforms {
     // xyz: camera position, w: unused.
     public float4 eye;
     // x: wireframe (0 off, 1 overlay, 2 hidden line), y: the view's first layer of the sun's
-    // shadow map (a batch's views each read their world's).
+    // shadow map (a batch's views each read their world's), z: the view's layer of the render
+    // targets, which G-buffer vertex shaders draw into (SV_RenderTargetArrayIndex).
     public uint4 flags;
     // A batch view's own sun shadow map, fitted to its world, in place of cascade 0's when
     // `sunShadow.z` is 1: its view-projection, then its texel size and depth span in world units.

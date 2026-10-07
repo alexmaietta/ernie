@@ -302,7 +302,7 @@ void BeginRendering(VkCommandBuffer commands, const RenderingTarget& target) {
     depth.clearValue.depthStencil = {1.0f, 0};
     VkRenderingInfo info{VK_STRUCTURE_TYPE_RENDERING_INFO};
     info.renderArea = {{0, 0}, target.extent};
-    info.layerCount = 1;
+    info.layerCount = target.layers;
     info.colorAttachmentCount = static_cast<std::uint32_t>(colors.size());
     info.pColorAttachments = colors.data();
     info.pDepthAttachment = target.depth != VK_NULL_HANDLE ? &depth : nullptr;

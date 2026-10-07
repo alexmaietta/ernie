@@ -149,6 +149,9 @@ struct RenderingTarget {
     std::vector<VkClearColorValue> clearColors;
     /// Keep the depth attachment's contents instead of clearing it to 1.
     bool loadDepth = false;
+    /// Layers rendered at once, by attachments that view as many: layered rendering, where each
+    /// primitive picks its layer (`SV_RenderTargetArrayIndex`).
+    std::uint32_t layers = 1;
 };
 
 /// Records a barrier moving every subresource of `image` from `from` to `to`; waits for and makes

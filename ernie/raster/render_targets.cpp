@@ -42,9 +42,11 @@ RenderTargets::RenderTargets(const VulkanContext& context, VkExtent2D extent, in
                                     std::to_string(bands) + " bands, not " + std::to_string(views));
     }
     for (std::size_t i = 0; i < gbuffer_.size(); ++i) {
+        // Arrays even for one view, so shading reads every view's layer in one dispatch.
         gbuffer_[i] = std::make_unique<GpuImage>(
             context, ImageDesc{extent.width, extent.height, views, 1, kGBufferFormats[i],
-                               VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT});
+                               VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                               false, true});
     }
     // An array even for one view, so a depth pyramid builds from every view's layer at once.
     depth_ = std::make_unique<GpuImage>(
@@ -61,13 +63,14 @@ RenderTargets::RenderTargets(const VulkanContext& context, VkExtent2D extent, in
         const bool held = std::find(held_.begin(), held_.end(), kVarNames[i]) != held_.end();
         holds_.push_back(held);
         // A placeholder has a texel per view (a group of them per view for SpectralRadiance), so
-        // passes bind it like the image it stands for.
+        // passes bind it like the image it stands for; each is an array, as the filters write
+        // every view's layer in one dispatch.
         const std::uint32_t width = held ? extent.width : 1;
         const std::uint32_t height = held ? extent.height : 1;
         vars_.push_back(std::make_unique<GpuImage>(
             context, ImageDesc{width, height, spectral ? views * bandLayers : views, 1,
                                kVarFormats[i], kStorage, held && shared && !spectral && views == 1,
-                               spectral, spectral ? bandLayers : 0u}));
+                               true, spectral ? bandLayers : 0u}));
     }
 }
 
@@ -92,18 +95,19 @@ GpuImage& RenderTargets::Hzb() {
     return *hzb_;
 }
 
-RenderingTarget RenderTargets::GBufferTarget(std::uint32_t view, bool load) const {
+RenderingTarget RenderTargets::GBufferTarget(bool load) const {
     RenderingTarget target;
     target.loadColor = load;
     target.loadDepth = load;
     for (const std::unique_ptr<GpuImage>& image : gbuffer_) {
-        target.colors.push_back(image->LayerView(view));
+        target.colors.push_back(image->View());
     }
     VkClearColorValue background{};
     background.uint32[0] = 0xFFFFFFFFu;
     target.clearColors = {VkClearColorValue{}, VkClearColorValue{}, background};
-    target.depth = depth_->LayerView(view);
+    target.depth = depth_->View();
     target.extent = extent_;
+    target.layers = views_;
     return target;
 }
 

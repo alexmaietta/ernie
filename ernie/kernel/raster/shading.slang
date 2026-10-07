@@ -14,9 +14,14 @@
 // map's irradiance over pi, D, from spherical harmonics, diffusely. Unlit pixels get
 // L = E / pi * albedo.
 //
-// Bindings: 0 ShadingUniforms, 1 G-buffer normal, 2 G-buffer albedo, 3 G-buffer ids, 4 depth,
-// 5 materials, 6 RGB-to-spectrum coefficient table, 7 its sampler, 8 spectral radiance, 9 lights,
-// 10 the lights' shadow maps, 11 their comparison sampler, 12 their view-projections.
+// One dispatch shades every view of a set of render targets, view `z` of the dispatch in their
+// layer `z` (a group of `bands` layers of the spectral image) with the uniforms of view
+// `firstView + z`.
+//
+// Bindings: 0 every view's ShadingUniforms, 1 G-buffer normal, 2 G-buffer albedo, 3 G-buffer ids,
+// 4 depth (one layer per view each), 5 materials, 6 RGB-to-spectrum coefficient table, 7 its
+// sampler, 8 spectral radiance, 9 lights, 10 the lights' shadow maps, 11 their comparison sampler,
+// 12 their view-projections.
 import brdf;
 
 static const uint kUnlit = 1;
@@ -45,6 +50,8 @@ struct ShadingUniforms {
     // x: the lights this view sees, a bit per light (a batch's views see their world's and the
     // shared ones); yzw unused.
     uint4 view;
+    // To the views' stride in the buffer, 1024 bytes.
+    float4 padding[5];
 }
 
 static const uint kMaxLights = 16;
@@ -77,16 +84,16 @@ struct MaterialGpu {
 }
 
 struct ShadingConstants {
-    // x: index of the model this dispatch shades.
+    // x: index of the model this dispatch shades, y: the first view's uniforms, zw unused.
     uint4 model;
 }
 
-[[vk::binding(0, 0)]] ConstantBuffer<ShadingUniforms> sh;
+[[vk::binding(0, 0)]] StructuredBuffer<ShadingUniforms> shadingViews;
 [[vk::push_constant]] ConstantBuffer<ShadingConstants> pass;
-[[vk::binding(1, 0)]] Texture2D<float4> gNormal;
-[[vk::binding(2, 0)]] Texture2D<float4> gAlbedo;
-[[vk::binding(3, 0)]] Texture2D<uint4> gIds;
-[[vk::binding(4, 0)]] Texture2D<float> gDepth;
+[[vk::binding(1, 0)]] Texture2DArray<float4> gNormal;
+[[vk::binding(2, 0)]] Texture2DArray<float4> gAlbedo;
+[[vk::binding(3, 0)]] Texture2DArray<uint4> gIds;
+[[vk::binding(4, 0)]] Texture2DArray<float> gDepth;
 [[vk::binding(5, 0)]] StructuredBuffer<MaterialGpu> materials;
 // Jakob-Hanika sigmoid coefficients (c0, c1, c2) over linear RGB in [0, 1]^3: red along x, green
 // along y and blue across layers, at `size.z` samples per axis.
@@ -97,6 +104,10 @@ struct ShadingConstants {
 [[vk::binding(10, 0)]] Texture2DArray<float> lightShadowMaps;
 [[vk::binding(11, 0)]] SamplerComparisonState lightShadowSampler;
 [[vk::binding(12, 0)]] StructuredBuffer<float4x4> lightViews;
+
+// The uniforms of the view this thread shades (`shadeMain` sets it).
+static uint shadedView;
+#define sh shadingViews[shadedView]
 
 float bandValue(float4 values[16], uint band) {
     return values[band / 4][band % 4];
@@ -270,10 +281,11 @@ float3 radianceFactors(float3 n, float3 l, float3 v, float3 albedo, BrdfParams p
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void shadeMain(uint3 id : SV_DispatchThreadID) {
+    shadedView = pass.model.y + id.z;
     if (id.x >= sh.size.x || id.y >= sh.size.y) {
         return;
     }
-    let pixel = int3(id.xy, 0);
+    let pixel = int4(id.xyz, 0);
     let ids = gIds.Load(pixel);
     if (ids.x == kBackground) {
         return;
@@ -378,7 +390,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             radiance += lightScales[k] * lightSpectrum / PI * factors;
         }
         for (uint k = 0; k < 3 && first + k < bands; ++k) {
-            spectral[int3(id.xy, first + k)] = radiance[k];
+            spectral[int3(id.xy, id.z * bands + first + k)] = radiance[k];
         }
     }
 }

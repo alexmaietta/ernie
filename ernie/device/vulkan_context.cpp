@@ -248,8 +248,8 @@ std::unique_ptr<VulkanContext> VulkanContext::Create(const VulkanContextOptions&
         const bool suitable = properties.apiVersion >= VK_API_VERSION_1_3 && family < familyCount &&
                               features13.dynamicRendering && features13.synchronization2 &&
                               features13.shaderDemoteToHelperInvocation &&
-                              features12.timelineSemaphore && features11.shaderDrawParameters &&
-                              extensionsPresent;
+                              features12.timelineSemaphore && features12.shaderOutputLayer &&
+                              features11.shaderDrawParameters && extensionsPresent;
         if (!suitable) {
             rejected += std::string(" ") + properties.deviceName + ";";
             continue;
@@ -348,6 +348,8 @@ std::unique_ptr<VulkanContext> VulkanContext::Create(const VulkanContextOptions&
     VkPhysicalDeviceVulkan12Features features12{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
     features12.timelineSemaphore = VK_TRUE;
+    // Layered rendering: a batch's views draw their G-buffers in one pass, each into its layer.
+    features12.shaderOutputLayer = VK_TRUE;
     features12.bufferDeviceAddress = supported12.bufferDeviceAddress;
     features12.pNext = &features13;
     VkPhysicalDeviceVulkan11Features features11{
