@@ -16,7 +16,7 @@ inline constexpr char kFrameSlang[] = R"slang(@ERNIE_RASTER_FRAME_SLANG@)slang";
 
 /// Spectral shading, sensor filters and the present pass.
 inline constexpr char kShadingSlang[] = R"slang(@ERNIE_RASTER_SHADING_SLANG@)slang";
-inline constexpr char kFiltersSlang[] = R"slang(@ERNIE_FILM_FILTERS_SLANG@)slang";
+inline constexpr char kSensorSlang[] = R"slang(@ERNIE_FILM_SENSOR_SLANG@)slang";
 inline constexpr char kPresentSlang[] = R"slang(@ERNIE_RASTER_PRESENT_SLANG@)slang";
 
 /// The infinite ground plane's pass.

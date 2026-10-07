@@ -100,44 +100,15 @@ std::vector<std::string_view> RequiredVars(std::span<const std::string_view> req
     if (requested.empty()) {
         return {kRenderVarNames.begin(), kRenderVarNames.end()};
     }
-    const auto has = [&](std::string_view name) {
-        return std::find(requested.begin(), requested.end(), name) != requested.end();
-    };
+    // The sensor computes every var from the raster radiance in one pass, keeping what a var is
+    // made from in registers, so a frame holds just the requested vars, in binding order.
     std::vector<std::string_view> vars;
     for (const std::string_view name : kRenderVarNames) {
-        // Every sensor var derives from SpectralRadiance, RawDN from Electrons, and LdrColor from
-        // HdrColor, with PrimId telling it the background.
-        const bool needed = has(name) ||
-                            (name == render_vars::kSpectralRadiance &&
-                             (has(render_vars::kElectrons) || has(render_vars::kRawDn) ||
-                              has(render_vars::kHdrColor) || has(render_vars::kLdrColor))) ||
-                            (name == render_vars::kElectrons && has(render_vars::kRawDn)) ||
-                            (name == render_vars::kHdrColor && has(render_vars::kLdrColor)) ||
-                            (name == render_vars::kPrimId && has(render_vars::kLdrColor));
-        if (needed) {
+        if (std::find(requested.begin(), requested.end(), name) != requested.end()) {
             vars.push_back(name);
         }
     }
     return vars;
-}
-
-std::vector<SensorFilter> FiltersFor(std::span<const SensorFilter> chain,
-                                     std::span<const std::string_view> vars) {
-    const auto has = [&](std::string_view name) {
-        return std::find(vars.begin(), vars.end(), name) != vars.end();
-    };
-    std::vector<SensorFilter> filters;
-    for (const SensorFilter filter : chain) {
-        const SensorFilter one[] = {filter};
-        std::vector<std::string_view> written = VarsWrittenBy(one);
-        if (filter == SensorFilter::Noise) {
-            written.push_back(render_vars::kElectrons);
-        }
-        if (std::any_of(written.begin(), written.end(), has)) {
-            filters.push_back(filter);
-        }
-    }
-    return filters;
 }
 
 }  // namespace ernie

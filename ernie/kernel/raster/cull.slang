@@ -176,7 +176,7 @@ bool occluded(Placed placed, uint view, uint layer) {
             return false;  // reaches behind the camera: keep it
         }
         let ndc = clip.xyz / clip.w;
-        // Image rows run down while NDC y runs up (filters.slang's lens).
+        // Image rows run down while NDC y runs up (sensor.slang's lens).
         let uv = float2(0.5 * ndc.x + 0.5, 0.5 - 0.5 * ndc.y);
         low = min(low, uv);
         high = max(high, uv);

@@ -189,8 +189,8 @@ struct FrameParams {
     ShadowSettings shadows;
     /// The sensor filters to run (`CheckFilterChain`); empty runs `DefaultFilterChain`.
     std::vector<SensorFilter> filters;
-    /// The render vars wanted from the frame; empty for all. Filters that produce none of them
-    /// (nor what they need, `RequiredVars`) do not run.
+    /// The render vars wanted from the frame; empty for all. Only they are held, and filters
+    /// that produce none of them do not run (the sensor fuses the rest, `PlanSensor`).
     std::vector<std::string_view> vars;
     glm::vec3 clearColor{0.0f};  ///< Linear display colour of the background in LdrColor.
     /// The frame number temporal noise derives from (`FrameSeed`): rendering the same frame again

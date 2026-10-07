@@ -6,7 +6,7 @@ set(ernie_shaders
     closure/lommel_seeliger.slang
     closure/lunar_lambert.slang
     closure/oren_nayar.slang
-    film/filters.slang
+    film/sensor.slang
     raster/cull.slang
     raster/hzb.slang
     raster/frame.slang

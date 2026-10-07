@@ -98,7 +98,7 @@ struct SensorUniforms {
     float qe[SpectralBands::kMaxBands][4];
     float padding[8];  ///< To the views' stride, so the filters read them as one array.
 };
-static_assert(sizeof(SensorUniforms) == 2304, "SensorUniforms must match filters.slang");
+static_assert(sizeof(SensorUniforms) == 2304, "SensorUniforms must match sensor.slang");
 
 /// Per-view uniforms sit in one buffer at multiples of this, the largest
 /// `minUniformBufferOffsetAlignment` Vulkan allows.
@@ -206,9 +206,6 @@ const PresentMode* PresentModeOf(std::string_view var) {
     }
     return nullptr;
 }
-
-constexpr std::array<const char*, 6> kFilterEntries{"lensMain", "qeMain",  "noiseMain",
-                                                    "adcMain",  "cieMain", "exposureMain"};
 
 /// Jakob-Hanika coefficients over a `kTableResolution`^3 grid of linear RGB, red along x, green
 /// along y, blue across layers, as RGBA32F texels; computed once per process.
@@ -398,12 +395,6 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
         sigmoidTable_.Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     });
 
-    const std::vector<ShaderModuleSource> filterModules{{"filters", shaders::kFiltersSlang}};
-    for (std::size_t i = 0; i < kSensorFilters.size(); ++i) {
-        const std::vector<std::uint32_t> spirv =
-            compiler_.CompileSpirv(filterModules, kFilterEntries[i]);
-        filterPipelines_[i] = std::make_unique<ComputePipeline>(context_, filterLayout_, spirv);
-    }
     const std::vector<ShaderModuleSource> hzbModules{{"hzb", shaders::kHzbSlang}};
     hzbPipeline_ = std::make_unique<ComputePipeline>(context_, hzbLayout_,
                                                      compiler_.CompileSpirv(hzbModules, "hzbMain"));
@@ -826,11 +817,12 @@ void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable*
         params.sunIrradiance.size() != static_cast<std::size_t>(params.camera.bands.count)) {
         throw std::invalid_argument("The sun's irradiance needs one value per camera band");
     }
-    // Only the filters producing the wanted vars, or what those read, run.
+    // Only the filters producing the wanted vars run, fused into one kernel that writes only them.
     requiredVars_ = RequiredVars(params.vars);
-    filters_ =
-        FiltersFor(CheckFilterChain(params.filters.empty() ? DefaultFilterChain() : params.filters),
-                   requiredVars_);
+    sensorPlan_ =
+        PlanSensor(params.filters.empty() ? DefaultFilterChain() : params.filters, requiredVars_);
+    filters_ = sensorPlan_.filters;
+    SensorPipeline(sensorPlan_);
     bands_ = params.camera.bands;
     extent_ = {params.camera.width, params.camera.height};
     WriteMaterialTable();
@@ -997,19 +989,6 @@ void RasterRenderer::WriteSensor(const FrameParams& params) {
     sensor.noise[0] = model.noise ? 1u : 0u;
     sensor.noise[1] = model.seed;
     sensor.noise[2] = FrameSeed(model.seed, params.stream, params.frame);
-    // The vars the lens filter writes when the frame holds them, one bit each (filters.slang).
-    const std::string_view geometry[] = {render_vars::kDistanceToImagePlane,
-                                         render_vars::kDistanceToCamera,
-                                         render_vars::kNormal,
-                                         render_vars::kPrimId,
-                                         render_vars::kInstanceId,
-                                         render_vars::kSpectralRadiance};
-    for (std::uint32_t bit = 0; bit < std::size(geometry); ++bit) {
-        if (std::find(requiredVars_.begin(), requiredVars_.end(), geometry[bit]) !=
-            requiredVars_.end()) {
-            sensor.noise[3] |= 1u << bit;
-        }
-    }
     sensor.clear[0] = params.clearColor.r;
     sensor.clear[1] = params.clearColor.g;
     sensor.clear[2] = params.clearColor.b;
@@ -1401,14 +1380,29 @@ void RasterRenderer::ShadeAndFilter(VkCommandBuffer commands, RenderTargets& tar
         filters.push_back(general(targets.Bound(name)));
     }
     const std::uint32_t constants[4] = {firstView, 0, 0, 0};
-    for (const SensorFilter filter : filters_) {
-        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
-                          filterPipelines_[static_cast<std::size_t>(filter)]->Handle());
-        filterLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, filters);
-        filterLayout_.PushConstants(commands, constants, sizeof(constants));
-        vkCmdDispatch(commands, groupsX, groupsY, views);
-        ShaderBarrier(commands);
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                      sensorPipelines_.at(sensorPlan_.Key())->Handle());
+    filterLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, filters);
+    filterLayout_.PushConstants(commands, constants, sizeof(constants));
+    vkCmdDispatch(commands, groupsX, groupsY, views);
+    ShaderBarrier(commands);
+}
+
+const ComputePipeline& RasterRenderer::SensorPipeline(const SensorPlan& plan) {
+    const std::string key = plan.Key();
+    auto it = sensorPipelines_.find(key);
+    if (it == sensorPipelines_.end()) {
+        ERNIE_ZONE("Compile sensor kernel");
+        const std::string source = plan.Source();
+        const std::vector<ShaderModuleSource> modules{{"sensor", shaders::kSensorSlang},
+                                                      {"sensorPlan", source}};
+        it = sensorPipelines_
+                 .emplace(key, std::make_unique<ComputePipeline>(
+                                   context_, filterLayout_,
+                                   compiler_.CompileSpirv(modules, "sensorMain")))
+                 .first;
     }
+    return *it->second;
 }
 
 void RasterRenderer::Present(VkCommandBuffer commands, RenderTargets& targets,

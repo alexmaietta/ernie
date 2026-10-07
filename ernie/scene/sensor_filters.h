@@ -32,7 +32,8 @@ inline constexpr std::array<std::string_view, 10> kRenderVarNames{
     render_vars::kInstanceId};
 
 /// The built-in sensor filters a render product runs in order on its spectral radiance, as
-/// Chrono::Sensor's filter lists:
+/// Chrono::Sensor's filter lists; the rasterizer fuses a chain into one kernel (`PlanSensor`), so
+/// the vars below are written only when held:
 /// - `Lens`: resamples the radiance into sensor pixels through the inverse lens distortion, with
 ///   cos^4 vignetting; writes SpectralRadiance and the geometry vars. Always runs first.
 /// - `Qe`: mean electrons per channel (camera equation, quantum efficiency, dark current); writes
@@ -66,13 +67,9 @@ std::vector<SensorFilter> CheckFilterChain(std::span<const SensorFilter> chain);
 /// The render vars `chain` writes.
 std::vector<std::string_view> VarsWrittenBy(std::span<const SensorFilter> chain);
 
-/// The render vars a frame must hold to produce `requested`: those, and the ones the filters
-/// producing them read (SpectralRadiance for every sensor var, Electrons for RawDN, HdrColor and
-/// PrimId for LdrColor). Empty `requested` means every var.
+/// The render vars a frame holds to produce `requested`: those, in `kRenderVarNames` order, as
+/// the sensor keeps what they are made from (SpectralRadiance, Electrons, HdrColor) in registers.
+/// Empty `requested` means every var.
 std::vector<std::string_view> RequiredVars(std::span<const std::string_view> requested);
-
-/// The filters of `chain` that write at least one of `vars` (Noise with Electrons), in order.
-std::vector<SensorFilter> FiltersFor(std::span<const SensorFilter> chain,
-                                     std::span<const std::string_view> vars);
 
 }  // namespace ernie

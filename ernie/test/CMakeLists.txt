@@ -10,6 +10,7 @@ ernie_add_test_suite(
     geometry_primitives_test.cpp
     raster_delegate_test.cpp
     raster_poisson_disk_test.cpp
+    raster_sensor_plan_test.cpp
     raster_shadow_cascades_test.cpp
     scene_brdf_test.cpp
     scene_camera_test.cpp

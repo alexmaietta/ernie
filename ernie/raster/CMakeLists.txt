@@ -8,6 +8,7 @@ ernie_add_library(
     poisson_disk.cpp
     render_targets.cpp
     renderer.cpp
+    sensor_plan.cpp
     shadow_cascades.cpp
     terrain_drawable.cpp
     PUBLIC

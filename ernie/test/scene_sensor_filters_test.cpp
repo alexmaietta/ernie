@@ -65,31 +65,13 @@ TEST(SensorFilters, VarsWrittenByFollowTheChain) {
     }
 }
 
-TEST(RequiredVars, AddsWhatTheRequestedVarsAreMadeFrom) {
+TEST(RequiredVars, HoldsJustTheRequestedVarsInBindingOrder) {
     using namespace ernie::render_vars;
-    const std::string_view depth[] = {kDistanceToCamera};
-    EXPECT_EQ(ernie::RequiredVars(depth), std::vector<std::string_view>{kDistanceToCamera});
-    const std::string_view colour[] = {kLdrColor};
-    const std::vector<std::string_view> forColour = ernie::RequiredVars(colour);
-    for (const std::string_view name : {kSpectralRadiance, kHdrColor, kLdrColor, kPrimId}) {
-        EXPECT_NE(std::find(forColour.begin(), forColour.end(), name), forColour.end()) << name;
-    }
-    EXPECT_EQ(std::find(forColour.begin(), forColour.end(), kElectrons), forColour.end());
-    const std::string_view raw[] = {kRawDn};
-    const std::vector<std::string_view> forRaw = ernie::RequiredVars(raw);
-    EXPECT_NE(std::find(forRaw.begin(), forRaw.end(), kElectrons), forRaw.end());
+    const std::string_view colour[] = {kLdrColor, kDistanceToCamera};
+    EXPECT_EQ(ernie::RequiredVars(colour),
+              (std::vector<std::string_view>{kLdrColor, kDistanceToCamera}))
+        << "what LdrColor is made from stays in the sensor kernel's registers";
+    const std::string_view raw[] = {kRawDn, kSpectralRadiance};
+    EXPECT_EQ(ernie::RequiredVars(raw), (std::vector<std::string_view>{kSpectralRadiance, kRawDn}));
     EXPECT_EQ(ernie::RequiredVars({}).size(), ernie::kRenderVarNames.size()) << "empty is all";
-}
-
-TEST(FiltersFor, RunsOnlyTheFiltersTheVarsNeed) {
-    using ernie::SensorFilter;
-    const std::vector<SensorFilter> chain = ernie::DefaultFilterChain();
-    const std::string_view colour[] = {ernie::render_vars::kLdrColor};
-    EXPECT_EQ(
-        ernie::FiltersFor(chain, ernie::RequiredVars(colour)),
-        (std::vector<SensorFilter>{SensorFilter::Lens, SensorFilter::Cie, SensorFilter::Exposure}));
-    const std::string_view raw[] = {ernie::render_vars::kRawDn};
-    EXPECT_EQ(ernie::FiltersFor(chain, ernie::RequiredVars(raw)),
-              (std::vector<SensorFilter>{SensorFilter::Lens, SensorFilter::Qe, SensorFilter::Noise,
-                                         SensorFilter::Adc}));
 }

@@ -8,6 +8,7 @@
 #include "ernie/raster/drawable.h"
 #include "ernie/raster/material.h"
 #include "ernie/raster/render_targets.h"
+#include "ernie/raster/sensor_plan.h"
 #include "ernie/scene/brdf.h"
 
 #include <glm/glm.hpp>
@@ -284,6 +285,8 @@ class RasterRenderer {
     void CreateLightShadowMaps(std::uint32_t resolution, std::uint32_t layers);
     void WriteLights(const FrameParams& params, const std::optional<Bounds3>& bounds);
     const ComputePipeline& ShadingPipeline(std::size_t model);
+    /// The fused sensor kernel of `plan`, compiled on first use.
+    const ComputePipeline& SensorPipeline(const SensorPlan& plan);
     void WriteMaterialTable();
     void WriteShading(const FrameParams& params);
     void WriteSensor(const FrameParams& params);
@@ -348,7 +351,9 @@ class RasterRenderer {
     PipelineLayout shadingLayout_;
     std::map<std::size_t, std::unique_ptr<ComputePipeline>> shadingPipelines_;
     PipelineLayout filterLayout_;
-    std::array<std::unique_ptr<ComputePipeline>, kSensorFilters.size()> filterPipelines_;
+    /// The fused sensor kernel of each plan used so far, by `SensorPlan::Key`.
+    std::map<std::string, std::unique_ptr<ComputePipeline>> sensorPipelines_;
+    SensorPlan sensorPlan_;  ///< The last `Update`'s.
     PipelineLayout presentLayout_;
     PipelineLayout hzbLayout_;
     std::unique_ptr<ComputePipeline> hzbPipeline_;
