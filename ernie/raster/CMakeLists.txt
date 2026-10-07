@@ -1,0 +1,16 @@
+ernie_add_library(
+    ernie_raster
+    SOURCES
+    delegate.cpp
+    ground_drawable.cpp
+    material.cpp
+    mesh_drawable.cpp
+    poisson_disk.cpp
+    render_targets.cpp
+    renderer.cpp
+    shadow_cascades.cpp
+    terrain_drawable.cpp
+    PUBLIC
+    ernie_session
+    PRIVATE
+    ernie_meshoptimizer)

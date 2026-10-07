@@ -1,0 +1,12 @@
+ernie_add_library(
+    ernie_util
+    SOURCES
+    image.cpp
+    spectrum.cpp
+    tensor.cpp
+    PUBLIC
+    ernie_glm
+    ernie_dlpack
+    PRIVATE
+    ernie_stb
+    ernie_tinyexr)

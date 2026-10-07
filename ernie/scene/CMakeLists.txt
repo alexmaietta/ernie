@@ -1,0 +1,12 @@
+ernie_add_library(
+    ernie_scene
+    SOURCES
+    brdf.cpp
+    camera.cpp
+    orbit_controller.cpp
+    path.cpp
+    scene.cpp
+    schema.cpp
+    sensor_filters.cpp
+    PUBLIC
+    ernie_util)

@@ -1,0 +1,9 @@
+ernie_add_library(
+    ernie_geometry
+    SOURCES
+    frustum.cpp
+    lod_quadtree.cpp
+    mesh_data.cpp
+    primitives.cpp
+    PUBLIC
+    ernie_util)

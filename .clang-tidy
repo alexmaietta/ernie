@@ -14,5 +14,5 @@ Checks: >
   -bugprone-easily-swappable-parameters
 
 WarningsAsErrors: ''
-HeaderFilterRegex: '.*/(ernie/include/ernie|ernie/src|gui/include/ernie/gui|gui/src)/.*'
+HeaderFilterRegex: '.*/ernie/[a-z_]+/[^/]+\\.h$'
 FormatStyle: file

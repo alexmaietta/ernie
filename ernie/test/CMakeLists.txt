@@ -1,0 +1,89 @@
+include("${ERNIE_SOURCE_DIR}/cmake/ErnieTesting.cmake")
+
+ernie_add_test_suite(
+    unit
+    SOURCES
+    device_shader_compiler_test.cpp
+    geometry_frustum_test.cpp
+    geometry_lod_quadtree_test.cpp
+    geometry_mesh_data_test.cpp
+    geometry_primitives_test.cpp
+    raster_delegate_test.cpp
+    raster_poisson_disk_test.cpp
+    raster_shadow_cascades_test.cpp
+    scene_brdf_test.cpp
+    scene_camera_test.cpp
+    scene_orbit_controller_test.cpp
+    scene_path_test.cpp
+    scene_scene_test.cpp
+    scene_schema_test.cpp
+    scene_sensor_filters_test.cpp
+    session_delegate_test.cpp
+    session_lights_test.cpp
+    session_resolve_test.cpp
+    session_sampling_test.cpp
+    util_image_test.cpp
+    util_spectrum_test.cpp
+    util_tensor_test.cpp
+    LIBRARIES
+    ernie
+    ernie_stb
+    ernie_tinyexr
+    DEFINITIONS
+    ERNIE_TEST_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+ernie_add_test_suite(
+    gpu
+    SOURCES
+    device_cuda_interop_test.cpp
+    device_pipeline_test.cpp
+    device_vulkan_context_test.cpp
+    raster_delegate_gpu_test.cpp
+    raster_hex_tiling_gpu_test.cpp
+    raster_mesh_drawable_test.cpp
+    raster_terrain_drawable_test.cpp
+    scene_brdf_vulkan_test.cpp
+    LIBRARIES
+    ernie
+    LABELS
+    gpu
+    DEFINITIONS
+    ERNIE_SHADER_DIR="${ERNIE_SOURCE_DIR}/ernie/kernel")
+
+if(TARGET _ernie)
+    execute_process(
+        COMMAND "${Python_EXECUTABLE}" -c "import pytest, numpy"
+        RESULT_VARIABLE ernie_python_test_deps_missing
+        OUTPUT_QUIET ERROR_QUIET)
+    if(ernie_python_test_deps_missing)
+        message(WARNING "pytest or numpy not found for ${Python_EXECUTABLE}; skipping Ernie's "
+                        "Python tests")
+    else()
+        add_test(NAME ernie.python.pytest
+                 COMMAND "${Python_EXECUTABLE}" -m pytest -q -p no:cacheprovider
+                         "${CMAKE_CURRENT_SOURCE_DIR}/python")
+        set_tests_properties(
+            ernie.python.pytest PROPERTIES ENVIRONMENT "PYTHONPATH=${CMAKE_BINARY_DIR}/python"
+                                           LABELS "gpu;python")
+    endif()
+endif()
+
+if(TARGET ernie_app)
+    ernie_add_test_suite(
+        app
+        SOURCES
+        app_panel_test.cpp
+        app_session_test.cpp
+        app_theme_test.cpp
+        LIBRARIES
+        ernie_app
+        ernie_stb)
+    ernie_add_test_suite(
+        app_gpu
+        SOURCES
+        app_viewer_gpu_test.cpp
+        LIBRARIES
+        ernie_app
+        ernie_stb
+        LABELS
+        gpu)
+endif()

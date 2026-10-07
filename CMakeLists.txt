@@ -8,11 +8,24 @@ project(
 
 option(ERNIE_BUILD_TESTS "Build Ernie's tests" ${PROJECT_IS_TOP_LEVEL})
 option(ERNIE_BUILD_PYTHON "Build Ernie's Python module" OFF)
-option(ERNIE_BUILD_GUI "Build Ernie's GUI viewer (GLFW, Dear ImGui, ImPlot, ImGuizmo, fonts)" OFF)
+option(ERNIE_BUILD_DEMOS "Build Ernie's C++ demos" ${PROJECT_IS_TOP_LEVEL})
+option(ERNIE_BUILD_APP "Build Ernie's app, the GUI viewer (GLFW, Dear ImGui, ImPlot, ImGuizmo, fonts)"
+       OFF)
 
 set(ERNIE_SOURCE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}"
     CACHE INTERNAL "Ernie source directory")
+
+# An optimised build with debug info unless a build type is given: Ernie's CPU side (frame setup,
+# culling lists, scene sync) is many times slower without optimisation.
+get_property(ernie_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if(PROJECT_IS_TOP_LEVEL
+   AND NOT ernie_multi_config
+   AND NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE
+        RelWithDebInfo
+        CACHE STRING "Build type" FORCE)
+endif()
 
 if(PROJECT_IS_TOP_LEVEL)
     set(CMAKE_CXX_STANDARD 20)
@@ -39,6 +52,7 @@ include(cmake/third_party/glm.cmake)
 include(cmake/third_party/dlpack.cmake)
 include(cmake/third_party/stb.cmake)
 include(cmake/third_party/tinyexr.cmake)
+include(cmake/third_party/meshoptimizer.cmake)
 
 # Warning and coverage flags: TerrainGen's when built inside it, Ernie's own otherwise.
 add_library(ernie_build_options INTERFACE)
@@ -58,141 +72,13 @@ else()
                   -Wdouble-promotion)
 endif()
 
-set(ernie_shaders
-    material/brdf.slang
-    material/lambert.slang
-    material/lommel_seeliger.slang
-    material/lunar_lambert.slang
-    material/oren_nayar.slang
-    material/hapke.slang
-    raster/filters.slang
-    raster/frame.slang
-    raster/ground.slang
-    raster/mesh.slang
-    raster/present.slang
-    raster/shading.slang
-    raster/terrain.slang
-    raster/surface.slang
-    raster/terrain_shadow.slang
-    raster/terrain_color.slang)
-foreach(shader ${ernie_shaders})
-    string(MAKE_C_IDENTIFIER "${shader}" shader_id)
-    string(TOUPPER "${shader_id}" shader_upper)
-    file(READ "ernie/src/shaders/${shader}" ERNIE_${shader_upper})
-    set_property(
-        DIRECTORY
-        APPEND
-        PROPERTY CMAKE_CONFIGURE_DEPENDS "ernie/src/shaders/${shader}")
-endforeach()
-configure_file(ernie/src/shaders/embedded_shaders.h.in
-               "${CMAKE_CURRENT_BINARY_DIR}/generated/embedded_shaders.h" @ONLY)
+add_subdirectory(ernie)
 
-# Layers, each depending only on the ones above it:
-#   Ernie::core    image I/O, raster views, geometry, cameras, materials, scene, tensors; no Vulkan
-#   Ernie::gpu     Vulkan device, memory, pipelines, Slang compiler, presentation
-#   Ernie::raster  the rasterizer
-#   Ernie::ernie   everything
-function(ernie_layer target)
-    target_include_directories(
-        ${target}
-        PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/ernie/include"
-        PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ernie/src" "${CMAKE_CURRENT_BINARY_DIR}/generated")
-    target_compile_features(${target} PUBLIC cxx_std_20)
-    target_link_libraries(${target} PRIVATE ernie_build_options)
-endfunction()
-
-add_library(
-    ernie_core STATIC
-    ernie/src/camera/orbit_controller.cpp
-    ernie/src/camera/camera.cpp
-    ernie/src/camera/sensor_filters.cpp
-    ernie/src/core/image.cpp
-    ernie/src/core/spectrum.cpp
-    ernie/src/geometry/frustum.cpp
-    ernie/src/geometry/lod_quadtree.cpp
-    ernie/src/geometry/mesh_data.cpp
-    ernie/src/geometry/primitives.cpp
-    ernie/src/interop/tensor.cpp
-    ernie/src/material/brdf.cpp
-    ernie/src/scene/path.cpp
-    ernie/src/scene/scene.cpp
-    ernie/src/scene/schema.cpp)
-ernie_layer(ernie_core)
-target_link_libraries(
-    ernie_core
-    PUBLIC ernie_glm ernie_dlpack
-    PRIVATE ernie_stb ernie_tinyexr)
-
-add_library(
-    ernie_gpu STATIC
-    ernie/src/gpu/gpu_buffer.cpp
-    ernie/src/gpu/gpu_image.cpp
-    ernie/src/interop/cuda_interop.cpp
-    ernie/src/gpu/offscreen_target.cpp
-    ernie/src/gpu/pipeline.cpp
-    ernie/src/gpu/shader_compiler.cpp
-    ernie/src/gpu/swapchain.cpp
-    ernie/src/gpu/vulkan_context.cpp)
-ernie_layer(ernie_gpu)
-target_link_libraries(
-    ernie_gpu
-    PUBLIC ernie_core ernie_volk ernie_vma
-    PRIVATE slang::slang ${CMAKE_DL_LIBS})
-# Vulkan structs are initialised as `VkFoo info{VK_STRUCTURE_TYPE_FOO}` with the rest zeroed, here
-# and in code that uses Ernie's Vulkan types.
-target_compile_options(ernie_gpu
-                       PUBLIC $<$<CXX_COMPILER_ID:GNU,Clang>:-Wno-missing-field-initializers>)
-if(APPLE)
-    target_compile_definitions(ernie_gpu PRIVATE ERNIE_MOLTENVK_PATH="${ERNIE_MOLTENVK_LIBRARY}")
-endif()
-
-add_library(ernie_render STATIC ernie/src/render/render_delegate.cpp
-                                ernie/src/render/render_outputs.cpp ernie/src/render/resolve.cpp)
-ernie_layer(ernie_render)
-target_link_libraries(ernie_render PUBLIC ernie_gpu)
-
-add_library(
-    ernie_raster STATIC
-    ernie/src/raster/ground_part.cpp
-    ernie/src/raster/mesh_part.cpp
-    ernie/src/raster/poisson_disk.cpp
-    ernie/src/raster/raster_delegate.cpp
-    ernie/src/raster/raster_material.cpp
-    ernie/src/raster/raster_renderer.cpp
-    ernie/src/raster/render_targets.cpp
-    ernie/src/raster/shadow_cascades.cpp
-    ernie/src/raster/terrain_part.cpp)
-ernie_layer(ernie_raster)
-target_link_libraries(ernie_raster PUBLIC ernie_render)
-
-# The backends `CreateRenderDelegate` can make.
-add_library(ernie_backends STATIC ernie/src/render/backends.cpp)
-ernie_layer(ernie_backends)
-target_link_libraries(ernie_backends PUBLIC ernie_raster)
-
-add_library(ernie INTERFACE)
-target_link_libraries(ernie INTERFACE ernie_backends)
-add_library(Ernie::core ALIAS ernie_core)
-add_library(Ernie::gpu ALIAS ernie_gpu)
-add_library(Ernie::render ALIAS ernie_render)
-add_library(Ernie::raster ALIAS ernie_raster)
-add_library(Ernie::ernie ALIAS ernie)
-
-if(ERNIE_BUILD_GUI)
-    include(cmake/third_party/glfw.cmake)
-    include(cmake/third_party/dear_imgui.cmake)
-    include(cmake/third_party/implot.cmake)
-    include(cmake/third_party/imguizmo.cmake)
-    include(cmake/third_party/gui_fonts.cmake)
-    add_subdirectory(gui)
-endif()
-
-if(ERNIE_BUILD_PYTHON)
-    include(cmake/third_party/nanobind.cmake)
-    add_subdirectory(ernie/python)
+if(ERNIE_BUILD_DEMOS)
+    add_subdirectory(demos)
 endif()
 
 if(ERNIE_BUILD_TESTS)
     enable_testing()
-    add_subdirectory(tests)
+    add_subdirectory(ernie/test)
 endif()

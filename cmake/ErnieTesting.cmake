@@ -35,7 +35,6 @@ function(ernie_add_test_suite name)
             TEST_PREFIX "ernie_${name}." DISCOVERY_MODE PRE_TEST
             PROPERTIES LABELS "${ARG_LABELS}")
     endif()
-    target_include_directories(${target} PRIVATE "${ERNIE_SOURCE_DIR}/tests"
-                                                 "${ERNIE_SOURCE_DIR}/ernie/src")
+    target_include_directories(${target} PRIVATE "${ERNIE_SOURCE_DIR}/ernie/test")
     target_compile_definitions(${target} PRIVATE ${ARG_DEFINITIONS})
 endfunction()

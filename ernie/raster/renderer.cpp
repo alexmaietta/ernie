@@ -1,0 +1,1407 @@
+#include "ernie/raster/renderer.h"
+
+#include "ernie/kernel/embedded_shaders.h"
+#include "ernie/raster/poisson_disk.h"
+#include "ernie/session/sampling.h"
+
+#include <glm/gtc/type_ptr.hpp>
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstring>
+#include <limits>
+#include <mutex>
+#include <set>
+#include <stdexcept>
+#include <string>
+#include <utility>
+
+namespace ernie {
+
+namespace {
+
+struct Uniforms {
+    float viewProjection[16];
+    float sun[4];
+    float forward[4];
+    float eye[4];
+    std::uint32_t flags[4];
+    float sunViewProjection[16];  ///< A batch view's own fitted sun map, with `sunShadow[2]` 1.
+    float sunShadow[4];           ///< Its texel size and depth span in world units, and the flag.
+};
+static_assert(sizeof(Uniforms) == 208, "Uniforms must match frame.slang");
+
+struct ShadowUniforms {
+    float lightViewProjection[4][16];
+    float splits[4];
+    float texelWorld[4];
+    float depthWorld[4];
+    float params[4];
+    float sun[4];
+    std::uint32_t debug[4];
+    float poisson[32];
+};
+static_assert(sizeof(ShadowUniforms) == 480, "ShadowUniforms must match frame.slang");
+
+struct ShadingUniforms {
+    float invViewProj[16];
+    float eye[4];
+    float sun[4];
+    float range[4];
+    std::uint32_t size[4];
+    float irradiance[SpectralBands::kMaxBands];
+    float lightShadow[4];
+    float poisson[32];
+    float domeSh[9][4];
+    float dome[SpectralBands::kMaxBands];
+    std::uint32_t view[4];
+};
+static_assert(sizeof(ShadingUniforms) == 944, "ShadingUniforms must match shading.slang");
+
+struct LightGpu {
+    float position[4];
+    float axis[4];
+    float cone[4];
+    float shadow[4];
+    float extentX[4];
+    float extentY[4];
+    float spectrum[SpectralBands::kMaxBands];
+};
+static_assert(sizeof(LightGpu) == 352, "LightGpu must match shading.slang");
+
+struct MaterialGpu {
+    std::uint32_t info[4];
+    float params[BrdfRegistry::kMaxParams];
+    float reflectance[SpectralBands::kMaxBands];
+};
+static_assert(sizeof(MaterialGpu) == 336, "MaterialGpu must match shading.slang");
+
+/// Reflectance luminance below which a material counts as black; its spectrum's shape is flat.
+constexpr float kBlackLuminance = 1e-6f;
+
+struct SensorUniforms {
+    float invViewProj[16];
+    float eye[4];
+    float forward[4];
+    float intrinsics[4];
+    std::uint32_t size[4];
+    float distortion[4];
+    float lens[4];
+    float sensor[4];
+    float adc[4];
+    std::uint32_t noise[4];
+    float clear[4];
+    float colour[SpectralBands::kMaxBands][4];
+    float qe[SpectralBands::kMaxBands][4];
+};
+static_assert(sizeof(SensorUniforms) == 2272, "SensorUniforms must match filters.slang");
+
+/// Per-view uniforms sit in one buffer at multiples of this, the largest
+/// `minUniformBufferOffsetAlignment` Vulkan allows.
+constexpr VkDeviceSize kUniformAlignment = 256;
+
+constexpr VkDeviceSize Aligned(VkDeviceSize bytes) {
+    return (bytes + kUniformAlignment - 1) / kUniformAlignment * kUniformAlignment;
+}
+
+constexpr VkDeviceSize kUniformsStride = Aligned(sizeof(Uniforms));
+constexpr VkDeviceSize kShadingStride = Aligned(sizeof(ShadingUniforms));
+constexpr VkDeviceSize kSensorStride = Aligned(sizeof(SensorUniforms));
+
+/// Samples per axis of the RGB-to-spectrum coefficient table.
+constexpr std::uint32_t kTableResolution = 17;
+
+constexpr VkShaderStageFlags kCompute = VK_SHADER_STAGE_COMPUTE_BIT;
+
+constexpr DescriptorBinding kShadingBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kCompute},
+    {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {3, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {4, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {6, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {7, VK_DESCRIPTOR_TYPE_SAMPLER, kCompute},
+    {8, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {9, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {10, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {11, VK_DESCRIPTOR_TYPE_SAMPLER, kCompute},
+    {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+};
+
+constexpr DescriptorBinding kFilterBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kCompute},
+    {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {3, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {4, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {5, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {6, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {7, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {8, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {9, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {10, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {11, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {12, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {13, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {14, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+};
+
+/// hzb.slang: the source level and the destination level.
+constexpr DescriptorBinding kHzbBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+};
+
+/// views.slang: the camera, the poses and the per-view blocks it patches.
+constexpr DescriptorBinding kViewsBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+    {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+};
+
+/// views.slang's camera: parent-to-world, projection and its inverse.
+constexpr VkDeviceSize kPoseCameraBytes = 3 * sizeof(glm::mat4);
+
+/// Per-view uniforms the CPU writes and views.slang may patch.
+constexpr VkBufferUsageFlags kViewUniformUsage =
+    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+
+constexpr DescriptorBinding kPresentBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT},
+    {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT},
+};
+
+/// How present.slang shows a render var (its kShow* constants), and whether it is an integer
+/// image.
+struct PresentMode {
+    std::string_view var;
+    std::uint32_t show;
+    bool integer;
+};
+
+constexpr std::array<PresentMode, 9> kPresentModes{{
+    {render_vars::kLdrColor, 0, false},
+    {render_vars::kHdrColor, 1, false},
+    {render_vars::kDistanceToImagePlane, 2, false},
+    {render_vars::kDistanceToCamera, 2, false},
+    {render_vars::kNormal, 3, false},
+    {render_vars::kElectrons, 4, false},
+    {render_vars::kPrimId, 5, true},
+    {render_vars::kInstanceId, 5, true},
+    {render_vars::kRawDn, 6, true},
+}};
+
+const PresentMode* PresentModeOf(std::string_view var) {
+    for (const PresentMode& mode : kPresentModes) {
+        if (mode.var == var) {
+            return &mode;
+        }
+    }
+    return nullptr;
+}
+
+constexpr std::array<const char*, 6> kFilterEntries{"lensMain", "qeMain",  "noiseMain",
+                                                    "adcMain",  "cieMain", "exposureMain"};
+
+/// Jakob-Hanika coefficients over a `kTableResolution`^3 grid of linear RGB, red along x, green
+/// along y, blue across layers, as RGBA32F texels; computed once per process.
+const std::vector<float>& SigmoidTable() {
+    static const std::vector<float> table = [] {
+        const std::uint32_t n = kTableResolution;
+        std::vector<float> texels(static_cast<std::size_t>(n) * n * n * 4);
+        for (std::uint32_t b = 0; b < n; ++b) {
+            for (std::uint32_t g = 0; g < n; ++g) {
+                for (std::uint32_t r = 0; r < n; ++r) {
+                    const glm::dvec3 rgb(r / double(n - 1), g / double(n - 1), b / double(n - 1));
+                    const glm::dvec3 c = RgbToSigmoid(rgb).coefficients;
+                    float* texel = &texels[((static_cast<std::size_t>(b) * n + g) * n + r) * 4];
+                    texel[0] = static_cast<float>(c.x);
+                    texel[1] = static_cast<float>(c.y);
+                    texel[2] = static_cast<float>(c.z);
+                    texel[3] = 0.0f;
+                }
+            }
+        }
+        return texels;
+    }();
+    return table;
+}
+
+/// A barrier making compute and graphics writes visible to later compute, fragment and transfer
+/// reads.
+void ShaderBarrier(VkCommandBuffer commands) {
+    VkMemoryBarrier2 barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    barrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+    VkDependencyInfo dependency{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    dependency.memoryBarrierCount = 1;
+    dependency.pMemoryBarriers = &barrier;
+    vkCmdPipelineBarrier2(commands, &dependency);
+}
+
+/// The integral of the CIE y function over 360-830 nm, in nm.
+double LuminanceIntegral() {
+    static const double integral = [] {
+        double sum = 0.0;
+        for (double w = 360.0; w <= 830.0; w += 1.0) {
+            sum += CieXyz(w).y;
+        }
+        return sum;
+    }();
+    return integral;
+}
+
+void CopyMatrix(float (&target)[16], const glm::mat4& matrix) {
+    std::memcpy(target, glm::value_ptr(matrix), sizeof(target));
+}
+
+std::uint32_t Groups(std::uint32_t size) {
+    return (size + 7) / 8;
+}
+
+/// A unit vector perpendicular enough to `direction` to serve as a look-at up vector.
+glm::vec3 UpFor(const glm::vec3& direction) {
+    return std::abs(direction.z) > 0.99f ? glm::vec3(0.0f, 1.0f, 0.0f)
+                                         : glm::vec3(0.0f, 0.0f, 1.0f);
+}
+
+/// World depth spanned by the [0, 1] depth of an orthographic view-projection.
+float OrthographicDepth(const glm::mat4& viewProjection) {
+    const float gradient =
+        glm::length(glm::vec3(viewProjection[0][2], viewProjection[1][2], viewProjection[2][2]));
+    return gradient > 0.0f ? 1.0f / gradient : 0.0f;
+}
+
+/// A compute shader that evaluates `model` once, to check that its module implements `IBrdf`.
+std::vector<ShaderModuleSource> BrdfCheckModules(const BrdfModel& model) {
+    return {{"brdf", std::string(BrdfSlang())},
+            {BrdfModuleName(model), model.slang},
+            {"brdf_check", "import brdf;\nimport " + BrdfModuleName(model) +
+                               ";\nRWStructuredBuffer<float3> result;\n"
+                               "[shader(\"compute\")]\n[numthreads(1, 1, 1)]\n"
+                               "void main() {\n    " +
+                               model.typeName +
+                               " model;\n    BrdfInput input;\n    BrdfParams params;\n"
+                               "    result[0] = model.radianceFactor(input, params);\n}\n"}};
+}
+
+}  // namespace
+
+std::vector<ShadowCascade> FitLightShadowViews(const Light& light, const glm::vec3& sceneMin,
+                                               const glm::vec3& sceneMax,
+                                               std::uint32_t resolution) {
+    if (!light.shadows) {
+        return {};
+    }
+    const float texels = static_cast<float>(std::max(resolution, 1u));
+    const glm::vec3 centre = 0.5f * (sceneMin + sceneMax);
+    if (light.type == LightType::Distant) {
+        const float radius = std::max(0.5f * glm::length(sceneMax - sceneMin), 1e-3f);
+        const glm::vec3 towards = glm::normalize(light.direction);
+        ShadowCascade view;
+        view.lightViewProjection =
+            glm::orthoRH_ZO(-radius, radius, -radius, radius, radius, 3.0f * radius) *
+            glm::lookAtRH(centre + 2.0f * radius * towards, centre, UpFor(towards));
+        view.texelWorldSize = 2.0f * radius / texels;
+        return {view};
+    }
+    float farPlane = 1e-3f;
+    for (int i = 0; i < 8; ++i) {
+        const glm::vec3 corner((i & 1) ? sceneMax.x : sceneMin.x, (i & 2) ? sceneMax.y : sceneMin.y,
+                               (i & 4) ? sceneMax.z : sceneMin.z);
+        farPlane = std::max(farPlane, 1.01f * glm::length(corner - light.position));
+    }
+    const float nearPlane = std::max(light.radius, 1e-4f * farPlane);
+    const auto perspective = [&](const glm::vec3& axis, float fov) {
+        ShadowCascade view;
+        view.lightViewProjection =
+            glm::perspectiveRH_ZO(fov, 1.0f, nearPlane, farPlane) *
+            glm::lookAtRH(light.position, light.position + axis, UpFor(axis));
+        view.texelWorldSize = 2.0f * std::tan(0.5f * fov) / texels;
+        return view;
+    };
+    if (light.coneAngle <= Light::kMaxSpotConeDegrees) {
+        return {perspective(glm::normalize(light.direction),
+                            2.0f * glm::radians(std::max(light.coneAngle, 0.5f)))};
+    }
+    std::vector<ShadowCascade> faces;
+    for (const glm::vec3 axis : {glm::vec3(1, 0, 0), glm::vec3(-1, 0, 0), glm::vec3(0, 1, 0),
+                                 glm::vec3(0, -1, 0), glm::vec3(0, 0, 1), glm::vec3(0, 0, -1)}) {
+        faces.push_back(perspective(axis, glm::radians(90.0f)));
+    }
+    return faces;
+}
+
+RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFormat,
+                               BrdfRegistry brdfs)
+    : context_(context), presentFormat_(presentFormat), brdfs_(std::move(brdfs)),
+      uniforms_(context, kUniformsStride, kViewUniformUsage, BufferMemory::Upload),
+      shadowUniforms_(context, sizeof(ShadowUniforms), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                      BufferMemory::Upload),
+      clampSampler_(context, SamplerDesc{}),
+      shadowSampler_(context, SamplerDesc{VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST,
+                                          VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 1.0f, true}),
+      poisson_(PoissonDisk(16)), shadingLayout_(context, kShadingBindings, 16),
+      filterLayout_(context, kFilterBindings), presentLayout_(context, kPresentBindings, 32),
+      hzbLayout_(context, kHzbBindings, 16), viewsLayout_(context, kViewsBindings, 48),
+      poseCamera_(context, kPoseCameraBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                  BufferMemory::Upload),
+      sigmoidTable_(context, ImageDesc{kTableResolution, kTableResolution, kTableResolution, 1,
+                                       VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT}),
+      tableSampler_(context, SamplerDesc{VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST,
+                                         VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 1.0f, false}),
+      shadingUniforms_(context, kShadingStride, kViewUniformUsage, BufferMemory::Upload),
+      sensorUniforms_(context, kSensorStride, kViewUniformUsage, BufferMemory::Upload),
+      lightTable_(context, kMaxLights * sizeof(LightGpu), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                  BufferMemory::Upload),
+      lightViewMatrices_(context, kMaxLightShadowViews * sizeof(glm::mat4),
+                         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Upload) {
+    if (brdfs_.Models().empty()) {
+        throw std::invalid_argument("RasterRenderer needs at least one BRDF");
+    }
+    MaterialSettings defaults;
+    if (brdfs_.Find(defaults.brdf) == nullptr) {
+        defaults.brdf = brdfs_.Models().front().id;
+    }
+    materials_.emplace(kDefaultMaterial, std::make_unique<RasterMaterial>(context_));
+    SetMaterial(kDefaultMaterial, defaults);
+    CreateShadowMaps(1, kMaxCascades);
+    CreateLightShadowMaps(1, 1);
+
+    const std::vector<float>& table = SigmoidTable();
+    const std::size_t layerBytes =
+        static_cast<std::size_t>(kTableResolution) * kTableResolution * 4 * sizeof(float);
+    GpuBuffer staging(context_, table.size() * sizeof(float), 0, BufferMemory::Upload);
+    staging.Write(std::as_bytes(std::span(table)));
+    context_.Submit([&](VkCommandBuffer commands) {
+        sigmoidTable_.Transition(commands, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        std::vector<VkBufferImageCopy> regions;
+        for (std::uint32_t layer = 0; layer < kTableResolution; ++layer) {
+            VkBufferImageCopy region{};
+            region.bufferOffset = layer * layerBytes;
+            region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, layer, 1};
+            region.imageExtent = {kTableResolution, kTableResolution, 1};
+            regions.push_back(region);
+        }
+        vkCmdCopyBufferToImage(commands, staging.Handle(), sigmoidTable_.Handle(),
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                               static_cast<std::uint32_t>(regions.size()), regions.data());
+        sigmoidTable_.Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    });
+
+    const std::vector<ShaderModuleSource> filterModules{{"filters", shaders::kFiltersSlang}};
+    for (std::size_t i = 0; i < kSensorFilters.size(); ++i) {
+        const std::vector<std::uint32_t> spirv =
+            compiler_.CompileSpirv(filterModules, kFilterEntries[i]);
+        filterPipelines_[i] = std::make_unique<ComputePipeline>(context_, filterLayout_, spirv);
+    }
+    const std::vector<ShaderModuleSource> hzbModules{{"hzb", shaders::kHzbSlang}};
+    hzbPipeline_ = std::make_unique<ComputePipeline>(context_, hzbLayout_,
+                                                     compiler_.CompileSpirv(hzbModules, "hzbMain"));
+    const std::vector<ShaderModuleSource> viewsModules{{"views", shaders::kViewsSlang}};
+    viewsPipeline_ = std::make_unique<ComputePipeline>(
+        context_, viewsLayout_, compiler_.CompileSpirv(viewsModules, "viewsMain"));
+    const std::vector<ShaderModuleSource> presentModules{{"present", shaders::kPresentSlang}};
+    const std::vector<std::uint32_t> vertex =
+        compiler_.CompileSpirv(presentModules, "presentVertex");
+    const auto presentPipeline = [&](const char* entry) {
+        const std::vector<std::uint32_t> fragment = compiler_.CompileSpirv(presentModules, entry);
+        GraphicsPipelineDesc present;
+        present.vertexSpirv = vertex;
+        present.fragmentSpirv = fragment;
+        present.colorFormat = presentFormat_;
+        present.depthFormat = VK_FORMAT_UNDEFINED;
+        return std::make_unique<GraphicsPipeline>(context_, presentLayout_, present);
+    };
+    presentFloat_ = presentPipeline("presentFloat");
+    presentUint_ = presentPipeline("presentUint");
+}
+
+RasterRenderer::~RasterRenderer() {
+    vkDeviceWaitIdle(context_.Device());
+}
+
+void RasterRenderer::AddBrdf(BrdfModel model) {
+    BrdfRegistry candidate = brdfs_;
+    candidate.Add(model);
+    try {
+        compiler_.CompileSpirv(BrdfCheckModules(model), "main");
+    } catch (const std::invalid_argument& error) {
+        throw std::invalid_argument("BRDF " + model.id + " failed to compile: " + error.what());
+    }
+    brdfs_ = std::move(candidate);
+}
+
+std::uint32_t RasterRenderer::AddMaterial(const MaterialSettings& settings) {
+    if (brdfs_.Find(settings.brdf) == nullptr) {
+        throw std::invalid_argument("Unknown BRDF: " + settings.brdf);
+    }
+    const std::uint32_t id = nextMaterial_++;
+    materials_.emplace(id, std::make_unique<RasterMaterial>(context_));
+    SetMaterial(id, settings);
+    return id;
+}
+
+void RasterRenderer::SetMaterial(std::uint32_t id, const MaterialSettings& settings) {
+    const BrdfModel* model = brdfs_.Find(settings.brdf);
+    if (model == nullptr) {
+        throw std::invalid_argument("Unknown BRDF: " + settings.brdf);
+    }
+    Material(id).Update(settings, ResolveBrdfParams(*model, settings.brdfParams));
+}
+
+RasterMaterial& RasterRenderer::Material(std::uint32_t id) {
+    const auto it = materials_.find(id);
+    if (it == materials_.end()) {
+        throw std::invalid_argument("Unknown material " + std::to_string(id));
+    }
+    return *it->second;
+}
+
+const RasterMaterial& RasterRenderer::Material(std::uint32_t id) const {
+    const auto it = materials_.find(id);
+    if (it == materials_.end()) {
+        throw std::invalid_argument("Unknown material " + std::to_string(id));
+    }
+    return *it->second;
+}
+
+void RasterRenderer::RemoveMaterial(std::uint32_t id) {
+    if (id == kDefaultMaterial) {
+        throw std::invalid_argument("The default material cannot be removed");
+    }
+    const auto it = materials_.find(id);
+    if (it == materials_.end()) {
+        throw std::invalid_argument("Unknown material " + std::to_string(id));
+    }
+    vkDeviceWaitIdle(context_.Device());
+    materials_.erase(it);
+}
+
+const RasterMaterial& RasterRenderer::MaterialOrDefault(std::uint32_t id) const {
+    const auto it = materials_.find(id);
+    return it != materials_.end() ? *it->second : *materials_.at(kDefaultMaterial);
+}
+
+void RasterRenderer::CreateShadowMaps(std::uint32_t resolution, std::uint32_t layers) {
+    vkDeviceWaitIdle(context_.Device());
+    shadowMaps_ = std::make_unique<GpuImage>(
+        context_,
+        ImageDesc{resolution, resolution, std::max<std::uint32_t>(layers, kMaxCascades), 1,
+                  VK_FORMAT_D32_SFLOAT,
+                  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                      VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT});
+    context_.Submit([this](VkCommandBuffer commands) {
+        shadowMaps_->Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    });
+    shadowResolution_ = resolution;
+}
+
+void RasterRenderer::CreateLightShadowMaps(std::uint32_t resolution, std::uint32_t layers) {
+    vkDeviceWaitIdle(context_.Device());
+    lightShadowMaps_ = std::make_unique<GpuImage>(
+        context_,
+        ImageDesc{resolution, resolution, layers, 1, VK_FORMAT_D32_SFLOAT,
+                  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false,
+                  true});
+    context_.Submit([this](VkCommandBuffer commands) {
+        lightShadowMaps_->Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    });
+    lightResolution_ = resolution;
+}
+
+void RasterRenderer::WriteLights(const FrameParams& params, const std::optional<Bounds3>& bounds) {
+    const std::uint32_t resolution = std::max(params.shadows.lightResolution, 1u);
+    lightViews_.clear();
+    std::vector<LightGpu> table(params.lights.size());
+    for (std::size_t i = 0; i < params.lights.size(); ++i) {
+        const Light& light = params.lights[i];
+        LightGpu& entry = table[i];
+        const glm::vec3 axis = glm::normalize(light.direction);
+        const bool distant = light.type == LightType::Distant;
+        const glm::vec3 where = distant ? axis : light.position;
+        entry.position[0] = where.x;
+        entry.position[1] = where.y;
+        entry.position[2] = where.z;
+        entry.position[3] = static_cast<float>(light.type);
+        entry.axis[0] = axis.x;
+        entry.axis[1] = axis.y;
+        entry.axis[2] = axis.z;
+        entry.axis[3] = light.radius;
+        const glm::vec3 x = glm::normalize(light.tangent);
+        const glm::vec3 y = glm::cross(x, axis);
+        const glm::vec2 half =
+            light.type == LightType::Disk ? glm::vec2(light.radius) : 0.5f * light.size;
+        for (int k = 0; k < 3; ++k) {
+            entry.extentX[k] = x[k] * half.x;
+            entry.extentY[k] = y[k] * half.y;
+        }
+        const bool cone = !distant && light.coneAngle < 180.0f;
+        const float softness = std::clamp(light.coneSoftness, 0.0f, 1.0f);
+        entry.cone[0] = cone ? std::cos(glm::radians(light.coneAngle)) : -2.0f;
+        entry.cone[1] = cone ? std::cos(glm::radians(light.coneAngle * (1.0f - softness))) : -1.0f;
+        if (bounds) {
+            const std::vector<ShadowCascade> views =
+                FitLightShadowViews(light, bounds->first, bounds->second, resolution);
+            if (!views.empty() && lightViews_.size() + views.size() <= kMaxLightShadowViews) {
+                entry.cone[2] = static_cast<float>(lightViews_.size());
+                entry.cone[3] = static_cast<float>(views.size());
+                entry.shadow[0] = views.front().texelWorldSize;
+                lightViews_.insert(lightViews_.end(), views.begin(), views.end());
+            }
+        }
+        std::copy(light.spectrum.begin(), light.spectrum.end(), entry.spectrum);
+    }
+    if (!table.empty()) {
+        lightTable_.Write(std::as_bytes(std::span(table)));
+    }
+    std::vector<glm::mat4> matrices;
+    for (const ShadowCascade& view : lightViews_) {
+        matrices.push_back(view.lightViewProjection);
+    }
+    if (!matrices.empty()) {
+        lightViewMatrices_.Write(std::as_bytes(std::span(matrices)));
+        const auto layers = static_cast<std::uint32_t>(lightViews_.size());
+        if (resolution != lightResolution_ || layers > lightShadowMaps_->Desc().layers) {
+            CreateLightShadowMaps(resolution, layers);
+        }
+    }
+}
+
+void RasterRenderer::PlanBatchShadows(const FrameParams& params, const Bounds3& scene,
+                                      std::span<RasterDrawable* const> drawables) {
+    const ShadowSettings& shadows = params.shadows;
+    Light sun;
+    sun.type = LightType::Distant;
+    sun.direction = params.sunDirection;
+    // A fit of the sun's map around `low` to `high`, one cascade covering every view depth.
+    const auto fit = [&](const glm::vec3& low, const glm::vec3& high) {
+        std::vector<ShadowCascade> views = FitLightShadowViews(sun, low, high, shadowResolution_);
+        ShadowCascade cascade = views.front();
+        cascade.splitFar = std::numeric_limits<float>::max();
+        return cascade;
+    };
+    cascades_ = {fit(scene.first, scene.second)};
+    std::vector<std::int32_t> worlds;
+    for (std::uint32_t v = 0; v < views_; ++v) {
+        worlds.push_back(params.ViewWorld(v));
+    }
+    std::sort(worlds.begin(), worlds.end());
+    worlds.erase(std::unique(worlds.begin(), worlds.end()), worlds.end());
+    // One map for all: every view of every world, the worlds' shared casters only, or every
+    // world's casters.
+    if (worlds == std::vector<std::int32_t>{-1} || shadows.worlds != WorldShadows::Separate) {
+        const std::int32_t casting = shadows.worlds == WorldShadows::Shared
+                                         ? ShadowCasters::kNoWorld
+                                         : ShadowCasters::kAllWorlds;
+        shadowPasses_.push_back({0, 0, ShadowCasters{true, casting}, false});
+        return;
+    }
+    // A map per world: layer 0 holds the shared casters. Fitted to the scene, each world's layer
+    // is a copy of it with the world's casters drawn on top; fitted to the world, it draws the
+    // shared casters again with its own light view. Views of every world (-1) get every caster.
+    shadowPasses_.push_back({0, 0, ShadowCasters{true, ShadowCasters::kNoWorld}, false});
+    const std::uint32_t maxLayers = context_.Limits().maxImageArrayLayers;
+    std::map<std::int32_t, std::uint32_t> layerOf;
+    std::map<std::int32_t, std::uint32_t> cascadeOf;
+    for (const std::int32_t world : worlds) {
+        if (shadowPasses_.size() == maxLayers) {
+            break;  // Further worlds get the shared casters' shadows only.
+        }
+        const auto layer = static_cast<std::uint32_t>(shadowPasses_.size());
+        layerOf[world] = layer;
+        std::optional<Bounds3> own;
+        if (shadows.worldFit == WorldShadowFit::World && world != -1) {
+            for (const RasterDrawable* drawable : drawables) {
+                if (const std::optional<Bounds3> box = drawable->WorldBounds(world)) {
+                    own = own ? Bounds3(glm::min(own->first, box->first),
+                                        glm::max(own->second, box->second))
+                              : *box;
+                }
+            }
+        }
+        if (!own) {
+            shadowPasses_.push_back({layer, 0, ShadowCasters{false, world}, true});
+            continue;
+        }
+        const glm::vec3 margin(shadows.worldMargin);
+        const auto cascade = static_cast<std::uint32_t>(cascades_.size());
+        cascades_.push_back(fit(own->first - margin, own->second + margin));
+        cascadeOf[world] = cascade;
+        shadowPasses_.push_back({layer, cascade, ShadowCasters{true, world}, false});
+    }
+    for (std::uint32_t v = 0; v < views_; ++v) {
+        const auto layer = layerOf.find(params.ViewWorld(v));
+        viewShadowLayers_[v] = layer != layerOf.end() ? layer->second : 0;
+        const auto cascade = cascadeOf.find(params.ViewWorld(v));
+        viewSunCascades_[v] =
+            cascade != cascadeOf.end() ? static_cast<std::int32_t>(cascade->second) : -1;
+    }
+    shadowLayers_ = static_cast<std::uint32_t>(shadowPasses_.size());
+}
+
+void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable* const> drawables) {
+    const CameraView view = params.View();
+    if (params.lights.size() > kMaxLights) {
+        throw std::invalid_argument("A frame has at most " + std::to_string(kMaxLights) +
+                                    " lights besides the sun");
+    }
+    for (const Light& light : params.lights) {
+        if (light.spectrum.size() != static_cast<std::size_t>(params.camera.bands.count)) {
+            throw std::invalid_argument("Every light's spectrum needs one value per camera band");
+        }
+        if (glm::length(light.direction) == 0.0f) {
+            throw std::invalid_argument("A light's direction must not be zero");
+        }
+        const bool area = light.type == LightType::Rect || light.type == LightType::Disk;
+        if (area && std::abs(glm::dot(glm::normalize(light.tangent),
+                                      glm::normalize(light.direction))) > 1e-3f) {
+            throw std::invalid_argument("A rect or disk light's tangent must be perpendicular to "
+                                        "its direction");
+        }
+    }
+    if (params.dome &&
+        params.dome->radiance.size() != static_cast<std::size_t>(params.camera.bands.count)) {
+        throw std::invalid_argument("The dome's radiance needs one value per camera band");
+    }
+    views_ = static_cast<std::uint32_t>(params.Views());
+    EnsureViewBuffers(views_);
+    posesOnGpu_ = params.posesOnGpu;
+    if (posesOnGpu_) {
+        WritePoseCamera(params);
+    }
+    // Views posed on the GPU are planned as a batch, whose shadows do not follow the views.
+    const bool batch = views_ > 1 || posesOnGpu_;
+    const SensorModel& sensor = params.camera.sensor;
+    presentRange_ = {static_cast<float>(params.camera.nearPlane),
+                     static_cast<float>(params.camera.farPlane),
+                     static_cast<float>(sensor.fullWellElectrons),
+                     static_cast<float>(std::ldexp(1.0, sensor.adcBits) - 1.0)};
+
+    std::optional<Bounds3> bounds;
+    for (const RasterDrawable* drawable : drawables) {
+        if (const std::optional<Bounds3> box = drawable->Bounds()) {
+            bounds = bounds ? Bounds3(glm::min(bounds->first, box->first),
+                                      glm::max(bounds->second, box->second))
+                            : *box;
+        }
+    }
+    const ShadowSettings& shadows = params.shadows;
+    shadowsEnabled_ =
+        params.sun && shadows.enabled && bounds.has_value() && params.sunDirection.z > 0.0f;
+    cascades_.clear();
+    shadowPasses_.clear();
+    viewShadowLayers_.assign(views_, 0);
+    viewSunCascades_.assign(views_, -1);
+    shadowLayers_ = 1;
+    // Other lights' maps hold what a single view sees, or in a batch what every world shares
+    // (every world's casters when merged).
+    lightCasters_ = !batch ? ShadowCasters{true, params.ViewWorld(0)}
+                           : ShadowCasters{true, shadows.worlds == WorldShadows::Merged
+                                                     ? ShadowCasters::kAllWorlds
+                                                     : ShadowCasters::kNoWorld};
+    if (shadowsEnabled_ && batch) {
+        // A batch's per-world maps use their own, smaller resolution.
+        const std::uint32_t resolution =
+            shadows.worlds == WorldShadows::Separate ? shadows.worldResolution : shadows.resolution;
+        if (resolution != shadowResolution_) {
+            CreateShadowMaps(resolution, kMaxCascades);
+        }
+        PlanBatchShadows(params, *bounds, drawables);
+        if (shadowLayers_ > shadowMaps_->Desc().layers) {
+            CreateShadowMaps(resolution, shadowLayers_);
+        }
+    }
+    if (shadowsEnabled_ && !batch) {
+        if (shadows.resolution != shadowResolution_) {
+            CreateShadowMaps(shadows.resolution, kMaxCascades);
+        }
+        const auto [low, high] = *bounds;
+        float farthest = 0.0f;
+        for (int i = 0; i < 8; ++i) {
+            const glm::vec3 corner((i & 1) ? high.x : low.x, (i & 2) ? high.y : low.y,
+                                   (i & 4) ? high.z : low.z);
+            farthest = std::max(farthest, glm::dot(corner - view.eye, view.forward));
+        }
+        // A margin keeps surfaces at exactly the farthest depth, such as flat ground under a
+        // nadir camera, inside the last cascade.
+        const float shadowDistance = std::min(view.farPlane, 1.01f * farthest);
+        cascades_ = FitCascades(view, shadowDistance, params.sunDirection, low, high,
+                                std::clamp(shadows.cascades, 1, kMaxCascades), shadows.splitLambda,
+                                shadowResolution_);
+        // A single view's cascades hold what it sees: the shared casters and its world's.
+        for (std::uint32_t c = 0; c < cascades_.size(); ++c) {
+            shadowPasses_.push_back({c, c, ShadowCasters{true, params.ViewWorld(0)}, false});
+        }
+        shadowLayers_ = static_cast<std::uint32_t>(cascades_.size());
+    }
+
+    for (std::uint32_t v = 0; v < views_; ++v) {
+        const CameraView viewOf = params.View(v);
+        Uniforms uniforms{};
+        const glm::mat4 viewProjection = viewOf.ViewProjection();
+        std::memcpy(uniforms.viewProjection, glm::value_ptr(viewProjection),
+                    sizeof(uniforms.viewProjection));
+        uniforms.sun[0] = params.sunDirection.x;
+        uniforms.sun[1] = params.sunDirection.y;
+        uniforms.sun[2] = params.sunDirection.z;
+        uniforms.sun[3] = params.ambient;
+        uniforms.forward[0] = viewOf.forward.x;
+        uniforms.forward[1] = viewOf.forward.y;
+        uniforms.forward[2] = viewOf.forward.z;
+        uniforms.forward[3] = glm::dot(viewOf.eye, viewOf.forward);
+        uniforms.eye[0] = viewOf.eye.x;
+        uniforms.eye[1] = viewOf.eye.y;
+        uniforms.eye[2] = viewOf.eye.z;
+        uniforms.eye[3] = params.exposure;
+        uniforms.flags[0] = static_cast<std::uint32_t>(params.wireframe);
+        uniforms.flags[1] = viewShadowLayers_[v];
+        if (viewSunCascades_[v] >= 0) {
+            // A view of a world with its own fitted map samples it in place of cascade 0.
+            const ShadowCascade& own = cascades_[static_cast<std::size_t>(viewSunCascades_[v])];
+            std::memcpy(uniforms.sunViewProjection, glm::value_ptr(own.lightViewProjection),
+                        sizeof(uniforms.sunViewProjection));
+            uniforms.sunShadow[0] = own.texelWorldSize;
+            uniforms.sunShadow[1] = OrthographicDepth(own.lightViewProjection);
+            uniforms.sunShadow[2] = 1.0f;
+        }
+        uniforms_.Write(std::as_bytes(std::span(&uniforms, 1)), v * kUniformsStride);
+    }
+
+    ShadowUniforms shadowUniforms{};
+    // A batch's views all sample cascade 0 (or their own fitted map).
+    const std::size_t sampled =
+        batch ? std::min<std::size_t>(cascades_.size(), 1) : cascades_.size();
+    for (std::size_t c = 0; c < sampled; ++c) {
+        std::memcpy(shadowUniforms.lightViewProjection[c],
+                    glm::value_ptr(cascades_[c].lightViewProjection), 64);
+        shadowUniforms.splits[c] = cascades_[c].splitFar;
+        shadowUniforms.texelWorld[c] = cascades_[c].texelWorldSize;
+        shadowUniforms.depthWorld[c] = OrthographicDepth(cascades_[c].lightViewProjection);
+    }
+    shadowUniforms.sun[0] = std::tan(0.5f * glm::radians(std::max(params.sunAngle, 0.0f)));
+    shadowUniforms.params[0] = shadows.softness;
+    shadowUniforms.params[1] = shadows.normalOffset;
+    shadowUniforms.params[2] = static_cast<float>(sampled);
+    shadowUniforms.params[3] = shadowsEnabled_ ? 1.0f : 0.0f;
+    shadowUniforms.debug[0] = shadows.showCascades ? 1u : 0u;
+    for (std::size_t i = 0; i < poisson_.size(); ++i) {
+        shadowUniforms.poisson[2 * i] = poisson_[i].x;
+        shadowUniforms.poisson[2 * i + 1] = poisson_[i].y;
+    }
+    shadowUniforms_.Write(std::as_bytes(std::span(&shadowUniforms, 1)));
+
+    params.camera.Check();
+    if (params.camera.sensor.channels.size() > 4) {
+        throw std::invalid_argument("A sensor has at most four channels");
+    }
+    if (!params.sunIrradiance.empty() &&
+        params.sunIrradiance.size() != static_cast<std::size_t>(params.camera.bands.count)) {
+        throw std::invalid_argument("The sun's irradiance needs one value per camera band");
+    }
+    // Only the filters producing the wanted vars, or what those read, run.
+    requiredVars_ = RequiredVars(params.vars);
+    filters_ =
+        FiltersFor(CheckFilterChain(params.filters.empty() ? DefaultFilterChain() : params.filters),
+                   requiredVars_);
+    bands_ = params.camera.bands;
+    extent_ = {params.camera.width, params.camera.height};
+    WriteMaterialTable();
+    for (const std::size_t model : modelsInUse_) {
+        ShadingPipeline(model);
+    }
+    WriteShading(params);
+    WriteSensor(params);
+
+    WriteLights(params, bounds);
+    shadowViews_ = cascades_;
+    shadowViews_.insert(shadowViews_.end(), lightViews_.begin(), lightViews_.end());
+    for (RasterDrawable* drawable : drawables) {
+        drawable->Prepare(params, shadowViews_);
+    }
+    updated_ = true;
+}
+
+const ComputePipeline& RasterRenderer::ShadingPipeline(std::size_t model) {
+    if (const auto it = shadingPipelines_.find(model); it != shadingPipelines_.end()) {
+        return *it->second;
+    }
+    const BrdfModel& brdf = brdfs_.Models()[model];
+    const std::vector<ShaderModuleSource> modules{
+        {"brdf", std::string(BrdfSlang())},
+        {BrdfModuleName(brdf), brdf.slang},
+        {"shading", "import " + BrdfModuleName(brdf) + ";\ntypealias ActiveBrdf = " +
+                        brdf.typeName + ";\n" + shaders::kShadingSlang}};
+    std::vector<std::uint32_t> spirv;
+    try {
+        spirv = compiler_.CompileSpirv(modules, "shadeMain");
+    } catch (const std::invalid_argument& error) {
+        throw std::invalid_argument("BRDF " + brdf.id +
+                                    " failed to compile for shading: " + error.what());
+    }
+    auto pipeline = std::make_unique<ComputePipeline>(context_, shadingLayout_, spirv);
+    return *shadingPipelines_.emplace(model, std::move(pipeline)).first->second;
+}
+
+void RasterRenderer::WriteMaterialTable() {
+    const std::uint32_t count = materials_.rbegin()->first + 1;
+    std::vector<MaterialGpu> table(count, MaterialGpu{});
+    std::set<std::size_t> models;
+    const std::span<const BrdfModel> registered = brdfs_.Models();
+    for (const auto& [id, material] : materials_) {
+        MaterialGpu& entry = table[id];
+        const auto model =
+            std::find_if(registered.begin(), registered.end(),
+                         [&](const BrdfModel& m) { return m.id == material->Settings().brdf; });
+        const auto index = static_cast<std::size_t>(model - registered.begin());
+        entry.info[0] = static_cast<std::uint32_t>(index);
+        models.insert(index);
+        const std::vector<float>& params = material->Params();
+        std::copy_n(params.begin(), std::min<std::size_t>(params.size(), BrdfRegistry::kMaxParams),
+                    entry.params);
+        std::vector<float> shape = material->Reflectance().Bin(bands_);
+        const float luminance = material->Luminance();
+        for (float& value : shape) {
+            value = luminance > kBlackLuminance ? value / luminance : 1.0f;
+        }
+        std::copy(shape.begin(), shape.end(), entry.reflectance);
+    }
+    modelsInUse_.assign(models.begin(), models.end());
+    const VkDeviceSize bytes = table.size() * sizeof(MaterialGpu);
+    if (materialTable_ == nullptr || materialTable_->Size() < bytes) {
+        vkDeviceWaitIdle(context_.Device());
+        materialTable_ = std::make_unique<GpuBuffer>(
+            context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Upload);
+    }
+    materialTable_->Write(std::as_bytes(std::span(table)));
+}
+
+void RasterRenderer::WriteShading(const FrameParams& params) {
+    ShadingUniforms shading{};
+    shading.sun[0] = params.sunDirection.x;
+    shading.sun[1] = params.sunDirection.y;
+    shading.sun[2] = params.sunDirection.z;
+    shading.sun[3] = params.ambient;
+    shading.range[0] = static_cast<float>(bands_.minNm);
+    shading.range[1] = static_cast<float>(bands_.Width());
+    shading.range[2] = static_cast<float>(bands_.count);
+    shading.size[0] = extent_.width;
+    shading.size[1] = extent_.height;
+    shading.size[2] = kTableResolution;
+    shading.size[3] = static_cast<std::uint32_t>(params.lights.size());
+    for (int i = 0; i < bands_.count && params.sun; ++i) {
+        shading.irradiance[i] =
+            params.sunIrradiance.empty()
+                ? static_cast<float>(M_PI / (kLuminousEfficacy * LuminanceIntegral()))
+                : params.sunIrradiance[static_cast<std::size_t>(i)];
+    }
+    if (params.dome) {
+        for (std::size_t k = 0; k < params.dome->sh.size(); ++k) {
+            shading.domeSh[k][0] = params.dome->sh[k].r;
+            shading.domeSh[k][1] = params.dome->sh[k].g;
+            shading.domeSh[k][2] = params.dome->sh[k].b;
+        }
+        std::copy(params.dome->radiance.begin(), params.dome->radiance.end(), shading.dome);
+    }
+    shading.lightShadow[0] = params.shadows.softness;
+    shading.lightShadow[1] = params.shadows.normalOffset;
+    shading.lightShadow[2] = static_cast<float>(lightResolution_);
+    for (std::size_t i = 0; i < poisson_.size(); ++i) {
+        shading.poisson[2 * i] = poisson_[i].x;
+        shading.poisson[2 * i + 1] = poisson_[i].y;
+    }
+    for (std::uint32_t v = 0; v < views_; ++v) {
+        const CameraView view = params.View(v);
+        CopyMatrix(shading.invViewProj, glm::inverse(view.ViewProjection()));
+        shading.eye[0] = view.eye.x;
+        shading.eye[1] = view.eye.y;
+        shading.eye[2] = view.eye.z;
+        // The lights the view sees: the shared ones and its world's, or all for every world.
+        const std::int32_t world = params.ViewWorld(v);
+        shading.view[0] = 0;
+        for (std::size_t k = 0; k < params.lights.size(); ++k) {
+            const std::int32_t of = params.lights[k].world;
+            if (of == -1 || world == -1 || of == world) {
+                shading.view[0] |= 1u << k;
+            }
+        }
+        shadingUniforms_.Write(std::as_bytes(std::span(&shading, 1)), v * kShadingStride);
+    }
+}
+
+void RasterRenderer::WriteSensor(const FrameParams& params) {
+    const Camera& camera = params.camera;
+    const glm::mat4& projection = params.View().projection;
+    const double rasterFocal =
+        static_cast<double>(projection[1][1]) * static_cast<double>(extent_.height) / 2.0;
+    SensorUniforms sensor{};
+    sensor.intrinsics[0] = static_cast<float>(rasterFocal * params.overscan);
+    sensor.intrinsics[1] =
+        static_cast<float>(extent_.width / 2.0 * (1.0 - static_cast<double>(projection[2][0])));
+    sensor.intrinsics[2] =
+        static_cast<float>(extent_.height / 2.0 * (1.0 + static_cast<double>(projection[2][1])));
+    sensor.intrinsics[3] = static_cast<float>(params.overscan);
+    sensor.size[0] = extent_.width;
+    sensor.size[1] = extent_.height;
+    sensor.size[2] = static_cast<std::uint32_t>(bands_.count);
+    sensor.size[3] = static_cast<std::uint32_t>(camera.sensor.channels.size());
+    const LensModel& lens = camera.lens;
+    sensor.distortion[0] = static_cast<float>(lens.k1);
+    sensor.distortion[1] = static_cast<float>(lens.k2);
+    sensor.distortion[2] = static_cast<float>(lens.k3);
+    sensor.distortion[3] = static_cast<float>(lens.p1);
+    sensor.lens[0] = static_cast<float>(lens.p2);
+    sensor.lens[1] = lens.vignetting ? 1.0f : 0.0f;
+    sensor.lens[2] =
+        static_cast<float>(camera.LinearExposureScale() * static_cast<double>(params.exposure));
+    sensor.lens[3] = static_cast<float>(camera.exposureTime);
+    const SensorModel& model = camera.sensor;
+    sensor.sensor[0] = static_cast<float>(model.fullWellElectrons);
+    sensor.sensor[1] = static_cast<float>(model.readNoiseElectrons);
+    sensor.sensor[2] = static_cast<float>(model.darkCurrentElectrons);
+    sensor.sensor[3] = static_cast<float>(model.prnu);
+    sensor.adc[0] = static_cast<float>(model.dsnuElectrons);
+    sensor.adc[1] = static_cast<float>(model.ElectronsPerDn(camera.iso));
+    sensor.adc[2] = static_cast<float>(model.blackLevelDn);
+    sensor.adc[3] = static_cast<float>(std::exp2(model.adcBits) - 1.0);
+    sensor.noise[0] = model.noise ? 1u : 0u;
+    sensor.noise[1] = model.seed;
+    sensor.noise[2] = FrameSeed(model.seed, params.stream, params.frame);
+    // The vars the lens filter writes when the frame holds them, one bit each (filters.slang).
+    const std::string_view geometry[] = {render_vars::kDistanceToImagePlane,
+                                         render_vars::kDistanceToCamera,
+                                         render_vars::kNormal,
+                                         render_vars::kPrimId,
+                                         render_vars::kInstanceId,
+                                         render_vars::kSpectralRadiance};
+    for (std::uint32_t bit = 0; bit < std::size(geometry); ++bit) {
+        if (std::find(requiredVars_.begin(), requiredVars_.end(), geometry[bit]) !=
+            requiredVars_.end()) {
+            sensor.noise[3] |= 1u << bit;
+        }
+    }
+    sensor.clear[0] = params.clearColor.r;
+    sensor.clear[1] = params.clearColor.g;
+    sensor.clear[2] = params.clearColor.b;
+    const std::vector<glm::dvec3> weights = CieWeights(bands_);
+    for (int i = 0; i < bands_.count; ++i) {
+        const glm::dvec3 rgb =
+            EqualEnergyXyzToLinearSrgb(weights[static_cast<std::size_t>(i)] * kLuminousEfficacy);
+        sensor.colour[i][0] = static_cast<float>(rgb.r);
+        sensor.colour[i][1] = static_cast<float>(rgb.g);
+        sensor.colour[i][2] = static_cast<float>(rgb.b);
+    }
+    for (std::size_t c = 0; c < model.channels.size(); ++c) {
+        const std::vector<float> factors = camera.ElectronsPerRadiance(c);
+        for (int i = 0; i < bands_.count; ++i) {
+            sensor.qe[i][c] = factors[static_cast<std::size_t>(i)];
+        }
+    }
+    for (std::uint32_t v = 0; v < views_; ++v) {
+        const CameraView view = params.View(v);
+        CopyMatrix(sensor.invViewProj, glm::inverse(view.ViewProjection()));
+        sensor.eye[0] = view.eye.x;
+        sensor.eye[1] = view.eye.y;
+        sensor.eye[2] = view.eye.z;
+        sensor.forward[0] = view.forward.x;
+        sensor.forward[1] = view.forward.y;
+        sensor.forward[2] = view.forward.z;
+        // Every view of a batch has noise of its own; view 0's is the single view's.
+        sensor.noise[2] = FrameSeed(model.seed, params.stream ^ (v * 0x9E3779B9u), params.frame);
+        sensorUniforms_.Write(std::as_bytes(std::span(&sensor, 1)), v * kSensorStride);
+    }
+}
+
+void RasterRenderer::EnsureViewBuffers(std::uint32_t views) {
+    if (uniforms_.Size() >= views * kUniformsStride) {
+        return;
+    }
+    vkDeviceWaitIdle(context_.Device());
+    uniforms_ =
+        GpuBuffer(context_, views * kUniformsStride, kViewUniformUsage, BufferMemory::Upload);
+    shadingUniforms_ =
+        GpuBuffer(context_, views * kShadingStride, kViewUniformUsage, BufferMemory::Upload);
+    sensorUniforms_ =
+        GpuBuffer(context_, views * kSensorStride, kViewUniformUsage, BufferMemory::Upload);
+}
+
+RasterFrame RasterRenderer::Frame(std::uint32_t view) const {
+    return {DescriptorResource::Of(uniforms_, view * kUniformsStride, sizeof(Uniforms)),
+            DescriptorResource::Of(shadowUniforms_), DescriptorResource::Of(shadowMaps_->View()),
+            DescriptorResource::Of(shadowSampler_), DescriptorResource::Of(clampSampler_)};
+}
+
+bool RasterRenderer::CanPresent(std::string_view name) {
+    return PresentModeOf(name) != nullptr;
+}
+
+void RasterRenderer::Record(VkCommandBuffer commands, RenderTargets& targets,
+                            std::span<const RasterDrawable* const> drawables,
+                            const RenderingTarget* present, std::string_view var) const {
+    if (present != nullptr && !CanPresent(var)) {
+        throw std::invalid_argument("Render var '" + std::string(var) + "' cannot be presented");
+    }
+    if (!updated_) {
+        if (present != nullptr) {
+            BeginRendering(commands, *present);
+            vkCmdEndRendering(commands);
+        }
+        return;
+    }
+    RecordShadows(commands, drawables);
+    RecordViews(commands, targets, drawables, 0);
+    if (present != nullptr) {
+        Present(commands, targets, *present, var);
+    }
+}
+
+void RasterRenderer::RecordShadows(VkCommandBuffer commands,
+                                   std::span<const RasterDrawable* const> drawables) const {
+    if (!updated_) {
+        return;
+    }
+    if (posesOnGpu_) {
+        RecordViewPoses(commands, drawables);
+    }
+    // Culling and other compute the draws read, once for every view and shadow view.
+    for (const RasterDrawable* drawable : drawables) {
+        drawable->RecordCull(commands);
+    }
+    ShaderBarrier(commands);
+    const RasterFrame frame = Frame(0);
+    if (shadowsEnabled_) {
+        shadowMaps_->Transition(commands, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+        const auto record = [&](const ShadowPass& pass) {
+            RenderingTarget shadow;
+            shadow.depth = shadowMaps_->LayerView(pass.layer);
+            shadow.extent = {shadowResolution_, shadowResolution_};
+            shadow.loadDepth = pass.fromBase;
+            BeginRendering(commands, shadow);
+            for (const RasterDrawable* drawable : drawables) {
+                drawable->RecordShadow(commands, frame, pass.cascade,
+                                       cascades_[pass.cascade].lightViewProjection, pass.casters);
+            }
+            vkCmdEndRendering(commands);
+        };
+        for (const ShadowPass& pass : shadowPasses_) {
+            if (!pass.fromBase) {
+                record(pass);
+            }
+        }
+        // Each world's layer starts as a copy of the shared casters' layer 0.
+        std::vector<VkImageCopy> copies;
+        for (const ShadowPass& pass : shadowPasses_) {
+            if (pass.fromBase) {
+                VkImageCopy copy{};
+                copy.srcSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
+                copy.dstSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, pass.layer, 1};
+                copy.extent = {shadowResolution_, shadowResolution_, 1};
+                copies.push_back(copy);
+            }
+        }
+        if (!copies.empty()) {
+            shadowMaps_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+            vkCmdCopyImage(commands, shadowMaps_->Handle(), VK_IMAGE_LAYOUT_GENERAL,
+                           shadowMaps_->Handle(), VK_IMAGE_LAYOUT_GENERAL,
+                           static_cast<std::uint32_t>(copies.size()), copies.data());
+            shadowMaps_->Transition(commands, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+            for (const ShadowPass& pass : shadowPasses_) {
+                if (pass.fromBase) {
+                    record(pass);
+                }
+            }
+        }
+        shadowMaps_->Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
+    if (!lightViews_.empty()) {
+        lightShadowMaps_->Transition(commands, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+        for (std::size_t v = 0; v < lightViews_.size(); ++v) {
+            RenderingTarget shadow;
+            shadow.depth = lightShadowMaps_->LayerView(static_cast<std::uint32_t>(v));
+            shadow.extent = {lightResolution_, lightResolution_};
+            BeginRendering(commands, shadow);
+            for (const RasterDrawable* drawable : drawables) {
+                drawable->RecordShadow(commands, frame, cascades_.size() + v,
+                                       lightViews_[v].lightViewProjection, lightCasters_);
+            }
+            vkCmdEndRendering(commands);
+        }
+        lightShadowMaps_->Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
+}
+
+void RasterRenderer::RecordViews(VkCommandBuffer commands, RenderTargets& targets,
+                                 std::span<const RasterDrawable* const> drawables,
+                                 std::uint32_t firstView) const {
+    if (!updated_) {
+        return;
+    }
+    if (targets.Extent().width != extent_.width || targets.Extent().height != extent_.height ||
+        targets.Bands() != bands_.count) {
+        throw std::invalid_argument("Render targets need the camera's extent and band count");
+    }
+    if (firstView + targets.Views() > views_) {
+        throw std::invalid_argument("Render targets hold views past the frame's " +
+                                    std::to_string(views_));
+    }
+    for (const std::string_view name : requiredVars_) {
+        if (targets.Var(name) == nullptr) {
+            throw std::invalid_argument("Render targets lack render var " + std::string(name) +
+                                        ", which the frame needs");
+        }
+    }
+    // With occlusion culling, each view draws its occluders, then a depth pyramid of them is
+    // built for all the views, the occlusion-culled instances are tested against it, and each view
+    // draws those it does not hide on top.
+    const bool occlusion =
+        std::any_of(drawables.begin(), drawables.end(),
+                    [](const RasterDrawable* drawable) { return drawable->CullsOcclusion(); });
+    const auto draw = [&](DrawPhase phase, bool load) {
+        targets.PrepareGBuffer(commands);
+        for (std::uint32_t v = 0; v < targets.Views(); ++v) {
+            BeginRendering(commands, targets.GBufferTarget(v, load));
+            const RasterFrame frame = Frame(firstView + v);
+            for (const RasterDrawable* drawable : drawables) {
+                drawable->RecordColor(commands, frame, firstView + v, phase);
+            }
+            vkCmdEndRendering(commands);
+        }
+    };
+    if (!occlusion) {
+        draw(DrawPhase::All, false);
+    } else {
+        draw(DrawPhase::Occluders, false);
+        BuildHzb(commands, targets);
+        for (const RasterDrawable* drawable : drawables) {
+            drawable->RecordOcclusionCull(commands, targets.Hzb(), firstView, targets.Views());
+        }
+        ShaderBarrier(commands);
+        draw(DrawPhase::Occludees, true);
+    }
+    ShadeAndFilter(commands, targets, firstView);
+}
+
+void RasterRenderer::WritePoseCamera(const FrameParams& params) {
+    const glm::mat4 projection = params.View().projection;
+    const glm::mat4 camera[] = {glm::mat4(params.posesParent), projection,
+                                glm::inverse(projection)};
+    poseCamera_.Write(std::as_bytes(std::span(camera)));
+    const VkDeviceSize bytes = views_ * sizeof(glm::mat4);
+    if (poseBuffer_ == nullptr || poseBuffer_->Size() < bytes) {
+        vkDeviceWaitIdle(context_.Device());
+        poseBuffer_ = std::make_unique<GpuBuffer>(
+            context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Shared);
+        poseHistory_ = std::make_unique<GpuBuffer>(
+            context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Readback);
+    }
+    poseHistoryViews_ = views_;
+}
+
+std::vector<glm::dmat4> RasterRenderer::LastGpuPoses(std::uint32_t views) const {
+    std::vector<glm::dmat4> poses;
+    if (poseHistory_ == nullptr || views != poseHistoryViews_ || views == 0) {
+        return poses;
+    }
+    std::vector<glm::mat4> read(views);
+    poseHistory_->Read(std::as_writable_bytes(std::span(read)));
+    poses.assign(read.begin(), read.end());
+    return poses;
+}
+
+void RasterRenderer::PatchViews(VkCommandBuffer commands, const GpuBuffer& blocks,
+                                VkDeviceSize first, VkDeviceSize stride,
+                                const ViewFields& fields) const {
+    if (!posesOnGpu_) {
+        return;
+    }
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, viewsPipeline_->Handle());
+    const DescriptorResource resources[] = {DescriptorResource::Of(poseCamera_),
+                                            DescriptorResource::Of(*poseBuffer_),
+                                            DescriptorResource::Of(blocks)};
+    viewsLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+    const std::uint32_t constants[12] = {views_,
+                                         static_cast<std::uint32_t>(stride),
+                                         static_cast<std::uint32_t>(first),
+                                         fields.forwardDepth ? 1u : 0u,
+                                         fields.viewProjection,
+                                         fields.inverseViewProjection,
+                                         fields.eye,
+                                         fields.forward,
+                                         fields.planes,
+                                         fields.pose,
+                                         0u,
+                                         0u};
+    viewsLayout_.PushConstants(commands, constants, sizeof(constants));
+    vkCmdDispatch(commands, (views_ + 63) / 64, 1, 1);
+}
+
+void RasterRenderer::RecordViewPoses(VkCommandBuffer commands,
+                                     std::span<const RasterDrawable* const> drawables) const {
+    ViewFields frame;
+    frame.viewProjection = offsetof(Uniforms, viewProjection);
+    frame.eye = offsetof(Uniforms, eye);
+    frame.forward = offsetof(Uniforms, forward);
+    frame.forwardDepth = true;
+    PatchViews(commands, uniforms_, 0, kUniformsStride, frame);
+    ViewFields shading;
+    shading.inverseViewProjection = offsetof(ShadingUniforms, invViewProj);
+    shading.eye = offsetof(ShadingUniforms, eye);
+    PatchViews(commands, shadingUniforms_, 0, kShadingStride, shading);
+    ViewFields sensor;
+    sensor.inverseViewProjection = offsetof(SensorUniforms, invViewProj);
+    sensor.eye = offsetof(SensorUniforms, eye);
+    sensor.forward = offsetof(SensorUniforms, forward);
+    PatchViews(commands, sensorUniforms_, 0, kSensorStride, sensor);
+    // The poses rendered, for the CPU's estimates of the next frame's.
+    ViewFields history;
+    history.pose = 0;
+    PatchViews(commands, *poseHistory_, 0, sizeof(glm::mat4), history);
+    for (const RasterDrawable* drawable : drawables) {
+        drawable->RecordViewPoses(commands);
+    }
+    ShaderBarrier(commands);
+}
+
+void RasterRenderer::BuildHzb(VkCommandBuffer commands, RenderTargets& targets) const {
+    GpuImage& depth = targets.Depth();
+    GpuImage& hzb = targets.Hzb();
+    depth.Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    hzb.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, hzbPipeline_->Handle());
+    std::uint32_t sourceWidth = depth.Desc().width;
+    std::uint32_t sourceHeight = depth.Desc().height;
+    for (std::uint32_t mip = 0; mip < hzb.Desc().mips; ++mip) {
+        const std::uint32_t width = std::max(hzb.Desc().width >> mip, 1u);
+        const std::uint32_t height = std::max(hzb.Desc().height >> mip, 1u);
+        const DescriptorResource resources[] = {
+            mip == 0 ? DescriptorResource::Of(depth.View())
+                     : DescriptorResource::Of(hzb.MipView(mip - 1), VK_IMAGE_LAYOUT_GENERAL),
+            DescriptorResource::Of(hzb.MipView(mip), VK_IMAGE_LAYOUT_GENERAL)};
+        hzbLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+        const std::uint32_t size[4] = {sourceWidth, sourceHeight, width, height};
+        hzbLayout_.PushConstants(commands, size, sizeof(size));
+        vkCmdDispatch(commands, Groups(width), Groups(height), targets.Views());
+        ShaderBarrier(commands);
+        sourceWidth = width;
+        sourceHeight = height;
+    }
+}
+
+void RasterRenderer::ShadeAndFilter(VkCommandBuffer commands, RenderTargets& targets,
+                                    std::uint32_t firstView) const {
+    targets.PrepareCompute(commands);
+    const VkClearColorValue zero{};
+    const VkImageSubresourceRange all{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0,
+                                      targets.RasterRadiance().Desc().layers};
+    vkCmdClearColorImage(commands, targets.RasterRadiance().Handle(), VK_IMAGE_LAYOUT_GENERAL,
+                         &zero, 1, &all);
+    ShaderBarrier(commands);
+
+    // Every pass reads and writes view `v`'s layers: one layer of the G-buffer, depth and the
+    // single-layer vars, one group of a layer per band of the spectral images.
+    const auto sampled = [](const GpuImage& image, std::uint32_t v) {
+        return DescriptorResource::Of(image.LayerView(v), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    };
+    const auto general = [](VkImageView view) {
+        return DescriptorResource::Of(view, VK_IMAGE_LAYOUT_GENERAL);
+    };
+    const std::uint32_t groupsX = Groups(extent_.width);
+    const std::uint32_t groupsY = Groups(extent_.height);
+    const std::uint32_t views = targets.Views();
+    for (const std::size_t model : modelsInUse_) {
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          shadingPipelines_.at(model)->Handle());
+        const std::uint32_t constants[4] = {static_cast<std::uint32_t>(model), 0, 0, 0};
+        shadingLayout_.PushConstants(commands, constants, sizeof(constants));
+        for (std::uint32_t v = 0; v < views; ++v) {
+            const std::vector<DescriptorResource> shading{
+                DescriptorResource::Of(shadingUniforms_, (firstView + v) * kShadingStride,
+                                       sizeof(ShadingUniforms)),
+                sampled(targets.GBuffer(0), v),
+                sampled(targets.GBuffer(1), v),
+                sampled(targets.GBuffer(2), v),
+                sampled(targets.Depth(), v),
+                DescriptorResource::Of(*materialTable_),
+                DescriptorResource::Of(sigmoidTable_.View()),
+                DescriptorResource::Of(tableSampler_),
+                general(targets.RasterRadiance().GroupView(v)),
+                DescriptorResource::Of(lightTable_),
+                DescriptorResource::Of(lightShadowMaps_->View()),
+                DescriptorResource::Of(shadowSampler_),
+                DescriptorResource::Of(lightViewMatrices_)};
+            shadingLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, shading);
+            vkCmdDispatch(commands, groupsX, groupsY, 1);
+        }
+    }
+    ShaderBarrier(commands);
+
+    for (const SensorFilter filter : filters_) {
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          filterPipelines_[static_cast<std::size_t>(filter)]->Handle());
+        for (std::uint32_t v = 0; v < views; ++v) {
+            std::vector<DescriptorResource> filters{
+                DescriptorResource::Of(sensorUniforms_, (firstView + v) * kSensorStride,
+                                       sizeof(SensorUniforms)),
+                general(targets.RasterRadiance().GroupView(v)), sampled(targets.GBuffer(0), v),
+                sampled(targets.GBuffer(2), v), sampled(targets.Depth(), v)};
+            for (const std::string_view name : RenderTargets::VarNames()) {
+                const GpuImage& image = targets.Bound(name);
+                filters.push_back(general(name == render_vars::kSpectralRadiance
+                                              ? image.GroupView(v)
+                                              : image.LayerView(v)));
+            }
+            filterLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, filters);
+            vkCmdDispatch(commands, groupsX, groupsY, 1);
+        }
+        ShaderBarrier(commands);
+    }
+}
+
+void RasterRenderer::Present(VkCommandBuffer commands, RenderTargets& targets,
+                             const RenderingTarget& present, std::string_view var) const {
+    const PresentMode& mode = *PresentModeOf(var);
+    GpuImage& image = *targets.Var(var);
+    image.Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    RenderingTarget target = present;
+    target.depth = VK_NULL_HANDLE;
+    BeginRendering(commands, target);
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      (mode.integer ? presentUint_ : presentFloat_)->Handle());
+    // Both bindings take the var; the pipeline reads the one of its type.
+    const DescriptorResource view =
+        DescriptorResource::Of(image.LayerView(0), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    const std::array<DescriptorResource, 2> views{view, view};
+    presentLayout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, views);
+    const bool srgb =
+        presentFormat_ == VK_FORMAT_R8G8B8A8_SRGB || presentFormat_ == VK_FORMAT_B8G8R8A8_SRGB;
+    struct {
+        std::uint32_t flags[4];
+        float range[4];
+    } constants{{srgb ? 1u : 0u, mode.show, 0, 0},
+                {presentRange_[0], presentRange_[1], presentRange_[2], presentRange_[3]}};
+    if (var == render_vars::kRawDn) {
+        constants.range[2] = presentRange_[3];
+    }
+    presentLayout_.PushConstants(commands, &constants, sizeof(constants));
+    vkCmdDraw(commands, 3, 1, 0, 0);
+    vkCmdEndRendering(commands);
+    image.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+}
+
+std::uint64_t RasterRenderer::GpuBytes() const {
+    std::uint64_t bytes = uniforms_.Size() + shadowUniforms_.Size() + shadowMaps_->Bytes() +
+                          lightShadowMaps_->Bytes() + lightTable_.Size() +
+                          lightViewMatrices_.Size() + sigmoidTable_.Bytes() +
+                          shadingUniforms_.Size() + sensorUniforms_.Size() +
+                          (materialTable_ != nullptr ? materialTable_->Size() : 0);
+    for (const auto& [id, material] : materials_) {
+        bytes += material->GpuBytes();
+    }
+    return bytes;
+}
+
+}  // namespace ernie

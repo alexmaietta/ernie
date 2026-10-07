@@ -1,0 +1,10 @@
+ernie_add_library(
+    ernie_session
+    SOURCES
+    delegate.cpp
+    outputs.cpp
+    resolve.cpp
+    PUBLIC
+    ernie_device
+    ernie_geometry
+    ernie_scene)
