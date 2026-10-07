@@ -1,6 +1,3 @@
-# Builds Ernie and runs its C++, GPU and Python tests on Mesa's lavapipe (a CPU Vulkan driver, so
-# hosted runners need no GPU), with the Vulkan validation layers failing tests on any message;
-# CUDA interop tests skip. Also builds and tests the Python wheel, and checks formatting.
 name: CI
 
 on:

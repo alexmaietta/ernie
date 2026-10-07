@@ -172,12 +172,18 @@ void lensMain(uint3 id : SV_DispatchThreadID) {
         let cosine2 = 1.0 / (1.0 + dot(p, p));
         falloff = cosine2 * cosine2;
     }
+    // Shading writes only the pixels it shades: background taps count as no radiance, without
+    // clearing the raster radiance first.
+    let litA = gIds.Load(int4(base.x, base.y, layer, 0)).x != kBackground;
+    let litB = gIds.Load(int4(next.x, base.y, layer, 0)).x != kBackground;
+    let litC = gIds.Load(int4(base.x, next.y, layer, 0)).x != kBackground;
+    let litD = gIds.Load(int4(next.x, next.y, layer, 0)).x != kBackground;
     for (uint band = 0; band < bands && (cam.noise.w & kHoldsSpectral) != 0; ++band) {
         let slice = int(id.z * bands + band);
-        let a = spectral.Load(int4(base.x, base.y, slice, 0));
-        let b = spectral.Load(int4(next.x, base.y, slice, 0));
-        let c = spectral.Load(int4(base.x, next.y, slice, 0));
-        let d = spectral.Load(int4(next.x, next.y, slice, 0));
+        let a = litA ? spectral.Load(int4(base.x, base.y, slice, 0)) : 0.0;
+        let b = litB ? spectral.Load(int4(next.x, base.y, slice, 0)) : 0.0;
+        let c = litC ? spectral.Load(int4(base.x, next.y, slice, 0)) : 0.0;
+        let d = litD ? spectral.Load(int4(next.x, next.y, slice, 0)) : 0.0;
         let value = lerp(lerp(a, b, w.x), lerp(c, d, w.x), w.y);
         sensorRadiance[int3(id.xy, slice)] = value * falloff;
     }

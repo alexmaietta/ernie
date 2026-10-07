@@ -1352,13 +1352,9 @@ void RasterRenderer::BuildHzb(VkCommandBuffer commands, RenderTargets& targets) 
 void RasterRenderer::ShadeAndFilter(VkCommandBuffer commands, RenderTargets& targets,
                                     std::uint32_t firstView) const {
     ERNIE_ZONE("ShadeAndFilter");
+    // Shading writes the pixels it shades; the lens reads background ones as no radiance, so
+    // the raster radiance needs no clearing.
     targets.PrepareCompute(commands);
-    const VkClearColorValue zero{};
-    const VkImageSubresourceRange all{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0,
-                                      targets.RasterRadiance().Desc().layers};
-    vkCmdClearColorImage(commands, targets.RasterRadiance().Handle(), VK_IMAGE_LAYOUT_GENERAL,
-                         &zero, 1, &all);
-    ShaderBarrier(commands);
 
     // Every pass covers all the views in one dispatch, view `z` in layer `z` of each image (a
     // group of a layer per band of the spectral ones) with uniforms `firstView + z`.
