@@ -1,5 +1,6 @@
 #include "ernie/raster/renderer.h"
 
+#include "ernie/device/gpu_profile.h"
 #include "ernie/kernel/embedded_shaders.h"
 #include "ernie/raster/poisson_disk.h"
 #include "ernie/session/sampling.h"
@@ -515,6 +516,7 @@ void RasterRenderer::CreateLightShadowMaps(std::uint32_t resolution, std::uint32
 }
 
 void RasterRenderer::WriteLights(const FrameParams& params, const std::optional<Bounds3>& bounds) {
+    ERNIE_ZONE("Lights");
     const std::uint32_t resolution = std::max(params.shadows.lightResolution, 1u);
     lightViews_.clear();
     std::vector<LightGpu> table(params.lights.size());
@@ -574,6 +576,7 @@ void RasterRenderer::WriteLights(const FrameParams& params, const std::optional<
 
 void RasterRenderer::PlanBatchShadows(const FrameParams& params, const Bounds3& scene,
                                       std::span<RasterDrawable* const> drawables) {
+    ERNIE_ZONE("Plan batch shadows");
     const ShadowSettings& shadows = params.shadows;
     Light sun;
     sun.type = LightType::Distant;
@@ -645,6 +648,8 @@ void RasterRenderer::PlanBatchShadows(const FrameParams& params, const Bounds3& 
 }
 
 void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable* const> drawables) {
+    ERNIE_ZONE("Renderer::Update");
+    ERNIE_PLOT("Views", params.Views());
     const CameraView view = params.View();
     if (params.lights.size() > kMaxLights) {
         throw std::invalid_argument("A frame has at most " + std::to_string(kMaxLights) +
@@ -740,36 +745,39 @@ void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable*
         shadowLayers_ = static_cast<std::uint32_t>(cascades_.size());
     }
 
-    for (std::uint32_t v = 0; v < views_; ++v) {
-        const CameraView viewOf = params.View(v);
-        Uniforms uniforms{};
-        const glm::mat4 viewProjection = viewOf.ViewProjection();
-        std::memcpy(uniforms.viewProjection, glm::value_ptr(viewProjection),
-                    sizeof(uniforms.viewProjection));
-        uniforms.sun[0] = params.sunDirection.x;
-        uniforms.sun[1] = params.sunDirection.y;
-        uniforms.sun[2] = params.sunDirection.z;
-        uniforms.sun[3] = params.ambient;
-        uniforms.forward[0] = viewOf.forward.x;
-        uniforms.forward[1] = viewOf.forward.y;
-        uniforms.forward[2] = viewOf.forward.z;
-        uniforms.forward[3] = glm::dot(viewOf.eye, viewOf.forward);
-        uniforms.eye[0] = viewOf.eye.x;
-        uniforms.eye[1] = viewOf.eye.y;
-        uniforms.eye[2] = viewOf.eye.z;
-        uniforms.eye[3] = params.exposure;
-        uniforms.flags[0] = static_cast<std::uint32_t>(params.wireframe);
-        uniforms.flags[1] = viewShadowLayers_[v];
-        if (viewSunCascades_[v] >= 0) {
-            // A view of a world with its own fitted map samples it in place of cascade 0.
-            const ShadowCascade& own = cascades_[static_cast<std::size_t>(viewSunCascades_[v])];
-            std::memcpy(uniforms.sunViewProjection, glm::value_ptr(own.lightViewProjection),
-                        sizeof(uniforms.sunViewProjection));
-            uniforms.sunShadow[0] = own.texelWorldSize;
-            uniforms.sunShadow[1] = OrthographicDepth(own.lightViewProjection);
-            uniforms.sunShadow[2] = 1.0f;
+    {
+        ERNIE_ZONE("Frame uniforms");
+        for (std::uint32_t v = 0; v < views_; ++v) {
+            const CameraView viewOf = params.View(v);
+            Uniforms uniforms{};
+            const glm::mat4 viewProjection = viewOf.ViewProjection();
+            std::memcpy(uniforms.viewProjection, glm::value_ptr(viewProjection),
+                        sizeof(uniforms.viewProjection));
+            uniforms.sun[0] = params.sunDirection.x;
+            uniforms.sun[1] = params.sunDirection.y;
+            uniforms.sun[2] = params.sunDirection.z;
+            uniforms.sun[3] = params.ambient;
+            uniforms.forward[0] = viewOf.forward.x;
+            uniforms.forward[1] = viewOf.forward.y;
+            uniforms.forward[2] = viewOf.forward.z;
+            uniforms.forward[3] = glm::dot(viewOf.eye, viewOf.forward);
+            uniforms.eye[0] = viewOf.eye.x;
+            uniforms.eye[1] = viewOf.eye.y;
+            uniforms.eye[2] = viewOf.eye.z;
+            uniforms.eye[3] = params.exposure;
+            uniforms.flags[0] = static_cast<std::uint32_t>(params.wireframe);
+            uniforms.flags[1] = viewShadowLayers_[v];
+            if (viewSunCascades_[v] >= 0) {
+                // A view of a world with its own fitted map samples it in place of cascade 0.
+                const ShadowCascade& own = cascades_[static_cast<std::size_t>(viewSunCascades_[v])];
+                std::memcpy(uniforms.sunViewProjection, glm::value_ptr(own.lightViewProjection),
+                            sizeof(uniforms.sunViewProjection));
+                uniforms.sunShadow[0] = own.texelWorldSize;
+                uniforms.sunShadow[1] = OrthographicDepth(own.lightViewProjection);
+                uniforms.sunShadow[2] = 1.0f;
+            }
+            uploads_.Write(uniforms_, std::as_bytes(std::span(&uniforms, 1)), v * kUniformsStride);
         }
-        uploads_.Write(uniforms_, std::as_bytes(std::span(&uniforms, 1)), v * kUniformsStride);
     }
 
     ShadowUniforms shadowUniforms{};
@@ -848,6 +856,7 @@ const ComputePipeline& RasterRenderer::ShadingPipeline(std::size_t model) {
 }
 
 void RasterRenderer::WriteMaterialTable() {
+    ERNIE_ZONE("Material table");
     const std::uint32_t count = materials_.rbegin()->first + 1;
     std::vector<MaterialGpu> table(count, MaterialGpu{});
     std::set<std::size_t> models;
@@ -881,6 +890,7 @@ void RasterRenderer::WriteMaterialTable() {
 }
 
 void RasterRenderer::WriteShading(const FrameParams& params) {
+    ERNIE_ZONE("Shading uniforms");
     ShadingUniforms shading{};
     shading.sun[0] = params.sunDirection.x;
     shading.sun[1] = params.sunDirection.y;
@@ -934,6 +944,7 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
 }
 
 void RasterRenderer::WriteSensor(const FrameParams& params) {
+    ERNIE_ZONE("Sensor uniforms");
     const Camera& camera = params.camera;
     const glm::mat4& projection = params.View().projection;
     const double rasterFocal =
@@ -1064,18 +1075,27 @@ void RasterRenderer::RecordShadows(VkCommandBuffer commands,
     if (!updated_) {
         return;
     }
-    // The frame's host data first, after every earlier frame's use of the buffers it fills.
-    uploads_.Record(commands);
+    ERNIE_ZONE("RecordShadows");
+    {
+        ERNIE_GPU_ZONE(context_, commands, "Uploads");
+        // The frame's host data first, after every earlier frame's use of the buffers it fills.
+        uploads_.Record(commands);
+    }
     if (posesOnGpu_) {
+        ERNIE_GPU_ZONE(context_, commands, "View poses");
         RecordViewPoses(commands, drawables);
     }
-    // Culling and other compute the draws read, once for every view and shadow view.
-    for (const RasterDrawable* drawable : drawables) {
-        drawable->RecordCull(commands);
+    {
+        ERNIE_GPU_ZONE(context_, commands, "Cull");
+        // Culling and other compute the draws read, once for every view and shadow view.
+        for (const RasterDrawable* drawable : drawables) {
+            drawable->RecordCull(commands);
+        }
+        ShaderBarrier(commands);
     }
-    ShaderBarrier(commands);
     const RasterFrame frame = Frame(0);
     if (shadowsEnabled_) {
+        ERNIE_GPU_ZONE(context_, commands, "Sun shadows");
         shadowMaps_->Transition(commands, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
         const auto record = [&](const ShadowPass& pass) {
             RenderingTarget shadow;
@@ -1120,6 +1140,7 @@ void RasterRenderer::RecordShadows(VkCommandBuffer commands,
         shadowMaps_->Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
     if (!lightViews_.empty()) {
+        ERNIE_GPU_ZONE(context_, commands, "Light shadows");
         lightShadowMaps_->Transition(commands, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
         for (std::size_t v = 0; v < lightViews_.size(); ++v) {
             RenderingTarget shadow;
@@ -1173,15 +1194,24 @@ void RasterRenderer::RecordViews(VkCommandBuffer commands, RenderTargets& target
             vkCmdEndRendering(commands);
         }
     };
+    ERNIE_ZONE("RecordViews");
     if (!occlusion) {
+        ERNIE_GPU_ZONE(context_, commands, "G-buffer");
         draw(DrawPhase::All, false);
     } else {
-        draw(DrawPhase::Occluders, false);
-        BuildHzb(commands, targets);
-        for (const RasterDrawable* drawable : drawables) {
-            drawable->RecordOcclusionCull(commands, targets.Hzb(), firstView, targets.Views());
+        {
+            ERNIE_GPU_ZONE(context_, commands, "G-buffer occluders");
+            draw(DrawPhase::Occluders, false);
         }
-        ShaderBarrier(commands);
+        {
+            ERNIE_GPU_ZONE(context_, commands, "Hi-Z and occlusion cull");
+            BuildHzb(commands, targets);
+            for (const RasterDrawable* drawable : drawables) {
+                drawable->RecordOcclusionCull(commands, targets.Hzb(), firstView, targets.Views());
+            }
+            ShaderBarrier(commands);
+        }
+        ERNIE_GPU_ZONE(context_, commands, "G-buffer occludees");
         draw(DrawPhase::Occludees, true);
     }
     ShadeAndFilter(commands, targets, firstView);
@@ -1251,6 +1281,7 @@ void RasterRenderer::PatchViews(VkCommandBuffer commands, const GpuBuffer& block
 
 void RasterRenderer::RecordViewPoses(VkCommandBuffer commands,
                                      std::span<const RasterDrawable* const> drawables) const {
+    ERNIE_ZONE("Record view poses");
     ViewFields frame;
     frame.viewProjection = offsetof(Uniforms, viewProjection);
     frame.eye = offsetof(Uniforms, eye);
@@ -1277,6 +1308,7 @@ void RasterRenderer::RecordViewPoses(VkCommandBuffer commands,
 }
 
 void RasterRenderer::BuildHzb(VkCommandBuffer commands, RenderTargets& targets) const {
+    ERNIE_ZONE("Record Hi-Z");
     GpuImage& depth = targets.Depth();
     GpuImage& hzb = targets.Hzb();
     depth.Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -1303,6 +1335,7 @@ void RasterRenderer::BuildHzb(VkCommandBuffer commands, RenderTargets& targets) 
 
 void RasterRenderer::ShadeAndFilter(VkCommandBuffer commands, RenderTargets& targets,
                                     std::uint32_t firstView) const {
+    ERNIE_ZONE("ShadeAndFilter");
     targets.PrepareCompute(commands);
     const VkClearColorValue zero{};
     const VkImageSubresourceRange all{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0,
@@ -1322,32 +1355,37 @@ void RasterRenderer::ShadeAndFilter(VkCommandBuffer commands, RenderTargets& tar
     const std::uint32_t groupsX = Groups(extent_.width);
     const std::uint32_t groupsY = Groups(extent_.height);
     const std::uint32_t views = targets.Views();
-    for (const std::size_t model : modelsInUse_) {
-        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
-                          shadingPipelines_.at(model)->Handle());
-        const std::uint32_t constants[4] = {static_cast<std::uint32_t>(model), 0, 0, 0};
-        shadingLayout_.PushConstants(commands, constants, sizeof(constants));
-        for (std::uint32_t v = 0; v < views; ++v) {
-            const std::vector<DescriptorResource> shading{
-                DescriptorResource::Of(shadingUniforms_, (firstView + v) * kShadingStride,
-                                       sizeof(ShadingUniforms)),
-                sampled(targets.GBuffer(0), v),
-                sampled(targets.GBuffer(1), v),
-                sampled(targets.GBuffer(2), v),
-                sampled(targets.Depth(), v),
-                DescriptorResource::Of(*materialTable_),
-                DescriptorResource::Of(sigmoidTable_.View()),
-                DescriptorResource::Of(tableSampler_),
-                general(targets.RasterRadiance().GroupView(v)),
-                DescriptorResource::Of(lightTable_),
-                DescriptorResource::Of(lightShadowMaps_->View()),
-                DescriptorResource::Of(shadowSampler_),
-                DescriptorResource::Of(lightViewMatrices_)};
-            shadingLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, shading);
-            vkCmdDispatch(commands, groupsX, groupsY, 1);
+    {
+        ERNIE_GPU_ZONE(context_, commands, "Shading");
+        for (const std::size_t model : modelsInUse_) {
+            vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                              shadingPipelines_.at(model)->Handle());
+            const std::uint32_t constants[4] = {static_cast<std::uint32_t>(model), 0, 0, 0};
+            shadingLayout_.PushConstants(commands, constants, sizeof(constants));
+            for (std::uint32_t v = 0; v < views; ++v) {
+                const std::vector<DescriptorResource> shading{
+                    DescriptorResource::Of(shadingUniforms_, (firstView + v) * kShadingStride,
+                                           sizeof(ShadingUniforms)),
+                    sampled(targets.GBuffer(0), v),
+                    sampled(targets.GBuffer(1), v),
+                    sampled(targets.GBuffer(2), v),
+                    sampled(targets.Depth(), v),
+                    DescriptorResource::Of(*materialTable_),
+                    DescriptorResource::Of(sigmoidTable_.View()),
+                    DescriptorResource::Of(tableSampler_),
+                    general(targets.RasterRadiance().GroupView(v)),
+                    DescriptorResource::Of(lightTable_),
+                    DescriptorResource::Of(lightShadowMaps_->View()),
+                    DescriptorResource::Of(shadowSampler_),
+                    DescriptorResource::Of(lightViewMatrices_)};
+                shadingLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, shading);
+                vkCmdDispatch(commands, groupsX, groupsY, 1);
+            }
         }
+        ShaderBarrier(commands);
     }
-    ShaderBarrier(commands);
+
+    ERNIE_GPU_ZONE(context_, commands, "Sensor filters");
 
     for (const SensorFilter filter : filters_) {
         vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,

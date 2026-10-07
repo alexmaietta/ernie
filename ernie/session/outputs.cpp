@@ -2,6 +2,7 @@
 
 #include "ernie/scene/sensor_filters.h"
 #include "ernie/session/product_frame.h"
+#include "ernie/util/profile.h"
 
 #include <stdexcept>
 #include <utility>
@@ -134,6 +135,7 @@ std::vector<GpuImage*> RenderVar::Images() const {
 }
 
 MappedRenderVar RenderVar::Map(MapDevice device, std::uintptr_t syncStream) {
+    ERNIE_ZONE("Map render var");
     if (frame_ == nullptr) {
         throw std::invalid_argument("RenderVar::Map on an empty render var");
     }

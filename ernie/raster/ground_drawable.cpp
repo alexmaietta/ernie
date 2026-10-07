@@ -1,6 +1,7 @@
 #include "ernie/raster/ground_drawable.h"
 
 #include "ernie/kernel/embedded_shaders.h"
+#include "ernie/util/profile.h"
 
 #include <glm/gtc/type_ptr.hpp>
 
@@ -86,6 +87,7 @@ void GroundDrawable::SetParams(const GroundParams& params) {
 }
 
 void GroundDrawable::Prepare(const FrameParams& params, std::span<const ShadowCascade>) {
+    ERNIE_ZONE("Ground prepare");
     prepared_ = false;
     if (!enabled_) {
         return;

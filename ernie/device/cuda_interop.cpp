@@ -1,5 +1,7 @@
 #include "ernie/device/cuda_interop.h"
 
+#include "ernie/util/profile.h"
+
 #include <dlfcn.h>
 #include <unistd.h>
 
@@ -582,6 +584,7 @@ void CudaInterop::CheckOnDevice(const Tensor& tensor) const {
 
 void CudaInterop::CopyToBuffer(const Tensor& source, GpuBuffer& buffer, VkDeviceSize offset,
                                std::uintptr_t stream) {
+    ERNIE_ZONE("CUDA copy to buffer");
     CheckOnDevice(source);
     const auto bytes = static_cast<VkDeviceSize>(source.Elements()) * SizeOf(source.Type());
     if (offset > buffer.Size() || bytes > buffer.Size() - offset) {
@@ -692,6 +695,7 @@ Tensor CudaInterop::View(std::shared_ptr<GpuBuffer> buffer, DType type,
 }
 
 Tensor CudaInterop::Upload(const Tensor& host) {
+    ERNIE_ZONE("CUDA upload (waits)");
     if (host.Location().kind != DeviceKind::Cpu) {
         throw std::invalid_argument("CudaInterop::Upload needs a CPU tensor");
     }
@@ -715,6 +719,7 @@ Tensor CudaInterop::Upload(const Tensor& host) {
 }
 
 Tensor CudaInterop::Download(const Tensor& device, std::uintptr_t stream) {
+    ERNIE_ZONE("CUDA download (waits)");
     CheckOnDevice(device);
     Tensor host = Tensor::Zeros(device.Type(), device.Shape());
     const std::size_t bytes = static_cast<std::size_t>(device.Elements()) * SizeOf(device.Type());

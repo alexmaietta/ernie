@@ -1,6 +1,7 @@
 #include "ernie/raster/terrain_drawable.h"
 
 #include "ernie/kernel/embedded_shaders.h"
+#include "ernie/util/profile.h"
 #include "ernie/util/raster_checks.h"
 
 #include <glm/gtc/packing.hpp>
@@ -245,6 +246,7 @@ std::optional<Bounds3> TerrainDrawable::Bounds() const {
 }
 
 void TerrainDrawable::Prepare(const FrameParams& frame, std::span<const ShadowCascade> cascades) {
+    ERNIE_ZONE("Terrain prepare");
     prepared_ = false;
     if (!HasHeightfield()) {
         return;

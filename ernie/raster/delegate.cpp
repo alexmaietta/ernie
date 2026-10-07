@@ -2,8 +2,9 @@
 
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
-
 #include "ernie/session/product_frame.h"
+#include "ernie/util/profile.h"
+
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
@@ -266,6 +267,7 @@ std::uint32_t RasterDelegate::MaterialOf(const Scene& scene, const Path& prim) c
 }
 
 void RasterDelegate::SyncMaterials(const Scene& scene) {
+    ERNIE_ZONE("Sync materials");
     using namespace tokens;
     std::set<Path> seen;
     std::vector<std::string> errors;
@@ -342,6 +344,7 @@ void RasterDelegate::SyncMaterial(const Scene& scene, const Path& path, SyncedMa
 }
 
 void RasterDelegate::SyncHeightfield(const Scene& scene, const Path& terrain) {
+    ERNIE_ZONE("Sync heightfield");
     using namespace tokens;
     if (terrain.IsEmpty() || scene.Read(terrain, kHeights) == nullptr) {
         if (heightfield_) {
@@ -401,6 +404,7 @@ void RasterDelegate::SetMeshPoints(const Scene& scene, const Path& path, std::ui
 }
 
 void RasterDelegate::SyncMeshes(const Scene& scene) {
+    ERNIE_ZONE("Sync meshes");
     using namespace tokens;
     std::set<Path> seen;
     std::vector<std::string> errors;
@@ -471,6 +475,7 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
 }
 
 void RasterDelegate::SyncInstancers(const Scene& scene) {
+    ERNIE_ZONE("Sync instancers");
     using namespace tokens;
     std::set<Path> seen;
     std::vector<std::string> errors;
@@ -537,6 +542,7 @@ void RasterDelegate::SyncInstancers(const Scene& scene) {
 }
 
 void RasterDelegate::Sync(const Scene& scene) {
+    ERNIE_ZONE("Sync");
     if (scene.Id() != sceneId_) {
         sceneId_ = scene.Id();
         cursor_.version = scene.Version();
@@ -567,6 +573,7 @@ void RasterDelegate::Sync(const Scene& scene) {
 }
 
 std::vector<MeshItem> RasterDelegate::Items(const Scene& scene) const {
+    ERNIE_ZONE("Sync items");
     std::set<Path> prototypes;
     for (const auto& [path, synced] : instancers_) {
         for (const Path& prototype : TargetsOf(scene, path, tokens::kPrototypes)) {
@@ -653,9 +660,13 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
                                  std::vector<glm::dmat4> poses, std::vector<std::int32_t> worlds,
                                  std::vector<std::string_view> vars,
                                  std::optional<glm::dmat4> posesParent) {
+    ERNIE_ZONE("UpdatePrims");
     Sync(scene);
     prims_ = prims;
-    FrameParams frame = FrameParamsOf(scene, prims_, extent.width, extent.height);
+    FrameParams frame = [&] {
+        ERNIE_ZONE("FrameParamsOf");
+        return FrameParamsOf(scene, prims_, extent.width, extent.height);
+    }();
     frame.filters.assign(filters.begin(), filters.end());
     frame.poses = std::move(poses);
     frame.posesOnGpu = posesParent.has_value();
@@ -725,6 +736,7 @@ std::shared_ptr<ProductFrame> RasterDelegate::AcquireFrame(const Path& product, 
                                                            int bands, std::uint32_t views,
                                                            bool batched,
                                                            std::span<const std::string_view> vars) {
+    ERNIE_ZONE("AcquireFrame");
     const std::vector<std::string_view> held = RequiredVars(vars);
     std::vector<std::shared_ptr<ProductFrame>>& frames = frames_[product];
     const bool shared = cuda_ != nullptr;
@@ -774,13 +786,17 @@ std::uint32_t RasterDelegate::BeginFrame() {
     nextSlot_ = (nextSlot_ + 1) % FrameUploads::kSlots;
     // Only the frame that last staged its uploads in this slot must have finished: later ones
     // keep running while this one is prepared.
-    context_.WaitForSubmission(slotSubmissions_[slot]);
+    {
+        ERNIE_ZONE("Wait for the slot's frame");
+        context_.WaitForSubmission(slotSubmissions_[slot]);
+    }
     renderer_.BeginFrame(slot);
     return slot;
 }
 
 StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path> products,
                                         const Path& settings) {
+    ERNIE_ZONE("StepAsync");
     CudaInterop* cuda = Cuda();
     const RenderPrims base = ResolveRenderPrims(scene, settings);
     const std::vector<RenderProductSpec> specs = ResolveRenderProducts(scene, products, settings);
@@ -861,6 +877,7 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         const std::vector<RenderTargets*> targets = TargetsOf(*frame->images);
         const RasterDrawable* drawables[] = {&terrain_, &meshes_, &ground_};
         // Every view of the product renders in this one submission, sharing the shadow passes.
+        ERNIE_ZONE_TEXT(spec.product.String());
         submission = context_.SubmitAsync(
             [&](VkCommandBuffer commands) {
                 renderer_.RecordShadows(commands, drawables);
@@ -879,6 +896,7 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
             output.vars.emplace(name, RenderVar(frame, path, name));
         }
     }
+    ERNIE_FRAME_MARK("Step");
     return StepOperation(context_, submission, std::move(outputs));
 }
 

@@ -1,6 +1,7 @@
 #include "ernie/device/frame_uploads.h"
 
 #include "ernie/device/vulkan_context.h"
+#include "ernie/util/profile.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -33,6 +34,7 @@ void FullBarrier(VkCommandBuffer commands) {
 FrameUploads::FrameUploads(const VulkanContext& context) : context_(context) {}
 
 void FrameUploads::Begin(std::uint32_t slot) {
+    ERNIE_ZONE("FrameUploads::Begin");
     if (slot >= kSlots) {
         throw std::out_of_range("FrameUploads::Begin past the last slot");
     }
@@ -95,6 +97,7 @@ void FrameUploads::Write(const GpuBuffer& destination, std::span<const std::byte
 }
 
 void FrameUploads::Record(VkCommandBuffer commands) {
+    ERNIE_ZONE("FrameUploads::Record");
     FullBarrier(commands);
     // Consecutive copies between the same pair of buffers go in one command.
     for (std::size_t first = 0; first < copies_.size();) {

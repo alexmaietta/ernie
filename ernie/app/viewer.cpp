@@ -14,6 +14,7 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/session/delegate.h"
 #include "ernie/session/resolve.h"
+#include "ernie/util/profile.h"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -1110,7 +1111,11 @@ bool Viewer::State::Step() {
     VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vkBeginCommandBuffer(commands, &begin);
-    RecordViewport(commands);
+    gpu->CollectGpuProfile(commands);
+    {
+        ERNIE_ZONE("Viewer viewport");
+        RecordViewport(commands);
+    }
     if (image) {
         RecordUi(commands, image->image, image->view, swapchain->Extent());
     } else {
@@ -1120,6 +1125,7 @@ bool Viewer::State::Step() {
     vkEndCommandBuffer(commands);
     Submit(commands, image ? &*image : nullptr);
     ++frames;
+    ERNIE_FRAME_MARK("Viewer frame");
     if (image && !swapchain->Present(*image)) {
         ResizeSwapchain(framebufferWidth, framebufferHeight);
     }

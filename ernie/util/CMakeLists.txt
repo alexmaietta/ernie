@@ -7,6 +7,7 @@ ernie_add_library(
     PUBLIC
     ernie_glm
     ernie_dlpack
+    ernie_tracy
     PRIVATE
     ernie_stb
     ernie_tinyexr)

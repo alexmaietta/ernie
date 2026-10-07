@@ -1,5 +1,7 @@
 #include "ernie/device/vulkan_context.h"
 
+#include "ernie/device/gpu_profile.h"
+
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -294,6 +296,16 @@ std::unique_ptr<VulkanContext> VulkanContext::Create(const VulkanContextOptions&
         enabled.push_back(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
         enabled.push_back(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
     }
+#if ERNIE_TRACY
+    // Profiling builds put GPU zones on the CPU's timeline with calibrated timestamps.
+    const bool calibratedKhr = Has(deviceExtensions, VK_KHR_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
+    const bool calibratedExt = Has(deviceExtensions, VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
+    if (calibratedKhr) {
+        enabled.push_back(VK_KHR_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
+    } else if (calibratedExt) {
+        enabled.push_back(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
+    }
+#endif
 
     VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationSupport{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR};
@@ -391,12 +403,50 @@ std::unique_ptr<VulkanContext> VulkanContext::Create(const VulkanContextOptions&
     CheckVk(vkCreateCommandPool(c.device_, &poolInfo, nullptr, &c.commandPool_),
             "vkCreateCommandPool");
     c.submissions_ = c.CreateTimelineSemaphore();
+#if ERNIE_TRACY
+    if (c.limits_.timestampComputeAndGraphics) {
+        VkCommandBufferAllocateInfo allocateInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+        allocateInfo.commandPool = c.commandPool_;
+        allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocateInfo.commandBufferCount = 1;
+        VkCommandBuffer commands = VK_NULL_HANDLE;
+        CheckVk(vkAllocateCommandBuffers(c.device_, &allocateInfo, &commands),
+                "vkAllocateCommandBuffers");
+        PFN_vkGetPhysicalDeviceCalibrateableTimeDomainsEXT domains =
+            calibratedKhr   ? vkGetPhysicalDeviceCalibrateableTimeDomainsKHR
+            : calibratedExt ? vkGetPhysicalDeviceCalibrateableTimeDomainsEXT
+                            : nullptr;
+        PFN_vkGetCalibratedTimestampsEXT timestamps = calibratedKhr   ? vkGetCalibratedTimestampsKHR
+                                                      : calibratedExt ? vkGetCalibratedTimestampsEXT
+                                                                      : nullptr;
+        tracy::VkCtx* profiler = TracyVkContextCalibrated(c.physicalDevice_, c.device_, c.queue_,
+                                                          commands, domains, timestamps);
+        vkFreeCommandBuffers(c.device_, c.commandPool_, 1, &commands);
+        const std::string name = "Vulkan: " + c.deviceName_;
+        TracyVkContextName(profiler, name.c_str(), static_cast<std::uint16_t>(name.size()));
+        c.gpuProfiler_ = profiler;
+    }
+#endif
     return context;
+}
+
+void VulkanContext::CollectGpuProfile([[maybe_unused]] VkCommandBuffer commands) const {
+#if ERNIE_TRACY
+    if (gpuProfiler_ != nullptr) {
+        std::lock_guard lock(profilerMutex_);
+        TracyVkCollect(static_cast<tracy::VkCtx*>(gpuProfiler_), commands);
+    }
+#endif
 }
 
 VulkanContext::~VulkanContext() {
     if (device_ != VK_NULL_HANDLE) {
         vkDeviceWaitIdle(device_);
+#if ERNIE_TRACY
+        if (gpuProfiler_ != nullptr) {
+            TracyVkDestroy(static_cast<tracy::VkCtx*>(gpuProfiler_));
+        }
+#endif
         if (submissions_ != VK_NULL_HANDLE) {
             vkDestroySemaphore(device_, submissions_, nullptr);
         }
@@ -464,6 +514,7 @@ VkCommandBuffer VulkanContext::Record(const std::function<void(VkCommandBuffer)>
     VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vkBeginCommandBuffer(commands, &begin);
+    CollectGpuProfile(commands);
     record(commands);
     // Make every write visible to the host and to later submissions.
     VkMemoryBarrier2 barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
@@ -502,6 +553,7 @@ std::vector<VkSemaphoreSubmitInfo> SubmitInfos(std::span<const TimelinePoint> po
 void VulkanContext::Submit(const std::function<void(VkCommandBuffer)>& record,
                            std::span<const TimelinePoint> waits,
                            std::span<const TimelinePoint> signals) const {
+    ERNIE_ZONE("Submit (waits)");
     std::lock_guard lock(submitMutex_);
     RecyclePending();
     VkCommandBuffer commands = Record(record);
@@ -531,6 +583,7 @@ void VulkanContext::Submit(const std::function<void(VkCommandBuffer)>& record,
 std::uint64_t VulkanContext::SubmitAsync(const std::function<void(VkCommandBuffer)>& record,
                                          std::span<const TimelinePoint> waits,
                                          std::span<const TimelinePoint> signals) const {
+    ERNIE_ZONE("SubmitAsync");
     std::lock_guard lock(submitMutex_);
     RecyclePending();
     VkCommandBuffer commands = Record(record);
@@ -557,6 +610,7 @@ std::uint64_t VulkanContext::SubmitAsync(const std::function<void(VkCommandBuffe
 }
 
 bool VulkanContext::WaitForSubmission(std::uint64_t submission, std::uint64_t timeoutNs) const {
+    ERNIE_ZONE("Wait for submission");
     VkSemaphoreWaitInfo wait{VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO};
     wait.semaphoreCount = 1;
     wait.pSemaphores = &submissions_;
@@ -579,6 +633,7 @@ void VulkanContext::RecyclePending() const {
 }
 
 void VulkanContext::WaitForSubmissions() const {
+    ERNIE_ZONE("Wait for every submission");
     std::lock_guard lock(submitMutex_);
     if (pending_.empty()) {
         return;

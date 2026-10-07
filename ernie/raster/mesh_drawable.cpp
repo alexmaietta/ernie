@@ -1,8 +1,8 @@
 #include "ernie/raster/mesh_drawable.h"
 
 #include "ernie/geometry/frustum.h"
-
 #include "ernie/kernel/embedded_shaders.h"
+#include "ernie/util/profile.h"
 
 #include <glm/gtc/type_ptr.hpp>
 #include <meshoptimizer.h>
@@ -298,6 +298,7 @@ void MeshDrawable::CreateGBufferPipeline() {
 }
 
 std::uint32_t MeshDrawable::AddMesh(MeshData data) {
+    ERNIE_ZONE("Mesh add (LOD simplify)");
     if (data.points.size() % 3 != 0 || data.indices.size() % 3 != 0) {
         throw std::invalid_argument("Mesh points and indices must come in threes");
     }
@@ -532,6 +533,7 @@ void MeshDrawable::SetItems(std::vector<MeshItem> items) {
 }
 
 void MeshDrawable::RebuildGeometry() {
+    ERNIE_ZONE("Mesh rebuild geometry");
     std::vector<float> points;
     std::vector<float> normals;
     std::vector<float> colors;
@@ -569,6 +571,7 @@ void MeshDrawable::RebuildGeometry() {
 }
 
 void MeshDrawable::RebuildInstances() {
+    ERNIE_ZONE("Mesh rebuild instances");
     std::vector<float> positions;
     std::vector<float> orientations;
     std::vector<float> scales;
@@ -635,6 +638,7 @@ void MeshDrawable::WriteInstancer(const Instancer& instancer) {
 }
 
 void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCascade> cascades) {
+    ERNIE_ZONE("Mesh prepare");
     viewWorlds_.clear();
     for (std::size_t v = 0; v < params.Views(); ++v) {
         viewWorlds_.push_back(params.ViewWorld(v));
@@ -848,6 +852,7 @@ std::optional<Bounds3> MeshDrawable::RangeBounds(std::size_t item, const WorldRa
 }
 
 void MeshDrawable::Cull(const FrameParams& params, std::span<const ShadowCascade> cascades) {
+    ERNIE_ZONE("Mesh cull lists");
     culling_ = params.culling;
     posesOnGpu_ = params.posesOnGpu;
     occlusion_ = culling_ == Culling::Gpu ? params.occlusion : Occlusion::Off;
@@ -996,6 +1001,7 @@ void MeshDrawable::Cull(const FrameParams& params, std::span<const ShadowCascade
 void MeshDrawable::WriteCullJobs(const std::vector<GpuCullJob>& jobs,
                                  const std::vector<glm::vec4>& views, std::uint32_t visible,
                                  std::uint32_t draws) {
+    ERNIE_ZONE("Mesh write cull jobs");
     cullJobs_.assign(jobs.begin(), jobs.end());
     if (jobs.empty()) {
         return;

@@ -169,6 +169,19 @@ class VulkanContext {
     /// Whether `SubmitAsync` work is still pending on the device.
     bool HasPendingSubmissions() const;
 
+    /// The Tracy Vulkan context of a profiling build (ERNIE_TRACY) for `ERNIE_GPU_ZONE`; null
+    /// otherwise. GPU zones are calibrated against the CPU's clock when the device has
+    /// VK_KHR_calibrated_timestamps (or the EXT).
+    void* GpuProfiler() const {
+        return gpuProfiler_;
+    }
+
+    /// Records into `commands`, outside a rendering pass, the collection of finished GPU zones
+    /// for the profiler; nothing without one. `Submit` and `SubmitAsync` collect at the start
+    /// of every command buffer, so only command buffers recorded elsewhere need it, such as an
+    /// app's frames.
+    void CollectGpuProfile(VkCommandBuffer commands) const;
+
   private:
     VulkanContext() = default;
     void Report(std::string message);
@@ -193,6 +206,8 @@ class VulkanContext {
     bool multiDrawIndirect_ = false;
     bool validation_ = false;
     mutable std::mutex submitMutex_;
+    void* gpuProfiler_ = nullptr;  ///< A tracy::VkCtx in a profiling build.
+    mutable std::mutex profilerMutex_;
     /// Timeline signalled by every `SubmitAsync`, and its command buffers awaiting recycling.
     VkSemaphore submissions_ = VK_NULL_HANDLE;
     mutable std::uint64_t submitted_ = 0;

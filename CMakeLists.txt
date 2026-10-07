@@ -11,6 +11,8 @@ option(ERNIE_BUILD_PYTHON "Build Ernie's Python module" OFF)
 option(ERNIE_BUILD_DEMOS "Build Ernie's C++ demos" ${PROJECT_IS_TOP_LEVEL})
 option(ERNIE_BUILD_APP "Build Ernie's app, the GUI viewer (GLFW, Dear ImGui, ImPlot, ImGuizmo, fonts)"
        OFF)
+option(ERNIE_TRACY "Instrument Ernie for the Tracy profiler (CPU and Vulkan GPU zones, on demand)"
+       OFF)
 
 set(ERNIE_SOURCE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -53,6 +55,7 @@ include(cmake/third_party/dlpack.cmake)
 include(cmake/third_party/stb.cmake)
 include(cmake/third_party/tinyexr.cmake)
 include(cmake/third_party/meshoptimizer.cmake)
+include(cmake/third_party/tracy.cmake)
 
 # Warning and coverage flags: TerrainGen's when built inside it, Ernie's own otherwise.
 add_library(ernie_build_options INTERFACE)
