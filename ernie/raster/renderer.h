@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ernie/device/buffer.h"
+#include "ernie/device/frame_uploads.h"
 #include "ernie/device/image.h"
 #include "ernie/device/pipeline.h"
 #include "ernie/device/shader_compiler.h"
@@ -150,8 +151,8 @@ class RasterRenderer {
 
     /// Writes the frame, shading and sensor uniforms and the material table, fits the shadow
     /// cascades around the drawables' bounds and prepares every drawable. Call once per frame
-    /// before `Record`, only while no submitted frame is still reading the renderer's or the
-    /// drawables' buffers.
+    /// after `BeginFrame` and before `Record`; earlier frames may still be running, since host
+    /// data reaches the buffers through `Uploads` when the frame records.
     /// @throws std::invalid_argument for an invalid camera (`Camera::Check`) or filter
     /// chain (`CheckFilterChain`), a sun or light spectrum with the wrong number of bands, more
     /// than `kMaxLights` lights, or a model whose shading pass fails to compile.
@@ -205,6 +206,16 @@ class RasterRenderer {
     void PatchViews(VkCommandBuffer commands, const GpuBuffer& blocks, VkDeviceSize first,
                     VkDeviceSize stride, const ViewFields& fields) const;
 
+    /// Starts preparing a frame in `FrameUploads` slot `slot`, whose previous frame must have
+    /// finished on the device; the frame's host data then reaches the device with its commands
+    /// (`Uploads`), so earlier frames may still be running while it is prepared.
+    void BeginFrame(std::uint32_t slot);
+
+    /// Host data for the renderer's and the drawables' buffers, copied when the frame records.
+    FrameUploads& Uploads() const {
+        return uploads_;
+    }
+
     /// The buffer the views' poses of a frame with `FrameParams::posesOnGpu` are copied into
     /// before it records (`CudaInterop::CopyToBuffer`), row-major 4x4 float32 per view; valid
     /// after that frame's `Update`.
@@ -212,8 +223,9 @@ class RasterRenderer {
         return *poseBuffer_;
     }
 
-    /// The camera-to-world poses the last frame with poses on the GPU rendered, once it has
-    /// finished, if it had `views` views; otherwise empty. Estimates of the next frame's poses.
+    /// The camera-to-world poses the last frame with poses on the GPU in this `BeginFrame`'s slot
+    /// rendered (a finished frame), if it had `views` views; otherwise empty. Estimates of the
+    /// next frame's poses.
     std::vector<glm::dmat4> LastGpuPoses(std::uint32_t views) const;
 
     /// The number of views of the last `Update` (`FrameParams::Views`).
@@ -287,6 +299,8 @@ class RasterRenderer {
     VkFormat presentFormat_;
     ShaderCompiler compiler_;
     BrdfRegistry brdfs_;
+    /// Recorded by the const `Record*` calls, so mutable.
+    mutable FrameUploads uploads_;
     std::map<std::uint32_t, std::unique_ptr<RasterMaterial>> materials_;
     std::uint32_t nextMaterial_ = 1;
 
@@ -308,7 +322,7 @@ class RasterRenderer {
     /// Whether the last `Update`'s views take their poses from `poseBuffer_`, and the views of
     /// `poseHistory_` (the poses it last rendered) then.
     bool posesOnGpu_ = false;
-    std::uint32_t poseHistoryViews_ = 0;
+    std::array<std::uint32_t, FrameUploads::kSlots> poseHistoryViews_{};
     /// One pass rendering the sun's casters `casters` for cascade `cascade` into shadow map
     /// layer `layer`, starting from a copy of layer 0 with `fromBase`.
     struct ShadowPass {
@@ -335,7 +349,7 @@ class RasterRenderer {
     std::unique_ptr<ComputePipeline> viewsPipeline_;
     GpuBuffer poseCamera_;  ///< views.slang's camera: parent, projection, its inverse.
     std::unique_ptr<GpuBuffer> poseBuffer_;
-    std::unique_ptr<GpuBuffer> poseHistory_;
+    std::array<std::unique_ptr<GpuBuffer>, FrameUploads::kSlots> poseHistory_;
     std::unique_ptr<GraphicsPipeline> presentFloat_;
     std::unique_ptr<GraphicsPipeline> presentUint_;
     /// Present ranges of the last `Update`: near and far plane, full well, ADC maximum.

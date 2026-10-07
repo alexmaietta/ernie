@@ -73,6 +73,8 @@ void main(uint3 id : SV_DispatchThreadID) {
 
 class HexTilingGpuTest : public ernie::testing::VulkanTest {
   protected:
+    std::unique_ptr<ernie::FrameUploads> uploads_;
+
     std::vector<glm::vec3> Sample(const RasterMaterial& material,
                                   const std::vector<glm::vec2>& at) {
         const std::vector<ShaderModuleSource> modules = {
@@ -106,6 +108,7 @@ class HexTilingGpuTest : public ernie::testing::VulkanTest {
         resources.push_back(DescriptorResource::Of(points));
         resources.push_back(DescriptorResource::Of(samples));
         context_->Submit([&](VkCommandBuffer commands) {
+            uploads_->Record(commands);  // the material's uniforms
             pipeline.Dispatch(commands, resources,
                               static_cast<std::uint32_t>((at.size() + 63) / 64));
         });
@@ -142,7 +145,8 @@ std::pair<Image, Image> MatchedRamps(int axis) {
 
 TEST_F(HexTilingGpuTest, SlopesRotateWithTheirTile) {
     for (const int axis : {0, 1}) {
-        RasterMaterial material(*context_);
+        uploads_ = std::make_unique<ernie::FrameUploads>(*context_);
+        RasterMaterial material(*context_, *uploads_);
         const auto [albedo, normal] = MatchedRamps(axis);
         material.SetDetailTextures(&albedo, &normal);
         MaterialSettings settings;

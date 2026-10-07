@@ -97,7 +97,7 @@ std::vector<std::uint32_t> PackedGradients(const RasterView& raster) {
 TerrainDrawable::TerrainDrawable(RasterRenderer& renderer)
     : renderer_(renderer), layout_(renderer.Context(), kBindings, sizeof(DrawConstants)),
       uniforms_(renderer.Context(), kUniformsStride, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                BufferMemory::Upload) {
+                BufferMemory::Device) {
     std::vector<ShaderModuleSource> modules = TerrainModules();
     modules.push_back({"terrain_shadow", shaders::kTerrainShadowSlang});
     const std::vector<std::uint32_t> shadowVertex =
@@ -141,7 +141,7 @@ void TerrainDrawable::ReservePatches(std::size_t count) {
     vkDeviceWaitIdle(renderer_.Context().Device());
     patchBuffer_ =
         std::make_unique<GpuBuffer>(renderer_.Context(), capacity * sizeof(LodPatch),
-                                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Upload);
+                                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
 }
 
 void TerrainDrawable::ClearHeightfield() {
@@ -302,14 +302,15 @@ void TerrainDrawable::Prepare(const FrameParams& frame, std::span<const ShadowCa
     if (uniforms_.Size() < bytes) {
         vkDeviceWaitIdle(renderer_.Context().Device());
         uniforms_ = GpuBuffer(renderer_.Context(), bytes, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                              BufferMemory::Upload);
+                              BufferMemory::Device);
     }
     // Each view morphs its levels of detail around its own eye.
     for (std::size_t v = 0; v < views; ++v) {
         uniforms.lodEye[0] = lodEyes_[v].x;
         uniforms.lodEye[1] = lodEyes_[v].y;
         uniforms.lodEye[2] = lodEyes_[v].z;
-        uniforms_.Write(std::as_bytes(std::span(&uniforms, 1)), v * kUniformsStride);
+        renderer_.Uploads().Write(uniforms_, std::as_bytes(std::span(&uniforms, 1)),
+                                  v * kUniformsStride);
     }
 
     patches_.clear();
@@ -346,7 +347,7 @@ void TerrainDrawable::Prepare(const FrameParams& frame, std::span<const ShadowCa
     }
     if (!patches_.empty()) {
         ReservePatches(patches_.size());
-        patchBuffer_->Write(std::as_bytes(std::span(patches_)));
+        renderer_.Uploads().Write(*patchBuffer_, std::as_bytes(std::span(patches_)));
     }
     prepared_ = true;
 }

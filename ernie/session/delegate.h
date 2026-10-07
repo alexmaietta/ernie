@@ -104,7 +104,10 @@ class RenderDelegate {
     /// several cameras or a camera with `ernie:poses` renders a batch of views (`ViewPosesOf`),
     /// such as one per environment in reinforcement learning, in one submission; its render vars
     /// gain a leading view dimension. Each product renders into a frame of its own that later
-    /// steps reuse once its outputs are dropped and unmapped.
+    /// steps reuse once its outputs are dropped and unmapped. Steps do not wait for earlier ones
+    /// to finish: the next step is prepared while the last renders, so a loop that maps its
+    /// outputs to CUDA without waiting keeps the GPU busy (a backend may bound the steps in
+    /// flight, as the rasterizer does at two).
     /// @throws std::invalid_argument as `ResolveRenderProducts` and `Update`.
     virtual StepOperation StepAsync(const Scene& scene, std::span<const Path> products = {},
                                     const Path& settings = {}) = 0;

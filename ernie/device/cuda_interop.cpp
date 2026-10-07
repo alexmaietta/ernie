@@ -591,6 +591,9 @@ void CudaInterop::CopyToBuffer(const Tensor& source, GpuBuffer& buffer, VkDevice
     if (bytes == 0) {
         return;
     }
+    // Vulkan work already submitted may still read the buffer (frames in flight): the copy
+    // follows it on the GPU.
+    WaitForVulkan(stream);
     const State::Scope scope(*state_);
     const auto onStream = reinterpret_cast<cu::Stream>(stream);
     state_->Check(state_->driver.memcpyDtoDAsync(

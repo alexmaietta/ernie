@@ -8,7 +8,7 @@ namespace ernie {
 
 GpuBuffer::GpuBuffer(const VulkanContext& context, VkDeviceSize size, VkBufferUsageFlags usage,
                      BufferMemory memory)
-    : context_(&context), size_(size), memory_(memory) {
+    : context_(&context), lifetime_(std::make_shared<char>()), size_(size), memory_(memory) {
     VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
     info.size = size;
     info.usage = usage | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -69,8 +69,9 @@ GpuBuffer::GpuBuffer(GpuBuffer&& other) noexcept
       allocation_(std::exchange(other.allocation_, VK_NULL_HANDLE)),
       sharedMemory_(std::exchange(other.sharedMemory_, VK_NULL_HANDLE)),
       allocationSize_(std::exchange(other.allocationSize_, 0)),
-      attached_(std::move(other.attached_)), mapped_(std::exchange(other.mapped_, nullptr)),
-      size_(std::exchange(other.size_, 0)), memory_(other.memory_) {}
+      attached_(std::move(other.attached_)), lifetime_(std::move(other.lifetime_)),
+      mapped_(std::exchange(other.mapped_, nullptr)), size_(std::exchange(other.size_, 0)),
+      memory_(other.memory_) {}
 
 GpuBuffer& GpuBuffer::operator=(GpuBuffer&& other) noexcept {
     if (this != &other) {
@@ -81,6 +82,7 @@ GpuBuffer& GpuBuffer::operator=(GpuBuffer&& other) noexcept {
         sharedMemory_ = std::exchange(other.sharedMemory_, VK_NULL_HANDLE);
         allocationSize_ = std::exchange(other.allocationSize_, 0);
         attached_ = std::move(other.attached_);
+        lifetime_ = std::move(other.lifetime_);
         mapped_ = std::exchange(other.mapped_, nullptr);
         size_ = std::exchange(other.size_, 0);
         memory_ = other.memory_;
@@ -90,6 +92,7 @@ GpuBuffer& GpuBuffer::operator=(GpuBuffer&& other) noexcept {
 
 void GpuBuffer::Release() {
     attached_.reset();
+    lifetime_.reset();
     if (sharedMemory_ != VK_NULL_HANDLE) {
         vkDestroyBuffer(context_->Device(), buffer_, nullptr);
         vkFreeMemory(context_->Device(), sharedMemory_, nullptr);

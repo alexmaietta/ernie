@@ -65,9 +65,10 @@ class CudaInterop {
 
     /// Queues a device-to-device copy of a contiguous tensor on this CUDA device into `buffer` at
     /// byte `offset` on CUDA stream `stream` (DLPack numbering, as `Scene::Write`), so it follows
-    /// the work writing the tensor there, and returns without waiting; Vulkan work reading the
-    /// buffer must wait for `VulkanWait`. Later writes to the tensor on that stream follow the
-    /// copy.
+    /// the work writing the tensor there and the Vulkan work submitted so far (which may still
+    /// read the buffer, `NextVulkanSignal`), and returns without waiting; Vulkan work reading
+    /// the buffer must wait for `VulkanWait`. Later writes to the tensor on that stream follow
+    /// the copy.
     /// @throws std::invalid_argument if the tensor is not a contiguous tensor on this device, the
     /// buffer is not `BufferMemory::Shared`, or the bytes do not fit.
     void CopyToBuffer(const Tensor& source, GpuBuffer& buffer, VkDeviceSize offset = 0,

@@ -35,6 +35,7 @@ ernie_add_test_suite(
     gpu
     SOURCES
     device_cuda_interop_test.cpp
+    device_frame_uploads_test.cpp
     device_pipeline_test.cpp
     device_vulkan_context_test.cpp
     raster_delegate_gpu_test.cpp

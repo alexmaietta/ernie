@@ -338,10 +338,10 @@ std::vector<ShadowCascade> FitLightShadowViews(const Light& light, const glm::ve
 
 RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFormat,
                                BrdfRegistry brdfs)
-    : context_(context), presentFormat_(presentFormat), brdfs_(std::move(brdfs)),
-      uniforms_(context, kUniformsStride, kViewUniformUsage, BufferMemory::Upload),
+    : context_(context), presentFormat_(presentFormat), brdfs_(std::move(brdfs)), uploads_(context),
+      uniforms_(context, kUniformsStride, kViewUniformUsage, BufferMemory::Device),
       shadowUniforms_(context, sizeof(ShadowUniforms), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                      BufferMemory::Upload),
+                      BufferMemory::Device),
       clampSampler_(context, SamplerDesc{}),
       shadowSampler_(context, SamplerDesc{VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST,
                                           VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 1.0f, true}),
@@ -349,17 +349,17 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
       filterLayout_(context, kFilterBindings), presentLayout_(context, kPresentBindings, 32),
       hzbLayout_(context, kHzbBindings, 16), viewsLayout_(context, kViewsBindings, 48),
       poseCamera_(context, kPoseCameraBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                  BufferMemory::Upload),
+                  BufferMemory::Device),
       sigmoidTable_(context, ImageDesc{kTableResolution, kTableResolution, kTableResolution, 1,
                                        VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT}),
       tableSampler_(context, SamplerDesc{VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST,
                                          VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 1.0f, false}),
-      shadingUniforms_(context, kShadingStride, kViewUniformUsage, BufferMemory::Upload),
-      sensorUniforms_(context, kSensorStride, kViewUniformUsage, BufferMemory::Upload),
+      shadingUniforms_(context, kShadingStride, kViewUniformUsage, BufferMemory::Device),
+      sensorUniforms_(context, kSensorStride, kViewUniformUsage, BufferMemory::Device),
       lightTable_(context, kMaxLights * sizeof(LightGpu), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                  BufferMemory::Upload),
+                  BufferMemory::Device),
       lightViewMatrices_(context, kMaxLightShadowViews * sizeof(glm::mat4),
-                         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Upload) {
+                         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device) {
     if (brdfs_.Models().empty()) {
         throw std::invalid_argument("RasterRenderer needs at least one BRDF");
     }
@@ -367,7 +367,7 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
     if (brdfs_.Find(defaults.brdf) == nullptr) {
         defaults.brdf = brdfs_.Models().front().id;
     }
-    materials_.emplace(kDefaultMaterial, std::make_unique<RasterMaterial>(context_));
+    materials_.emplace(kDefaultMaterial, std::make_unique<RasterMaterial>(context_, uploads_));
     SetMaterial(kDefaultMaterial, defaults);
     CreateShadowMaps(1, kMaxCascades);
     CreateLightShadowMaps(1, 1);
@@ -441,7 +441,7 @@ std::uint32_t RasterRenderer::AddMaterial(const MaterialSettings& settings) {
         throw std::invalid_argument("Unknown BRDF: " + settings.brdf);
     }
     const std::uint32_t id = nextMaterial_++;
-    materials_.emplace(id, std::make_unique<RasterMaterial>(context_));
+    materials_.emplace(id, std::make_unique<RasterMaterial>(context_, uploads_));
     SetMaterial(id, settings);
     return id;
 }
@@ -557,14 +557,14 @@ void RasterRenderer::WriteLights(const FrameParams& params, const std::optional<
         std::copy(light.spectrum.begin(), light.spectrum.end(), entry.spectrum);
     }
     if (!table.empty()) {
-        lightTable_.Write(std::as_bytes(std::span(table)));
+        uploads_.Write(lightTable_, std::as_bytes(std::span(table)));
     }
     std::vector<glm::mat4> matrices;
     for (const ShadowCascade& view : lightViews_) {
         matrices.push_back(view.lightViewProjection);
     }
     if (!matrices.empty()) {
-        lightViewMatrices_.Write(std::as_bytes(std::span(matrices)));
+        uploads_.Write(lightViewMatrices_, std::as_bytes(std::span(matrices)));
         const auto layers = static_cast<std::uint32_t>(lightViews_.size());
         if (resolution != lightResolution_ || layers > lightShadowMaps_->Desc().layers) {
             CreateLightShadowMaps(resolution, layers);
@@ -769,7 +769,7 @@ void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable*
             uniforms.sunShadow[1] = OrthographicDepth(own.lightViewProjection);
             uniforms.sunShadow[2] = 1.0f;
         }
-        uniforms_.Write(std::as_bytes(std::span(&uniforms, 1)), v * kUniformsStride);
+        uploads_.Write(uniforms_, std::as_bytes(std::span(&uniforms, 1)), v * kUniformsStride);
     }
 
     ShadowUniforms shadowUniforms{};
@@ -793,7 +793,7 @@ void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable*
         shadowUniforms.poisson[2 * i] = poisson_[i].x;
         shadowUniforms.poisson[2 * i + 1] = poisson_[i].y;
     }
-    shadowUniforms_.Write(std::as_bytes(std::span(&shadowUniforms, 1)));
+    uploads_.Write(shadowUniforms_, std::as_bytes(std::span(&shadowUniforms, 1)));
 
     params.camera.Check();
     if (params.camera.sensor.channels.size() > 4) {
@@ -875,9 +875,9 @@ void RasterRenderer::WriteMaterialTable() {
     if (materialTable_ == nullptr || materialTable_->Size() < bytes) {
         vkDeviceWaitIdle(context_.Device());
         materialTable_ = std::make_unique<GpuBuffer>(
-            context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Upload);
+            context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
     }
-    materialTable_->Write(std::as_bytes(std::span(table)));
+    uploads_.Write(*materialTable_, std::as_bytes(std::span(table)));
 }
 
 void RasterRenderer::WriteShading(const FrameParams& params) {
@@ -929,7 +929,7 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
                 shading.view[0] |= 1u << k;
             }
         }
-        shadingUniforms_.Write(std::as_bytes(std::span(&shading, 1)), v * kShadingStride);
+        uploads_.Write(shadingUniforms_, std::as_bytes(std::span(&shading, 1)), v * kShadingStride);
     }
 }
 
@@ -1012,7 +1012,7 @@ void RasterRenderer::WriteSensor(const FrameParams& params) {
         sensor.forward[2] = view.forward.z;
         // Every view of a batch has noise of its own; view 0's is the single view's.
         sensor.noise[2] = FrameSeed(model.seed, params.stream ^ (v * 0x9E3779B9u), params.frame);
-        sensorUniforms_.Write(std::as_bytes(std::span(&sensor, 1)), v * kSensorStride);
+        uploads_.Write(sensorUniforms_, std::as_bytes(std::span(&sensor, 1)), v * kSensorStride);
     }
 }
 
@@ -1022,11 +1022,11 @@ void RasterRenderer::EnsureViewBuffers(std::uint32_t views) {
     }
     vkDeviceWaitIdle(context_.Device());
     uniforms_ =
-        GpuBuffer(context_, views * kUniformsStride, kViewUniformUsage, BufferMemory::Upload);
+        GpuBuffer(context_, views * kUniformsStride, kViewUniformUsage, BufferMemory::Device);
     shadingUniforms_ =
-        GpuBuffer(context_, views * kShadingStride, kViewUniformUsage, BufferMemory::Upload);
+        GpuBuffer(context_, views * kShadingStride, kViewUniformUsage, BufferMemory::Device);
     sensorUniforms_ =
-        GpuBuffer(context_, views * kSensorStride, kViewUniformUsage, BufferMemory::Upload);
+        GpuBuffer(context_, views * kSensorStride, kViewUniformUsage, BufferMemory::Device);
 }
 
 RasterFrame RasterRenderer::Frame(std::uint32_t view) const {
@@ -1064,6 +1064,8 @@ void RasterRenderer::RecordShadows(VkCommandBuffer commands,
     if (!updated_) {
         return;
     }
+    // The frame's host data first, after every earlier frame's use of the buffers it fills.
+    uploads_.Record(commands);
     if (posesOnGpu_) {
         RecordViewPoses(commands, drawables);
     }
@@ -1185,29 +1187,37 @@ void RasterRenderer::RecordViews(VkCommandBuffer commands, RenderTargets& target
     ShadeAndFilter(commands, targets, firstView);
 }
 
+void RasterRenderer::BeginFrame(std::uint32_t slot) {
+    uploads_.Begin(slot);
+}
+
 void RasterRenderer::WritePoseCamera(const FrameParams& params) {
     const glm::mat4 projection = params.View().projection;
     const glm::mat4 camera[] = {glm::mat4(params.posesParent), projection,
                                 glm::inverse(projection)};
-    poseCamera_.Write(std::as_bytes(std::span(camera)));
+    uploads_.Write(poseCamera_, std::as_bytes(std::span(camera)));
     const VkDeviceSize bytes = views_ * sizeof(glm::mat4);
     if (poseBuffer_ == nullptr || poseBuffer_->Size() < bytes) {
         vkDeviceWaitIdle(context_.Device());
         poseBuffer_ = std::make_unique<GpuBuffer>(
             context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Shared);
-        poseHistory_ = std::make_unique<GpuBuffer>(
-            context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Readback);
+        poseHistoryViews_.fill(0);
+        for (std::unique_ptr<GpuBuffer>& history : poseHistory_) {
+            history = std::make_unique<GpuBuffer>(
+                context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Readback);
+        }
     }
-    poseHistoryViews_ = views_;
+    poseHistoryViews_[uploads_.Slot()] = views_;
 }
 
 std::vector<glm::dmat4> RasterRenderer::LastGpuPoses(std::uint32_t views) const {
     std::vector<glm::dmat4> poses;
-    if (poseHistory_ == nullptr || views != poseHistoryViews_ || views == 0) {
+    const std::uint32_t slot = uploads_.Slot();
+    if (poseHistory_[slot] == nullptr || views != poseHistoryViews_[slot] || views == 0) {
         return poses;
     }
     std::vector<glm::mat4> read(views);
-    poseHistory_->Read(std::as_writable_bytes(std::span(read)));
+    poseHistory_[slot]->Read(std::as_writable_bytes(std::span(read)));
     poses.assign(read.begin(), read.end());
     return poses;
 }
@@ -1259,7 +1269,7 @@ void RasterRenderer::RecordViewPoses(VkCommandBuffer commands,
     // The poses rendered, for the CPU's estimates of the next frame's.
     ViewFields history;
     history.pose = 0;
-    PatchViews(commands, *poseHistory_, 0, sizeof(glm::mat4), history);
+    PatchViews(commands, *poseHistory_[uploads_.Slot()], 0, sizeof(glm::mat4), history);
     for (const RasterDrawable* drawable : drawables) {
         drawable->RecordViewPoses(commands);
     }

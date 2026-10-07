@@ -3,6 +3,7 @@ ernie_add_library(
     SOURCES
     buffer.cpp
     cuda_interop.cpp
+    frame_uploads.cpp
     image.cpp
     offscreen_target.cpp
     pipeline.cpp

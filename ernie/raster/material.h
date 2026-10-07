@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ernie/device/buffer.h"
+#include "ernie/device/frame_uploads.h"
 #include "ernie/device/image.h"
 #include "ernie/device/pipeline.h"
 #include "ernie/scene/material.h"
@@ -36,7 +37,8 @@ namespace ernie {
 ///   Techniques 9(3), 2020 (pcg2d, for per-tile rotations and offsets).
 class RasterMaterial {
   public:
-    explicit RasterMaterial(const VulkanContext& context);
+    /// Its uniforms reach the device through `uploads`, which must outlive it.
+    RasterMaterial(const VulkanContext& context, FrameUploads& uploads);
     RasterMaterial(const RasterMaterial&) = delete;
     RasterMaterial& operator=(const RasterMaterial&) = delete;
 
@@ -121,6 +123,7 @@ class RasterMaterial {
                                          ImageEncoding encoding, VkFormat format) const;
 
     const VulkanContext& context_;
+    FrameUploads& uploads_;
     MaterialSettings settings_;
     std::vector<float> params_;
     Spectrum reflectance_ = Spectrum::Constant(1.0);

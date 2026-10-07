@@ -56,7 +56,7 @@ constexpr DescriptorBinding kBindings[] = {
 
 GroundDrawable::GroundDrawable(RasterRenderer& renderer)
     : renderer_(renderer), layout_(renderer.Context(), kBindings, kDrawConstantsSize),
-      uniforms_(renderer.Context(), kUniformsStride, kUniformsUsage, BufferMemory::Upload) {
+      uniforms_(renderer.Context(), kUniformsStride, kUniformsUsage, BufferMemory::Device) {
     const std::vector<ShaderModuleSource> modules{{"brdf", std::string(BrdfSlang())},
                                                   {"frame", shaders::kFrameSlang},
                                                   {"surface", shaders::kSurfaceSlang},
@@ -106,12 +106,13 @@ void GroundDrawable::Prepare(const FrameParams& params, std::span<const ShadowCa
     const VkDeviceSize bytes = params.Views() * kUniformsStride;
     if (uniforms_.Size() < bytes) {
         vkDeviceWaitIdle(renderer_.Context().Device());
-        uniforms_ = GpuBuffer(renderer_.Context(), bytes, kUniformsUsage, BufferMemory::Upload);
+        uniforms_ = GpuBuffer(renderer_.Context(), bytes, kUniformsUsage, BufferMemory::Device);
     }
     for (std::size_t v = 0; v < params.Views(); ++v) {
         const glm::mat4 inverse = glm::inverse(params.View(v).ViewProjection());
         std::memcpy(uniforms.invViewProj, glm::value_ptr(inverse), sizeof(uniforms.invViewProj));
-        uniforms_.Write(std::as_bytes(std::span(&uniforms, 1)), v * kUniformsStride);
+        renderer_.Uploads().Write(uniforms_, std::as_bytes(std::span(&uniforms, 1)),
+                                  v * kUniformsStride);
     }
     prepared_ = true;
 }

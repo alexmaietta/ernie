@@ -641,6 +641,9 @@ std::vector<MeshItem> RasterDelegate::Items(const Scene& scene) const {
 }
 
 void RasterDelegate::Update(const Scene& scene, const Path& settings, VkExtent2D extent) {
+    // The caller records and submits the frame itself, so nothing may still be running.
+    context_.WaitForSubmissions();
+    BeginFrame();
     const RenderPrims prims = ResolveRenderPrims(scene, settings);
     UpdatePrims(scene, prims, extent, NextFrame(scene, prims.settings, prims.settings));
 }
@@ -650,7 +653,6 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
                                  std::vector<glm::dmat4> poses, std::vector<std::int32_t> worlds,
                                  std::vector<std::string_view> vars,
                                  std::optional<glm::dmat4> posesParent) {
-    context_.WaitForSubmissions();
     Sync(scene);
     prims_ = prims;
     FrameParams frame = FrameParamsOf(scene, prims_, extent.width, extent.height);
@@ -728,11 +730,17 @@ std::shared_ptr<ProductFrame> RasterDelegate::AcquireFrame(const Path& product, 
     const bool shared = cuda_ != nullptr;
     std::erase_if(frames, [&](const std::shared_ptr<ProductFrame>& frame) {
         const RenderTargets& targets = *TargetsOf(*frame->images).front();
-        return frame.use_count() == 1 && frame->arrayMaps == 0 &&
-               (targets.Extent().width != extent.width ||
-                targets.Extent().height != extent.height || targets.Bands() != bands ||
-                targets.Shared() != shared || frame->images->Views() != views ||
-                frame->batched != batched || targets.Vars() != held);
+        const bool stale = frame.use_count() == 1 && frame->arrayMaps == 0 &&
+                           (targets.Extent().width != extent.width ||
+                            targets.Extent().height != extent.height || targets.Bands() != bands ||
+                            targets.Shared() != shared || frame->images->Views() != views ||
+                            frame->batched != batched || targets.Vars() != held);
+        if (stale) {
+            // Earlier steps may still render into it, and maps copy from it: rare, so wait for
+            // everything.
+            context_.WaitForSubmissions();
+        }
+        return stale;
     });
     for (const std::shared_ptr<ProductFrame>& frame : frames) {
         if (frame.use_count() == 1 && frame->arrayMaps == 0) {
@@ -761,15 +769,25 @@ std::shared_ptr<ProductFrame> RasterDelegate::AcquireFrame(const Path& product, 
     return frame;
 }
 
+std::uint32_t RasterDelegate::BeginFrame() {
+    const std::uint32_t slot = nextSlot_;
+    nextSlot_ = (nextSlot_ + 1) % FrameUploads::kSlots;
+    // Only the frame that last staged its uploads in this slot must have finished: later ones
+    // keep running while this one is prepared.
+    context_.WaitForSubmission(slotSubmissions_[slot]);
+    renderer_.BeginFrame(slot);
+    return slot;
+}
+
 StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path> products,
                                         const Path& settings) {
-    context_.WaitForSubmissions();
     CudaInterop* cuda = Cuda();
     const RenderPrims base = ResolveRenderPrims(scene, settings);
     const std::vector<RenderProductSpec> specs = ResolveRenderProducts(scene, products, settings);
     RenderProductSetOutputs outputs;
     std::uint64_t submission = 0;
     for (const RenderProductSpec& spec : specs) {
+        const std::uint32_t slot = BeginFrame();
         RenderPrims prims = base;
         if (!spec.camera.IsEmpty()) {
             prims.camera = spec.camera;
@@ -854,6 +872,7 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
             },
             waits, signals);
         frame->submission = submission;
+        slotSubmissions_[slot] = submission;
         RenderProductOutput& output = outputs[spec.product];
         output.product = spec.product;
         for (const auto& [path, name] : spec.vars) {

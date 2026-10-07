@@ -74,8 +74,9 @@ class RasterDrawable {
     /// Prepares the next frame once the views and shadow views are final, for example selecting
     /// levels of detail for every view (`params.View(v)` for each of `params.Views()`) and each
     /// shadow view (orthographic or perspective; only their `lightViewProjection` applies to
-    /// every view). Called by `RasterRenderer::Update`, only while no submitted frame is reading
-    /// the drawable's buffers.
+    /// every view). Called by `RasterRenderer::Update` while earlier frames may still be running:
+    /// host data for buffers they read goes through `RasterRenderer::Uploads`, and buffers are
+    /// replaced only after `vkDeviceWaitIdle`.
     virtual void Prepare(const FrameParams& params, std::span<const ShadowCascade> cascades) = 0;
 
     /// Records compute work the frame's draws depend on, such as culling instances on the GPU,

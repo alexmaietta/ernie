@@ -170,6 +170,9 @@ class RasterDelegate : public RenderDelegate {
                      std::span<const SensorFilter> filters = {}, std::vector<glm::dmat4> poses = {},
                      std::vector<std::int32_t> worlds = {}, std::vector<std::string_view> vars = {},
                      std::optional<glm::dmat4> posesParent = std::nullopt);
+    /// Takes the next `FrameUploads` slot for a frame, once the frame that last used it has
+    /// finished; returns it.
+    std::uint32_t BeginFrame();
     std::shared_ptr<ProductFrame> AcquireFrame(const Path& product, VkExtent2D extent, int bands,
                                                std::uint32_t views, bool batched,
                                                std::span<const std::string_view> vars);
@@ -190,6 +193,9 @@ class RasterDelegate : public RenderDelegate {
     mutable std::vector<Path> primPaths_;
     std::map<Path, std::vector<std::shared_ptr<ProductFrame>>> frames_;
     std::vector<std::shared_ptr<GpuBuffer>> linearPool_;
+    /// Per `FrameUploads` slot, the submission that last used it; the slot to use next.
+    std::array<std::uint64_t, FrameUploads::kSlots> slotSubmissions_{};
+    std::uint32_t nextSlot_ = 0;
     ChangeCursor cursor_;
     std::uint64_t sceneId_ = 0;
     RenderPrims prims_;

@@ -72,6 +72,12 @@ class GpuBuffer {
         return attached_;
     }
 
+    /// Expires when the buffer is destroyed or replaced by assignment, for work queued for it
+    /// later (`FrameUploads`).
+    std::weak_ptr<const void> Lifetime() const {
+        return lifetime_;
+    }
+
   private:
     void Release();
 
@@ -81,6 +87,7 @@ class GpuBuffer {
     VkDeviceMemory sharedMemory_ = VK_NULL_HANDLE;
     VkDeviceSize allocationSize_ = 0;
     std::shared_ptr<void> attached_;
+    std::shared_ptr<const void> lifetime_;
     void* mapped_ = nullptr;
     VkDeviceSize size_ = 0;
     BufferMemory memory_ = BufferMemory::Device;

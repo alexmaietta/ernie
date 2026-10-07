@@ -44,9 +44,10 @@ std::span<const std::byte> Bytes(const auto& values) {
 
 }  // namespace
 
-RasterMaterial::RasterMaterial(const VulkanContext& context)
-    : context_(context), uniform_(context, sizeof(SurfaceUniforms),
-                                  VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, BufferMemory::Upload),
+RasterMaterial::RasterMaterial(const VulkanContext& context, FrameUploads& uploads)
+    : context_(context), uploads_(uploads),
+      uniform_(context, sizeof(SurfaceUniforms), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+               BufferMemory::Device),
       sampler_(context, SamplerDesc{VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_LINEAR,
                                     VK_SAMPLER_ADDRESS_MODE_REPEAT, 16.0f, false}) {
     ClearAlbedoMap();
@@ -194,7 +195,7 @@ void RasterMaterial::WriteUniform() {
     u.hex[3] = std::max(detail.hexSharpness, 1.0f);
     const std::size_t count = std::min(brdfParams.size(), BrdfRegistry::kMaxParams);
     std::memcpy(u.params, brdfParams.data(), count * sizeof(float));
-    uniform_.Write(std::as_bytes(std::span(&u, 1)));
+    uploads_.Write(uniform_, std::as_bytes(std::span(&u, 1)));
 }
 
 std::uint64_t RasterMaterial::GpuBytes() const {

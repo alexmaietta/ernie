@@ -8,7 +8,8 @@ Poses written as a contiguous float32 CUDA array (any DLPack array: PyTorch, JAX
 here `Renderer.cuda_upload` stands in for the simulator's) are copied device to device and each
 view's matrices are computed on the GPU, so a step never waits for the host to read them: the CPU
 prepares the frame while the simulator's queued GPU work still runs, which downloading the poses
-would have to wait for.
+would have to wait for. Stepping with `step_async` and mapping the outputs to CUDA without
+waiting lets the CPU prepare the next step while the GPU renders this one.
 Setting `ernie:poses:device` (`tokens.POSES_DEVICE`) to "host" on the camera downloads them
 instead, which lets CPU stages see exact poses (see `tokens.POSES_DEVICE`).
 """
@@ -70,7 +71,10 @@ def main():
             if physics:
                 renderer.cuda_copy(state[0], state[1])
             scene.write("/World/Camera", tokens.POSES, poses)
-            product = renderer.step(scene, render_products=["/Render/Batch"])["/Render/Batch"]
+            # Submit and take the outputs without waiting: the CUDA mapping orders on the GPU,
+            # and the next step is prepared while this one renders.
+            step = renderer.step_async(scene, render_products=["/Render/Batch"])
+            product = step.outputs()["/Render/Batch"]
             product.frames[0].render_vars["/Render/Batch/LdrColor"].map(device=ernie.Device.CUDA)
         return (time.perf_counter() - start) / steps * 1e3
 

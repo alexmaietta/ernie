@@ -623,13 +623,14 @@ void MeshDrawable::WriteInstancer(const Instancer& instancer) {
         return;
     }
     const InstanceData& data = instancer.data;
-    positions_->Write(std::as_bytes(std::span(data.positions)), first * 3 * sizeof(float));
+    FrameUploads& uploads = renderer_.Uploads();
+    uploads.Write(*positions_, std::as_bytes(std::span(data.positions)), first * 3 * sizeof(float));
     if (!data.orientations.empty()) {
-        orientations_->Write(std::as_bytes(std::span(data.orientations)),
-                             first * 4 * sizeof(float));
+        uploads.Write(*orientations_, std::as_bytes(std::span(data.orientations)),
+                      first * 4 * sizeof(float));
     }
     if (!data.scales.empty()) {
-        scales_->Write(std::as_bytes(std::span(data.scales)), first * 3 * sizeof(float));
+        uploads.Write(*scales_, std::as_bytes(std::span(data.scales)), first * 3 * sizeof(float));
     }
 }
 
@@ -648,8 +649,8 @@ void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCasc
             if (!mesh.devicePoints.Empty()) {
                 CopyDevicePoints(mesh);
             } else {
-                points_->Write(std::as_bytes(std::span(mesh.data.points)),
-                               VkDeviceSize{mesh.firstVertex} * 3 * sizeof(float));
+                renderer_.Uploads().Write(*points_, std::as_bytes(std::span(mesh.data.points)),
+                                          VkDeviceSize{mesh.firstVertex} * 3 * sizeof(float));
             }
             mesh.pointsDirty = false;
         }
@@ -714,13 +715,13 @@ void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCasc
         vkDeviceWaitIdle(context_.Device());
         draws_ = StorageBuffer(context_, draws);
     } else if (!draws.empty()) {
-        draws_->Write(std::as_bytes(std::span(draws)));
+        renderer_.Uploads().Write(*draws_, std::as_bytes(std::span(draws)));
     }
     if (instanceIds_->Size() < bytes(instanceIds)) {
         vkDeviceWaitIdle(context_.Device());
         instanceIds_ = StorageBuffer(context_, instanceIds);
     } else if (!instanceIds.empty()) {
-        instanceIds_->Write(std::as_bytes(std::span(instanceIds)));
+        renderer_.Uploads().Write(*instanceIds_, std::as_bytes(std::span(instanceIds)));
     }
     Cull(params, cascades);
 }
@@ -970,8 +971,8 @@ void MeshDrawable::Cull(const FrameParams& params, std::span<const ShadowCascade
     WriteCullJobs(jobs, views, visible, draws);
     if (!records.empty()) {
         Reserve(context_, drawRecords_, records.size() * sizeof(glm::uvec4),
-                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Upload);
-        drawRecords_->Write(std::as_bytes(std::span(records)));
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+        renderer_.Uploads().Write(*drawRecords_, std::as_bytes(std::span(records)));
     }
     // One visibility bit per (view, instance id) for two-pass occlusion culling, forgotten when
     // the views or the instances change.
@@ -1044,8 +1045,8 @@ void MeshDrawable::WriteCullJobs(const std::vector<GpuCullJob>& jobs,
     }
     const auto upload = [&](std::unique_ptr<GpuBuffer>& buffer, std::span<const std::byte> bytes) {
         Reserve(context_, buffer, bytes.size(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                BufferMemory::Upload);
-        buffer->Write(bytes);
+                BufferMemory::Device);
+        renderer_.Uploads().Write(*buffer, bytes);
     };
     upload(cullItemBuffer_, std::as_bytes(std::span(items)));
     upload(cullJobBuffer_, std::as_bytes(std::span(jobs)));

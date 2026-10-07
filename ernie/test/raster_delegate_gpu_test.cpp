@@ -14,10 +14,12 @@
 #include <array>
 #include <cmath>
 #include <cstring>
+#include <functional>
 #include <map>
 #include <memory>
 #include <vector>
 
+using ernie::DeviceKind;
 using ernie::DType;
 using ernie::OrbitController;
 using ernie::Path;
@@ -2339,4 +2341,124 @@ TEST_F(RasterDelegateTest, GpuPosedViewsCullInstancesAgainstTheirOwnFrusta) {
     const Tensor poses = *scene.Read("/World/Rig/Camera", tokens::kPoses);
     scene.Write("/World/Rig/Camera", tokens::kPoses, cuda->Upload(poses));
     EXPECT_EQ(kept(), host) << "the GPU poses' frusta keep exactly the host poses' instances";
+}
+
+namespace {
+
+/// LdrColor of every step of `scene` after `change(scene, step)`, all submitted before any is
+/// fetched (`pipelined`), or each fetched before the next.
+std::vector<std::vector<std::uint8_t>> Steps(RasterDelegate& delegate, Scene& scene,
+                                             const std::function<void(Scene&, int)>& change,
+                                             int steps, bool pipelined) {
+    const Path product[] = {"/Render/Posed"};
+    std::vector<ernie::StepOperation> operations;
+    std::vector<std::vector<std::uint8_t>> images;
+    const auto fetch = [&](ernie::StepOperation& operation) {
+        images.push_back(Bytes(operation.Fetch()
+                                   .at("/Render/Posed")
+                                   .vars.at("LdrColor")
+                                   .Map(ernie::MapDevice::Cpu)
+                                   .tensor));
+    };
+    for (int step = 0; step < steps; ++step) {
+        change(scene, step);
+        operations.push_back(delegate.StepAsync(scene, product));
+        if (!pipelined) {
+            fetch(operations.back());
+        }
+    }
+    if (pipelined) {
+        for (ernie::StepOperation& operation : operations) {
+            fetch(operation);
+        }
+    }
+    return images;
+}
+
+}  // namespace
+
+namespace {
+
+constexpr std::size_t kFourViews = 4;
+
+/// PosedRowScene with a few more views and pixels.
+Scene PosedRowSceneOfFour() {
+    Scene scene = PosedRowScene(kFourViews);
+    scene.Set("/Render/Posed", tokens::kResolution, glm::ivec2(96, 96));
+    return scene;
+}
+
+}  // namespace
+
+TEST_F(RasterDelegateTest, StepsInFlightRenderAsStepsOneAtATime) {
+    // Every step moves the row and the views; later steps are prepared while earlier ones still
+    // render, so their host data must not reach the frames in flight.
+    const auto change = [](Scene& scene, int step) {
+        std::vector<float> positions;
+        for (int i = -20; i <= 20; ++i) {
+            positions.insert(positions.end(),
+                             {5.0f * static_cast<float>(i) + 1.5f * static_cast<float>(step),
+                              -20.0f + 2.0f * static_cast<float>(step % 3), 0.0f});
+        }
+        scene.Write("/World/Row", tokens::kPositions, Tensor::Copy<float>(positions, {41, 3}));
+        scene.Set("/World/Rig", tokens::kTransform,
+                  glm::translate(glm::dmat4(1.0), glm::dvec3(2.0 * step, -4.0, 0.0)));
+    };
+    constexpr int kSteps = 6;
+    Scene oneAtATime = PosedRowSceneOfFour();
+    RasterDelegate reference(*context_);
+    const auto expected = Steps(reference, oneAtATime, change, kSteps, false);
+    ASSERT_NE(expected.front(), expected.back()) << "the steps differ";
+
+    RasterDelegate delegate(*context_);
+    Scene pipelined = PosedRowSceneOfFour();
+    const auto images = Steps(delegate, pipelined, change, kSteps, true);
+    for (int step = 0; step < kSteps; ++step) {
+        EXPECT_EQ(images[step], expected[step]) << "step " << step;
+    }
+
+    // Poses copied from CUDA each step, in flight too.
+    std::string why;
+    ernie::CudaInterop* cuda = delegate.Cuda(&why);
+    if (cuda == nullptr) {
+        GTEST_SKIP() << "No CUDA interop: " << why;
+    }
+    // Every step's poses on the GPU up front: uploading or reading them back during the steps
+    // would wait for the work queued before. Each step's views turn a little further.
+    const Tensor firstPoses = *PosedRowSceneOfFour().Read("/World/Rig/Camera", tokens::kPoses);
+    std::vector<Tensor> posesOfStep;
+    for (int step = 0; step < kSteps; ++step) {
+        std::vector<float> turned(firstPoses.As<float>(),
+                                  firstPoses.As<float>() + firstPoses.Elements());
+        for (std::size_t v = 0; v < kFourViews; ++v) {
+            turned[v * 16 + 3] += 0.5f * static_cast<float>(step);
+        }
+        posesOfStep.push_back(cuda->Upload(
+            Tensor::Copy<float>(turned, {static_cast<std::int64_t>(kFourViews), 4, 4})));
+    }
+    const auto onGpu = [&](Scene& scene, int step) {
+        change(scene, step);
+        scene.Write("/World/Rig/Camera", tokens::kPoses,
+                    posesOfStep[static_cast<std::size_t>(step)]);
+    };
+    Scene gpuOneAtATime = PosedRowSceneOfFour();
+    Scene gpuPipelined = PosedRowSceneOfFour();
+    const auto gpuExpected = Steps(reference, gpuOneAtATime, onGpu, kSteps, false);
+    // Long CUDA work queued before the first step's poses holds every frame back on the GPU, as
+    // a simulator's would, while the host prepares the later steps as far ahead as it may.
+    const std::vector<float> zeros(std::size_t{1} << 26);  // 256 MiB
+    const Tensor busy = cuda->Upload(Tensor::Copy<float>(zeros, {1 << 26}));
+    const Tensor busyCopy = cuda->Upload(Tensor::Copy<float>(zeros, {1 << 26}));
+    const auto stalled = [&](Scene& scene, int step) {
+        if (step == 0) {
+            for (int i = 0; i < 30; ++i) {
+                cuda->Copy(busy, busyCopy);
+            }
+        }
+        onGpu(scene, step);
+    };
+    const auto gpuImages = Steps(delegate, gpuPipelined, stalled, kSteps, true);
+    for (int step = 0; step < kSteps; ++step) {
+        EXPECT_EQ(gpuImages[step], gpuExpected[step]) << "GPU poses, step " << step;
+    }
 }
