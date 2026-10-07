@@ -1304,10 +1304,10 @@ void DefineBatchCamera(Scene& scene, const Path& path, const glm::dmat4& pose) {
         .Set(tokens::kSensorNoise, false);
 }
 
-void DefineProduct(Scene& scene, const Path& path, ernie::Value cameras,
+void DefineProduct(Scene& scene, const Path& path, const ernie::Value& cameras,
                    std::uint32_t size = kSize) {
     scene.Define(path, tokens::kRenderProduct)
-        .Set(tokens::kCameraRel, std::move(cameras))
+        .Set(tokens::kCameraRel, cameras)
         .Set(tokens::kResolution, glm::ivec2(size, size))
         .Set(tokens::kOrderedVars, std::vector<Path>{"/Render/Vars/Color", "/Render/Vars/Distance",
                                                      "/Render/Vars/Spectral"});

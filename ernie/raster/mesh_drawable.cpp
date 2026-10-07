@@ -515,12 +515,11 @@ void MeshDrawable::SetItems(std::vector<MeshItem> items) {
     }
     std::vector<std::vector<WorldRange>> ranges;
     for (const MeshItem& item : items) {
-        std::vector<WorldRange>& runs = ranges.emplace_back();
+        std::vector<WorldRange> runs;
         if (item.instanceWorlds.empty()) {
             const auto count =
                 static_cast<std::uint32_t>(item.instancer ? item.instances.size() : std::size_t{1});
             runs.push_back({item.world, 0, count});
-            continue;
         }
         for (std::uint32_t i = 0; i < item.instanceWorlds.size(); ++i) {
             if (runs.empty() || runs.back().world != item.instanceWorlds[i]) {
@@ -528,6 +527,7 @@ void MeshDrawable::SetItems(std::vector<MeshItem> items) {
             }
             ++runs.back().count;
         }
+        ranges.push_back(std::move(runs));
     }
     items_ = std::move(items);
     itemRanges_ = std::move(ranges);

@@ -1,0 +1,8 @@
+{
+  "NVIDIA GeForce RTX 5070 Laptop GPU": {
+    "cloned worlds, 1024 views, 3 bands": 12.423,
+    "cloned worlds, 4096 views, 3 bands": 58.91,
+    "instanced worlds, 1024 views, 16 bands": 9.869,
+    "instanced worlds, 256 views, 16 bands": 2.679
+  }
+}

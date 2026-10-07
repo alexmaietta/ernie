@@ -29,6 +29,34 @@ ernie.Scene()...
 
 ### Build from source
 
+Ernie needs CMake 3.22+, a C++20 compiler and a Vulkan 1.3 driver; it fetches its other
+dependencies (Slang, volk, VMA, glm, meshoptimizer, and nanobind for Python).
+
+```sh
+cmake -S . -B build -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
+cmake --build build -j
+ctest --test-dir build -j8              # C++, GPU and Python tests
+build/bin/ernie                         # the viewer
+```
+
+A Python wheel bundles the module with the Slang runtime it loads:
+
+```sh
+uv build --wheel --out-dir dist .
+uv pip install dist/ernie-*.whl
+```
+
+Tests run without a GPU on Mesa's lavapipe, as CI does (`.github/workflows/ci.yml`); CUDA interop
+tests skip there:
+
+```sh
+VK_DRIVER_FILES=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json) ctest --test-dir build -j8
+```
+
+`tools/benchmark.py` times batched scenes per step against baselines recorded per GPU
+(`tools/benchmark_baselines.json`); `--check` fails on a slowdown past 15%, `--update` records the
+current GPU's numbers.
+
 ## Profiling
 
 Ernie can be built with zones for the [Tracy](https://github.com/wolfpld/tracy) profiler: CPU

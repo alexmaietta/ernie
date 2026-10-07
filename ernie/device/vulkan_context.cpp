@@ -407,8 +407,14 @@ std::unique_ptr<VulkanContext> VulkanContext::Create(const VulkanContextOptions&
     c.submissions_ = c.CreateTimelineSemaphore();
 #if ERNIE_TRACY
     if (c.limits_.timestampComputeAndGraphics) {
+        // Tracy records into its command buffer more than once, so its pool allows resets.
+        VkCommandPoolCreateInfo resettable{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+        resettable.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        resettable.queueFamilyIndex = c.queueFamily_;
+        VkCommandPool pool = VK_NULL_HANDLE;
+        CheckVk(vkCreateCommandPool(c.device_, &resettable, nullptr, &pool), "vkCreateCommandPool");
         VkCommandBufferAllocateInfo allocateInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-        allocateInfo.commandPool = c.commandPool_;
+        allocateInfo.commandPool = pool;
         allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocateInfo.commandBufferCount = 1;
         VkCommandBuffer commands = VK_NULL_HANDLE;
@@ -423,7 +429,7 @@ std::unique_ptr<VulkanContext> VulkanContext::Create(const VulkanContextOptions&
                                                                       : nullptr;
         tracy::VkCtx* profiler = TracyVkContextCalibrated(c.physicalDevice_, c.device_, c.queue_,
                                                           commands, domains, timestamps);
-        vkFreeCommandBuffers(c.device_, c.commandPool_, 1, &commands);
+        vkDestroyCommandPool(c.device_, pool, nullptr);
         const std::string name = "Vulkan: " + c.deviceName_;
         TracyVkContextName(profiler, name.c_str(), static_cast<std::uint16_t>(name.size()));
         c.gpuProfiler_ = profiler;

@@ -25,6 +25,30 @@ set_target_properties(_ernie PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${ernie_packag
 configure_file(ernie/__init__.py "${ernie_package_dir}/__init__.py" COPYONLY)
 configure_file(ernie/app.py "${ernie_package_dir}/app.py" COPYONLY)
 configure_file(ernie/batch.py "${ernie_package_dir}/batch.py" COPYONLY)
+# A wheel (pyproject.toml, scikit-build-core): the package, with Slang's compiler and the glslang
+# library it loads at run time beside the module, found through $ORIGIN; the `python` component
+# only, not dependencies' own install rules.
 if(SKBUILD)
-    install(TARGETS _ernie LIBRARY DESTINATION ernie)
+    install(TARGETS _ernie LIBRARY DESTINATION ernie COMPONENT python)
+    install(
+        FILES ernie/__init__.py ernie/app.py ernie/batch.py
+        DESTINATION ernie
+        COMPONENT python)
+    set_target_properties(_ernie PROPERTIES INSTALL_RPATH "$ORIGIN")
+    get_target_property(slang_library slang::slang IMPORTED_LOCATION_RELEASE)
+    if(NOT slang_library)
+        get_target_property(slang_library slang::slang IMPORTED_LOCATION)
+    endif()
+    get_filename_component(slang_library_dir "${slang_library}" DIRECTORY)
+    file(
+        GLOB
+        slang_runtime
+        "${slang_library_dir}/libslang-compiler.so.*"
+        "${slang_library_dir}/libslang-glslang-*.so"
+        "${slang_library_dir}/libslang-compiler*.dylib"
+        "${slang_library_dir}/libslang-glslang-*.dylib")
+    install(
+        FILES ${slang_runtime}
+        DESTINATION ernie
+        COMPONENT python)
 endif()

@@ -1,0 +1,83 @@
+# Builds Ernie and runs its C++, GPU and Python tests on Mesa's lavapipe (a CPU Vulkan driver, so
+# hosted runners need no GPU), with the Vulkan validation layers failing tests on any message;
+# CUDA interop tests skip. Also builds and tests the Python wheel, and checks formatting.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CMAKE_GENERATOR: Ninja
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: pre-commit/action@v3.0.1
+
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Vulkan (lavapipe, validation layers) and the app's window system headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build mesa-vulkan-drivers vulkan-validationlayers \
+            libvulkan1 xvfb libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libwayland-dev libxkbcommon-dev
+      - uses: astral-sh/setup-uv@v6
+      - name: Python environment
+        run: |
+          uv venv --python 3.12
+          uv pip install numpy pytest nanobind
+      - uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: test-${{ runner.os }}
+      - name: Configure
+        run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
+          -DPython_EXECUTABLE=$PWD/.venv/bin/python
+      - name: Build
+        run: cmake --build build -j
+      - name: Test on lavapipe
+        run: |
+          export VK_DRIVER_FILES=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n1)
+          export VK_ICD_FILENAMES=$VK_DRIVER_FILES
+          xvfb-run -a ctest --test-dir build --output-on-failure -j4 --timeout 900
+
+  wheel:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Vulkan (lavapipe, validation layers)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build mesa-vulkan-drivers vulkan-validationlayers libvulkan1
+      - uses: astral-sh/setup-uv@v6
+      - name: Build the wheel
+        run: uv build --wheel --out-dir dist .
+      - name: Test the installed wheel on lavapipe
+        run: |
+          uv venv --python 3.12 wheel-venv
+          uv pip install --python wheel-venv/bin/python dist/*.whl pytest
+          export VK_DRIVER_FILES=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n1)
+          export VK_ICD_FILENAMES=$VK_DRIVER_FILES
+          cd "$RUNNER_TEMP" && "$GITHUB_WORKSPACE/wheel-venv/bin/python" -m pytest -q \
+            -p no:cacheprovider "$GITHUB_WORKSPACE/ernie/test/python"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-linux-x86_64
+          path: dist/*.whl

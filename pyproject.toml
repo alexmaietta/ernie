@@ -1,0 +1,32 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "nanobind>=2.4"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "ernie"
+version = "0.1.0"
+description = "Efficient Renderer for Natural and Interplanetary Environments: a spectral Vulkan renderer with a USD-style scene and batched cameras"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["numpy>=1.26"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.scikit-build]
+cmake.version = ">=3.22"
+cmake.build-type = "Release"
+# Inside the repository, like Ernie's other builds.
+build-dir = "build/wheel/{wheel_tag}"
+# nanobind's stable ABI: one wheel for CPython 3.12 and later.
+wheel.py-api = "cp312"
+wheel.packages = []
+# Ernie's package only, not its dependencies' install rules.
+install.components = ["python"]
+sdist.exclude = ["build", "dist", ".venv"]
+
+[tool.scikit-build.cmake.define]
+ERNIE_BUILD_PYTHON = "ON"
+ERNIE_BUILD_TESTS = "OFF"
+ERNIE_BUILD_DEMOS = "OFF"
+ERNIE_BUILD_APP = "OFF"

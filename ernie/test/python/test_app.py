@@ -3,7 +3,7 @@ import pytest
 import ernie
 from ernie import tokens
 
-app = pytest.importorskip("ernie.app", reason="Ernie was built without its app")
+app = pytest.importorskip("ernie.app", reason="Ernie was built without its app", exc_type=ImportError)
 
 
 def cube_scene(lit=True):

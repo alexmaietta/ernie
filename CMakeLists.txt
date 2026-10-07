@@ -9,8 +9,8 @@ project(
 option(ERNIE_BUILD_TESTS "Build Ernie's tests" ${PROJECT_IS_TOP_LEVEL})
 option(ERNIE_BUILD_PYTHON "Build Ernie's Python module" OFF)
 option(ERNIE_BUILD_DEMOS "Build Ernie's C++ demos" ${PROJECT_IS_TOP_LEVEL})
-option(ERNIE_BUILD_APP "Build Ernie's app, the GUI viewer (GLFW, Dear ImGui, ImPlot, ImGuizmo, fonts)"
-       OFF)
+option(ERNIE_BUILD_APP
+       "Build Ernie's app, the GUI viewer (GLFW, Dear ImGui, ImPlot, ImGuizmo, fonts)" OFF)
 option(ERNIE_TRACY "Instrument Ernie for the Tracy profiler (CPU and Vulkan GPU zones, on demand)"
        OFF)
 
