@@ -161,6 +161,29 @@ struct DomeLight {
     /// Irradiance over pi of the RGB map as order-2 spherical harmonics in world space
     /// (`DomeIrradianceSh`): a uniform map of 1 has sh[0] = sqrt(4 pi) and zeros elsewhere.
     std::array<glm::vec3, 9> sh{};
+    /// Whether camera rays that hit nothing see the dome (`tokens::kVisibleInPrimaryRay`): its
+    /// radiance times its map (`DomeMapOf`) in their direction.
+    bool visible = true;
+    /// The rotation from world directions to the dome's frame, in which its map lies.
+    glm::mat3 toDome{1.0f};
+};
+
+/// One star of a `StarField`, as renders take it: where it is and the black-body spectrum it
+/// shines with.
+struct Star {
+    float rightAscension = 0.0f;  ///< Radians, in the catalogue's frame.
+    float declination = 0.0f;     ///< Radians.
+    float temperature = 5772.0f;  ///< Kelvin.
+    /// Spectral irradiance at 555 nm, W m^-2 nm^-1; at other wavelengths, this times the black
+    /// body's spectral radiance there over its value at 555 nm.
+    float irradiance555 = 0.0f;
+};
+
+/// The stars of a StarField prim (`StarsOf`) are uploaded when they change; each frame takes only
+/// where the catalogue's frame lies (`StarFieldOf`).
+struct StarField {
+    /// The rotation from world directions to the catalogue's frame.
+    glm::mat3 toCatalogue{1.0f};
 };
 
 /// Per-frame parameters of a render, whatever the backend: the camera, the sun, the other lights,
@@ -186,6 +209,7 @@ struct FrameParams {
     std::vector<Light>
         lights;  ///< Other lights; the rasterizer takes `RasterRenderer::kMaxLights`.
     std::optional<DomeLight> dome;
+    std::optional<StarField> stars;  ///< Stars behind everything, as last uploaded.
     float exposure = 1.0f;                 ///< Extra scale on the photographic output.
     bool meter = false;  ///< Measure the scene's luminance (`tokens::kMeter`).
     Culling culling = Culling::Gpu;        ///< How draws outside a view are culled.

@@ -118,6 +118,25 @@ void Dome(ImDrawList* draw, const Frame& at) {
     draw->AddLine(at(0.08f, 0.76f), at(0.92f, 0.76f), kLamp, std::max(1.0f, at(0.08f)));
 }
 
+/// A five-pointed star with a smaller one beside it.
+void Stars(ImDrawList* draw, const Frame& at) {
+    const auto star = [&](float u, float v, float outer) {
+        ImVec2 points[10];
+        for (int k = 0; k < 10; ++k) {
+            const float a = -0.5f * std::numbers::pi_v<float> +
+                            static_cast<float>(k) * std::numbers::pi_v<float> / 5.0f;
+            const float r = k % 2 == 0 ? outer : 0.42f * outer;
+            points[k] = at(u + r * std::cos(a), v + r * std::sin(a));
+        }
+        // Not convex: a fan of triangles from the centre.
+        for (int k = 0; k < 10; ++k) {
+            draw->AddTriangleFilled(at(u, v), points[k], points[(k + 1) % 10], kLamp);
+        }
+    };
+    star(0.42f, 0.56f, 0.38f);
+    star(0.8f, 0.2f, 0.16f);
+}
+
 void CameraIcon(ImDrawList* draw, const Frame& at) {
     const ImU32 body = Rgb(150, 160, 164);
     draw->AddRectFilled(at(0.08f, 0.32f), at(0.66f, 0.78f), body, at(0.08f));
@@ -197,6 +216,8 @@ void DrawPrimIcon(ImDrawList* draw, const ImVec2& corner, float size, std::strin
         Panel(draw, at, type == kDiskLight);
     } else if (type == kDomeLight) {
         Dome(draw, at);
+    } else if (type == kStarField) {
+        Stars(draw, at);
     } else if (type == kCamera) {
         CameraIcon(draw, at);
     } else if (type == kTerrain) {

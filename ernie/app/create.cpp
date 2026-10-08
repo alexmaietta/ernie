@@ -2,6 +2,7 @@
 
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/util/astronomy.h"
 #include "ernie/util/tensor.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -37,6 +38,7 @@ constexpr CreatableType kTypes[] = {
     {kRectLight, "Rect Light", "Lights", "RectLight", "/World"},
     {kDiskLight, "Disk Light", "Lights", "DiskLight", "/World"},
     {kDomeLight, "Dome Light", "Lights", "Dome", "/World"},
+    {kStarField, "Star Field", "Lights", "Stars", "/World"},
     {kCamera, "Camera from View", "Cameras", "Camera", "/World"},
     {kMaterial, "Material", "Shading", "Material", "/Looks"},
     {kRenderSettings, "Render Settings", "Render", "Settings", "/Render"},
@@ -135,6 +137,17 @@ void AuthorDefaultPrim(Scene& scene, const Path& path, std::string_view type,
         scene.Set(path, kPhotometricIlluminance, 100000.0);
     } else if (type == kDomeLight) {
         scene.Set(path, kPhotometricIlluminance, 10000.0);
+    } else if (type == kStarField) {
+        // A made-up naked-eye sky until a catalogue replaces it.
+        const StarCatalogue stars = SyntheticStars(5000);
+        const auto write = [&](std::string_view attribute, const std::vector<float>& values) {
+            scene.Write(path, attribute,
+                        Tensor::Copy<float>(values, {static_cast<std::int64_t>(values.size())}));
+        };
+        write(kStarsRightAscension, stars.rightAscension);
+        write(kStarsDeclination, stars.declination);
+        write(kStarsMagnitude, stars.magnitude);
+        write(kStarsColorIndex, stars.colorIndex);
     } else if (type == kSphereLight) {
         PlaceAbove(scene, path, context, 3.0);
         scene.Set(path, kRadius, 0.1 * s);

@@ -18,10 +18,24 @@
 // layer `z` (a group of `bands` layers of the spectral image) with the uniforms of view
 // `firstView + z`.
 //
+// `skyMain` fills the pixels no geometry covers: the dome's radiance times its map in the pixel's
+// direction, plus the stars of a star field, points at infinity spread over the four pixels nearest
+// each (a tent filter, which sums to one, so a star's irradiance is kept at any resolution): each
+// adds its spectral irradiance times its weight over the pixel's solid angle. Each pixel gathers
+// the stars in the grid cells around its direction, in a fixed order, so images repeat exactly.
+//
 // Bindings: 0 every view's ShadingUniforms, 1 G-buffer normal, 2 G-buffer albedo, 3 G-buffer ids,
 // 4 depth (one layer per view each), 5 materials, 6 RGB-to-spectrum coefficient table, 7 its
 // sampler, 8 spectral radiance, 9 lights, 10 the lights' shadow maps, 11 their comparison sampler,
-// 12 their view-projections.
+// 12 their view-projections, 13 the dome's map, 14 the stars, 15 their grid cells.
+//
+// References:
+// - W. Jakob and J. Hanika, "A Low-Dimensional Function Space for Efficient Spectral Upsampling",
+//   Computer Graphics Forum 38(2), 2019 (sigmoid spectra of RGB colours).
+// - H. W. Jensen et al., "A Physically-Based Night Sky Model", SIGGRAPH 2001, 399-408 (stars as
+//   black bodies of their magnitude's irradiance). https://doi.org/10.1145/383259.383306
+// - M. Planck, "Ueber das Gesetz der Energieverteilung im Normalspectrum", Annalen der Physik
+//   309(3):553-563, 1901 (black-body spectra).
 import brdf;
 
 static const uint kUnlit = 1;
@@ -50,9 +64,22 @@ struct ShadingUniforms {
     // x: the lights this view sees, a bit per light (a batch's views see their world's and the
     // shared ones); yzw unused.
     uint4 view;
-    // To the views' stride in the buffer, 1024 bytes.
-    float4 padding[5];
+    // Rows of the rotation from world directions to the dome's frame, and to the star catalogue's.
+    float4 toDome[3];
+    float4 toCatalogue[3];
+    // x: what shows behind the scene (kSky* bits); y, z: the dome map's width and height; w: its
+    // mip levels.
+    uint4 sky;
+    // x: the stars' grid cells around in right ascension, y: in declination; zw unused.
+    float4 starGrid;
+    // To the views' stride in the buffer, 1280 bytes.
+    float4 padding[13];
 }
+
+// What `skyMain` draws behind the scene.
+static const uint kSkyDome = 1;   // the dome's radiance
+static const uint kSkyMap = 2;    // times its map
+static const uint kSkyStars = 4;  // and the stars
 
 static const uint kMaxLights = 16;
 
@@ -104,6 +131,12 @@ struct ShadingConstants {
 [[vk::binding(10, 0)]] Texture2DArray<float> lightShadowMaps;
 [[vk::binding(11, 0)]] SamplerComparisonState lightShadowSampler;
 [[vk::binding(12, 0)]] StructuredBuffer<float4x4> lightViews;
+// The dome's latitude-longitude RGB map with its mips (rows from +z down, columns from +x
+// through +y), its stars (right ascension and declination in radians, temperature in kelvin,
+// spectral irradiance at 555 nm) sorted by grid cell, and each cell's first star and count.
+[[vk::binding(13, 0)]] Texture2D<float4> domeMap;
+[[vk::binding(14, 0)]] StructuredBuffer<float4> stars;
+[[vk::binding(15, 0)]] StructuredBuffer<uint2> starCells;
 
 // The uniforms of the view this thread shades (`shadeMain` sets it).
 static uint shadedView;
@@ -392,5 +425,184 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         for (uint k = 0; k < 3 && first + k < bands; ++k) {
             spectral[int3(id.xy, id.z * bands + first + k)] = radiance[k];
         }
+    }
+}
+
+static const uint kMaxBands = 64;
+// Planck's second radiation constant, hc/k, in nm K.
+static const float kPlanckC2 = 1.4387769e7;
+
+// A black body's spectral radiance at `wavelength` (nm) over its value at 555 nm.
+float planckRatio(float wavelength, float kelvin) {
+    let r = 555.0 / wavelength;
+    return r * r * r * r * r * (exp(kPlanckC2 / (555.0 * kelvin)) - 1.0) /
+           (exp(kPlanckC2 / (wavelength * kelvin)) - 1.0);
+}
+
+// The direction through normalised device coordinates `ndc`, from the near to the far plane: its
+// length varies so that it is linear in `ndc`, a point of the image plane.
+float3 rayThrough(float2 ndc) {
+    let near = mul(sh.invViewProj, float4(ndc, 0.0, 1.0));
+    let far = mul(sh.invViewProj, float4(ndc, 1.0, 1.0));
+    return far.xyz / far.w - near.xyz / near.w;
+}
+
+// Texel (`x`, `y`) of mip `level` of the dome map, wrapping around in longitude.
+float3 domeTexel(int x, int y, uint level, int2 size) {
+    let wrapped = int2((x % size.x + size.x) % size.x, clamp(y, 0, size.y - 1));
+    return domeMap.Load(int3(wrapped, int(level))).rgb;
+}
+
+// The dome map bilinearly at (`u`, `v`) in mip `level`.
+float3 domeBilinear(float2 uv, uint level) {
+    let size = int2(max(sh.sky.y >> level, 1u), max(sh.sky.z >> level, 1u));
+    let p = uv * float2(size) - 0.5;
+    let base = int2(floor(p));
+    let f = p - float2(base);
+    let a = domeTexel(base.x, base.y, level, size);
+    let b = domeTexel(base.x + 1, base.y, level, size);
+    let c = domeTexel(base.x, base.y + 1, level, size);
+    let d = domeTexel(base.x + 1, base.y + 1, level, size);
+    return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
+}
+
+// The dome map in world direction `d`, from the mips whose texels match `pixelAngle` (radians):
+// trilinear, with the manual filtering that float32 maps need on every device.
+float3 domeMapAt(float3 d, float pixelAngle) {
+    let local = float3(dot(sh.toDome[0].xyz, d), dot(sh.toDome[1].xyz, d),
+                       dot(sh.toDome[2].xyz, d));
+    var u = atan2(local.y, local.x) / (2.0 * PI);
+    u = u < 0.0 ? u + 1.0 : u;
+    let v = acos(clamp(local.z, -1.0, 1.0)) / PI;
+    let texelAngle = PI / float(sh.sky.z);
+    let lod = clamp(log2(max(pixelAngle / texelAngle, 1e-6)), 0.0, float(sh.sky.w - 1));
+    let lower = uint(floor(lod));
+    let upper = min(lower + 1, sh.sky.w - 1);
+    return lerp(domeBilinear(float2(u, v), lower), domeBilinear(float2(u, v), upper),
+                lod - float(lower));
+}
+
+// The star grid's row of declination `declination` (radians), of `rows` from the south pole.
+int starRow(float declination, int rows) {
+    return clamp(int(floor((declination + 0.5 * PI) / PI * float(rows))), 0, rows - 1);
+}
+
+// Adds the stars around world direction `d` to `radiance` (per band), as their tent-filtered
+// irradiance over the pixel's solid angle. `a`, `b` and `c` are `rayThrough`'s steps in x and y
+// and its value at the image centre; `pixel` the pixel's centre in pixels.
+void addStars(inout float radiance[kMaxBands], float3 d, float3 a, float3 b, float3 c,
+              float2 pixel, float pixelAngle, float solidAngle) {
+    // Points within a pixel and a half: farther ones give this pixel no weight.
+    let reach = 1.5 * pixelAngle;
+    if (reach > 0.2) {
+        return;  // pixels so wide a point covers a crowd of cells: no stars
+    }
+    let cat = float3(dot(sh.toCatalogue[0].xyz, d), dot(sh.toCatalogue[1].xyz, d),
+                     dot(sh.toCatalogue[2].xyz, d));
+    let declination = asin(clamp(cat.z, -1.0, 1.0));
+    var ascension = atan2(cat.y, cat.x);
+    ascension = ascension < 0.0 ? ascension + 2.0 * PI : ascension;
+    let columns = int(sh.starGrid.x);
+    let rows = int(sh.starGrid.y);
+    let firstRow = starRow(declination - reach, rows);
+    let lastRow = starRow(declination + reach, rows);
+    let widest = min(abs(declination) + reach, 0.5 * PI);
+    int firstColumn = 0;
+    int lastColumn = columns - 1;
+    if (widest < 0.5 * PI - 1e-3) {
+        let span = reach / cos(widest);
+        if (span < PI) {
+            firstColumn = int(floor((ascension - span) / (2.0 * PI) * float(columns)));
+            lastColumn = int(floor((ascension + span) / (2.0 * PI) * float(columns)));
+        }
+    }
+    // Directions to image coordinates: d = alpha a + beta b + gamma c gives the point
+    // (alpha, beta) / gamma in normalised device coordinates.
+    let bc = cross(b, c);
+    let ca = cross(c, a);
+    let ab = cross(a, b);
+    let det = dot(a, bc);
+    let size = float2(sh.size.xy);
+    let bands = uint(sh.range.z);
+    for (int r = firstRow; r <= lastRow; ++r) {
+        for (int k = firstColumn; k <= lastColumn; ++k) {
+            let column = (k % columns + columns) % columns;
+            let cell = starCells[uint(r * columns + column)];
+            for (uint i = cell.x; i < cell.x + cell.y; ++i) {
+                let star = stars[i];
+                let cosDec = cos(star.y);
+                let local = float3(cosDec * cos(star.x), cosDec * sin(star.x), sin(star.y));
+                let w = sh.toCatalogue[0].xyz * local.x + sh.toCatalogue[1].xyz * local.y +
+                        sh.toCatalogue[2].xyz * local.z;
+                let gamma = dot(ab, w) / det;
+                if (gamma <= 0.0) {
+                    continue;
+                }
+                let ndc = float2(dot(bc, w), dot(ca, w)) / det / gamma;
+                let at = float2((ndc.x + 1.0) * 0.5 * size.x, (1.0 - ndc.y) * 0.5 * size.y);
+                let offset = abs(at - pixel);
+                let weight = max(1.0 - offset.x, 0.0) * max(1.0 - offset.y, 0.0);
+                if (weight <= 0.0) {
+                    continue;
+                }
+                let scale = star.w * weight / solidAngle;
+                for (uint band = 0; band < bands; ++band) {
+                    let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;
+                    radiance[band] += scale * planckRatio(wavelength, star.z);
+                }
+            }
+        }
+    }
+}
+
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void skyMain(uint3 id : SV_DispatchThreadID) {
+    shadedView = pass.model.y + id.z;
+    if (id.x >= sh.size.x || id.y >= sh.size.y) {
+        return;
+    }
+    if (gIds.Load(int4(id.xyz, 0)).x != kBackground) {
+        return;
+    }
+    let size = float2(sh.size.xy);
+    let pixel = float2(id.xy) + 0.5;
+    let ndc = float2(pixel.x / size.x * 2.0 - 1.0, 1.0 - pixel.y / size.y * 2.0);
+    let c = rayThrough(float2(0.0));
+    let a = rayThrough(float2(1.0, 0.0)) - c;
+    let b = rayThrough(float2(0.0, 1.0)) - c;
+    let ray = c + ndc.x * a + ndc.y * b;
+    let d = normalize(ray);
+    // The image plane, `distance` from the eye along `forward`, and the pixel's solid angle there:
+    // its area over the distance squared, times the cube of the cosine off the axis.
+    var forward = normalize(cross(a, b));
+    forward = dot(forward, c) < 0.0 ? -forward : forward;
+    let distance = dot(c, forward);
+    let pixelArea = 4.0 * length(a) * length(b) / (size.x * size.y);
+    let cosine = dot(d, forward);
+    let solidAngle = pixelArea / (distance * distance) * cosine * cosine * cosine;
+    let pixelAngle = 2.0 * length(b) / size.y / distance;
+
+    let bands = uint(sh.range.z);
+    float radiance[kMaxBands];
+    for (uint band = 0; band < kMaxBands; ++band) {
+        radiance[band] = 0.0;
+    }
+    if ((sh.sky.x & kSkyDome) != 0) {
+        let rgb = (sh.sky.x & kSkyMap) != 0 ? max(domeMapAt(d, pixelAngle), float3(0.0))
+                                             : float3(1.0);
+        let scale = max(rgb.x, max(rgb.y, rgb.z));
+        let coefficients = scale > 0.0 ? sigmoidCoefficients(rgb / scale) : float3(0.0);
+        for (uint band = 0; band < bands; ++band) {
+            let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;
+            radiance[band] =
+                bandValue(sh.dome, band) * modulationAt(coefficients, scale, wavelength);
+        }
+    }
+    if ((sh.sky.x & kSkyStars) != 0) {
+        addStars(radiance, d, a, b, c, pixel, pixelAngle, solidAngle);
+    }
+    for (uint band = 0; band < bands; ++band) {
+        spectral[int3(id.xy, id.z * bands + band)] = radiance[band];
     }
 }

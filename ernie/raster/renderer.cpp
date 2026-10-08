@@ -58,9 +58,18 @@ struct ShadingUniforms {
     float domeSh[9][4];
     float dome[SpectralBands::kMaxBands];
     std::uint32_t view[4];
-    float padding[20];  ///< To the views' stride, so shading reads them as one array.
+    float toDome[3][4];       ///< Rows of the rotation from world directions to the dome's frame.
+    float toCatalogue[3][4];  ///< And to the star catalogue's.
+    std::uint32_t sky[4];     ///< kSky* bits, the dome map's width, height and mip levels.
+    float starGrid[4];        ///< The star grid's columns and rows.
+    float padding[52];        ///< To the views' stride, so shading reads them as one array.
 };
-static_assert(sizeof(ShadingUniforms) == 1024, "ShadingUniforms must match shading.slang");
+static_assert(sizeof(ShadingUniforms) == 1280, "ShadingUniforms must match shading.slang");
+
+/// shading.slang's kSky* bits: what its sky pass draws behind the scene.
+constexpr std::uint32_t kSkyDome = 1;
+constexpr std::uint32_t kSkyMap = 2;
+constexpr std::uint32_t kSkyStars = 4;
 
 struct LightGpu {
     float position[4];
@@ -135,6 +144,9 @@ constexpr DescriptorBinding kShadingBindings[] = {
     {10, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {11, VK_DESCRIPTOR_TYPE_SAMPLER, kCompute},
     {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {13, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {14, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
 constexpr DescriptorBinding kFilterBindings[] = {
@@ -481,6 +493,20 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
         sigmoidTable_.Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     });
 
+    SetDomeMap(nullptr);
+    SetStars({});
+    {
+        // The sky pass shares shading's module, composed with the first model, which it ignores.
+        const BrdfModel& brdf = brdfs_.Models().front();
+        const std::vector<ShaderModuleSource> modules{
+            {"brdf", std::string(BrdfSlang())},
+            {BrdfModuleName(brdf), brdf.slang},
+            {"shading", "import " + BrdfModuleName(brdf) + ";\ntypealias ActiveBrdf = " +
+                            brdf.typeName + ";\n" + shaders::kShadingSlang}};
+        skyPipeline_ = std::make_unique<ComputePipeline>(
+            context_, shadingLayout_, compiler_.CompileSpirv(modules, "skyMain"));
+    }
+
     const std::vector<ShaderModuleSource> hzbModules{{"hzb", shaders::kHzbSlang}};
     hzbPipeline_ = std::make_unique<ComputePipeline>(context_, hzbLayout_,
                                                      compiler_.CompileSpirv(hzbModules, "hzbMain"));
@@ -606,6 +632,88 @@ void RasterRenderer::RemoveMaterial(std::uint32_t id) {
 const RasterMaterial& RasterRenderer::MaterialOrDefault(std::uint32_t id) const {
     const auto it = materials_.find(id);
     return it != materials_.end() ? *it->second : *materials_.at(kDefaultMaterial);
+}
+
+void RasterRenderer::SetDomeMap(const Image* map) {
+    if (map != nullptr) {
+        if (map->width == 0 || map->height == 0 ||
+            map->pixels.size() != static_cast<std::size_t>(map->width) * map->height) {
+            throw std::invalid_argument("The dome's map is empty");
+        }
+        const std::uint32_t maxSize = context_.Limits().maxImageDimension2D;
+        if (map->width > maxSize || map->height > maxSize) {
+            throw std::invalid_argument("The dome's map exceeds the device's maximum texture size");
+        }
+    }
+    const Image white(1, 1, glm::vec4(1.0f));
+    const std::vector<Image> mips = MipChain(map != nullptr ? *map : white, MipFilter::Average);
+    // Float texels, filtered by the shader itself: linear filtering of float32 is optional.
+    auto image = std::make_unique<GpuImage>(
+        context_, ImageDesc{mips.front().width, mips.front().height, 1,
+                            static_cast<std::uint32_t>(mips.size()),
+                            VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT});
+    std::vector<std::span<const std::byte>> spans;
+    for (const Image& mip : mips) {
+        spans.push_back(std::as_bytes(std::span(mip.pixels)));
+    }
+    image->Upload(spans);
+    vkDeviceWaitIdle(context_.Device());
+    domeMap_ = std::move(image);
+    hasDomeMap_ = map != nullptr;
+}
+
+void RasterRenderer::SetStars(std::span<const Star> stars) {
+    // Each star's grid cell, by declination row from the south pole and right ascension column.
+    const auto cellOf = [](const Star& star) {
+        constexpr double kTwoPi = 2.0 * M_PI;
+        const double ascension = std::fmod(std::fmod(star.rightAscension, kTwoPi) + kTwoPi, kTwoPi);
+        const auto column = std::min<std::uint32_t>(
+            static_cast<std::uint32_t>(ascension / kTwoPi * kStarColumns), kStarColumns - 1);
+        const auto row = std::min<std::uint32_t>(
+            static_cast<std::uint32_t>(std::max(star.declination + M_PI / 2.0, 0.0) / M_PI *
+                                       kStarRows),
+            kStarRows - 1);
+        return row * kStarColumns + column;
+    };
+    std::vector<std::uint32_t> order(stars.size());
+    for (std::uint32_t i = 0; i < order.size(); ++i) {
+        order[i] = i;
+    }
+    std::vector<std::uint32_t> cells(stars.size());
+    for (std::size_t i = 0; i < stars.size(); ++i) {
+        cells[i] = cellOf(stars[i]);
+    }
+    std::stable_sort(order.begin(), order.end(),
+                     [&cells](std::uint32_t a, std::uint32_t b) { return cells[a] < cells[b]; });
+    std::vector<glm::vec4> packed;
+    packed.reserve(std::max<std::size_t>(stars.size(), 1));
+    std::vector<glm::uvec2> ranges(static_cast<std::size_t>(kStarColumns) * kStarRows,
+                                   glm::uvec2(0));
+    for (const std::uint32_t i : order) {
+        glm::uvec2& range = ranges[cells[i]];
+        if (range.y == 0) {
+            range.x = static_cast<std::uint32_t>(packed.size());
+        }
+        range.y += 1;
+        const Star& star = stars[i];
+        packed.emplace_back(star.rightAscension, star.declination, star.temperature,
+                            star.irradiance555);
+    }
+    if (packed.empty()) {
+        packed.emplace_back(0.0f);  // buffers cannot be empty
+    }
+    auto starBuffer = std::make_unique<GpuBuffer>(
+        context_, packed.size() * sizeof(glm::vec4), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        BufferMemory::Device);
+    auto cellBuffer = std::make_unique<GpuBuffer>(
+        context_, ranges.size() * sizeof(glm::uvec2), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        BufferMemory::Device);
+    starBuffer->Write(std::as_bytes(std::span(packed)));
+    cellBuffer->Write(std::as_bytes(std::span(ranges)));
+    vkDeviceWaitIdle(context_.Device());
+    stars_ = std::move(starBuffer);
+    starCells_ = std::move(cellBuffer);
+    starCount_ = stars.size();
 }
 
 void RasterRenderer::CreateShadowMaps(std::uint32_t resolution, std::uint32_t layers) {
@@ -1006,6 +1114,13 @@ void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable*
     for (const std::size_t model : modelsInUse_) {
         ShadingPipeline(model);
     }
+    sky_ = 0;
+    if (params.dome && params.dome->visible) {
+        sky_ |= kSkyDome | (hasDomeMap_ ? kSkyMap : 0u);
+    }
+    if (params.stars && starCount_ > 0) {
+        sky_ |= kSkyStars;
+    }
     // The lights first: shading reads the size of the light shadow maps they make.
     WriteLights(params, bounds);
     WriteShading(params);
@@ -1102,6 +1217,23 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
         }
         std::copy(params.dome->radiance.begin(), params.dome->radiance.end(), shading.dome);
     }
+    // Rows of the rotations, so the shader dots directions with them.
+    const auto rows = [](const glm::mat3& rotation, float (&out)[3][4]) {
+        for (int r = 0; r < 3; ++r) {
+            for (int c = 0; c < 3; ++c) {
+                out[r][c] = rotation[c][r];
+            }
+        }
+    };
+    rows(params.dome ? params.dome->toDome : glm::mat3(1.0f), shading.toDome);
+    rows(params.stars ? params.stars->toCatalogue : glm::mat3(1.0f), shading.toCatalogue);
+    const ImageDesc& map = domeMap_->Desc();
+    shading.sky[0] = sky_;
+    shading.sky[1] = map.width;
+    shading.sky[2] = map.height;
+    shading.sky[3] = map.mips;
+    shading.starGrid[0] = static_cast<float>(kStarColumns);
+    shading.starGrid[1] = static_cast<float>(kStarRows);
     shading.lightShadow[0] = params.shadows.softness;
     shading.lightShadow[1] = params.shadows.normalOffset;
     shading.lightShadow[2] = static_cast<float>(lightResolution_);
@@ -1174,6 +1306,7 @@ void RasterRenderer::WriteSensor(const FrameParams& params) {
     sensor.clear[0] = params.clearColor.r;
     sensor.clear[1] = params.clearColor.g;
     sensor.clear[2] = params.clearColor.b;
+    sensor.clear[3] = sky_ != 0 ? 1.0f : 0.0f;  // the background holds the sky's radiance
     sensor.range[0] = static_cast<float>(bands_.minNm);
     sensor.range[1] = static_cast<float>(bands_.Width());
     const std::vector<glm::dvec3> weights = CieWeights(bands_);
@@ -1731,12 +1864,24 @@ void RasterRenderer::ShadeAndFilter(VkCommandBuffer commands, RenderTargets& tar
                                               DescriptorResource::Of(lightTable_),
                                               DescriptorResource::Of(lightShadowMaps_->View()),
                                               DescriptorResource::Of(shadowSampler_),
-                                              DescriptorResource::Of(lightViewMatrices_)};
+                                              DescriptorResource::Of(lightViewMatrices_),
+                                              sampled(*domeMap_),
+                                              DescriptorResource::Of(*stars_),
+                                              DescriptorResource::Of(*starCells_)};
         for (const std::size_t model : modelsInUse_) {
             vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                               shadingPipelines_.at(model)->Handle());
             shadingLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, shading);
             const std::uint32_t constants[4] = {static_cast<std::uint32_t>(model), firstView, 0, 0};
+            shadingLayout_.PushConstants(commands, constants, sizeof(constants));
+            vkCmdDispatch(commands, groupsX, groupsY, views);
+        }
+        // The pixels no geometry covers, when the dome or stars show there; else the lens reads
+        // them as no radiance.
+        if (sky_ != 0) {
+            vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, skyPipeline_->Handle());
+            shadingLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, shading);
+            const std::uint32_t constants[4] = {0, firstView, 0, 0};
             shadingLayout_.PushConstants(commands, constants, sizeof(constants));
             vkCmdDispatch(commands, groupsX, groupsY, views);
         }
@@ -1837,7 +1982,8 @@ std::uint64_t RasterRenderer::GpuBytes() const {
                           lightViewMatrices_.Size() + sigmoidTable_.Bytes() +
                           shadingUniforms_.Size() + sensorUniforms_.Size() +
                           (materialTable_ != nullptr ? materialTable_->Size() : 0) +
-                          overlays_->GpuBytes();
+                          overlays_->GpuBytes() + domeMap_->Bytes() + stars_->Size() +
+                          starCells_->Size();
     for (const auto& [id, material] : materials_) {
         bytes += material->GpuBytes();
     }

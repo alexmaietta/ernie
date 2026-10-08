@@ -52,6 +52,7 @@ struct RenderPrims {
     std::vector<Path> lights;
     Path dome;
     Path ground;
+    Path stars;  ///< The first visible StarField.
 };
 
 /// A render product to draw, resolved from UsdRender prims.
@@ -185,6 +186,33 @@ std::array<glm::vec3, 9> DomeIrradianceSh(const Tensor& latlong, const glm::dmat
 /// without one) rotated by its transform.
 /// @throws std::invalid_argument for another prim type, an invalid map, bands or spectrum pairs.
 DomeLight DomeOf(const Scene& scene, const Path& path, const SpectralBands& bands);
+
+/// The DomeLight at `path`'s map (`tokens::kLightTexture`) as a linear RGB image for drawing
+/// behind the scene; none without one.
+/// @throws std::invalid_argument for an invalid map.
+std::optional<Image> DomeMapOf(const Scene& scene, const Path& path);
+
+/// The stars of the StarField at `path`: each one's place from `ernie:stars:rightAscension` and
+/// `ernie:stars:declination` (or `ernie:stars:direction`), and its black-body spectrum from its
+/// temperature (`ernie:stars:temperature`, else `ernie:stars:colorIndex` through
+/// `ColorIndexToTemperature`, else the Sun's) scaled to its illuminance from
+/// `ernie:stars:magnitude` (`StarIlluminance` of `ernie:stars:zeroPoint`, times
+/// 2^`inputs:exposure`). Stars fainter than `ernie:stars:magnitudeLimit` are left out.
+///
+/// References:
+/// - A. N. Cox (ed.), "Allen's Astrophysical Quantities", 4th edition, Springer, 2000 (the
+///   illuminance of a magnitude 0 star).
+/// - F. J. Ballesteros, "New insights into black bodies", EPL 97(3):34008, 2012 (B-V to
+///   temperature).
+/// - H. W. Jensen, F. Durand, J. Dorsey, M. M. Stark, P. Shirley and S. Premoze, "A
+///   Physically-Based Night Sky Model", SIGGRAPH 2001, 399-408 (stars as black bodies by
+///   magnitude and colour index). https://doi.org/10.1145/383259.383306
+/// @throws std::invalid_argument for another prim type, or arrays of mismatched lengths.
+std::vector<Star> StarsOf(const Scene& scene, const Path& path);
+
+/// Where the StarField at `path`'s catalogue frame lies in the world, from its transform.
+/// @throws std::invalid_argument for another prim type.
+StarField StarFieldOf(const Scene& scene, const Path& path);
 
 /// How much wider than the sensor's the raster image's field of view must be for every sensor
 /// pixel's undistorted ray to land in it: 1 without distortion, else the largest ratio along the

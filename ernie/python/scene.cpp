@@ -3,6 +3,7 @@
 #include "ernie/scene/scene.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/util/astronomy.h"
 
 #include <nanobind/operators.h>
 #include <nanobind/stl/pair.h>
@@ -707,6 +708,38 @@ void BindScene(nb::module_& m) {
             return MatrixToPython(DistantLightTransform(Vec3FromPython(towards)));
         },
         nb::arg("towards_light"), "Transform of a DistantLight shining from `towards_light`.");
+    m.def("julian_date", &JulianDate, nb::arg("year"), nb::arg("month"), nb::arg("day"),
+          nb::arg("hours") = 0.0,
+          "The Julian date of `hours` UT past midnight of a Gregorian date (Meeus, chapter 7).");
+    m.def("greenwich_sidereal_time", &GreenwichMeanSiderealTime, nb::arg("julian_date"),
+          "Greenwich mean sidereal time in degrees at a Julian date (Meeus, equation 12.4).");
+    m.def(
+        "celestial_to_local",
+        [](double latitude, double longitude, double julianDate) {
+            return MatrixToPython(CelestialToLocal(latitude, longitude, julianDate));
+        },
+        nb::arg("latitude"), nb::arg("longitude"), nb::arg("julian_date"),
+        "A StarField's transform for the sky over a site (degrees, east positive) at a Julian "
+        "date: J2000 equatorial to x east, y north, z up.");
+    m.def("star_illuminance", &StarIlluminance, nb::arg("magnitude"),
+          nb::arg("zero_point") = kMagnitudeZeroLux,
+          "Lux of a star of visual magnitude `magnitude` (2.54e-6 lux at magnitude 0).");
+    m.def("color_index_to_temperature", &ColorIndexToTemperature, nb::arg("color_index"),
+          "A star's temperature in kelvin from its B-V colour index (Ballesteros 2012).");
+    m.def(
+        "synthetic_stars",
+        [](std::size_t count, std::uint64_t seed, double faintest) {
+            StarCatalogue stars = SyntheticStars(count, seed, faintest);
+            nb::dict result;
+            result["right_ascension"] = stars.rightAscension;
+            result["declination"] = stars.declination;
+            result["magnitude"] = stars.magnitude;
+            result["color_index"] = stars.colorIndex;
+            return result;
+        },
+        nb::arg("count"), nb::arg("seed") = 1, nb::arg("faintest") = 6.5,
+        "`count` made-up stars as lists of right_ascension and declination (degrees), "
+        "magnitude and color_index, the same for the same seed.");
 
     nb::module_ tokens = m.def_submodule("tokens", "Prim type and attribute names.");
     const std::pair<const char*, std::string_view> names[] = {
@@ -875,6 +908,16 @@ void BindScene(nb::module_& m) {
         {"PHOTOMETRIC_ILLUMINANCE", tokens::kPhotometricIlluminance},
         {"PHOTOMETRIC_ILLUMINANCE_DISTANCE", tokens::kPhotometricIlluminanceDistance},
         {"PHOTOMETRIC_POWER", tokens::kPhotometricPower},
+        {"VISIBLE_IN_PRIMARY_RAY", tokens::kVisibleInPrimaryRay},
+        {"STAR_FIELD", tokens::kStarField},
+        {"STARS_RIGHT_ASCENSION", tokens::kStarsRightAscension},
+        {"STARS_DECLINATION", tokens::kStarsDeclination},
+        {"STARS_DIRECTION", tokens::kStarsDirection},
+        {"STARS_MAGNITUDE", tokens::kStarsMagnitude},
+        {"STARS_COLOR_INDEX", tokens::kStarsColorIndex},
+        {"STARS_TEMPERATURE", tokens::kStarsTemperature},
+        {"STARS_MAGNITUDE_LIMIT", tokens::kStarsMagnitudeLimit},
+        {"STARS_ZERO_POINT", tokens::kStarsZeroPoint},
         {"WHITE", tokens::kWhite},
         {"BLACKBODY", tokens::kBlackbody},
         {"ILLUMINANT_D", tokens::kIlluminantD},

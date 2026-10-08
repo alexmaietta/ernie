@@ -37,6 +37,7 @@ inline constexpr std::string_view kDomeLight = "DomeLight";
 inline constexpr std::string_view kMaterial = "Material";
 inline constexpr std::string_view kTerrain = "Terrain";
 inline constexpr std::string_view kGroundPlane = "GroundPlane";  ///< Ernie: an infinite floor.
+inline constexpr std::string_view kStarField = "StarField";  ///< Ernie: stars behind everything.
 inline constexpr std::string_view kRenderSettings = "RenderSettings";
 inline constexpr std::string_view kRenderProduct = "RenderProduct";
 inline constexpr std::string_view kRenderVar = "RenderVar";
@@ -172,6 +173,36 @@ inline constexpr std::string_view kPhotometricIlluminanceDistance =
 /// float, lumens: an area light's (SphereLight, RectLight, DiskLight) luminous flux, default
 /// 1600; a SphereLight emits it in every direction, a RectLight or DiskLight from its face.
 inline constexpr std::string_view kPhotometricPower = "photometric:power";
+
+/// bool: whether a DomeLight shows behind the scene where camera rays hit no geometry (Omniverse's
+/// "Visible In Primary Ray"); default on. Off, it still lights the scene.
+inline constexpr std::string_view kVisibleInPrimaryRay = "visibleInPrimaryRay";
+
+// Star field (Ernie): stars from a catalogue as points of light at infinity, behind everything
+// else, each with a black-body spectrum. The prim's transform takes the catalogue's frame, J2000
+// equatorial with x towards right ascension 0 and z the north celestial pole, into the world
+// (`CelestialToLocal` places it over a site at a time). A star's illuminance is
+// `ernie:stars:zeroPoint` times 10^(-0.4 magnitude) times 2^`inputs:exposure`. Renders draw the
+// first visible StarField.
+//
+/// float arrays, degrees, one per star: right ascension and declination in the catalogue's frame.
+inline constexpr std::string_view kStarsRightAscension = "ernie:stars:rightAscension";
+inline constexpr std::string_view kStarsDeclination = "ernie:stars:declination";
+/// float array (stars, 3): unit directions to the stars in the prim's frame, in place of right
+/// ascension and declination.
+inline constexpr std::string_view kStarsDirection = "ernie:stars:direction";
+/// float array: apparent visual (Johnson V) magnitudes, one per star.
+inline constexpr std::string_view kStarsMagnitude = "ernie:stars:magnitude";
+/// float array: B-V colour indices, from which each star's temperature follows (Ballesteros 2012).
+inline constexpr std::string_view kStarsColorIndex = "ernie:stars:colorIndex";
+/// float array, kelvin: each star's temperature, in place of `ernie:stars:colorIndex`. Without
+/// either, stars are 5772 K, the Sun's.
+inline constexpr std::string_view kStarsTemperature = "ernie:stars:temperature";
+/// float: stars fainter than this magnitude are left out (default 99, none).
+inline constexpr std::string_view kStarsMagnitudeLimit = "ernie:stars:magnitudeLimit";
+/// float, lux: the illuminance of a magnitude 0 star (default 2.54e-6, Allen's Astrophysical
+/// Quantities), so 10^(-0.4 m) of it for a star of magnitude m.
+inline constexpr std::string_view kStarsZeroPoint = "ernie:stars:zeroPoint";
 
 // Terrain (Ernie): a north-up heightfield, x east, y north, z up.
 inline constexpr std::string_view kHeights = "heights";          ///< float32 tensor (rows, cols).

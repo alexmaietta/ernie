@@ -169,6 +169,15 @@ class RasterRenderer {
     /// The material drawables should use for `id`: that material, or the default one if it is gone.
     const RasterMaterial& MaterialOrDefault(std::uint32_t id) const;
 
+    /// Sets the dome's latitude-longitude RGB map (`DomeMapOf`) drawn behind the scene where the
+    /// dome is visible (`DomeLight::visible`), with its mips; none draws its radiance alone.
+    /// @throws std::invalid_argument for an empty map or one larger than the device allows.
+    void SetDomeMap(const Image* map);
+
+    /// Sets the stars (`StarsOf`) drawn behind the scene while frames have `FrameParams::stars`,
+    /// binned into cells of a degree for each pixel to gather the stars around it.
+    void SetStars(std::span<const Star> stars);
+
     /// Writes the frame, shading and sensor uniforms and the material table, fits the shadow
     /// cascades around the drawables' bounds and prepares every drawable. Call once per frame
     /// after `BeginFrame` and before `Record`; earlier frames may still be running, since host
@@ -430,6 +439,18 @@ class RasterRenderer {
     GpuBuffer lightTable_;
     GpuBuffer lightViewMatrices_;
     std::unique_ptr<GpuBuffer> materialTable_;
+    /// What shows behind the scene: the dome's map (a white texel without one), the stars sorted
+    /// by grid cell (`kStarColumns` by `kStarRows`), each cell's first star and count, and the
+    /// last `Update`'s kSky* bits (shading.slang); the sky pass runs when any are set.
+    static constexpr std::uint32_t kStarColumns = 360;
+    static constexpr std::uint32_t kStarRows = 180;
+    std::unique_ptr<GpuImage> domeMap_;
+    bool hasDomeMap_ = false;
+    std::unique_ptr<GpuBuffer> stars_;
+    std::unique_ptr<GpuBuffer> starCells_;
+    std::size_t starCount_ = 0;
+    std::uint32_t sky_ = 0;
+    std::unique_ptr<ComputePipeline> skyPipeline_;
     std::vector<std::size_t> modelsInUse_;
     SpectralBands bands_;
     std::vector<SensorFilter> filters_;

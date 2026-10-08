@@ -60,7 +60,8 @@ public struct SensorUniforms {
     public float4 adc;
     // Noise on (1), seed, frame seed (FrameSeed of the seed, stream and frame), unused.
     public uint4 noise;
-    // Linear display colour of the background in LdrColor.
+    // Linear display colour of the background in LdrColor (rgb); w: 1 when the background holds
+    // radiance (a visible dome or stars, `skyMain`), which then shows in its place.
     public float4 clear;
     // Per band: weights from radiance to linear sRGB (cd/m^2), with the luminous efficacy, the
     // CIE observer and Bradford adaptation from the equal-energy white folded in.
@@ -300,9 +301,11 @@ public struct Lens : ISpatialSource {
     int2 next;   // and its last
     float2 weight;
     float falloff;
-    // Which of the four taps hit a prim: shading writes only those, so the others are zero.
+    // Which of the four taps hold radiance: shading writes the prims' pixels, and the sky the
+    // background's when it has any; the others are zero.
     bool4 lit;
     bool background;
+    bool dark;  // no radiance: the ray leaves the image, or meets a background without any
     float imagePlane;
     float camera;
     float4 normal;
@@ -326,18 +329,20 @@ public struct Lens : ISpatialSource {
         let layer = int(id.z);
         let ids = gIds.Load(int4(nearest, layer, 0));
         Lens lens;
+        let sky = cam.clear.w > 0.5;
         lens.background = outside || ids.x == kBackground;
+        lens.dark = outside || (lens.background && !sky);
         lens.base = int3(0, 0, layer);
         lens.next = int2(0);
         lens.weight = float2(0.0);
         lens.falloff = 1.0;
         lens.lit = bool4(false);
-        if (lens.background) {
-            lens.imagePlane = infinity;
-            lens.camera = infinity;
-            lens.normal = float4(0.0);
-            lens.prim = 0;
-            lens.instance = 0;
+        lens.imagePlane = infinity;
+        lens.camera = infinity;
+        lens.normal = float4(0.0);
+        lens.prim = 0;
+        lens.instance = 0;
+        if (lens.dark) {
             return lens;
         }
         let base = int2(floor(clamp(raster, float2(0.0), size - 1.0)));
@@ -349,10 +354,14 @@ public struct Lens : ISpatialSource {
             let cosine2 = 1.0 / (1.0 + dot(p, p));
             lens.falloff = cosine2 * cosine2;
         }
-        lens.lit = bool4(gIds.Load(int4(base.x, base.y, layer, 0)).x != kBackground,
-                         gIds.Load(int4(next.x, base.y, layer, 0)).x != kBackground,
-                         gIds.Load(int4(base.x, next.y, layer, 0)).x != kBackground,
-                         gIds.Load(int4(next.x, next.y, layer, 0)).x != kBackground);
+        lens.lit = sky ? bool4(true)
+                       : bool4(gIds.Load(int4(base.x, base.y, layer, 0)).x != kBackground,
+                               gIds.Load(int4(next.x, base.y, layer, 0)).x != kBackground,
+                               gIds.Load(int4(base.x, next.y, layer, 0)).x != kBackground,
+                               gIds.Load(int4(next.x, next.y, layer, 0)).x != kBackground);
+        if (lens.background) {
+            return lens;  // the sky's radiance, at infinity with no prim
+        }
         let ndc = float3((float(nearest.x) + 0.5) / size.x * 2.0 - 1.0,
                          1.0 - (float(nearest.y) + 0.5) / size.y * 2.0,
                          gDepth.Load(int4(nearest, layer, 0)));
@@ -367,7 +376,7 @@ public struct Lens : ISpatialSource {
     }
 
     public float band(uint band, PixelContext pixel) {
-        if (background) {
+        if (dark) {
             return 0.0;
         }
         let slice = pixel.slice(band);
@@ -527,12 +536,13 @@ float encodeSrgb(float linear) {
 }
 
 // Exposure: the photographic output, HDR colour times USD's linear exposure scale, clipped to
-// [0, 1] and sRGB-encoded; background pixels show the clear colour.
+// [0, 1] and sRGB-encoded; background pixels show the clear colour unless the sky fills them.
 public struct Exposure {
     public static void apply(inout SensorPixel value, PixelContext pixel) {
         let cam = pixel.uniforms();
-        let linear =
-            value.background ? cam.clear.rgb : clamp(value.rgb * cam.lens.z, 0.0, 1.0);
+        let linear = value.background && cam.clear.w < 0.5
+                         ? cam.clear.rgb
+                         : clamp(value.rgb * cam.lens.z, 0.0, 1.0);
         value.display =
             float4(encodeSrgb(linear.r), encodeSrgb(linear.g), encodeSrgb(linear.b), 1.0);
     }

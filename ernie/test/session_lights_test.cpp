@@ -1,6 +1,7 @@
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/session/resolve.h"
+#include "ernie/util/astronomy.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
@@ -300,4 +301,64 @@ TEST(LightOf, IlluminantsShapeTheSpectrum) {
     const std::vector<float> spectrum = ernie::LightOf(relative, "/Sun", bands).spectrum;
     EXPECT_NEAR(Luminous(spectrum, bands), 2.0 * M_PI, 0.1) << "pi x intensity lux, as before";
     EXPECT_NEAR(Chromaticity(spectrum, bands).x, 0.4369, 0.005);
+}
+
+TEST(StarsOf, StarsShineByTheirMagnitudeAndColour) {
+    Scene scene;
+    scene.Define("/Sky", tokens::kStarField)
+        .Set(tokens::kStarsRightAscension, std::vector<float>{0.0f, 90.0f, 180.0f})
+        .Set(tokens::kStarsDeclination, std::vector<float>{0.0f, 45.0f, -30.0f})
+        .Set(tokens::kStarsMagnitude, std::vector<float>{0.0f, 5.0f, 9.0f})
+        .Set(tokens::kStarsColorIndex, std::vector<float>{0.65f, 0.0f, 1.5f});
+    std::vector<ernie::Star> stars = ernie::StarsOf(scene, "/Sky");
+    ASSERT_EQ(stars.size(), 3u);
+    EXPECT_NEAR(stars[1].rightAscension, M_PI / 2.0, 1e-6);
+    EXPECT_NEAR(stars[1].declination, M_PI / 4.0, 1e-6);
+    EXPECT_NEAR(stars[0].temperature, 5778.0f, 5.0f) << "B-V 0.65";
+    EXPECT_NEAR(stars[0].irradiance555,
+                ernie::BlackbodySpectralIrradiance(555.0, stars[0].temperature, 2.54e-6),
+                1e-15);
+    EXPECT_GT(stars[2].temperature, 0.0f);
+    EXPECT_LT(stars[2].temperature, stars[1].temperature) << "redder is cooler";
+
+    scene.Set("/Sky", tokens::kStarsMagnitudeLimit, 6.0);
+    EXPECT_EQ(ernie::StarsOf(scene, "/Sky").size(), 2u) << "fainter than the limit";
+    scene.Set("/Sky", tokens::kExposure, 1.0);
+    EXPECT_NEAR(ernie::StarsOf(scene, "/Sky")[0].irradiance555 / stars[0].irradiance555, 2.0,
+                1e-5)
+        << "2^exposure";
+
+    scene.Set("/Sky", tokens::kStarsDeclination, std::vector<float>{0.0f});
+    EXPECT_THROW(ernie::StarsOf(scene, "/Sky"), std::invalid_argument) << "lengths differ";
+    Scene directions;
+    directions.Define("/Sky", tokens::kStarField)
+        .Set(tokens::kStarsDirection, std::vector<float>{0.0f, 0.0f, 2.0f})
+        .Set(tokens::kStarsMagnitude, std::vector<float>{1.0f});
+    EXPECT_NEAR(ernie::StarsOf(directions, "/Sky")[0].declination, M_PI / 2.0, 1e-6);
+    EXPECT_NEAR(ernie::StarsOf(directions, "/Sky")[0].temperature, 5772.0f, 1e-3f)
+        << "the Sun's without a colour";
+    directions.Define("/Bare", tokens::kStarField)
+        .Set(tokens::kStarsMagnitude, std::vector<float>{1.0f});
+    EXPECT_THROW(ernie::StarsOf(directions, "/Bare"), std::invalid_argument) << "no places";
+}
+
+TEST(FrameParamsOf, DomesShowAndStarFieldsTurnWithTheirTransforms) {
+    Scene scene;
+    scene.Define("/Camera", tokens::kCamera);
+    scene.Define("/Dome", tokens::kDomeLight)
+        .Set(tokens::kTransform, glm::rotate(glm::dmat4(1.0), M_PI / 2.0, glm::dvec3(0, 0, 1)));
+    scene.Define("/Stars", tokens::kStarField)
+        .Set(tokens::kTransform, glm::rotate(glm::dmat4(1.0), M_PI / 2.0, glm::dvec3(1, 0, 0)));
+    const ernie::RenderPrims prims = ernie::ResolveRenderPrims(scene, {});
+    EXPECT_EQ(prims.stars, Path("/Stars"));
+    ernie::FrameParams params = ernie::FrameParamsOf(scene, prims, 16, 16);
+    ASSERT_TRUE(params.dome && params.stars);
+    EXPECT_TRUE(params.dome->visible);
+    // World +y is the dome's +x after a quarter turn about z.
+    const glm::vec3 local = params.dome->toDome * glm::vec3(0.0f, 1.0f, 0.0f);
+    EXPECT_NEAR(local.x, 1.0f, 1e-6f);
+    // World +y is the catalogue's -z after a quarter turn about x.
+    EXPECT_NEAR((params.stars->toCatalogue * glm::vec3(0.0f, 1.0f, 0.0f)).z, -1.0f, 1e-6f);
+    scene.Set("/Dome", tokens::kVisibleInPrimaryRay, false);
+    EXPECT_FALSE(ernie::FrameParamsOf(scene, prims, 16, 16).dome->visible);
 }

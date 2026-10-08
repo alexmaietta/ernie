@@ -111,7 +111,9 @@ std::vector<PropertySection> LightOf(std::string_view type) {
                         Field(kLightPower, "Power", Kind::Float, 0.0, 0.0, 1e7, {},
                               "Radiant flux in W, in place of the intensity when set")};
     } else if (type == kDomeLight) {
-        shape.fields = {Field(kTextureFile, "Texture file", Kind::Text, S(""))};
+        shape.fields = {Field(kTextureFile, "Texture file", Kind::Text, S("")),
+                        Field(kVisibleInPrimaryRay, "Visible in primary ray", Kind::Bool, true,
+                              0, 0, {}, "Show behind the scene where camera rays meet nothing")};
     }
     if (!shape.fields.empty()) {
         sections.push_back(std::move(shape));
@@ -333,6 +335,15 @@ std::vector<PropertySection> SchemaOf(const Scene& scene, const Path& path,
     } else if (type == kDistantLight || type == kSphereLight || type == kRectLight ||
                type == kDiskLight || type == kDomeLight) {
         sections = LightOf(type);
+    } else if (type == kStarField) {
+        sections.push_back(
+            {"Stars",
+             {Field(kStarsMagnitudeLimit, "Magnitude limit", Kind::Float, 99.0, -30.0, 99.0, {},
+                    "Stars fainter than this are left out"),
+              Field(kExposure, "Exposure", Kind::Float, 0.0, -16.0, 16.0, {},
+                    "Stops; scales every star by 2^exposure"),
+              Field(kStarsZeroPoint, "Zero point", Kind::Float, 2.54e-6, 0.0, 1.0, {},
+                    "Lux of a magnitude 0 star (Allen's Astrophysical Quantities)")}});
     } else if (type == kCamera) {
         sections = CameraSchema();
     } else if (type == kMaterial) {

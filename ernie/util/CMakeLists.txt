@@ -1,6 +1,7 @@
 ernie_add_library(
     ernie_util
     SOURCES
+    astronomy.cpp
     image.cpp
     spectrum.cpp
     tensor.cpp

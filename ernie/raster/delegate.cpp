@@ -375,6 +375,42 @@ void RasterDelegate::SyncHeightfield(const Scene& scene, const Path& terrain) {
     }
 }
 
+void RasterDelegate::SyncSky(const Scene& scene, const RenderPrims& prims) {
+    ERNIE_ZONE("Sync sky");
+    using namespace tokens;
+    const std::optional<Key> map =
+        prims.dome.IsEmpty() ? std::nullopt
+                             : std::optional(KeyOf(scene, prims.dome, {kLightTexture}));
+    if (map != domeMap_) {
+        domeMap_ = map;
+        try {
+            const std::optional<Image> image =
+                prims.dome.IsEmpty() ? std::nullopt : DomeMapOf(scene, prims.dome);
+            renderer_.SetDomeMap(image ? &*image : nullptr);
+        } catch (const std::invalid_argument& error) {
+            renderer_.SetDomeMap(nullptr);
+            throw UploadError(prims.dome, kLightTexture, error.what());
+        }
+    }
+    const std::optional<Key> stars =
+        prims.stars.IsEmpty()
+            ? std::nullopt
+            : std::optional(KeyOf(scene, prims.stars,
+                                  {kStarsRightAscension, kStarsDeclination, kStarsDirection,
+                                   kStarsMagnitude, kStarsColorIndex, kStarsTemperature,
+                                   kStarsMagnitudeLimit, kStarsZeroPoint, kExposure}));
+    if (stars != stars_) {
+        stars_ = stars;
+        try {
+            renderer_.SetStars(prims.stars.IsEmpty() ? std::vector<Star>()
+                                                     : StarsOf(scene, prims.stars));
+        } catch (const std::invalid_argument& error) {
+            renderer_.SetStars({});
+            throw UploadError(prims.stars, kStarsMagnitude, error.what());
+        }
+    }
+}
+
 ComputeInterop* RasterDelegate::Compute(std::string* why) {
     if (!computeTried_) {
         computeTried_ = true;
@@ -686,6 +722,7 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
     ERNIE_ZONE("UpdatePrims");
     Sync(scene);
     prims_ = prims;
+    SyncSky(scene, prims_);
     FrameParams frame = [&] {
         ERNIE_ZONE("FrameParamsOf");
         return FrameParamsOf(scene, prims_, extent.width, extent.height);

@@ -173,6 +173,8 @@ class RasterDelegate : public RenderDelegate {
     void SyncMaterials(const Scene& scene);
     void SyncMaterial(const Scene& scene, const Path& path, SyncedMaterial& material);
     void SyncHeightfield(const Scene& scene, const Path& terrain);
+    /// Uploads the map of the frame's dome and the stars of its StarField when they change.
+    void SyncSky(const Scene& scene, const RenderPrims& prims);
     void SyncMeshes(const Scene& scene);
     void SyncInstancers(const Scene& scene);
     std::uint32_t MaterialOf(const Scene& scene, const Path& prim) const;
@@ -219,6 +221,8 @@ class RasterDelegate : public RenderDelegate {
     std::uint64_t sceneId_ = 0;
     RenderPrims prims_;
     std::optional<Key> heightfield_;
+    std::optional<Key> domeMap_;  ///< The dome map last uploaded, and its dome.
+    std::optional<Key> stars_;    ///< The StarField last uploaded.
     std::map<Path, SyncedMaterial> materials_;
     std::map<Path, SyncedMesh> syncedMeshes_;
     std::map<Path, SyncedInstancer> instancers_;

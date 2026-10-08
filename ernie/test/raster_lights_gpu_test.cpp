@@ -5,6 +5,8 @@
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/session/renderer.h"
+#include "ernie/session/resolve.h"
+#include "ernie/util/astronomy.h"
 #include "support/delegate_scenes.h"
 #include "support/test_raster.h"
 #include "support/vulkan_fixture.h"
@@ -325,4 +327,119 @@ TEST_F(RasterDelegateTest, MeteringMeasuresTheScenesLuminance) {
     const int base = centre();
     scene.Set("/Render/Settings", tokens::kExposureCompensation, 2.0);
     EXPECT_GT(centre(), base + 40);
+}
+
+namespace {
+
+/// FlatScene without its terrain or sun: an empty world, the camera at the origin looking along
+/// `forward`.
+Scene SkyScene(glm::dvec3 forward, glm::dvec3 up) {
+    Scene scene = FlatScene();
+    scene.Remove("/World/Terrain");
+    scene.Remove("/World/Sun");
+    scene.Set("/World/Camera", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, 0.0}, forward, up));
+    return scene;
+}
+
+/// Band `band` of SpectralRadiance, (bands, rows, cols), at (`row`, `col`) of a `size` square.
+float SpectralAt(const Tensor& spectral, std::size_t band, std::size_t row, std::size_t col,
+                 std::size_t size) {
+    return static_cast<const float*>(spectral.Data())[(band * size + row) * size + col];
+}
+
+}  // namespace
+
+TEST_F(RasterDelegateTest, DomesShowBehindTheScene) {
+    Scene scene = SkyScene({0.0, 0.0, 1.0}, {0.0, 1.0, 0.0});
+    scene.Define("/World/Sky", tokens::kDomeLight).Set(tokens::kIntensity, 1.0);
+    RasterDelegate delegate(*context_);
+    ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+    auto vars = MapVars(outputs);
+    const ernie::SpectralBands bands =
+        ernie::CameraOf(scene, "/World/Camera", kVarSize, kVarSize).bands;
+    const std::vector<float> dome = ernie::DomeOf(scene, "/World/Sky", bands).radiance;
+    const std::size_t c = kVarSize / 2;
+    for (int band = 0; band < bands.count; ++band) {
+        EXPECT_NEAR(SpectralAt(vars.at("SpectralRadiance"), band, c, c, kVarSize), dome[band],
+                    0.02f * dome[band])
+            << "band " << band;
+    }
+    const auto luminance = [&](std::map<std::string, Tensor, std::less<>>& of) {
+        return 0.2126f * At<float>(of.at("HdrColor"), c, c, 0) +
+               0.7152f * At<float>(of.at("HdrColor"), c, c, 1) +
+               0.0722f * At<float>(of.at("HdrColor"), c, c, 2);
+    };
+    EXPECT_NEAR(luminance(vars), 1.0f, 0.03f) << "a 1 cd/m^2 dome looks 1 cd/m^2";
+    EXPECT_EQ(At<std::uint32_t>(vars.at("PrimId"), c, c), 0u) << "still no prim";
+
+    // Red above the horizon, blue below: looking up sees red, until the dome turns over.
+    std::vector<float> map(8 * 16 * 3, 0.0f);
+    for (std::size_t texel = 0; texel < 8 * 16; ++texel) {
+        map[3 * texel + (texel < 4 * 16 ? 0 : 2)] = 1.0f;
+    }
+    scene.Write("/World/Sky", tokens::kLightTexture, Tensor::Copy<float>(map, {8, 16, 3}));
+    ernie::RenderProductSetOutputs upper = delegate.Step(scene);
+    auto up = MapVars(upper);
+    EXPECT_GT(At<float>(up.at("HdrColor"), c, c, 0), 10.0f * At<float>(up.at("HdrColor"), c, c, 2));
+    scene.Set("/World/Sky", tokens::kTransform,
+              glm::rotate(glm::dmat4(1.0), M_PI, glm::dvec3(1.0, 0.0, 0.0)));
+    ernie::RenderProductSetOutputs turned = delegate.Step(scene);
+    auto down = MapVars(turned);
+    EXPECT_GT(At<float>(down.at("HdrColor"), c, c, 2),
+              10.0f * At<float>(down.at("HdrColor"), c, c, 0));
+
+    scene.Set("/World/Sky", tokens::kVisibleInPrimaryRay, false);
+    ernie::RenderProductSetOutputs hidden = delegate.Step(scene);
+    EXPECT_EQ(SpectralAt(MapVars(hidden).at("SpectralRadiance"), 8, c, c, kVarSize), 0.0f)
+        << "not in camera rays, though it still lights";
+}
+
+TEST_F(RasterDelegateTest, StarsKeepTheirIrradianceAtAnyResolutionBehindTheScene) {
+    // A magnitude 0 star of the Sun's temperature a little off the view's axis: summing the
+    // radiance of its pixels times their solid angles gives back its spectral irradiance, at any
+    // resolution.
+    Scene scene = SkyScene({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
+    scene.Define("/World/Stars", tokens::kStarField)
+        .Set(tokens::kStarsRightAscension, std::vector<float>{0.7f})
+        .Set(tokens::kStarsDeclination, std::vector<float>{-0.4f})
+        .Set(tokens::kStarsMagnitude, std::vector<float>{0.0f})
+        .Set(tokens::kStarsTemperature, std::vector<float>{5772.0f});
+    RasterDelegate delegate(*context_);
+    const auto irradiance = [&](std::size_t size, std::size_t band) {
+        scene.Set("/Render/Settings", tokens::kResolution,
+                  glm::ivec2(static_cast<int>(size), static_cast<int>(size)));
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const Tensor spectral =
+            outputs.at("/Render/Product").vars.at("SpectralRadiance").Map(ernie::MapDevice::Cpu).tensor;
+        const ernie::Camera camera = ernie::CameraOf(scene, "/World/Camera", size, size);
+        const double f = camera.FocalLengthPixels();
+        double sum = 0.0;
+        for (std::size_t row = 0; row < size; ++row) {
+            for (std::size_t col = 0; col < size; ++col) {
+                const double x = (static_cast<double>(col) + 0.5 - 0.5 * size) / f;
+                const double y = (static_cast<double>(row) + 0.5 - 0.5 * size) / f;
+                const double cosine = 1.0 / std::sqrt(1.0 + x * x + y * y);
+                sum += SpectralAt(spectral, band, row, col, size) * cosine * cosine * cosine /
+                       (f * f);
+            }
+        }
+        return sum;
+    };
+    const ernie::SpectralBands bands = ernie::CameraOf(scene, "/World/Camera", 32, 32).bands;
+    for (const std::size_t band : {std::size_t{2}, std::size_t{12}}) {
+        const double expected = ernie::BlackbodySpectralIrradiance(
+            bands.Lower(static_cast<int>(band)) + 0.5 * bands.Width(), 5772.0, 2.54e-6);
+        for (const std::size_t size : {32u, 57u, 90u}) {
+            EXPECT_NEAR(irradiance(size, band), expected, 0.03 * expected)
+                << size << " pixels, band " << band;
+        }
+    }
+
+    // A quad in front hides it.
+    DefineQuad(scene, "/World/Blocker");
+    scene.Set("/World/Blocker", tokens::kTransform,
+              glm::rotate(glm::translate(glm::dmat4(1.0), glm::dvec3(5.0, 0.0, 0.0)), M_PI / 2.0,
+                          glm::dvec3(0.0, 1.0, 0.0)));
+    EXPECT_EQ(irradiance(32, 12), 0.0) << "behind the scene";
 }

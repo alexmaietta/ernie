@@ -3,6 +3,7 @@
 #include "ernie/geometry/primitives.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/util/astronomy.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -448,6 +449,7 @@ RenderPrims ResolveRenderPrims(const Scene& scene, const Path& settings) {
         }
     }
     prims.ground = FirstVisible(scene, tokens::kGroundPlane);
+    prims.stars = FirstVisible(scene, tokens::kStarField);
     return prims;
 }
 
@@ -874,11 +876,13 @@ DomeLight DomeOf(const Scene& scene, const Path& path, const SpectralBands& band
         throw std::invalid_argument("'" + path.String() + "' is not a DomeLight");
     }
     DomeLight dome;
+    const glm::dmat4 world = scene.WorldTransform(path);
+    const glm::dmat3 rotation(glm::normalize(glm::dvec3(world[0])),
+                              glm::normalize(glm::dvec3(world[1])),
+                              glm::normalize(glm::dvec3(world[2])));
+    dome.toDome = glm::mat3(glm::transpose(rotation));
+    dome.visible = GetBool(scene, path, kVisibleInPrimaryRay, true);
     if (const Tensor* texture = scene.Read(path, kLightTexture)) {
-        const glm::dmat4 world = scene.WorldTransform(path);
-        const glm::dmat3 rotation(glm::normalize(glm::dvec3(world[0])),
-                                  glm::normalize(glm::dvec3(world[1])),
-                                  glm::normalize(glm::dvec3(world[2])));
         dome.sh = DomeIrradianceSh(*texture, rotation);
     } else {
         dome.sh[0] = glm::vec3(static_cast<float>(std::sqrt(4.0 * M_PI)));
@@ -906,6 +910,131 @@ DomeLight DomeOf(const Scene& scene, const Path& path, const SpectralBands& band
                         ? Spectrum::FromPairs(*pairs).Bin(bands)
                         : RelativeSpectrum(scene, path, bands, LightIntensity(scene, path));
     return dome;
+}
+
+std::optional<Image> DomeMapOf(const Scene& scene, const Path& path) {
+    const Tensor* texture = scene.Read(path, tokens::kLightTexture);
+    if (texture == nullptr) {
+        return std::nullopt;
+    }
+    try {
+        return ImageOfTensor(*texture, ImageEncoding::Linear);
+    } catch (const std::invalid_argument& error) {
+        throw std::invalid_argument("'" + std::string(tokens::kLightTexture) + "' of '" +
+                                    path.String() + "': " + error.what());
+    }
+}
+
+namespace {
+
+/// The prim's float array `attribute`, `components` per element, from a tensor or a float array
+/// value.
+std::optional<std::vector<float>> FloatArray(const Scene& scene, const Path& path,
+                                             std::string_view attribute,
+                                             std::size_t components) {
+    if (std::optional<std::vector<float>> values =
+            FloatAttribute(scene, path, attribute, components)) {
+        return values;
+    }
+    if (const Value* value = scene.Get(path, attribute)) {
+        if (const auto* list = value->Get<std::vector<float>>()) {
+            if (list->size() % components != 0) {
+                throw std::invalid_argument("'" + std::string(attribute) + "' of '" +
+                                            path.String() + "' needs " +
+                                            std::to_string(components) + " values per element");
+            }
+            return *list;
+        }
+    }
+    return std::nullopt;
+}
+
+/// The rotation part of the world transform of `path`, without scale.
+glm::dmat3 WorldRotation(const Scene& scene, const Path& path) {
+    const glm::dmat4 world = scene.WorldTransform(path);
+    return glm::dmat3(glm::normalize(glm::dvec3(world[0])), glm::normalize(glm::dvec3(world[1])),
+                      glm::normalize(glm::dvec3(world[2])));
+}
+
+}  // namespace
+
+std::vector<Star> StarsOf(const Scene& scene, const Path& path) {
+    using namespace tokens;
+    if (scene.TypeOf(path) != kStarField) {
+        throw std::invalid_argument("'" + path.String() + "' is not a StarField");
+    }
+    const auto array = [&](std::string_view attribute, std::size_t components) {
+        return FloatArray(scene, path, attribute, components);
+    };
+    const std::optional<std::vector<float>> magnitudes = array(kStarsMagnitude, 1);
+    if (!magnitudes) {
+        return {};
+    }
+    const std::size_t count = magnitudes->size();
+    const auto check = [&](const std::optional<std::vector<float>>& values,
+                           std::string_view attribute, std::size_t components) {
+        if (values && values->size() != count * components) {
+            throw std::invalid_argument("'" + std::string(attribute) + "' of '" + path.String() +
+                                        "' has " + std::to_string(values->size() / components) +
+                                        " stars where '" + std::string(kStarsMagnitude) +
+                                        "' has " + std::to_string(count));
+        }
+    };
+    const std::optional<std::vector<float>> ra = array(kStarsRightAscension, 1);
+    const std::optional<std::vector<float>> dec = array(kStarsDeclination, 1);
+    const std::optional<std::vector<float>> direction = array(kStarsDirection, 3);
+    const std::optional<std::vector<float>> temperature = array(kStarsTemperature, 1);
+    const std::optional<std::vector<float>> colorIndex = array(kStarsColorIndex, 1);
+    check(ra, kStarsRightAscension, 1);
+    check(dec, kStarsDeclination, 1);
+    check(direction, kStarsDirection, 3);
+    check(temperature, kStarsTemperature, 1);
+    check(colorIndex, kStarsColorIndex, 1);
+    if (!(ra && dec) && !direction) {
+        throw std::invalid_argument("StarField '" + path.String() + "' needs '" +
+                                    std::string(kStarsRightAscension) + "' and '" +
+                                    std::string(kStarsDeclination) + "', or '" +
+                                    std::string(kStarsDirection) + "'");
+    }
+    const double zeroPoint = GetNumber(scene, path, kStarsZeroPoint, kMagnitudeZeroLux) *
+                             std::exp2(GetNumber(scene, path, kExposure, 0.0));
+    const double limit = GetNumber(scene, path, kStarsMagnitudeLimit, 99.0);
+    std::vector<Star> stars;
+    stars.reserve(count);
+    for (std::size_t i = 0; i < count; ++i) {
+        const double magnitude = (*magnitudes)[i];
+        if (!(magnitude <= limit)) {
+            continue;
+        }
+        Star star;
+        if (ra && dec) {
+            star.rightAscension = static_cast<float>(glm::radians(static_cast<double>((*ra)[i])));
+            star.declination = static_cast<float>(glm::radians(static_cast<double>((*dec)[i])));
+        } else {
+            const glm::dvec3 d = glm::normalize(glm::dvec3((*direction)[3 * i],
+                                                           (*direction)[3 * i + 1],
+                                                           (*direction)[3 * i + 2]));
+            star.rightAscension = static_cast<float>(std::atan2(d.y, d.x));
+            star.declination = static_cast<float>(std::asin(std::clamp(d.z, -1.0, 1.0)));
+        }
+        const double kelvin = temperature  ? static_cast<double>((*temperature)[i])
+                              : colorIndex ? ColorIndexToTemperature((*colorIndex)[i])
+                                           : 5772.0;
+        star.temperature = static_cast<float>(kelvin);
+        star.irradiance555 = static_cast<float>(
+            BlackbodySpectralIrradiance(555.0, kelvin, StarIlluminance(magnitude, zeroPoint)));
+        stars.push_back(star);
+    }
+    return stars;
+}
+
+StarField StarFieldOf(const Scene& scene, const Path& path) {
+    if (scene.TypeOf(path) != tokens::kStarField) {
+        throw std::invalid_argument("'" + path.String() + "' is not a StarField");
+    }
+    StarField field;
+    field.toCatalogue = glm::mat3(glm::transpose(WorldRotation(scene, path)));
+    return field;
 }
 
 double OverscanOf(const Camera& camera) {
@@ -1011,6 +1140,9 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
     params.sun = !prims.light.IsEmpty();
     if (!prims.dome.IsEmpty()) {
         params.dome = DomeOf(scene, prims.dome, params.camera.bands);
+    }
+    if (!prims.stars.IsEmpty()) {
+        params.stars = StarFieldOf(scene, prims.stars);
     }
     for (const Path& light : prims.lights) {
         params.lights.push_back(LightOf(scene, light, params.camera.bands));
