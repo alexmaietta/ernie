@@ -4,8 +4,11 @@
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/util/astronomy.h"
+#include "ernie/util/image.h"
+#include "ernie/util/tensor.h"
 
 #include <nanobind/operators.h>
+#include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
@@ -708,6 +711,20 @@ void BindScene(nb::module_& m) {
             return MatrixToPython(DistantLightTransform(Vec3FromPython(towards)));
         },
         nb::arg("towards_light"), "Transform of a DistantLight shining from `towards_light`.");
+    m.def(
+        "load_image",
+        [](const std::filesystem::path& path, bool srgb) {
+            const Image image =
+                LoadImage(path, srgb ? ImageEncoding::Srgb : ImageEncoding::Linear);
+            const auto* values = reinterpret_cast<const float*>(image.pixels.data());
+            return ArrayFromTensor(Tensor::Copy<float>(
+                std::span(values, image.pixels.size() * 4),
+                {static_cast<std::int64_t>(image.height), static_cast<std::int64_t>(image.width),
+                 4}), true);
+        },
+        nb::arg("path"), nb::arg("srgb") = true,
+        "A PNG, JPEG or OpenEXR image as a linear float32 (rows, cols, 4) array: PNG and JPEG "
+        "values decode as sRGB (srgb) or as linear data such as normal maps; EXR is linear.");
     m.def("julian_date", &JulianDate, nb::arg("year"), nb::arg("month"), nb::arg("day"),
           nb::arg("hours") = 0.0,
           "The Julian date of `hours` UT past midnight of a Gregorian date (Meeus, chapter 7).");

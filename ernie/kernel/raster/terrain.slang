@@ -87,12 +87,14 @@ public GridVertex gridVertex(uint vertexIndex, uint instanceIndex) {
     return v;
 }
 
-// Exaggerated terrain slope (dz/dx, dz/dy) from the full-resolution gradient at a world position
-// rather than from the mesh, so shading does not change as LOD levels morph.
+// Exaggerated terrain slope (dz/dx, dz/dy) from the gradient texture at a world position rather
+// than from the mesh, so shading does not change as LOD levels morph; filtered over the pixel's
+// footprint through the gradients' mips (fragment shaders only: it takes screen derivatives), so
+// distant terrain shades by its mean slope rather than aliasing.
 public float2 terrainSlope(float3 world) {
     let extent = float2(t.dims.xy) * t.grid.z;
     let uv = float2(world.x - t.grid.x, t.grid.y - world.y) / extent;
-    return gradients.SampleLevel(clampSampler, uv, 0) * t.grid.w;
+    return gradients.Sample(clampSampler, uv) * t.grid.w;
 }
 
 public float3 slopeNormal(float2 slope) {

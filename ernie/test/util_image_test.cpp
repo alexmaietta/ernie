@@ -2,14 +2,16 @@
 
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
+#include <ImfRgbaFile.h>
 #include <stb_image_write.h>
-#include <tinyexr.h>
 
 #include <array>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
+#include <string>
+#include <utility>
 #include <vector>
 
 using ernie::Image;
@@ -156,12 +158,23 @@ TEST_F(ImageFiles, LoadsJpeg) {
     EXPECT_NEAR(image.At(2, 2).r, 100.0f / 255.0f, 3.0f / 255.0f);
 }
 
+namespace {
+
+/// Writes `rgba` (width x height, row by row) as a half-float EXR with `compression`.
+void WriteExr(const std::filesystem::path& path, const std::vector<Imf::Rgba>& rgba, int width,
+              int height, Imf::Compression compression) {
+    Imf::RgbaOutputFile file(path.string().c_str(), width, height, Imf::WRITE_RGBA, 1.0f,
+                             Imath::V2f(0.0f, 0.0f), 1.0f, Imf::INCREASING_Y, compression);
+    file.setFrameBuffer(rgba.data(), 1, static_cast<std::size_t>(width));
+    file.writePixels(height);
+}
+
+}  // namespace
+
 TEST_F(ImageFiles, LoadsFloatExrAsLinear) {
-    const std::vector<float> rgba = {0.25f, 2.0f, -0.5f, 1.0f, 0.0f, 0.125f, 10.0f, 0.5f};
+    const std::vector<Imf::Rgba> rgba = {{0.25f, 2.0f, -0.5f, 1.0f}, {0.0f, 0.125f, 10.0f, 0.5f}};
     const auto path = dir_ / "data.exr";
-    const char* error = nullptr;
-    ASSERT_EQ(SaveEXR(rgba.data(), 2, 1, 4, 0, path.string().c_str(), &error), TINYEXR_SUCCESS)
-        << (error != nullptr ? error : "");
+    WriteExr(path, rgba, 2, 1, Imf::ZIP_COMPRESSION);
     const Image image = LoadImage(path, ImageEncoding::Srgb);
     ASSERT_EQ(image.width, 2u);
     EXPECT_FLOAT_EQ(image.At(0, 0).r, 0.25f) << "EXR ignores the sRGB encoding";
@@ -169,6 +182,30 @@ TEST_F(ImageFiles, LoadsFloatExrAsLinear) {
     EXPECT_FLOAT_EQ(image.At(0, 0).b, -0.5f);
     EXPECT_FLOAT_EQ(image.At(1, 0).b, 10.0f);
     EXPECT_FLOAT_EQ(image.At(1, 0).a, 0.5f);
+}
+
+TEST_F(ImageFiles, LoadsExrInLossyAndLosslessCompressions) {
+    // A smooth gradient, which the lossy DWA codecs keep closely; Poly Haven's normal maps are
+    // DWAA.
+    constexpr int kSize = 64;
+    std::vector<Imf::Rgba> rgba;
+    for (int y = 0; y < kSize; ++y) {
+        for (int x = 0; x < kSize; ++x) {
+            rgba.emplace_back(static_cast<float>(x) / kSize, static_cast<float>(y) / kSize, 0.5f,
+                              1.0f);
+        }
+    }
+    for (const auto [compression, tolerance] :
+         {std::pair(Imf::PIZ_COMPRESSION, 0.0f), std::pair(Imf::DWAA_COMPRESSION, 0.02f),
+          std::pair(Imf::DWAB_COMPRESSION, 0.02f)}) {
+        const auto path = dir_ / ("gradient" + std::to_string(compression) + ".exr");
+        WriteExr(path, rgba, kSize, kSize, compression);
+        const Image image = LoadImage(path, ImageEncoding::Linear);
+        ASSERT_EQ(image.width, static_cast<std::uint32_t>(kSize));
+        EXPECT_NEAR(image.At(40, 10).r, 40.0f / kSize, tolerance + 1e-3f) << compression;
+        EXPECT_NEAR(image.At(40, 10).g, 10.0f / kSize, tolerance + 1e-3f) << compression;
+        EXPECT_NEAR(image.At(40, 10).b, 0.5f, tolerance + 1e-3f) << compression;
+    }
 }
 
 TEST_F(ImageFiles, ReportsMissingCorruptAndUnsupportedFiles) {

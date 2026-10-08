@@ -46,8 +46,8 @@ struct Image {
 ///
 /// PNG and JPEG values decode with `encoding`; EXR values are linear already, so `encoding` is
 /// ignored for them. Grey images replicate into rgb and a missing alpha channel reads as 1. PNG and
-/// JPEG use stb_image; EXR uses tinyexr, which reads scanline and tiled images with no, RLE, ZIP
-/// and PIZ compression but not DWA or B44.
+/// JPEG use stb_image; EXR uses OpenEXR, which reads scanline and tiled images in every
+/// compression, including the lossy DWAA and DWAB that texture libraries ship.
 /// @throws std::runtime_error if the file cannot be read or decoded, or its extension is not
 /// .png, .jpg, .jpeg or .exr.
 Image LoadImage(const std::filesystem::path& path, ImageEncoding encoding);

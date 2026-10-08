@@ -81,25 +81,51 @@ std::vector<ShaderModuleSource> TerrainModules() {
             {"surface", shaders::kSurfaceSlang}};
 }
 
-// Central-difference gradients (dz/dx east, dz/dy north) per cell as packed half floats, clamping
-// at the raster's edges.
-std::vector<std::uint32_t> PackedGradients(const RasterView& raster) {
-    const std::size_t w = raster.width;
-    const std::size_t h = raster.height;
+// Central-difference gradients (dz/dx east, dz/dy north) per cell, clamping at the raster's edges,
+// and their mip chain as packed half floats: each level averages 2 x 2 of the one before (odd
+// sizes repeat their last row or column), so a distant pixel shades by the mean slope it covers
+// instead of one cell's, which aliased into salt-and-pepper speckle on fine heightfields.
+std::vector<std::vector<std::uint32_t>> PackedGradientMips(const RasterView& raster) {
+    std::size_t w = raster.width;
+    std::size_t h = raster.height;
     const auto scale = static_cast<float>(0.5 / raster.cellSize);
-    std::vector<std::uint32_t> packed(w * h);
+    std::vector<glm::vec2> level(w * h);
     for (std::size_t row = 0; row < h; ++row) {
         const std::size_t north = row > 0 ? row - 1 : row;
         const std::size_t south = row + 1 < h ? row + 1 : row;
         for (std::size_t col = 0; col < w; ++col) {
             const std::size_t west = col > 0 ? col - 1 : col;
             const std::size_t east = col + 1 < w ? col + 1 : col;
-            const glm::vec2 gradient((raster(east, row) - raster(west, row)) * scale,
-                                     (raster(col, north) - raster(col, south)) * scale);
-            packed[row * w + col] = glm::packHalf2x16(gradient);
+            level[row * w + col] = glm::vec2((raster(east, row) - raster(west, row)) * scale,
+                                             (raster(col, north) - raster(col, south)) * scale);
         }
     }
-    return packed;
+    std::vector<std::vector<std::uint32_t>> mips;
+    while (true) {
+        std::vector<std::uint32_t>& packed = mips.emplace_back(level.size());
+        for (std::size_t i = 0; i < level.size(); ++i) {
+            packed[i] = glm::packHalf2x16(level[i]);
+        }
+        if (w == 1 && h == 1) {
+            return mips;
+        }
+        const std::size_t nw = std::max<std::size_t>(w / 2, 1);
+        const std::size_t nh = std::max<std::size_t>(h / 2, 1);
+        std::vector<glm::vec2> next(nw * nh);
+        for (std::size_t row = 0; row < nh; ++row) {
+            const std::size_t r0 = std::min(2 * row, h - 1);
+            const std::size_t r1 = std::min(2 * row + 1, h - 1);
+            for (std::size_t col = 0; col < nw; ++col) {
+                const std::size_t c0 = std::min(2 * col, w - 1);
+                const std::size_t c1 = std::min(2 * col + 1, w - 1);
+                next[row * nw + col] = 0.25f * (level[r0 * w + c0] + level[r0 * w + c1] +
+                                                level[r1 * w + c0] + level[r1 * w + c1]);
+            }
+        }
+        level = std::move(next);
+        w = nw;
+        h = nh;
+    }
 }
 
 }  // namespace
@@ -216,11 +242,15 @@ void TerrainDrawable::SetHeightfield(const RasterView& raster) {
                                                                   VK_IMAGE_USAGE_SAMPLED_BIT});
     const std::span<const std::byte> heightMips[] = {std::as_bytes(std::span(packedHeights))};
     heights->Upload(heightMips);
-    const std::vector<std::uint32_t> gradients = PackedGradients(raster);
+    const std::vector<std::vector<std::uint32_t>> gradients = PackedGradientMips(raster);
     auto gradientImage = std::make_unique<GpuImage>(
         renderer_.Context(),
-        ImageDesc{w, h, 1, 1, VK_FORMAT_R16G16_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT});
-    const std::span<const std::byte> gradientMips[] = {std::as_bytes(std::span(gradients))};
+        ImageDesc{w, h, 1, static_cast<std::uint32_t>(gradients.size()), VK_FORMAT_R16G16_SFLOAT,
+                  VK_IMAGE_USAGE_SAMPLED_BIT});
+    std::vector<std::span<const std::byte>> gradientMips;
+    for (const std::vector<std::uint32_t>& mip : gradients) {
+        gradientMips.push_back(std::as_bytes(std::span(mip)));
+    }
     gradientImage->Upload(gradientMips);
     // The tree in the terrain's own coordinates (its north-west corner at x = y = 0), small and
     // exact in float wherever the terrain lies; `LocalFrom` maps views into them.

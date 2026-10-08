@@ -6,9 +6,12 @@ implementation. Build glue is in `cmake/third_party/<name>.cmake`.
 
 | Library | Version | Files | License | Used for |
 | --- | --- | --- | --- | --- |
-| [stb](https://github.com/nothings/stb) | commit `2c980bb59875b0d32144a71867fbdebb2f77cd20` | `stb_image.h`, `stb_image_write.h` | MIT or public domain | Reading PNG (8/16-bit) and JPEG textures; zlib for tinyexr |
+| [stb](https://github.com/nothings/stb) | commit `2c980bb59875b0d32144a71867fbdebb2f77cd20` | `stb_image.h`, `stb_image_write.h` | MIT or public domain | Reading PNG (8/16-bit) and JPEG textures |
 | [DLPack](https://github.com/dmlc/dlpack) | `v1.3` | `include/dlpack/dlpack.h` | Apache-2.0 | Tensor exchange with NumPy, PyTorch, JAX and Warp |
-| [tinyexr](https://github.com/syoyo/tinyexr) | `v1.0.9` | `tinyexr.h` | BSD-3-Clause (with OpenEXR BSD-3-Clause portions) | Reading OpenEXR textures |
+
+OpenEXR textures are read with the reference [OpenEXR](https://github.com/AcademySoftwareFoundation/openexr)
+library (BSD-3-Clause), fetched at configure time (`cmake/third_party/openexr.cmake`) rather than
+vendored.
 
 To update one, replace its headers with the files from the new upstream version, update the
 version here, and rerun the image tests (`ernie_tests_unit` or, inside TerrainGen, `terraingen_tests_ernie_unit`, with `--gtest_filter='Image*:*Png*:*Exr*'`).

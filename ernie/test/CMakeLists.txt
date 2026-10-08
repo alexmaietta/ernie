@@ -32,7 +32,7 @@ ernie_add_test_suite(
     LIBRARIES
     ernie
     ernie_stb
-    ernie_tinyexr
+    ernie_openexr
     DEFINITIONS
     ERNIE_TEST_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 ernie_add_test_suite(

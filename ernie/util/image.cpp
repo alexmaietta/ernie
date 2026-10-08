@@ -1,14 +1,16 @@
 #include "ernie/util/image.h"
 
+#include <ImfRgbaFile.h>
 #include <stb_image.h>
-#include <tinyexr.h>
 
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstddef>
 #include <cstdlib>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace ernie {
 
@@ -21,21 +23,31 @@ std::string Lowercase(std::string text) {
 }
 
 Image LoadExr(const std::filesystem::path& path) {
-    float* rgba = nullptr;
-    int width = 0;
-    int height = 0;
-    const char* error = nullptr;
-    if (LoadEXR(&rgba, &width, &height, path.string().c_str(), &error) != TINYEXR_SUCCESS) {
-        const std::string message = error != nullptr ? error : "unknown error";
-        FreeEXRErrorMessage(error);
-        throw std::runtime_error("Cannot read " + path.string() + ": " + message);
+    try {
+        // RGBA as half floats, whatever the file holds: missing alpha reads as 1, luminance
+        // images as grey, and every compression (RLE, ZIP, PIZ, PXR24, B44, DWAA, DWAB, HTJ2K)
+        // decodes, scanline or tiled.
+        Imf::RgbaInputFile file(path.string().c_str());
+        const Imath::Box2i window = file.dataWindow();
+        const int width = window.max.x - window.min.x + 1;
+        const int height = window.max.y - window.min.y + 1;
+        std::vector<Imf::Rgba> texels(static_cast<std::size_t>(width) *
+                                      static_cast<std::size_t>(height));
+        // Strides that put the window's first pixel at the buffer's start.
+        file.setFrameBuffer(texels.data() - window.min.x -
+                                static_cast<std::ptrdiff_t>(window.min.y) * width,
+                            1, static_cast<std::size_t>(width));
+        file.readPixels(window.min.y, window.max.y);
+        Image image(static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height));
+        for (std::size_t i = 0; i < image.pixels.size(); ++i) {
+            const Imf::Rgba& t = texels[i];
+            image.pixels[i] = glm::vec4(static_cast<float>(t.r), static_cast<float>(t.g),
+                                        static_cast<float>(t.b), static_cast<float>(t.a));
+        }
+        return image;
+    } catch (const std::exception& error) {
+        throw std::runtime_error("Cannot read " + path.string() + ": " + error.what());
     }
-    Image image(static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height));
-    for (std::size_t i = 0; i < image.pixels.size(); ++i) {
-        image.pixels[i] = glm::vec4(rgba[4 * i], rgba[4 * i + 1], rgba[4 * i + 2], rgba[4 * i + 3]);
-    }
-    std::free(rgba);
-    return image;
 }
 
 template <typename T>

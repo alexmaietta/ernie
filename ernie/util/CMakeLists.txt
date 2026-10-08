@@ -12,4 +12,4 @@ ernie_add_library(
     ernie_tracy
     PRIVATE
     ernie_stb
-    ernie_tinyexr)
+    ernie_openexr)
