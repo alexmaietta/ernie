@@ -100,26 +100,30 @@ class PropertiesPanel final : public Panel {
             return;
         }
         const Path& path = selection.front();
-        if (selection.size() > 1) {
-            ImGui::TextDisabled("%zu prims selected; showing the first", selection.size());
-        }
-        ImGui::TextUnformatted(path.String().c_str());
+        // As Kit's property window: a search field, then the prim's path and type.
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::InputTextWithHint("##search", "Search", search_, sizeof(search_));
+        const std::string_view filter(search_);
         const std::string& type = scene.TypeOf(path);
-        ImGui::TextDisabled("%s", type.empty() ? "(untyped)" : type.c_str());
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(path.String().c_str());
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s%s", type.empty() ? "untyped" : type.c_str(),
+                            selection.size() > 1 ? "  (first of the selection)" : "");
         if (!error_.empty()) {
             ImGui::TextColored(ImVec4(0.89f, 0.34f, 0.32f, 1.0f), "%s", error_.c_str());
         }
-        ImGui::Separator();
-        labelWidth_ = viewer.GetTheme().propertyLabelWidth * ImGui::GetFontSize() /
-                      viewer.GetTheme().fontSize;
+        labelWidth_ = PropertyLabelWidth(viewer);
         if (!path.IsRoot() && HasTransform(type) &&
+            MatchesFilter("Translate Rotate Scale", tokens::kTransform, filter) &&
             ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
             DrawTransform(viewer, scene, path);
         }
         // What Ernie reads on this type, set or not, then whatever else the prim holds.
         const std::vector<PropertySection> sections =
             SchemaOf(scene, path, viewer.Brdfs(), viewer.Delegate().SensorFilters());
-        const std::string failure = DrawPropertySections(viewer, path, sections, labelWidth_);
+        const std::string failure =
+            DrawPropertySections(viewer, path, sections, labelWidth_, filter);
         if (!failure.empty()) {
             error_ = failure;
         }
@@ -131,7 +135,7 @@ class PropertiesPanel final : public Panel {
         }
         std::vector<std::string> others;
         for (const std::string& attribute : scene.Attributes(path)) {
-            if (!known.contains(attribute)) {
+            if (!known.contains(attribute) && MatchesFilter(attribute, attribute, filter)) {
                 others.push_back(attribute);
             }
         }
@@ -162,17 +166,16 @@ class PropertiesPanel final : public Panel {
             }
             ImGui::EndPopup();
         }
+        ImGui::TableSetColumnIndex(2);
+        if (ResetSquare(viewer, authored)) {
+            viewer.ClearAttribute(path, attribute);
+        }
         ImGui::TableSetColumnIndex(1);
         ImGui::SetNextItemWidth(-1.0f);
     }
 
     bool BeginTable(const char* id) {
-        if (!ImGui::BeginTable(id, 2, ImGuiTableFlags_SizingFixedFit)) {
-            return false;
-        }
-        ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthFixed, labelWidth_);
-        ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
-        return true;
+        return BeginPropertyTable(id, labelWidth_);
     }
 
     /// Applies `value` to `attribute`, keeping a failure to show.
@@ -339,6 +342,7 @@ class PropertiesPanel final : public Panel {
     }
 
     float labelWidth_ = 120.0f;
+    char search_[128] = {};
     std::string error_;
     std::map<std::string, std::string> buffers_;  ///< Text being typed, by prim and attribute.
     std::string editing_;

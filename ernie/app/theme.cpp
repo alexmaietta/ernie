@@ -97,8 +97,9 @@ void ApplyTheme(const Theme& theme, float contentScale, ImGuiStyle& style) {
     set(ImGuiCol_Button, theme.field);
     set(ImGuiCol_ButtonHovered, theme.fieldHovered);
     set(ImGuiCol_ButtonActive, accentDim);
+    // Headers: section bars, and selected rows of trees and lists.
     set(ImGuiCol_Header, theme.header);
-    set(ImGuiCol_HeaderHovered, theme.fieldHovered);
+    set(ImGuiCol_HeaderHovered, WithAlpha(theme.accent, 0.30f));
     set(ImGuiCol_HeaderActive, accentDim);
     set(ImGuiCol_Separator, theme.separator);
     set(ImGuiCol_SeparatorHovered, accentDim);
@@ -107,11 +108,12 @@ void ApplyTheme(const Theme& theme, float contentScale, ImGuiStyle& style) {
     set(ImGuiCol_ResizeGripHovered, accentDim);
     set(ImGuiCol_ResizeGripActive, theme.accent);
     set(ImGuiCol_InputTextCursor, theme.text);
-    set(ImGuiCol_Tab, theme.header);
+    // Tabs as Kit draws them: dim on the dark bar, the shown one in the panel's colour.
+    set(ImGuiCol_Tab, theme.background);
     set(ImGuiCol_TabHovered, theme.fieldHovered);
     set(ImGuiCol_TabSelected, theme.panel);
     set(ImGuiCol_TabSelectedOverline, theme.accent);
-    set(ImGuiCol_TabDimmed, theme.header);
+    set(ImGuiCol_TabDimmed, theme.background);
     set(ImGuiCol_TabDimmedSelected, theme.panel);
     set(ImGuiCol_TabDimmedSelectedOverline, WithAlpha(theme.accent, 0.0f));
     set(ImGuiCol_DockingPreview, accentDim);

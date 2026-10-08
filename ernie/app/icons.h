@@ -24,6 +24,11 @@ inline constexpr const char* kX = "\xee\x86\xb2";                  ///< U+E1B2
 inline constexpr const char* kFlashlight = "\xee\x83\x93";         ///< U+E0D3
 inline constexpr const char* kSave = "\xee\x85\x8d";               ///< U+E14D
 inline constexpr const char* kFolderOpen = "\xee\x89\x87";         ///< U+E247
+inline constexpr const char* kMousePointer = "\xee\x87\x83";       ///< U+E1C3 mouse-pointer-2
+inline constexpr const char* kMove = "\xee\x84\xa1";               ///< U+E121
+inline constexpr const char* kRotateCw = "\xee\x85\x89";           ///< U+E149
+inline constexpr const char* kScaling = "\xee\x8b\xac";            ///< U+E2EC
+inline constexpr const char* kGlobe = "\xee\x83\xa8";              ///< U+E0E8
 
 /// First and last codepoints of the icon font, for loading its glyphs.
 inline constexpr unsigned kFirst = 0xE000;

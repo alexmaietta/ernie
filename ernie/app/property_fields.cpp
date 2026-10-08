@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <cstring>
 #include <optional>
@@ -208,16 +209,67 @@ float PropertyLabelWidth(const Viewer& viewer) {
     return viewer.GetTheme().propertyLabelWidth * ImGui::GetFontSize() / viewer.GetTheme().fontSize;
 }
 
-std::string DrawPropertyFields(Viewer& viewer, const Path& path,
-                               std::span<const PropertyField> fields, float labelWidth) {
-    Scene& scene = viewer.GetScene();
-    std::string error;
-    if (!ImGui::BeginTable("##fields", 2, ImGuiTableFlags_SizingFixedFit)) {
-        return error;
+bool MatchesFilter(std::string_view label, std::string_view attribute, std::string_view filter) {
+    if (filter.empty()) {
+        return true;
+    }
+    const auto contains = [&](std::string_view text) {
+        return std::search(text.begin(), text.end(), filter.begin(), filter.end(),
+                           [](char a, char b) {
+                               return std::tolower(static_cast<unsigned char>(a)) ==
+                                      std::tolower(static_cast<unsigned char>(b));
+                           }) != text.end();
+    };
+    return contains(label) || contains(attribute);
+}
+
+bool ResetSquare(const Viewer& viewer, bool authored) {
+    const float size = std::round(0.55f * ImGui::GetFontSize());
+    const float row = ImGui::GetFrameHeight();
+    const ImVec2 corner = ImGui::GetCursorScreenPos();
+    const bool clicked = ImGui::InvisibleButton("##reset", ImVec2(size + 4.0f, row));
+    const ImVec2 low(corner.x + 2.0f, corner.y + 0.5f * (row - size));
+    const ImVec2 high(low.x + size, low.y + size);
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    const Theme& theme = viewer.GetTheme();
+    if (authored) {
+        const glm::vec4& accent = theme.accent;
+        draw->AddRectFilled(low, high,
+                            ImGui::GetColorU32(ImVec4(accent.r, accent.g, accent.b,
+                                                      ImGui::IsItemHovered() ? 1.0f : 0.85f)),
+                            1.0f);
+    } else {
+        draw->AddRect(low, high, ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.45f), 1.0f);
+    }
+    if (authored && ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Reset to fallback");
+    }
+    return clicked && authored;
+}
+
+bool BeginPropertyTable(const char* id, float labelWidth) {
+    if (!ImGui::BeginTable(id, 3, ImGuiTableFlags_SizingFixedFit)) {
+        return false;
     }
     ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthFixed, labelWidth);
     ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
+    ImGui::TableSetupColumn("reset", ImGuiTableColumnFlags_WidthFixed,
+                            std::round(0.55f * ImGui::GetFontSize()) + 4.0f);
+    return true;
+}
+
+std::string DrawPropertyFields(Viewer& viewer, const Path& path,
+                               std::span<const PropertyField> fields, float labelWidth,
+                               std::string_view filter) {
+    Scene& scene = viewer.GetScene();
+    std::string error;
+    if (!BeginPropertyTable("##fields", labelWidth)) {
+        return error;
+    }
     for (const PropertyField& field : fields) {
+        if (!MatchesFilter(field.label, field.attribute, filter)) {
+            continue;
+        }
         ImGui::PushID(field.attribute.c_str());
         const bool authored = scene.Get(path, field.attribute) != nullptr;
         ImGui::TableNextRow();
@@ -238,6 +290,10 @@ std::string DrawPropertyFields(Viewer& viewer, const Path& path,
                 viewer.ClearAttribute(path, field.attribute);
             }
             ImGui::EndPopup();
+        }
+        ImGui::TableSetColumnIndex(2);
+        if (ResetSquare(viewer, authored)) {
+            viewer.ClearAttribute(path, field.attribute);
         }
         ImGui::TableSetColumnIndex(1);
         ImGui::SetNextItemWidth(-1.0f);
@@ -261,12 +317,21 @@ std::string DrawPropertyFields(Viewer& viewer, const Path& path,
 }
 
 std::string DrawPropertySections(Viewer& viewer, const Path& path,
-                                 std::span<const PropertySection> sections, float labelWidth) {
+                                 std::span<const PropertySection> sections, float labelWidth,
+                                 std::string_view filter) {
     std::string error;
     for (const PropertySection& section : sections) {
+        const bool matches =
+            std::any_of(section.fields.begin(), section.fields.end(), [&](const auto& field) {
+                return MatchesFilter(field.label, field.attribute, filter);
+            });
+        if (!matches) {
+            continue;
+        }
         if (ImGui::CollapsingHeader(section.title.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
             ImGui::PushID(section.title.c_str());
-            const std::string failure = DrawPropertyFields(viewer, path, section.fields, labelWidth);
+            const std::string failure =
+                DrawPropertyFields(viewer, path, section.fields, labelWidth, filter);
             if (error.empty()) {
                 error = failure;
             }

@@ -5,6 +5,7 @@
 
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace ernie::app {
@@ -40,16 +41,32 @@ struct PropertySection {
     std::vector<PropertyField> fields;
 };
 
-/// Draws `fields` of the prim at `path` as rows of a two-column table, `labelWidth` pixels for
-/// the labels: authored values normally and fallbacks muted, each edited through the viewer's undo
-/// history (`Viewer::Edit`) and reset by a right-click on its label (`Viewer::ClearAttribute`).
-/// Returns the first error an edit raised, or an empty string.
+/// Draws `fields` of the prim at `path` as rows of a table, as Omniverse's property widgets do: a
+/// label (`labelWidth` pixels; muted while the attribute is unset), the value's widget, and a
+/// reset square, blue once the attribute is authored, which resets it to its fallback when clicked
+/// (`Viewer::ClearAttribute`; so does a right-click on the label). Edits go through the viewer's
+/// undo history (`Viewer::Edit`). Only fields whose label or attribute contains `filter` (case
+/// aside) show. Returns the first error an edit raised, or an empty string.
 std::string DrawPropertyFields(Viewer& viewer, const Path& path,
-                               std::span<const PropertyField> fields, float labelWidth);
+                               std::span<const PropertyField> fields, float labelWidth,
+                               std::string_view filter = {});
 
-/// Draws each of `sections` under a collapsing header, open by default.
+/// Draws each of `sections` under a collapsing header, open by default; with a `filter`, only the
+/// sections with fields that match it.
 std::string DrawPropertySections(Viewer& viewer, const Path& path,
-                                 std::span<const PropertySection> sections, float labelWidth);
+                                 std::span<const PropertySection> sections, float labelWidth,
+                                 std::string_view filter = {});
+
+/// Whether `label` or `attribute` contains `filter`, ignoring case; always for an empty filter.
+bool MatchesFilter(std::string_view label, std::string_view attribute, std::string_view filter);
+
+/// A row's reset square: filled with the accent when `authored`, an outline otherwise. Returns
+/// whether it was clicked while authored.
+bool ResetSquare(const Viewer& viewer, bool authored);
+
+/// Sets up a property table `id` of a label column `labelWidth` wide, a value column and a reset
+/// column; returns false (and nothing to end) when it is clipped.
+bool BeginPropertyTable(const char* id, float labelWidth);
 
 /// The label column's width in pixels for the viewer's theme and font.
 float PropertyLabelWidth(const Viewer& viewer);

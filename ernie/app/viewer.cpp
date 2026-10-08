@@ -175,7 +175,7 @@ const char* LightingName(Lighting lighting) {
 
 const char* WireframeName(std::optional<Wireframe> mode) {
     if (!mode) {
-        return "Settings Wireframe";
+        return "Wireframe";
     }
     switch (*mode) {
     case Wireframe::Off:
@@ -527,14 +527,16 @@ struct Viewer::State {
 
     void LoadFonts() {
         ImGuiIO& io = ImGui::GetIO();
+        static const ImWchar kIconRange[] = {static_cast<ImWchar>(icons::kFirst),
+                                             static_cast<ImWchar>(icons::kLast), 0};
         ImFontConfig text;
         text.FontDataOwnedByAtlas = false;
+        // Inter has glyphs of its own in the private use area, which would hide the icons'.
+        text.GlyphExcludeRanges = kIconRange;
         std::snprintf(text.Name, sizeof(text.Name), "Inter");
         io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(kErnieFont_inter),
                                        static_cast<int>(kErnieFont_inter_size), theme.fontSize,
                                        &text);
-        static const ImWchar kIconRange[] = {static_cast<ImWchar>(icons::kFirst),
-                                             static_cast<ImWchar>(icons::kLast), 0};
         ImFontConfig iconConfig;
         iconConfig.FontDataOwnedByAtlas = false;
         iconConfig.MergeMode = true;
@@ -864,8 +866,11 @@ struct Viewer::State {
         HandleNavigation(hovered, active, size.y);
         DrawGizmo(origin, size);
         DrawToolbar(origin, size);
+        DrawToolStrip(origin);
         if (!renderError.empty()) {
-            ImGui::SetCursorScreenPos(ImVec2(origin.x + 12.0f, origin.y + size.y - 28.0f));
+            // Above the HUD at the bottom left.
+            ImGui::SetCursorScreenPos(
+                ImVec2(origin.x + 12.0f, origin.y + size.y - 3.5f * ImGui::GetFrameHeight()));
             ImGui::TextColored(ToImVec4(theme.error), "%s", renderError.c_str());
         }
         ImGui::End();
@@ -934,8 +939,78 @@ struct Viewer::State {
         gizmoDrawn = true;
     }
 
-    /// Outlines the selection in the session's selection overlay: each prim's extent as a box, or
-    /// its axes for prims without one (lights, cameras, transforms).
+    /// Draws the light at `path` (placed by `world`) as Kit's light manipulators show one: its
+    /// emitting shape and the direction it shines, with a spot's cone. Returns false for prims
+    /// that are no light. Sizes for points and directions follow the view's distance.
+    bool DrawLightGizmo(Overlay& overlay, const Path& path, const glm::dmat4& world) {
+        const std::string& type = scene.TypeOf(path);
+        const bool sphere = type == tokens::kSphereLight;
+        const bool rect = type == tokens::kRectLight;
+        const bool disk = type == tokens::kDiskLight;
+        const bool distant = type == tokens::kDistantLight;
+        if (!sphere && !rect && !disk && !distant) {
+            return false;
+        }
+        OverlayStyle style;
+        style.color = {0.98f, 0.82f, 0.30f, 1.0f};  // lamp yellow
+        style.width = 1.5f * contentScale;
+        style.depth = OverlayDepth::XRay;
+        const double reach = 0.12 * static_cast<double>(controller.distance);
+        const glm::dvec3 centre(world[3]);
+        const glm::dvec3 x = glm::normalize(glm::dvec3(world[0]));
+        const glm::dvec3 y = glm::normalize(glm::dvec3(world[1]));
+        // Lights shine along their -z axis.
+        const glm::dvec3 down = -glm::normalize(glm::dvec3(world[2]));
+        const auto number = [&](std::string_view attribute, double fallback) {
+            return GetNumber(scene, path, attribute, fallback);
+        };
+        if (distant) {
+            // Parallel rays through a disc facing the light.
+            overlay.Circle(centre, down, 0.35 * reach, style);
+            for (const glm::dvec2 offset :
+                 {glm::dvec2(0.0), glm::dvec2(1.0, 0.0), glm::dvec2(-1.0, 0.0),
+                  glm::dvec2(0.0, 1.0), glm::dvec2(0.0, -1.0)}) {
+                const glm::dvec3 start = centre + 0.25 * reach * (offset.x * x + offset.y * y);
+                overlay.Arrow(start, start + down * reach, style, 0.18 * reach);
+            }
+            return true;
+        }
+        if (sphere) {
+            const double radius = GetBool(scene, path, tokens::kTreatAsPoint, false)
+                                      ? 0.0
+                                      : number(tokens::kRadius, 0.5);
+            overlay.Sphere(centre, std::max(radius, 0.05 * reach), style);
+            const double cone = number(tokens::kShapingConeAngle, 180.0);
+            if (cone < 90.0) {
+                // The cone's edge as rays and a ring at the gizmo's reach.
+                const double spread = reach * std::tan(glm::radians(cone));
+                const glm::dvec3 tip = centre + down * reach;
+                overlay.Circle(tip, down, spread, style);
+                for (int k = 0; k < 4; ++k) {
+                    const double angle = k * glm::half_pi<double>();
+                    overlay.Line(centre, tip + spread * (std::cos(angle) * x + std::sin(angle) * y),
+                                 style);
+                }
+            } else {
+                overlay.Arrow(centre, centre + down * reach, style, 0.18 * reach);
+            }
+            return true;
+        }
+        // Rect and disk lights: their outline, scaled with the prim, and their normal.
+        if (rect) {
+            const double w = 0.5 * number(tokens::kWidth, 1.0);
+            const double h = 0.5 * number(tokens::kHeight, 1.0);
+            overlay.Box({-w, -h, 0.0}, {w, h, 0.0}, style, world);
+        } else {
+            const double radius = number(tokens::kRadius, 0.5) * glm::length(glm::dvec3(world[0]));
+            overlay.Circle(centre, down, radius, style);
+        }
+        overlay.Arrow(centre, centre + down * reach, style, 0.18 * reach);
+        return true;
+    }
+
+    /// Outlines the selection in the session's selection overlay: each light as its gizmo, each
+    /// prim's extent as a box, or its axes for other prims without one (cameras, transforms).
     void UpdateSelectionOverlay() {
         Overlay& overlay = scene.GetOverlay(kSelectionOverlay);
         if (selection.empty() && overlay.Empty()) {
@@ -951,6 +1026,9 @@ struct Viewer::State {
                 continue;
             }
             const glm::dmat4 world = scene.WorldTransform(path);
+            if (DrawLightGizmo(overlay, path, world)) {
+                continue;
+            }
             if (const std::optional<Bounds3> extent = LocalBounds(path)) {
                 overlay.Box(glm::dvec3(extent->first), glm::dvec3(extent->second), style, world);
             } else {
@@ -1055,19 +1133,79 @@ struct Viewer::State {
         }
     }
 
+    /// Kit's vertical tool strip down the viewport's left: select (no gizmo), move, rotate and
+    /// scale (Q, W, E, R), then world or local axes for the gizmo.
+    void DrawToolStrip(const ImVec2& origin) {
+        const float pad = 8.0f * contentScale;
+        const float button = 1.15f * ImGui::GetFrameHeight();
+        const float gap = 3.0f * contentScale;
+        ImVec2 at(origin.x + pad, origin.y + pad + 1.6f * ImGui::GetFrameHeight());
+        // Each button placed in turn: the window's own cursor would return to its left edge.
+        const auto next = [&](float extra = 0.0f) {
+            at.y += extra;
+            ImGui::SetCursorScreenPos(at);
+            at.y += button + gap;
+        };
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, theme.pillRounding * contentScale);
+        const struct {
+            const char* icon;
+            Viewer::Gizmo mode;
+            const char* tip;
+        } tools[] = {{icons::kMousePointer, Viewer::Gizmo::None, "Select (Q)"},
+                     {icons::kMove, Viewer::Gizmo::Translate, "Move (W)"},
+                     {icons::kRotateCw, Viewer::Gizmo::Rotate, "Rotate (E)"},
+                     {icons::kScaling, Viewer::Gizmo::Scale, "Scale (R)"}};
+        const ImVec4 accent = ToImVec4(theme.accent);
+        for (const auto& tool : tools) {
+            next();
+            const bool on = gizmo == tool.mode;
+            ImGui::PushStyleColor(ImGuiCol_Button, on ? accent : ToImVec4(theme.overlay));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                  on ? accent : ToImVec4(theme.fieldHovered));
+            if (ImGui::Button(tool.icon, ImVec2(button, button))) {
+                gizmo = tool.mode;
+            }
+            ImGui::PopStyleColor(2);
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s", tool.tip);
+            }
+        }
+        next(2.0f * gap);
+        ImGui::PushStyleColor(ImGuiCol_Button,
+                              gizmoLocal ? accent : ToImVec4(theme.overlay));
+        if (ImGui::Button(gizmoLocal ? icons::kBox : icons::kGlobe, ImVec2(button, button))) {
+            gizmoLocal = !gizmoLocal;
+        }
+        ImGui::PopStyleColor();
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(gizmoLocal ? "Gizmo in local axes" : "Gizmo in world axes");
+        }
+        ImGui::PopStyleVar();
+    }
+
+    /// The viewport's toolbar as Kit draws it: pills over the image, renderer, camera, shown var
+    /// and wireframe at the top left, the lighting at the top right, and a small HUD of exposure,
+    /// size and frame rate at the bottom left.
     void DrawToolbar(const ImVec2& origin, const ImVec2& size) {
-        const ImGuiStyle& style = ImGui::GetStyle();
         const float pad = 8.0f * contentScale;
         ImGui::SetCursorScreenPos(ImVec2(origin.x + pad, origin.y + pad));
         ImGui::PushStyleColor(ImGuiCol_FrameBg, ToImVec4(theme.overlay));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ToImVec4(theme.fieldHovered));
         ImGui::PushStyleColor(ImGuiCol_Button, ToImVec4(theme.overlay));
         ImGui::PushStyleColor(ImGuiCol_PopupBg, ToImVec4(theme.panel));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, theme.pillRounding * contentScale);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+                            ImVec2(9.0f * contentScale, 4.0f * contentScale));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
+                            ImVec2(5.0f * contentScale, 4.0f * contentScale));
+        // Pills fit their label, without an arrow.
+        constexpr ImGuiComboFlags kPill =
+            ImGuiComboFlags_WidthFitPreview | ImGuiComboFlags_NoArrowButton;
         const float comboWidth = 150.0f * contentScale;
 
         const std::vector<std::string> renderers = RenderBackends();
-        ImGui::SetNextItemWidth(110.0f * contentScale);
         const std::string rendererLabel = std::string(icons::kMonitor) + "  " + renderer;
-        if (ImGui::BeginCombo("##renderer", rendererLabel.c_str())) {
+        if (ImGui::BeginCombo("##renderer", rendererLabel.c_str(), kPill)) {
             for (const std::string& name : renderers) {
                 if (ImGui::Selectable(name.c_str(), name == renderer) && name != renderer) {
                     try {
@@ -1082,9 +1220,8 @@ struct Viewer::State {
         }
         ImGui::SameLine();
 
-        ImGui::SetNextItemWidth(comboWidth);
         const std::string cameraLabel = std::string(icons::kCamera) + "  " + Label(activeCamera);
-        if (ImGui::BeginCombo("##camera", cameraLabel.c_str())) {
+        if (ImGui::BeginCombo("##camera", cameraLabel.c_str(), kPill)) {
             for (const Path& camera : ViewableCameras(scene)) {
                 if (ImGui::Selectable(Label(camera).c_str(), camera == activeCamera)) {
                     SetActive(camera);
@@ -1096,9 +1233,8 @@ struct Viewer::State {
             ImGui::EndCombo();
         }
         ImGui::SameLine();
-        ImGui::SetNextItemWidth(comboWidth);
         const std::string varLabel = std::string(icons::kImage) + "  " + viewVar;
-        if (ImGui::BeginCombo("##var", varLabel.c_str())) {
+        if (ImGui::BeginCombo("##var", varLabel.c_str(), kPill)) {
             const std::vector<std::string>& shown = delegate->Info().viewVars;
             for (const std::string_view name : kRenderVarNames) {
                 const bool supported = std::find(shown.begin(), shown.end(), name) != shown.end();
@@ -1118,20 +1254,8 @@ struct Viewer::State {
             DrawBandCombo(comboWidth);
         }
         ImGui::SameLine();
-        ImGui::SetNextItemWidth(comboWidth);
-        const std::string lightLabel = std::string(icons::kSun) + "  " + LightingName(lighting);
-        if (ImGui::BeginCombo("##lighting", lightLabel.c_str())) {
-            for (const Lighting mode : {Lighting::Stage, Lighting::Camera, Lighting::Default}) {
-                if (ImGui::Selectable(LightingName(mode), mode == lighting)) {
-                    lighting = mode;
-                }
-            }
-            ImGui::EndCombo();
-        }
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(comboWidth);
         const std::string wireLabel = std::string(icons::kBox) + "  " + WireframeName(wireframe);
-        if (ImGui::BeginCombo("##wireframe", wireLabel.c_str())) {
+        if (ImGui::BeginCombo("##wireframe", wireLabel.c_str(), kPill)) {
             for (const std::optional<Wireframe> mode :
                  {std::optional<Wireframe>(), std::optional(Wireframe::Off),
                   std::optional(Wireframe::Overlay), std::optional(Wireframe::HiddenLine)}) {
@@ -1144,31 +1268,42 @@ struct Viewer::State {
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Wireframe (Z cycles)");
         }
-        if (swapchain) {
-            ImGui::SameLine();
-            bool vsync = swapchain->Vsync();
-            if (ImGui::Checkbox("VSync", &vsync)) {
-                self.SetVsync(vsync);
+
+        // The lighting, alone at the top right as Kit's "Stage Lights".
+        const ImGuiStyle& style = ImGui::GetStyle();
+        const std::string lightLabel = std::string(icons::kSun) + "  " + LightingName(lighting);
+        const float lightWidth = ImGui::CalcTextSize(lightLabel.c_str()).x + 2.0f * style.FramePadding.x;
+        ImGui::SetCursorScreenPos(ImVec2(origin.x + size.x - lightWidth - pad, origin.y + pad));
+        if (ImGui::BeginCombo("##lighting", lightLabel.c_str(), kPill)) {
+            for (const Lighting mode : {Lighting::Stage, Lighting::Camera, Lighting::Default}) {
+                if (ImGui::Selectable(LightingName(mode), mode == lighting)) {
+                    lighting = mode;
+                }
             }
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Wait for the display's refresh; off draws as fast as it renders");
-            }
+            ImGui::EndCombo();
         }
 
+        // The HUD: exposure, image size and frame rate in a pill at the bottom left.
         char info[96];
         const std::optional<double> ev = self.MeteredEv();
         char exposureText[32] = "";
         if (ev) {
-            std::snprintf(exposureText, sizeof(exposureText), "EV %.1f%s  ", *ev,
+            std::snprintf(exposureText, sizeof(exposureText), "EV %.1f%s   ", *ev,
                           AutoExposing() ? " auto" : "");
         }
-        std::snprintf(info, sizeof(info), "%s%u x %u  %.0f fps", exposureText, ViewportWidth(),
+        std::snprintf(info, sizeof(info), "%s%u x %u   %.0f fps", exposureText, ViewportWidth(),
                       ViewportHeight(), static_cast<double>(ImGui::GetIO().Framerate));
-        const float infoWidth = ImGui::CalcTextSize(info).x;
-        ImGui::SetCursorScreenPos(ImVec2(origin.x + size.x - infoWidth - pad - style.FramePadding.x,
-                                         origin.y + pad + style.FramePadding.y));
-        ImGui::TextColored(ToImVec4(theme.textMuted), "%s", info);
-        ImGui::PopStyleColor(3);
+        const ImVec2 text = ImGui::CalcTextSize(info);
+        const ImVec2 low(origin.x + pad, origin.y + size.y - pad - text.y - 2.0f * style.FramePadding.y);
+        const ImVec2 high(low.x + text.x + 2.0f * style.FramePadding.x,
+                          low.y + text.y + 2.0f * style.FramePadding.y);
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        draw->AddRectFilled(low, high, ImGui::GetColorU32(ToImVec4(theme.overlay)),
+                            theme.pillRounding * contentScale);
+        draw->AddText(ImVec2(low.x + style.FramePadding.x, low.y + style.FramePadding.y),
+                      ImGui::GetColorU32(ToImVec4(theme.textMuted)), info);
+        ImGui::PopStyleVar(3);
+        ImGui::PopStyleColor(4);
     }
 
     void DrawPanels() {

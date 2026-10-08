@@ -130,14 +130,18 @@ void AuthorDefaultPrim(Scene& scene, const Path& path, std::string_view type,
                              context.target.y + 0.5 * kCells * cell));
         scene.Set(path, kCellSize, cell);
     } else if (type == kDistantLight) {
+        // Lights come in photometric units: a clear-day sun, a 100 W bulb's 1600 lumens.
         scene.Set(path, kTransform, DistantLightTransform({0.4, -0.5, 0.75}));
+        scene.Set(path, kPhotometricIlluminance, 100000.0);
+    } else if (type == kDomeLight) {
+        scene.Set(path, kPhotometricIlluminance, 10000.0);
     } else if (type == kSphereLight) {
         PlaceAbove(scene, path, context, 3.0);
-        scene.Set(path, kGeomRadius, 0.1 * s);
-        scene.Set(path, kLightPower, 1000.0 * s * s);
+        scene.Set(path, kRadius, 0.1 * s);
+        scene.Set(path, kPhotometricPower, 1600.0 * s * s);
     } else if (type == kRectLight || type == kDiskLight) {
         PlaceAbove(scene, path, context, 3.0);
-        scene.Set(path, kIntensity, 1000.0);
+        scene.Set(path, kPhotometricPower, 1600.0 * s * s);
         if (type == kRectLight) {
             scene.Set(path, kWidth, s);
             scene.Set(path, kHeight, s);

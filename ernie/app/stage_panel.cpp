@@ -71,7 +71,21 @@ class StagePanel final : public Panel {
         const std::vector<Path>& selection = viewer.Selection();
         reveal_ = selection != shown_;
         shown_ = selection;
-        if (ImGui::BeginChild("##tree")) {
+        // As Kit's stage window: Name, Type and visibility columns under a header, rows shaded
+        // alternately and selected across their width.
+        constexpr ImGuiTableFlags kFlags = ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY |
+                                           ImGuiTableFlags_BordersInnerV |
+                                           ImGuiTableFlags_Resizable;
+        if (ImGui::BeginTable("##stage", 3, kFlags)) {
+            ImGui::TableSetupScrollFreeze(0, 1);
+            ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed,
+                                    7.0f * ImGui::GetFontSize());
+            ImGui::TableSetupColumn("##visible",
+                                    ImGuiTableColumnFlags_WidthFixed |
+                                        ImGuiTableColumnFlags_NoResize,
+                                    ImGui::GetFrameHeight());
+            ImGui::TableHeadersRow();
             const std::string_view filter(filter_.data());
             if (filter.empty()) {
                 for (const Path& child : scene.Children(Path::Root())) {
@@ -84,8 +98,8 @@ class StagePanel final : public Panel {
                     }
                 }
             }
+            ImGui::EndTable();
         }
-        ImGui::EndChild();
     }
 
   private:
@@ -119,9 +133,12 @@ class StagePanel final : public Panel {
                  bool leaf) {
         const std::vector<Path>& selection = viewer.Selection();
         const bool selected = std::find(selection.begin(), selection.end(), path) != selection.end();
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
         ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow |
                                    ImGuiTreeNodeFlags_OpenOnDoubleClick |
-                                   ImGuiTreeNodeFlags_SpanAvailWidth;
+                                   ImGuiTreeNodeFlags_SpanAllColumns |
+                                   ImGuiTreeNodeFlags_AllowOverlap;
         if (selected) {
             flags |= ImGuiTreeNodeFlags_Selected;
         }
@@ -162,16 +179,10 @@ class StagePanel final : public Panel {
             }
             ImGui::EndPopup();
         }
-        // The type, muted, and a visibility toggle at the right.
-        const float right = ImGui::GetWindowContentRegionMax().x;
-        const float eye = ImGui::GetFrameHeight();
-        if (!type.empty()) {
-            const float typeWidth = ImGui::CalcTextSize(type.c_str()).x;
-            ImGui::SameLine(std::max(ImGui::GetCursorPosX(),
-                                     right - eye - typeWidth - ImGui::GetStyle().ItemSpacing.x));
-            ImGui::TextDisabled("%s", type.c_str());
-        }
-        ImGui::SameLine(right - eye);
+        // The type, muted, and the visibility toggle in their columns.
+        ImGui::TableSetColumnIndex(1);
+        ImGui::TextDisabled("%s", type.c_str());
+        ImGui::TableSetColumnIndex(2);
         ImGui::PushID(path.String().c_str());
         const bool authoredInvisible =
             scene.Get<std::string>(path, tokens::kVisibility, "") == tokens::kInvisible;
