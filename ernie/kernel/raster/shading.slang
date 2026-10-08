@@ -300,6 +300,22 @@ float lightVisibility(LightGpu light, float3 world, float3 n, float nDotL, float
     return lit / 16.0;
 }
 
+// Cosine to the viewer below which a shading normal is bent towards it.
+static const float kMinFacing = 0.05;
+
+// The shading normal `n` bent towards the viewer `v` just enough that it faces them. Normal maps
+// tilt shading normals away from the viewer, which no visible surface does; such pixels shaded
+// black, as speckle wherever the light is near the view direction, most of all at the opposition
+// surge, where everything the viewer sees is lit.
+//
+// Reference: V. Schuessler, E. Heitz, J. Hanika and C. Dachsbacher, "Microfacet-based Normal
+// Mapping for Robust Monte Carlo Path Tracing", ACM Transactions on Graphics 36(6), 2017, section 2
+// (the black and energy-losing pixels of back-facing shading normals).
+float3 facingNormal(float3 n, float3 v) {
+    let facing = dot(n, v);
+    return facing >= kMinFacing ? n : normalize(n + (kMinFacing - facing) * v);
+}
+
 // Radiance factors of the active model for three bands at once: the bands' albedos go in the RGB
 // slots of BrdfInput, which models treat independently.
 float3 radianceFactors(float3 n, float3 l, float3 v, float3 albedo, BrdfParams params) {
@@ -332,13 +348,13 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     let clip = mul(sh.invViewProj, float4(ndc, 1.0));
     let world = clip.xyz / clip.w;
     let normalVisibility = gNormal.Load(pixel);
-    let n = normalize(normalVisibility.xyz);
+    let v = normalize(sh.eye.xyz - world);
+    let n = facingNormal(normalize(normalVisibility.xyz), v);
     let visibility = normalVisibility.w;
     let albedo = gAlbedo.Load(pixel);
     let modulation = max(albedo.yzw, float3(0.0));
     let scale = max(modulation.x, max(modulation.y, modulation.z));
     let coefficients = scale > 0.0 ? sigmoidCoefficients(modulation / scale) : float3(0.0);
-    let v = normalize(sh.eye.xyz - world);
     let l = sh.sun.xyz;
     let ambient = sh.sun.w;
     let bands = uint(sh.range.z);
