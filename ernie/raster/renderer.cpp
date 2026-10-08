@@ -475,7 +475,6 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
                                          VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 1.0f, false}),
       shadingUniforms_(context, kShadingStride, kViewUniformUsage, BufferMemory::Device),
       sensorUniforms_(context, kSensorStride, kViewUniformUsage, BufferMemory::Device),
-      filterParams_(context, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device),
       lightTable_(context, kMaxLights * sizeof(LightGpu), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                   BufferMemory::Device),
       lightViewMatrices_(context, kMaxLightShadowViews * sizeof(glm::mat4),
@@ -1116,22 +1115,48 @@ void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable*
         params.sunIrradiance.size() != static_cast<std::size_t>(params.camera.bands.count)) {
         throw std::invalid_argument("The sun's irradiance needs one value per camera band");
     }
-    // Only the filters producing the wanted vars run, fused into one kernel that writes only them.
-    requiredVars_ = RequiredVars(params.vars);
-    sensorPlan_ =
-        PlanSensor(params.filters.empty() ? StepsOf(DefaultFilterChain()) : params.filters,
-                   requiredVars_, sensorFilters_);
-    if (!sensorPlan_.params.empty()) {
-        const VkDeviceSize bytes = sensorPlan_.params.size() * sizeof(float);
-        if (filterParams_.Size() < bytes) {
-            vkDeviceWaitIdle(context_.Device());
-            filterParams_ = GpuBuffer(context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                      BufferMemory::Device);
-        }
-        uploads_.Write(filterParams_, std::as_bytes(std::span(sensorPlan_.params)));
+    // Only the filters producing the wanted vars run, fused into one kernel that writes only them,
+    // per chain: the frame's own, or each of its chains for the vars that chain writes.
+    std::vector<FrameParams::SensorChain> chains = params.chains;
+    if (chains.empty()) {
+        chains.push_back({params.filters, params.vars, 0});
     }
-    filters_ = sensorPlan_.filters;
-    SensorPipelines(sensorPlan_);
+    requiredVars_.clear();
+    std::vector<SensorPass> passes(chains.size());
+    for (std::size_t c = 0; c < chains.size(); ++c) {
+        const FrameParams::SensorChain& chain = chains[c];
+        const std::vector<std::string_view> held = RequiredVars(chain.vars);
+        for (const std::string_view var : held) {
+            if (std::find(requiredVars_.begin(), requiredVars_.end(), var) !=
+                requiredVars_.end()) {
+                throw std::invalid_argument("Render var '" + std::string(var) +
+                                            "' comes from two sensor filter chains");
+            }
+            requiredVars_.push_back(var);
+        }
+        SensorPass& pass = passes[c];
+        pass.plan = PlanSensor(chain.filters.empty() ? StepsOf(DefaultFilterChain()) : chain.filters,
+                               held, sensorFilters_, chain.aovOffset);
+        // Each pass's parameters in a buffer of its own; kept from the last frame's pass at the
+        // same place in the order when large enough, which only ever waits when one grows.
+        const VkDeviceSize bytes = std::max<VkDeviceSize>(pass.plan.params.size(), 1) *
+                                   sizeof(float);
+        if (c < sensorPasses_.size() && sensorPasses_[c].params != nullptr &&
+            sensorPasses_[c].params->Size() >= bytes) {
+            pass.params = std::move(sensorPasses_[c].params);
+        } else {
+            vkDeviceWaitIdle(context_.Device());
+            pass.params = std::make_unique<GpuBuffer>(context_, bytes,
+                                                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                                      BufferMemory::Device);
+        }
+        if (!pass.plan.params.empty()) {
+            uploads_.Write(*pass.params, std::as_bytes(std::span(pass.plan.params)));
+        }
+        SensorPipelines(pass.plan);
+    }
+    sensorPasses_ = std::move(passes);
+    filters_ = sensorPasses_.front().plan.filters;
     bands_ = params.camera.bands;
     extent_ = {params.camera.width, params.camera.height};
     overlays_->Prepare(overlays, params.origin);
@@ -1938,43 +1963,48 @@ void RasterRenderer::ShadeAndFilter(VkCommandBuffer commands, RenderTargets& tar
     for (const std::string_view name : RenderTargets::VarNames()) {
         filters.push_back(general(targets.Bound(name)));
     }
-    filters.push_back(DescriptorResource::Of(filterParams_));
-    // Each segment reads the images the one before stored and stores those the next reads, the
-    // two sets alternating (placeholders for a plan that passes none on).
-    const auto image = [&](bool spectrum, std::uint32_t set) -> GpuImage& {
-        GpuImage& image = targets.SensorImage(
-            spectrum, set, spectrum ? sensorPlan_.spectrumImages : sensorPlan_.channelImages);
-        image.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
-        return image;
-    };
-    // The temporal filters' state, from the last frame and for the next, or a placeholder.
-    const bool state = sensorPlan_.states > 0 && stateNext_ != nullptr;
-    GpuImage& previous = state && statePrevious_ != nullptr ? *statePrevious_ : *statePlaceholder_;
-    GpuImage& next = state ? *stateNext_ : *statePlaceholder_;
-    previous.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
-    next.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
-    // The AOV slots the frame holds, which filters' `writeOutput` writes; whether the state holds
-    // history, and its slots per view.
-    const std::uint32_t constants[4] = {firstView, sensorPlan_.aovs,
-                                        state && stateHistory_ ? 1u : 0u,
-                                        state ? sensorPlan_.states : 0u};
-    for (std::uint32_t segment = 0; segment < sensorPlan_.segments; ++segment) {
-        std::vector<DescriptorResource> resources = filters;
-        resources.push_back(general(image(true, segment + 1)));
-        resources.push_back(general(image(false, segment + 1)));
-        resources.push_back(general(image(true, segment)));
-        resources.push_back(general(image(false, segment)));
-        for (std::size_t slot = 0; slot < kMaxAovs; ++slot) {
-            resources.push_back(general(targets.BoundAov(slot)));
+    // Each chain's kernels in turn over the one raster image, each writing its own vars.
+    for (const SensorPass& pass : sensorPasses_) {
+        const SensorPlan& plan = pass.plan;
+        std::vector<DescriptorResource> bound = filters;
+        bound.push_back(DescriptorResource::Of(*pass.params));
+        // Each segment reads the images the one before stored and stores those the next reads,
+        // the two sets alternating (placeholders for a plan that passes none on).
+        const auto image = [&](bool spectrum, std::uint32_t set) -> GpuImage& {
+            GpuImage& sensorImage = targets.SensorImage(
+                spectrum, set, spectrum ? plan.spectrumImages : plan.channelImages);
+            sensorImage.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+            return sensorImage;
+        };
+        // The temporal filters' state, from the last frame and for the next, or a placeholder.
+        const bool state = plan.states > 0 && pass.stateNext != nullptr;
+        GpuImage& previous = state && pass.statePrevious != nullptr ? *pass.statePrevious
+                                                                    : *statePlaceholder_;
+        GpuImage& next = state ? *pass.stateNext : *statePlaceholder_;
+        previous.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+        next.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+        // The AOV slots the frame holds, which filters' `writeOutput` writes; whether the state
+        // holds history, and its slots per view.
+        const std::uint32_t constants[4] = {firstView, plan.aovs, state && pass.history ? 1u : 0u,
+                                            state ? plan.states : 0u};
+        for (std::uint32_t segment = 0; segment < plan.segments; ++segment) {
+            std::vector<DescriptorResource> resources = bound;
+            resources.push_back(general(image(true, segment + 1)));
+            resources.push_back(general(image(false, segment + 1)));
+            resources.push_back(general(image(true, segment)));
+            resources.push_back(general(image(false, segment)));
+            for (std::size_t slot = 0; slot < kMaxAovs; ++slot) {
+                resources.push_back(general(targets.BoundAov(slot)));
+            }
+            resources.push_back(general(previous));
+            resources.push_back(general(next));
+            vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                              sensorPipelines_.at(SensorKernelKey(plan, segment))->Handle());
+            filterLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+            filterLayout_.PushConstants(commands, constants, sizeof(constants));
+            vkCmdDispatch(commands, groupsX, groupsY, views);
+            ShaderBarrier(commands);
         }
-        resources.push_back(general(previous));
-        resources.push_back(general(next));
-        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
-                          sensorPipelines_.at(SensorKernelKey(sensorPlan_, segment))->Handle());
-        filterLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
-        filterLayout_.PushConstants(commands, constants, sizeof(constants));
-        vkCmdDispatch(commands, groupsX, groupsY, views);
-        ShaderBarrier(commands);
     }
 }
 

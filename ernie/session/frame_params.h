@@ -225,6 +225,15 @@ struct FrameParams {
     /// The render vars wanted from the frame; empty for all. Only they are held, and filters
     /// that produce none of them do not run (the sensor fuses the rest, `PlanSensor`).
     std::vector<std::string_view> vars;
+    /// Several sensor chains over the one raster image, each writing its own vars (render vars
+    /// with their own `ernie:filters`); empty runs `filters` for `vars`. Each var comes from one
+    /// chain; each chain's AOV slots start at its `aovOffset`.
+    struct SensorChain {
+        std::vector<SensorFilterStep> filters;
+        std::vector<std::string_view> vars;
+        std::uint32_t aovOffset = 0;
+    };
+    std::vector<SensorChain> chains;
     /// The overlays drawn over LdrColor (`tokens::kOverlays`): "*", names, or empty for none.
     std::string overlays;
     glm::vec3 clearColor{0.0f};  ///< Linear display colour of the background in LdrColor.

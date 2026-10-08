@@ -296,23 +296,30 @@ class RasterRenderer {
         presentBand_ = band;
     }
 
-    /// State slots per pixel the temporal filters of the last `Update`'s chain keep.
-    std::uint32_t SensorStateSlots() const {
-        return sensorPlan_.states;
+    /// The sensor passes of the last `Update`: one per chain (`FrameParams::chains`), in order.
+    std::size_t SensorPasses() const {
+        return sensorPasses_.size();
     }
 
-    /// The last `Update`'s sensor plan.
-    const SensorPlan& Plan() const {
-        return sensorPlan_;
+    /// State slots per pixel the temporal filters of sensor pass `pass` keep.
+    std::uint32_t SensorStateSlots(std::size_t pass = 0) const {
+        return sensorPasses_.at(pass).plan.states;
     }
 
-    /// The temporal filters' state for the next `Record`: images of `SensorStateSlots` layers per
-    /// view, `previous` holding the last frame's (when `history`) and `next` taking this one's;
-    /// null for none. Call after `Update`; the images must outlive the frame's recording.
-    void SetSensorState(GpuImage* previous, GpuImage* next, bool history) {
-        statePrevious_ = previous;
-        stateNext_ = next;
-        stateHistory_ = history && previous != nullptr;
+    /// The last `Update`'s sensor plan of pass `pass`.
+    const SensorPlan& Plan(std::size_t pass = 0) const {
+        return sensorPasses_.at(pass).plan;
+    }
+
+    /// The temporal filters' state of sensor pass `pass` for the next `Record`: images of
+    /// `SensorStateSlots` layers per view, `previous` holding the last frame's (when `history`)
+    /// and `next` taking this one's; null for none. Call after `Update`; the images must outlive
+    /// the frame's recording.
+    void SetSensorState(std::size_t pass, GpuImage* previous, GpuImage* next, bool history) {
+        SensorPass& sensor = sensorPasses_.at(pass);
+        sensor.statePrevious = previous;
+        sensor.stateNext = next;
+        sensor.history = history && previous != nullptr;
     }
 
     /// The spectral bands and filter chain of the last `Update`.
@@ -440,7 +447,6 @@ class RasterRenderer {
     PipelineLayout filterLayout_;
     /// The fused sensor kernel of each plan used so far, by `SensorPlan::Key`.
     std::map<std::string, std::unique_ptr<ComputePipeline>> sensorPipelines_;
-    SensorPlan sensorPlan_;  ///< The last `Update`'s.
     SensorFilterRegistry sensorFilters_ = SensorFilterRegistry::WithStandard();
     PipelineLayout presentLayout_;
     PipelineLayout hzbLayout_;
@@ -455,9 +461,16 @@ class RasterRenderer {
     std::unique_ptr<GraphicsPipeline> presentSpectral_;
     std::unique_ptr<GraphicsPipeline> presentOutline_;
     std::unique_ptr<GpuBuffer> highlight_;        ///< A bit per highlighted prim id.
-    GpuImage* statePrevious_ = nullptr;           ///< `SetSensorState`'s images, or null.
-    GpuImage* stateNext_ = nullptr;
-    bool stateHistory_ = false;
+    /// One chain's sensor kernels: its plan, its custom filters' parameters and the temporal
+    /// filters' state images (`SetSensorState`, or null).
+    struct SensorPass {
+        SensorPlan plan;
+        std::unique_ptr<GpuBuffer> params;
+        GpuImage* statePrevious = nullptr;
+        GpuImage* stateNext = nullptr;
+        bool history = false;
+    };
+    std::vector<SensorPass> sensorPasses_;
     std::unique_ptr<GpuImage> statePlaceholder_;  ///< Bound without state.
     std::vector<std::uint32_t> highlightBits_;
     std::uint32_t highlightWords_ = 0;            ///< 0 draws no outline.
@@ -471,7 +484,6 @@ class RasterRenderer {
     Sampler tableSampler_;
     GpuBuffer shadingUniforms_;
     GpuBuffer sensorUniforms_;
-    GpuBuffer filterParams_;  ///< The plan's custom filter parameters (sensor.slang's binding 15).
     GpuBuffer lightTable_;
     GpuBuffer lightViewMatrices_;
     std::unique_ptr<GpuBuffer> materialTable_;

@@ -66,9 +66,11 @@ struct SensorPlan {
 /// held, ADC and the filters on its numbers for RawDN, CIE and the filters on linear colour for
 /// HdrColor or LdrColor, exposure and the filters on display colour for LdrColor, and band
 /// filters whenever the bands reach a held var. A custom filter's parameters are its step's
-/// inputs, or their defaults.
+/// inputs, or their defaults. The chain's AOVs take slots from `aovOffset` on (a product's later
+/// chains after its earlier ones').
 SensorPlan PlanSensor(std::span<const SensorFilterStep> chain,
-                      std::span<const std::string_view> held, const SensorFilterRegistry& registry);
+                      std::span<const std::string_view> held, const SensorFilterRegistry& registry,
+                      std::uint32_t aovOffset = 0);
 
 /// `PlanSensor` of a chain of built-in filters.
 SensorPlan PlanSensor(std::span<const SensorFilter> chain, std::span<const std::string_view> held);

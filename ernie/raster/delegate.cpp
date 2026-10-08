@@ -715,10 +715,21 @@ void RasterDelegate::Update(const Scene& scene, const Path& settings, VkExtent2D
 }
 
 void RasterDelegate::PrepareSensorState(const Path& key, VkExtent2D extent, std::uint32_t views) {
-    const std::uint32_t slots = renderer_.SensorStateSlots();
+    // Passes the frame no longer has keep no state.
+    std::erase_if(sensorStates_, [&](const auto& entry) {
+        return entry.first.first == key && entry.first.second >= renderer_.SensorPasses();
+    });
+    for (std::size_t pass = 0; pass < renderer_.SensorPasses(); ++pass) {
+        PrepareSensorState(key, pass, extent, views);
+    }
+}
+
+void RasterDelegate::PrepareSensorState(const Path& key, std::size_t pass, VkExtent2D extent,
+                                        std::uint32_t views) {
+    const std::uint32_t slots = renderer_.SensorStateSlots(pass);
     if (slots == 0) {
-        renderer_.SetSensorState(nullptr, nullptr, false);
-        sensorStates_.erase(key);
+        renderer_.SetSensorState(pass, nullptr, nullptr, false);
+        sensorStates_.erase({key, pass});
         return;
     }
     const std::uint32_t layers = views * slots;
@@ -727,8 +738,8 @@ void RasterDelegate::PrepareSensorState(const Path& key, VkExtent2D extent, std:
                                     " state slots per view, too many for " +
                                     std::to_string(views) + " views on this device");
     }
-    SensorState& state = sensorStates_[key];
-    const std::string chain = renderer_.Plan().Key();
+    SensorState& state = sensorStates_[{key, pass}];
+    const std::string chain = renderer_.Plan(pass).Key();
     const GpuImage* existing = state.images[0].get();
     if (existing == nullptr || existing->Desc().width != extent.width ||
         existing->Desc().height != extent.height || existing->Desc().layers != layers ||
@@ -749,8 +760,8 @@ void RasterDelegate::PrepareSensorState(const Path& key, VkExtent2D extent, std:
         state.history = false;
         state.chain = chain;
     }
-    renderer_.SetSensorState(state.images[1 - state.next].get(), state.images[state.next].get(),
-                             state.history);
+    renderer_.SetSensorState(pass, state.images[1 - state.next].get(),
+                             state.images[state.next].get(), state.history);
     // The next frame reads what this one writes. Frames run on the device in submission order,
     // and the sensor pass's barrier orders this frame's writes before the next one's reads.
     state.next = 1 - state.next;
@@ -763,7 +774,8 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
                                  std::vector<glm::dmat4> poses, std::vector<std::int32_t> worlds,
                                  std::vector<std::string_view> vars,
                                  std::optional<glm::dmat4> posesParent,
-                                 const std::optional<std::string>& overlays) {
+                                 const std::optional<std::string>& overlays,
+                                 std::vector<FrameParams::SensorChain> chains) {
     ERNIE_ZONE("UpdatePrims");
     Sync(scene);
     prims_ = prims;
@@ -773,6 +785,13 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
         return FrameParamsOf(scene, prims_, extent.width, extent.height);
     }();
     frame.filters.assign(filters.begin(), filters.end());
+    // One chain needs no chains of its own: `filters` and `vars` run as it (its filters, which
+    // are a var's own when every var has the same).
+    if (chains.size() == 1) {
+        frame.filters = chains.front().filters;
+    } else if (chains.size() > 1) {
+        frame.chains = std::move(chains);
+    }
     frame.poses = std::move(poses);
     frame.posesOnGpu = posesParent.has_value();
     frame.posesParent = posesParent.value_or(glm::dmat4(1.0));
@@ -1009,38 +1028,92 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         const auto views = static_cast<std::uint32_t>(std::max<std::size_t>(poses.size(), 1));
         std::vector<std::int32_t> worlds = ViewWorldsOf(scene, cameras, views);
         // Only the vars the product asks for, as the static names of `kRenderVarNames`, and its
-        // AOVs ("aov:<output>") as the slots its chain lays them in (`kAovSlotNames`).
-        const std::vector<SensorFilterStep> chainSteps =
-            spec.filters.empty() ? StepsOf(DefaultFilterChain()) : spec.filters;
-        const std::vector<std::string> aovs =
-            AovOutputsOf(chainSteps, renderer_.SensorFilters());
-        const std::vector<std::string_view> written =
-            VarsWrittenBy(chainSteps, renderer_.SensorFilters());
+        // AOVs ("aov:<output>") as the slots its chains lay them in (`kAovSlotNames`), each from
+        // its chain: the product's, or a var's own (`RenderProductSpec::varFilters`).
+        const SensorFilterRegistry& registry = renderer_.SensorFilters();
+        std::vector<FrameParams::SensorChain> chains;
+        std::vector<std::string> aovs;
+        std::vector<std::vector<std::string>> chainAovs;
+        std::vector<std::vector<std::string_view>> chainWritten;
+        const auto chainOf = [&](const std::vector<SensorFilterStep>& steps) {
+            const std::vector<SensorFilterStep> full =
+                steps.empty() ? StepsOf(DefaultFilterChain()) : steps;
+            for (std::size_t c = 0; c < chains.size(); ++c) {
+                if (chains[c].filters == full) {
+                    return c;
+                }
+            }
+            FrameParams::SensorChain chain;
+            chain.filters = full;
+            chain.aovOffset = static_cast<std::uint32_t>(aovs.size());
+            chainAovs.push_back(AovOutputsOf(full, registry));
+            for (const std::string& output : chainAovs.back()) {
+                if (std::find(aovs.begin(), aovs.end(), output) != aovs.end()) {
+                    throw std::invalid_argument("Two of product '" + spec.product.String() +
+                                                "'s chains write AOV '" + output + "'");
+                }
+                aovs.push_back(output);
+            }
+            if (aovs.size() > kMaxAovs) {
+                throw std::invalid_argument("Product '" + spec.product.String() + "' writes " +
+                                            "more than " + std::to_string(kMaxAovs) + " AOVs");
+            }
+            chainWritten.push_back(VarsWrittenBy(full, registry));
+            chains.push_back(std::move(chain));
+            return chains.size() - 1;
+        };
+        chainOf(spec.filters);  // the product's chain first
         std::vector<std::string_view> vars;
-        for (const auto& [path, name] : spec.vars) {
+        for (std::size_t v = 0; v < spec.vars.size(); ++v) {
+            const auto& [path, name] = spec.vars[v];
+            const std::optional<std::vector<SensorFilterStep>>& own =
+                v < spec.varFilters.size() ? spec.varFilters[v] : std::nullopt;
+            const std::size_t c = chainOf(own ? *own : spec.filters);
+            const auto missing = [&] {
+                return std::invalid_argument("Render var '" + path.String() + "' asks for '" +
+                                             name +
+                                             "', which its sensor filters do not write");
+            };
+            std::string_view held;
             const auto known = std::find(kRenderVarNames.begin(), kRenderVarNames.end(), name);
             if (known != kRenderVarNames.end()) {
+                const std::vector<std::string_view>& written = chainWritten[c];
                 if (std::find(written.begin(), written.end(), name) == written.end()) {
-                    throw std::invalid_argument("Render var '" + path.String() + "' asks for '" +
-                                                name +
-                                                "', which the product's sensor filters do not "
-                                                "write");
+                    throw missing();
                 }
-                vars.push_back(*known);
+                held = *known;
+            } else if (name.starts_with(kAovPrefix)) {
+                const std::vector<std::string>& outputs = chainAovs[c];
+                if (std::find(outputs.begin(), outputs.end(), name.substr(kAovPrefix.size())) ==
+                    outputs.end()) {
+                    throw missing();
+                }
+                const auto slot =
+                    std::find(aovs.begin(), aovs.end(), name.substr(kAovPrefix.size()));
+                held = kAovSlotNames[static_cast<std::size_t>(slot - aovs.begin())];
+            } else {
                 continue;
             }
-            if (name.starts_with(kAovPrefix)) {
-                const auto output = std::find(aovs.begin(), aovs.end(),
-                                              name.substr(kAovPrefix.size()));
-                if (output == aovs.end()) {
-                    throw std::invalid_argument("Render var '" + path.String() + "' asks for '" +
-                                                name +
-                                                "', which the product's sensor filters do not "
-                                                "write");
+            if (std::find(vars.begin(), vars.end(), held) != vars.end()) {
+                // The same var twice: the first chain asking for it makes it.
+                bool same = false;
+                for (const std::string_view other : chains[c].vars) {
+                    same = same || other == held;
                 }
-                vars.push_back(kAovSlotNames[static_cast<std::size_t>(output - aovs.begin())]);
+                if (!same) {
+                    throw std::invalid_argument("Product '" + spec.product.String() +
+                                                "' asks for '" + name +
+                                                "' from two sensor filter chains");
+                }
+                continue;
             }
+            vars.push_back(held);
+            chains[c].vars.push_back(held);
         }
+        // Chains no var asks for do not run.
+        std::erase_if(chains, [](const FrameParams::SensorChain& chain) {
+            return chain.vars.empty();
+        });
         std::shared_ptr<ProductFrame> frame =
             AcquireFrame(spec.product, spec.resolution, bands, views, batched, vars, aovs);
         std::optional<glm::dmat4> posesParent;
@@ -1049,8 +1122,7 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         }
         UpdatePrims(scene, prims, spec.resolution, NextFrame(scene, base.settings, spec.product),
                     spec.product, spec.filters, std::move(poses), std::move(worlds),
-                    std::move(vars),
-                    posesParent, spec.overlays);
+                    std::move(vars), posesParent, spec.overlays, std::move(chains));
         if (gpuPoses != nullptr) {
             // Once no submission reads the pose buffer (`UpdatePrims` waits), on the writer's
             // stream; the submission waits for it (`SubmitWaits`).

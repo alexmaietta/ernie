@@ -125,7 +125,7 @@ std::string_view ChannelOf(FilterDomain domain) {
 
 SensorPlan PlanSensor(std::span<const SensorFilterStep> chain,
                       std::span<const std::string_view> held,
-                      const SensorFilterRegistry& registry) {
+                      const SensorFilterRegistry& registry, std::uint32_t aovOffset) {
     SensorPlan plan;
     for (const std::string_view var : held) {
         plan.holds |= BitOf(var);
@@ -142,7 +142,7 @@ SensorPlan PlanSensor(std::span<const SensorFilterStep> chain,
     std::vector<std::uint32_t> bases(steps.size(), 0);
     std::vector<bool> forced(steps.size(), false);
     std::array<bool, kDomains> forcedDomains{};
-    std::uint32_t slot = 0;
+    std::uint32_t slot = aovOffset;
     for (std::size_t i = 0; i < steps.size(); ++i) {
         if (steps[i].Builtin()) {
             continue;

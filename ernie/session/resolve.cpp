@@ -615,6 +615,45 @@ std::vector<std::int32_t> InstanceWorldsOf(const Scene& scene, const Path& insta
     return std::vector<std::int32_t>(count, WorldOf(scene, instancer));
 }
 
+namespace {
+
+/// The sensor filter chain a product or render var names in `ernie:filters`: each SensorFilter
+/// prim's type, with every number or float array under its inputs:.
+std::vector<SensorFilterStep> FilterStepsOf(const Scene& scene, const Path& prim) {
+    using namespace tokens;
+    std::vector<SensorFilterStep> steps;
+    for (const Path& filter : TargetsOf(scene, prim, kFilters)) {
+        if (!scene.Has(filter) || scene.TypeOf(filter) != kSensorFilter) {
+            throw std::invalid_argument("'" + filter.String() + "' is not a SensorFilter prim");
+        }
+        SensorFilterStep step;
+        step.type = GetToken(scene, filter, kFilterType, "");
+        if (step.type.empty()) {
+            throw std::invalid_argument("Sensor filter '" + filter.String() + "' has no '" +
+                                        std::string(kFilterType) + "'");
+        }
+        constexpr std::string_view kInputs = "inputs:";
+        for (const std::string& attribute : scene.Attributes(filter)) {
+            if (!attribute.starts_with(kInputs)) {
+                continue;
+            }
+            const std::string name = attribute.substr(kInputs.size());
+            const Value* value = scene.Get(filter, attribute);
+            if (const auto* list = value != nullptr ? value->Get<std::vector<float>>() : nullptr) {
+                step.arrays[name] = *list;
+            } else if (const Tensor* tensor = scene.Read(filter, attribute)) {
+                step.arrays[name] = FloatsOf(*tensor, 1, attribute);
+            } else {
+                step.inputs[name] = static_cast<float>(GetNumber(scene, filter, attribute, 0.0));
+            }
+        }
+        steps.push_back(std::move(step));
+    }
+    return steps;
+}
+
+}  // namespace
+
 std::vector<RenderProductSpec>
 ResolveRenderProducts(const Scene& scene, std::span<const Path> products, const Path& settings) {
     using namespace tokens;
@@ -639,6 +678,7 @@ ResolveRenderProducts(const Scene& scene, std::span<const Path> products, const 
         spec.vars.emplace_back(spec.product.IsRoot() ? Path("/LdrColor")
                                                      : spec.product.Child("LdrColor"),
                                std::string(kLdrColor));
+        spec.varFilters.push_back(std::nullopt);
         specs.push_back(std::move(spec));
         return specs;
     }
@@ -654,47 +694,28 @@ ResolveRenderProducts(const Scene& scene, std::span<const Path> products, const 
         if (scene.Get(path, kOverlays) != nullptr) {
             spec.overlays = GetToken(scene, path, kOverlays, "");
         }
+        bool ownChains = false;
         for (const Path& var : TargetsOf(scene, path, kOrderedVars)) {
             if (!scene.Has(var) || scene.TypeOf(var) != kRenderVar) {
                 throw std::invalid_argument("'" + var.String() + "' is not a RenderVar prim");
             }
             const std::string name = GetToken(scene, var, kSourceName, kLdrColor);
             spec.vars.emplace_back(var, name);
+            // A var with its own `ernie:filters` comes from that chain, not the product's.
+            if (scene.Get(var, kFilters) != nullptr) {
+                spec.varFilters.push_back(FilterStepsOf(scene, var));
+                ownChains = true;
+            } else {
+                spec.varFilters.push_back(std::nullopt);
+            }
         }
-        for (const Path& filter : TargetsOf(scene, path, kFilters)) {
-            if (!scene.Has(filter) || scene.TypeOf(filter) != kSensorFilter) {
-                throw std::invalid_argument("'" + filter.String() + "' is not a SensorFilter prim");
-            }
-            SensorFilterStep step;
-            step.type = GetToken(scene, filter, kFilterType, "");
-            if (step.type.empty()) {
-                throw std::invalid_argument("Sensor filter '" + filter.String() + "' has no '" +
-                                            std::string(kFilterType) + "'");
-            }
-            // Its parameters: every number or float array under inputs:.
-            constexpr std::string_view kInputs = "inputs:";
-            for (const std::string& attribute : scene.Attributes(filter)) {
-                if (!attribute.starts_with(kInputs)) {
-                    continue;
-                }
-                const std::string name = attribute.substr(kInputs.size());
-                const Value* value = scene.Get(filter, attribute);
-                if (const auto* list = value != nullptr ? value->Get<std::vector<float>>()
-                                                        : nullptr) {
-                    step.arrays[name] = *list;
-                } else if (const Tensor* tensor = scene.Read(filter, attribute)) {
-                    step.arrays[name] = FloatsOf(*tensor, 1, attribute);
-                } else {
-                    step.inputs[name] = static_cast<float>(GetNumber(scene, filter, attribute, 0.0));
-                }
-            }
-            spec.filters.push_back(std::move(step));
-        }
+        spec.filters = FilterStepsOf(scene, path);
         // The built-in filters decide which vars the chain writes. A chain with custom filters
-        // (which may integrate in place of qe or cie) is checked by the renderer, which knows
-        // them (`VarsWrittenBy` with its registry).
+        // (which may integrate in place of qe or cie), or vars with chains of their own, are
+        // checked by the renderer, which knows the custom filters (`VarsWrittenBy` with its
+        // registry).
         std::vector<SensorFilter> builtins;
-        bool custom = false;
+        bool custom = ownChains;
         for (const SensorFilterStep& step : spec.filters) {
             if (const std::optional<SensorFilter> builtin = step.Builtin()) {
                 builtins.push_back(*builtin);
@@ -705,6 +726,7 @@ ResolveRenderProducts(const Scene& scene, std::span<const Path> products, const 
         if (custom) {
             if (spec.vars.empty()) {
                 spec.vars.emplace_back(path.Child("LdrColor"), std::string(kLdrColor));
+                spec.varFilters.push_back(std::nullopt);
             }
             specs.push_back(std::move(spec));
             continue;
@@ -729,6 +751,7 @@ ResolveRenderProducts(const Scene& scene, std::span<const Path> products, const 
         }
         if (spec.vars.empty()) {
             spec.vars.emplace_back(path.Child("LdrColor"), std::string(kLdrColor));
+            spec.varFilters.push_back(std::nullopt);
         }
         specs.push_back(std::move(spec));
     }

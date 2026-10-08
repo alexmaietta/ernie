@@ -193,10 +193,14 @@ class RasterDelegate : public RenderDelegate {
                      std::vector<glm::dmat4> poses = {}, std::vector<std::int32_t> worlds = {},
                      std::vector<std::string_view> vars = {},
                      std::optional<glm::dmat4> posesParent = std::nullopt,
-                     const std::optional<std::string>& overlays = std::nullopt);
+                     const std::optional<std::string>& overlays = std::nullopt,
+                     std::vector<FrameParams::SensorChain> chains = {});
     /// Hands the renderer the state images of `key` for the frame `Update` just prepared, made
     /// (and history dropped) when its size, views or chain change, and swaps them for the next.
     void PrepareSensorState(const Path& key, VkExtent2D extent, std::uint32_t views);
+    /// The state of sensor pass `pass` (one chain of the frame).
+    void PrepareSensorState(const Path& key, std::size_t pass, VkExtent2D extent,
+                            std::uint32_t views);
     /// Takes the next `FrameUploads` slot for a frame, once the frame that last used it has
     /// finished; returns it.
     std::uint32_t BeginFrame();
@@ -243,7 +247,7 @@ class RasterDelegate : public RenderDelegate {
         bool history = false;    ///< Whether the other holds a frame.
         std::string chain;       ///< The plan key it was made for.
     };
-    std::map<Path, SensorState> sensorStates_;
+    std::map<std::pair<Path, std::size_t>, SensorState> sensorStates_;  ///< By product, pass.
     std::optional<Key> stars_;    ///< The StarField last uploaded.
     std::map<Path, SyncedMaterial> materials_;
     std::map<Path, SyncedMesh> syncedMeshes_;

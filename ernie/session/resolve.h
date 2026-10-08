@@ -69,6 +69,10 @@ struct RenderProductSpec {
     /// `DefaultFilterChain`. Custom filter types are checked when rendering, against the
     /// renderer's registry.
     std::vector<SensorFilterStep> filters;
+    /// Per var of `vars`, the chain of its own `ernie:filters` when it has one: that var comes
+    /// from it rather than the product's (the same chain twice runs once), each source name from
+    /// one chain.
+    std::vector<std::optional<std::vector<SensorFilterStep>>> varFilters;
     /// The product's own `ernie:overlays` (`tokens::kOverlays`), in place of its settings'.
     std::optional<std::string> overlays;
 };

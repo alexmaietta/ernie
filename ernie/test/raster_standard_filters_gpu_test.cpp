@@ -396,6 +396,57 @@ TEST_F(RasterDelegateTest, CustomIntegratorsStandInForQe) {
         << "one integrator into electrons";
 }
 
+TEST_F(RasterDelegateTest, RenderVarsCanNameTheirOwnChains) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    scene.Set("/World/Camera", tokens::kSensorNoise, false);
+    scene.Set("/World/Camera", tokens::kExposureTime, 0.001);
+    const auto balancedAlone = VarThrough(delegate, scene, "HdrColor",
+                                          {{"cie", kNone}, {"whiteBalance", {{"red", 2.0f}}}});
+    const auto mosaicAlone =
+        VarThrough(delegate, scene, "RawDN", {{"qe", kNone}, {"bayer", kNone}, {"adc", kNone}});
+
+    // One product: HdrColor through a white-balanced chain, RawDN through a mosaicking one.
+    const auto define = [&](const std::string& name, const std::string& type,
+                            std::map<std::string, float> inputs = {}) {
+        const Path path("/Render/Chains/" + name);
+        scene.Define(path, tokens::kSensorFilter).Set(tokens::kFilterType, type);
+        for (const auto& [input, value] : inputs) {
+            scene.Set(path, "inputs:" + input, value);
+        }
+        return path;
+    };
+    const std::vector<Path> photo = {define("Cie", "cie"),
+                                     define("Balance", "whiteBalance", {{"red", 2.0f}})};
+    const std::vector<Path> raw = {define("Qe", "qe"), define("Bayer", "bayer"),
+                                   define("Adc", "adc")};
+    scene.Define("/Render/Vars/Photo", tokens::kRenderVar)
+        .Set(tokens::kSourceName, std::string("HdrColor"))
+        .Set(tokens::kFilters, photo);
+    scene.Define("/Render/Vars/Raw", tokens::kRenderVar)
+        .Set(tokens::kSourceName, std::string("RawDN"))
+        .Set(tokens::kFilters, raw);
+    scene.Define("/Render/Both", tokens::kRenderProduct)
+        .Set(tokens::kCameraRel, Path("/World/Camera"))
+        .Set(tokens::kResolution, glm::ivec2(kSize, kSize))
+        .Set(tokens::kOrderedVars, std::vector<Path>{"/Render/Vars/Photo", "/Render/Vars/Raw"});
+    const Path product[] = {"/Render/Both"};
+    auto outputs = delegate.Step(scene, product);
+    const Tensor hdr = outputs.at("/Render/Both").vars.at("HdrColor").Map(ernie::MapDevice::Cpu).tensor;
+    const Tensor dn = outputs.at("/Render/Both").vars.at("RawDN").Map(ernie::MapDevice::Cpu).tensor;
+    for (std::size_t i = 0; i < balancedAlone.size(); ++i) {
+        ASSERT_EQ(hdr.As<float>()[i], balancedAlone[i]) << i;
+        ASSERT_EQ(static_cast<float>(dn.As<std::uint16_t>()[i]), mosaicAlone[i]) << i;
+    }
+
+    // The same source from two different chains is ambiguous.
+    scene.Define("/Render/Vars/Raw2", tokens::kRenderVar)
+        .Set(tokens::kSourceName, std::string("RawDN"));
+    scene.Set("/Render/Both", tokens::kOrderedVars,
+              std::vector<Path>{"/Render/Vars/Raw", "/Render/Vars/Raw2"});
+    EXPECT_THROW(delegate.Step(scene, product), std::invalid_argument);
+}
+
 TEST_F(RasterDelegateTest, TemporalFiltersKeepStateBetweenAProductsFrames) {
     // Two frames of each: the red quad, then the quad gone.
     const auto frames = [&](const Steps& chain, const std::string& var) {
