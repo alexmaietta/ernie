@@ -82,8 +82,9 @@ class GpuImage {
     /// earlier work, which is simple rather than minimal.
     void Transition(VkCommandBuffer commands, VkImageLayout layout);
 
-    /// Uploads tightly packed texels for each mip of layer 0 (`mipData[m]` holds mip `m`) and
-    /// leaves the image ready for sampling in fragment and compute shaders.
+    /// Uploads tightly packed texels for each mip of layer 0 (`mipData[m]` holds mip `m`), or of
+    /// every layer in turn (`mipData[l * mips + m]` holds mip `m` of layer `l`), and leaves the
+    /// image ready for sampling in fragment and compute shaders.
     /// @throws std::invalid_argument if the number of mips or a mip's size does not match.
     void Upload(std::span<const std::span<const std::byte>> mipData);
 

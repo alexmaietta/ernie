@@ -966,6 +966,7 @@ void BindScene(nb::module_& m) {
         {"SHADOW_SOFTNESS", tokens::kShadowSoftness},
         {"SHADOW_NORMAL_OFFSET", tokens::kShadowNormalOffset},
         {"SHADOW_SPLIT_LAMBDA", tokens::kShadowSplitLambda},
+        {"PLANET_RADIUS", tokens::kPlanetRadius},
         {"SHADOW_SHOW_CASCADES", tokens::kShadowShowCascades},
         {"LOD_ENABLE", tokens::kLodEnable},
         {"LOD_DETAIL", tokens::kLodDetail},

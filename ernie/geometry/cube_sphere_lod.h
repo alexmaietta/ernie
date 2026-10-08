@@ -186,9 +186,8 @@ class CubeSphereLod {
     bool Hidden(const CubeSphereRegion& region, const glm::dvec3& eye, const Frustum* frustum,
                 double occluder) const;
     bool SelectNode(std::uint32_t face, std::uint32_t level, std::uint32_t x, std::uint32_t y,
-                    const glm::dvec3& eye, std::span<const LodRange> ranges,
-                    const Frustum* frustum, float exaggeration, double occluder,
-                    std::vector<LodPatch>& out) const;
+                    const glm::dvec3& eye, std::span<const LodRange> ranges, const Frustum* frustum,
+                    float exaggeration, double occluder, std::vector<LodPatch>& out) const;
     void EmitQuarters(std::uint32_t face, std::uint32_t level, std::uint32_t x, std::uint32_t y,
                       const glm::dvec3& eye, const Frustum* frustum, float exaggeration,
                       double occluder, std::vector<LodPatch>& out) const;

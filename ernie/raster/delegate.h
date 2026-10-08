@@ -5,6 +5,7 @@
 #include "ernie/geometry/primitives.h"
 #include "ernie/raster/ground_drawable.h"
 #include "ernie/raster/mesh_drawable.h"
+#include "ernie/raster/planet_drawable.h"
 #include "ernie/raster/points_drawable.h"
 #include "ernie/raster/renderer.h"
 #include "ernie/raster/terrain_drawable.h"
@@ -149,6 +150,10 @@ class RasterDelegate : public RenderDelegate {
         return terrain_;
     }
 
+    const PlanetDrawable& Planet() const {
+        return planet_;
+    }
+
     const GroundDrawable& Ground() const {
         return ground_;
     }
@@ -247,6 +252,7 @@ class RasterDelegate : public RenderDelegate {
     bool terrainOnGpu_ = false;  ///< Whether the terrain has the compute interop.
     RasterRenderer renderer_;
     TerrainDrawable terrain_;
+    PlanetDrawable planet_;
     MeshDrawable meshes_;
     GroundDrawable ground_;
     PointsDrawable points_;

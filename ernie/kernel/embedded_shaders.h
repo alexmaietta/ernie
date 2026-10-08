@@ -84,4 +84,9 @@ extern const char kTerrainColorSlang[];
 /// Gradients and LOD leaf ranges of heightfields written on the GPU.
 extern const char kTerrainUpdateSlang[];
 
+/// Planet modules: shared resources and cube-sphere grid vertex, and the passes.
+extern const char kPlanetSlang[];
+extern const char kPlanetColorSlang[];
+extern const char kPlanetShadowSlang[];
+
 }  // namespace ernie::shaders

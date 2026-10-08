@@ -153,9 +153,8 @@ glm::vec2 CubeSphereLod::HeightRange() const {
     return range;
 }
 
-CubeSphereRegion CubeSphereLod::NodeRegion(std::uint32_t face, std::uint32_t level,
-                                           std::uint32_t x, std::uint32_t y,
-                                           float exaggeration) const {
+CubeSphereRegion CubeSphereLod::NodeRegion(std::uint32_t face, std::uint32_t level, std::uint32_t x,
+                                           std::uint32_t y, float exaggeration) const {
     const glm::vec2& h = trees_.at(face).NodeHeights(level, x, y);
     CubeSphereRegion region;
     if (h.x > h.y) {
@@ -189,8 +188,8 @@ double CubeSphereLod::OccluderRadius(float exaggeration) const {
     if (Empty() || h.x > h.y) {
         return 0.0;
     }
-    const double lowest = radius_ + static_cast<double>(std::min(h.x * exaggeration,
-                                                                  h.y * exaggeration));
+    const double lowest =
+        radius_ + static_cast<double>(std::min(h.x * exaggeration, h.y * exaggeration));
     return std::max(0.0, lowest) * std::cos(kPi / (2.0 * static_cast<double>(LeafCells())));
 }
 
@@ -206,11 +205,10 @@ double CubeSphereLod::MinFirstRange(float exaggeration, float morphStart) const 
                         continue;
                     }
                     const double spread = std::cos(std::min(2.0 * r.angle, kPi));
-                    const double diameter =
-                        std::sqrt(std::max({2.0 * r.outer * r.outer * (1.0 - spread),
-                                            r.inner * r.inner + r.outer * r.outer -
-                                                2.0 * r.inner * r.outer * spread,
-                                            0.0}));
+                    const double diameter = std::sqrt(std::max(
+                        {2.0 * r.outer * r.outer * (1.0 - spread),
+                         r.inner * r.inner + r.outer * r.outer - 2.0 * r.inner * r.outer * spread,
+                         0.0}));
                     range = std::max(range, diameter / (static_cast<double>(morphStart) *
                                                         static_cast<double>(1u << level)));
                 }

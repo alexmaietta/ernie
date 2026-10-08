@@ -246,28 +246,31 @@ void GpuImage::Transition(VkCommandBuffer commands, VkImageLayout layout) {
 }
 
 void GpuImage::Upload(std::span<const std::span<const std::byte>> mipData) {
-    if (mipData.size() != desc_.mips) {
+    const std::uint32_t mips = desc_.mips;
+    if (mipData.size() != mips && mipData.size() != std::size_t{mips} * desc_.layers) {
         throw std::invalid_argument("GpuImage::Upload needs data for every mip");
     }
     const std::uint32_t texel = TexelBytes(desc_.format);
     std::vector<VkBufferImageCopy> regions;
     VkDeviceSize total = 0;
-    for (std::uint32_t mip = 0; mip < desc_.mips; ++mip) {
+    for (std::size_t i = 0; i < mipData.size(); ++i) {
+        const auto mip = static_cast<std::uint32_t>(i % mips);
+        const auto layer = static_cast<std::uint32_t>(i / mips);
         const std::uint32_t w = std::max(1u, desc_.width >> mip);
         const std::uint32_t h = std::max(1u, desc_.height >> mip);
-        if (mipData[mip].size() != static_cast<std::size_t>(w) * h * texel) {
+        if (mipData[i].size() != static_cast<std::size_t>(w) * h * texel) {
             throw std::invalid_argument("GpuImage::Upload got the wrong size for a mip");
         }
         VkBufferImageCopy region{};
         region.bufferOffset = total;
-        region.imageSubresource = {AspectOf(desc_.format), mip, 0, 1};
+        region.imageSubresource = {AspectOf(desc_.format), mip, layer, 1};
         region.imageExtent = {w, h, 1};
         regions.push_back(region);
-        total += mipData[mip].size();
+        total += mipData[i].size();
     }
     GpuBuffer staging(*context_, total, 0, BufferMemory::Upload);
-    for (std::uint32_t mip = 0; mip < desc_.mips; ++mip) {
-        staging.Write(mipData[mip], regions[mip].bufferOffset);
+    for (std::size_t i = 0; i < mipData.size(); ++i) {
+        staging.Write(mipData[i], regions[i].bufferOffset);
     }
     context_->Submit([&](VkCommandBuffer commands) {
         Transition(commands, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);

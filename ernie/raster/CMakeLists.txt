@@ -7,6 +7,7 @@ ernie_add_library(
     mesh_drawable.cpp
     points_drawable.cpp
     overlay_pass.cpp
+    planet_drawable.cpp
     poisson_disk.cpp
     render_targets.cpp
     renderer.cpp

@@ -126,9 +126,9 @@ std::vector<PatchEdge> Edges(const CubeSphereLod& lod, const Faces& faces,
                                          : side == 2 ? glm::uvec2(0, along)
                                                      : glm::uvec2(n, along);
                 const glm::ivec2 g = GridIndex(patches[i], local);
-                edge.keys.push_back(DirectionKey(lod.VertexDirection(
-                    patches[i].face, static_cast<std::uint32_t>(g.x),
-                    static_cast<std::uint32_t>(g.y))));
+                edge.keys.push_back(DirectionKey(
+                    lod.VertexDirection(patches[i].face, static_cast<std::uint32_t>(g.x),
+                                        static_cast<std::uint32_t>(g.y))));
                 edge.points.push_back(
                     MorphedVertex(lod, faces, patches[i], local, eye, ranges, exaggeration));
             }
@@ -272,8 +272,8 @@ bool BehindSphere(const glm::dvec3& eye, const glm::dvec3& point, double radius)
 }  // namespace
 
 TEST(CubeSphereLod, FacesSitOnTheAxesAndWindTheSameWay) {
-    const std::array<glm::dvec3, 6> centres = {{{1, 0, 0}, {0, 1, 0}, {-1, 0, 0}, {0, -1, 0},
-                                                {0, 0, 1}, {0, 0, -1}}};
+    const std::array<glm::dvec3, 6> centres = {
+        {{1, 0, 0}, {0, 1, 0}, {-1, 0, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}}};
     for (std::uint32_t face = 0; face < CubeSphereLod::kFaces; ++face) {
         const glm::dvec3 c = CubeSphereLod::FaceDirection(face, 0.0, 0.0);
         EXPECT_EQ(c, centres[face]) << face;
@@ -325,8 +325,8 @@ TEST(CubeSphereLod, CellsSpanEqualAnglesAlongTheCentreLines) {
     const CubeSphereLod lod(kRadius, n, 4);
     const double expected = 0.5 * std::numbers::pi / n;
     for (std::uint32_t col = 0; col < n; ++col) {
-        const double angle = std::acos(glm::dot(lod.VertexDirection(2, col, n / 2),
-                                                lod.VertexDirection(2, col + 1, n / 2)));
+        const double angle = std::acos(
+            glm::dot(lod.VertexDirection(2, col, n / 2), lod.VertexDirection(2, col + 1, n / 2)));
         EXPECT_NEAR(angle, expected, 1e-12);
     }
 }
@@ -408,10 +408,10 @@ TEST(CubeSphereLod, RegionDistanceIsExactForSimpleCases) {
     EXPECT_DOUBLE_EQ(region.Distance(glm::dvec3(0.0, 0.0, 4.0)), 6.0);
     EXPECT_DOUBLE_EQ(region.Distance(glm::dvec3(0.0)), 10.0);
     const double rim = std::cos(0.25 * std::numbers::pi);
-    EXPECT_NEAR(region.Distance(glm::dvec3(11.0, 0.0, 0.0)),
-                std::sqrt(121.0 + 100.0 - 220.0 * rim), 1e-12);
-    EXPECT_NEAR(region.Distance(glm::dvec3(0.0, 0.0, -5.0)),
-                std::sqrt(25.0 + 100.0 + 100.0 * rim), 1e-12);
+    EXPECT_NEAR(region.Distance(glm::dvec3(11.0, 0.0, 0.0)), std::sqrt(121.0 + 100.0 - 220.0 * rim),
+                1e-12);
+    EXPECT_NEAR(region.Distance(glm::dvec3(0.0, 0.0, -5.0)), std::sqrt(25.0 + 100.0 + 100.0 * rim),
+                1e-12);
     const auto [low, high] = region.Box();
     EXPECT_NEAR(high.z, 12.0, 1e-12);
     EXPECT_NEAR(low.z, 10.0 * std::cos(0.25 * std::numbers::pi), 1e-12);
@@ -608,9 +608,9 @@ TEST(CubeSphereLod, HorizonCullingDropsOnlyHiddenPatches) {
     std::vector<LodPatch> kept;
     lod.Select(low, ranges, nullptr, 1.0f, true, kept);
     EXPECT_LT(kept.size(), all.size());
-    EXPECT_TRUE(std::none_of(kept.begin(), kept.end(),
-                             [](const LodPatch& p) { return p.face == 2; }))
-        << "the far side is culled";
+    EXPECT_TRUE(std::none_of(kept.begin(), kept.end(), [](const LodPatch& p) {
+        return p.face == 2;
+    })) << "the far side is culled";
 }
 
 TEST(CubeSphereLod, FrustumCullingWorksRelativeToTheEye) {
@@ -620,8 +620,8 @@ TEST(CubeSphereLod, FrustumCullingWorksRelativeToTheEye) {
     const glm::dvec3 eye(kRadius + 5.0, 0.0, 0.0);
     const glm::mat4 projection = glm::perspectiveRH_ZO(1.0f, 1.0f, 0.1f, 1e4f);
 
-    const glm::mat4 level = glm::lookAtRH(glm::vec3(0.0f), glm::vec3(-0.2f, 1.0f, 0.0f),
-                                          glm::vec3(1.0f, 0.0f, 0.0f));
+    const glm::mat4 level =
+        glm::lookAtRH(glm::vec3(0.0f), glm::vec3(-0.2f, 1.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f));
     const Frustum frustum = Frustum::FromMatrix(projection * level);
     std::vector<LodPatch> all;
     lod.Select(eye, ranges, nullptr, 1.0f, true, all);
@@ -633,8 +633,8 @@ TEST(CubeSphereLod, FrustumCullingWorksRelativeToTheEye) {
         EXPECT_NE(std::find(all.begin(), all.end(), patch), all.end());
     }
 
-    const glm::mat4 up = glm::lookAtRH(glm::vec3(0.0f), glm::vec3(1.0f, 0.0f, 0.0f),
-                                       glm::vec3(0.0f, 0.0f, 1.0f));
+    const glm::mat4 up =
+        glm::lookAtRH(glm::vec3(0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     const Frustum sky = Frustum::FromMatrix(projection * up);
     std::vector<LodPatch> none;
     lod.Select(eye, ranges, &sky, 1.0f, true, none);

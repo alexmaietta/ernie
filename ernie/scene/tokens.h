@@ -242,6 +242,10 @@ inline constexpr std::string_view kOrigin = "ernie:origin";      ///< dvec2 nort
 inline constexpr std::string_view kCellSize = "ernie:cellSize";  ///< double, world units.
 inline constexpr std::string_view kNoData = "ernie:noData";      ///< float marking missing cells.
 inline constexpr std::string_view kExaggeration = "ernie:exaggeration";  ///< float.
+/// double: makes the Terrain a whole planet of this radius centred at the world's origin, its
+/// heights a float32 (6, n + 1, n + 1) tensor of cube faces (`CubeSphereLod`, n a power of two of
+/// at least 64) rather than a raster, so `ernie:origin` and `ernie:cellSize` do not apply.
+inline constexpr std::string_view kPlanetRadius = "ernie:radius";
 /// int4 (first column, first row, columns, rows): the cells that changed with the last write of
 /// heights on a GPU, so only their gradients and LOD bounds are rebuilt; absent for all.
 inline constexpr std::string_view kHeightsDirty = "ernie:heights:dirty";

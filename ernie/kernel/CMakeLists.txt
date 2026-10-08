@@ -38,6 +38,9 @@ set(ernie_shaders
     raster/meter.slang=kMeterSlang
     raster/motion.slang=kMotionSlang
     raster/overlay.slang=kOverlaySlang
+    raster/planet.slang=kPlanetSlang
+    raster/planet_color.slang=kPlanetColorSlang
+    raster/planet_shadow.slang=kPlanetShadowSlang
     raster/points.slang=kPointsSlang
     raster/present.slang=kPresentSlang
     raster/projection_pinhole.slang=kProjectionPinholeSlang

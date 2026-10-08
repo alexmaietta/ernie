@@ -185,7 +185,7 @@ TerrainParams TerrainParamsOf(const Scene& scene, const RenderPrims& prims) {
 RasterDelegate::RasterDelegate(const VulkanContext& context, VkFormat presentFormat,
                                BrdfRegistry brdfs)
     : context_(context), renderer_(context, presentFormat, std::move(brdfs)), terrain_(renderer_),
-      meshes_(renderer_), ground_(renderer_), points_(renderer_) {}
+      planet_(renderer_), meshes_(renderer_), ground_(renderer_), points_(renderer_) {}
 
 RasterDelegate::~RasterDelegate() {
     context_.WaitForSubmissions();
@@ -207,7 +207,7 @@ const RendererInfo& RasterDelegate::Info() const {
 std::optional<Bounds3> RasterDelegate::SceneBounds() const {
     std::optional<Bounds3> bounds;
     for (const std::optional<Bounds3>& drawable :
-         {terrain_.Bounds(), meshes_.Bounds(), points_.Bounds()}) {
+         {terrain_.Bounds(), planet_.Bounds(), meshes_.Bounds(), points_.Bounds()}) {
         if (!drawable) {
             continue;
         }
@@ -250,7 +250,7 @@ std::vector<RenderTargets*> TargetsOf(FrameImages& images) {
 
 RenderStats RasterDelegate::Stats() const {
     RenderStats stats;
-    stats.gpuBytes = renderer_.GpuBytes() + terrain_.GpuBytes() +
+    stats.gpuBytes = renderer_.GpuBytes() + terrain_.GpuBytes() + planet_.GpuBytes() +
                      (viewTargets_ != nullptr ? viewTargets_->GpuBytes() : 0);
     for (const auto& [product, frames] : frames_) {
         for (const std::shared_ptr<ProductFrame>& frame : frames) {
@@ -259,9 +259,11 @@ RenderStats RasterDelegate::Stats() const {
             }
         }
     }
-    stats.triangles = terrain_.TriangleCount() + meshes_.TriangleCount();
-    stats.counters.emplace_back(raster_stats::kTerrainPatches, terrain_.PatchCount());
-    stats.counters.emplace_back(raster_stats::kTerrainLodLevels, terrain_.Lod().Levels());
+    stats.triangles = terrain_.TriangleCount() + planet_.TriangleCount() + meshes_.TriangleCount();
+    stats.counters.emplace_back(raster_stats::kTerrainPatches,
+                                terrain_.PatchCount() + planet_.PatchCount());
+    stats.counters.emplace_back(raster_stats::kTerrainLodLevels,
+                                std::max(terrain_.Lod().Levels(), planet_.Lod().Levels()));
     stats.counters.emplace_back(raster_stats::kMeshDraws, meshes_.DrawCount(0));
     stats.counters.emplace_back(raster_stats::kMeshDrawCalls, meshes_.DrawCalls(0));
     return stats;
@@ -371,15 +373,49 @@ void RasterDelegate::SyncHeightfield(const Scene& scene, const Path& terrain) {
     if (terrain.IsEmpty() || scene.Read(terrain, kHeights) == nullptr) {
         if (heightfield_) {
             terrain_.ClearHeightfield();
+            planet_.ClearHeights();
             heightfield_.reset();
         }
         return;
     }
-    const Key key = KeyOf(scene, terrain, {kHeights, kOrigin, kCellSize, kNoData});
+    const Key key = KeyOf(scene, terrain, {kHeights, kOrigin, kCellSize, kNoData, kPlanetRadius});
     if (heightfield_ == key) {
         return;
     }
     heightfield_ = key;
+    if (scene.Get(terrain, kPlanetRadius) != nullptr) {
+        try {
+            if (terrain_.HasHeightfield()) {
+                terrain_.ClearHeightfield();
+            }
+            const Tensor heights = scene.Read(terrain, kHeights)->Contiguous();
+            if (heights.Type() != DType::Float32 || heights.Rank() != 3 ||
+                heights.Shape()[0] != CubeSphereLod::kFaces ||
+                heights.Location().kind != DeviceKind::Cpu) {
+                throw std::invalid_argument(
+                    "a planet's heights must be a float32 (6, n + 1, n + 1) CPU tensor");
+            }
+            std::array<RasterView, CubeSphereLod::kFaces> faces;
+            const auto rows = static_cast<std::size_t>(heights.Shape()[1]);
+            const auto cols = static_cast<std::size_t>(heights.Shape()[2]);
+            for (std::size_t face = 0; face < faces.size(); ++face) {
+                faces[face].data = heights.As<float>() + face * rows * cols;
+                faces[face].width = cols;
+                faces[face].height = rows;
+                if (scene.Get(terrain, kNoData) != nullptr) {
+                    faces[face].noData =
+                        static_cast<float>(GetNumber(scene, terrain, kNoData, 0.0));
+                }
+            }
+            planet_.SetHeights(GetNumber(scene, terrain, kPlanetRadius, 0.0), faces);
+        } catch (const std::invalid_argument& error) {
+            throw UploadError(terrain, kHeights, error.what());
+        }
+        return;
+    }
+    if (planet_.HasHeights()) {
+        planet_.ClearHeights();
+    }
     // Heights written on a GPU stay there: the terrain copies them device to device and rebuilds
     // what depends on the cells that changed on the GPU.
     const Tensor* written = scene.Read(terrain, kHeights);
@@ -1093,6 +1129,7 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
     terrain.material = MaterialOf(scene, prims_.terrain);
     terrain.primId = prims_.terrain.IsEmpty() ? 0u : PrimIdOf(prims_.terrain);
     terrain_.SetParams(terrain);
+    planet_.SetParams(terrain);
     ground_.SetEnabled(!prims_.ground.IsEmpty());
     if (!prims_.ground.IsEmpty()) {
         GroundParams ground = GroundParamsOf(scene, prims_.ground);
@@ -1109,7 +1146,7 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
         }
     }
     renderer_.SetHighlight(highlighted, highlightColour_);
-    RasterDrawable* drawables[] = {&terrain_, &meshes_, &ground_, &points_};
+    RasterDrawable* drawables[] = {&terrain_, &planet_, &meshes_, &ground_, &points_};
     if (overlays) {
         frame.overlays = *overlays;
     }
@@ -1186,7 +1223,7 @@ void RasterDelegate::Record(VkCommandBuffer commands, const RenderingTarget& tar
         viewTargets_ = std::make_unique<RenderTargets>(context_, extent, renderer_.Bands().count,
                                                        false, 1, vars, viewAovs_);
     }
-    const RasterDrawable* drawables[] = {&terrain_, &meshes_, &ground_, &points_};
+    const RasterDrawable* drawables[] = {&terrain_, &planet_, &meshes_, &ground_, &points_};
     renderer_.Record(commands, *viewTargets_, drawables, &target, var);
 }
 
@@ -1415,7 +1452,7 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
             signals.push_back(compute->NextVulkanSignal());
         }
         const std::vector<RenderTargets*> targets = TargetsOf(*frame->images);
-        const RasterDrawable* drawables[] = {&terrain_, &meshes_, &ground_, &points_};
+        const RasterDrawable* drawables[] = {&terrain_, &planet_, &meshes_, &ground_, &points_};
         // Every view of the product renders in this one submission, sharing the shadow passes.
         ERNIE_ZONE_TEXT(spec.product.String());
         submission = context_.SubmitAsync(

@@ -55,6 +55,7 @@ ernie_add_test_suite(
     raster_mesh_drawable_test.cpp
     raster_motion_gpu_test.cpp
     raster_overlays_gpu_test.cpp
+    raster_planet_gpu_test.cpp
     raster_points_gpu_test.cpp
     raster_products_gpu_test.cpp
     raster_sensor_filters_gpu_test.cpp
