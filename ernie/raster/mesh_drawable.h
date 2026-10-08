@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ernie/device/buffer.h"
-#include "ernie/device/cuda_interop.h"
+#include "ernie/device/compute_interop.h"
 #include "ernie/device/pipeline.h"
 #include "ernie/geometry/mesh_data.h"
 #include "ernie/raster/drawable.h"
@@ -114,12 +114,12 @@ class MeshDrawable : public RasterDrawable {
     /// @throws std::invalid_argument for an unknown mesh or a different number of points.
     void SetPoints(std::uint32_t mesh, std::span<const float> points);
 
-    /// Replaces a mesh's points with a contiguous float32 CUDA tensor of the same number of
-    /// points, copied device to device at the next `Prepare` on CUDA stream `stream`, the one the
-    /// points are written on. `bounds` are the points' bounds; without them the points are
-    /// copied to the host to compute them.
+    /// Replaces a mesh's points with a contiguous float32 tensor on the compute device of the same
+    /// number of points, copied device to device at the next `Prepare` on compute stream `stream`,
+    /// the one the points are written on. `bounds` are the points' bounds; without them the points
+    /// are copied to the host to compute them.
     /// @throws std::invalid_argument for an unknown mesh, a different number of points, a tensor
-    /// that is not float32 on the CUDA device, or without `SetCudaInterop`.
+    /// that is not float32 on the compute device, or without `SetComputeInterop`.
     void SetPoints(std::uint32_t mesh, const Tensor& points,
                    std::optional<std::pair<glm::vec3, glm::vec3>> bounds = std::nullopt,
                    std::uintptr_t stream = 1);
@@ -139,15 +139,15 @@ class MeshDrawable : public RasterDrawable {
     /// @throws std::invalid_argument for an unknown instancer.
     void RemoveInstancer(std::uint32_t instancer);
 
-    /// Replaces an instancer's arrays with CUDA tensors, copied device to device at the next
-    /// `Prepare`; only the arrays of instancers that changed are copied.
+    /// Replaces an instancer's arrays with tensors on the compute device, copied device to device
+    /// at the next `Prepare`; only the arrays of instancers that changed are copied.
     /// @throws std::invalid_argument for an unknown instancer, tensors that are not float32 on
-    /// the CUDA device or do not match the positions, or without `SetCudaInterop`.
+    /// the compute device or do not match the positions, or without `SetComputeInterop`.
     void SetInstances(std::uint32_t instancer, const DeviceInstanceData& data);
 
-    /// Enables CUDA inputs: geometry and instance pools move to memory shared with `cuda`, which
-    /// must outlive the drawable. Null turns CUDA inputs off again.
-    void SetCudaInterop(CudaInterop* cuda);
+    /// Enables GPU inputs: geometry and instance pools move to memory shared with `compute` (CUDA
+    /// or HIP), which must outlive the drawable. Null turns GPU inputs off again.
+    void SetComputeInterop(ComputeInterop* compute);
 
     /// Sets the draws of the next frames; nothing is drawn until the next `Prepare`. Draws whose
     /// material is removed later use the default material. Each view draws only the draws and
@@ -323,7 +323,7 @@ class MeshDrawable : public RasterDrawable {
     std::uint32_t nextHandle_ = 1;
     bool geometryDirty_ = true;
     bool instancesDirty_ = true;
-    CudaInterop* cuda_ = nullptr;
+    ComputeInterop* compute_ = nullptr;
     std::vector<MeshItem> items_;
     /// Per draw, its instances by world: one range of every instance without instance worlds.
     std::vector<std::vector<WorldRange>> itemRanges_;

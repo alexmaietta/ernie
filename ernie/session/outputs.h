@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ernie/device/cuda_interop.h"
+#include "ernie/device/compute_interop.h"
 #include "ernie/device/image.h"
 #include "ernie/scene/path.h"
 #include "ernie/util/tensor.h"
@@ -16,18 +16,21 @@
 
 namespace ernie {
 
-/// Where `RenderVar::Map` delivers an output.
+/// Where `RenderVar::Map` delivers an output. The GPU kinds are on the delegate's compute device
+/// (CUDA or ROCm, see `ComputeInterop`); `Cuda` and `CudaArray` are their earlier names.
 enum class MapDevice {
-    Cpu,        ///< A host tensor; the texels are copied to the host.
-    Cuda,       ///< A linear CUDA tensor; the GPU detiles the image into it, without the host.
-    CudaArray,  ///< The rendered image itself as a CUDA array: no copy at all.
+    Cpu,       ///< A host tensor; the texels are copied to the host.
+    Gpu,       ///< A linear tensor on the compute device; the GPU detiles the image into it.
+    GpuArray,  ///< The rendered image itself as a compute array: no copy at all.
+    Cuda = Gpu,
+    CudaArray = GpuArray,
 };
 
-/// A mapped render var: a tensor for `Cpu` and `Cuda`, a CUDA array for `CudaArray`.
+/// A mapped render var: a tensor for `Cpu` and `Gpu`, a compute array for `GpuArray`.
 struct MappedRenderVar {
     MapDevice device = MapDevice::Cpu;
     Tensor tensor;
-    CudaArrayView array;
+    ComputeArrayView array;
 };
 
 /// The images a backend renders one frame of a render product into, by render var name: what
@@ -110,20 +113,21 @@ class RenderVar {
     /// Element type of the mapped tensor.
     DType Type() const;
 
-    /// Maps the output to `device`. CUDA mappings make CUDA stream `syncStream` (DLPack
-    /// numbering: 1 legacy default, 2 per-thread default) wait on the GPU for the render, without
-    /// blocking the host; a CPU mapping waits on the host. `Cuda` and `Cpu` tensors own their
-    /// texels; a `CudaArray` is the frame's image, which must be unmapped before the frame is
-    /// dropped, and is not available for the layered SpectralRadiance or a batch of views.
-    /// @throws std::invalid_argument for a CUDA device without CUDA interop, or a format CUDA
+    /// Maps the output to `device`. GPU mappings make compute stream `syncStream` (DLPack
+    /// numbering for the device kind; for CUDA 1 legacy default, 2 per-thread default) wait on the
+    /// GPU for the render, without blocking the host; a CPU mapping waits on the host. `Gpu` and
+    /// `Cpu` tensors own their texels; a `GpuArray` is the frame's image, which must be unmapped
+    /// before the frame is dropped, and is not available for the layered SpectralRadiance or a
+    /// batch of views.
+    /// @throws std::invalid_argument for a GPU device without compute interop, or a format compute
     /// arrays do not support.
     MappedRenderVar Map(MapDevice device, std::uintptr_t syncStream = 1);
 
-    /// Ends a mapping. For a `CudaArray`, Vulkan waits for the work queued on CUDA stream `stream`
-    /// before rendering into the image again.
+    /// Ends a mapping. For a `GpuArray`, Vulkan waits for the work queued on compute stream
+    /// `stream` before rendering into the image again.
     void Unmap(std::uintptr_t stream = 1);
 
-    /// Whether the var is mapped as a CUDA array.
+    /// Whether the var is mapped as a compute array.
     bool IsMapped() const;
 
   private:
@@ -163,8 +167,8 @@ class StepOperation {
     /// The step's outputs, waiting for its GPU work first.
     RenderProductSetOutputs Fetch();
 
-    /// The step's outputs without waiting: mapping them to CUDA orders the consumer after the
-    /// step on the GPU, and mapping them to the CPU waits on the host.
+    /// The step's outputs without waiting: mapping them to the compute device orders the consumer
+    /// after the step on the GPU, and mapping them to the CPU waits on the host.
     const RenderProductSetOutputs& Outputs() const {
         return outputs_;
     }

@@ -398,7 +398,7 @@ TEST_F(MeshDrawableTest, CudaInstancesAndPointsRenderLikeHostOnes) {
     const std::vector<Pixel> expected = Render(host);
 
     Frame device(*context_);
-    device.meshes.SetCudaInterop(cuda.get());
+    device.meshes.SetComputeInterop(cuda.get());
     MeshItem deviceItem = item;
     deviceItem.mesh = device.meshes.AddMesh(Square(1.0f));
     deviceItem.instancer = device.meshes.AddInstancer({{0, 0, 0, 0, 0, 0, 0, 0, 0}, {}, {}});

@@ -355,7 +355,7 @@ void MeshDrawable::SetPoints(std::uint32_t mesh, const Tensor& points,
     if (bounds) {
         std::tie(target.low, target.high) = *bounds;
     } else {
-        const Tensor host = cuda_->Download(points);
+        const Tensor host = compute_->Download(points);
         target.data.points.assign(host.As<float>(), host.As<float>() + host.Elements());
         std::tie(target.low, target.high) = PointBounds(target.data.points);
     }
@@ -365,12 +365,12 @@ void MeshDrawable::SetPoints(std::uint32_t mesh, const Tensor& points,
 }
 
 void MeshDrawable::CopyDevicePoints(Mesh& mesh) {
-    cuda_->CopyToBuffer(mesh.devicePoints, *points_,
-                        VkDeviceSize{mesh.firstVertex} * 3 * sizeof(float), mesh.deviceStream);
+    compute_->CopyToBuffer(mesh.devicePoints, *points_,
+                           VkDeviceSize{mesh.firstVertex} * 3 * sizeof(float), mesh.deviceStream);
 }
 
 std::shared_ptr<GpuBuffer> MeshDrawable::Pool(std::span<const std::byte> bytes) const {
-    if (cuda_ == nullptr) {
+    if (compute_ == nullptr) {
         return StorageBuffer(context_, bytes);
     }
     auto buffer =
@@ -420,18 +420,18 @@ void MeshDrawable::SetInstances(std::uint32_t instancer, InstanceData data) {
 
 void MeshDrawable::CheckDeviceTensor(const Tensor& tensor, std::size_t components,
                                      const char* what) const {
-    if (cuda_ == nullptr) {
-        throw std::invalid_argument("CUDA inputs need MeshDrawable::SetCudaInterop");
+    if (compute_ == nullptr) {
+        throw std::invalid_argument("GPU inputs need MeshDrawable::SetComputeInterop");
     }
     const bool shaped =
         tensor.Rank() == 1 ||
         (tensor.Rank() == 2 && tensor.Shape()[1] == static_cast<std::int64_t>(components));
-    if (tensor.Location() != Device{DeviceKind::Cuda, cuda_->Device()} ||
-        tensor.Type() != DType::Float32 || !tensor.IsContiguous() || !shaped ||
+    if (tensor.Location() != compute_->Location() || tensor.Type() != DType::Float32 ||
+        !tensor.IsContiguous() || !shaped ||
         static_cast<std::size_t>(tensor.Elements()) % components != 0) {
         throw std::invalid_argument(std::string(what) + " must be a contiguous float32 tensor of " +
-                                    std::to_string(components) + "-vectors on CUDA device " +
-                                    std::to_string(cuda_->Device()));
+                                    std::to_string(components) + "-vectors on the compute device " +
+                                    std::to_string(compute_->Device()));
     }
 }
 
@@ -462,17 +462,17 @@ void MeshDrawable::SetInstances(std::uint32_t instancer, const DeviceInstanceDat
     target.dirty = true;
     target.data = {};
     if (!data.extent) {
-        const Tensor positions = cuda_->Download(data.positions);
+        const Tensor positions = compute_->Download(data.positions);
         target.data.positions.assign(positions.As<float>(), positions.As<float>() + 3 * count);
         if (!data.scales.Empty()) {
-            const Tensor scales = cuda_->Download(data.scales);
+            const Tensor scales = compute_->Download(data.scales);
             target.data.scales.assign(scales.As<float>(), scales.As<float>() + 3 * count);
         }
     }
 }
 
-void MeshDrawable::SetCudaInterop(CudaInterop* cuda) {
-    cuda_ = cuda;
+void MeshDrawable::SetComputeInterop(ComputeInterop* compute) {
+    compute_ = compute;
     geometryDirty_ = true;
     instancesDirty_ = true;
 }
@@ -584,7 +584,7 @@ void MeshDrawable::RebuildGeometry() {
     colors_ = StorageBuffer(context_, colors);
     indices_ = StorageBuffer(context_, indices);
     for (auto& [handle, mesh] : meshes_) {
-        if (!mesh.devicePoints.Empty() && cuda_ != nullptr) {
+        if (!mesh.devicePoints.Empty() && compute_ != nullptr) {
             CopyDevicePoints(mesh);
         }
     }
@@ -635,14 +635,15 @@ void MeshDrawable::WriteInstancer(const Instancer& instancer) {
     const VkDeviceSize first = instancer.first;
     if (instancer.onDevice) {
         const DeviceInstanceData& device = instancer.device;
-        cuda_->CopyToBuffer(device.positions, *positions_, first * 3 * sizeof(float),
-                            device.stream);
+        compute_->CopyToBuffer(device.positions, *positions_, first * 3 * sizeof(float),
+                               device.stream);
         if (!device.orientations.Empty()) {
-            cuda_->CopyToBuffer(device.orientations, *orientations_, first * 4 * sizeof(float),
-                                device.stream);
+            compute_->CopyToBuffer(device.orientations, *orientations_, first * 4 * sizeof(float),
+                                   device.stream);
         }
         if (!device.scales.Empty()) {
-            cuda_->CopyToBuffer(device.scales, *scales_, first * 3 * sizeof(float), device.stream);
+            compute_->CopyToBuffer(device.scales, *scales_, first * 3 * sizeof(float),
+                                   device.stream);
         }
         return;
     }

@@ -464,7 +464,7 @@ TEST_F(RasterDelegateTest, LightsShineOnlyInTheirWorld) {
 TEST_F(RasterDelegateTest, PosesWrittenAsCudaArraysRenderAsHostPoses) {
     RasterDelegate delegate(*context_);
     std::string why;
-    ernie::CudaInterop* cuda = delegate.Cuda(&why);
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
     if (cuda == nullptr) {
         GTEST_SKIP() << "No CUDA interop: " << why;
     }
@@ -488,7 +488,7 @@ TEST_F(RasterDelegateTest, PosesWrittenAsCudaArraysRenderAsHostPoses) {
 TEST_F(RasterDelegateTest, CudaWritesOnSeveralStreamsSignalVulkanInOrder) {
     RasterDelegate delegate(*context_);
     std::string why;
-    ernie::CudaInterop* cuda = delegate.Cuda(&why);
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
     if (cuda == nullptr) {
         GTEST_SKIP() << "No CUDA interop: " << why;
     }
@@ -519,7 +519,7 @@ TEST(CudaInterop, TensorsMayOutliveTheirDelegateAndDevice) {
     }
     auto delegate = std::make_unique<RasterDelegate>(*context);
     std::string why;
-    ernie::CudaInterop* cuda = delegate->Cuda(&why);
+    ernie::ComputeInterop* cuda = delegate->Compute(&why);
     if (cuda == nullptr) {
         GTEST_SKIP() << "No CUDA interop: " << why;
     }
@@ -688,7 +688,7 @@ TEST(GpuPosesOf, KeepsContiguousFloat32CudaPosesOnTheGpu) {
 TEST_F(RasterDelegateTest, PosesOnTheGpuRenderAsPosesOnTheHost) {
     RasterDelegate delegate(*context_);
     std::string why;
-    ernie::CudaInterop* cuda = delegate.Cuda(&why);
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
     if (cuda == nullptr) {
         GTEST_SKIP() << "No CUDA interop: " << why;
     }
@@ -728,7 +728,7 @@ TEST_F(RasterDelegateTest, PosesOnTheGpuRenderAsPosesOnTheHost) {
 TEST_F(RasterDelegateTest, GpuPosedViewsCullInstancesAgainstTheirOwnFrusta) {
     RasterDelegate delegate(*context_);
     std::string why;
-    ernie::CudaInterop* cuda = delegate.Cuda(&why);
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
     if (cuda == nullptr) {
         GTEST_SKIP() << "No CUDA interop: " << why;
     }
@@ -828,7 +828,7 @@ TEST_F(RasterDelegateTest, StepsInFlightRenderAsStepsOneAtATime) {
 
     // Poses copied from CUDA each step, in flight too.
     std::string why;
-    ernie::CudaInterop* cuda = delegate.Cuda(&why);
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
     if (cuda == nullptr) {
         GTEST_SKIP() << "No CUDA interop: " << why;
     }

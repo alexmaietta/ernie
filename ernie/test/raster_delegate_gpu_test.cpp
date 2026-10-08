@@ -303,7 +303,7 @@ TEST_F(RasterDelegateTest, ABadMeshDoesNotBlockTheOthers) {
 TEST_F(RasterDelegateTest, CudaArraysAndCudaOutputMatchTheHostPath) {
     RasterDelegate delegate(*context_);
     std::string why;
-    ernie::CudaInterop* cuda = delegate.Cuda(&why);
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
     if (cuda == nullptr) {
         GTEST_SKIP() << "No CUDA interop: " << why;
     }

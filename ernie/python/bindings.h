@@ -20,6 +20,9 @@ using AnyArray = nb::ndarray<nb::ro>;
 /// @throws std::invalid_argument for an element type Ernie does not exchange.
 Tensor TensorFromArray(const AnyArray& array);
 
+/// The DLPack device type of memory of `kind` (`kDLCPU`, `kDLCUDA` or `kDLROCM`).
+int DlpackDeviceType(DeviceKind kind);
+
 /// The DLPack element type of `type`.
 nb::dlpack::dtype DlpackOf(DType type);
 

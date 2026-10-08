@@ -80,14 +80,27 @@ nb::dlpack::dtype DlpackOf(DType type) {
     throw std::invalid_argument("Unknown element type");
 }
 
+int DlpackDeviceType(DeviceKind kind) {
+    switch (kind) {
+    case DeviceKind::Cuda:
+        return nb::device::cuda::value;
+    case DeviceKind::Rocm:
+        return nb::device::rocm::value;
+    default:
+        return nb::device::cpu::value;
+    }
+}
+
 Tensor TensorFromArray(const AnyArray& array) {
     const DType type = DTypeOf(array.dtype());
     Device device;
     if (array.device_type() == nb::device::cuda::value) {
         device = {DeviceKind::Cuda, array.device_id()};
+    } else if (array.device_type() == nb::device::rocm::value) {
+        device = {DeviceKind::Rocm, array.device_id()};
     } else if (array.device_type() != nb::device::cpu::value &&
                array.device_type() != nb::device::cuda_host::value) {
-        throw std::invalid_argument("Arrays must live on the CPU or a CUDA device");
+        throw std::invalid_argument("Arrays must live on the CPU or a CUDA or ROCm device");
     }
     std::vector<std::int64_t> shape(array.ndim());
     std::vector<std::int64_t> strides(array.ndim());
@@ -106,16 +119,16 @@ nb::object ArrayFromTensor(const Tensor& tensor, bool writable) {
     nb::capsule owner(kept, [](void* p) noexcept { delete static_cast<Tensor*>(p); });
     std::vector<std::size_t> shape(tensor.Shape().begin(), tensor.Shape().end());
     const std::vector<std::int64_t>& strides = tensor.Strides();
-    const bool cuda = tensor.Location().kind == DeviceKind::Cuda;
-    const int deviceType = cuda ? nb::device::cuda::value : nb::device::cpu::value;
-    const int deviceId = cuda ? tensor.Location().id : 0;
+    const bool gpu = IsGpu(tensor.Location().kind);
+    const int deviceType = DlpackDeviceType(tensor.Location().kind);
+    const int deviceId = gpu ? tensor.Location().id : 0;
     const auto view = [&]<typename Framework, typename... Flags>() {
         nb::ndarray<Framework, Flags...> array(tensor.Data(), shape.size(), shape.data(), owner,
                                                strides.data(), DlpackOf(tensor.Type()), deviceType,
                                                deviceId);
         return nb::cast(array, nb::rv_policy::reference);
     };
-    if (!cuda) {
+    if (!gpu) {
         return writable ? view.template operator()<nb::numpy>()
                         : view.template operator()<nb::numpy, nb::ro>();
     }

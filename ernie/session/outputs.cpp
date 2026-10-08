@@ -165,18 +165,18 @@ MappedRenderVar RenderVar::Map(MapDevice device, std::uintptr_t syncStream) {
         mapped.tensor = Tensor(owner->data(), type, shape, {}, {}, owner);
         return mapped;
     }
-    if (frame.cuda == nullptr) {
-        throw std::invalid_argument("Mapping a render var to CUDA needs CUDA interop");
+    if (frame.compute == nullptr) {
+        throw std::invalid_argument("Mapping a render var to the GPU needs compute interop");
     }
-    if (device == MapDevice::CudaArray) {
+    if (device == MapDevice::GpuArray) {
         GpuImage& image = *images.front();
         if (image.Desc().layers > 1 || images.size() > 1) {
             throw std::invalid_argument("Render var " + name_ +
-                                        " has several layers or views; map it to Device.CUDA "
-                                        "instead");
+                                        " has several layers or views; map it to a linear GPU "
+                                        "tensor instead");
         }
-        mapped.array = frame.cuda->MapImage(image);
-        frame.cuda->WaitForVulkan(syncStream);
+        mapped.array = frame.compute->MapImage(image);
+        frame.compute->WaitForVulkan(syncStream);
         ++frame.arrayMaps;
         return mapped;
     }
@@ -192,11 +192,11 @@ MappedRenderVar RenderVar::Map(MapDevice device, std::uintptr_t syncStream) {
             *frame.context, bytes, VK_BUFFER_USAGE_TRANSFER_DST_BIT, BufferMemory::Shared);
         frame.linearPool->push_back(buffer);
     }
-    const TimelinePoint signal = frame.cuda->NextVulkanSignal();
+    const TimelinePoint signal = frame.compute->NextVulkanSignal();
     frame.context->SubmitAsync([&](VkCommandBuffer commands) { recordCopies(commands, *buffer); },
                                {}, std::span(&signal, 1));
-    frame.cuda->WaitForVulkan(syncStream);
-    mapped.tensor = frame.cuda->View(buffer, type, shape);
+    frame.compute->WaitForVulkan(syncStream);
+    mapped.tensor = frame.compute->View(buffer, type, shape);
     return mapped;
 }
 
@@ -204,7 +204,7 @@ void RenderVar::Unmap(std::uintptr_t stream) {
     if (frame_ == nullptr || frame_->arrayMaps == 0) {
         return;
     }
-    frame_->cuda->SignalVulkan(stream);
+    frame_->compute->SignalVulkan(stream);
     --frame_->arrayMaps;
 }
 

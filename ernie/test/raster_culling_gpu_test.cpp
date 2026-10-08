@@ -126,7 +126,7 @@ TEST_F(RasterDelegateTest, GpuCullingKeepsExactlyTheInstancesInView) {
 TEST_F(RasterDelegateTest, InstancesWrittenAsCudaArraysAreCulledOnTheGpu) {
     RasterDelegate delegate(*context_);
     std::string why;
-    ernie::CudaInterop* cuda = delegate.Cuda(&why);
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
     if (cuda == nullptr) {
         GTEST_SKIP() << "No CUDA interop: " << why;
     }

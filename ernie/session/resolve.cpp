@@ -472,7 +472,7 @@ glm::dmat4 PosesParentOf(const Scene& scene, const Path& camera) {
 
 const Tensor* GpuPosesOf(const Scene& scene, const Path& camera) {
     const Tensor* tensor = scene.Read(camera, tokens::kPoses);
-    if (tensor == nullptr || tensor->Location().kind != DeviceKind::Cuda) {
+    if (tensor == nullptr || !IsGpu(tensor->Location().kind)) {
         return nullptr;
     }
     CheckPosesShape(*tensor, camera);
@@ -1092,7 +1092,7 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh) {
     }
     MeshData data;
     const Tensor* pointsTensor = scene.Read(mesh, kPoints);
-    if (pointsTensor != nullptr && pointsTensor->Location().kind == DeviceKind::Cuda) {
+    if (pointsTensor != nullptr && IsGpu(pointsTensor->Location().kind)) {
         if (pointsTensor->Elements() % 3 != 0) {
             throw std::invalid_argument("points must be 3-vectors");
         }

@@ -242,7 +242,7 @@ class RasterRenderer {
     }
 
     /// The buffer the views' poses of a frame with `FrameParams::posesOnGpu` are copied into
-    /// before it records (`CudaInterop::CopyToBuffer`), row-major 4x4 float32 per view; valid
+    /// before it records (`ComputeInterop::CopyToBuffer`), row-major 4x4 float32 per view; valid
     /// after that frame's `Update`.
     GpuBuffer& PoseBuffer() {
         return *poseBuffer_;

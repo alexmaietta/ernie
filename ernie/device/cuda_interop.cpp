@@ -486,6 +486,7 @@ CudaArrayView CudaInterop::MapImage(GpuImage& image) {
     CudaArrayView view;
     view.width = desc.width;
     view.height = desc.height;
+    view.kind = DeviceKind::Cuda;
     view.device = state_->ordinal;
     int format = 0;
     switch (desc.format) {

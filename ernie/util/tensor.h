@@ -18,8 +18,13 @@ enum class DType : std::uint8_t { UInt8, UInt16, UInt32, Int32, Int64, Float16, 
 /// Bytes per element of `type`.
 std::size_t SizeOf(DType type);
 
-/// Where a tensor's memory lives.
-enum class DeviceKind : std::uint8_t { Cpu, Cuda };
+/// Where a tensor's memory lives: host memory, or the memory of a CUDA or ROCm (HIP) device.
+enum class DeviceKind : std::uint8_t { Cpu, Cuda, Rocm };
+
+/// True for the memory of a GPU compute device (CUDA or ROCm).
+constexpr bool IsGpu(DeviceKind kind) {
+    return kind != DeviceKind::Cpu;
+}
 
 struct Device {
     DeviceKind kind = DeviceKind::Cpu;

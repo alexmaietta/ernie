@@ -46,9 +46,9 @@ class FakeDelegate : public RenderDelegate {
     ernie::StepOperation StepAsync(const Scene&, std::span<const Path>, const Path&) override {
         throw std::logic_error("not rendered");
     }
-    ernie::CudaInterop* Cuda(std::string* why) override {
+    ernie::ComputeInterop* Compute(std::string* why) override {
         if (why != nullptr) {
-            *why = "no CUDA in tests";
+            *why = "no GPU compute in tests";
         }
         return nullptr;
     }
@@ -93,10 +93,12 @@ TEST(RenderDelegate, FramesCountPerProductUnlessTheSettingsAuthorOne) {
     EXPECT_EQ(delegate.NextFrame(scene, {}, left).frame, 5u) << "no settings: the count";
 }
 
-TEST(RenderDelegate, CudaRendersNeedCudaInterop) {
+TEST(RenderDelegate, GpuRendersNeedComputeInterop) {
     Scene scene;
     FakeDelegate delegate;
     EXPECT_THROW(delegate.Render(scene, {}, ernie::Device{ernie::DeviceKind::Cuda, 0}),
+                 std::invalid_argument);
+    EXPECT_THROW(delegate.Render(scene, {}, ernie::Device{ernie::DeviceKind::Rocm, 0}),
                  std::invalid_argument);
     EXPECT_THROW(delegate.Step(scene), std::logic_error) << "Step runs StepAsync";
 }

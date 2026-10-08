@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ernie/device/cuda_interop.h"
+#include "ernie/device/compute_interop.h"
 #include "ernie/device/pipeline.h"
 #include "ernie/device/vulkan_context.h"
 #include "ernie/scene/brdf.h"
@@ -126,18 +126,19 @@ class RenderDelegate {
                                  const Path& settings = {});
 
     /// Renders the first product of the settings and returns its `LdrColor`: a uint8 (rows, cols,
-    /// 4) RGBA tensor, rows top to bottom, on the CPU, or with a CUDA `device` a linear CUDA
-    /// tensor that the GPU fills without the host. A CUDA result returns without waiting for the
-    /// render; CUDA work reading it must first wait with `CudaInterop::WaitForVulkan` (Python's
-    /// `__dlpack__` does so on the consumer's stream; `CudaInterop::Download` does so itself). It
-    /// stays valid while the tensor lives, but not beyond the delegate's Vulkan context.
-    /// @throws std::invalid_argument as `StepAsync` and `RenderVar::Map`, or for a CUDA device
+    /// 4) RGBA tensor, rows top to bottom, on the CPU, or with a GPU compute `device` (CUDA or
+    /// ROCm) a linear tensor there that the GPU fills without the host. A GPU result returns
+    /// without waiting for the render; work reading it must first wait with
+    /// `ComputeInterop::WaitForVulkan` (Python's `__dlpack__` does so on the consumer's stream;
+    /// `ComputeInterop::Download` does so itself). It stays valid while the tensor lives, but not
+    /// beyond the delegate's Vulkan context.
+    /// @throws std::invalid_argument as `StepAsync` and `RenderVar::Map`, or for a GPU device
     /// other than the delegate's.
     Tensor Render(const Scene& scene, const Path& settings = {}, Device device = {});
 
-    /// The CUDA interop of the delegate's device, connected on first use; null if unavailable,
-    /// with the reason in `why` if given.
-    virtual CudaInterop* Cuda(std::string* why = nullptr) = 0;
+    /// The compute interop (CUDA or HIP) of the delegate's device, connected on first use; null if
+    /// unavailable, with the reason in `why` if given.
+    virtual ComputeInterop* Compute(std::string* why = nullptr) = 0;
 
     /// The prim path of a PrimId render var value, or the empty path for 0 or an unknown id.
     virtual Path PrimPath(std::uint32_t id) const = 0;

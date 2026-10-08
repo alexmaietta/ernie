@@ -144,7 +144,7 @@ TEST_F(RasterDelegateTest, FramesHeldByOutputsAreNotRenderedOver) {
 TEST_F(RasterDelegateTest, MapsRenderVarsToCudaArraysWithoutCopying) {
     RasterDelegate delegate(*context_);
     std::string why;
-    ernie::CudaInterop* cuda = delegate.Cuda(&why);
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
     if (cuda == nullptr) {
         GTEST_SKIP() << "No CUDA interop: " << why;
     }
@@ -182,7 +182,7 @@ TEST_F(RasterDelegateTest, MapsRenderVarsToCudaArraysWithoutCopying) {
 TEST_F(RasterDelegateTest, CudaArraysMappedInTheSceneAreWrittenInPlace) {
     RasterDelegate delegate(*context_);
     std::string why;
-    ernie::CudaInterop* cuda = delegate.Cuda(&why);
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
     if (cuda == nullptr) {
         GTEST_SKIP() << "No CUDA interop: " << why;
     }

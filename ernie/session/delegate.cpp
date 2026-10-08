@@ -17,24 +17,24 @@ RenderProductSetOutputs RenderDelegate::Step(const Scene& scene, std::span<const
 }
 
 Tensor RenderDelegate::Render(const Scene& scene, const Path& settings, Device device) {
-    const bool cuda = device.kind == DeviceKind::Cuda;
-    if (cuda) {
+    const bool gpu = IsGpu(device.kind);
+    if (gpu) {
         std::string why;
-        CudaInterop* interop = Cuda(&why);
+        ComputeInterop* interop = Compute(&why);
         if (interop == nullptr) {
-            throw std::invalid_argument("A CUDA render needs CUDA interop: " + why);
+            throw std::invalid_argument("A GPU render needs compute interop: " + why);
         }
-        if (interop->Device() != device.id) {
-            throw std::invalid_argument("The renderer's Vulkan device is CUDA device " +
-                                        std::to_string(interop->Device()));
+        if (interop->Location() != device) {
+            throw std::invalid_argument("The renderer's Vulkan device is compute device " +
+                                        std::to_string(interop->Device()) + " of another kind or ordinal");
         }
     }
     StepOperation step = StepAsync(scene, {}, settings);
-    RenderProductSetOutputs outputs = cuda ? step.Outputs() : step.Fetch();
+    RenderProductSetOutputs outputs = gpu ? step.Outputs() : step.Fetch();
     for (auto& [path, output] : outputs) {
         if (const auto it = output.vars.find(std::string(render_vars::kLdrColor));
             it != output.vars.end()) {
-            return it->second.Map(cuda ? MapDevice::Cuda : MapDevice::Cpu).tensor;
+            return it->second.Map(gpu ? MapDevice::Gpu : MapDevice::Cpu).tensor;
         }
     }
     throw std::invalid_argument("The render products have no LdrColor render var");

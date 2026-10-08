@@ -26,17 +26,21 @@ Device ParseDevice(const std::string& device) {
     if (device == "cpu") {
         return {};
     }
-    if (device == "cuda") {
-        return {DeviceKind::Cuda, 0};
-    }
-    if (device.rfind("cuda:", 0) == 0) {
-        try {
-            return {DeviceKind::Cuda, std::stoi(device.substr(5))};
-        } catch (const std::exception&) {
+    for (const auto& [name, kind] : {std::pair{std::string("cuda"), DeviceKind::Cuda},
+                                     std::pair{std::string("rocm"), DeviceKind::Rocm}}) {
+        if (device == name) {
+            return {kind, 0};
+        }
+        if (device.rfind(name + ":", 0) == 0) {
+            try {
+                return {kind, std::stoi(device.substr(name.size() + 1))};
+            } catch (const std::exception&) {
+            }
         }
     }
-    throw std::invalid_argument("device must be \"cpu\", \"cuda\" or \"cuda:<index>\", not \"" +
-                                device + "\"");
+    throw std::invalid_argument(
+        "device must be \"cpu\", \"cuda\", \"cuda:<index>\", \"rocm\" or \"rocm:<index>\", not \"" +
+        device + "\"");
 }
 
 /// Holds a Python object, releasing it with the GIL held.
@@ -66,22 +70,24 @@ Tensor KeepingAlive(const Tensor& tensor, nb::handle keep) {
                   std::move(owner));
 }
 
-/// A CUDA render result: implements the DLPack protocol so a consumer's stream waits on the GPU
-/// for the render before reading it.
+/// A render result on the compute device (CUDA or ROCm): implements the DLPack protocol so a
+/// consumer's stream waits on the GPU for the render before reading it.
 struct CudaArray {
     Tensor tensor;
-    CudaInterop* cuda = nullptr;
+    ComputeInterop* compute = nullptr;
 
     nb::object Dlpack(nb::handle stream) const {
-        const std::intptr_t handle = stream.is_none() ? 1 : nb::cast<std::intptr_t>(stream);
+        // No stream means the default stream, numbered as DLPack does for the device kind.
+        const std::intptr_t fallback = tensor.Location().kind == DeviceKind::Rocm ? 0 : 1;
+        const std::intptr_t handle = stream.is_none() ? fallback : nb::cast<std::intptr_t>(stream);
         if (handle != -1) {
-            cuda->WaitForVulkan(static_cast<std::uintptr_t>(handle));
+            compute->WaitForVulkan(static_cast<std::uintptr_t>(handle));
         }
         auto* kept = new Tensor(tensor);
         nb::capsule owner(kept, [](void* p) noexcept { delete static_cast<Tensor*>(p); });
         std::vector<std::size_t> shape(tensor.Shape().begin(), tensor.Shape().end());
         nb::ndarray<nb::ro> array(tensor.Data(), shape.size(), shape.data(), owner, nullptr,
-                                  DlpackOf(tensor.Type()), nb::device::cuda::value,
+                                  DlpackOf(tensor.Type()), DlpackDeviceType(tensor.Location().kind),
                                   tensor.Location().id);
         return nb::cast(array, nb::rv_policy::reference);
     }
@@ -93,9 +99,9 @@ struct PyRenderVar {
     RenderVar var;
 };
 
-/// A render var mapped as a CUDA array: the frame's own image, read in place.
+/// A render var mapped as a compute array: the frame's own image, read in place.
 struct PyCudaArrayMapping {
-    CudaArrayView view;
+    ComputeArrayView view;
     PyRenderVar var;
 };
 
@@ -146,13 +152,13 @@ std::vector<Path> PathsOf(nb::handle products) {
     return paths;
 }
 
-CudaInterop& RequireCuda(Renderer& r) {
+ComputeInterop& RequireCuda(Renderer& r) {
     std::string why;
-    CudaInterop* cuda = r.Delegate().Cuda(&why);
-    if (cuda == nullptr) {
-        throw std::invalid_argument("CUDA interop is unavailable: " + why);
+    ComputeInterop* compute = r.Delegate().Compute(&why);
+    if (compute == nullptr) {
+        throw std::invalid_argument("GPU compute interop (CUDA or HIP) is unavailable: " + why);
     }
-    return *cuda;
+    return *compute;
 }
 
 }  // namespace
@@ -172,7 +178,7 @@ void BindRender(nb::module_& m) {
             nb::arg("copy").none() = nb::none())
         .def("__dlpack_device__",
              [](const CudaArray& a) {
-                 return nb::make_tuple(static_cast<int>(nb::device::cuda::value),
+                 return nb::make_tuple(DlpackDeviceType(a.tensor.Location().kind),
                                        a.tensor.Location().id);
              })
         .def_prop_ro("shape", [](const CudaArray& a) {
@@ -451,9 +457,9 @@ void BindRender(nb::module_& m) {
                     nb::gil_scoped_release release;
                     image = self.p->Delegate().Render(scene, settings, target);
                 }
-                if (target.kind == DeviceKind::Cuda) {
+                if (IsGpu(target.kind)) {
                     return nb::cast(
-                        CudaArray{KeepingAlive(image, self.h), self.p->Delegate().Cuda()});
+                        CudaArray{KeepingAlive(image, self.h), self.p->Delegate().Compute()});
                 }
                 return ArrayFromTensor(KeepingAlive(image, self.h));
             },
@@ -505,7 +511,7 @@ void BindRender(nb::module_& m) {
             nb::arg("source"), nb::arg("destination"), nb::arg("stream").none() = nb::none(),
             "Queues a device-to-device copy between CUDA arrays of the same size on `stream`.")
         .def_prop_ro(
-            "cuda_available", [](Renderer& r) { return r.Delegate().Cuda() != nullptr; },
+            "cuda_available", [](Renderer& r) { return r.Delegate().Compute() != nullptr; },
             "Whether CUDA arrays can be written to scenes this renderer draws, and rendered to.")
         .def(
             "cuda_upload",

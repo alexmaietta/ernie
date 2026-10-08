@@ -72,6 +72,8 @@ Device FromDl(DLDevice device) {
         return {DeviceKind::Cpu, 0};
     case kDLCUDA:
         return {DeviceKind::Cuda, device.device_id};
+    case kDLROCM:
+        return {DeviceKind::Rocm, device.device_id};
     default:
         throw std::invalid_argument("Unsupported DLPack device type " +
                                     std::to_string(static_cast<int>(device.device_type)));
@@ -185,8 +187,17 @@ DLManagedTensorVersioned* Tensor::ToDlpack() const {
     };
     DLTensor& dl = m.dl_tensor;
     dl.data = data_;
-    dl.device =
-        device_.kind == DeviceKind::Cuda ? DLDevice{kDLCUDA, device_.id} : DLDevice{kDLCPU, 0};
+    switch (device_.kind) {
+    case DeviceKind::Cuda:
+        dl.device = DLDevice{kDLCUDA, device_.id};
+        break;
+    case DeviceKind::Rocm:
+        dl.device = DLDevice{kDLROCM, device_.id};
+        break;
+    default:
+        dl.device = DLDevice{kDLCPU, 0};
+        break;
+    }
     dl.ndim = static_cast<std::int32_t>(shape_.size());
     dl.dtype = ToDl(type_);
     dl.shape = exported->shape.data();

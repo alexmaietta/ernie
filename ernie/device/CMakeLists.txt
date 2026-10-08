@@ -2,6 +2,7 @@ ernie_add_library(
     ernie_device
     SOURCES
     buffer.cpp
+    compute_interop.cpp
     cuda_interop.cpp
     frame_uploads.cpp
     image.cpp

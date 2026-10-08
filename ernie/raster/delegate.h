@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ernie/device/cuda_interop.h"
+#include "ernie/device/compute_interop.h"
 #include "ernie/device/offscreen_target.h"
 #include "ernie/geometry/primitives.h"
 #include "ernie/raster/ground_drawable.h"
@@ -53,9 +53,9 @@ TerrainParams TerrainParamsOf(const Scene& scene, const RenderPrims& prims);
 ///
 /// `Sync` re-uploads GPU data only when the attributes behind it changed
 /// (`Scene::AttributeVersion`): a deforming mesh rewrites only its points, and moving instances
-/// rewrites only the instance arrays. Arrays on a CUDA device (mesh `points`, instance
+/// rewrites only the instance arrays. Arrays on a GPU compute device (mesh `points`, instance
 /// `positions`, `orientations` and `scales`, contiguous float32) are copied device to device
-/// through `CudaInterop`, connected on first use; author `extent` on such prims to spare a copy
+/// through `ComputeInterop`, connected on first use; author `extent` on such prims to spare a copy
 /// to the host for bounds. Meshes that are prototypes of a PointInstancer are drawn
 /// only through it; prototypes must be Mesh prims. A mesh without a bound material uses the
 /// default material tinted by its `primvars:displayColor` (0.5 grey without one).
@@ -92,11 +92,11 @@ class RasterDelegate : public RenderDelegate {
                 std::string_view var) override;
 
     /// As `RenderDelegate::StepAsync`. Products render one after another; GPU work is ordered
-    /// after CUDA copies into the renderer's buffers, and signals CUDA when done.
+    /// after compute copies into the renderer's buffers, and signals the compute side when done.
     StepOperation StepAsync(const Scene& scene, std::span<const Path> products = {},
                             const Path& settings = {}) override;
 
-    CudaInterop* Cuda(std::string* why = nullptr) override;
+    ComputeInterop* Compute(std::string* why = nullptr) override;
 
     Path PrimPath(std::uint32_t id) const override;
     Path Pick(std::uint32_t x, std::uint32_t y) override;
@@ -178,7 +178,7 @@ class RasterDelegate : public RenderDelegate {
     std::uint32_t MaterialOf(const Scene& scene, const Path& prim) const;
     std::vector<MeshItem> Items(const Scene& scene) const;
 
-    CudaInterop& RequireCuda();
+    ComputeInterop& RequireCompute();
     void UpdatePrims(const Scene& scene, const RenderPrims& prims, VkExtent2D extent, FrameId frame,
                      std::span<const SensorFilterStep> filters = {},
                      std::vector<glm::dmat4> poses = {}, std::vector<std::int32_t> worlds = {},
@@ -195,10 +195,10 @@ class RasterDelegate : public RenderDelegate {
     void SetMeshPoints(const Scene& scene, const Path& path, std::uint32_t handle);
 
     const VulkanContext& context_;
-    std::unique_ptr<CudaInterop> cuda_;
-    bool cudaTried_ = false;
-    std::string cudaWhy_;
-    bool meshesOnCuda_ = false;
+    std::unique_ptr<ComputeInterop> compute_;
+    bool computeTried_ = false;
+    std::string computeWhy_;
+    bool meshesOnGpu_ = false;
     RasterRenderer renderer_;
     TerrainDrawable terrain_;
     MeshDrawable meshes_;

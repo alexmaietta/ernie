@@ -375,34 +375,34 @@ void RasterDelegate::SyncHeightfield(const Scene& scene, const Path& terrain) {
     }
 }
 
-CudaInterop* RasterDelegate::Cuda(std::string* why) {
-    if (!cudaTried_) {
-        cudaTried_ = true;
-        cuda_ = CudaInterop::Create(context_, &cudaWhy_);
+ComputeInterop* RasterDelegate::Compute(std::string* why) {
+    if (!computeTried_) {
+        computeTried_ = true;
+        compute_ = ComputeInterop::Create(context_, &computeWhy_);
     }
-    if (cuda_ == nullptr && why != nullptr) {
-        *why = cudaWhy_;
+    if (compute_ == nullptr && why != nullptr) {
+        *why = computeWhy_;
     }
-    return cuda_.get();
+    return compute_.get();
 }
 
-CudaInterop& RasterDelegate::RequireCuda() {
+ComputeInterop& RasterDelegate::RequireCompute() {
     std::string why;
-    CudaInterop* cuda = Cuda(&why);
-    if (cuda == nullptr) {
-        throw std::invalid_argument("CUDA arrays need CUDA interop, which is unavailable: " + why);
+    ComputeInterop* compute = Compute(&why);
+    if (compute == nullptr) {
+        throw std::invalid_argument("GPU arrays need compute interop, which is unavailable: " + why);
     }
-    if (!meshesOnCuda_) {
-        meshes_.SetCudaInterop(cuda);
-        meshesOnCuda_ = true;
+    if (!meshesOnGpu_) {
+        meshes_.SetComputeInterop(compute);
+        meshesOnGpu_ = true;
     }
-    return *cuda;
+    return *compute;
 }
 
 void RasterDelegate::SetMeshPoints(const Scene& scene, const Path& path, std::uint32_t handle) {
     const Tensor* tensor = scene.Read(path, tokens::kPoints);
-    if (tensor != nullptr && tensor->Location().kind == DeviceKind::Cuda) {
-        RequireCuda();
+    if (tensor != nullptr && IsGpu(tensor->Location().kind)) {
+        RequireCompute();
         meshes_.SetPoints(handle, *tensor, ExtentOf(scene, path),
                           scene.WriteStream(path, tokens::kPoints));
         return;
@@ -456,7 +456,7 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
             synced.tint = ConstantDisplayColor(scene, path).value_or(glm::vec3(0.5f));
             synced.handle = meshes_.AddMesh(std::move(data));
             const Tensor* tensor = scene.Read(path, kPoints);
-            if (tensor != nullptr && tensor->Location().kind == DeviceKind::Cuda) {
+            if (tensor != nullptr && IsGpu(tensor->Location().kind)) {
                 SetMeshPoints(scene, path, synced.handle);
             }
         } catch (const std::invalid_argument& error) {
@@ -499,15 +499,14 @@ void RasterDelegate::SyncInstancers(const Scene& scene) {
         synced.key = key;
         try {
             const Tensor* positions = scene.Read(path, kPositions);
-            if (positions != nullptr && positions->Location().kind == DeviceKind::Cuda) {
-                CudaInterop& cuda = RequireCuda();
+            if (positions != nullptr && IsGpu(positions->Location().kind)) {
+                ComputeInterop& compute = RequireCompute();
                 const auto onDevice = [&](std::string_view attribute) {
                     const Tensor* tensor = scene.Read(path, attribute);
                     if (tensor == nullptr) {
                         return Tensor();
                     }
-                    return tensor->Location().kind == DeviceKind::Cuda ? *tensor
-                                                                       : cuda.Upload(*tensor);
+                    return IsGpu(tensor->Location().kind) ? *tensor : compute.Upload(*tensor);
                 };
                 DeviceInstanceData data;
                 data.positions = *positions;
@@ -774,10 +773,10 @@ Path RasterDelegate::Pick(std::uint32_t x, std::uint32_t y) {
 }
 
 std::vector<TimelinePoint> RasterDelegate::SubmitWaits() const {
-    if (cuda_ == nullptr || cuda_->VulkanWait().semaphore == VK_NULL_HANDLE) {
+    if (compute_ == nullptr || compute_->VulkanWait().semaphore == VK_NULL_HANDLE) {
         return {};
     }
-    return {cuda_->VulkanWait()};
+    return {compute_->VulkanWait()};
 }
 
 void RasterDelegate::Record(VkCommandBuffer commands, const RenderingTarget& target,
@@ -806,7 +805,7 @@ std::shared_ptr<ProductFrame> RasterDelegate::AcquireFrame(const Path& product, 
     ERNIE_ZONE("AcquireFrame");
     const std::vector<std::string_view> held = RequiredVars(vars);
     std::vector<std::shared_ptr<ProductFrame>>& frames = frames_[product];
-    const bool shared = cuda_ != nullptr;
+    const bool shared = compute_ != nullptr;
     std::erase_if(frames, [&](const std::shared_ptr<ProductFrame>& frame) {
         const RenderTargets& targets = *TargetsOf(*frame->images).front();
         const bool stale = frame.use_count() == 1 && frame->arrayMaps == 0 &&
@@ -828,7 +827,7 @@ std::shared_ptr<ProductFrame> RasterDelegate::AcquireFrame(const Path& product, 
     }
     auto frame = std::make_shared<ProductFrame>();
     frame->context = &context_;
-    frame->cuda = cuda_.get();
+    frame->compute = compute_.get();
     frame->linearPool = &linearPool_;
     frame->batched = batched;
     // A batch of more views than one set of targets holds renders into consecutive chunks.
@@ -864,7 +863,7 @@ std::uint32_t RasterDelegate::BeginFrame() {
 StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path> products,
                                         const Path& settings) {
     ERNIE_ZONE("StepAsync");
-    CudaInterop* cuda = Cuda();
+    ComputeInterop* compute = Compute();
     const RenderPrims base = ResolveRenderPrims(scene, settings);
     const std::vector<RenderProductSpec> specs = ResolveRenderProducts(scene, products, settings);
     RenderProductSetOutputs outputs;
@@ -884,7 +883,7 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         // The product's cameras, or the settings' one.
         const std::vector<Path> cameras =
             spec.cameras.empty() ? std::vector<Path>{prims.camera} : spec.cameras;
-        // Poses written as a CUDA array stay on the GPU (`GpuPosesOf`), copied device to device
+        // Poses written as a GPU array stay on the GPU (`GpuPosesOf`), copied device to device
         // after the work writing them, with the last ones rendered as the CPU's estimates; or
         // come to the host for the views' uniforms.
         const Tensor* gpuPoses = cameras.size() == 1 ? GpuPosesOf(scene, cameras.front()) : nullptr;
@@ -902,8 +901,8 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         } else {
             if (cameras.size() == 1) {
                 const Tensor* written = scene.Read(cameras.front(), tokens::kPoses);
-                if (written != nullptr && written->Location().kind == DeviceKind::Cuda) {
-                    hostPoses = RequireCuda().Download(
+                if (written != nullptr && IsGpu(written->Location().kind)) {
+                    hostPoses = RequireCompute().Download(
                         *written, scene.WriteStream(cameras.front(), tokens::kPoses));
                 }
             }
@@ -933,13 +932,13 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         if (gpuPoses != nullptr) {
             // Once no submission reads the pose buffer (`UpdatePrims` waits), on the writer's
             // stream; the submission waits for it (`SubmitWaits`).
-            RequireCuda().CopyToBuffer(*gpuPoses, renderer_.PoseBuffer(), 0,
-                                       scene.WriteStream(cameras.front(), tokens::kPoses));
+            RequireCompute().CopyToBuffer(*gpuPoses, renderer_.PoseBuffer(), 0,
+                                          scene.WriteStream(cameras.front(), tokens::kPoses));
         }
         const std::vector<TimelinePoint> waits = SubmitWaits();
         std::vector<TimelinePoint> signals;
-        if (cuda != nullptr) {
-            signals.push_back(cuda->NextVulkanSignal());
+        if (compute != nullptr) {
+            signals.push_back(compute->NextVulkanSignal());
         }
         const std::vector<RenderTargets*> targets = TargetsOf(*frame->images);
         const RasterDrawable* drawables[] = {&terrain_, &meshes_, &ground_};
