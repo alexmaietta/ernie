@@ -1,6 +1,7 @@
 #include "ernie/util/spectrum.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <stdexcept>
 #include <string>
@@ -120,6 +121,54 @@ double PlanckRadiance(double wavelengthNm, double kelvin) {
     const double perMetre = 2.0 * kPlanck * kSpeedOfLight * kSpeedOfLight /
                             (std::pow(lambda, 5.0) * std::expm1(exponent));
     return perMetre * 1e-9;
+}
+
+namespace {
+
+/// CIE daylight components S0, S1 and S2 from 300 to 830 nm every 10 nm (CIE 015:2018, table 6).
+constexpr std::array<double, 54> kDaylightS0{
+    0.04,  6.0,   29.6,  55.3,  57.3,  61.8,  61.5,  68.8,  63.4,  65.8,  94.8,  104.8,
+    105.9, 96.8,  113.9, 125.6, 125.5, 121.3, 121.3, 113.5, 113.1, 110.8, 106.5, 108.8,
+    105.3, 104.4, 100.0, 96.0,  95.1,  89.1,  90.5,  90.3,  88.4,  84.0,  85.1,  81.9,
+    82.6,  84.9,  81.3,  71.9,  74.3,  76.4,  63.3,  71.7,  77.0,  65.2,  47.7,  68.6,
+    65.0,  66.0,  61.0,  53.3,  58.9,  61.9};
+constexpr std::array<double, 54> kDaylightS1{
+    0.02,  4.5,   22.4,  42.0,  40.6,  41.6,  38.0,  42.4,  38.5,  35.0,  43.4,  46.3,
+    43.9,  37.1,  36.7,  35.9,  32.6,  27.9,  24.3,  20.1,  16.2,  13.2,  8.6,   6.1,
+    4.2,   1.9,   0.0,   -1.6,  -3.5,  -3.5,  -5.8,  -7.2,  -8.6,  -9.5,  -10.9, -10.7,
+    -12.0, -14.0, -13.6, -12.0, -13.3, -12.9, -10.6, -11.6, -12.2, -10.2, -7.8,  -11.2,
+    -10.4, -10.6, -9.7,  -8.3,  -9.3,  -9.8};
+constexpr std::array<double, 54> kDaylightS2{
+    0.0,  2.0,  4.0,  8.5,  7.8,  6.7,  5.3,  6.1,  3.0,  1.2,  -1.1, -0.5, -0.7, -1.2,
+    -2.6, -2.9, -2.8, -2.6, -2.6, -1.8, -1.5, -1.3, -1.2, -1.0, -0.5, -0.3, 0.0,  0.2,
+    0.5,  2.1,  3.2,  4.1,  4.7,  5.1,  6.7,  7.3,  8.6,  9.8,  10.2, 8.3,  9.6,  8.5,
+    7.0,  7.6,  8.0,  6.7,  5.2,  7.4,  6.8,  7.0,  6.4,  5.5,  6.1,  6.5};
+
+}  // namespace
+
+double CieDaylight(double wavelengthNm, double kelvin) {
+    if (!(kelvin >= 4000.0 && kelvin <= 25000.0)) {
+        throw std::invalid_argument("CIE illuminant D needs a temperature from 4000 to 25000 K");
+    }
+    // The daylight locus: chromaticity x from the temperature, then y from x.
+    const double t = kelvin;
+    const double x = t <= 7000.0
+                         ? -4.6070e9 / (t * t * t) + 2.9678e6 / (t * t) + 0.09911e3 / t + 0.244063
+                         : -2.0064e9 / (t * t * t) + 1.9018e6 / (t * t) + 0.24748e3 / t + 0.237040;
+    const double y = -3.000 * x * x + 2.870 * x - 0.275;
+    const double m = 0.0241 + 0.2562 * x - 0.7341 * y;
+    const double m1 = (-1.3515 - 1.7703 * x + 5.9114 * y) / m;
+    const double m2 = (0.0300 - 31.4424 * x + 30.0717 * y) / m;
+    const double position = (wavelengthNm - 300.0) / 10.0;
+    if (position < 0.0 || position > static_cast<double>(kDaylightS0.size() - 1)) {
+        return 0.0;
+    }
+    const auto i = std::min(static_cast<std::size_t>(position), kDaylightS0.size() - 2);
+    const double f = position - static_cast<double>(i);
+    const auto at = [&](std::size_t k) {
+        return kDaylightS0[k] + m1 * kDaylightS1[k] + m2 * kDaylightS2[k];
+    };
+    return (1.0 - f) * at(i) + f * at(i + 1);
 }
 
 std::vector<float> BlackbodyIrradiance(const SpectralBands& bands, double kelvin,

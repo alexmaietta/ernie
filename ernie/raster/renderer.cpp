@@ -242,7 +242,11 @@ constexpr VkBufferUsageFlags kViewUniformUsage =
 constexpr DescriptorBinding kPresentBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT},
     {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT},
+    {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT},
 };
+
+/// present.slang's kShowSpectral: SpectralRadiance's bands, through presentSpectral.
+constexpr std::uint32_t kShowSpectral = 7;
 
 /// How present.slang shows a render var (its kShow* constants), and whether it is an integer
 /// image.
@@ -252,7 +256,8 @@ struct PresentMode {
     bool integer;
 };
 
-constexpr std::array<PresentMode, 9> kPresentModes{{
+constexpr std::array<PresentMode, 10> kPresentModes{{
+    {render_vars::kSpectralRadiance, kShowSpectral, false},
     {render_vars::kLdrColor, 0, false},
     {render_vars::kHdrColor, 1, false},
     {render_vars::kDistanceToImagePlane, 2, false},
@@ -311,11 +316,12 @@ void ShaderBarrier(VkCommandBuffer commands) {
     vkCmdPipelineBarrier2(commands, &dependency);
 }
 
-/// The integral of the CIE y function over 360-830 nm, in nm.
+/// The integral of the CIE y function over 360-830 nm, in nm, by midpoints of 1 nm steps as
+/// light spectra are scaled (`RelativeSpectrum`).
 double LuminanceIntegral() {
     static const double integral = [] {
         double sum = 0.0;
-        for (double w = 360.0; w <= 830.0; w += 1.0) {
+        for (double w = 360.5; w < 830.0; w += 1.0) {
             sum += CieXyz(w).y;
         }
         return sum;
@@ -482,6 +488,7 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
     };
     presentFloat_ = presentPipeline("presentFloat");
     presentUint_ = presentPipeline("presentUint");
+    presentSpectral_ = presentPipeline("presentSpectral");
     overlays_ = std::make_unique<OverlayPass>(context_, compiler_, uploads_, presentFormat_);
     const std::vector<ShaderModuleSource> depthRangeModules{
         {"depth_range", shaders::kDepthRangeSlang}};
@@ -1120,6 +1127,10 @@ void RasterRenderer::WriteSensor(const FrameParams& params) {
     sensor.lens[1] = lens.vignetting ? 1.0f : 0.0f;
     sensor.lens[2] =
         static_cast<float>(camera.LinearExposureScale() * static_cast<double>(params.exposure));
+    // A flat spectrum of spectral radiance L has luminance 683 L times the y function's integral;
+    // shown with this gain it is as bright as in the photographic image.
+    spectralGain_ = static_cast<float>(static_cast<double>(sensor.lens[2]) * kLuminousEfficacy *
+                                       LuminanceIntegral());
     sensor.lens[3] = static_cast<float>(camera.exposureTime);
     const SensorModel& model = camera.sensor;
     sensor.sensor[0] = static_cast<float>(model.fullWellElectrons);
@@ -1695,12 +1706,17 @@ void RasterRenderer::Present(VkCommandBuffer commands, RenderTargets& targets,
     RenderingTarget target = present;
     target.depth = VK_NULL_HANDLE;
     BeginRendering(commands, target);
-    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      (mode.integer ? presentUint_ : presentFloat_)->Handle());
-    // Both bindings take the var; the pipeline reads the one of its type.
+    const bool spectral = mode.show == kShowSpectral;
+    vkCmdBindPipeline(
+        commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        (spectral ? presentSpectral_ : mode.integer ? presentUint_ : presentFloat_)->Handle());
+    // Every binding takes the var, SpectralRadiance's view 0 bands at 2; the pipeline reads the
+    // one of its type.
     const DescriptorResource view =
         DescriptorResource::Of(image.LayerView(0), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    const std::array<DescriptorResource, 2> views{view, view};
+    const DescriptorResource bands = DescriptorResource::Of(
+        spectral ? image.GroupView(0) : image.View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    const std::array<DescriptorResource, 3> views{view, view, bands};
     presentLayout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, views);
     const bool srgb =
         presentFormat_ == VK_FORMAT_R8G8B8A8_SRGB || presentFormat_ == VK_FORMAT_B8G8R8A8_SRGB;
@@ -1711,6 +1727,13 @@ void RasterRenderer::Present(VkCommandBuffer commands, RenderTargets& targets,
                 {presentRange_[0], presentRange_[1], presentRange_[2], presentRange_[3]}};
     if (var == render_vars::kRawDn) {
         constants.range[2] = presentRange_[3];
+    }
+    if (spectral) {
+        constants.flags[2] = presentBand_ >= 0 && presentBand_ < bands_.count
+                                 ? static_cast<std::uint32_t>(presentBand_)
+                                 : 0xFFFFFFFFu;
+        constants.flags[3] = static_cast<std::uint32_t>(bands_.count);
+        constants.range[3] = spectralGain_;
     }
     presentLayout_.PushConstants(commands, &constants, sizeof(constants));
     vkCmdDraw(commands, 3, 1, 0, 0);

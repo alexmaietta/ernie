@@ -142,6 +142,12 @@ class RenderDelegate {
     /// The prim path of a PrimId render var value, or the empty path for 0 or an unknown id.
     virtual Path PrimPath(std::uint32_t id) const = 0;
 
+    /// Which spectral band `Record` shows when it presents SpectralRadiance: 0 to the camera's
+    /// band count - 1, or -1 for the mean over the bands; backends that cannot choose ignore it.
+    virtual void SetViewBand(int band) {
+        static_cast<void>(band);
+    }
+
     /// The prim the last frame `Record` drew shows at pixel (`x`, `y`) of its image, from its
     /// PrimId; the empty path for the background, a pixel outside the image, or a backend that
     /// cannot tell. Waits for the device, so for clicks rather than every frame.

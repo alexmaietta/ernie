@@ -116,6 +116,33 @@ std::vector<PropertySection> LightOf(std::string_view type) {
     if (!shape.fields.empty()) {
         sections.push_back(std::move(shape));
     }
+    sections.push_back(
+        {"Spectrum",
+         {Field(kPhysicalIlluminant, "Illuminant", Kind::Token, S(kWhite), 0, 0,
+                {S(kWhite), S(kBlackbody), S(kIlluminantD), S(kCustom)},
+                "The spectrum's shape; blackbody and illuminant D take the temperature above. "
+                "Unset: a black body if the temperature is used, else flat")}});
+    const std::string switches =
+        "Setting any photometric value puts the light in photometric units: they alone then set "
+        "its brightness";
+    PropertySection photometric{"Photometric", {}};
+    if (type == kDistantLight) {
+        photometric.fields = {Field(kPhotometricIlluminance, "Illuminance", Kind::Float, 10000.0,
+                                    0.0, 200000.0, {}, "Lux on a surface facing it. " + switches)};
+    } else if (type == kDomeLight) {
+        photometric.fields = {Field(kPhotometricIlluminance, "Illuminance", Kind::Float, 10000.0,
+                                    0.0, 200000.0, {},
+                                    "Lux on an upward-facing surface. " + switches)};
+    } else {
+        photometric.fields = {
+            Field(kPhotometricPower, "Power", Kind::Float, 1600.0, 0.0, 1e6, {},
+                  "Luminous flux in lumens. " + switches),
+            Field(kPhotometricIlluminance, "Illuminance", Kind::Float, 0.0, 0.0, 200000.0, {},
+                  "Lux on a surface facing it at the distance below, in place of the power"),
+            Field(kPhotometricIlluminanceDistance, "At distance", Kind::Float, 0.0, 0.0, 1000.0,
+                  {}, "Metres; 0 uses the power")};
+    }
+    sections.push_back(std::move(photometric));
     return sections;
 }
 

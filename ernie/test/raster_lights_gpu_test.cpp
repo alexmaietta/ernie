@@ -174,7 +174,7 @@ Scene AreaLightScene(std::string_view type) {
 /// Spectral radiance of a flat 1 cd/m^2 white emitter, per band.
 double UnitLuminanceRadiance() {
     double sum = 0.0;
-    for (double w = 360.0; w <= 830.0; w += 1.0) {
+    for (double w = 360.5; w < 830.0; w += 1.0) {
         sum += ernie::CieXyz(w).y;
     }
     return 1.0 / (ernie::kLuminousEfficacy * sum);

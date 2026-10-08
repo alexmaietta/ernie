@@ -254,6 +254,11 @@ class Viewer {
     /// @throws std::invalid_argument for a name not in the backend's `RendererInfo::viewVars`.
     void SetViewVar(std::string name);
 
+    /// The spectral band the viewport shows while it shows SpectralRadiance, or -1 (the default)
+    /// for the mean over the camera's bands (`RenderDelegate::SetViewBand`).
+    int ViewBand() const;
+    void SetViewBand(int band);
+
     Lighting GetLighting() const;
     void SetLighting(Lighting lighting);
 

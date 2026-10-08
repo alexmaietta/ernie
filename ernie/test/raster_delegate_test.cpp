@@ -94,7 +94,7 @@ TEST(FrameParamsOf, ReadsLightMaterialTerrainAndSettings) {
     EXPECT_DOUBLE_EQ(frame.camera.LinearExposureScale(), 2.0) << "camera exposure 1 stop";
     ASSERT_EQ(frame.sunIrradiance.size(), 16u);
     double luminanceIntegral = 0.0;
-    for (double w = 360.0; w <= 830.0; w += 1.0) {
+    for (double w = 360.5; w < 830.0; w += 1.0) {
         luminanceIntegral += ernie::CieXyz(w).y;
     }
     EXPECT_NEAR(frame.sunIrradiance[5], M_PI * 4.0 / (683.002 * luminanceIntegral), 1e-6)

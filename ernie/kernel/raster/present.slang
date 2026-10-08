@@ -1,12 +1,14 @@
 // Present pass: draws one of a frame's render vars into a colour attachment with a full-screen
 // triangle, as a display image, decoding to linear last when the attachment encodes sRGB itself.
-// Float vars bind at 0 and integer vars at 1; each entry point reads only its own binding.
+// Float vars bind at 0, integer vars at 1 and SpectralRadiance's bands at 2; each entry point
+// reads only its own binding.
 
 struct PresentConstants {
-    // x: 1 when the attachment has an sRGB format; y: how to show the var (kShow*).
+    // x: 1 when the attachment has an sRGB format; y: how to show the var (kShow*); z: for
+    // SpectralRadiance, the band shown, or 0xFFFFFFFF for their mean; w: the band count.
     uint4 flags;
     // Distances: x near and y far end of the logarithmic range. Sensor vars: z the value shown
-    // as white.
+    // as white. SpectralRadiance: w the display value per W m^-2 sr^-1 nm^-1.
     float4 range;
 }
 
@@ -22,6 +24,7 @@ static const uint kShowLinearUint = 6; // Integer rgb over range.z.
 // Unknown formats, so one declaration reads vars of any channel count and width.
 [[vk::binding(0, 0)]] [[vk::image_format("unknown")]] Texture2D<float4> floatVar;
 [[vk::binding(1, 0)]] [[vk::image_format("unknown")]] Texture2D<uint4> uintVar;
+[[vk::binding(2, 0)]] Texture2DArray<float> spectralVar;
 [[vk::push_constant]] ConstantBuffer<PresentConstants> constants;
 
 struct VertexOutput {
@@ -94,6 +97,24 @@ float3 idColor(uint id) {
     h ^= h >> 16;
     return 0.25 + 0.75 * float3(float(h & 0xffu), float((h >> 8) & 0xffu),
                                 float((h >> 16) & 0xffu)) / 255.0;
+}
+
+// SpectralRadiance as grey: one band's spectral radiance, or the mean over the bands, times the
+// exposure's gain, so a flat spectrum shows as bright as in the photographic image.
+[shader("fragment")]
+float4 presentSpectral(VertexOutput in) : SV_Target {
+    let pixel = int2(in.position.xy);
+    let bands = constants.flags.w;
+    var radiance = 0.0;
+    if (constants.flags.z < bands) {
+        radiance = spectralVar.Load(int4(pixel, int(constants.flags.z), 0));
+    } else {
+        for (uint band = 0; band < bands; ++band) {
+            radiance += spectralVar.Load(int4(pixel, int(band), 0));
+        }
+        radiance /= float(max(bands, 1u));
+    }
+    return displayLinear(float3(radiance * constants.range.w));
 }
 
 [shader("fragment")]

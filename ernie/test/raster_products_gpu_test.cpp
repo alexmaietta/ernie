@@ -264,7 +264,7 @@ TEST_F(RasterDelegateTest, RenderVarsMeasureTheScene) {
     ASSERT_EQ(spectral.Shape(), (std::vector<std::int64_t>{16, kVarSize, kVarSize}));
     EXPECT_EQ(spectral.Type(), DType::Float32);
     double luminanceIntegral = 0.0;
-    for (double w = 360.0; w <= 830.0; w += 1.0) {
+    for (double w = 360.5; w < 830.0; w += 1.0) {
         luminanceIntegral += ernie::CieXyz(w).y;
     }
     const float* radiance = static_cast<const float*>(spectral.Data());

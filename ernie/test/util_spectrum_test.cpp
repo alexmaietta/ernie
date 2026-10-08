@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <numeric>
+#include <stdexcept>
 #include <vector>
 
 using ernie::SpectralBands;
@@ -106,4 +107,24 @@ TEST(Spectrum, SigmoidUpsamplingRoundTripsColoursAndKeepsGreysFlat) {
     }
     const Spectrum red = ernie::RgbToSpectrum({0.8, 0.05, 0.05});
     EXPECT_GT(red(650.0), red(450.0)) << "red reflects long wavelengths";
+}
+
+TEST(Spectrum, CieDaylightHasTheDaylightLocusChromaticities) {
+    // Integrated against the observer, D65 lands on its white point and D50 on its own.
+    const auto chromaticity = [](double kelvin) {
+        glm::dvec3 xyz(0.0);
+        for (double w = 380.0; w <= 780.0; w += 1.0) {
+            xyz += ernie::CieDaylight(w, kelvin) * ernie::CieXyz(w);
+        }
+        return glm::dvec2(xyz.x, xyz.y) / (xyz.x + xyz.y + xyz.z);
+    };
+    const glm::dvec2 d65 = chromaticity(6504.0);
+    EXPECT_NEAR(d65.x, 0.3127, 0.004);
+    EXPECT_NEAR(d65.y, 0.3290, 0.004);
+    const glm::dvec2 d50 = chromaticity(5003.0);
+    EXPECT_NEAR(d50.x, 0.3457, 0.004);
+    EXPECT_NEAR(d50.y, 0.3585, 0.004);
+    EXPECT_NEAR(ernie::CieDaylight(560.0, 6504.0), 100.0, 1e-9) << "normalised at 560 nm";
+    EXPECT_EQ(ernie::CieDaylight(900.0, 6504.0), 0.0);
+    EXPECT_THROW(ernie::CieDaylight(500.0, 3000.0), std::invalid_argument);
 }

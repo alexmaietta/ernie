@@ -94,6 +94,15 @@ class Spectrum {
 /// Planck's law: the spectral radiance of a black body at `kelvin`, in W m^-2 sr^-1 nm^-1.
 double PlanckRadiance(double wavelengthNm, double kelvin);
 
+/// The relative spectral power of CIE standard illuminant D (daylight) at correlated colour
+/// temperature `kelvin` (4000 to 25000 K; D65 is 6504 K), normalised to 100 at 560 nm, linearly
+/// interpolated from the CIE's 10 nm basis functions over 300 to 830 nm and 0 outside.
+///
+/// Reference: CIE 015:2018, "Colorimetry", 4th edition, section 4.1.2 and table 6 (the S0, S1 and
+/// S2 components of daylight).
+/// @throws std::invalid_argument for a temperature outside 4000 to 25000 K.
+double CieDaylight(double wavelengthNm, double kelvin);
+
 /// The spectral irradiance of a black body at `kelvin` scaled so that its integral over all
 /// wavelengths is `totalIrradiance` (W/m^2), averaged over each of `bands`.
 std::vector<float> BlackbodyIrradiance(const SpectralBands& bands, double kelvin,

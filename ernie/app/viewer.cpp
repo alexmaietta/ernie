@@ -279,6 +279,7 @@ struct Viewer::State {
     Path settingsSource;
     std::map<std::string, std::uint64_t> mirrored;
     std::string viewVar = "LdrColor";
+    int viewBand = -1;
     Lighting lighting = Lighting::Stage;
     std::optional<Wireframe> wireframe;
     Theme theme;
@@ -981,6 +982,43 @@ struct Viewer::State {
         wireframe = static_cast<Wireframe>((static_cast<std::uint32_t>(current) + 1) % 3);
     }
 
+    /// The spectral band the viewport shows of SpectralRadiance: the mean, or one of the active
+    /// camera's bands by its wavelengths.
+    void DrawBandCombo(float width) {
+        SpectralBands bands;
+        try {
+            bands = CameraOf(scene, activeCamera, 16, 16).bands;
+        } catch (const std::exception&) {
+            return;
+        }
+        const auto label = [&](int band) {
+            char text[64];
+            if (band < 0) {
+                std::snprintf(text, sizeof(text), "%.0f-%.0f nm mean", bands.minNm, bands.maxNm);
+            } else {
+                std::snprintf(text, sizeof(text), "%.0f-%.0f nm", bands.Lower(band),
+                              bands.Lower(band) + bands.Width());
+            }
+            return std::string(text);
+        };
+        if (viewBand >= bands.count) {
+            viewBand = -1;
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(width);
+        if (ImGui::BeginCombo("##band", label(viewBand).c_str())) {
+            for (int band = -1; band < bands.count; ++band) {
+                if (ImGui::Selectable(label(band).c_str(), band == viewBand)) {
+                    viewBand = band;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Spectral radiance as grey, at the photographic image's exposure");
+        }
+    }
+
     void DrawToolbar(const ImVec2& origin, const ImVec2& size) {
         const ImGuiStyle& style = ImGui::GetStyle();
         const float pad = 8.0f * contentScale;
@@ -1039,6 +1077,9 @@ struct Viewer::State {
                 }
             }
             ImGui::EndCombo();
+        }
+        if (viewVar == render_vars::kSpectralRadiance) {
+            DrawBandCombo(comboWidth);
         }
         ImGui::SameLine();
         ImGui::SetNextItemWidth(comboWidth);
@@ -1177,6 +1218,7 @@ struct Viewer::State {
             delegate->Update(scene, SessionSettingsPath(), viewport->Extent());
             const RenderingTarget target = viewport->Prepare(commands, clear);
             const std::string& var = capture && !capture->var.empty() ? capture->var : viewVar;
+            delegate->SetViewBand(viewBand);
             delegate->Record(commands, target, var);
             renderError.clear();
             drawn = true;
@@ -1643,6 +1685,14 @@ Path Viewer::CameraFromView(const Path& path) {
     camera.transform = LocalFromWorld(s.scene, path, camera.transform);
     SetCamera(s.scene, path, camera);
     return path;
+}
+
+int Viewer::ViewBand() const {
+    return state_->viewBand;
+}
+
+void Viewer::SetViewBand(int band) {
+    state_->viewBand = band < 0 ? -1 : band;
 }
 
 const std::string& Viewer::ViewVar() const {

@@ -101,6 +101,10 @@ class RasterDelegate : public RenderDelegate {
     Path PrimPath(std::uint32_t id) const override;
     Path Pick(std::uint32_t x, std::uint32_t y) override;
 
+    void SetViewBand(int band) override {
+        renderer_.SetPresentBand(band);
+    }
+
     /// GPU memory of the renderer, drawables and the view's targets; triangles drawn by the terrain
     /// and meshes; and the `raster_stats` counters.
     RenderStats Stats() const override;

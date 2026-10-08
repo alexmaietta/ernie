@@ -116,7 +116,7 @@ TEST_F(ViewerTest, RendersTheSceneIntoTheViewport) {
 
 TEST_F(ViewerTest, ShowsEveryRenderVarTheBackendCanDraw) {
     const std::vector<std::string>& vars = viewer_->Delegate().Info().viewVars;
-    EXPECT_EQ(vars.size(), kRenderVarNames.size() - 1) << "all but SpectralRadiance";
+    EXPECT_EQ(vars.size(), kRenderVarNames.size()) << "every one";
     ASSERT_TRUE(viewer_->Step());
     // The centre pixel (the cube) and a corner (background) of a capture of `var`.
     const auto sample = [&](const std::string& var) {
@@ -150,6 +150,16 @@ TEST_F(ViewerTest, ShowsEveryRenderVarTheBackendCanDraw) {
     }
     EXPECT_NE(sample("Normal")[0], sample("PrimId")[0]);
     EXPECT_EQ(viewer_->ViewVar(), "LdrColor") << "captures leave the shown var";
+
+    // SpectralRadiance in grey, the mean over the bands or one of them.
+    const auto mean = sample("SpectralRadiance")[0];
+    EXPECT_EQ(mean[0], mean[2]) << "grey";
+    viewer_->SetViewBand(8);
+    const auto band = sample("SpectralRadiance")[0];
+    EXPECT_GT(sum(band), 0);
+    EXPECT_EQ(viewer_->ViewBand(), 8);
+    viewer_->SetViewBand(-5);
+    EXPECT_EQ(viewer_->ViewBand(), -1);
 
     viewer_->SetViewVar("DistanceToCamera");
     ASSERT_TRUE(viewer_->Step());
@@ -497,8 +507,7 @@ TEST_F(ViewerTest, RejectsVarsAndSettingsItCannotShowYet) {
     EXPECT_EQ(viewer_->ViewVar(), "LdrColor");
     EXPECT_THROW(viewer_->SetViewVar("NotAVar"), std::invalid_argument);
     EXPECT_THROW(viewer_->SetViewVar("Depth"), std::invalid_argument);
-    EXPECT_THROW(viewer_->SetViewVar("SpectralRadiance"), std::invalid_argument)
-        << "multi-band, so not shown";
+    EXPECT_NO_THROW(viewer_->SetViewVar("SpectralRadiance")) << "as grey, by band or mean";
     EXPECT_NO_THROW(viewer_->SetViewVar("LdrColor"));
     EXPECT_THROW(viewer_->SetSettings(Path("/World/Cube")), std::invalid_argument);
     EXPECT_THROW(viewer_->SetSettings(Path("/__session/RenderSettings")), std::invalid_argument);

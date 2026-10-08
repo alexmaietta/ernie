@@ -258,11 +258,19 @@ class RasterRenderer {
         return views_;
     }
 
-    /// Whether `Record` can present render var `name`: every one but SpectralRadiance. LdrColor
-    /// shows as is; HdrColor clipped at 1; distances from white at the camera's near plane to
-    /// black at its far plane on a log scale; normals as rgb; Electrons over the full well and
-    /// RawDN over the ADC range; ids as hashed colours, black for the background.
+    /// Whether `Record` can present render var `name`: every one. LdrColor shows as is; HdrColor
+    /// clipped at 1; SpectralRadiance as grey, one band or their mean (`SetPresentBand`);
+    /// distances from white at the camera's near plane to black at its far plane on a log scale;
+    /// normals as rgb; Electrons over the full well and RawDN over the ADC range; ids as hashed
+    /// colours, black for the background.
     static bool CanPresent(std::string_view name);
+
+    /// Which band `Record` shows when presenting SpectralRadiance: 0 to the band count - 1, or -1
+    /// (or any other) for the mean over the bands. It shows as grey at the photographic image's
+    /// brightness: a flat spectrum as bright as there.
+    void SetPresentBand(int band) {
+        presentBand_ = band;
+    }
 
     /// The spectral bands and filter chain of the last `Update`.
     const SpectralBands& Bands() const {
@@ -397,6 +405,9 @@ class RasterRenderer {
     std::array<std::unique_ptr<GpuBuffer>, FrameUploads::kSlots> poseHistory_;
     std::unique_ptr<GraphicsPipeline> presentFloat_;
     std::unique_ptr<GraphicsPipeline> presentUint_;
+    std::unique_ptr<GraphicsPipeline> presentSpectral_;
+    int presentBand_ = -1;       ///< The SpectralRadiance band `Present` shows; -1 their mean.
+    float spectralGain_ = 1.0f;  ///< SpectralRadiance's display gain, from the exposure.
     /// Present ranges of the last `Update`: near and far plane, full well, ADC maximum.
     std::array<float, 4> presentRange_{};
     GpuImage sigmoidTable_;

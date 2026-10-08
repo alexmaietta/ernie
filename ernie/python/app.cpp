@@ -317,6 +317,8 @@ void BindApp(nb::module_& parent) {
              "Defines a Camera prim at `path` with the active camera's pose and lens.")
         .def_prop_rw("view_var", &Viewer::ViewVar, &Viewer::SetViewVar,
                      "The render var the viewport shows, one of `view_vars`.")
+        .def_prop_rw("view_band", &Viewer::ViewBand, &Viewer::SetViewBand,
+                     "The spectral band shown of SpectralRadiance, or -1 for their mean.")
         .def_prop_ro(
             "view_vars", [](Viewer& viewer) { return viewer.Delegate().Info().viewVars; },
             "The render vars the current renderer can show in the viewport.")

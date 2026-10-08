@@ -146,6 +146,33 @@ inline constexpr std::string_view kLightPower = "ernie:power";
 /// from +x through +y. (USD's `inputs:texture:file` maps are not read.)
 inline constexpr std::string_view kLightTexture = "ernie:texture";
 
+// Physical lighting (Omniverse's PhysicalLightIlluminantAPI and Photometric*LightAPI): the shape of
+// a light's spectrum, and its brightness in photometric units. Authoring any `photometric:` value
+// puts the light in photometric units: its brightness then comes from them alone, not from
+// `inputs:intensity`, `inputs:exposure`, `ernie:power` or `ernie:irradiance`.
+//
+/// token: the shape of the light's spectrum: "white" (flat, Ernie's neutral; the default),
+/// "blackbody" or "illuminant D" (CIE daylight) at `inputs:colorTemperature`, or "custom"
+/// (`physical:customIlluminant`). `inputs:color` still tints it. Unset, the shape is a black body
+/// when `inputs:enableColorTemperature` is on, else flat.
+inline constexpr std::string_view kPhysicalIlluminant = "physical:illuminant";
+inline constexpr std::string_view kWhite = "white";
+inline constexpr std::string_view kBlackbody = "blackbody";
+inline constexpr std::string_view kIlluminantD = "illuminant D";
+inline constexpr std::string_view kCustom = "custom";
+/// float array: (nm, value) pairs, wavelengths increasing, of a "custom" illuminant's shape; zero
+/// outside them.
+inline constexpr std::string_view kPhysicalCustomIlluminant = "physical:customIlluminant";
+/// float, lux: for a DistantLight, on a surface facing it (default 10000); for a DomeLight, on an
+/// upward-facing surface (default 10000); for an area light, on a surface facing it at
+/// `photometric:illuminance:distance` metres, when that is not 0.
+inline constexpr std::string_view kPhotometricIlluminance = "photometric:illuminance";
+inline constexpr std::string_view kPhotometricIlluminanceDistance =
+    "photometric:illuminance:distance";
+/// float, lumens: an area light's (SphereLight, RectLight, DiskLight) luminous flux, default
+/// 1600; a SphereLight emits it in every direction, a RectLight or DiskLight from its face.
+inline constexpr std::string_view kPhotometricPower = "photometric:power";
+
 // Terrain (Ernie): a north-up heightfield, x east, y north, z up.
 inline constexpr std::string_view kHeights = "heights";          ///< float32 tensor (rows, cols).
 inline constexpr std::string_view kOrigin = "ernie:origin";      ///< dvec2 north-west corner.

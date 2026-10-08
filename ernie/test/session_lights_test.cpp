@@ -20,7 +20,7 @@ namespace {
 
 double LuminanceIntegral() {
     double sum = 0.0;
-    for (double w = 360.0; w <= 830.0; w += 1.0) {
+    for (double w = 360.5; w < 830.0; w += 1.0) {
         sum += ernie::CieXyz(w).y;
     }
     return sum;
@@ -213,4 +213,91 @@ TEST(DomeOf, ResolvesTheDomeAndTurnsOffTheDefaultSun) {
                 1e-7);
     EXPECT_NEAR(frame.dome->sh[0].r, std::sqrt(4.0 * M_PI), 1e-5);
     EXPECT_THROW(ernie::DomeOf(scene, "/World/Camera", {}), std::invalid_argument);
+}
+
+namespace {
+
+/// The luminous value of a binned spectrum: 683 lm/W times its integral against the y function.
+double Luminous(const std::vector<float>& spectrum, const ernie::SpectralBands& bands) {
+    return ernie::kLuminousEfficacy * ernie::ToXyz(bands, spectrum).y;
+}
+
+glm::dvec2 Chromaticity(const std::vector<float>& spectrum, const ernie::SpectralBands& bands) {
+    const glm::dvec3 xyz = ernie::ToXyz(bands, spectrum);
+    return glm::dvec2(xyz.x, xyz.y) / (xyz.x + xyz.y + xyz.z);
+}
+
+}  // namespace
+
+TEST(LightOf, PhotometricUnitsSetTheBrightnessInLuxAndLumens) {
+    const ernie::SpectralBands bands{380.0, 780.0, 40};
+    Scene scene;
+    // A sun of 50000 lux, whatever its intensity and exposure say.
+    scene.Define("/Sun", tokens::kDistantLight)
+        .Set(tokens::kIntensity, 7.0)
+        .Set(tokens::kExposure, 3.0)
+        .Set(tokens::kPhotometricIlluminance, 50000.0);
+    EXPECT_NEAR(Luminous(ernie::LightOf(scene, "/Sun", bands).spectrum, bands), 50000.0, 500.0);
+
+    // A sphere of 1600 lumens: 1600 / 4 pi candela; or 100 lux at 2 m: 400 cd.
+    scene.Define("/Bulb", tokens::kSphereLight).Set(tokens::kPhotometricPower, 1600.0);
+    EXPECT_NEAR(Luminous(ernie::LightOf(scene, "/Bulb", bands).spectrum, bands),
+                1600.0 / (4.0 * M_PI), 1.5);
+    scene.Set("/Bulb", tokens::kPhotometricIlluminance, 100.0);
+    scene.Set("/Bulb", tokens::kPhotometricIlluminanceDistance, 2.0);
+    EXPECT_NEAR(Luminous(ernie::LightOf(scene, "/Bulb", bands).spectrum, bands), 400.0, 4.0);
+
+    // A 2 m x 1 m panel of 1000 lumens: luminance 1000 / (pi 2) nits; or 50 lux at 3 m.
+    scene.Define("/Panel", tokens::kRectLight)
+        .Set(tokens::kWidth, 2.0)
+        .Set(tokens::kHeight, 1.0)
+        .Set(tokens::kPhotometricPower, 1000.0);
+    EXPECT_NEAR(Luminous(ernie::LightOf(scene, "/Panel", bands).spectrum, bands),
+                1000.0 / (2.0 * M_PI), 1.6);
+    scene.Set("/Panel", tokens::kPhotometricIlluminance, 50.0);
+    scene.Set("/Panel", tokens::kPhotometricIlluminanceDistance, 3.0);
+    EXPECT_NEAR(Luminous(ernie::LightOf(scene, "/Panel", bands).spectrum, bands), 225.0, 2.3);
+
+    // A uniform dome giving 20000 lux on the ground: luminance 20000 / pi.
+    scene.Define("/Sky", tokens::kDomeLight).Set(tokens::kPhotometricIlluminance, 20000.0);
+    EXPECT_NEAR(Luminous(ernie::DomeOf(scene, "/Sky", bands).radiance, bands), 20000.0 / M_PI,
+                64.0);
+}
+
+TEST(LightOf, IlluminantsShapeTheSpectrum) {
+    const ernie::SpectralBands bands{380.0, 780.0, 40};
+    Scene scene;
+    scene.Define("/Sun", tokens::kDistantLight).Set(tokens::kPhotometricIlluminance, 1000.0);
+    const auto shape = [&](std::string_view illuminant) {
+        scene.Set("/Sun", tokens::kPhysicalIlluminant, std::string(illuminant));
+        return ernie::LightOf(scene, "/Sun", bands).spectrum;
+    };
+    const glm::dvec2 white = Chromaticity(shape(tokens::kWhite), bands);
+    EXPECT_NEAR(white.x, 1.0 / 3.0, 0.005) << "flat: the equal-energy point";
+    scene.Set("/Sun", tokens::kColorTemperature, 6504.0);
+    const glm::dvec2 daylight = Chromaticity(shape(tokens::kIlluminantD), bands);
+    EXPECT_NEAR(daylight.x, 0.3127, 0.005);
+    EXPECT_NEAR(daylight.y, 0.3290, 0.005);
+    scene.Set("/Sun", tokens::kColorTemperature, 3000.0);
+    const glm::dvec2 warm = Chromaticity(shape(tokens::kBlackbody), bands);
+    EXPECT_NEAR(warm.x, 0.4369, 0.005) << "the Planckian locus at 3000 K";
+    EXPECT_THROW(shape(tokens::kIlluminantD), std::invalid_argument) << "below 4000 K";
+
+    scene.Set("/Sun", tokens::kPhysicalCustomIlluminant,
+              std::vector<float>{540.0f, 1.0f, 560.0f, 1.0f});
+    const std::vector<float> custom = shape(tokens::kCustom);
+    EXPECT_EQ(custom.front(), 0.0f) << "nothing outside the pairs";
+    EXPECT_GT(custom[17], 0.0f) << "the 550 nm band";
+    EXPECT_NEAR(Luminous(custom, bands), 1000.0, 10.0) << "still 1000 lux";
+    EXPECT_THROW(shape("candle"), std::invalid_argument);
+
+    // Without photometric units, an illuminant only shapes the spectrum.
+    Scene relative;
+    relative.Define("/Sun", tokens::kDistantLight)
+        .Set(tokens::kIntensity, 2.0)
+        .Set(tokens::kPhysicalIlluminant, std::string(tokens::kBlackbody))
+        .Set(tokens::kColorTemperature, 3000.0);
+    const std::vector<float> spectrum = ernie::LightOf(relative, "/Sun", bands).spectrum;
+    EXPECT_NEAR(Luminous(spectrum, bands), 2.0 * M_PI, 0.1) << "pi x intensity lux, as before";
+    EXPECT_NEAR(Chromaticity(spectrum, bands).x, 0.4369, 0.005);
 }
