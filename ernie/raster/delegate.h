@@ -99,6 +99,7 @@ class RasterDelegate : public RenderDelegate {
     CudaInterop* Cuda(std::string* why = nullptr) override;
 
     Path PrimPath(std::uint32_t id) const override;
+    Path Pick(std::uint32_t x, std::uint32_t y) override;
 
     /// GPU memory of the renderer, drawables and the view's targets; triangles drawn by the terrain
     /// and meshes; and the `raster_stats` counters.

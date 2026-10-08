@@ -5,6 +5,7 @@ if not hasattr(_ernie, "app"):
 
 Dock = _ernie.app.Dock
 FrameInfo = _ernie.app.FrameInfo
+Gizmo = _ernie.app.Gizmo
 Lighting = _ernie.app.Lighting
 Theme = _ernie.app.Theme
 Viewer = _ernie.app.Viewer
@@ -15,6 +16,7 @@ light_theme = _ernie.app.light_theme
 __all__ = [
     "Dock",
     "FrameInfo",
+    "Gizmo",
     "Lighting",
     "Theme",
     "Viewer",

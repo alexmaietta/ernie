@@ -5,6 +5,7 @@
 #include <nanobind/stl/function.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
+#include <nanobind/stl/string_view.h>
 #include <nanobind/stl/vector.h>
 
 #include "ernie/app/viewer.h"
@@ -75,6 +76,12 @@ void BindApp(nb::module_& parent) {
         .value("STAGE", Lighting::Stage, "The scene's own lights; black without any.")
         .value("CAMERA", Lighting::Camera, "A distant light along the view direction.")
         .value("DEFAULT", Lighting::Default, "A white sun from above with shadows.");
+
+    nb::enum_<Viewer::Gizmo>(m, "Gizmo", "What the transform gizmo on a selected prim does.")
+        .value("NONE", Viewer::Gizmo::None)
+        .value("TRANSLATE", Viewer::Gizmo::Translate)
+        .value("ROTATE", Viewer::Gizmo::Rotate)
+        .value("SCALE", Viewer::Gizmo::Scale);
 
     nb::class_<Theme> themeClass(m, "Theme",
                                  "Colours (sRGB RGBA tuples) and metrics of the viewer's UI.");
@@ -233,6 +240,22 @@ void BindApp(nb::module_& parent) {
         .def_prop_ro_static("perspective_camera",
                             [](nb::handle) { return Viewer::PerspectiveCamera(); })
         .def_prop_rw("selection", &Viewer::Selection, &Viewer::SetSelection)
+        .def(
+            "edit",
+            [](Viewer& viewer, const Path& path, std::string_view attribute, nb::handle value) {
+                viewer.Edit(path, attribute, ValueFromPython(value));
+            },
+            nb::arg("path"), nb::arg("attribute"), nb::arg("value"),
+            "Sets an attribute as an undoable GUI edit.")
+        .def("clear_attribute", &Viewer::ClearAttribute, nb::arg("path"), nb::arg("attribute"),
+             "Clears an attribute back to its fallback, as an undoable GUI edit.")
+        .def("undo", &Viewer::Undo, "Undoes the last GUI edit; returns whether there was one.")
+        .def("redo", &Viewer::Redo, "Redoes the last undone GUI edit.")
+        .def_prop_rw("gizmo", &Viewer::GetGizmo, &Viewer::SetGizmo)
+        .def_prop_rw("gizmo_local", &Viewer::GizmoLocal, &Viewer::SetGizmoLocal)
+        .def("pick", &Viewer::Pick, nb::arg("x"), nb::arg("y"),
+             "The prim the viewport shows at pixel (x, y) of its last frame; an empty Path for "
+             "the background.")
         .def_prop_ro("cameras", &Viewer::Cameras,
                      "The viewer's cameras, then the scene's, by path.")
         .def_prop_rw("active_camera", &Viewer::ActiveCamera, &Viewer::SetActiveCamera)

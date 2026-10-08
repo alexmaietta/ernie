@@ -747,6 +747,32 @@ Path RasterDelegate::PrimPath(std::uint32_t id) const {
     return id >= 1 && id <= primPaths_.size() ? primPaths_[id - 1] : Path();
 }
 
+Path RasterDelegate::Pick(std::uint32_t x, std::uint32_t y) {
+    GpuImage* ids = viewTargets_ != nullptr ? viewTargets_->Var(render_vars::kPrimId) : nullptr;
+    if (ids == nullptr || x >= viewTargets_->Extent().width ||
+        y >= viewTargets_->Extent().height) {
+        return {};
+    }
+    // The caller's frames are submitted outside the context's tracking.
+    vkDeviceWaitIdle(context_.Device());
+    GpuBuffer texel(context_, sizeof(std::uint32_t), VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                    BufferMemory::Readback);
+    context_.Submit([&](VkCommandBuffer commands) {
+        const VkImageLayout layout = ids->Layout();
+        ids->Transition(commands, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+        VkBufferImageCopy region{};
+        region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        region.imageOffset = {static_cast<std::int32_t>(x), static_cast<std::int32_t>(y), 0};
+        region.imageExtent = {1, 1, 1};
+        vkCmdCopyImageToBuffer(commands, ids->Handle(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                               texel.Handle(), 1, &region);
+        ids->Transition(commands, layout);
+    });
+    std::uint32_t id = 0;
+    texel.Read(std::as_writable_bytes(std::span(&id, 1)));
+    return PrimPath(id);
+}
+
 std::vector<TimelinePoint> RasterDelegate::SubmitWaits() const {
     if (cuda_ == nullptr || cuda_->VulkanWait().semaphore == VK_NULL_HANDLE) {
         return {};

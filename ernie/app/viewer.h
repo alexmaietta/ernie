@@ -3,6 +3,7 @@
 #include "ernie/app/panel.h"
 #include "ernie/app/theme.h"
 #include "ernie/device/vulkan_context.h"
+#include "ernie/scene/edit_history.h"
 #include "ernie/scene/path.h"
 #include "ernie/scene/scene.h"
 #include "ernie/session/delegate.h"
@@ -166,6 +167,35 @@ class Viewer {
 
     const std::vector<Path>& Selection() const;
     void SetSelection(std::vector<Path> paths);
+
+    /// Sets `attribute` of the prim at `path` as a GUI edit, through the viewer's undo history
+    /// (`History`). With `open`, a continuing edit (a drag) merges into one undo step, which ends
+    /// once no widget or gizmo is in use.
+    /// @throws std::invalid_argument as `Scene::Set`.
+    void Edit(const Path& path, std::string_view attribute, Value value, bool open = false);
+
+    /// Clears `attribute` of the prim at `path`, back to its fallback, as an undoable GUI edit.
+    void ClearAttribute(const Path& path, std::string_view attribute);
+
+    /// Undoes or redoes the last GUI edit (Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y); returns whether there
+    /// was one.
+    bool Undo();
+    bool Redo();
+
+    /// The GUI edits, for undo and redo.
+    EditHistory& History();
+
+    /// What the transform gizmo on a single selected prim does: none, or translate, rotate or
+    /// scale (the W, E and R keys), in world or local axes.
+    enum class Gizmo { None, Translate, Rotate, Scale };
+    Gizmo GetGizmo() const;
+    void SetGizmo(Gizmo gizmo);
+    bool GizmoLocal() const;
+    void SetGizmoLocal(bool local);
+
+    /// The prim the viewport shows at pixel (`x`, `y`) of its image (`RenderDelegate::Pick`), as a
+    /// click selects; the empty path for the background or a session prim.
+    Path Pick(std::uint32_t x, std::uint32_t y);
 
     /// The cameras the viewport can look through: the viewer's own, then the scene's Camera prims
     /// by path.

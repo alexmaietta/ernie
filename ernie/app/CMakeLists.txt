@@ -2,7 +2,9 @@ ernie_add_library(
     ernie_app
     SOURCES
     panel.cpp
+    properties_panel.cpp
     session.cpp
+    stage_panel.cpp
     theme.cpp
     viewer.cpp
     PUBLIC

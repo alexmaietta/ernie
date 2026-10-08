@@ -3,6 +3,7 @@ ernie_add_library(
     SOURCES
     brdf.cpp
     camera.cpp
+    edit_history.cpp
     orbit_controller.cpp
     overlay.cpp
     path.cpp

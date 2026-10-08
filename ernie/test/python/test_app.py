@@ -159,3 +159,34 @@ def test_renderer_is_an_option_and_switchable(viewer):
     viewer.renderer = "raster"
     viewer.sync()
     assert viewer.step()
+
+
+def test_clicks_pick_prims_and_edits_undo(viewer):
+    viewer.step()
+    viewer.step()
+    # The default view frames the cube, so the image's centre shows it.
+    assert viewer.pick(240, 160) == ernie.Path("/World/Cube")
+    assert viewer.pick(2, 2) == ernie.Path()
+    assert viewer.pick(10000, 10000) == ernie.Path()
+
+    viewer.selection = [ernie.Path("/World/Cube")]
+    viewer.step()  # draws the Stage and Properties panels and the selection's outline
+    assert "__selection" in viewer.scene.overlay_names()
+
+    viewer.edit("/World/Cube", tokens.SIZE, 3.0)
+    viewer.edit("/World/Cube", tokens.DISPLAY_COLOR, (1.0, 0.0, 0.0))
+    assert viewer.scene.get("/World/Cube", tokens.SIZE) == 3.0
+    assert viewer.undo()
+    assert viewer.scene.get("/World/Cube", tokens.DISPLAY_COLOR) is None
+    assert viewer.undo()
+    assert viewer.scene.get("/World/Cube", tokens.SIZE) == 2.0
+    assert viewer.redo()
+    assert viewer.scene.get("/World/Cube", tokens.SIZE) == 3.0
+    viewer.clear_attribute("/World/Cube", tokens.SIZE)
+    assert viewer.scene.get("/World/Cube", tokens.SIZE) is None
+    viewer.step()
+
+    assert viewer.gizmo == app.Gizmo.TRANSLATE
+    viewer.gizmo = app.Gizmo.ROTATE
+    viewer.gizmo_local = True
+    viewer.step()

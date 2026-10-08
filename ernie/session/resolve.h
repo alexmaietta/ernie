@@ -269,6 +269,11 @@ InstancesByPrototype(const Scene& scene, const Path& instancer, std::size_t prot
 /// none if unset or malformed.
 std::optional<Bounds3> ExtentOf(const Scene& scene, const Path& prim);
 
+/// The prim's bounds in its own space: its `extent` if authored, else those of its geometry, a
+/// Mesh's CPU points or a UsdGeom primitive's shape (`PrimitiveMeshOf`); none for other prims or
+/// geometry that cannot be read.
+std::optional<Bounds3> LocalBoundsOf(const Scene& scene, const Path& prim);
+
 /// A detail texture tensor as an `Image`: float32 values are linear; uint8 values are sRGB-encoded
 /// when `encoding` is `Srgb` and linear otherwise. Grey replicates into rgb and a missing alpha
 /// reads as 1.

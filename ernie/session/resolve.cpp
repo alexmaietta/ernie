@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -1038,6 +1039,40 @@ std::optional<Bounds3> ExtentOf(const Scene& scene, const Path& prim) {
     }
     return Bounds3(glm::vec3(values[0], values[1], values[2]),
                    glm::vec3(values[3], values[4], values[5]));
+}
+
+std::optional<Bounds3> LocalBoundsOf(const Scene& scene, const Path& prim) {
+    if (std::optional<Bounds3> extent = ExtentOf(scene, prim)) {
+        return extent;
+    }
+    if (!IsMeshType(scene.TypeOf(prim))) {
+        return std::nullopt;
+    }
+    MeshData mesh;
+    try {
+        if (scene.TypeOf(prim) == tokens::kMesh) {
+            const Tensor* points = scene.Read(prim, tokens::kPoints);
+            if (points == nullptr || points->Location().kind != DeviceKind::Cpu) {
+                return std::nullopt;
+            }
+            mesh.points = FloatsOf(*points, 3, tokens::kPoints);
+        } else {
+            mesh = PrimitiveMeshOf(scene, prim);
+        }
+    } catch (const std::invalid_argument&) {
+        return std::nullopt;
+    }
+    if (mesh.points.size() < 3) {
+        return std::nullopt;
+    }
+    Bounds3 bounds{glm::vec3(std::numeric_limits<float>::max()),
+                   glm::vec3(std::numeric_limits<float>::lowest())};
+    for (std::size_t i = 0; i + 2 < mesh.points.size(); i += 3) {
+        const glm::vec3 p(mesh.points[i], mesh.points[i + 1], mesh.points[i + 2]);
+        bounds.first = glm::min(bounds.first, p);
+        bounds.second = glm::max(bounds.second, p);
+    }
+    return bounds;
 }
 
 std::vector<std::vector<std::uint32_t>>

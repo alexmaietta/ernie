@@ -1,5 +1,6 @@
 #include "ernie/app/viewer.h"
 
+#include "ernie/app/builtin_panels.h"
 #include "ernie/app/icons.h"
 #include "ernie/app/session.h"
 #include "ernie/device/image.h"
@@ -18,12 +19,16 @@
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
+#include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
 #include <imgui_internal.h>
 #include <implot.h>
 #include <stb_image_write.h>
+
+// After imgui.h, which it needs first.
+#include <ImGuizmo.h>
 
 #include <algorithm>
 #include <array>
@@ -52,6 +57,13 @@ constexpr VkFormat kViewportFormat = VK_FORMAT_R8G8B8A8_UNORM;
 constexpr const char* kViewportTitle = "Viewport";
 constexpr const char* kStatsTitle = "Stats";
 constexpr const char* kDockSpace = "ErnieDockSpace";
+
+/// The session's overlay outlining the selection; overlays named with a leading "__" are the
+/// viewer's own, which the Overlays panel hides.
+constexpr const char* kSelectionOverlay = "__selection";
+
+/// Pixels the mouse may move between press and release for a click (a pick) rather than a drag.
+constexpr float kClickSlop = 3.0f;
 constexpr std::size_t kFrameHistory = 240;
 
 const Path& SessionSettingsPath() {
@@ -202,11 +214,15 @@ class OverlaysPanel final : public Panel {
     void Draw(Viewer& viewer) override {
         Scene& scene = viewer.GetScene();
         const std::vector<std::string> names = scene.OverlayNames();
-        if (names.empty()) {
+        if (std::none_of(names.begin(), names.end(),
+                         [](const std::string& name) { return !name.starts_with("__"); })) {
             ImGui::TextDisabled("No overlays. Draw some with Scene::GetOverlay.");
             return;
         }
         for (const std::string& name : names) {
+            if (name.starts_with("__")) {
+                continue;
+            }
             Overlay& overlay = scene.GetOverlay(name);
             ImGui::PushID(name.c_str());
             bool visible = overlay.IsVisible();
@@ -267,6 +283,28 @@ struct Viewer::State {
     Theme theme;
     float contentScale = 1.0f;
     std::vector<Path> selection;
+    EditHistory history;
+    Viewer::Gizmo gizmo = Viewer::Gizmo::Translate;
+    bool gizmoLocal = false;
+    bool gizmoDrawn = false;  ///< Whether the last frame drew the gizmo, so it may take the mouse.
+    /// Prims' local bounds (`LocalBoundsOf`), with the attribute versions they were read at.
+    std::map<Path, std::pair<std::uint64_t, std::optional<Bounds3>>> boundsCache;
+
+    /// `LocalBoundsOf(path)`, read again only when its geometry attributes change.
+    std::optional<Bounds3> LocalBounds(const Path& path) {
+        std::uint64_t key = std::hash<std::string>()(scene.TypeOf(path));
+        for (const std::string_view attribute :
+             {tokens::kExtent, tokens::kPoints, tokens::kSize, tokens::kGeomRadius,
+              tokens::kGeomHeight, tokens::kGeomWidth, tokens::kGeomLength, tokens::kAxis}) {
+            key = key * 1099511628211ull + scene.AttributeVersion(path, attribute);
+        }
+        auto& [cachedKey, bounds] = boundsCache[path];
+        if (cachedKey != key || key == 0) {
+            cachedKey = key;
+            bounds = LocalBoundsOf(scene, path);
+        }
+        return bounds;
+    }
 
     enum class Stage { Frame, Ui, PreRender, PostRender };
     struct FrameCallback {
@@ -634,7 +672,7 @@ struct Viewer::State {
         if (!ImGui::BeginMainMenuBar()) {
             return;
         }
-        std::vector<std::string> menus = {"File", "Window"};
+        std::vector<std::string> menus = {"File", "Edit", "Window"};
         for (const MenuItem& item : menuItems) {
             if (std::find(menus.begin(), menus.end(), item.menu) == menus.end()) {
                 menus.push_back(item.menu);
@@ -643,6 +681,29 @@ struct Viewer::State {
         for (const std::string& menu : menus) {
             if (!ImGui::BeginMenu(menu.c_str())) {
                 continue;
+            }
+            if (menu == "Edit") {
+                const std::string undo = "Undo " + history.UndoLabel();
+                const std::string redo = "Redo " + history.RedoLabel();
+                if (ImGui::MenuItem(undo.c_str(), "Ctrl+Z", false, history.CanUndo())) {
+                    self.Undo();
+                }
+                if (ImGui::MenuItem(redo.c_str(), "Ctrl+Shift+Z", false, history.CanRedo())) {
+                    self.Redo();
+                }
+                ImGui::Separator();
+                const std::pair<const char*, Viewer::Gizmo> modes[] = {
+                    {"No Gizmo", Viewer::Gizmo::None},
+                    {"Translate", Viewer::Gizmo::Translate},
+                    {"Rotate", Viewer::Gizmo::Rotate},
+                    {"Scale", Viewer::Gizmo::Scale}};
+                const char* keys[] = {"Q", "W", "E", "R"};
+                for (std::size_t i = 0; i < std::size(modes); ++i) {
+                    if (ImGui::MenuItem(modes[i].first, keys[i], gizmo == modes[i].second)) {
+                        gizmo = modes[i].second;
+                    }
+                }
+                ImGui::MenuItem("Gizmo in Local Axes", nullptr, &gizmoLocal);
             }
             if (menu == "Window") {
                 for (const auto& panel : panels) {
@@ -711,18 +772,122 @@ struct Viewer::State {
             draw->AddImage(ImTextureRef(reinterpret_cast<ImTextureID>(viewportTexture)), origin,
                            ImVec2(origin.x + size.x, origin.y + size.y));
         }
-        ImGui::SetNextItemAllowOverlap();
-        ImGui::InvisibleButton("##viewport", ImVec2(std::max(size.x, 1.0f), std::max(size.y, 1.0f)),
-                               ImGuiButtonFlags_MouseButtonLeft |
-                                   ImGuiButtonFlags_MouseButtonRight |
-                                   ImGuiButtonFlags_MouseButtonMiddle);
-        HandleNavigation(ImGui::IsItemHovered(), ImGui::IsItemActive(), size.y);
+        // The gizmo takes the mouse over its handles and while dragging; elsewhere the viewport
+        // navigates, and a click picks.
+        const bool gizmoBusy = gizmoDrawn && (ImGuizmo::IsOver() || ImGuizmo::IsUsing());
+        bool hovered = false;
+        bool active = false;
+        if (!gizmoBusy) {
+            ImGui::SetNextItemAllowOverlap();
+            ImGui::InvisibleButton("##viewport",
+                                   ImVec2(std::max(size.x, 1.0f), std::max(size.y, 1.0f)),
+                                   ImGuiButtonFlags_MouseButtonLeft |
+                                       ImGuiButtonFlags_MouseButtonRight |
+                                       ImGuiButtonFlags_MouseButtonMiddle);
+            hovered = ImGui::IsItemHovered();
+            active = ImGui::IsItemActive();
+            const ImGuiIO& io = ImGui::GetIO();
+            if (ImGui::IsItemDeactivated() && ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
+                io.MouseDragMaxDistanceSqr[ImGuiMouseButton_Left] <= kClickSlop * kClickSlop) {
+                PickAt(io.MousePos.x - origin.x, io.MousePos.y - origin.y, io.KeyCtrl);
+            }
+        }
+        HandleNavigation(hovered, active, size.y);
+        DrawGizmo(origin, size);
         DrawToolbar(origin, size);
         if (!renderError.empty()) {
             ImGui::SetCursorScreenPos(ImVec2(origin.x + 12.0f, origin.y + size.y - 28.0f));
             ImGui::TextColored(ToImVec4(theme.error), "%s", renderError.c_str());
         }
         ImGui::End();
+    }
+
+    /// Selects what the viewport shows at (`x`, `y`) pixels: it alone, or toggled in the selection
+    /// with `toggle`; the background clears the selection unless toggling.
+    void PickAt(float x, float y, bool toggle) {
+        if (x < 0.0f || y < 0.0f) {
+            return;
+        }
+        const Path picked =
+            self.Pick(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+        if (!toggle) {
+            SetSelection(picked.IsEmpty() ? std::vector<Path>{} : std::vector<Path>{picked});
+            return;
+        }
+        if (picked.IsEmpty()) {
+            return;
+        }
+        std::vector<Path> paths = selection;
+        const auto found = std::find(paths.begin(), paths.end(), picked);
+        if (found != paths.end()) {
+            paths.erase(found);
+        } else {
+            paths.push_back(picked);
+        }
+        SetSelection(std::move(paths));
+    }
+
+    /// The transform gizmo on a single selected prim, in coordinates relative to the camera so it
+    /// stays precise far from the world origin.
+    void DrawGizmo(const ImVec2& origin, const ImVec2& size) {
+        gizmoDrawn = false;
+        if (gizmo == Viewer::Gizmo::None || selection.size() != 1) {
+            return;
+        }
+        const Path& path = selection.front();
+        if (!scene.Has(path) || path.IsRoot() || IsSessionPath(path) ||
+            !scene.Has(activeCamera)) {
+            return;
+        }
+        const Camera camera = CameraOf(scene, activeCamera, ViewportWidth(), ViewportHeight());
+        const glm::dvec3 eye(camera.transform[3]);
+        glm::dmat4 orientation = camera.transform;
+        orientation[3] = glm::dvec4(0.0, 0.0, 0.0, 1.0);
+        const glm::mat4 view(glm::inverse(orientation));
+        const glm::mat4 projection = camera.RasterView().projection;
+        glm::dmat4 world = scene.WorldTransform(path);
+        world[3] -= glm::dvec4(eye, 0.0);
+        glm::mat4 model(world);
+        ImGuizmo::SetOrthographic(false);
+        ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
+        ImGuizmo::SetRect(origin.x, origin.y, size.x, size.y);
+        const ImGuizmo::OPERATION operation = gizmo == Viewer::Gizmo::Rotate ? ImGuizmo::ROTATE
+                                              : gizmo == Viewer::Gizmo::Scale
+                                                  ? ImGuizmo::SCALE
+                                                  : ImGuizmo::TRANSLATE;
+        if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), operation,
+                                 gizmoLocal ? ImGuizmo::LOCAL : ImGuizmo::WORLD,
+                                 glm::value_ptr(model))) {
+            glm::dmat4 moved(model);
+            moved[3] += glm::dvec4(eye, 0.0);
+            self.Edit(path, tokens::kTransform, LocalFromWorld(scene, path, moved), true);
+        }
+        gizmoDrawn = true;
+    }
+
+    /// Outlines the selection in the session's selection overlay: each prim's extent as a box, or
+    /// its axes for prims without one (lights, cameras, transforms).
+    void UpdateSelectionOverlay() {
+        Overlay& overlay = scene.GetOverlay(kSelectionOverlay);
+        if (selection.empty() && overlay.Empty()) {
+            return;
+        }
+        overlay.Clear();
+        OverlayStyle style;
+        style.color = theme.accent;
+        style.width = 2.0f * contentScale;
+        style.depth = OverlayDepth::XRay;
+        for (const Path& path : selection) {
+            if (!scene.Has(path) || path.IsRoot()) {
+                continue;
+            }
+            const glm::dmat4 world = scene.WorldTransform(path);
+            if (const std::optional<Bounds3> extent = LocalBounds(path)) {
+                overlay.Box(glm::dvec3(extent->first), glm::dvec3(extent->second), style, world);
+            } else {
+                overlay.Axes(world, 1.0, style);
+            }
+        }
     }
 
     void HandleNavigation(bool hovered, bool active, float height) {
@@ -745,12 +910,22 @@ struct Viewer::State {
             (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f || io.MouseWheel != 0.0f)) {
             WriteActiveCamera();
         }
-        if (!io.WantTextInput && (hovered || ImGui::IsWindowFocused())) {
+        if (!io.WantTextInput && (hovered || ImGui::IsWindowFocused()) && !io.KeyCtrl) {
             if (ImGui::IsKeyPressed(ImGuiKey_F, false)) {
                 self.Frame(selection);
             }
             if (ImGui::IsKeyPressed(ImGuiKey_Z, false)) {
                 CycleWireframe();
+            }
+            const std::pair<ImGuiKey, Viewer::Gizmo> gizmoKeys[] = {
+                {ImGuiKey_Q, Viewer::Gizmo::None},
+                {ImGuiKey_W, Viewer::Gizmo::Translate},
+                {ImGuiKey_E, Viewer::Gizmo::Rotate},
+                {ImGuiKey_R, Viewer::Gizmo::Scale}};
+            for (const auto& [key, mode] : gizmoKeys) {
+                if (ImGui::IsKeyPressed(key, false)) {
+                    gizmo = mode;
+                }
             }
         }
         if (!io.WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
@@ -908,10 +1083,26 @@ struct Viewer::State {
             layoutReady = true;
         }
         DrawMenuBar();
+        const ImGuiIO& io = ImGui::GetIO();
+        if (!io.WantTextInput && io.KeyCtrl) {
+            if (ImGui::IsKeyPressed(ImGuiKey_Z, false)) {
+                if (io.KeyShift) {
+                    self.Redo();
+                } else {
+                    self.Undo();
+                }
+            } else if (ImGui::IsKeyPressed(ImGuiKey_Y, false)) {
+                self.Redo();
+            }
+        }
         ImGui::DockSpaceOverViewport(dockSpace, ImGui::GetMainViewport());
         DrawViewport();
         DrawPanels();
         RunCallbacks(Stage::Ui, frameInfo);
+        // A drag ends once nothing is held, so the next edit is a new undo step.
+        if (!ImGui::IsAnyItemActive() && !ImGuizmo::IsUsing()) {
+            history.Close();
+        }
     }
 
     void RecordViewport(VkCommandBuffer commands) {
@@ -939,9 +1130,13 @@ struct Viewer::State {
             if (!authored(tokens::kShadowFit)) {
                 overrides.emplace(tokens::kShadowFit, std::string(tokens::kVisible));
             }
-            if (!authored(tokens::kOverlays)) {
-                overrides.emplace(tokens::kOverlays, std::string("*"));
-            }
+            // The selection's outline always shows, besides the overlays the settings choose.
+            UpdateSelectionOverlay();
+            overrides.emplace(tokens::kOverlays,
+                              authored(tokens::kOverlays)
+                                  ? GetToken(scene, settingsSource, tokens::kOverlays, "") + " " +
+                                        kSelectionOverlay
+                                  : std::string("*"));
             MirrorSettings(scene, settingsSource, SessionSettingsPath(), overrides, mirrored);
             delegate->Update(scene, SessionSettingsPath(), viewport->Extent());
             const RenderingTarget target = viewport->Prepare(commands, clear);
@@ -1145,6 +1340,7 @@ bool Viewer::State::Step() {
         ImGui::GetIO().DeltaTime = static_cast<float>(std::max(info.delta, 1e-4));
     }
     ImGui::NewFrame();
+    ImGuizmo::BeginFrame();
     ImGuiErrorRecoveryState recovery;
     ImGui::ErrorRecoveryStoreState(&recovery);
     try {
@@ -1221,6 +1417,8 @@ Viewer::Viewer(Scene& scene, const ViewerOptions& options)
     s.stats = stats.get();
     s.panels.push_back(std::move(stats));
     s.panels.push_back(std::make_unique<OverlaysPanel>());
+    s.panels.push_back(MakeStagePanel());
+    s.panels.push_back(MakePropertiesPanel());
     s.builtInPanels = s.panels.size();
     s.CreateSession();
 }
@@ -1366,7 +1564,7 @@ void Viewer::Frame(std::span<const Path> paths) {
         std::vector<std::optional<Bounds3>> boxes;
         for (const Path& path : paths) {
             if (s.scene.Has(path)) {
-                std::optional<Bounds3> extent = ExtentOf(s.scene, path);
+                std::optional<Bounds3> extent = s.LocalBounds(path);
                 if (extent) {
                     const glm::dmat4 world = s.scene.WorldTransform(path);
                     Bounds3 box{glm::vec3(std::numeric_limits<float>::max()),
@@ -1418,6 +1616,47 @@ void Viewer::SetViewVar(std::string name) {
                                     "' in the viewport");
     }
     state_->viewVar = std::move(name);
+}
+
+void Viewer::Edit(const Path& path, std::string_view attribute, Value value, bool open) {
+    state_->history.Set(state_->scene, path, attribute, std::move(value), open);
+}
+
+void Viewer::ClearAttribute(const Path& path, std::string_view attribute) {
+    state_->history.Clear(state_->scene, path, attribute);
+}
+
+bool Viewer::Undo() {
+    return state_->history.Undo(state_->scene);
+}
+
+bool Viewer::Redo() {
+    return state_->history.Redo(state_->scene);
+}
+
+EditHistory& Viewer::History() {
+    return state_->history;
+}
+
+Viewer::Gizmo Viewer::GetGizmo() const {
+    return state_->gizmo;
+}
+
+void Viewer::SetGizmo(Gizmo gizmo) {
+    state_->gizmo = gizmo;
+}
+
+bool Viewer::GizmoLocal() const {
+    return state_->gizmoLocal;
+}
+
+void Viewer::SetGizmoLocal(bool local) {
+    state_->gizmoLocal = local;
+}
+
+Path Viewer::Pick(std::uint32_t x, std::uint32_t y) {
+    const Path picked = state_->delegate->Pick(x, y);
+    return IsSessionPath(picked) ? Path() : picked;
 }
 
 bool Viewer::GetVsync() const {
