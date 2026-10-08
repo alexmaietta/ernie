@@ -80,14 +80,18 @@ class RasterDelegate : public RenderDelegate {
     void Sync(const Scene& scene) override;
 
     /// As `RenderDelegate::Update`; waits for earlier `StepAsync` work, then needs no submitted
-    /// frame to still be reading the renderer.
+    /// frame to still be reading the renderer. The view runs the sensor filter chain of the
+    /// settings' first product, so it shows what that product renders, AOVs included.
     void Update(const Scene& scene, const Path& settings, VkExtent2D extent) override;
+
+    /// `Info().viewVars`, then the AOVs of the view's chain as "aov:<name>".
+    std::vector<std::string> ViewVars() const override;
 
     std::vector<TimelinePoint> SubmitWaits() const override;
 
     /// Records the frame prepared by the last `Update` into render targets of the delegate's own
-    /// and draws its LdrColor into `target.color`. Recreating those targets for a new size or band
-    /// count waits for the device.
+    /// and draws its var `var` into `target.color`. Recreating those targets for a new size, band
+    /// count or AOVs waits for the device.
     void Record(VkCommandBuffer commands, const RenderingTarget& target,
                 std::string_view var) override;
 
@@ -221,6 +225,8 @@ class RasterDelegate : public RenderDelegate {
     MeshDrawable meshes_;
     GroundDrawable ground_;
     std::unique_ptr<RenderTargets> viewTargets_;
+    /// The AOVs the view's chain writes, in slot order, as of the last `Update`.
+    std::vector<std::string> viewAovs_;
     /// The prims `SetHighlight` outlines, resolved to prim ids (with their descendants') per frame.
     std::vector<Path> highlight_;
     glm::vec4 highlightColour_{1.0f, 0.6f, 0.1f, 1.0f};

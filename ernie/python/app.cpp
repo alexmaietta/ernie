@@ -362,8 +362,9 @@ void BindApp(nb::module_& parent) {
         .def_prop_rw("view_band", &Viewer::ViewBand, &Viewer::SetViewBand,
                      "The spectral band shown of SpectralRadiance, or -1 for their mean.")
         .def_prop_ro(
-            "view_vars", [](Viewer& viewer) { return viewer.Delegate().Info().viewVars; },
-            "The render vars the current renderer can show in the viewport.")
+            "view_vars", [](Viewer& viewer) { return viewer.Delegate().ViewVars(); },
+            "The render vars the current renderer can show in the viewport, with the AOVs of "
+            "the viewport's sensor filter chain as 'aov:<name>'.")
         .def_prop_rw("lighting", &Viewer::GetLighting, &Viewer::SetLighting)
         .def_prop_rw("exposure", &Viewer::GetExposure, &Viewer::SetExposure)
         .def_prop_rw("exposure_compensation", &Viewer::ExposureCompensation,

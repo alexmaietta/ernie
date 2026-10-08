@@ -1,3 +1,4 @@
+#include "ernie/device/offscreen_target.h"
 #include "ernie/raster/delegate.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
@@ -366,6 +367,35 @@ TEST_F(RasterDelegateTest, AovsRunTheirFiltersAndNameTheirOutputs) {
     EXPECT_EQ(both.at("aov:mosaic"), aov);
     EXPECT_NE(both.at("RawDN"), mosaic);
     EXPECT_THROW(VarsThrough(delegate, scene, {"aov:missing"}, chain), std::invalid_argument);
+}
+
+TEST_F(RasterDelegateTest, TheViewRunsTheFirstProductsChainAndShowsItsAovs) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    scene.Set("/World/Camera", tokens::kExposureTime, 0.001);
+    const Steps chain = {{"qe", kNone}, {"bayer", kNone}, {"adc", kNone}, {"demosaic", kNone}};
+    VarsThrough(delegate, scene, {"aov:mosaic"}, chain);  // defines /Render/Many
+    scene.Set("/Render/Settings", tokens::kProducts, std::vector<Path>{"/Render/Many"});
+    const auto draw = [&](std::string_view var) {
+        ernie::OffscreenTarget target(*context_, kSize, kSize);
+        context_->Submit([&](VkCommandBuffer commands) {
+            delegate.Record(commands, target.Prepare(commands), var);
+        });
+        return target.ReadColor();
+    };
+    delegate.Update(scene, "/Render/Settings", {kSize, kSize});
+    std::vector<std::string> vars = delegate.ViewVars();
+    EXPECT_EQ(vars.back(), "aov:mosaic");
+    const std::vector<std::uint8_t> mosaic = draw("aov:mosaic");
+    EXPECT_GT(std::accumulate(mosaic.begin(), mosaic.end(), 0L), 0L) << "the mosaic shows";
+    EXPECT_NE(mosaic, draw(ernie::render_vars::kLdrColor));
+
+    // Without products the view runs the default chain, which writes no AOVs.
+    scene.Clear("/Render/Settings", tokens::kProducts);
+    delegate.Update(scene, "/Render/Settings", {kSize, kSize});
+    vars = delegate.ViewVars();
+    EXPECT_EQ(std::count(vars.begin(), vars.end(), "aov:mosaic"), 0);
+    EXPECT_EQ(draw(ernie::render_vars::kLdrColor).size(), mosaic.size());
 }
 
 TEST_F(RasterDelegateTest, CustomIntegratorsStandInForQe) {

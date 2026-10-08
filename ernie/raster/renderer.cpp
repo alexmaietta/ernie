@@ -317,11 +317,18 @@ constexpr std::array<PresentMode, 10> kPresentModes{{
     {render_vars::kRawDn, 6, true},
 }};
 
+/// AOVs, as linear rgb over the electrons' white, the scale filters' charge outputs share.
+constexpr PresentMode kAovPresentMode{"", 4, false};
+
 const PresentMode* PresentModeOf(std::string_view var) {
     for (const PresentMode& mode : kPresentModes) {
         if (mode.var == var) {
             return &mode;
         }
+    }
+    if (var.starts_with(kAovPrefix) ||
+        std::find(kAovSlotNames.begin(), kAovSlotNames.end(), var) != kAovSlotNames.end()) {
+        return &kAovPresentMode;
     }
     return nullptr;
 }
@@ -1467,6 +1474,9 @@ void RasterRenderer::Record(VkCommandBuffer commands, RenderTargets& targets,
             vkCmdEndRendering(commands);
         }
         return;
+    }
+    if (present != nullptr && targets.Var(var) == nullptr) {
+        throw std::invalid_argument("The frame holds no render var '" + std::string(var) + "'");
     }
     RecordShadows(commands, drawables);
     // With a present target the overlays go over what it shows, whichever var, not LdrColor.

@@ -1896,6 +1896,20 @@ struct Viewer::State {
                                       renderer.c_str(), std::string(name).c_str());
                 }
             }
+            // The AOVs the sensor filter chain writes, below the vars.
+            bool aovs = false;
+            for (const std::string& name : delegate->ViewVars()) {
+                if (!name.starts_with(kAovPrefix)) {
+                    continue;
+                }
+                if (!aovs) {
+                    ImGui::SeparatorText("AOVs");
+                    aovs = true;
+                }
+                if (ImGui::Selectable(name.c_str(), name == viewVar)) {
+                    viewVar = name;
+                }
+            }
             ImGui::EndCombo();
         }
         if (viewVar == render_vars::kSpectralRadiance) {
@@ -2077,6 +2091,11 @@ struct Viewer::State {
             MirrorSettings(scene, settingsSource, SessionSettingsPath(), overrides, mirrored);
             delegate->Update(scene, SessionSettingsPath(), viewport->Extent());
             const RenderingTarget target = viewport->Prepare(commands, clear);
+            // An AOV the chain no longer writes shows as LdrColor.
+            const std::vector<std::string> shown = delegate->ViewVars();
+            if (std::find(shown.begin(), shown.end(), viewVar) == shown.end()) {
+                viewVar = std::string(render_vars::kLdrColor);
+            }
             const std::string& var = capture && !capture->var.empty() ? capture->var : viewVar;
             delegate->SetViewBand(viewBand);
             delegate->Record(commands, target, var);
@@ -2581,10 +2600,12 @@ const std::string& Viewer::ViewVar() const {
 
 void Viewer::SetViewVar(std::string name) {
     const auto& names = kRenderVarNames;
-    if (std::find(names.begin(), names.end(), name) == names.end()) {
+    if (std::find(names.begin(), names.end(), name) == names.end() &&
+        !name.starts_with(kAovPrefix)) {
         throw std::invalid_argument("'" + name + "' is not a render var");
     }
-    const std::vector<std::string>& shown = state_->delegate->Info().viewVars;
+    // AOVs only once the view's chain writes them.
+    const std::vector<std::string> shown = state_->delegate->ViewVars();
     if (std::find(shown.begin(), shown.end(), name) == shown.end()) {
         throw std::invalid_argument("The " + state_->renderer + " renderer cannot show '" + name +
                                     "' in the viewport");
@@ -2870,7 +2891,7 @@ void Viewer::SetSettings(Path settings) {
 }
 
 void Viewer::Capture(const std::filesystem::path& path, std::string var) {
-    const std::vector<std::string>& shown = state_->delegate->Info().viewVars;
+    const std::vector<std::string> shown = state_->delegate->ViewVars();
     if (!var.empty() && std::find(shown.begin(), shown.end(), var) == shown.end()) {
         throw std::invalid_argument("The " + state_->renderer + " renderer cannot show '" + var +
                                     "' in the viewport");

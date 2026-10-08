@@ -18,6 +18,18 @@ namespace ernie {
 
 namespace {
 
+/// The vars the view holds for a chain writing `aovs` AOVs: every var (empty) without AOVs, else
+/// every var and the first `aovs` AOV slots.
+std::vector<std::string_view> ViewHeldVars(std::size_t aovs) {
+    if (aovs == 0) {
+        return {};
+    }
+    std::vector<std::string_view> vars(kRenderVarNames.begin(), kRenderVarNames.end());
+    vars.insert(vars.end(), kAovSlotNames.begin(),
+                kAovSlotNames.begin() + static_cast<std::ptrdiff_t>(aovs));
+    return vars;
+}
+
 float Number(const Scene& scene, const Path& path, std::string_view attribute, float fallback) {
     return static_cast<float>(GetNumber(scene, path, attribute, fallback));
 }
@@ -710,8 +722,22 @@ void RasterDelegate::Update(const Scene& scene, const Path& settings, VkExtent2D
     context_.WaitForSubmissions();
     BeginFrame();
     const RenderPrims prims = ResolveRenderPrims(scene, settings);
+    // The view runs the first product's chain (`DefaultFilterChain` without products), holding
+    // every var and the AOV slots of what that chain writes.
+    const std::vector<SensorFilterStep> filters =
+        ResolveRenderProducts(scene, {}, settings).front().filters;
+    viewAovs_ = filters.empty() ? std::vector<std::string>{}
+                                : AovOutputsOf(filters, renderer_.SensorFilters());
     UpdatePrims(scene, prims, extent, NextFrame(scene, prims.settings, prims.settings),
-                prims.settings);
+                prims.settings, filters, {}, {}, ViewHeldVars(viewAovs_.size()));
+}
+
+std::vector<std::string> RasterDelegate::ViewVars() const {
+    std::vector<std::string> vars = Info().viewVars;
+    for (const std::string& aov : viewAovs_) {
+        vars.push_back(std::string(kAovPrefix) + aov);
+    }
+    return vars;
 }
 
 void RasterDelegate::PrepareSensorState(const Path& key, VkExtent2D extent, std::uint32_t views) {
@@ -896,15 +922,16 @@ void RasterDelegate::Record(VkCommandBuffer commands, const RenderingTarget& tar
     const VkExtent2D extent = renderer_.Extent();
     if (viewTargets_ == nullptr || viewTargets_->Extent().width != extent.width ||
         viewTargets_->Extent().height != extent.height ||
-        viewTargets_->Bands() != renderer_.Bands().count) {
+        viewTargets_->Bands() != renderer_.Bands().count || viewTargets_->AovNames() != viewAovs_) {
         if (extent.width == 0 || extent.height == 0) {
             BeginRendering(commands, target);
             vkCmdEndRendering(commands);
             return;
         }
         vkDeviceWaitIdle(context_.Device());
-        viewTargets_ =
-            std::make_unique<RenderTargets>(context_, extent, renderer_.Bands().count, false);
+        const std::vector<std::string_view> vars = ViewHeldVars(viewAovs_.size());
+        viewTargets_ = std::make_unique<RenderTargets>(context_, extent, renderer_.Bands().count,
+                                                       false, 1, vars, viewAovs_);
     }
     const RasterDrawable* drawables[] = {&terrain_, &meshes_, &ground_};
     renderer_.Record(commands, *viewTargets_, drawables, &target, var);

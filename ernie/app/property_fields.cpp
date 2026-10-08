@@ -97,8 +97,97 @@ Value Shown(const Scene& scene, const Path& path, const PropertyField& field) {
         return Vec2Of(*authored);
     case Kind::Target:
         return TargetOf(*authored);
+    case Kind::Curve:
+        if (authored->Get<std::vector<float>>() != nullptr) {
+            return *authored;
+        }
+        // A written array when it is a flat CPU float32 one; edits write a float array value.
+        if (const Tensor* tensor = scene.Read(path, field.attribute);
+            tensor != nullptr && tensor->Location().kind == DeviceKind::Cpu &&
+            tensor->Rank() == 1 && tensor->Type() == DType::Float32) {
+            const Tensor packed = tensor->Contiguous();
+            const auto count = static_cast<std::size_t>(packed.Elements());
+            return std::vector<float>(packed.As<float>(), packed.As<float>() + count);
+        }
+        return field.fallback;
     }
     return field.fallback;
+}
+
+/// A curve editor for `values`, `height` pixels tall over the available width: the samples as a
+/// line over [0, 1], set to the pointer's height where it drags across them. The value range is
+/// `min` to `max` when they differ, else 0 to the larger of 1 and the curve's peak, kept while a
+/// drag lasts so the curve does not rescale under the pointer. Returns whether `values` changed.
+bool CurveEditor(std::vector<float>& values, double min, double max, float height) {
+    const float width = std::max(ImGui::GetContentRegionAvail().x, 40.0f);
+    const ImVec2 low = ImGui::GetCursorScreenPos();
+    const ImVec2 high(low.x + width, low.y + height);
+    ImGui::InvisibleButton("##curve", ImVec2(width, height));
+    const bool active = ImGui::IsItemActive();
+    ImGuiStorage& storage = *ImGui::GetStateStorage();
+    const ImGuiID rangeId = ImGui::GetItemID();
+    float lo = static_cast<float>(min);
+    float hi = static_cast<float>(max);
+    if (!(max > min)) {
+        lo = std::min(0.0f, values.empty() ? 0.0f : *std::min_element(values.begin(), values.end()));
+        hi = std::max(1.0f, values.empty() ? 1.0f : *std::max_element(values.begin(), values.end()));
+        if (active && ImGui::IsItemActivated()) {
+            storage.SetFloat(rangeId, hi);
+        } else if (active) {
+            hi = storage.GetFloat(rangeId, hi);
+        }
+    }
+    const auto toScreen = [&](std::size_t i, float v) {
+        const float t = values.size() > 1 ? float(i) / float(values.size() - 1) : 0.5f;
+        return ImVec2(low.x + t * width, high.y - (v - lo) / (hi - lo) * height);
+    };
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    draw->AddRectFilled(low, high, ImGui::GetColorU32(ImGuiCol_FrameBg), 2.0f);
+    // Quarter grid lines, then the curve.
+    for (int q = 1; q < 4; ++q) {
+        const float x = low.x + width * float(q) / 4.0f;
+        const float y = low.y + height * float(q) / 4.0f;
+        const ImU32 grid = ImGui::GetColorU32(ImGuiCol_Border, 0.5f);
+        draw->AddLine(ImVec2(x, low.y), ImVec2(x, high.y), grid);
+        draw->AddLine(ImVec2(low.x, y), ImVec2(high.x, y), grid);
+    }
+    std::vector<ImVec2> points;
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        points.push_back(toScreen(i, values[i]));
+    }
+    draw->AddPolyline(points.data(), static_cast<int>(points.size()),
+                      ImGui::GetColorU32(ImGuiCol_PlotLines), ImDrawFlags_None, 1.5f);
+    if (ImGui::IsItemHovered() && !active && !values.empty()) {
+        const float t = std::clamp((ImGui::GetIO().MousePos.x - low.x) / width, 0.0f, 1.0f);
+        const auto i = static_cast<std::size_t>(std::lround(t * float(values.size() - 1)));
+        ImGui::SetTooltip("[%zu] %.4g", i, static_cast<double>(values[i]));
+    }
+    if (!active || values.empty()) {
+        return false;
+    }
+    // Every sample between the pointer's last and current place, so a fast drag leaves no gaps.
+    const ImGuiIO& io = ImGui::GetIO();
+    const ImVec2 to = io.MousePos;
+    const ImVec2 from = ImGui::IsItemActivated()
+                            ? to
+                            : ImVec2(to.x - io.MouseDelta.x, to.y - io.MouseDelta.y);
+    const auto indexOf = [&](float x) {
+        const float t = std::clamp((x - low.x) / width, 0.0f, 1.0f);
+        return static_cast<std::ptrdiff_t>(std::lround(t * float(values.size() - 1)));
+    };
+    const auto valueAt = [&](float y) {
+        return std::clamp(lo + (high.y - y) / height * (hi - lo), lo, hi);
+    };
+    const std::ptrdiff_t a = indexOf(from.x);
+    const std::ptrdiff_t b = indexOf(to.x);
+    bool changed = false;
+    for (std::ptrdiff_t i = std::min(a, b); i <= std::max(a, b); ++i) {
+        const float s = a == b ? 1.0f : float(i - a) / float(b - a);
+        const float v = valueAt(from.y + s * (to.y - from.y));
+        changed |= values[static_cast<std::size_t>(i)] != v;
+        values[static_cast<std::size_t>(i)] = v;
+    }
+    return changed;
 }
 
 /// The field's widget for `shown`; the new value when edited.
@@ -198,6 +287,14 @@ std::optional<Value> Widget(Viewer& viewer, const PropertyField& field, const Va
             ImGui::EndCombo();
         }
         return chosen;
+    }
+    case Kind::Curve: {
+        const auto* shownValues = shown.Get<std::vector<float>>();
+        std::vector<float> values = shownValues != nullptr ? *shownValues : std::vector<float>{};
+        if (CurveEditor(values, field.min, field.max, 5.0f * ImGui::GetFrameHeight())) {
+            return values;
+        }
+        break;
     }
     }
     return std::nullopt;

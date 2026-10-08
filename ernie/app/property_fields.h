@@ -24,6 +24,9 @@ struct PropertyField {
         Int2,    ///< Such as a resolution.
         Text,
         Target,  ///< A relationship to one prim, of type `options[0]` when given.
+        /// A float array as a curve over [0, 1], edited by dragging across it, which sets the
+        /// samples under the pointer; `min` and `max` bound the values when they differ.
+        Curve,
     };
     std::string attribute;
     std::string label;

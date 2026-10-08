@@ -376,7 +376,14 @@ std::vector<PropertySection> SchemaOf(const Scene& scene, const Path& path,
             if (model.id == current) {
                 for (const SensorFilterParam& param : model.params) {
                     if (param.size > 1) {
-                        continue;  // arrays (curves) show among the other attributes
+                        // Arrays as curves, of their default resampled to their size.
+                        filter.fields.push_back(Field(
+                            "inputs:" + param.name, param.name, Kind::Curve,
+                            param.defaults.empty()
+                                ? std::vector<float>(param.size, param.defaultValue)
+                                : ResampleCurve(param.defaults, param.size),
+                            0, 0, {}, param.description));
+                        continue;
                     }
                     filter.fields.push_back(Field("inputs:" + param.name, param.name, Kind::Float,
                                                   static_cast<double>(param.defaultValue), 0, 0,

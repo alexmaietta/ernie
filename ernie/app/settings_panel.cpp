@@ -81,7 +81,7 @@ class SettingsPanel final : public Panel {
         }
         row("Shows");
         if (ImGui::BeginCombo("##var", viewer.ViewVar().c_str())) {
-            for (const std::string& name : viewer.Delegate().Info().viewVars) {
+            for (const std::string& name : viewer.Delegate().ViewVars()) {
                 if (ImGui::Selectable(name.c_str(), name == viewer.ViewVar())) {
                     viewer.SetViewVar(name);
                 }

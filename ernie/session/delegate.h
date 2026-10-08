@@ -101,10 +101,16 @@ class RenderDelegate {
     /// delegate's buffers that may still be running; empty without CUDA inputs.
     virtual std::vector<TimelinePoint> SubmitWaits() const = 0;
 
+    /// The render vars `Record` can draw of the frame the last `Update` prepared: `Info().viewVars`
+    /// and what that frame adds, such as the AOVs its sensor filters write ("aov:<name>").
+    virtual std::vector<std::string> ViewVars() const {
+        return Info().viewVars;
+    }
+
     /// Records the frame prepared by the last `Update` and draws its render var `var` (one of
-    /// `Info().viewVars`) into `target.color` (in the colour attachment layout, of the delegate's
+    /// `ViewVars`) into `target.color` (in the colour attachment layout, of the delegate's
     /// present format), as an image for display.
-    /// @throws std::invalid_argument for a var not in `Info().viewVars`.
+    /// @throws std::invalid_argument for a var not in `ViewVars`.
     virtual void Record(VkCommandBuffer commands, const RenderingTarget& target,
                         std::string_view var) = 0;
 
