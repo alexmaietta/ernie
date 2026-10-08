@@ -451,6 +451,8 @@ struct Viewer::State {
     std::vector<std::unique_ptr<Panel>> panels;
     StatsPanel* stats = nullptr;
     Panel* profilerPanel = nullptr;
+    bool showControls = false;  ///< Help > Keyboard and Mouse.
+    bool showAbout = false;     ///< Help > About Ernie.
     std::size_t builtInPanels = 0;  ///< The first panels, which removing only hides.
     std::vector<MenuItem> menuItems;
     struct ViewportToggle {
@@ -875,10 +877,12 @@ struct Viewer::State {
         }
         std::vector<std::string> menus = {"File", "Edit", "Create", "Window"};
         for (const MenuItem& item : menuItems) {
-            if (std::find(menus.begin(), menus.end(), item.menu) == menus.end()) {
+            if (std::find(menus.begin(), menus.end(), item.menu) == menus.end() &&
+                item.menu != "Help") {
                 menus.push_back(item.menu);
             }
         }
+        menus.push_back("Help");  // last, as in Kit
         for (const std::string& menu : menus) {
             if (!ImGui::BeginMenu(menu.c_str())) {
                 continue;
@@ -906,9 +910,19 @@ struct Viewer::State {
                 }
                 ImGui::MenuItem("Gizmo in Local Axes", nullptr, &gizmoLocal);
                 ImGui::Separator();
+                if (ImGui::MenuItem("Duplicate", "Ctrl+D", false, !selection.empty())) {
+                    self.Duplicate(std::vector<Path>(selection));
+                }
                 if (ImGui::MenuItem("Delete", "Del", false, !selection.empty())) {
                     self.Delete(std::vector<Path>(selection));
                 }
+                if (ImGui::MenuItem("Frame Selection", "F", false, !selection.empty())) {
+                    self.Frame(selection);
+                }
+            }
+            if (menu == "Help") {
+                ImGui::MenuItem("Keyboard and Mouse", nullptr, &showControls);
+                ImGui::MenuItem("About Ernie", nullptr, &showAbout);
             }
             if (menu == "Create") {
                 const char* group = nullptr;
@@ -1013,13 +1027,57 @@ struct Viewer::State {
         DrawGizmo(origin, size);
         DrawToolbar(origin, size);
         DrawToolStrip(origin);
+        DrawAxisIndicator(origin, size);
         if (!renderError.empty()) {
-            // At the bottom left.
-            ImGui::SetCursorScreenPos(
-                ImVec2(origin.x + 12.0f, origin.y + size.y - 2.0f * ImGui::GetFrameHeight()));
+            // At the bottom left, beside the axis indicator.
+            ImGui::SetCursorScreenPos(ImVec2(origin.x + 90.0f * contentScale,
+                                             origin.y + size.y - 2.0f * ImGui::GetFrameHeight()));
             ImGui::TextColored(ToImVec4(theme.error), "%s", renderError.c_str());
         }
         ImGui::End();
+    }
+
+    /// Kit's orientation indicator in the viewport's bottom left corner: the world's x, y and z
+    /// axes as seen through the active camera, in red, green and blue with labelled tips, drawn
+    /// back to front and dimmer when pointing away.
+    void DrawAxisIndicator(const ImVec2& origin, const ImVec2& size) {
+        if (!scene.Has(activeCamera)) {
+            return;
+        }
+        const glm::dmat4 camera = scene.WorldTransform(activeCamera);
+        // World directions in the camera's frame: x right, y up, z towards the viewer.
+        const glm::dmat3 toView = glm::transpose(glm::dmat3(glm::normalize(glm::dvec3(camera[0])),
+                                                            glm::normalize(glm::dvec3(camera[1])),
+                                                            glm::normalize(glm::dvec3(camera[2]))));
+        const float length = 26.0f * contentScale;
+        const ImVec2 centre(origin.x + 14.0f * contentScale + length,
+                            origin.y + size.y - 14.0f * contentScale - length);
+        struct Axis {
+            glm::dvec3 view;
+            ImU32 colour;
+            const char* label;
+        };
+        std::array<Axis, 3> axes{{{toView * glm::dvec3(1, 0, 0), IM_COL32(222, 74, 64, 255), "X"},
+                                  {toView * glm::dvec3(0, 1, 0), IM_COL32(110, 190, 70, 255), "Y"},
+                                  {toView * glm::dvec3(0, 0, 1), IM_COL32(70, 130, 230, 255), "Z"}}};
+        std::sort(axes.begin(), axes.end(),
+                  [](const Axis& a, const Axis& b) { return a.view.z < b.view.z; });
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        draw->AddCircleFilled(centre, length + 10.0f * contentScale,
+                              ImGui::GetColorU32(ToImVec4(theme.overlay)), 32);
+        for (const Axis& axis : axes) {
+            const ImVec2 tip(centre.x + static_cast<float>(axis.view.x) * length,
+                             centre.y - static_cast<float>(axis.view.y) * length);
+            // Axes pointing away from the viewer fade.
+            const float alpha = axis.view.z < 0.0 ? 0.45f : 1.0f;
+            const ImU32 colour = (axis.colour & ~IM_COL32_A_MASK) |
+                                 (static_cast<ImU32>(alpha * 255.0f) << IM_COL32_A_SHIFT);
+            draw->AddLine(centre, tip, colour, 2.0f * contentScale);
+            draw->AddCircleFilled(tip, 7.0f * contentScale, colour, 16);
+            const ImVec2 text = ImGui::CalcTextSize(axis.label);
+            draw->AddText(ImVec2(tip.x - 0.5f * text.x, tip.y - 0.5f * text.y),
+                          IM_COL32(20, 20, 20, static_cast<int>(alpha * 255.0f)), axis.label);
+        }
     }
 
     /// Selects what the viewport shows at (`x`, `y`) pixels: it alone, or toggled in the selection
@@ -1152,8 +1210,8 @@ struct Viewer::State {
         return true;
     }
 
-    /// Outlines the selection in the session's selection overlay: each light as its gizmo, each
-    /// prim's extent as a box, or its axes for other prims without one (cameras, transforms).
+    /// Draws in the session's selection overlay what the outline (`SetHighlight`) cannot show:
+    /// each selected light as its gizmo, and each camera's axes. Geometry is outlined.
     void UpdateSelectionOverlay() {
         Overlay& overlay = scene.GetOverlay(kSelectionOverlay);
         overlay.SetVisible(display.selection);
@@ -1176,9 +1234,7 @@ struct Viewer::State {
             if (DrawLightGizmo(overlay, path, world, lamp)) {
                 continue;
             }
-            if (const std::optional<Bounds3> extent = LocalBounds(path)) {
-                overlay.Box(glm::dvec3(extent->first), glm::dvec3(extent->second), style, world);
-            } else {
+            if (scene.TypeOf(path) == tokens::kCamera) {
                 overlay.Axes(world, 1.0, style);
             }
         }
@@ -1875,6 +1931,54 @@ struct Viewer::State {
         ImGui::PopStyleColor(4);
     }
 
+    /// Help's windows: the viewport's mouse and keyboard controls, and what Ernie is.
+    void DrawHelpWindows() {
+        if (showControls) {
+            ImGui::SetNextWindowSize(ImVec2(440.0f * contentScale, 0.0f), ImGuiCond_FirstUseEver);
+            if (ImGui::Begin("Keyboard and Mouse", &showControls,
+                             ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize)) {
+                const std::pair<const char*, const char*> controls[] = {
+                    {"Left drag", "Orbit around the target"},
+                    {"Right drag", "Pan along the ground"},
+                    {"Middle drag", "Pan across the screen, up and down in z"},
+                    {"Wheel", "Zoom towards the target"},
+                    {"Click", "Select; Ctrl+click adds or removes"},
+                    {"F", "Frame the selection (everything without one)"},
+                    {"Q W E R", "Select, move, rotate, scale"},
+                    {"Z", "Cycle wireframe: off, overlay, hidden line"},
+                    {"Del", "Delete the selection"},
+                    {"Ctrl+D", "Duplicate the selection"},
+                    {"F2", "Rename the selected prim (Stage)"},
+                    {"Ctrl+Z / Ctrl+Shift+Z", "Undo / redo"},
+                    {"Esc", "Close the viewer"},
+                };
+                if (ImGui::BeginTable("##controls", 2, ImGuiTableFlags_RowBg)) {
+                    for (const auto& [keys, action] : controls) {
+                        ImGui::TableNextRow();
+                        ImGui::TableNextColumn();
+                        ImGui::TextColored(ToImVec4(theme.accent), "%s", keys);
+                        ImGui::TableNextColumn();
+                        ImGui::TextUnformatted(action);
+                    }
+                    ImGui::EndTable();
+                }
+            }
+            ImGui::End();
+        }
+        if (showAbout) {
+            if (ImGui::Begin("About Ernie", &showAbout,
+                             ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize)) {
+                ImGui::TextUnformatted("Ernie");
+                ImGui::TextDisabled("A spectral, physically based sensor renderer on Vulkan");
+                ImGui::Separator();
+                ImGui::Text("Device: %s", gpu->DeviceName().c_str());
+                ImGui::Text("Renderer: %s", renderer.c_str());
+                ImGui::Text("Dear ImGui %s", ImGui::GetVersion());
+            }
+            ImGui::End();
+        }
+    }
+
     void DrawPanels() {
         for (std::size_t i = 0; i < panels.size(); ++i) {
             Panel& panel = *panels[i];
@@ -1915,12 +2019,17 @@ struct Viewer::State {
                 self.Redo();
             }
         }
+        if (!io.WantTextInput && io.KeyCtrl && !selection.empty() &&
+            ImGui::IsKeyPressed(ImGuiKey_D, false)) {
+            self.Duplicate(std::vector<Path>(selection));
+        }
         if (!io.WantTextInput && !selection.empty() && ImGui::IsKeyPressed(ImGuiKey_Delete, false)) {
             self.Delete(std::vector<Path>(selection));
         }
         ImGui::DockSpaceOverViewport(dockSpace, ImGui::GetMainViewport());
         DrawViewport();
         DrawPanels();
+        DrawHelpWindows();
         RunCallbacks(Stage::Ui, frameInfo);
         // A drag ends once nothing is held, so the next edit is a new undo step.
         if (!ImGui::IsAnyItemActive() && !ImGuizmo::IsUsing()) {
@@ -1960,6 +2069,10 @@ struct Viewer::State {
             // overlays the settings choose.
             UpdateSelectionOverlay();
             UpdateViewportOverlay();
+            // Selected geometry outlined as Kit does, from the frame's prim ids.
+            const std::vector<Path> outlined =
+                display.selection ? selection : std::vector<Path>{};
+            delegate->SetHighlight(outlined, theme.outline);
             overrides.emplace(tokens::kOverlays, ShownOverlays(authored(tokens::kOverlays)));
             MirrorSettings(scene, settingsSource, SessionSettingsPath(), overrides, mirrored);
             delegate->Update(scene, SessionSettingsPath(), viewport->Extent());
@@ -2581,6 +2694,90 @@ void Viewer::Delete(std::span<const Path> paths) {
     }
     s.history.EndGroup();
     s.SetSelection({});
+}
+
+namespace {
+
+/// Copies the prim at `from` of `scene` and its descendants, with their attributes and tensors
+/// (shared), into `scratch` under `to`.
+void CopySubtree(const Scene& scene, const Path& from, Scene& scratch, const Path& to) {
+    const std::string prefix = from.String();
+    for (const Path& prim : scene.Prims()) {
+        if (prim != from && !prim.HasPrefix(from)) {
+            continue;
+        }
+        const Path target(to.String() + prim.String().substr(prefix.size()));
+        scratch.Define(target, scene.TypeOf(prim));
+        for (const std::string& attribute : scene.Attributes(prim)) {
+            if (const Value* value = scene.Get(prim, attribute)) {
+                scratch.Set(target, attribute, *value);
+            } else if (const Tensor* tensor = scene.Read(prim, attribute)) {
+                scratch.Write(target, attribute, *tensor);
+            }
+        }
+    }
+}
+
+}  // namespace
+
+std::vector<Path> Viewer::Duplicate(std::span<const Path> paths) {
+    State& s = *state_;
+    const std::vector<Path> originals(paths.begin(), paths.end());
+    std::vector<Path> copies;
+    s.history.BeginGroup();
+    for (const Path& path : originals) {
+        if (IsSessionPath(path) || path.IsRoot() || !s.scene.Has(path)) {
+            continue;
+        }
+        Path copy;
+        for (int k = 1;; ++k) {
+            char suffix[16];
+            std::snprintf(suffix, sizeof(suffix), "_%02d", k);
+            copy = path.Parent().Child(std::string(path.Name()) + suffix);
+            if (!s.scene.Has(copy)) {
+                break;
+            }
+        }
+        Scene scratch;
+        CopySubtree(s.scene, path, scratch, copy);
+        s.history.Add(s.scene, scratch, copy);
+        copies.push_back(copy);
+        Log(LogLevel::Info, "Duplicated " + path.String() + " as " + copy.String());
+    }
+    s.history.EndGroup();
+    if (!copies.empty()) {
+        s.SetSelection(copies);
+    }
+    return copies;
+}
+
+Path Viewer::Rename(const Path& path, std::string_view name) {
+    State& s = *state_;
+    if (path.IsRoot() || IsSessionPath(path) || !s.scene.Has(path)) {
+        throw std::invalid_argument("Cannot rename '" + path.String() + "'");
+    }
+    if (name == path.Name()) {
+        return path;
+    }
+    const Path renamed = path.Parent().Child(name);  // validates the name
+    if (s.scene.Has(renamed)) {
+        throw std::invalid_argument("'" + renamed.String() + "' already exists");
+    }
+    Scene scratch;
+    CopySubtree(s.scene, path, scratch, renamed);
+    const bool wasSelected =
+        std::find(s.selection.begin(), s.selection.end(), path) != s.selection.end();
+    s.history.BeginGroup();
+    s.history.Add(s.scene, scratch, renamed);
+    s.history.Remove(s.scene, path);
+    s.history.EndGroup();
+    if (wasSelected) {
+        std::vector<Path> selection = s.selection;
+        std::replace(selection.begin(), selection.end(), path, renamed);
+        s.SetSelection(std::move(selection));
+    }
+    Log(LogLevel::Info, "Renamed " + path.String() + " to " + renamed.String());
+    return renamed;
 }
 
 Viewer::Gizmo Viewer::GetGizmo() const {

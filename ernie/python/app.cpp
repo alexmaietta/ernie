@@ -113,6 +113,7 @@ void BindApp(nb::module_& parent) {
     ColourProperty<&Theme::text>(themeClass, "text", "Text.");
     ColourProperty<&Theme::textMuted>(themeClass, "text_muted", "Labels and disabled text.");
     ColourProperty<&Theme::accent>(themeClass, "accent", "Selection, active tab, slider fill.");
+    ColourProperty<&Theme::outline>(themeClass, "outline", "The viewport's selection outline.");
     ColourProperty<&Theme::warning>(themeClass, "warning", "Warnings.");
     ColourProperty<&Theme::error>(themeClass, "error", "Errors.");
     ColourProperty<&Theme::overlay>(themeClass, "overlay", "Viewport toolbar and HUD.");
@@ -294,6 +295,14 @@ void BindApp(nb::module_& parent) {
             "delete",
             [](Viewer& viewer, const std::vector<Path>& paths) { viewer.Delete(paths); },
             nb::arg("paths"), "Deletes prims and their descendants as one undo step.")
+        .def(
+            "duplicate",
+            [](Viewer& viewer, const std::vector<Path>& paths) { return viewer.Duplicate(paths); },
+            nb::arg("paths"),
+            "Copies prims with their descendants beside themselves (<name>_01, ...) as one undo "
+            "step; selects and returns the copies.")
+        .def("rename", &Viewer::Rename, nb::arg("path"), nb::arg("name"),
+             "Renames a prim, moving its descendants, as one undo step; returns its new path.")
         .def_static(
             "creatable_types",
             [] {

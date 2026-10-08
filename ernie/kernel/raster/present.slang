@@ -1,7 +1,8 @@
 // Present pass: draws one of a frame's render vars into a colour attachment with a full-screen
 // triangle, as a display image, decoding to linear last when the attachment encodes sRGB itself.
 // Float vars bind at 0, integer vars at 1 and SpectralRadiance's bands at 2; each entry point
-// reads only its own binding.
+// reads only its own binding. `presentOutline` draws the selection's outline over the image from
+// the PrimId var at 1 and the highlighted prims at 3.
 
 struct PresentConstants {
     // x: 1 when the attachment has an sRGB format; y: how to show the var (kShow*); z: for
@@ -124,4 +125,46 @@ float4 presentUint(VertexOutput in) : SV_Target {
         return value.x == 0 ? display(float3(0.0)) : display(idColor(value.x));
     }
     return displayLinear(float3(value.rgb) / constants.range.z);
+}
+
+// The highlighted prims (the viewer's selection): a bit per prim id, 32 to a word.
+[[vk::binding(3, 0)]] StructuredBuffer<uint> highlighted;
+
+bool isHighlighted(uint id) {
+    let word = id / 32u;
+    return id != 0 && word < constants.flags.z && ((highlighted[word] >> (id % 32u)) & 1u) != 0;
+}
+
+bool highlightedAt(int2 pixel, int2 size) {
+    let p = clamp(pixel, int2(0), size - 1);
+    return isHighlighted(uintVar.Load(int3(p, 0)).x);
+}
+
+// Omniverse Kit's selection outline from the PrimId var (bound at 1): pixels within flags.y pixels
+// of the boundary between highlighted prims and the rest, on both sides, in the display colour
+// range.rgb at opacity range.a, blended over the presented image.
+[shader("fragment")]
+float4 presentOutline(VertexOutput in) : SV_Target {
+    uint width = 0;
+    uint height = 0;
+    uintVar.GetDimensions(width, height);
+    let size = int2(int(width), int(height));
+    let pixel = int2(in.position.xy);
+    let centre = highlightedAt(pixel, size);
+    let radius = int(constants.flags.y);
+    var edge = false;
+    for (int dy = -radius; dy <= radius && !edge; ++dy) {
+        for (int dx = -radius; dx <= radius && !edge; ++dx) {
+            if (dx * dx + dy * dy <= radius * radius &&
+                highlightedAt(pixel + int2(dx, dy), size) != centre) {
+                edge = true;
+            }
+        }
+    }
+    if (!edge) {
+        discard;
+    }
+    var colour = display(constants.range.rgb);
+    colour.a = constants.range.a;
+    return colour;
 }

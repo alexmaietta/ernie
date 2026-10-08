@@ -267,6 +267,7 @@ constexpr DescriptorBinding kPresentBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT},
     {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT},
     {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT},
+    {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT},
 };
 
 /// present.slang's kShowSpectral: SpectralRadiance's bands, through presentSpectral.
@@ -516,18 +517,22 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
     const std::vector<ShaderModuleSource> presentModules{{"present", shaders::kPresentSlang}};
     const std::vector<std::uint32_t> vertex =
         compiler_.CompileSpirv(presentModules, "presentVertex");
-    const auto presentPipeline = [&](const char* entry) {
+    const auto presentPipeline = [&](const char* entry, bool blend = false) {
         const std::vector<std::uint32_t> fragment = compiler_.CompileSpirv(presentModules, entry);
         GraphicsPipelineDesc present;
         present.vertexSpirv = vertex;
         present.fragmentSpirv = fragment;
         present.colorFormat = presentFormat_;
         present.depthFormat = VK_FORMAT_UNDEFINED;
+        present.alphaBlend = blend;
         return std::make_unique<GraphicsPipeline>(context_, presentLayout_, present);
     };
     presentFloat_ = presentPipeline("presentFloat");
     presentUint_ = presentPipeline("presentUint");
     presentSpectral_ = presentPipeline("presentSpectral");
+    presentOutline_ = presentPipeline("presentOutline", true);
+    highlight_ = std::make_unique<GpuBuffer>(context_, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                             BufferMemory::Device);
     overlays_ = std::make_unique<OverlayPass>(context_, compiler_, uploads_, presentFormat_);
     const std::vector<ShaderModuleSource> depthRangeModules{
         {"depth_range", shaders::kDepthRangeSlang}};
@@ -1938,6 +1943,11 @@ void RasterRenderer::Present(VkCommandBuffer commands, RenderTargets& targets,
     const PresentMode& mode = *PresentModeOf(var);
     GpuImage& image = *targets.Var(var);
     image.Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    // The outline reads PrimId in the same pass, so it is made readable before the pass starts.
+    GpuImage* ids = highlightWords_ > 0 ? targets.Var(render_vars::kPrimId) : nullptr;
+    if (ids != nullptr && ids != &image) {
+        ids->Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
     RenderingTarget target = present;
     target.depth = VK_NULL_HANDLE;
     BeginRendering(commands, target);
@@ -1951,7 +1961,8 @@ void RasterRenderer::Present(VkCommandBuffer commands, RenderTargets& targets,
         DescriptorResource::Of(image.LayerView(0), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     const DescriptorResource bands = DescriptorResource::Of(
         spectral ? image.GroupView(0) : image.View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    const std::array<DescriptorResource, 3> views{view, view, bands};
+    const std::array<DescriptorResource, 4> views{view, view, bands,
+                                                  DescriptorResource::Of(*highlight_)};
     presentLayout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, views);
     const bool srgb =
         presentFormat_ == VK_FORMAT_R8G8B8A8_SRGB || presentFormat_ == VK_FORMAT_B8G8R8A8_SRGB;
@@ -1972,8 +1983,64 @@ void RasterRenderer::Present(VkCommandBuffer commands, RenderTargets& targets,
     }
     presentLayout_.PushConstants(commands, &constants, sizeof(constants));
     vkCmdDraw(commands, 3, 1, 0, 0);
-    vkCmdEndRendering(commands);
+
+    // The highlighted prims' outline over whatever var shows, from the PrimId var.
+    if (ids != nullptr) {
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, presentOutline_->Handle());
+        const DescriptorResource idView =
+            DescriptorResource::Of(ids->LayerView(0), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        const std::array<DescriptorResource, 4> outline{idView, idView, bands,
+                                                        DescriptorResource::Of(*highlight_)};
+        presentLayout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, outline);
+        struct {
+            std::uint32_t flags[4];
+            float colour[4];
+        } outlineConstants{{srgb ? 1u : 0u, highlightWidth_, highlightWords_, 0},
+                           {highlightColour_.r, highlightColour_.g, highlightColour_.b,
+                            highlightColour_.a}};
+        presentLayout_.PushConstants(commands, &outlineConstants, sizeof(outlineConstants));
+        vkCmdDraw(commands, 3, 1, 0, 0);
+        vkCmdEndRendering(commands);
+        if (ids != &image) {
+            ids->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+        }
+    } else {
+        vkCmdEndRendering(commands);
+    }
     image.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+}
+
+void RasterRenderer::SetHighlight(std::span<const std::uint32_t> primIds, glm::vec4 colour,
+                                  std::uint32_t width) {
+    highlightColour_ = colour;
+    highlightWidth_ = std::max(width, 1u);
+    std::vector<std::uint32_t> words;
+    for (const std::uint32_t id : primIds) {
+        if (id == 0) {
+            continue;
+        }
+        if (words.size() <= id / 32) {
+            words.resize(id / 32 + 1, 0);
+        }
+        words[id / 32] |= 1u << (id % 32);
+    }
+    if (words == highlightBits_) {
+        return;
+    }
+    highlightBits_ = words;
+    highlightWords_ = static_cast<std::uint32_t>(words.size());
+    if (words.empty()) {
+        return;
+    }
+    const VkDeviceSize bytes = words.size() * sizeof(std::uint32_t);
+    if (highlight_->Size() < bytes) {
+        vkDeviceWaitIdle(context_.Device());
+        highlight_ = std::make_unique<GpuBuffer>(context_, std::max<VkDeviceSize>(bytes, 256),
+                                                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                                 BufferMemory::Device);
+    }
+    // Through the frame's uploads, ordered with the frames still reading the buffer.
+    uploads_.Write(*highlight_, std::as_bytes(std::span(highlightBits_)));
 }
 
 std::uint64_t RasterRenderer::GpuBytes() const {

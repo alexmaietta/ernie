@@ -757,6 +757,15 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
         ground.primId = PrimIdOf(prims_.ground);
         ground_.SetParams(ground);
     }
+    // The highlighted prims and everything under them, as the prim ids the frame draws.
+    std::vector<std::uint32_t> highlighted;
+    for (const auto& [path, id] : primIds_) {
+        if (std::any_of(highlight_.begin(), highlight_.end(),
+                        [&path](const Path& prefix) { return path.HasPrefix(prefix); })) {
+            highlighted.push_back(id);
+        }
+    }
+    renderer_.SetHighlight(highlighted, highlightColour_);
     RasterDrawable* drawables[] = {&terrain_, &meshes_, &ground_};
     if (overlays) {
         frame.overlays = *overlays;

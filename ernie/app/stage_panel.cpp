@@ -1,4 +1,5 @@
 #include "ernie/app/builtin_panels.h"
+#include "ernie/app/create.h"
 #include "ernie/app/prim_icons.h"
 #include "ernie/app/session.h"
 #include "ernie/app/viewer.h"
@@ -127,6 +128,13 @@ class StagePanel final : public Panel {
         const std::vector<Path>& selection = viewer.Selection();
         reveal_ = selection != shown_;
         shown_ = selection;
+        // F2 renames the selected prim, as in Kit.
+        if (selection.size() == 1 && renaming_.IsEmpty() &&
+            ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
+            !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed(ImGuiKey_F2, false) &&
+            !IsSessionPath(selection.front())) {
+            StartRename(selection.front());
+        }
         if (reveal_) {
             for (const Path& selected : selection) {
                 for (Path at = selected.Parent(); !at.IsEmpty() && !at.IsRoot(); at = at.Parent()) {
@@ -289,7 +297,7 @@ class StagePanel final : public Panel {
         if (selected && reveal_) {
             ImGui::SetScrollHereY();
         }
-        DrawContextMenu(viewer, path);
+        DrawContextMenu(viewer, scene, path);
 
         // The boxed +/- toggle, the icon and the name, indented by depth.
         const std::string& type = scene.TypeOf(path);
@@ -321,8 +329,13 @@ class StagePanel final : public Panel {
         const float icon = std::round(1.05f * ImGui::GetFontSize());
         DrawPrimIcon(draw, ImVec2(x, middle - 0.5f * icon), icon, type);
         x += icon + 5.0f;
-        draw->AddText(ImVec2(x, middle - 0.5f * ImGui::GetFontSize()),
-                      Colour(visible ? theme_.text : theme_.textMuted), label.c_str());
+        if (renaming_ == path) {
+            DrawRenameField(viewer, path, ImVec2(x - 4.0f, rowStart.y),
+                            ImGui::GetContentRegionMax().x + ImGui::GetWindowPos().x - x);
+        } else {
+            draw->AddText(ImVec2(x, middle - 0.5f * ImGui::GetFontSize()),
+                          Colour(visible ? theme_.text : theme_.textMuted), label.c_str());
+        }
 
         // The eye, for prims that can be hidden.
         ImGui::TableSetColumnIndex(1);
@@ -351,22 +364,112 @@ class StagePanel final : public Panel {
         ImGui::PopID();
     }
 
-    static void DrawContextMenu(Viewer& viewer, const Path& path) {
+    /// Kit's prim context menu: creating under it, renaming, duplicating and deleting, its
+    /// visibility, selecting and framing, and copying its path. Right-clicking an unselected
+    /// prim selects it first.
+    void DrawContextMenu(Viewer& viewer, Scene& scene, const Path& path) {
+        if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+            const std::vector<Path>& selection = viewer.Selection();
+            if (std::find(selection.begin(), selection.end(), path) == selection.end()) {
+                viewer.SetSelection({path});
+            }
+        }
         if (!ImGui::BeginPopupContextItem("##context")) {
             return;
+        }
+        const bool editable = !IsSessionPath(path) && !path.IsRoot();
+        if (ImGui::BeginMenu("Create", editable)) {
+            // Under this prim when it groups others (an Xform or Scope), as the Create menu.
+            const char* group = nullptr;
+            for (const CreatableType& creatable : CreatableTypes()) {
+                if (group == nullptr || std::string_view(group) != creatable.group) {
+                    group = creatable.group;
+                    ImGui::SeparatorText(group);
+                }
+                if (ImGui::MenuItem(creatable.label)) {
+                    viewer.SetSelection({path});
+                    try {
+                        viewer.Create(creatable.type);
+                    } catch (const std::invalid_argument& error) {
+                        viewer.Log(LogLevel::Error, error.what());
+                    }
+                }
+            }
+            ImGui::EndMenu();
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Rename", "F2", false, editable)) {
+            StartRename(path);
+        }
+        if (ImGui::MenuItem("Duplicate", "Ctrl+D", false, editable)) {
+            viewer.Duplicate(std::vector<Path>(viewer.Selection()));
+        }
+        if (ImGui::MenuItem("Delete", "Del", false, editable)) {
+            viewer.Delete(std::vector<Path>(viewer.Selection()));
+        }
+        ImGui::Separator();
+        const bool hidden =
+            scene.Get<std::string>(path, tokens::kVisibility, "") == tokens::kInvisible;
+        if (ImGui::MenuItem(hidden ? "Show" : "Hide", nullptr, false,
+                            editable && Imageable(scene.TypeOf(path)))) {
+            viewer.Edit(path, tokens::kVisibility,
+                        std::string(hidden ? tokens::kInherited : tokens::kInvisible));
+        }
+        if (ImGui::MenuItem("Select Children", nullptr, false, !scene.Children(path).empty())) {
+            viewer.SetSelection(scene.Children(path));
+        }
+        if (ImGui::MenuItem("Expand All Below")) {
+            ExpandBelow(scene, path);
         }
         if (ImGui::MenuItem("Frame", "F")) {
             const Path frame[] = {path};
             viewer.Frame(frame);
         }
+        ImGui::Separator();
         if (ImGui::MenuItem("Copy Path")) {
             ImGui::SetClipboardText(path.String().c_str());
         }
-        if (ImGui::MenuItem("Delete", "Del", false, !IsSessionPath(path))) {
-            const Path doomed[] = {path};
-            viewer.Delete(doomed);
-        }
         ImGui::EndPopup();
+    }
+
+    void ExpandBelow(const Scene& scene, const Path& path) {
+        expanded_.insert(path);
+        for (const Path& child : scene.Children(path)) {
+            ExpandBelow(scene, child);
+        }
+    }
+
+    void StartRename(const Path& path) {
+        renaming_ = path;
+        renameFocus_ = true;
+        const std::string name(path.Name());
+        std::fill(renameBuffer_.begin(), renameBuffer_.end(), '\0');
+        std::copy_n(name.begin(), std::min(name.size(), renameBuffer_.size() - 1),
+                    renameBuffer_.begin());
+    }
+
+    /// The name field of the prim being renamed, at `corner` and `width` wide: Enter renames,
+    /// Escape or clicking away cancels.
+    void DrawRenameField(Viewer& viewer, const Path& path, ImVec2 corner, float width) {
+        ImGui::SetCursorScreenPos(corner);
+        ImGui::SetNextItemWidth(width);
+        if (renameFocus_) {
+            ImGui::SetKeyboardFocusHere();
+            renameFocus_ = false;
+        }
+        const bool entered = ImGui::InputText("##rename", renameBuffer_.data(), renameBuffer_.size(),
+                                              ImGuiInputTextFlags_EnterReturnsTrue |
+                                                  ImGuiInputTextFlags_AutoSelectAll);
+        if (entered) {
+            try {
+                viewer.Rename(path, renameBuffer_.data());
+            } catch (const std::invalid_argument& error) {
+                viewer.Log(LogLevel::Error, error.what());
+            }
+            renaming_ = Path();
+        } else if (ImGui::IsItemDeactivated() || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            renaming_ = Path();
+        }
     }
 
     static void Select(Viewer& viewer, const Path& path, bool toggle) {
@@ -392,6 +495,9 @@ class StagePanel final : public Panel {
     std::set<Path> seen_;      ///< Prims drawn before, to open new top-level ones once.
     std::vector<Path> shown_;  ///< The selection last drawn.
     bool reveal_ = false;      ///< Whether the selection changed since, to open and scroll to.
+    Path renaming_;            ///< The prim whose name is being edited, if any.
+    bool renameFocus_ = false;
+    std::array<char, 256> renameBuffer_{};
 };
 
 }  // namespace

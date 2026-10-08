@@ -105,6 +105,11 @@ class RasterDelegate : public RenderDelegate {
         renderer_.SetPresentBand(band);
     }
 
+    void SetHighlight(std::span<const Path> paths, glm::vec4 colour) override {
+        highlight_.assign(paths.begin(), paths.end());
+        highlightColour_ = colour;
+    }
+
     std::optional<double> MeteredLuminance() const override {
         return renderer_.MeteredLuminance();
     }
@@ -206,6 +211,9 @@ class RasterDelegate : public RenderDelegate {
     MeshDrawable meshes_;
     GroundDrawable ground_;
     std::unique_ptr<RenderTargets> viewTargets_;
+    /// The prims `SetHighlight` outlines, resolved to prim ids (with their descendants') per frame.
+    std::vector<Path> highlight_;
+    glm::vec4 highlightColour_{1.0f, 0.6f, 0.1f, 1.0f};
     mutable std::map<Path, std::uint32_t> primIds_;
     mutable std::vector<Path> primPaths_;
     std::map<Path, std::vector<std::shared_ptr<ProductFrame>>> frames_;

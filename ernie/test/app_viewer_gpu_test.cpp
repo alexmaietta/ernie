@@ -536,6 +536,63 @@ TEST_F(ViewerTest, ViewportTogglesShowOverlaysAndHudItemsList) {
     EXPECT_TRUE(viewer_->Step());
 }
 
+TEST_F(ViewerTest, DuplicateAndRenameAreSingleUndoSteps) {
+    scene_.Define("/World/Cube/Child", tokens::kSphere).Set(tokens::kGeomRadius, 0.5);
+    const std::vector<Path> copies = viewer_->Duplicate(std::vector<Path>{Path("/World/Cube")});
+    ASSERT_EQ(copies, std::vector<Path>{Path("/World/Cube_01")});
+    EXPECT_EQ(scene_.TypeOf("/World/Cube_01"), tokens::kCube);
+    EXPECT_DOUBLE_EQ(GetNumber(scene_, "/World/Cube_01", tokens::kSize, 0.0), 2.0);
+    EXPECT_TRUE(scene_.Has("/World/Cube_01/Child")) << "with its descendants";
+    EXPECT_EQ(viewer_->Selection(), copies);
+    EXPECT_EQ(viewer_->Duplicate(std::vector<Path>{Path("/World/Cube")}).front(),
+              Path("/World/Cube_02"));
+
+    const Path renamed = viewer_->Rename("/World/Cube_01", "Box");
+    EXPECT_EQ(renamed, Path("/World/Box"));
+    EXPECT_FALSE(scene_.Has("/World/Cube_01"));
+    EXPECT_TRUE(scene_.Has("/World/Box/Child"));
+    EXPECT_THROW(viewer_->Rename("/World/Box", "Cube"), std::invalid_argument) << "taken";
+    EXPECT_THROW(viewer_->Rename("/World/Box", "bad name"), std::invalid_argument);
+    ASSERT_TRUE(viewer_->Undo());
+    EXPECT_TRUE(scene_.Has("/World/Cube_01/Child")) << "one step undoes the rename";
+    EXPECT_FALSE(scene_.Has("/World/Box"));
+    EXPECT_TRUE(viewer_->Step());
+}
+
+TEST_F(ViewerTest, OutlinesTheSelectionInTheViewport) {
+    // Pixels of the outline colour, Kit's orange.
+    const auto outlined = [&] {
+        const std::filesystem::path path = TempFile("outline.png");
+        viewer_->Capture(path);
+        EXPECT_TRUE(viewer_->Step());
+        int width = 0;
+        int height = 0;
+        int channels = 0;
+        unsigned char* texels = stbi_load(path.string().c_str(), &width, &height, &channels, 4);
+        std::size_t count = 0;
+        const glm::vec4 colour = viewer_->GetTheme().outline;
+        for (int i = 0; i < width * height; ++i) {
+            const unsigned char* p = texels + 4 * i;
+            if (std::abs(p[0] - colour.r * 255.0f) < 12.0f &&
+                std::abs(p[1] - colour.g * 255.0f) < 12.0f &&
+                std::abs(p[2] - colour.b * 255.0f) < 12.0f) {
+                ++count;
+            }
+        }
+        stbi_image_free(texels);
+        std::filesystem::remove(path);
+        return count;
+    };
+    viewer_->Step();
+    EXPECT_LT(outlined(), 5u) << "nothing selected";
+    viewer_->SetSelection({Path("/World/Cube")});
+    EXPECT_GT(outlined(), 100u) << "the cube's silhouette";
+    ViewportDisplay display = viewer_->GetViewportDisplay();
+    display.selection = false;
+    viewer_->SetViewportDisplay(display);
+    EXPECT_LT(outlined(), 5u) << "the eye menu hides it";
+}
+
 TEST_F(ViewerTest, LayoutsRoundTripThroughFiles) {
     viewer_->Step();
     const std::filesystem::path path = TempFile("layout.ini");

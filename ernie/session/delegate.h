@@ -156,6 +156,14 @@ class RenderDelegate {
         static_cast<void>(band);
     }
 
+    /// Outlines the prims at `paths` and their descendants in `Record`'s image, as Omniverse Kit
+    /// outlines its selection, in display colour `colour` (sRGB-encoded rgb, alpha its opacity);
+    /// none for no paths. Backends that cannot outline ignore it.
+    virtual void SetHighlight(std::span<const Path> paths, glm::vec4 colour) {
+        static_cast<void>(paths);
+        static_cast<void>(colour);
+    }
+
     /// The prim the last frame `Record` drew shows at pixel (`x`, `y`) of its image, from its
     /// PrimId; the empty path for the background, a pixel outside the image, or a backend that
     /// cannot tell. Waits for the device, so for clicks rather than every frame.

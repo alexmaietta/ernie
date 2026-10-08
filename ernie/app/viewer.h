@@ -226,6 +226,18 @@ class Viewer {
     /// selection; the viewer's own prims are left alone.
     void Delete(std::span<const Path> paths);
 
+    /// Copies the prims at `paths` with their descendants and attributes (sharing tensors) beside
+    /// themselves, named `<name>_01`, `<name>_02`... with the first free number, as one undo step
+    /// (Ctrl+D); selects and returns the copies. The viewer's own prims are left alone.
+    std::vector<Path> Duplicate(std::span<const Path> paths);
+
+    /// Renames the prim at `path` to `name`, moving its descendants with it, as one undo step
+    /// (F2 in the Stage), keeping the selection on it; returns its new path. Relationships to it
+    /// (material bindings, cameras) still name the old path.
+    /// @throws std::invalid_argument for an invalid name, a name taken by a sibling, the root or
+    /// a viewer prim.
+    Path Rename(const Path& path, std::string_view name);
+
     /// What the transform gizmo on a single selected prim does: none, or translate, rotate or
     /// scale (the W, E and R keys), in world or local axes.
     enum class Gizmo { None, Translate, Rotate, Scale };

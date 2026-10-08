@@ -178,6 +178,13 @@ class RasterRenderer {
     /// binned into cells of a degree for each pixel to gather the stars around it.
     void SetStars(std::span<const Star> stars);
 
+    /// Outlines the prims with ids `primIds` (PrimId values) in `Record`'s presented image, as
+    /// Omniverse Kit outlines its selection: `width` pixels each side of their silhouettes, in
+    /// display colour `colour` (sRGB-encoded rgb, alpha its opacity), from frames whose targets
+    /// hold PrimId. No ids, no outline. Call between frames, before `Update`.
+    void SetHighlight(std::span<const std::uint32_t> primIds, glm::vec4 colour,
+                      std::uint32_t width = 2);
+
     /// Writes the frame, shading and sensor uniforms and the material table, fits the shadow
     /// cascades around the drawables' bounds and prepares every drawable. Call once per frame
     /// after `BeginFrame` and before `Record`; earlier frames may still be running, since host
@@ -427,6 +434,12 @@ class RasterRenderer {
     std::unique_ptr<GraphicsPipeline> presentFloat_;
     std::unique_ptr<GraphicsPipeline> presentUint_;
     std::unique_ptr<GraphicsPipeline> presentSpectral_;
+    std::unique_ptr<GraphicsPipeline> presentOutline_;
+    std::unique_ptr<GpuBuffer> highlight_;        ///< A bit per highlighted prim id.
+    std::vector<std::uint32_t> highlightBits_;
+    std::uint32_t highlightWords_ = 0;            ///< 0 draws no outline.
+    std::uint32_t highlightWidth_ = 2;
+    glm::vec4 highlightColour_{1.0f, 0.6f, 0.1f, 1.0f};
     int presentBand_ = -1;       ///< The SpectralRadiance band `Present` shows; -1 their mean.
     float spectralGain_ = 1.0f;  ///< SpectralRadiance's display gain, from the exposure.
     /// Present ranges of the last `Update`: near and far plane, full well, ADC maximum.

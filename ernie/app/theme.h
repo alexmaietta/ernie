@@ -22,6 +22,7 @@ struct Theme {
     glm::vec4 textMuted{0.557f, 0.573f, 0.580f, 1.0f};  ///< Labels, types and disabled text.
     glm::vec4 selection{0.176f, 0.220f, 0.247f, 1.0f};  ///< Selected rows (Kit's subtle blue-grey).
     glm::vec4 accent{0.290f, 0.522f, 0.678f, 1.0f};     ///< Changed values, active tools, sliders.
+    glm::vec4 outline{1.0f, 0.62f, 0.16f, 1.0f};        ///< The viewport's selection outline.
     glm::vec4 warning{0.910f, 0.698f, 0.235f, 1.0f};
     glm::vec4 error{0.886f, 0.341f, 0.318f, 1.0f};
     glm::vec4 overlay{0.141f, 0.157f, 0.169f, 0.88f};  ///< Viewport toolbar pills and HUD.

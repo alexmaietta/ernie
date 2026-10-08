@@ -26,6 +26,32 @@ namespace ernie::app {
 
 namespace {
 
+/// Three drag fields for x, y and z in the item width, each marked on its left edge in its axis's
+/// colour (red, green, blue), as Kit's transform fields are.
+bool DragXyz(double* values, float speed) {
+    constexpr ImU32 kAxisColours[] = {IM_COL32(222, 74, 64, 255), IM_COL32(110, 190, 70, 255),
+                                      IM_COL32(70, 130, 230, 255)};
+    const float spacing = ImGui::GetStyle().ItemInnerSpacing.x;
+    const float width = std::max((ImGui::CalcItemWidth() - 2.0f * spacing) / 3.0f, 1.0f);
+    const float mark = std::max(2.0f, std::round(0.15f * ImGui::GetFontSize()));
+    bool changed = false;
+    for (int k = 0; k < 3; ++k) {
+        if (k > 0) {
+            ImGui::SameLine(0.0f, spacing);
+        }
+        ImGui::PushID(k);
+        const ImVec2 corner = ImGui::GetCursorScreenPos();
+        ImGui::SetNextItemWidth(width);
+        changed |= ImGui::DragScalar("##axis", ImGuiDataType_Double, &values[k], speed, nullptr,
+                                     nullptr, "%.3f");
+        ImGui::GetWindowDrawList()->AddRectFilled(
+            corner, ImVec2(corner.x + mark, corner.y + ImGui::GetFrameHeight()), kAxisColours[k],
+            ImGui::GetStyle().FrameRounding, ImDrawFlags_RoundCornersLeft);
+        ImGui::PopID();
+    }
+    return changed;
+}
+
 const char* DTypeName(DType type) {
     switch (type) {
     case DType::Float32:
@@ -203,8 +229,7 @@ class PropertiesPanel final : public Panel {
         for (int i = 0; i < 3; ++i) {
             ImGui::PushID(i);
             Row(viewer, path, labels[i], tokens::kTransform, authored);
-            if (ImGui::DragScalarN("##v", ImGuiDataType_Double, &(*fields[i])[0], 3,
-                                   static_cast<float>(speeds[i]), nullptr, nullptr, "%.3f")) {
+            if (DragXyz(&(*fields[i])[0], static_cast<float>(speeds[i]))) {
                 Apply(viewer, path, tokens::kTransform, Compose(trs));
             }
             ImGui::PopID();
