@@ -49,6 +49,25 @@ TEST(PlanSensor, FusesTheChainInOrderAndWritesOnlyHeldVars) {
     EXPECT_EQ(PlanSensor(chain, held).Key(), plan.Key()) << "the same plan shares its kernel";
 }
 
+TEST(PlanSensor, CompilesTheLensProjectionIn) {
+    ernie::LensModel lens;
+    EXPECT_EQ(ernie::LensKernelOf(lens), "Pinhole");
+    lens.k1 = -0.1;
+    EXPECT_EQ(ernie::LensKernelOf(lens), "BrownConrady");
+    lens.projection = ernie::LensProjection::Fisheye;
+    EXPECT_EQ(ernie::LensKernelOf(lens), "Fisheye");
+
+    const std::string_view held[] = {kHdrColor};
+    ernie::SensorPlan plan = PlanSensor(ernie::DefaultFilterChain(), held);
+    const std::string pinhole = plan.Key();
+    EXPECT_NE(plan.LensSource().find("Pinhole.pinholeOf"), std::string::npos);
+    EXPECT_EQ(plan.LensSource().find("BrownConrady"), std::string::npos)
+        << "a pinhole's kernel has no distortion";
+    plan.lens = "Fisheye";
+    EXPECT_NE(plan.Key(), pinhole) << "each projection has its own kernel";
+    EXPECT_NE(plan.LensSource().find("Fisheye.falloff"), std::string::npos);
+}
+
 TEST(PlanSensor, RejectsChainsThatReadBeforeWriting) {
     const SensorFilter chain[] = {SensorFilter::Exposure};
     const std::string_view held[] = {kLdrColor};

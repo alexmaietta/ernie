@@ -60,6 +60,87 @@ TEST(Camera, DistortionRoundTrips) {
     EXPECT_NEAR(back.y, p.y, 1e-9);
 }
 
+TEST(Camera, FisheyeMapsFieldAnglesToRadii) {
+    ernie::LensModel lens;
+    lens.projection = ernie::LensProjection::Fisheye;
+    EXPECT_FALSE(lens.IsPinhole());
+    // Equidistant: a ray at field angle theta lands at radius theta.
+    const double theta = 1.2;
+    const glm::dvec2 pinhole = std::tan(theta) * glm::dvec2(0.6, -0.8);
+    const glm::dvec2 image = lens.Distort(pinhole);
+    EXPECT_NEAR(image.x, 0.6 * theta, 1e-12);
+    EXPECT_NEAR(image.y, -0.8 * theta, 1e-12);
+    EXPECT_NEAR(lens.FieldAngle(image), theta, 1e-12);
+    lens.fisheye = {-0.05, 0.01, -0.002, 0.0005};
+    const glm::dvec2 back = lens.Undistort(lens.Distort(pinhole));
+    EXPECT_NEAR(back.x, pinhole.x, 1e-9);
+    EXPECT_NEAR(back.y, pinhole.y, 1e-9);
+    const double t2 = theta * theta;
+    const double radius =
+        theta * (1.0 + t2 * (-0.05 + t2 * (0.01 + t2 * (-0.002 + t2 * 0.0005))));
+    EXPECT_NEAR(glm::length(lens.Distort(pinhole)), radius, 1e-12);
+}
+
+TEST(Camera, NaturalVignettingFollowsTheProjection) {
+    ernie::LensModel lens;
+    const glm::dvec2 p(0.3, 0.4);
+    const double cosine2 = 1.0 / 1.25;
+    EXPECT_NEAR(lens.NaturalVignetting(p), cosine2 * cosine2, 1e-15) << "cos^4 for a pinhole";
+    lens.projection = ernie::LensProjection::Fisheye;
+    const double theta = 0.5;  // the radius of p, equidistant
+    EXPECT_NEAR(lens.NaturalVignetting(p), std::cos(theta) * std::sin(theta) / theta, 1e-12);
+    EXPECT_DOUBLE_EQ(lens.NaturalVignetting({0.0, 0.0}), 1.0);
+}
+
+TEST(Camera, FisheyeFieldIsLimited) {
+    Camera camera;
+    camera.width = 100;
+    camera.height = 100;
+    camera.lens.projection = ernie::LensProjection::Fisheye;
+    camera.SetVerticalFov(1.0);  // a corner at 0.5 sqrt(2) radians off axis
+    EXPECT_NO_THROW(camera.Check());
+    camera.focalLengthMm = camera.verticalApertureMm / 3.0;  // corners at 2.1 radians
+    EXPECT_THROW(camera.Check(), std::invalid_argument);
+    camera.SetVerticalFov(1.0);
+    camera.lens.k1 = 0.1;
+    EXPECT_THROW(camera.Check(), std::invalid_argument) << "no Brown-Conrady terms on a fisheye";
+}
+
+TEST(Camera, OrthographicSpansItsAperturesInTheScene) {
+    Camera camera;
+    camera.width = 200;
+    camera.height = 100;
+    camera.orthographic = true;
+    camera.verticalApertureMm = 40.0;  // 4 scene units
+    camera.verticalApertureOffsetMm = 4.0;  // the view up by 0.4 units
+    camera.transform = ernie::LookAtTransform({1.0, 2.0, 10.0}, {1.0, 2.0, 0.0}, {0, 1, 0});
+    EXPECT_DOUBLE_EQ(camera.OrthographicPixelSize(), 0.04);
+    EXPECT_DOUBLE_EQ(camera.PixelPitchMetres(), 5e-6) << "the sensor's, not the scene's";
+    EXPECT_EQ(camera.PrincipalPoint(), glm::dvec2(100.0, 40.0));
+    const ernie::CameraView view = camera.RasterView();
+    EXPECT_TRUE(view.IsOrthographic());
+    EXPECT_FALSE(Camera().RasterView().IsOrthographic());
+    // The axis lands on the principal point at every depth, and a pixel is 0.04 units.
+    for (const double depth : {2.0, 9.0}) {
+        const glm::vec4 clip = view.ViewProjection() * glm::vec4(1.0f, 2.0f, 10.0f - depth, 1.0f);
+        EXPECT_NEAR(clip.w, 1.0f, 1e-6f);
+        EXPECT_NEAR((clip.x + 1.0f) * 100.0f, 100.0f, 1e-4f);
+        EXPECT_NEAR((1.0f - clip.y) * 50.0f, 40.0f, 1e-4f);
+        EXPECT_NEAR(clip.z, (depth - camera.nearPlane) / (camera.farPlane - camera.nearPlane),
+                    1e-6);
+    }
+    const glm::vec4 right = view.ViewProjection() * glm::vec4(3.0f, 2.0f, 5.0f, 1.0f);
+    EXPECT_NEAR((right.x + 1.0f) * 100.0f, 150.0f, 1e-3f) << "2 units is 50 pixels";
+
+    camera.lens.vignetting = true;
+    EXPECT_DOUBLE_EQ(camera.IrradiancePerRadiance({0.5, 0.5}),
+                     camera.IrradiancePerRadiance({0.0, 0.0}))
+        << "telecentric optics";
+    EXPECT_NO_THROW(camera.Check());
+    camera.lens.projection = ernie::LensProjection::Fisheye;
+    EXPECT_THROW(camera.Check(), std::invalid_argument);
+}
+
 TEST(Camera, ElectronsFollowTheCameraEquation) {
     Camera camera;
     camera.width = 100;
@@ -135,6 +216,30 @@ TEST(Camera, ReadsUsdAndErnieAttributes) {
     EXPECT_FALSE(camera.sensor.noise);
     EXPECT_EQ(camera.sensor.seed, 7u);
 
+    EXPECT_FALSE(camera.orthographic);
+    EXPECT_EQ(camera.lens.projection, ernie::LensProjection::Perspective);
+
+    scene.Set("/Camera", tokens::kLensDistortion, std::vector<float>{});
+    scene.Set("/Camera", tokens::kLensProjection, std::string(tokens::kFisheye));
+    scene.Set("/Camera", tokens::kLensFisheye, std::vector<float>{-0.01f, 0.002f});
+    const Camera fisheye = ernie::CameraOf(scene, "/Camera", 64, 48);
+    EXPECT_EQ(fisheye.lens.projection, ernie::LensProjection::Fisheye);
+    EXPECT_DOUBLE_EQ(fisheye.lens.fisheye[1], 0.002f);
+    EXPECT_DOUBLE_EQ(fisheye.lens.fisheye[3], 0.0);
+    scene.Set("/Camera", tokens::kLensProjection, std::string("panoramic"));
+    EXPECT_THROW(ernie::CameraOf(scene, "/Camera", 64, 48), std::invalid_argument);
+    scene.Set("/Camera", tokens::kLensProjection, std::string(tokens::kPerspective));
+
+    scene.Set("/Camera", tokens::kProjection, std::string(tokens::kOrthographic));
+    scene.Set("/Camera", tokens::kSensorPixelPitch, 3.45);
+    const Camera orthographic = ernie::CameraOf(scene, "/Camera", 64, 48);
+    EXPECT_TRUE(orthographic.orthographic);
+    EXPECT_DOUBLE_EQ(orthographic.orthographicPixelPitchUm, 3.45);
+    EXPECT_DOUBLE_EQ(orthographic.OrthographicPixelSize(),
+                     0.1 * orthographic.verticalApertureMm / 48.0)
+        << "apertures in tenths of a scene unit, as UsdGeomCamera";
+    scene.Set("/Camera", tokens::kProjection, std::string(tokens::kPerspective));
+
     scene.Set("/Camera", tokens::kSensorType, "infrared");
     EXPECT_THROW(ernie::CameraOf(scene, "/Camera", 64, 48), std::invalid_argument);
     scene.Set("/Camera", tokens::kSensorType, "rgb");
@@ -207,5 +312,5 @@ TEST(Camera, SetCameraAndCameraOfRoundTrip) {
         << "the horizontal aperture follows the aspect";
 
     scene.Set("/Camera", tokens::kProjection, tokens::kOrthographic);
-    EXPECT_THROW(ernie::CameraOf(scene, "/Camera", 40, 20), std::invalid_argument);
+    EXPECT_TRUE(ernie::CameraOf(scene, "/Camera", 40, 20).orthographic);
 }

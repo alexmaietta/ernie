@@ -129,7 +129,7 @@ TEST(Schema, CameraOfUsesUsdDefaultsAndRejectsBadCameras) {
     scene.Set("/Camera", tokens::kClippingRange, glm::vec2(5.0f, 1.0f));
     EXPECT_THROW(ernie::CameraOf(scene, "/Camera", 8, 8), std::invalid_argument);
     scene.Set("/Camera", tokens::kClippingRange, glm::vec2(1.0f, 5.0f));
-    scene.Set("/Camera", tokens::kProjection, tokens::kOrthographic);
+    scene.Set("/Camera", tokens::kProjection, std::string("panoramic"));
     EXPECT_THROW(ernie::CameraOf(scene, "/Camera", 8, 8), std::invalid_argument);
 }
 

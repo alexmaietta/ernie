@@ -24,10 +24,10 @@
 // state from the previous frame and for the next; 30 the pyramids' sampler; 31 with motion blur,
 // the share of each raster pixel's exposure prims covered (motion.slang).
 //
+// The lens head's projection comes from module `lensProjection`, which the renderer generates for
+// the camera's lens (`SensorPlan::lens`) from lens.slang's projections.
+//
 // References:
-// - D. C. Brown, "Decentering Distortion of Lenses", Photogrammetric Engineering 32(3):444-462,
-//   1966 (lens distortion, in OpenCV's convention).
-// - B. K. P. Horn, "Robot Vision", MIT Press, 1986 (cos^4 falloff of image irradiance).
 // - EMVA Standard 1288 Release 4.0 Linear, 2021 (the linear sensor model: quantum efficiency,
 //   shot, read and dark noise, PRNU, DSNU, gain).
 // - D. E. Knuth, "The Art of Computer Programming", vol. 2, 3rd ed., 1997, section 3.4.1
@@ -38,6 +38,8 @@
 //   https://doi.org/10.1109/TIV.2020.3003524
 
 module sensor;
+
+import lensProjection;
 
 static const uint kBackground = 0xFFFFFFFF;
 
@@ -52,9 +54,9 @@ public struct SensorUniforms {
     public float4 intrinsics;
     // Sensor width, height, band count, channel count.
     public uint4 size;
-    // Brown-Conrady k1, k2, k3, p1.
+    // The lens's distortion: Brown-Conrady k1, k2, k3, p1, or the fisheye's k1 to k4.
     public float4 distortion;
-    // p2, cos^4 vignetting (1 on), photographic exposure scale, exposure time (s).
+    // Brown-Conrady p2, natural vignetting (1 on), photographic exposure scale, exposure time (s).
     public float4 lens;
     // Full well (e-), read noise (e-), dark current (e-/s), PRNU (fraction).
     public float4 sensor;
@@ -73,7 +75,8 @@ public struct SensorUniforms {
     // Per band: mean electrons per unit radiance for each channel.
     public float4 qe[64];
     // First band's lower wavelength and band width (nm), the lens's f-number for depth of field
-    // (0: a pinhole), unused.
+    // (0: a pinhole), 1 when the projection is orthographic (distances to the camera are along the
+    // view direction).
     public float4 range;
     // The f-number diffraction takes, the pixel pitch (um), the focal length (mm), the focus
     // distance (scene units; 0 is infinity).
@@ -386,33 +389,13 @@ public void storeChannel(SensorPixel value, PixelContext pixel, uint channel) {
     channelsOut[int3(pixel.id.xy, pixel.id.z * kChannelDomains + channel)] = stored;
 }
 
-float2 distort(SensorUniforms cam, float2 p) {
-    let k = cam.distortion;
-    let p2 = cam.lens.x;
-    let r2 = dot(p, p);
-    let radial = 1.0 + r2 * (k.x + r2 * (k.y + r2 * k.z));
-    return float2(p.x * radial + 2.0 * k.w * p.x * p.y + p2 * (r2 + 2.0 * p.x * p.x),
-                  p.y * radial + k.w * (r2 + 2.0 * p.y * p.y) + 2.0 * p2 * p.x * p.y);
-}
-
-// The inverse of `distort` by fixed-point iteration.
-float2 undistort(SensorUniforms cam, float2 distorted) {
-    var p = distorted;
-    for (int i = 0; i < 12; ++i) {
-        p += distorted - distort(cam, p);
-    }
-    return p;
-}
-
 // The raster image position (pixels, before rounding) that sensor pixel `at` of `cam` sees
-// through the inverse lens distortion.
+// through the lens's projection.
 float2 rasterPositionOf(SensorUniforms cam, int2 at) {
     let f = cam.intrinsics.x;
     let distorted = float2((float(at.x) + 0.5 - cam.intrinsics.y) / f,
                            (cam.intrinsics.z - (float(at.y) + 0.5)) / f);
-    let k = cam.distortion;
-    let undistorted =
-        all(k == float4(0.0)) && cam.lens.x == 0.0 ? distorted : undistort(cam, distorted);
+    let undistorted = lensPinholeOf(distorted, cam.distortion, cam.lens.x);
     let rasterF = f / cam.intrinsics.w;
     return float2(cam.intrinsics.y + undistorted.x * rasterF,
                   cam.intrinsics.z - undistorted.y * rasterF) - 0.5;
@@ -433,11 +416,14 @@ public float sceneDistance(PixelContext pixel, int2 at) {
                      1.0 - (float(nearest.y) + 0.5) / size.y * 2.0,
                      gDepth.Load(int4(nearest, layer, 0)));
     let clip = mul(cam.invViewProj, float4(ndc, 1.0));
-    return length(clip.xyz / clip.w - cam.eye.xyz);
+    let world = clip.xyz / clip.w;
+    return cam.range.w != 0.0 ? dot(world - cam.eye.xyz, cam.forward.xyz)
+                              : length(world - cam.eye.xyz);
 }
 
-// Lens: maps each sensor pixel through the inverse distortion to the undistorted raster image,
-// resamples spectral radiance there (bilinearly) with cos^4 vignetting, and the geometry outputs
+// Lens: maps each sensor pixel through the lens's projection (`lensPinholeOf`) to the pinhole
+// raster image, resamples spectral radiance there (bilinearly) with the lens's natural vignetting
+// (`lensFalloff`), and the geometry outputs
 // (nearest). Sensor pixels whose rays leave the raster image are background.
 public struct Lens : ISpatialSource {
     int3 base;   // the bilinear footprint's first texel (x, y, layer)
@@ -462,7 +448,7 @@ public struct Lens : ISpatialSource {
         let f = cam.intrinsics.x;
         let distorted = float2((float(id.x) + 0.5 - cam.intrinsics.y) / f,
                                (cam.intrinsics.z - (float(id.y) + 0.5)) / f);
-        let p = undistort(cam, distorted);
+        let p = lensPinholeOf(distorted, cam.distortion, cam.lens.x);
         let rasterF = f / cam.intrinsics.w;
         let raster =
             float2(cam.intrinsics.y + p.x * rasterF, cam.intrinsics.z - p.y * rasterF) - 0.5;
@@ -501,8 +487,7 @@ public struct Lens : ISpatialSource {
         lens.next = next;
         lens.weight = clamp(raster - float2(base), float2(0.0), float2(1.0));
         if (cam.lens.y > 0.5) {
-            let cosine2 = 1.0 / (1.0 + dot(p, p));
-            lens.falloff = cosine2 * cosine2;
+            lens.falloff = lensFalloff(distorted, p, cam.distortion);
         }
         lens.lit = sky ? bool4(true)
                        : bool4(gIds.Load(int4(base.x, base.y, layer, 0)).x != kBackground,
@@ -518,7 +503,8 @@ public struct Lens : ISpatialSource {
         let clip = mul(cam.invViewProj, float4(ndc, 1.0));
         let world = clip.xyz / clip.w;
         lens.imagePlane = dot(world - cam.eye.xyz, cam.forward.xyz);
-        lens.camera = length(world - cam.eye.xyz);
+        // An orthographic view's rays start on its image plane, which is then the camera.
+        lens.camera = cam.range.w != 0.0 ? lens.imagePlane : length(world - cam.eye.xyz);
         lens.normal = float4(normalize(gNormal.Load(int4(nearest, layer, 0)).xyz), 0.0);
         lens.prim = ids.y;
         lens.instance = ids.z;

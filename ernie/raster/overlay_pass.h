@@ -56,6 +56,7 @@ class OverlayPass {
         std::int32_t world = -1;
         float nearPlane = 0.1f;
         float farPlane = 1000.0f;
+        bool orthographic = false;  ///< Whether the depth is linear (an orthographic view).
     };
 
     /// Draws the prepared items over `target`'s image, keeping what it holds.

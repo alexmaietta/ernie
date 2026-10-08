@@ -38,7 +38,8 @@ struct Sprite {
 }
 
 struct OverlayConstants {
-    // x: the view's world, y: its layer of the depth, z: 1 when the attachment has an sRGB format.
+    // x: the view's world, y: its layer of the depth, z: 1 when the attachment has an sRGB format,
+    // w: 1 when the projection is orthographic.
     int4 view;
     // Image width and height in pixels, near and far planes.
     float4 viewport;
@@ -185,10 +186,14 @@ VertexOutput spriteVertex(uint vertexIndex : SV_VertexID) {
     return out;
 }
 
-// View depth (distance along the view axis) of a [0, 1] depth from a perspective projection.
+// View depth (distance along the view axis) of a [0, 1] depth: from a perspective projection, or
+// linear in it from an orthographic one.
 float linearDepth(float depth) {
     let near = constants.viewport.z;
     let far = constants.viewport.w;
+    if (constants.view.w != 0) {
+        return near + depth * (far - near);
+    }
     return near * far / (far - depth * (far - near));
 }
 

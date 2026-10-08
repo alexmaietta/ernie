@@ -245,7 +245,7 @@ DetailSample triplanarDetail(float3 world, inout float3 normal) {
 [shader("fragment")]
 GBuffer meshFragmentMain(VertexOutput in) {
     let d = draws[in.item];
-    let toEye = normalize(u.eye.xyz - in.world);
+    let toEye = towardsViewer(in.world);
     let flat = cross(ddx(in.world), ddy(in.world));
     var normal = (d.offsets.w & kHasNormals) != 0 && dot(in.normal, in.normal) > 0.0
                      ? normalize(in.normal)

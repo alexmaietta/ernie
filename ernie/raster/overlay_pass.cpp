@@ -195,7 +195,8 @@ void OverlayPass::Record(VkCommandBuffer commands, const Target& target) const {
     const bool srgb =
         target.format == VK_FORMAT_R8G8B8A8_SRGB || target.format == VK_FORMAT_B8G8R8A8_SRGB;
     const OverlayConstants constants{
-        {target.world, static_cast<std::int32_t>(target.depthLayer), srgb ? 1 : 0, 0},
+        {target.world, static_cast<std::int32_t>(target.depthLayer), srgb ? 1 : 0,
+         target.orthographic ? 1 : 0},
         {static_cast<float>(target.extent.width), static_cast<float>(target.extent.height),
          target.nearPlane, target.farPlane}};
     layout_.PushConstants(commands, &constants, sizeof(constants));

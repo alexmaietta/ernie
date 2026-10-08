@@ -3,7 +3,7 @@
 // to its whole clipping range. Each wave reduces its pixels and one lane folds them into the
 // result with atomics; positive floats order as their bits do, so the result stays uint.
 //
-// Bindings: 0 the views' depth (perspective, [0, 1]), 1 the result: [0] the nearest depth's bits,
+// Bindings: 0 the views' depth ([0, 1]), 1 the result: [0] the nearest depth's bits,
 // cleared to the largest float, and [1] the farthest's, cleared to 0. Pixels without a surface
 // (depth 1) count for neither.
 //
@@ -11,7 +11,7 @@
 // I3D 2011, 97-102. https://doi.org/10.1145/1944745.1944761
 
 struct DepthRangeConstants {
-    // xy: image size, z: the layer.
+    // xy: image size, z: the layer, w: 1 when the projection is orthographic (depth linear).
     uint4 size;
     // x: near plane, y: far plane.
     float4 clip;
@@ -31,7 +31,8 @@ void depthRangeMain(uint3 id : SV_DispatchThreadID) {
         if (d < 1.0) {
             let near = constants.clip.x;
             let far = constants.clip.y;
-            let viewDepth = near * far / (far - d * (far - near));
+            let viewDepth = constants.size.w != 0 ? near + d * (far - near)
+                                                  : near * far / (far - d * (far - near));
             nearest = viewDepth;
             farthest = viewDepth;
         }

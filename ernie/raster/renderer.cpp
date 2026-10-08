@@ -233,7 +233,9 @@ SensorPlan ProbePlan(const SensorFilterModel& model, const SensorFilterRegistry&
 
 /// The modules of `plan`'s kernel: the sensor, its custom filters' and its entry point.
 std::vector<ShaderModuleSource> SensorModules(const SensorPlan& plan, std::uint32_t segment) {
-    std::vector<ShaderModuleSource> modules{{"sensor", shaders::kSensorSlang}};
+    std::vector<ShaderModuleSource> modules{{"lens", shaders::kLensSlang},
+                                            {"lensProjection", plan.LensSource()},
+                                            {"sensor", shaders::kSensorSlang}};
     for (auto& [name, source] : plan.Modules()) {
         modules.push_back({name, source});
     }
@@ -1118,6 +1120,7 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
             // Its layer of the render targets it draws into: a frame of more views renders them in
             // chunks of `RenderTargets::MaxViews`, and each sub-frame into the same targets.
             uniforms.flags[2] = (v % outputViews_) % viewsPerTargets;
+            uniforms.flags[3] = params.camera.orthographic ? 1u : 0u;
             uniforms.motion[0] =
                 subframes_ > 1
                     ? static_cast<float>(1.0 + frame.camera.SubframeTime(
@@ -1189,6 +1192,7 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
         SensorPass& pass = passes[c];
         pass.plan = PlanSensor(chain.filters.empty() ? StepsOf(DefaultFilterChain()) : chain.filters,
                                held, sensorFilters_, chain.aovOffset);
+        pass.plan.lens = LensKernelOf(params.camera.lens);
         // Each pass's parameters in a buffer of its own; kept from the last frame's pass at the
         // same place in the order when large enough, which only ever waits when one grows.
         const VkDeviceSize bytes = std::max<VkDeviceSize>(pass.plan.params.size(), 1) *
@@ -1218,6 +1222,7 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
     }
     clipRange_ = {static_cast<float>(params.camera.nearPlane),
                   static_cast<float>(params.camera.farPlane)};
+    orthographic_ = params.camera.orthographic;
     WriteMaterialTable();
     for (const std::size_t model : modelsInUse_) {
         ShadingPipeline(model);
@@ -1307,6 +1312,7 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
     shading.range[0] = static_cast<float>(bands_.minNm);
     shading.range[1] = static_cast<float>(bands_.Width());
     shading.range[2] = static_cast<float>(bands_.count);
+    shading.range[3] = params.camera.orthographic ? 1.0f : 0.0f;
     shading.size[0] = extent_.width;
     shading.size[1] = extent_.height;
     shading.size[2] = kTableResolution;
@@ -1381,17 +1387,27 @@ void RasterRenderer::WriteSensor(const FrameParams& params) {
     sensor.intrinsics[2] =
         static_cast<float>(extent_.height / 2.0 * (1.0 + static_cast<double>(projection[2][1])));
     sensor.intrinsics[3] = static_cast<float>(params.overscan);
+    if (camera.orthographic) {
+        // Its principal point is a shift of the projection, not a skew: pixels per scene unit
+        // stand in for the focal length, which the pinhole lens maps through unchanged.
+        const glm::dvec2 centre = camera.PrincipalPoint();
+        sensor.intrinsics[1] = static_cast<float>(centre.x);
+        sensor.intrinsics[2] = static_cast<float>(centre.y);
+    }
     sensor.size[0] = extent_.width;
     sensor.size[1] = extent_.height;
     sensor.size[2] = static_cast<std::uint32_t>(bands_.count);
     sensor.size[3] = static_cast<std::uint32_t>(camera.sensor.channels.size());
     const LensModel& lens = camera.lens;
-    sensor.distortion[0] = static_cast<float>(lens.k1);
-    sensor.distortion[1] = static_cast<float>(lens.k2);
-    sensor.distortion[2] = static_cast<float>(lens.k3);
-    sensor.distortion[3] = static_cast<float>(lens.p1);
+    // The kernel's projection (`LensKernelOf`) reads Brown-Conrady's terms or the fisheye's.
+    const bool fisheye = lens.projection == LensProjection::Fisheye;
+    sensor.distortion[0] = static_cast<float>(fisheye ? lens.fisheye[0] : lens.k1);
+    sensor.distortion[1] = static_cast<float>(fisheye ? lens.fisheye[1] : lens.k2);
+    sensor.distortion[2] = static_cast<float>(fisheye ? lens.fisheye[2] : lens.k3);
+    sensor.distortion[3] = static_cast<float>(fisheye ? lens.fisheye[3] : lens.p1);
     sensor.lens[0] = static_cast<float>(lens.p2);
-    sensor.lens[1] = lens.vignetting ? 1.0f : 0.0f;
+    // Telecentric (orthographic) optics have no fall-off off axis.
+    sensor.lens[1] = lens.vignetting && !camera.orthographic ? 1.0f : 0.0f;
     sensor.lens[2] =
         static_cast<float>(camera.LinearExposureScale() * static_cast<double>(params.exposure));
     // A flat spectrum of spectral radiance L has luminance 683 L times the y function's integral;
@@ -1421,7 +1437,10 @@ void RasterRenderer::WriteSensor(const FrameParams& params) {
     // The optics filters read (sensor.slang's PixelContext): the lens's f-number for depth of
     // field (0, a pinhole), the one diffraction takes (the lens's, else the exposure's), the
     // sensor's pixel pitch, the focal length and the focus distance.
-    sensor.range[2] = static_cast<float>(camera.lensFStop);
+    // Depth of field follows a thin lens's at its distance from the eye, which telecentric
+    // (orthographic) optics do not have: they stay all in focus.
+    sensor.range[2] = static_cast<float>(camera.orthographic ? 0.0 : camera.lensFStop);
+    sensor.range[3] = camera.orthographic ? 1.0f : 0.0f;
     sensor.optics[0] =
         static_cast<float>(camera.lensFStop > 0.0 ? camera.lensFStop : camera.fStop);
     sensor.optics[1] = static_cast<float>(camera.PixelPitchMetres() * 1e6);
@@ -1719,7 +1738,8 @@ void RasterRenderer::RecordDepthRange(VkCommandBuffer commands, RenderTargets& t
     const struct {
         std::uint32_t size[4];
         float clip[4];
-    } constants{{extent_.width, extent_.height, 0, 0}, {clipRange_[0], clipRange_[1], 0.0f, 0.0f}};
+    } constants{{extent_.width, extent_.height, 0, orthographic_ ? 1u : 0u},
+                {clipRange_[0], clipRange_[1], 0.0f, 0.0f}};
     depthRangeLayout_.PushConstants(commands, &constants, sizeof(constants));
     vkCmdDispatch(commands, (extent_.width + 15) / 16, (extent_.height + 15) / 16, 1);
     ShaderBarrier(commands);
@@ -1823,6 +1843,7 @@ OverlayPass::Target RasterRenderer::OverlayTarget(RenderTargets& targets, std::u
     target.world = view < viewWorlds_.size() ? viewWorlds_[view] : -1;
     target.nearPlane = clipRange_[0];
     target.farPlane = clipRange_[1];
+    target.orthographic = orthographic_;
     return target;
 }
 

@@ -22,6 +22,7 @@ set(ernie_shaders
     film/filter_temporal_average.slang=kFilterTemporalAverageSlang
     film/filter_tone_curve.slang=kFilterToneCurveSlang
     film/filter_white_balance.slang=kFilterWhiteBalanceSlang
+    film/lens.slang=kLensSlang
     film/pyramid.slang=kPyramidSlang
     film/sensor.slang=kSensorSlang
     raster/cull.slang=kCullSlang

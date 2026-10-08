@@ -47,7 +47,8 @@ struct ShadingUniforms {
     float4 eye;
     // xyz: unit direction towards the sun, w: ambient fraction.
     float4 sun;
-    // First band's lower wavelength (nm), band width (nm), band count, unused.
+    // First band's lower wavelength (nm), band width (nm), band count, 1 when the projection is
+    // orthographic (every ray along the view direction).
     float4 range;
     // Image width and height, coefficient table resolution, light count.
     uint4 size;
@@ -348,7 +349,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     let clip = mul(sh.invViewProj, float4(ndc, 1.0));
     let world = clip.xyz / clip.w;
     let normalVisibility = gNormal.Load(pixel);
-    let v = normalize(sh.eye.xyz - world);
+    let v = sh.range.w != 0.0 ? -normalize(rayThrough(ndc.xy)) : normalize(sh.eye.xyz - world);
     let n = facingNormal(normalize(normalVisibility.xyz), v);
     let visibility = normalVisibility.w;
     let albedo = gAlbedo.Load(pixel);
@@ -587,6 +588,30 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
     let c = rayThrough(float2(0.0));
     let a = rayThrough(float2(1.0, 0.0)) - c;
     let b = rayThrough(float2(0.0, 1.0)) - c;
+    let bands = uint(sh.range.z);
+    float radiance[kMaxBands];
+    for (uint band = 0; band < kMaxBands; ++band) {
+        radiance[band] = 0.0;
+    }
+    if (sh.range.w != 0.0) {
+        // Orthographic: every pixel sees the dome along the view direction, with no solid angle
+        // for stars to fill.
+        if ((sh.sky.x & kSkyDome) != 0) {
+            let rgb = (sh.sky.x & kSkyMap) != 0 ? max(domeMapAt(normalize(c), 0.0), float3(0.0))
+                                                 : float3(1.0);
+            let scale = max(rgb.x, max(rgb.y, rgb.z));
+            let coefficients = scale > 0.0 ? sigmoidCoefficients(rgb / scale) : float3(0.0);
+            for (uint band = 0; band < bands; ++band) {
+                let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;
+                radiance[band] =
+                    bandValue(sh.dome, band) * modulationAt(coefficients, scale, wavelength);
+            }
+        }
+        for (uint band = 0; band < bands; ++band) {
+            spectral[int3(id.xy, id.z * bands + band)] = radiance[band];
+        }
+        return;
+    }
     let ray = c + ndc.x * a + ndc.y * b;
     let d = normalize(ray);
     // The image plane, `distance` from the eye along `forward`, and the pixel's solid angle there:
@@ -599,11 +624,6 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
     let solidAngle = pixelArea / (distance * distance) * cosine * cosine * cosine;
     let pixelAngle = 2.0 * length(b) / size.y / distance;
 
-    let bands = uint(sh.range.z);
-    float radiance[kMaxBands];
-    for (uint band = 0; band < kMaxBands; ++band) {
-        radiance[band] = 0.0;
-    }
     if ((sh.sky.x & kSkyDome) != 0) {
         let rgb = (sh.sky.x & kSkyMap) != 0 ? max(domeMapAt(d, pixelAngle), float3(0.0))
                                              : float3(1.0);

@@ -571,6 +571,7 @@ class RasterRenderer {
     bool meter_ = false;  ///< Whether the last `Update`'s frame meters.
     std::vector<std::int32_t> viewWorlds_;  ///< Per view of the last `Update`, its world.
     std::array<float, 2> clipRange_{};      ///< The last `Update`'s near and far planes.
+    bool orthographic_ = false;             ///< Whether the last `Update`'s camera is.
 };
 
 }  // namespace ernie

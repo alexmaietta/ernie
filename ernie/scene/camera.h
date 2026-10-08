@@ -5,6 +5,7 @@
 
 #include <glm/glm.hpp>
 
+#include <array>
 #include <cstdint>
 #include <span>
 #include <string>
@@ -27,37 +28,84 @@ struct CameraView {
     glm::mat4 ViewProjection() const {
         return projection * view;
     }
+
+    /// Whether the projection is orthographic: every ray runs along `forward`, and `verticalFov`
+    /// is 0.
+    bool IsOrthographic() const {
+        return projection[3][3] == 1.0f;
+    }
 };
 
-/// A lens: radial and tangential distortion (Brown-Conrady, in OpenCV's convention), natural
-/// cos^4 vignetting and transmission.
-///
-/// Distortion maps undistorted normalised image coordinates (x, y) = (X/Z, Y/Z) to distorted ones:
+/// How a lens maps the field angle of a ray to its place in the image.
+enum class LensProjection : std::uint8_t {
+    /// Rectilinear: a ray at field angle theta lands at radius tan(theta), with Brown-Conrady
+    /// distortion on top.
+    Perspective,
+    /// Kannala-Brandt fisheye: at radius theta_d = theta (1 + k1 theta^2 + k2 theta^4 +
+    /// k3 theta^6 + k4 theta^8), with `fisheye` as k1 to k4; all zero is the equidistant
+    /// projection.
+    Fisheye,
+};
+
+/// A lens: its projection, natural vignetting and transmission. A perspective lens has radial and
+/// tangential distortion (Brown-Conrady, in OpenCV's convention), which maps undistorted
+/// normalised image coordinates (x, y) = (X/Z, Y/Z) to distorted ones:
 ///   x' = x (1 + k1 r^2 + k2 r^4 + k3 r^6) + 2 p1 x y + p2 (r^2 + 2 x^2)
 ///   y' = y (1 + k1 r^2 + k2 r^4 + k3 r^6) + p1 (r^2 + 2 y^2) + 2 p2 x y
+/// A fisheye lens maps them to theta_d / r (x, y), with theta = atan(r) (OpenCV's fisheye model).
+///
+/// The rasterizer draws a pinhole image and the sensor resamples it through the lens, so a
+/// fisheye's field angle must stay below `kMaxFisheyeFieldAngle`.
 ///
 /// References:
 /// - D. C. Brown, "Decentering Distortion of Lenses", Photogrammetric Engineering 32(3):444-462,
 ///   1966.
+/// - J. Kannala and S. S. Brandt, "A Generic Camera Model and Calibration Method for
+///   Conventional, Wide-Angle, and Fish-Eye Lenses", IEEE TPAMI 28(8):1335-1340, 2006.
+///   https://doi.org/10.1109/TPAMI.2006.153
 /// - OpenCV, "Camera Calibration and 3D Reconstruction",
-///   https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html
+///   https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html, and "Fisheye camera model",
+///   https://docs.opencv.org/4.x/db/d58/group__calib3d__fisheye.html
 struct LensModel {
+    LensProjection projection = LensProjection::Perspective;
     double k1 = 0.0;
     double k2 = 0.0;
     double k3 = 0.0;
     double p1 = 0.0;
     double p2 = 0.0;
-    bool vignetting = false;    ///< Natural cos^4 falloff of irradiance off axis.
+    std::array<double, 4> fisheye{};  ///< Kannala-Brandt k1 to k4.
+    bool vignetting = false;    ///< Natural falloff of irradiance off axis (cos^4 for pinholes).
     double transmission = 1.0;  ///< Fraction of light the optics pass.
 
+    /// The largest field angle a fisheye may see, in radians (80 degrees): the pinhole image the
+    /// sensor resamples grows as its tangent.
+    static constexpr double kMaxFisheyeFieldAngle = 1.3962634015954636;
+
+    /// Whether the lens is a pinhole: perspective without distortion.
+    bool IsPinhole() const {
+        return projection == LensProjection::Perspective && !HasDistortion();
+    }
+
+    /// Whether Brown-Conrady distortion is set.
     bool HasDistortion() const {
         return k1 != 0.0 || k2 != 0.0 || k3 != 0.0 || p1 != 0.0 || p2 != 0.0;
     }
 
+    /// Distorted normalised image coordinates of pinhole ones `undistorted`.
     glm::dvec2 Distort(glm::dvec2 undistorted) const;
 
-    /// The inverse of `Distort` by fixed-point iteration, accurate for moderate distortion.
+    /// The inverse of `Distort`: pinhole normalised image coordinates of the ray landing at
+    /// `distorted`. By fixed-point iteration for perspective lenses, accurate for moderate
+    /// distortion; by Newton's method on the field angle for fisheyes.
     glm::dvec2 Undistort(glm::dvec2 distorted) const;
+
+    /// The field angle in radians of the ray landing at normalised image coordinates `distorted`.
+    double FieldAngle(glm::dvec2 distorted) const;
+
+    /// The irradiance at normalised image coordinates `distorted` relative to the axis, from the
+    /// aperture's foreshortening and the solid angle the image there sees:
+    /// cos(theta) sin(theta) / (theta_d theta_d'), cos^4(theta) for a pinhole.
+    double NaturalVignetting(glm::dvec2 distorted) const;
 };
 
 /// One channel of a sensor: its quantum efficiency (electrons per photon) over wavelength.
@@ -111,6 +159,13 @@ struct SensorModel {
 /// pixels are square with a pitch of `verticalAperture / height`, and the horizontal aperture
 /// follows from the image's aspect. Aperture offsets shift the principal point.
 ///
+/// An `orthographic` camera follows UsdGeomCamera (and GfCamera): its apertures and their offsets
+/// are in tenths of a scene unit, the size of the view in the scene, and it has no focal length;
+/// every ray runs along the view direction. Its optics are telecentric, without fall-off off axis
+/// or depth of field, and its pixels have the pitch `orthographicPixelPitchUm` on the sensor. Its
+/// lens has no distortion. Distances to the camera are from its image plane. Terrain levels of
+/// detail still follow the distance from the camera's position, so place it near what it sees.
+///
 /// Radiometry follows the camera equation: a scene radiance L reaches the sensor as irradiance
 /// E = L pi t cos^4(theta) / (4 N^2) for an object far away, with transmission t, f-number N and
 /// field angle theta; a pixel collects E times its area times the exposure time, converted to
@@ -126,10 +181,16 @@ struct Camera {
     glm::dmat4 transform{1.0};  ///< Camera to world.
     std::uint32_t width = 1;
     std::uint32_t height = 1;
+    /// USD `projection` "orthographic": the apertures and offsets below are in tenths of a scene
+    /// unit, and the focal length is unused.
+    bool orthographic = false;
     double focalLengthMm = 50.0;
     double verticalApertureMm = 15.2908;
     double horizontalApertureOffsetMm = 0.0;
     double verticalApertureOffsetMm = 0.0;
+    /// An orthographic camera's pixel pitch on its sensor, in micrometres, for the camera equation;
+    /// a perspective camera's follows from its aperture.
+    double orthographicPixelPitchUm = 5.0;
     double nearPlane = 1.0;
     double farPlane = 1e6;
     double exposureStops = 0.0;  ///< USD `exposure`: scales the photographic output by 2^stops.
@@ -167,7 +228,8 @@ struct Camera {
 
     /// The raster view: the inverse pose, and a projection with the focal length divided by
     /// `overscan` (so with lens distortion it covers the undistorted rays of every sensor pixel),
-    /// the principal point and the clipping range.
+    /// the principal point and the clipping range. An orthographic camera's spans its apertures
+    /// in the scene (`overscan` 1, as it has no distortion).
     CameraView RasterView(double overscan = 1.0) const;
 
     /// `RasterView` from camera-to-world `pose` in place of `transform`, such as one view of a
@@ -178,11 +240,14 @@ struct Camera {
     /// responsivity * time * (iso / 100) * 2^exposure / fStop^2.
     double LinearExposureScale() const;
 
-    /// Side of a pixel, in metres.
+    /// Side of a pixel on the sensor, in metres.
     double PixelPitchMetres() const;
 
-    /// Focal length in pixels.
+    /// Focal length in pixels, of a perspective camera.
     double FocalLengthPixels() const;
+
+    /// An orthographic camera's side of a pixel in the scene, in scene units.
+    double OrthographicPixelSize() const;
 
     /// The principal point in pixels, from the image's top-left corner.
     glm::dvec2 PrincipalPoint() const;
@@ -191,7 +256,8 @@ struct Camera {
     double VerticalFov() const;
 
     /// Irradiance at the sensor per unit scene radiance at normalised image coordinates
-    /// (`x`, `y`): pi t cos^4(theta) / (4 N^2), without the cos^4 term when vignetting is off.
+    /// (`x`, `y`) on the sensor: pi t cos^4(theta) / (4 N^2) for a pinhole, the lens's
+    /// `NaturalVignetting` in place of cos^4, which is left out when vignetting is off.
     double IrradiancePerRadiance(glm::dvec2 normalised) const;
 
     /// Mean electrons a pixel at normalised coordinates `normalised` collects in channel
@@ -211,7 +277,9 @@ struct Camera {
     /// @throws std::invalid_argument for non-positive sizes, times, f-numbers, ISO or focal
     /// length, a bad clipping range, a degenerate transform, a bad spectral range, no sensor
     /// channels or more than four, or a shutter closing before it opens, a negative rolling
-    /// readout or shutter samples outside 1 to `kMaxShutterSamples`.
+    /// readout or shutter samples outside 1 to `kMaxShutterSamples`, an orthographic camera with
+    /// lens distortion or a fisheye or a non-positive pixel pitch, or a fisheye with
+    /// Brown-Conrady distortion or a field reaching past `LensModel::kMaxFisheyeFieldAngle`.
     void Check() const;
 
     static constexpr int kMaxShutterSamples = 64;

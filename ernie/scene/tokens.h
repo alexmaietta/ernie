@@ -113,7 +113,12 @@ inline constexpr std::string_view kShutterRolling = "ernie:shutter:rolling";
 // interleaved (wavelength in nm, value) pairs.
 inline constexpr std::string_view kSpectralRange = "ernie:spectral:range";    ///< vec2 nm.
 inline constexpr std::string_view kSpectralBands = "ernie:spectral:bands";    ///< int, 1 to 64.
+/// The lens's projection: "perspective" (the default) or "fisheye" (`LensProjection`).
+inline constexpr std::string_view kLensProjection = "ernie:lens:projection";
+inline constexpr std::string_view kFisheye = "fisheye";
 inline constexpr std::string_view kLensDistortion = "ernie:lens:distortion";  ///< k1 k2 k3 p1 p2.
+/// A fisheye's Kannala-Brandt coefficients k1 k2 k3 k4 (float array; none is equidistant).
+inline constexpr std::string_view kLensFisheye = "ernie:lens:fisheye";
 inline constexpr std::string_view kLensVignetting = "ernie:lens:vignetting";  ///< bool.
 inline constexpr std::string_view kLensTransmission = "ernie:lens:transmission";  ///< fraction.
 inline constexpr std::string_view kSensorType = "ernie:sensor:type";  ///< "rgb" or "mono".
@@ -127,6 +132,9 @@ inline constexpr std::string_view kSensorDsnu = "ernie:sensor:dsnu";            
 inline constexpr std::string_view kSensorGain = "ernie:sensor:electronsPerDn";      ///< at ISO 100.
 inline constexpr std::string_view kSensorAdcBits = "ernie:sensor:adcBits";
 inline constexpr std::string_view kSensorBlackLevel = "ernie:sensor:blackLevel";  ///< DN.
+/// An orthographic (telecentric) camera's pixel pitch on its sensor, in micrometres: its apertures
+/// span the scene, so they do not give it (`Camera::orthographicPixelPitchUm`).
+inline constexpr std::string_view kSensorPixelPitch = "ernie:sensor:pixelPitch";
 inline constexpr std::string_view kSensorNoise = "ernie:sensor:noise";            ///< bool.
 inline constexpr std::string_view kSensorSeed = "ernie:sensor:seed";              ///< int.
 

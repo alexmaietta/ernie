@@ -13,9 +13,21 @@ namespace {
 
 std::array<glm::vec3, 8> SliceCorners(const CameraView& camera, float nearDepth, float farDepth) {
     const glm::mat4 cameraToWorld = glm::inverse(camera.view);
+    std::array<glm::vec3, 8> corners{};
+    if (camera.IsOrthographic()) {
+        // The view's box: the projection's edges at every depth.
+        const glm::mat4 toView = glm::inverse(camera.projection);
+        for (int i = 0; i < 8; ++i) {
+            const float depth = (i & 4) ? farDepth : nearDepth;
+            const glm::vec4 edge = toView * glm::vec4(i & 1 ? 1.0f : -1.0f, i & 2 ? 1.0f : -1.0f,
+                                                      0.0f, 1.0f);
+            corners[static_cast<std::size_t>(i)] =
+                glm::vec3(cameraToWorld * glm::vec4(edge.x, edge.y, -depth, 1.0f));
+        }
+        return corners;
+    }
     const float tanY = std::tan(0.5f * camera.verticalFov);
     const float tanX = tanY * camera.aspect;
-    std::array<glm::vec3, 8> corners{};
     for (int i = 0; i < 8; ++i) {
         const float depth = (i & 4) ? farDepth : nearDepth;
         const glm::vec4 inView((i & 1 ? 1.0f : -1.0f) * tanX * depth,

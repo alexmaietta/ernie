@@ -35,7 +35,35 @@ const std::vector<float>* FloatArray(const Scene& scene, const Path& path,
 
 }  // namespace
 
+namespace {
+
+/// The fisheye's radius theta_d of field angle `theta`, and its derivative.
+double FisheyeRadius(const std::array<double, 4>& k, double theta) {
+    const double t2 = theta * theta;
+    return theta * (1.0 + t2 * (k[0] + t2 * (k[1] + t2 * (k[2] + t2 * k[3]))));
+}
+
+double FisheyeSlope(const std::array<double, 4>& k, double theta) {
+    const double t2 = theta * theta;
+    return 1.0 + t2 * (3.0 * k[0] + t2 * (5.0 * k[1] + t2 * (7.0 * k[2] + t2 * 9.0 * k[3])));
+}
+
+/// The field angle of the fisheye ray landing at radius `rd`, by Newton's method.
+double FisheyeFieldAngle(const std::array<double, 4>& k, double rd) {
+    double theta = rd;
+    for (int i = 0; i < 20; ++i) {
+        theta -= (FisheyeRadius(k, theta) - rd) / FisheyeSlope(k, theta);
+    }
+    return theta;
+}
+
+}  // namespace
+
 glm::dvec2 LensModel::Distort(glm::dvec2 p) const {
+    if (projection == LensProjection::Fisheye) {
+        const double r = glm::length(p);
+        return r > 0.0 ? p * (FisheyeRadius(fisheye, std::atan(r)) / r) : p;
+    }
     const double r2 = glm::dot(p, p);
     const double radial = 1.0 + r2 * (k1 + r2 * (k2 + r2 * k3));
     return {p.x * radial + 2.0 * p1 * p.x * p.y + p2 * (r2 + 2.0 * p.x * p.x),
@@ -43,11 +71,36 @@ glm::dvec2 LensModel::Distort(glm::dvec2 p) const {
 }
 
 glm::dvec2 LensModel::Undistort(glm::dvec2 distorted) const {
+    if (projection == LensProjection::Fisheye) {
+        const double rd = glm::length(distorted);
+        return rd > 0.0 ? distorted * (std::tan(FisheyeFieldAngle(fisheye, rd)) / rd) : distorted;
+    }
     glm::dvec2 p = distorted;
     for (int i = 0; i < 20; ++i) {
         p += distorted - Distort(p);
     }
     return p;
+}
+
+double LensModel::FieldAngle(glm::dvec2 distorted) const {
+    if (projection == LensProjection::Fisheye) {
+        return FisheyeFieldAngle(fisheye, glm::length(distorted));
+    }
+    return std::atan(glm::length(Undistort(distorted)));
+}
+
+double LensModel::NaturalVignetting(glm::dvec2 distorted) const {
+    if (projection == LensProjection::Fisheye) {
+        const double rd = glm::length(distorted);
+        if (rd <= 0.0) {
+            return 1.0;
+        }
+        const double theta = FisheyeFieldAngle(fisheye, rd);
+        return std::cos(theta) * std::sin(theta) / (rd * FisheyeSlope(fisheye, theta));
+    }
+    const glm::dvec2 p = Undistort(distorted);
+    const double cosine2 = 1.0 / (1.0 + glm::dot(p, p));
+    return cosine2 * cosine2;
 }
 
 SensorModel SensorModel::Rgb() {
@@ -78,17 +131,22 @@ double Camera::LinearExposureScale() const {
 }
 
 double Camera::PixelPitchMetres() const {
-    return verticalApertureMm * 1e-3 / height;
+    return orthographic ? orthographicPixelPitchUm * 1e-6 : verticalApertureMm * 1e-3 / height;
 }
 
 double Camera::FocalLengthPixels() const {
-    return focalLengthMm * 1e-3 / PixelPitchMetres();
+    return focalLengthMm / (verticalApertureMm / height);
+}
+
+double Camera::OrthographicPixelSize() const {
+    return 0.1 * verticalApertureMm / height;
 }
 
 glm::dvec2 Camera::PrincipalPoint() const {
-    const double pitchMm = PixelPitchMetres() * 1e3;
-    return {0.5 * width + horizontalApertureOffsetMm / pitchMm,
-            0.5 * height - verticalApertureOffsetMm / pitchMm};
+    // Offsets share the apertures' units, millimetres or tenths of a scene unit.
+    const double pitch = verticalApertureMm / height;
+    return {0.5 * width + horizontalApertureOffsetMm / pitch,
+            0.5 * height - verticalApertureOffsetMm / pitch};
 }
 
 double Camera::VerticalFov() const {
@@ -97,9 +155,9 @@ double Camera::VerticalFov() const {
 
 double Camera::IrradiancePerRadiance(glm::dvec2 normalised) const {
     double factor = M_PI * lens.transmission / (4.0 * fStop * fStop);
-    if (lens.vignetting) {
-        const double cosine2 = 1.0 / (1.0 + glm::dot(normalised, normalised));
-        factor *= cosine2 * cosine2;
+    // Telecentric optics see every pixel's scene head on.
+    if (lens.vignetting && !orthographic) {
+        factor *= lens.NaturalVignetting(normalised);
     }
     return factor;
 }
@@ -156,16 +214,25 @@ CameraView Camera::RasterView(double overscan) const {
 CameraView Camera::RasterView(const glm::dmat4& pose, double overscan) const {
     const double w = width;
     const double h = height;
-    const double focal = FocalLengthPixels() / overscan;
     const glm::dvec2 centre = PrincipalPoint();
     CameraView view;
-    view.verticalFov = static_cast<float>(2.0 * std::atan(0.5 * h / focal));
     view.aspect = static_cast<float>(w / h);
     view.nearPlane = static_cast<float>(nearPlane);
     view.farPlane = static_cast<float>(farPlane);
     view.eye = glm::vec3(pose[3]);
     view.forward = glm::vec3(glm::normalize(-glm::dvec3(pose[2])));
     view.view = glm::mat4(glm::inverse(pose));
+    if (orthographic) {
+        // The image's edges in the view, the principal point on the axis.
+        const double size = OrthographicPixelSize();
+        view.verticalFov = 0.0f;
+        view.projection = glm::mat4(glm::orthoRH_ZO(-centre.x * size, (w - centre.x) * size,
+                                                    -(h - centre.y) * size, centre.y * size,
+                                                    nearPlane, farPlane));
+        return view;
+    }
+    const double focal = FocalLengthPixels() / overscan;
+    view.verticalFov = static_cast<float>(2.0 * std::atan(0.5 * h / focal));
     view.projection =
         glm::perspectiveRH_ZO(view.verticalFov, view.aspect, view.nearPlane, view.farPlane);
     view.projection[2][0] = static_cast<float>(1.0 - 2.0 * centre.x / w);
@@ -200,6 +267,44 @@ void Camera::Check() const {
                                     "rolling readout and 1 to " +
                                     std::to_string(kMaxShutterSamples) + " samples");
     }
+    if (orthographic && (!lens.IsPinhole() || !(orthographicPixelPitchUm > 0.0))) {
+        throw std::invalid_argument(
+            "An orthographic camera needs a perspective lens without distortion and a positive "
+            "pixel pitch");
+    }
+    if (lens.projection == LensProjection::Fisheye) {
+        if (lens.HasDistortion()) {
+            throw std::invalid_argument(
+                "A fisheye lens takes its distortion from its fisheye coefficients, not "
+                "Brown-Conrady's");
+        }
+        // The widest ray is at a corner of the image; the fisheye's radius must grow with the
+        // field angle up to it.
+        const double f = FocalLengthPixels();
+        const glm::dvec2 centre = PrincipalPoint();
+        const double corner =
+            glm::length(glm::dvec2(std::max(centre.x, width - centre.x),
+                                   std::max(centre.y, height - centre.y))) /
+            f;
+        double theta = 0.0;
+        double reached = 0.0;
+        constexpr int kSteps = 256;
+        for (int i = 1; i <= kSteps && reached < corner; ++i) {
+            theta = LensModel::kMaxFisheyeFieldAngle * i / kSteps;
+            const double radius = FisheyeRadius(lens.fisheye, theta);
+            if (!(FisheyeSlope(lens.fisheye, theta) > 0.0)) {
+                break;
+            }
+            reached = radius;
+        }
+        if (reached < corner) {
+            throw std::invalid_argument(
+                "A fisheye camera's field reaches past " +
+                std::to_string(LensModel::kMaxFisheyeFieldAngle * 180.0 / M_PI) +
+                " degrees off axis, or its projection folds back; lengthen the focal length or "
+                "shrink the aperture");
+        }
+    }
 }
 
 int Camera::Subframes() const {
@@ -219,11 +324,13 @@ Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::
     if (!scene.Has(path) || scene.TypeOf(path) != kCamera) {
         throw std::invalid_argument("'" + path.String() + "' is not a Camera");
     }
-    if (GetToken(scene, path, kProjection, kPerspective) != kPerspective) {
-        throw std::invalid_argument("Camera '" + path.String() +
-                                    "': only perspective projection is supported");
+    const std::string projection = GetToken(scene, path, kProjection, kPerspective);
+    if (projection != kPerspective && projection != kOrthographic) {
+        throw std::invalid_argument("Camera '" + path.String() + "' has projection '" +
+                                    projection + "'; use perspective or orthographic");
     }
     Camera camera;
+    camera.orthographic = projection == kOrthographic;
     camera.transform = scene.WorldTransform(path);
     camera.width = width;
     camera.height = height;
@@ -263,6 +370,18 @@ Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::
         lens.p1 = at(3);
         lens.p2 = at(4);
     }
+    const std::string lensProjection = GetToken(scene, path, kLensProjection, kPerspective);
+    if (lensProjection == kFisheye) {
+        lens.projection = LensProjection::Fisheye;
+    } else if (lensProjection != kPerspective) {
+        throw std::invalid_argument("Camera '" + path.String() + "' has lens projection '" +
+                                    lensProjection + "'; use perspective or fisheye");
+    }
+    if (const std::vector<float>* k = FloatArray(scene, path, kLensFisheye)) {
+        for (std::size_t i = 0; i < lens.fisheye.size(); ++i) {
+            lens.fisheye[i] = i < k->size() ? double((*k)[i]) : 0.0;
+        }
+    }
     lens.vignetting = GetBool(scene, path, kLensVignetting, lens.vignetting);
     lens.transmission = number(kLensTransmission, lens.transmission);
 
@@ -290,6 +409,7 @@ Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::
     sensor.electronsPerDnAtIso100 = number(kSensorGain, sensor.electronsPerDnAtIso100);
     sensor.adcBits = static_cast<int>(number(kSensorAdcBits, sensor.adcBits));
     sensor.blackLevelDn = number(kSensorBlackLevel, sensor.blackLevelDn);
+    camera.orthographicPixelPitchUm = number(kSensorPixelPitch, camera.orthographicPixelPitchUm);
     sensor.noise = GetBool(scene, path, kSensorNoise, sensor.noise);
     sensor.seed = static_cast<std::uint32_t>(number(kSensorSeed, sensor.seed));
     camera.Check();

@@ -203,16 +203,21 @@ std::vector<PropertySection> CameraSchema() {
     const SensorModel& sensor = camera.sensor;
     return {
         {"Lens",
-         {Field(kFocalLength, "Focal length", Kind::Float, camera.focalLengthMm, 1.0, 2000.0, {},
+         {Field(kProjection, "Projection", Kind::Token, S(kPerspective), 0, 0,
+                {S(kPerspective), S(kOrthographic)},
+                "Orthographic reads the apertures in tenths of a scene unit"),
+          Field(kFocalLength, "Focal length", Kind::Float, camera.focalLengthMm, 1.0, 2000.0, {},
                 "mm"),
           Field(kVerticalAperture, "Vertical aperture", Kind::Float, camera.verticalApertureMm,
-                0.1, 100.0, {}, "mm"),
+                0.1, 100.0, {}, "mm; tenths of a scene unit when orthographic"),
           Field(kHorizontalApertureOffset, "Horizontal offset", Kind::Float, 0.0, -50.0, 50.0, {},
                 "mm"),
           Field(kVerticalApertureOffset, "Vertical offset", Kind::Float, 0.0, -50.0, 50.0, {},
                 "mm"),
           Field(kClippingRange, "Clipping range", Kind::Vec2,
                 glm::dvec2(camera.nearPlane, camera.farPlane)),
+          Field(kLensProjection, "Lens projection", Kind::Token, S(kPerspective), 0, 0,
+                {S(kPerspective), S(kFisheye)}),
           Field(kLensVignetting, "Vignetting", Kind::Bool, camera.lens.vignetting),
           Field(kLensTransmission, "Transmission", Kind::Float, camera.lens.transmission, 0.0,
                 1.0)}},
@@ -255,6 +260,8 @@ std::vector<PropertySection> CameraSchema() {
           Field(kSensorAdcBits, "ADC bits", Kind::Int, sensor.adcBits, 1, 16),
           Field(kSensorBlackLevel, "Black level", Kind::Float, sensor.blackLevelDn, 0.0, 4096.0,
                 {}, "DN"),
+          Field(kSensorPixelPitch, "Pixel pitch", Kind::Float, camera.orthographicPixelPitchUm,
+                0.1, 100.0, {}, "Micrometres, of orthographic cameras"),
           Field(kSensorSeed, "Seed", Kind::Int, static_cast<int>(sensor.seed))}},
     };
 }

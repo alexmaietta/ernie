@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ernie/scene/camera.h"
 #include "ernie/scene/sensor_filters.h"
 
 #include <cstdint>
@@ -50,6 +51,9 @@ struct SensorPlan {
     /// Segments whose spatial filters read their input's pyramid (`SensorFilterModel::pyramid`),
     /// a bit each: the renderer builds the channel images' pyramid before them.
     std::uint32_t pyramids = 0;
+    /// The lens head's projection, a struct of lens.slang: "Pinhole", "BrownConrady" or
+    /// "Fisheye" (`LensKernelOf`). Compiled into the kernel, so a pinhole runs no distortion code.
+    std::string lens = "Pinhole";
 
     /// Identifies the kernels: plans with the same key share them (parameter values aside, which
     /// the kernels read from a buffer).
@@ -59,6 +63,10 @@ struct SensorPlan {
     /// and its custom filters' modules (`Modules`). Segment `s` reads the images segment `s - 1`
     /// stored (sensor.slang's bindings 16 and 17) and stores those segment `s + 1` reads (18, 19).
     std::string Source(std::uint32_t segment = 0) const;
+
+    /// The Slang source of module `lensProjection`, which module `sensor` imports: `lensPinholeOf`
+    /// and `lensFalloff` of projection `lens`, from module `lens`.
+    std::string LensSource() const;
 
     /// The custom filters' modules as (name, source), for the shader compiler.
     std::vector<std::pair<std::string, std::string>> Modules() const;
@@ -74,6 +82,10 @@ struct SensorPlan {
 SensorPlan PlanSensor(std::span<const SensorFilterStep> chain,
                       std::span<const std::string_view> held, const SensorFilterRegistry& registry,
                       std::uint32_t aovOffset = 0);
+
+/// The lens projection of lens.slang that `lens` compiles into the sensor kernel
+/// (`SensorPlan::lens`): "Pinhole" without distortion, "BrownConrady" with it, or "Fisheye".
+std::string LensKernelOf(const LensModel& lens);
 
 /// `PlanSensor` of a chain of built-in filters.
 SensorPlan PlanSensor(std::span<const SensorFilter> chain, std::span<const std::string_view> held);

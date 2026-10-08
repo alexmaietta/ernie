@@ -296,7 +296,30 @@ std::string SensorPlan::Key() const {
     if (pyramids != 0) {
         key += "^" + std::to_string(pyramids);
     }
-    return key;
+    return key + "~" + lens;
+}
+
+std::string LensKernelOf(const LensModel& lens) {
+    if (lens.projection == LensProjection::Fisheye) {
+        return "Fisheye";
+    }
+    return lens.HasDistortion() ? "BrownConrady" : "Pinhole";
+}
+
+std::string SensorPlan::LensSource() const {
+    return "// Generated for the lens projection " + lens +
+           ".\n"
+           "import lens;\n"
+           "public float2 lensPinholeOf(float2 sensor, float4 k, float p2) {\n"
+           "    return " +
+           lens +
+           ".pinholeOf(sensor, k, p2);\n"
+           "}\n"
+           "public float lensFalloff(float2 sensor, float2 pinhole, float4 k) {\n"
+           "    return " +
+           lens +
+           ".falloff(sensor, pinhole, k);\n"
+           "}\n";
 }
 
 std::vector<std::pair<std::string, std::string>> SensorPlan::Modules() const {

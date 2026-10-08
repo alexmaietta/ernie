@@ -1086,7 +1086,7 @@ StarField StarFieldOf(const Scene& scene, const Path& path) {
 }
 
 double OverscanOf(const Camera& camera) {
-    if (!camera.lens.HasDistortion()) {
+    if (camera.lens.IsPinhole()) {
         return 1.0;
     }
     const double f = camera.FocalLengthPixels();

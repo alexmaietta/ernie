@@ -359,6 +359,58 @@ TEST_F(RasterDelegateTest, ExposureNoiseAndDistortionFollowTheCamera) {
         << "barrel distortion sees wider at the corners";
 }
 
+TEST_F(RasterDelegateTest, OrthographicSeesItsApertureInTheScene) {
+    // Looking straight down from 50 over terrain spanning x in [-65, 65]: an aperture of 2000
+    // tenths of a scene unit spans 200 units, 6.25 per pixel, so the terrain covers the middle
+    // 65% of the image, every pixel of it at the same distance.
+    Scene scene = FlatScene();
+    scene.Set("/World/Camera", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, 50.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
+    scene.Set("/World/Camera", tokens::kProjection, std::string(tokens::kOrthographic));
+    scene.Set("/World/Camera", tokens::kVerticalAperture, 2000.0f);
+    scene.Set("/World/Camera", tokens::kClippingRange, glm::dvec2(1.0, 1000.0));
+    RasterDelegate delegate(*context_);
+    ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+    const auto vars = MapVars(outputs);
+    const std::size_t c = kVarSize / 2;
+    EXPECT_EQ(At<std::uint32_t>(vars.at("PrimId"), c, 4), 0u) << "x = -71.9, past the terrain";
+    for (const std::size_t col : {std::size_t{6}, c, std::size_t{25}}) {
+        EXPECT_NE(At<std::uint32_t>(vars.at("PrimId"), c, col), 0u) << "column " << col;
+        EXPECT_NEAR(At<float>(vars.at("DistanceToImagePlane"), c, col), 50.0f, 0.05f);
+        EXPECT_NEAR(At<float>(vars.at("DistanceToCamera"), c, col), 50.0f, 0.05f)
+            << "rays start on the image plane";
+        EXPECT_NEAR(At<float>(vars.at("HdrColor"), c, col), 0.5f, 0.02f)
+            << "the sun overhead lights it as a perspective view does";
+    }
+    EXPECT_EQ(At<std::uint32_t>(vars.at("PrimId"), c, 27), 0u) << "x = 71.9";
+}
+
+TEST_F(RasterDelegateTest, FisheyeSeesFieldAnglesInProportionToRadius) {
+    // 50 above flat ground looking straight down: a ray at field angle theta meets it
+    // 50 / cos(theta) away. Equidistant, a pixel's theta is its radius over the focal length.
+    Scene scene = FlatScene();
+    scene.Set("/World/Camera", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, 50.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
+    scene.Set("/World/Camera", tokens::kFocalLength, 12.0f);
+    scene.Set("/World/Camera", tokens::kLensProjection, std::string(tokens::kFisheye));
+    RasterDelegate delegate(*context_);
+    ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+    const auto vars = MapVars(outputs);
+    const ernie::Camera camera = ernie::CameraOf(scene, "/World/Camera", kVarSize, kVarSize);
+    const std::size_t c = kVarSize / 2;
+    for (const std::size_t col : {std::size_t{0}, std::size_t{4}, c}) {
+        const double x = (col + 0.5 - camera.PrincipalPoint().x) / camera.FocalLengthPixels();
+        const double y = (camera.PrincipalPoint().y - (c + 0.5)) / camera.FocalLengthPixels();
+        const double theta = std::hypot(x, y);
+        // The raster image is sampled at its nearest texel, a pixel of a 32-pixel image.
+        EXPECT_NEAR(At<float>(vars.at("DistanceToCamera"), c, col), 50.0 / std::cos(theta), 0.8)
+            << "column " << col;
+    }
+    const double edge = std::abs((0.5 - camera.PrincipalPoint().x) / camera.FocalLengthPixels());
+    EXPECT_GT(50.0 / std::cos(edge) - 50.0 * std::sqrt(1.0 + edge * edge), 1.6)
+        << "a pinhole would see the edge nearer";
+}
+
 namespace {
 
 /// The Electrons var of `product` in `outputs`, on the CPU.

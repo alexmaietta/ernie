@@ -19,6 +19,8 @@ extern const char kFrameSlang[];
 extern const char kShadingSlang[];
 extern const char kSensorSlang[];
 extern const char kPresentSlang[];
+/// The sensor's lens projections (pinhole, Brown-Conrady, fisheye).
+extern const char kLensSlang[];
 /// Image pyramids for spatial sensor filters that read far around a pixel.
 extern const char kPyramidSlang[];
 
