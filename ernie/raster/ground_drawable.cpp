@@ -19,12 +19,13 @@ namespace {
 struct GroundUniforms {
     float invViewProj[16];
     float plane[4];
+    float checkerPhase[4];
     float colour0[4];
     float colour1[4];
     float viewport[4];
     std::uint32_t ids[4];
 };
-static_assert(sizeof(GroundUniforms) == 144, "GroundUniforms must match ground.slang");
+static_assert(sizeof(GroundUniforms) == 160, "GroundUniforms must match ground.slang");
 
 /// Each view's uniforms start at a multiple of this, the largest uniform offset alignment.
 constexpr VkDeviceSize kUniformsStride = 256;
@@ -93,9 +94,14 @@ void GroundDrawable::Prepare(const FrameParams& params, std::span<const ShadowCa
         return;
     }
     GroundUniforms uniforms{};
-    uniforms.plane[0] = params_.height;
+    // Relative to the frame's origin, the checkerboard keeping its place in the world.
+    uniforms.plane[0] = static_cast<float>(static_cast<double>(params_.height) - origin_.z);
     uniforms.plane[1] = params_.checkerSize;
     uniforms.plane[2] = params_.checker ? 1.0f : 0.0f;
+    const glm::dvec2 squares = glm::dvec2(origin_) / static_cast<double>(params_.checkerSize);
+    const glm::dvec2 phase = squares - 2.0 * glm::floor(squares / 2.0);
+    uniforms.checkerPhase[0] = static_cast<float>(phase.x);
+    uniforms.checkerPhase[1] = static_cast<float>(phase.y);
     for (int k = 0; k < 3; ++k) {
         uniforms.colour0[k] = params_.checkerColors[0][k];
         uniforms.colour1[k] = params_.checkerColors[1][k];

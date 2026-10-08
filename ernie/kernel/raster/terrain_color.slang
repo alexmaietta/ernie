@@ -48,7 +48,7 @@ float3 colormap(float t) {
 
 [shader("fragment")]
 GBuffer fragmentMain(VertexOutput in) {
-    let detail = sampleDetail(detailCoords(in.world.xy));
+    let detail = sampleDetail(detailCoords(in.world.xy, kProjectXy));
 
     // Shadow lookups use the terrain normal; shading adds the detail normal's slope.
     let slope = terrainSlope(in.world);

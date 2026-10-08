@@ -38,7 +38,7 @@ TEST(LightOf, SphereLightsInRelativeUnitsCarryTheirSurfaceLuminance) {
     const ernie::SpectralBands bands;
     const Light lamp = ernie::LightOf(scene, "/Lamp", bands);
     EXPECT_EQ(lamp.type, LightType::Sphere);
-    EXPECT_EQ(lamp.position, glm::vec3(1.0f, 2.0f, 10.0f));
+    EXPECT_EQ(lamp.position, glm::dvec3(1.0, 2.0, 10.0));
     EXPECT_NEAR(lamp.direction.z, -1.0f, 1e-6f) << "emits along its -z axis";
     EXPECT_EQ(lamp.radius, 0.5f);
     EXPECT_EQ(lamp.coneAngle, 180.0f) << "unshaped";

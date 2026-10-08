@@ -144,7 +144,8 @@ TEST(FitLightShadowViews, CoversTheSceneFromEachKindOfLight) {
     Light distant;
     distant.type = LightType::Distant;
     distant.direction = glm::normalize(glm::vec3(1.0f, 0.0f, 1.0f));
-    const std::vector<ShadowCascade> ortho = ernie::FitLightShadowViews(distant, low, high, 512);
+    const std::vector<ShadowCascade> ortho =
+        ernie::FitLightShadowViews(distant, glm::vec3(0.0f), low, high, 512);
     ASSERT_EQ(ortho.size(), 1u);
     for (int i = 0; i < 8; ++i) {
         const glm::vec3 corner((i & 1) ? high.x : low.x, (i & 2) ? high.y : low.y,
@@ -154,10 +155,12 @@ TEST(FitLightShadowViews, CoversTheSceneFromEachKindOfLight) {
     EXPECT_NEAR(ortho[0].texelWorldSize, glm::length(high - low) / 512.0f, 1e-4f);
 
     Light spot;
-    spot.position = glm::vec3(0.0f, 0.0f, 10.0f);
+    const glm::vec3 position(0.0f, 0.0f, 10.0f);
+    spot.position = position;
     spot.direction = glm::vec3(0.0f, 0.0f, -1.0f);
     spot.coneAngle = 30.0f;
-    const std::vector<ShadowCascade> one = ernie::FitLightShadowViews(spot, low, high, 512);
+    const std::vector<ShadowCascade> one =
+        ernie::FitLightShadowViews(spot, position, low, high, 512);
     ASSERT_EQ(one.size(), 1u);
     EXPECT_TRUE(Sees(one[0], {0.0f, 0.0f, 0.0f}));
     EXPECT_TRUE(Sees(one[0], {5.0f, 0.0f, 0.0f})) << "inside the 30 degree cone";
@@ -165,14 +168,15 @@ TEST(FitLightShadowViews, CoversTheSceneFromEachKindOfLight) {
     EXPECT_NEAR(one[0].texelWorldSize, 2.0f * std::tan(glm::radians(30.0f)) / 512.0f, 1e-6f);
 
     spot.coneAngle = 180.0f;
-    const std::vector<ShadowCascade> cube = ernie::FitLightShadowViews(spot, low, high, 512);
+    const std::vector<ShadowCascade> cube =
+        ernie::FitLightShadowViews(spot, position, low, high, 512);
     ASSERT_EQ(cube.size(), 6u);
     const glm::vec3 axes[] = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
     for (std::size_t face = 0; face < 6; ++face) {
-        EXPECT_TRUE(Sees(cube[face], spot.position + 5.0f * axes[face])) << "face " << face;
-        EXPECT_FALSE(Sees(cube[face], spot.position - 5.0f * axes[face])) << "face " << face;
+        EXPECT_TRUE(Sees(cube[face], position + 5.0f * axes[face])) << "face " << face;
+        EXPECT_FALSE(Sees(cube[face], position - 5.0f * axes[face])) << "face " << face;
     }
 
     spot.shadows = false;
-    EXPECT_TRUE(ernie::FitLightShadowViews(spot, low, high, 512).empty());
+    EXPECT_TRUE(ernie::FitLightShadowViews(spot, position, low, high, 512).empty());
 }

@@ -52,6 +52,32 @@ def test_custom_filters_registered_from_python_run_in_chains(renderer, terrain_s
     assert renderer.take_validation_messages() == []
 
 
+SHIFT = """
+import sensor;
+struct Shift : ISpatialPixelFilter {
+    struct Params { float dx; }
+    static void apply(inout SensorPixel value, PixelContext pixel, SpatialImage input,
+                      Params params) {
+        value.rgb = input.values(pixel, int2(pixel.id.xy) - int2(int(params.dx), 0)).xyz;
+    }
+}
+"""
+
+
+def test_spatial_filters_read_neighbouring_pixels(renderer, terrain_scene):
+    if "shift" not in renderer.sensor_filters:
+        renderer.add_sensor_filter(
+            "shift", "Shift", SHIFT, kind="spatial", domain="rgb", params={"dx": 1.0}
+        )
+    base = hdr_through(renderer, terrain_scene, ["cie"])
+    shifted = hdr_through(renderer, terrain_scene, ["cie", "shift"], {"dx": 2.0})
+    expected = base.copy()
+    expected[:, 2:] = base[:, :-2]
+    expected[:, :2] = base[:, :1]  # the left edge repeats its first column
+    np.testing.assert_array_equal(shifted, expected)
+    assert renderer.take_validation_messages() == []
+
+
 def test_add_sensor_filter_rejects_bad_filters(renderer):
     with pytest.raises(ValueError):
         renderer.add_sensor_filter("bad1", "Gain", GAIN, kind="spatial")

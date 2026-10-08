@@ -202,6 +202,11 @@ std::optional<Bounds3> RasterDelegate::SceneBounds() const {
                                   glm::max(bounds->second, drawable->second)}
                         : *drawable;
     }
+    // The drawables' bounds are relative to the render origin.
+    if (bounds) {
+        const glm::vec3 origin(origin_);
+        bounds = Bounds3{bounds->first + origin, bounds->second + origin};
+    }
     return bounds;
 }
 
@@ -616,7 +621,7 @@ std::vector<MeshItem> RasterDelegate::Items(const Scene& scene) const {
         }
         MeshItem item;
         item.mesh = synced.handle;
-        item.transform = glm::mat4(scene.WorldTransform(path));
+        item.transform = scene.WorldTransform(path);
         item.primId = PrimIdOf(path);
         item.world = WorldOf(scene, path);
         shade(path, synced, item);
@@ -633,7 +638,7 @@ std::vector<MeshItem> RasterDelegate::Items(const Scene& scene) const {
         const std::vector<std::int32_t> worlds = InstanceWorldsOf(
             scene, path,
             positions != nullptr ? static_cast<std::size_t>(positions->Elements()) / 3 : 0);
-        const glm::mat4 world(scene.WorldTransform(path));
+        const glm::dmat4 world = scene.WorldTransform(path);
         for (std::size_t k = 0; k < targets.size(); ++k) {
             const auto mesh = syncedMeshes_.find(targets[k]);
             if (mesh == syncedMeshes_.end() || mesh->second.handle == 0 || lists[k].empty()) {
@@ -689,6 +694,14 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
     frame.poses = std::move(poses);
     frame.posesOnGpu = posesParent.has_value();
     frame.posesParent = posesParent.value_or(glm::dmat4(1.0));
+    // A floating origin: the GPU's coordinates are relative to a point near the camera, which
+    // moves only when the camera has travelled `kRebaseDistance` from it, so what is relative to
+    // it is rebuilt rarely while float precision stays a fraction of a millimetre near the camera.
+    const glm::dvec3 eye(frame.poses.empty() ? frame.camera.transform[3] : frame.poses.front()[3]);
+    if (glm::length(eye - origin_) > kRebaseDistance) {
+        origin_ = eye;
+    }
+    frame.origin = origin_;
     frame.vars = std::move(vars);
     // Without a batch's worlds, the single view sees its camera's world.
     frame.worlds = worlds.empty() && !prims_.camera.IsEmpty()

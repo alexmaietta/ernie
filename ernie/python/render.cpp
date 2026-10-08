@@ -340,9 +340,11 @@ void BindRender(nb::module_& m) {
                     model.kind = FilterKind::Band;
                 } else if (kind == "pixel") {
                     model.kind = FilterKind::Pixel;
+                } else if (kind == "spatial") {
+                    model.kind = FilterKind::Spatial;
                 } else {
-                    throw std::invalid_argument("kind must be \"band\" or \"pixel\", not \"" +
-                                                kind + "\"");
+                    throw std::invalid_argument(
+                        "kind must be \"band\", \"pixel\" or \"spatial\", not \"" + kind + "\"");
                 }
                 const std::string on = domain.is_none()
                                            ? (model.kind == FilterKind::Band ? "spectrum" : "")
@@ -388,8 +390,10 @@ void BindRender(nb::module_& m) {
             nb::arg("name") = "", nb::arg("description") = "",
             "Registers a sensor filter written in Slang, for SensorFilter prims to name in "
             "ernie:filter:type: struct `type_name` in module `slang` implementing IBandFilter "
-            "(kind=\"band\", on the spectrum) or IPixelFilter (kind=\"pixel\", domain "
-            "\"electrons\", \"digital\", \"rgb\" or \"display\"), with a nested Params "
+            "(kind=\"band\", on the spectrum), IPixelFilter (kind=\"pixel\", domain "
+            "\"electrons\", \"digital\", \"rgb\" or \"display\"), or for kind=\"spatial\", which "
+            "reads the pixels around its own through a SpatialImage, ISpatialBandFilter "
+            "(domain \"spectrum\") or ISpatialPixelFilter (the others), with a nested Params "
             "struct of one float per parameter. `params` is {name: default} in order, or a list "
             "of {\"name\", \"default\", \"description\"}; prims set them as inputs:<name>. "
             "Raises ValueError for an invalid filter or one that fails to compile, with the "

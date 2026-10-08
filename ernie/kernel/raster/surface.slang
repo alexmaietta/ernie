@@ -18,6 +18,12 @@ public struct Surface {
     public float4 detailMean;
     // Hex tiling: enabled, rotation strength, luminance contrast, blend exponent.
     public float4 hex;
+    // Detail tiles at the frame's origin (`FrameParams::origin`), so tiling stays fixed to the
+    // world while positions are relative to it: xyz the fractional tile along each axis; then the
+    // hex lattice's phase for the xy and yz projections, and xy the phase for xz (`kHexPeriod`).
+    public float4 detailPhase;
+    public float4 hexPhaseXyYz;
+    public float4 hexPhaseXz;
     // Parameters of the active reflectance model.
     public BrdfParams brdf;
 }
@@ -47,18 +53,38 @@ public float surfaceAlbedoScale(float3 world) {
 // Detail texture coordinates: world x east and y north scaled to tiles. Textures are sampled with
 // v = -y so image rows run southwards and the image's up direction points north.
 public struct DetailCoords {
-    public float2 tile;
+    public float2 tile;     // in the detail texture's period: the world's tile, plus whole tiles
+    public float2 hexTile;  // in the hex lattice's period (`kHexPeriod`)
     public float2 dx;
     public float2 dy;
 }
 
-// Detail coordinates of a planar projection of the world, in world units, with x east and y
-// north for the terrain's horizontal projection.
-public DetailCoords detailCoords(float2 planar) {
+// The planar projections of the world detail textures use: horizontal (terrain, and meshes'
+// faces looking up or down), and the two vertical ones meshes blend in.
+public static const uint kProjectXy = 0;
+public static const uint kProjectYz = 1;
+public static const uint kProjectXz = 2;
+
+// Hex tiling's random rotations repeat every this many lattice cells along each lattice axis
+// (about 1200 tiles), so the lattice's phase at the frame's origin stays small and exact in float.
+static const int kHexPeriod = 4096;
+
+// Detail coordinates of planar projection `projection` of a point, `planar` its coordinates
+// relative to the frame's origin, in world units, with x east and y north for the horizontal one.
+public DetailCoords detailCoords(float2 planar, uint projection) {
+    let local = planar * surface.albedoMapSize.z;
+    let phase = surface.detailPhase;
+    let tilePhase = projection == kProjectXy   ? phase.xy
+                    : projection == kProjectYz ? phase.yz
+                                               : phase.xz;
+    let hexPhase = projection == kProjectXy   ? surface.hexPhaseXyYz.xy
+                   : projection == kProjectYz ? surface.hexPhaseXyYz.zw
+                                              : surface.hexPhaseXz.xy;
     DetailCoords c;
-    c.tile = planar * surface.albedoMapSize.z;
-    c.dx = ddx(c.tile);
-    c.dy = ddy(c.tile);
+    c.tile = local + tilePhase;
+    c.hexTile = local + hexPhase;
+    c.dx = ddx(local);
+    c.dy = ddy(local);
     return c;
 }
 
@@ -138,11 +164,13 @@ public DetailTap hexDetail(float2 tile, float2 dx, float2 dy) {
         let vertex = vertices[k];
         let centre = float2(float(vertex.x) + 0.5 * float(vertex.y), float(vertex.y) / 1.15470054) /
                      (2.0 * sqrt(3.0));
-        let h = pcg2d(asuint(vertex));
+        // Random per cell of a lattice repeating every kHexPeriod cells, and sampled around the
+        // cell's centre, so the pattern depends only on where the cell is in the world.
+        let h = pcg2d(asuint(((vertex % kHexPeriod) + kHexPeriod) % kHexPeriod));
         let angle = (float(h.x) / 4294967295.0 * 2.0 - 1.0) * PI * surface.hex.y;
         let cs = float2(cos(angle), sin(angle));
         let offset = float2(pcg2d(h)) / 4294967295.0;
-        let rotated = rotate(tile - centre, cs) + centre + offset;
+        let rotated = rotate(tile - centre, cs) + offset;
         taps[k] = detailTap(rotated, rotate(dx, cs), rotate(dy, cs), float2(cs.x, -cs.y));
         luminance[k] = dot(taps[k].albedo, float3(0.299, 0.587, 0.114));
     }
@@ -162,7 +190,7 @@ public DetailTap hexDetail(float2 tile, float2 dx, float2 dy) {
 public DetailSample sampleDetail(DetailCoords c) {
     DetailTap tap;
     if (surface.hex.x > 0.0) {
-        tap = hexDetail(c.tile, c.dx, c.dy);
+        tap = hexDetail(c.hexTile, c.dx, c.dy);
     } else {
         tap = detailTap(c.tile, c.dx, c.dy, float2(1.0, 0.0));
     }

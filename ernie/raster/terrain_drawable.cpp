@@ -21,6 +21,15 @@ namespace {
 
 constexpr std::size_t kInitialPatchCapacity = 256;
 
+/// `frustum` with its points moved by `offset`: a point p is inside the result where p - offset
+/// was inside `frustum`, as from origin-relative to terrain coordinates.
+Frustum Shifted(Frustum frustum, const glm::vec3& offset) {
+    for (glm::vec4& plane : frustum.planes) {
+        plane.w -= glm::dot(glm::vec3(plane), offset);
+    }
+    return frustum;
+}
+
 struct TerrainUniforms {
     float grid[4];
     float heightRange[4];
@@ -213,7 +222,12 @@ void TerrainDrawable::SetHeightfield(const RasterView& raster) {
         ImageDesc{w, h, 1, 1, VK_FORMAT_R16G16_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT});
     const std::span<const std::byte> gradientMips[] = {std::as_bytes(std::span(gradients))};
     gradientImage->Upload(gradientMips);
-    tree_ = LodQuadtree(raster, kLodLeafCells);
+    // The tree in the terrain's own coordinates (its north-west corner at x = y = 0), small and
+    // exact in float wherever the terrain lies; `LocalFrom` maps views into them.
+    RasterView local = raster;
+    local.originX = 0.0;
+    local.originY = 0.0;
+    tree_ = LodQuadtree(local, kLodLeafCells);
     heights_ = std::move(heights);
     gradients_ = std::move(gradientImage);
 }
@@ -227,15 +241,16 @@ std::uint64_t TerrainDrawable::GpuBytes() const {
 }
 
 std::pair<glm::vec3, glm::vec3> TerrainDrawable::Bounds(float exaggeration) const {
-    const auto halfPixel = static_cast<float>(0.5 * pixelSize_);
-    const glm::vec3 low(static_cast<float>(originX_) + halfPixel,
-                        static_cast<float>(originY_ - static_cast<double>(height_) * pixelSize_) +
-                            halfPixel,
-                        minHeight_ * exaggeration);
-    const glm::vec3 high(static_cast<float>(originX_ + static_cast<double>(width_) * pixelSize_) -
-                             halfPixel,
-                         static_cast<float>(originY_) - halfPixel, maxHeight_ * exaggeration);
-    return {glm::min(low, high), glm::max(low, high)};
+    // Relative to the frame's origin, computed in double.
+    const double halfPixel = 0.5 * pixelSize_;
+    const glm::dvec3 low(originX_ + halfPixel,
+                         originY_ - static_cast<double>(height_) * pixelSize_ + halfPixel,
+                         static_cast<double>(minHeight_ * exaggeration));
+    const glm::dvec3 high(originX_ + static_cast<double>(width_) * pixelSize_ - halfPixel,
+                          originY_ - halfPixel, static_cast<double>(maxHeight_ * exaggeration));
+    const glm::vec3 a(low - origin_);
+    const glm::vec3 b(high - origin_);
+    return {glm::min(a, b), glm::max(a, b)};
 }
 
 std::optional<Bounds3> TerrainDrawable::Bounds() const {
@@ -255,12 +270,14 @@ void TerrainDrawable::Prepare(const FrameParams& frame, std::span<const ShadowCa
                                        ? params_.material
                                        : RasterRenderer::kDefaultMaterial;
     TerrainUniforms uniforms{};
-    uniforms.grid[0] = static_cast<float>(originX_);
-    uniforms.grid[1] = static_cast<float>(originY_);
+    // Relative to the frame's origin.
+    uniforms.grid[0] = static_cast<float>(originX_ - origin_.x);
+    uniforms.grid[1] = static_cast<float>(originY_ - origin_.y);
     uniforms.grid[2] = static_cast<float>(pixelSize_);
     uniforms.grid[3] = params_.exaggeration;
     uniforms.heightRange[0] = minHeight_;
     uniforms.heightRange[1] = maxHeight_;
+    uniforms.heightRange[2] = static_cast<float>(origin_.z);
     uniforms.dims[0] = static_cast<std::uint32_t>(width_);
     uniforms.dims[1] = static_cast<std::uint32_t>(height_);
     uniforms.dims[2] = static_cast<std::uint32_t>(params_.colorMode);
@@ -268,13 +285,16 @@ void TerrainDrawable::Prepare(const FrameParams& frame, std::span<const ShadowCa
 
     const LodSettings& lod = params_.lod;
     const std::size_t views = frame.Views();
+    // The LOD eyes and frusta in the terrain's coordinates (`tree_`), which do not move with the
+    // frame's origin, so a frozen LOD stays put across a rebase.
+    const glm::vec3 local = LocalFrom();
     if (!(lod.freeze && frozen_) || lodEyes_.size() != views) {
         lodEyes_.clear();
         lodFrusta_.clear();
         for (std::size_t v = 0; v < views; ++v) {
             const CameraView view = frame.View(v);
-            lodEyes_.push_back(view.eye);
-            lodFrusta_.push_back(Frustum::FromMatrix(view.ViewProjection()));
+            lodEyes_.push_back(view.eye + local);
+            lodFrusta_.push_back(Shifted(Frustum::FromMatrix(view.ViewProjection()), local));
         }
     }
     frozen_ = lod.freeze;
@@ -308,9 +328,10 @@ void TerrainDrawable::Prepare(const FrameParams& frame, std::span<const ShadowCa
     }
     // Each view morphs its levels of detail around its own eye.
     for (std::size_t v = 0; v < views; ++v) {
-        uniforms.lodEye[0] = lodEyes_[v].x;
-        uniforms.lodEye[1] = lodEyes_[v].y;
-        uniforms.lodEye[2] = lodEyes_[v].z;
+        const glm::vec3 eye = lodEyes_[v] - local;  // relative to the frame's origin
+        uniforms.lodEye[0] = eye.x;
+        uniforms.lodEye[1] = eye.y;
+        uniforms.lodEye[2] = eye.z;
         renderer_.Uploads().Write(uniforms_, std::as_bytes(std::span(&uniforms, 1)),
                                   v * kUniformsStride);
     }
@@ -343,7 +364,7 @@ void TerrainDrawable::Prepare(const FrameParams& frame, std::span<const ShadowCa
             continue;
         }
         const auto first = static_cast<std::uint32_t>(patches_.size());
-        const Frustum light = Frustum::FromMatrix(cascades[c].lightViewProjection);
+        const Frustum light = Shifted(Frustum::FromMatrix(cascades[c].lightViewProjection), local);
         tree_.Select(lodEyes_.front(), ranges, &light, params_.exaggeration, patches_);
         cascadeRanges_[c] = {first, static_cast<std::uint32_t>(patches_.size()) - first};
     }

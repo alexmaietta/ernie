@@ -677,7 +677,7 @@ Light LightOf(const Scene& scene, const Path& path, const SpectralBands& bands) 
                                     "' is not a DistantLight, SphereLight, RectLight or DiskLight");
     }
     const glm::dmat4 world = scene.WorldTransform(path);
-    light.position = glm::vec3(world[3]);
+    light.position = glm::dvec3(world[3]);
     const glm::dvec3 axis = -glm::dvec3(world[2]);
     const glm::dvec3 xAxis(world[0]);
     const glm::dvec3 yAxis(world[1]);

@@ -193,9 +193,9 @@ float4 meshShadowVertex(uint vertexIndex : SV_VertexID, uint instanceIndex : SV_
 DetailSample triplanarDetail(float3 world, inout float3 normal) {
     var w = pow(abs(normal), float3(4.0));
     w = w / max(w.x + w.y + w.z, 1e-6);
-    let x = sampleDetail(detailCoords(world.yz));
-    let y = sampleDetail(detailCoords(world.xz));
-    let z = sampleDetail(detailCoords(world.xy));
+    let x = sampleDetail(detailCoords(world.yz, kProjectYz));
+    let y = sampleDetail(detailCoords(world.xz, kProjectXz));
+    let z = sampleDetail(detailCoords(world.xy, kProjectXy));
     DetailSample d;
     d.albedo = w.x * x.albedo + w.y * y.albedo + w.z * z.albedo;
     d.slope = float2(0.0);

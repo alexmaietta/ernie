@@ -2519,6 +2519,7 @@ std::vector<float> HdrThrough(RasterDelegate& delegate, Scene& scene,
     std::vector<Path> filters;
     for (std::size_t i = 0; i < types.size(); ++i) {
         const Path path("/Render/Filters/F" + std::to_string(i));
+        scene.Remove(path);  // a fresh prim: no inputs left from an earlier chain
         scene.Define(path, tokens::kSensorFilter).Set(tokens::kFilterType, types[i]);
         for (const auto& [name, value] : inputs) {
             if (types[i] != "cie") {
@@ -2596,4 +2597,111 @@ struct Gain : IPixelFilter {
         << "an unknown filter type";
     delegate.AddSensorFilter(GainFilter());
     EXPECT_NO_THROW(HdrThrough(delegate, scene, {"cie", "gain"})) << "the fixed filter registers";
+}
+
+namespace {
+
+/// Spatial filters: linear colour from the pixel `dx` to the left, and each band from the pixel
+/// itself.
+ernie::SensorFilterModel ShiftFilter() {
+    ernie::SensorFilterModel model;
+    model.id = "shift";
+    model.kind = ernie::FilterKind::Spatial;
+    model.domain = ernie::FilterDomain::Rgb;
+    model.params = {{"dx", 1.0f, ""}};
+    model.typeName = "Shift";
+    model.slang = R"(import sensor;
+struct Shift : ISpatialPixelFilter {
+    struct Params { float dx; }
+    static void apply(inout SensorPixel value, PixelContext pixel, SpatialImage input,
+                      Params params) {
+        value.rgb = input.values(pixel, int2(pixel.id.xy) - int2(int(params.dx), 0)).xyz;
+    }
+})";
+    return model;
+}
+
+ernie::SensorFilterModel CopySpectrumFilter() {
+    ernie::SensorFilterModel model;
+    model.id = "copySpectrum";
+    model.kind = ernie::FilterKind::Spatial;
+    model.domain = ernie::FilterDomain::Spectrum;
+    model.typeName = "CopySpectrum";
+    model.slang = R"(import sensor;
+struct CopySpectrum : ISpatialBandFilter {
+    struct Params {}
+    static float band(uint band, PixelContext pixel, SpatialImage input, Params params) {
+        return input.band(pixel, int2(pixel.id.xy), band);
+    }
+})";
+    return model;
+}
+
+/// `hdr` (kSize x kSize RGBA rows) with each pixel taken from `dx` to its left, clamped.
+std::vector<float> ShiftedRight(const std::vector<float>& hdr, int dx) {
+    std::vector<float> shifted(hdr.size());
+    for (int y = 0; y < static_cast<int>(kSize); ++y) {
+        for (int x = 0; x < static_cast<int>(kSize); ++x) {
+            const int from = std::max(x - dx, 0);
+            for (int c = 0; c < 4; ++c) {
+                shifted[(static_cast<std::size_t>(y) * kSize + static_cast<std::size_t>(x)) * 4 +
+                        static_cast<std::size_t>(c)] =
+                    hdr[(static_cast<std::size_t>(y) * kSize + static_cast<std::size_t>(from)) * 4 +
+                        static_cast<std::size_t>(c)];
+            }
+        }
+    }
+    return shifted;
+}
+
+}  // namespace
+
+TEST_F(RasterDelegateTest, SpatialSensorFiltersReadThePixelsAroundTheirOwn) {
+    RasterDelegate delegate(*context_);
+    delegate.AddSensorFilter(ShiftFilter());
+    delegate.AddSensorFilter(CopySpectrumFilter());
+    Scene scene = MeshScene();
+    const std::vector<float> base = HdrThrough(delegate, scene, {"cie"});
+
+    EXPECT_EQ(HdrThrough(delegate, scene, {"cie", "shift"}), ShiftedRight(base, 1));
+    EXPECT_EQ(HdrThrough(delegate, scene, {"cie", "shift"}, {{"dx", 3.0f}}), ShiftedRight(base, 3));
+    EXPECT_EQ(HdrThrough(delegate, scene, {"cie", "shift", "shift"}), ShiftedRight(base, 2))
+        << "two in a row: three kernels, the images alternating";
+    EXPECT_EQ(HdrThrough(delegate, scene, {"copySpectrum", "cie"}), base)
+        << "the spectrum passes between kernels exactly";
+}
+
+namespace {
+
+/// MeshScene under /World moved by `offset`, with a checkered ground plane 1 below the meshes (2
+/// unit squares, so offsets in multiples of 4 keep the pattern in place), a lamp and a terrain
+/// beside them.
+Scene MovedScene(const glm::dvec3& offset) {
+    Scene scene = MeshScene();
+    scene.Define("/World", tokens::kXform)
+        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), offset));
+    scene.Define("/World/Ground", tokens::kGroundPlane)
+        .Set(tokens::kGroundHeight, offset.z - 1.0)
+        .Set(tokens::kChecker, true)
+        .Set(tokens::kCheckerSize, 2.0);
+    scene.Define("/World/Lamp", tokens::kSphereLight)
+        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(4.0, 4.0, 6.0)))
+        .Set(tokens::kIntensity, 30.0f);
+    return scene;
+}
+
+}  // namespace
+
+TEST_F(RasterDelegateTest, ScenesFarFromTheWorldOriginRenderAsNearIt) {
+    // About 2000 km out and 3 km up, where float positions are 0.25 m apart: rendered relative to
+    // an origin near the camera, the image matches the scene's at the world origin.
+    RasterDelegate delegate(*context_);
+    Scene near = MovedScene(glm::dvec3(0.0));
+    const std::vector<std::uint8_t> expected = Bytes(delegate.Render(near));
+    Scene far = MovedScene(glm::dvec3(1'234'564.0, -1'765'432.0, 3000.0));
+    const std::vector<std::uint8_t> moved = Bytes(delegate.Render(far));
+    EXPECT_LE(BytesDiffering(moved, expected), expected.size() / 1000)
+        << "the origin moved with the camera, a rebase";
+    // And back near the world origin: the origin follows again.
+    EXPECT_LE(BytesDiffering(Bytes(delegate.Render(near)), expected), expected.size() / 1000);
 }

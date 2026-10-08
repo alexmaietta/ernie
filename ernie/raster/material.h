@@ -92,6 +92,10 @@ class RasterMaterial {
     /// reading the material.
     void Update(const MaterialSettings& settings, std::span<const float> brdfParams);
 
+    /// Moves the origin positions are relative to (`FrameParams::origin`): the albedo map's
+    /// placement and the detail tiling's phase follow, so both stay fixed to the world.
+    void SetOrigin(const glm::dvec3& origin);
+
     /// The settings of the last `Update`.
     const MaterialSettings& Settings() const {
         return settings_;
@@ -139,6 +143,7 @@ class RasterMaterial {
     bool hasDetailNormal_ = false;
     glm::vec3 detailMean_{1.0f};
     glm::dvec4 albedoGrid_{0.0};  ///< Origin x, origin y, pixel size, unused.
+    glm::dvec3 origin_{0.0};      ///< The frame's origin (`SetOrigin`).
     glm::uvec2 albedoSize_{1u, 1u};
 };
 

@@ -1,13 +1,16 @@
-"""Adds two custom sensor filters written in Slang and renders through them: an IR-cut filter on
-the spectrum (a band filter, before the sensor integrates the bands) and hot pixels on the
-electrons (a pixel filter, between QE and the ADC). Saves the RawDN and LdrColor images.
+"""Adds three custom sensor filters written in Slang and renders through them: an IR-cut filter on
+the spectrum (a band filter, before the sensor integrates the bands), hot pixels on the
+electrons (a pixel filter, between QE and the ADC) and a glow on linear colour (a spatial
+filter, reading the pixels around its own). Saves the RawDN and LdrColor images.
 
     PYTHONPATH=build/python python demos/python/demo_sensor_custom_filters.py [out_prefix]
 
-A custom filter is a Slang struct implementing IBandFilter or IPixelFilter from module `sensor`,
-with a nested Params struct of one float per parameter; SensorFilter prims name it in
-ernie:filter:type and set its parameters as inputs:<name>. The renderer fuses it with the
-built-in filters into one kernel, so it costs about as much as its own arithmetic.
+A custom filter is a Slang struct implementing IBandFilter, IPixelFilter, ISpatialBandFilter or
+ISpatialPixelFilter from module `sensor`, with a nested Params struct of one float per
+parameter; SensorFilter prims name it in ernie:filter:type and set its parameters as
+inputs:<name>. The renderer fuses band and pixel filters with the built-in ones into one kernel,
+so they cost about as much as their own arithmetic; a spatial filter splits the kernel, the part
+before writing its domain to an image it reads.
 """
 
 import sys
@@ -44,6 +47,29 @@ struct HotPixels : IPixelFilter {
 }
 """
 
+GLOW = """
+import sensor;
+
+// Adds `strength` times the mean linear colour within `radius` pixels: a soft bloom, light
+// spreading from every region into its surroundings.
+struct Glow : ISpatialPixelFilter {
+    struct Params { float radius; float strength; }
+    static void apply(inout SensorPixel value, PixelContext pixel, SpatialImage input,
+                      Params params) {
+        let r = int(params.radius);
+        let centre = int2(pixel.id.xy);
+        var sum = float3(0.0);
+        for (int y = -r; y <= r; ++y) {
+            for (int x = -r; x <= r; ++x) {
+                sum += input.values(pixel, centre + int2(x, y)).xyz;
+            }
+        }
+        let count = float((2 * r + 1) * (2 * r + 1));
+        value.rgb = input.values(pixel, centre).xyz + params.strength * sum / count;
+    }
+}
+"""
+
 
 def build_scene():
     scene = ernie.Scene()
@@ -66,7 +92,8 @@ def build_scene():
         tokens.FOCAL_LENGTH, 18.0
     ).set(tokens.EXPOSURE_TIME, 0.0002)
 
-    # The chain: lens (implied), IR cut, QE, hot pixels, noise, ADC, CIE, exposure.
+    # The chain: lens (implied), IR cut, QE, hot pixels, noise, ADC, CIE, glow, exposure. The glow
+    # splits the colour branch into a second kernel; the raw branch stays in the first.
     chain = [
         ("IrCut", "irCut", {"cutoff": 650.0, "width": 40.0}),
         ("Qe", "qe", {}),
@@ -74,6 +101,7 @@ def build_scene():
         ("Noise", "noise", {}),
         ("Adc", "adc", {}),
         ("Cie", "cie", {}),
+        ("Glow", "glow", {"radius": 6.0, "strength": 0.2}),
         ("Exposure", "exposure", {}),
     ]
     paths = []
@@ -103,6 +131,10 @@ def main():
     renderer.add_sensor_filter(
         "hotPixels", "HotPixels", HOT_PIXELS, kind="pixel", domain="electrons",
         params={"fraction": 1e-4, "electrons": 2000.0},
+    )
+    renderer.add_sensor_filter(
+        "glow", "Glow", GLOW, kind="spatial", domain="rgb",
+        params={"radius": 4.0, "strength": 0.3},
     )
     outputs = renderer.step(build_scene(), render_products=["/Render/Raw", "/Render/Photo"])
     raw = np.array(outputs["/Render/Raw"].frames[0].render_vars["/Render/Vars/RawDN"].map())

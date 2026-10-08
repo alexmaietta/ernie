@@ -62,7 +62,14 @@ class RasterDrawable {
   public:
     virtual ~RasterDrawable() = default;
 
-    /// World bounds of the drawable's geometry, for fitting shadow cascades; none if it has none.
+    /// Moves the origin the drawable's coordinates are relative to (`FrameParams::origin`): every
+    /// position it gives the GPU and every bound it reports is world minus `origin`. The renderer
+    /// calls it at the start of each `Update`, before `Bounds`; it changes rarely, so drawables
+    /// recompute what depends on it only when it does.
+    virtual void SetOrigin(const glm::dvec3& /*origin*/) {}
+
+    /// Bounds of the drawable's geometry relative to its origin (`SetOrigin`), for fitting shadow
+    /// cascades; none if it has none.
     virtual std::optional<Bounds3> Bounds() const = 0;
 
     /// World bounds of the drawable's geometry in world `world` (`tokens::kWorld`, not the

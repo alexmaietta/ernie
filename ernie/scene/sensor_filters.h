@@ -95,10 +95,13 @@ struct SensorFilterParam {
 };
 
 /// A sensor filter written in Slang, run in the fused sensor kernel like the built-in ones: a
-/// struct `typeName` in module `slang` implementing `IBandFilter` (kind `Band`, domain `Spectrum`)
-/// or `IPixelFilter` (kind `Pixel`, on one of the other domains), with a nested `Params` struct of
-/// one float field per parameter, in order. The module imports `sensor` for the interfaces,
-/// `SensorPixel` and `PixelContext`.
+/// struct `typeName` in module `slang` implementing `IBandFilter` (kind `Band`, domain `Spectrum`),
+/// `IPixelFilter` (kind `Pixel`, on one of the other domains), or for kind `Spatial`, which reads
+/// the pixels around its own, `ISpatialBandFilter` (domain `Spectrum`) or `ISpatialPixelFilter`
+/// (the other domains). It has a nested `Params` struct of one float field per parameter, in order.
+/// The module imports `sensor` for the interfaces, `SensorPixel`, `PixelContext` and
+/// `SpatialImage`. A spatial filter splits the kernel: what comes before it writes its domain to an
+/// image, which it reads, heading a kernel of its own for what follows on its branch.
 ///
 ///     import sensor;
 ///     struct HotPixels : IPixelFilter {
@@ -114,7 +117,7 @@ struct SensorFilterModel {
     std::string name;
     std::string description;
     std::vector<std::string> references;
-    FilterKind kind = FilterKind::Pixel;  ///< `Band` or `Pixel`.
+    FilterKind kind = FilterKind::Pixel;  ///< `Band`, `Pixel` or `Spatial`.
     FilterDomain domain = FilterDomain::Electrons;
     std::vector<SensorFilterParam> params;
     std::string typeName;  ///< The Slang struct implementing the interface.
@@ -130,7 +133,7 @@ class SensorFilterRegistry {
     /// Adds `model`; its Slang is compiled when a chain first uses it (`RasterRenderer::
     /// AddSensorFilter` compiles eagerly).
     /// @throws std::invalid_argument if the id is not an identifier, names a built-in filter or is
-    /// taken; the kind is not `Band` or `Pixel`, or the domain does not suit it; there are more
+    /// taken; the kind is `Integrator`, or the domain does not suit it; there are more
     /// than `kMaxParams` parameters or one is not an identifier or repeats; or the type name is
     /// not an identifier or the source does not mention it.
     void Add(SensorFilterModel model);

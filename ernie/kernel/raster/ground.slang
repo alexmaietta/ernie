@@ -13,8 +13,11 @@ import surface;
 
 struct GroundUniforms {
     float4x4 invViewProj;
-    // Height, checker square size, checker on, unused.
+    // Height (relative to the frame's origin), checker square size, checker on, unused.
     float4 plane;
+    // xy: the checkerboard's phase at the frame's origin, in squares modulo its two-square
+    // period, so it stays fixed to the world.
+    float4 checkerPhase;
     // Linear checker colours, rgb.
     float4 colour0;
     float4 colour1;
@@ -76,10 +79,10 @@ GroundOutput fragmentMain(VertexOutput in) {
     let world = origin + direction * max(t, 0.0);
 
     // Everything that takes screen-space derivatives runs before the discard.
-    let detail = sampleDetail(detailCoords(world.xy));
+    let detail = sampleDetail(detailCoords(world.xy, kProjectXy));
     var modulation = detail.albedo;
     if (g.plane.z > 0.0) {
-        let blend = filteredChecker(world.xy / max(g.plane.y, 1e-6));
+        let blend = filteredChecker(world.xy / max(g.plane.y, 1e-6) + g.checkerPhase.xy);
         modulation = modulation * lerp(g.colour0.rgb, g.colour1.rgb, blend);
     }
     if (!(t > 0.0)) {

@@ -34,9 +34,11 @@ namespace ernie {
 ///   +x, -x, +y, -y, +z, -z.
 /// Perspective views reach from the light (its radius, at least 1/10000 of the far plane) to the
 /// scene's farthest corner, and their `texelWorldSize` is the size of a texel one unit away. None
-/// for a light without shadows.
-std::vector<ShadowCascade> FitLightShadowViews(const Light& light, const glm::vec3& sceneMin,
-                                               const glm::vec3& sceneMax, std::uint32_t resolution);
+/// for a light without shadows. `position` is the light's position in the coordinates of the
+/// bounds, relative to the frame's origin (`FrameParams::Relative`); distant lights ignore it.
+std::vector<ShadowCascade> FitLightShadowViews(const Light& light, const glm::vec3& position,
+                                               const glm::vec3& sceneMin, const glm::vec3& sceneMax,
+                                               std::uint32_t resolution);
 
 /// Ernie's rasterizer: owns what the drawables of a frame share, and draws them, spectrally.
 ///
@@ -295,8 +297,8 @@ class RasterRenderer {
     void CreateLightShadowMaps(std::uint32_t resolution, std::uint32_t layers);
     void WriteLights(const FrameParams& params, const std::optional<Bounds3>& bounds);
     const ComputePipeline& ShadingPipeline(std::size_t model);
-    /// The fused sensor kernel of `plan`, compiled on first use.
-    const ComputePipeline& SensorPipeline(const SensorPlan& plan);
+    /// Compiles `plan`'s fused sensor kernels, one per segment, unless already compiled.
+    void SensorPipelines(const SensorPlan& plan);
     void WriteMaterialTable();
     void WriteShading(const FrameParams& params);
     void WriteSensor(const FrameParams& params);
@@ -323,6 +325,7 @@ class RasterRenderer {
     std::map<std::uint32_t, std::unique_ptr<RasterMaterial>> materials_;
     std::uint32_t nextMaterial_ = 1;
     std::uint64_t materialSetVersion_ = 0;
+    glm::dvec3 materialsOrigin_{0.0};  ///< The origin the materials' uniforms are relative to.
 
     GpuBuffer uniforms_;
     GpuBuffer shadowUniforms_;
@@ -343,6 +346,7 @@ class RasterRenderer {
     /// `poseHistory_` (the poses it last rendered) then.
     bool posesOnGpu_ = false;
     std::array<std::uint32_t, FrameUploads::kSlots> poseHistoryViews_{};
+    std::array<glm::dvec3, FrameUploads::kSlots> poseHistoryOrigins_{};  ///< Their frames' origins.
     /// One pass rendering the sun's casters `casters` for cascade `cascade` into shadow map
     /// layer `layer`, starting from a copy of layer 0 with `fromBase`.
     struct ShadowPass {

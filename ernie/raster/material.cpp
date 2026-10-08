@@ -21,10 +21,30 @@ struct SurfaceUniforms {
     float detail[4];
     float detailMean[4];
     float hex[4];
+    float detailPhase[4];
+    float hexPhaseXyYz[4];
+    float hexPhaseXz[4];
     float params[BrdfRegistry::kMaxParams];
 };
-static_assert(sizeof(SurfaceUniforms) == 160,
+static_assert(sizeof(SurfaceUniforms) == 208,
               "SurfaceUniforms must match Surface in surface.slang");
+
+/// surface.slang's hex lattice: its skew (tile coordinates times `kSkewScale`, then x minus
+/// `kSkewX` times y and y times `kSkewY`) and the period of its random rotations.
+constexpr double kSkewScale = 3.4641016151377544;  // 2 sqrt(3)
+constexpr double kSkewX = 0.57735027;
+constexpr double kSkewY = 1.15470054;
+constexpr double kHexPeriod = 4096.0;
+
+/// The hex lattice's phase at world plane point `planar` (in tiles): the tile offset that puts the
+/// origin-relative lattice where the world's is, modulo the rotations' period.
+glm::dvec2 HexPhase(const glm::dvec2& planar) {
+    const glm::dvec2 st = planar * kSkewScale;
+    glm::dvec2 skewed(st.x - kSkewX * st.y, kSkewY * st.y);
+    skewed -= kHexPeriod * glm::floor(skewed / kHexPeriod);
+    const double y = skewed.y / (kSkewScale * kSkewY);
+    return {skewed.x / kSkewScale + kSkewX * y, y};
+}
 
 glm::vec3 QuantisedSrgbMean(const Image& image) {
     const std::vector<std::uint8_t> bytes = ToRgba8(image, ImageEncoding::Srgb);
@@ -164,6 +184,13 @@ void RasterMaterial::Update(const MaterialSettings& settings, std::span<const fl
     WriteUniform();
 }
 
+void RasterMaterial::SetOrigin(const glm::dvec3& origin) {
+    if (origin != origin_) {
+        origin_ = origin;
+        WriteUniform();
+    }
+}
+
 void RasterMaterial::WriteUniform() {
     const MaterialSettings& settings = settings_;
     const std::span<const float> brdfParams = params_;
@@ -173,8 +200,9 @@ void RasterMaterial::WriteUniform() {
     u.albedo[2] = settings.albedo.b;
     u.albedo[3] = luminance_;
     const bool useMap = hasAlbedoMap_ && settings.useAlbedoMap;
-    u.albedoMap[0] = static_cast<float>(albedoGrid_.x);
-    u.albedoMap[1] = static_cast<float>(albedoGrid_.y);
+    // Relative to the frame's origin, as the positions shading samples it at are.
+    u.albedoMap[0] = static_cast<float>(albedoGrid_.x - origin_.x);
+    u.albedoMap[1] = static_cast<float>(albedoGrid_.y - origin_.y);
     u.albedoMap[2] = static_cast<float>(albedoGrid_.z);
     u.albedoMap[3] = useMap ? 1.0f : 0.0f;
     const DetailSettings& detail = settings.detail;
@@ -193,6 +221,22 @@ void RasterMaterial::WriteUniform() {
     u.hex[1] = std::clamp(detail.hexRotation, 0.0f, 1.0f);
     u.hex[2] = std::clamp(detail.hexContrast, 0.0f, 1.0f);
     u.hex[3] = std::max(detail.hexSharpness, 1.0f);
+    // The detail tiling at the origin, so it stays fixed to the world.
+    const auto tilesPerUnit = static_cast<double>(u.albedoMapSize[2]);
+    const glm::dvec3 tiles = origin_ * tilesPerUnit;
+    const glm::dvec3 fraction = tiles - glm::floor(tiles);
+    const glm::dvec2 xy = HexPhase({tiles.x, tiles.y});
+    const glm::dvec2 yz = HexPhase({tiles.y, tiles.z});
+    const glm::dvec2 xz = HexPhase({tiles.x, tiles.z});
+    u.detailPhase[0] = static_cast<float>(fraction.x);
+    u.detailPhase[1] = static_cast<float>(fraction.y);
+    u.detailPhase[2] = static_cast<float>(fraction.z);
+    u.hexPhaseXyYz[0] = static_cast<float>(xy.x);
+    u.hexPhaseXyYz[1] = static_cast<float>(xy.y);
+    u.hexPhaseXyYz[2] = static_cast<float>(yz.x);
+    u.hexPhaseXyYz[3] = static_cast<float>(yz.y);
+    u.hexPhaseXz[0] = static_cast<float>(xz.x);
+    u.hexPhaseXz[1] = static_cast<float>(xz.y);
     const std::size_t count = std::min(brdfParams.size(), BrdfRegistry::kMaxParams);
     std::memcpy(u.params, brdfParams.data(), count * sizeof(float));
     uploads_.Write(uniform_, std::as_bytes(std::span(&u, 1)));

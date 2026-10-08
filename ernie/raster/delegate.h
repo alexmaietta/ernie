@@ -201,6 +201,10 @@ class RasterDelegate : public RenderDelegate {
     /// Per `FrameUploads` slot, the submission that last used it; the slot to use next.
     std::array<std::uint64_t, FrameUploads::kSlots> slotSubmissions_{};
     std::uint32_t nextSlot_ = 0;
+    /// The render origin (`FrameParams::origin`), and how far the camera may move from it before
+    /// it follows: float precision there is 1024 * 2^-24, about 0.06 mm.
+    glm::dvec3 origin_{0.0};
+    static constexpr double kRebaseDistance = 1024.0;
     ChangeCursor cursor_;
     std::uint64_t sceneId_ = 0;
     RenderPrims prims_;

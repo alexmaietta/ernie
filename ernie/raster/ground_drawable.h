@@ -58,6 +58,10 @@ class GroundDrawable : public RasterDrawable {
         return params_;
     }
 
+    void SetOrigin(const glm::dvec3& origin) override {
+        origin_ = origin;
+    }
+
     std::optional<Bounds3> Bounds() const override {
         return std::nullopt;
     }
@@ -77,6 +81,7 @@ class GroundDrawable : public RasterDrawable {
     std::unique_ptr<GraphicsPipeline> pipeline_;
     GpuBuffer uniforms_;
     GroundParams params_;
+    glm::dvec3 origin_{0.0};  ///< The frame's origin (`SetOrigin`).
     bool enabled_ = false;
     bool prepared_ = false;
 };

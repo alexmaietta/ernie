@@ -5,9 +5,10 @@
 __exported import frame;
 
 public struct TerrainUniforms {
-    // Origin x, origin y (top edge), pixel size, vertical exaggeration.
+    // Origin x, origin y (top edge), pixel size, vertical exaggeration; the origin relative to the
+    // frame's (`FrameParams::origin`), like every position the passes see.
     public float4 grid;
-    // Min height, max height.
+    // Min height, max height, the frame origin's height (subtracted from the terrain's).
     public float4 heightRange;
     // Width, height, colour mode, tint patches by LOD level.
     public uint4 dims;
@@ -41,7 +42,7 @@ float2 morphRange(uint level) {
 
 public float3 worldAt(float2 cell, float h) {
     return float3(t.grid.x + (cell.x + 0.5) * t.grid.z, t.grid.y - (cell.y + 0.5) * t.grid.z,
-                  h * t.grid.w);
+                  h * t.grid.w - t.heightRange.z);
 }
 
 public struct GridVertex {

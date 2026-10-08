@@ -136,8 +136,13 @@ class TerrainDrawable : public RasterDrawable {
     /// GPU memory held for the heightfield and the drawable's buffers, in bytes.
     std::uint64_t GpuBytes() const;
 
-    /// World-space bounds of the drawn mesh at the given vertical exaggeration.
+    /// Bounds of the drawn mesh at the given vertical exaggeration, relative to the origin
+    /// (`SetOrigin`).
     std::pair<glm::vec3, glm::vec3> Bounds(float exaggeration) const;
+
+    void SetOrigin(const glm::dvec3& origin) override {
+        origin_ = origin;
+    }
 
     /// Bounds at the current exaggeration; none without a heightfield.
     std::optional<Bounds3> Bounds() const override;
@@ -164,6 +169,12 @@ class TerrainDrawable : public RasterDrawable {
     std::vector<DescriptorResource> Resources(const RasterFrame& frame, std::size_t view) const;
     void DrawPatches(VkCommandBuffer commands, DrawRange range, const glm::mat4& light) const;
 
+    /// What maps a point relative to the origin into the tree's coordinates (the terrain's
+    /// north-west corner at x = y = 0, heights as they are): add it.
+    glm::vec3 LocalFrom() const {
+        return glm::vec3(origin_ - glm::dvec3(originX_, originY_, 0.0));
+    }
+
     RasterRenderer& renderer_;
     PipelineLayout layout_;
     std::unique_ptr<GraphicsPipeline> gbufferPipeline_;
@@ -182,8 +193,9 @@ class TerrainDrawable : public RasterDrawable {
     std::uint64_t triangles_ = 0;
     float firstRange_ = 0.0f;
     bool frozen_ = false;
-    std::vector<glm::vec3> lodEyes_;
-    std::vector<Frustum> lodFrusta_;
+    std::vector<glm::vec3> lodEyes_;  ///< In the tree's coordinates (`LocalFrom`).
+    std::vector<Frustum> lodFrusta_;  ///< Likewise.
+    glm::dvec3 origin_{0.0};          ///< The frame's origin (`SetOrigin`).
     bool prepared_ = false;
 
     std::size_t width_ = 0;

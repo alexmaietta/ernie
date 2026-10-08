@@ -99,11 +99,12 @@ void SensorFilterRegistry::Add(SensorFilterModel model) {
     if (SensorFilterNamed(model.id) || Find(model.id) != nullptr) {
         throw std::invalid_argument(what + " is already defined");
     }
-    if (model.kind == FilterKind::Band
-            ? model.domain != FilterDomain::Spectrum
-            : model.kind != FilterKind::Pixel || model.domain == FilterDomain::Spectrum) {
-        throw std::invalid_argument(what + ": a custom filter is a band filter on the spectrum "
-                                           "or a pixel filter on another domain");
+    const bool suits = model.kind == FilterKind::Band    ? model.domain == FilterDomain::Spectrum
+                       : model.kind == FilterKind::Pixel ? model.domain != FilterDomain::Spectrum
+                                                         : model.kind == FilterKind::Spatial;
+    if (!suits) {
+        throw std::invalid_argument(what + ": a custom filter is a band filter on the spectrum, "
+                                           "a pixel filter on another domain or a spatial filter");
     }
     if (model.params.size() > kMaxParams) {
         throw std::invalid_argument(what + " has more than " + std::to_string(kMaxParams) +

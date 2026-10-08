@@ -153,6 +153,10 @@ constexpr DescriptorBinding kFilterBindings[] = {
     {13, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {14, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {16, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {17, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {18, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {19, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
 };
 
 /// A plan that runs custom filter `model`, with the built-in filters its domain needs, and holds a
@@ -189,13 +193,18 @@ SensorPlan ProbePlan(const SensorFilterModel& model, const SensorFilterRegistry&
 }
 
 /// The modules of `plan`'s kernel: the sensor, its custom filters' and its entry point.
-std::vector<ShaderModuleSource> SensorModules(const SensorPlan& plan) {
+std::vector<ShaderModuleSource> SensorModules(const SensorPlan& plan, std::uint32_t segment) {
     std::vector<ShaderModuleSource> modules{{"sensor", shaders::kSensorSlang}};
     for (auto& [name, source] : plan.Modules()) {
         modules.push_back({name, source});
     }
-    modules.push_back({"sensorPlan", plan.Source()});
+    modules.push_back({"sensorPlan", plan.Source(segment)});
     return modules;
+}
+
+/// The key of `plan`'s kernel `segment` among the compiled sensor kernels.
+std::string SensorKernelKey(const SensorPlan& plan, std::uint32_t segment) {
+    return plan.Key() + "/" + std::to_string(segment);
 }
 
 /// hzb.slang: the source level and the destination level.
@@ -338,8 +347,8 @@ std::vector<ShaderModuleSource> BrdfCheckModules(const BrdfModel& model) {
 
 }  // namespace
 
-std::vector<ShadowCascade> FitLightShadowViews(const Light& light, const glm::vec3& sceneMin,
-                                               const glm::vec3& sceneMax,
+std::vector<ShadowCascade> FitLightShadowViews(const Light& light, const glm::vec3& position,
+                                               const glm::vec3& sceneMin, const glm::vec3& sceneMax,
                                                std::uint32_t resolution) {
     if (!light.shadows) {
         return {};
@@ -360,14 +369,13 @@ std::vector<ShadowCascade> FitLightShadowViews(const Light& light, const glm::ve
     for (int i = 0; i < 8; ++i) {
         const glm::vec3 corner((i & 1) ? sceneMax.x : sceneMin.x, (i & 2) ? sceneMax.y : sceneMin.y,
                                (i & 4) ? sceneMax.z : sceneMin.z);
-        farPlane = std::max(farPlane, 1.01f * glm::length(corner - light.position));
+        farPlane = std::max(farPlane, 1.01f * glm::length(corner - position));
     }
     const float nearPlane = std::max(light.radius, 1e-4f * farPlane);
     const auto perspective = [&](const glm::vec3& axis, float fov) {
         ShadowCascade view;
-        view.lightViewProjection =
-            glm::perspectiveRH_ZO(fov, 1.0f, nearPlane, farPlane) *
-            glm::lookAtRH(light.position, light.position + axis, UpFor(axis));
+        view.lightViewProjection = glm::perspectiveRH_ZO(fov, 1.0f, nearPlane, farPlane) *
+                                   glm::lookAtRH(position, position + axis, UpFor(axis));
         view.texelWorldSize = 2.0f * std::tan(0.5f * fov) / texels;
         return view;
     };
@@ -472,7 +480,9 @@ void RasterRenderer::AddSensorFilter(SensorFilterModel model) {
     candidate.Add(model);
     try {
         const SensorPlan probe = ProbePlan(model, candidate);
-        compiler_.CompileSpirv(SensorModules(probe), "sensorMain");
+        for (std::uint32_t segment = 0; segment < probe.segments; ++segment) {
+            compiler_.CompileSpirv(SensorModules(probe, segment), "sensorMain");
+        }
     } catch (const std::invalid_argument& error) {
         throw std::invalid_argument("Sensor filter " + model.id +
                                     " failed to compile: " + error.what());
@@ -497,6 +507,7 @@ std::uint32_t RasterRenderer::AddMaterial(const MaterialSettings& settings) {
     }
     const std::uint32_t id = nextMaterial_++;
     materials_.emplace(id, std::make_unique<RasterMaterial>(context_, uploads_));
+    materials_.at(id)->SetOrigin(materialsOrigin_);
     ++materialSetVersion_;
     SetMaterial(id, settings);
     return id;
@@ -581,7 +592,7 @@ void RasterRenderer::WriteLights(const FrameParams& params, const std::optional<
         LightGpu& entry = table[i];
         const glm::vec3 axis = glm::normalize(light.direction);
         const bool distant = light.type == LightType::Distant;
-        const glm::vec3 where = distant ? axis : light.position;
+        const glm::vec3 where = distant ? axis : params.Relative(light.position);
         entry.position[0] = where.x;
         entry.position[1] = where.y;
         entry.position[2] = where.z;
@@ -603,8 +614,8 @@ void RasterRenderer::WriteLights(const FrameParams& params, const std::optional<
         entry.cone[0] = cone ? std::cos(glm::radians(light.coneAngle)) : -2.0f;
         entry.cone[1] = cone ? std::cos(glm::radians(light.coneAngle * (1.0f - softness))) : -1.0f;
         if (bounds) {
-            const std::vector<ShadowCascade> views =
-                FitLightShadowViews(light, bounds->first, bounds->second, resolution);
+            const std::vector<ShadowCascade> views = FitLightShadowViews(
+                light, params.Relative(light.position), bounds->first, bounds->second, resolution);
             if (!views.empty() && lightViews_.size() + views.size() <= kMaxLightShadowViews) {
                 entry.cone[2] = static_cast<float>(lightViews_.size());
                 entry.cone[3] = static_cast<float>(views.size());
@@ -639,7 +650,8 @@ void RasterRenderer::PlanBatchShadows(const FrameParams& params, const Bounds3& 
     sun.direction = params.sunDirection;
     // A fit of the sun's map around `low` to `high`, one cascade covering every view depth.
     const auto fit = [&](const glm::vec3& low, const glm::vec3& high) {
-        std::vector<ShadowCascade> views = FitLightShadowViews(sun, low, high, shadowResolution_);
+        std::vector<ShadowCascade> views =
+            FitLightShadowViews(sun, glm::vec3(0.0f), low, high, shadowResolution_);
         ShadowCascade cascade = views.front();
         cascade.splitFar = std::numeric_limits<float>::max();
         return cascade;
@@ -745,6 +757,16 @@ void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable*
                      static_cast<float>(sensor.fullWellElectrons),
                      static_cast<float>(std::ldexp(1.0, sensor.adcBits) - 1.0)};
 
+    // Everything below is relative to the frame's origin, the drawables' bounds included.
+    for (RasterDrawable* drawable : drawables) {
+        drawable->SetOrigin(params.origin);
+    }
+    if (params.origin != materialsOrigin_) {
+        materialsOrigin_ = params.origin;
+        for (auto& [id, material] : materials_) {
+            material->SetOrigin(params.origin);
+        }
+    }
     std::optional<Bounds3> bounds;
     for (const RasterDrawable* drawable : drawables) {
         if (const std::optional<Bounds3> box = drawable->Bounds()) {
@@ -891,7 +913,7 @@ void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable*
         uploads_.Write(filterParams_, std::as_bytes(std::span(sensorPlan_.params)));
     }
     filters_ = sensorPlan_.filters;
-    SensorPipeline(sensorPlan_);
+    SensorPipelines(sensorPlan_);
     bands_ = params.camera.bands;
     extent_ = {params.camera.width, params.camera.height};
     WriteMaterialTable();
@@ -1289,7 +1311,8 @@ void RasterRenderer::BeginFrame(std::uint32_t slot) {
 
 void RasterRenderer::WritePoseCamera(const FrameParams& params) {
     const glm::mat4 projection = params.View().projection;
-    const glm::mat4 camera[] = {glm::mat4(params.posesParent), projection,
+    // Relative to the frame's origin, so the views' poses are too.
+    const glm::mat4 camera[] = {params.Relative(params.posesParent), projection,
                                 glm::inverse(projection)};
     uploads_.Write(poseCamera_, std::as_bytes(std::span(camera)));
     const VkDeviceSize bytes = views_ * sizeof(glm::mat4);
@@ -1304,6 +1327,7 @@ void RasterRenderer::WritePoseCamera(const FrameParams& params) {
         }
     }
     poseHistoryViews_[uploads_.Slot()] = views_;
+    poseHistoryOrigins_[uploads_.Slot()] = params.origin;
 }
 
 std::vector<glm::dmat4> RasterRenderer::LastGpuPoses(std::uint32_t views) const {
@@ -1314,7 +1338,12 @@ std::vector<glm::dmat4> RasterRenderer::LastGpuPoses(std::uint32_t views) const 
     }
     std::vector<glm::mat4> read(views);
     poseHistory_[slot]->Read(std::as_writable_bytes(std::span(read)));
-    poses.assign(read.begin(), read.end());
+    // Back in the world: the poses were relative to that frame's origin.
+    for (const glm::mat4& pose : read) {
+        glm::dmat4 world(pose);
+        world[3] += glm::dvec4(poseHistoryOrigins_[slot], 0.0);
+        poses.push_back(world);
+    }
     return poses;
 }
 
@@ -1451,27 +1480,41 @@ void RasterRenderer::ShadeAndFilter(VkCommandBuffer commands, RenderTargets& tar
         filters.push_back(general(targets.Bound(name)));
     }
     filters.push_back(DescriptorResource::Of(filterParams_));
+    // Each segment reads the images the one before stored and stores those the next reads, the
+    // two sets alternating (placeholders for a plan that passes none on).
+    const auto image = [&](bool spectrum, std::uint32_t set) -> GpuImage& {
+        GpuImage& image = targets.SensorImage(
+            spectrum, set, spectrum ? sensorPlan_.spectrumImages : sensorPlan_.channelImages);
+        image.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+        return image;
+    };
     const std::uint32_t constants[4] = {firstView, 0, 0, 0};
-    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
-                      sensorPipelines_.at(sensorPlan_.Key())->Handle());
-    filterLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, filters);
-    filterLayout_.PushConstants(commands, constants, sizeof(constants));
-    vkCmdDispatch(commands, groupsX, groupsY, views);
-    ShaderBarrier(commands);
+    for (std::uint32_t segment = 0; segment < sensorPlan_.segments; ++segment) {
+        std::vector<DescriptorResource> resources = filters;
+        resources.push_back(general(image(true, segment + 1)));
+        resources.push_back(general(image(false, segment + 1)));
+        resources.push_back(general(image(true, segment)));
+        resources.push_back(general(image(false, segment)));
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          sensorPipelines_.at(SensorKernelKey(sensorPlan_, segment))->Handle());
+        filterLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+        filterLayout_.PushConstants(commands, constants, sizeof(constants));
+        vkCmdDispatch(commands, groupsX, groupsY, views);
+        ShaderBarrier(commands);
+    }
 }
 
-const ComputePipeline& RasterRenderer::SensorPipeline(const SensorPlan& plan) {
-    const std::string key = plan.Key();
-    auto it = sensorPipelines_.find(key);
-    if (it == sensorPipelines_.end()) {
-        ERNIE_ZONE("Compile sensor kernel");
-        it = sensorPipelines_
-                 .emplace(key, std::make_unique<ComputePipeline>(
-                                   context_, filterLayout_,
-                                   compiler_.CompileSpirv(SensorModules(plan), "sensorMain")))
-                 .first;
+void RasterRenderer::SensorPipelines(const SensorPlan& plan) {
+    for (std::uint32_t segment = 0; segment < plan.segments; ++segment) {
+        const std::string key = SensorKernelKey(plan, segment);
+        if (!sensorPipelines_.contains(key)) {
+            ERNIE_ZONE("Compile sensor kernel");
+            sensorPipelines_.emplace(
+                key, std::make_unique<ComputePipeline>(
+                         context_, filterLayout_,
+                         compiler_.CompileSpirv(SensorModules(plan, segment), "sensorMain")));
+        }
     }
-    return *it->second;
 }
 
 void RasterRenderer::Present(VkCommandBuffer commands, RenderTargets& targets,

@@ -73,6 +73,13 @@ class RenderTargets : public FrameImages {
     /// the image, so a texel of level `l` bounds 2^l x 2^l of it at most twice over.
     GpuImage& Hzb();
 
+    /// The images consecutive sensor kernels pass on for spatial filters (sensor.slang's bindings
+    /// 16 to 19), set `set` (0 or 1, alternating by kernel), in the general layout: the spectrum at
+    /// each sensor pixel (a group of `Bands` layers per view) with `spectrum`, else the four
+    /// channel domains (four RGBA32F layers per view). Created on first use with `full`; otherwise
+    /// a one-texel placeholder that kernels bind but do not touch.
+    GpuImage& SensorImage(bool spectrum, std::uint32_t set, bool full);
+
     /// Records the transitions that let compute passes read the G-buffer, depth and raster
     /// radiance and write the radiance and the render vars.
     void PrepareCompute(VkCommandBuffer commands);
@@ -118,6 +125,9 @@ class RenderTargets : public FrameImages {
     std::unique_ptr<GpuImage> depth_;
     std::unique_ptr<GpuImage> rasterRadiance_;
     std::unique_ptr<GpuImage> hzb_;
+    /// `SensorImage`s: spectrum then channels, two sets each, and their placeholders.
+    std::array<std::unique_ptr<GpuImage>, 4> sensorImages_;
+    std::array<std::unique_ptr<GpuImage>, 2> sensorPlaceholders_;
     std::vector<std::unique_ptr<GpuImage>> vars_;
     std::vector<bool>
         holds_;  ///< Per var of `VarNames`, whether `vars_` holds it or a placeholder.

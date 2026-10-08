@@ -41,7 +41,9 @@ struct DeviceInstanceData {
 /// mesh as their prototype.
 struct MeshItem {
     std::uint32_t mesh = 0;
-    glm::mat4 transform{1.0f};  ///< World transform of the mesh, or of the instancer.
+    /// World transform of the mesh, or of the instancer, in double: the drawable draws it relative
+    /// to the frame's origin (`SetOrigin`).
+    glm::dmat4 transform{1.0};
     glm::mat4 prototype{1.0f};  ///< Instanced: the prototype's own transform, applied first.
     std::optional<std::uint32_t> instancer;
     std::vector<std::uint32_t> instances;  ///< Instanced: indices into the instancer's arrays.
@@ -156,6 +158,7 @@ class MeshDrawable : public RasterDrawable {
     void SetItems(std::vector<MeshItem> items);
 
     /// World bounds of the current draws, or none without any.
+    void SetOrigin(const glm::dvec3& origin) override;
     std::optional<Bounds3> Bounds() const override;
 
     /// World bounds of the current draws (and runs of instances) in world `world`.
@@ -266,6 +269,8 @@ class MeshDrawable : public RasterDrawable {
     void CreateGBufferPipeline();
     /// Writes every draw's GPU record and instance ids, and their pipelines and id offsets.
     void WriteDraws();
+    /// Rebuilds `transforms_` from the items and the origin.
+    void UpdateTransforms();
     void RebuildGeometry();
     void RebuildInstances();
     void WriteInstancer(const Instancer& instancer);
@@ -345,6 +350,10 @@ class MeshDrawable : public RasterDrawable {
 
     Culling culling_ = Culling::Gpu;
     bool drawsDirty_ = true;  ///< Whether the draws changed since `WriteDraws`.
+    /// Each item's transform relative to `origin_` (`SetOrigin`), in float for the GPU and the
+    /// bounds; rebuilt when the items or the origin change.
+    std::vector<glm::mat4> transforms_;
+    glm::dvec3 origin_{0.0};
     /// The renderer's `MaterialSetVersion` at `WriteDraws`, which resolves material ids.
     std::uint64_t drawsMaterials_ = 0;
     bool posesOnGpu_ = false;  ///< Whether the views' cull planes come from the GPU poses.

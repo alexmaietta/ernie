@@ -83,3 +83,64 @@ TEST(PlanSensor, CallsCustomFiltersWithTheirStepsInputs) {
     EXPECT_TRUE(PlanSensor(chain, colour, registry).params.empty())
         << "a filter on electrons does not run for colour alone";
 }
+
+namespace {
+
+ernie::SensorFilterModel Spatial(std::string id, ernie::FilterDomain domain) {
+    ernie::SensorFilterModel model;
+    model.id = std::move(id);
+    model.kind = ernie::FilterKind::Spatial;
+    model.domain = domain;
+    model.typeName = "Spread";
+    model.slang = "import sensor; struct Spread {}";
+    return model;
+}
+
+}  // namespace
+
+TEST(PlanSensor, SplitsTheKernelAtSpatialFiltersOnTheirBranch) {
+    ernie::SensorFilterRegistry registry;
+    registry.Add(Spatial("glow", ernie::FilterDomain::Rgb));
+    registry.Add(Spatial("blur", ernie::FilterDomain::Spectrum));
+
+    // Glare on linear colour splits the colour branch only: RawDN is final in the first kernel.
+    const ernie::SensorFilterStep glare[] = {
+        {"qe", {}}, {"adc", {}}, {"cie", {}}, {"glow", {}}, {"exposure", {}}};
+    const std::string_view rawAndColour[] = {kRawDn, kLdrColor};
+    const ernie::SensorPlan split = PlanSensor(glare, rawAndColour, registry);
+    ASSERT_EQ(split.segments, 2u);
+    EXPECT_TRUE(split.channelImages);
+    EXPECT_FALSE(split.spectrumImages);
+    std::vector<std::uint32_t> segments;
+    for (const ernie::SensorPlan::Stage& stage : split.stages) {
+        segments.push_back(stage.segment);
+    }
+    EXPECT_EQ(segments, (std::vector<std::uint32_t>{0, 0, 0, 0, 1, 1}))
+        << "lens, qe, adc, cie, then glow and exposure";
+    const std::string first = split.Source(0);
+    const std::string second = split.Source(1);
+    EXPECT_NE(first.find("storeChannel(value, pixel, kChannelRgb)"), std::string::npos);
+    EXPECT_NE(first.find("writeOutputs(value, pixel, 4u)"), std::string::npos) << "RawDN";
+    EXPECT_NE(second.find("Spread.apply(value, pixel, input4, params4)"), std::string::npos);
+    EXPECT_NE(second.find("writeOutputs(value, pixel, 16u)"), std::string::npos) << "LdrColor";
+    EXPECT_EQ(second.find("pixel.bands()"), std::string::npos) << "no spectrum after the split";
+
+    // A blur on the spectrum moves everything after it, both branches, to the second kernel.
+    const ernie::SensorFilterStep psf[] = {{"blur", {}}, {"qe", {}}, {"cie", {}}};
+    const std::string_view held[] = {kSpectralRadiance, kElectrons, kHdrColor};
+    const ernie::SensorPlan blurred = PlanSensor(psf, held, registry);
+    ASSERT_EQ(blurred.segments, 2u);
+    EXPECT_TRUE(blurred.spectrumImages);
+    const std::string before = blurred.Source(0);
+    const std::string after = blurred.Source(1);
+    EXPECT_NE(before.find("storeSpectrum"), std::string::npos);
+    EXPECT_EQ(before.find("writeSpectral"), std::string::npos);
+    EXPECT_NE(after.find("Spread.band(band, pixel, input1, params1)"), std::string::npos);
+    EXPECT_NE(after.find("writeSpectral"), std::string::npos);
+    EXPECT_NE(after.find("Qe.accumulate"), std::string::npos);
+
+    // Two in a row alternate the images between three kernels.
+    const ernie::SensorFilterStep twice[] = {{"cie", {}}, {"glow", {}}, {"glow", {}}};
+    const std::string_view hdr[] = {kHdrColor};
+    EXPECT_EQ(PlanSensor(twice, hdr, registry).segments, 3u);
+}

@@ -3,7 +3,7 @@ build-*/
 dist/
 CMakeUserPresets.json
 
-TODO.md
+TODO*.md
 .vscode/
 .venv/
 

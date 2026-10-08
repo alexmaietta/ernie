@@ -95,6 +95,28 @@ GpuImage& RenderTargets::Hzb() {
     return *hzb_;
 }
 
+GpuImage& RenderTargets::SensorImage(bool spectrum, std::uint32_t set, bool full) {
+    if (!full) {
+        std::unique_ptr<GpuImage>& placeholder = sensorPlaceholders_[spectrum ? 0 : 1];
+        if (placeholder == nullptr) {
+            placeholder = std::make_unique<GpuImage>(
+                context_, ImageDesc{1, 1, 1, 1,
+                                    spectrum ? VK_FORMAT_R32_SFLOAT : VK_FORMAT_R32G32B32A32_SFLOAT,
+                                    kStorage, false, true});
+        }
+        return *placeholder;
+    }
+    std::unique_ptr<GpuImage>& image = sensorImages_[(spectrum ? 0 : 2) + (set & 1u)];
+    if (image == nullptr) {
+        const auto bands = static_cast<std::uint32_t>(bands_);
+        image = std::make_unique<GpuImage>(
+            context_, ImageDesc{extent_.width, extent_.height, views_ * (spectrum ? bands : 4u), 1,
+                                spectrum ? VK_FORMAT_R32_SFLOAT : VK_FORMAT_R32G32B32A32_SFLOAT,
+                                kStorage, false, true});
+    }
+    return *image;
+}
+
 RenderingTarget RenderTargets::GBufferTarget(bool load) const {
     RenderingTarget target;
     target.loadColor = load;
@@ -152,6 +174,9 @@ std::uint64_t RenderTargets::GpuBytes() const {
     }
     for (const std::unique_ptr<GpuImage>& image : vars_) {
         bytes += image->Bytes();
+    }
+    for (const std::unique_ptr<GpuImage>& image : sensorImages_) {
+        bytes += image != nullptr ? image->Bytes() : 0;
     }
     return bytes;
 }

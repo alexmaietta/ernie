@@ -533,6 +533,24 @@ void MeshDrawable::SetItems(std::vector<MeshItem> items) {
     itemRanges_ = std::move(ranges);
     itemPipelines_.clear();
     drawsDirty_ = true;
+    UpdateTransforms();
+}
+
+void MeshDrawable::SetOrigin(const glm::dvec3& origin) {
+    if (origin != origin_) {
+        origin_ = origin;
+        UpdateTransforms();
+        drawsDirty_ = true;
+    }
+}
+
+void MeshDrawable::UpdateTransforms() {
+    transforms_.clear();
+    for (const MeshItem& item : items_) {
+        glm::dmat4 relative = item.transform;
+        relative[3] -= glm::dvec4(origin_, 0.0);
+        transforms_.emplace_back(relative);
+    }
 }
 
 void MeshDrawable::RebuildGeometry() {
@@ -698,7 +716,7 @@ void MeshDrawable::WriteDraws() {
         const Mesh& mesh = meshes_.at(item.mesh);
         itemPipelines_.push_back(gbufferPipeline_.get());
         GpuDraw& draw = draws[i];
-        std::memcpy(draw.model, glm::value_ptr(item.transform), sizeof(draw.model));
+        std::memcpy(draw.model, glm::value_ptr(transforms_[i]), sizeof(draw.model));
         std::memcpy(draw.prototype, glm::value_ptr(item.prototype), sizeof(draw.prototype));
         draw.tint[0] = item.tint.r;
         draw.tint[1] = item.tint.g;
@@ -755,19 +773,21 @@ std::optional<Bounds3> MeshDrawable::Bounds() const {
                                     glm::max(bounds->second, box.second))
                         : box;
     };
-    for (const MeshItem& item : items_) {
+    for (std::size_t n = 0; n < items_.size(); ++n) {
+        const MeshItem& item = items_[n];
+        const glm::mat4& transform = transforms_[n];
         const Mesh& mesh = meshes_.at(item.mesh);
         if (mesh.data.points.empty()) {
             continue;
         }
         if (!item.instancer) {
-            add(TransformBox(item.transform, mesh.low, mesh.high));
+            add(TransformBox(transform, mesh.low, mesh.high));
             continue;
         }
         const Instancer& instancer = instancers_.at(*item.instancer);
         const std::optional<Bounds3>& extent = instancer.device.extent;
         if (instancer.onDevice && extent) {
-            add(TransformBox(item.transform, extent->first, extent->second));
+            add(TransformBox(transform, extent->first, extent->second));
             continue;
         }
         const auto [low, high] = TransformBox(item.prototype, mesh.low, mesh.high);
@@ -781,7 +801,7 @@ std::optional<Bounds3> MeshDrawable::Bounds() const {
             }
             const glm::vec3 p(data.positions[3 * i], data.positions[3 * i + 1],
                               data.positions[3 * i + 2]);
-            add(TransformBox(item.transform, p - glm::vec3(radius * scale),
+            add(TransformBox(transform, p - glm::vec3(radius * scale),
                              p + glm::vec3(radius * scale)));
         }
     }
@@ -838,11 +858,11 @@ std::optional<Bounds3> MeshDrawable::RangeBounds(std::size_t item, const WorldRa
         return std::nullopt;
     }
     if (!draw.instancer) {
-        return TransformBox(draw.transform, mesh.low, mesh.high);
+        return TransformBox(transforms_[item], mesh.low, mesh.high);
     }
     const Instancer& instancer = instancers_.at(*draw.instancer);
     if (instancer.onDevice && instancer.device.extent) {
-        return TransformBox(draw.transform, instancer.device.extent->first,
+        return TransformBox(transforms_[item], instancer.device.extent->first,
                             instancer.device.extent->second);
     }
     const InstanceData& data = instancer.data;
@@ -866,7 +886,7 @@ std::optional<Bounds3> MeshDrawable::RangeBounds(std::size_t item, const WorldRa
         boxLow = glm::min(boxLow, p - glm::vec3(radius * scale));
         boxHigh = glm::max(boxHigh, p + glm::vec3(radius * scale));
     }
-    return TransformBox(draw.transform, boxLow, boxHigh);
+    return TransformBox(transforms_[item], boxLow, boxHigh);
 }
 
 void MeshDrawable::Cull(const FrameParams& params, std::span<const ShadowCascade> cascades) {
@@ -1082,12 +1102,12 @@ void MeshDrawable::WriteCullJobs(const std::vector<GpuCullJob>& jobs,
         const auto [low, high] = TransformBox(item.prototype, mesh.low, mesh.high);
         const glm::vec3 centre = 0.5f * (low + high);
         GpuCullItem& entry = items[i];
-        std::memcpy(entry.model, glm::value_ptr(item.transform), sizeof(entry.model));
+        std::memcpy(entry.model, glm::value_ptr(transforms_[i]), sizeof(entry.model));
         entry.sphere[0] = centre.x;
         entry.sphere[1] = centre.y;
         entry.sphere[2] = centre.z;
         entry.sphere[3] = 0.5f * glm::length(high - low);
-        entry.info[0] = MaxScale(item.transform);
+        entry.info[0] = MaxScale(transforms_[i]);
         entry.info[2] = MaxScale(item.prototype);
         entry.levels[0] = first->second;
         entry.levels[1] = static_cast<std::uint32_t>(mesh.levels.size());

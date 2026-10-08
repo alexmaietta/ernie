@@ -18,7 +18,9 @@
 // 2 G-buffer normal, 3 G-buffer ids, 4 depth; outputs 5 SpectralRadiance (sensor pixels, one layer
 // per band), 6 Electrons, 7 RawDN, 8 HdrColor, 9 LdrColor, 10 DistanceToImagePlane,
 // 11 DistanceToCamera, 12 Normal, 13 PrimId, 14 InstanceId, every image one layer per view;
-// 15 the custom filters' parameters.
+// 15 the custom filters' parameters; for spatial filters, the images between kernels:
+// 16 and 17 the spectrum and the channels (a layer per channel domain per view) a kernel reads,
+// 18 and 19 those it writes for the next.
 //
 // References:
 // - D. C. Brown, "Decentering Distortion of Lenses", Photogrammetric Engineering 32(3):444-462,
@@ -94,6 +96,20 @@ public struct SensorConstants {
 [[vk::image_format("r32ui")]] [[vk::binding(14, 0)]] RWTexture2DArray<uint> instanceId;
 // The custom filters' parameters, packed in chain order (`SensorPlan::params`).
 [[vk::binding(15, 0)]] public StructuredBuffer<float> filterParams;
+// Between the kernels a spatial filter splits a chain into: each band at each sensor pixel (a
+// group of `bands` layers per view), and each channel domain's values (`kChannel*` layers per
+// view), as one kernel left them for the spatial filters heading the next.
+[[vk::binding(16, 0)]] Texture2DArray<float> spectrumIn;
+[[vk::binding(17, 0)]] Texture2DArray<float4> channelsIn;
+[[vk::image_format("r32f")]] [[vk::binding(18, 0)]] RWTexture2DArray<float> spectrumOut;
+[[vk::image_format("rgba32f")]] [[vk::binding(19, 0)]] RWTexture2DArray<float4> channelsOut;
+
+// A view's layers of the channel images: one per domain after the spectrum.
+public static const uint kChannelElectrons = 0;
+public static const uint kChannelDigital = 1;
+public static const uint kChannelRgb = 2;
+public static const uint kChannelDisplay = 3;
+public static const uint kChannelDomains = 4;
 
 // The render vars a plan writes, one bit each in `kRenderVarNames` order (sensor_filters.h).
 public static const uint kHoldsSpectral = 1u << 0;
@@ -191,6 +207,71 @@ public interface IIntegrator {
 public interface ISpatialSource {
     static This at(PixelContext pixel);
     float band(uint band, PixelContext pixel);
+}
+
+// What a spatial filter reads: its domain at every sensor pixel of its view, as the chain left it
+// before the filter. Pixels outside the image read as the nearest edge pixel.
+public struct SpatialImage {
+    // The domain's layer among the channel images (`kChannel*`); unused for the spectrum.
+    public uint channel;
+
+    // The sensor image's width and height.
+    public int2 size(PixelContext pixel) {
+        return int2(sensorViews[pixel.view].size.xy);
+    }
+
+    // Band `band` of the spectrum at sensor pixel `at`.
+    public float band(PixelContext pixel, int2 at, uint band) {
+        let p = clamp(at, int2(0), size(pixel) - 1);
+        return spectrumIn.Load(int4(p, pixel.slice(band), 0));
+    }
+
+    // The domain's values at sensor pixel `at`: electrons, digital numbers (as floats), linear
+    // colour (xyz) or display colour.
+    public float4 values(PixelContext pixel, int2 at) {
+        let p = clamp(at, int2(0), size(pixel) - 1);
+        return channelsIn.Load(int4(p, int(pixel.id.z * kChannelDomains + channel), 0));
+    }
+}
+
+// A spatial filter on the spectrum: each band of its pixel from the bands of the pixels around
+// it, before the integrators, such as a point-spread blur or chromatic aberration.
+public interface ISpatialBandFilter {
+    associatedtype Params;
+    static float band(uint band, PixelContext pixel, SpatialImage input, Params params);
+}
+
+// A spatial filter on another domain: its pixel's values of the domain (the `SensorPixel` field
+// it sets) from those around it, such as blooming on electrons or glare on linear colour.
+public interface ISpatialPixelFilter {
+    associatedtype Params;
+    static void apply(inout SensorPixel value, PixelContext pixel, SpatialImage input,
+                      Params params);
+}
+
+// Stores band `band` of the pixel's spectrum for the next kernel's spatial filters.
+public void storeSpectrum(PixelContext pixel, uint band, float radiance) {
+    spectrumOut[int3(pixel.id.xy, pixel.slice(band))] = radiance;
+}
+
+// Stores the pixel's values of channel domain `channel` for the next kernel's spatial filters.
+public void storeChannel(SensorPixel value, PixelContext pixel, uint channel) {
+    float4 stored;
+    switch (channel) {
+    case kChannelElectrons:
+        stored = value.electrons;
+        break;
+    case kChannelDigital:
+        stored = float4(value.digital);
+        break;
+    case kChannelRgb:
+        stored = float4(value.rgb, 1.0);
+        break;
+    default:
+        stored = value.display;
+        break;
+    }
+    channelsOut[int3(pixel.id.xy, pixel.id.z * kChannelDomains + channel)] = stored;
 }
 
 float2 distort(SensorUniforms cam, float2 p) {

@@ -115,7 +115,7 @@ enum class LightType : std::uint32_t {
 /// SIGGRAPH '94, 343-350, 1994. https://doi.org/10.1145/192161.192250
 struct Light {
     LightType type = LightType::Sphere;
-    glm::vec3 position{0.0f};  ///< Sphere, rect and disk: world centre.
+    glm::dvec3 position{0.0};  ///< Sphere, rect and disk: world centre.
     /// Distant: unit vector towards the light. Others: unit axis the light emits along (its -z):
     /// the cone's axis, or the normal of the emitting face.
     glm::vec3 direction{0.0f, 0.0f, 1.0f};
@@ -237,10 +237,37 @@ struct FrameParams {
         return result;
     }
 
+    /// The world position the GPU's coordinates are relative to (camera-relative rendering, a
+    /// floating origin): passes see world points as `point - origin`, so float precision follows
+    /// the camera instead of the world's origin, as planet-scale scenes need. Chosen near the
+    /// camera and moved only when the camera gets far from it (`RasterDelegate`), so what is
+    /// expressed relative to it is recomputed rarely.
+    ///
+    /// References:
+    /// - C. Thorne, "Using a Floating Origin to Improve Fidelity and Performance of Large,
+    ///   Distributed Virtual Worlds", CW 2005. https://doi.org/10.1109/CW.2005.94
+    /// - P. Cozzi and K. Ring, "3D Engine Design for Virtual Globes", CRC Press, 2011, chapter 5
+    ///   (rendering relative to center and to eye).
+    glm::dvec3 origin{0.0};
+
+    /// World transform `world` relative to `origin`, in float for the GPU.
+    glm::mat4 Relative(const glm::dmat4& world) const {
+        glm::dmat4 relative = world;
+        relative[3] -= glm::dvec4(origin, 0.0);
+        return glm::mat4(relative);
+    }
+
+    /// World point `world` relative to `origin`.
+    glm::vec3 Relative(const glm::dvec3& world) const {
+        return glm::vec3(world - origin);
+    }
+
     /// The raster view the passes draw view `view` with, `ViewCamera(view).RasterView(overscan)`
-    /// without copying the camera.
+    /// relative to `origin` and without copying the camera.
     CameraView View(std::size_t view = 0) const {
-        return camera.RasterView(poses.empty() ? camera.transform : poses.at(view), overscan);
+        glm::dmat4 pose = poses.empty() ? camera.transform : poses.at(view);
+        pose[3] -= glm::dvec4(origin, 0.0);
+        return camera.RasterView(pose, overscan);
     }
 };
 
