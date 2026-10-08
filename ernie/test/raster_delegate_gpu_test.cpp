@@ -494,6 +494,27 @@ TEST_F(RasterDelegateTest, PrimitivesStandOnTheGroundAndShadowIt) {
         << "the cube shadows the ground away from the sun";
 }
 
+TEST_F(RasterDelegateTest, FloatingCastersShadowTheGroundFarBelowThem) {
+    // A block 8 above the ground: its shadow lands below the level of its own bottom, where
+    // cascades fitted to the casters alone would not reach.
+    Scene scene = GroundScene(0.0);
+    scene.Set("/World/Sun", tokens::kShadowEnable, true);
+    scene.Set("/World/Sun", tokens::kTransform, ernie::DistantLightTransform({1.0, 0.0, 1.0}));
+    scene.Define("/World/Block", tokens::kCube)
+        .Set(tokens::kSize, 4.0)
+        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 8.0)));
+    RasterDelegate delegate(*context_);
+    ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+    const auto vars = MapVars(outputs);
+    // Under the sun at 45 degrees, the shadow of the block's centre falls 8 to the -x side.
+    const auto [shadowRow, shadowCol] = PixelOf(scene, -8.0f, 0.0f);
+    const auto [litRow, litCol] = PixelOf(scene, 5.0f, 5.0f);
+    EXPECT_EQ(delegate.PrimPath(At<std::uint32_t>(vars.at("PrimId"), shadowRow, shadowCol)),
+              Path("/World/Ground"));
+    EXPECT_LT(At<float>(vars.at("HdrColor"), shadowRow, shadowCol, 1),
+              0.2f * At<float>(vars.at("HdrColor"), litRow, litCol, 1));
+}
+
 namespace {
 
 /// MeshScene under /World moved by `offset`, with a checkered ground plane 1 below the meshes (2

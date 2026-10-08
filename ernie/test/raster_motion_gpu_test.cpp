@@ -177,6 +177,23 @@ TEST_F(RasterDelegateTest, InstancesAndDeformingPointsBlurFromHostAndCudaArrays)
     }
 }
 
+TEST_F(RasterDelegateTest, MovingCastersShadowEachSubframeFromWhereTheyAre) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MotionScene();
+    // A ground the raised quad shadows under a low sun, the quad sliding across it.
+    scene.Define("/World/Ground", tokens::kGroundPlane).Set(tokens::kGroundHeight, -6.0);
+    scene.Set("/World/Sun", tokens::kTransform, ernie::DistantLightTransform({0.6, 0.2, 0.8}));
+    scene.Set("/World/Sun", tokens::kShadowEnable, true);
+    scene.Remove("/World/Rocks");
+    ExpectMotionBlur(
+        delegate, scene,
+        [&](double s) {
+            scene.Set("/World/Quad", tokens::kTransform,
+                      glm::translate(glm::dmat4(1.0), glm::dvec3(-12.0 + 10.0 * s, 0.0, 0.0)));
+        },
+        5);
+}
+
 TEST_F(RasterDelegateTest, CameraMotionBlurAveragesTheViewsAcrossTheShutter) {
     RasterDelegate delegate(*context_);
     Scene scene = MotionScene();

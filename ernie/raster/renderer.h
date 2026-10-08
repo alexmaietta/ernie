@@ -392,6 +392,11 @@ class RasterRenderer {
     /// Fills mips 1 onward of `image` (a channel image) from mip 0, each the mean of the one
     /// before.
     void BuildPyramid(VkCommandBuffer commands, GpuImage& image) const;
+    /// Records the sun's and the other lights' shadow maps of the frame's casters, with `frame`'s
+    /// uniforms: a sub-frame's, whose time (`Uniforms::motion`) places moving casters.
+    void RecordShadowMaps(VkCommandBuffer commands,
+                          std::span<const RasterDrawable* const> drawables,
+                          const RasterFrame& frame) const;
     /// Spectral shading and the sky of `targets`' views into their raster radiance, with the
     /// uniforms of view `firstView` on (a sub-frame's).
     void Shade(VkCommandBuffer commands, RenderTargets& targets, std::uint32_t firstView) const;

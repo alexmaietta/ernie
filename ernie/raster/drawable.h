@@ -88,6 +88,13 @@ class RasterDrawable {
         return std::nullopt;
     }
 
+    /// The height (relative to the origin) of an unbounded floor the drawable draws, such as a
+    /// ground plane, which the sun's shadows of the other drawables reach down to; none for a
+    /// drawable without one.
+    virtual std::optional<float> ShadowFloor() const {
+        return std::nullopt;
+    }
+
     /// Prepares the next frame once the views and shadow views are final, for example selecting
     /// levels of detail for every view (`params.View(v)` for each of `params.Views()`) and each
     /// shadow view (orthographic or perspective; only their `lightViewProjection` applies to

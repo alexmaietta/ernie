@@ -214,7 +214,8 @@ LayeredVertexOutput meshVertexMain(uint vertexIndex : SV_VertexID, uint instance
 float4 meshShadowVertex(uint vertexIndex : SV_VertexID, uint instanceIndex : SV_InstanceID,
                         uint drawIndex : SV_DrawIndex)
     : SV_Position {
-    let v = meshVertex(vertexIndex, instanceIndex, drawCall(drawIndex));
+    // Where the caster is at the pass's sub-frame (Uniforms.motion, 1 without motion blur).
+    let v = meshVertex(vertexIndex, instanceIndex, drawCall(drawIndex), u.motion.x);
     return mul(draw.lightViewProj, float4(v.world, 1.0));
 }
 

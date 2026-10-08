@@ -154,7 +154,8 @@ float3 lightAxis(uint row) {
 [shader("vertex")]
 ShadowVertexOutput shadowVertex(uint vertexIndex : SV_VertexID, uint point : SV_InstanceID) {
     let d = draws[draw.first];
-    let sphere = sphereOf(d, point, 1.0);
+    // Where the point is at the pass's sub-frame (Uniforms.motion, 1 without motion blur).
+    let sphere = sphereOf(d, point, u.motion.x);
     let corner = cornerOf(vertexIndex);
     let world = sphere.xyz + (corner.x * lightAxis(0) + corner.y * lightAxis(1)) * sphere.w;
     ShadowVertexOutput out;

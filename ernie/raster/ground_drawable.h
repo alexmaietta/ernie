@@ -66,6 +66,13 @@ class GroundDrawable : public RasterDrawable {
         return std::nullopt;
     }
 
+    /// The plane's height when enabled: the casters' shadows reach down to it.
+    std::optional<float> ShadowFloor() const override {
+        return enabled_ ? std::optional<float>(static_cast<float>(
+                              static_cast<double>(params_.height) - origin_.z))
+                        : std::nullopt;
+    }
+
     void Prepare(const FrameParams& params, std::span<const ShadowCascade> cascades) override;
 
     void RecordShadow(VkCommandBuffer, const RasterFrame&, std::size_t, const glm::mat4&,

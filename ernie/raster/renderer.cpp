@@ -1057,8 +1057,14 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
             CreateShadowMaps(shadows.resolution, kMaxCascades);
         }
         // Where the shadows land counts too: on a ground plane, which has no bounds, they reach
-        // past the casters.
-        const auto [low, high] = WithShadows(bounds->first, bounds->second, params.sunDirection);
+        // past the casters, and down to it when the casters float above it.
+        glm::vec3 casters = bounds->first;
+        for (const RasterDrawable* drawable : drawables) {
+            if (const std::optional<float> floor = drawable->ShadowFloor()) {
+                casters.z = std::min(casters.z, *floor);
+            }
+        }
+        const auto [low, high] = WithShadows(casters, bounds->second, params.sunDirection);
         float farthest = 0.0f;
         for (int i = 0; i < 8; ++i) {
             const glm::vec3 corner((i & 1) ? high.x : low.x, (i & 2) ? high.y : low.y,
@@ -1618,7 +1624,13 @@ void RasterRenderer::RecordShadows(VkCommandBuffer commands,
         }
         ShaderBarrier(commands);
     }
-    const RasterFrame frame = Frame(0);
+    // The first sub-frame's (the frame's own without motion blur); `RecordViews` the others'.
+    RecordShadowMaps(commands, drawables, Frame(0));
+}
+
+void RasterRenderer::RecordShadowMaps(VkCommandBuffer commands,
+                                      std::span<const RasterDrawable* const> drawables,
+                                      const RasterFrame& frame) const {
     if (shadowsEnabled_) {
         ERNIE_GPU_ZONE(context_, commands, "Sun shadows");
         shadowMaps_->Transition(commands, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
@@ -1713,6 +1725,12 @@ void RasterRenderer::RecordViews(VkCommandBuffer commands, RenderTargets& target
     // blur their radiance sums into what each row's exposure sees, which the sensor filters.
     for (std::uint32_t subframe = 0; subframe < subframes_; ++subframe) {
         const std::uint32_t first = subframe * outputViews_ + firstView;
+        // Each sub-frame's shadows from its casters where they are at its time (the first's
+        // come from `RecordShadows`, unless an earlier chunk of views left the last one's); the
+        // cascades stay fitted to the frame's own view.
+        if (subframes_ > 1 && (subframe > 0 || firstView > 0)) {
+            RecordShadowMaps(commands, drawables, Frame(subframe * outputViews_));
+        }
         // One layered pass for all the views: each view's draws go to its layer
         // (`Uniforms::flags`).
         const auto draw = [&](DrawPhase phase, bool load) {
