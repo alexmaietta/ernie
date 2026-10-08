@@ -4,6 +4,7 @@ ernie_add_library(
     brdf.cpp
     camera.cpp
     edit_history.cpp
+    isd.cpp
     orbit_controller.cpp
     overlay.cpp
     path.cpp
@@ -14,4 +15,5 @@ ernie_add_library(
     ernie_util
     PRIVATE
     ernie_kernel
+    ernie_json
     ernie_stb)

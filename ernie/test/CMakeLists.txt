@@ -16,6 +16,7 @@ ernie_add_test_suite(
     scene_brdf_test.cpp
     scene_camera_test.cpp
     scene_edit_history_test.cpp
+    scene_isd_test.cpp
     scene_orbit_controller_test.cpp
     scene_overlay_test.cpp
     scene_path_test.cpp

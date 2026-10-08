@@ -87,6 +87,7 @@ else()
                   -Wsign-conversion
                   -Wdouble-promotion)
 endif()
+include(cmake/third_party/json.cmake)
 
 add_subdirectory(ernie)
 
