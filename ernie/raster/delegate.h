@@ -5,6 +5,7 @@
 #include "ernie/geometry/primitives.h"
 #include "ernie/raster/ground_drawable.h"
 #include "ernie/raster/mesh_drawable.h"
+#include "ernie/raster/points_drawable.h"
 #include "ernie/raster/renderer.h"
 #include "ernie/raster/terrain_drawable.h"
 #include "ernie/scene/scene.h"
@@ -146,6 +147,10 @@ class RasterDelegate : public RenderDelegate {
         return ground_;
     }
 
+    const PointsDrawable& Points() const {
+        return points_;
+    }
+
     const MeshDrawable& Meshes() const {
         return meshes_;
     }
@@ -178,6 +183,11 @@ class RasterDelegate : public RenderDelegate {
         Key key;
     };
 
+    struct SyncedPoints {
+        std::uint32_t handle = 0;
+        Key key;
+    };
+
     Key KeyOf(const Scene& scene, const Path& path,
               std::initializer_list<std::string_view> attributes) const;
     void SyncMaterials(const Scene& scene);
@@ -187,6 +197,9 @@ class RasterDelegate : public RenderDelegate {
     void SyncSky(const Scene& scene, const RenderPrims& prims);
     void SyncMeshes(const Scene& scene);
     void SyncInstancers(const Scene& scene);
+    /// Uploads the Points prims that changed: their arrays from the host or kept on the GPU.
+    void SyncPoints(const Scene& scene);
+    std::vector<PointsItem> PointsItems(const Scene& scene) const;
     std::uint32_t MaterialOf(const Scene& scene, const Path& prim) const;
     std::vector<MeshItem> Items(const Scene& scene) const;
 
@@ -228,6 +241,7 @@ class RasterDelegate : public RenderDelegate {
     TerrainDrawable terrain_;
     MeshDrawable meshes_;
     GroundDrawable ground_;
+    PointsDrawable points_;
     std::unique_ptr<RenderTargets> viewTargets_;
     /// The AOVs the view's chain writes, in slot order, as of the last `Update`.
     std::vector<std::string> viewAovs_;
@@ -265,6 +279,7 @@ class RasterDelegate : public RenderDelegate {
     std::map<Path, SyncedMaterial> materials_;
     std::map<Path, SyncedMesh> syncedMeshes_;
     std::map<Path, SyncedInstancer> instancers_;
+    std::map<Path, SyncedPoints> syncedPoints_;
 };
 
 }  // namespace ernie

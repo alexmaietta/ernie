@@ -43,6 +43,9 @@ extern const char kOverlaySlang[];
 
 /// The infinite ground plane's pass.
 extern const char kGroundSlang[];
+/// Point clouds as ray-cast spheres.
+extern const char kPointsSlang[];
+
 
 /// Hierarchical depth (Hi-Z) pyramid for occlusion culling.
 extern const char kHzbSlang[];

@@ -35,6 +35,7 @@ set(ernie_shaders
     raster/motion.slang=kMotionSlang
     raster/overlay.slang=kOverlaySlang
     raster/present.slang=kPresentSlang
+    raster/points.slang=kPointsSlang
     raster/shading.slang=kShadingSlang
     raster/surface.slang=kSurfaceSlang
     raster/terrain.slang=kTerrainSlang

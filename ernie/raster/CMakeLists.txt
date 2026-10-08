@@ -5,6 +5,7 @@ ernie_add_library(
     ground_drawable.cpp
     material.cpp
     mesh_drawable.cpp
+    points_drawable.cpp
     overlay_pass.cpp
     poisson_disk.cpp
     render_targets.cpp

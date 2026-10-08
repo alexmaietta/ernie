@@ -27,6 +27,8 @@ inline constexpr std::string_view kCone = "Cone";
 inline constexpr std::string_view kCapsule = "Capsule";
 inline constexpr std::string_view kPlane = "Plane";
 inline constexpr std::string_view kPointInstancer = "PointInstancer";
+/// UsdGeomPoints: `points` drawn as spheres `widths` across, coloured by their displayColor.
+inline constexpr std::string_view kGeomPoints = "Points";
 inline constexpr std::string_view kVolume = "Volume";
 inline constexpr std::string_view kCamera = "Camera";
 inline constexpr std::string_view kDistantLight = "DistantLight";
@@ -51,6 +53,8 @@ inline constexpr std::string_view kInvisible = "invisible";
 // Geometry (UsdGeom Mesh, PointInstancer).
 inline constexpr std::string_view kPoints = "points";
 inline constexpr std::string_view kNormals = "normals";
+/// A Points prim's diameters: one per point, or one for all (default 1).
+inline constexpr std::string_view kWidths = "widths";
 inline constexpr std::string_view kFaceVertexCounts = "faceVertexCounts";
 inline constexpr std::string_view kFaceVertexIndices = "faceVertexIndices";
 inline constexpr std::string_view kDisplayColor = "primvars:displayColor";

@@ -185,7 +185,7 @@ TerrainParams TerrainParamsOf(const Scene& scene, const RenderPrims& prims) {
 RasterDelegate::RasterDelegate(const VulkanContext& context, VkFormat presentFormat,
                                BrdfRegistry brdfs)
     : context_(context), renderer_(context, presentFormat, std::move(brdfs)), terrain_(renderer_),
-      meshes_(renderer_), ground_(renderer_) {}
+      meshes_(renderer_), ground_(renderer_), points_(renderer_) {}
 
 RasterDelegate::~RasterDelegate() {
     context_.WaitForSubmissions();
@@ -206,7 +206,8 @@ const RendererInfo& RasterDelegate::Info() const {
 
 std::optional<Bounds3> RasterDelegate::SceneBounds() const {
     std::optional<Bounds3> bounds;
-    for (const std::optional<Bounds3>& drawable : {terrain_.Bounds(), meshes_.Bounds()}) {
+    for (const std::optional<Bounds3>& drawable :
+         {terrain_.Bounds(), meshes_.Bounds(), points_.Bounds()}) {
         if (!drawable) {
             continue;
         }
@@ -484,6 +485,7 @@ ComputeInterop& RasterDelegate::RequireCompute() {
     }
     if (!meshesOnGpu_) {
         meshes_.SetComputeInterop(compute);
+        points_.SetComputeInterop(compute);
         meshesOnGpu_ = true;
     }
     return *compute;
@@ -673,6 +675,113 @@ void RasterDelegate::SyncInstancers(const Scene& scene) {
     }
 }
 
+void RasterDelegate::SyncPoints(const Scene& scene) {
+    ERNIE_ZONE("Sync points");
+    using namespace tokens;
+    std::set<Path> seen;
+    std::vector<std::string> errors;
+    for (const Path& path : scene.Prims(kGeomPoints)) {
+        seen.insert(path);
+        const Key key = KeyOf(scene, path, {kPoints, kWidths, kDisplayColor, kExtent});
+        auto [it, added] = syncedPoints_.try_emplace(path);
+        SyncedPoints& synced = it->second;
+        if (!added && synced.key == key) {
+            continue;
+        }
+        synced.key = key;
+        try {
+            // A width for all from a value or a one-element array, else one per point.
+            const auto widthsOf = [&](float& width) -> const Tensor* {
+                width = static_cast<float>(GetNumber(scene, path, kWidths, 1.0));
+                const Tensor* tensor = scene.Read(path, kWidths);
+                if (tensor != nullptr && tensor->Elements() == 1 &&
+                    tensor->Location().kind == DeviceKind::Cpu) {
+                    width = FloatsOf(*tensor, 1, kWidths).front();
+                    return nullptr;
+                }
+                return tensor;
+            };
+            const Tensor* points = scene.Read(path, kPoints);
+            if (points != nullptr && IsGpu(points->Location().kind)) {
+                ComputeInterop& compute = RequireCompute();
+                const auto onDevice = [&](const Tensor* tensor) {
+                    return tensor == nullptr ? Tensor()
+                           : IsGpu(tensor->Location().kind)
+                               ? *tensor
+                               : compute.Upload(*tensor);
+                };
+                DevicePointsData data;
+                data.points = *points;
+                data.widths = onDevice(widthsOf(data.width));
+                const Tensor* colors = scene.Read(path, kDisplayColor);
+                if (colors != nullptr && colors->Elements() == points->Elements()) {
+                    data.colors = onDevice(colors);
+                }
+                data.extent = ExtentOf(scene, path);
+                data.stream = scene.WriteStream(path, kPoints);
+                if (synced.handle == 0) {
+                    synced.handle = points_.Add({});
+                }
+                points_.Set(synced.handle, data);
+            } else {
+                PointsData data;
+                data.points = FloatAttribute(scene, path, kPoints, 3).value_or(std::vector<float>());
+                if (const Tensor* widths = widthsOf(data.width)) {
+                    data.widths = FloatsOf(*widths, 1, kWidths);
+                }
+                if (const Tensor* colors = scene.Read(path, kDisplayColor);
+                    colors != nullptr &&
+                    static_cast<std::size_t>(colors->Elements()) == data.points.size() &&
+                    data.points.size() > 3) {
+                    data.colors = FloatsOf(*colors, 3, kDisplayColor);
+                }
+                if (synced.handle == 0) {
+                    synced.handle = points_.Add(std::move(data));
+                } else {
+                    points_.Set(synced.handle, std::move(data));
+                }
+            }
+        } catch (const std::invalid_argument& error) {
+            if (synced.handle != 0) {
+                points_.Remove(synced.handle);
+                synced.handle = 0;
+            }
+            errors.push_back(Describe(path, "points", error));
+        }
+    }
+    for (auto it = syncedPoints_.begin(); it != syncedPoints_.end();) {
+        if (seen.contains(it->first)) {
+            ++it;
+            continue;
+        }
+        if (it->second.handle != 0) {
+            points_.Remove(it->second.handle);
+        }
+        it = syncedPoints_.erase(it);
+    }
+    if (!errors.empty()) {
+        throw std::invalid_argument("Cannot upload " + errors.front());
+    }
+}
+
+std::vector<PointsItem> RasterDelegate::PointsItems(const Scene& scene) const {
+    std::vector<PointsItem> items;
+    for (const auto& [path, synced] : syncedPoints_) {
+        if (synced.handle == 0 || !scene.IsVisible(path)) {
+            continue;
+        }
+        PointsItem item;
+        item.points = synced.handle;
+        item.transform = scene.WorldTransform(path);
+        item.material = MaterialOf(scene, path);
+        item.tint = ConstantDisplayColor(scene, path).value_or(glm::vec3(0.5f));
+        item.primId = PrimIdOf(path);
+        item.world = WorldOf(scene, path);
+        items.push_back(item);
+    }
+    return items;
+}
+
 void RasterDelegate::Sync(const Scene& scene) {
     ERNIE_ZONE("Sync");
     if (scene.Id() != sceneId_) {
@@ -707,6 +816,8 @@ void RasterDelegate::Sync(const Scene& scene) {
     attempt([&] { SyncHeightfield(scene, ResolveRenderPrims(scene, {}).terrain); });
     attempt([&] { SyncMeshes(scene); });
     attempt([&] { SyncInstancers(scene); });
+    attempt([&] { SyncPoints(scene); });
+    attempt([&] { points_.SetItems(PointsItems(scene)); });
     // The draws, so the meshes' bounds are known as soon as the scene syncs.
     attempt([&] { meshes_.SetItems(Items(scene)); });
     if (!errors.empty()) {
@@ -798,6 +909,7 @@ void RasterDelegate::Update(const Scene& scene, const Path& settings, VkExtent2D
     context_.WaitForSubmissions();
     BeginFrame();
     meshes_.SettleMotion();
+    points_.SettleMotion();
     const RenderPrims prims = ResolveRenderPrims(scene, settings);
     // The view runs the first product's chain (`DefaultFilterChain` without products), holding
     // every var and the AOV slots of what that chain writes.
@@ -944,7 +1056,7 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
         }
     }
     renderer_.SetHighlight(highlighted, highlightColour_);
-    RasterDrawable* drawables[] = {&terrain_, &meshes_, &ground_};
+    RasterDrawable* drawables[] = {&terrain_, &meshes_, &ground_, &points_};
     if (overlays) {
         frame.overlays = *overlays;
     }
@@ -1021,7 +1133,7 @@ void RasterDelegate::Record(VkCommandBuffer commands, const RenderingTarget& tar
         viewTargets_ = std::make_unique<RenderTargets>(context_, extent, renderer_.Bands().count,
                                                        false, 1, vars, viewAovs_);
     }
-    const RasterDrawable* drawables[] = {&terrain_, &meshes_, &ground_};
+    const RasterDrawable* drawables[] = {&terrain_, &meshes_, &ground_, &points_};
     renderer_.Record(commands, *viewTargets_, drawables, &target, var);
 }
 
@@ -1100,6 +1212,7 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
     std::uint64_t submission = 0;
     // A new step: what moved in the last one stands still unless it moves again.
     meshes_.SettleMotion();
+    points_.SettleMotion();
     for (const RenderProductSpec& spec : specs) {
         const std::uint32_t slot = BeginFrame();
         RenderPrims prims = base;
@@ -1252,7 +1365,7 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
             signals.push_back(compute->NextVulkanSignal());
         }
         const std::vector<RenderTargets*> targets = TargetsOf(*frame->images);
-        const RasterDrawable* drawables[] = {&terrain_, &meshes_, &ground_};
+        const RasterDrawable* drawables[] = {&terrain_, &meshes_, &ground_, &points_};
         // Every view of the product renders in this one submission, sharing the shadow passes.
         ERNIE_ZONE_TEXT(spec.product.String());
         submission = context_.SubmitAsync(
