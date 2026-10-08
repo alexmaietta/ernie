@@ -10,8 +10,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <iterator>
 #include <map>
 #include <numeric>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -147,7 +149,8 @@ const std::map<std::string, float> kNone;
 TEST_F(RasterDelegateTest, TheStandardSensorFiltersAreRegistered) {
     RasterDelegate delegate(*context_);
     for (const char* id :
-         {"psf", "defocus", "bayer", "demosaic", "whiteBalance", "colorMatrix", "compand"}) {
+         {"psf", "defocus", "bayer", "demosaic", "whiteBalance", "colorMatrix", "compand",
+          "detectorPattern", "readoutTaps", "tdi"}) {
         EXPECT_NE(delegate.SensorFilters().Find(id), nullptr) << id;
     }
 }
@@ -552,5 +555,104 @@ TEST_F(RasterDelegateTest, TemporalFiltersKeepStateBetweenAProductsFrames) {
             delegate, scene, "HdrColor",
             {{"cie", kNone}, {"whiteBalance", kNone}, {"temporalAverage", {{"alpha", 0.5f}}}});
         EXPECT_EQ(fresh[i], 0.0f) << "no history after the chain changed";
+    }
+}
+
+TEST_F(RasterDelegateTest, DetectorPatternsStripeAlongTheTrack) {
+    RasterDelegate delegate(*context_);
+    Scene scene = FlatScene();  // grey terrain filling the image
+    scene.Set("/World/Camera", tokens::kExposureTime, 1e-6);  // unsaturated
+    const auto at = [](std::size_t x, std::size_t y) { return (y * kSize + x) * 4 + 1; };
+    const auto base = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
+    // Gain alone: each column's electrons scale by its detector's gain, all down the column.
+    const auto gains = VarThrough(delegate, scene, "Electrons",
+                                  {{"qe", kNone},
+                                   {"detectorPattern", {{"gain", 0.05f}, {"offset", 0.0f}}}});
+    std::vector<double> columnGain(kSize, 0.0);
+    int lit = 0;
+    for (std::size_t x = 0; x < kSize; ++x) {
+        for (std::size_t y = 0; y < kSize; ++y) {
+            if (base[at(x, y)] < 5.0f) {
+                continue;
+            }
+            const double gain = gains[at(x, y)] / base[at(x, y)];
+            if (columnGain[x] == 0.0) {
+                columnGain[x] = gain;
+            }
+            EXPECT_NEAR(gain, columnGain[x], 1e-4) << "one gain down column " << x;
+            ++lit;
+        }
+    }
+    ASSERT_GT(lit, 100);
+    std::vector<double> seen;
+    std::copy_if(columnGain.begin(), columnGain.end(), std::back_inserter(seen),
+                 [](double g) { return g != 0.0; });
+    const auto [low, high] = std::minmax_element(seen.begin(), seen.end());
+    EXPECT_GT(*high - *low, 0.03) << "columns differ";
+    // Offset alone with axis 1: a constant per row instead.
+    const auto offsets = VarThrough(
+        delegate, scene, "Electrons",
+        {{"qe", kNone}, {"detectorPattern", {{"gain", 0.0f}, {"offset", 50.0f}, {"axis", 1.0f}}}});
+    std::vector<float> rowShift;
+    for (std::size_t y = 0; y < kSize; ++y) {
+        std::optional<float> shift;
+        for (std::size_t x = 0; x < kSize; ++x) {
+            if (offsets[at(x, y)] <= 0.0f) {
+                continue;  // clipped at no electrons
+            }
+            const float own = offsets[at(x, y)] - base[at(x, y)];
+            if (!shift) {
+                shift = own;
+                rowShift.push_back(own);
+            }
+            EXPECT_NEAR(own, *shift, 0.05f) << "one offset along row " << y;
+        }
+    }
+    ASSERT_GT(rowShift.size(), 10u);
+    const auto [lowShift, highShift] = std::minmax_element(rowShift.begin(), rowShift.end());
+    EXPECT_GT(*highShift - *lowShift, 20.0f) << "rows differ";
+}
+
+TEST_F(RasterDelegateTest, ReadoutTapsOffsetInterleavedPixels) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    const auto raw = VarThrough(delegate, scene, "RawDN", {{"qe", kNone}, {"adc", kNone}});
+    const auto tapped = VarThrough(delegate, scene, "RawDN",
+                                   {{"qe", kNone},
+                                    {"adc", kNone},
+                                    {"readoutTaps", {{"offset0", 7.0f}, {"gain1", 2.0f}}}});
+    int checked = 0;
+    for (std::size_t y = 0; y < kSize; ++y) {
+        for (std::size_t x = 0; x < kSize; ++x) {
+            const std::size_t i = (y * kSize + x) * 4 + 1;
+            if (raw[i] > 2000.0f) {
+                continue;  // doubled past the ADC's range
+            }
+            EXPECT_EQ(tapped[i], x % 2 == 0 ? raw[i] + 7.0f : 2.0f * raw[i]) << x << ", " << y;
+            ++checked;
+        }
+    }
+    EXPECT_GT(checked, 1000);
+}
+
+TEST_F(RasterDelegateTest, TdiSumsItsStagesAndSmearsWhenOutOfStep) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    scene.Set("/World/Camera", tokens::kExposureTime, 1e-6);  // unsaturated
+    const auto at = [](std::size_t x, std::size_t y) { return (y * kSize + x) * 4 + 1; };
+    const auto line = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
+    ASSERT_LT(*std::max_element(line.begin(), line.end()), 2000.0f) << "four stages unsaturated";
+    const auto inStep = VarThrough(delegate, scene, "Electrons",
+                                   {{"qe", kNone}, {"tdi", {{"stages", 4.0f}, {"drift", 0.0f}}}});
+    const auto drifting =
+        VarThrough(delegate, scene, "Electrons",
+                   {{"qe", kNone}, {"tdi", {{"stages", 4.0f}, {"drift", 1.0f}}}});
+    for (std::size_t y = 0; y + 3 < kSize; ++y) {
+        for (std::size_t x = 0; x < kSize; ++x) {
+            EXPECT_NEAR(inStep[at(x, y)], 4.0f * line[at(x, y)], 1e-3f * line[at(x, y)] + 1e-3f);
+            const float smeared = line[at(x, y)] + line[at(x, y + 1)] + line[at(x, y + 2)] +
+                                  line[at(x, y + 3)];
+            EXPECT_NEAR(drifting[at(x, y)], smeared, 1e-3f * smeared + 1e-3f) << x << ", " << y;
+        }
     }
 }

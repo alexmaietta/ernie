@@ -237,6 +237,16 @@ public struct PixelContext {
         return uniform01(pcg3d(uint3(id.x, id.y, seed * 4u + salt * 2654435761u)).x);
     }
 
+    // A standard normal number for `key` and `salt`, the same every frame (from the sensor's seed
+    // alone), shared by every pixel with that key: for patterns of parts of the sensor, such as
+    // a key of (column, 0) for each detector of a line scanner.
+    public float fixedNormal(uint2 key, uint salt) {
+        let seed = sensorViews[view].noise.y;
+        let bits = pcg3d(uint3(key.x * 7919u + 13u, key.y * 104729u + 7u,
+                               seed * 4u + salt * 2654435761u + 1u));
+        return gaussian(bits.xy);
+    }
+
     // A uniform number in (0, 1] for this pixel and `salt`, new every frame (from the frame
     // seed, which also differs per view): for temporal noise.
     public float random(uint salt) {

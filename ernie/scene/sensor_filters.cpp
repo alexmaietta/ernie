@@ -325,6 +325,42 @@ std::vector<SensorFilterModel> StandardSensorFilters() {
          {{"inputBits", 12.0f, "Bits of the ADC's numbers"},
           {"outputBits", 8.0f, "Bits after companding"}},
          "Compand", shaders::kFilterCompandSlang},
+        {"detectorPattern", "Detector pattern",
+         "A fixed gain and offset per detector of a line scanner, the same down its whole column: "
+         "the along-track stripes of pushbroom images. Before noise.",
+         {"H. Carfantan and J. Idier, \"Statistical Linear Destriping of Satellite-Based "
+          "Pushbroom-Type Images\", IEEE TGRS 48(4), 2010"},
+         Kind::Pixel, Domain::Electrons,
+         {{"gain", 0.01f, "Standard deviation of each detector's relative gain"},
+          {"offset", 2.0f, "Standard deviation of each detector's offset, electrons"},
+          {"axis", 0.0f, "0: a detector per column (lines are rows), 1: per row"}},
+         "DetectorPattern", shaders::kFilterDetectorPatternSlang},
+        {"readoutTaps", "Readout taps",
+         "Interleaved output amplifiers, pixel x on tap x mod taps, each with its own gain and "
+         "offset, such as even and odd pixel offsets. After adc.",
+         {"D. C. Humm et al., \"Flight Calibration of the LROC Narrow Angle Camera\", Space "
+          "Science Reviews 200, 2016"},
+         Kind::Pixel, Domain::Digital,
+         {{"taps", 2.0f, "Interleaved taps, 1 to 4"},
+          {"offset0", 0.0f, "Tap 0's offset (even pixels of two), DN"},
+          {"offset1", 0.0f, "Tap 1's offset, DN"},
+          {"offset2", 0.0f, "Tap 2's offset, DN"},
+          {"offset3", 0.0f, "Tap 3's offset, DN"},
+          {"gain0", 1.0f, "Tap 0's gain"},
+          {"gain1", 1.0f, "Tap 1's gain"},
+          {"gain2", 1.0f, "Tap 2's gain"},
+          {"gain3", 1.0f, "Tap 3's gain"}},
+         "ReadoutTaps", shaders::kFilterReadoutTapsSlang},
+        {"tdi", "Time delay integration",
+         "A TDI line scanner's stages summed along the track, each one line's exposure, smeared "
+         "when the image drifts against the charge's clocking. Before noise.",
+         {"G. Lepage, J. Bogaerts and G. Meynants, \"Time-Delay-Integration Architectures in "
+          "CMOS Image Sensors\", IEEE Transactions on Electron Devices 56(11), 2009"},
+         Kind::Spatial, Domain::Electrons,
+         {{"stages", 32.0f, "Stages summed, 1 to 128"},
+          {"drift", 0.0f, "Pixels the image drifts along the track per stage; 0 in step"},
+          {"axis", 0.0f, "0: the track runs down the rows, 1: along the columns"}},
+         "Tdi", shaders::kFilterTdiSlang},
     };
 }
 
