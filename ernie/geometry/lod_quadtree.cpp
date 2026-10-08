@@ -20,14 +20,15 @@ bool SphereIntersects(const glm::vec3& low, const glm::vec3& high, const glm::ve
 
 }  // namespace
 
-LodQuadtree::LodQuadtree(const RasterView& heights, std::uint32_t leafCells) {
+void LodQuadtree::Shape(std::uint32_t width, std::uint32_t height, double cellSize,
+                        std::uint32_t leafCells) {
     if (leafCells < 4 || !std::has_single_bit(leafCells)) {
         throw std::invalid_argument("LOD leaf cells must be a power of two of at least 4");
     }
-    if (heights.width < 2 || heights.height < 2) {
+    if (width < 2 || height < 2) {
         throw std::invalid_argument("LOD heightfield must be at least 2 x 2 cells");
     }
-    const std::size_t quads = std::max(heights.width, heights.height) - 1;
+    const std::size_t quads = std::max(width, height) - 1;
     std::uint32_t top = 0;
     while ((static_cast<std::size_t>(leafCells) << top) < quads) {
         ++top;
@@ -35,20 +36,40 @@ LodQuadtree::LodQuadtree(const RasterView& heights, std::uint32_t leafCells) {
             throw std::invalid_argument("Heightfield needs more LOD levels than supported");
         }
     }
-
     leafCells_ = leafCells;
     levels_ = top + 1;
-    width_ = static_cast<std::uint32_t>(heights.width);
-    height_ = static_cast<std::uint32_t>(heights.height);
+    width_ = width;
+    height_ = height;
+    pixelSize_ = static_cast<float>(cellSize);
+    heights_.assign(levels_, {});
+    maxHeightSpan_.assign(levels_, 0.0f);
+    const std::uint32_t leaves = NodesPerSide(0);
+    heights_[0].assign(static_cast<std::size_t>(leaves) * leaves, glm::vec2(kInfinity, -kInfinity));
+}
+
+LodQuadtree::LodQuadtree(std::uint32_t width, std::uint32_t height, double cellSize,
+                         std::uint32_t leafCells) {
+    Shape(width, height, cellSize, leafCells);
+    BuildParents();
+}
+
+void LodQuadtree::SetLeaves(std::span<const glm::vec2> leaves) {
+    if (leaves.size() != heights_.at(0).size()) {
+        throw std::invalid_argument("A LOD tree needs one height range per leaf");
+    }
+    heights_[0].assign(leaves.begin(), leaves.end());
+    BuildParents();
+}
+
+LodQuadtree::LodQuadtree(const RasterView& heights, std::uint32_t leafCells) {
+    if (heights.width < 2 || heights.height < 2) {
+        throw std::invalid_argument("LOD heightfield must be at least 2 x 2 cells");
+    }
+    Shape(static_cast<std::uint32_t>(heights.width), static_cast<std::uint32_t>(heights.height),
+          heights.cellSize, leafCells);
     originX_ = static_cast<float>(heights.originX);
     originY_ = static_cast<float>(heights.originY);
-    pixelSize_ = static_cast<float>(heights.cellSize);
-    heights_.resize(levels_);
-    maxHeightSpan_.assign(levels_, 0.0f);
-
-    const glm::vec2 empty(kInfinity, -kInfinity);
     const std::uint32_t leaves = NodesPerSide(0);
-    heights_[0].assign(static_cast<std::size_t>(leaves) * leaves, empty);
     for (std::uint32_t y = 0; y < leaves; ++y) {
         const std::uint32_t row0 = y * leafCells;
         if (row0 >= height_ - 1) {
@@ -73,7 +94,11 @@ LodQuadtree::LodQuadtree(const RasterView& heights, std::uint32_t leafCells) {
             }
         }
     }
+    BuildParents();
+}
 
+void LodQuadtree::BuildParents() {
+    const glm::vec2 empty(kInfinity, -kInfinity);
     for (std::uint32_t level = 1; level < levels_; ++level) {
         const std::uint32_t side = NodesPerSide(level);
         heights_[level].assign(static_cast<std::size_t>(side) * side, empty);
@@ -90,6 +115,7 @@ LodQuadtree::LodQuadtree(const RasterView& heights, std::uint32_t leafCells) {
         }
     }
 
+    maxHeightSpan_.assign(levels_, 0.0f);
     for (std::uint32_t level = 0; level < levels_; ++level) {
         for (const glm::vec2& node : heights_[level]) {
             if (node.x <= node.y) {

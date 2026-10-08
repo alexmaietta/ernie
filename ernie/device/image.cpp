@@ -117,9 +117,9 @@ GpuImage::GpuImage(const VulkanContext& context, const ImageDesc& desc)
             layerViews_.push_back(layerView);
         }
     }
-    if (array && desc.mips > 1) {
+    if (desc.mips > 1) {
         for (std::uint32_t mip = 0; mip < desc.mips; ++mip) {
-            view.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+            view.viewType = array ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
             view.subresourceRange = {AspectOf(desc.format), mip, 1, 0, desc.layers};
             VkImageView mipView = VK_NULL_HANDLE;
             CheckVk(vkCreateImageView(context.Device(), &view, nullptr, &mipView),

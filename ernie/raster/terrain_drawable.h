@@ -1,6 +1,8 @@
 #pragma once
 
 #include "ernie/device/buffer.h"
+#include "ernie/device/compute_interop.h"
+#include "ernie/device/frame_uploads.h"
 #include "ernie/device/image.h"
 #include "ernie/device/pipeline.h"
 #include "ernie/geometry/frustum.h"
@@ -51,6 +53,20 @@ struct TerrainParams {
     std::uint32_t primId = 1;  ///< Written to the PrimId render var; 0 means background.
 };
 
+/// A heightfield written on the compute device (CUDA or HIP), which stays there: a contiguous
+/// float32 (rows, cols) tensor and how it lies, as `RasterView`.
+struct DeviceHeightfield {
+    Tensor heights;
+    double originX = 0.0;  ///< World x of the north-west corner of the first cell.
+    double originY = 0.0;  ///< World y of that corner.
+    double cellSize = 1.0;
+    std::optional<float> noData;
+    /// The cells that changed since the last update as (first column, first row, columns, rows),
+    /// so only their gradients and LOD bounds are rebuilt; none for every cell.
+    std::optional<std::array<std::uint32_t, 4>> dirty;
+    std::uintptr_t stream = 1;  ///< The stream the heights are written on.
+};
+
 /// A north-up heightfield raster drawn as a lit, shadowed triangle mesh: a `RasterDrawable`.
 ///
 /// Heights live in an `R32_SFLOAT` image that the vertex shader reads; the mesh has no vertex or
@@ -90,11 +106,38 @@ class TerrainDrawable : public RasterDrawable {
     /// `RasterView`), or larger than the device's maximum texture size.
     void SetHeightfield(const RasterView& heights);
 
+    /// Draws heights written on the compute device of `compute` (`SetComputeInterop`), without
+    /// a host copy. They are copied device to device into the drawable's own buffer at once (on
+    /// the field's stream), and the next frame rebuilds the gradients and LOD bounds of the dirty
+    /// cells on the GPU. A first field, or one of another size, waits for the GPU to bound it;
+    /// later ones never wait, and the LOD tree takes their bounds a frame or two later, so for
+    /// that long it selects and culls with the last bounds.
+    /// @throws std::invalid_argument without compute interop, for a tensor that is not a
+    /// contiguous float32 (rows, cols) tensor on its device, smaller than 2 x 2 or larger than the
+    /// device's textures, or a dirty rectangle outside it.
+    void SetHeightfield(const DeviceHeightfield& field);
+
+    /// Enables heightfields on the compute device (`SetHeightfield`); `compute` must outlive the
+    /// drawable.
+    void SetComputeInterop(ComputeInterop* compute) {
+        compute_ = compute;
+    }
+
+    /// Records the GPU update of heights written on the device since the last frame, before
+    /// any pass draws them.
+    void RecordCull(VkCommandBuffer commands) const override;
+
     /// Drops the heightfield, so nothing is drawn. Waits for the device to go idle.
     void ClearHeightfield();
 
     bool HasHeightfield() const {
         return heights_ != nullptr;
+    }
+
+    /// The heights' gradient image (R16G16 float, a mip chain) shading samples, for tests; null
+    /// without a heightfield.
+    const GpuImage* Gradients() const {
+        return gradients_.get();
     }
 
     std::size_t Width() const {
@@ -166,6 +209,17 @@ class TerrainDrawable : public RasterDrawable {
 
     void CreateGBufferPipeline();
     void ReservePatches(std::size_t count);
+    /// Makes the images and buffers of device heights for a `width` x `height` raster of cells
+    /// `cellSize` wide and resets the tree and patches; they are written later.
+    void AllocateHeightfield(std::uint32_t width, std::uint32_t height, double cellSize);
+    /// Records the update of the device heights' cells in `rect` (first column, first row, end
+    /// column, end row): the heights image, gradients, their mips and LOD leaf ranges, and the
+    /// leaves' copy into `readback` when given.
+    void RecordHeightUpdate(VkCommandBuffer commands, const std::array<std::uint32_t, 4>& rect,
+                            const GpuBuffer* readback) const;
+    /// Takes the LOD leaf ranges the GPU computed into `readback` into the tree and the height
+    /// range.
+    void TakeLeaves(const GpuBuffer& readback);
     std::vector<DescriptorResource> Resources(const RasterFrame& frame, std::size_t view) const;
     void DrawPatches(VkCommandBuffer commands, DrawRange range, const glm::mat4& light) const;
 
@@ -205,6 +259,22 @@ class TerrainDrawable : public RasterDrawable {
     double pixelSize_ = 1.0;
     float minHeight_ = 0.0f;
     float maxHeight_ = 0.0f;
+
+    // Heightfields on the compute device.
+    ComputeInterop* compute_ = nullptr;
+    DeviceHeightfield device_;               ///< The last field, its tensor dropped.
+    std::shared_ptr<GpuBuffer> deviceHeights_;  ///< The heights, copied from the device.
+    std::unique_ptr<GpuBuffer> leaves_;      ///< Per LOD leaf, (min, max).
+    PipelineLayout updateLayout_;
+    std::unique_ptr<ComputePipeline> gradientsPipeline_;
+    std::unique_ptr<ComputePipeline> gradientMipPipeline_;
+    std::unique_ptr<ComputePipeline> leafRangePipeline_;
+    /// The cells changed since the last recorded update, (first column, first row, end column, end
+    /// row); empty when none.
+    mutable std::optional<std::array<std::uint32_t, 4>> pendingRect_;
+    /// Per frame slot, the leaf ranges its frame copies back, and whether it did.
+    std::array<std::unique_ptr<GpuBuffer>, FrameUploads::kSlots> readbacks_;
+    mutable std::array<bool, FrameUploads::kSlots> readbackPending_{};
 };
 
 }  // namespace ernie

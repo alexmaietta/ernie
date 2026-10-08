@@ -55,8 +55,8 @@ class GpuImage {
     /// @throws std::out_of_range for a layer the image does not have.
     VkImageView LayerView(std::uint32_t layer) const;
 
-    /// View of mip `mip` of every layer, as a 2D array for array images, such as one level of a
-    /// depth pyramid of a batch of views.
+    /// View of mip `mip` alone, of every layer as a 2D array for array images, such as one level
+    /// of a depth pyramid of a batch of views; a 2D view of it otherwise.
     /// @throws std::out_of_range for a mip the image does not have.
     VkImageView MipView(std::uint32_t mip) const;
 

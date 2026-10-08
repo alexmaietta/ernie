@@ -379,6 +379,48 @@ void RasterDelegate::SyncHeightfield(const Scene& scene, const Path& terrain) {
         return;
     }
     heightfield_ = key;
+    // Heights written on a GPU stay there: the terrain copies them device to device and rebuilds
+    // what depends on the cells that changed on the GPU.
+    const Tensor* written = scene.Read(terrain, kHeights);
+    if (IsGpu(written->Location().kind)) {
+        try {
+            if (!terrainOnGpu_) {
+                terrain_.SetComputeInterop(&RequireCompute());
+                terrainOnGpu_ = true;
+            }
+            DeviceHeightfield field;
+            field.heights = *written;
+            const glm::dvec2 corner = GetVec2(scene, terrain, kOrigin, {0.0, 0.0});
+            field.originX = corner.x;
+            field.originY = corner.y;
+            field.cellSize = GetNumber(scene, terrain, kCellSize, 1.0);
+            if (scene.Get(terrain, kNoData) != nullptr) {
+                field.noData = static_cast<float>(GetNumber(scene, terrain, kNoData, 0.0));
+            }
+            if (const Value* value = scene.Get(terrain, kHeightsDirty)) {
+                // A vec4, or four numbers.
+                glm::vec4 dirty(-1.0f);
+                if (const auto* vector = value->Get<glm::vec4>()) {
+                    dirty = *vector;
+                } else if (const auto* list = value->Get<std::vector<float>>();
+                           list != nullptr && list->size() == 4) {
+                    dirty = {(*list)[0], (*list)[1], (*list)[2], (*list)[3]};
+                }
+                if (glm::any(glm::lessThan(dirty, glm::vec4(0.0f)))) {
+                    throw std::invalid_argument(std::string(kHeightsDirty) +
+                                                " must be four non-negative numbers");
+                }
+                field.dirty = std::array<std::uint32_t, 4>{
+                    static_cast<std::uint32_t>(dirty.x), static_cast<std::uint32_t>(dirty.y),
+                    static_cast<std::uint32_t>(dirty.z), static_cast<std::uint32_t>(dirty.w)};
+            }
+            field.stream = scene.WriteStream(terrain, kHeights);
+            terrain_.SetHeightfield(field);
+        } catch (const std::invalid_argument& error) {
+            throw UploadError(terrain, kHeights, error.what());
+        }
+        return;
+    }
     try {
         const Tensor heights = scene.Read(terrain, kHeights)->Contiguous();
         terrain_.SetHeightfield(RasterOf(scene, terrain, heights, kOrigin, kCellSize, kNoData));

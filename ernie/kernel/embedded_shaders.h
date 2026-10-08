@@ -70,5 +70,7 @@ extern const char kTerrainSlang[];
 extern const char kSurfaceSlang[];
 extern const char kTerrainShadowSlang[];
 extern const char kTerrainColorSlang[];
+/// Gradients and LOD leaf ranges of heightfields written on the GPU.
+extern const char kTerrainUpdateSlang[];
 
 }  // namespace ernie::shaders

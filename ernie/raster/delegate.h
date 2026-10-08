@@ -223,6 +223,7 @@ class RasterDelegate : public RenderDelegate {
     bool computeTried_ = false;
     std::string computeWhy_;
     bool meshesOnGpu_ = false;
+    bool terrainOnGpu_ = false;  ///< Whether the terrain has the compute interop.
     RasterRenderer renderer_;
     TerrainDrawable terrain_;
     MeshDrawable meshes_;

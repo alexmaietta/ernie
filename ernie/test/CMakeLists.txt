@@ -47,6 +47,7 @@ ernie_add_test_suite(
     raster_culling_gpu_test.cpp
     raster_delegate_gpu_test.cpp
     raster_gpu_meshes_gpu_test.cpp
+    raster_gpu_terrain_gpu_test.cpp
     raster_hex_tiling_gpu_test.cpp
     raster_lights_gpu_test.cpp
     raster_mesh_drawable_test.cpp

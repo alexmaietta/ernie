@@ -1,5 +1,6 @@
 #include "ernie/raster/terrain_drawable.h"
 
+#include "ernie/device/gpu_profile.h"
 #include "ernie/kernel/embedded_shaders.h"
 #include "ernie/util/profile.h"
 #include "ernie/util/raster_checks.h"
@@ -85,6 +86,21 @@ std::vector<ShaderModuleSource> TerrainModules() {
 // and their mip chain as packed half floats: each level averages 2 x 2 of the one before (odd
 // sizes repeat their last row or column), so a distant pixel shades by the mean slope it covers
 // instead of one cell's, which aliased into salt-and-pepper speckle on fine heightfields.
+/// terrain_update.slang's bindings: heights, the gradient mip written and the one below, leaves.
+constexpr DescriptorBinding kUpdateBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+    {2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+    {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+};
+
+/// terrain_update.slang's constants.
+struct UpdateConstants {
+    std::uint32_t rect[4];
+    std::uint32_t size[4];
+    float values[4];
+};
+
 std::vector<std::vector<std::uint32_t>> PackedGradientMips(const RasterView& raster) {
     std::size_t w = raster.width;
     std::size_t h = raster.height;
@@ -133,7 +149,16 @@ std::vector<std::vector<std::uint32_t>> PackedGradientMips(const RasterView& ras
 TerrainDrawable::TerrainDrawable(RasterRenderer& renderer)
     : renderer_(renderer), layout_(renderer.Context(), kBindings, sizeof(DrawConstants)),
       uniforms_(renderer.Context(), kUniformsStride, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                BufferMemory::Device) {
+                BufferMemory::Device),
+      updateLayout_(renderer.Context(), kUpdateBindings, sizeof(UpdateConstants)) {
+    const std::vector<ShaderModuleSource> update{{"terrain_update", shaders::kTerrainUpdateSlang}};
+    const auto compile = [&](const char* entry) {
+        return std::make_unique<ComputePipeline>(
+            renderer_.Context(), updateLayout_, renderer_.Compiler().CompileSpirv(update, entry));
+    };
+    gradientsPipeline_ = compile("gradientsMain");
+    gradientMipPipeline_ = compile("gradientMipMain");
+    leafRangePipeline_ = compile("leafRangeMain");
     std::vector<ShaderModuleSource> modules = TerrainModules();
     modules.push_back({"terrain_shadow", shaders::kTerrainShadowSlang});
     const std::vector<std::uint32_t> shadowVertex =
@@ -192,6 +217,10 @@ void TerrainDrawable::ClearHeightfield() {
     prepared_ = false;
     width_ = 0;
     height_ = 0;
+    deviceHeights_.reset();
+    leaves_.reset();
+    pendingRect_.reset();
+    readbackPending_ = {};
 }
 
 void TerrainDrawable::SetHeightfield(const RasterView& raster) {
@@ -210,6 +239,10 @@ void TerrainDrawable::SetHeightfield(const RasterView& raster) {
     cascadeRanges_.clear();
     triangles_ = 0;
     prepared_ = false;
+    deviceHeights_.reset();
+    leaves_.reset();
+    pendingRect_.reset();
+    readbackPending_ = {};
     width_ = raster.width;
     height_ = raster.height;
     originX_ = raster.originX;
@@ -262,10 +295,228 @@ void TerrainDrawable::SetHeightfield(const RasterView& raster) {
     gradients_ = std::move(gradientImage);
 }
 
+void TerrainDrawable::AllocateHeightfield(std::uint32_t width, std::uint32_t height,
+                                          double cellSize) {
+    const VulkanContext& context = renderer_.Context();
+    vkDeviceWaitIdle(context.Device());
+    patches_.clear();
+    mainRanges_.clear();
+    cascadeRanges_.clear();
+    triangles_ = 0;
+    prepared_ = false;
+    width_ = width;
+    height_ = height;
+    heights_ = std::make_unique<GpuImage>(
+        context, ImageDesc{width, height, 1, 1, VK_FORMAT_R32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT});
+    const auto mips = static_cast<std::uint32_t>(std::bit_width(std::max(width, height)));
+    gradients_ = std::make_unique<GpuImage>(
+        context, ImageDesc{width, height, 1, mips, VK_FORMAT_R16G16_SFLOAT,
+                           VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT});
+    deviceHeights_ = std::make_shared<GpuBuffer>(
+        context, VkDeviceSize{width} * height * sizeof(float), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        BufferMemory::Shared);
+    tree_ = LodQuadtree(width, height, cellSize, kLodLeafCells);
+    const VkDeviceSize leafBytes =
+        VkDeviceSize{tree_.LeavesPerSide()} * tree_.LeavesPerSide() * sizeof(glm::vec2);
+    leaves_ = std::make_unique<GpuBuffer>(
+        context, leafBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        BufferMemory::Device);
+    for (std::unique_ptr<GpuBuffer>& readback : readbacks_) {
+        readback = std::make_unique<GpuBuffer>(context, leafBytes, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                               BufferMemory::Readback);
+    }
+    pendingRect_.reset();
+    readbackPending_ = {};
+}
+
+void TerrainDrawable::SetHeightfield(const DeviceHeightfield& field) {
+    if (compute_ == nullptr) {
+        throw std::invalid_argument("Heights on a GPU need compute interop");
+    }
+    const Tensor& tensor = field.heights;
+    if (tensor.Location() != compute_->Location() || tensor.Type() != DType::Float32 ||
+        tensor.Rank() != 2 || !tensor.IsContiguous()) {
+        throw std::invalid_argument(
+            "Heights on a GPU must be a contiguous float32 (rows, cols) tensor on compute device " +
+            std::to_string(compute_->Device()));
+    }
+    const auto width = static_cast<std::uint32_t>(tensor.Shape()[1]);
+    const auto height = static_cast<std::uint32_t>(tensor.Shape()[0]);
+    const std::uint32_t maxSize = renderer_.Context().Limits().maxImageDimension2D;
+    if (width < 2 || height < 2 || width > maxSize || height > maxSize) {
+        throw std::invalid_argument("Heightfield must be from 2 x 2 to the device's maximum "
+                                    "texture size");
+    }
+    if (!(field.cellSize > 0.0)) {
+        throw std::invalid_argument("Heightfield cells must have a positive size");
+    }
+    std::array<std::uint32_t, 4> rect{0, 0, width, height};
+    if (field.dirty) {
+        const auto& [col, row, columns, rows] = *field.dirty;
+        if (std::uint64_t{col} + columns > width || std::uint64_t{row} + rows > height) {
+            throw std::invalid_argument("The heights' dirty rectangle must lie inside them");
+        }
+        rect = {col, row, col + columns, row + rows};
+    }
+    // A first field, or one of another shape, starts over; another nodata value changes every
+    // cell's bounds.
+    const bool reshape = deviceHeights_ == nullptr || width != width_ || height != height_ ||
+                         field.cellSize != device_.cellSize;
+    if (reshape) {
+        AllocateHeightfield(width, height, field.cellSize);
+    }
+    if (reshape || field.noData != device_.noData) {
+        rect = {0, 0, width, height};
+    }
+    device_ = field;
+    device_.heights = Tensor();
+    originX_ = field.originX;
+    originY_ = field.originY;
+    pixelSize_ = field.cellSize;
+    compute_->CopyToBuffer(tensor, *deviceHeights_, 0, field.stream);
+    if (rect[0] < rect[2] && rect[1] < rect[3]) {
+        pendingRect_ = pendingRect_ ? std::array<std::uint32_t, 4>{std::min((*pendingRect_)[0], rect[0]),
+                                                                    std::min((*pendingRect_)[1], rect[1]),
+                                                                    std::max((*pendingRect_)[2], rect[2]),
+                                                                    std::max((*pendingRect_)[3], rect[3])}
+                                    : rect;
+    }
+    if (reshape) {
+        // Bounded at once, so the first frame selects patches from the real heights.
+        const TimelinePoint wait = compute_->VulkanWait();
+        const std::span<const TimelinePoint> waits(&wait, wait.semaphore != VK_NULL_HANDLE ? 1 : 0);
+        renderer_.Context().Submit(
+            [&](VkCommandBuffer commands) {
+                RecordHeightUpdate(commands, *pendingRect_, readbacks_[0].get());
+            },
+            waits);
+        pendingRect_.reset();
+        TakeLeaves(*readbacks_[0]);
+    }
+}
+
+void TerrainDrawable::RecordCull(VkCommandBuffer commands) const {
+    if (!pendingRect_) {
+        return;
+    }
+    // Its leaves come back to the host once this frame's slot is next taken (`Prepare`).
+    const std::uint32_t slot = renderer_.Uploads().Slot();
+    RecordHeightUpdate(commands, *pendingRect_, readbacks_[slot].get());
+    readbackPending_[slot] = true;
+    pendingRect_.reset();
+}
+
+void TerrainDrawable::RecordHeightUpdate(VkCommandBuffer commands,
+                                         const std::array<std::uint32_t, 4>& rect,
+                                         const GpuBuffer* readback) const {
+    ERNIE_GPU_ZONE(renderer_.Context(), commands, "Terrain heights");
+    const auto width = static_cast<std::uint32_t>(width_);
+    const auto height = static_cast<std::uint32_t>(height_);
+    const auto barrier = [&](VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess) {
+        VkMemoryBarrier2 memory{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+        memory.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+        memory.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT;
+        memory.dstStageMask = dstStage;
+        memory.dstAccessMask = dstAccess;
+        VkDependencyInfo dependency{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        dependency.memoryBarrierCount = 1;
+        dependency.pMemoryBarriers = &memory;
+        vkCmdPipelineBarrier2(commands, &dependency);
+    };
+    const auto groups = [](std::uint32_t extent) { return (extent + 7) / 8; };
+
+    // The heights image over the rectangle, from the copy of the device's heights.
+    heights_->Transition(commands, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    VkBufferImageCopy region{};
+    region.bufferOffset = (VkDeviceSize{rect[1]} * width + rect[0]) * sizeof(float);
+    region.bufferRowLength = width;
+    region.bufferImageHeight = height;
+    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    region.imageOffset = {static_cast<std::int32_t>(rect[0]), static_cast<std::int32_t>(rect[1]), 0};
+    region.imageExtent = {rect[2] - rect[0], rect[3] - rect[1], 1};
+    vkCmdCopyBufferToImage(commands, deviceHeights_->Handle(), heights_->Handle(),
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    heights_->Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    UpdateConstants constants{};
+    constants.size[2] = kLodLeafCells;
+    constants.size[3] = tree_.LeavesPerSide();
+    constants.values[0] = static_cast<float>(0.5 / pixelSize_);
+    constants.values[1] = device_.noData.value_or(0.0f);
+    constants.values[2] = device_.noData ? 1.0f : 0.0f;
+    const auto dispatch = [&](const ComputePipeline& pipeline, std::uint32_t mip,
+                              const std::array<std::uint32_t, 4>& at, std::uint32_t w,
+                              std::uint32_t h) {
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline.Handle());
+        const DescriptorResource resources[] = {
+            DescriptorResource::Of(*deviceHeights_),
+            DescriptorResource::Of(gradients_->MipView(mip), VK_IMAGE_LAYOUT_GENERAL),
+            DescriptorResource::Of(gradients_->MipView(mip > 0 ? mip - 1 : 0),
+                                   VK_IMAGE_LAYOUT_GENERAL),
+            DescriptorResource::Of(*leaves_)};
+        updateLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+        std::copy(at.begin(), at.end(), constants.rect);
+        constants.size[0] = w;
+        constants.size[1] = h;
+        updateLayout_.PushConstants(commands, &constants, sizeof(constants));
+        vkCmdDispatch(commands, groups(at[2] - at[0]), groups(at[3] - at[1]), 1);
+    };
+
+    // Gradients: level 0 where a changed height is a neighbour, then each mip over what those
+    // texels average into.
+    gradients_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    std::array<std::uint32_t, 4> at{rect[0] > 0 ? rect[0] - 1 : 0, rect[1] > 0 ? rect[1] - 1 : 0,
+                                    std::min(rect[2] + 1, width), std::min(rect[3] + 1, height)};
+    dispatch(*gradientsPipeline_, 0, at, width, height);
+    for (std::uint32_t mip = 1; mip < gradients_->Desc().mips; ++mip) {
+        barrier(VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT);
+        const std::uint32_t below = mip - 1;
+        const std::uint32_t mipWidth = std::max(width >> mip, 1u);
+        const std::uint32_t mipHeight = std::max(height >> mip, 1u);
+        at = {at[0] / 2, at[1] / 2, std::min((at[2] + 1) / 2, mipWidth),
+              std::min((at[3] + 1) / 2, mipHeight)};
+        dispatch(*gradientMipPipeline_, mip, at, std::max(width >> below, 1u),
+                 std::max(height >> below, 1u));
+    }
+
+    // The LOD leaves sharing a vertex with a changed cell; every leaf, those past the raster's
+    // edge included, when every cell changed.
+    const std::uint32_t leaves = tree_.LeavesPerSide();
+    const auto first = [](std::uint32_t cell) { return cell > 0 ? (cell - 1) / kLodLeafCells : 0; };
+    const bool all = rect == std::array<std::uint32_t, 4>{0, 0, width, height};
+    const std::array<std::uint32_t, 4> leafRect =
+        all ? std::array<std::uint32_t, 4>{0, 0, leaves, leaves}
+            : std::array<std::uint32_t, 4>{first(rect[0]), first(rect[1]),
+                                           std::min((rect[2] - 1) / kLodLeafCells + 1, leaves),
+                                           std::min((rect[3] - 1) / kLodLeafCells + 1, leaves)};
+    dispatch(*leafRangePipeline_, 0, leafRect, width, height);
+    barrier(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_TRANSFER_READ_BIT);
+    gradients_->Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    if (readback != nullptr) {
+        const VkBufferCopy copy{0, 0, leaves_->Size()};
+        vkCmdCopyBuffer(commands, leaves_->Handle(), readback->Handle(), 1, &copy);
+        barrier(VK_PIPELINE_STAGE_2_HOST_BIT, VK_ACCESS_2_HOST_READ_BIT);
+    }
+}
+
+void TerrainDrawable::TakeLeaves(const GpuBuffer& readback) {
+    std::vector<glm::vec2> leaves(static_cast<std::size_t>(tree_.LeavesPerSide()) *
+                                  tree_.LeavesPerSide());
+    readback.Read(std::as_writable_bytes(std::span(leaves)));
+    tree_.SetLeaves(leaves);
+    const glm::vec2 range = tree_.HeightRange();
+    minHeight_ = range.x <= range.y ? range.x : 0.0f;
+    maxHeight_ = range.x <= range.y ? range.y : 0.0f;
+}
+
 std::uint64_t TerrainDrawable::GpuBytes() const {
     std::uint64_t bytes = uniforms_.Size() + patchBuffer_->Size();
     if (heights_ != nullptr) {
         bytes += heights_->Bytes() + gradients_->Bytes();
+    }
+    if (deviceHeights_ != nullptr) {
+        bytes += deviceHeights_->Size() + leaves_->Size();
     }
     return bytes;
 }
@@ -295,6 +546,12 @@ void TerrainDrawable::Prepare(const FrameParams& frame, std::span<const ShadowCa
     prepared_ = false;
     if (!HasHeightfield()) {
         return;
+    }
+    // The LOD bounds of device heights this slot's last frame updated, now that it finished.
+    const std::uint32_t slot = renderer_.Uploads().Slot();
+    if (readbackPending_[slot]) {
+        readbackPending_[slot] = false;
+        TakeLeaves(*readbacks_[slot]);
     }
     const std::uint32_t material = renderer_.HasMaterial(params_.material)
                                        ? params_.material

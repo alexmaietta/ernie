@@ -40,6 +40,7 @@ set(ernie_shaders
     raster/terrain.slang=kTerrainSlang
     raster/terrain_color.slang=kTerrainColorSlang
     raster/terrain_shadow.slang=kTerrainShadowSlang
+    raster/terrain_update.slang=kTerrainUpdateSlang
     raster/views.slang=kViewsSlang)
 set(shader_files)
 foreach(entry ${ernie_shaders})

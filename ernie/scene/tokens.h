@@ -223,6 +223,9 @@ inline constexpr std::string_view kOrigin = "ernie:origin";      ///< dvec2 nort
 inline constexpr std::string_view kCellSize = "ernie:cellSize";  ///< double, world units.
 inline constexpr std::string_view kNoData = "ernie:noData";      ///< float marking missing cells.
 inline constexpr std::string_view kExaggeration = "ernie:exaggeration";  ///< float.
+/// int4 (first column, first row, columns, rows): the cells that changed with the last write of
+/// heights on a GPU, so only their gradients and LOD bounds are rebuilt; absent for all.
+inline constexpr std::string_view kHeightsDirty = "ernie:heights:dirty";
 
 // Ground plane (Ernie): an infinite horizontal plane facing +z, drawn with its material binding.
 inline constexpr std::string_view kGroundHeight = "ernie:height";       ///< World z, default 0.

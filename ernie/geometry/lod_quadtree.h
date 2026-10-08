@@ -67,6 +67,28 @@ class LodQuadtree {
     /// or the tree would need more than `kMaxLevels` levels.
     LodQuadtree(const RasterView& heights, std::uint32_t leafCells);
 
+    /// A tree over a `width` x `height` raster of cells `cellSize` wide with its north-west
+    /// corner at x = y = 0, whose leaves' min and max heights come later (`SetLeaves`), such as
+    /// from the GPU; until then no node is selected.
+    /// @throws std::invalid_argument as the other constructor.
+    LodQuadtree(std::uint32_t width, std::uint32_t height, double cellSize,
+                std::uint32_t leafCells);
+
+    /// Level-0 nodes along each side: `SetLeaves` takes their square, row-major.
+    std::uint32_t LeavesPerSide() const {
+        return Empty() ? 0 : NodesPerSide(0);
+    }
+
+    /// Replaces every leaf's (min, max) height, min above max for a leaf without valid cells,
+    /// and rebuilds the levels above.
+    /// @throws std::invalid_argument for a count other than `LeavesPerSide()` squared.
+    void SetLeaves(std::span<const glm::vec2> leaves);
+
+    /// The (min, max) height over every node, min above max without valid cells.
+    glm::vec2 HeightRange() const {
+        return Empty() ? glm::vec2(1.0f, 0.0f) : heights_[levels_ - 1].front();
+    }
+
     bool Empty() const {
         return levels_ == 0;
     }
@@ -121,6 +143,11 @@ class LodQuadtree {
                                                std::uint32_t y, float exaggeration) const;
 
   private:
+    /// Sets up the levels for a `width` x `height` raster, every node empty.
+    void Shape(std::uint32_t width, std::uint32_t height, double cellSize, std::uint32_t leafCells);
+    /// Rebuilds the levels above the leaves and the largest spans.
+    void BuildParents();
+
     std::uint32_t NodesPerSide(std::uint32_t level) const {
         return 1u << (levels_ - 1 - level);
     }
