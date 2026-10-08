@@ -671,12 +671,21 @@ ResolveRenderProducts(const Scene& scene, std::span<const Path> products, const 
                 throw std::invalid_argument("Sensor filter '" + filter.String() + "' has no '" +
                                             std::string(kFilterType) + "'");
             }
-            // Its parameters: every number under inputs:.
+            // Its parameters: every number or float array under inputs:.
             constexpr std::string_view kInputs = "inputs:";
             for (const std::string& attribute : scene.Attributes(filter)) {
-                if (attribute.starts_with(kInputs)) {
-                    step.inputs[attribute.substr(kInputs.size())] =
-                        static_cast<float>(GetNumber(scene, filter, attribute, 0.0));
+                if (!attribute.starts_with(kInputs)) {
+                    continue;
+                }
+                const std::string name = attribute.substr(kInputs.size());
+                const Value* value = scene.Get(filter, attribute);
+                if (const auto* list = value != nullptr ? value->Get<std::vector<float>>()
+                                                        : nullptr) {
+                    step.arrays[name] = *list;
+                } else if (const Tensor* tensor = scene.Read(filter, attribute)) {
+                    step.arrays[name] = FloatsOf(*tensor, 1, attribute);
+                } else {
+                    step.inputs[name] = static_cast<float>(GetNumber(scene, filter, attribute, 0.0));
                 }
             }
             spec.filters.push_back(std::move(step));

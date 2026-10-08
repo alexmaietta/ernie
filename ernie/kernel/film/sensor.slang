@@ -489,6 +489,14 @@ public struct Lens : ISpatialSource {
     }
 }
 
+// A curve parameter (`SensorFilterParam::size` above 1) at `t` in [0, 1]: linear between its N
+// evenly spaced samples, values[0] at 0 and values[N - 1] at 1, held beyond them.
+public float curveAt<let N : int>(float values[N], float t) {
+    let at = saturate(t) * float(N - 1);
+    let lower = min(int(at), N - 2);
+    return lerp(values[lower], values[lower + 1], at - float(lower));
+}
+
 // Writes `value` to output `output` of the running filter (its model's `outputs`, in order), the
 // AOV a render var asks for as "aov:<name>"; nothing when the product does not hold it.
 public void writeOutput(PixelContext pixel, uint output, float4 value) {

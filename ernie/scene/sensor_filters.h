@@ -105,12 +105,22 @@ struct SensorFilterOutput {
     std::string description;
 };
 
-/// A custom filter's parameter: a float its prim sets as `inputs:<name>`.
+/// A custom filter's parameter: a float its prim sets as `inputs:<name>`, or with `size` above 1
+/// an array of floats (`float name[size]` in the filter's `Params`, such as a curve; sensor.slang's
+/// `curveAt` reads one), which the prim sets as a float array of any length, resampled linearly
+/// to `size` (a single number fills it).
 struct SensorFilterParam {
     std::string name;  ///< An identifier: the field of the filter's `Params` struct.
     float defaultValue = 0.0f;
     std::string description;
+    std::uint32_t size = 1;
+    /// An array parameter's default, resampled to `size`; empty fills it with `defaultValue`.
+    std::vector<float> defaults = {};
 };
+
+/// `values` resampled linearly to `size` evenly spaced samples, first to first and last to last;
+/// one value fills them all, and none gives zeros.
+std::vector<float> ResampleCurve(std::span<const float> values, std::size_t size);
 
 /// A sensor filter written in Slang, run in the fused sensor kernel like the built-in ones: a
 /// struct `typeName` in module `slang` implementing `IBandFilter` (kind `Band`, domain `Spectrum`),
@@ -147,8 +157,9 @@ struct SensorFilterModel {
 /// Custom sensor filters a renderer can run, by `SensorFilterModel::id`.
 class SensorFilterRegistry {
   public:
-    /// Most parameters a filter may declare.
+    /// Most parameters a filter may declare, and floats they may hold together.
     static constexpr std::size_t kMaxParams = 16;
+    static constexpr std::size_t kMaxParamFloats = 1024;
 
     /// Adds `model`; its Slang is compiled when a chain first uses it (`RasterRenderer::
     /// AddSensorFilter` compiles eagerly).
@@ -188,6 +199,10 @@ class SensorFilterRegistry {
 /// - `colorMatrix` (pixel, rgb): a 3 x 3 colour correction matrix `m00`..`m22`; after `cie`.
 /// - `compand` (pixel, digital): square-root companding from `inputBits` to `outputBits`;
 ///   after `adc`.
+/// - `toneCurve` (pixel, display): each channel through `curve` (33 samples over 0 to 1); after
+///   `exposure`.
+/// - `spectralTransmission` (band): each band times `curve` (48 samples, 360 to 830 nm), a
+///   measured filter's transmission; before `qe` and `cie`.
 /// Each file's header cites its references.
 std::vector<SensorFilterModel> StandardSensorFilters();
 
@@ -197,6 +212,8 @@ std::vector<SensorFilterModel> StandardSensorFilters();
 struct SensorFilterStep {
     std::string type;
     std::map<std::string, float, std::less<>> inputs;
+    /// Its float-array `inputs:*`, for array parameters.
+    std::map<std::string, std::vector<float>, std::less<>> arrays = {};
 
     /// The built-in filter it names, if any.
     std::optional<SensorFilter> Builtin() const {

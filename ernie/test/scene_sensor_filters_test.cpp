@@ -18,6 +18,29 @@ bool Contains(const std::vector<std::string_view>& names, std::string_view name)
 
 }  // namespace
 
+TEST(SensorFilters, CurvesResampleLinearlyEndToEnd) {
+    const std::vector<float> ramp = {0.0f, 1.0f};
+    EXPECT_EQ(ernie::ResampleCurve(ramp, 5), (std::vector<float>{0.0f, 0.25f, 0.5f, 0.75f, 1.0f}));
+    const std::vector<float> one = {0.5f};
+    EXPECT_EQ(ernie::ResampleCurve(one, 3), (std::vector<float>{0.5f, 0.5f, 0.5f}));
+    const std::vector<float> three = {0.0f, 2.0f, 0.0f};
+    EXPECT_EQ(ernie::ResampleCurve(three, 5), (std::vector<float>{0.0f, 1.0f, 2.0f, 1.0f, 0.0f}));
+    EXPECT_EQ(ernie::ResampleCurve({}, 2), (std::vector<float>{0.0f, 0.0f}));
+}
+
+TEST(SensorFilters, StandardFiltersRegisterAndTheirAovsLayOutInChainOrder) {
+    const ernie::SensorFilterRegistry registry = ernie::SensorFilterRegistry::WithStandard();
+    const std::vector<ernie::SensorFilterStep> chain = {
+        {"qe", {}}, {"blooming", {}}, {"adc", {}}, {"demosaic", {}}};
+    EXPECT_EQ(ernie::AovOutputsOf(chain, registry),
+              (std::vector<std::string>{"overflow", "mosaic"}));
+    ernie::SensorFilterModel huge = ernie::StandardSensorFilters().front();
+    huge.id = "huge";
+    huge.params = {{"curve", 0.0f, "", 2000}};
+    ernie::SensorFilterRegistry copy = registry;
+    EXPECT_THROW(copy.Add(huge), std::invalid_argument) << "more floats than kMaxParamFloats";
+}
+
 TEST(SensorFilters, NamesRoundTrip) {
     for (const SensorFilter filter : ernie::kSensorFilters) {
         EXPECT_EQ(ernie::SensorFilterNamed(ernie::NameOf(filter)), filter);

@@ -212,8 +212,22 @@ SensorPlan PlanSensor(std::span<const SensorFilterStep> chain,
                 stage.firstParam = static_cast<std::uint32_t>(plan.params.size());
                 for (const SensorFilterParam& param : model.params) {
                     const auto input = step.inputs.find(param.name);
-                    plan.params.push_back(input != step.inputs.end() ? input->second
-                                                                     : param.defaultValue);
+                    if (param.size == 1) {
+                        plan.params.push_back(input != step.inputs.end() ? input->second
+                                                                         : param.defaultValue);
+                        continue;
+                    }
+                    // An array: the step's array, else its number, else the defaults,
+                    // resampled to the parameter's size.
+                    const auto array = step.arrays.find(param.name);
+                    std::vector<float> values =
+                        array != step.arrays.end() ? array->second
+                        : input != step.inputs.end()
+                            ? std::vector<float>{input->second}
+                        : !param.defaults.empty() ? param.defaults
+                                                  : std::vector<float>{param.defaultValue};
+                    const std::vector<float> resampled = ResampleCurve(values, param.size);
+                    plan.params.insert(plan.params.end(), resampled.begin(), resampled.end());
                 }
                 stage.custom = model;
             }
@@ -325,9 +339,17 @@ std::string SensorPlan::Source(std::uint32_t segment) const {
         if (stage.custom) {
             imports += "import " + ModuleOf(stage.custom->id) + ";\n";
             params += "    " + type + ".Params " + var + ";\n";
-            for (std::size_t p = 0; p < stage.custom->params.size(); ++p) {
-                params += "    " + var + "." + stage.custom->params[p].name + " = filterParams[" +
-                          std::to_string(stage.firstParam + p) + "];\n";
+            std::uint32_t offset = stage.firstParam;
+            for (const SensorFilterParam& param : stage.custom->params) {
+                if (param.size == 1) {
+                    params += "    " + var + "." + param.name + " = filterParams[" +
+                              std::to_string(offset) + "];\n";
+                } else {
+                    params += "    for (uint i = 0; i < " + std::to_string(param.size) +
+                              "; ++i) {\n        " + var + "." + param.name +
+                              "[i] = filterParams[" + std::to_string(offset) + " + i];\n    }\n";
+                }
+                offset += param.size;
             }
         }
         const std::string args = stage.custom ? ", " + var : "";

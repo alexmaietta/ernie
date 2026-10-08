@@ -15,6 +15,8 @@ set(ernie_shaders
     film/filter_defocus.slang=kFilterDefocusSlang
     film/filter_demosaic.slang=kFilterDemosaicSlang
     film/filter_psf.slang=kFilterPsfSlang
+    film/filter_spectral_transmission.slang=kFilterSpectralTransmissionSlang
+    film/filter_tone_curve.slang=kFilterToneCurveSlang
     film/filter_white_balance.slang=kFilterWhiteBalanceSlang
     film/sensor.slang=kSensorSlang
     raster/cull.slang=kCullSlang

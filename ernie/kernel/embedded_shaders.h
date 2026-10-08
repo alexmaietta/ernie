@@ -28,6 +28,8 @@ extern const char kFilterCompandSlang[];
 extern const char kFilterDefocusSlang[];
 extern const char kFilterDemosaicSlang[];
 extern const char kFilterPsfSlang[];
+extern const char kFilterSpectralTransmissionSlang[];
+extern const char kFilterToneCurveSlang[];
 extern const char kFilterWhiteBalanceSlang[];
 
 /// Debug drawing over the display image.

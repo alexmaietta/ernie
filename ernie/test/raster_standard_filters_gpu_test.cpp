@@ -24,12 +24,16 @@ namespace tokens = ernie::tokens;
 namespace {
 
 using Steps = std::vector<std::pair<std::string, std::map<std::string, float>>>;
+/// Float-array inputs by step index, then input name.
+using Arrays = std::map<std::size_t, std::map<std::string, std::vector<float>>>;
 
 /// Render vars `vars` (source names, such as "Electrons" or "aov:overflow") of MeshScene's camera
-/// (without noise) through SensorFilter prims of `steps`, each with its own inputs, as floats.
+/// (without noise) through SensorFilter prims of `steps`, each with its own inputs and `arrays`,
+/// as floats.
 std::map<std::string, std::vector<float>> VarsThrough(RasterDelegate& delegate, Scene& scene,
                                                       const std::vector<std::string>& vars,
-                                                      const Steps& steps) {
+                                                      const Steps& steps,
+                                                      const Arrays& arrays = {}) {
     scene.Set("/World/Camera", tokens::kSensorNoise, false);
     std::vector<Path> filters;
     for (std::size_t i = 0; i < steps.size(); ++i) {
@@ -38,6 +42,11 @@ std::map<std::string, std::vector<float>> VarsThrough(RasterDelegate& delegate, 
         scene.Define(path, tokens::kSensorFilter).Set(tokens::kFilterType, steps[i].first);
         for (const auto& [name, value] : steps[i].second) {
             scene.Set(path, "inputs:" + name, value);
+        }
+        if (const auto found = arrays.find(i); found != arrays.end()) {
+            for (const auto& [name, values] : found->second) {
+                scene.Set(path, "inputs:" + name, values);
+            }
         }
         filters.push_back(path);
     }
@@ -62,8 +71,10 @@ std::map<std::string, std::vector<float>> VarsThrough(RasterDelegate& delegate, 
         std::vector<float>& out = values[var];
         out.resize(static_cast<std::size_t>(tensor.Elements()));
         for (std::size_t i = 0; i < out.size(); ++i) {
-            out[i] = tensor.Type() == ernie::DType::UInt16
-                         ? static_cast<float>(tensor.As<std::uint16_t>()[i])
+            out[i] = tensor.Type() == ernie::DType::UInt16 ? static_cast<float>(
+                                                                 tensor.As<std::uint16_t>()[i])
+                     : tensor.Type() == ernie::DType::UInt8
+                         ? static_cast<float>(tensor.As<std::uint8_t>()[i])
                          : tensor.As<float>()[i];
         }
     }
@@ -245,6 +256,47 @@ TEST_F(RasterDelegateTest, BayerMosaicsDemosaicRestoresAndCompandingCompresses) 
         const float expected =
             std::floor(255.0f * std::sqrt(std::min(raw[i] / 4095.0f, 1.0f)) + 0.5f);
         EXPECT_NEAR(companded[i], expected, 1.0f);
+    }
+}
+
+TEST_F(RasterDelegateTest, CurveParametersTakeArraysOfAnyLength) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    const auto base = VarThrough(delegate, scene, "HdrColor", {{"cie", kNone}});
+    // A single number fills the curve: half the light in every band.
+    EXPECT_EQ(VarThrough(delegate, scene, "HdrColor",
+                         {{"spectralTransmission", {{"curve", 0.5f}}}, {"cie", kNone}}),
+              [&] {
+                  std::vector<float> half = base;
+                  for (std::size_t i = 0; i < half.size(); ++i) {
+                      half[i] *= i % 4 == 3 ? 1.0f : 0.5f;
+                  }
+                  return half;
+              }());
+
+    // An array, resampled: transmission falling to nothing above 570 nm (ten samples over 360 to
+    // 830 nm) dims white rocks' red and keeps their blue.
+    scene.Set("/World/Rocks/Rock", tokens::kDisplayColor, glm::vec3(1.0f));
+    const auto white = VarThrough(delegate, scene, "HdrColor", {{"cie", kNone}});
+    const auto cut =
+        VarsThrough(delegate, scene, {"HdrColor"}, {{"spectralTransmission", kNone}, {"cie", kNone}},
+                    {{0, {{"curve", {1, 1, 1, 1, 1, 0, 0, 0, 0, 0}}}}})
+            .at("HdrColor");
+    EXPECT_LT(Sum(cut, 0), 0.3 * Sum(white, 0)) << "red passes little";
+    EXPECT_GT(Sum(cut, 2), 0.7 * Sum(white, 2)) << "blue mostly passes";
+
+    // An inverting tone curve, as two samples resampled to 33.
+    const auto ldr =
+        VarsThrough(delegate, scene, {"LdrColor"}, {{"cie", kNone}, {"exposure", kNone}})
+            .at("LdrColor");
+    const auto flipped = VarsThrough(delegate, scene, {"LdrColor"},
+                                     {{"cie", kNone}, {"exposure", kNone}, {"toneCurve", kNone}},
+                                     {{2, {{"curve", {1.0f, 0.0f}}}}})
+                             .at("LdrColor");
+    for (std::size_t i = 0; i < ldr.size(); ++i) {
+        if (i % 4 != 3) {
+            ASSERT_NEAR(flipped[i], 255.0f - ldr[i], 1.0f) << i;
+        }
     }
 }
 

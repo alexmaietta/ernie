@@ -112,6 +112,17 @@ void SensorFilterRegistry::Add(SensorFilterModel model) {
         throw std::invalid_argument(what + " has more than " + std::to_string(kMaxParams) +
                                     " parameters");
     }
+    std::size_t floats = 0;
+    for (const SensorFilterParam& param : model.params) {
+        if (param.size == 0) {
+            throw std::invalid_argument(what + ": parameter '" + param.name + "' has size 0");
+        }
+        floats += param.size;
+    }
+    if (floats > kMaxParamFloats) {
+        throw std::invalid_argument(what + "'s parameters hold more than " +
+                                    std::to_string(kMaxParamFloats) + " floats");
+    }
     for (std::size_t i = 0; i < model.params.size(); ++i) {
         const std::string& name = model.params[i].name;
         if (!IsIdentifier(name)) {
@@ -151,6 +162,22 @@ const SensorFilterModel* SensorFilterRegistry::Find(std::string_view id) const {
         }
     }
     return nullptr;
+}
+
+std::vector<float> ResampleCurve(std::span<const float> values, std::size_t size) {
+    std::vector<float> out(size, values.empty() ? 0.0f : values.front());
+    if (values.size() < 2 || size < 2) {
+        return out;
+    }
+    for (std::size_t i = 0; i < size; ++i) {
+        const double at = static_cast<double>(i) / static_cast<double>(size - 1) *
+                          static_cast<double>(values.size() - 1);
+        const std::size_t lower = std::min(static_cast<std::size_t>(at), values.size() - 2);
+        const double f = at - static_cast<double>(lower);
+        out[i] = static_cast<float>(static_cast<double>(values[lower]) * (1.0 - f) +
+                                    static_cast<double>(values[lower + 1]) * f);
+    }
+    return out;
 }
 
 std::vector<SensorFilterModel> StandardSensorFilters() {
@@ -217,6 +244,20 @@ std::vector<SensorFilterModel> StandardSensorFilters() {
           {"m10", 0.0f, ""}, {"m11", 1.0f, ""}, {"m12", 0.0f, ""},
           {"m20", 0.0f, ""}, {"m21", 0.0f, ""}, {"m22", 1.0f, ""}},
          "ColorMatrix", shaders::kFilterColorMatrixSlang},
+        {"toneCurve", "Tone curve",
+         "Each display channel through a curve of 33 samples over 0 to 1 (identity by default).",
+         {"M. S. Brown, \"Understanding the In-Camera Image Processing Pipeline for Computer "
+          "Vision\", CVPR 2016 tutorial"},
+         Kind::Pixel, Domain::Display,
+         {{"curve", 0.0f, "Output at evenly spaced inputs from 0 to 1", 33, {0.0f, 1.0f}}},
+         "ToneCurve", shaders::kFilterToneCurveSlang},
+        {"spectralTransmission", "Spectral transmission",
+         "Each band times a transmission curve of 48 samples, 360 to 830 nm every 10 nm (all 1 "
+         "by default): an IR-cut, band-pass or ND filter, a lens's or window's transmission.",
+         {},
+         Kind::Band, Domain::Spectrum,
+         {{"curve", 1.0f, "Transmission at evenly spaced wavelengths from 360 to 830 nm", 48}},
+         "SpectralTransmission", shaders::kFilterSpectralTransmissionSlang},
         {"compand", "Square-root companding",
          "Digital numbers compressed as the square root of their fraction of full scale, as "
          "LROC's cameras compress 12 bits to 8.",
