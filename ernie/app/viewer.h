@@ -35,6 +35,8 @@ struct ViewerOptions {
     std::uint32_t height = 900;       ///< Window height in screen coordinates.
     bool hidden = false;              ///< Render without showing the window, for tests.
     bool validation = false;          ///< Enable the Vulkan validation layer when installed.
+    /// Wait for the display's refresh; otherwise draw frames as fast as they render.
+    bool vsync = false;
     std::string device;               ///< GPU name to prefer; empty picks the first discrete.
     std::string renderer = "raster";  ///< Render backend, one of `Viewer::Renderers()`.
     Theme theme = DarkTheme();        ///< Colours and metrics of the UI.
@@ -196,6 +198,12 @@ class Viewer {
 
     Lighting GetLighting() const;
     void SetLighting(Lighting lighting);
+
+    /// Whether frames wait for the display's refresh (`ViewerOptions::vsync`); without it the
+    /// viewer draws as fast as it renders, without tearing where the display allows. Always
+    /// false for a hidden viewer.
+    bool GetVsync() const;
+    void SetVsync(bool vsync);
 
     /// How the viewport draws triangle edges: a mode overriding the render settings' own
     /// (`ernie:wireframe`) in the viewport only, or none (the default) to follow them. The Z key

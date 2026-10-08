@@ -20,6 +20,7 @@ Opens Ernie's interactive viewer on a default scene.
 Options:
   --renderer NAME   Render backend to start with (default: raster)
   --validation      Enable the Vulkan validation layer when installed
+  --vsync           Wait for the display's refresh (default: draw as fast as possible)
   -h, --help        Show this help and exit
 )";
 
@@ -56,6 +57,8 @@ int main(int argc, char** argv) {
         }
         if (arg == "--validation") {
             options.validation = true;
+        } else if (arg == "--vsync") {
+            options.vsync = true;
         } else if (arg == "--renderer" && i + 1 < argc) {
             options.renderer = argv[++i];
         } else {

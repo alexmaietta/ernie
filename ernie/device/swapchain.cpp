@@ -6,8 +6,8 @@
 namespace ernie {
 
 Swapchain::Swapchain(const VulkanContext& context, VkSurfaceKHR surface, std::uint32_t width,
-                     std::uint32_t height)
-    : context_(context), surface_(surface) {
+                     std::uint32_t height, bool vsync)
+    : context_(context), surface_(surface), vsync_(vsync) {
     VkBool32 supported = VK_FALSE;
     vkGetPhysicalDeviceSurfaceSupportKHR(context.PhysicalDevice(), context.QueueFamily(), surface,
                                          &supported);
@@ -29,6 +29,13 @@ void Swapchain::Resize(std::uint32_t width, std::uint32_t height) {
     vkDeviceWaitIdle(context_.Device());
     Destroy();
     Create(width, height);
+}
+
+void Swapchain::SetVsync(bool vsync) {
+    if (vsync != vsync_) {
+        vsync_ = vsync;
+        Resize(extent_.width, extent_.height);
+    }
 }
 
 void Swapchain::Destroy() {
@@ -89,7 +96,23 @@ void Swapchain::Create(std::uint32_t width, std::uint32_t height) {
     info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     info.preTransform = capabilities.currentTransform;
     info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+    // FIFO is always there; without vsync, mailbox replaces queued frames without tearing, and
+    // immediate presents at once, possibly tearing.
+    presentMode_ = VK_PRESENT_MODE_FIFO_KHR;
+    if (!vsync_) {
+        std::uint32_t modeCount = 0;
+        vkGetPhysicalDeviceSurfacePresentModesKHR(physical, surface_, &modeCount, nullptr);
+        std::vector<VkPresentModeKHR> modes(modeCount);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(physical, surface_, &modeCount, modes.data());
+        for (const VkPresentModeKHR mode :
+             {VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR}) {
+            if (std::find(modes.begin(), modes.end(), mode) != modes.end()) {
+                presentMode_ = mode;
+                break;
+            }
+        }
+    }
+    info.presentMode = presentMode_;
     info.clipped = VK_TRUE;
     VkSwapchainKHR previous = swapchain_;
     info.oldSwapchain = previous;

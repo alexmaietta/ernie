@@ -149,8 +149,9 @@ void BindApp(nb::module_& parent) {
             [](Viewer* self, Scene& scene, const std::string& title, std::uint32_t width,
                std::uint32_t height, bool hidden, bool validation, const std::string& device,
                const Theme* theme, const std::optional<std::filesystem::path>& layout,
-               const Path& settings, const std::string& renderer) {
+               const Path& settings, const std::string& renderer, bool vsync) {
                 ViewerOptions options;
+                options.vsync = vsync;
                 options.title = title;
                 options.width = width;
                 options.height = height;
@@ -170,7 +171,7 @@ void BindApp(nb::module_& parent) {
             nb::arg("height") = 900, nb::arg("hidden") = false, nb::arg("validation") = false,
             nb::arg("device") = "", nb::arg("theme").none() = nb::none(),
             nb::arg("layout").none() = nb::none(), nb::arg("settings") = Path(),
-            nb::arg("renderer") = "raster", nb::keep_alive<1, 2>(),
+            nb::arg("renderer") = "raster", nb::arg("vsync") = false, nb::keep_alive<1, 2>(),
             "Opens the window (none when `hidden`) on a Vulkan device. Raises RuntimeError "
             "without a window system or Vulkan device.")
         .def("run", &Viewer::Run, nb::call_guard<nb::gil_scoped_release>(),
@@ -247,6 +248,9 @@ void BindApp(nb::module_& parent) {
             "view_vars", [](Viewer& viewer) { return viewer.Delegate().Info().viewVars; },
             "The render vars the current renderer can show in the viewport.")
         .def_prop_rw("lighting", &Viewer::GetLighting, &Viewer::SetLighting)
+        .def_prop_rw("vsync", &Viewer::GetVsync, &Viewer::SetVsync,
+                     "Whether frames wait for the display's refresh; off draws as fast as it "
+                     "renders. Always False for a hidden viewer.")
         .def_prop_rw("wireframe", &Viewer::GetWireframe, &Viewer::SetWireframe,
                      nb::for_setter(nb::arg("mode").none()),
                      "The viewport's Wireframe mode, overriding the render settings' own; None "

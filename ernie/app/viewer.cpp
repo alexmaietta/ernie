@@ -238,7 +238,13 @@ struct Viewer::State {
     std::unique_ptr<VulkanContext> gpu;
     std::unique_ptr<Swapchain> swapchain;
     std::unique_ptr<OffscreenTarget> uiTarget;
-    std::optional<FrameResources> frame;
+    /// Two frames in flight: the host records one while the device draws the other. Each frame
+    /// waits for the one two before it, which also finishes everything submitted earlier, such as
+    /// the render delegate's frame in the upload slot it takes again (it alternates two per
+    /// viewport frame).
+    std::array<std::optional<FrameResources>, 2> frameResources;
+    FrameResources* frame = nullptr;  ///< This frame's, from `frameResources`.
+    std::size_t frameSlot = 0;
     ImGuiContext* imgui = nullptr;
     ImPlotContext* implot = nullptr;
     bool imguiVulkan = false;
@@ -331,7 +337,10 @@ struct Viewer::State {
         if (imgui != nullptr) {
             ImGui::DestroyContext(imgui);
         }
-        frame.reset();
+        frame = nullptr;
+        for (std::optional<FrameResources>& resources : frameResources) {
+            resources.reset();
+        }
         uiTarget.reset();
         swapchain.reset();
         gpu.reset();
@@ -379,13 +388,16 @@ struct Viewer::State {
             glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
             swapchain = std::make_unique<Swapchain>(
                 *gpu, surface, static_cast<std::uint32_t>(std::max(framebufferWidth, 1)),
-                static_cast<std::uint32_t>(std::max(framebufferHeight, 1)));
+                static_cast<std::uint32_t>(std::max(framebufferHeight, 1)), options.vsync);
         } else {
             framebufferWidth = static_cast<int>(options.width);
             framebufferHeight = static_cast<int>(options.height);
             uiTarget = std::make_unique<OffscreenTarget>(*gpu, options.width, options.height);
         }
-        frame.emplace(*gpu);
+        for (std::optional<FrameResources>& resources : frameResources) {
+            resources.emplace(*gpu);
+        }
+        frame = &*frameResources[0];
         delegate = CreateRenderDelegate(options.renderer, *gpu, kViewportFormat);
         renderer = options.renderer;
         sampler = std::make_unique<Sampler>(*gpu, SamplerDesc{VK_FILTER_LINEAR});
@@ -847,6 +859,16 @@ struct Viewer::State {
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Wireframe (Z cycles)");
         }
+        if (swapchain) {
+            ImGui::SameLine();
+            bool vsync = swapchain->Vsync();
+            if (ImGui::Checkbox("VSync", &vsync)) {
+                self.SetVsync(vsync);
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Wait for the display's refresh; off draws as fast as it renders");
+            }
+        }
 
         char info[64];
         std::snprintf(info, sizeof(info), "%u x %u  %.0f fps", ViewportWidth(), ViewportHeight(),
@@ -1178,6 +1200,8 @@ bool Viewer::State::Step() {
     if (capture && capture->rendered) {
         WriteCapture();
     }
+    frameSlot = (frameSlot + 1) % frameResources.size();
+    frame = &*frameResources[frameSlot];
     RunCallbacks(Stage::PostRender, info);
     return open;
 }
@@ -1394,6 +1418,17 @@ void Viewer::SetViewVar(std::string name) {
                                     "' in the viewport");
     }
     state_->viewVar = std::move(name);
+}
+
+bool Viewer::GetVsync() const {
+    return state_->swapchain != nullptr && state_->swapchain->Vsync();
+}
+
+void Viewer::SetVsync(bool vsync) {
+    if (state_->swapchain != nullptr) {
+        state_->swapchain->SetVsync(vsync);
+        ImGui_ImplVulkan_SetMinImageCount(state_->swapchain->MinImageCount());
+    }
 }
 
 Lighting Viewer::GetLighting() const {
