@@ -316,7 +316,12 @@ TEST_F(RasterDelegateTest, ExposureNoiseAndDistortionFollowTheCamera) {
         << "exposure is photographic only";
     EXPECT_EQ(At<std::uint8_t>(stop.at("LdrColor"), c, c), 255) << "2 x 0.5 is white";
 
+    // Noise on pixels well below the full well (saturated pixels read the full well, without
+    // noise).
     scene.Set("/World/Camera", tokens::kCameraExposure, 0.0f);
+    scene.Set("/World/Camera", tokens::kExposureTime, 1e-6);  // its pixels are 0.5 mm, at f/1
+    ernie::RenderProductSetOutputs noiseless = delegate.Step(scene);
+    const auto cleanVars = MapVars(noiseless);
     scene.Set("/World/Camera", tokens::kSensorNoise, true);
     ernie::RenderProductSetOutputs first = delegate.Step(scene);
     ernie::RenderProductSetOutputs second = delegate.Step(scene);
@@ -330,10 +335,13 @@ TEST_F(RasterDelegateTest, ExposureNoiseAndDistortionFollowTheCamera) {
     for (std::size_t row = 0; row < kVarSize; ++row) {
         for (std::size_t col = 0; col < kVarSize; ++col) {
             mean += At<float>(a, row, col, 1);
-            clean += At<float>(before.at("Electrons"), row, col, 1);
+            clean += At<float>(cleanVars.at("Electrons"), row, col, 1);
             differing += At<float>(a, row, col, 1) != At<float>(b, row, col, 1) ? 1 : 0;
         }
     }
+    const ernie::Camera camera = ernie::CameraOf(scene, "/World/Camera", kVarSize, kVarSize);
+    ASSERT_LT(clean / (kVarSize * kVarSize), 0.5 * camera.sensor.fullWellElectrons)
+        << "unsaturated";
     EXPECT_GT(differing, static_cast<int>(kVarSize * kVarSize / 2)) << "temporal noise";
     EXPECT_NEAR(mean / clean, 1.0, 0.02) << "noise keeps the mean";
 
@@ -359,10 +367,12 @@ std::vector<float> ElectronsOf(ernie::RenderProductSetOutputs& outputs, const Pa
     return {data, data + tensor.Elements()};
 }
 
-/// FlatScene with sensor noise, and a second product `/Render/Other` of the same camera.
+/// FlatScene with sensor noise, exposed well below the full well, and a second product
+/// `/Render/Other` of the same camera.
 Scene NoisyScene() {
     Scene scene = FlatScene();
     scene.Set("/World/Camera", tokens::kSensorNoise, true);
+    scene.Set("/World/Camera", tokens::kExposureTime, 1e-6);
     scene.Define("/Render/Other", tokens::kRenderProduct)
         .Set(tokens::kOrderedVars, *scene.Get("/Render/Product", tokens::kOrderedVars));
     return scene;

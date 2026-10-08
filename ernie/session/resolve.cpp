@@ -692,6 +692,10 @@ ResolveRenderProducts(const Scene& scene, std::span<const Path> products, const 
             CheckFilterChain(spec.filters.empty() ? DefaultFilterChain() : builtins);
         const std::vector<std::string_view> written = VarsWrittenBy(chain);
         for (const auto& [var, name] : spec.vars) {
+            // AOVs ("aov:<output>") come from custom filters, which the renderer checks.
+            if (name.starts_with(kAovPrefix) && name.size() > kAovPrefix.size()) {
+                continue;
+            }
             const auto& names = kRenderVarNames;
             if (std::find(names.begin(), names.end(), name) == names.end()) {
                 throw std::invalid_argument("Render var '" + var.String() + "' asks for '" + name +

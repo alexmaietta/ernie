@@ -2,7 +2,8 @@
 // same `pattern` (`bayer`), by `method` 0 bilinear interpolation of each channel's neighbours, or
 // 1 Malvar, He and Cutler's gradient-corrected linear filters, which add the local gradient of
 // the pixel's own channel and avoid most of bilinear's colour fringes at edges. On digital
-// numbers, after `adc`; the result stays within the ADC's range.
+// numbers, after `adc`; the result stays within the ADC's range. Output 0, `mosaic`, keeps the
+// raw mosaic it read.
 //
 // Reference: H. S. Malvar, L. He and R. Cutler, "High-quality linear interpolation for demosaicing
 // of Bayer-patterned color images", IEEE ICASSP 2004, vol. 3, 485-488.
@@ -83,6 +84,10 @@ struct Demosaic : ISpatialPixelFilter {
         }
         let largest = sensorUniformsMaxDn(pixel);
         value.digital = uint4(uint3(clamp(rgb + 0.5, float3(0.0), float3(largest))), 0u);
+        // Output 0, `mosaic`: the raw mosaic, the pixel's own channel alone.
+        var mosaic = float4(0.0);
+        mosaic[own] = c;
+        writeOutput(pixel, 0, mosaic);
     }
 
     static float sensorUniformsMaxDn(PixelContext pixel) {

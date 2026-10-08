@@ -20,7 +20,7 @@
 // 11 DistanceToCamera, 12 Normal, 13 PrimId, 14 InstanceId, every image one layer per view;
 // 15 the custom filters' parameters; for spatial filters, the images between kernels:
 // 16 and 17 the spectrum and the channels (a layer per channel domain per view) a kernel reads,
-// 18 and 19 those it writes for the next.
+// 18 and 19 those it writes for the next; 20 to 27 the AOV slots.
 //
 // References:
 // - D. C. Brown, "Decentering Distortion of Lenses", Photogrammetric Engineering 32(3):444-462,
@@ -77,7 +77,7 @@ public struct SensorUniforms {
 }
 
 public struct SensorConstants {
-    // x: the first view's uniforms, yzw unused.
+    // x: the first view's uniforms, y: the AOV slots held (a bit each), zw unused.
     public uint4 view;
 }
 
@@ -106,6 +106,16 @@ public struct SensorConstants {
 [[vk::binding(17, 0)]] Texture2DArray<float4> channelsIn;
 [[vk::image_format("r32f")]] [[vk::binding(18, 0)]] RWTexture2DArray<float> spectrumOut;
 [[vk::image_format("rgba32f")]] [[vk::binding(19, 0)]] RWTexture2DArray<float4> channelsOut;
+// The product's AOV slots (`kAovSlotNames`), one layer per view, which filters write with
+// `writeOutput`.
+[[vk::image_format("rgba32f")]] [[vk::binding(20, 0)]] RWTexture2DArray<float4> aov0;
+[[vk::image_format("rgba32f")]] [[vk::binding(21, 0)]] RWTexture2DArray<float4> aov1;
+[[vk::image_format("rgba32f")]] [[vk::binding(22, 0)]] RWTexture2DArray<float4> aov2;
+[[vk::image_format("rgba32f")]] [[vk::binding(23, 0)]] RWTexture2DArray<float4> aov3;
+[[vk::image_format("rgba32f")]] [[vk::binding(24, 0)]] RWTexture2DArray<float4> aov4;
+[[vk::image_format("rgba32f")]] [[vk::binding(25, 0)]] RWTexture2DArray<float4> aov5;
+[[vk::image_format("rgba32f")]] [[vk::binding(26, 0)]] RWTexture2DArray<float4> aov6;
+[[vk::image_format("rgba32f")]] [[vk::binding(27, 0)]] RWTexture2DArray<float4> aov7;
 
 // A view's layers of the channel images: one per domain after the spectrum.
 public static const uint kChannelElectrons = 0;
@@ -132,6 +142,11 @@ public struct PixelContext {
     public uint3 id;
     // The view's index in the uniforms.
     public uint view;
+    // The AOV slot of the running filter's output 0 (the plan sets it before each filter); its
+    // output k is slot outputBase + k.
+    public uint outputBase;
+    // Slots the product holds, a bit each, so writes to others are skipped.
+    public uint heldOutputs;
 
     public SensorUniforms uniforms() {
         return sensorViews[view];
@@ -201,6 +216,8 @@ public struct PixelContext {
 public bool beginPixel(uint3 id, out PixelContext pixel) {
     pixel.id = id;
     pixel.view = pass.view.x + id.z;
+    pixel.outputBase = 0;
+    pixel.heldOutputs = pass.view.y;
     let size = sensorViews[pixel.view].size;
     return id.x < size.x && id.y < size.y;
 }
@@ -472,14 +489,51 @@ public struct Lens : ISpatialSource {
     }
 }
 
+// Writes `value` to output `output` of the running filter (its model's `outputs`, in order), the
+// AOV a render var asks for as "aov:<name>"; nothing when the product does not hold it.
+public void writeOutput(PixelContext pixel, uint output, float4 value) {
+    let slot = pixel.outputBase + output;
+    if (slot >= 8u || ((pixel.heldOutputs >> slot) & 1u) == 0) {
+        return;
+    }
+    let id = pixel.id;
+    switch (slot) {
+    case 0:
+        aov0[id] = value;
+        break;
+    case 1:
+        aov1[id] = value;
+        break;
+    case 2:
+        aov2[id] = value;
+        break;
+    case 3:
+        aov3[id] = value;
+        break;
+    case 4:
+        aov4[id] = value;
+        break;
+    case 5:
+        aov5[id] = value;
+        break;
+    case 6:
+        aov6[id] = value;
+        break;
+    default:
+        aov7[id] = value;
+        break;
+    }
+}
+
 // Writes band `band` of SpectralRadiance.
 public void writeSpectral(PixelContext pixel, uint band, float radiance) {
     spectralRadiance[int3(pixel.id.xy, pixel.slice(band))] = radiance;
 }
 
 // QE: mean electrons per channel, sum over bands of radiance times the channel's per-band factor
-// (camera equation and quantum efficiency), plus dark current over the exposure, clipped at the
-// full well.
+// (camera equation and quantum efficiency), plus dark current over the exposure. Not yet clipped
+// at the full well: filters on electrons see the charge beyond it, which blooming spills to the
+// neighbours; the Electrons var and the ADC clip it (`fullWell`).
 public struct Qe : IIntegrator {
     public static void accumulate(inout SensorPixel value, uint band, float radiance,
                                   PixelContext pixel) {
@@ -494,8 +548,13 @@ public struct Qe : IIntegrator {
         for (uint c = channels; c < 4; ++c) {
             e[c] = 0.0;
         }
-        value.electrons = min(e, float4(cam.sensor.x));
+        value.electrons = e;
     }
+}
+
+// The full well in electrons: what a pixel holds, the Electrons var and the ADC clipping there.
+public float fullWell(PixelContext pixel) {
+    return pixel.uniforms().sensor.x;
 }
 
 uint3 pcg3d(uint3 v) {
@@ -544,7 +603,8 @@ float poisson(float mean, uint3 seed) {
 }
 
 // Noise: per-pixel fixed patterns (PRNU gain and DSNU offset, from the seed alone) and temporal
-// photon shot noise and read noise (from the frame seed), clipped at the full well.
+// photon shot noise and read noise (from the frame seed), at least zero; charge beyond the full
+// well stays for filters after it (see `Qe`).
 public struct Noise {
     public static void apply(inout SensorPixel value, PixelContext pixel) {
         let cam = pixel.uniforms();
@@ -561,18 +621,19 @@ public struct Noise {
                                  cam.noise.y * 4u + c + 977u);
             let shot = poisson(e[c] * gain, temporal);
             let read = cam.sensor.y * gaussian(pcg3d(temporal + 1u).xy);
-            e[c] = clamp(shot + offset + read, 0.0, cam.sensor.x);
+            e[c] = max(shot + offset + read, 0.0);
         }
         value.electrons = e;
     }
 }
 
-// ADC: digital numbers, electrons over the ISO-dependent electrons per DN plus the black level,
-// rounded and clipped to the ADC range.
+// ADC: digital numbers of the electrons clipped at the full well, over the ISO-dependent
+// electrons per DN plus the black level, rounded and clipped to the ADC range.
 public struct Adc {
     public static void apply(inout SensorPixel value, PixelContext pixel) {
         let cam = pixel.uniforms();
-        let dn = clamp(floor(value.electrons / cam.adc.y + cam.adc.z + 0.5), float4(0.0),
+        let e = min(value.electrons, float4(cam.sensor.x));
+        let dn = clamp(floor(e / cam.adc.y + cam.adc.z + 0.5), float4(0.0),
                        float4(cam.adc.w));
         var digital = uint4(dn);
         for (uint c = cam.size.w; c < 4; ++c) {
@@ -614,7 +675,7 @@ public struct Exposure {
 public void writeOutputs(SensorPixel value, PixelContext pixel, uint holds) {
     let id = pixel.id;
     if ((holds & kHoldsElectrons) != 0) {
-        electrons[id] = value.electrons;
+        electrons[id] = min(value.electrons, float4(pixel.uniforms().sensor.x));
     }
     if ((holds & kHoldsRawDn) != 0) {
         rawDn[id] = value.digital;

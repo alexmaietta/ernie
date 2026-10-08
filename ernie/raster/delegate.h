@@ -197,7 +197,8 @@ class RasterDelegate : public RenderDelegate {
     std::uint32_t BeginFrame();
     std::shared_ptr<ProductFrame> AcquireFrame(const Path& product, VkExtent2D extent, int bands,
                                                std::uint32_t views, bool batched,
-                                               std::span<const std::string_view> vars);
+                                               std::span<const std::string_view> vars,
+                                               std::span<const std::string> aovs = {});
     std::uint32_t PrimIdOf(const Path& path) const;
     void SetMeshPoints(const Scene& scene, const Path& path, std::uint32_t handle);
 

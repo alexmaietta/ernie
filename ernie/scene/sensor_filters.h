@@ -87,6 +87,24 @@ enum class FilterDomain : std::uint8_t { Spectrum, Electrons, Digital, Rgb, Disp
 /// The kind of a built-in filter.
 FilterKind KindOf(SensorFilter filter);
 
+/// Arbitrary output variables (AOVs): what sensor filters write besides the render vars, such as
+/// a mosaic before demosaicing or the charge blooming spilled. A filter model declares its outputs
+/// (`SensorFilterModel::outputs`) and writes them with sensor.slang's `writeOutput`; a RenderVar
+/// asks for one with `sourceName` "aov:<output>" and maps it as float32 (rows, cols, 4). A
+/// product's chain lays its filters' outputs into `kMaxAovs` slots in chain order
+/// (`AovOutputsOf`); a requested output's filter runs whatever else the product holds.
+inline constexpr std::string_view kAovPrefix = "aov:";
+inline constexpr std::size_t kMaxAovs = 8;
+/// The slots' names inside a frame (its held vars and images).
+inline constexpr std::array<std::string_view, kMaxAovs> kAovSlotNames{
+    "Aov0", "Aov1", "Aov2", "Aov3", "Aov4", "Aov5", "Aov6", "Aov7"};
+
+/// One output of a sensor filter.
+struct SensorFilterOutput {
+    std::string name;  ///< An identifier; render vars ask for "aov:<name>".
+    std::string description;
+};
+
 /// A custom filter's parameter: a float its prim sets as `inputs:<name>`.
 struct SensorFilterParam {
     std::string name;  ///< An identifier: the field of the filter's `Params` struct.
@@ -122,6 +140,8 @@ struct SensorFilterModel {
     std::vector<SensorFilterParam> params;
     std::string typeName;  ///< The Slang struct implementing the interface.
     std::string slang;     ///< Its module's source.
+    /// Its AOVs, which it writes with `writeOutput(pixel, index, value)` in this order.
+    std::vector<SensorFilterOutput> outputs = {};
 };
 
 /// Custom sensor filters a renderer can run, by `SensorFilterModel::id`.
@@ -161,7 +181,9 @@ class SensorFilterRegistry {
 /// - `bayer` (pixel, electrons): a Bayer colour filter mosaic, `pattern` 0 RGGB, 1 BGGR, 2 GRBG,
 ///   3 GBRG; best between `noise` and `adc`.
 /// - `demosaic` (spatial, digital): interpolates the mosaic back, `method` 0 bilinear or
-///   1 Malvar-He-Cutler; after `adc`.
+///   1 Malvar-He-Cutler; after `adc`. AOV `mosaic`: the mosaic it read.
+/// - `blooming` (spatial, electrons): charge beyond the full well spilling along columns,
+///   `antiBlooming` the fraction drained; after `qe`. AOV `overflow`: the charge beyond the well.
 /// - `whiteBalance` (pixel, rgb): `red`, `green` and `blue` gains; after `cie`.
 /// - `colorMatrix` (pixel, rgb): a 3 x 3 colour correction matrix `m00`..`m22`; after `cie`.
 /// - `compand` (pixel, digital): square-root companding from `inputBits` to `outputBits`;
@@ -196,9 +218,15 @@ std::vector<SensorFilterStep> StepsOf(std::span<const SensorFilter> chain);
 std::vector<SensorFilterStep> CheckFilterChain(std::span<const SensorFilterStep> chain,
                                                const SensorFilterRegistry& registry);
 
+/// The AOVs `chain`'s custom filters write (`SensorFilterModel::outputs`), in slot order.
+/// @throws std::invalid_argument as `CheckFilterChain`, for two outputs of one name, or more than
+/// `kMaxAovs`.
+std::vector<std::string> AovOutputsOf(std::span<const SensorFilterStep> chain,
+                                      const SensorFilterRegistry& registry);
+
 /// The render vars a frame holds to produce `requested`: those, in `kRenderVarNames` order, as
-/// the sensor keeps what they are made from (SpectralRadiance, Electrons, HdrColor) in registers.
-/// Empty `requested` means every var.
+/// the sensor keeps what they are made from (SpectralRadiance, Electrons, HdrColor) in registers,
+/// then the AOV slots (`kAovSlotNames`) requested. Empty `requested` means every render var.
 std::vector<std::string_view> RequiredVars(std::span<const std::string_view> requested);
 
 }  // namespace ernie

@@ -126,6 +126,21 @@ void SensorFilterRegistry::Add(SensorFilterModel model) {
     if (!IsIdentifier(model.typeName) || model.slang.find(model.typeName) == std::string::npos) {
         throw std::invalid_argument(what + ": its Slang must define type '" + model.typeName + "'");
     }
+    if (model.outputs.size() > kMaxAovs) {
+        throw std::invalid_argument(what + " has more than " + std::to_string(kMaxAovs) +
+                                    " outputs");
+    }
+    for (std::size_t i = 0; i < model.outputs.size(); ++i) {
+        const std::string& name = model.outputs[i].name;
+        if (!IsIdentifier(name)) {
+            throw std::invalid_argument(what + ": output '" + name + "' is not an identifier");
+        }
+        for (std::size_t j = 0; j < i; ++j) {
+            if (model.outputs[j].name == name) {
+                throw std::invalid_argument(what + ": output '" + name + "' repeats");
+            }
+        }
+    }
     models_.push_back(std::move(model));
 }
 
@@ -177,7 +192,17 @@ std::vector<SensorFilterModel> StandardSensorFilters() {
          Kind::Spatial, Domain::Digital,
          {{"pattern", 0.0f, "As the bayer filter's"},
           {"method", 1.0f, "0 bilinear, 1 Malvar-He-Cutler"}},
-         "Demosaic", shaders::kFilterDemosaicSlang},
+         "Demosaic", shaders::kFilterDemosaicSlang,
+         {{"mosaic", "The raw mosaic before demosaicing: each pixel's own channel, the others 0"}}},
+        {"blooming", "Blooming",
+         "Charge beyond the full well spilling along columns, filling each neighbour to its full "
+         "well, as in a CCD; antiBlooming drains a fraction of it instead.",
+         {"J. R. Janesick, \"Scientific Charge-Coupled Devices\", SPIE Press, 2001"},
+         Kind::Spatial, Domain::Electrons,
+         {{"antiBlooming", 0.0f, "Fraction of the excess an overflow drain removes, 0 to 1"},
+          {"maxLength", 64.0f, "The longest spill in pixels each way, bounding the cost"}},
+         "Blooming", shaders::kFilterBloomingSlang,
+         {{"overflow", "Electrons beyond the full well before spilling"}}},
         {"whiteBalance", "White balance", "Gains on linear colour's red, green and blue.",
          {"J. von Kries, 1905, in D. L. MacAdam (ed.), \"Sources of Color Science\", 1970"},
          Kind::Pixel, Domain::Rgb,
@@ -322,7 +347,35 @@ std::vector<std::string_view> RequiredVars(std::span<const std::string_view> req
             vars.push_back(name);
         }
     }
+    for (const std::string_view slot : kAovSlotNames) {
+        if (std::find(requested.begin(), requested.end(), slot) != requested.end()) {
+            vars.push_back(slot);
+        }
+    }
     return vars;
+}
+
+std::vector<std::string> AovOutputsOf(std::span<const SensorFilterStep> chain,
+                                      const SensorFilterRegistry& registry) {
+    std::vector<std::string> outputs;
+    for (const SensorFilterStep& step : CheckFilterChain(chain, registry)) {
+        if (step.Builtin()) {
+            continue;
+        }
+        for (const SensorFilterOutput& output : registry.Find(step.type)->outputs) {
+            if (std::find(outputs.begin(), outputs.end(), output.name) != outputs.end()) {
+                throw std::invalid_argument("Two sensor filters of the chain write AOV '" +
+                                            output.name + "'");
+            }
+            outputs.push_back(output.name);
+        }
+    }
+    if (outputs.size() > kMaxAovs) {
+        throw std::invalid_argument("The sensor filter chain writes " +
+                                    std::to_string(outputs.size()) + " AOVs, more than " +
+                                    std::to_string(kMaxAovs));
+    }
+    return outputs;
 }
 
 }  // namespace ernie

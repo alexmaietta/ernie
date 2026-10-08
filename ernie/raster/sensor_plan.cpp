@@ -125,13 +125,48 @@ SensorPlan PlanSensor(std::span<const SensorFilterStep> chain,
     SensorPlan plan;
     for (const std::string_view var : held) {
         plan.holds |= BitOf(var);
+        for (std::size_t slot = 0; slot < kAovSlotNames.size(); ++slot) {
+            if (kAovSlotNames[slot] == var) {
+                plan.aovs |= 1u << slot;
+            }
+        }
     }
     const auto holds = [&plan](std::string_view var) { return (plan.holds & BitOf(var)) != 0; };
-    const bool electrons = holds(render_vars::kElectrons) || holds(render_vars::kRawDn);
-    const bool colour = holds(render_vars::kHdrColor) || holds(render_vars::kLdrColor);
-    const bool bands = electrons || colour || holds(render_vars::kSpectralRadiance);
-    for (const SensorFilterStep& step : CheckFilterChain(chain, registry)) {
+    const std::vector<SensorFilterStep> steps = CheckFilterChain(chain, registry);
+    // Each custom step's first AOV slot, in chain order, and whether one of its slots is held: a
+    // held AOV runs its filter and the branch of the chain it is on.
+    std::vector<std::uint32_t> bases(steps.size(), 0);
+    std::vector<bool> forced(steps.size(), false);
+    std::array<bool, kDomains> forcedDomains{};
+    std::uint32_t slot = 0;
+    for (std::size_t i = 0; i < steps.size(); ++i) {
+        if (steps[i].Builtin()) {
+            continue;
+        }
+        const SensorFilterModel& model = *registry.Find(steps[i].type);
+        bases[i] = slot;
+        for (std::size_t k = 0; k < model.outputs.size(); ++k, ++slot) {
+            if (slot < kAovSlotNames.size() && ((plan.aovs >> slot) & 1u) != 0) {
+                forced[i] = true;
+                forcedDomains[IndexOf(model.domain)] = true;
+            }
+        }
+    }
+    const auto forcedDomain = [&](FilterDomain domain) {
+        return forcedDomains[IndexOf(domain)];
+    };
+    const bool digital = holds(render_vars::kRawDn) || forcedDomain(FilterDomain::Digital);
+    const bool electrons =
+        holds(render_vars::kElectrons) || digital || forcedDomain(FilterDomain::Electrons);
+    const bool display = holds(render_vars::kLdrColor) || forcedDomain(FilterDomain::Display);
+    const bool colour =
+        holds(render_vars::kHdrColor) || display || forcedDomain(FilterDomain::Rgb);
+    const bool bands = electrons || colour || holds(render_vars::kSpectralRadiance) ||
+                       forcedDomain(FilterDomain::Spectrum);
+    for (std::size_t i = 0; i < steps.size(); ++i) {
+        const SensorFilterStep& step = steps[i];
         SensorPlan::Stage stage;
+        stage.outputBase = bases[i];
         bool needed = false;
         if (const std::optional<SensorFilter> builtin = step.Builtin()) {
             stage.builtin = builtin;
@@ -144,13 +179,13 @@ SensorPlan PlanSensor(std::span<const SensorFilterStep> chain,
                 needed = electrons;
                 break;
             case SensorFilter::Adc:
-                needed = holds(render_vars::kRawDn);
+                needed = digital;
                 break;
             case SensorFilter::Cie:
                 needed = colour;
                 break;
             case SensorFilter::Exposure:
-                needed = holds(render_vars::kLdrColor);
+                needed = display;
                 break;
             }
         } else {
@@ -163,15 +198,16 @@ SensorPlan PlanSensor(std::span<const SensorFilterStep> chain,
                 needed = electrons;
                 break;
             case FilterDomain::Digital:
-                needed = holds(render_vars::kRawDn);
+                needed = digital;
                 break;
             case FilterDomain::Rgb:
                 needed = colour;
                 break;
             case FilterDomain::Display:
-                needed = holds(render_vars::kLdrColor);
+                needed = display;
                 break;
             }
+            needed = needed || forced[i];
             if (needed) {
                 stage.firstParam = static_cast<std::uint32_t>(plan.params.size());
                 for (const SensorFilterParam& param : model.params) {
@@ -219,6 +255,10 @@ std::string SensorPlan::Key() const {
     for (const Stage& stage : stages) {
         key += ':';
         key += stage.builtin ? std::string(NameOf(*stage.builtin)) : stage.custom->id;
+        // Filters with outputs write them from their slot, part of the kernel.
+        if (stage.custom && !stage.custom->outputs.empty()) {
+            key += '@' + std::to_string(stage.outputBase);
+        }
     }
     return key;
 }
@@ -267,6 +307,7 @@ std::string SensorPlan::Source(std::uint32_t segment) const {
     std::string imports;
     std::string params;
     std::string source = "lens.band(band, pixel)";  // the spectrum's source in this segment
+    std::string sourceBase;  // its outputs' slot, set before it in each band's iteration
     std::string bandFilters;
     std::string integrate;
     std::string pixels;
@@ -290,6 +331,11 @@ std::string SensorPlan::Source(std::uint32_t segment) const {
             }
         }
         const std::string args = stage.custom ? ", " + var : "";
+        // Where the filter's outputs go (`writeOutput`), set before each call.
+        const std::string base =
+            stage.custom && !stage.custom->outputs.empty()
+                ? "pixel.outputBase = " + std::to_string(stage.outputBase) + "u; "
+                : "";
         switch (kind) {
         case FilterKind::Spatial:
             if (stage.builtin) {
@@ -298,17 +344,18 @@ std::string SensorPlan::Source(std::uint32_t segment) const {
             if (stage.custom->domain == FilterDomain::Spectrum) {
                 params += "    SpatialImage input" + std::to_string(s) + " = {0};\n";
                 source = type + ".band(band, pixel, input" + std::to_string(s) + args + ")";
+                sourceBase = base;
                 usesBands = true;
             } else {
                 params += "    SpatialImage input" + std::to_string(s) + " = {" +
                           std::string(ChannelOf(stage.custom->domain)) + "};\n";
-                pixels += "    " + type + ".apply(value, pixel, input" + std::to_string(s) + args +
-                          ");\n";
+                pixels += "    " + base + type + ".apply(value, pixel, input" +
+                          std::to_string(s) + args + ");\n";
             }
             break;
         case FilterKind::Band:
-            bandFilters +=
-                "        radiance = " + type + ".apply(radiance, band, pixel" + args + ");\n";
+            bandFilters += "        " + base + "radiance = " + type +
+                           ".apply(radiance, band, pixel" + args + ");\n";
             usesBands = true;
             break;
         case FilterKind::Integrator:
@@ -317,7 +364,7 @@ std::string SensorPlan::Source(std::uint32_t segment) const {
             usesBands = true;
             break;
         case FilterKind::Pixel:
-            pixels += "    " + type + ".apply(value, pixel" + args + ");\n";
+            pixels += "    " + base + type + ".apply(value, pixel" + args + ");\n";
             break;
         }
     }
@@ -330,9 +377,9 @@ std::string SensorPlan::Source(std::uint32_t segment) const {
     }
     std::string loop;
     if (usesBands) {
-        loop = "    for (uint band = 0; band < pixel.bands(); ++band) {\n"
-               "        var radiance = " +
-               source + ";\n" + bandFilters +
+        loop = "    for (uint band = 0; band < pixel.bands(); ++band) {\n" +
+               (sourceBase.empty() ? std::string() : "        " + sourceBase + "\n") +
+               "        var radiance = " + source + ";\n" + bandFilters +
                (spectral ? "        writeSpectral(pixel, band, radiance);\n" : "") +
                (stores[IndexOf(FilterDomain::Spectrum)]
                     ? "        storeSpectrum(pixel, band, radiance);\n"

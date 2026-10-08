@@ -23,6 +23,53 @@ namespace tokens = ernie::tokens;
 
 namespace {
 
+using Steps = std::vector<std::pair<std::string, std::map<std::string, float>>>;
+
+/// Render vars `vars` (source names, such as "Electrons" or "aov:overflow") of MeshScene's camera
+/// (without noise) through SensorFilter prims of `steps`, each with its own inputs, as floats.
+std::map<std::string, std::vector<float>> VarsThrough(RasterDelegate& delegate, Scene& scene,
+                                                      const std::vector<std::string>& vars,
+                                                      const Steps& steps) {
+    scene.Set("/World/Camera", tokens::kSensorNoise, false);
+    std::vector<Path> filters;
+    for (std::size_t i = 0; i < steps.size(); ++i) {
+        const Path path("/Render/Filters/F" + std::to_string(i));
+        scene.Remove(path);
+        scene.Define(path, tokens::kSensorFilter).Set(tokens::kFilterType, steps[i].first);
+        for (const auto& [name, value] : steps[i].second) {
+            scene.Set(path, "inputs:" + name, value);
+        }
+        filters.push_back(path);
+    }
+    std::vector<Path> varPaths;
+    for (std::size_t i = 0; i < vars.size(); ++i) {
+        const Path varPath("/Render/Vars/V" + std::to_string(i));
+        scene.Define(varPath, tokens::kRenderVar).Set(tokens::kSourceName, vars[i]);
+        varPaths.push_back(varPath);
+    }
+    scene.Remove("/Render/Many");
+    scene.Define("/Render/Many", tokens::kRenderProduct)
+        .Set(tokens::kCameraRel, Path("/World/Camera"))
+        .Set(tokens::kResolution, glm::ivec2(kSize, kSize))
+        .Set(tokens::kOrderedVars, varPaths)
+        .Set(tokens::kFilters, filters);
+    const Path product[] = {"/Render/Many"};
+    auto outputs = delegate.Step(scene, product);
+    std::map<std::string, std::vector<float>> values;
+    for (const std::string& var : vars) {
+        const Tensor tensor =
+            outputs.at("/Render/Many").vars.at(var).Map(ernie::MapDevice::Cpu).tensor;
+        std::vector<float>& out = values[var];
+        out.resize(static_cast<std::size_t>(tensor.Elements()));
+        for (std::size_t i = 0; i < out.size(); ++i) {
+            out[i] = tensor.Type() == ernie::DType::UInt16
+                         ? static_cast<float>(tensor.As<std::uint16_t>()[i])
+                         : tensor.As<float>()[i];
+        }
+    }
+    return values;
+}
+
 /// Render var `var` of MeshScene's camera (without noise) through SensorFilter prims of `types`,
 /// each step with its own inputs, as floats.
 std::vector<float> VarThrough(RasterDelegate& delegate, Scene& scene, std::string_view var,
@@ -199,4 +246,72 @@ TEST_F(RasterDelegateTest, BayerMosaicsDemosaicRestoresAndCompandingCompresses) 
             std::floor(255.0f * std::sqrt(std::min(raw[i] / 4095.0f, 1.0f)) + 0.5f);
         EXPECT_NEAR(companded[i], expected, 1.0f);
     }
+}
+
+TEST_F(RasterDelegateTest, BloomingSpillsSaturatedChargeAlongColumns) {
+    // MeshScene's red quad at the default 1 s exposure holds far more than the full well.
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    const float well = static_cast<float>(
+        ernie::CameraOf(scene, "/World/Camera", kSize, kSize).sensor.fullWellElectrons);
+    const auto clipped = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
+    const auto bloomed =
+        VarsThrough(delegate, scene, {"Electrons", "aov:overflow"},
+                    {{"qe", kNone}, {"blooming", {{"maxLength", 64.0f}}}});
+    const auto& electrons = bloomed.at("Electrons");
+    const auto& overflow = bloomed.at("aov:overflow");
+    const auto at = [](const std::vector<float>& image, std::size_t x, std::size_t y) {
+        return image[(y * kSize + x) * 4];  // red
+    };
+    // The quad's brightest column at the middle row, and a column of background beside it.
+    std::size_t column = 0;
+    for (std::size_t x = 0; x < kSize; ++x) {
+        column = at(clipped, x, kSize / 2) > at(clipped, column, kSize / 2) ? x : column;
+    }
+    ASSERT_EQ(at(clipped, column, kSize / 2), well) << "saturated";
+    std::size_t dark = column;
+    while (dark > 0 && at(clipped, dark, kSize / 2) > 0.01f * well) {
+        --dark;
+    }
+    --dark;  // a pixel clear of the quad's edge
+    std::size_t streaked = 0;
+    std::size_t before = 0;
+    for (std::size_t y = 0; y < kSize; ++y) {
+        streaked += at(electrons, column, y) >= well ? 1u : 0u;
+        before += at(clipped, column, y) >= well ? 1u : 0u;
+    }
+    EXPECT_GT(streaked, before + 10) << "a vertical streak beyond the quad";
+    EXPECT_LT(at(electrons, dark, kSize / 2), 0.01f * well) << "not sideways";
+    EXPECT_GT(at(overflow, column, kSize / 2), 0.0f) << "the overflow AOV";
+    EXPECT_EQ(at(overflow, column, 0), 0.0f) << "nothing overflowed above the quad";
+
+    // An overflow drain takes it all: no streak.
+    const auto drained =
+        VarThrough(delegate, scene, "Electrons", {{"qe", kNone}, {"blooming", {{"antiBlooming", 1.0f}}}});
+    EXPECT_EQ(drained, clipped);
+}
+
+TEST_F(RasterDelegateTest, AovsRunTheirFiltersAndNameTheirOutputs) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    scene.Set("/World/Camera", tokens::kExposureTime, 0.001);
+    const Steps chain = {{"qe", kNone}, {"bayer", kNone}, {"adc", kNone}, {"demosaic", kNone}};
+    // RawDN through bayer and adc alone is the mosaic itself.
+    const auto mosaic =
+        VarThrough(delegate, scene, "RawDN", {{"qe", kNone}, {"bayer", kNone}, {"adc", kNone}});
+    // Asking for the AOV alone runs the chain up to demosaic, which writes the mosaic it read.
+    const auto aov = VarsThrough(delegate, scene, {"aov:mosaic"}, chain).at("aov:mosaic");
+    ASSERT_EQ(aov.size(), mosaic.size());
+    for (std::size_t y = 0; y < kSize; ++y) {
+        for (std::size_t x = 0; x < kSize; ++x) {
+            const std::size_t own = (y % 2 == 0) ? (x % 2 == 0 ? 0 : 1) : (x % 2 == 0 ? 1 : 2);
+            const std::size_t i = (y * kSize + x) * 4 + own;
+            ASSERT_EQ(aov[i], mosaic[i]) << x << ", " << y;
+        }
+    }
+    // Both at once: the demosaiced RawDN and the mosaic.
+    const auto both = VarsThrough(delegate, scene, {"RawDN", "aov:mosaic"}, chain);
+    EXPECT_EQ(both.at("aov:mosaic"), aov);
+    EXPECT_NE(both.at("RawDN"), mosaic);
+    EXPECT_THROW(VarsThrough(delegate, scene, {"aov:missing"}, chain), std::invalid_argument);
 }

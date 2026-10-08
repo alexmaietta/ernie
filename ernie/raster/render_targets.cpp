@@ -30,8 +30,10 @@ std::uint32_t RenderTargets::MaxViews(const VulkanContext& context, int bands) {
 
 RenderTargets::RenderTargets(const VulkanContext& context, VkExtent2D extent, int bands,
                              bool shared, std::uint32_t views,
-                             std::span<const std::string_view> vars)
-    : context_(context), extent_(extent), bands_(bands), views_(views), shared_(shared) {
+                             std::span<const std::string_view> vars,
+                             std::span<const std::string> aovs)
+    : context_(context), extent_(extent), bands_(bands), views_(views), shared_(shared),
+      aovNames_(aovs.begin(), aovs.end()) {
     if (extent.width == 0 || extent.height == 0) {
         throw std::invalid_argument("Render targets need a non-zero extent");
     }
@@ -76,6 +78,16 @@ RenderTargets::RenderTargets(const VulkanContext& context, VkExtent2D extent, in
             context, ImageDesc{width, height, spectral ? views * bandLayers : views, 1,
                                kVarFormats[i], usage, held && shared && !spectral && views == 1,
                                true, spectral ? bandLayers : 0u}));
+    }
+    // The AOV slots, float RGBA, held or one-texel placeholders as the vars.
+    for (std::size_t slot = 0; slot < kMaxAovs; ++slot) {
+        const bool held =
+            std::find(held_.begin(), held_.end(), kAovSlotNames[slot]) != held_.end();
+        holdsAov_[slot] = held;
+        aovImages_[slot] = std::make_unique<GpuImage>(
+            context, ImageDesc{held ? extent.width : 1, held ? extent.height : 1, views, 1,
+                               VK_FORMAT_R32G32B32A32_SFLOAT, kStorage,
+                               held && shared && views == 1, true});
     }
 }
 
@@ -147,12 +159,24 @@ void RenderTargets::PrepareCompute(VkCommandBuffer commands) {
     for (const std::unique_ptr<GpuImage>& image : vars_) {
         image->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
     }
+    for (const std::unique_ptr<GpuImage>& image : aovImages_) {
+        image->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    }
 }
 
 GpuImage* RenderTargets::Var(std::string_view name) {
     for (std::size_t i = 0; i < kVarNames.size(); ++i) {
         if (kVarNames[i] == name) {
             return holds_[i] ? vars_[i].get() : nullptr;
+        }
+    }
+    // AOVs, by slot name or as "aov:<output>".
+    for (std::size_t slot = 0; slot < kMaxAovs; ++slot) {
+        const bool named = name == kAovSlotNames[slot] ||
+                           (name.starts_with(kAovPrefix) && slot < aovNames_.size() &&
+                            name.substr(kAovPrefix.size()) == aovNames_[slot]);
+        if (named) {
+            return holdsAov_[slot] ? aovImages_[slot].get() : nullptr;
         }
     }
     return nullptr;
@@ -182,6 +206,9 @@ std::uint64_t RenderTargets::GpuBytes() const {
     }
     for (const std::unique_ptr<GpuImage>& image : sensorImages_) {
         bytes += image != nullptr ? image->Bytes() : 0;
+    }
+    for (const std::unique_ptr<GpuImage>& image : aovImages_) {
+        bytes += image->Bytes();
     }
     return bytes;
 }

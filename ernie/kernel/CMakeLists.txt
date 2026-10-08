@@ -9,6 +9,7 @@ set(ernie_shaders
     closure/lunar_lambert.slang=kBrdfLunarLambertSlang
     closure/oren_nayar.slang=kBrdfOrenNayarSlang
     film/filter_bayer.slang=kFilterBayerSlang
+    film/filter_blooming.slang=kFilterBloomingSlang
     film/filter_color_matrix.slang=kFilterColorMatrixSlang
     film/filter_compand.slang=kFilterCompandSlang
     film/filter_defocus.slang=kFilterDefocusSlang

@@ -170,6 +170,15 @@ constexpr DescriptorBinding kFilterBindings[] = {
     {17, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {18, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {19, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    // The AOV slots.
+    {20, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {21, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {22, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {23, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {24, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {25, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {26, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {27, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
 };
 
 /// A plan that runs custom filter `model`, with the built-in filters its domain needs, and holds a
@@ -1919,13 +1928,17 @@ void RasterRenderer::ShadeAndFilter(VkCommandBuffer commands, RenderTargets& tar
         image.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
         return image;
     };
-    const std::uint32_t constants[4] = {firstView, 0, 0, 0};
+    // The AOV slots the frame holds, which filters' `writeOutput` writes.
+    const std::uint32_t constants[4] = {firstView, sensorPlan_.aovs, 0, 0};
     for (std::uint32_t segment = 0; segment < sensorPlan_.segments; ++segment) {
         std::vector<DescriptorResource> resources = filters;
         resources.push_back(general(image(true, segment + 1)));
         resources.push_back(general(image(false, segment + 1)));
         resources.push_back(general(image(true, segment)));
         resources.push_back(general(image(false, segment)));
+        for (std::size_t slot = 0; slot < kMaxAovs; ++slot) {
+            resources.push_back(general(targets.BoundAov(slot)));
+        }
         vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                           sensorPipelines_.at(SensorKernelKey(sensorPlan_, segment))->Handle());
         filterLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);

@@ -847,9 +847,11 @@ void RasterDelegate::Record(VkCommandBuffer commands, const RenderingTarget& tar
 std::shared_ptr<ProductFrame> RasterDelegate::AcquireFrame(const Path& product, VkExtent2D extent,
                                                            int bands, std::uint32_t views,
                                                            bool batched,
-                                                           std::span<const std::string_view> vars) {
+                                                           std::span<const std::string_view> vars,
+                                                           std::span<const std::string> aovs) {
     ERNIE_ZONE("AcquireFrame");
     const std::vector<std::string_view> held = RequiredVars(vars);
+    const std::vector<std::string> aovNames(aovs.begin(), aovs.end());
     std::vector<std::shared_ptr<ProductFrame>>& frames = frames_[product];
     const bool shared = compute_ != nullptr;
     std::erase_if(frames, [&](const std::shared_ptr<ProductFrame>& frame) {
@@ -858,7 +860,8 @@ std::shared_ptr<ProductFrame> RasterDelegate::AcquireFrame(const Path& product, 
                            (targets.Extent().width != extent.width ||
                             targets.Extent().height != extent.height || targets.Bands() != bands ||
                             targets.Shared() != shared || frame->images->Views() != views ||
-                            frame->batched != batched || targets.Vars() != held);
+                            frame->batched != batched || targets.Vars() != held ||
+                            targets.AovNames() != aovNames);
         if (stale) {
             // Earlier steps may still render into it, and maps copy from it: rare, so wait for
             // everything.
@@ -879,13 +882,13 @@ std::shared_ptr<ProductFrame> RasterDelegate::AcquireFrame(const Path& product, 
     // A batch of more views than one set of targets holds renders into consecutive chunks.
     const std::uint32_t chunk = RenderTargets::MaxViews(context_, bands);
     if (views <= chunk) {
-        frame->images =
-            std::make_unique<RenderTargets>(context_, extent, bands, shared, views, held);
+        frame->images = std::make_unique<RenderTargets>(context_, extent, bands, shared, views,
+                                                        held, aovNames);
     } else {
         std::vector<std::unique_ptr<FrameImages>> chunks;
         for (std::uint32_t first = 0; first < views; first += chunk) {
-            chunks.push_back(std::make_unique<RenderTargets>(context_, extent, bands, shared,
-                                                             std::min(chunk, views - first), held));
+            chunks.push_back(std::make_unique<RenderTargets>(
+                context_, extent, bands, shared, std::min(chunk, views - first), held, aovNames));
         }
         frame->images = std::make_unique<ChunkedFrameImages>(std::move(chunks));
     }
@@ -958,16 +961,33 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         const bool batched = !poses.empty();
         const auto views = static_cast<std::uint32_t>(std::max<std::size_t>(poses.size(), 1));
         std::vector<std::int32_t> worlds = ViewWorldsOf(scene, cameras, views);
-        // Only the vars the product asks for, as the static names of `kRenderVarNames`.
+        // Only the vars the product asks for, as the static names of `kRenderVarNames`, and its
+        // AOVs ("aov:<output>") as the slots its chain lays them in (`kAovSlotNames`).
+        const std::vector<SensorFilterStep> chainSteps =
+            spec.filters.empty() ? StepsOf(DefaultFilterChain()) : spec.filters;
+        const std::vector<std::string> aovs =
+            AovOutputsOf(chainSteps, renderer_.SensorFilters());
         std::vector<std::string_view> vars;
         for (const auto& [path, name] : spec.vars) {
             const auto known = std::find(kRenderVarNames.begin(), kRenderVarNames.end(), name);
             if (known != kRenderVarNames.end()) {
                 vars.push_back(*known);
+                continue;
+            }
+            if (name.starts_with(kAovPrefix)) {
+                const auto output = std::find(aovs.begin(), aovs.end(),
+                                              name.substr(kAovPrefix.size()));
+                if (output == aovs.end()) {
+                    throw std::invalid_argument("Render var '" + path.String() + "' asks for '" +
+                                                name +
+                                                "', which the product's sensor filters do not "
+                                                "write");
+                }
+                vars.push_back(kAovSlotNames[static_cast<std::size_t>(output - aovs.begin())]);
             }
         }
         std::shared_ptr<ProductFrame> frame =
-            AcquireFrame(spec.product, spec.resolution, bands, views, batched, vars);
+            AcquireFrame(spec.product, spec.resolution, bands, views, batched, vars, aovs);
         std::optional<glm::dmat4> posesParent;
         if (gpuPoses != nullptr) {
             posesParent = PosesParentOf(scene, cameras.front());

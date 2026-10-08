@@ -37,8 +37,11 @@ class RenderTargets : public FrameImages {
     /// (`MaxViews`).
     /// Holds the render vars `vars` (`RequiredVars`; empty for every var); the others get
     /// placeholders of one texel per view that passes bind but do not write.
+    /// `aovs` names the AOV slots in order (`AovOutputsOf` of the frame's chain); `vars` may hold
+    /// slots by their `kAovSlotNames`, which `Var` also finds as "aov:<name>".
     RenderTargets(const VulkanContext& context, VkExtent2D extent, int bands, bool shared,
-                  std::uint32_t views = 1, std::span<const std::string_view> vars = {});
+                  std::uint32_t views = 1, std::span<const std::string_view> vars = {},
+                  std::span<const std::string> aovs = {});
 
     /// The most views one set of targets with `bands` bands can hold on `context`'s device: its
     /// `maxImageArrayLayers` over the bands.
@@ -105,6 +108,16 @@ class RenderTargets : public FrameImages {
     /// @throws std::invalid_argument for an unknown name.
     GpuImage& Bound(std::string_view name);
 
+    /// The image the sensor binds for AOV slot `slot`: its own when held, else a placeholder.
+    GpuImage& BoundAov(std::size_t slot) {
+        return *aovImages_.at(slot);
+    }
+
+    /// The AOV slots' names, as the targets were made with.
+    const std::vector<std::string>& AovNames() const {
+        return aovNames_;
+    }
+
     /// The render vars the targets hold.
     const std::vector<std::string_view>& Vars() const {
         return held_;
@@ -132,6 +145,9 @@ class RenderTargets : public FrameImages {
     std::vector<bool>
         holds_;  ///< Per var of `VarNames`, whether `vars_` holds it or a placeholder.
     std::vector<std::string_view> held_;
+    std::array<std::unique_ptr<GpuImage>, kMaxAovs> aovImages_;
+    std::array<bool, kMaxAovs> holdsAov_{};
+    std::vector<std::string> aovNames_;
 };
 
 }  // namespace ernie
