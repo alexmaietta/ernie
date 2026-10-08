@@ -30,6 +30,7 @@ set(ernie_shaders
     raster/frame.slang=kFrameSlang
     raster/ground.slang=kGroundSlang
     raster/mesh.slang=kMeshSlang
+    raster/mesh_normals.slang=kMeshNormalsSlang
     raster/meter.slang=kMeterSlang
     raster/motion.slang=kMotionSlang
     raster/overlay.slang=kOverlaySlang

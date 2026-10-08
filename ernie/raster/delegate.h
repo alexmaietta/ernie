@@ -167,7 +167,8 @@ class RasterDelegate : public RenderDelegate {
     struct SyncedMesh {
         std::uint32_t handle = 0;
         Key key;
-        std::uint64_t points = 0;
+        /// Versions of its points, and of its normals and colours when written on the GPU.
+        std::array<std::uint64_t, 3> versions{};
         bool hasColors = false;
         glm::vec3 tint{0.5f};
     };
@@ -214,6 +215,8 @@ class RasterDelegate : public RenderDelegate {
                                                std::span<const std::string> aovs = {});
     std::uint32_t PrimIdOf(const Path& path) const;
     void SetMeshPoints(const Scene& scene, const Path& path, std::uint32_t handle);
+    /// Hands the mesh its normals and colours written on the GPU.
+    void SetMeshAttributes(const Scene& scene, const Path& path, std::uint32_t handle);
 
     const VulkanContext& context_;
     std::unique_ptr<ComputeInterop> compute_;

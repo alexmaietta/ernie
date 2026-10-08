@@ -1290,14 +1290,23 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh) {
         data.indices = TriangulateFaces(IntsOf(*counts, kFaceVertexCounts),
                                         IntsOf(*indices, kFaceVertexIndices), count);
     }
-    if (std::optional<std::vector<float>> normals = FloatAttribute(scene, mesh, kNormals, 3)) {
+    // Normals and colours written on the GPU are zeros here, holding their place until the
+    // renderer copies them in (as points).
+    const Tensor* normalsTensor = scene.Read(mesh, kNormals);
+    if (normalsTensor != nullptr && IsGpu(normalsTensor->Location().kind)) {
+        if (static_cast<std::size_t>(normalsTensor->Elements()) == data.points.size()) {
+            data.normals.assign(data.points.size(), 0.0f);
+        }
+    } else if (std::optional<std::vector<float>> normals =
+                   FloatAttribute(scene, mesh, kNormals, 3)) {
         if (normals->size() == data.points.size()) {
             data.normals = std::move(*normals);
         }
     }
     if (const Tensor* colors = scene.Read(mesh, kDisplayColor)) {
         if (static_cast<std::size_t>(colors->Elements()) == data.points.size() && count > 1) {
-            data.colors = FloatsOf(*colors, 3, kDisplayColor);
+            data.colors = IsGpu(colors->Location().kind) ? std::vector<float>(data.points.size(), 0.0f)
+                                                         : FloatsOf(*colors, 3, kDisplayColor);
         }
     }
     return data;

@@ -122,7 +122,7 @@ std::optional<glm::vec3> ConstantDisplayColor(const Scene& scene, const Path& me
         return glm::vec3(GetVec3(scene, mesh, tokens::kDisplayColor, glm::dvec3(0.5)));
     }
     if (const Tensor* tensor = scene.Read(mesh, tokens::kDisplayColor)) {
-        if (tensor->Elements() == 3) {
+        if (tensor->Elements() == 3 && tensor->Location().kind == DeviceKind::Cpu) {
             const std::vector<float> color = FloatsOf(*tensor, 3, tokens::kDisplayColor);
             return glm::vec3(color[0], color[1], color[2]);
         }
@@ -460,6 +460,20 @@ void RasterDelegate::SetMeshPoints(const Scene& scene, const Path& path, std::ui
     meshes_.SetPoints(handle, points.value_or(std::vector<float>()));
 }
 
+void RasterDelegate::SetMeshAttributes(const Scene& scene, const Path& path,
+                                       std::uint32_t handle) {
+    const Tensor* normals = scene.Read(path, tokens::kNormals);
+    if (normals != nullptr && IsGpu(normals->Location().kind)) {
+        RequireCompute();
+        meshes_.SetNormals(handle, *normals, scene.WriteStream(path, tokens::kNormals));
+    }
+    const Tensor* colors = scene.Read(path, tokens::kDisplayColor);
+    if (colors != nullptr && IsGpu(colors->Location().kind)) {
+        RequireCompute();
+        meshes_.SetColors(handle, *colors, scene.WriteStream(path, tokens::kDisplayColor));
+    }
+}
+
 void RasterDelegate::SyncMeshes(const Scene& scene) {
     ERNIE_ZONE("Sync meshes");
     using namespace tokens;
@@ -473,20 +487,38 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
     }
     for (const Path& path : paths) {
         seen.insert(path);
-        const Key key = KeyOf(scene, path,
-                              {kFaceVertexCounts, kFaceVertexIndices, kNormals, kDisplayColor,
-                               kSize, kGeomRadius, kGeomHeight, kGeomWidth, kGeomLength, kAxis});
-        const std::uint64_t points = scene.AttributeVersion(path, kPoints);
+        Key key = KeyOf(scene, path,
+                        {kFaceVertexCounts, kFaceVertexIndices, kNormals, kDisplayColor, kSize,
+                         kGeomRadius, kGeomHeight, kGeomWidth, kGeomLength, kAxis});
+        // Normals and colours written on the GPU update in place like points, rather than
+        // adding the mesh again (key slots 3 and 4).
+        const auto onGpu = [&](std::string_view attribute) {
+            const Tensor* tensor = scene.Read(path, attribute);
+            return tensor != nullptr && IsGpu(tensor->Location().kind);
+        };
+        const bool gpuNormals = onGpu(kNormals);
+        const bool gpuColors = onGpu(kDisplayColor);
+        key.second[3] = gpuNormals ? 1 : key.second[3];
+        key.second[4] = gpuColors ? 1 : key.second[4];
+        const std::array<std::uint64_t, 3> versions{
+            scene.AttributeVersion(path, kPoints),
+            gpuNormals ? scene.AttributeVersion(path, kNormals) : 0,
+            gpuColors ? scene.AttributeVersion(path, kDisplayColor) : 0};
         const auto it = syncedMeshes_.find(path);
         if (it != syncedMeshes_.end() && it->second.key == key) {
             SyncedMesh& synced = it->second;
-            if (synced.points == points) {
+            if (synced.versions == versions) {
                 continue;
             }
-            synced.points = points;
             if (synced.handle != 0) {
                 try {
-                    SetMeshPoints(scene, path, synced.handle);
+                    if (synced.versions[0] != versions[0]) {
+                        SetMeshPoints(scene, path, synced.handle);
+                    }
+                    if (synced.versions[1] != versions[1] || synced.versions[2] != versions[2]) {
+                        SetMeshAttributes(scene, path, synced.handle);
+                    }
+                    synced.versions = versions;
                     continue;
                 } catch (const std::invalid_argument&) {
                 }
@@ -494,7 +526,7 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
         }
         SyncedMesh synced;
         synced.key = key;
-        synced.points = points;
+        synced.versions = versions;
         if (it != syncedMeshes_.end() && it->second.handle != 0) {
             meshes_.RemoveMesh(it->second.handle);
         }
@@ -503,9 +535,11 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
             synced.hasColors = !data.colors.empty();
             synced.tint = ConstantDisplayColor(scene, path).value_or(glm::vec3(0.5f));
             synced.handle = meshes_.AddMesh(std::move(data));
-            const Tensor* tensor = scene.Read(path, kPoints);
-            if (tensor != nullptr && IsGpu(tensor->Location().kind)) {
+            if (onGpu(kPoints)) {
                 SetMeshPoints(scene, path, synced.handle);
+            }
+            if (gpuNormals || gpuColors) {
+                SetMeshAttributes(scene, path, synced.handle);
             }
         } catch (const std::invalid_argument& error) {
             if (synced.handle != 0) {

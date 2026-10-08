@@ -62,6 +62,8 @@ extern const char kCullSlang[];
 
 /// Mesh and PointInstancer passes.
 extern const char kMeshSlang[];
+/// Vertex normals of meshes whose points move on the GPU.
+extern const char kMeshNormalsSlang[];
 
 /// Terrain modules: shared resources and grid vertex, the surface material, and the passes.
 extern const char kTerrainSlang[];

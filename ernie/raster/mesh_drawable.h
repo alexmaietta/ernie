@@ -124,6 +124,17 @@ class MeshDrawable : public RasterDrawable {
                    std::optional<std::pair<glm::vec3, glm::vec3>> bounds = std::nullopt,
                    std::uintptr_t stream = 1);
 
+    /// Replaces a mesh's normals with a contiguous float32 tensor on the compute device, one
+    /// normal per point, copied device to device at the next `Prepare` on stream `stream`. They
+    /// then follow the tensor rather than the points.
+    /// @throws std::invalid_argument as the device `SetPoints`.
+    void SetNormals(std::uint32_t mesh, const Tensor& normals, std::uintptr_t stream = 1);
+
+    /// Replaces a mesh's vertex colours (linear RGB per point) with a contiguous float32 tensor on
+    /// the compute device, copied as `SetNormals`. The mesh must have been added with colours.
+    /// @throws std::invalid_argument as the device `SetPoints`, or for a mesh without colours.
+    void SetColors(std::uint32_t mesh, const Tensor& colors, std::uintptr_t stream = 1);
+
     /// @throws std::invalid_argument for an unknown mesh.
     void RemoveMesh(std::uint32_t mesh);
 
@@ -259,6 +270,19 @@ class MeshDrawable : public RasterDrawable {
         bool pointsDirty = false;
         Tensor devicePoints;  ///< CUDA points replacing `data.points` on the GPU, if any.
         std::uintptr_t deviceStream = 1;        ///< The CUDA stream `devicePoints` are written on.
+        Tensor deviceNormals;  ///< Device normals replacing `data.normals`, if any.
+        std::uintptr_t normalsStream = 1;
+        bool normalsDirty = false;
+        Tensor deviceColors;  ///< Device colours replacing `data.colors`, if any.
+        std::uintptr_t colorsStream = 1;
+        bool colorsDirty = false;
+        /// Whether its normals follow its device points, recomputed on the GPU when they move:
+        /// a mesh with normals whose points, but not normals, come from the device.
+        bool recomputeNormals = false;
+        /// Per point, the triangles around it (`adjacency_`), for recomputing normals: offsets
+        /// (points + 1) then triangle indices, from `firstAdjacency`.
+        std::vector<std::uint32_t> adjacency;
+        std::uint32_t firstAdjacency = 0;
         std::vector<MeshLevel> levels;          ///< Its levels of detail, the full mesh first.
         std::vector<std::uint32_t> lodIndices;  ///< The coarser levels' indices, one after another.
     };
@@ -281,6 +305,8 @@ class MeshDrawable : public RasterDrawable {
     void RebuildInstances();
     void WriteInstancer(const Instancer& instancer);
     void CopyDevicePoints(Mesh& mesh);
+    /// Copies a mesh's device normals and colours that changed into the pools.
+    void CopyDeviceAttributes(Mesh& mesh, bool all);
     std::shared_ptr<GpuBuffer> Pool(std::span<const std::byte> bytes) const;
     void CheckDeviceTensor(const Tensor& tensor, std::size_t components, const char* what) const;
     /// Draw `item`'s bindings; with `culled`, the visible ids of GPU culling at binding 18.
@@ -342,9 +368,15 @@ class MeshDrawable : public RasterDrawable {
     std::vector<const GraphicsPipeline*> itemPipelines_;
 
     std::shared_ptr<GpuBuffer> points_;
-    std::unique_ptr<GpuBuffer> normals_;
-    std::unique_ptr<GpuBuffer> colors_;
+    std::shared_ptr<GpuBuffer> normals_;
+    std::shared_ptr<GpuBuffer> colors_;
     std::unique_ptr<GpuBuffer> indices_;
+    /// Every recomputing mesh's `Mesh::adjacency`, one after another.
+    std::unique_ptr<GpuBuffer> adjacency_;
+    PipelineLayout normalsLayout_;
+    std::unique_ptr<ComputePipeline> normalsPipeline_;  ///< mesh_normals.slang.
+    /// The meshes whose normals the next frame recomputes, as their handles.
+    std::vector<std::uint32_t> pendingNormals_;
     std::shared_ptr<GpuBuffer> positions_;
     std::shared_ptr<GpuBuffer> orientations_;
     std::shared_ptr<GpuBuffer> scales_;

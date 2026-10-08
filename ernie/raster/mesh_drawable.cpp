@@ -1,5 +1,6 @@
 #include "ernie/raster/mesh_drawable.h"
 
+#include "ernie/device/gpu_profile.h"
 #include "ernie/geometry/frustum.h"
 #include "ernie/kernel/embedded_shaders.h"
 #include "ernie/util/profile.h"
@@ -81,6 +82,34 @@ constexpr DescriptorBinding kCullBindings[] = {
     {10, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
+
+/// mesh_normals.slang's bindings: points, indices, adjacency and the normals it writes.
+constexpr DescriptorBinding kNormalsBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+};
+
+/// Per point of a mesh of `count` points, the triangles of `indices` around it: offsets
+/// (count + 1) into the triangle indices that follow them.
+std::vector<std::uint32_t> TrianglesAround(std::span<const std::uint32_t> indices,
+                                           std::size_t count) {
+    std::vector<std::uint32_t> offsets(count + 1, 0);
+    for (const std::uint32_t index : indices) {
+        ++offsets[index + 1];
+    }
+    for (std::size_t i = 0; i < count; ++i) {
+        offsets[i + 1] += offsets[i];
+    }
+    std::vector<std::uint32_t> adjacency(offsets.begin(), offsets.end());
+    adjacency.resize(count + 1 + indices.size());
+    std::vector<std::uint32_t> next(offsets.begin(), offsets.end() - 1);
+    for (std::size_t corner = 0; corner < indices.size(); ++corner) {
+        adjacency[count + 1 + next[indices[corner]]++] = static_cast<std::uint32_t>(corner / 3);
+    }
+    return adjacency;
+}
 
 /// cull.slang's modes.
 constexpr std::uint32_t kCullFrustum = 0;
@@ -255,7 +284,11 @@ std::vector<Level> SimplifiedLevels(const MeshData& data, std::size_t maxLevels,
 MeshDrawable::MeshDrawable(RasterRenderer& renderer)
     : renderer_(renderer), context_(renderer.Context()),
       layout_(renderer.Context(), kBindings, sizeof(DrawConstants)),
+      normalsLayout_(renderer.Context(), kNormalsBindings, 32),
       cullLayout_(renderer.Context(), kCullBindings, 32) {
+    const std::vector<ShaderModuleSource> normals{{"mesh_normals", shaders::kMeshNormalsSlang}};
+    normalsPipeline_ = std::make_unique<ComputePipeline>(
+        context_, normalsLayout_, renderer_.Compiler().CompileSpirv(normals, "normalsMain"));
     // Stands in for a depth pyramid in culling without one.
     noHzb_ =
         std::make_unique<GpuImage>(context_, ImageDesc{1, 1, 1, 1, VK_FORMAT_R32_SFLOAT,
@@ -363,11 +396,74 @@ void MeshDrawable::SetPoints(std::uint32_t mesh, const Tensor& points,
     target.devicePoints = points;
     target.deviceStream = stream;
     target.pointsDirty = true;
+    // Normals it has follow the points on the GPU, unless they come from the device too.
+    const bool recompute = !target.data.normals.empty() && target.deviceNormals.Empty() &&
+                           !target.data.indices.empty();
+    if (recompute && !target.recomputeNormals) {
+        target.recomputeNormals = true;
+        target.adjacency = TrianglesAround(target.data.indices, target.data.points.size() / 3);
+        geometryDirty_ = true;
+    }
+}
+
+void MeshDrawable::SetNormals(std::uint32_t mesh, const Tensor& normals, std::uintptr_t stream) {
+    const auto it = meshes_.find(mesh);
+    if (it == meshes_.end()) {
+        throw std::invalid_argument("Unknown mesh " + std::to_string(mesh));
+    }
+    CheckDeviceTensor(normals, 3, "Mesh normals");
+    Mesh& target = it->second;
+    if (static_cast<std::size_t>(normals.Elements()) != target.data.points.size()) {
+        throw std::invalid_argument("Mesh normals need one per point");
+    }
+    if (target.data.normals.empty()) {
+        // Shaded with normals from now on: the draws' flags change.
+        target.data.normals.assign(target.data.points.size(), 0.0f);
+        geometryDirty_ = true;
+    }
+    if (target.recomputeNormals) {
+        target.recomputeNormals = false;
+        target.adjacency.clear();
+        geometryDirty_ = true;
+    }
+    target.deviceNormals = normals;
+    target.normalsStream = stream;
+    target.normalsDirty = true;
+}
+
+void MeshDrawable::SetColors(std::uint32_t mesh, const Tensor& colors, std::uintptr_t stream) {
+    const auto it = meshes_.find(mesh);
+    if (it == meshes_.end()) {
+        throw std::invalid_argument("Unknown mesh " + std::to_string(mesh));
+    }
+    CheckDeviceTensor(colors, 3, "Mesh colours");
+    Mesh& target = it->second;
+    if (target.data.colors.empty()) {
+        throw std::invalid_argument("Device colours need a mesh added with colours");
+    }
+    if (static_cast<std::size_t>(colors.Elements()) != target.data.points.size()) {
+        throw std::invalid_argument("Mesh colours need one per point");
+    }
+    target.deviceColors = colors;
+    target.colorsStream = stream;
+    target.colorsDirty = true;
 }
 
 void MeshDrawable::CopyDevicePoints(Mesh& mesh) {
     compute_->CopyToBuffer(mesh.devicePoints, *points_,
                            VkDeviceSize{mesh.firstVertex} * 3 * sizeof(float), mesh.deviceStream);
+}
+
+void MeshDrawable::CopyDeviceAttributes(Mesh& mesh, bool all) {
+    const VkDeviceSize offset = VkDeviceSize{mesh.firstVertex} * 3 * sizeof(float);
+    if (!mesh.deviceNormals.Empty() && (all || mesh.normalsDirty)) {
+        compute_->CopyToBuffer(mesh.deviceNormals, *normals_, offset, mesh.normalsStream);
+    }
+    if (!mesh.deviceColors.Empty() && (all || mesh.colorsDirty)) {
+        compute_->CopyToBuffer(mesh.deviceColors, *colors_, offset, mesh.colorsStream);
+    }
+    mesh.normalsDirty = false;
+    mesh.colorsDirty = false;
 }
 
 std::shared_ptr<GpuBuffer> MeshDrawable::Pool(std::span<const std::byte> bytes) const {
@@ -593,6 +689,7 @@ void MeshDrawable::RebuildGeometry() {
     std::vector<float> normals;
     std::vector<float> colors;
     std::vector<std::uint32_t> indices;
+    std::vector<std::uint32_t> adjacency;
     for (auto& [handle, mesh] : meshes_) {
         mesh.firstIndex = static_cast<std::uint32_t>(indices.size());
         mesh.firstVertex = static_cast<std::uint32_t>(points.size() / 3);
@@ -610,16 +707,26 @@ void MeshDrawable::RebuildGeometry() {
         }
         indices.insert(indices.end(), mesh.data.indices.begin(), mesh.data.indices.end());
         indices.insert(indices.end(), mesh.lodIndices.begin(), mesh.lodIndices.end());
+        mesh.firstAdjacency = static_cast<std::uint32_t>(adjacency.size());
+        adjacency.insert(adjacency.end(), mesh.adjacency.begin(), mesh.adjacency.end());
         mesh.pointsDirty = false;
     }
     vkDeviceWaitIdle(context_.Device());
     points_ = Pool(std::as_bytes(std::span(points)));
-    normals_ = StorageBuffer(context_, normals);
-    colors_ = StorageBuffer(context_, colors);
+    normals_ = Pool(std::as_bytes(std::span(normals)));
+    colors_ = Pool(std::as_bytes(std::span(colors)));
     indices_ = StorageBuffer(context_, indices);
+    adjacency_ = StorageBuffer(context_, adjacency);
+    pendingNormals_.clear();
     for (auto& [handle, mesh] : meshes_) {
-        if (!mesh.devicePoints.Empty() && compute_ != nullptr) {
-            CopyDevicePoints(mesh);
+        if (compute_ != nullptr) {
+            if (!mesh.devicePoints.Empty()) {
+                CopyDevicePoints(mesh);
+            }
+            CopyDeviceAttributes(mesh, true);
+        }
+        if (mesh.recomputeNormals) {
+            pendingNormals_.push_back(handle);
         }
     }
     geometryDirty_ = false;
@@ -708,7 +815,12 @@ void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCasc
     if (geometryDirty_) {
         RebuildGeometry();
     } else {
+        // Only meshes whose points move recompute their normals.
+        pendingNormals_.clear();
         for (auto& [handle, mesh] : meshes_) {
+            if (compute_ != nullptr) {
+                CopyDeviceAttributes(mesh, false);
+            }
             if (!mesh.pointsDirty) {
                 continue;
             }
@@ -717,6 +829,9 @@ void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCasc
             } else {
                 renderer_.Uploads().Write(*points_, std::as_bytes(std::span(mesh.data.points)),
                                           VkDeviceSize{mesh.firstVertex} * 3 * sizeof(float));
+            }
+            if (mesh.recomputeNormals) {
+                pendingNormals_.push_back(handle);
             }
             mesh.pointsDirty = false;
         }
@@ -1226,6 +1341,32 @@ void MeshDrawable::RecordViewPoses(VkCommandBuffer commands) const {
 }
 
 void MeshDrawable::RecordCull(VkCommandBuffer commands) const {
+    // Normals that follow moving points first, before any pass draws them.
+    if (!pendingNormals_.empty()) {
+        ERNIE_GPU_ZONE(context_, commands, "Mesh normals");
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, normalsPipeline_->Handle());
+        const DescriptorResource resources[] = {
+            DescriptorResource::Of(*points_), DescriptorResource::Of(*indices_),
+            DescriptorResource::Of(*adjacency_), DescriptorResource::Of(*normals_)};
+        normalsLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+        for (const std::uint32_t handle : pendingNormals_) {
+            const Mesh& mesh = meshes_.at(handle);
+            const auto count = static_cast<std::uint32_t>(mesh.data.points.size() / 3);
+            const std::uint32_t constants[4] = {mesh.firstVertex, mesh.firstIndex, count,
+                                                mesh.firstAdjacency};
+            normalsLayout_.PushConstants(commands, constants, sizeof(constants));
+            vkCmdDispatch(commands, (count + 63) / 64, 1, 1);
+        }
+        VkMemoryBarrier2 barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+        barrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        barrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+        VkDependencyInfo dependency{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        dependency.memoryBarrierCount = 1;
+        dependency.pMemoryBarriers = &barrier;
+        vkCmdPipelineBarrier2(commands, &dependency);
+    }
     if (cullJobs_.empty()) {
         return;
     }
