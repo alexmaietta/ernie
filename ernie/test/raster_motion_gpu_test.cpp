@@ -1,0 +1,213 @@
+#include "ernie/raster/delegate.h"
+#include "ernie/scene/schema.h"
+#include "ernie/scene/tokens.h"
+#include "ernie/session/frame_params.h"
+#include "support/delegate_scenes.h"
+#include "support/vulkan_fixture.h"
+
+#include <glm/gtc/matrix_transform.hpp>
+#include <gtest/gtest.h>
+
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <map>
+#include <string>
+#include <vector>
+
+using ernie::Path;
+using ernie::RasterDelegate;
+using ernie::Scene;
+using ernie::Tensor;
+using namespace ernie::testing;
+namespace tokens = ernie::tokens;
+
+namespace {
+
+/// MeshScene without noise, rendering HdrColor and LdrColor through /Render/Out.
+Scene MotionScene() {
+    Scene scene = MeshScene();
+    scene.Set("/World/Camera", tokens::kSensorNoise, false);
+    std::vector<Path> vars;
+    for (const std::string_view name : {"HdrColor", "LdrColor"}) {
+        const Path var("/Render/Vars/" + std::string(name));
+        scene.Define(var, tokens::kRenderVar).Set(tokens::kSourceName, std::string(name));
+        vars.push_back(var);
+    }
+    scene.Define("/Render/Out", tokens::kRenderProduct)
+        .Set(tokens::kCameraRel, Path("/World/Camera"))
+        .Set(tokens::kResolution, glm::ivec2(kSize, kSize))
+        .Set(tokens::kOrderedVars, vars);
+    return scene;
+}
+
+/// One step of /Render/Out: render var `var` as floats.
+std::vector<float> Step(RasterDelegate& delegate, const Scene& scene, const std::string& var) {
+    const Path product[] = {"/Render/Out"};
+    const Tensor tensor =
+        delegate.Step(scene, product).at("/Render/Out").vars.at(var).Map(ernie::MapDevice::Cpu).tensor;
+    std::vector<float> values(static_cast<std::size_t>(tensor.Elements()));
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        values[i] = tensor.Type() == ernie::DType::UInt8
+                        ? static_cast<float>(tensor.As<std::uint8_t>()[i])
+                        : tensor.As<float>()[i];
+    }
+    return values;
+}
+
+/// The largest difference between `a` and `b` over the largest magnitude of `b`.
+float RelativeError(const std::vector<float>& a, const std::vector<float>& b) {
+    float error = 0.0f;
+    float scale = 1e-12f;
+    for (std::size_t i = 0; i < a.size(); ++i) {
+        error = std::max(error, std::abs(a[i] - b[i]));
+        scale = std::max(scale, std::abs(b[i]));
+    }
+    return error / scale;
+}
+
+void SetShutter(Scene& scene, double open, double close, int samples, double rolling = 0.0) {
+    scene.Set("/World/Camera", tokens::kShutterOpen, open);
+    scene.Set("/World/Camera", tokens::kShutterClose, close);
+    scene.Set("/World/Camera", tokens::kShutterSamples, samples);
+    scene.Set("/World/Camera", tokens::kShutterRolling, rolling);
+}
+
+glm::dmat4 CameraAt(double x) {
+    return ernie::LookAtTransform({x, 0.0, 60.0}, {x, 0.0, 0.0}, {0.0, 1.0, 0.0});
+}
+
+/// The weights a global shutter over the whole frame gives `count` sub-frames: the trapezoid
+/// rule, halves at the ends.
+std::vector<double> TrapezoidWeights(int count) {
+    std::vector<double> weights(static_cast<std::size_t>(count), 1.0 / (count - 1));
+    weights.front() *= 0.5;
+    weights.back() *= 0.5;
+    return weights;
+}
+
+}  // namespace
+
+TEST_F(RasterDelegateTest, CameraMotionBlurAveragesTheViewsAcrossTheShutter) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MotionScene();
+    constexpr int kSamples = 5;
+    const glm::dmat4 from = CameraAt(0.0);
+    const glm::dmat4 to = CameraAt(6.0);
+    // Sharp frames at each sub-frame's pose, summed as the shutter weighs them.
+    const std::vector<double> weights = TrapezoidWeights(kSamples);
+    std::vector<float> expected;
+    for (int k = 0; k < kSamples; ++k) {
+        scene.Set("/World/Camera", tokens::kTransform,
+                  ernie::InterpolatePose(from, to, k / double(kSamples - 1)));
+        const std::vector<float> sharp = Step(delegate, scene, "HdrColor");
+        expected.resize(sharp.size(), 0.0f);
+        for (std::size_t i = 0; i < sharp.size(); ++i) {
+            expected[i] += static_cast<float>(weights[static_cast<std::size_t>(k)]) * sharp[i];
+        }
+    }
+    const std::vector<float> still = Step(delegate, scene, "HdrColor");
+
+    // The shutter open over the whole frame, from the last frame's pose to this one's.
+    SetShutter(scene, -1.0, 0.0, kSamples);
+    scene.Set("/World/Camera", tokens::kTransform, from);
+    Step(delegate, scene, "HdrColor");  // moved back from the last reference's pose
+    EXPECT_LT(RelativeError(Step(delegate, scene, "HdrColor"), Step(delegate, scene, "HdrColor")),
+              1e-6f)
+        << "a camera standing still renders the same frame";
+    scene.Set("/World/Camera", tokens::kTransform, to);
+    const std::vector<float> blurred = Step(delegate, scene, "HdrColor");
+    EXPECT_LT(RelativeError(blurred, expected), 2e-3f);
+    EXPECT_GT(RelativeError(blurred, still), 0.1f) << "blurred";
+}
+
+TEST_F(RasterDelegateTest, ObjectMotionBlurFollowsTheMovesBetweenSteps) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MotionScene();
+    constexpr int kSamples = 4;
+    const auto quadAt = [&](double x) {
+        scene.Set("/World/Quad", tokens::kTransform,
+                  glm::translate(glm::dmat4(1.0), glm::dvec3(x, 0.0, 0.0)));
+    };
+    const std::vector<double> weights = TrapezoidWeights(kSamples);
+    std::vector<float> expected;
+    for (int k = 0; k < kSamples; ++k) {
+        quadAt(-12.0 + 6.0 * k / (kSamples - 1));
+        const std::vector<float> sharp = Step(delegate, scene, "HdrColor");
+        expected.resize(sharp.size(), 0.0f);
+        for (std::size_t i = 0; i < sharp.size(); ++i) {
+            expected[i] += static_cast<float>(weights[static_cast<std::size_t>(k)]) * sharp[i];
+        }
+    }
+    SetShutter(scene, -1.0, 0.0, kSamples);
+    quadAt(-12.0);
+    Step(delegate, scene, "HdrColor");
+    quadAt(-6.0);
+    EXPECT_LT(RelativeError(Step(delegate, scene, "HdrColor"), expected), 2e-3f);
+    // The next step without a move stands still again: the quad sharp where it stopped.
+    const std::vector<float> stopped = Step(delegate, scene, "HdrColor");
+    SetShutter(scene, 0.0, 0.0, kSamples);
+    EXPECT_LT(RelativeError(stopped, Step(delegate, scene, "HdrColor")), 1e-5f);
+}
+
+TEST_F(RasterDelegateTest, RollingShutterExposesEachRowAtItsOwnTime) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MotionScene();
+    constexpr int kSamples = 9;
+    const glm::dmat4 from = CameraAt(0.0);
+    const glm::dmat4 to = CameraAt(8.0);
+    std::vector<std::vector<float>> sharp;
+    for (int k = 0; k < kSamples; ++k) {
+        scene.Set("/World/Camera", tokens::kTransform,
+                  ernie::InterpolatePose(from, to, k / double(kSamples - 1)));
+        sharp.push_back(Step(delegate, scene, "HdrColor"));
+    }
+    // Instantaneous rows read out over the frame, the top row at the last frame's time.
+    SetShutter(scene, 0.0, 0.0, kSamples, 1.0);
+    scene.Set("/World/Camera", tokens::kTransform, from);
+    Step(delegate, scene, "HdrColor");
+    scene.Set("/World/Camera", tokens::kTransform, to);
+    const std::vector<float> rolled = Step(delegate, scene, "HdrColor");
+    // Each row interpolates the two sub-frames around its time.
+    const double step = 1.0 / (kSamples - 1);
+    float worst = 0.0f;
+    float scale = 1e-12f;
+    for (std::size_t y = 0; y < kSize; ++y) {
+        const double t = -(1.0 - (static_cast<double>(y) + 0.5) / kSize);
+        for (std::size_t x = 0; x < kSize; ++x) {
+            for (std::size_t c = 0; c < 4; ++c) {
+                const std::size_t i = (y * kSize + x) * 4 + c;
+                double value = 0.0;
+                for (int k = 0; k < kSamples; ++k) {
+                    const double w = std::max(0.0, 1.0 - std::abs(t - (-1.0 + k * step)) / step);
+                    value += w * static_cast<double>(sharp[static_cast<std::size_t>(k)][i]);
+                }
+                worst = std::max(worst, std::abs(rolled[i] - static_cast<float>(value)));
+                scale = std::max(scale, std::abs(rolled[i]));
+            }
+        }
+    }
+    EXPECT_LT(worst / scale, 2e-3f);
+    EXPECT_GT(RelativeError(rolled, sharp.back()), 0.1f) << "the top rows lag behind";
+}
+
+TEST_F(RasterDelegateTest, MotionBlurBlendsTheClearColourByCoverage) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MotionScene();
+    scene.Set("/Render/Settings", tokens::kClearColor, glm::vec3(0.0f, 0.0f, 1.0f));
+    SetShutter(scene, -1.0, 0.0, 6);
+    scene.Set("/World/Camera", tokens::kTransform, CameraAt(0.0));
+    Step(delegate, scene, "LdrColor");
+    scene.Set("/World/Camera", tokens::kTransform, CameraAt(6.0));
+    const std::vector<float> ldr = Step(delegate, scene, "LdrColor");
+    // A corner far from every prim shows the clear colour, as without motion.
+    EXPECT_EQ(ldr[0], 0.0f);
+    EXPECT_EQ(ldr[1], 0.0f);
+    EXPECT_EQ(ldr[2], 255.0f);
+    // Some pixels partly covered over the exposure mix the quad's red with the blue.
+    std::size_t mixed = 0;
+    for (std::size_t i = 0; i < ldr.size(); i += 4) {
+        mixed += ldr[i] > 20.0f && ldr[i + 2] > 20.0f ? 1u : 0u;
+    }
+    EXPECT_GT(mixed, 0u);
+}

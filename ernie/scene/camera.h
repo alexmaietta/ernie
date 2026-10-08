@@ -140,6 +140,16 @@ struct Camera {
     /// USD `fStop`: the lens's f-number for depth of field; 0 is a pinhole, all in focus.
     double lensFStop = 0.0;
     double focusDistance = 0.0;  ///< USD `focusDistance`, scene units; 0 focuses at infinity.
+    /// USD `shutter:open` and `shutter:close`: the interval each row integrates over, in frames
+    /// relative to the frame's time, the last frame's at -1. Equal (the default) for no motion
+    /// blur.
+    double shutterOpen = 0.0;
+    double shutterClose = 0.0;
+    /// Sub-frames rendered across the shutter and the readout when either is open.
+    int shutterSamples = 8;
+    /// Rolling shutter readout: the top row's interval comes this many frames before the bottom
+    /// row's, rows in between in proportion; 0 is a global shutter.
+    double rollingShutter = 0.0;
     SpectralBands bands;
     LensModel lens;
     SensorModel sensor = SensorModel::Rgb();
@@ -200,8 +210,20 @@ struct Camera {
 
     /// @throws std::invalid_argument for non-positive sizes, times, f-numbers, ISO or focal
     /// length, a bad clipping range, a degenerate transform, a bad spectral range, no sensor
-    /// channels or more than four.
+    /// channels or more than four, or a shutter closing before it opens, a negative rolling
+    /// readout or shutter samples outside 1 to `kMaxShutterSamples`.
     void Check() const;
+
+    static constexpr int kMaxShutterSamples = 64;
+
+    /// The sub-frames a frame renders: 1 with the shutter closed (open equal to close) and a
+    /// global shutter, else `shutterSamples`, at least 2.
+    int Subframes() const;
+
+    /// The time of sub-frame `subframe` in frames relative to the frame's: evenly spaced from the
+    /// top row's opening to the bottom row's closing, the last at `shutterClose`. Each row's
+    /// exposure interpolates its interval linearly between them.
+    double SubframeTime(int subframe) const;
 };
 
 /// The camera of the Camera prim at `path` for an image of `width` x `height`: its world

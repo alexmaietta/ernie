@@ -31,8 +31,9 @@ struct Uniforms {
     std::uint32_t flags[4];
     float sunViewProjection[16];  ///< A batch view's own fitted sun map, with `sunShadow[2]` 1.
     float sunShadow[4];           ///< Its texel size and depth span in world units, and the flag.
+    float motion[4];              ///< The sub-frame's share from the last frame's transforms.
 };
-static_assert(sizeof(Uniforms) == 208, "Uniforms must match frame.slang");
+static_assert(sizeof(Uniforms) == 224, "Uniforms must match frame.slang");
 
 struct ShadowUniforms {
     float lightViewProjection[4][16];
@@ -185,6 +186,8 @@ constexpr DescriptorBinding kFilterBindings[] = {
     {29, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     // Linear filtering of the channel images' pyramids.
     {30, VK_DESCRIPTOR_TYPE_SAMPLER, kCompute},
+    // With motion blur, the raster pixels' coverage.
+    {31, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
 };
 
 /// A plan that runs custom filter `model`, with the built-in filters its domain needs, and holds a
@@ -247,6 +250,14 @@ std::string SensorKernelKey(const SensorPlan& plan, std::uint32_t segment) {
 constexpr DescriptorBinding kHzbBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
     {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+};
+
+/// motion.slang: the sub-frame's radiance, the sum, its ids and the coverage.
+constexpr DescriptorBinding kMotionBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+    {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+    {3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
 };
 
 /// views.slang: the camera, the poses and the per-view blocks it patches.
@@ -475,7 +486,8 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
                                           VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 1.0f, true}),
       poisson_(PoissonDisk(16)), shadingLayout_(context, kShadingBindings, 16),
       filterLayout_(context, kFilterBindings, 16), presentLayout_(context, kPresentBindings, 32),
-      hzbLayout_(context, kHzbBindings, 16), viewsLayout_(context, kViewsBindings, 48),
+      hzbLayout_(context, kHzbBindings, 16), motionLayout_(context, kMotionBindings, 48),
+      viewsLayout_(context, kViewsBindings, 48),
       poseCamera_(context, kPoseCameraBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                   BufferMemory::Device),
       sigmoidTable_(context, ImageDesc{kTableResolution, kTableResolution, kTableResolution, 1,
@@ -541,6 +553,9 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
     const std::vector<ShaderModuleSource> pyramidModules{{"pyramid", shaders::kPyramidSlang}};
     pyramidPipeline_ = std::make_unique<ComputePipeline>(
         context_, hzbLayout_, compiler_.CompileSpirv(pyramidModules, "pyramidMain"));
+    const std::vector<ShaderModuleSource> motionModules{{"motion", shaders::kMotionSlang}};
+    motionPipeline_ = std::make_unique<ComputePipeline>(
+        context_, motionLayout_, compiler_.CompileSpirv(motionModules, "motionMain"));
     hzbPipeline_ = std::make_unique<ComputePipeline>(context_, hzbLayout_,
                                                      compiler_.CompileSpirv(hzbModules, "hzbMain"));
     const std::vector<ShaderModuleSource> viewsModules{{"views", shaders::kViewsSlang}};
@@ -918,11 +933,31 @@ void RasterRenderer::PlanBatchShadows(const FrameParams& params, const Bounds3& 
     shadowLayers_ = static_cast<std::uint32_t>(shadowPasses_.size());
 }
 
-void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable* const> drawables,
+void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* const> drawables,
                             std::span<const Overlay* const> overlays) {
     ERNIE_ZONE("Renderer::Update");
-    ERNIE_PLOT("Views", params.Views());
-    const CameraView view = params.View();
+    ERNIE_PLOT("Views", frame.Views());
+    // With motion blur, a view per sub-frame and view (`FrameParams::Subframes`): the drawables
+    // cull and draw each, and the sensor reads their sum.
+    frame.camera.Check();
+    subframes_ = static_cast<std::uint32_t>(frame.camera.Subframes());
+    if (subframes_ > 1 && frame.posesOnGpu) {
+        throw std::invalid_argument("Motion blur needs the views' poses on the host");
+    }
+    std::optional<FrameParams> expanded;
+    if (subframes_ > 1) {
+        expanded = frame.Subframes();
+    }
+    const FrameParams& params = expanded ? *expanded : frame;
+    outputViews_ = static_cast<std::uint32_t>(frame.Views());
+    const Camera& shutter = frame.camera;
+    const double first = shutter.SubframeTime(0);
+    shutter_ = {static_cast<float>(first),
+                static_cast<float>(subframes_ > 1 ? shutter.SubframeTime(1) - first : 1.0),
+                static_cast<float>(shutter.shutterOpen), static_cast<float>(shutter.shutterClose),
+                static_cast<float>(shutter.rollingShutter)};
+    // The cascades follow the frame's own view.
+    const CameraView view = frame.View();
     if (params.lights.size() > kMaxLights) {
         throw std::invalid_argument("A frame has at most " + std::to_string(kMaxLights) +
                                     " lights besides the sun");
@@ -954,7 +989,7 @@ void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable*
         WritePoseCamera(params);
     }
     // Views posed on the GPU are planned as a batch, whose shadows do not follow the views.
-    const bool batch = views_ > 1 || posesOnGpu_;
+    const bool batch = outputViews_ > 1 || posesOnGpu_;
     const SensorModel& sensor = params.camera.sensor;
     presentRange_ = {static_cast<float>(params.camera.nearPlane),
                      static_cast<float>(params.camera.farPlane),
@@ -1081,8 +1116,13 @@ void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable*
             uniforms.flags[0] = static_cast<std::uint32_t>(params.wireframe);
             uniforms.flags[1] = viewShadowLayers_[v];
             // Its layer of the render targets it draws into: a frame of more views renders them in
-            // chunks of `RenderTargets::MaxViews`.
-            uniforms.flags[2] = v % viewsPerTargets;
+            // chunks of `RenderTargets::MaxViews`, and each sub-frame into the same targets.
+            uniforms.flags[2] = (v % outputViews_) % viewsPerTargets;
+            uniforms.motion[0] =
+                subframes_ > 1
+                    ? static_cast<float>(1.0 + frame.camera.SubframeTime(
+                                                   static_cast<int>(v / outputViews_)))
+                    : 1.0f;
             if (viewSunCascades_[v] >= 0) {
                 // A view of a world with its own fitted map samples it in place of cascade 0.
                 const ShadowCascade& own = cascades_[static_cast<std::size_t>(viewSunCascades_[v])];
@@ -1374,7 +1414,8 @@ void RasterRenderer::WriteSensor(const FrameParams& params) {
     sensor.clear[0] = params.clearColor.r;
     sensor.clear[1] = params.clearColor.g;
     sensor.clear[2] = params.clearColor.b;
-    sensor.clear[3] = sky_ != 0 ? 1.0f : 0.0f;  // the background holds the sky's radiance
+    // The background holds the sky's radiance; or with motion blur, every pixel the sub-frames'.
+    sensor.clear[3] = sky_ != 0 ? 1.0f : subframes_ > 1 ? 2.0f : 0.0f;
     sensor.range[0] = static_cast<float>(bands_.minNm);
     sensor.range[1] = static_cast<float>(bands_.Width());
     // The optics filters read (sensor.slang's PixelContext): the lens's f-number for depth of
@@ -1424,8 +1465,9 @@ void RasterRenderer::WriteSensor(const FrameParams& params) {
             sensor.qe[i][c] = factors[static_cast<std::size_t>(i)];
         }
     }
-    for (std::uint32_t v = 0; v < views_; ++v) {
-        const CameraView view = params.View(v);
+    // The sensor filters the output views, reading the G-buffer of their last sub-frame.
+    for (std::uint32_t v = 0; v < outputViews_; ++v) {
+        const CameraView view = params.View(LastSubframeView(v));
         CopyMatrix(sensor.invViewProj, glm::inverse(view.ViewProjection()));
         sensor.eye[0] = view.eye.x;
         sensor.eye[1] = view.eye.y;
@@ -1486,7 +1528,7 @@ void RasterRenderer::Record(VkCommandBuffer commands, RenderTargets& targets,
         if (!overlays_->Empty()) {
             ERNIE_GPU_ZONE(context_, commands, "Overlays");
             targets.Depth().Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-            OverlayPass::Target target = OverlayTarget(targets, 0, 0);
+            OverlayPass::Target target = OverlayTarget(targets, LastSubframeView(0), 0);
             target.color = present->color;
             target.format = presentFormat_;
             target.extent = present->extent;
@@ -1592,9 +1634,9 @@ void RasterRenderer::RecordViews(VkCommandBuffer commands, RenderTargets& target
         targets.Bands() != bands_.count) {
         throw std::invalid_argument("Render targets need the camera's extent and band count");
     }
-    if (firstView + targets.Views() > views_) {
+    if (firstView + targets.Views() > outputViews_) {
         throw std::invalid_argument("Render targets hold views past the frame's " +
-                                    std::to_string(views_));
+                                    std::to_string(outputViews_));
     }
     for (const std::string_view name : requiredVars_) {
         if (targets.Var(name) == nullptr) {
@@ -1608,39 +1650,49 @@ void RasterRenderer::RecordViews(VkCommandBuffer commands, RenderTargets& target
     const bool occlusion =
         std::any_of(drawables.begin(), drawables.end(),
                     [](const RasterDrawable* drawable) { return drawable->CullsOcclusion(); });
-    // One layered pass for all the views: each view's draws go to its layer (`Uniforms::flags`).
-    const auto draw = [&](DrawPhase phase, bool load) {
-        targets.PrepareGBuffer(commands);
-        BeginRendering(commands, targets.GBufferTarget(load));
-        for (std::uint32_t v = 0; v < targets.Views(); ++v) {
-            const RasterFrame frame = Frame(firstView + v);
-            for (const RasterDrawable* drawable : drawables) {
-                drawable->RecordColor(commands, frame, firstView + v, phase);
-            }
-        }
-        vkCmdEndRendering(commands);
-    };
     ERNIE_ZONE("RecordViews");
-    if (!occlusion) {
-        ERNIE_GPU_ZONE(context_, commands, "G-buffer");
-        draw(DrawPhase::All, false);
-    } else {
-        {
-            ERNIE_GPU_ZONE(context_, commands, "G-buffer occluders");
-            draw(DrawPhase::Occluders, false);
-        }
-        {
-            ERNIE_GPU_ZONE(context_, commands, "Hi-Z and occlusion cull");
-            BuildHzb(commands, targets);
-            for (const RasterDrawable* drawable : drawables) {
-                drawable->RecordOcclusionCull(commands, targets.Hzb(), firstView, targets.Views());
+    // Each sub-frame in turn draws and shades its views into the one set of targets; with motion
+    // blur their radiance sums into what each row's exposure sees, which the sensor filters.
+    for (std::uint32_t subframe = 0; subframe < subframes_; ++subframe) {
+        const std::uint32_t first = subframe * outputViews_ + firstView;
+        // One layered pass for all the views: each view's draws go to its layer
+        // (`Uniforms::flags`).
+        const auto draw = [&](DrawPhase phase, bool load) {
+            targets.PrepareGBuffer(commands);
+            BeginRendering(commands, targets.GBufferTarget(load));
+            for (std::uint32_t v = 0; v < targets.Views(); ++v) {
+                const RasterFrame frame = Frame(first + v);
+                for (const RasterDrawable* drawable : drawables) {
+                    drawable->RecordColor(commands, frame, first + v, phase);
+                }
             }
-            ShaderBarrier(commands);
+            vkCmdEndRendering(commands);
+        };
+        if (!occlusion) {
+            ERNIE_GPU_ZONE(context_, commands, "G-buffer");
+            draw(DrawPhase::All, false);
+        } else {
+            {
+                ERNIE_GPU_ZONE(context_, commands, "G-buffer occluders");
+                draw(DrawPhase::Occluders, false);
+            }
+            {
+                ERNIE_GPU_ZONE(context_, commands, "Hi-Z and occlusion cull");
+                BuildHzb(commands, targets);
+                for (const RasterDrawable* drawable : drawables) {
+                    drawable->RecordOcclusionCull(commands, targets.Hzb(), first, targets.Views());
+                }
+                ShaderBarrier(commands);
+            }
+            ERNIE_GPU_ZONE(context_, commands, "G-buffer occludees");
+            draw(DrawPhase::Occludees, true);
         }
-        ERNIE_GPU_ZONE(context_, commands, "G-buffer occludees");
-        draw(DrawPhase::Occludees, true);
+        Shade(commands, targets, first);
+        if (subframes_ > 1) {
+            Accumulate(commands, targets, subframe);
+        }
     }
-    ShadeAndFilter(commands, targets, firstView);
+    Filter(commands, targets, firstView);
     if (measureDepth_ && firstView == 0) {
         RecordDepthRange(commands, targets);
     }
@@ -1784,7 +1836,7 @@ void RasterRenderer::RecordOverlays(VkCommandBuffer commands, RenderTargets& tar
     targets.Depth().Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     color->Transition(commands, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     for (std::uint32_t v = 0; v < targets.Views(); ++v) {
-        OverlayPass::Target target = OverlayTarget(targets, firstView + v, v);
+        OverlayPass::Target target = OverlayTarget(targets, LastSubframeView(firstView + v), v);
         target.color = color->LayerView(v);
         target.format = VK_FORMAT_R8G8B8A8_UNORM;
         overlays_->Record(commands, target);
@@ -1935,9 +1987,9 @@ void RasterRenderer::BuildPyramid(VkCommandBuffer commands, GpuImage& image) con
     }
 }
 
-void RasterRenderer::ShadeAndFilter(VkCommandBuffer commands, RenderTargets& targets,
-                                    std::uint32_t firstView) const {
-    ERNIE_ZONE("ShadeAndFilter");
+void RasterRenderer::Shade(VkCommandBuffer commands, RenderTargets& targets,
+                           std::uint32_t firstView) const {
+    ERNIE_ZONE("Shade");
     // Shading writes the pixels it shades; the lens reads background ones as no radiance, so
     // the raster radiance needs no clearing.
     targets.PrepareCompute(commands);
@@ -1990,7 +2042,48 @@ void RasterRenderer::ShadeAndFilter(VkCommandBuffer commands, RenderTargets& tar
         }
         ShaderBarrier(commands);
     }
+}
 
+void RasterRenderer::Accumulate(VkCommandBuffer commands, RenderTargets& targets,
+                                std::uint32_t subframe) const {
+    ERNIE_GPU_ZONE(context_, commands, "Motion blur");
+    GpuImage& sum = targets.RadianceSum();
+    GpuImage& coverage = targets.Coverage(true);
+    sum.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    coverage.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    const DescriptorResource resources[] = {
+        DescriptorResource::Of(targets.RasterRadiance().View(), VK_IMAGE_LAYOUT_GENERAL),
+        DescriptorResource::Of(sum.View(), VK_IMAGE_LAYOUT_GENERAL),
+        DescriptorResource::Of(targets.GBuffer(2).View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+        DescriptorResource::Of(coverage.View(), VK_IMAGE_LAYOUT_GENERAL)};
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, motionPipeline_->Handle());
+    motionLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+    struct {
+        std::uint32_t frame[4];
+        float times[4];
+        float rolling[4];
+    } constants{{subframe, subframes_, static_cast<std::uint32_t>(bands_.count), sky_ != 0 ? 1u : 0u},
+                {shutter_[0], shutter_[1], shutter_[2], shutter_[3]},
+                {shutter_[4], 0.0f, 0.0f, 0.0f}};
+    motionLayout_.PushConstants(commands, &constants, sizeof(constants));
+    vkCmdDispatch(commands, Groups(extent_.width), Groups(extent_.height),
+                  targets.Views() * static_cast<std::uint32_t>(bands_.count));
+    ShaderBarrier(commands);
+}
+
+void RasterRenderer::Filter(VkCommandBuffer commands, RenderTargets& targets,
+                            std::uint32_t firstView) const {
+    const auto sampled = [](const GpuImage& image) {
+        return DescriptorResource::Of(image.View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    };
+    const auto general = [](const GpuImage& image) {
+        return DescriptorResource::Of(image.View(), VK_IMAGE_LAYOUT_GENERAL);
+    };
+    const std::uint32_t groupsX = Groups(extent_.width);
+    const std::uint32_t groupsY = Groups(extent_.height);
+    const std::uint32_t views = targets.Views();
+    GpuImage& coverage = targets.Coverage(subframes_ > 1);
+    coverage.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
     ERNIE_GPU_ZONE(context_, commands, "Sensor filters");
     std::vector<DescriptorResource> filters{
         DescriptorResource::Of(sensorUniforms_), general(targets.RasterRadiance()),
@@ -2035,6 +2128,7 @@ void RasterRenderer::ShadeAndFilter(VkCommandBuffer commands, RenderTargets& tar
             resources.push_back(general(previous));
             resources.push_back(general(next));
             resources.push_back(DescriptorResource::Of(clampSampler_));
+            resources.push_back(general(coverage));
             vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                               sensorPipelines_.at(SensorKernelKey(plan, segment))->Handle());
             filterLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);

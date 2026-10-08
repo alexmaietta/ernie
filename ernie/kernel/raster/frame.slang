@@ -19,6 +19,9 @@ public struct Uniforms {
     // `sunShadow.z` is 1: its view-projection, then its texel size and depth span in world units.
     public float4x4 sunViewProj;
     public float4 sunShadow;
+    // x: the view's sub-frame time as the share of the way from the last frame's transforms (0)
+    // to this one's (1), which moving meshes interpolate for motion blur; 1 without.
+    public float4 motion;
 }
 
 // Per draw: the light's view-projection for shadow passes, the pass's first item (terrain patch

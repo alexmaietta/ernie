@@ -155,7 +155,13 @@ class MeshDrawable : public RasterDrawable {
     /// `ShadowCasters`.
     /// @throws std::invalid_argument for an unknown mesh, instancer or material, an instance
     /// index out of range, or instance worlds that do not match the instances or are unsorted.
+    /// Draws keep their transforms from the last frame for motion blur, matched by prim id: a
+    /// draw whose transform changed moves from its old one over the frame (`Uniforms::motion`).
     void SetItems(std::vector<MeshItem> items);
+
+    /// Starts a frame's motion: draws that `SetItems` does not move again before the next
+    /// `Prepare` stand still.
+    void SettleMotion();
 
     /// World bounds of the current draws, or none without any.
     void SetOrigin(const glm::dvec3& origin) override;
@@ -353,6 +359,10 @@ class MeshDrawable : public RasterDrawable {
     /// Each item's transform relative to `origin_` (`SetOrigin`), in float for the GPU and the
     /// bounds; rebuilt when the items or the origin change.
     std::vector<glm::mat4> transforms_;
+    /// Each item's world transform at the last frame, and relative to `origin_` as
+    /// `transforms_`.
+    std::vector<glm::dmat4> previous_;
+    std::vector<glm::mat4> previousTransforms_;
     glm::dvec3 origin_{0.0};
     /// The renderer's `MaterialSetVersion` at `WriteDraws`, which resolves material ids.
     std::uint64_t drawsMaterials_ = 0;

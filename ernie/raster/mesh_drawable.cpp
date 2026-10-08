@@ -35,8 +35,9 @@ struct GpuDraw {
     float tint[4];
     std::uint32_t offsets[4];
     std::uint32_t points[4];
+    float previous[16];  ///< `model` at the last frame, for motion blur.
 };
-static_assert(sizeof(GpuDraw) == 176, "GpuDraw must match MeshDraw in mesh.slang");
+static_assert(sizeof(GpuDraw) == 240, "GpuDraw must match MeshDraw in mesh.slang");
 
 struct DrawConstants {
     float lightViewProj[16];
@@ -529,11 +530,40 @@ void MeshDrawable::SetItems(std::vector<MeshItem> items) {
         }
         ranges.push_back(std::move(runs));
     }
+    // Each draw's transform at the last frame: a draw of the same prim keeps its own while its
+    // transform stays, else moves from it; a new draw stands still.
+    std::map<std::uint32_t, std::size_t> old;
+    for (std::size_t i = 0; i < items_.size(); ++i) {
+        old.try_emplace(items_[i].primId, i);
+    }
+    std::vector<glm::dmat4> previous;
+    for (const MeshItem& item : items) {
+        const auto found = old.find(item.primId);
+        if (found == old.end()) {
+            previous.push_back(item.transform);
+            continue;
+        }
+        const glm::dmat4& was = items_[found->second].transform;
+        previous.push_back(was == item.transform ? previous_[found->second] : was);
+    }
     items_ = std::move(items);
+    previous_ = std::move(previous);
     itemRanges_ = std::move(ranges);
     itemPipelines_.clear();
     drawsDirty_ = true;
     UpdateTransforms();
+}
+
+void MeshDrawable::SettleMotion() {
+    for (std::size_t i = 0; i < items_.size(); ++i) {
+        if (previous_[i] != items_[i].transform) {
+            previous_[i] = items_[i].transform;
+            drawsDirty_ = true;
+        }
+    }
+    if (drawsDirty_) {
+        UpdateTransforms();
+    }
 }
 
 void MeshDrawable::SetOrigin(const glm::dvec3& origin) {
@@ -545,11 +575,15 @@ void MeshDrawable::SetOrigin(const glm::dvec3& origin) {
 }
 
 void MeshDrawable::UpdateTransforms() {
+    const auto relative = [&](glm::dmat4 world) {
+        world[3] -= glm::dvec4(origin_, 0.0);
+        return glm::mat4(world);
+    };
     transforms_.clear();
-    for (const MeshItem& item : items_) {
-        glm::dmat4 relative = item.transform;
-        relative[3] -= glm::dvec4(origin_, 0.0);
-        transforms_.emplace_back(relative);
+    previousTransforms_.clear();
+    for (std::size_t i = 0; i < items_.size(); ++i) {
+        transforms_.push_back(relative(items_[i].transform));
+        previousTransforms_.push_back(relative(previous_[i]));
     }
 }
 
@@ -718,6 +752,7 @@ void MeshDrawable::WriteDraws() {
         itemPipelines_.push_back(gbufferPipeline_.get());
         GpuDraw& draw = draws[i];
         std::memcpy(draw.model, glm::value_ptr(transforms_[i]), sizeof(draw.model));
+        std::memcpy(draw.previous, glm::value_ptr(previousTransforms_[i]), sizeof(draw.previous));
         std::memcpy(draw.prototype, glm::value_ptr(item.prototype), sizeof(draw.prototype));
         draw.tint[0] = item.tint.r;
         draw.tint[1] = item.tint.g;
@@ -858,13 +893,22 @@ std::optional<Bounds3> MeshDrawable::RangeBounds(std::size_t item, const WorldRa
     if (mesh.data.points.empty() && mesh.devicePoints.Empty()) {
         return std::nullopt;
     }
+    // The draw's box where it is and, moving, where it was at the last frame: sub-frames of a
+    // motion-blurred frame see it anywhere between.
+    const auto transformBox = [&](const glm::vec3& low, const glm::vec3& high) {
+        Bounds3 box = TransformBox(transforms_[item], low, high);
+        if (previousTransforms_[item] != transforms_[item]) {
+            const Bounds3 was = TransformBox(previousTransforms_[item], low, high);
+            box = {glm::min(box.first, was.first), glm::max(box.second, was.second)};
+        }
+        return box;
+    };
     if (!draw.instancer) {
-        return TransformBox(transforms_[item], mesh.low, mesh.high);
+        return transformBox(mesh.low, mesh.high);
     }
     const Instancer& instancer = instancers_.at(*draw.instancer);
     if (instancer.onDevice && instancer.device.extent) {
-        return TransformBox(transforms_[item], instancer.device.extent->first,
-                            instancer.device.extent->second);
+        return transformBox(instancer.device.extent->first, instancer.device.extent->second);
     }
     const InstanceData& data = instancer.data;
     if (data.positions.size() != 3 * instancer.count) {
@@ -887,7 +931,7 @@ std::optional<Bounds3> MeshDrawable::RangeBounds(std::size_t item, const WorldRa
         boxLow = glm::min(boxLow, p - glm::vec3(radius * scale));
         boxHigh = glm::max(boxHigh, p + glm::vec3(radius * scale));
     }
-    return TransformBox(transforms_[item], boxLow, boxHigh);
+    return transformBox(boxLow, boxHigh);
 }
 
 void MeshDrawable::Cull(const FrameParams& params, std::span<const ShadowCascade> cascades) {

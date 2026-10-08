@@ -96,6 +96,14 @@ inline constexpr std::string_view kExposureResponsivity = "exposure:responsivity
 /// in scene units it focuses at.
 inline constexpr std::string_view kFStop = "fStop";
 inline constexpr std::string_view kFocusDistance = "focusDistance";
+/// UsdGeomCamera's shutter interval, in frames relative to the frame's time (0): motion blurs
+/// over it (`Camera::shutterOpen`).
+inline constexpr std::string_view kShutterOpen = "shutter:open";
+inline constexpr std::string_view kShutterClose = "shutter:close";
+/// Sub-frames rendered across the shutter and readout for motion blur (int, default 8).
+inline constexpr std::string_view kShutterSamples = "ernie:shutter:samples";
+/// Rolling shutter: frames between the top row's exposure and the bottom row's (0, global).
+inline constexpr std::string_view kShutterRolling = "ernie:shutter:rolling";
 
 // Physical camera (Ernie): spectral sampling, lens and sensor. Spectra are float arrays of
 // interleaved (wavelength in nm, value) pairs.

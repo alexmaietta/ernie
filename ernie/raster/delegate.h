@@ -227,6 +227,9 @@ class RasterDelegate : public RenderDelegate {
     std::unique_ptr<RenderTargets> viewTargets_;
     /// The AOVs the view's chain writes, in slot order, as of the last `Update`.
     std::vector<std::string> viewAovs_;
+    /// Per product (or the settings for the view), its views' camera poses at its last frame,
+    /// for motion blur.
+    std::map<Path, std::vector<glm::dmat4>> lastPoses_;
     /// The prims `SetHighlight` outlines, resolved to prim ids (with their descendants') per frame.
     std::vector<Path> highlight_;
     glm::vec4 highlightColour_{1.0f, 0.6f, 0.1f, 1.0f};

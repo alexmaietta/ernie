@@ -194,6 +194,24 @@ void Camera::Check() const {
         throw std::invalid_argument("A sensor needs 1 to 16 ADC bits and a positive full well, "
                                     "and a lens a positive transmission");
     }
+    if (!(shutterClose >= shutterOpen) || !(rollingShutter >= 0.0) || shutterSamples < 1 ||
+        shutterSamples > kMaxShutterSamples) {
+        throw std::invalid_argument("A shutter needs close at or after open, a non-negative "
+                                    "rolling readout and 1 to " +
+                                    std::to_string(kMaxShutterSamples) + " samples");
+    }
+}
+
+int Camera::Subframes() const {
+    const bool moving = shutterClose > shutterOpen || rollingShutter > 0.0;
+    return moving ? std::max(shutterSamples, 2) : 1;
+}
+
+double Camera::SubframeTime(int subframe) const {
+    const int count = Subframes();
+    const double start = shutterOpen - rollingShutter;
+    return count == 1 ? shutterClose
+                      : start + (shutterClose - start) * subframe / static_cast<double>(count - 1);
 }
 
 Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::uint32_t height) {
@@ -227,6 +245,10 @@ Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::
     camera.responsivity = number(kExposureResponsivity, camera.responsivity);
     camera.lensFStop = std::max(number(kFStop, 0.0), 0.0);
     camera.focusDistance = std::max(number(kFocusDistance, 0.0), 0.0);
+    camera.shutterOpen = number(kShutterOpen, camera.shutterOpen);
+    camera.shutterClose = number(kShutterClose, camera.shutterClose);
+    camera.shutterSamples = static_cast<int>(number(kShutterSamples, camera.shutterSamples));
+    camera.rollingShutter = number(kShutterRolling, camera.rollingShutter);
 
     const glm::dvec2 range =
         GetVec2(scene, path, kSpectralRange, {camera.bands.minNm, camera.bands.maxNm});

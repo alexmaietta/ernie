@@ -221,6 +221,13 @@ class RasterRenderer {
     /// views need no more barriers than one view's. A frame of more views than one set of targets
     /// holds (`RenderTargets::MaxViews`) records in several calls. The `Update`'s overlays are
     /// drawn over each view's LdrColor last, unless `overlays` is false.
+    ///
+    /// With motion blur (`Camera::Subframes` above 1) each sub-frame draws and shades the views at
+    /// its time in turn, the camera between its last frame's pose and this one's and meshes
+    /// between their last frame's transforms and these; their radiance sums into what each row's
+    /// exposure sees (motion.slang, a rolling shutter shifting the rows' exposures), which the
+    /// sensor filters. The geometry vars and overlays are the last sub-frame's. Per-instance
+    /// positions and deforming points do not blur, and shadows are the frame's.
     /// @throws std::invalid_argument if `targets` do not have the camera's extent and bands, or
     /// hold views past the frame's.
     void RecordViews(VkCommandBuffer commands, RenderTargets& targets,
@@ -271,7 +278,12 @@ class RasterRenderer {
 
     /// The number of views of the last `Update` (`FrameParams::Views`).
     std::uint32_t Views() const {
-        return views_;
+        return outputViews_;
+    }
+
+    /// The sub-frames each view of the last `Update` renders (`Camera::Subframes`).
+    std::uint32_t Subframes() const {
+        return subframes_;
     }
 
     /// Whether `Record` can present render var `name`: every one. LdrColor shows as is; HdrColor
@@ -378,8 +390,20 @@ class RasterRenderer {
     /// Fills mips 1 onward of `image` (a channel image) from mip 0, each the mean of the one
     /// before.
     void BuildPyramid(VkCommandBuffer commands, GpuImage& image) const;
-    void ShadeAndFilter(VkCommandBuffer commands, RenderTargets& targets,
-                        std::uint32_t firstView) const;
+    /// Spectral shading and the sky of `targets`' views into their raster radiance, with the
+    /// uniforms of view `firstView` on (a sub-frame's).
+    void Shade(VkCommandBuffer commands, RenderTargets& targets, std::uint32_t firstView) const;
+    /// Adds sub-frame `subframe`'s raster radiance into `targets`' sum (motion.slang), each row
+    /// weighted for its share of its exposure; the last leaves the sum in the raster radiance.
+    void Accumulate(VkCommandBuffer commands, RenderTargets& targets,
+                    std::uint32_t subframe) const;
+    /// The sensor filters of output views `firstView` on.
+    void Filter(VkCommandBuffer commands, RenderTargets& targets, std::uint32_t firstView) const;
+    /// The internal view (uniforms, culling) of output view `view` at its last sub-frame, whose
+    /// G-buffer the sensor and overlays read.
+    std::uint32_t LastSubframeView(std::uint32_t view) const {
+        return (subframes_ - 1) * outputViews_ + view;
+    }
     void Present(VkCommandBuffer commands, RenderTargets& targets, const RenderingTarget& present,
                  std::string_view var) const;
     /// Records the measuring of view 0's visible depth range into this slot's buffer.
@@ -424,7 +448,14 @@ class RasterRenderer {
     std::vector<glm::vec2> poisson_;
     bool shadowsEnabled_ = false;
     bool updated_ = false;
+    /// Internal views: a view per sub-frame and output view (`FrameParams::Subframes`), sub-frame
+    /// `k`'s from `k * outputViews_` on, which uniforms, culling and drawables index.
     std::uint32_t views_ = 1;
+    std::uint32_t outputViews_ = 1;  ///< The frame's own views (`FrameParams::Views`).
+    std::uint32_t subframes_ = 1;    ///< Sub-frames per view: above 1 for motion blur.
+    /// The shutter for motion.slang: the first sub-frame's time and the spacing, the shutter's
+    /// opening and closing and the rolling readout, in frames.
+    std::array<float, 5> shutter_{};
     /// Whether the last `Update`'s views take their poses from `poseBuffer_`, and the views of
     /// `poseHistory_` (the poses it last rendered) then.
     bool posesOnGpu_ = false;
@@ -456,6 +487,8 @@ class RasterRenderer {
     std::unique_ptr<ComputePipeline> hzbPipeline_;
     /// Pyramids of the channel images for spatial filters (pyramid.slang, Hi-Z's layout).
     std::unique_ptr<ComputePipeline> pyramidPipeline_;
+    PipelineLayout motionLayout_;
+    std::unique_ptr<ComputePipeline> motionPipeline_;  ///< Sub-frame accumulation (motion.slang).
     PipelineLayout viewsLayout_;
     std::unique_ptr<ComputePipeline> viewsPipeline_;
     GpuBuffer poseCamera_;  ///< views.slang's camera: parent, projection, its inverse.

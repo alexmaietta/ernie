@@ -112,6 +112,27 @@ GpuImage& RenderTargets::Hzb() {
     return *hzb_;
 }
 
+GpuImage& RenderTargets::RadianceSum() {
+    if (radianceSum_ == nullptr) {
+        const auto bandLayers = static_cast<std::uint32_t>(bands_);
+        radianceSum_ = std::make_unique<GpuImage>(
+            context_, ImageDesc{extent_.width, extent_.height, views_ * bandLayers, 1,
+                                VK_FORMAT_R32_SFLOAT, kStorage, false, true, bandLayers});
+    }
+    return *radianceSum_;
+}
+
+GpuImage& RenderTargets::Coverage(bool full) {
+    std::unique_ptr<GpuImage>& image = full ? coverage_ : coveragePlaceholder_;
+    if (image == nullptr) {
+        image = std::make_unique<GpuImage>(
+            context_, ImageDesc{full ? extent_.width : 1, full ? extent_.height : 1,
+                                full ? views_ : 1, 1, VK_FORMAT_R32_SFLOAT, kStorage, false,
+                                true});
+    }
+    return *image;
+}
+
 GpuImage& RenderTargets::SensorImage(bool spectrum, std::uint32_t set, bool full, bool pyramid) {
     if (!full) {
         std::unique_ptr<GpuImage>& placeholder = sensorPlaceholders_[spectrum ? 0 : 1];
@@ -202,7 +223,9 @@ std::span<const std::string_view> RenderTargets::VarNames() {
 
 std::uint64_t RenderTargets::GpuBytes() const {
     std::uint64_t bytes =
-        depth_->Bytes() + rasterRadiance_->Bytes() + (hzb_ != nullptr ? hzb_->Bytes() : 0);
+        depth_->Bytes() + rasterRadiance_->Bytes() + (hzb_ != nullptr ? hzb_->Bytes() : 0) +
+        (radianceSum_ != nullptr ? radianceSum_->Bytes() : 0) +
+        (coverage_ != nullptr ? coverage_->Bytes() : 0);
     for (const std::unique_ptr<GpuImage>& image : gbuffer_) {
         bytes += image->Bytes();
     }

@@ -257,6 +257,10 @@ struct FrameParams {
     bool posesOnGpu = false;
     glm::dmat4 posesParent{1.0};
 
+    /// The views' camera-to-world poses at the last frame (time -1), one per view, for motion
+    /// blur; empty when there is no last frame, which holds the camera still.
+    std::vector<glm::dmat4> previousPoses;
+
     /// The world each view sees (`tokens::kWorld`): its own and the shared one, or every world
     /// for -1; empty for every view seeing every world.
     std::vector<std::int32_t> worlds;
@@ -312,7 +316,21 @@ struct FrameParams {
         pose[3] -= glm::dvec4(origin, 0.0);
         return camera.RasterView(pose, overscan);
     }
+
+    /// The frame as its sub-frames see it, for motion blur (`Camera::Subframes`): a view per
+    /// sub-frame and view, sub-frame `k`'s from `k * Views()` on, each posed at
+    /// `camera.SubframeTime(k)` between `previousPoses` and its pose (`InterpolatePose`) and
+    /// seeing its view's world. A copy for a frame of one sub-frame.
+    /// @throws std::invalid_argument for `previousPoses` of another view count.
+    FrameParams Subframes() const;
 };
+
+/// Camera-to-world pose `s` of the way from `from` (0) to `to` (1), extrapolating outside: the
+/// rotation along the great arc between them (slerp), the position and scale along the line.
+///
+/// Reference: K. Shoemake, "Animating Rotation with Quaternion Curves", SIGGRAPH 1985, 245-254.
+/// https://doi.org/10.1145/325165.325242
+glm::dmat4 InterpolatePose(const glm::dmat4& from, const glm::dmat4& to, double s);
 
 /// Axis-aligned world bounds, low and high corners.
 using Bounds3 = std::pair<glm::vec3, glm::vec3>;

@@ -139,6 +139,10 @@ void SetCamera(Scene& scene, const Path& path, const Camera& camera) {
         .Set(kExposureResponsivity, camera.responsivity)
         .Set(kFStop, camera.lensFStop)
         .Set(kFocusDistance, camera.focusDistance)
+        .Set(kShutterOpen, camera.shutterOpen)
+        .Set(kShutterClose, camera.shutterClose)
+        .Set(kShutterSamples, camera.shutterSamples)
+        .Set(kShutterRolling, camera.rollingShutter)
         .Set(kSpectralRange, glm::dvec2(camera.bands.minNm, camera.bands.maxNm))
         .Set(kSpectralBands, camera.bands.count);
 }

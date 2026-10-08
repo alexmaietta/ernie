@@ -102,6 +102,15 @@ class RenderTargets : public FrameImages {
         return *rasterRadiance_;
     }
 
+    /// With motion blur, the sum of the sub-frames' raster radiance so far, shaped as
+    /// `RasterRadiance`; created on first use.
+    GpuImage& RadianceSum();
+
+    /// With `full`, the share of each raster pixel's exposure that prims covered (a layer per
+    /// view), which motion blur accumulates and the sensor blends the clear colour by; created
+    /// on first use. Otherwise a one-texel placeholder that the sensor binds but does not read.
+    GpuImage& Coverage(bool full);
+
     /// The image of render var `name`, or null for an unknown name or one the targets do not
     /// hold.
     GpuImage* Var(std::string_view name) override;
@@ -139,6 +148,9 @@ class RenderTargets : public FrameImages {
     std::array<std::unique_ptr<GpuImage>, 3> gbuffer_;
     std::unique_ptr<GpuImage> depth_;
     std::unique_ptr<GpuImage> rasterRadiance_;
+    std::unique_ptr<GpuImage> radianceSum_;
+    std::unique_ptr<GpuImage> coverage_;
+    std::unique_ptr<GpuImage> coveragePlaceholder_;
     std::unique_ptr<GpuImage> hzb_;
     /// `SensorImage`s: spectrum then channels, two sets each, and their placeholders.
     std::array<std::unique_ptr<GpuImage>, 4> sensorImages_;

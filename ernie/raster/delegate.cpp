@@ -721,6 +721,7 @@ void RasterDelegate::Update(const Scene& scene, const Path& settings, VkExtent2D
     // The caller records and submits the frame itself, so nothing may still be running.
     context_.WaitForSubmissions();
     BeginFrame();
+    meshes_.SettleMotion();
     const RenderPrims prims = ResolveRenderPrims(scene, settings);
     // The view runs the first product's chain (`DefaultFilterChain` without products), holding
     // every var and the AOV slots of what that chain writes.
@@ -821,6 +822,17 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
     frame.poses = std::move(poses);
     frame.posesOnGpu = posesParent.has_value();
     frame.posesParent = posesParent.value_or(glm::dmat4(1.0));
+    // The views' poses at the last frame of `stateKey`, for motion blur: none for the first frame
+    // or another view count, which hold the camera still.
+    {
+        std::vector<glm::dmat4> current =
+            frame.poses.empty() ? std::vector<glm::dmat4>{frame.camera.transform} : frame.poses;
+        std::vector<glm::dmat4>& last = lastPoses_[stateKey];
+        if (last.size() == current.size() && !frame.posesOnGpu) {
+            frame.previousPoses = std::move(last);
+        }
+        last = std::move(current);
+    }
     // A floating origin: the GPU's coordinates are relative to a point near the camera, which
     // moves only when the camera has travelled `kRebaseDistance` from it, so what is relative to
     // it is rebuilt rarely while float precision stays a fraction of a millimetre near the camera.
@@ -1010,6 +1022,8 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
     const std::vector<RenderProductSpec> specs = ResolveRenderProducts(scene, products, settings);
     RenderProductSetOutputs outputs;
     std::uint64_t submission = 0;
+    // A new step: what moved in the last one stands still unless it moves again.
+    meshes_.SettleMotion();
     for (const RenderProductSpec& spec : specs) {
         const std::uint32_t slot = BeginFrame();
         RenderPrims prims = base;

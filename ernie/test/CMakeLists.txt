@@ -22,6 +22,7 @@ ernie_add_test_suite(
     scene_schema_test.cpp
     scene_sensor_filters_test.cpp
     session_delegate_test.cpp
+    session_frame_params_test.cpp
     session_lights_test.cpp
     session_resolve_test.cpp
     session_sampling_test.cpp
@@ -48,6 +49,7 @@ ernie_add_test_suite(
     raster_hex_tiling_gpu_test.cpp
     raster_lights_gpu_test.cpp
     raster_mesh_drawable_test.cpp
+    raster_motion_gpu_test.cpp
     raster_overlays_gpu_test.cpp
     raster_products_gpu_test.cpp
     raster_sensor_filters_gpu_test.cpp

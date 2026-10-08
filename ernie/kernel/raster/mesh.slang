@@ -26,6 +26,8 @@ struct MeshDraw {
     // First point in `points` (which differs from the first vertex for bound points), material,
     // prim id, and the instancer's first entry in the instance arrays.
     uint4 points;
+    // `model` at the last frame, for motion blur (Uniforms.motion).
+    float4x4 previous;
 }
 
 [[vk::binding(10, 0)]] StructuredBuffer<float> points;
@@ -98,8 +100,9 @@ struct MeshVertex {
     uint item;
 }
 
-// Vertex `vertexIndex` (three per triangle) of instance `instanceIndex` of the current draw.
-MeshVertex meshVertex(uint vertexIndex, uint instanceIndex, DrawCall call) {
+// Vertex `vertexIndex` (three per triangle) of instance `instanceIndex` of the current draw, at
+// `motion` of the way from the last frame's transform (0) to this one's (1).
+MeshVertex meshVertex(uint vertexIndex, uint instanceIndex, DrawCall call, float motion = 1.0) {
     let d = draws[call.item];
     let flags = d.offsets.w;
     let corner = indices[d.offsets.x + call.indexOffset + vertexIndex];
@@ -127,6 +130,10 @@ MeshVertex meshVertex(uint vertexIndex, uint instanceIndex, DrawCall call) {
     MeshVertex v;
     v.world = transformPoint(d.model, p);
     v.normal = transformNormal(d.model, n);
+    if (motion != 1.0) {
+        v.world = lerp(transformPoint(d.previous, p), v.world, motion);
+        v.normal = lerp(transformNormal(d.previous, n), v.normal, motion);
+    }
     v.color = (flags & kHasColors) != 0 ? load3(colors, index) : d.tint.rgb;
     v.corner = vertexIndex % 3;
     v.item = call.item;
@@ -164,7 +171,7 @@ struct LayeredVertexOutput {
 LayeredVertexOutput meshVertexMain(uint vertexIndex : SV_VertexID, uint instanceIndex : SV_InstanceID,
                             uint drawIndex : SV_DrawIndex) {
     let barycentric = float3[3](float3(1, 0, 0), float3(0, 1, 0), float3(0, 0, 1));
-    let v = meshVertex(vertexIndex, instanceIndex, drawCall(drawIndex));
+    let v = meshVertex(vertexIndex, instanceIndex, drawCall(drawIndex), u.motion.x);
     LayeredVertexOutput out;
     out.layer = u.flags.z;
     out.position = mul(u.viewProj, float4(v.world, 1.0));

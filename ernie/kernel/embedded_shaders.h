@@ -54,6 +54,9 @@ extern const char kDepthRangeSlang[];
 /// A view's log-luminance histogram, for exposure metering.
 extern const char kMeterSlang[];
 
+/// Motion blur and rolling shutter: the sub-frames' radiance summed per row's exposure.
+extern const char kMotionSlang[];
+
 /// GPU instance culling for mesh draws.
 extern const char kCullSlang[];
 
