@@ -280,6 +280,42 @@ struct Viewer::State {
     std::map<std::string, std::uint64_t> mirrored;
     std::string viewVar = "LdrColor";
     int viewBand = -1;
+    Viewer::Exposure exposure = Viewer::Exposure::Default;
+    double compensation = 0.0;
+    std::optional<double> autoStops;  ///< The automatic exposure's stops, as it adapts.
+
+    bool AutoExposing() const {
+        return exposure == Viewer::Exposure::Auto ||
+               (exposure == Viewer::Exposure::Default && activeCamera == PerspectiveCamera());
+    }
+
+    /// The stops of exposure the viewport adds to the camera's: the compensation, the scene
+    /// settings' own, and when exposing automatically the stops that bring the metered
+    /// luminance to middle grey, approached smoothly.
+    double ExposureStops() {
+        // Middle grey: the linear display value an average scene is keyed to.
+        constexpr double kMiddleGrey = 0.18;
+        // Seconds the automatic exposure takes to cover most (63%) of a change.
+        constexpr double kAdaptation = 0.25;
+        double stops = compensation;
+        if (!settingsSource.IsEmpty()) {
+            stops += GetNumber(scene, settingsSource, tokens::kExposureCompensation, 0.0);
+        }
+        if (!AutoExposing()) {
+            autoStops.reset();
+            return stops;
+        }
+        if (const std::optional<double> luminance = delegate->MeteredLuminance();
+            luminance && scene.Has(activeCamera)) {
+            const double scale = CameraOf(scene, activeCamera, ViewportWidth(), ViewportHeight())
+                                     .LinearExposureScale();
+            const double target = std::log2(kMiddleGrey / (*luminance * scale));
+            autoStops = autoStops ? *autoStops + (target - *autoStops) *
+                                                     (1.0 - std::exp(-frameInfo.delta / kAdaptation))
+                                  : target;
+        }
+        return stops + autoStops.value_or(0.0);
+    }
     Lighting lighting = Lighting::Stage;
     std::optional<Wireframe> wireframe;
     Theme theme;
@@ -1119,9 +1155,15 @@ struct Viewer::State {
             }
         }
 
-        char info[64];
-        std::snprintf(info, sizeof(info), "%u x %u  %.0f fps", ViewportWidth(), ViewportHeight(),
-                      static_cast<double>(ImGui::GetIO().Framerate));
+        char info[96];
+        const std::optional<double> ev = self.MeteredEv();
+        char exposureText[32] = "";
+        if (ev) {
+            std::snprintf(exposureText, sizeof(exposureText), "EV %.1f%s  ", *ev,
+                          AutoExposing() ? " auto" : "");
+        }
+        std::snprintf(info, sizeof(info), "%s%u x %u  %.0f fps", exposureText, ViewportWidth(),
+                      ViewportHeight(), static_cast<double>(ImGui::GetIO().Framerate));
         const float infoWidth = ImGui::CalcTextSize(info).x;
         ImGui::SetCursorScreenPos(ImVec2(origin.x + size.x - infoWidth - pad - style.FramePadding.x,
                                          origin.y + pad + style.FramePadding.y));
@@ -1207,6 +1249,9 @@ struct Viewer::State {
             if (!authored(tokens::kShadowFit)) {
                 overrides.emplace(tokens::kShadowFit, std::string(tokens::kVisible));
             }
+            // Exposure: metered every frame, for automatic exposure and the meter.
+            overrides.emplace(tokens::kExposureCompensation, ExposureStops());
+            overrides.emplace(tokens::kMeter, true);
             // The selection's outline always shows, besides the overlays the settings choose.
             UpdateSelectionOverlay();
             overrides.emplace(tokens::kOverlays,
@@ -1835,6 +1880,34 @@ void Viewer::SetGizmoLocal(bool local) {
 Path Viewer::Pick(std::uint32_t x, std::uint32_t y) {
     const Path picked = state_->delegate->Pick(x, y);
     return IsSessionPath(picked) ? Path() : picked;
+}
+
+Viewer::Exposure Viewer::GetExposure() const {
+    return state_->exposure;
+}
+
+void Viewer::SetExposure(Exposure exposure) {
+    state_->exposure = exposure;
+}
+
+double Viewer::ExposureCompensation() const {
+    return state_->compensation;
+}
+
+void Viewer::SetExposureCompensation(double stops) {
+    state_->compensation = stops;
+}
+
+std::optional<double> Viewer::MeteredEv() const {
+    const std::optional<double> luminance = state_->delegate->MeteredLuminance();
+    if (!luminance || !(*luminance > 0.0)) {
+        return std::nullopt;
+    }
+    return std::log2(*luminance * 100.0 / 12.5);
+}
+
+bool Viewer::AutoExposing() const {
+    return state_->AutoExposing();
 }
 
 bool Viewer::GetVsync() const {

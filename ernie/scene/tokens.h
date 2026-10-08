@@ -297,6 +297,12 @@ inline constexpr std::string_view kShadowWorldMargin = "ernie:shadows:worldMargi
 /// shadow maps: the depths a recent frame of the same product saw, tighter and sharper, but an
 /// image then depends on the frames before it; the viewer's choice).
 inline constexpr std::string_view kShadowFit = "ernie:shadows:fit";
+/// float, stops: exposure compensation on the photographic outputs (HdrColor's display, LdrColor),
+/// on top of the camera's own exposure; default 0.
+inline constexpr std::string_view kExposureCompensation = "ernie:exposure";
+/// bool: measure each frame's scene luminance (its histogram) for automatic exposure and exposure
+/// meters, read back from a later frame (`RenderDelegate::MeteredLuminance`); default off.
+inline constexpr std::string_view kMeter = "ernie:meter";
 inline constexpr std::string_view kVisible = "visible";
 inline constexpr std::string_view kShadowSoftness = "ernie:shadows:softness";
 inline constexpr std::string_view kShadowNormalOffset = "ernie:shadows:normalOffset";

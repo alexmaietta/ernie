@@ -142,6 +142,13 @@ class RenderDelegate {
     /// The prim path of a PrimId render var value, or the empty path for 0 or an unknown id.
     virtual Path PrimPath(std::uint32_t id) const = 0;
 
+    /// The scene's average luminance in cd/m^2 a recent frame measured with metering on
+    /// (`tokens::kMeter`), for automatic exposure and meters; none before one has, or from
+    /// backends that do not meter.
+    virtual std::optional<double> MeteredLuminance() const {
+        return std::nullopt;
+    }
+
     /// Which spectral band `Record` shows when it presents SpectralRadiance: 0 to the camera's
     /// band count - 1, or -1 for the mean over the bands; backends that cannot choose ignore it.
     virtual void SetViewBand(int band) {

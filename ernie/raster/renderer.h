@@ -265,6 +265,14 @@ class RasterRenderer {
     /// colours, black for the background.
     static bool CanPresent(std::string_view name);
 
+    /// The scene's average luminance in cd/m^2 as the latest finished frame that metered it
+    /// measured (`FrameParams::meter`): the geometric mean of its HdrColor without the darkest
+    /// tenth and the brightest twentieth of its lit pixels. None until a metered frame has
+    /// finished, or if it saw no light.
+    std::optional<double> MeteredLuminance() const {
+        return meteredLuminance_;
+    }
+
     /// Which band `Record` shows when presenting SpectralRadiance: 0 to the band count - 1, or -1
     /// (or any other) for the mean over the bands. It shows as grey at the photographic image's
     /// brightness: a flat spectrum as bright as there.
@@ -331,6 +339,10 @@ class RasterRenderer {
                  std::string_view var) const;
     /// Records the measuring of view 0's visible depth range into this slot's buffer.
     void RecordDepthRange(VkCommandBuffer commands, RenderTargets& targets) const;
+    /// Records the counting of view 0's log-luminance histogram into this slot's buffer.
+    void RecordMeter(VkCommandBuffer commands, RenderTargets& targets) const;
+    /// Reads this slot's histogram, if its frame metered, into `meteredLuminance_`.
+    void ReadMeter();
     /// The view depths from which the sun's cascades start and to which they reach for a
     /// `ShadowFit::Visible` frame: those a recent frame of the same stream saw, if its view was
     /// close to this one; otherwise none.
@@ -441,6 +453,15 @@ class RasterRenderer {
     std::array<DepthSample, FrameUploads::kSlots> depthSlots_;
     std::map<std::uint32_t, DepthSample> seenDepths_;  ///< The latest read, by stream.
     bool measureDepth_ = false;  ///< Whether the last `Update`'s frame measures its depths.
+
+    /// Exposure metering (`FrameParams::meter`): each slot's frame counts its view's
+    /// log-luminance histogram into its buffer (`RecordMeter`), read by a later frame in the slot.
+    PipelineLayout meterLayout_;
+    std::unique_ptr<ComputePipeline> meterPipeline_;
+    std::array<std::unique_ptr<GpuBuffer>, FrameUploads::kSlots> meterBins_;
+    std::array<bool, FrameUploads::kSlots> metered_{};
+    std::optional<double> meteredLuminance_;
+    bool meter_ = false;  ///< Whether the last `Update`'s frame meters.
     std::vector<std::int32_t> viewWorlds_;  ///< Per view of the last `Update`, its world.
     std::array<float, 2> clipRange_{};      ///< The last `Update`'s near and far planes.
 };

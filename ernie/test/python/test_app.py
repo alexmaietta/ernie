@@ -1,3 +1,7 @@
+import math
+import os
+import tempfile
+
 import pytest
 
 import ernie
@@ -226,3 +230,37 @@ def test_create_makes_every_type_and_undoes(viewer):
     assert viewer.log_entries[-1][1:] == ("warning", "hello")
     viewer.clear_log()
     assert viewer.log_entries == []
+
+
+def test_auto_exposure_keys_bright_scenes_to_middle_grey():
+    # A grey cube under 100,000 lux: through the viewer's camera (exposure 1, f/1, 1 s) the
+    # camera's own exposure is white; automatic exposure brings it to the middle.
+    image_module = pytest.importorskip("PIL.Image")
+    scene = cube_scene(lit=False)
+    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+        tokens.TRANSFORM, ernie.distant_light_transform((0.0, -0.3, 1.0))
+    ).set(tokens.PHOTOMETRIC_ILLUMINANCE, 100000.0)
+    try:
+        viewer = app.Viewer(scene, hidden=True, width=320, height=240)
+    except RuntimeError as error:
+        pytest.skip(f"No Vulkan device: {error}")
+    assert viewer.exposure == app.Exposure.DEFAULT and viewer.auto_exposing
+    for _ in range(30):  # long enough to adapt, at the hidden viewer's frame times
+        viewer.step()
+    assert viewer.metered_ev == pytest.approx(math.log2(0.5 * 100000.0 / math.pi * 8.0), abs=1.0)
+
+    def centre():
+        path = tempfile.mktemp(suffix=".png")
+        viewer.capture(path)
+        viewer.step()
+        with image_module.open(path) as image:
+            value = image.getpixel((image.width // 2, image.height // 2))[1]
+        os.remove(path)
+        return value
+
+    automatic = centre()
+    assert 60 < automatic < 220, automatic
+    viewer.exposure = app.Exposure.CAMERA
+    assert not viewer.auto_exposing
+    viewer.step()
+    assert centre() == 255, "the camera's own exposure: blown out"

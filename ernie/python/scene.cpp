@@ -868,6 +868,8 @@ void BindScene(nb::module_& m) {
         {"WORLD_FIT", tokens::kWorldFit},
         {"SHADOW_WORLD_MARGIN", tokens::kShadowWorldMargin},
         {"SHADOW_FIT", tokens::kShadowFit},
+        {"EXPOSURE_COMPENSATION", tokens::kExposureCompensation},
+        {"METER", tokens::kMeter},
         {"PHYSICAL_ILLUMINANT", tokens::kPhysicalIlluminant},
         {"PHYSICAL_CUSTOM_ILLUMINANT", tokens::kPhysicalCustomIlluminant},
         {"PHOTOMETRIC_ILLUMINANCE", tokens::kPhotometricIlluminance},

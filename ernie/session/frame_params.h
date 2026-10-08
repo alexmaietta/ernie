@@ -187,6 +187,7 @@ struct FrameParams {
         lights;  ///< Other lights; the rasterizer takes `RasterRenderer::kMaxLights`.
     std::optional<DomeLight> dome;
     float exposure = 1.0f;                 ///< Extra scale on the photographic output.
+    bool meter = false;  ///< Measure the scene's luminance (`tokens::kMeter`).
     Culling culling = Culling::Gpu;        ///< How draws outside a view are culled.
     Occlusion occlusion = Occlusion::Off;  ///< Whether views cull instances hidden by others.
     /// The simplification error, in pixels, up to which instanced meshes draw a coarser level of

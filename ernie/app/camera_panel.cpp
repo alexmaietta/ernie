@@ -39,6 +39,9 @@ class CameraPanel final : public Panel {
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("A scene camera with the view's pose and lens, looked through");
         }
+        if (ImGui::CollapsingHeader("Viewport Exposure", ImGuiTreeNodeFlags_DefaultOpen)) {
+            DrawExposure(viewer, scene, camera);
+        }
         const std::string error =
             DrawPropertySections(viewer, camera, schema_, PropertyLabelWidth(viewer));
         if (ImGui::CollapsingHeader("Quantum Efficiency", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -58,6 +61,37 @@ class CameraPanel final : public Panel {
     }
 
   private:
+    /// The viewport's exposure mode and compensation, and the meter: the scene's metered EV100
+    /// and the camera's own.
+    static void DrawExposure(Viewer& viewer, const Scene& scene, const Path& camera) {
+        const char* modes[] = {"Default (auto for the viewer's camera)", "Auto", "Camera"};
+        int mode = static_cast<int>(viewer.GetExposure());
+        ImGui::SetNextItemWidth(-1.0f);
+        if (ImGui::Combo("##exposure", &mode, modes, 3)) {
+            viewer.SetExposure(static_cast<Viewer::Exposure>(mode));
+        }
+        float compensation = static_cast<float>(viewer.ExposureCompensation());
+        ImGui::SetNextItemWidth(-1.0f);
+        if (ImGui::SliderFloat("##compensation", &compensation, -6.0f, 6.0f,
+                               "Compensation %+.1f EV")) {
+            viewer.SetExposureCompensation(compensation);
+        }
+        if (const std::optional<double> ev = viewer.MeteredEv()) {
+            ImGui::Text("Scene EV100 %.1f%s", *ev, viewer.AutoExposing() ? ", exposing for it" : "");
+        } else {
+            ImGui::TextDisabled("Scene EV100: not metered yet");
+        }
+        try {
+            // The exposure value the camera's settings make, at ISO 100 (EV100).
+            const Camera settings = CameraOf(scene, camera, 64, 64);
+            const double ev = std::log2(settings.fStop * settings.fStop / settings.exposureTime) -
+                              std::log2(settings.iso / 100.0) - settings.exposureStops;
+            ImGui::TextDisabled("Camera EV100 %.1f (f/%.1f, %.4g s, ISO %.0f)", ev,
+                                settings.fStop, settings.exposureTime, settings.iso);
+        } catch (const std::exception&) {
+        }
+    }
+
     /// `base`, or it with the first number after it that names no prim.
     static Path FreePath(const Scene& scene, const std::string& base) {
         Path path(base);

@@ -296,3 +296,33 @@ TEST_F(RasterDelegateTest, ARenderersFirstFrameHasItsLightsShadows) {
     const std::vector<std::uint8_t> once = Bytes(first.Render(scene));
     EXPECT_EQ(Bytes(first.Render(scene)), once);
 }
+
+TEST_F(RasterDelegateTest, MeteringMeasuresTheScenesLuminance) {
+    // The grey floor (albedo 0.5) under a 20000 lux sun straight above: 0.5 x 20000 / pi cd/m^2
+    // everywhere, which the meter reads a frame or two later.
+    Scene scene = FlatScene();
+    scene.Remove("/World/Terrain");
+    scene.Define("/World/Floor", tokens::kGroundPlane)
+        .Set(tokens::kMaterialBinding, Path("/Looks/Grey"));
+    scene.Set("/World/Sun", tokens::kPhotometricIlluminance, 20000.0);
+    RasterDelegate delegate(*context_);
+    delegate.Render(scene);
+    EXPECT_FALSE(delegate.MeteredLuminance()) << "metering is off by default";
+    scene.Set("/Render/Settings", tokens::kMeter, true);
+    for (int i = 0; i < 3; ++i) {
+        delegate.Render(scene);
+    }
+    ASSERT_TRUE(delegate.MeteredLuminance());
+    // Within a quarter of the histogram's half-stop bins.
+    EXPECT_NEAR(std::log2(*delegate.MeteredLuminance()), std::log2(0.5 * 20000.0 / M_PI), 0.3);
+
+    // Exposure compensation brightens the photographic image by its stops.
+    const auto centre = [&] {
+        const Tensor image = delegate.Render(scene);
+        return static_cast<int>(image.As<std::uint8_t>()[4 * (kVarSize / 2 * kVarSize + kVarSize / 2)]);
+    };
+    scene.Set("/World/Camera", tokens::kExposureTime, 1.0 / 20000.0);
+    const int base = centre();
+    scene.Set("/Render/Settings", tokens::kExposureCompensation, 2.0);
+    EXPECT_GT(centre(), base + 40);
+}

@@ -262,6 +262,25 @@ class Viewer {
     Lighting GetLighting() const;
     void SetLighting(Lighting lighting);
 
+    /// How the viewport exposes its image: `Auto` keys the scene's metered average luminance to
+    /// middle grey (adapting over a fraction of a second), `Camera` takes the camera's own
+    /// exposure attributes as they are, and `Default` (the default) is automatic through the
+    /// viewer's own camera and the camera's own through a scene camera.
+    enum class Exposure { Default, Auto, Camera };
+    Exposure GetExposure() const;
+    void SetExposure(Exposure exposure);
+
+    /// Stops of exposure compensation on top of either mode (`tokens::kExposureCompensation`).
+    double ExposureCompensation() const;
+    void SetExposureCompensation(double stops);
+
+    /// The EV100 of the scene's average luminance as last metered (EV = log2(L x 100 / 12.5)),
+    /// if the backend meters.
+    std::optional<double> MeteredEv() const;
+
+    /// Whether the viewport currently exposes automatically (`Exposure`).
+    bool AutoExposing() const;
+
     /// Whether frames wait for the display's refresh (`ViewerOptions::vsync`); without it the
     /// viewer draws as fast as it renders, without tearing where the display allows. Always
     /// false for a hidden viewer.

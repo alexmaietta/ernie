@@ -957,6 +957,9 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
     params.ambient = Number(scene, settings, kAmbient, params.ambient);
     params.wireframe = WireframeOf(scene, settings);
     params.overlays = GetToken(scene, settings, kOverlays, "");
+    params.exposure =
+        static_cast<float>(std::exp2(GetNumber(scene, settings, kExposureCompensation, 0.0)));
+    params.meter = GetBool(scene, settings, kMeter, false);
     params.culling = CullingOf(scene, settings);
     params.occlusion = OcclusionOf(scene, settings);
     params.meshLodError =

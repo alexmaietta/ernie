@@ -4,6 +4,7 @@ if not hasattr(_ernie, "app"):
     raise ImportError("This build of Ernie has no app; configure it with -DERNIE_BUILD_APP=ON")
 
 Dock = _ernie.app.Dock
+Exposure = _ernie.app.Exposure
 FrameInfo = _ernie.app.FrameInfo
 Gizmo = _ernie.app.Gizmo
 Lighting = _ernie.app.Lighting
@@ -15,6 +16,7 @@ light_theme = _ernie.app.light_theme
 
 __all__ = [
     "Dock",
+    "Exposure",
     "FrameInfo",
     "Gizmo",
     "Lighting",

@@ -105,6 +105,10 @@ class RasterDelegate : public RenderDelegate {
         renderer_.SetPresentBand(band);
     }
 
+    std::optional<double> MeteredLuminance() const override {
+        return renderer_.MeteredLuminance();
+    }
+
     /// GPU memory of the renderer, drawables and the view's targets; triangles drawn by the terrain
     /// and meshes; and the `raster_stats` counters.
     RenderStats Stats() const override;

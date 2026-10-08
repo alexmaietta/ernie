@@ -82,6 +82,12 @@ void BindApp(nb::module_& parent) {
         .value("CAMERA", Lighting::Camera, "A distant light along the view direction.")
         .value("DEFAULT", Lighting::Default, "A white sun from above with shadows.");
 
+    nb::enum_<Viewer::Exposure>(m, "Exposure", "How the viewport exposes its image.")
+        .value("DEFAULT", Viewer::Exposure::Default,
+               "Automatic through the viewer's camera, the camera's own through scene cameras.")
+        .value("AUTO", Viewer::Exposure::Auto, "Keys the metered luminance to middle grey.")
+        .value("CAMERA", Viewer::Exposure::Camera, "The camera's own exposure attributes.");
+
     nb::enum_<Viewer::Gizmo>(m, "Gizmo", "What the transform gizmo on a selected prim does.")
         .value("NONE", Viewer::Gizmo::None)
         .value("TRANSLATE", Viewer::Gizmo::Translate)
@@ -323,6 +329,12 @@ void BindApp(nb::module_& parent) {
             "view_vars", [](Viewer& viewer) { return viewer.Delegate().Info().viewVars; },
             "The render vars the current renderer can show in the viewport.")
         .def_prop_rw("lighting", &Viewer::GetLighting, &Viewer::SetLighting)
+        .def_prop_rw("exposure", &Viewer::GetExposure, &Viewer::SetExposure)
+        .def_prop_rw("exposure_compensation", &Viewer::ExposureCompensation,
+                     &Viewer::SetExposureCompensation, "Stops on top of either exposure mode.")
+        .def_prop_ro("metered_ev", &Viewer::MeteredEv,
+                     "EV100 of the scene's average luminance as last metered, or None.")
+        .def_prop_ro("auto_exposing", &Viewer::AutoExposing)
         .def_prop_rw("vsync", &Viewer::GetVsync, &Viewer::SetVsync,
                      "Whether frames wait for the display's refresh; off draws as fast as it "
                      "renders. Always False for a hidden viewer.")

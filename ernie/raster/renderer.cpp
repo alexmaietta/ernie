@@ -227,6 +227,18 @@ constexpr DescriptorBinding kDepthRangeBindings[] = {
     {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
 };
 
+/// meter.slang: HdrColor and its histogram.
+constexpr DescriptorBinding kMeterBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+};
+
+/// meter.slang's histogram: its bins, the log2 luminance its first starts at, and its bins per
+/// stop, spanning 2^-12 to 2^20 cd/m^2 (starlight to well above the sunlit sky).
+constexpr std::uint32_t kMeterBins = 64;
+constexpr float kMeterLow = -12.0f;
+constexpr float kMeterBinsPerStop = 2.0f;
+
 /// How far a view may move from the one whose depths a cascade fit reuses (`ShadowFit::Visible`):
 /// its eye by this fraction of the nearest depth seen, its direction by this cosine.
 constexpr double kVisibleFitEyeShift = 0.1;
@@ -434,7 +446,8 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
                   BufferMemory::Device),
       lightViewMatrices_(context, kMaxLightShadowViews * sizeof(glm::mat4),
                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device),
-      depthRangeLayout_(context, kDepthRangeBindings, 32) {
+      depthRangeLayout_(context, kDepthRangeBindings, 32),
+      meterLayout_(context, kMeterBindings, 32) {
     if (brdfs_.Models().empty()) {
         throw std::invalid_argument("RasterRenderer needs at least one BRDF");
     }
@@ -497,6 +510,15 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
     for (std::unique_ptr<GpuBuffer>& range : depthRanges_) {
         range = std::make_unique<GpuBuffer>(
             context_, 2 * sizeof(std::uint32_t),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            BufferMemory::Readback);
+    }
+    const std::vector<ShaderModuleSource> meterModules{{"meter", shaders::kMeterSlang}};
+    meterPipeline_ = std::make_unique<ComputePipeline>(
+        context_, meterLayout_, compiler_.CompileSpirv(meterModules, "meterMain"));
+    for (std::unique_ptr<GpuBuffer>& bins : meterBins_) {
+        bins = std::make_unique<GpuBuffer>(
+            context_, kMeterBins * sizeof(std::uint32_t),
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             BufferMemory::Readback);
     }
@@ -872,6 +894,10 @@ void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable*
         }
         shadowLayers_ = static_cast<std::uint32_t>(cascades_.size());
     }
+    // A metering frame counts its luminance for later frames; this slot's last one has finished.
+    ReadMeter();
+    meter_ = params.meter && !batch;
+    metered_[uploads_.Slot()] = meter_;
     // A visible fit's frame measures what it sees, for later frames' cascades.
     measureDepth_ = shadowsEnabled_ && !batch && params.shadows.fit == ShadowFit::Visible;
     if (measureDepth_) {
@@ -1402,6 +1428,9 @@ void RasterRenderer::RecordViews(VkCommandBuffer commands, RenderTargets& target
     if (measureDepth_ && firstView == 0) {
         RecordDepthRange(commands, targets);
     }
+    if (meter_ && firstView == 0) {
+        RecordMeter(commands, targets);
+    }
     if (overlays) {
         RecordOverlays(commands, targets, firstView);
     }
@@ -1426,6 +1455,66 @@ void RasterRenderer::RecordDepthRange(VkCommandBuffer commands, RenderTargets& t
     depthRangeLayout_.PushConstants(commands, &constants, sizeof(constants));
     vkCmdDispatch(commands, (extent_.width + 15) / 16, (extent_.height + 15) / 16, 1);
     ShaderBarrier(commands);
+}
+
+void RasterRenderer::RecordMeter(VkCommandBuffer commands, RenderTargets& targets) const {
+    GpuImage* hdr = targets.Var(render_vars::kHdrColor);
+    if (hdr == nullptr) {
+        return;
+    }
+    ERNIE_GPU_ZONE(context_, commands, "Exposure meter");
+    const GpuBuffer& bins = *meterBins_[uploads_.Slot()];
+    vkCmdFillBuffer(commands, bins.Handle(), 0, VK_WHOLE_SIZE, 0u);
+    hdr->Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    ShaderBarrier(commands);
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, meterPipeline_->Handle());
+    const DescriptorResource resources[] = {DescriptorResource::Of(hdr->View()),
+                                            DescriptorResource::Of(bins)};
+    meterLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+    const struct {
+        std::uint32_t size[4];
+        float range[4];
+    } constants{{extent_.width, extent_.height, 0, 0}, {kMeterLow, kMeterBinsPerStop, 0.0f, 0.0f}};
+    meterLayout_.PushConstants(commands, &constants, sizeof(constants));
+    vkCmdDispatch(commands, (extent_.width + 15) / 16, (extent_.height + 15) / 16, 1);
+    hdr->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+}
+
+void RasterRenderer::ReadMeter() {
+    const std::uint32_t slot = uploads_.Slot();
+    if (!metered_[slot]) {
+        return;
+    }
+    metered_[slot] = false;
+    std::array<std::uint32_t, kMeterBins> bins{};
+    meterBins_[slot]->Read(std::as_writable_bytes(std::span(bins)));
+    std::uint64_t total = 0;
+    for (const std::uint32_t count : bins) {
+        total += count;
+    }
+    if (total == 0) {
+        meteredLuminance_.reset();
+        return;
+    }
+    // The mean log luminance of the pixels between the darkest tenth and the brightest
+    // twentieth, so a few very dark or bright ones do not swing it.
+    const double low = 0.10 * static_cast<double>(total);
+    const double high = 0.95 * static_cast<double>(total);
+    double seen = 0.0;
+    double weighted = 0.0;
+    double counted = 0.0;
+    for (std::uint32_t bin = 0; bin < kMeterBins; ++bin) {
+        const double count = bins[bin];
+        const double from = std::max(seen, low);
+        const double to = std::min(seen + count, high);
+        if (to > from) {
+            const double centre = kMeterLow + (bin + 0.5) / kMeterBinsPerStop;
+            weighted += centre * (to - from);
+            counted += to - from;
+        }
+        seen += count;
+    }
+    meteredLuminance_ = counted > 0.0 ? std::optional(std::exp2(weighted / counted)) : std::nullopt;
 }
 
 std::optional<std::pair<float, float>> RasterRenderer::VisibleDepths(const FrameParams& params) {
