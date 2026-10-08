@@ -13,6 +13,8 @@ struct NormalsConstants {
     // x: the mesh's first point (and normal), y: its first index, z: its points, w: its first
     // adjacency entry.
     uint4 mesh;
+    // x: the offset of the points' current half in the double-buffered points pool.
+    uint4 pool;
 }
 
 [[vk::binding(0, 0)]] StructuredBuffer<float> points;
@@ -22,7 +24,7 @@ struct NormalsConstants {
 [[vk::push_constant]] ConstantBuffer<NormalsConstants> constants;
 
 float3 pointAt(uint i) {
-    let at = 3 * (constants.mesh.x + i);
+    let at = 3 * (constants.pool.x + constants.mesh.x + i);
     return float3(points[at], points[at + 1], points[at + 2]);
 }
 

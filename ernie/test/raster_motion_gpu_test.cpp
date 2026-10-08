@@ -1,3 +1,4 @@
+#include "ernie/device/compute_interop.h"
 #include "ernie/raster/delegate.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
@@ -9,6 +10,8 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
+#include <functional>
 #include <cmath>
 #include <cstdint>
 #include <map>
@@ -86,7 +89,79 @@ std::vector<double> TrapezoidWeights(int count) {
     return weights;
 }
 
+/// Expects a step from `move(0)` to `move(1)` with the shutter open over the whole frame to render
+/// the shutter's weighting of sharp steps at each sub-frame's `move(s)`, and the step after it,
+/// without a move, to render sharp again.
+void ExpectMotionBlur(RasterDelegate& delegate, Scene& scene,
+                      const std::function<void(double)>& move, int samples) {
+    SetShutter(scene, 0.0, 0.0, samples);
+    const std::vector<double> weights = TrapezoidWeights(samples);
+    std::vector<float> expected;
+    for (int k = 0; k < samples; ++k) {
+        move(k / double(samples - 1));
+        const std::vector<float> sharp = Step(delegate, scene, "HdrColor");
+        expected.resize(sharp.size(), 0.0f);
+        for (std::size_t i = 0; i < sharp.size(); ++i) {
+            expected[i] += static_cast<float>(weights[static_cast<std::size_t>(k)]) * sharp[i];
+        }
+    }
+    const std::vector<float> sharp = Step(delegate, scene, "HdrColor");
+    SetShutter(scene, -1.0, 0.0, samples);
+    move(0.0);
+    Step(delegate, scene, "HdrColor");
+    move(1.0);
+    const std::vector<float> blurred = Step(delegate, scene, "HdrColor");
+    EXPECT_LT(RelativeError(blurred, expected), 2e-3f);
+    EXPECT_GT(RelativeError(blurred, sharp), 0.05f) << "blurred";
+    EXPECT_LT(RelativeError(Step(delegate, scene, "HdrColor"), sharp), 1e-5f)
+        << "standing still once it stops";
+}
+
 }  // namespace
+
+TEST_F(RasterDelegateTest, InstancesAndDeformingPointsBlurFromHostAndCudaArrays) {
+    RasterDelegate delegate(*context_);
+    std::string why;
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
+    Scene scene = MotionScene();
+    // The rocks: the middle one slides 6 m towards -x.
+    const auto rocks = [&](double s, bool device) {
+        const std::array<float, 9> positions{12, -10, 0, static_cast<float>(12.0 - 6.0 * s),
+                                             0,  0,   12, 10, 0};
+        const Tensor host = Tensor::Copy<float>(positions, {3, 3});
+        scene.Write("/World/Rocks", tokens::kPositions, device ? cuda->Upload(host) : host);
+    };
+    // The quad: its points stretched up to twice as wide.
+    const auto quad = [&](double s, bool device) {
+        const auto w = static_cast<float>(2.0 * (1.0 + s));
+        const std::array<float, 12> points{-w, -2, 0, w, -2, 0, w, 2, 0, -w, 2, 0};
+        const Tensor host = Tensor::Copy<float>(points, {4, 3});
+        scene.Write("/World/Quad", tokens::kPoints, device ? cuda->Upload(host) : host);
+    };
+    {
+        SCOPED_TRACE("instances on the host");
+        ExpectMotionBlur(delegate, scene, [&](double s) { rocks(s, false); }, 4);
+    }
+    {
+        SCOPED_TRACE("points on the host");
+        ExpectMotionBlur(delegate, scene, [&](double s) { quad(s, false); }, 4);
+    }
+    if (cuda == nullptr) {
+        GTEST_SKIP() << "No CUDA interop: " << why;
+    }
+    scene.Set("/World/Rocks", tokens::kExtent,
+              std::vector<float>{-2.0f, -12.0f, -1.0f, 14.0f, 12.0f, 1.0f});
+    scene.Set("/World/Quad", tokens::kExtent,
+              std::vector<float>{-4.0f, -2.0f, 0.0f, 4.0f, 2.0f, 0.0f});
+    {
+        SCOPED_TRACE("instances on CUDA");
+        ExpectMotionBlur(delegate, scene, [&](double s) { rocks(s, true); }, 4);
+    }
+    {
+        SCOPED_TRACE("points on CUDA");
+        ExpectMotionBlur(delegate, scene, [&](double s) { quad(s, true); }, 4);
+    }
+}
 
 TEST_F(RasterDelegateTest, CameraMotionBlurAveragesTheViewsAcrossTheShutter) {
     RasterDelegate delegate(*context_);

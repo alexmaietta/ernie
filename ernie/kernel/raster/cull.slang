@@ -55,7 +55,8 @@ struct CullItem {
     // x: largest scale of `model`; y: flags (bit 0 orientations, bit 1 scales); z: largest
     // scale of the prototype's transform, for its levels' errors.
     float4 info;
-    // x: first level of detail in `lods`, y: level count.
+    // x: first level of detail in `lods`, y: level count; z: the instancer's arrays' offset in
+    // the double-buffered instance pools now, w: at the last frame (z when it stood still).
     uint4 lods;
 }
 
@@ -120,25 +121,42 @@ struct Placed {
     float scale;
 }
 
-// Instance `instance` of `item` placed as mesh.slang places it.
-Placed place(CullItem item, uint instance) {
+// Instance `instance` of `item` placed as mesh.slang places it, from its arrays at `base` in the
+// double-buffered instance pools.
+Placed placeAt(CullItem item, uint instance, uint base) {
     let flags = asuint(item.info.y);
+    let i = base + instance;
     var centre = item.sphere.xyz;
     var scale = item.info.x;
     if ((flags & kHasScales) != 0) {
-        let s = load3(scales, instance);
+        let s = load3(scales, i);
         centre = centre * s;
         scale = scale * max(abs(s.x), max(abs(s.y), abs(s.z)));
     }
     if ((flags & kHasOrientations) != 0) {
-        let q = float4(orientations[4 * instance], orientations[4 * instance + 1],
-                       orientations[4 * instance + 2], orientations[4 * instance + 3]);
+        let q = float4(orientations[4 * i], orientations[4 * i + 1], orientations[4 * i + 2],
+                       orientations[4 * i + 3]);
         centre = rotate(q / max(length(q), 1e-20), centre);
     }
     Placed placed;
-    placed.centre = mul(item.model, float4(centre + load3(positions, instance), 1.0)).xyz;
+    placed.centre = mul(item.model, float4(centre + load3(positions, i), 1.0)).xyz;
     placed.radius = item.sphere.w * scale;
     placed.scale = scale;
+    return placed;
+}
+
+// Instance `instance` of `item` as its views see it: where it is, or for an instancer that moved
+// since the last frame (`lods.z` and `lods.w` its arrays now and then), a sphere around where it
+// is and where it was, which the sub-frames of a motion-blurred frame see it between.
+Placed place(CullItem item, uint instance) {
+    var placed = placeAt(item, instance, item.lods.z);
+    if (item.lods.w != item.lods.z) {
+        let was = placeAt(item, instance, item.lods.w);
+        let radius = max(placed.radius, was.radius);
+        placed.radius = radius + 0.5 * length(placed.centre - was.centre);
+        placed.centre = 0.5 * (placed.centre + was.centre);
+        placed.scale = max(placed.scale, was.scale);
+    }
     return placed;
 }
 

@@ -37,8 +37,11 @@ struct GpuDraw {
     std::uint32_t offsets[4];
     std::uint32_t points[4];
     float previous[16];  ///< `model` at the last frame, for motion blur.
+    /// The instance arrays' and points' offsets in their double-buffered pools, now and at the
+    /// last frame.
+    std::uint32_t motion[4];
 };
-static_assert(sizeof(GpuDraw) == 240, "GpuDraw must match MeshDraw in mesh.slang");
+static_assert(sizeof(GpuDraw) == 256, "GpuDraw must match MeshDraw in mesh.slang");
 
 struct DrawConstants {
     float lightViewProj[16];
@@ -451,7 +454,27 @@ void MeshDrawable::SetColors(std::uint32_t mesh, const Tensor& colors, std::uint
 
 void MeshDrawable::CopyDevicePoints(Mesh& mesh) {
     compute_->CopyToBuffer(mesh.devicePoints, *points_,
-                           VkDeviceSize{mesh.firstVertex} * 3 * sizeof(float), mesh.deviceStream);
+                           VkDeviceSize{PointBase(mesh) + mesh.firstVertex} * 3 * sizeof(float),
+                           mesh.deviceStream);
+}
+
+void MeshDrawable::FlipPoints(Mesh& mesh) {
+    if (!mesh.pointsWritten) {
+        mesh.pointSet ^= 1u;
+        mesh.pointsWritten = true;
+        mesh.pointsMoving = true;
+        drawsDirty_ = true;
+    }
+}
+
+std::uint32_t MeshDrawable::PointBase(const Mesh& mesh, bool previous) const {
+    const std::uint32_t set = previous && mesh.pointsMoving ? 1u - mesh.pointSet : mesh.pointSet;
+    return set * pointTotal_;
+}
+
+std::uint32_t MeshDrawable::InstanceBase(const Instancer& instancer, bool previous) const {
+    const std::uint32_t set = previous && instancer.moving ? 1u - instancer.set : instancer.set;
+    return set * instanceTotal_;
 }
 
 void MeshDrawable::CopyDeviceAttributes(Mesh& mesh, bool all) {
@@ -657,6 +680,17 @@ void MeshDrawable::SettleMotion() {
             drawsDirty_ = true;
         }
     }
+    // Points and instance arrays that moved stand still until written again.
+    for (auto& [handle, mesh] : meshes_) {
+        drawsDirty_ = drawsDirty_ || mesh.pointsMoving;
+        mesh.pointsMoving = false;
+        mesh.pointsWritten = false;
+    }
+    for (auto& [handle, instancer] : instancers_) {
+        drawsDirty_ = drawsDirty_ || instancer.moving;
+        instancer.moving = false;
+        instancer.written = false;
+    }
     if (drawsDirty_) {
         UpdateTransforms();
     }
@@ -712,6 +746,14 @@ void MeshDrawable::RebuildGeometry() {
         mesh.pointsDirty = false;
     }
     vkDeviceWaitIdle(context_.Device());
+    // Both halves start with the points; each mesh's are in half 0 and stand still.
+    pointTotal_ = static_cast<std::uint32_t>(points.size() / 3);
+    points.insert(points.end(), points.begin(), points.end());
+    for (auto& [handle, mesh] : meshes_) {
+        mesh.pointSet = 0;
+        mesh.pointsMoving = false;
+        mesh.pointsWritten = false;
+    }
     points_ = Pool(std::as_bytes(std::span(points)));
     normals_ = Pool(std::as_bytes(std::span(normals)));
     colors_ = Pool(std::as_bytes(std::span(colors)));
@@ -760,20 +802,34 @@ void MeshDrawable::RebuildInstances() {
         }
     }
     vkDeviceWaitIdle(context_.Device());
+    // Both halves start with the arrays; each instancer's are in half 0 and stand still.
+    instanceTotal_ = static_cast<std::uint32_t>(positions.size() / 3);
+    for (std::vector<float>* array : {&positions, &orientations, &scales}) {
+        array->insert(array->end(), array->begin(), array->end());
+    }
     positions_ = Pool(std::as_bytes(std::span(positions)));
     orientations_ = Pool(std::as_bytes(std::span(orientations)));
     scales_ = Pool(std::as_bytes(std::span(scales)));
     for (auto& [handle, instancer] : instancers_) {
+        instancer.set = 0;
+        instancer.moving = false;
+        instancer.written = false;
         if (instancer.onDevice) {
-            WriteInstancer(instancer);
+            WriteInstancer(instancer, false);
         }
         instancer.dirty = false;
     }
     instancesDirty_ = false;
 }
 
-void MeshDrawable::WriteInstancer(const Instancer& instancer) {
-    const VkDeviceSize first = instancer.first;
+void MeshDrawable::WriteInstancer(Instancer& instancer, bool flip) {
+    if (flip && !instancer.written) {
+        instancer.set ^= 1u;
+        instancer.written = true;
+        instancer.moving = true;
+        drawsDirty_ = true;
+    }
+    const VkDeviceSize first = VkDeviceSize{InstanceBase(instancer)} + instancer.first;
     if (instancer.onDevice) {
         const DeviceInstanceData& device = instancer.device;
         compute_->CopyToBuffer(device.positions, *positions_, first * 3 * sizeof(float),
@@ -824,11 +880,14 @@ void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCasc
             if (!mesh.pointsDirty) {
                 continue;
             }
+            // Into the other half, keeping the last frame's points for motion blur.
+            FlipPoints(mesh);
             if (!mesh.devicePoints.Empty()) {
                 CopyDevicePoints(mesh);
             } else {
-                renderer_.Uploads().Write(*points_, std::as_bytes(std::span(mesh.data.points)),
-                                          VkDeviceSize{mesh.firstVertex} * 3 * sizeof(float));
+                renderer_.Uploads().Write(
+                    *points_, std::as_bytes(std::span(mesh.data.points)),
+                    VkDeviceSize{PointBase(mesh) + mesh.firstVertex} * 3 * sizeof(float));
             }
             if (mesh.recomputeNormals) {
                 pendingNormals_.push_back(handle);
@@ -841,13 +900,14 @@ void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCasc
     } else {
         for (auto& [handle, instancer] : instancers_) {
             if (instancer.dirty) {
-                WriteInstancer(instancer);
+                WriteInstancer(instancer, true);
                 instancer.dirty = false;
             }
         }
     }
 
-    if (drawsChanged) {
+    // Flipped halves move the draws' offsets.
+    if (drawsChanged || drawsDirty_) {
         WriteDraws();
         drawsDirty_ = false;
         drawsMaterials_ = renderer_.MaterialSetVersion();
@@ -893,7 +953,11 @@ void MeshDrawable::WriteDraws() {
             for (const std::uint32_t instance : item.instances) {
                 instanceIds.push_back(first + instance);
             }
+            draw.motion[0] = InstanceBase(instancer);
+            draw.motion[1] = InstanceBase(instancer, true);
         }
+        draw.motion[2] = PointBase(mesh);
+        draw.motion[3] = PointBase(mesh, true);
         draw.offsets[3] = flags;
         draw.points[0] = mesh.firstVertex;
         draw.points[1] =
@@ -1272,6 +1336,8 @@ void MeshDrawable::WriteCullJobs(const std::vector<GpuCullJob>& jobs,
         entry.levels[0] = first->second;
         entry.levels[1] = static_cast<std::uint32_t>(mesh.levels.size());
         const Instancer& instancer = instancers_.at(*item.instancer);
+        entry.levels[2] = InstanceBase(instancer);
+        entry.levels[3] = InstanceBase(instancer, true);
         std::uint32_t flags = 0;
         if (instancer.onDevice ? !instancer.device.orientations.Empty()
                                : !instancer.data.orientations.empty()) {
@@ -1352,8 +1418,8 @@ void MeshDrawable::RecordCull(VkCommandBuffer commands) const {
         for (const std::uint32_t handle : pendingNormals_) {
             const Mesh& mesh = meshes_.at(handle);
             const auto count = static_cast<std::uint32_t>(mesh.data.points.size() / 3);
-            const std::uint32_t constants[4] = {mesh.firstVertex, mesh.firstIndex, count,
-                                                mesh.firstAdjacency};
+            const std::uint32_t constants[8] = {mesh.firstVertex, mesh.firstIndex, count,
+                                                mesh.firstAdjacency, PointBase(mesh), 0, 0, 0};
             normalsLayout_.PushConstants(commands, constants, sizeof(constants));
             vkCmdDispatch(commands, (count + 63) / 64, 1, 1);
         }

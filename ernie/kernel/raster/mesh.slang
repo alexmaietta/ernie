@@ -28,6 +28,10 @@ struct MeshDraw {
     uint4 points;
     // `model` at the last frame, for motion blur (Uniforms.motion).
     float4x4 previous;
+    // Where the instance arrays and points are in their double-buffered pools: x the instances'
+    // current offset and y their last frame's, z the points' current offset and w their last
+    // frame's (equal to the current ones when they stood still).
+    uint4 motion;
 }
 
 [[vk::binding(10, 0)]] StructuredBuffer<float> points;
@@ -100,39 +104,61 @@ struct MeshVertex {
     uint item;
 }
 
+// A vertex's world position and normal: its point at `pointBase` in the points pool, placed as
+// instance `instance` at `instanceBase` in the instance pools (instanced draws), through `model`.
+struct Placed {
+    float3 world;
+    float3 normal;
+}
+
+Placed placeVertex(MeshDraw d, uint corner, uint instance, uint pointBase, uint instanceBase,
+                   float4x4 model) {
+    let flags = d.offsets.w;
+    var p = load3(points, pointBase + d.points.x + corner);
+    var n = (flags & kHasNormals) != 0 ? load3(normals, d.offsets.y + corner) : float3(0.0);
+    if ((flags & kInstanced) != 0) {
+        let i = instanceBase + instance;
+        p = transformPoint(d.prototype, p);
+        n = transformNormal(d.prototype, n);
+        if ((flags & kHasScales) != 0) {
+            let scale = load3(scales, i);
+            p = p * scale;
+            n = n / scale;
+        }
+        if ((flags & kHasOrientations) != 0) {
+            let q = float4(orientations[4 * i], orientations[4 * i + 1], orientations[4 * i + 2],
+                           orientations[4 * i + 3]);
+            let unit = q / max(length(q), 1e-20);
+            p = rotate(unit, p);
+            n = rotate(unit, n);
+        }
+        p = p + load3(positions, i);
+    }
+    Placed placed;
+    placed.world = transformPoint(model, p);
+    placed.normal = transformNormal(model, n);
+    return placed;
+}
+
 // Vertex `vertexIndex` (three per triangle) of instance `instanceIndex` of the current draw, at
-// `motion` of the way from the last frame's transform (0) to this one's (1).
+// `motion` of the way from the last frame (0) to this one (1): its transform, instance arrays and
+// points each interpolated between their last frame's and this one's.
 MeshVertex meshVertex(uint vertexIndex, uint instanceIndex, DrawCall call, float motion = 1.0) {
     let d = draws[call.item];
     let flags = d.offsets.w;
     let corner = indices[d.offsets.x + call.indexOffset + vertexIndex];
     let index = d.offsets.y + corner;
-    var p = load3(points, d.points.x + corner);
-    var n = (flags & kHasNormals) != 0 ? load3(normals, index) : float3(0.0);
-    if ((flags & kInstanced) != 0) {
-        let instance = instanceIds[d.offsets.z + call.instanceOffset + instanceIndex];
-        p = transformPoint(d.prototype, p);
-        n = transformNormal(d.prototype, n);
-        if ((flags & kHasScales) != 0) {
-            let scale = load3(scales, instance);
-            p = p * scale;
-            n = n / scale;
-        }
-        if ((flags & kHasOrientations) != 0) {
-            let q = float4(orientations[4 * instance], orientations[4 * instance + 1],
-                           orientations[4 * instance + 2], orientations[4 * instance + 3]);
-            let unit = q / max(length(q), 1e-20);
-            p = rotate(unit, p);
-            n = rotate(unit, n);
-        }
-        p = p + load3(positions, instance);
-    }
+    let instance = (flags & kInstanced) != 0
+                       ? instanceIds[d.offsets.z + call.instanceOffset + instanceIndex]
+                       : 0u;
+    let now = placeVertex(d, corner, instance, d.motion.z, d.motion.x, d.model);
     MeshVertex v;
-    v.world = transformPoint(d.model, p);
-    v.normal = transformNormal(d.model, n);
+    v.world = now.world;
+    v.normal = now.normal;
     if (motion != 1.0) {
-        v.world = lerp(transformPoint(d.previous, p), v.world, motion);
-        v.normal = lerp(transformNormal(d.previous, n), v.normal, motion);
+        let before = placeVertex(d, corner, instance, d.motion.w, d.motion.y, d.previous);
+        v.world = lerp(before.world, now.world, motion);
+        v.normal = lerp(before.normal, now.normal, motion);
     }
     v.color = (flags & kHasColors) != 0 ? load3(colors, index) : d.tint.rgb;
     v.corner = vertexIndex % 3;

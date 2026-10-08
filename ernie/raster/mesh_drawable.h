@@ -170,8 +170,10 @@ class MeshDrawable : public RasterDrawable {
     /// draw whose transform changed moves from its old one over the frame (`Uniforms::motion`).
     void SetItems(std::vector<MeshItem> items);
 
-    /// Starts a frame's motion: draws that `SetItems` does not move again before the next
-    /// `Prepare` stand still.
+    /// Starts a frame's motion: draws that `SetItems` does not move again, and points and
+    /// instance arrays not written again, before the next `Prepare` stand still. Points and
+    /// instance arrays written in a frame keep the last frame's in the other half of their pools,
+    /// which motion-blurred frames interpolate from.
     void SettleMotion();
 
     /// World bounds of the current draws, or none without any.
@@ -283,6 +285,12 @@ class MeshDrawable : public RasterDrawable {
         /// (points + 1) then triangle indices, from `firstAdjacency`.
         std::vector<std::uint32_t> adjacency;
         std::uint32_t firstAdjacency = 0;
+        /// Which half of the double-buffered points pool holds its points now; the other holds
+        /// the last frame's while `pointsMoving`. The first write of a frame flips it
+        /// (`pointsWritten`), so the last frame's points stay for motion blur.
+        std::uint32_t pointSet = 0;
+        bool pointsMoving = false;
+        bool pointsWritten = false;
         std::vector<MeshLevel> levels;          ///< Its levels of detail, the full mesh first.
         std::vector<std::uint32_t> lodIndices;  ///< The coarser levels' indices, one after another.
     };
@@ -294,6 +302,11 @@ class MeshDrawable : public RasterDrawable {
         std::size_t count = 0;
         std::uint32_t first = 0;
         bool dirty = false;
+        /// Which half of the double-buffered instance pools holds its arrays now, as the mesh's
+        /// `pointSet`.
+        std::uint32_t set = 0;
+        bool moving = false;
+        bool written = false;
     };
 
     void CreateGBufferPipeline();
@@ -303,8 +316,16 @@ class MeshDrawable : public RasterDrawable {
     void UpdateTransforms();
     void RebuildGeometry();
     void RebuildInstances();
-    void WriteInstancer(const Instancer& instancer);
+    /// Writes an instancer's arrays into its half of the pools; with `flip`, into the other half
+    /// on its first write of a frame, keeping the last frame's arrays for motion blur.
+    void WriteInstancer(Instancer& instancer, bool flip);
     void CopyDevicePoints(Mesh& mesh);
+    /// Moves a mesh's points to the other half of the pool on its first write of a frame.
+    void FlipPoints(Mesh& mesh);
+    /// A mesh's points' offset in the pool, in points: now, or at the last frame with `previous`.
+    std::uint32_t PointBase(const Mesh& mesh, bool previous = false) const;
+    /// Likewise an instancer's arrays' offset in the instance pools, in instances.
+    std::uint32_t InstanceBase(const Instancer& instancer, bool previous = false) const;
     /// Copies a mesh's device normals and colours that changed into the pools.
     void CopyDeviceAttributes(Mesh& mesh, bool all);
     std::shared_ptr<GpuBuffer> Pool(std::span<const std::byte> bytes) const;
@@ -367,7 +388,11 @@ class MeshDrawable : public RasterDrawable {
     mutable std::vector<std::size_t> viewCalls_;  ///< Per view, the draw calls it recorded last.
     std::vector<const GraphicsPipeline*> itemPipelines_;
 
+    /// Points and instance arrays are double-buffered for motion blur: two halves of
+    /// `pointTotal_` points or `instanceTotal_` instances each.
     std::shared_ptr<GpuBuffer> points_;
+    std::uint32_t pointTotal_ = 0;
+    std::uint32_t instanceTotal_ = 0;
     std::shared_ptr<GpuBuffer> normals_;
     std::shared_ptr<GpuBuffer> colors_;
     std::unique_ptr<GpuBuffer> indices_;
