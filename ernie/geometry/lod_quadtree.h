@@ -18,7 +18,7 @@ struct LodPatch {
     std::uint32_t originX = 0;  ///< Raster column of the patch's north-west vertex.
     std::uint32_t originY = 0;  ///< Raster row of the patch's north-west vertex.
     std::uint32_t level = 0;
-    std::uint32_t pad = 0;
+    std::uint32_t face = 0;  ///< Cube face of a `CubeSphereLod` patch; 0 on flat terrain.
 
     bool operator==(const LodPatch&) const = default;
 };
@@ -137,6 +137,12 @@ class LodQuadtree {
     /// zero area in the shader and are not counted.
     std::uint64_t TriangleCount(std::span<const LodPatch> patches) const;
 
+    /// The (min, max) height of the node at (`x`, `y`) on `level`, min above max without valid
+    /// cells.
+    const glm::vec2& NodeHeights(std::uint32_t level, std::uint32_t x, std::uint32_t y) const {
+        return heights_[level][static_cast<std::size_t>(y) * NodesPerSide(level) + x];
+    }
+
     /// World bounds of the node at (`x`, `y`) on `level`; empty (low > high) for nodes without
     /// valid cells.
     std::pair<glm::vec3, glm::vec3> NodeBounds(std::uint32_t level, std::uint32_t x,
@@ -154,10 +160,6 @@ class LodQuadtree {
 
     std::uint32_t NodeCells(std::uint32_t level) const {
         return leafCells_ << level;
-    }
-
-    const glm::vec2& Heights(std::uint32_t level, std::uint32_t x, std::uint32_t y) const {
-        return heights_[level][static_cast<std::size_t>(y) * NodesPerSide(level) + x];
     }
 
     bool SelectNode(std::uint32_t level, std::uint32_t x, std::uint32_t y, const glm::vec3& eye,

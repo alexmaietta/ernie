@@ -107,7 +107,7 @@ void LodQuadtree::BuildParents() {
                 glm::vec2& node = heights_[level][static_cast<std::size_t>(y) * side + x];
                 for (std::uint32_t child = 0; child < 4; ++child) {
                     const glm::vec2& h =
-                        Heights(level - 1, 2 * x + (child & 1u), 2 * y + (child >> 1));
+                        NodeHeights(level - 1, 2 * x + (child & 1u), 2 * y + (child >> 1));
                     node.x = std::min(node.x, h.x);
                     node.y = std::max(node.y, h.y);
                 }
@@ -166,7 +166,7 @@ void LodQuadtree::SelectAll(std::vector<LodPatch>& out) const {
     const std::uint32_t leaves = NodesPerSide(0);
     for (std::uint32_t y = 0; y < leaves; ++y) {
         for (std::uint32_t x = 0; x < leaves; ++x) {
-            const glm::vec2& h = Heights(0, x, y);
+            const glm::vec2& h = NodeHeights(0, x, y);
             if (h.x <= h.y) {
                 EmitQuarters(0, x, y, nullptr, 1.0f, out);
             }
@@ -198,7 +198,7 @@ std::pair<glm::vec3, glm::vec3> LodQuadtree::NodeBounds(std::uint32_t level, std
     const std::uint32_t col1 = std::min(x * cells + cells, width_ - 1);
     const std::uint32_t row0 = std::min(y * cells, height_ - 1);
     const std::uint32_t row1 = std::min(y * cells + cells, height_ - 1);
-    const glm::vec2& h = Heights(level, x, y);
+    const glm::vec2& h = NodeHeights(level, x, y);
     const glm::vec3 low(originX_ + (static_cast<float>(col0) + 0.5f) * pixelSize_,
                         originY_ - (static_cast<float>(row1) + 0.5f) * pixelSize_,
                         h.x * exaggeration);
@@ -214,7 +214,7 @@ bool LodQuadtree::SelectNode(std::uint32_t level, std::uint32_t x, std::uint32_t
                              const glm::vec3& eye, std::span<const LodRange> ranges,
                              const Frustum* frustum, float exaggeration,
                              std::vector<LodPatch>& out) const {
-    const glm::vec2& h = Heights(level, x, y);
+    const glm::vec2& h = NodeHeights(level, x, y);
     if (h.x > h.y) {
         return true;
     }
@@ -263,7 +263,7 @@ void LodQuadtree::EmitQuarters(std::uint32_t level, std::uint32_t x, std::uint32
 void LodQuadtree::EmitChildArea(std::uint32_t level, std::uint32_t childX, std::uint32_t childY,
                                 const Frustum* frustum, float exaggeration,
                                 std::vector<LodPatch>& out) const {
-    const glm::vec2& h = Heights(level - 1, childX, childY);
+    const glm::vec2& h = NodeHeights(level - 1, childX, childY);
     if (h.x > h.y) {
         return;
     }
