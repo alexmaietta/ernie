@@ -1,6 +1,7 @@
 #include "ernie/app/viewer.h"
 
 #include "ernie/app/builtin_panels.h"
+#include "ernie/app/create.h"
 #include "ernie/app/icons.h"
 #include "ernie/app/session.h"
 #include "ernie/device/image.h"
@@ -284,6 +285,7 @@ struct Viewer::State {
     float contentScale = 1.0f;
     std::vector<Path> selection;
     EditHistory history;
+    std::deque<LogEntry> log;
     Viewer::Gizmo gizmo = Viewer::Gizmo::Translate;
     bool gizmoLocal = false;
     bool gizmoDrawn = false;  ///< Whether the last frame drew the gizmo, so it may take the mouse.
@@ -672,7 +674,7 @@ struct Viewer::State {
         if (!ImGui::BeginMainMenuBar()) {
             return;
         }
-        std::vector<std::string> menus = {"File", "Edit", "Window"};
+        std::vector<std::string> menus = {"File", "Edit", "Create", "Window"};
         for (const MenuItem& item : menuItems) {
             if (std::find(menus.begin(), menus.end(), item.menu) == menus.end()) {
                 menus.push_back(item.menu);
@@ -704,6 +706,26 @@ struct Viewer::State {
                     }
                 }
                 ImGui::MenuItem("Gizmo in Local Axes", nullptr, &gizmoLocal);
+                ImGui::Separator();
+                if (ImGui::MenuItem("Delete", "Del", false, !selection.empty())) {
+                    self.Delete(std::vector<Path>(selection));
+                }
+            }
+            if (menu == "Create") {
+                const char* group = nullptr;
+                for (const CreatableType& creatable : CreatableTypes()) {
+                    if (group != nullptr && std::string_view(group) != creatable.group) {
+                        ImGui::Separator();
+                    }
+                    group = creatable.group;
+                    if (ImGui::MenuItem(creatable.label)) {
+                        try {
+                            self.Create(creatable.type);
+                        } catch (const std::exception& error) {
+                            self.Log(LogLevel::Error, error.what());
+                        }
+                    }
+                }
             }
             if (menu == "Window") {
                 for (const auto& panel : panels) {
@@ -968,6 +990,7 @@ struct Viewer::State {
                         self.SetRenderer(name);
                     } catch (const std::exception& error) {
                         renderError = error.what();
+                        self.Log(LogLevel::Error, error.what());
                     }
                 }
             }
@@ -1095,6 +1118,9 @@ struct Viewer::State {
                 self.Redo();
             }
         }
+        if (!io.WantTextInput && !selection.empty() && ImGui::IsKeyPressed(ImGuiKey_Delete, false)) {
+            self.Delete(std::vector<Path>(selection));
+        }
         ImGui::DockSpaceOverViewport(dockSpace, ImGui::GetMainViewport());
         DrawViewport();
         DrawPanels();
@@ -1145,6 +1171,9 @@ struct Viewer::State {
             renderError.clear();
             drawn = true;
         } catch (const std::invalid_argument& error) {
+            if (renderError != error.what()) {
+                self.Log(LogLevel::Error, error.what());
+            }
             renderError = error.what();
         }
         if (!drawn) {
@@ -1419,6 +1448,9 @@ Viewer::Viewer(Scene& scene, const ViewerOptions& options)
     s.panels.push_back(std::make_unique<OverlaysPanel>());
     s.panels.push_back(MakeStagePanel());
     s.panels.push_back(MakePropertiesPanel());
+    s.panels.push_back(MakeSettingsPanel());
+    s.panels.push_back(MakeCameraPanel());
+    s.panels.push_back(MakeLogPanel());
     s.builtInPanels = s.panels.size();
     s.CreateSession();
 }
@@ -1618,6 +1650,25 @@ void Viewer::SetViewVar(std::string name) {
     state_->viewVar = std::move(name);
 }
 
+void Viewer::Log(LogLevel level, std::string text) {
+    constexpr std::size_t kLogLimit = 5000;
+    State& s = *state_;
+    const double time =
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - s.start).count();
+    s.log.push_back({time, level, std::move(text)});
+    while (s.log.size() > kLogLimit) {
+        s.log.pop_front();
+    }
+}
+
+const std::deque<LogEntry>& Viewer::LogEntries() const {
+    return state_->log;
+}
+
+void Viewer::ClearLog() {
+    state_->log.clear();
+}
+
 void Viewer::Edit(const Path& path, std::string_view attribute, Value value, bool open) {
     state_->history.Set(state_->scene, path, attribute, std::move(value), open);
 }
@@ -1636,6 +1687,71 @@ bool Viewer::Redo() {
 
 EditHistory& Viewer::History() {
     return state_->history;
+}
+
+Path Viewer::Create(std::string_view type) {
+    State& s = *state_;
+    const CreatableType* creatable = FindCreatable(type);
+    if (creatable == nullptr) {
+        throw std::invalid_argument("The viewer cannot create a '" + std::string(type) + "'");
+    }
+    // Under a selected group prim, else where the type usually goes.
+    Path parent(creatable->parent);
+    if (s.selection.size() == 1 && !IsSessionPath(s.selection.front()) &&
+        s.scene.Has(s.selection.front())) {
+        const std::string& selected = s.scene.TypeOf(s.selection.front());
+        if (selected == tokens::kXform || selected == tokens::kScope || selected.empty()) {
+            parent = s.selection.front();
+        }
+    }
+    Path path = parent.Child(creatable->name);
+    for (int n = 1; s.scene.Has(path); ++n) {
+        path = parent.Child(std::string(creatable->name) + std::to_string(n));
+    }
+    CreateContext context;
+    context.target = glm::dvec3(s.controller.target);
+    // Default sizes at the view's scale: a power of ten near a tenth of its distance.
+    context.scale = std::pow(10.0, std::round(std::log10(std::max(
+                                       static_cast<double>(s.controller.distance) / 10.0, 1e-3))));
+    context.parentWorld = s.scene.Has(parent) ? s.scene.WorldTransform(parent) : glm::dmat4(1.0);
+    context.camera =
+        CameraOf(s.scene, s.activeCamera, s.ViewportWidth(), s.ViewportHeight());
+    if (!IsSessionPath(s.activeCamera)) {
+        context.activeCamera = s.activeCamera;
+    }
+    Scene scratch;
+    AuthorDefaultPrim(scratch, path, type, context);
+    s.history.BeginGroup();
+    try {
+        s.history.Add(s.scene, scratch, path);
+        if (type == tokens::kMaterial) {
+            for (const Path& selected : s.selection) {
+                if (s.scene.Has(selected) && IsMeshType(s.scene.TypeOf(selected))) {
+                    s.history.Set(s.scene, selected, tokens::kMaterialBinding, path);
+                }
+            }
+        }
+    } catch (...) {
+        s.history.EndGroup();
+        throw;
+    }
+    s.history.EndGroup();
+    s.SetSelection({path});
+    Log(LogLevel::Info, "Created " + path.String());
+    return path;
+}
+
+void Viewer::Delete(std::span<const Path> paths) {
+    State& s = *state_;
+    const std::vector<Path> doomed(paths.begin(), paths.end());
+    s.history.BeginGroup();
+    for (const Path& path : doomed) {
+        if (!IsSessionPath(path) && s.history.Remove(s.scene, path)) {
+            Log(LogLevel::Info, "Deleted " + path.String());
+        }
+    }
+    s.history.EndGroup();
+    s.SetSelection({});
 }
 
 Viewer::Gizmo Viewer::GetGizmo() const {

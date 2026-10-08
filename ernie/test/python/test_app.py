@@ -190,3 +190,35 @@ def test_clicks_pick_prims_and_edits_undo(viewer):
     viewer.gizmo = app.Gizmo.ROTATE
     viewer.gizmo_local = True
     viewer.step()
+
+
+def test_create_makes_every_type_and_undoes(viewer):
+    types = app.Viewer.creatable_types()
+    assert "Cube" in types and "SphereLight" in types and "Camera" in types
+    before = set(str(p) for p in viewer.scene.prims())
+    created = []
+    for kind in types:
+        path = viewer.create(kind)
+        assert viewer.scene.type_of(path) == kind
+        assert viewer.selection == [path]
+        created.append(path)
+        viewer.step()  # each renders without an error
+        assert not any(level == "error" for _, level, _ in viewer.log_entries), viewer.log_entries
+    assert created[0] != created[1]
+    assert viewer.create("Cube") != viewer.create("Cube"), "unique names"
+    with pytest.raises(ValueError):
+        viewer.create("Teapot")
+
+    viewer.delete([ernie.Path("/World")])
+    assert not viewer.scene.has("/World/Cube")
+    viewer.undo()
+    assert viewer.scene.has("/World/Cube")
+    for _ in range(len(types) + 2):
+        viewer.undo()
+    created_paths = set(str(p) for p in viewer.scene.prims() if not str(p).startswith("/__session"))
+    assert created_paths <= before | {"/World", "/Looks", "/Render", "/Render/Vars"}
+
+    viewer.log("hello", level="warning")
+    assert viewer.log_entries[-1][1:] == ("warning", "hello")
+    viewer.clear_log()
+    assert viewer.log_entries == []

@@ -1,9 +1,14 @@
 ernie_add_library(
     ernie_app
     SOURCES
+    camera_panel.cpp
+    create.cpp
+    log_panel.cpp
     panel.cpp
     properties_panel.cpp
+    property_fields.cpp
     session.cpp
+    settings_panel.cpp
     stage_panel.cpp
     theme.cpp
     viewer.cpp

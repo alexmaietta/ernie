@@ -6,8 +6,10 @@
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
+#include <nanobind/stl/tuple.h>
 #include <nanobind/stl/vector.h>
 
+#include "ernie/app/create.h"
 #include "ernie/app/viewer.h"
 #include "ernie/device/vulkan_context.h"
 
@@ -21,6 +23,8 @@ namespace {
 
 using app::FrameInfo;
 using app::Lighting;
+using app::LogEntry;
+using app::LogLevel;
 using app::Theme;
 using app::Viewer;
 using app::ViewerOptions;
@@ -249,6 +253,49 @@ void BindApp(nb::module_& parent) {
             "Sets an attribute as an undoable GUI edit.")
         .def("clear_attribute", &Viewer::ClearAttribute, nb::arg("path"), nb::arg("attribute"),
              "Clears an attribute back to its fallback, as an undoable GUI edit.")
+        .def("create", &Viewer::Create, nb::arg("type"),
+             "Creates a prim of `type` (any of `creatable_types`) with defaults that make it "
+             "show, as one undo step; selects it and returns its path.")
+        .def(
+            "delete",
+            [](Viewer& viewer, const std::vector<Path>& paths) { viewer.Delete(paths); },
+            nb::arg("paths"), "Deletes prims and their descendants as one undo step.")
+        .def_static(
+            "creatable_types",
+            [] {
+                std::vector<std::string> types;
+                for (const app::CreatableType& creatable : app::CreatableTypes()) {
+                    types.emplace_back(creatable.type);
+                }
+                return types;
+            },
+            "The prim types `create` and the Create menu make.")
+        .def(
+            "log",
+            [](Viewer& viewer, std::string text, std::string_view level) {
+                const LogLevel parsed = level == "error"     ? LogLevel::Error
+                                        : level == "warning" ? LogLevel::Warning
+                                        : level == "info"
+                                            ? LogLevel::Info
+                                            : throw nb::value_error(
+                                                  "level must be \"info\", \"warning\" or "
+                                                  "\"error\"");
+                viewer.Log(parsed, std::move(text));
+            },
+            nb::arg("text"), nb::arg("level") = "info", "Adds a message to the Log panel.")
+        .def_prop_ro(
+            "log_entries",
+            [](const Viewer& viewer) {
+                const char* names[] = {"info", "warning", "error"};
+                std::vector<std::tuple<double, std::string, std::string>> entries;
+                for (const LogEntry& entry : viewer.LogEntries()) {
+                    entries.emplace_back(entry.time,
+                                         names[static_cast<std::size_t>(entry.level)], entry.text);
+                }
+                return entries;
+            },
+            "(seconds, level, text) of every message in the log.")
+        .def("clear_log", &Viewer::ClearLog)
         .def("undo", &Viewer::Undo, "Undoes the last GUI edit; returns whether there was one.")
         .def("redo", &Viewer::Redo, "Redoes the last undone GUI edit.")
         .def_prop_rw("gizmo", &Viewer::GetGizmo, &Viewer::SetGizmo)

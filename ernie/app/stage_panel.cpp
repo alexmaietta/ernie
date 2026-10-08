@@ -156,6 +156,10 @@ class StagePanel final : public Panel {
             if (ImGui::MenuItem("Copy Path")) {
                 ImGui::SetClipboardText(path.String().c_str());
             }
+            if (ImGui::MenuItem("Delete", "Del", false, !IsSessionPath(path))) {
+                const Path doomed[] = {path};
+                viewer.Delete(doomed);
+            }
             ImGui::EndPopup();
         }
         // The type, muted, and a visibility toggle at the right.

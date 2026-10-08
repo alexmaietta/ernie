@@ -10,6 +10,7 @@
 #include "ernie/session/frame_params.h"
 
 #include <cstdint>
+#include <deque>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -45,6 +46,16 @@ struct ViewerOptions {
                                       ///< the built-in default layout.
     Path settings;                    ///< RenderSettings prim the viewport starts with;
                                       ///< empty picks the first one, as `ResolveRenderPrims`.
+};
+
+/// How serious a log message is.
+enum class LogLevel { Info, Warning, Error };
+
+/// One message of the viewer's log (`Viewer::Log`).
+struct LogEntry {
+    double time = 0.0;  ///< Seconds since the viewer opened.
+    LogLevel level = LogLevel::Info;
+    std::string text;
 };
 
 /// Per-frame information passed to `OnFrame`, `OnPreRender` and `OnPostRender` callbacks.
@@ -185,6 +196,17 @@ class Viewer {
     /// The GUI edits, for undo and redo.
     EditHistory& History();
 
+    /// Creates a prim of `type`, any of the Create menu's (`CreatableTypes`), with defaults that
+    /// make it show (`AuthorDefaultPrim`): under the selected Xform or Scope if one is, else its
+    /// type's usual parent, at the view's target and scale. A material is bound to the selected
+    /// geometry. One undo step; selects the new prim and returns its path.
+    /// @throws std::invalid_argument for a type the menu does not offer.
+    Path Create(std::string_view type);
+
+    /// Deletes the prims at `paths` and their descendants as one undo step and clears the
+    /// selection; the viewer's own prims are left alone.
+    void Delete(std::span<const Path> paths);
+
     /// What the transform gizmo on a single selected prim does: none, or translate, rotate or
     /// scale (the W, E and R keys), in world or local axes.
     enum class Gizmo { None, Translate, Rotate, Scale };
@@ -196,6 +218,12 @@ class Viewer {
     /// The prim the viewport shows at pixel (`x`, `y`) of its image (`RenderDelegate::Pick`), as a
     /// click selects; the empty path for the background or a session prim.
     Path Pick(std::uint32_t x, std::uint32_t y);
+
+    /// Adds a message to the viewer's log, shown in the Log panel; the viewer itself logs render
+    /// errors as they start. The log keeps the latest few thousand messages.
+    void Log(LogLevel level, std::string text);
+    const std::deque<LogEntry>& LogEntries() const;
+    void ClearLog();
 
     /// The cameras the viewport can look through: the viewer's own, then the scene's Camera prims
     /// by path.
