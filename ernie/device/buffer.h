@@ -82,6 +82,7 @@ class GpuBuffer {
     void Release();
 
     const VulkanContext* context_ = nullptr;
+    std::weak_ptr<const void> contextAlive_;  ///< `VulkanContext::Alive`.
     VkBuffer buffer_ = VK_NULL_HANDLE;
     VmaAllocation allocation_ = VK_NULL_HANDLE;
     VkDeviceMemory sharedMemory_ = VK_NULL_HANDLE;

@@ -117,6 +117,13 @@ class TerrainDrawable : public RasterDrawable {
     /// device's textures, or a dirty rectangle outside it.
     void SetHeightfield(const DeviceHeightfield& field);
 
+    /// Maps the heights on the compute device for writing in place: a float32 (rows, cols)
+    /// tensor over the drawable's own copy of them, holding the heights as they are. Writes go on
+    /// `stream`, which first waits for the frames already submitted; handing the tensor back with
+    /// the device `SetHeightfield` (and its dirty rectangle) then draws them without copying.
+    /// @throws std::invalid_argument without heights on the compute device.
+    Tensor MapHeights(std::uintptr_t stream = 1);
+
     /// Enables heightfields on the compute device (`SetHeightfield`); `compute` must outlive the
     /// drawable.
     void SetComputeInterop(ComputeInterop* compute) {
@@ -264,6 +271,7 @@ class TerrainDrawable : public RasterDrawable {
     ComputeInterop* compute_ = nullptr;
     DeviceHeightfield device_;               ///< The last field, its tensor dropped.
     std::shared_ptr<GpuBuffer> deviceHeights_;  ///< The heights, copied from the device.
+    Tensor mappedHeights_;  ///< The view of `deviceHeights_` `MapHeights` gives out.
     std::unique_ptr<GpuBuffer> leaves_;      ///< Per LOD leaf, (min, max).
     PipelineLayout updateLayout_;
     std::unique_ptr<ComputePipeline> gradientsPipeline_;

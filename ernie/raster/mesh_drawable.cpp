@@ -396,6 +396,9 @@ void MeshDrawable::SetPoints(std::uint32_t mesh, const Tensor& points,
         target.data.points.assign(host.As<float>(), host.As<float>() + host.Elements());
         std::tie(target.low, target.high) = PointBounds(target.data.points);
     }
+    // The view `MapPoints` gave out, handed back: the points are in the pool already.
+    target.pointsInPlace = !target.mappedPoints.Empty() &&
+                           points.Data() == target.mappedPoints.Data() && !geometryDirty_;
     target.devicePoints = points;
     target.deviceStream = stream;
     target.pointsDirty = true;
@@ -475,6 +478,78 @@ std::uint32_t MeshDrawable::PointBase(const Mesh& mesh, bool previous) const {
 std::uint32_t MeshDrawable::InstanceBase(const Instancer& instancer, bool previous) const {
     const std::uint32_t set = previous && instancer.moving ? 1u - instancer.set : instancer.set;
     return set * instanceTotal_;
+}
+
+Tensor MeshDrawable::PoolView(const std::shared_ptr<GpuBuffer>& pool, std::size_t offset,
+                              std::vector<std::int64_t> shape) const {
+    return compute_->View(pool, DType::Float32, std::move(shape),
+                          static_cast<VkDeviceSize>(offset) * sizeof(float));
+}
+
+void MeshDrawable::EnsurePools() {
+    if (compute_ == nullptr) {
+        throw std::invalid_argument("Mapping arrays needs compute interop");
+    }
+    if (geometryDirty_) {
+        RebuildGeometry();
+    }
+    if (instancesDirty_) {
+        RebuildInstances();
+    }
+}
+
+Tensor MeshDrawable::MapPoints(std::uint32_t mesh, std::uintptr_t stream) {
+    const auto it = meshes_.find(mesh);
+    if (it == meshes_.end()) {
+        throw std::invalid_argument("Unknown mesh " + std::to_string(mesh));
+    }
+    EnsurePools();
+    Mesh& target = it->second;
+    const auto count = static_cast<std::int64_t>(target.data.points.size() / 3);
+    // Nothing writes the half frames still in flight may read until they finish.
+    compute_->WaitForVulkan(stream);
+    const Tensor current =
+        PoolView(points_, 3 * std::size_t{PointBase(target) + target.firstVertex}, {count, 3});
+    FlipPoints(target);
+    target.mappedPoints =
+        PoolView(points_, 3 * std::size_t{PointBase(target) + target.firstVertex}, {count, 3});
+    if (target.mappedPoints.Data() != current.Data()) {
+        compute_->Copy(current, target.mappedPoints, stream);
+    }
+    return target.mappedPoints;
+}
+
+Tensor MeshDrawable::MapInstances(std::uint32_t instancer, std::size_t array,
+                                  std::uintptr_t stream) {
+    const auto it = instancers_.find(instancer);
+    if (it == instancers_.end()) {
+        throw std::invalid_argument("Unknown instancer " + std::to_string(instancer));
+    }
+    if (array > 2) {
+        throw std::invalid_argument("Instance arrays are 0 positions, 1 orientations, 2 scales");
+    }
+    EnsurePools();
+    Instancer& target = it->second;
+    const std::array<const std::shared_ptr<GpuBuffer>*, 3> pools{&positions_, &orientations_,
+                                                                 &scales_};
+    const std::array<std::size_t, 3> components{3, 4, 3};
+    const auto count = static_cast<std::int64_t>(target.count);
+    const auto view = [&](std::size_t a) {
+        return PoolView(*pools[a],
+                        components[a] * std::size_t{InstanceBase(target) + target.first},
+                        {count, static_cast<std::int64_t>(components[a])});
+    };
+    compute_->WaitForVulkan(stream);
+    if (!target.written) {
+        // Every array moves to the other half together, as they are now.
+        std::array<Tensor, 3> current{view(0), view(1), view(2)};
+        FlipInstancer(target);
+        for (std::size_t a = 0; a < 3; ++a) {
+            compute_->Copy(current[a], view(a), stream);
+        }
+    }
+    target.mapped[array] = view(array);
+    return target.mapped[array];
 }
 
 void MeshDrawable::CopyDeviceAttributes(Mesh& mesh, bool all) {
@@ -576,6 +651,12 @@ void MeshDrawable::SetInstances(std::uint32_t instancer, const DeviceInstanceDat
     }
     Instancer& target = it->second;
     instancesDirty_ = instancesDirty_ || count != target.count;
+    // Arrays handed back as the views `MapInstances` gave out are written in place.
+    const std::array<const Tensor*, 3> arrays{&data.positions, &data.orientations, &data.scales};
+    for (std::size_t a = 0; a < arrays.size(); ++a) {
+        target.inPlace[a] = !arrays[a]->Empty() && !target.mapped[a].Empty() &&
+                            arrays[a]->Data() == target.mapped[a].Data() && !instancesDirty_;
+    }
     target.count = count;
     target.device = data;
     target.onDevice = true;
@@ -753,6 +834,9 @@ void MeshDrawable::RebuildGeometry() {
         mesh.pointSet = 0;
         mesh.pointsMoving = false;
         mesh.pointsWritten = false;
+        // Points mapped into the old pool copy across from there.
+        mesh.pointsInPlace = false;
+        mesh.mappedPoints = Tensor();
     }
     points_ = Pool(std::as_bytes(std::span(points)));
     normals_ = Pool(std::as_bytes(std::span(normals)));
@@ -814,6 +898,9 @@ void MeshDrawable::RebuildInstances() {
         instancer.set = 0;
         instancer.moving = false;
         instancer.written = false;
+        // Arrays mapped into the old pools copy across from there.
+        instancer.inPlace = {};
+        instancer.mapped = {};
         if (instancer.onDevice) {
             WriteInstancer(instancer, false);
         }
@@ -822,26 +909,41 @@ void MeshDrawable::RebuildInstances() {
     instancesDirty_ = false;
 }
 
-void MeshDrawable::WriteInstancer(Instancer& instancer, bool flip) {
-    if (flip && !instancer.written) {
+void MeshDrawable::FlipInstancer(Instancer& instancer) {
+    if (!instancer.written) {
         instancer.set ^= 1u;
         instancer.written = true;
         instancer.moving = true;
         drawsDirty_ = true;
     }
+}
+
+void MeshDrawable::WriteInstancer(Instancer& instancer, bool flip) {
+    if (flip) {
+        FlipInstancer(instancer);
+    }
     const VkDeviceSize first = VkDeviceSize{InstanceBase(instancer)} + instancer.first;
     if (instancer.onDevice) {
+        // Arrays written in place (`MapInstances`) are there already; the frame waits for their
+        // stream.
         const DeviceInstanceData& device = instancer.device;
-        compute_->CopyToBuffer(device.positions, *positions_, first * 3 * sizeof(float),
-                               device.stream);
-        if (!device.orientations.Empty()) {
+        if (std::any_of(instancer.inPlace.begin(), instancer.inPlace.end(),
+                        [](bool inPlace) { return inPlace; })) {
+            compute_->SignalVulkan(device.stream);
+        }
+        if (!instancer.inPlace[0]) {
+            compute_->CopyToBuffer(device.positions, *positions_, first * 3 * sizeof(float),
+                                   device.stream);
+        }
+        if (!device.orientations.Empty() && !instancer.inPlace[1]) {
             compute_->CopyToBuffer(device.orientations, *orientations_, first * 4 * sizeof(float),
                                    device.stream);
         }
-        if (!device.scales.Empty()) {
+        if (!device.scales.Empty() && !instancer.inPlace[2]) {
             compute_->CopyToBuffer(device.scales, *scales_, first * 3 * sizeof(float),
                                    device.stream);
         }
+        instancer.inPlace = {};
         return;
     }
     const InstanceData& data = instancer.data;
@@ -882,7 +984,11 @@ void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCasc
             }
             // Into the other half, keeping the last frame's points for motion blur.
             FlipPoints(mesh);
-            if (!mesh.devicePoints.Empty()) {
+            if (mesh.pointsInPlace) {
+                // Written there through `MapPoints`: the frame waits for their stream.
+                compute_->SignalVulkan(mesh.deviceStream);
+                mesh.pointsInPlace = false;
+            } else if (!mesh.devicePoints.Empty()) {
                 CopyDevicePoints(mesh);
             } else {
                 renderer_.Uploads().Write(

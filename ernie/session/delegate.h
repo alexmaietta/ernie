@@ -101,6 +101,17 @@ class RenderDelegate {
     /// delegate's buffers that may still be running; empty without CUDA inputs.
     virtual std::vector<TimelinePoint> SubmitWaits() const = 0;
 
+    /// Maps array `attribute` of the prim at `path` for writing in place on the compute device:
+    /// syncs `scene`, writes into it as that attribute a tensor over the renderer's own memory for
+    /// it, holding its values as they are, and returns that tensor. Write into it on `stream`
+    /// (which first waits for the frames already submitted), then `scene.Unmap(path, attribute,
+    /// stream)`: the next frame draws the values without copying them. Map again each step, as
+    /// the memory behind it may alternate (for motion blur).
+    /// @throws std::invalid_argument if the backend maps no arrays, has no compute interop, or
+    /// cannot map that attribute of that prim.
+    virtual Tensor MapArray(Scene& scene, const Path& path, std::string_view attribute,
+                            std::uintptr_t stream = 1);
+
     /// The render vars `Record` can draw of the frame the last `Update` prepared: `Info().viewVars`
     /// and what that frame adds, such as the AOVs its sensor filters write ("aov:<name>").
     virtual std::vector<std::string> ViewVars() const {

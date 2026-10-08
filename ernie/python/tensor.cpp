@@ -136,6 +136,35 @@ nb::object ArrayFromTensor(const Tensor& tensor, bool writable) {
                     : view.template operator()<nb::array_api, nb::ro>();
 }
 
+namespace {
+
+/// Holds a Python object, releasing it with the GIL held.
+struct PythonReference {
+    nb::object object;
+
+    ~PythonReference() {
+        if (Py_IsInitialized() != 0) {
+            nb::gil_scoped_acquire gil;
+            object = nb::object();
+        }
+    }
+};
+
+}  // namespace
+
+Tensor KeepingAlive(const Tensor& tensor, nb::handle keep) {
+    // The tensor goes before the reference, so what it keeps alive outlives it.
+    struct Owner {
+        PythonReference keep;
+        Tensor tensor;
+    };
+    auto owner = std::make_shared<Owner>();
+    owner->keep.object = nb::borrow(keep);
+    owner->tensor = tensor;
+    return Tensor(tensor.Data(), tensor.Type(), tensor.Shape(), tensor.Strides(), tensor.Location(),
+                  std::move(owner));
+}
+
 std::uintptr_t StreamOf(nb::handle stream) {
     if (stream.is_none()) {
         return 1;

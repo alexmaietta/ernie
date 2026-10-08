@@ -58,6 +58,7 @@ ernie_add_test_suite(
     raster_sensor_filters_gpu_test.cpp
     raster_standard_filters_gpu_test.cpp
     raster_terrain_drawable_test.cpp
+    raster_zero_copy_gpu_test.cpp
     scene_brdf_vulkan_test.cpp
     support/delegate_scenes.cpp
     LIBRARIES

@@ -675,6 +675,53 @@ void RasterDelegate::SyncInstancers(const Scene& scene) {
     }
 }
 
+Tensor RasterDelegate::MapArray(Scene& scene, const Path& path, std::string_view attribute,
+                                std::uintptr_t stream) {
+    using namespace tokens;
+    RequireCompute();
+    Sync(scene);
+    if (!scene.Has(path)) {
+        throw std::invalid_argument("Cannot map " + std::string(attribute) + " of '" +
+                                    path.String() + "', which does not exist");
+    }
+    const std::string_view type = scene.TypeOf(path);
+    const auto unsynced = [&] {
+        return std::invalid_argument("Cannot map " + std::string(attribute) + " of '" +
+                                     path.String() + "': it has not been uploaded");
+    };
+    Tensor view;
+    if (type == kMesh && attribute == kPoints) {
+        const auto it = syncedMeshes_.find(path);
+        if (it == syncedMeshes_.end() || it->second.handle == 0) {
+            throw unsynced();
+        }
+        view = meshes_.MapPoints(it->second.handle, stream);
+    } else if (type == kPointInstancer &&
+               (attribute == kPositions || attribute == kOrientations || attribute == kScales)) {
+        const auto it = instancers_.find(path);
+        if (it == instancers_.end() || it->second.handle == 0) {
+            throw unsynced();
+        }
+        const std::size_t array = attribute == kPositions ? 0 : attribute == kOrientations ? 1 : 2;
+        view = meshes_.MapInstances(it->second.handle, array, stream);
+    } else if (type == kGeomPoints && attribute == kPoints) {
+        const auto it = syncedPoints_.find(path);
+        if (it == syncedPoints_.end() || it->second.handle == 0) {
+            throw unsynced();
+        }
+        view = points_.MapPositions(it->second.handle, stream);
+    } else if (type == kTerrain && attribute == kHeights &&
+               path == ResolveRenderPrims(scene, {}).terrain) {
+        view = terrain_.MapHeights(stream);
+    } else {
+        throw std::invalid_argument("Cannot map " + std::string(attribute) + " of '" +
+                                    path.String() + "': only a Mesh's points, a PointInstancer's "
+                                    "arrays, a Points prim's points and the Terrain's heights map");
+    }
+    scene.Write(path, attribute, view, stream);
+    return view;
+}
+
 void RasterDelegate::SyncPoints(const Scene& scene) {
     ERNIE_ZONE("Sync points");
     using namespace tokens;
@@ -908,8 +955,6 @@ void RasterDelegate::Update(const Scene& scene, const Path& settings, VkExtent2D
     // The caller records and submits the frame itself, so nothing may still be running.
     context_.WaitForSubmissions();
     BeginFrame();
-    meshes_.SettleMotion();
-    points_.SettleMotion();
     const RenderPrims prims = ResolveRenderPrims(scene, settings);
     // The view runs the first product's chain (`DefaultFilterChain` without products), holding
     // every var and the AOV slots of what that chain writes.
@@ -919,6 +964,14 @@ void RasterDelegate::Update(const Scene& scene, const Path& settings, VkExtent2D
                                 : AovOutputsOf(filters, renderer_.SensorFilters());
     UpdatePrims(scene, prims, extent, NextFrame(scene, prims.settings, prims.settings),
                 prims.settings, filters, {}, {}, ViewHeldVars(viewAovs_.size()));
+    SettleMotion();
+}
+
+void RasterDelegate::SettleMotion() {
+    // The frame is prepared: what moved in it stands still unless written or mapped again
+    // before the next, so writes between frames count as the next one's motion.
+    meshes_.SettleMotion();
+    points_.SettleMotion();
 }
 
 std::vector<std::string> RasterDelegate::ViewVars() const {
@@ -1210,9 +1263,6 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
     const std::vector<RenderProductSpec> specs = ResolveRenderProducts(scene, products, settings);
     RenderProductSetOutputs outputs;
     std::uint64_t submission = 0;
-    // A new step: what moved in the last one stands still unless it moves again.
-    meshes_.SettleMotion();
-    points_.SettleMotion();
     for (const RenderProductSpec& spec : specs) {
         const std::uint32_t slot = BeginFrame();
         RenderPrims prims = base;
@@ -1386,6 +1436,7 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
             output.vars.emplace(name, RenderVar(frame, path, name));
         }
     }
+    SettleMotion();
     ERNIE_FRAME_MARK("Step");
     return StepOperation(context_, submission, std::move(outputs));
 }

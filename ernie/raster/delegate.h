@@ -85,6 +85,12 @@ class RasterDelegate : public RenderDelegate {
     /// settings' first product, so it shows what that product renders, AOVs included.
     void Update(const Scene& scene, const Path& settings, VkExtent2D extent) override;
 
+    /// As `RenderDelegate::MapArray`: a Mesh's `points`, a PointInstancer's `positions`,
+    /// `orientations` or `scales`, a Points prim's `points`, or a Terrain's `heights` once
+    /// written on the GPU.
+    Tensor MapArray(Scene& scene, const Path& path, std::string_view attribute,
+                    std::uintptr_t stream = 1) override;
+
     /// `Info().viewVars`, then the AOVs of the view's chain as "aov:<name>".
     std::vector<std::string> ViewVars() const override;
 
@@ -204,6 +210,8 @@ class RasterDelegate : public RenderDelegate {
     std::vector<MeshItem> Items(const Scene& scene) const;
 
     ComputeInterop& RequireCompute();
+    /// Ends a step's motion once all of it is prepared (`MeshDrawable::SettleMotion`).
+    void SettleMotion();
     /// `stateKey` names whose frames the temporal filters' state follows: the product, or the
     /// settings for the interactive view.
     void UpdatePrims(const Scene& scene, const RenderPrims& prims, VkExtent2D extent, FrameId frame,

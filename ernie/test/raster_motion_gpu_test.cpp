@@ -161,6 +161,20 @@ TEST_F(RasterDelegateTest, InstancesAndDeformingPointsBlurFromHostAndCudaArrays)
         SCOPED_TRACE("points on CUDA");
         ExpectMotionBlur(delegate, scene, [&](double s) { quad(s, true); }, 4);
     }
+    {
+        // Written in place each step through a map: the last step's arrays stay for the blur.
+        SCOPED_TRACE("instances mapped");
+        ExpectMotionBlur(
+            delegate, scene,
+            [&](double s) {
+                const Tensor view = delegate.MapArray(scene, "/World/Rocks", tokens::kPositions);
+                const std::array<float, 9> positions{
+                    12, -10, 0, static_cast<float>(12.0 - 6.0 * s), 0, 0, 12, 10, 0};
+                cuda->Copy(cuda->Upload(Tensor::Copy<float>(positions, {3, 3})), view);
+                scene.Unmap("/World/Rocks", tokens::kPositions);
+            },
+            4);
+    }
 }
 
 TEST_F(RasterDelegateTest, CameraMotionBlurAveragesTheViewsAcrossTheShutter) {

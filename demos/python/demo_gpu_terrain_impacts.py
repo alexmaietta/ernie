@@ -3,13 +3,13 @@ crater on the GPU, and Ernie rebuilds only the patch each one changed.
 
     PYTHONPATH=build/python python demos/python/demo_gpu_terrain_impacts.py [--capture impacts.png]
 
-Needs Warp (`uv pip install warp-lang`) and CUDA interop. The heights live in one Warp array the
-whole time: a kernel fills it with rolling fractal relief, and each impact's kernel carves a
-bowl with a raised rim and an ejecta blanket into it. Each frame `scene.write` hands Ernie the
-array on the kernels' stream along with `ernie:heights:dirty`, the rectangle of cells the impacts
-touched, so the renderer copies the heights device to device and recomputes the gradients,
-their mips and the level-of-detail bounds of that rectangle alone, on the GPU. The host never
-reads the heights.
+Needs Warp (`uv pip install warp-lang`) and CUDA interop. A kernel fills a Warp array with
+rolling fractal relief, written once as the terrain's heights. From then on each frame maps the
+renderer's own copy of the heights (`Viewer.map`, a CUDA array over Ernie's memory) and each
+impact's kernel carves a bowl with a raised rim and an ejecta blanket straight into it; unmapping
+on the kernels' stream with `ernie:heights:dirty`, the rectangle of cells the impacts touched,
+has the renderer recompute the gradients, their mips and the level-of-detail bounds of that
+rectangle alone, on the GPU. Nothing is copied, and the host never reads the heights.
 
 References:
 - H. J. Melosh, "Impact Cratering: A Geologic Process", Oxford University Press, 1989 (crater
@@ -149,10 +149,11 @@ def main():
                     hidden=args.capture is not None)
 
     def update(v, info):
-        dirty = carve(heights, impacts, args.rate, device)
-        if dirty[2] > 0 and dirty[3] > 0:
-            v.scene.set(terrain, tokens.HEIGHTS_DIRTY, [float(x) for x in dirty])
-            v.scene.write(terrain, tokens.HEIGHTS, heights, stream=stream)
+        # Ernie's own copy of the heights, carved straight into: nothing is copied at all.
+        mapped = wp.from_dlpack(v.map(terrain, tokens.HEIGHTS, stream=stream))
+        dirty = carve(mapped, impacts, args.rate, device)
+        v.scene.set(terrain, tokens.HEIGHTS_DIRTY, [float(x) for x in dirty])
+        v.scene.unmap(terrain, tokens.HEIGHTS, stream=stream)
 
     viewer.active_camera = ernie.Path("/World/Camera")
     if args.capture is not None:

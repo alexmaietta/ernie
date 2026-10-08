@@ -80,6 +80,13 @@ class VulkanContext {
         return allocator_;
     }
 
+    /// Expires when the context is destroyed, for objects that may outlive it, such as buffers
+    /// behind arrays a scene still holds after its renderer is gone: they then leave their
+    /// handles to the destroyed device rather than destroy them.
+    std::weak_ptr<const void> Alive() const {
+        return alive_;
+    }
+
     /// Device name, e.g. "NVIDIA GeForce RTX 5070 Laptop GPU".
     const std::string& DeviceName() const {
         return deviceName_;
@@ -191,6 +198,7 @@ class VulkanContext {
     void CollectGpuProfile(VkCommandBuffer commands) const;
 
   private:
+    std::shared_ptr<const void> alive_ = std::make_shared<char>();  ///< See `Alive`.
     VulkanContext() = default;
     void Report(std::string message);
 

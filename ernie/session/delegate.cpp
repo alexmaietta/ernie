@@ -40,6 +40,10 @@ Tensor RenderDelegate::Render(const Scene& scene, const Path& settings, Device d
     throw std::invalid_argument("The render products have no LdrColor render var");
 }
 
+Tensor RenderDelegate::MapArray(Scene&, const Path&, std::string_view, std::uintptr_t) {
+    throw std::invalid_argument("The " + Info().name + " renderer maps no arrays");
+}
+
 FrameId RenderDelegate::NextFrame(const Scene& scene, const Path& settings, const Path& product) {
     std::uint64_t& count = frameCounts_[product];
     FrameId id;

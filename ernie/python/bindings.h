@@ -30,6 +30,10 @@ nb::dlpack::dtype DlpackOf(DType type);
 /// tensors, an array-API object with `__dlpack__` (for torch.from_dlpack, CuPy, JAX) otherwise.
 nb::object ArrayFromTensor(const Tensor& tensor, bool writable = false);
 
+/// `tensor`, also keeping the Python object `keep` alive, so arrays in memory of the renderer's
+/// Vulkan device or CUDA context cannot outlive the renderer.
+Tensor KeepingAlive(const Tensor& tensor, nb::handle keep);
+
 /// A CUDA stream argument in DLPack numbering: None for the legacy default stream (1), an int,
 /// or an object with a `cuda_stream` attribute such as a `torch.cuda.Stream`.
 std::uintptr_t StreamOf(nb::handle stream);

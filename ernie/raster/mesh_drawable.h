@@ -135,6 +135,22 @@ class MeshDrawable : public RasterDrawable {
     /// @throws std::invalid_argument as the device `SetPoints`, or for a mesh without colours.
     void SetColors(std::uint32_t mesh, const Tensor& colors, std::uintptr_t stream = 1);
 
+    /// Maps a mesh's points for writing in place on the compute device: a float32 (points, 3)
+    /// tensor over the drawable's own points pool, the half the next frame draws, holding the
+    /// points as they are now (copied on `stream` from the half the last frame drew, so updates in
+    /// place see them). Writes go on `stream`, which first waits for the frames already submitted;
+    /// handing the tensor back with the device `SetPoints` then draws them without copying. Map
+    /// again for each frame: the halves alternate so motion blur keeps the last frame's points.
+    /// @throws std::invalid_argument for an unknown mesh or without `SetComputeInterop`.
+    Tensor MapPoints(std::uint32_t mesh, std::uintptr_t stream = 1);
+
+    /// Maps instance array `array` (0 positions, 1 orientations, 2 scales) of an instancer for
+    /// writing in place, as `MapPoints`; the device `SetInstances` takes it back. The instancer's
+    /// other arrays move to the same half with it.
+    /// @throws std::invalid_argument for an unknown instancer or array, or without
+    /// `SetComputeInterop`.
+    Tensor MapInstances(std::uint32_t instancer, std::size_t array, std::uintptr_t stream = 1);
+
     /// @throws std::invalid_argument for an unknown mesh.
     void RemoveMesh(std::uint32_t mesh);
 
@@ -291,6 +307,9 @@ class MeshDrawable : public RasterDrawable {
         std::uint32_t pointSet = 0;
         bool pointsMoving = false;
         bool pointsWritten = false;
+        /// The view `MapPoints` last gave out, and whether the points written are already in it.
+        Tensor mappedPoints;
+        bool pointsInPlace = false;
         std::vector<MeshLevel> levels;          ///< Its levels of detail, the full mesh first.
         std::vector<std::uint32_t> lodIndices;  ///< The coarser levels' indices, one after another.
     };
@@ -307,6 +326,10 @@ class MeshDrawable : public RasterDrawable {
         std::uint32_t set = 0;
         bool moving = false;
         bool written = false;
+        /// Per array, the view `MapInstances` last gave out, and whether the array written is
+        /// already in it.
+        std::array<Tensor, 3> mapped;
+        std::array<bool, 3> inPlace{};
     };
 
     void CreateGBufferPipeline();
@@ -322,6 +345,13 @@ class MeshDrawable : public RasterDrawable {
     void CopyDevicePoints(Mesh& mesh);
     /// Moves a mesh's points to the other half of the pool on its first write of a frame.
     void FlipPoints(Mesh& mesh);
+    /// Likewise an instancer's arrays.
+    void FlipInstancer(Instancer& instancer);
+    /// Rebuilds the pools now if they are due, so their buffers exist to map.
+    void EnsurePools();
+    /// A float32 tensor of `shape` over `pool` from float `offset`, on the compute device.
+    Tensor PoolView(const std::shared_ptr<GpuBuffer>& pool, std::size_t offset,
+                    std::vector<std::int64_t> shape) const;
     /// A mesh's points' offset in the pool, in points: now, or at the last frame with `previous`.
     std::uint32_t PointBase(const Mesh& mesh, bool previous = false) const;
     /// Likewise an instancer's arrays' offset in the instance pools, in instances.

@@ -230,9 +230,15 @@ void PointsDrawable::Set(std::uint32_t points, const DevicePointsData& data) {
         }
     }
     Cloud& cloud = it->second;
-    const bool layout = count != cloud.count || !cloud.onDevice ||
-                        data.widths.Empty() != cloud.device.widths.Empty() ||
-                        data.colors.Empty() != cloud.device.colors.Empty();
+    const bool hadWidths =
+        cloud.onDevice ? !cloud.device.widths.Empty() : !cloud.data.widths.empty();
+    const bool hadColors =
+        cloud.onDevice ? !cloud.device.colors.Empty() : !cloud.data.colors.empty();
+    const bool layout = count != cloud.count ||
+                        (!cloud.onDevice && cloud.mapped.Empty()) ||
+                        data.widths.Empty() == hadWidths || data.colors.Empty() == hadColors;
+    // The view `MapPositions` gave out, handed back: the positions are in place already.
+    cloud.inPlace = !layout && !cloud.mapped.Empty() && data.points.Data() == cloud.mapped.Data();
     cloud.device = data;
     cloud.onDevice = true;
     cloud.count = count;
@@ -255,6 +261,52 @@ void PointsDrawable::Set(std::uint32_t points, const DevicePointsData& data) {
     } else {
         cloud.dirty = true;
     }
+}
+
+Tensor PointsDrawable::MapPositions(std::uint32_t points, std::uintptr_t stream) {
+    const auto it = clouds_.find(points);
+    if (it == clouds_.end()) {
+        throw std::invalid_argument("Unknown points " + std::to_string(points));
+    }
+    if (compute_ == nullptr) {
+        throw std::invalid_argument("Mapping points needs compute interop");
+    }
+    Cloud& cloud = it->second;
+    if (cloud.positions->Memory() != BufferMemory::Shared) {
+        // Made before compute interop: into memory the compute device sees, both halves holding
+        // the points now.
+        Allocate(cloud);
+        if (!cloud.onDevice) {
+            const std::span<const std::byte> bytes = std::as_bytes(std::span(cloud.data.points));
+            cloud.positions->Write(bytes);
+            cloud.positions->Write(bytes, bytes.size());
+            if (!cloud.data.widths.empty()) {
+                cloud.widths->Write(std::as_bytes(std::span(cloud.data.widths)));
+            }
+            if (!cloud.data.colors.empty()) {
+                cloud.colors->Write(std::as_bytes(std::span(cloud.data.colors)));
+            }
+            cloud.dirty = false;
+        }
+    }
+    const auto count = static_cast<std::int64_t>(cloud.count);
+    const auto view = [&] {
+        return compute_->View(cloud.positions, DType::Float32, {count, 3},
+                              VkDeviceSize{cloud.set} * cloud.count * 3 * sizeof(float));
+    };
+    // Nothing writes the half frames still in flight may read until they finish.
+    compute_->WaitForVulkan(stream);
+    const Tensor current = view();
+    if (!cloud.written) {
+        cloud.set ^= 1u;
+        cloud.written = true;
+        cloud.moving = true;
+    }
+    cloud.mapped = view();
+    if (cloud.mapped.Data() != current.Data()) {
+        compute_->Copy(current, cloud.mapped, stream);
+    }
+    return cloud.mapped;
 }
 
 void PointsDrawable::Remove(std::uint32_t points) {
@@ -295,7 +347,13 @@ void PointsDrawable::Write(Cloud& cloud) {
     const VkDeviceSize half = VkDeviceSize{cloud.set} * cloud.count * 3 * sizeof(float);
     if (cloud.onDevice) {
         const DevicePointsData& device = cloud.device;
-        compute_->CopyToBuffer(device.points, *cloud.positions, half, device.stream);
+        if (cloud.inPlace) {
+            // Written there through `MapPositions`: the frame waits for their stream.
+            compute_->SignalVulkan(device.stream);
+            cloud.inPlace = false;
+        } else {
+            compute_->CopyToBuffer(device.points, *cloud.positions, half, device.stream);
+        }
         if (!device.widths.Empty()) {
             compute_->CopyToBuffer(device.widths, *cloud.widths, 0, device.stream);
         }

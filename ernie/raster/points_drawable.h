@@ -87,6 +87,13 @@ class PointsDrawable : public RasterDrawable {
     /// `SetComputeInterop`.
     void Set(std::uint32_t points, const DevicePointsData& data);
 
+    /// Maps a cloud's positions for writing in place on the compute device, as
+    /// `MeshDrawable::MapPoints`: a float32 (points, 3) tensor over the half of the drawable's
+    /// own buffer the next frame draws, holding the positions as they are now; the device `Set`
+    /// takes it back without copying.
+    /// @throws std::invalid_argument for an unknown cloud or without `SetComputeInterop`.
+    Tensor MapPositions(std::uint32_t points, std::uintptr_t stream = 1);
+
     /// @throws std::invalid_argument for an unknown cloud.
     void Remove(std::uint32_t points);
 
@@ -138,6 +145,9 @@ class PointsDrawable : public RasterDrawable {
         bool moving = false;
         bool written = false;
         bool dirty = true;
+        /// The view `MapPositions` last gave out, and whether the positions written are in it.
+        Tensor mapped;
+        bool inPlace = false;
     };
 
     void Check(const Cloud& cloud) const;

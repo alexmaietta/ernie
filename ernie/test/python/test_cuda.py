@@ -110,3 +110,21 @@ def test_poses_written_from_cuda_stay_on_the_gpu(cuda_renderer):
     assert np.mean(np.abs(gpu.astype(int) - host.astype(int)) > 8) < 0.005
     np.testing.assert_array_equal(render(on_gpu, device=tokens.HOST), host)
     assert cuda_renderer.take_validation_messages() == []
+
+
+def test_mapped_arrays_are_written_in_place(cuda_renderer):
+    positions = np.array([[-10.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.0, 10.0, 0.0]], np.float32)
+    scene = instancer_scene(positions)
+    cuda_renderer.render(scene)
+    mapped = cuda_renderer.map(scene, "/World/Rocks", tokens.POSITIONS)
+    # A writable DLPack array (for torch, cupy, warp.from_dlpack) holding the values.
+    assert mapped.__dlpack_device__() == (2, 0)
+    np.testing.assert_array_equal(np.array(cuda_renderer.cuda_download(mapped)), positions)
+    moved = np.array([[-10.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 10.0, 0.0]], np.float32)
+    cuda_renderer.cuda_copy(cuda_renderer.cuda_upload(moved), mapped)
+    scene.unmap("/World/Rocks", tokens.POSITIONS)
+    np.testing.assert_array_equal(
+        np.array(cuda_renderer.render(scene)),
+        np.array(cuda_renderer.render(instancer_scene(moved))))
+    with pytest.raises(ValueError):
+        cuda_renderer.map(scene, "/World/Rocks", tokens.NORMALS)

@@ -218,6 +218,7 @@ void TerrainDrawable::ClearHeightfield() {
     width_ = 0;
     height_ = 0;
     deviceHeights_.reset();
+    mappedHeights_ = Tensor();
     leaves_.reset();
     pendingRect_.reset();
     readbackPending_ = {};
@@ -240,6 +241,7 @@ void TerrainDrawable::SetHeightfield(const RasterView& raster) {
     triangles_ = 0;
     prepared_ = false;
     deviceHeights_.reset();
+    mappedHeights_ = Tensor();
     leaves_.reset();
     pendingRect_.reset();
     readbackPending_ = {};
@@ -312,6 +314,7 @@ void TerrainDrawable::AllocateHeightfield(std::uint32_t width, std::uint32_t hei
     gradients_ = std::make_unique<GpuImage>(
         context, ImageDesc{width, height, 1, mips, VK_FORMAT_R16G16_SFLOAT,
                            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT});
+    mappedHeights_ = Tensor();
     deviceHeights_ = std::make_shared<GpuBuffer>(
         context, VkDeviceSize{width} * height * sizeof(float), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         BufferMemory::Shared);
@@ -373,7 +376,12 @@ void TerrainDrawable::SetHeightfield(const DeviceHeightfield& field) {
     originX_ = field.originX;
     originY_ = field.originY;
     pixelSize_ = field.cellSize;
-    compute_->CopyToBuffer(tensor, *deviceHeights_, 0, field.stream);
+    if (!reshape && !mappedHeights_.Empty() && tensor.Data() == mappedHeights_.Data()) {
+        // Written in place through `MapHeights`: the frame waits for their stream.
+        compute_->SignalVulkan(field.stream);
+    } else {
+        compute_->CopyToBuffer(tensor, *deviceHeights_, 0, field.stream);
+    }
     if (rect[0] < rect[2] && rect[1] < rect[3]) {
         pendingRect_ = pendingRect_ ? std::array<std::uint32_t, 4>{std::min((*pendingRect_)[0], rect[0]),
                                                                     std::min((*pendingRect_)[1], rect[1]),
@@ -393,6 +401,18 @@ void TerrainDrawable::SetHeightfield(const DeviceHeightfield& field) {
         pendingRect_.reset();
         TakeLeaves(*readbacks_[0]);
     }
+}
+
+Tensor TerrainDrawable::MapHeights(std::uintptr_t stream) {
+    if (compute_ == nullptr || deviceHeights_ == nullptr) {
+        throw std::invalid_argument("Mapping heights needs heights written on the GPU first");
+    }
+    // Nothing writes them while frames already submitted may still copy them.
+    compute_->WaitForVulkan(stream);
+    mappedHeights_ = compute_->View(deviceHeights_, DType::Float32,
+                                    {static_cast<std::int64_t>(height_),
+                                     static_cast<std::int64_t>(width_)});
+    return mappedHeights_;
 }
 
 void TerrainDrawable::RecordCull(VkCommandBuffer commands) const {

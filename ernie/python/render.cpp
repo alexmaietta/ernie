@@ -43,33 +43,6 @@ Device ParseDevice(const std::string& device) {
         device + "\"");
 }
 
-/// Holds a Python object, releasing it with the GIL held.
-struct PythonReference {
-    nb::object object;
-
-    ~PythonReference() {
-        if (Py_IsInitialized() != 0) {
-            nb::gil_scoped_acquire gil;
-            object = nb::object();
-        }
-    }
-};
-
-/// `tensor`, also keeping the Python object `keep` alive, so arrays in memory of the renderer's
-/// Vulkan device or CUDA context cannot outlive the renderer.
-Tensor KeepingAlive(const Tensor& tensor, nb::handle keep) {
-    // The tensor goes before the reference, so what it keeps alive outlives it.
-    struct Owner {
-        PythonReference keep;
-        Tensor tensor;
-    };
-    auto owner = std::make_shared<Owner>();
-    owner->keep.object = nb::borrow(keep);
-    owner->tensor = tensor;
-    return Tensor(tensor.Data(), tensor.Type(), tensor.Shape(), tensor.Strides(), tensor.Location(),
-                  std::move(owner));
-}
-
 /// A render result on the compute device (CUDA or ROCm): implements the DLPack protocol so a
 /// consumer's stream waits on the GPU for the render before reading it.
 struct CudaArray {
@@ -522,6 +495,23 @@ void BindRender(nb::module_& m) {
             nb::arg("array"),
             "A copy of a host array in CUDA memory, for frameworks without CUDA arrays of their "
             "own.")
+        .def(
+            "map",
+            [](nb::pointer_and_handle<Renderer> self, Scene& scene, const Path& path,
+               std::string_view attribute, nb::handle stream) {
+                return ArrayFromTensor(KeepingAlive(
+                    self.p->Delegate().MapArray(scene, path, attribute, StreamOf(stream)),
+                    self.h), true);
+            },
+            nb::arg("scene"), nb::arg("path"), nb::arg("attribute"),
+            nb::arg("stream").none() = nb::none(),
+            "Maps an array of `path` for writing in place on the GPU, without copies: a CUDA "
+            "array over the renderer's own memory for it (a Mesh's or Points prim's points, a "
+            "PointInstancer's positions, orientations or scales, the Terrain's heights once "
+            "written on the GPU), holding its values, which the scene now holds as the attribute. "
+            "Write into it on `stream` (which first waits for frames already submitted), then "
+            "`scene.unmap(path, attribute, stream)`; map again every step, as the memory behind "
+            "it alternates to keep the last step's values for motion blur.")
         .def(
             "cuda_download",
             [](Renderer& r, const AnyArray& array) {

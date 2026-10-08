@@ -8,7 +8,8 @@ namespace ernie {
 
 GpuBuffer::GpuBuffer(const VulkanContext& context, VkDeviceSize size, VkBufferUsageFlags usage,
                      BufferMemory memory)
-    : context_(&context), lifetime_(std::make_shared<char>()), size_(size), memory_(memory) {
+    : context_(&context), contextAlive_(context.Alive()), lifetime_(std::make_shared<char>()),
+      size_(size), memory_(memory) {
     VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
     info.size = size;
     info.usage = usage | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -65,7 +66,8 @@ GpuBuffer::~GpuBuffer() {
 }
 
 GpuBuffer::GpuBuffer(GpuBuffer&& other) noexcept
-    : context_(other.context_), buffer_(std::exchange(other.buffer_, VK_NULL_HANDLE)),
+    : context_(other.context_), contextAlive_(other.contextAlive_),
+      buffer_(std::exchange(other.buffer_, VK_NULL_HANDLE)),
       allocation_(std::exchange(other.allocation_, VK_NULL_HANDLE)),
       sharedMemory_(std::exchange(other.sharedMemory_, VK_NULL_HANDLE)),
       allocationSize_(std::exchange(other.allocationSize_, 0)),
@@ -77,6 +79,7 @@ GpuBuffer& GpuBuffer::operator=(GpuBuffer&& other) noexcept {
     if (this != &other) {
         Release();
         context_ = other.context_;
+        contextAlive_ = other.contextAlive_;
         buffer_ = std::exchange(other.buffer_, VK_NULL_HANDLE);
         allocation_ = std::exchange(other.allocation_, VK_NULL_HANDLE);
         sharedMemory_ = std::exchange(other.sharedMemory_, VK_NULL_HANDLE);
@@ -93,6 +96,14 @@ GpuBuffer& GpuBuffer::operator=(GpuBuffer&& other) noexcept {
 void GpuBuffer::Release() {
     attached_.reset();
     lifetime_.reset();
+    if (buffer_ != VK_NULL_HANDLE && contextAlive_.expired()) {
+        // The device went first, taking its memory with it, as when a scene still holds an array
+        // over the buffer after its renderer is gone: nothing left to destroy.
+        buffer_ = VK_NULL_HANDLE;
+        allocation_ = VK_NULL_HANDLE;
+        sharedMemory_ = VK_NULL_HANDLE;
+        return;
+    }
     if (sharedMemory_ != VK_NULL_HANDLE) {
         vkDestroyBuffer(context_->Device(), buffer_, nullptr);
         vkFreeMemory(context_->Device(), sharedMemory_, nullptr);

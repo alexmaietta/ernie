@@ -380,6 +380,20 @@ void BindApp(nb::module_& parent) {
                      "The viewport's Wireframe mode, overriding the render settings' own; None "
                      "follows them.")
         .def_prop_rw("settings", &Viewer::Settings, &Viewer::SetSettings)
+        .def(
+            "map",
+            [](nb::pointer_and_handle<Viewer> self, const Path& path, std::string_view attribute,
+               nb::handle stream) {
+                Viewer& viewer = *self.p;
+                return ArrayFromTensor(KeepingAlive(
+                    viewer.Delegate().MapArray(viewer.GetScene(), path, attribute,
+                                               StreamOf(stream)),
+                    self.h), true);
+            },
+            nb::arg("path"), nb::arg("attribute"), nb::arg("stream").none() = nb::none(),
+            "As Renderer.map, for the viewer's scene and renderer: a CUDA array over the "
+            "viewer's own memory for the attribute, to write in place and then "
+            "`scene.unmap(path, attribute, stream)`; map again every frame.")
         .def("capture", &Viewer::Capture, nb::arg("path"), nb::arg("var") = "",
              "Writes the next viewport frame to `path` as PNG.")
         .def("add_panel", &Viewer::AddWidgetPanel, nb::arg("title"),
