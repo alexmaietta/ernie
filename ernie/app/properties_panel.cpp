@@ -227,8 +227,11 @@ class PropertiesPanel final : public Panel {
                 for (const std::int64_t extent : tensor->Shape()) {
                     shape += (shape.empty() ? "" : " x ") + std::to_string(extent);
                 }
+                const DeviceKind kind = tensor->Location().kind;
                 ImGui::TextDisabled("%s [%s] %s", DTypeName(tensor->Type()), shape.c_str(),
-                                    tensor->Location().kind == DeviceKind::Cuda ? "cuda" : "cpu");
+                                    kind == DeviceKind::Cuda   ? "cuda"
+                                    : kind == DeviceKind::Rocm ? "rocm"
+                                                               : "cpu");
             }
             ImGui::PopID();
         }
