@@ -25,8 +25,9 @@ bool IsSessionPath(const Path& path);
 /// then the scene's own, each in path order.
 std::vector<Path> ViewableCameras(const Scene& scene);
 
-/// Defines or updates the Camera prim at `path` with `controller`'s pose, field of view and
-/// clipping range, for an image of `width` x `height`.
+/// Defines the Camera prim at `path` with `controller`'s pose, field of view and clipping range,
+/// for an image of `width` x `height`; an existing one takes the pose and clipping range and
+/// keeps its own lens.
 void AuthorControllerCamera(Scene& scene, const Path& path, const OrbitController& controller,
                             std::uint32_t width, std::uint32_t height);
 

@@ -7,6 +7,7 @@ ernie_add_library(
     panel.cpp
     prim_icons.cpp
     prim_schemas.cpp
+    profiler_panel.cpp
     properties_panel.cpp
     property_fields.cpp
     session.cpp

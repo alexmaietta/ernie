@@ -264,7 +264,8 @@ def test_auto_exposure_keys_bright_scenes_to_middle_grey():
         viewer = app.Viewer(scene, hidden=True, width=320, height=240)
     except RuntimeError as error:
         pytest.skip(f"No Vulkan device: {error}")
-    assert viewer.exposure == app.Exposure.DEFAULT and viewer.auto_exposing
+    assert viewer.exposure == app.Exposure.CAMERA and not viewer.auto_exposing, "off by default"
+    viewer.exposure = app.Exposure.AUTO
     display = viewer.viewport_display  # the sun's gizmo would cover the centre
     display.grid = display.lights = False
     viewer.viewport_display = display

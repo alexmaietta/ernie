@@ -3,6 +3,7 @@ ernie_add_library(
     SOURCES
     astronomy.cpp
     image.cpp
+    profiler.cpp
     spectrum.cpp
     tensor.cpp
     PUBLIC

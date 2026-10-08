@@ -377,6 +377,27 @@ void BindApp(nb::module_& parent) {
              "Adds a WidgetPanel titled `title`, docked at `dock` in the default layout.")
         .def("remove_panel", &Viewer::RemovePanel, nb::arg("title"))
         .def(
+            "panel_visible",
+            [](Viewer& viewer, std::string_view title) {
+                const app::Panel* panel = viewer.FindPanel(title);
+                if (panel == nullptr) {
+                    throw nb::value_error(("No panel is titled " + std::string(title)).c_str());
+                }
+                return panel->IsVisible();
+            },
+            nb::arg("title"), "Whether the panel titled `title` (such as \"Profiler\") shows.")
+        .def(
+            "set_panel_visible",
+            [](Viewer& viewer, std::string_view title, bool visible) {
+                app::Panel* panel = viewer.FindPanel(title);
+                if (panel == nullptr) {
+                    throw nb::value_error(("No panel is titled " + std::string(title)).c_str());
+                }
+                panel->SetVisible(visible);
+            },
+            nb::arg("title"), nb::arg("visible"),
+            "Shows or hides the panel titled `title`, as the Window menu does.")
+        .def(
             "add_menu_item",
             [](Viewer& viewer, const std::string& menu, const std::string& label,
                nb::callable action) {

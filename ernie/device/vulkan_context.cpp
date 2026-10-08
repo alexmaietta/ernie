@@ -351,6 +351,8 @@ std::unique_ptr<VulkanContext> VulkanContext::Create(const VulkanContextOptions&
     // Layered rendering: a batch's views draw their G-buffers in one pass, each into its layer.
     features12.shaderOutputLayer = VK_TRUE;
     features12.bufferDeviceAddress = supported12.bufferDeviceAddress;
+    // For the profiler's GPU zones (GpuTimer), which free their queries from the host.
+    features12.hostQueryReset = supported12.hostQueryReset;
     features12.pNext = &features13;
     VkPhysicalDeviceVulkan11Features features11{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES};
@@ -405,6 +407,15 @@ std::unique_ptr<VulkanContext> VulkanContext::Create(const VulkanContextOptions&
     CheckVk(vkCreateCommandPool(c.device_, &poolInfo, nullptr, &c.commandPool_),
             "vkCreateCommandPool");
     c.submissions_ = c.CreateTimelineSemaphore();
+    {
+        std::uint32_t familyCount = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(c.physicalDevice_, &familyCount, nullptr);
+        std::vector<VkQueueFamilyProperties> families(familyCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(c.physicalDevice_, &familyCount, families.data());
+        const std::uint32_t bits =
+            supported12.hostQueryReset ? families[c.queueFamily_].timestampValidBits : 0;
+        c.timer_ = std::make_unique<GpuTimer>(c.device_, bits, c.limits_.timestampPeriod);
+    }
 #if ERNIE_TRACY
     if (c.limits_.timestampComputeAndGraphics) {
         // Tracy records into its command buffer more than once, so its pool allows resets.
@@ -439,6 +450,7 @@ std::unique_ptr<VulkanContext> VulkanContext::Create(const VulkanContextOptions&
 }
 
 void VulkanContext::CollectGpuProfile([[maybe_unused]] VkCommandBuffer commands) const {
+    timer_->Collect();
 #if ERNIE_TRACY
     if (gpuProfiler_ != nullptr) {
         std::lock_guard lock(profilerMutex_);
@@ -450,6 +462,7 @@ void VulkanContext::CollectGpuProfile([[maybe_unused]] VkCommandBuffer commands)
 VulkanContext::~VulkanContext() {
     if (device_ != VK_NULL_HANDLE) {
         vkDeviceWaitIdle(device_);
+        timer_.reset();
 #if ERNIE_TRACY
         if (gpuProfiler_ != nullptr) {
             TracyVkDestroy(static_cast<tracy::VkCtx*>(gpuProfiler_));

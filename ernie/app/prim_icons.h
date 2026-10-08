@@ -14,6 +14,10 @@ namespace ernie::app {
 /// so they stay crisp at any size and need no image assets.
 void DrawPrimIcon(ImDrawList* draw, const ImVec2& corner, float size, std::string_view type);
 
+/// Draws the viewport's renderer icon, a lit ball on the ground, into the square of `size` pixels
+/// at `corner`.
+void DrawRendererIcon(ImDrawList* draw, const ImVec2& corner, float size);
+
 /// Reserves a `size` square at the cursor, as an item, and draws `type`'s icon in it.
 void PrimIcon(std::string_view type, float size);
 

@@ -89,6 +89,16 @@ TEST(OrbitController, PanFollowsTheCursorAtTargetDepth) {
     EXPECT_FLOAT_EQ(camera.target.z, before.z);
 }
 
+TEST(OrbitController, VerticalPanMovesAlongZ) {
+    OrbitController camera;
+    camera.distance = 100.0f;
+    const float perPixel = 2.0f * 100.0f * std::tan(0.5f * camera.verticalFov) / 500.0f;
+    camera.PanVertical(0.0f, 20.0f, 500.0f);
+    EXPECT_NEAR(camera.target.z, 20.0f * perPixel, 1e-4f) << "dragging down raises the view";
+    EXPECT_FLOAT_EQ(camera.target.x, 0.0f);
+    EXPECT_FLOAT_EQ(camera.target.y, 0.0f);
+}
+
 TEST(OrbitController, FrameFitsTheBoxInView) {
     OrbitController camera;
     camera.yaw = 0.7f;

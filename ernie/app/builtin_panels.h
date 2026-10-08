@@ -27,4 +27,9 @@ std::unique_ptr<Panel> MakeCameraPanel();
 /// The Log panel: the viewer's messages (`Viewer::Log`), filtered by level and text.
 std::unique_ptr<Panel> MakeLogPanel();
 
+/// The Profiler panel, hidden until shown: Ernie's profiler (ernie/util/profiler.h) recording
+/// while it shows, with frame times, a timeline of the CPU and GPU zones of a frame, and their
+/// totals, after Omniverse Kit's profiler window.
+std::unique_ptr<Panel> MakeProfilerPanel();
+
 }  // namespace ernie::app

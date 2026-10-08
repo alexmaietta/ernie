@@ -20,7 +20,9 @@ class OrbitController {
     float distance = 100.0f;        ///< World units from the eye to the target.
     float verticalFov = 0.785398f;  ///< Radians.
 
-    static constexpr float kMinPitch = 0.05f;
+    /// Pitch stops short of straight down and up, where the view's up vector degenerates; views
+    /// may look up from below the ground.
+    static constexpr float kMinPitch = -1.55f;
     static constexpr float kMaxPitch = 1.55f;
 
     /// Eye position in world coordinates.
@@ -52,6 +54,10 @@ class OrbitController {
     /// viewport `viewportHeight` pixels tall, so the terrain follows the cursor at the target
     /// depth.
     void Pan(float dx, float dy, float viewportHeight);
+
+    /// Moves the target across the screen by a drag of (`dx`, `dy`) pixels: sideways as `Pan`,
+    /// and up and down along world z.
+    void PanVertical(float dx, float dy, float viewportHeight);
 
     /// Zooms by `steps` scroll steps; positive moves closer. Distance stays within [1e-3, 1e7].
     void Zoom(float steps);

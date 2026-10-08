@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ernie/device/gpu_timer.h"
+
 #include <vk_mem_alloc.h>
 #include <volk.h>
 
@@ -176,8 +178,14 @@ class VulkanContext {
         return gpuProfiler_;
     }
 
+    /// The timer of `ERNIE_GPU_ZONE`s for Ernie's own profiler (ernie/util/profiler.h); it times
+    /// nothing on devices without timestamps or host query reset.
+    GpuTimer& Timer() const {
+        return *timer_;
+    }
+
     /// Records into `commands`, outside a rendering pass, the collection of finished GPU zones
-    /// for the profiler; nothing without one. `Submit` and `SubmitAsync` collect at the start
+    /// for Tracy, and hands those Ernie's profiler timed to it; nothing without either. `Submit` and `SubmitAsync` collect at the start
     /// of every command buffer, so only command buffers recorded elsewhere need it, such as an
     /// app's frames.
     void CollectGpuProfile(VkCommandBuffer commands) const;
@@ -207,6 +215,7 @@ class VulkanContext {
     bool validation_ = false;
     mutable std::mutex submitMutex_;
     void* gpuProfiler_ = nullptr;  ///< A tracy::VkCtx in a profiling build.
+    std::unique_ptr<GpuTimer> timer_;
     mutable std::mutex profilerMutex_;
     /// Timeline signalled by every `SubmitAsync`, and its command buffers awaiting recycling.
     VkSemaphore submissions_ = VK_NULL_HANDLE;

@@ -65,11 +65,15 @@ TEST(SessionTest, ControllerFromTransformReproducesAnOrbitPose) {
     ExpectNear(back.Transform(), orbit.Transform(), 1e-4);
 }
 
-TEST(SessionTest, ControllerFromTransformClampsViewsFromBelow) {
+TEST(SessionTest, ControllerFromTransformKeepsViewsFromBelow) {
     const glm::dmat4 lookingUp = glm::inverse(glm::lookAtRH(
         glm::dvec3(0.0, 0.0, 0.0), glm::dvec3(0.0, 1.0, 1.0), glm::dvec3(0.0, 0.0, 1.0)));
     const OrbitController controller = ControllerFromTransform(lookingUp, 10.0f, 0.8f);
-    EXPECT_FLOAT_EQ(controller.pitch, OrbitController::kMinPitch);
+    EXPECT_NEAR(controller.pitch, -glm::quarter_pi<float>(), 1e-5f) << "the eye below the target";
+    const glm::dmat4 straightUp = glm::inverse(glm::lookAtRH(
+        glm::dvec3(0.0, 0.0, 0.0), glm::dvec3(0.0, 0.001, 1.0), glm::dvec3(0.0, 0.0, 1.0)));
+    EXPECT_FLOAT_EQ(ControllerFromTransform(straightUp, 10.0f, 0.8f).pitch,
+                    OrbitController::kMinPitch);
 }
 
 TEST(SessionTest, LocalFromWorldUndoesTheParentsTransform) {
@@ -108,6 +112,20 @@ TEST(SessionTest, AuthorControllerCameraKeepsTheCamerasExposure) {
     SetCamera(scene, path, custom);
     AuthorControllerCamera(scene, path, OrbitController{}, 64, 64);
     EXPECT_DOUBLE_EQ(CameraOf(scene, path, 64, 64).exposureStops, 2.0);
+}
+
+TEST(SessionTest, AuthorControllerCameraKeepsAnAuthoredLens) {
+    // A focal length set in the Camera panel survives orbiting the view.
+    Scene scene;
+    const Path path("/__session/Perspective");
+    AuthorControllerCamera(scene, path, OrbitController{}, 64, 64);
+    scene.Set(path, tokens::kFocalLength, 85.0);
+    OrbitController moved;
+    moved.yaw = 1.0f;
+    AuthorControllerCamera(scene, path, moved, 64, 64);
+    const Camera camera = CameraOf(scene, path, 64, 64);
+    EXPECT_DOUBLE_EQ(camera.focalLengthMm, 85.0);
+    ExpectNear(camera.transform, moved.Transform(), 1e-4);
 }
 
 TEST(SessionTest, MirrorSettingsCopiesValuesAndOverridesTheCamera) {

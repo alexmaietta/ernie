@@ -192,7 +192,8 @@ void DrawPrimIcon(ImDrawList* draw, const ImVec2& corner, float size, std::strin
     const Frame at{corner, size};
     if (type == kXform) {
         Tripod(draw, at);
-    } else if (type == kScope) {
+    } else if (type == kScope || type.empty()) {
+        // Untyped prims group others, as folders.
         Folder(draw, at);
     } else if (type == kSphere || type == kCapsule) {
         Ball(draw, at, Rgb(74, 85, 88), Rgb(104, 114, 118), Rgb(170, 178, 182));
@@ -229,6 +230,14 @@ void DrawPrimIcon(ImDrawList* draw, const ImVec2& corner, float size, std::strin
     } else {
         Untyped(draw, at);
     }
+}
+
+void DrawRendererIcon(ImDrawList* draw, const ImVec2& corner, float size) {
+    const Frame at{corner, size};
+    // A lit ball on the ground with its shadow: a rendered image.
+    draw->AddEllipseFilled(at(0.58f, 0.86f), ImVec2(at(0.36f), at(0.1f)), Rgb(20, 22, 24, 200));
+    Ball(draw, at, Rgb(52, 92, 122), Rgb(74, 133, 173), Rgb(214, 232, 244));
+    draw->AddCircle(at(0.5f, 0.52f), at(0.4f), Rgb(150, 160, 164), 0, std::max(1.0f, at(0.05f)));
 }
 
 void PrimIcon(std::string_view type, float size) {

@@ -26,10 +26,18 @@ std::vector<Path> ViewableCameras(const Scene& scene) {
 
 void AuthorControllerCamera(Scene& scene, const Path& path, const OrbitController& controller,
                             std::uint32_t width, std::uint32_t height) {
-    Camera camera = scene.Has(path) ? CameraOf(scene, path, width, height) : Camera{};
+    const bool existing = scene.Has(path);
+    Camera camera = existing ? CameraOf(scene, path, width, height) : Camera{};
     camera.width = width;
     camera.height = height;
-    controller.Apply(camera);
+    if (existing) {
+        // Its lens stays as authored, such as a focal length set in the Camera panel.
+        camera.transform = controller.Transform();
+        camera.nearPlane = controller.NearPlane();
+        camera.farPlane = controller.FarPlane();
+    } else {
+        controller.Apply(camera);
+    }
     SetCamera(scene, path, camera);
 }
 

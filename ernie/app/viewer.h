@@ -282,8 +282,8 @@ class Viewer {
     void SetLighting(Lighting lighting);
 
     /// How the viewport exposes its image: `Auto` keys the scene's metered average luminance to
-    /// middle grey (adapting over a fraction of a second), `Camera` takes the camera's own
-    /// exposure attributes as they are, and `Default` (the default) is automatic through the
+    /// middle grey (adapting over a fraction of a second), `Camera` (the default) takes the
+    /// camera's own exposure attributes as they are, and `Default` is automatic through the
     /// viewer's own camera and the camera's own through a scene camera.
     enum class Exposure { Default, Auto, Camera };
     Exposure GetExposure() const;

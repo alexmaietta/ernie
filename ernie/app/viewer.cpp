@@ -3,6 +3,7 @@
 #include "ernie/app/builtin_panels.h"
 #include "ernie/app/create.h"
 #include "ernie/app/icons.h"
+#include "ernie/app/prim_icons.h"
 #include "ernie/app/session.h"
 #include "ernie/device/image.h"
 #include "ernie/device/offscreen_target.h"
@@ -16,6 +17,7 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/session/delegate.h"
 #include "ernie/session/resolve.h"
+#include "ernie/device/gpu_profile.h"
 #include "ernie/util/profile.h"
 
 #define GLFW_INCLUDE_NONE
@@ -190,6 +192,24 @@ const char* LightingName(Lighting lighting) {
     return "";
 }
 
+/// Draws the icon glyph `icon` (one UTF-8 character) centred on `centre` by its ink, not its
+/// advance, which icon fonts leave uneven.
+void DrawIconCentred(ImDrawList* draw, const char* icon, ImVec2 centre, ImU32 colour) {
+    unsigned int codepoint = 0;
+    ImTextCharFromUtf8(&codepoint, icon, nullptr);
+    const ImFontGlyph* glyph =
+        ImGui::GetFontBaked()->FindGlyphNoFallback(static_cast<ImWchar>(codepoint));
+    ImVec2 at;
+    if (glyph != nullptr) {
+        at = ImVec2(centre.x - 0.5f * (glyph->X0 + glyph->X1),
+                    centre.y - 0.5f * (glyph->Y0 + glyph->Y1));
+    } else {
+        const ImVec2 size = ImGui::CalcTextSize(icon);
+        at = ImVec2(centre.x - 0.5f * size.x, centre.y - 0.5f * size.y);
+    }
+    draw->AddText(ImVec2(std::round(at.x), std::round(at.y)), colour, icon);
+}
+
 /// A backend's name as menus show it: "raster" as "Raster".
 std::string DisplayName(std::string name) {
     if (!name.empty()) {
@@ -342,7 +362,7 @@ struct Viewer::State {
     std::map<std::string, std::uint64_t> mirrored;
     std::string viewVar = "LdrColor";
     int viewBand = -1;
-    Viewer::Exposure exposure = Viewer::Exposure::Default;
+    Viewer::Exposure exposure = Viewer::Exposure::Camera;
     double compensation = 0.0;
     std::optional<double> autoStops;  ///< The automatic exposure's stops, as it adapts.
 
@@ -430,6 +450,7 @@ struct Viewer::State {
     std::uint64_t nextCallback = 1;
     std::vector<std::unique_ptr<Panel>> panels;
     StatsPanel* stats = nullptr;
+    Panel* profilerPanel = nullptr;
     std::size_t builtInPanels = 0;  ///< The first panels, which removing only hides.
     std::vector<MenuItem> menuItems;
     struct ViewportToggle {
@@ -712,6 +733,11 @@ struct Viewer::State {
 
     void WriteActiveCamera() {
         if (activeCamera == PerspectiveCamera()) {
+            // The camera's lens may have changed (the Camera panel): framing follows it.
+            if (scene.Has(activeCamera)) {
+                controller.verticalFov = static_cast<float>(
+                    CameraOf(scene, activeCamera, ViewportWidth(), ViewportHeight()).VerticalFov());
+            }
             AuthorControllerCamera(scene, activeCamera, controller, ViewportWidth(),
                                    ViewportHeight());
         } else {
@@ -939,10 +965,6 @@ struct Viewer::State {
             }
             ImGui::EndMenu();
         }
-        const std::string device = gpu->DeviceName();
-        const float width = ImGui::CalcTextSize(device.c_str()).x;
-        ImGui::SameLine(ImGui::GetWindowWidth() - width - ImGui::GetStyle().ItemSpacing.x * 2.0f);
-        ImGui::TextDisabled("%s", device.c_str());
         ImGui::EndMainMenuBar();
     }
 
@@ -1282,9 +1304,13 @@ struct Viewer::State {
             controller.Orbit(-io.MouseDelta.x * 0.005f, io.MouseDelta.y * 0.005f);
             moved = true;
         }
-        if (active && (ImGui::IsMouseDragging(ImGuiMouseButton_Right, 0.0f) ||
-                       ImGui::IsMouseDragging(ImGuiMouseButton_Middle, 0.0f))) {
+        // Right drags along the ground, middle across the screen (up and down along z).
+        if (active && ImGui::IsMouseDragging(ImGuiMouseButton_Right, 0.0f)) {
             controller.Pan(io.MouseDelta.x, io.MouseDelta.y, height);
+            moved = true;
+        }
+        if (active && ImGui::IsMouseDragging(ImGuiMouseButton_Middle, 0.0f)) {
+            controller.PanVertical(io.MouseDelta.x, io.MouseDelta.y, height);
             moved = true;
         }
         if (hovered && io.MouseWheel != 0.0f) {
@@ -1384,41 +1410,45 @@ struct Viewer::State {
             ImGui::SetCursorScreenPos(at);
             at.y += button + gap;
         };
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, theme.pillRounding * contentScale);
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        // A square button with its icon centred by the glyph's ink.
+        const auto iconButton = [&](const char* id, const char* icon, bool on) {
+            const ImVec2 corner = ImGui::GetCursorScreenPos();
+            const bool pressed = ImGui::InvisibleButton(id, ImVec2(button, button));
+            const bool hovered = ImGui::IsItemHovered();
+            const glm::vec4 fill = on ? theme.accent : hovered ? theme.fieldHovered : theme.overlay;
+            draw->AddRectFilled(corner, ImVec2(corner.x + button, corner.y + button),
+                                ImGui::GetColorU32(ToImVec4(fill)),
+                                theme.pillRounding * contentScale);
+            DrawIconCentred(draw, icon, ImVec2(corner.x + 0.5f * button, corner.y + 0.5f * button),
+                            ImGui::GetColorU32(ImGuiCol_Text));
+            return pressed;
+        };
         const struct {
+            const char* id;
             const char* icon;
             Viewer::Gizmo mode;
             const char* tip;
-        } tools[] = {{icons::kMousePointer, Viewer::Gizmo::None, "Select (Q)"},
-                     {icons::kMove, Viewer::Gizmo::Translate, "Move (W)"},
-                     {icons::kRotateCw, Viewer::Gizmo::Rotate, "Rotate (E)"},
-                     {icons::kScaling, Viewer::Gizmo::Scale, "Scale (R)"}};
-        const ImVec4 accent = ToImVec4(theme.accent);
+        } tools[] = {{"##select", icons::kMousePointer, Viewer::Gizmo::None, "Select (Q)"},
+                     {"##move", icons::kMove, Viewer::Gizmo::Translate, "Move (W)"},
+                     {"##rotate", icons::kRotateCw, Viewer::Gizmo::Rotate, "Rotate (E)"},
+                     {"##scale", icons::kScaling, Viewer::Gizmo::Scale, "Scale (R)"}};
         for (const auto& tool : tools) {
             next();
-            const bool on = gizmo == tool.mode;
-            ImGui::PushStyleColor(ImGuiCol_Button, on ? accent : ToImVec4(theme.overlay));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                                  on ? accent : ToImVec4(theme.fieldHovered));
-            if (ImGui::Button(tool.icon, ImVec2(button, button))) {
+            if (iconButton(tool.id, tool.icon, gizmo == tool.mode)) {
                 gizmo = tool.mode;
             }
-            ImGui::PopStyleColor(2);
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("%s", tool.tip);
             }
         }
         next(2.0f * gap);
-        ImGui::PushStyleColor(ImGuiCol_Button,
-                              gizmoLocal ? accent : ToImVec4(theme.overlay));
-        if (ImGui::Button(gizmoLocal ? icons::kBox : icons::kGlobe, ImVec2(button, button))) {
+        if (iconButton("##axes", gizmoLocal ? icons::kBox : icons::kGlobe, gizmoLocal)) {
             gizmoLocal = !gizmoLocal;
         }
-        ImGui::PopStyleColor();
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip(gizmoLocal ? "Gizmo in local axes" : "Gizmo in world axes");
         }
-        ImGui::PopStyleVar();
     }
 
     /// Kit's viewport settings menu: frame pacing, exposure, the perspective camera's lens and
@@ -1431,6 +1461,16 @@ struct Viewer::State {
         }
         ImGui::MenuItem("Gizmo in Local Axes", nullptr, &gizmoLocal);
         ImGui::SeparatorText("Exposure");
+        // On and off in one: automatic, or the camera's own exposure.
+        bool automatic = AutoExposing();
+        if (ImGui::MenuItem("Auto Exposure", nullptr, &automatic)) {
+            exposure = automatic ? Viewer::Exposure::Auto : Viewer::Exposure::Camera;
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Key the scene's metered luminance to middle grey; off, the camera's "
+                              "own exposure (ISO, shutter, f-stop) applies");
+        }
+        ImGui::TextDisabled("Mode");
         const std::pair<Viewer::Exposure, const char*> modes[] = {
             {Viewer::Exposure::Default, "Default"},
             {Viewer::Exposure::Auto, "Automatic"},
@@ -1447,12 +1487,18 @@ struct Viewer::State {
         }
         ImGui::SeparatorText("Camera");
         const bool perspective = activeCamera == PerspectiveCamera();
-        ImGui::BeginDisabled(!perspective);
-        float fov = glm::degrees(controller.verticalFov);
-        ImGui::SetNextItemWidth(160.0f * contentScale);
-        if (ImGui::SliderFloat("Vertical FOV", &fov, 5.0f, 120.0f, "%.0f deg")) {
-            controller.verticalFov = glm::radians(fov);
-            WriteActiveCamera();
+        ImGui::BeginDisabled(!perspective || !scene.Has(activeCamera));
+        if (scene.Has(activeCamera)) {
+            Camera lens = CameraOf(scene, activeCamera, ViewportWidth(), ViewportHeight());
+            float fov = static_cast<float>(glm::degrees(lens.VerticalFov()));
+            ImGui::SetNextItemWidth(160.0f * contentScale);
+            if (ImGui::SliderFloat("Vertical FOV", &fov, 5.0f, 120.0f, "%.0f deg")) {
+                // Through the focal length, as the Camera panel shows it.
+                lens.focalLengthMm = lens.verticalApertureMm /
+                                     (2.0 * std::tan(0.5 * glm::radians(static_cast<double>(fov))));
+                self.Edit(activeCamera, tokens::kFocalLength, lens.focalLengthMm, true);
+                WriteActiveCamera();
+            }
         }
         ImGui::EndDisabled();
         if (ImGui::MenuItem("Frame Selection", "F", false, !selection.empty())) {
@@ -1562,8 +1608,8 @@ struct Viewer::State {
             float yaw;
             float pitch;
         } views[] = {{"Top", 0.0f, OrbitController::kMaxPitch},
-                     {"Front", 0.0f, OrbitController::kMinPitch},
-                     {"Right", glm::half_pi<float>(), OrbitController::kMinPitch}};
+                     {"Front", 0.0f, 0.0f},
+                     {"Right", glm::half_pi<float>(), 0.0f}};
         for (const auto& view : views) {
             if (ImGui::MenuItem(view.name)) {
                 if (activeCamera != PerspectiveCamera()) {
@@ -1669,14 +1715,15 @@ struct Viewer::State {
         return {used, total};
     }
 
-    /// The heads-up display as Kit draws it: lines of text on a translucent box at `corner`.
-    void DrawHud(const ImVec2& corner) {
+    /// The heads-up display as Kit draws it: lines of text on a translucent box whose top right
+    /// corner is `topRight`. Returns the box's left edge (`topRight.x` without a box).
+    float DrawHud(const ImVec2& topRight) {
         if (!display.hud) {
-            return;
+            return topRight.x;
         }
         RefreshHud();
         if (hudLines.empty()) {
-            return;
+            return topRight.x;
         }
         const float pad = 6.0f * contentScale;
         const float lineHeight = ImGui::GetTextLineHeight();
@@ -1684,6 +1731,7 @@ struct Viewer::State {
         for (const std::string& text : hudLines) {
             width = std::max(width, ImGui::CalcTextSize(text.c_str()).x);
         }
+        const ImVec2 corner(topRight.x - width - 2.0f * pad, topRight.y);
         ImDrawList* draw = ImGui::GetWindowDrawList();
         ImVec4 box = ToImVec4(theme.overlay);
         box.w *= 0.85f;
@@ -1701,11 +1749,12 @@ struct Viewer::State {
                           ImGui::GetColorU32(ToImVec4(theme.text)), text.c_str() + label.size());
             at.y += lineHeight;
         }
+        return corner.x;
     }
 
     /// The viewport's toolbar as Kit draws it, pills over the image: at the top left the settings
-    /// menu, the renderer, the eye menu of what shows and the shown render var; at the top right
-    /// the camera and the lighting; and the heads-up display below.
+    /// menu, the renderer, the eye menu of what shows and the shown render var; the heads-up
+    /// display in the top right corner, with the camera and the lighting to its left.
     void DrawToolbar(const ImVec2& origin, const ImVec2& size) {
         const float pad = 8.0f * contentScale;
         ImGui::SetCursorScreenPos(ImVec2(origin.x + pad, origin.y + pad));
@@ -1749,11 +1798,22 @@ struct Viewer::State {
         }
         ImGui::SameLine();
 
-        const std::string rendererLabel =
-            std::string(icons::kMonitor) + "  " + DisplayName(renderer);
-        if (ImGui::BeginCombo("##renderer", rendererLabel.c_str(), kPill)) {
-            DrawRendererMenu();
-            ImGui::EndCombo();
+        {
+            // Spaces where the drawn icon goes.
+            const ImVec2 corner = ImGui::GetCursorScreenPos();
+            const std::string rendererLabel = "      " + DisplayName(renderer);
+            if (ImGui::BeginCombo("##renderer", rendererLabel.c_str(), kPill)) {
+                DrawRendererMenu();
+                ImGui::EndCombo();
+            }
+            const float icon = ImGui::GetTextLineHeight() * 1.15f;
+            DrawRendererIcon(draw,
+                             ImVec2(corner.x + ImGui::GetStyle().FramePadding.x,
+                                    corner.y + 0.5f * (ImGui::GetFrameHeight() - icon)),
+                             icon);
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Renderer, rendering mode and render settings");
         }
         ImGui::SameLine();
 
@@ -1786,16 +1846,17 @@ struct Viewer::State {
             DrawBandCombo(comboWidth);
         }
 
-        // The camera and the lighting at the top right, as Kit's "Perspective" and "Stage
-        // Lights".
+        // The heads-up display in the top right corner, and to its left the camera and the
+        // lighting, as Kit's "Perspective" and "Stage Lights".
         const ImGuiStyle& style = ImGui::GetStyle();
+        const float hudLeft = DrawHud(ImVec2(origin.x + size.x - pad, origin.y + pad));
         const std::string cameraLabel = std::string(icons::kCamera) + "  " + Label(activeCamera);
         const std::string lightLabel = std::string(icons::kSun) + "  " + LightingName(lighting);
         const auto pillWidth = [&](const std::string& label) {
             return ImGui::CalcTextSize(label.c_str()).x + 2.0f * style.FramePadding.x;
         };
-        ImGui::SetCursorScreenPos(ImVec2(origin.x + size.x - pad - pillWidth(lightLabel) -
-                                             style.ItemSpacing.x - pillWidth(cameraLabel),
+        ImGui::SetCursorScreenPos(ImVec2(hudLeft - pillWidth(lightLabel) -
+                                             2.0f * style.ItemSpacing.x - pillWidth(cameraLabel),
                                          origin.y + pad));
         if (ImGui::BeginCombo("##camera", cameraLabel.c_str(), kPill)) {
             DrawCameraMenu();
@@ -1812,10 +1873,6 @@ struct Viewer::State {
         }
         ImGui::PopStyleVar(3);
         ImGui::PopStyleColor(4);
-
-        // The heads-up display under the toolbar, right of the tool strip.
-        DrawHud(ImVec2(origin.x + 2.0f * pad + 1.15f * ImGui::GetFrameHeight(),
-                       origin.y + 2.0f * pad + ImGui::GetFrameHeight()));
     }
 
     void DrawPanels() {
@@ -2079,7 +2136,15 @@ bool Viewer::State::Step() {
             return true;
         }
     }
-    frame->Wait();
+    // A profiler frame per viewer frame, recording only while the Profiler panel shows.
+    if (!profilerPanel->IsVisible()) {
+        profiler::SetEnabled(false);
+    }
+    profiler::BeginFrame();
+    {
+        ERNIE_ZONE("Wait for frame");
+        frame->Wait();
+    }
     ResizeViewport();
     if (capture) {
         capture->rendered = true;
@@ -2115,6 +2180,7 @@ bool Viewer::State::Step() {
     ImGuiErrorRecoveryState recovery;
     ImGui::ErrorRecoveryStoreState(&recovery);
     try {
+        ERNIE_ZONE("Viewer UI");
         BuildUi();
     } catch (...) {
         ImGuiIO& io = ImGui::GetIO();
@@ -2151,16 +2217,24 @@ bool Viewer::State::Step() {
         ERNIE_ZONE("Viewer viewport");
         RecordViewport(commands);
     }
-    if (image) {
-        RecordUi(commands, image->image, image->view, swapchain->Extent());
-    } else {
-        RecordUi(commands, uiTarget->Color().Handle(), uiTarget->Color().View(),
-                 uiTarget->Extent());
+    {
+        ERNIE_ZONE("Viewer UI draw");
+        ERNIE_GPU_ZONE(*gpu, commands, "UI");
+        if (image) {
+            RecordUi(commands, image->image, image->view, swapchain->Extent());
+        } else {
+            RecordUi(commands, uiTarget->Color().Handle(), uiTarget->Color().View(),
+                     uiTarget->Extent());
+        }
     }
     vkEndCommandBuffer(commands);
-    Submit(commands, image ? &*image : nullptr);
+    {
+        ERNIE_ZONE("Submit");
+        Submit(commands, image ? &*image : nullptr);
+    }
     ++frames;
     ERNIE_FRAME_MARK("Viewer frame");
+    ERNIE_ZONE("Present");
     if (image && !swapchain->Present(*image)) {
         ResizeSwapchain(framebufferWidth, framebufferHeight);
     }
@@ -2195,7 +2269,10 @@ Viewer::Viewer(Scene& scene, const ViewerOptions& options)
     s.panels.push_back(std::move(stats));
     s.panels.push_back(std::make_unique<OverlaysPanel>());
     s.panels.push_back(MakeLogPanel());
+    s.panels.push_back(MakeProfilerPanel());
+    s.profilerPanel = s.panels.back().get();
     s.builtInPanels = s.panels.size();
+    profiler::SetThreadName("Main");
     s.CreateSession();
 }
 

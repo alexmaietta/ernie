@@ -5,6 +5,7 @@ ernie_add_library(
     compute_interop.cpp
     cuda_interop.cpp
     frame_uploads.cpp
+    gpu_timer.cpp
     image.cpp
     offscreen_target.cpp
     pipeline.cpp

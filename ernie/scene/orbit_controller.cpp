@@ -52,6 +52,13 @@ void OrbitController::Pan(float dx, float dy, float viewportHeight) {
     target += (-dx * right + dy * forward) * worldPerPixel;
 }
 
+void OrbitController::PanVertical(float dx, float dy, float viewportHeight) {
+    const float worldPerPixel =
+        2.0f * distance * std::tan(0.5f * verticalFov) / std::max(viewportHeight, 1.0f);
+    const glm::vec3 right(std::cos(yaw), std::sin(yaw), 0.0f);
+    target += (-dx * right + dy * glm::vec3(0.0f, 0.0f, 1.0f)) * worldPerPixel;
+}
+
 void OrbitController::Zoom(float steps) {
     distance = std::clamp(distance * std::pow(0.9f, steps), kMinDistance, kMaxDistance);
 }
