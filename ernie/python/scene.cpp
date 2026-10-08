@@ -12,11 +12,15 @@
 #include <nanobind/stl/vector.h>
 
 #include <array>
+#include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 namespace ernie::python {
+
+using namespace nb::literals;
 
 namespace {
 
@@ -66,6 +70,292 @@ glm::dvec3 Vec3FromPython(nb::handle object) {
 
 bool IsNumber(nb::handle item) {
     return nb::isinstance<nb::float_>(item) || nb::isinstance<nb::int_>(item);
+}
+
+/// `object` as a C-contiguous NumPy array of `dtype` and rows of `columns` (any leading shape).
+nb::ndarray<nb::numpy, nb::c_contig> RowsOf(nb::handle object, const char* dtype,
+                                             std::size_t columns) {
+    nb::module_ numpy = nb::module_::import_("numpy");
+    nb::object array = numpy.attr("ascontiguousarray")(object, "dtype"_a = dtype);
+    if (nb::cast<std::size_t>(array.attr("size")) % columns != 0) {
+        throw nb::value_error(("expected rows of " + std::to_string(columns) + " values").c_str());
+    }
+    array = array.attr("reshape")(-1, columns);
+    return nb::cast<nb::ndarray<nb::numpy, nb::c_contig>>(array);
+}
+
+/// Points as rows of three numbers: an (N, 3) array or a sequence of 3-sequences.
+std::vector<glm::dvec3> PointsFromPython(nb::handle object) {
+    const auto rows = RowsOf(object, "float64", 3);
+    const auto* values = static_cast<const double*>(rows.data());
+    std::vector<glm::dvec3> points(rows.shape(0));
+    for (std::size_t i = 0; i < points.size(); ++i) {
+        points[i] = {values[3 * i], values[3 * i + 1], values[3 * i + 2]};
+    }
+    return points;
+}
+
+/// Colours as rows of RGBA, or of RGB with opacity 1; none for None.
+std::vector<glm::vec4> ColorsFromPython(nb::handle object) {
+    std::vector<glm::vec4> colors;
+    if (object.is_none()) {
+        return colors;
+    }
+    nb::module_ numpy = nb::module_::import_("numpy");
+    nb::object array = numpy.attr("asarray")(object, "dtype"_a = "float32");
+    const std::size_t width = nb::cast<std::size_t>(array.attr("shape")[nb::int_(-1)]);
+    if (width != 3 && width != 4) {
+        throw nb::value_error("expected colours as rows of RGB or RGBA");
+    }
+    const auto rows = RowsOf(array, "float32", width);
+    const auto* values = static_cast<const float*>(rows.data());
+    colors.resize(rows.shape(0));
+    for (std::size_t i = 0; i < colors.size(); ++i) {
+        const float* row = values + width * i;
+        colors[i] = {row[0], row[1], row[2], width == 4 ? row[3] : 1.0f};
+    }
+    return colors;
+}
+
+std::vector<std::uint32_t> IndicesFromPython(nb::handle object) {
+    const auto rows = RowsOf(object, "uint32", 1);
+    const auto* values = static_cast<const std::uint32_t*>(rows.data());
+    return {values, values + rows.shape(0)};
+}
+
+glm::vec4 ColorFromPython(nb::handle object) {
+    const std::vector<glm::vec4> colors = ColorsFromPython(object);
+    if (colors.size() != 1) {
+        throw nb::value_error("expected one RGB or RGBA colour");
+    }
+    return colors.front();
+}
+
+glm::dmat4 TransformFromPython(nb::handle object) {
+    if (object.is_none()) {
+        return glm::dmat4(1.0);
+    }
+    const Value value = ValueFromPython(object);
+    if (const auto* matrix = value.Get<glm::dmat4>()) {
+        return *matrix;
+    }
+    throw nb::type_error("expected a 4 x 4 transform");
+}
+
+OverlayDepth DepthFromPython(std::string_view name) {
+    if (name == "test") {
+        return OverlayDepth::Test;
+    }
+    if (name == "xray") {
+        return OverlayDepth::XRay;
+    }
+    if (name == "always") {
+        return OverlayDepth::Always;
+    }
+    throw nb::value_error("depth must be \"test\", \"xray\" or \"always\"");
+}
+
+MarkerShape ShapeFromPython(std::string_view name) {
+    constexpr std::pair<std::string_view, MarkerShape> kShapes[] = {
+        {"circle", MarkerShape::Circle}, {"ring", MarkerShape::Ring},
+        {"square", MarkerShape::Square}, {"diamond", MarkerShape::Diamond},
+        {"cross", MarkerShape::Cross},   {"plus", MarkerShape::Plus}};
+    for (const auto& [token, shape] : kShapes) {
+        if (token == name) {
+            return shape;
+        }
+    }
+    throw nb::value_error(
+        "shape must be \"circle\", \"ring\", \"square\", \"diamond\", \"cross\" or \"plus\"");
+}
+
+/// An `OverlayStyle` from keyword arguments: color, width, size, depth ("test", "xray" or
+/// "always"), world and background.
+OverlayStyle StyleFromPython(const nb::kwargs& kwargs) {
+    OverlayStyle style;
+    for (const auto& [key, value] : kwargs) {
+        const std::string name = nb::cast<std::string>(key);
+        if (name == "color") {
+            style.color = ColorFromPython(value);
+        } else if (name == "width") {
+            style.width = nb::cast<float>(value);
+        } else if (name == "size") {
+            style.size = nb::cast<float>(value);
+        } else if (name == "depth") {
+            style.depth = DepthFromPython(nb::cast<std::string>(value));
+        } else if (name == "world") {
+            style.world = nb::cast<std::int32_t>(value);
+        } else if (name == "background") {
+            style.background = ColorFromPython(value);
+        } else {
+            throw nb::type_error(("unknown overlay style '" + name +
+                                  "'; expected color, width, size, depth, world or background")
+                                     .c_str());
+        }
+    }
+    return style;
+}
+
+constexpr const char* kStyleDoc =
+    " Style keywords: color (RGB or RGBA display colour), width (line pixels), size (marker or "
+    "text pixels), depth (\"test\", \"xray\" or \"always\"), world (-1 for every view) and "
+    "background (labels' backing colour). Returns the overlay, for chaining.";
+
+void BindOverlay(nb::module_& m) {
+    nb::class_<Overlay>(
+        m, "Overlay",
+        "A named layer of debug drawing in world coordinates (`Scene.overlay`): lines, shapes, "
+        "markers and labels drawn over the LdrColor of render products whose `ernie:overlays` "
+        "names it (\"*\" for all; the viewer shows all). Items stay until `clear`.")
+        .def("clear", &Overlay::Clear, nb::rv_policy::reference_internal)
+        .def_prop_rw("visible", &Overlay::IsVisible,
+                     [](Overlay& overlay, bool visible) { overlay.SetVisible(visible); })
+        .def_prop_ro("version", &Overlay::Version)
+        .def_prop_ro("empty", &Overlay::Empty)
+        .def(
+            "line",
+            [](Overlay& o, nb::handle a, nb::handle b, const nb::kwargs& style) -> Overlay& {
+                return o.Line(Vec3FromPython(a), Vec3FromPython(b), StyleFromPython(style));
+            },
+            nb::arg("a"), nb::arg("b"), nb::arg("style"), nb::rv_policy::reference_internal,
+            (std::string("A segment from `a` to `b`.") + kStyleDoc).c_str())
+        .def(
+            "lines",
+            [](Overlay& o, nb::handle endpoints, nb::handle colors,
+               const nb::kwargs& style) -> Overlay& {
+                return o.Lines(PointsFromPython(endpoints), StyleFromPython(style),
+                               ColorsFromPython(colors));
+            },
+            nb::arg("endpoints"), nb::arg("colors") = nb::none(), nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string("Many segments: `endpoints` as (N, 2, 3) or (2N, 3), coloured by "
+                         "`colors` (N rows of RGB or RGBA) when given.") +
+             kStyleDoc)
+                .c_str())
+        .def(
+            "polyline",
+            [](Overlay& o, nb::handle points, bool closed, const nb::kwargs& style) -> Overlay& {
+                return o.Polyline(PointsFromPython(points), StyleFromPython(style), closed);
+            },
+            nb::arg("points"), nb::arg("closed") = false, nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string("Segments through (N, 3) `points`, back to the first when `closed`.") +
+             kStyleDoc)
+                .c_str())
+        .def(
+            "arrow",
+            [](Overlay& o, nb::handle start, nb::handle end, double head,
+               const nb::kwargs& style) -> Overlay& {
+                return o.Arrow(Vec3FromPython(start), Vec3FromPython(end),
+                               StyleFromPython(style), head);
+            },
+            nb::arg("start"), nb::arg("end"), nb::arg("head") = 0.0, nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string("A line with a cone head `head` long (a fifth of it when 0).") +
+             kStyleDoc)
+                .c_str())
+        .def(
+            "box",
+            [](Overlay& o, nb::handle low, nb::handle high, nb::handle transform,
+               const nb::kwargs& style) -> Overlay& {
+                return o.Box(Vec3FromPython(low), Vec3FromPython(high), StyleFromPython(style),
+                             TransformFromPython(transform));
+            },
+            nb::arg("low"), nb::arg("high"), nb::arg("transform") = nb::none(), nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string("The edges of a box, placed by a 4 x 4 `transform`.") + kStyleDoc)
+                .c_str())
+        .def(
+            "circle",
+            [](Overlay& o, nb::handle centre, nb::handle normal, double radius, int segments,
+               const nb::kwargs& style) -> Overlay& {
+                return o.Circle(Vec3FromPython(centre), Vec3FromPython(normal), radius,
+                                StyleFromPython(style), segments);
+            },
+            nb::arg("centre"), nb::arg("normal"), nb::arg("radius"), nb::arg("segments") = 48,
+            nb::arg("style"), nb::rv_policy::reference_internal,
+            (std::string("A circle in the plane facing `normal`.") + kStyleDoc).c_str())
+        .def(
+            "sphere",
+            [](Overlay& o, nb::handle centre, double radius, const nb::kwargs& style) -> Overlay& {
+                return o.Sphere(Vec3FromPython(centre), radius, StyleFromPython(style));
+            },
+            nb::arg("centre"), nb::arg("radius"), nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string("Three great circles of a sphere.") + kStyleDoc).c_str())
+        .def(
+            "axes",
+            [](Overlay& o, nb::handle transform, double length,
+               const nb::kwargs& style) -> Overlay& {
+                return o.Axes(TransformFromPython(transform), length, StyleFromPython(style));
+            },
+            nb::arg("transform"), nb::arg("length") = 1.0, nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string("A transform's x, y and z axes in red, green and blue.") + kStyleDoc)
+                .c_str())
+        .def(
+            "wire_mesh",
+            [](Overlay& o, nb::handle points, nb::handle indices, nb::handle transform,
+               const nb::kwargs& style) -> Overlay& {
+                return o.WireMesh(PointsFromPython(points), IndicesFromPython(indices),
+                                  StyleFromPython(style), TransformFromPython(transform));
+            },
+            nb::arg("points"), nb::arg("indices"), nb::arg("transform") = nb::none(),
+            nb::arg("style"), nb::rv_policy::reference_internal,
+            (std::string("The edges of triangles (`indices` in threes over `points`).") +
+             kStyleDoc)
+                .c_str())
+        .def(
+            "triangles",
+            [](Overlay& o, nb::handle points, nb::handle indices, nb::handle transform,
+               const nb::kwargs& style) -> Overlay& {
+                return o.Triangles(PointsFromPython(points), IndicesFromPython(indices),
+                                   StyleFromPython(style), TransformFromPython(transform));
+            },
+            nb::arg("points"), nb::arg("indices"), nb::arg("transform") = nb::none(),
+            nb::arg("style"), nb::rv_policy::reference_internal,
+            (std::string("Filled triangles (`indices` in threes over `points`).") + kStyleDoc)
+                .c_str())
+        .def(
+            "marker",
+            [](Overlay& o, nb::handle point, std::string_view shape,
+               const nb::kwargs& style) -> Overlay& {
+                return o.Marker(Vec3FromPython(point), StyleFromPython(style),
+                                ShapeFromPython(shape));
+            },
+            nb::arg("point"), nb::arg("shape") = "circle", nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string("A marker of `size` pixels: circle, ring, square, diamond, cross or "
+                         "plus.") +
+             kStyleDoc)
+                .c_str())
+        .def(
+            "markers",
+            [](Overlay& o, nb::handle points, nb::handle colors, std::string_view shape,
+               const nb::kwargs& style) -> Overlay& {
+                return o.Markers(PointsFromPython(points), StyleFromPython(style),
+                                 ShapeFromPython(shape), ColorsFromPython(colors));
+            },
+            nb::arg("points"), nb::arg("colors") = nb::none(), nb::arg("shape") = "circle",
+            nb::arg("style"), nb::rv_policy::reference_internal,
+            (std::string("Markers at (N, 3) `points`, coloured by `colors` when given.") +
+             kStyleDoc)
+                .c_str())
+        .def(
+            "label",
+            [](Overlay& o, nb::handle point, std::string_view text,
+               const nb::kwargs& style) -> Overlay& {
+                return o.Label(Vec3FromPython(point), text, StyleFromPython(style));
+            },
+            nb::arg("point"), nb::arg("text"), nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string("ASCII `text`, `size` pixels tall, beside `point`.") + kStyleDoc)
+                .c_str())
+        .def("__repr__", [](const Overlay& o) {
+            return "Overlay(" + std::to_string(o.Segments().size()) + " segments, " +
+                   std::to_string(o.Fills().size()) + " triangles, " +
+                   std::to_string(o.Sprites().size()) + " sprites)";
+        });
 }
 
 }  // namespace
@@ -188,6 +478,7 @@ nb::object ValueToPython(const Value& value) {
 }
 
 void BindScene(nb::module_& m) {
+    BindOverlay(m);
     nb::class_<Path>(m, "Path",
                      "Absolute path of a prim, as in USD: `/` is the root and `/World/Sun` the "
                      "child `Sun` of `/World`. Functions taking a path also accept a str.")
@@ -385,6 +676,10 @@ void BindScene(nb::module_& m) {
             },
             nb::arg("path"))
         .def("is_visible", &Scene::IsVisible, nb::arg("path"))
+        .def("overlay", &Scene::GetOverlay, nb::arg("name"), nb::rv_policy::reference_internal,
+             "The overlay (debug drawing layer) named `name`, created empty if missing.")
+        .def("overlay_names", &Scene::OverlayNames)
+        .def("remove_overlay", &Scene::RemoveOverlay, nb::arg("name"))
         .def_prop_ro("version", &Scene::Version)
         .def(
             "changes",
@@ -572,6 +867,9 @@ void BindScene(nb::module_& m) {
         {"SCENE", tokens::kScene},
         {"WORLD_FIT", tokens::kWorldFit},
         {"SHADOW_WORLD_MARGIN", tokens::kShadowWorldMargin},
+        {"SHADOW_FIT", tokens::kShadowFit},
+        {"VISIBLE", tokens::kVisible},
+        {"OVERLAYS", tokens::kOverlays},
         {"OCCLUDERS", tokens::kOccluders},
         {"TWO_PASS", tokens::kTwoPass},
         {"CLEAR_COLOR", tokens::kClearColor},

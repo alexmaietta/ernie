@@ -193,6 +193,39 @@ class StatsPanel final : public Panel {
     std::deque<float> times_;
 };
 
+/// Built-in panel listing the scene's overlays (debug drawing layers), each with its item counts
+/// and toggles to show or clear it.
+class OverlaysPanel final : public Panel {
+  public:
+    OverlaysPanel() : Panel("Overlays") {}
+
+    void Draw(Viewer& viewer) override {
+        Scene& scene = viewer.GetScene();
+        const std::vector<std::string> names = scene.OverlayNames();
+        if (names.empty()) {
+            ImGui::TextDisabled("No overlays. Draw some with Scene::GetOverlay.");
+            return;
+        }
+        for (const std::string& name : names) {
+            Overlay& overlay = scene.GetOverlay(name);
+            ImGui::PushID(name.c_str());
+            bool visible = overlay.IsVisible();
+            if (ImGui::Checkbox(name.c_str(), &visible)) {
+                overlay.SetVisible(visible);
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("%zu lines, %zu triangles, %zu sprites", overlay.Segments().size(),
+                                overlay.Fills().size(), overlay.Sprites().size());
+            ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::CalcTextSize("Clear").x -
+                            ImGui::GetStyle().FramePadding.x * 2.0f);
+            if (ImGui::SmallButton("Clear")) {
+                overlay.Clear();
+            }
+            ImGui::PopID();
+        }
+    }
+};
+
 }  // namespace
 
 struct Viewer::State {
@@ -249,6 +282,7 @@ struct Viewer::State {
     std::uint64_t nextCallback = 1;
     std::vector<std::unique_ptr<Panel>> panels;
     StatsPanel* stats = nullptr;
+    std::size_t builtInPanels = 0;  ///< The first panels, which removing only hides.
     std::vector<MenuItem> menuItems;
 
     std::uint64_t frames = 0;
@@ -1162,6 +1196,8 @@ Viewer::Viewer(Scene& scene, const ViewerOptions& options)
     auto stats = std::make_unique<StatsPanel>();
     s.stats = stats.get();
     s.panels.push_back(std::move(stats));
+    s.panels.push_back(std::make_unique<OverlaysPanel>());
+    s.builtInPanels = s.panels.size();
     s.CreateSession();
 }
 
@@ -1443,8 +1479,8 @@ void Viewer::RemovePanel(const std::string& title) {
     if (found == panels.end()) {
         throw std::invalid_argument("No panel titled '" + title + "'");
     }
-    if (found->get() == state_->stats) {
-        state_->stats->SetVisible(false);
+    if (found - panels.begin() < static_cast<std::ptrdiff_t>(state_->builtInPanels)) {
+        (*found)->SetVisible(false);
         return;
     }
     panels.erase(found);
