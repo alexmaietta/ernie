@@ -435,3 +435,20 @@ TEST_F(RasterDelegateTest, IsARenderBackend) {
     EXPECT_GT(delegate->Stats().triangles, 0u);
     EXPECT_GT(delegate->Stats().gpuBytes, stats.gpuBytes) << "the product's frame";
 }
+
+TEST_F(RasterDelegateTest, MonochromeSensorsMakeGreyPhotographicImages) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    const glm::vec3 quad(-12.0f, 0.0f, 0.0f);
+    const Tensor colour = delegate.Render(scene);
+    const std::uint8_t* red = TexelAt(scene, colour, quad);
+    EXPECT_GT(red[0], red[1] + 50) << "the red quad through an RGB sensor";
+    scene.Set("/World/Camera", tokens::kSensorType, std::string("mono"));
+    const Tensor grey = delegate.Render(scene);
+    const std::uint8_t* mono = TexelAt(scene, grey, quad);
+    EXPECT_EQ(mono[0], mono[1]);
+    EXPECT_EQ(mono[1], mono[2]);
+    EXPECT_GT(mono[0], 10) << "silicon sees red light";
+    const std::uint8_t* rock = TexelAt(scene, grey, {12.0f, 0.0f, 0.0f});
+    EXPECT_EQ(rock[0], rock[2]);
+}

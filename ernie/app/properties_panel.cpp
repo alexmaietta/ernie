@@ -1,5 +1,7 @@
 #include "ernie/app/builtin_panels.h"
 #include "ernie/app/icons.h"
+#include "ernie/app/prim_schemas.h"
+#include "ernie/app/property_fields.h"
 #include "ernie/app/viewer.h"
 #include "ernie/scene/tokens.h"
 
@@ -11,6 +13,7 @@
 #include <cctype>
 #include <cmath>
 #include <map>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -109,11 +112,32 @@ class PropertiesPanel final : public Panel {
         ImGui::Separator();
         labelWidth_ = viewer.GetTheme().propertyLabelWidth * ImGui::GetFontSize() /
                       viewer.GetTheme().fontSize;
-        if (!path.IsRoot() && ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (!path.IsRoot() && HasTransform(type) &&
+            ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
             DrawTransform(viewer, scene, path);
         }
-        if (ImGui::CollapsingHeader("Attributes", ImGuiTreeNodeFlags_DefaultOpen)) {
-            DrawAttributes(viewer, scene, path);
+        // What Ernie reads on this type, set or not, then whatever else the prim holds.
+        const std::vector<PropertySection> sections =
+            SchemaOf(scene, path, viewer.Brdfs(), viewer.Delegate().SensorFilters());
+        const std::string failure = DrawPropertySections(viewer, path, sections, labelWidth_);
+        if (!failure.empty()) {
+            error_ = failure;
+        }
+        std::set<std::string, std::less<>> known{std::string(tokens::kTransform)};
+        for (const PropertySection& section : sections) {
+            for (const PropertyField& field : section.fields) {
+                known.insert(field.attribute);
+            }
+        }
+        std::vector<std::string> others;
+        for (const std::string& attribute : scene.Attributes(path)) {
+            if (!known.contains(attribute)) {
+                others.push_back(attribute);
+            }
+        }
+        if (!others.empty() &&
+            ImGui::CollapsingHeader("Other attributes", ImGuiTreeNodeFlags_DefaultOpen)) {
+            DrawAttributes(viewer, scene, path, others);
         }
     }
 
@@ -182,14 +206,12 @@ class PropertiesPanel final : public Panel {
         ImGui::EndTable();
     }
 
-    void DrawAttributes(Viewer& viewer, Scene& scene, const Path& path) {
+    void DrawAttributes(Viewer& viewer, Scene& scene, const Path& path,
+                        const std::vector<std::string>& attributes) {
         if (!BeginTable("##attributes")) {
             return;
         }
-        for (const std::string& attribute : scene.Attributes(path)) {
-            if (attribute == tokens::kTransform) {
-                continue;
-            }
+        for (const std::string& attribute : attributes) {
             ImGui::PushID(attribute.c_str());
             Row(viewer, path, attribute.c_str(), attribute, true);
             if (const Value* value = scene.Get(path, attribute)) {

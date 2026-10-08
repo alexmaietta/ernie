@@ -1139,9 +1139,30 @@ void RasterRenderer::WriteSensor(const FrameParams& params) {
     sensor.range[0] = static_cast<float>(bands_.minNm);
     sensor.range[1] = static_cast<float>(bands_.Width());
     const std::vector<glm::dvec3> weights = CieWeights(bands_);
+    std::vector<glm::dvec3> colours;
     for (int i = 0; i < bands_.count; ++i) {
-        const glm::dvec3 rgb =
-            EqualEnergyXyzToLinearSrgb(weights[static_cast<std::size_t>(i)] * kLuminousEfficacy);
+        colours.push_back(
+            EqualEnergyXyzToLinearSrgb(weights[static_cast<std::size_t>(i)] * kLuminousEfficacy));
+    }
+    // A monochrome sensor's photographic outputs are grey: its channel's spectral response,
+    // scaled so that a flat spectrum keeps the luminance the CIE observer gives it.
+    if (model.channels.size() == 1) {
+        const std::vector<float> response = model.channels.front().quantumEfficiency.Bin(bands_);
+        double luminance = 0.0;
+        double total = 0.0;
+        for (int i = 0; i < bands_.count; ++i) {
+            const glm::dvec3& rgb = colours[static_cast<std::size_t>(i)];
+            luminance += 0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b;
+            total += response[static_cast<std::size_t>(i)];
+        }
+        const double scale = total > 0.0 ? luminance / total : 0.0;
+        for (int i = 0; i < bands_.count; ++i) {
+            colours[static_cast<std::size_t>(i)] =
+                glm::dvec3(scale * response[static_cast<std::size_t>(i)]);
+        }
+    }
+    for (int i = 0; i < bands_.count; ++i) {
+        const glm::dvec3& rgb = colours[static_cast<std::size_t>(i)];
         sensor.colour[i][0] = static_cast<float>(rgb.r);
         sensor.colour[i][1] = static_cast<float>(rgb.g);
         sensor.colour[i][2] = static_cast<float>(rgb.b);

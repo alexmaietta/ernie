@@ -115,7 +115,8 @@ struct SensorModel {
 /// E = L pi t cos^4(theta) / (4 N^2) for an object far away, with transmission t, f-number N and
 /// field angle theta; a pixel collects E times its area times the exposure time, converted to
 /// photons and electrons per band. The photographic outputs instead scale luminance by USD's
-/// linear exposure scale.
+/// linear exposure scale; with a one-channel (monochrome) sensor they are grey, weighting the
+/// bands by that channel's quantum efficiency, scaled so a flat spectrum keeps its luminance.
 ///
 /// References:
 /// - B. K. P. Horn, "Robot Vision", MIT Press, 1986 (the image irradiance equation

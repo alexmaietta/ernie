@@ -1,4 +1,5 @@
 #include "ernie/app/builtin_panels.h"
+#include "ernie/app/prim_schemas.h"
 #include "ernie/app/property_fields.h"
 #include "ernie/app/session.h"
 #include "ernie/app/viewer.h"
@@ -17,63 +18,6 @@
 namespace ernie::app {
 
 namespace {
-
-using Kind = PropertyField::Kind;
-
-/// The camera attributes Ernie reads, with the fallbacks of a default `Camera`.
-std::vector<PropertyField> LensFields() {
-    using namespace tokens;
-    const Camera camera;
-    return {
-        {kFocalLength, "Focal length", Kind::Float, camera.focalLengthMm, 1.0, 2000.0, {}, "mm"},
-        {kVerticalAperture, "Vertical aperture", Kind::Float, camera.verticalApertureMm, 0.1,
-         100.0, {}, "mm"},
-        {kClippingRange, "Clipping range", Kind::Vec2,
-         glm::dvec2(camera.nearPlane, camera.farPlane)},
-        {kLensVignetting, "Vignetting", Kind::Bool, camera.lens.vignetting},
-        {kLensTransmission, "Transmission", Kind::Float, camera.lens.transmission, 0.0, 1.0},
-    };
-}
-
-std::vector<PropertyField> ExposureFields() {
-    using namespace tokens;
-    const Camera camera;
-    return {
-        {kCameraExposure, "Exposure", Kind::Float, camera.exposureStops, -16.0, 16.0, {},
-         "Stops; scales the photographic outputs"},
-        {kExposureTime, "Exposure time", Kind::Float, camera.exposureTime, 1e-6, 10.0, {},
-         "Seconds"},
-        {kExposureIso, "ISO", Kind::Float, camera.iso, 25.0, 102400.0},
-        {kExposureFStop, "f-number", Kind::Float, camera.fStop, 0.5, 64.0},
-        {kExposureResponsivity, "Responsivity", Kind::Float, camera.responsivity, 0.0, 100.0},
-    };
-}
-
-std::vector<PropertyField> SensorFields() {
-    using namespace tokens;
-    const Camera camera;
-    const SensorModel& sensor = camera.sensor;
-    return {
-        {kSpectralRange, "Spectral range", Kind::Vec2,
-         glm::dvec2(camera.bands.minNm, camera.bands.maxNm), 0, 0, {}, "nm"},
-        {kSpectralBands, "Bands", Kind::Int, camera.bands.count, 1, SpectralBands::kMaxBands},
-        {kSensorType, "Type", Kind::Token, std::string("rgb"), 0, 0, {"rgb", "mono"}},
-        {kSensorNoise, "Noise", Kind::Bool, sensor.noise},
-        {kSensorFullWell, "Full well", Kind::Float, sensor.fullWellElectrons, 100.0, 1e6, {},
-         "Electrons"},
-        {kSensorReadNoise, "Read noise", Kind::Float, sensor.readNoiseElectrons, 0.0, 100.0, {},
-         "Electrons"},
-        {kSensorDarkCurrent, "Dark current", Kind::Float, sensor.darkCurrentElectrons, 0.0, 1000.0,
-         {}, "Electrons per second"},
-        {kSensorPrnu, "PRNU", Kind::Float, sensor.prnu, 0.0, 0.2},
-        {kSensorDsnu, "DSNU", Kind::Float, sensor.dsnuElectrons, 0.0, 100.0, {}, "Electrons"},
-        {kSensorGain, "Electrons per DN", Kind::Float, sensor.electronsPerDnAtIso100, 0.0, 1000.0,
-         {}, "At ISO 100; 0 for the full well over the ADC range"},
-        {kSensorAdcBits, "ADC bits", Kind::Int, sensor.adcBits, 1, 16},
-        {kSensorBlackLevel, "Black level", Kind::Float, sensor.blackLevelDn, 0.0, 4096.0, {}, "DN"},
-        {kSensorSeed, "Seed", Kind::Int, static_cast<int>(sensor.seed), 0, 0},
-    };
-}
 
 class CameraPanel final : public Panel {
   public:
@@ -95,22 +39,8 @@ class CameraPanel final : public Panel {
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("A scene camera with the view's pose and lens, looked through");
         }
-        const float labelWidth = viewer.GetTheme().propertyLabelWidth * ImGui::GetFontSize() /
-                                 viewer.GetTheme().fontSize;
-        std::string error;
-        const auto section = [&](const char* title, const std::vector<PropertyField>& fields) {
-            if (ImGui::CollapsingHeader(title, ImGuiTreeNodeFlags_DefaultOpen)) {
-                ImGui::PushID(title);
-                const std::string failure = DrawPropertyFields(viewer, camera, fields, labelWidth);
-                if (error.empty()) {
-                    error = failure;
-                }
-                ImGui::PopID();
-            }
-        };
-        section("Lens", lens_);
-        section("Exposure", exposure_);
-        section("Sensor", sensor_);
+        const std::string error =
+            DrawPropertySections(viewer, camera, schema_, PropertyLabelWidth(viewer));
         if (ImGui::CollapsingHeader("Quantum Efficiency", ImGuiTreeNodeFlags_DefaultOpen)) {
             DrawEfficiency(scene, camera);
         }
@@ -183,9 +113,7 @@ class CameraPanel final : public Panel {
                             bands.minNm, bands.maxNm);
     }
 
-    std::vector<PropertyField> lens_ = LensFields();
-    std::vector<PropertyField> exposure_ = ExposureFields();
-    std::vector<PropertyField> sensor_ = SensorFields();
+    std::vector<PropertySection> schema_ = CameraSchema();
 };
 
 }  // namespace

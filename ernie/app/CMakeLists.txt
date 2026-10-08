@@ -5,6 +5,7 @@ ernie_add_library(
     create.cpp
     log_panel.cpp
     panel.cpp
+    prim_schemas.cpp
     properties_panel.cpp
     property_fields.cpp
     session.cpp
