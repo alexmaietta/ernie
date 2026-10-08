@@ -200,7 +200,7 @@ LayeredVertexOutput meshVertexMain(uint vertexIndex : SV_VertexID, uint instance
     let v = meshVertex(vertexIndex, instanceIndex, drawCall(drawIndex), u.motion.x);
     LayeredVertexOutput out;
     out.layer = u.flags.z;
-    out.position = mul(u.viewProj, float4(v.world, 1.0));
+    out.position = projectWorld(v.world);
     out.world = v.world;
     out.normal = v.normal;
     out.color = v.color;

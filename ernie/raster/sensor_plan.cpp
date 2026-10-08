@@ -296,7 +296,7 @@ std::string SensorPlan::Key() const {
     if (pyramids != 0) {
         key += "^" + std::to_string(pyramids);
     }
-    return key + "~" + lens;
+    return key + "~" + lens + (pushbroom ? "~pushbroom" : "");
 }
 
 std::string LensKernelOf(const LensModel& lens) {

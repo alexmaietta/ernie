@@ -3,8 +3,8 @@
 // fixed pixel size around their anchor's projection, and triangles stay as they are; each is
 // depth-tested by hand against the view's depth, so items can be hidden, faded or always shown.
 //
-// Bindings: 0 the view's Uniforms (frame.slang; only its view-projection is read), 1 the views'
-// depth, 2 segments, 3 triangles, 4 sprites.
+// Bindings: 0 the view's Uniforms (frame.slang; only its view-projection and pushbroom strip are
+// read, through module `projection`), 1 the views' depth, 2 segments, 3 triangles, 4 sprites.
 //
 // References:
 // - M. Rougier, "Shader-Based Antialiased, Dashed, Stroked Polylines", JCGT 2(2), 2013: lines as
@@ -12,8 +12,24 @@
 // - I. Quilez, "2D distance functions", https://iquilezles.org/articles/distfunctions2d/: the
 //   marker shapes.
 
+import projection;
+
+// frame.slang's Uniforms, as far as this pass reads.
 struct ViewUniforms {
     float4x4 viewProj;
+    float4 sun;
+    float4 forward;
+    float4 eye;
+    uint4 flags;
+    float4x4 sunViewProj;
+    float4 sunShadow;
+    float4 motion;
+    float4 strip;
+}
+
+// Clip coordinates of world point `world` in the view.
+float4 project(float3 world) {
+    return cameraProject(u.viewProj, u.strip, world);
 }
 
 // Every item: x packed RGBA8 display colour (r in the low byte), y depth mode (kDepth*) in its
@@ -115,8 +131,8 @@ VertexOutput segmentVertex(uint vertexIndex : SV_VertexID) {
     static const uint2 kCorners[6] = { uint2(0, 0), uint2(1, 0), uint2(1, 1),
                                        uint2(0, 0), uint2(1, 1), uint2(0, 1) };
     let corner = kCorners[vertexIndex % 6];
-    var p0 = mul(u.viewProj, float4(segment.a.xyz, 1.0));
-    var p1 = mul(u.viewProj, float4(segment.b.xyz, 1.0));
+    var p0 = project(segment.a.xyz);
+    var p1 = project(segment.b.xyz);
     // Clipped to just in front of the eye, so segments passing behind it keep their visible part.
     const float kNear = 1e-5;
     if (p0.w < kNear && p1.w < kNear) {
@@ -159,7 +175,7 @@ VertexOutput triangleVertex(uint vertexIndex : SV_VertexID) {
     let corner = vertexIndex % 3;
     let p = corner == 0 ? triangle.p0 : (corner == 1 ? triangle.p1 : triangle.p2);
     VertexOutput out;
-    out.position = mul(u.viewProj, float4(p.xyz, 1.0));
+    out.position = project(p.xyz);
     out.color = unpackColor(triangle.info.x);
     out.shape = float4(0.0);
     out.info = uint4(kKindTriangle, triangle.info.y & 0xff, 0, 0);
@@ -169,7 +185,7 @@ VertexOutput triangleVertex(uint vertexIndex : SV_VertexID) {
 [shader("vertex")]
 VertexOutput spriteVertex(uint vertexIndex : SV_VertexID) {
     let sprite = sprites[vertexIndex / 6];
-    let anchor = mul(u.viewProj, float4(sprite.anchor.xyz, 1.0));
+    let anchor = project(sprite.anchor.xyz);
     if (!inWorld(sprite.info) || anchor.w <= 0.0) {
         return culled();
     }

@@ -43,6 +43,109 @@ glm::dmat4 InterpolatePose(const glm::dmat4& from, const glm::dmat4& to, double 
     return pose;
 }
 
+namespace {
+
+/// The rotation of camera-to-world `pose`, its scale left out.
+glm::dquat RotationOf(const glm::dmat4& pose) {
+    return glm::normalize(glm::quat_cast(glm::dmat3(glm::normalize(glm::dvec3(pose[0])),
+                                                    glm::normalize(glm::dvec3(pose[1])),
+                                                    glm::normalize(glm::dvec3(pose[2])))));
+}
+
+}  // namespace
+
+glm::mat4 PushbroomStrip::Packed() const {
+    glm::mat4 packed;
+    packed[0] = glm::vec4(from, nearPlane);
+    packed[1] = glm::vec4(to, farPlane);
+    packed[2] = glm::vec4(fromRotation.x, fromRotation.y, fromRotation.z, fromRotation.w);
+    packed[3] = glm::vec4(toRotation.x, toRotation.y, toRotation.z, toRotation.w);
+    return packed;
+}
+
+CameraView PushbroomEnvelope(const Camera& camera, const glm::dmat4& from, const glm::dmat4& to) {
+    const glm::dmat4 middle = InterpolatePose(from, to, 0.5);
+    const glm::dmat3 rotation = glm::mat3_cast(RotationOf(middle));
+    const glm::dvec3 forward = -rotation[2];
+    const double length = glm::length(glm::dvec3(to[3]) - glm::dvec3(from[3]));
+    glm::dmat4 eyePose(rotation);
+    eyePose[3] = glm::dvec4(glm::dvec3(middle[3]) - forward * length, 1.0);
+    const glm::dmat4 toEye = glm::inverse(eyePose);
+
+    // The detector line's ends at the clipping planes, from poses along the strip: the rays
+    // between them are straight, and their image coordinates from the eye monotonic along them.
+    const double f = camera.FocalLengthPixels();
+    const double cx = camera.PrincipalPoint().x;
+    const double edges[] = {-cx / f, (camera.width - cx) / f};
+    const double line = camera.lineOffsetMm / camera.focalLengthMm;
+    double tanX = 0.0;
+    double tanY = 0.0;
+    double nearest = std::numeric_limits<double>::max();
+    double farthest = 0.0;
+    constexpr int kSamples = 16;
+    for (int i = 0; i <= kSamples; ++i) {
+        const glm::dmat4 sample = InterpolatePose(from, to, double(i) / kSamples);
+        const glm::dmat4 pose(glm::mat3_cast(RotationOf(sample)));
+        const glm::dvec3 position(sample[3]);
+        for (const double x : edges) {
+            for (const double depth : {camera.nearPlane, camera.farPlane}) {
+                const glm::dvec3 world =
+                    position + glm::dvec3(pose * glm::dvec4(x * depth, line * depth, -depth, 0.0));
+                const glm::dvec3 p(toEye * glm::dvec4(world, 1.0));
+                const double z = std::max(-p.z, 1e-6);
+                nearest = std::min(nearest, z);
+                farthest = std::max(farthest, z);
+                tanX = std::max(tanX, std::abs(p.x) / z);
+                tanY = std::max(tanY, std::abs(p.y) / z);
+            }
+        }
+    }
+    // Padding for the rays between samples, and a sliver of height for a still camera.
+    tanX *= 1.02;
+    tanY = std::max(tanY * 1.02, 1e-4);
+    CameraView view;
+    view.verticalFov = static_cast<float>(2.0 * std::atan(tanY));
+    view.aspect = static_cast<float>(tanX / tanY);
+    view.nearPlane = static_cast<float>(0.98 * nearest);
+    view.farPlane = static_cast<float>(1.02 * farthest);
+    view.eye = glm::vec3(eyePose[3]);
+    view.forward = glm::vec3(forward);
+    view.view = glm::mat4(toEye);
+    view.projection =
+        glm::perspectiveRH_ZO(view.verticalFov, view.aspect, view.nearPlane, view.farPlane);
+    return view;
+}
+
+glm::dmat4 FrameParams::PreviousPose(std::size_t view) const {
+    glm::dmat4 pose = previousPoses.empty() ? (poses.empty() ? camera.transform : poses.at(view))
+                                            : previousPoses.at(view);
+    pose[3] -= glm::dvec4(origin, 0.0);
+    return pose;
+}
+
+PushbroomStrip FrameParams::Strip(std::size_t view) const {
+    glm::dmat4 pose = poses.empty() ? camera.transform : poses.at(view);
+    pose[3] -= glm::dvec4(origin, 0.0);
+    const glm::dmat4 from = PreviousPose(view);
+    const glm::dquat a = RotationOf(from);
+    glm::dquat b = RotationOf(pose);
+    if (glm::dot(a, b) < 0.0) {
+        b = -b;  // the shorter arc, as `InterpolatePose`
+    }
+    PushbroomStrip strip;
+    strip.from = glm::vec3(from[3]);
+    strip.to = glm::vec3(pose[3]);
+    strip.fromRotation = glm::quat(a);
+    strip.toRotation = glm::quat(b);
+    strip.nearPlane = static_cast<float>(camera.nearPlane);
+    strip.farPlane = static_cast<float>(camera.farPlane);
+    const double width = camera.width;
+    strip.scale = static_cast<float>(2.0 * camera.FocalLengthPixels() / width);
+    strip.shift = static_cast<float>(2.0 * camera.PrincipalPoint().x / width - 1.0);
+    strip.line = static_cast<float>(camera.lineOffsetMm / camera.focalLengthMm);
+    return strip;
+}
+
 FrameParams FrameParams::Subframes() const {
     FrameParams result = *this;
     const int subframes = camera.Subframes();

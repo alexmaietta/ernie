@@ -3,7 +3,14 @@
 //   4 clamping linear sampler;
 // the per-draw push constants; and sun visibility and reflectance helpers. Materials take
 // bindings 5 to 9 (surface.slang) and each drawable's own resources start at 10.
+//
+// Passes place world points in the image with `projectWorld`, from module `projection`: a frame
+// camera's view-projection (projection_pinhole.slang), or a pushbroom's strip
+// (projection_pushbroom.slang), whichever the pass was compiled with.
+import projection;
+
 public struct Uniforms {
+    // The view-projection; a pushbroom's strip in its place (`PushbroomStrip::Packed`).
     public float4x4 viewProj;
     // xyz: unit direction towards the sun, w: ambient light fraction.
     public float4 sun;
@@ -23,6 +30,13 @@ public struct Uniforms {
     // x: the view's sub-frame time as the share of the way from the last frame's transforms (0)
     // to this one's (1), which moving meshes interpolate for motion blur; 1 without.
     public float4 motion;
+    // A pushbroom's intrinsics (`PushbroomStrip::Intrinsics`); unused by frame cameras.
+    public float4 strip;
+}
+
+// Clip coordinates of world point `world` in the view.
+public float4 projectWorld(float3 world) {
+    return cameraProject(u.viewProj, u.strip, world);
 }
 
 // Per draw: the light's view-projection for shadow passes, the pass's first item (terrain patch

@@ -332,7 +332,8 @@ class MeshDrawable : public RasterDrawable {
         std::array<bool, 3> inPlace{};
     };
 
-    void CreateGBufferPipeline();
+    /// The G-buffer pipeline for a frame camera's views, or a pushbroom's.
+    void CreateGBufferPipeline(bool pushbroom);
     /// Writes every draw's GPU record and instance ids, and their pipelines and id offsets.
     void WriteDraws();
     /// Rebuilds `transforms_` from the items and the origin.
@@ -399,7 +400,9 @@ class MeshDrawable : public RasterDrawable {
     const VulkanContext& context_;
     PipelineLayout layout_;
     std::unique_ptr<GraphicsPipeline> shadowPipeline_;
-    std::unique_ptr<GraphicsPipeline> gbufferPipeline_;
+    /// The G-buffer pipelines for frame cameras and, once one is seen, pushbrooms.
+    std::array<std::unique_ptr<GraphicsPipeline>, 2> gbufferPipelines_;
+    bool pushbroom_ = false;  ///< Whether the last `Prepare`'s camera is a pushbroom.
 
     std::map<std::uint32_t, Mesh> meshes_;
     std::map<std::uint32_t, Instancer> instancers_;

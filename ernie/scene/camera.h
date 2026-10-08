@@ -211,6 +211,17 @@ struct Camera {
     /// Rolling shutter readout: the top row's interval comes this many frames before the bottom
     /// row's, rows in between in proportion; 0 is a global shutter.
     double rollingShutter = 0.0;
+    /// A pushbroom (line scan) camera (`ernie:camera:scan` "pushbroom"): one detector line along
+    /// the image's x axis, `lineOffsetMm` off the principal point along y on the focal plane,
+    /// read out once per image row as the camera moves. Row r (from the top) is exposed at the
+    /// pose (r + 0.5) / height of the way from the last frame's pose to this frame's, so a frame
+    /// is one strip of the scan. Its lens has no distortion and it has no shutter interval or
+    /// rolling readout of its own.
+    ///
+    /// Reference: R. Gupta and R. I. Hartley, "Linear Pushbroom Cameras", IEEE TPAMI 19(9):963-975,
+    /// 1997.
+    bool pushbroom = false;
+    double lineOffsetMm = 0.0;
     SpectralBands bands;
     LensModel lens;
     SensorModel sensor = SensorModel::Rgb();
@@ -278,7 +289,8 @@ struct Camera {
     /// length, a bad clipping range, a degenerate transform, a bad spectral range, no sensor
     /// channels or more than four, or a shutter closing before it opens, a negative rolling
     /// readout or shutter samples outside 1 to `kMaxShutterSamples`, an orthographic camera with
-    /// lens distortion or a fisheye or a non-positive pixel pitch, or a fisheye with
+    /// lens distortion or a fisheye or a non-positive pixel pitch, a pushbroom that is
+    /// orthographic, has lens distortion or more than one sub-frame, or a fisheye with
     /// Brown-Conrady distortion or a field reaching past `LensModel::kMaxFisheyeFieldAngle`.
     void Check() const;
 

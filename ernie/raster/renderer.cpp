@@ -32,8 +32,9 @@ struct Uniforms {
     float sunViewProjection[16];  ///< A batch view's own fitted sun map, with `sunShadow[2]` 1.
     float sunShadow[4];           ///< Its texel size and depth span in world units, and the flag.
     float motion[4];              ///< The sub-frame's share from the last frame's transforms.
+    float strip[4];               ///< A pushbroom's intrinsics (`PushbroomStrip::Intrinsics`).
 };
-static_assert(sizeof(Uniforms) == 224, "Uniforms must match frame.slang");
+static_assert(sizeof(Uniforms) == 240, "Uniforms must match frame.slang");
 
 struct ShadowUniforms {
     float lightViewProjection[4][16];
@@ -63,7 +64,8 @@ struct ShadingUniforms {
     float toCatalogue[3][4];  ///< And to the star catalogue's.
     std::uint32_t sky[4];     ///< kSky* bits, the dome map's width, height and mip levels.
     float starGrid[4];        ///< The star grid's columns and rows.
-    float padding[52];        ///< To the views' stride, so shading reads them as one array.
+    float strip[4];           ///< A pushbroom's intrinsics (`PushbroomStrip::Intrinsics`).
+    float padding[48];        ///< To the views' stride, so shading reads them as one array.
 };
 static_assert(sizeof(ShadingUniforms) == 1280, "ShadingUniforms must match shading.slang");
 
@@ -231,9 +233,20 @@ SensorPlan ProbePlan(const SensorFilterModel& model, const SensorFilterRegistry&
     return PlanSensor(chain, vars, registry);
 }
 
+/// The modules of the shading and sky passes with `brdf` as the active model, for a frame
+/// camera's views or a pushbroom's.
+std::vector<ShaderModuleSource> ShadingModules(const BrdfModel& brdf, bool pushbroom) {
+    return {{"brdf", std::string(BrdfSlang())},
+            {BrdfModuleName(brdf), brdf.slang},
+            ProjectionModule(pushbroom),
+            {"shading", "import " + BrdfModuleName(brdf) + ";\ntypealias ActiveBrdf = " +
+                            brdf.typeName + ";\n" + shaders::kShadingSlang}};
+}
+
 /// The modules of `plan`'s kernel: the sensor, its custom filters' and its entry point.
 std::vector<ShaderModuleSource> SensorModules(const SensorPlan& plan, std::uint32_t segment) {
-    std::vector<ShaderModuleSource> modules{{"lens", shaders::kLensSlang},
+    std::vector<ShaderModuleSource> modules{ProjectionModule(plan.pushbroom),
+                                            {"lens", shaders::kLensSlang},
                                             {"lensProjection", plan.LensSource()},
                                             {"sensor", shaders::kSensorSlang}};
     for (auto& [name, source] : plan.Modules()) {
@@ -539,17 +552,7 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
 
     SetDomeMap(nullptr);
     SetStars({});
-    {
-        // The sky pass shares shading's module, composed with the first model, which it ignores.
-        const BrdfModel& brdf = brdfs_.Models().front();
-        const std::vector<ShaderModuleSource> modules{
-            {"brdf", std::string(BrdfSlang())},
-            {BrdfModuleName(brdf), brdf.slang},
-            {"shading", "import " + BrdfModuleName(brdf) + ";\ntypealias ActiveBrdf = " +
-                            brdf.typeName + ";\n" + shaders::kShadingSlang}};
-        skyPipeline_ = std::make_unique<ComputePipeline>(
-            context_, shadingLayout_, compiler_.CompileSpirv(modules, "skyMain"));
-    }
+    SkyPipeline(false);
 
     const std::vector<ShaderModuleSource> hzbModules{{"hzb", shaders::kHzbSlang}};
     const std::vector<ShaderModuleSource> pyramidModules{{"pyramid", shaders::kPyramidSlang}};
@@ -946,6 +949,9 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
     if (subframes_ > 1 && frame.posesOnGpu) {
         throw std::invalid_argument("Motion blur needs the views' poses on the host");
     }
+    if (frame.camera.pushbroom && frame.posesOnGpu) {
+        throw std::invalid_argument("A pushbroom camera needs the views' poses on the host");
+    }
     std::optional<FrameParams> expanded;
     if (subframes_ > 1) {
         expanded = frame.Subframes();
@@ -1100,9 +1106,15 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
         for (std::uint32_t v = 0; v < views_; ++v) {
             const CameraView viewOf = params.View(v);
             Uniforms uniforms{};
-            const glm::mat4 viewProjection = viewOf.ViewProjection();
-            std::memcpy(uniforms.viewProjection, glm::value_ptr(viewProjection),
-                        sizeof(uniforms.viewProjection));
+            // A pushbroom projects through its strip in place of a view-projection (`projectWorld`).
+            if (params.camera.pushbroom) {
+                const PushbroomStrip strip = params.Strip(v);
+                CopyMatrix(uniforms.viewProjection, strip.Packed());
+                const glm::vec4 intrinsics = strip.Intrinsics();
+                std::memcpy(uniforms.strip, glm::value_ptr(intrinsics), sizeof(uniforms.strip));
+            } else {
+                CopyMatrix(uniforms.viewProjection, viewOf.ViewProjection());
+            }
             uniforms.sun[0] = params.sunDirection.x;
             uniforms.sun[1] = params.sunDirection.y;
             uniforms.sun[2] = params.sunDirection.z;
@@ -1193,6 +1205,7 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
         pass.plan = PlanSensor(chain.filters.empty() ? StepsOf(DefaultFilterChain()) : chain.filters,
                                held, sensorFilters_, chain.aovOffset);
         pass.plan.lens = LensKernelOf(params.camera.lens);
+        pass.plan.pushbroom = params.camera.pushbroom;
         // Each pass's parameters in a buffer of its own; kept from the last frame's pass at the
         // same place in the order when large enough, which only ever waits when one grows.
         const VkDeviceSize bytes = std::max<VkDeviceSize>(pass.plan.params.size(), 1) *
@@ -1215,7 +1228,7 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
     filters_ = sensorPasses_.front().plan.filters;
     bands_ = params.camera.bands;
     extent_ = {params.camera.width, params.camera.height};
-    overlays_->Prepare(overlays, params.origin);
+    overlays_->Prepare(overlays, params.origin, params.camera.pushbroom);
     viewWorlds_.assign(views_, -1);
     for (std::size_t v = 0; v < std::min<std::size_t>(params.worlds.size(), views_); ++v) {
         viewWorlds_[v] = params.worlds[v];
@@ -1223,10 +1236,12 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
     clipRange_ = {static_cast<float>(params.camera.nearPlane),
                   static_cast<float>(params.camera.farPlane)};
     orthographic_ = params.camera.orthographic;
+    pushbroom_ = params.camera.pushbroom;
     WriteMaterialTable();
     for (const std::size_t model : modelsInUse_) {
-        ShadingPipeline(model);
+        ShadingPipeline(model, pushbroom_);
     }
+    SkyPipeline(pushbroom_);
     sky_ = 0;
     if (params.dome && params.dome->visible) {
         sky_ |= kSkyDome | (hasDomeMap_ ? kSkyMap : 0u);
@@ -1247,25 +1262,33 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
     updated_ = true;
 }
 
-const ComputePipeline& RasterRenderer::ShadingPipeline(std::size_t model) {
-    if (const auto it = shadingPipelines_.find(model); it != shadingPipelines_.end()) {
+const ComputePipeline& RasterRenderer::ShadingPipeline(std::size_t model, bool pushbroom) {
+    if (const auto it = shadingPipelines_.find({model, pushbroom});
+        it != shadingPipelines_.end()) {
         return *it->second;
     }
-    const BrdfModel& brdf = brdfs_.Models()[model];
-    const std::vector<ShaderModuleSource> modules{
-        {"brdf", std::string(BrdfSlang())},
-        {BrdfModuleName(brdf), brdf.slang},
-        {"shading", "import " + BrdfModuleName(brdf) + ";\ntypealias ActiveBrdf = " +
-                        brdf.typeName + ";\n" + shaders::kShadingSlang}};
     std::vector<std::uint32_t> spirv;
+    const BrdfModel& brdf = brdfs_.Models()[model];
     try {
-        spirv = compiler_.CompileSpirv(modules, "shadeMain");
+        spirv = compiler_.CompileSpirv(ShadingModules(brdf, pushbroom), "shadeMain");
     } catch (const std::invalid_argument& error) {
         throw std::invalid_argument("BRDF " + brdf.id +
                                     " failed to compile for shading: " + error.what());
     }
     auto pipeline = std::make_unique<ComputePipeline>(context_, shadingLayout_, spirv);
-    return *shadingPipelines_.emplace(model, std::move(pipeline)).first->second;
+    return *shadingPipelines_.emplace(std::pair(model, pushbroom), std::move(pipeline))
+                .first->second;
+}
+
+void RasterRenderer::SkyPipeline(bool pushbroom) {
+    std::unique_ptr<ComputePipeline>& sky = skyPipelines_[pushbroom ? 1 : 0];
+    if (sky == nullptr) {
+        // The sky pass shares shading's module, composed with the first model, which it ignores.
+        sky = std::make_unique<ComputePipeline>(
+            context_, shadingLayout_,
+            compiler_.CompileSpirv(ShadingModules(brdfs_.Models().front(), pushbroom),
+                                   "skyMain"));
+    }
 }
 
 void RasterRenderer::WriteMaterialTable() {
@@ -1357,7 +1380,15 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
     }
     for (std::uint32_t v = 0; v < views_; ++v) {
         const CameraView view = params.View(v);
-        CopyMatrix(shading.invViewProj, glm::inverse(view.ViewProjection()));
+        if (params.camera.pushbroom) {
+            // Its pixels' rays come from its strip (projection_pushbroom.slang).
+            const PushbroomStrip strip = params.Strip(v);
+            CopyMatrix(shading.invViewProj, strip.Packed());
+            const glm::vec4 intrinsics = strip.Intrinsics();
+            std::memcpy(shading.strip, glm::value_ptr(intrinsics), sizeof(shading.strip));
+        } else {
+            CopyMatrix(shading.invViewProj, glm::inverse(view.ViewProjection()));
+        }
         shading.eye[0] = view.eye.x;
         shading.eye[1] = view.eye.y;
         shading.eye[2] = view.eye.z;
@@ -1487,7 +1518,15 @@ void RasterRenderer::WriteSensor(const FrameParams& params) {
     // The sensor filters the output views, reading the G-buffer of their last sub-frame.
     for (std::uint32_t v = 0; v < outputViews_; ++v) {
         const CameraView view = params.View(LastSubframeView(v));
-        CopyMatrix(sensor.invViewProj, glm::inverse(view.ViewProjection()));
+        if (params.camera.pushbroom) {
+            // Its strip, and its intrinsics where a pushbroom has no lens distortion.
+            const PushbroomStrip strip = params.Strip(LastSubframeView(v));
+            CopyMatrix(sensor.invViewProj, strip.Packed());
+            const glm::vec4 intrinsics = strip.Intrinsics();
+            std::memcpy(sensor.distortion, glm::value_ptr(intrinsics), sizeof(sensor.distortion));
+        } else {
+            CopyMatrix(sensor.invViewProj, glm::inverse(view.ViewProjection()));
+        }
         sensor.eye[0] = view.eye.x;
         sensor.eye[1] = view.eye.y;
         sensor.eye[2] = view.eye.z;
@@ -1856,6 +1895,7 @@ void RasterRenderer::RecordOverlays(VkCommandBuffer commands, RenderTargets& tar
     ERNIE_GPU_ZONE(context_, commands, "Overlays");
     targets.Depth().Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     color->Transition(commands, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    target.pushbroom = pushbroom_;
     for (std::uint32_t v = 0; v < targets.Views(); ++v) {
         OverlayPass::Target target = OverlayTarget(targets, LastSubframeView(firstView + v), v);
         target.color = color->LayerView(v);
@@ -2046,7 +2086,7 @@ void RasterRenderer::Shade(VkCommandBuffer commands, RenderTargets& targets,
                                               DescriptorResource::Of(*starCells_)};
         for (const std::size_t model : modelsInUse_) {
             vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
-                              shadingPipelines_.at(model)->Handle());
+                              shadingPipelines_.at({model, pushbroom_})->Handle());
             shadingLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, shading);
             const std::uint32_t constants[4] = {static_cast<std::uint32_t>(model), firstView, 0, 0};
             shadingLayout_.PushConstants(commands, constants, sizeof(constants));
@@ -2055,7 +2095,8 @@ void RasterRenderer::Shade(VkCommandBuffer commands, RenderTargets& targets,
         // The pixels no geometry covers, when the dome or stars show there; else the lens reads
         // them as no radiance.
         if (sky_ != 0) {
-            vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, skyPipeline_->Handle());
+            vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                              skyPipelines_[pushbroom_ ? 1 : 0]->Handle());
             shadingLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, shading);
             const std::uint32_t constants[4] = {0, firstView, 0, 0};
             shadingLayout_.PushConstants(commands, constants, sizeof(constants));

@@ -76,9 +76,14 @@ class GroundDrawable : public RasterDrawable {
                      DrawPhase phase = DrawPhase::All) const override;
 
   private:
+    /// The pipeline for a frame camera's views, or a pushbroom's.
+    void CreatePipeline(bool pushbroom);
+
     RasterRenderer& renderer_;
     PipelineLayout layout_;
-    std::unique_ptr<GraphicsPipeline> pipeline_;
+    /// For frame cameras and, once one is seen, pushbrooms.
+    std::array<std::unique_ptr<GraphicsPipeline>, 2> pipelines_;
+    bool pushbroom_ = false;  ///< Whether the last `Prepare`'s camera is a pushbroom.
     GpuBuffer uniforms_;
     GroundParams params_;
     glm::dvec3 origin_{0.0};  ///< The frame's origin (`SetOrigin`).

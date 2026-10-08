@@ -54,6 +54,9 @@ struct SensorPlan {
     /// The lens head's projection, a struct of lens.slang: "Pinhole", "BrownConrady" or
     /// "Fisheye" (`LensKernelOf`). Compiled into the kernel, so a pinhole runs no distortion code.
     std::string lens = "Pinhole";
+    /// Whether the camera is a pushbroom, whose pixels' rays come from module `projection`'s
+    /// pushbroom strip (projection_pushbroom.slang) rather than one view-projection.
+    bool pushbroom = false;
 
     /// Identifies the kernels: plans with the same key share them (parameter values aside, which
     /// the kernels read from a buffer).

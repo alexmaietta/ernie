@@ -157,6 +157,8 @@ class PointsDrawable : public RasterDrawable {
     /// write of a frame.
     void Write(Cloud& cloud);
     /// Draw `item`'s bounds relative to the origin.
+    /// The G-buffer pipeline for a frame camera's views, or a pushbroom's.
+    void CreateGBufferPipeline(bool pushbroom);
     Bounds3 ItemBounds(std::size_t item) const;
     std::vector<DescriptorResource> Resources(const RasterFrame& frame, std::size_t item) const;
 
@@ -164,7 +166,9 @@ class PointsDrawable : public RasterDrawable {
     const VulkanContext& context_;
     ComputeInterop* compute_ = nullptr;
     PipelineLayout layout_;
-    std::unique_ptr<GraphicsPipeline> gbufferPipeline_;
+    /// The G-buffer pipelines for frame cameras and, once one is seen, pushbrooms.
+    std::array<std::unique_ptr<GraphicsPipeline>, 2> gbufferPipelines_;
+    bool pushbroom_ = false;  ///< Whether the last `Prepare`'s camera is a pushbroom.
     std::unique_ptr<GraphicsPipeline> shadowPipeline_;
     std::map<std::uint32_t, Cloud> clouds_;
     std::uint32_t nextHandle_ = 1;

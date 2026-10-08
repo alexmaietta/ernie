@@ -59,7 +59,12 @@ constexpr DescriptorBinding kBindings[] = {
 GroundDrawable::GroundDrawable(RasterRenderer& renderer)
     : renderer_(renderer), layout_(renderer.Context(), kBindings, kDrawConstantsSize),
       uniforms_(renderer.Context(), kUniformsStride, kUniformsUsage, BufferMemory::Device) {
+    CreatePipeline(false);
+}
+
+void GroundDrawable::CreatePipeline(bool pushbroom) {
     const std::vector<ShaderModuleSource> modules{{"brdf", std::string(BrdfSlang())},
+                                                  ProjectionModule(pushbroom),
                                                   {"frame", shaders::kFrameSlang},
                                                   {"surface", shaders::kSurfaceSlang},
                                                   {"ground", shaders::kGroundSlang}};
@@ -73,7 +78,8 @@ GroundDrawable::GroundDrawable(RasterRenderer& renderer)
     desc.colorFormats.assign(RenderTargets::kGBufferFormats.begin(),
                              RenderTargets::kGBufferFormats.end());
     desc.depthFormat = RenderTargets::kDepthFormat;
-    pipeline_ = std::make_unique<GraphicsPipeline>(renderer_.Context(), layout_, desc);
+    pipelines_[pushbroom ? 1 : 0] =
+        std::make_unique<GraphicsPipeline>(renderer_.Context(), layout_, desc);
 }
 
 GroundDrawable::~GroundDrawable() {
@@ -92,6 +98,10 @@ void GroundDrawable::Prepare(const FrameParams& params, std::span<const ShadowCa
     prepared_ = false;
     if (!enabled_) {
         return;
+    }
+    pushbroom_ = params.camera.pushbroom;
+    if (pipelines_[pushbroom_ ? 1 : 0] == nullptr) {
+        CreatePipeline(pushbroom_);
     }
     GroundUniforms uniforms{};
     // Relative to the frame's origin, the checkerboard keeping its place in the world.
@@ -144,7 +154,8 @@ void GroundDrawable::RecordColor(VkCommandBuffer commands, const RasterFrame& fr
     renderer_.MaterialOrDefault(params_.material).AppendResources(resources);
     resources.push_back(
         DescriptorResource::Of(uniforms_, view * kUniformsStride, sizeof(GroundUniforms)));
-    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_->Handle());
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      pipelines_[pushbroom_ ? 1 : 0]->Handle());
     layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, resources);
     vkCmdDraw(commands, 3, 1, 0, 0);
 }

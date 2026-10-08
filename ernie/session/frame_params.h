@@ -4,6 +4,7 @@
 #include "ernie/scene/sensor_filters.h"
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
 #include <array>
@@ -15,6 +16,37 @@
 #include <vector>
 
 namespace ernie {
+
+/// A pushbroom camera's strip for one frame (`Camera::pushbroom`), as its shaders project with it
+/// (projection_pushbroom.slang): its rows' poses run from `from` (the top row's camera position)
+/// to `to` (the bottom row's), turning from `fromRotation` to `toRotation` along the great arc.
+/// Positions are relative to the frame's origin.
+struct PushbroomStrip {
+    glm::vec3 from{0.0f};
+    glm::vec3 to{0.0f};
+    glm::quat fromRotation{1.0f, 0.0f, 0.0f, 0.0f};  ///< Camera to world.
+    glm::quat toRotation{1.0f, 0.0f, 0.0f, 0.0f};    ///< On `fromRotation`'s side of the sphere.
+    float nearPlane = 0.1f;
+    float farPlane = 1000.0f;
+    float scale = 1.0f;  ///< 2 f / width: NDC x per normalised image x.
+    float shift = 0.0f;  ///< 2 cx / width - 1.
+    float line = 0.0f;   ///< The detector line's normalised image y.
+
+    /// What the shaders read in place of a view-projection: columns (from, near), (to, far),
+    /// fromRotation and toRotation as (x, y, z, w).
+    glm::mat4 Packed() const;
+
+    /// (scale, shift, line, 0).
+    glm::vec4 Intrinsics() const {
+        return {scale, shift, line, 0.0f};
+    }
+};
+
+/// A pinhole view that holds every ray of pushbroom `camera`'s strip from pose `from` to `to`
+/// between its clipping planes, for culling, levels of detail and shadow cascades: its eye at the
+/// middle pose pulled back along the view by the strip's length, its field of view the widest
+/// the rays reach from there, sampled along the strip and padded.
+CameraView PushbroomEnvelope(const Camera& camera, const glm::dmat4& from, const glm::dmat4& to);
 
 /// Which casters shadow a batch of views of several worlds (`ernie:shadows:worlds`).
 enum class WorldShadows : std::uint32_t {
@@ -310,12 +342,23 @@ struct FrameParams {
     }
 
     /// The raster view the passes draw view `view` with, `ViewCamera(view).RasterView(overscan)`
-    /// relative to `origin` and without copying the camera.
+    /// relative to `origin` and without copying the camera. A pushbroom's is a pinhole view
+    /// around its whole strip (`PushbroomEnvelope`), for what the CPU plans: culling, levels of
+    /// detail and shadow cascades.
     CameraView View(std::size_t view = 0) const {
         glm::dmat4 pose = poses.empty() ? camera.transform : poses.at(view);
         pose[3] -= glm::dvec4(origin, 0.0);
+        if (camera.pushbroom) {
+            return PushbroomEnvelope(camera, PreviousPose(view), pose);
+        }
         return camera.RasterView(pose, overscan);
     }
+
+    /// View `view`'s pose at the last frame relative to `origin`: its pose now without one.
+    glm::dmat4 PreviousPose(std::size_t view = 0) const;
+
+    /// A pushbroom camera's strip of view `view`, from its last frame's pose to this one's.
+    PushbroomStrip Strip(std::size_t view = 0) const;
 
     /// The frame as its sub-frames see it, for motion blur (`Camera::Subframes`): a view per
     /// sub-frame and view, sub-frame `k`'s from `k * Views()` on, each posed at

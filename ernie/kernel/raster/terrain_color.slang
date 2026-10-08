@@ -29,7 +29,7 @@ LayeredVertexOutput vertexMain(uint vertexIndex : SV_VertexID, uint instanceInde
     let v = gridVertex(vertexIndex, instanceIndex);
     LayeredVertexOutput out;
     out.layer = u.flags.z;
-    out.position = mul(u.viewProj, float4(v.world, 1.0));
+    out.position = projectWorld(v.world);
     out.world = v.world;
     out.height = v.height;
     out.barycentric = barycentric[v.corner];

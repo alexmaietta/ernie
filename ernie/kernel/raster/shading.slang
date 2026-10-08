@@ -37,6 +37,9 @@
 // - M. Planck, "Ueber das Gesetz der Energieverteilung im Normalspectrum", Annalen der Physik
 //   309(3):553-563, 1901 (black-body spectra).
 import brdf;
+// The camera's projection: a frame camera's matrices, or a pushbroom's strip
+// (projection_pinhole.slang, projection_pushbroom.slang).
+import projection;
 
 static const uint kUnlit = 1;
 static const uint kBackground = 0xFFFFFFFF;
@@ -73,8 +76,10 @@ struct ShadingUniforms {
     uint4 sky;
     // x: the stars' grid cells around in right ascension, y: in declination; zw unused.
     float4 starGrid;
+    // A pushbroom's intrinsics (`PushbroomStrip::Intrinsics`), its strip in `invViewProj`'s place.
+    float4 strip;
     // To the views' stride in the buffer, 1280 bytes.
-    float4 padding[13];
+    float4 padding[12];
 }
 
 // What `skyMain` draws behind the scene.
@@ -346,10 +351,13 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     }
     let ndc = float3((float(id.x) + 0.5) / float(sh.size.x) * 2.0 - 1.0,
                      1.0 - (float(id.y) + 0.5) / float(sh.size.y) * 2.0, gDepth.Load(pixel));
-    let clip = mul(sh.invViewProj, float4(ndc, 1.0));
-    let world = clip.xyz / clip.w;
+    let world = cameraPoint(sh.invViewProj, sh.strip, ndc.xy, ndc.z);
     let normalVisibility = gNormal.Load(pixel);
-    let v = sh.range.w != 0.0 ? -normalize(rayThrough(ndc.xy)) : normalize(sh.eye.xyz - world);
+    // Back along the pixel's ray: towards the eye, along the view when orthographic, towards the
+    // row's pose for a pushbroom.
+    let v = kPushbroomCamera ? -cameraRay(sh.invViewProj, sh.strip, ndc.xy)
+            : sh.range.w != 0.0 ? -normalize(rayThrough(ndc.xy))
+                                : normalize(sh.eye.xyz - world);
     let n = facingNormal(normalize(normalVisibility.xyz), v);
     let visibility = normalVisibility.w;
     let albedo = gAlbedo.Load(pixel);
@@ -593,11 +601,13 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
     for (uint band = 0; band < kMaxBands; ++band) {
         radiance[band] = 0.0;
     }
-    if (sh.range.w != 0.0) {
+    if (kPushbroomCamera || sh.range.w != 0.0) {
         // Orthographic: every pixel sees the dome along the view direction, with no solid angle
-        // for stars to fill.
+        // for stars to fill. A pushbroom's pixels look along their rows' rays; its stars are not
+        // drawn.
+        let d = kPushbroomCamera ? cameraRay(sh.invViewProj, sh.strip, ndc) : normalize(c);
         if ((sh.sky.x & kSkyDome) != 0) {
-            let rgb = (sh.sky.x & kSkyMap) != 0 ? max(domeMapAt(normalize(c), 0.0), float3(0.0))
+            let rgb = (sh.sky.x & kSkyMap) != 0 ? max(domeMapAt(d, 0.0), float3(0.0))
                                                  : float3(1.0);
             let scale = max(rgb.x, max(rgb.y, rgb.z));
             let coefficients = scale > 0.0 ? sigmoidCoefficients(rgb / scale) : float3(0.0);

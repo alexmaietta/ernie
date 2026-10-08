@@ -214,7 +214,8 @@ class TerrainDrawable : public RasterDrawable {
         std::uint32_t count = 0;
     };
 
-    void CreateGBufferPipeline();
+    /// The G-buffer pipeline for a frame camera's views, or a pushbroom's.
+    void CreateGBufferPipeline(bool pushbroom);
     void ReservePatches(std::size_t count);
     /// Makes the images and buffers of device heights for a `width` x `height` raster of cells
     /// `cellSize` wide and resets the tree and patches; they are written later.
@@ -238,7 +239,9 @@ class TerrainDrawable : public RasterDrawable {
 
     RasterRenderer& renderer_;
     PipelineLayout layout_;
-    std::unique_ptr<GraphicsPipeline> gbufferPipeline_;
+    /// The G-buffer pipelines for frame cameras and, once one is seen, pushbrooms.
+    std::array<std::unique_ptr<GraphicsPipeline>, 2> gbufferPipelines_;
+    bool pushbroom_ = false;  ///< Whether the last `Prepare`'s camera is a pushbroom.
     std::unique_ptr<GraphicsPipeline> shadowPipeline_;
     TerrainParams params_;
 

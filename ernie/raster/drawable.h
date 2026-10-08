@@ -1,6 +1,8 @@
 #pragma once
 
 #include "ernie/device/pipeline.h"
+#include "ernie/kernel/embedded_shaders.h"
+#include "ernie/util/shader_source.h"
 #include "ernie/raster/render_targets.h"
 #include "ernie/raster/shadow_cascades.h"
 #include "ernie/session/frame_params.h"
@@ -16,6 +18,14 @@
 #include <vector>
 
 namespace ernie {
+
+/// Module `projection`, which `frame.slang` imports for `projectWorld`: a pushbroom camera's
+/// (projection_pushbroom.slang) or a frame camera's (projection_pinhole.slang). Passes facing the
+/// camera compile with the frame's; others, such as shadow passes, with the frame camera's.
+inline ShaderModuleSource ProjectionModule(bool pushbroom) {
+    return {"projection", pushbroom ? shaders::kProjectionPushbroomSlang
+                                    : shaders::kProjectionPinholeSlang};
+}
 
 /// The per-frame resources every raster pass binds (`frame.slang`): view and light uniforms,
 /// shadow uniforms, cascaded shadow maps, their comparison sampler and a clamping linear sampler,

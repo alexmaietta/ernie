@@ -385,6 +385,45 @@ TEST_F(RasterDelegateTest, OrthographicSeesItsApertureInTheScene) {
     EXPECT_EQ(At<std::uint32_t>(vars.at("PrimId"), c, 27), 0u) << "x = 71.9";
 }
 
+TEST_F(RasterDelegateTest, PushbroomScansItsRowsAlongItsMotion) {
+    // Looking straight down from 50, moving 32 along +y over one frame: row r sees the ground
+    // under the camera (r + 0.5) / 32 of the way along, y = r + 0.5 - 16, one unit per row, and
+    // across it a pinhole's view of x. A 2-unit cube at y = 5 shows on rows 20 and 21 only.
+    Scene scene = FlatScene();
+    scene.Define("/World/Box", tokens::kCube)
+        .Set(tokens::kSize, 2.0)
+        .Set(tokens::kTransform,
+             glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 5.0, 1.0)));
+    const auto at = [](double y) {
+        return ernie::LookAtTransform({0.0, y, 50.0}, {0.0, y, 0.0}, {0.0, 1.0, 0.0});
+    };
+    scene.Set("/World/Camera", tokens::kCameraScan, std::string(tokens::kPushbroom));
+    scene.Set("/World/Camera", tokens::kTransform, at(-16.0));
+    RasterDelegate delegate(*context_);
+    delegate.Step(scene);  // the strip's start
+    scene.Set("/World/Camera", tokens::kTransform, at(16.0));
+    ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+    const auto vars = MapVars(outputs);
+    const std::size_t c = kVarSize / 2;
+    const std::uint32_t terrain = At<std::uint32_t>(vars.at("PrimId"), 5, c);
+    ASSERT_EQ(delegate.PrimPath(terrain), Path("/World/Terrain"));
+    for (std::size_t row = 0; row < kVarSize; ++row) {
+        const std::uint32_t id = At<std::uint32_t>(vars.at("PrimId"), row, c);
+        const bool box = row == 20 || row == 21;
+        EXPECT_EQ(delegate.PrimPath(id), Path(box ? "/World/Box" : "/World/Terrain"))
+            << "row " << row;
+    }
+    const ernie::Camera camera = ernie::CameraOf(scene, "/World/Camera", kVarSize, kVarSize);
+    const double x = (0.5 - camera.PrincipalPoint().x) / camera.FocalLengthPixels();
+    for (const std::size_t row : {std::size_t{2}, std::size_t{12}, std::size_t{30}}) {
+        EXPECT_NEAR(At<float>(vars.at("DistanceToImagePlane"), row, 0), 50.0f, 0.05f);
+        EXPECT_NEAR(At<float>(vars.at("DistanceToCamera"), row, 0), 50.0 * std::sqrt(1.0 + x * x),
+                    0.05)
+            << "across the row as a pinhole sees, from the row's own pose";
+        EXPECT_NEAR(At<float>(vars.at("HdrColor"), row, c), 0.5f, 0.02f) << "lit as a frame";
+    }
+}
+
 TEST_F(RasterDelegateTest, FisheyeSeesFieldAnglesInProportionToRadius) {
     // 50 above flat ground looking straight down: a ray at field angle theta meets it
     // 50 / cos(theta) away. Equidistant, a pixel's theta is its radius over the focal length.

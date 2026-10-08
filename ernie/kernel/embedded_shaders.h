@@ -14,6 +14,9 @@ extern const char kBrdfHapkeSlang[];
 
 /// Per-frame resources and helpers every raster pass shares.
 extern const char kFrameSlang[];
+/// The camera projections, each loaded as module `projection`: frame cameras' and pushbrooms'.
+extern const char kProjectionPinholeSlang[];
+extern const char kProjectionPushbroomSlang[];
 
 /// Spectral shading, sensor filters and the present pass.
 extern const char kShadingSlang[];

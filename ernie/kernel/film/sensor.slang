@@ -40,6 +40,7 @@
 module sensor;
 
 import lensProjection;
+import projection;
 
 static const uint kBackground = 0xFFFFFFFF;
 
@@ -425,10 +426,30 @@ public float sceneDistance(PixelContext pixel, int2 at) {
     let ndc = float3((float(nearest.x) + 0.5) / size.x * 2.0 - 1.0,
                      1.0 - (float(nearest.y) + 0.5) / size.y * 2.0,
                      gDepth.Load(int4(nearest, layer, 0)));
+    float imagePlane;
+    float camera;
+    distancesAt(cam, ndc, imagePlane, camera);
+    return camera;
+}
+
+// The distances of what raster normalised device coordinates `ndc` (with [0, 1] depth z) see:
+// along the view from the image plane, and from the camera. An orthographic view's camera is its
+// image plane; a pushbroom's is its row's pose (its strip in `invViewProj`, its intrinsics in
+// `distortion`).
+void distancesAt(SensorUniforms cam, float3 ndc, out float imagePlane, out float camera) {
+    if (kPushbroomCamera) {
+        float3 origin;
+        float3 direction;  // one unit of view depth long
+        cameraRayThrough(cam.invViewProj, cam.distortion, ndc.xy, origin, direction);
+        camera = length(cameraPoint(cam.invViewProj, cam.distortion, ndc.xy, ndc.z) - origin);
+        imagePlane = camera / length(direction);
+        return;
+    }
     let clip = mul(cam.invViewProj, float4(ndc, 1.0));
     let world = clip.xyz / clip.w;
-    return cam.range.w != 0.0 ? dot(world - cam.eye.xyz, cam.forward.xyz)
-                              : length(world - cam.eye.xyz);
+    imagePlane = dot(world - cam.eye.xyz, cam.forward.xyz);
+    // An orthographic view's rays start on its image plane, which is then the camera.
+    camera = cam.range.w != 0.0 ? imagePlane : length(world - cam.eye.xyz);
 }
 
 // Lens: maps each sensor pixel through the lens's projection (`lensPinholeOf`) to the pinhole
@@ -510,11 +531,7 @@ public struct Lens : ISpatialSource {
         let ndc = float3((float(nearest.x) + 0.5) / size.x * 2.0 - 1.0,
                          1.0 - (float(nearest.y) + 0.5) / size.y * 2.0,
                          gDepth.Load(int4(nearest, layer, 0)));
-        let clip = mul(cam.invViewProj, float4(ndc, 1.0));
-        let world = clip.xyz / clip.w;
-        lens.imagePlane = dot(world - cam.eye.xyz, cam.forward.xyz);
-        // An orthographic view's rays start on its image plane, which is then the camera.
-        lens.camera = cam.range.w != 0.0 ? lens.imagePlane : length(world - cam.eye.xyz);
+        distancesAt(cam, ndc, lens.imagePlane, lens.camera);
         lens.normal = float4(normalize(gNormal.Load(int4(nearest, layer, 0)).xyz), 0.0);
         lens.prim = ids.y;
         lens.instance = ids.z;

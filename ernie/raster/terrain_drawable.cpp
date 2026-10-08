@@ -75,8 +75,9 @@ constexpr DescriptorBinding kBindings[] = {
     {13, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
 };
 
-std::vector<ShaderModuleSource> TerrainModules() {
+std::vector<ShaderModuleSource> TerrainModules(bool pushbroom = false) {
     return {{"brdf", std::string(BrdfSlang())},
+            ProjectionModule(pushbroom),
             {"frame", shaders::kFrameSlang},
             {"terrain", shaders::kTerrainSlang},
             {"surface", shaders::kSurfaceSlang}};
@@ -168,7 +169,7 @@ TerrainDrawable::TerrainDrawable(RasterRenderer& renderer)
     shadow.depthFormat = VK_FORMAT_D32_SFLOAT;
     shadow.depthBiasSlope = 1.5f;
     shadowPipeline_ = std::make_unique<GraphicsPipeline>(renderer_.Context(), layout_, shadow);
-    CreateGBufferPipeline();
+    CreateGBufferPipeline(false);
     ReservePatches(kInitialPatchCapacity);
 }
 
@@ -176,8 +177,8 @@ TerrainDrawable::~TerrainDrawable() {
     vkDeviceWaitIdle(renderer_.Context().Device());
 }
 
-void TerrainDrawable::CreateGBufferPipeline() {
-    std::vector<ShaderModuleSource> modules = TerrainModules();
+void TerrainDrawable::CreateGBufferPipeline(bool pushbroom) {
+    std::vector<ShaderModuleSource> modules = TerrainModules(pushbroom);
     modules.push_back({"terrain_color", shaders::kTerrainColorSlang});
     const std::vector<std::uint32_t> vertex =
         renderer_.Compiler().CompileSpirv(modules, "vertexMain");
@@ -189,7 +190,8 @@ void TerrainDrawable::CreateGBufferPipeline() {
     desc.colorFormats.assign(RenderTargets::kGBufferFormats.begin(),
                              RenderTargets::kGBufferFormats.end());
     desc.depthFormat = RenderTargets::kDepthFormat;
-    gbufferPipeline_ = std::make_unique<GraphicsPipeline>(renderer_.Context(), layout_, desc);
+    gbufferPipelines_[pushbroom ? 1 : 0] =
+        std::make_unique<GraphicsPipeline>(renderer_.Context(), layout_, desc);
 }
 
 void TerrainDrawable::ReservePatches(std::size_t count) {
@@ -564,6 +566,10 @@ std::optional<Bounds3> TerrainDrawable::Bounds() const {
 void TerrainDrawable::Prepare(const FrameParams& frame, std::span<const ShadowCascade> cascades) {
     ERNIE_ZONE("Terrain prepare");
     prepared_ = false;
+    pushbroom_ = frame.camera.pushbroom;
+    if (gbufferPipelines_[pushbroom_ ? 1 : 0] == nullptr) {
+        CreateGBufferPipeline(pushbroom_);
+    }
     if (!HasHeightfield()) {
         return;
     }
@@ -724,7 +730,8 @@ void TerrainDrawable::RecordColor(VkCommandBuffer commands, const RasterFrame& f
     if (!prepared_ || view >= mainRanges_.size() || phase == DrawPhase::Occludees) {
         return;
     }
-    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, gbufferPipeline_->Handle());
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      gbufferPipelines_[pushbroom_ ? 1 : 0]->Handle());
     layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, Resources(frame, view));
     DrawPatches(commands, mainRanges_[view], glm::mat4(1.0f));
 }

@@ -372,7 +372,9 @@ class RasterRenderer {
                           std::span<RasterDrawable* const> drawables);
     void CreateLightShadowMaps(std::uint32_t resolution, std::uint32_t layers);
     void WriteLights(const FrameParams& params, const std::optional<Bounds3>& bounds);
-    const ComputePipeline& ShadingPipeline(std::size_t model);
+    const ComputePipeline& ShadingPipeline(std::size_t model, bool pushbroom = false);
+    /// Compiles the sky pass for a frame camera, or a pushbroom, unless it has.
+    void SkyPipeline(bool pushbroom);
     /// Compiles `plan`'s fused sensor kernels, one per segment, unless already compiled.
     void SensorPipelines(const SensorPlan& plan);
     void WriteMaterialTable();
@@ -477,7 +479,8 @@ class RasterRenderer {
     std::vector<std::string_view> requiredVars_;   ///< The vars the last `Update`'s frame needs.
 
     PipelineLayout shadingLayout_;
-    std::map<std::size_t, std::unique_ptr<ComputePipeline>> shadingPipelines_;
+    /// Per model and whether for a pushbroom's views.
+    std::map<std::pair<std::size_t, bool>, std::unique_ptr<ComputePipeline>> shadingPipelines_;
     PipelineLayout filterLayout_;
     /// The fused sensor kernel of each plan used so far, by `SensorPlan::Key`.
     std::map<std::string, std::unique_ptr<ComputePipeline>> sensorPipelines_;
@@ -536,7 +539,8 @@ class RasterRenderer {
     std::unique_ptr<GpuBuffer> starCells_;
     std::size_t starCount_ = 0;
     std::uint32_t sky_ = 0;
-    std::unique_ptr<ComputePipeline> skyPipeline_;
+    /// For frame cameras and, once one is seen, pushbrooms.
+    std::array<std::unique_ptr<ComputePipeline>, 2> skyPipelines_;
     std::vector<std::size_t> modelsInUse_;
     SpectralBands bands_;
     std::vector<SensorFilter> filters_;
@@ -575,3 +579,4 @@ class RasterRenderer {
 };
 
 }  // namespace ernie
+    bool pushbroom_ = false;                ///< Whether the last `Update`'s camera is one.

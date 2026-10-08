@@ -240,6 +240,15 @@ TEST(Camera, ReadsUsdAndErnieAttributes) {
         << "apertures in tenths of a scene unit, as UsdGeomCamera";
     scene.Set("/Camera", tokens::kProjection, std::string(tokens::kPerspective));
 
+    scene.Set("/Camera", tokens::kCameraScan, std::string(tokens::kPushbroom));
+    scene.Set("/Camera", tokens::kPushbroomLineOffset, 1.5);
+    const Camera pushbroom = ernie::CameraOf(scene, "/Camera", 64, 48);
+    EXPECT_TRUE(pushbroom.pushbroom);
+    EXPECT_DOUBLE_EQ(pushbroom.lineOffsetMm, 1.5);
+    scene.Set("/Camera", tokens::kCameraScan, std::string("whiskbroom"));
+    EXPECT_THROW(ernie::CameraOf(scene, "/Camera", 64, 48), std::invalid_argument);
+    scene.Set("/Camera", tokens::kCameraScan, std::string(tokens::kFrameScan));
+
     scene.Set("/Camera", tokens::kSensorType, "infrared");
     EXPECT_THROW(ernie::CameraOf(scene, "/Camera", 64, 48), std::invalid_argument);
     scene.Set("/Camera", tokens::kSensorType, "rgb");

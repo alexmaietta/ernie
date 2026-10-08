@@ -267,6 +267,11 @@ void Camera::Check() const {
                                     "rolling readout and 1 to " +
                                     std::to_string(kMaxShutterSamples) + " samples");
     }
+    if (pushbroom && (orthographic || !lens.IsPinhole() || Subframes() != 1)) {
+        throw std::invalid_argument(
+            "A pushbroom camera needs a perspective projection, a lens without distortion, and "
+            "no shutter interval or rolling readout: its rows are its readout");
+    }
     if (orthographic && (!lens.IsPinhole() || !(orthographicPixelPitchUm > 0.0))) {
         throw std::invalid_argument(
             "An orthographic camera needs a perspective lens without distortion and a positive "
@@ -356,6 +361,13 @@ Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::
     camera.shutterClose = number(kShutterClose, camera.shutterClose);
     camera.shutterSamples = static_cast<int>(number(kShutterSamples, camera.shutterSamples));
     camera.rollingShutter = number(kShutterRolling, camera.rollingShutter);
+    const std::string scan = GetToken(scene, path, kCameraScan, kFrameScan);
+    if (scan != kFrameScan && scan != kPushbroom) {
+        throw std::invalid_argument("Camera '" + path.String() + "' has scan '" + scan +
+                                    "'; use frame or pushbroom");
+    }
+    camera.pushbroom = scan == kPushbroom;
+    camera.lineOffsetMm = number(kPushbroomLineOffset, camera.lineOffsetMm);
 
     const glm::dvec2 range =
         GetVec2(scene, path, kSpectralRange, {camera.bands.minNm, camera.bands.maxNm});

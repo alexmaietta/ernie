@@ -9,6 +9,7 @@
 //
 // Bindings: frame 0 to 4 (frame.slang), material 5 to 9 (surface.slang), 10 GroundUniforms.
 import frame;
+import projection;
 import surface;
 
 struct GroundUniforms {
@@ -69,10 +70,11 @@ float filteredChecker(float2 p) {
 GroundOutput fragmentMain(VertexOutput in) {
     let uv = in.position.xy / g.viewport.xy;
     let ndc = float2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
-    let nearClip = mul(g.invViewProj, float4(ndc, 0.0, 1.0));
-    let farClip = mul(g.invViewProj, float4(ndc, 1.0, 1.0));
-    let origin = nearClip.xyz / nearClip.w;
-    let direction = farClip.xyz / farClip.w - origin;
+    // A pushbroom's strip is in the frame's uniforms (and its pixels' rays from different poses).
+    float3 origin;
+    float3 direction;
+    cameraRayThrough(kPushbroomCamera ? u.viewProj : g.invViewProj, u.strip, ndc, origin,
+                     direction);
     let height = g.plane.x;
     let valid = abs(direction.z) > 1e-12;
     let t = valid ? (height - origin.z) / direction.z : -1.0;
@@ -89,7 +91,7 @@ GroundOutput fragmentMain(VertexOutput in) {
         discard;
     }
 
-    let clip = mul(u.viewProj, float4(world, 1.0));
+    let clip = projectWorld(world);
     let normal = float3(0.0, 0.0, 1.0);
     GroundOutput out;
     out.normal = float4(normalize(float3(-detail.slope, 1.0)), sunVisibility(world, normal,

@@ -172,8 +172,9 @@ constexpr DescriptorBinding kBindings[] = {
 };
 
 /// The mesh passes, which write the renderer's G-buffer.
-std::vector<ShaderModuleSource> MeshModules() {
+std::vector<ShaderModuleSource> MeshModules(bool pushbroom = false) {
     return {{"brdf", std::string(BrdfSlang())},
+            ProjectionModule(pushbroom),
             {"frame", shaders::kFrameSlang},
             {"surface", shaders::kSurfaceSlang},
             {"mesh", shaders::kMeshSlang}};
@@ -302,7 +303,7 @@ MeshDrawable::MeshDrawable(RasterRenderer& renderer)
     const std::vector<ShaderModuleSource> cull{{"cull", shaders::kCullSlang}};
     cullPipeline_ = std::make_unique<ComputePipeline>(
         context_, cullLayout_, renderer_.Compiler().CompileSpirv(cull, "cullMain"));
-    CreateGBufferPipeline();
+    CreateGBufferPipeline(false);
     const std::vector<std::uint32_t> vertex =
         renderer_.Compiler().CompileSpirv(MeshModules(), "meshShadowVertex");
     GraphicsPipelineDesc shadow;
@@ -321,8 +322,8 @@ MeshDrawable::~MeshDrawable() {
     vkDeviceWaitIdle(context_.Device());
 }
 
-void MeshDrawable::CreateGBufferPipeline() {
-    const std::vector<ShaderModuleSource> modules = MeshModules();
+void MeshDrawable::CreateGBufferPipeline(bool pushbroom) {
+    const std::vector<ShaderModuleSource> modules = MeshModules(pushbroom);
     const std::vector<std::uint32_t> vertex =
         renderer_.Compiler().CompileSpirv(modules, "meshVertexMain");
     const std::vector<std::uint32_t> fragment =
@@ -333,7 +334,8 @@ void MeshDrawable::CreateGBufferPipeline() {
     desc.colorFormats.assign(RenderTargets::kGBufferFormats.begin(),
                              RenderTargets::kGBufferFormats.end());
     desc.depthFormat = RenderTargets::kDepthFormat;
-    gbufferPipeline_ = std::make_unique<GraphicsPipeline>(context_, layout_, desc);
+    gbufferPipelines_[pushbroom ? 1 : 0] =
+        std::make_unique<GraphicsPipeline>(context_, layout_, desc);
 }
 
 std::uint32_t MeshDrawable::AddMesh(MeshData data) {
@@ -960,6 +962,16 @@ void MeshDrawable::WriteInstancer(Instancer& instancer, bool flip) {
 
 void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCascade> cascades) {
     ERNIE_ZONE("Mesh prepare");
+    // A pushbroom camera's views draw with the pipeline compiled for it.
+    const bool pushbroom = params.camera.pushbroom;
+    if (gbufferPipelines_[pushbroom ? 1 : 0] == nullptr) {
+        CreateGBufferPipeline(pushbroom);
+    }
+    if (pushbroom != pushbroom_) {
+        pushbroom_ = pushbroom;
+        std::fill(itemPipelines_.begin(), itemPipelines_.end(),
+                  gbufferPipelines_[pushbroom ? 1 : 0].get());
+    }
     viewWorlds_.clear();
     for (std::size_t v = 0; v < params.Views(); ++v) {
         viewWorlds_.push_back(params.ViewWorld(v));
@@ -1030,7 +1042,7 @@ void MeshDrawable::WriteDraws() {
     for (std::size_t i = 0; i < items_.size(); ++i) {
         const MeshItem& item = items_[i];
         const Mesh& mesh = meshes_.at(item.mesh);
-        itemPipelines_.push_back(gbufferPipeline_.get());
+        itemPipelines_.push_back(gbufferPipelines_[pushbroom_ ? 1 : 0].get());
         GpuDraw& draw = draws[i];
         std::memcpy(draw.model, glm::value_ptr(transforms_[i]), sizeof(draw.model));
         std::memcpy(draw.previous, glm::value_ptr(previousTransforms_[i]), sizeof(draw.previous));

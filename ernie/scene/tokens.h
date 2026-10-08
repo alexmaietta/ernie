@@ -108,6 +108,13 @@ inline constexpr std::string_view kShutterClose = "shutter:close";
 inline constexpr std::string_view kShutterSamples = "ernie:shutter:samples";
 /// Rolling shutter: frames between the top row's exposure and the bottom row's (0, global).
 inline constexpr std::string_view kShutterRolling = "ernie:shutter:rolling";
+/// How the camera reads out: "frame" (the default) or "pushbroom", a line scanner whose rows are
+/// read one after another along the camera's motion (`Camera::pushbroom`).
+inline constexpr std::string_view kCameraScan = "ernie:camera:scan";
+inline constexpr std::string_view kFrameScan = "frame";
+inline constexpr std::string_view kPushbroom = "pushbroom";
+/// A pushbroom's detector line along y on the focal plane from the principal point, mm.
+inline constexpr std::string_view kPushbroomLineOffset = "ernie:pushbroom:lineOffset";
 
 // Physical camera (Ernie): spectral sampling, lens and sensor. Spectra are float arrays of
 // interleaved (wavelength in nm, value) pairs.

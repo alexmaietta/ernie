@@ -97,8 +97,9 @@ float MaxScale(const glm::mat4& m) {
         {glm::length(glm::vec3(m[0])), glm::length(glm::vec3(m[1])), glm::length(glm::vec3(m[2]))});
 }
 
-std::vector<ShaderModuleSource> PointsModules() {
+std::vector<ShaderModuleSource> PointsModules(bool pushbroom = false) {
     return {{"brdf", std::string(BrdfSlang())},
+            ProjectionModule(pushbroom),
             {"frame", shaders::kFrameSlang},
             {"surface", shaders::kSurfaceSlang},
             {"points", shaders::kPointsSlang}};
@@ -112,18 +113,10 @@ PointsDrawable::PointsDrawable(RasterRenderer& renderer)
     const ShaderCompiler& compiler = renderer_.Compiler();
     const std::vector<ShaderModuleSource> modules = PointsModules();
     // The descriptions view the code, which must outlive them.
-    const std::vector<std::uint32_t> vertex = compiler.CompileSpirv(modules, "vertexMain");
-    const std::vector<std::uint32_t> fragment = compiler.CompileSpirv(modules, "fragmentMain");
     const std::vector<std::uint32_t> shadowVertex = compiler.CompileSpirv(modules, "shadowVertex");
     const std::vector<std::uint32_t> shadowFragment =
         compiler.CompileSpirv(modules, "shadowFragment");
-    GraphicsPipelineDesc gbuffer;
-    gbuffer.vertexSpirv = vertex;
-    gbuffer.fragmentSpirv = fragment;
-    gbuffer.colorFormats.assign(RenderTargets::kGBufferFormats.begin(),
-                                RenderTargets::kGBufferFormats.end());
-    gbuffer.depthFormat = RenderTargets::kDepthFormat;
-    gbufferPipeline_ = std::make_unique<GraphicsPipeline>(context_, layout_, gbuffer);
+    CreateGBufferPipeline(false);
     GraphicsPipelineDesc shadow;
     shadow.vertexSpirv = shadowVertex;
     shadow.fragmentSpirv = shadowFragment;
@@ -136,6 +129,22 @@ PointsDrawable::PointsDrawable(RasterRenderer& renderer)
 
 PointsDrawable::~PointsDrawable() {
     vkDeviceWaitIdle(context_.Device());
+}
+
+void PointsDrawable::CreateGBufferPipeline(bool pushbroom) {
+    const ShaderCompiler& compiler = renderer_.Compiler();
+    const std::vector<ShaderModuleSource> modules = PointsModules(pushbroom);
+    // The descriptions view the code, which must outlive them.
+    const std::vector<std::uint32_t> vertex = compiler.CompileSpirv(modules, "vertexMain");
+    const std::vector<std::uint32_t> fragment = compiler.CompileSpirv(modules, "fragmentMain");
+    GraphicsPipelineDesc gbuffer;
+    gbuffer.vertexSpirv = vertex;
+    gbuffer.fragmentSpirv = fragment;
+    gbuffer.colorFormats.assign(RenderTargets::kGBufferFormats.begin(),
+                                RenderTargets::kGBufferFormats.end());
+    gbuffer.depthFormat = RenderTargets::kDepthFormat;
+    gbufferPipelines_[pushbroom ? 1 : 0] =
+        std::make_unique<GraphicsPipeline>(context_, layout_, gbuffer);
 }
 
 void PointsDrawable::Check(const Cloud& cloud) const {
@@ -467,6 +476,10 @@ std::optional<Bounds3> PointsDrawable::WorldBounds(std::int32_t world) const {
 
 void PointsDrawable::Prepare(const FrameParams& params, std::span<const ShadowCascade>) {
     ERNIE_ZONE("Points prepare");
+    pushbroom_ = params.camera.pushbroom;
+    if (gbufferPipelines_[pushbroom_ ? 1 : 0] == nullptr) {
+        CreateGBufferPipeline(pushbroom_);
+    }
     for (auto& [handle, cloud] : clouds_) {
         if (cloud.dirty && cloud.count > 0) {
             Write(cloud);
@@ -561,7 +574,8 @@ void PointsDrawable::RecordColor(VkCommandBuffer commands, const RasterFrame& fr
     if (phase == DrawPhase::Occludees || view >= viewItems_.size()) {
         return;
     }
-    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, gbufferPipeline_->Handle());
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      gbufferPipelines_[pushbroom_ ? 1 : 0]->Handle());
     for (const std::uint32_t i : viewItems_[view]) {
         layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, Resources(frame, i));
         DrawConstants constants{};

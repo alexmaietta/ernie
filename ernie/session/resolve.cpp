@@ -1139,6 +1139,11 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
     params.meter = GetBool(scene, settings, kMeter, false);
     params.culling = CullingOf(scene, settings);
     params.occlusion = OcclusionOf(scene, settings);
+    // A pushbroom's depth pyramid holds its strip's depths, which no one view-projection tests
+    // against: its instances cull by the envelope's frustum alone.
+    if (params.camera.pushbroom) {
+        params.occlusion = Occlusion::Off;
+    }
     params.meshLodError =
         std::max(Number(scene, settings, kLodMeshError, params.meshLodError), 0.0f);
     params.clearColor = glm::vec3(GetVec3(scene, settings, kClearColor, {0.0, 0.0, 0.0}));

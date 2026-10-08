@@ -103,7 +103,7 @@ LayeredVertexOutput vertexMain(uint vertexIndex : SV_VertexID, uint point : SV_I
     let world = sphere.xyz + (corner.x * right + corner.y * up) * half;
     LayeredVertexOutput out;
     out.layer = u.flags.z;
-    out.position = mul(u.viewProj, float4(world, 1.0));
+    out.position = projectWorld(world);
     out.world = world;
     out.sphere = sphere;
     out.color = (d.info.z & kHasColors) != 0 ? load3(colors, point) : d.tint.rgb;
@@ -127,7 +127,9 @@ PointsOutput fragmentMain(VertexOutput in) {
     }
     let hit = origin + (-b - sqrt(h)) * direction;
     let normal = normalize(hit - in.sphere.xyz);
-    let clip = mul(u.viewProj, float4(hit, 1.0));
+    // A pushbroom's rows see from poses along its strip; the ray from its envelope's eye is
+    // close for spheres small beside the strip's distance to them.
+    let clip = projectWorld(hit);
     PointsOutput out;
     out.normal = float4(normal, sunVisibility(hit, normal, in.position.xy));
     out.albedo = float4(surfaceAlbedoScale(hit), cascadeTint(in.color, hit));

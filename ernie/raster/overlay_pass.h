@@ -34,8 +34,10 @@ class OverlayPass {
     OverlayPass& operator=(const OverlayPass&) = delete;
 
     /// Stages the visible items of `overlays`, relative to the frame's `origin`, for the next
-    /// frame's `Record`s; uploads only when an overlay or the origin changed.
-    void Prepare(std::span<const Overlay* const> overlays, const glm::dvec3& origin);
+    /// frame's `Record`s; uploads only when an overlay or the origin changed. With `pushbroom`,
+    /// first compiles the pipelines for a pushbroom camera's targets, unless it has.
+    void Prepare(std::span<const Overlay* const> overlays, const glm::dvec3& origin,
+                 bool pushbroom = false);
 
     /// Whether the last `Prepare` left nothing to draw.
     bool Empty() const {
@@ -57,6 +59,7 @@ class OverlayPass {
         float nearPlane = 0.1f;
         float farPlane = 1000.0f;
         bool orthographic = false;  ///< Whether the depth is linear (an orthographic view).
+        bool pushbroom = false;     ///< Whether the view is a pushbroom's strip.
     };
 
     /// Draws the prepared items over `target`'s image, keeping what it holds.
@@ -69,11 +72,19 @@ class OverlayPass {
     /// Grows `buffer` to `bytes` if needed and stages `bytes` of `data` into it.
     void Upload(std::unique_ptr<GpuBuffer>& buffer, std::span<const std::byte> data);
 
+    /// Compiles the pipelines of both attachment formats for a frame camera's or a pushbroom's
+    /// views.
+    void CreatePipelines(bool pushbroom);
+
     const VulkanContext& context_;
+    const ShaderCompiler& compiler_;
     FrameUploads& uploads_;
+    VkFormat presentFormat_;
     PipelineLayout layout_;
-    /// Per attachment format: the segment, triangle and sprite pipelines.
-    std::map<VkFormat, std::array<std::unique_ptr<GraphicsPipeline>, 3>> pipelines_;
+    /// Per attachment format and whether for a pushbroom: the segment, triangle and sprite
+    /// pipelines.
+    std::map<std::pair<VkFormat, bool>, std::array<std::unique_ptr<GraphicsPipeline>, 3>>
+        pipelines_;
     std::array<std::unique_ptr<GpuBuffer>, 3> buffers_;
     std::array<std::uint32_t, 3> counts_{};
     /// What the buffers hold: each overlay and its version, and the origin.

@@ -1,6 +1,7 @@
 #include "ernie/raster/overlay_pass.h"
 
 #include "ernie/kernel/embedded_shaders.h"
+#include "ernie/raster/drawable.h"
 #include "ernie/util/profile.h"
 
 #include <algorithm>
@@ -80,19 +81,30 @@ void Relative(float (&out)[4], const glm::dvec3& p, const glm::dvec3& origin, fl
 
 OverlayPass::OverlayPass(const VulkanContext& context, const ShaderCompiler& compiler,
                          FrameUploads& uploads, VkFormat presentFormat)
-    : context_(context), uploads_(uploads),
+    : context_(context), compiler_(compiler), uploads_(uploads), presentFormat_(presentFormat),
       layout_(context, kBindings, sizeof(OverlayConstants)) {
-    const std::vector<ShaderModuleSource> modules{{"overlay", shaders::kOverlaySlang}};
-    const std::vector<std::uint32_t> fragment = compiler.CompileSpirv(modules, "overlayFragment");
+    CreatePipelines(false);
+    // Placeholders, so the bindings always have a buffer.
+    for (std::unique_ptr<GpuBuffer>& buffer : buffers_) {
+        buffer = std::make_unique<GpuBuffer>(context, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                             BufferMemory::Device);
+    }
+}
+
+void OverlayPass::CreatePipelines(bool pushbroom) {
+    const std::vector<ShaderModuleSource> modules{ProjectionModule(pushbroom),
+                                                  {"overlay", shaders::kOverlaySlang}};
+    const std::vector<std::uint32_t> fragment = compiler_.CompileSpirv(modules, "overlayFragment");
     const std::array<std::vector<std::uint32_t>, 3> vertices{
-        compiler.CompileSpirv(modules, "segmentVertex"),
-        compiler.CompileSpirv(modules, "triangleVertex"),
-        compiler.CompileSpirv(modules, "spriteVertex")};
-    for (const VkFormat format : {kLdrFormat, presentFormat}) {
-        if (pipelines_.contains(format)) {
+        compiler_.CompileSpirv(modules, "segmentVertex"),
+        compiler_.CompileSpirv(modules, "triangleVertex"),
+        compiler_.CompileSpirv(modules, "spriteVertex")};
+    for (const VkFormat format : {kLdrFormat, presentFormat_}) {
+        if (pipelines_.contains({format, pushbroom})) {
             continue;
         }
-        std::array<std::unique_ptr<GraphicsPipeline>, 3>& pipelines = pipelines_[format];
+        std::array<std::unique_ptr<GraphicsPipeline>, 3>& pipelines =
+            pipelines_[{format, pushbroom}];
         for (std::size_t kind = 0; kind < vertices.size(); ++kind) {
             GraphicsPipelineDesc desc;
             desc.vertexSpirv = vertices[kind];
@@ -100,13 +112,8 @@ OverlayPass::OverlayPass(const VulkanContext& context, const ShaderCompiler& com
             desc.colorFormat = format;
             desc.depthFormat = VK_FORMAT_UNDEFINED;
             desc.alphaBlend = true;
-            pipelines[kind] = std::make_unique<GraphicsPipeline>(context, layout_, desc);
+            pipelines[kind] = std::make_unique<GraphicsPipeline>(context_, layout_, desc);
         }
-    }
-    // Placeholders, so the bindings always have a buffer.
-    for (std::unique_ptr<GpuBuffer>& buffer : buffers_) {
-        buffer = std::make_unique<GpuBuffer>(context, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                             BufferMemory::Device);
     }
 }
 
@@ -128,7 +135,11 @@ void OverlayPass::Upload(std::unique_ptr<GpuBuffer>& buffer, std::span<const std
     uploads_.Write(*buffer, data);
 }
 
-void OverlayPass::Prepare(std::span<const Overlay* const> overlays, const glm::dvec3& origin) {
+void OverlayPass::Prepare(std::span<const Overlay* const> overlays, const glm::dvec3& origin,
+                          bool pushbroom) {
+    if (pushbroom) {
+        CreatePipelines(true);
+    }
     std::vector<std::pair<const Overlay*, std::uint64_t>> wanted;
     for (const Overlay* overlay : overlays) {
         if (overlay != nullptr && overlay->IsVisible() && !overlay->Empty()) {
@@ -177,7 +188,7 @@ void OverlayPass::Record(VkCommandBuffer commands, const Target& target) const {
     if (Empty()) {
         return;
     }
-    const auto found = pipelines_.find(target.format);
+    const auto found = pipelines_.find({target.format, target.pushbroom});
     if (found == pipelines_.end()) {
         throw std::invalid_argument("Overlays cannot draw into format " +
                                     std::to_string(static_cast<int>(target.format)));
