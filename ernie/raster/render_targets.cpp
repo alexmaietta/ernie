@@ -112,7 +112,7 @@ GpuImage& RenderTargets::Hzb() {
     return *hzb_;
 }
 
-GpuImage& RenderTargets::SensorImage(bool spectrum, std::uint32_t set, bool full) {
+GpuImage& RenderTargets::SensorImage(bool spectrum, std::uint32_t set, bool full, bool pyramid) {
     if (!full) {
         std::unique_ptr<GpuImage>& placeholder = sensorPlaceholders_[spectrum ? 0 : 1];
         if (placeholder == nullptr) {
@@ -124,12 +124,17 @@ GpuImage& RenderTargets::SensorImage(bool spectrum, std::uint32_t set, bool full
         return *placeholder;
     }
     std::unique_ptr<GpuImage>& image = sensorImages_[(spectrum ? 0 : 2) + (set & 1u)];
-    if (image == nullptr) {
+    const std::uint32_t mips =
+        pyramid && !spectrum
+            ? static_cast<std::uint32_t>(std::bit_width(std::max(extent_.width, extent_.height)))
+            : 1u;
+    if (image == nullptr || image->Desc().mips < mips) {
         const auto bands = static_cast<std::uint32_t>(bands_);
         image = std::make_unique<GpuImage>(
-            context_, ImageDesc{extent_.width, extent_.height, views_ * (spectrum ? bands : 4u), 1,
-                                spectrum ? VK_FORMAT_R32_SFLOAT : VK_FORMAT_R32G32B32A32_SFLOAT,
-                                kStorage, false, true});
+            context_,
+            ImageDesc{extent_.width, extent_.height, views_ * (spectrum ? bands : 4u), mips,
+                      spectrum ? VK_FORMAT_R32_SFLOAT : VK_FORMAT_R32G32B32A32_SFLOAT, kStorage,
+                      false, true});
     }
     return *image;
 }

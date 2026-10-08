@@ -183,6 +183,8 @@ constexpr DescriptorBinding kFilterBindings[] = {
     // The temporal filters' state, previous and next.
     {28, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {29, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    // Linear filtering of the channel images' pyramids.
+    {30, VK_DESCRIPTOR_TYPE_SAMPLER, kCompute},
 };
 
 /// A plan that runs custom filter `model`, with the built-in filters its domain needs, and holds a
@@ -529,6 +531,9 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
     }
 
     const std::vector<ShaderModuleSource> hzbModules{{"hzb", shaders::kHzbSlang}};
+    const std::vector<ShaderModuleSource> pyramidModules{{"pyramid", shaders::kPyramidSlang}};
+    pyramidPipeline_ = std::make_unique<ComputePipeline>(
+        context_, hzbLayout_, compiler_.CompileSpirv(pyramidModules, "pyramidMain"));
     hzbPipeline_ = std::make_unique<ComputePipeline>(context_, hzbLayout_,
                                                      compiler_.CompileSpirv(hzbModules, "hzbMain"));
     const std::vector<ShaderModuleSource> viewsModules{{"views", shaders::kViewsSlang}};
@@ -1900,6 +1905,26 @@ void RasterRenderer::BuildHzb(VkCommandBuffer commands, RenderTargets& targets) 
     }
 }
 
+void RasterRenderer::BuildPyramid(VkCommandBuffer commands, GpuImage& image) const {
+    ERNIE_GPU_ZONE(context_, commands, "Sensor pyramid");
+    image.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, pyramidPipeline_->Handle());
+    for (std::uint32_t mip = 1; mip < image.Desc().mips; ++mip) {
+        const std::uint32_t sourceWidth = std::max(image.Desc().width >> (mip - 1), 1u);
+        const std::uint32_t sourceHeight = std::max(image.Desc().height >> (mip - 1), 1u);
+        const std::uint32_t width = std::max(image.Desc().width >> mip, 1u);
+        const std::uint32_t height = std::max(image.Desc().height >> mip, 1u);
+        const DescriptorResource resources[] = {
+            DescriptorResource::Of(image.MipView(mip - 1), VK_IMAGE_LAYOUT_GENERAL),
+            DescriptorResource::Of(image.MipView(mip), VK_IMAGE_LAYOUT_GENERAL)};
+        hzbLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+        const std::uint32_t size[4] = {sourceWidth, sourceHeight, width, height};
+        hzbLayout_.PushConstants(commands, size, sizeof(size));
+        vkCmdDispatch(commands, Groups(width), Groups(height), image.Desc().layers);
+        ShaderBarrier(commands);
+    }
+}
+
 void RasterRenderer::ShadeAndFilter(VkCommandBuffer commands, RenderTargets& targets,
                                     std::uint32_t firstView) const {
     ERNIE_ZONE("ShadeAndFilter");
@@ -1971,8 +1996,9 @@ void RasterRenderer::ShadeAndFilter(VkCommandBuffer commands, RenderTargets& tar
         // Each segment reads the images the one before stored and stores those the next reads,
         // the two sets alternating (placeholders for a plan that passes none on).
         const auto image = [&](bool spectrum, std::uint32_t set) -> GpuImage& {
-            GpuImage& sensorImage = targets.SensorImage(
-                spectrum, set, spectrum ? plan.spectrumImages : plan.channelImages);
+            GpuImage& sensorImage =
+                targets.SensorImage(spectrum, set, spectrum ? plan.spectrumImages : plan.channelImages,
+                                    plan.pyramids != 0);
             sensorImage.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
             return sensorImage;
         };
@@ -1998,12 +2024,18 @@ void RasterRenderer::ShadeAndFilter(VkCommandBuffer commands, RenderTargets& tar
             }
             resources.push_back(general(previous));
             resources.push_back(general(next));
+            resources.push_back(DescriptorResource::Of(clampSampler_));
             vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                               sensorPipelines_.at(SensorKernelKey(plan, segment))->Handle());
             filterLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
             filterLayout_.PushConstants(commands, constants, sizeof(constants));
             vkCmdDispatch(commands, groupsX, groupsY, views);
             ShaderBarrier(commands);
+            // The next segment reads what this one stored (set `segment`); its spatial filter's
+            // pyramid of it, when it reads one.
+            if (((plan.pyramids >> (segment + 1)) & 1u) != 0) {
+                BuildPyramid(commands, image(false, segment));
+            }
         }
     }
 }

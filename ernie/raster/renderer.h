@@ -375,6 +375,9 @@ class RasterRenderer {
     /// Builds `targets`' depth pyramid from their depth, every view at once, leaving it in the
     /// general layout.
     void BuildHzb(VkCommandBuffer commands, RenderTargets& targets) const;
+    /// Fills mips 1 onward of `image` (a channel image) from mip 0, each the mean of the one
+    /// before.
+    void BuildPyramid(VkCommandBuffer commands, GpuImage& image) const;
     void ShadeAndFilter(VkCommandBuffer commands, RenderTargets& targets,
                         std::uint32_t firstView) const;
     void Present(VkCommandBuffer commands, RenderTargets& targets, const RenderingTarget& present,
@@ -451,6 +454,8 @@ class RasterRenderer {
     PipelineLayout presentLayout_;
     PipelineLayout hzbLayout_;
     std::unique_ptr<ComputePipeline> hzbPipeline_;
+    /// Pyramids of the channel images for spatial filters (pyramid.slang, Hi-Z's layout).
+    std::unique_ptr<ComputePipeline> pyramidPipeline_;
     PipelineLayout viewsLayout_;
     std::unique_ptr<ComputePipeline> viewsPipeline_;
     GpuBuffer poseCamera_;  ///< views.slang's camera: parent, projection, its inverse.

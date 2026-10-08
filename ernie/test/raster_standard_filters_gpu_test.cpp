@@ -396,6 +396,28 @@ TEST_F(RasterDelegateTest, CustomIntegratorsStandInForQe) {
         << "one integrator into electrons";
 }
 
+TEST_F(RasterDelegateTest, GlareSpreadsAHaloFromItsPyramidAndKeepsTheLight) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    const auto base = VarThrough(delegate, scene, "HdrColor", {{"cie", kNone}});
+    const auto glare =
+        VarThrough(delegate, scene, "HdrColor", {{"cie", kNone}, {"glare", {{"strength", 0.2f}}}});
+    EXPECT_NEAR(Sum(glare, 0), Sum(base, 0), 0.03 * Sum(base, 0)) << "light is kept";
+    // A dark pixel beside the red quad gains red, less the farther it is.
+    const auto at = [](const std::vector<float>& image, std::size_t x, std::size_t y) {
+        return image[(y * kSize + x) * 4];
+    };
+    std::size_t edge = 0;  // the quad's leftmost lit column on the middle row
+    while (edge < kSize && at(base, edge, kSize / 2) <= 0.0f) {
+        ++edge;
+    }
+    ASSERT_GT(edge, 6u);
+    EXPECT_EQ(at(base, edge - 2, kSize / 2), 0.0f);
+    EXPECT_GT(at(glare, edge - 2, kSize / 2), 0.0f) << "the halo";
+    EXPECT_GT(at(glare, edge - 2, kSize / 2), at(glare, edge - 6, kSize / 2))
+        << "fading with distance";
+}
+
 TEST_F(RasterDelegateTest, RenderVarsCanNameTheirOwnChains) {
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();

@@ -47,6 +47,9 @@ struct SensorPlan {
     std::uint32_t segments = 1;         ///< Kernels, run in order with a barrier between.
     bool spectrumImages = false;  ///< Whether segments pass the spectrum on (spectral spatial).
     bool channelImages = false;   ///< Whether they pass other domains on.
+    /// Segments whose spatial filters read their input's pyramid (`SensorFilterModel::pyramid`),
+    /// a bit each: the renderer builds the channel images' pyramid before them.
+    std::uint32_t pyramids = 0;
 
     /// Identifies the kernels: plans with the same key share them (parameter values aside, which
     /// the kernels read from a buffer).

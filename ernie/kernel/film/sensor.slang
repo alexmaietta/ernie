@@ -125,6 +125,8 @@ public struct SensorConstants {
 // frame and what they store on this one, `pass.view.w` slots per view.
 [[vk::image_format("rgba32f")]] [[vk::binding(28, 0)]] RWTexture2DArray<float4> statePrevious;
 [[vk::image_format("rgba32f")]] [[vk::binding(29, 0)]] RWTexture2DArray<float4> stateNext;
+// Linear filtering for reading the channel images' pyramids (`SpatialImage.valuesAt`).
+[[vk::binding(30, 0)]] SamplerState pyramidSampler;
 
 // A view's layers of the channel images: one per domain after the spectrum.
 public static const uint kChannelElectrons = 0;
@@ -315,6 +317,25 @@ public struct SpatialImage {
     public float4 values(PixelContext pixel, int2 at) {
         let p = clamp(at, int2(0), size(pixel) - 1);
         return channelsIn.Load(int4(p, int(pixel.id.z * kChannelDomains + channel), 0));
+    }
+
+    // For filters with a pyramid (`SensorFilterModel::pyramid`): the domain's values bilinearly
+    // at `uv` (0 to 1 across the image) of pyramid level `level` (0 the image, each level half
+    // the size, each texel the mean of what it covers; fractional levels blend two), clamped at
+    // the edges. Level k is a box blur of about 2^k pixels, so wide kernels take a few taps.
+    public float4 valuesAt(PixelContext pixel, float2 uv, float level) {
+        return channelsIn.SampleLevel(
+            pyramidSampler, float3(uv, float(pixel.id.z * kChannelDomains + channel)), level);
+    }
+
+    // The pyramid's levels (1 without one).
+    public uint levels() {
+        uint width = 0;
+        uint height = 0;
+        uint elements = 0;
+        uint levelCount = 0;
+        channelsIn.GetDimensions(0, width, height, elements, levelCount);
+        return levelCount;
     }
 }
 

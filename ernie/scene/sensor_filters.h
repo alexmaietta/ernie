@@ -157,6 +157,10 @@ struct SensorFilterModel {
     /// Float4 state slots per pixel it keeps between a product's frames (`readState`,
     /// `writeState`): a temporal filter, such as image lag or a moving average.
     std::uint32_t states = 0;
+    /// Whether a spatial filter on a domain after the spectrum reads its input's pyramid
+    /// (`SpatialImage.valuesAt` at coarser levels), for kernels too wide to sum pixel by pixel,
+    /// such as glare; the renderer builds it before the filter's kernel.
+    bool pyramid = false;
 };
 
 /// Most state slots a product's chain keeps per pixel (`SensorFilterModel::states`).

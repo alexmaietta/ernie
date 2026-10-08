@@ -81,7 +81,9 @@ class RenderTargets : public FrameImages {
     /// each sensor pixel (a group of `Bands` layers per view) with `spectrum`, else the four
     /// channel domains (four RGBA32F layers per view). Created on first use with `full`; otherwise
     /// a one-texel placeholder that kernels bind but do not touch.
-    GpuImage& SensorImage(bool spectrum, std::uint32_t set, bool full);
+    /// With `pyramid`, the channel images have every mip level, for spatial filters reading a
+    /// pyramid (`SensorPlan::pyramids`).
+    GpuImage& SensorImage(bool spectrum, std::uint32_t set, bool full, bool pyramid = false);
 
     /// Records the transitions that let compute passes read the G-buffer, depth and raster
     /// radiance and write the radiance and the render vars.

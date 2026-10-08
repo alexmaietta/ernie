@@ -266,6 +266,9 @@ SensorPlan PlanSensor(std::span<const SensorFilterStep> chain,
         plan.segments = std::max(plan.segments, segment + 1);
         if (IsSpatialHead(stage)) {
             (input == FilterDomain::Spectrum ? plan.spectrumImages : plan.channelImages) = true;
+            if (stage.custom->pyramid) {
+                plan.pyramids |= 1u << segment;
+            }
         }
     }
     return plan;
@@ -287,6 +290,11 @@ std::string SensorPlan::Key() const {
         if (stage.custom && stage.custom->states > 0) {
             key += '#' + std::to_string(stage.stateBase);
         }
+    }
+    // Kernels read the pyramid's mips through the same bindings: no difference in source, but
+    // plans build different images.
+    if (pyramids != 0) {
+        key += "^" + std::to_string(pyramids);
     }
     return key;
 }

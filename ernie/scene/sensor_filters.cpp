@@ -142,6 +142,11 @@ void SensorFilterRegistry::Add(SensorFilterModel model) {
     if (!IsIdentifier(model.typeName) || model.slang.find(model.typeName) == std::string::npos) {
         throw std::invalid_argument(what + ": its Slang must define type '" + model.typeName + "'");
     }
+    if (model.pyramid &&
+        (model.kind != FilterKind::Spatial || model.domain == FilterDomain::Spectrum)) {
+        throw std::invalid_argument(what + ": only spatial filters on a domain after the "
+                                           "spectrum read a pyramid");
+    }
     if (model.states > kMaxStates) {
         throw std::invalid_argument(what + " keeps more than " + std::to_string(kMaxStates) +
                                     " state slots");
@@ -287,6 +292,16 @@ std::vector<SensorFilterModel> StandardSensorFilters() {
          Kind::Band, Domain::Spectrum,
          {{"curve", 1.0f, "Transmission at evenly spaced wavelengths from 360 to 830 nm", 48}},
          "SpectralTransmission", shaders::kFilterSpectralTransmissionSlang},
+        {"glare", "Glare",
+         "A wide halo of scattered light around bright sources, its point-spread falling as a "
+         "power of distance, summed over the image's pyramid; light is kept.",
+         {"G. Spencer, P. Shirley, K. Zimmerman and D. P. Greenberg, \"Physically-Based Glare "
+          "Effects for Digital Images\", SIGGRAPH 1995"},
+         Kind::Spatial, Domain::Rgb,
+         {{"strength", 0.04f, "Fraction of the light scattered into the halo, 0 to 1"},
+          {"falloff", 3.0f, "The point-spread's power of distance, above 2"},
+          {"levels", 8.0f, "Pyramid levels summed: the halo reaches about 2^levels pixels"}},
+         "Glare", shaders::kFilterGlareSlang, {}, 0, true},
         {"lag", "Image lag",
          "A fraction of each frame's charge read out with the next, so moving highlights trail "
          "ghosts (temporal).",

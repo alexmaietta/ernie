@@ -19,6 +19,8 @@ extern const char kFrameSlang[];
 extern const char kShadingSlang[];
 extern const char kSensorSlang[];
 extern const char kPresentSlang[];
+/// Image pyramids for spatial sensor filters that read far around a pixel.
+extern const char kPyramidSlang[];
 
 /// The standard sensor filters (`StandardSensorFilters`).
 extern const char kFilterBayerSlang[];
@@ -27,6 +29,7 @@ extern const char kFilterColorMatrixSlang[];
 extern const char kFilterCompandSlang[];
 extern const char kFilterDefocusSlang[];
 extern const char kFilterDemosaicSlang[];
+extern const char kFilterGlareSlang[];
 extern const char kFilterLagSlang[];
 extern const char kFilterMeasuredQeSlang[];
 extern const char kFilterPsfSlang[];

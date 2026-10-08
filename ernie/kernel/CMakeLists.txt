@@ -14,6 +14,7 @@ set(ernie_shaders
     film/filter_compand.slang=kFilterCompandSlang
     film/filter_defocus.slang=kFilterDefocusSlang
     film/filter_demosaic.slang=kFilterDemosaicSlang
+    film/filter_glare.slang=kFilterGlareSlang
     film/filter_lag.slang=kFilterLagSlang
     film/filter_measured_qe.slang=kFilterMeasuredQeSlang
     film/filter_psf.slang=kFilterPsfSlang
@@ -21,6 +22,7 @@ set(ernie_shaders
     film/filter_temporal_average.slang=kFilterTemporalAverageSlang
     film/filter_tone_curve.slang=kFilterToneCurveSlang
     film/filter_white_balance.slang=kFilterWhiteBalanceSlang
+    film/pyramid.slang=kPyramidSlang
     film/sensor.slang=kSensorSlang
     raster/cull.slang=kCullSlang
     raster/depth_range.slang=kDepthRangeSlang
