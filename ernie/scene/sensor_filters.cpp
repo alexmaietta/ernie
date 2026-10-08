@@ -1,5 +1,7 @@
 #include "ernie/scene/sensor_filters.h"
 
+#include "ernie/kernel/embedded_shaders.h"
+
 #include <algorithm>
 #include <cctype>
 #include <stdexcept>
@@ -134,6 +136,80 @@ const SensorFilterModel* SensorFilterRegistry::Find(std::string_view id) const {
         }
     }
     return nullptr;
+}
+
+std::vector<SensorFilterModel> StandardSensorFilters() {
+    using Kind = FilterKind;
+    using Domain = FilterDomain;
+    return {
+        {"psf", "Point spread",
+         "The lens's point-spread function: diffraction for the camera's f-number per band "
+         "(a Gaussian fit to the Airy disc, sigma = 0.42 lambda N) with a Gaussian blur for "
+         "aberrations; light is kept.",
+         {"G. B. Airy, \"On the Diffraction of an Object-glass with Circular Aperture\", 1835",
+          "B. Zhang, J. Zerubia and J.-C. Olivo-Marin, \"Gaussian approximations of fluorescence "
+          "microscope point-spread function models\", Applied Optics 46(10), 2007"},
+         Kind::Spatial, Domain::Spectrum,
+         {{"blur", 0.0f, "Gaussian sigma in pixels added to diffraction's"},
+          {"maxRadius", 12.0f, "The widest kernel in pixels, bounding the cost"}},
+         "Psf", shaders::kFilterPsfSlang},
+        {"defocus", "Depth of field",
+         "Thin-lens defocus from the camera's fStop and focusDistance: each point a disc of the "
+         "circle of confusion's size; pinhole cameras (fStop 0) are untouched.",
+         {"M. Potmesil and I. Chakravarty, \"A lens and aperture camera model for synthetic "
+          "image generation\", SIGGRAPH 1981",
+          "J. Jimenez, \"Next Generation Post Processing in Call of Duty: Advanced Warfare\", "
+          "SIGGRAPH 2014 course"},
+         Kind::Spatial, Domain::Spectrum,
+         {{"maxRadius", 8.0f, "The widest blur disc's radius in pixels, bounding the cost"}},
+         "Defocus", shaders::kFilterDefocusSlang},
+        {"bayer", "Bayer mosaic",
+         "A Bayer colour filter array: each pixel of an RGB sensor keeps one channel's "
+         "electrons.",
+         {"B. E. Bayer, \"Color imaging array\", US patent 3,971,065, 1976"},
+         Kind::Pixel, Domain::Electrons,
+         {{"pattern", 0.0f, "0 RGGB, 1 BGGR, 2 GRBG, 3 GBRG"}},
+         "Bayer", shaders::kFilterBayerSlang},
+        {"demosaic", "Demosaic",
+         "Full RGB digital numbers interpolated from a Bayer mosaic.",
+         {"H. S. Malvar, L. He and R. Cutler, \"High-quality linear interpolation for "
+          "demosaicing of Bayer-patterned color images\", IEEE ICASSP 2004"},
+         Kind::Spatial, Domain::Digital,
+         {{"pattern", 0.0f, "As the bayer filter's"},
+          {"method", 1.0f, "0 bilinear, 1 Malvar-He-Cutler"}},
+         "Demosaic", shaders::kFilterDemosaicSlang},
+        {"whiteBalance", "White balance", "Gains on linear colour's red, green and blue.",
+         {"J. von Kries, 1905, in D. L. MacAdam (ed.), \"Sources of Color Science\", 1970"},
+         Kind::Pixel, Domain::Rgb,
+         {{"red", 1.0f, "Red gain"}, {"green", 1.0f, "Green gain"}, {"blue", 1.0f, "Blue gain"}},
+         "WhiteBalance", shaders::kFilterWhiteBalanceSlang},
+        {"colorMatrix", "Colour matrix",
+         "A 3 x 3 colour correction matrix on linear colour, row by row.",
+         {"M. S. Brown, \"Understanding the In-Camera Image Processing Pipeline for Computer "
+          "Vision\", CVPR 2016 tutorial"},
+         Kind::Pixel, Domain::Rgb,
+         {{"m00", 1.0f, ""}, {"m01", 0.0f, ""}, {"m02", 0.0f, ""},
+          {"m10", 0.0f, ""}, {"m11", 1.0f, ""}, {"m12", 0.0f, ""},
+          {"m20", 0.0f, ""}, {"m21", 0.0f, ""}, {"m22", 1.0f, ""}},
+         "ColorMatrix", shaders::kFilterColorMatrixSlang},
+        {"compand", "Square-root companding",
+         "Digital numbers compressed as the square root of their fraction of full scale, as "
+         "LROC's cameras compress 12 bits to 8.",
+         {"M. S. Robinson et al., \"Lunar Reconnaissance Orbiter Camera (LROC) Instrument "
+          "Overview\", Space Science Reviews 150, 2010"},
+         Kind::Pixel, Domain::Digital,
+         {{"inputBits", 12.0f, "Bits of the ADC's numbers"},
+          {"outputBits", 8.0f, "Bits after companding"}},
+         "Compand", shaders::kFilterCompandSlang},
+    };
+}
+
+SensorFilterRegistry SensorFilterRegistry::WithStandard() {
+    SensorFilterRegistry registry;
+    for (SensorFilterModel& model : StandardSensorFilters()) {
+        registry.Add(std::move(model));
+    }
+    return registry;
 }
 
 std::vector<SensorFilterStep> StepsOf(std::span<const SensorFilter> chain) {

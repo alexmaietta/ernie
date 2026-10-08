@@ -137,6 +137,9 @@ struct Camera {
     double iso = 100.0;
     double fStop = 1.0;
     double responsivity = 1.0;
+    /// USD `fStop`: the lens's f-number for depth of field; 0 is a pinhole, all in focus.
+    double lensFStop = 0.0;
+    double focusDistance = 0.0;  ///< USD `focusDistance`, scene units; 0 focuses at infinity.
     SpectralBands bands;
     LensModel lens;
     SensorModel sensor = SensorModel::Rgb();

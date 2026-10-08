@@ -91,6 +91,11 @@ inline constexpr std::string_view kExposureTime = "exposure:time";  ///< Seconds
 inline constexpr std::string_view kExposureIso = "exposure:iso";
 inline constexpr std::string_view kExposureFStop = "exposure:fStop";
 inline constexpr std::string_view kExposureResponsivity = "exposure:responsivity";
+/// UsdGeomCamera's lens: its f-number for depth of field and diffraction (0, the default, is a
+/// pinhole with everything in focus, and diffraction then uses `exposure:fStop`), and the distance
+/// in scene units it focuses at.
+inline constexpr std::string_view kFStop = "fStop";
+inline constexpr std::string_view kFocusDistance = "focusDistance";
 
 // Physical camera (Ernie): spectral sampling, lens and sensor. Spectra are float arrays of
 // interleaved (wavelength in nm, value) pairs.

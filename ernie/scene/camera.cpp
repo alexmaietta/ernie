@@ -216,6 +216,8 @@ Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::
     camera.iso = number(kExposureIso, camera.iso);
     camera.fStop = number(kExposureFStop, camera.fStop);
     camera.responsivity = number(kExposureResponsivity, camera.responsivity);
+    camera.lensFStop = std::max(number(kFStop, 0.0), 0.0);
+    camera.focusDistance = std::max(number(kFocusDistance, 0.0), 0.0);
 
     const glm::dvec2 range =
         GetVec2(scene, path, kSpectralRange, {camera.bands.minNm, camera.bands.maxNm});

@@ -58,7 +58,7 @@ public struct SensorUniforms {
     public float4 sensor;
     // DSNU (e-), electrons per DN, black level (DN), largest DN.
     public float4 adc;
-    // Noise on (1), seed, frame seed (FrameSeed of the seed, stream and frame), unused.
+    // Noise on (1), seed, frame seed (FrameSeed of the seed, stream and frame), frame number.
     public uint4 noise;
     // Linear display colour of the background in LdrColor (rgb); w: 1 when the background holds
     // radiance (a visible dome or stars, `skyMain`), which then shows in its place.
@@ -68,10 +68,12 @@ public struct SensorUniforms {
     public float4 colour[64];
     // Per band: mean electrons per unit radiance for each channel.
     public float4 qe[64];
-    // First band's lower wavelength and band width (nm), unused.
+    // First band's lower wavelength and band width (nm), the lens's f-number for depth of field
+    // (0: a pinhole), unused.
     public float4 range;
-    // To the views' stride in the buffer, 2304 bytes.
-    float4 padding;
+    // The f-number diffraction takes, the pixel pitch (um), the focal length (mm), the focus
+    // distance (scene units; 0 is infinity). The views' stride in the buffer is 2304 bytes.
+    public float4 optics;
 }
 
 public struct SensorConstants {
@@ -148,6 +150,34 @@ public struct PixelContext {
     public float wavelength(uint band) {
         let range = sensorViews[view].range;
         return range.x + (float(band) + 0.5) * range.y;
+    }
+
+    // The camera's optics: the f-number diffraction takes (the lens's, else the exposure's),
+    // the lens's own for depth of field (0: a pinhole, all in focus), the sensor's pixel pitch in
+    // micrometres, the focal length in millimetres and the focus distance in scene units (0:
+    // infinity).
+    public float diffractionFNumber() {
+        return sensorViews[view].optics.x;
+    }
+    public float lensFNumber() {
+        return sensorViews[view].range.z;
+    }
+    public float pixelPitchMicrons() {
+        return sensorViews[view].optics.y;
+    }
+    public float focalLengthMm() {
+        return sensorViews[view].optics.z;
+    }
+    public float focusDistance() {
+        return sensorViews[view].optics.w;
+    }
+
+    // The frame's number and the exposure time in seconds, for temporal filters.
+    public uint frame() {
+        return sensorViews[view].noise.w;
+    }
+    public float exposureTime() {
+        return sensorViews[view].lens.w;
     }
 
     // A uniform number in (0, 1] for this pixel and `salt`, the same every frame (from the
@@ -291,6 +321,38 @@ float2 undistort(SensorUniforms cam, float2 distorted) {
         p += distorted - distort(cam, p);
     }
     return p;
+}
+
+// The raster image position (pixels, before rounding) that sensor pixel `at` of `cam` sees
+// through the inverse lens distortion.
+float2 rasterPositionOf(SensorUniforms cam, int2 at) {
+    let f = cam.intrinsics.x;
+    let distorted = float2((float(at.x) + 0.5 - cam.intrinsics.y) / f,
+                           (cam.intrinsics.z - (float(at.y) + 0.5)) / f);
+    let k = cam.distortion;
+    let undistorted =
+        all(k == float4(0.0)) && cam.lens.x == 0.0 ? distorted : undistort(cam, distorted);
+    let rasterF = f / cam.intrinsics.w;
+    return float2(cam.intrinsics.y + undistorted.x * rasterF,
+                  cam.intrinsics.z - undistorted.y * rasterF) - 0.5;
+}
+
+// The distance from the camera, in scene units, of what sensor pixel `at` of the pixel's view
+// sees: infinity for the background. For spatial filters such as depth of field.
+public float sceneDistance(PixelContext pixel, int2 at) {
+    let cam = pixel.uniforms();
+    let size = float2(cam.size.xy);
+    let raster = rasterPositionOf(cam, clamp(at, int2(0), int2(cam.size.xy) - 1));
+    let nearest = int2(clamp(floor(raster + 0.5), float2(0.0), size - 1.0));
+    let layer = int(pixel.id.z);
+    if (gIds.Load(int4(nearest, layer, 0)).x == kBackground) {
+        return asfloat(0x7f800000u);
+    }
+    let ndc = float3((float(nearest.x) + 0.5) / size.x * 2.0 - 1.0,
+                     1.0 - (float(nearest.y) + 0.5) / size.y * 2.0,
+                     gDepth.Load(int4(nearest, layer, 0)));
+    let clip = mul(cam.invViewProj, float4(ndc, 1.0));
+    return length(clip.xyz / clip.w - cam.eye.xyz);
 }
 
 // Lens: maps each sensor pixel through the inverse distortion to the undistorted raster image,

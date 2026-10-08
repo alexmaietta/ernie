@@ -8,6 +8,13 @@ set(ernie_shaders
     closure/lommel_seeliger.slang=kBrdfLommelSeeligerSlang
     closure/lunar_lambert.slang=kBrdfLunarLambertSlang
     closure/oren_nayar.slang=kBrdfOrenNayarSlang
+    film/filter_bayer.slang=kFilterBayerSlang
+    film/filter_color_matrix.slang=kFilterColorMatrixSlang
+    film/filter_compand.slang=kFilterCompandSlang
+    film/filter_defocus.slang=kFilterDefocusSlang
+    film/filter_demosaic.slang=kFilterDemosaicSlang
+    film/filter_psf.slang=kFilterPsfSlang
+    film/filter_white_balance.slang=kFilterWhiteBalanceSlang
     film/sensor.slang=kSensorSlang
     raster/cull.slang=kCullSlang
     raster/depth_range.slang=kDepthRangeSlang

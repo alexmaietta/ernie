@@ -422,7 +422,7 @@ class RasterRenderer {
     /// The fused sensor kernel of each plan used so far, by `SensorPlan::Key`.
     std::map<std::string, std::unique_ptr<ComputePipeline>> sensorPipelines_;
     SensorPlan sensorPlan_;  ///< The last `Update`'s.
-    SensorFilterRegistry sensorFilters_;
+    SensorFilterRegistry sensorFilters_ = SensorFilterRegistry::WithStandard();
     PipelineLayout presentLayout_;
     PipelineLayout hzbLayout_;
     std::unique_ptr<ComputePipeline> hzbPipeline_;

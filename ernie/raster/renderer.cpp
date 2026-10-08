@@ -106,8 +106,8 @@ struct SensorUniforms {
     float clear[4];
     float colour[SpectralBands::kMaxBands][4];
     float qe[SpectralBands::kMaxBands][4];
-    float range[4];    ///< First band's lower wavelength and band width (nm).
-    float padding[4];  ///< To the views' stride, so the filters read them as one array.
+    float range[4];   ///< First band's lower wavelength, band width (nm), the lens f-number.
+    float optics[4];  ///< Diffraction f-number, pixel pitch (um), focal length (mm), focus.
 };
 static_assert(sizeof(SensorUniforms) == 2304, "SensorUniforms must match sensor.slang");
 
@@ -1314,6 +1314,16 @@ void RasterRenderer::WriteSensor(const FrameParams& params) {
     sensor.clear[3] = sky_ != 0 ? 1.0f : 0.0f;  // the background holds the sky's radiance
     sensor.range[0] = static_cast<float>(bands_.minNm);
     sensor.range[1] = static_cast<float>(bands_.Width());
+    // The optics filters read (sensor.slang's PixelContext): the lens's f-number for depth of
+    // field (0, a pinhole), the one diffraction takes (the lens's, else the exposure's), the
+    // sensor's pixel pitch, the focal length and the focus distance.
+    sensor.range[2] = static_cast<float>(camera.lensFStop);
+    sensor.optics[0] =
+        static_cast<float>(camera.lensFStop > 0.0 ? camera.lensFStop : camera.fStop);
+    sensor.optics[1] = static_cast<float>(camera.PixelPitchMetres() * 1e6);
+    sensor.optics[2] = static_cast<float>(camera.focalLengthMm);
+    sensor.optics[3] = static_cast<float>(camera.focusDistance);
+    sensor.noise[3] = static_cast<std::uint32_t>(params.frame);
     const std::vector<glm::dvec3> weights = CieWeights(bands_);
     std::vector<glm::dvec3> colours;
     for (int i = 0; i < bands_.count; ++i) {

@@ -20,6 +20,15 @@ extern const char kShadingSlang[];
 extern const char kSensorSlang[];
 extern const char kPresentSlang[];
 
+/// The standard sensor filters (`StandardSensorFilters`).
+extern const char kFilterBayerSlang[];
+extern const char kFilterColorMatrixSlang[];
+extern const char kFilterCompandSlang[];
+extern const char kFilterDefocusSlang[];
+extern const char kFilterDemosaicSlang[];
+extern const char kFilterPsfSlang[];
+extern const char kFilterWhiteBalanceSlang[];
+
 /// Debug drawing over the display image.
 extern const char kOverlaySlang[];
 

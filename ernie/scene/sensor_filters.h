@@ -145,9 +145,29 @@ class SensorFilterRegistry {
         return models_;
     }
 
+    /// A registry of the standard filters (`StandardSensorFilters`), as renderers start with.
+    static SensorFilterRegistry WithStandard();
+
   private:
     std::vector<SensorFilterModel> models_;
 };
+
+/// The standard library of sensor filters, written in Slang like custom ones and registered with
+/// every renderer, for a SensorFilter prim's `ernie:filter:type`:
+/// - `psf` (spatial, spectrum): the lens's point-spread, diffraction for the camera's f-number
+///   per band (a Gaussian fit to the Airy disc) and a Gaussian `blur` in pixels; before `qe`.
+/// - `defocus` (spatial, spectrum): thin-lens depth of field from the camera's `fStop` and
+///   `focusDistance`; before `qe`.
+/// - `bayer` (pixel, electrons): a Bayer colour filter mosaic, `pattern` 0 RGGB, 1 BGGR, 2 GRBG,
+///   3 GBRG; best between `noise` and `adc`.
+/// - `demosaic` (spatial, digital): interpolates the mosaic back, `method` 0 bilinear or
+///   1 Malvar-He-Cutler; after `adc`.
+/// - `whiteBalance` (pixel, rgb): `red`, `green` and `blue` gains; after `cie`.
+/// - `colorMatrix` (pixel, rgb): a 3 x 3 colour correction matrix `m00`..`m22`; after `cie`.
+/// - `compand` (pixel, digital): square-root companding from `inputBits` to `outputBits`;
+///   after `adc`.
+/// Each file's header cites its references.
+std::vector<SensorFilterModel> StandardSensorFilters();
 
 /// One filter of a product's chain: a SensorFilter prim's `ernie:filter:type`, a built-in's name
 /// or a registered filter's id, with the floats of its `inputs:*` attributes by name (without
