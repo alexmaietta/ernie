@@ -242,8 +242,10 @@ TEST(ResolveRenderProducts, ReadsSensorFilterChains) {
     EXPECT_THROW(ernie::ResolveRenderProducts(scene, top, {}), std::invalid_argument)
         << "the chain has no ADC";
     scene.Set("/Render/Top", tokens::kOrderedVars, std::vector<Path>{"/Render/Vars/Color"});
+    // A chain with a type that is not built in may hold a custom integrator standing for cie:
+    // the renderer, which knows the custom filters, checks it.
     scene.Set("/Render/Filters/Cie", tokens::kFilterType, "bloom");
-    EXPECT_THROW(ernie::ResolveRenderProducts(scene, top, {}), std::invalid_argument);
+    EXPECT_NO_THROW(ernie::ResolveRenderProducts(scene, top, {}));
     scene.Set("/Render/Top", tokens::kFilters, std::vector<Path>{"/World/Camera"});
     EXPECT_THROW(ernie::ResolveRenderProducts(scene, top, {}), std::invalid_argument);
     scene.Define("/Render/Filters/Adc", tokens::kSensorFilter).Set(tokens::kFilterType, "adc");

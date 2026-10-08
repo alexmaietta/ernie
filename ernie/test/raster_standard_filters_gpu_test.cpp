@@ -368,6 +368,34 @@ TEST_F(RasterDelegateTest, AovsRunTheirFiltersAndNameTheirOutputs) {
     EXPECT_THROW(VarsThrough(delegate, scene, {"aov:missing"}, chain), std::invalid_argument);
 }
 
+TEST_F(RasterDelegateTest, CustomIntegratorsStandInForQe) {
+    // measuredQe given the camera's own red QE curve reproduces qe's red electrons, and no
+    // electrons where its curves are zero.
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    scene.Set("/World/Camera", tokens::kExposureTime, 1e-6);  // unsaturated
+    const ernie::Camera camera = ernie::CameraOf(scene, "/World/Camera", kSize, kSize);
+    std::vector<float> red(48);
+    for (std::size_t i = 0; i < red.size(); ++i) {
+        const double nm = 360.0 + 10.0 * static_cast<double>(i);
+        red[i] = static_cast<float>(camera.sensor.channels[0].quantumEfficiency(nm));
+    }
+    const auto builtin = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
+    const auto measured = VarsThrough(delegate, scene, {"Electrons", "RawDN"},
+                                      {{"measuredQe", kNone}, {"adc", kNone}},
+                                      {{0,
+                                        {{"red", red},
+                                         {"green", std::vector<float>{0.0f}},
+                                         {"blue", std::vector<float>{0.0f}}}}});
+    const auto& electrons = measured.at("Electrons");
+    EXPECT_NEAR(Sum(electrons, 0), Sum(builtin, 0), 0.03 * Sum(builtin, 0));
+    EXPECT_LT(Sum(electrons, 1), 1e-2) << "dark current alone";
+    EXPECT_GT(Sum(measured.at("RawDN"), 0), 0.0) << "adc after a custom integrator";
+    EXPECT_THROW(VarsThrough(delegate, scene, {"Electrons"}, {{"qe", kNone}, {"measuredQe", kNone}}),
+                 std::invalid_argument)
+        << "one integrator into electrons";
+}
+
 TEST_F(RasterDelegateTest, TemporalFiltersKeepStateBetweenAProductsFrames) {
     // Two frames of each: the red quad, then the quad gone.
     const auto frames = [&](const Steps& chain, const std::string& var) {

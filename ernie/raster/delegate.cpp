@@ -804,10 +804,10 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
     }
     // The highlighted prims and everything under them, as the prim ids the frame draws.
     std::vector<std::uint32_t> highlighted;
-    for (const auto& [path, id] : primIds_) {
+    for (const auto& [path, primId] : primIds_) {
         if (std::any_of(highlight_.begin(), highlight_.end(),
                         [&path](const Path& prefix) { return path.HasPrefix(prefix); })) {
-            highlighted.push_back(id);
+            highlighted.push_back(primId);
         }
     }
     renderer_.SetHighlight(highlighted, highlightColour_);
@@ -1014,10 +1014,18 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
             spec.filters.empty() ? StepsOf(DefaultFilterChain()) : spec.filters;
         const std::vector<std::string> aovs =
             AovOutputsOf(chainSteps, renderer_.SensorFilters());
+        const std::vector<std::string_view> written =
+            VarsWrittenBy(chainSteps, renderer_.SensorFilters());
         std::vector<std::string_view> vars;
         for (const auto& [path, name] : spec.vars) {
             const auto known = std::find(kRenderVarNames.begin(), kRenderVarNames.end(), name);
             if (known != kRenderVarNames.end()) {
+                if (std::find(written.begin(), written.end(), name) == written.end()) {
+                    throw std::invalid_argument("Render var '" + path.String() + "' asks for '" +
+                                                name +
+                                                "', which the product's sensor filters do not "
+                                                "write");
+                }
                 vars.push_back(*known);
                 continue;
             }

@@ -49,7 +49,9 @@ std::size_t IndexOf(FilterDomain domain) {
 /// The domain a stage reads.
 FilterDomain InputOf(const SensorPlan::Stage& stage) {
     if (stage.custom) {
-        return stage.custom->domain;
+        // An integrator reads the bands and writes its domain.
+        return stage.custom->kind == FilterKind::Integrator ? FilterDomain::Spectrum
+                                                            : stage.custom->domain;
     }
     switch (*stage.builtin) {
     case SensorFilter::Lens:
@@ -397,8 +399,10 @@ std::string SensorPlan::Source(std::uint32_t segment) const {
             usesBands = true;
             break;
         case FilterKind::Integrator:
-            integrate += "        " + type + ".accumulate(value, band, radiance, pixel);\n";
-            pixels += "    " + type + ".finish(value, pixel);\n";
+            // Built-in integrators take no parameters; custom ones (`ICustomIntegrator`) do.
+            integrate += "        " + base + type + ".accumulate(value, band, radiance, pixel" +
+                         args + ");\n";
+            pixels += "    " + base + type + ".finish(value, pixel" + args + ");\n";
             usesBands = true;
             break;
         case FilterKind::Pixel:

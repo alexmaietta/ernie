@@ -193,6 +193,11 @@ struct Camera {
     /// Per-band factors f_i so that `Electrons` = sum_i radiance_i f_i at the image centre.
     std::vector<float> ElectronsPerRadiance(std::size_t channel) const;
 
+    /// Per-band photons a pixel at the image centre collects over the exposure per unit spectral
+    /// radiance (the camera equation: optics, pixel area, time and band width over the photon
+    /// energy), before quantum efficiency: `ElectronsPerRadiance` without the channel's QE.
+    std::vector<float> PhotonsPerRadiance() const;
+
     /// @throws std::invalid_argument for non-positive sizes, times, f-numbers, ISO or focal
     /// length, a bad clipping range, a degenerate transform, a bad spectral range, no sensor
     /// channels or more than four.

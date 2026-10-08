@@ -28,6 +28,7 @@ extern const char kFilterCompandSlang[];
 extern const char kFilterDefocusSlang[];
 extern const char kFilterDemosaicSlang[];
 extern const char kFilterLagSlang[];
+extern const char kFilterMeasuredQeSlang[];
 extern const char kFilterPsfSlang[];
 extern const char kFilterTemporalAverageSlang[];
 extern const char kFilterSpectralTransmissionSlang[];

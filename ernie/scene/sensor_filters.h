@@ -145,7 +145,9 @@ struct SensorFilterModel {
     std::string name;
     std::string description;
     std::vector<std::string> references;
-    FilterKind kind = FilterKind::Pixel;  ///< `Band`, `Pixel` or `Spatial`.
+    /// `Band`, `Pixel`, `Spatial`, or `Integrator` (`ICustomIntegrator`, domain `Electrons` in
+    /// place of `qe` or `Rgb` in place of `cie`).
+    FilterKind kind = FilterKind::Pixel;
     FilterDomain domain = FilterDomain::Electrons;
     std::vector<SensorFilterParam> params;
     std::string typeName;  ///< The Slang struct implementing the interface.
@@ -244,6 +246,12 @@ std::vector<SensorFilterStep> StepsOf(std::span<const SensorFilter> chain);
 /// band filter, after `qe` or `cie`, which integrate the bands.
 std::vector<SensorFilterStep> CheckFilterChain(std::span<const SensorFilterStep> chain,
                                                const SensorFilterRegistry& registry);
+
+/// The render vars a chain with custom filters writes, a custom integrator writing what the
+/// built-in it stands for does (Electrons for one into electrons, HdrColor into linear colour).
+/// @throws std::invalid_argument as `CheckFilterChain`.
+std::vector<std::string_view> VarsWrittenBy(std::span<const SensorFilterStep> chain,
+                                            const SensorFilterRegistry& registry);
 
 /// The AOVs `chain`'s custom filters write (`SensorFilterModel::outputs`), in slot order.
 /// @throws std::invalid_argument as `CheckFilterChain`, for two outputs of one name, or more than

@@ -106,15 +106,24 @@ double Camera::IrradiancePerRadiance(glm::dvec2 normalised) const {
 
 std::vector<float> Camera::ElectronsPerRadiance(std::size_t channel) const {
     const SensorChannel& sensorChannel = sensor.channels.at(channel);
+    std::vector<float> factors = PhotonsPerRadiance();
+    for (int i = 0; i < bands.count; ++i) {
+        const double low = bands.Lower(i);
+        const double qe = sensorChannel.quantumEfficiency.Average(low, low + bands.Width());
+        factors[static_cast<std::size_t>(i)] =
+            static_cast<float>(static_cast<double>(factors[static_cast<std::size_t>(i)]) * qe);
+    }
+    return factors;
+}
+
+std::vector<float> Camera::PhotonsPerRadiance() const {
     const double area = PixelPitchMetres() * PixelPitchMetres();
     const double optics = IrradiancePerRadiance({0.0, 0.0});
     std::vector<float> factors(static_cast<std::size_t>(bands.count));
     for (int i = 0; i < bands.count; ++i) {
-        const double low = bands.Lower(i);
-        const double qe = sensorChannel.quantumEfficiency.Average(low, low + bands.Width());
         const double photonsPerJoule = bands.Centre(i) * 1e-9 / (kPlanck * kSpeedOfLight);
         factors[static_cast<std::size_t>(i)] =
-            static_cast<float>(optics * area * exposureTime * bands.Width() * photonsPerJoule * qe);
+            static_cast<float>(optics * area * exposureTime * bands.Width() * photonsPerJoule);
     }
     return factors;
 }

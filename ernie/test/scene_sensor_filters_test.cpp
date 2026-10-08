@@ -140,7 +140,10 @@ TEST(SensorFilterRegistry, ChecksCustomFilters) {
     };
     rejects([](ernie::SensorFilterModel& m) { m.id = "noise"; });  // a built-in's name
     rejects([](ernie::SensorFilterModel& m) { m.id = "not an id"; });
-    rejects([](ernie::SensorFilterModel& m) { m.kind = ernie::FilterKind::Integrator; });
+    rejects([](ernie::SensorFilterModel& m) {  // integrators make electrons or linear colour
+        m.kind = ernie::FilterKind::Integrator;
+        m.domain = ernie::FilterDomain::Display;
+    });
     rejects([](ernie::SensorFilterModel& m) { m.domain = ernie::FilterDomain::Spectrum; });
     rejects([](ernie::SensorFilterModel& m) { m.kind = ernie::FilterKind::Band; });  // on rgb
     rejects([](ernie::SensorFilterModel& m) { m.params.push_back(m.params.front()); });

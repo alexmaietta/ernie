@@ -73,8 +73,11 @@ public struct SensorUniforms {
     // (0: a pinhole), unused.
     public float4 range;
     // The f-number diffraction takes, the pixel pitch (um), the focal length (mm), the focus
-    // distance (scene units; 0 is infinity). The views' stride in the buffer is 2304 bytes.
+    // distance (scene units; 0 is infinity).
     public float4 optics;
+    // Per band: photons a pixel collects over the exposure per unit radiance, before quantum
+    // efficiency, four per float4. The views' stride in the buffer is 2560 bytes.
+    public float4 photons[16];
 }
 
 public struct SensorConstants {
@@ -195,6 +198,20 @@ public struct PixelContext {
         return sensorViews[view].optics.w;
     }
 
+    // Photons collected over the exposure per unit spectral radiance in band `band` (the camera
+    // equation, before quantum efficiency), for integrators with their own QE; and the dark
+    // current's electrons over the exposure.
+    public float photonsPerRadiance(uint band) {
+        return sensorViews[view].photons[band / 4][band % 4];
+    }
+    public float darkElectrons() {
+        return sensorViews[view].sensor.z * sensorViews[view].lens.w;
+    }
+    // The sensor's channel count (1 mono, 3 RGB, 4 RGB-NIR).
+    public uint channels() {
+        return sensorViews[view].size.w;
+    }
+
     // The frame's number and the exposure time in seconds, for temporal filters.
     public uint frame() {
         return sensorViews[view].noise.w;
@@ -257,6 +274,16 @@ public interface IPixelFilter {
 public interface IIntegrator {
     static void accumulate(inout SensorPixel value, uint band, float radiance, PixelContext pixel);
     static void finish(inout SensorPixel value, PixelContext pixel);
+}
+
+// A custom integrator, in place of `qe` (domain electrons: it sets `value.electrons`, typically
+// radiance times `pixel.photonsPerRadiance(band)` times its own quantum efficiency, plus
+// `pixel.darkElectrons()` in `finish`) or of `cie` (domain rgb: it sets `value.rgb`).
+public interface ICustomIntegrator {
+    associatedtype Params;
+    static void accumulate(inout SensorPixel value, uint band, float radiance, PixelContext pixel,
+                           Params params);
+    static void finish(inout SensorPixel value, PixelContext pixel, Params params);
 }
 
 // A filter that reads whole images and heads a fused kernel: it produces each band of its pixel

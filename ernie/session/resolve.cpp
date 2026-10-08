@@ -690,12 +690,24 @@ ResolveRenderProducts(const Scene& scene, std::span<const Path> products, const 
             }
             spec.filters.push_back(std::move(step));
         }
-        // The built-in filters decide which vars the chain writes; custom ones write none.
+        // The built-in filters decide which vars the chain writes. A chain with custom filters
+        // (which may integrate in place of qe or cie) is checked by the renderer, which knows
+        // them (`VarsWrittenBy` with its registry).
         std::vector<SensorFilter> builtins;
+        bool custom = false;
         for (const SensorFilterStep& step : spec.filters) {
             if (const std::optional<SensorFilter> builtin = step.Builtin()) {
                 builtins.push_back(*builtin);
+            } else {
+                custom = true;
             }
+        }
+        if (custom) {
+            if (spec.vars.empty()) {
+                spec.vars.emplace_back(path.Child("LdrColor"), std::string(kLdrColor));
+            }
+            specs.push_back(std::move(spec));
+            continue;
         }
         const std::vector<SensorFilter> chain =
             CheckFilterChain(spec.filters.empty() ? DefaultFilterChain() : builtins);

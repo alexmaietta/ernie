@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <stdexcept>
 #include <string>
 
@@ -101,12 +102,16 @@ void SensorFilterRegistry::Add(SensorFilterModel model) {
     if (SensorFilterNamed(model.id) || Find(model.id) != nullptr) {
         throw std::invalid_argument(what + " is already defined");
     }
-    const bool suits = model.kind == FilterKind::Band    ? model.domain == FilterDomain::Spectrum
-                       : model.kind == FilterKind::Pixel ? model.domain != FilterDomain::Spectrum
-                                                         : model.kind == FilterKind::Spatial;
+    const bool suits =
+        model.kind == FilterKind::Band    ? model.domain == FilterDomain::Spectrum
+        : model.kind == FilterKind::Pixel ? model.domain != FilterDomain::Spectrum
+        : model.kind == FilterKind::Integrator
+            ? model.domain == FilterDomain::Electrons || model.domain == FilterDomain::Rgb
+            : model.kind == FilterKind::Spatial;
     if (!suits) {
         throw std::invalid_argument(what + ": a custom filter is a band filter on the spectrum, "
-                                           "a pixel filter on another domain or a spatial filter");
+                                           "a pixel filter on another domain, a spatial filter, "
+                                           "or an integrator into electrons or linear colour");
     }
     if (model.params.size() > kMaxParams) {
         throw std::invalid_argument(what + " has more than " + std::to_string(kMaxParams) +
@@ -187,7 +192,27 @@ std::vector<float> ResampleCurve(std::span<const float> values, std::size_t size
 std::vector<SensorFilterModel> StandardSensorFilters() {
     using Kind = FilterKind;
     using Domain = FilterDomain;
+    // A Gaussian QE curve at 10 nm from 360 to 830 nm, for `measuredQe`'s defaults: a generic
+    // silicon sensor behind RGB dyes.
+    const auto gaussian = [](double peakNm, double widthNm, double peak) {
+        std::vector<float> curve(48);
+        for (std::size_t i = 0; i < curve.size(); ++i) {
+            const double nm = 360.0 + 10.0 * static_cast<double>(i);
+            curve[i] = static_cast<float>(
+                peak * std::exp(-0.5 * (nm - peakNm) * (nm - peakNm) / (widthNm * widthNm)));
+        }
+        return curve;
+    };
     return {
+        {"measuredQe", "Measured QE",
+         "Electrons from red, green and blue QE curves (48 samples, 360 to 830 nm) in place of "
+         "the camera's sensor model: an integrator, in place of qe.",
+         {"EMVA Standard 1288 Release 4.0 Linear, 2021"},
+         Kind::Integrator, Domain::Electrons,
+         {{"red", 0.0f, "Red QE at 360 to 830 nm, 0 to 1", 48, gaussian(600.0, 35.0, 0.45)},
+          {"green", 0.0f, "Green QE", 48, gaussian(530.0, 40.0, 0.55)},
+          {"blue", 0.0f, "Blue QE", 48, gaussian(460.0, 30.0, 0.5)}},
+         "MeasuredQe", shaders::kFilterMeasuredQeSlang},
         {"psf", "Point spread",
          "The lens's point-spread function: diffraction for the camera's f-number per band "
          "(a Gaussian fit to the Airy disc, sigma = 0.42 lambda N) with a Gaussian blur for "
@@ -306,13 +331,24 @@ std::vector<SensorFilterStep> StepsOf(std::span<const SensorFilter> chain) {
 
 std::vector<SensorFilterStep> CheckFilterChain(std::span<const SensorFilterStep> chain,
                                                const SensorFilterRegistry& registry) {
-    // The built-in filters keep their own rules; custom ones need their domain to exist.
+    // The built-in filters keep their own rules, a custom integrator standing for the built-in
+    // whose domain it makes (`qe` for electrons, `cie` for linear colour); other custom filters
+    // need their domain to exist.
     std::vector<SensorFilter> builtins;
+    const auto integratorOf = [&registry](const SensorFilterStep& step) -> std::optional<SensorFilter> {
+        const SensorFilterModel* model = registry.Find(step.type);
+        if (model == nullptr || model->kind != FilterKind::Integrator) {
+            return std::nullopt;
+        }
+        return model->domain == FilterDomain::Electrons ? SensorFilter::Qe : SensorFilter::Cie;
+    };
     for (const SensorFilterStep& step : chain) {
         if (const std::optional<SensorFilter> builtin = step.Builtin()) {
             builtins.push_back(*builtin);
         } else if (registry.Find(step.type) == nullptr) {
             throw std::invalid_argument("Unknown sensor filter type '" + step.type + "'");
+        } else if (const std::optional<SensorFilter> role = integratorOf(step)) {
+            builtins.push_back(*role);
         }
     }
     CheckFilterChain(builtins);
@@ -320,16 +356,17 @@ std::vector<SensorFilterStep> CheckFilterChain(std::span<const SensorFilterStep>
     if (chain.empty() || chain.front().Builtin() != SensorFilter::Lens) {
         checked.push_back({std::string(NameOf(SensorFilter::Lens)), {}});
     }
-    const auto seen = [&checked](SensorFilter filter) {
-        return std::any_of(checked.begin(), checked.end(), [filter](const SensorFilterStep& step) {
-            return step.Builtin() == filter;
+    const auto seen = [&checked, &integratorOf](SensorFilter filter) {
+        return std::any_of(checked.begin(), checked.end(), [&](const SensorFilterStep& step) {
+            return step.Builtin() == filter || integratorOf(step) == filter;
         });
     };
     for (const SensorFilterStep& step : chain) {
         if (step.Builtin() == SensorFilter::Lens && !checked.empty()) {
             throw std::invalid_argument("Sensor filter 'lens' must come first");
         }
-        if (const SensorFilterModel* model = registry.Find(step.type)) {
+        if (const SensorFilterModel* model = registry.Find(step.type);
+            model != nullptr && model->kind != FilterKind::Integrator) {
             bool ready = true;
             switch (model->domain) {
             case FilterDomain::Spectrum:
@@ -359,6 +396,21 @@ std::vector<SensorFilterStep> CheckFilterChain(std::span<const SensorFilterStep>
         checked.push_back(step);
     }
     return checked;
+}
+
+std::vector<std::string_view> VarsWrittenBy(std::span<const SensorFilterStep> chain,
+                                            const SensorFilterRegistry& registry) {
+    std::vector<SensorFilter> roles;
+    for (const SensorFilterStep& step : CheckFilterChain(chain, registry)) {
+        if (const std::optional<SensorFilter> builtin = step.Builtin()) {
+            roles.push_back(*builtin);
+        } else if (const SensorFilterModel* model = registry.Find(step.type);
+                   model->kind == FilterKind::Integrator) {
+            roles.push_back(model->domain == FilterDomain::Electrons ? SensorFilter::Qe
+                                                                     : SensorFilter::Cie);
+        }
+    }
+    return VarsWrittenBy(roles);
 }
 
 std::vector<std::string_view> VarsWrittenBy(std::span<const SensorFilter> chain) {

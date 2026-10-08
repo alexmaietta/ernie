@@ -108,8 +108,9 @@ struct SensorUniforms {
     float qe[SpectralBands::kMaxBands][4];
     float range[4];   ///< First band's lower wavelength, band width (nm), the lens f-number.
     float optics[4];  ///< Diffraction f-number, pixel pitch (um), focal length (mm), focus.
+    float photons[SpectralBands::kMaxBands];  ///< Per band: photons per unit radiance (no QE).
 };
-static_assert(sizeof(SensorUniforms) == 2304, "SensorUniforms must match sensor.slang");
+static_assert(sizeof(SensorUniforms) == 2560, "SensorUniforms must match sensor.slang");
 
 /// Per-view uniforms sit in one buffer at multiples of this, the largest
 /// `minUniformBufferOffsetAlignment` Vulkan allows.
@@ -189,6 +190,14 @@ constexpr DescriptorBinding kFilterBindings[] = {
 SensorPlan ProbePlan(const SensorFilterModel& model, const SensorFilterRegistry& registry) {
     std::vector<SensorFilter> before;
     std::string_view held = render_vars::kHdrColor;
+    if (model.kind == FilterKind::Integrator) {
+        // In place of qe or cie: straight from the lens, holding what it makes.
+        std::vector<SensorFilterStep> chain{{model.id, {}}};
+        const std::string_view vars[] = {model.domain == FilterDomain::Electrons
+                                             ? render_vars::kElectrons
+                                             : render_vars::kHdrColor};
+        return PlanSensor(chain, vars, registry);
+    }
     switch (model.domain) {
     case FilterDomain::Spectrum:
         break;
@@ -686,12 +695,14 @@ void RasterRenderer::SetStars(std::span<const Star> stars) {
     // Each star's grid cell, by declination row from the south pole and right ascension column.
     const auto cellOf = [](const Star& star) {
         constexpr double kTwoPi = 2.0 * M_PI;
-        const double ascension = std::fmod(std::fmod(star.rightAscension, kTwoPi) + kTwoPi, kTwoPi);
+        const double ascension = std::fmod(
+            std::fmod(static_cast<double>(star.rightAscension), kTwoPi) + kTwoPi, kTwoPi);
         const auto column = std::min<std::uint32_t>(
             static_cast<std::uint32_t>(ascension / kTwoPi * kStarColumns), kStarColumns - 1);
         const auto row = std::min<std::uint32_t>(
-            static_cast<std::uint32_t>(std::max(star.declination + M_PI / 2.0, 0.0) / M_PI *
-                                       kStarRows),
+            static_cast<std::uint32_t>(
+                std::max(static_cast<double>(star.declination) + M_PI / 2.0, 0.0) / M_PI *
+                kStarRows),
             kStarRows - 1);
         return row * kStarColumns + column;
     };
@@ -1368,6 +1379,8 @@ void RasterRenderer::WriteSensor(const FrameParams& params) {
         sensor.colour[i][1] = static_cast<float>(rgb.g);
         sensor.colour[i][2] = static_cast<float>(rgb.b);
     }
+    const std::vector<float> photons = camera.PhotonsPerRadiance();
+    std::copy(photons.begin(), photons.end(), sensor.photons);
     for (std::size_t c = 0; c < model.channels.size(); ++c) {
         const std::vector<float> factors = camera.ElectronsPerRadiance(c);
         for (int i = 0; i < bands_.count; ++i) {
