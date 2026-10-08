@@ -74,6 +74,7 @@ void BindApp(nb::module_& parent) {
         .value("LEFT", app::Dock::Left)
         .value("RIGHT", app::Dock::Right)
         .value("BOTTOM", app::Dock::Bottom)
+        .value("RIGHT_LOWER", app::Dock::RightLower, "The right column's lower part.")
         .value("FLOATING", app::Dock::Floating, "Not docked: a free window.");
 
     nb::enum_<Lighting>(m, "Lighting", "How the viewport lights the scene.")
@@ -296,6 +297,8 @@ void BindApp(nb::module_& parent) {
             },
             "(seconds, level, text) of every message in the log.")
         .def("clear_log", &Viewer::ClearLog)
+        .def("capture_window", &Viewer::CaptureWindow, nb::arg("path"),
+             "Writes the whole window, UI and all, as PNG; hidden viewers only.")
         .def("undo", &Viewer::Undo, "Undoes the last GUI edit; returns whether there was one.")
         .def("redo", &Viewer::Redo, "Redoes the last undone GUI edit.")
         .def_prop_rw("gizmo", &Viewer::GetGizmo, &Viewer::SetGizmo)

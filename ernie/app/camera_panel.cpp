@@ -21,7 +21,7 @@ namespace {
 
 class CameraPanel final : public Panel {
   public:
-    CameraPanel() : Panel("Camera", Dock::Right) {}
+    CameraPanel() : Panel("Camera", Dock::RightLower) {}
 
     void Draw(Viewer& viewer) override {
         Scene& scene = viewer.GetScene();

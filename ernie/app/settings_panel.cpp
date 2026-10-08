@@ -30,7 +30,7 @@ const char* LightingName(Lighting lighting) {
 
 class SettingsPanel final : public Panel {
   public:
-    SettingsPanel() : Panel("Settings", Dock::Right) {}
+    SettingsPanel() : Panel("Settings", Dock::RightLower) {}
 
     void Draw(Viewer& viewer) override {
         if (!ImGui::BeginTabBar("##settings")) {

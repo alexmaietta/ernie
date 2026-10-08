@@ -281,6 +281,12 @@ class Viewer {
     /// @throws std::invalid_argument as `SetViewVar`.
     void Capture(const std::filesystem::path& path, std::string var = {});
 
+    /// Writes the whole window as last drawn, UI and all, to `path` as PNG: for screenshot tests
+    /// of the interface. Only a hidden viewer (`ViewerOptions::hidden`) can.
+    /// @throws std::logic_error for a viewer with a window, or std::runtime_error if the file
+    /// cannot be written.
+    void CaptureWindow(const std::filesystem::path& path);
+
     /// Adds a dockable panel, shown under Window in the menu bar. Returns the panel.
     /// @throws std::invalid_argument for a null panel or a title in use or reserved ("Viewport").
     Panel& AddPanel(std::unique_ptr<Panel> panel);

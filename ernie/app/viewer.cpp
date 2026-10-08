@@ -191,7 +191,7 @@ const char* WireframeName(std::optional<Wireframe> mode) {
 /// Built-in panel showing the device, frame times, memory and the last render error.
 class StatsPanel final : public Panel {
   public:
-    StatsPanel() : Panel(kStatsTitle) {}
+    StatsPanel() : Panel(kStatsTitle, Dock::Bottom) {}
 
     void Record(float milliseconds) {
         times_.push_back(milliseconds);
@@ -210,7 +210,7 @@ class StatsPanel final : public Panel {
 /// and toggles to show or clear it.
 class OverlaysPanel final : public Panel {
   public:
-    OverlaysPanel() : Panel("Overlays") {}
+    OverlaysPanel() : Panel("Overlays", Dock::Bottom) {}
 
     void Draw(Viewer& viewer) override {
         Scene& scene = viewer.GetScene();
@@ -643,18 +643,28 @@ struct Viewer::State {
         ImGui::DockBuilderAddNode(dockSpace, ImGuiDockNodeFlags_DockSpace);
         ImGui::DockBuilderSetNodeSize(dockSpace, ImGui::GetMainViewport()->WorkSize);
         dockNodes.clear();
+        // Hidden panels take no room; they dock where they ask when shown again.
         const auto wants = [&](Dock dock) {
-            return std::any_of(panels.begin(), panels.end(),
-                               [dock](const auto& panel) { return panel->GetDock() == dock; });
+            return std::any_of(panels.begin(), panels.end(), [dock](const auto& panel) {
+                return panel->IsVisible() && panel->GetDock() == dock;
+            });
         };
         ImGuiID center = dockSpace;
         if (wants(Dock::Left)) {
             dockNodes[Dock::Left] =
                 ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.24f, nullptr, &center);
         }
-        if (wants(Dock::Right)) {
-            dockNodes[Dock::Right] =
-                ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.30f, nullptr, &center);
+        // The right column: `Right` above `RightLower`, either taking all of it alone.
+        if (wants(Dock::Right) || wants(Dock::RightLower)) {
+            ImGuiID column =
+                ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.28f, nullptr, &center);
+            if (wants(Dock::Right) && wants(Dock::RightLower)) {
+                dockNodes[Dock::RightLower] =
+                    ImGui::DockBuilderSplitNode(column, ImGuiDir_Down, 0.62f, nullptr, &column);
+                dockNodes[Dock::Right] = column;
+            } else {
+                dockNodes[wants(Dock::Right) ? Dock::Right : Dock::RightLower] = column;
+            }
         }
         if (wants(Dock::Bottom)) {
             dockNodes[Dock::Bottom] =
@@ -663,7 +673,7 @@ struct Viewer::State {
         ImGui::DockBuilderDockWindow(kViewportTitle, center);
         for (const auto& panel : panels) {
             const auto node = dockNodes.find(panel->GetDock());
-            if (node != dockNodes.end()) {
+            if (panel->IsVisible() && node != dockNodes.end()) {
                 ImGui::DockBuilderDockWindow(panel->Title().c_str(), node->second);
             }
         }
@@ -1013,7 +1023,7 @@ struct Viewer::State {
         }
         ImGui::SameLine();
         ImGui::SetNextItemWidth(comboWidth);
-        const std::string varLabel = std::string(icons::kEye) + "  " + viewVar;
+        const std::string varLabel = std::string(icons::kImage) + "  " + viewVar;
         if (ImGui::BeginCombo("##var", varLabel.c_str())) {
             const std::vector<std::string>& shown = delegate->Info().viewVars;
             for (const std::string_view name : kRenderVarNames) {
@@ -1444,12 +1454,14 @@ Viewer::Viewer(Scene& scene, const ViewerOptions& options)
     s.CreateImGui();
     auto stats = std::make_unique<StatsPanel>();
     s.stats = stats.get();
-    s.panels.push_back(std::move(stats));
-    s.panels.push_back(std::make_unique<OverlaysPanel>());
+    // Stage above Properties on the right, and Log, Stats and Overlays at the bottom, opening on
+    // Stage, Properties and Log.
     s.panels.push_back(MakeStagePanel());
     s.panels.push_back(MakePropertiesPanel());
     s.panels.push_back(MakeSettingsPanel());
     s.panels.push_back(MakeCameraPanel());
+    s.panels.push_back(std::move(stats));
+    s.panels.push_back(std::make_unique<OverlaysPanel>());
     s.panels.push_back(MakeLogPanel());
     s.builtInPanels = s.panels.size();
     s.CreateSession();
@@ -1822,6 +1834,21 @@ void Viewer::Capture(const std::filesystem::path& path, std::string var) {
                                     "' in the viewport");
     }
     state_->capture = State::CaptureRequest{path, std::move(var), false};
+}
+
+void Viewer::CaptureWindow(const std::filesystem::path& path) {
+    State& s = *state_;
+    if (s.uiTarget == nullptr) {
+        throw std::logic_error("Only a hidden viewer can capture its window");
+    }
+    vkDeviceWaitIdle(s.gpu->Device());
+    const std::vector<std::uint8_t> texels = s.uiTarget->ReadColor();
+    const VkExtent2D extent = s.uiTarget->Extent();
+    if (stbi_write_png(path.string().c_str(), static_cast<int>(extent.width),
+                       static_cast<int>(extent.height), 4, texels.data(),
+                       static_cast<int>(extent.width * 4)) == 0) {
+        throw std::runtime_error("Cannot write " + path.string());
+    }
 }
 
 Panel& Viewer::AddPanel(std::unique_ptr<Panel> panel) {

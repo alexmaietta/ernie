@@ -90,7 +90,7 @@ glm::dmat4 Compose(const Trs& trs) {
 
 class PropertiesPanel final : public Panel {
   public:
-    PropertiesPanel() : Panel("Properties", Dock::Right) {}
+    PropertiesPanel() : Panel("Properties", Dock::RightLower) {}
 
     void Draw(Viewer& viewer) override {
         const std::vector<Path>& selection = viewer.Selection();

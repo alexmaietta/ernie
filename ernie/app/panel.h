@@ -13,9 +13,10 @@ class Viewer;
 /// Where a panel docks in the viewer's default layout, around the viewport.
 enum class Dock {
     Left,
-    Right,
+    Right,       ///< The right column's upper part (the whole column if nothing docks below).
     Bottom,
-    Floating,  ///< Not docked: a free window.
+    Floating,    ///< Not docked: a free window.
+    RightLower,  ///< The right column's lower part, below `Right`.
 };
 
 /// A dockable window of the viewer. Subclasses draw with Dear ImGui (`#include <imgui.h>`) in

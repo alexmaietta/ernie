@@ -54,7 +54,7 @@ bool ContainsIgnoringCase(std::string_view text, std::string_view part) {
 
 class StagePanel final : public Panel {
   public:
-    StagePanel() : Panel("Stage", Dock::Left) {}
+    StagePanel() : Panel("Stage", Dock::Right) {}
 
     void Draw(Viewer& viewer) override {
         Scene& scene = viewer.GetScene();
@@ -164,7 +164,7 @@ class StagePanel final : public Panel {
         }
         // The type, muted, and a visibility toggle at the right.
         const float right = ImGui::GetWindowContentRegionMax().x;
-        const float eye = ImGui::CalcTextSize(icons::kEye).x + 2.0f * ImGui::GetStyle().FramePadding.x;
+        const float eye = ImGui::GetFrameHeight();
         if (!type.empty()) {
             const float typeWidth = ImGui::CalcTextSize(type.c_str()).x;
             ImGui::SameLine(std::max(ImGui::GetCursorPosX(),
@@ -175,20 +175,47 @@ class StagePanel final : public Panel {
         ImGui::PushID(path.String().c_str());
         const bool authoredInvisible =
             scene.Get<std::string>(path, tokens::kVisibility, "") == tokens::kInvisible;
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-        if (authoredInvisible) {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-        }
-        if (ImGui::SmallButton(icons::kEye)) {
+        if (VisibilityToggle(!authoredInvisible, visible)) {
             viewer.Edit(path, tokens::kVisibility,
                         std::string(authoredInvisible ? tokens::kInherited : tokens::kInvisible));
         }
-        if (authoredInvisible) {
-            ImGui::PopStyleColor();
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(authoredInvisible ? "Hidden; click to show"
+                              : visible         ? "Visible; click to hide"
+                                                : "Hidden by an ancestor; click to hide it too");
         }
-        ImGui::PopStyleColor();
         ImGui::PopID();
         return open && !leaf;
+    }
+
+    /// A clickable eye, drawn rather than taken from the icon font: open when `shown`, struck
+    /// through when not, and dimmed when the prim is not `visible` (here or by an ancestor).
+    /// Returns whether it was clicked.
+    static bool VisibilityToggle(bool shown, bool visible) {
+        const float size = ImGui::GetFrameHeight();
+        const ImVec2 corner = ImGui::GetCursorScreenPos();
+        const bool clicked = ImGui::InvisibleButton("##visibility", ImVec2(size, size));
+        const bool hovered = ImGui::IsItemHovered();
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        const ImU32 colour = ImGui::GetColorU32(
+            hovered ? ImGuiCol_Text : (visible ? ImGuiCol_Text : ImGuiCol_TextDisabled),
+            hovered || visible ? 1.0f : 0.8f);
+        const ImVec2 centre(corner.x + 0.5f * size, corner.y + 0.5f * size);
+        const float w = 0.36f * size;  // half the eye's width
+        const float h = 0.22f * size;  // half its height
+        const float thickness = std::max(1.0f, 0.07f * size);
+        // The lids, as two quadratic curves meeting at the corners.
+        draw->AddBezierQuadratic(ImVec2(centre.x - w, centre.y), ImVec2(centre.x, centre.y - 2 * h),
+                                 ImVec2(centre.x + w, centre.y), colour, thickness);
+        draw->AddBezierQuadratic(ImVec2(centre.x - w, centre.y), ImVec2(centre.x, centre.y + 2 * h),
+                                 ImVec2(centre.x + w, centre.y), colour, thickness);
+        if (shown) {
+            draw->AddCircleFilled(centre, 0.12f * size, colour);
+        } else {
+            draw->AddLine(ImVec2(centre.x - w, centre.y + w), ImVec2(centre.x + w, centre.y - w),
+                          colour, thickness);
+        }
+        return clicked;
     }
 
     static void Select(Viewer& viewer, const Path& path, bool toggle) {

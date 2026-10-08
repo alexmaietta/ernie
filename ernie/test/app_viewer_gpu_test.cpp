@@ -314,9 +314,10 @@ class CountingPanel final : public Panel {
 
 TEST_F(ViewerTest, PanelsDockWhereTheyAsk) {
     int draws = 0;
-    // Alone in their docks, as tabs hidden behind the built-in Stage and Log panels would not draw.
-    viewer_->RemovePanel("Stage");
-    viewer_->RemovePanel("Log");
+    // Alone in its dock, as tabs hidden behind the built-in bottom panels would not draw.
+    for (const char* title : {"Log", "Stats", "Overlays"}) {
+        viewer_->RemovePanel(title);
+    }
     CountingPanel& left = viewer_->AddPanel<CountingPanel>("Left Panel", Dock::Left, draws);
     viewer_->AddPanel<CountingPanel>("Bottom Panel", Dock::Bottom, draws);
     viewer_->AddPanel<CountingPanel>("Floating Panel", Dock::Floating, draws);
@@ -338,7 +339,7 @@ TEST_F(ViewerTest, PanelsDockWhereTheyAsk) {
     };
     EXPECT_TRUE(docked("Left Panel"));
     EXPECT_TRUE(docked("Bottom Panel"));
-    EXPECT_TRUE(docked("Stats"));
+    EXPECT_TRUE(docked("Properties"));
     EXPECT_FALSE(docked("Floating Panel"));
     std::filesystem::remove(path);
 }
