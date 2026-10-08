@@ -20,7 +20,8 @@
 // 11 DistanceToCamera, 12 Normal, 13 PrimId, 14 InstanceId, every image one layer per view;
 // 15 the custom filters' parameters; for spatial filters, the images between kernels:
 // 16 and 17 the spectrum and the channels (a layer per channel domain per view) a kernel reads,
-// 18 and 19 those it writes for the next; 20 to 27 the AOV slots.
+// 18 and 19 those it writes for the next; 20 to 27 the AOV slots; 28 and 29 the temporal filters'
+// state from the previous frame and for the next.
 //
 // References:
 // - D. C. Brown, "Decentering Distortion of Lenses", Photogrammetric Engineering 32(3):444-462,
@@ -77,7 +78,8 @@ public struct SensorUniforms {
 }
 
 public struct SensorConstants {
-    // x: the first view's uniforms, y: the AOV slots held (a bit each), zw unused.
+    // x: the first view's uniforms, y: the AOV slots held (a bit each), z: 1 when the state holds
+    // the product's previous frame, w: state slots per view.
     public uint4 view;
 }
 
@@ -116,6 +118,10 @@ public struct SensorConstants {
 [[vk::image_format("rgba32f")]] [[vk::binding(25, 0)]] RWTexture2DArray<float4> aov5;
 [[vk::image_format("rgba32f")]] [[vk::binding(26, 0)]] RWTexture2DArray<float4> aov6;
 [[vk::image_format("rgba32f")]] [[vk::binding(27, 0)]] RWTexture2DArray<float4> aov7;
+// Temporal filters' state (`readState`, `writeState`): what they stored on the product's previous
+// frame and what they store on this one, `pass.view.w` slots per view.
+[[vk::image_format("rgba32f")]] [[vk::binding(28, 0)]] RWTexture2DArray<float4> statePrevious;
+[[vk::image_format("rgba32f")]] [[vk::binding(29, 0)]] RWTexture2DArray<float4> stateNext;
 
 // A view's layers of the channel images: one per domain after the spectrum.
 public static const uint kChannelElectrons = 0;
@@ -147,6 +153,8 @@ public struct PixelContext {
     public uint outputBase;
     // Slots the product holds, a bit each, so writes to others are skipped.
     public uint heldOutputs;
+    // The state slot of the running filter's state 0 (the plan sets it before each filter).
+    public uint stateBase;
 
     public SensorUniforms uniforms() {
         return sensorViews[view];
@@ -218,6 +226,7 @@ public bool beginPixel(uint3 id, out PixelContext pixel) {
     pixel.view = pass.view.x + id.z;
     pixel.outputBase = 0;
     pixel.heldOutputs = pass.view.y;
+    pixel.stateBase = 0;
     let size = sensorViews[pixel.view].size;
     return id.x < size.x && id.y < size.y;
 }
@@ -487,6 +496,33 @@ public struct Lens : ISpatialSource {
             instanceId[id] = instance;
         }
     }
+}
+
+// Temporal filters: whether the product rendered a frame before this one with the same chain,
+// resolution and views, whose state `readState` then returns.
+public bool hasHistory(PixelContext pixel) {
+    return pass.view.z != 0;
+}
+
+// The state's layer: by the view's index in the whole batch (`pixel.view`), as batches larger
+// than one set of render targets record in chunks whose layers start again at 0.
+int stateLayer(PixelContext pixel, uint slot) {
+    return int(pixel.view * pass.view.w + pixel.stateBase + slot);
+}
+
+// What the running filter stored in its state slot `slot` (its model's `states`) at this pixel
+// on the product's previous frame; zeros without history (`hasHistory`).
+public float4 readState(PixelContext pixel, uint slot) {
+    if (pass.view.z == 0) {
+        return float4(0.0);
+    }
+    return statePrevious[int3(pixel.id.xy, stateLayer(pixel, slot))];
+}
+
+// Stores `value` in the running filter's state slot `slot` for the product's next frame, which
+// reads it with `readState`. A filter writes every slot it reads, every frame.
+public void writeState(PixelContext pixel, uint slot, float4 value) {
+    stateNext[int3(pixel.id.xy, stateLayer(pixel, slot))] = value;
 }
 
 // A curve parameter (`SensorFilterParam::size` above 1) at `t` in [0, 1]: linear between its N

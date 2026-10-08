@@ -34,6 +34,7 @@ struct SensorPlan {
         std::uint32_t firstParam = 0;
         std::uint32_t segment = 0;
         std::uint32_t outputBase = 0;  ///< The AOV slot of its output 0 (`AovOutputsOf`).
+        std::uint32_t stateBase = 0;   ///< The state slot of its state 0.
     };
 
     std::vector<Stage> stages;          ///< In chain order, the lens first.
@@ -41,6 +42,8 @@ struct SensorPlan {
     std::vector<float> params;          ///< Every custom stage's parameters, packed in order.
     std::uint32_t holds = 0;            ///< Vars written, a bit per `kRenderVarNames` index.
     std::uint32_t aovs = 0;             ///< AOV slots written, a bit per `kAovSlotNames` index.
+    /// State slots per pixel the temporal filters that run keep between frames, in their order.
+    std::uint32_t states = 0;
     std::uint32_t segments = 1;         ///< Kernels, run in order with a barrier between.
     bool spectrumImages = false;  ///< Whether segments pass the spectrum on (spectral spatial).
     bool channelImages = false;   ///< Whether they pass other domains on.

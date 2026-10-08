@@ -179,6 +179,9 @@ constexpr DescriptorBinding kFilterBindings[] = {
     {25, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {26, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {27, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    // The temporal filters' state, previous and next.
+    {28, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {29, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
 };
 
 /// A plan that runs custom filter `model`, with the built-in filters its domain needs, and holds a
@@ -542,6 +545,9 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
     presentOutline_ = presentPipeline("presentOutline", true);
     highlight_ = std::make_unique<GpuBuffer>(context_, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                              BufferMemory::Device);
+    statePlaceholder_ = std::make_unique<GpuImage>(
+        context_, ImageDesc{1, 1, 1, 1, VK_FORMAT_R32G32B32A32_SFLOAT,
+                            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false, true});
     overlays_ = std::make_unique<OverlayPass>(context_, compiler_, uploads_, presentFormat_);
     const std::vector<ShaderModuleSource> depthRangeModules{
         {"depth_range", shaders::kDepthRangeSlang}};
@@ -1928,8 +1934,17 @@ void RasterRenderer::ShadeAndFilter(VkCommandBuffer commands, RenderTargets& tar
         image.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
         return image;
     };
-    // The AOV slots the frame holds, which filters' `writeOutput` writes.
-    const std::uint32_t constants[4] = {firstView, sensorPlan_.aovs, 0, 0};
+    // The temporal filters' state, from the last frame and for the next, or a placeholder.
+    const bool state = sensorPlan_.states > 0 && stateNext_ != nullptr;
+    GpuImage& previous = state && statePrevious_ != nullptr ? *statePrevious_ : *statePlaceholder_;
+    GpuImage& next = state ? *stateNext_ : *statePlaceholder_;
+    previous.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    next.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    // The AOV slots the frame holds, which filters' `writeOutput` writes; whether the state holds
+    // history, and its slots per view.
+    const std::uint32_t constants[4] = {firstView, sensorPlan_.aovs,
+                                        state && stateHistory_ ? 1u : 0u,
+                                        state ? sensorPlan_.states : 0u};
     for (std::uint32_t segment = 0; segment < sensorPlan_.segments; ++segment) {
         std::vector<DescriptorResource> resources = filters;
         resources.push_back(general(image(true, segment + 1)));
@@ -1939,6 +1954,8 @@ void RasterRenderer::ShadeAndFilter(VkCommandBuffer commands, RenderTargets& tar
         for (std::size_t slot = 0; slot < kMaxAovs; ++slot) {
             resources.push_back(general(targets.BoundAov(slot)));
         }
+        resources.push_back(general(previous));
+        resources.push_back(general(next));
         vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                           sensorPipelines_.at(SensorKernelKey(sensorPlan_, segment))->Handle());
         filterLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);

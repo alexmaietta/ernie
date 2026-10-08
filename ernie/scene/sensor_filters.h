@@ -152,7 +152,13 @@ struct SensorFilterModel {
     std::string slang;     ///< Its module's source.
     /// Its AOVs, which it writes with `writeOutput(pixel, index, value)` in this order.
     std::vector<SensorFilterOutput> outputs = {};
+    /// Float4 state slots per pixel it keeps between a product's frames (`readState`,
+    /// `writeState`): a temporal filter, such as image lag or a moving average.
+    std::uint32_t states = 0;
 };
+
+/// Most state slots a product's chain keeps per pixel (`SensorFilterModel::states`).
+inline constexpr std::uint32_t kMaxStates = 8;
 
 /// Custom sensor filters a renderer can run, by `SensorFilterModel::id`.
 class SensorFilterRegistry {
@@ -203,6 +209,10 @@ class SensorFilterRegistry {
 ///   `exposure`.
 /// - `spectralTransmission` (band): each band times `curve` (48 samples, 360 to 830 nm), a
 ///   measured filter's transmission; before `qe` and `cie`.
+/// - `lag` (pixel, electrons; temporal): a `fraction` of each frame's charge read out with the
+///   next.
+/// - `temporalAverage` (pixel, rgb; temporal): an exponential moving average, `alpha` the new
+///   frame's weight.
 /// Each file's header cites its references.
 std::vector<SensorFilterModel> StandardSensorFilters();
 

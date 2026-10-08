@@ -186,12 +186,17 @@ class RasterDelegate : public RenderDelegate {
     std::vector<MeshItem> Items(const Scene& scene) const;
 
     ComputeInterop& RequireCompute();
+    /// `stateKey` names whose frames the temporal filters' state follows: the product, or the
+    /// settings for the interactive view.
     void UpdatePrims(const Scene& scene, const RenderPrims& prims, VkExtent2D extent, FrameId frame,
-                     std::span<const SensorFilterStep> filters = {},
+                     const Path& stateKey, std::span<const SensorFilterStep> filters = {},
                      std::vector<glm::dmat4> poses = {}, std::vector<std::int32_t> worlds = {},
                      std::vector<std::string_view> vars = {},
                      std::optional<glm::dmat4> posesParent = std::nullopt,
                      const std::optional<std::string>& overlays = std::nullopt);
+    /// Hands the renderer the state images of `key` for the frame `Update` just prepared, made
+    /// (and history dropped) when its size, views or chain change, and swaps them for the next.
+    void PrepareSensorState(const Path& key, VkExtent2D extent, std::uint32_t views);
     /// Takes the next `FrameUploads` slot for a frame, once the frame that last used it has
     /// finished; returns it.
     std::uint32_t BeginFrame();
@@ -231,6 +236,14 @@ class RasterDelegate : public RenderDelegate {
     RenderPrims prims_;
     std::optional<Key> heightfield_;
     std::optional<Key> domeMap_;  ///< The dome map last uploaded, and its dome.
+    /// The temporal filters' state per product: two images, the last frame's and the next's.
+    struct SensorState {
+        std::array<std::unique_ptr<GpuImage>, 2> images;
+        std::uint32_t next = 0;  ///< Which image the next frame writes.
+        bool history = false;    ///< Whether the other holds a frame.
+        std::string chain;       ///< The plan key it was made for.
+    };
+    std::map<Path, SensorState> sensorStates_;
     std::optional<Key> stars_;    ///< The StarField last uploaded.
     std::map<Path, SyncedMaterial> materials_;
     std::map<Path, SyncedMesh> syncedMeshes_;

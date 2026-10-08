@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <array>
+#include <stdexcept>
+#include <string>
 
 namespace ernie {
 
@@ -230,6 +232,13 @@ SensorPlan PlanSensor(std::span<const SensorFilterStep> chain,
                     plan.params.insert(plan.params.end(), resampled.begin(), resampled.end());
                 }
                 stage.custom = model;
+                stage.stateBase = plan.states;
+                plan.states += model.states;
+                if (plan.states > kMaxStates) {
+                    throw std::invalid_argument("The sensor filter chain keeps more than " +
+                                                std::to_string(kMaxStates) +
+                                                " state slots per pixel");
+                }
             }
         }
         if (needed) {
@@ -272,6 +281,9 @@ std::string SensorPlan::Key() const {
         // Filters with outputs write them from their slot, part of the kernel.
         if (stage.custom && !stage.custom->outputs.empty()) {
             key += '@' + std::to_string(stage.outputBase);
+        }
+        if (stage.custom && stage.custom->states > 0) {
+            key += '#' + std::to_string(stage.stateBase);
         }
     }
     return key;
@@ -354,10 +366,14 @@ std::string SensorPlan::Source(std::uint32_t segment) const {
         }
         const std::string args = stage.custom ? ", " + var : "";
         // Where the filter's outputs go (`writeOutput`), set before each call.
-        const std::string base =
-            stage.custom && !stage.custom->outputs.empty()
-                ? "pixel.outputBase = " + std::to_string(stage.outputBase) + "u; "
-                : "";
+        std::string base;
+        if (stage.custom && !stage.custom->outputs.empty()) {
+            base += "pixel.outputBase = " + std::to_string(stage.outputBase) + "u; ";
+        }
+        // And its state slots (`readState`, `writeState`).
+        if (stage.custom && stage.custom->states > 0) {
+            base += "pixel.stateBase = " + std::to_string(stage.stateBase) + "u; ";
+        }
         switch (kind) {
         case FilterKind::Spatial:
             if (stage.builtin) {

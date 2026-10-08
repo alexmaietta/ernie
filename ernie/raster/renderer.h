@@ -296,6 +296,25 @@ class RasterRenderer {
         presentBand_ = band;
     }
 
+    /// State slots per pixel the temporal filters of the last `Update`'s chain keep.
+    std::uint32_t SensorStateSlots() const {
+        return sensorPlan_.states;
+    }
+
+    /// The last `Update`'s sensor plan.
+    const SensorPlan& Plan() const {
+        return sensorPlan_;
+    }
+
+    /// The temporal filters' state for the next `Record`: images of `SensorStateSlots` layers per
+    /// view, `previous` holding the last frame's (when `history`) and `next` taking this one's;
+    /// null for none. Call after `Update`; the images must outlive the frame's recording.
+    void SetSensorState(GpuImage* previous, GpuImage* next, bool history) {
+        statePrevious_ = previous;
+        stateNext_ = next;
+        stateHistory_ = history && previous != nullptr;
+    }
+
     /// The spectral bands and filter chain of the last `Update`.
     const SpectralBands& Bands() const {
         return bands_;
@@ -436,6 +455,10 @@ class RasterRenderer {
     std::unique_ptr<GraphicsPipeline> presentSpectral_;
     std::unique_ptr<GraphicsPipeline> presentOutline_;
     std::unique_ptr<GpuBuffer> highlight_;        ///< A bit per highlighted prim id.
+    GpuImage* statePrevious_ = nullptr;           ///< `SetSensorState`'s images, or null.
+    GpuImage* stateNext_ = nullptr;
+    bool stateHistory_ = false;
+    std::unique_ptr<GpuImage> statePlaceholder_;  ///< Bound without state.
     std::vector<std::uint32_t> highlightBits_;
     std::uint32_t highlightWords_ = 0;            ///< 0 draws no outline.
     std::uint32_t highlightWidth_ = 2;

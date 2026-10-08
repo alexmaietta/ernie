@@ -367,3 +367,59 @@ TEST_F(RasterDelegateTest, AovsRunTheirFiltersAndNameTheirOutputs) {
     EXPECT_NE(both.at("RawDN"), mosaic);
     EXPECT_THROW(VarsThrough(delegate, scene, {"aov:missing"}, chain), std::invalid_argument);
 }
+
+TEST_F(RasterDelegateTest, TemporalFiltersKeepStateBetweenAProductsFrames) {
+    // Two frames of each: the red quad, then the quad gone.
+    const auto frames = [&](const Steps& chain, const std::string& var) {
+        RasterDelegate delegate(*context_);
+        Scene scene = MeshScene();
+        scene.Set("/World/Camera", tokens::kExposureTime, 1e-6);  // unsaturated
+        const auto first = VarThrough(delegate, scene, var, chain);
+        scene.Remove("/World/Quad");
+        const auto second = VarThrough(delegate, scene, var, chain);
+        return std::pair(first, second);
+    };
+    // The quad's brightest pixel, and its red.
+    const auto brightest = [](const std::vector<float>& image) {
+        std::size_t best = 0;
+        for (std::size_t i = 0; i < image.size(); i += 4) {
+            best = image[i] > image[best] ? i : best;
+        }
+        return best;
+    };
+
+    // Lag: 3/4 of the first frame's charge, then a ghost of the other quarter.
+    {
+        const Steps chain = {{"qe", kNone}, {"lag", {{"fraction", 0.25f}}}};
+        const auto [first, second] = frames(chain, "Electrons");
+        RasterDelegate reference(*context_);
+        Scene plain = MeshScene();
+        plain.Set("/World/Camera", tokens::kExposureTime, 1e-6);
+        const auto collected = VarThrough(reference, plain, "Electrons", {{"qe", kNone}});
+        const std::size_t i = brightest(collected);
+        ASSERT_GT(collected[i], 0.0f);
+        EXPECT_NEAR(first[i], 0.75f * collected[i], 1e-3f * collected[i]);
+        EXPECT_NEAR(second[i], 0.25f * collected[i], 1e-3f * collected[i]) << "the ghost";
+    }
+    // A moving average: the first frame as it is, then half way to the empty scene.
+    {
+        const Steps chain = {{"cie", kNone}, {"temporalAverage", {{"alpha", 0.5f}}}};
+        const auto [first, second] = frames(chain, "HdrColor");
+        const std::size_t i = brightest(first);
+        ASSERT_GT(first[i], 0.0f);
+        EXPECT_NEAR(second[i], 0.5f * first[i], 1e-4f * first[i]);
+    }
+    // A different chain starts a new history: the quad gone at once, not half way.
+    {
+        RasterDelegate delegate(*context_);
+        Scene scene = MeshScene();
+        const auto lit = VarThrough(delegate, scene, "HdrColor",
+                                    {{"cie", kNone}, {"temporalAverage", {{"alpha", 0.5f}}}});
+        const std::size_t i = brightest(lit);
+        scene.Remove("/World/Quad");
+        const auto fresh = VarThrough(
+            delegate, scene, "HdrColor",
+            {{"cie", kNone}, {"whiteBalance", kNone}, {"temporalAverage", {{"alpha", 0.5f}}}});
+        EXPECT_EQ(fresh[i], 0.0f) << "no history after the chain changed";
+    }
+}

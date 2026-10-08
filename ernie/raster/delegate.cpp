@@ -710,11 +710,56 @@ void RasterDelegate::Update(const Scene& scene, const Path& settings, VkExtent2D
     context_.WaitForSubmissions();
     BeginFrame();
     const RenderPrims prims = ResolveRenderPrims(scene, settings);
-    UpdatePrims(scene, prims, extent, NextFrame(scene, prims.settings, prims.settings));
+    UpdatePrims(scene, prims, extent, NextFrame(scene, prims.settings, prims.settings),
+                prims.settings);
+}
+
+void RasterDelegate::PrepareSensorState(const Path& key, VkExtent2D extent, std::uint32_t views) {
+    const std::uint32_t slots = renderer_.SensorStateSlots();
+    if (slots == 0) {
+        renderer_.SetSensorState(nullptr, nullptr, false);
+        sensorStates_.erase(key);
+        return;
+    }
+    const std::uint32_t layers = views * slots;
+    if (layers > context_.Limits().maxImageArrayLayers) {
+        throw std::invalid_argument("Temporal sensor filters keep " + std::to_string(slots) +
+                                    " state slots per view, too many for " +
+                                    std::to_string(views) + " views on this device");
+    }
+    SensorState& state = sensorStates_[key];
+    const std::string chain = renderer_.Plan().Key();
+    const GpuImage* existing = state.images[0].get();
+    if (existing == nullptr || existing->Desc().width != extent.width ||
+        existing->Desc().height != extent.height || existing->Desc().layers != layers ||
+        state.chain != chain) {
+        // A new history: the images and the chain they hold the state of. Earlier frames may
+        // still use the old ones (the viewer's included, which it submits itself): rare, so wait.
+        if (existing != nullptr) {
+            vkDeviceWaitIdle(context_.Device());
+        }
+        for (std::unique_ptr<GpuImage>& image : state.images) {
+            image = std::make_unique<GpuImage>(
+                context_, ImageDesc{extent.width, extent.height, layers, 1,
+                                    VK_FORMAT_R32G32B32A32_SFLOAT,
+                                    VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false,
+                                    true});
+        }
+        state.next = 0;
+        state.history = false;
+        state.chain = chain;
+    }
+    renderer_.SetSensorState(state.images[1 - state.next].get(), state.images[state.next].get(),
+                             state.history);
+    // The next frame reads what this one writes. Frames run on the device in submission order,
+    // and the sensor pass's barrier orders this frame's writes before the next one's reads.
+    state.next = 1 - state.next;
+    state.history = true;
 }
 
 void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, VkExtent2D extent,
-                                 FrameId id, std::span<const SensorFilterStep> filters,
+                                 FrameId id, const Path& stateKey,
+                                 std::span<const SensorFilterStep> filters,
                                  std::vector<glm::dmat4> poses, std::vector<std::int32_t> worlds,
                                  std::vector<std::string_view> vars,
                                  std::optional<glm::dmat4> posesParent,
@@ -776,7 +821,9 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
             drawn.push_back(scene.FindOverlay(name));
         }
     }
+    const auto views = static_cast<std::uint32_t>(std::max<std::size_t>(frame.poses.size(), 1));
     renderer_.Update(frame, drawables, drawn);
+    PrepareSensorState(stateKey, extent, views);
 }
 
 std::uint32_t RasterDelegate::PrimIdOf(const Path& path) const {
@@ -993,7 +1040,8 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
             posesParent = PosesParentOf(scene, cameras.front());
         }
         UpdatePrims(scene, prims, spec.resolution, NextFrame(scene, base.settings, spec.product),
-                    spec.filters, std::move(poses), std::move(worlds), std::move(vars),
+                    spec.product, spec.filters, std::move(poses), std::move(worlds),
+                    std::move(vars),
                     posesParent, spec.overlays);
         if (gpuPoses != nullptr) {
             // Once no submission reads the pose buffer (`UpdatePrims` waits), on the writer's

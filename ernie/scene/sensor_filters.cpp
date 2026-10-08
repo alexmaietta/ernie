@@ -137,6 +137,10 @@ void SensorFilterRegistry::Add(SensorFilterModel model) {
     if (!IsIdentifier(model.typeName) || model.slang.find(model.typeName) == std::string::npos) {
         throw std::invalid_argument(what + ": its Slang must define type '" + model.typeName + "'");
     }
+    if (model.states > kMaxStates) {
+        throw std::invalid_argument(what + " keeps more than " + std::to_string(kMaxStates) +
+                                    " state slots");
+    }
     if (model.outputs.size() > kMaxAovs) {
         throw std::invalid_argument(what + " has more than " + std::to_string(kMaxAovs) +
                                     " outputs");
@@ -258,6 +262,20 @@ std::vector<SensorFilterModel> StandardSensorFilters() {
          Kind::Band, Domain::Spectrum,
          {{"curve", 1.0f, "Transmission at evenly spaced wavelengths from 360 to 830 nm", 48}},
          "SpectralTransmission", shaders::kFilterSpectralTransmissionSlang},
+        {"lag", "Image lag",
+         "A fraction of each frame's charge read out with the next, so moving highlights trail "
+         "ghosts (temporal).",
+         {"J. R. Janesick, \"Photon Transfer\", SPIE Press, 2007"},
+         Kind::Pixel, Domain::Electrons,
+         {{"fraction", 0.05f, "Of each frame's charge read out with the next, 0 to 1"}},
+         "Lag", shaders::kFilterLagSlang, {}, 1},
+        {"temporalAverage", "Temporal average",
+         "An exponential moving average of linear colour over the frames (temporal).",
+         {"S. W. Roberts, \"Control chart tests based on geometric moving averages\", "
+          "Technometrics 1(3), 1959"},
+         Kind::Pixel, Domain::Rgb,
+         {{"alpha", 0.2f, "Weight of the new frame, 0 to 1"}},
+         "TemporalAverage", shaders::kFilterTemporalAverageSlang, {}, 1},
         {"compand", "Square-root companding",
          "Digital numbers compressed as the square root of their fraction of full scale, as "
          "LROC's cameras compress 12 bits to 8.",
