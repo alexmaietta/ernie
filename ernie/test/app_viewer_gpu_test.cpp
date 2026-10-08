@@ -13,7 +13,10 @@
 #include <array>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <memory>
+#include <set>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 
@@ -119,6 +122,10 @@ TEST_F(ViewerTest, ShowsEveryRenderVarTheBackendCanDraw) {
     EXPECT_EQ(vars.size(), kRenderVarNames.size()) << "every one";
     ASSERT_TRUE(viewer_->Step());
     // The centre pixel (the cube) and a corner (background) of a capture of `var`.
+    // Without the grid and gizmos over the image.
+    ViewportDisplay display;
+    display.grid = display.lights = display.cameras = false;
+    viewer_->SetViewportDisplay(display);
     const auto sample = [&](const std::string& var) {
         const std::filesystem::path path = TempFile("var.png");
         viewer_->Capture(path, var);
@@ -478,6 +485,54 @@ TEST_F(ViewerTest, PanelsAndMenuItemsAreManagedByTitle) {
     EXPECT_THROW(viewer_->RemovePanel("Controls"), std::invalid_argument);
     viewer_->RemovePanel("Stats");
     EXPECT_NO_THROW(viewer_->RemovePanel("Stats"));
+    EXPECT_TRUE(viewer_->Step());
+}
+
+TEST_F(ViewerTest, ViewportTogglesShowOverlaysAndHudItemsList) {
+    const Path session("/__session/RenderSettings");
+    const auto shown = [&] {
+        std::istringstream words(GetToken(scene_, session, tokens::kOverlays, ""));
+        return std::set<std::string>(std::istream_iterator<std::string>(words), {});
+    };
+    scene_.GetOverlay("contacts").Line({0.0, 0.0, 0.0}, {1.0, 0.0, 0.0});
+    scene_.GetOverlay("labels").Line({0.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
+    std::vector<bool> switched;
+    const std::uint64_t toggle = viewer_->AddViewportToggle(
+        "Contacts", false, "contacts", [&](Viewer&, bool on) { switched.push_back(on); });
+    int asked = 0;
+    const std::uint64_t hud = viewer_->AddHudItem("Physics", [&](Viewer&) {
+        ++asked;
+        return std::string("1 ms");
+    });
+    viewer_->AddViewportMenuItem("Pause", [](Viewer&) {}, [](const Viewer&) { return true; });
+    viewer_->Step();
+    EXPECT_FALSE(shown().contains("contacts")) << "its toggle hides it";
+    EXPECT_TRUE(shown().contains("labels"));
+    EXPECT_TRUE(shown().contains("__viewport"));
+    EXPECT_GT(asked, 0);
+    EXPECT_FALSE(scene_.GetOverlay("__viewport").Empty()) << "the grid";
+
+    viewer_->SetViewportToggleShown(toggle, true);
+    ViewportDisplay display = viewer_->GetViewportDisplay();
+    display.overlays = false;
+    display.grid = false;
+    display.lights = false;
+    display.cameras = false;
+    viewer_->SetViewportDisplay(display);
+    viewer_->Step();
+    EXPECT_TRUE(viewer_->ViewportToggleShown(toggle));
+    EXPECT_EQ(switched, std::vector<bool>{true});
+    EXPECT_TRUE(shown().contains("contacts")) << "toggled overlays follow their toggle alone";
+    EXPECT_FALSE(shown().contains("labels"));
+    EXPECT_TRUE(scene_.GetOverlay("__viewport").Empty());
+
+    viewer_->SetHudItemShown(hud, false);
+    EXPECT_FALSE(viewer_->HudItemShown(hud));
+    viewer_->RemoveViewportItem(toggle);
+    viewer_->RemoveViewportItem(hud);
+    EXPECT_THROW(viewer_->ViewportToggleShown(toggle), std::invalid_argument);
+    EXPECT_THROW(viewer_->AddViewportToggle(""), std::invalid_argument);
+    EXPECT_THROW(viewer_->AddHudItem("x", nullptr), std::invalid_argument);
     EXPECT_TRUE(viewer_->Step());
 }
 

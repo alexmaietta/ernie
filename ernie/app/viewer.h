@@ -48,6 +48,25 @@ struct ViewerOptions {
                                       ///< empty picks the first one, as `ResolveRenderPrims`.
 };
 
+/// What the viewport draws over the scene, as Kit's viewport "show by type" menu (the eye) and
+/// heads-up display settings choose. None of it renders into the scene's own render products.
+struct ViewportDisplay {
+    bool lights = true;     ///< Every light's gizmo: its shape and the direction it shines.
+    bool cameras = true;    ///< Every scene camera's frustum.
+    bool grid = true;       ///< A grid on the ground (z = 0) with the x and y axes.
+    bool selection = true;  ///< The selection's outline.
+    bool overlays = true;   ///< The scene's overlays (`Scene::GetOverlay`).
+    bool hud = true;        ///< The heads-up display at the top left, with the items below.
+    bool hudFps = true;           ///< Frames per second and frame time.
+    bool hudDeviceMemory = true;  ///< GPU memory in use, the renderer's share and the total.
+    bool hudHostMemory = false;   ///< The process's resident memory.
+    bool hudResolution = true;    ///< The viewport image's size.
+    bool hudExposure = false;     ///< The metered exposure value and whether it is automatic.
+    bool hudTriangles = false;    ///< Triangles the last frame drew.
+
+    bool operator==(const ViewportDisplay&) const = default;
+};
+
 /// How serious a log message is.
 enum class LogLevel { Info, Warning, Error };
 
@@ -292,6 +311,44 @@ class Viewer {
     /// cycles through off, overlay and hidden line.
     std::optional<Wireframe> GetWireframe() const;
     void SetWireframe(std::optional<Wireframe> mode);
+
+    /// What the viewport draws over the scene and its heads-up display lists.
+    const ViewportDisplay& GetViewportDisplay() const;
+    void SetViewportDisplay(const ViewportDisplay& display);
+
+    /// Adds a toggle to the viewport's eye menu, after the built-in ones, for what an application
+    /// draws over the scene, such as physics contacts or labels. With `overlay`, the toggle shows
+    /// or hides that scene overlay in the viewport (whatever the Scene Overlays toggle says);
+    /// either way `changed`, if given, is told when the user switches it. Returns an id for
+    /// `ViewportToggleShown`, `SetViewportToggleShown` and `RemoveViewportItem`.
+    /// @throws std::invalid_argument for an empty label.
+    std::uint64_t AddViewportToggle(std::string label, bool shown = true, std::string overlay = {},
+                                    std::function<void(Viewer&, bool)> changed = {});
+    /// @throws std::invalid_argument for an id that is no toggle.
+    bool ViewportToggleShown(std::uint64_t id) const;
+    void SetViewportToggleShown(std::uint64_t id, bool shown);
+
+    /// Adds a line to the viewport's heads-up display, "label: value" with the text `value`
+    /// returns (asked a few times a second), such as a physics step's time; the eye menu's Heads
+    /// Up Display submenu toggles it. Returns an id for `HudItemShown`, `SetHudItemShown` and
+    /// `RemoveViewportItem`.
+    /// @throws std::invalid_argument for an empty label or no `value`.
+    std::uint64_t AddHudItem(std::string label, std::function<std::string(Viewer&)> value,
+                             bool shown = true);
+    /// @throws std::invalid_argument for an id that is no heads-up display item.
+    bool HudItemShown(std::uint64_t id) const;
+    void SetHudItemShown(std::uint64_t id, bool shown);
+
+    /// Adds `label` to the viewport's settings menu (its leftmost pill), running `action` when
+    /// chosen; with `checked`, the item shows a check mark while it returns true. Returns an id
+    /// for `RemoveViewportItem`.
+    /// @throws std::invalid_argument for an empty label or no `action`.
+    std::uint64_t AddViewportMenuItem(std::string label, std::function<void(Viewer&)> action,
+                                      std::function<bool(const Viewer&)> checked = {});
+
+    /// Removes the viewport toggle, heads-up display item or viewport menu item with id `id`;
+    /// unknown ids are ignored.
+    void RemoveViewportItem(std::uint64_t id);
 
     /// The RenderSettings prim the viewport renders with.
     const Path& Settings() const;

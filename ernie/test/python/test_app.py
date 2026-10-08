@@ -110,6 +110,26 @@ def test_widget_panels_and_menus(viewer):
         panel.set(slider, True)
     viewer.add_menu_item("Tools", "Reset", lambda v: None)
     assert viewer.step()
+
+    # The viewport's eye menu, heads-up display and settings menu take items too.
+    switched = []
+    toggle = viewer.add_viewport_toggle("Contacts", False, "contacts",
+                                        lambda v, on: switched.append(on))
+    hud = viewer.add_hud_item("Physics", lambda v: "1 ms")
+    viewer.add_viewport_menu_item("Pause", lambda v: None, lambda v: True)
+    display = viewer.viewport_display
+    display.grid = False
+    display.hud_triangles = True
+    viewer.viewport_display = display
+    assert viewer.viewport_display == display
+    viewer.set_viewport_toggle_shown(toggle, True)
+    assert switched == [True] and viewer.viewport_toggle_shown(toggle)
+    assert viewer.step()
+    viewer.set_hud_item_shown(hud, False)
+    assert not viewer.hud_item_shown(hud)
+    viewer.remove_viewport_item(toggle)
+    with pytest.raises(ValueError):
+        viewer.viewport_toggle_shown(toggle)
     assert panel.title == "Sim"
     viewer.remove_panel("Sim")
 
@@ -245,6 +265,9 @@ def test_auto_exposure_keys_bright_scenes_to_middle_grey():
     except RuntimeError as error:
         pytest.skip(f"No Vulkan device: {error}")
     assert viewer.exposure == app.Exposure.DEFAULT and viewer.auto_exposing
+    display = viewer.viewport_display  # the sun's gizmo would cover the centre
+    display.grid = display.lights = False
+    viewer.viewport_display = display
     for _ in range(30):  # long enough to adapt, at the hidden viewer's frame times
         viewer.step()
     assert viewer.metered_ev == pytest.approx(math.log2(0.5 * 100000.0 / math.pi * 8.0), abs=1.0)

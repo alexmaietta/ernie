@@ -33,15 +33,22 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <deque>
 #include <fstream>
 #include <iterator>
 #include <limits>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
+
+#if defined(__linux__)
+#include <unistd.h>
+#endif
 
 extern "C" {
 extern const unsigned char kErnieFont_inter[];
@@ -62,6 +69,16 @@ constexpr const char* kDockSpace = "ErnieDockSpace";
 /// The session's overlay outlining the selection; overlays named with a leading "__" are the
 /// viewer's own, which the Overlays panel hides.
 constexpr const char* kSelectionOverlay = "__selection";
+/// The session overlay of what the viewport's eye menu shows: light and camera gizmos, the grid.
+constexpr const char* kViewportOverlay = "__viewport";
+/// Seconds between updates of the heads-up display's figures, so they stay readable.
+constexpr double kHudRefresh = 0.25;
+/// Light gizmos' lamp yellow, selected and not.
+constexpr glm::vec4 kLampColor{0.98f, 0.82f, 0.30f, 1.0f};
+constexpr glm::vec4 kLampDimColor{0.78f, 0.68f, 0.36f, 0.75f};
+/// Camera frusta's grey, and the grid's.
+constexpr glm::vec4 kCameraGizmoColor{0.72f, 0.76f, 0.78f, 0.8f};
+constexpr glm::vec4 kGridColor{0.55f, 0.58f, 0.60f, 0.35f};
 
 /// Pixels the mouse may move between press and release for a click (a pick) rather than a drag.
 constexpr float kClickSlop = 3.0f;
@@ -171,6 +188,51 @@ const char* LightingName(Lighting lighting) {
         return "Default Light";
     }
     return "";
+}
+
+/// A backend's name as menus show it: "raster" as "Raster".
+std::string DisplayName(std::string name) {
+    if (!name.empty()) {
+        name[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(name[0])));
+    }
+    return name;
+}
+
+/// `bytes` as Kit's heads-up display shows memory: GiB from one GiB, else MiB.
+std::string FormatBytes(std::uint64_t bytes) {
+    constexpr double kMiB = 1024.0 * 1024.0;
+    constexpr double kGiB = 1024.0 * kMiB;
+    char text[32];
+    const double value = static_cast<double>(bytes);
+    if (value >= kGiB) {
+        std::snprintf(text, sizeof(text), "%.2f GiB", value / kGiB);
+    } else {
+        std::snprintf(text, sizeof(text), "%.0f MiB", value / kMiB);
+    }
+    return text;
+}
+
+/// `count` with commas between thousands.
+std::string FormatCount(std::uint64_t count) {
+    std::string digits = std::to_string(count);
+    for (std::ptrdiff_t at = static_cast<std::ptrdiff_t>(digits.size()) - 3; at > 0; at -= 3) {
+        digits.insert(static_cast<std::size_t>(at), ",");
+    }
+    return digits;
+}
+
+/// The process's resident memory, where the platform tells.
+std::optional<std::uint64_t> HostResidentBytes() {
+#if defined(__linux__)
+    // statm: total and resident pages.
+    std::ifstream statm("/proc/self/statm");
+    std::uint64_t total = 0;
+    std::uint64_t resident = 0;
+    if (statm >> total >> resident) {
+        return resident * static_cast<std::uint64_t>(sysconf(_SC_PAGESIZE));
+    }
+#endif
+    return std::nullopt;
 }
 
 const char* WireframeName(std::optional<Wireframe> mode) {
@@ -318,6 +380,9 @@ struct Viewer::State {
     }
     Lighting lighting = Lighting::Stage;
     std::optional<Wireframe> wireframe;
+    ViewportDisplay display;
+    std::vector<std::string> hudLines;  ///< The heads-up display, as last refreshed.
+    double hudTime = -kHudRefresh;      ///< When `hudLines` was refreshed, in viewer seconds.
     Theme theme;
     float contentScale = 1.0f;
     std::vector<Path> selection;
@@ -367,6 +432,65 @@ struct Viewer::State {
     StatsPanel* stats = nullptr;
     std::size_t builtInPanels = 0;  ///< The first panels, which removing only hides.
     std::vector<MenuItem> menuItems;
+    struct ViewportToggle {
+        std::uint64_t id;
+        std::string label;
+        bool shown;
+        std::string overlay;
+        std::function<void(Viewer&, bool)> changed;
+    };
+    struct HudItem {
+        std::uint64_t id;
+        std::string label;
+        std::function<std::string(Viewer&)> value;
+        bool shown;
+    };
+    struct ViewportMenuItem {
+        std::uint64_t id;
+        std::string label;
+        std::function<void(Viewer&)> action;
+        std::function<bool(const Viewer&)> checked;
+    };
+    std::vector<ViewportToggle> viewportToggles;
+    std::vector<HudItem> hudItems;
+    std::vector<ViewportMenuItem> viewportMenuItems;
+
+    /// The overlays the viewport draws: the session's selection and eye-menu overlays, those of
+    /// applications' toggles while shown, and unless the eye menu hides them, the scene's others,
+    /// or those the settings name when they do.
+    std::string ShownOverlays(bool authored) const {
+        std::set<std::string, std::less<>> toggled;
+        std::string shown = std::string(kSelectionOverlay) + " " + kViewportOverlay;
+        for (const ViewportToggle& toggle : viewportToggles) {
+            if (toggle.overlay.empty()) {
+                continue;
+            }
+            toggled.insert(toggle.overlay);
+            if (toggle.shown) {
+                shown += " " + toggle.overlay;
+            }
+        }
+        if (!display.overlays) {
+            return shown;
+        }
+        std::vector<std::string> names = scene.OverlayNames();
+        if (authored) {
+            // The settings' names, separated by commas or spaces, with "*" for all.
+            std::string list = GetToken(scene, settingsSource, tokens::kOverlays, "");
+            std::replace(list.begin(), list.end(), ',', ' ');
+            std::istringstream words(list);
+            std::vector<std::string> named(std::istream_iterator<std::string>(words), {});
+            if (std::find(named.begin(), named.end(), "*") == named.end()) {
+                names = std::move(named);
+            }
+        }
+        for (const std::string& name : names) {
+            if (name != kSelectionOverlay && name != kViewportOverlay && !toggled.contains(name)) {
+                shown += " " + name;
+            }
+        }
+        return shown;
+    }
 
     std::uint64_t frames = 0;
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
@@ -868,9 +992,9 @@ struct Viewer::State {
         DrawToolbar(origin, size);
         DrawToolStrip(origin);
         if (!renderError.empty()) {
-            // Above the HUD at the bottom left.
+            // At the bottom left.
             ImGui::SetCursorScreenPos(
-                ImVec2(origin.x + 12.0f, origin.y + size.y - 3.5f * ImGui::GetFrameHeight()));
+                ImVec2(origin.x + 12.0f, origin.y + size.y - 2.0f * ImGui::GetFrameHeight()));
             ImGui::TextColored(ToImVec4(theme.error), "%s", renderError.c_str());
         }
         ImGui::End();
@@ -940,9 +1064,10 @@ struct Viewer::State {
     }
 
     /// Draws the light at `path` (placed by `world`) as Kit's light manipulators show one: its
-    /// emitting shape and the direction it shines, with a spot's cone. Returns false for prims
-    /// that are no light. Sizes for points and directions follow the view's distance.
-    bool DrawLightGizmo(Overlay& overlay, const Path& path, const glm::dmat4& world) {
+    /// emitting shape and the direction it shines, with a spot's cone, in `style`. Returns false
+    /// for prims that are no light. Sizes for points and directions follow the view's distance.
+    bool DrawLightGizmo(Overlay& overlay, const Path& path, const glm::dmat4& world,
+                        const OverlayStyle& style) {
         const std::string& type = scene.TypeOf(path);
         const bool sphere = type == tokens::kSphereLight;
         const bool rect = type == tokens::kRectLight;
@@ -951,10 +1076,6 @@ struct Viewer::State {
         if (!sphere && !rect && !disk && !distant) {
             return false;
         }
-        OverlayStyle style;
-        style.color = {0.98f, 0.82f, 0.30f, 1.0f};  // lamp yellow
-        style.width = 1.5f * contentScale;
-        style.depth = OverlayDepth::XRay;
         const double reach = 0.12 * static_cast<double>(controller.distance);
         const glm::dvec3 centre(world[3]);
         const glm::dvec3 x = glm::normalize(glm::dvec3(world[0]));
@@ -1013,6 +1134,7 @@ struct Viewer::State {
     /// prim's extent as a box, or its axes for other prims without one (cameras, transforms).
     void UpdateSelectionOverlay() {
         Overlay& overlay = scene.GetOverlay(kSelectionOverlay);
+        overlay.SetVisible(display.selection);
         if (selection.empty() && overlay.Empty()) {
             return;
         }
@@ -1021,12 +1143,15 @@ struct Viewer::State {
         style.color = theme.accent;
         style.width = 2.0f * contentScale;
         style.depth = OverlayDepth::XRay;
+        OverlayStyle lamp = style;
+        lamp.color = kLampColor;
+        lamp.width = 1.5f * contentScale;
         for (const Path& path : selection) {
             if (!scene.Has(path) || path.IsRoot()) {
                 continue;
             }
             const glm::dmat4 world = scene.WorldTransform(path);
-            if (DrawLightGizmo(overlay, path, world)) {
+            if (DrawLightGizmo(overlay, path, world, lamp)) {
                 continue;
             }
             if (const std::optional<Bounds3> extent = LocalBounds(path)) {
@@ -1035,6 +1160,119 @@ struct Viewer::State {
                 overlay.Axes(world, 1.0, style);
             }
         }
+    }
+
+    /// Draws what the eye menu shows over the scene into the viewport's session overlay: the
+    /// grid, every light's gizmo and every scene camera's frustum but the one looked through.
+    /// The selection's outline draws selected lights brighter.
+    void UpdateViewportOverlay() {
+        Overlay& overlay = scene.GetOverlay(kViewportOverlay);
+        if (!display.grid && !display.lights && !display.cameras) {
+            if (!overlay.Empty()) {
+                overlay.Clear();
+            }
+            return;
+        }
+        overlay.Clear();
+        if (display.grid) {
+            DrawGrid(overlay);
+        }
+        const auto selected = [&](const Path& path) {
+            return display.selection &&
+                   std::find(selection.begin(), selection.end(), path) != selection.end();
+        };
+        OverlayStyle style;
+        style.width = 1.0f * contentScale;
+        style.depth = OverlayDepth::XRay;
+        if (display.lights) {
+            style.color = kLampDimColor;
+            for (const std::string_view type : {tokens::kDistantLight, tokens::kSphereLight,
+                                                tokens::kRectLight, tokens::kDiskLight}) {
+                for (const Path& path : scene.Prims(type)) {
+                    if (!IsSessionPath(path) && !selected(path)) {
+                        DrawLightGizmo(overlay, path, scene.WorldTransform(path), style);
+                    }
+                }
+            }
+        }
+        if (display.cameras) {
+            style.color = kCameraGizmoColor;
+            for (const Path& path : scene.Prims(tokens::kCamera)) {
+                if (!IsSessionPath(path) && path != activeCamera) {
+                    DrawCameraFrustum(overlay, path, style);
+                }
+            }
+        }
+    }
+
+    /// Kit's ground grid: lines a power of ten apart suiting the view's distance, around the
+    /// point the view orbits, with the x axis in red and the y axis in green through the origin.
+    void DrawGrid(Overlay& overlay) {
+        constexpr int kLines = 20;  // to each side of the centre
+        const double step = std::pow(
+            10.0, std::floor(std::log10(std::max(0.25 * controller.distance, 1e-3))));
+        const glm::dvec2 centre = glm::round(glm::dvec2(controller.target) / step) * step;
+        const double half = kLines * step;
+        std::vector<glm::dvec3> endpoints;
+        endpoints.reserve(8 * kLines + 4);
+        for (int k = -kLines; k <= kLines; ++k) {
+            const double x = centre.x + k * step;
+            const double y = centre.y + k * step;
+            // The axes draw in their own colours.
+            if (std::abs(x) > 0.5 * step) {
+                endpoints.emplace_back(x, centre.y - half, 0.0);
+                endpoints.emplace_back(x, centre.y + half, 0.0);
+            }
+            if (std::abs(y) > 0.5 * step) {
+                endpoints.emplace_back(centre.x - half, y, 0.0);
+                endpoints.emplace_back(centre.x + half, y, 0.0);
+            }
+        }
+        OverlayStyle style;
+        style.color = kGridColor;
+        style.width = 1.0f * contentScale;
+        overlay.Lines(endpoints, style);
+        style.width = 1.5f * contentScale;
+        if (std::abs(centre.y) <= half) {
+            style.color = {0.80f, 0.32f, 0.30f, 0.8f};
+            overlay.Line({centre.x - half, 0.0, 0.0}, {centre.x + half, 0.0, 0.0}, style);
+        }
+        if (std::abs(centre.x) <= half) {
+            style.color = {0.42f, 0.72f, 0.34f, 0.8f};
+            overlay.Line({0.0, centre.y - half, 0.0}, {0.0, centre.y + half, 0.0}, style);
+        }
+    }
+
+    /// The frustum of the camera at `path` as a pyramid from its eye, its size following the
+    /// view's distance, with a triangle over its top edge showing which way is up.
+    void DrawCameraFrustum(Overlay& overlay, const Path& path, const OverlayStyle& style) {
+        Camera camera;
+        try {
+            camera = CameraOf(scene, path, ViewportWidth(), ViewportHeight());
+        } catch (const std::exception&) {
+            return;  // a camera that cannot resolve draws nothing
+        }
+        const double depth = 0.06 * static_cast<double>(controller.distance);
+        const double up = depth * std::tan(0.5 * camera.VerticalFov());
+        const double side = up * camera.width / std::max(camera.height, 1u);
+        const glm::dmat4& world = camera.transform;
+        const auto at = [&](double x, double y, double z) {
+            return glm::dvec3(world * glm::dvec4(x, y, z, 1.0));
+        };
+        // Cameras look down their -z axis with +y up.
+        const glm::dvec3 eye = at(0.0, 0.0, 0.0);
+        const glm::dvec3 corners[] = {at(-side, -up, -depth), at(side, -up, -depth),
+                                      at(side, up, -depth), at(-side, up, -depth)};
+        const glm::dvec3 endpoints[] = {
+            eye,        corners[0], eye,        corners[1], eye,        corners[2],
+            eye,        corners[3], corners[0], corners[1], corners[1], corners[2],
+            corners[2], corners[3], corners[3], corners[0]};
+        overlay.Lines(endpoints, style);
+        const glm::dvec3 roof[] = {at(-0.5 * side, 1.15 * up, -depth),
+                                   at(0.0, 1.6 * up, -depth),
+                                   at(0.5 * side, 1.15 * up, -depth),
+                                   at(-0.5 * side, 1.15 * up, -depth)};
+        overlay.Polyline(roof, style);
     }
 
     void HandleNavigation(bool hovered, bool active, float height) {
@@ -1183,9 +1421,291 @@ struct Viewer::State {
         ImGui::PopStyleVar();
     }
 
-    /// The viewport's toolbar as Kit draws it: pills over the image, renderer, camera, shown var
-    /// and wireframe at the top left, the lighting at the top right, and a small HUD of exposure,
-    /// size and frame rate at the bottom left.
+    /// Kit's viewport settings menu: frame pacing, exposure, the perspective camera's lens and
+    /// framing, then applications' items (`AddViewportMenuItem`).
+    void DrawSettingsMenu() {
+        ImGui::SeparatorText("Viewport");
+        bool vsync = self.GetVsync();
+        if (ImGui::MenuItem("Vsync", nullptr, &vsync)) {
+            self.SetVsync(vsync);
+        }
+        ImGui::MenuItem("Gizmo in Local Axes", nullptr, &gizmoLocal);
+        ImGui::SeparatorText("Exposure");
+        const std::pair<Viewer::Exposure, const char*> modes[] = {
+            {Viewer::Exposure::Default, "Default"},
+            {Viewer::Exposure::Auto, "Automatic"},
+            {Viewer::Exposure::Camera, "Camera's Own"}};
+        for (const auto& [mode, name] : modes) {
+            if (ImGui::MenuItem(name, nullptr, exposure == mode)) {
+                exposure = mode;
+            }
+        }
+        float stops = static_cast<float>(compensation);
+        ImGui::SetNextItemWidth(160.0f * contentScale);
+        if (ImGui::SliderFloat("Compensation", &stops, -6.0f, 6.0f, "%+.1f EV")) {
+            compensation = stops;
+        }
+        ImGui::SeparatorText("Camera");
+        const bool perspective = activeCamera == PerspectiveCamera();
+        ImGui::BeginDisabled(!perspective);
+        float fov = glm::degrees(controller.verticalFov);
+        ImGui::SetNextItemWidth(160.0f * contentScale);
+        if (ImGui::SliderFloat("Vertical FOV", &fov, 5.0f, 120.0f, "%.0f deg")) {
+            controller.verticalFov = glm::radians(fov);
+            WriteActiveCamera();
+        }
+        ImGui::EndDisabled();
+        if (ImGui::MenuItem("Frame Selection", "F", false, !selection.empty())) {
+            self.Frame(selection);
+        }
+        if (ImGui::MenuItem("Frame All")) {
+            self.Frame();
+        }
+        if (!viewportMenuItems.empty()) {
+            ImGui::Separator();
+            // Copied: an action may add or remove items.
+            const std::vector<ViewportMenuItem> items = viewportMenuItems;
+            for (const ViewportMenuItem& item : items) {
+                const bool checked = item.checked && item.checked(self);
+                if (ImGui::MenuItem(item.label.c_str(), nullptr, checked)) {
+                    item.action(self);
+                }
+            }
+        }
+    }
+
+    /// Kit's eye menu: what the viewport draws over the scene, applications' toggles
+    /// (`AddViewportToggle`), and the heads-up display's items.
+    void DrawShowMenu() {
+        // Toggles stay open, so several switch at once.
+        ImGui::PushItemFlag(ImGuiItemFlags_AutoClosePopups, false);
+        ImGui::SeparatorText("Show By Type");
+        ImGui::MenuItem("Lights", nullptr, &display.lights);
+        ImGui::MenuItem("Cameras", nullptr, &display.cameras);
+        ImGui::SeparatorText("Show");
+        ImGui::MenuItem("Grid", nullptr, &display.grid);
+        ImGui::MenuItem("Selection Outline", nullptr, &display.selection);
+        ImGui::MenuItem("Scene Overlays", nullptr, &display.overlays);
+        if (!viewportToggles.empty()) {
+            ImGui::Separator();
+            for (std::size_t i = 0; i < viewportToggles.size(); ++i) {
+                bool shown = viewportToggles[i].shown;
+                if (ImGui::MenuItem(viewportToggles[i].label.c_str(), nullptr, &shown)) {
+                    self.SetViewportToggleShown(viewportToggles[i].id, shown);
+                }
+            }
+        }
+        ImGui::Separator();
+        if (ImGui::BeginMenu("Heads Up Display")) {
+            ImGui::MenuItem("Show", nullptr, &display.hud);
+            ImGui::Separator();
+            ImGui::BeginDisabled(!display.hud);
+            ImGui::MenuItem("FPS", nullptr, &display.hudFps);
+            ImGui::MenuItem("Device Memory", nullptr, &display.hudDeviceMemory);
+            ImGui::MenuItem("Host Memory", nullptr, &display.hudHostMemory);
+            ImGui::MenuItem("Resolution", nullptr, &display.hudResolution);
+            ImGui::MenuItem("Exposure", nullptr, &display.hudExposure);
+            ImGui::MenuItem("Triangles", nullptr, &display.hudTriangles);
+            for (HudItem& item : hudItems) {
+                ImGui::MenuItem(item.label.c_str(), nullptr, &item.shown);
+            }
+            ImGui::EndDisabled();
+            ImGui::EndMenu();
+        }
+        ImGui::PopItemFlag();
+        // A switch shows in the heads-up display at once.
+        hudTime = -kHudRefresh;
+    }
+
+    /// Kit's renderer menu: the backends, the rendering mode (wireframe) and the render settings.
+    void DrawRendererMenu() {
+        ImGui::SeparatorText("Renderer");
+        for (const std::string& name : RenderBackends()) {
+            if (ImGui::MenuItem(DisplayName(name).c_str(), nullptr, name == renderer) &&
+                name != renderer) {
+                try {
+                    self.SetRenderer(name);
+                } catch (const std::exception& error) {
+                    renderError = error.what();
+                    self.Log(LogLevel::Error, error.what());
+                }
+            }
+        }
+        ImGui::SeparatorText("Rendering Mode");
+        for (const std::optional<Wireframe> mode :
+             {std::optional<Wireframe>(), std::optional(Wireframe::Off),
+              std::optional(Wireframe::Overlay), std::optional(Wireframe::HiddenLine)}) {
+            const char* name = mode ? WireframeName(mode) : "From Render Settings";
+            if (ImGui::MenuItem(name, mode ? nullptr : "Z cycles", mode == wireframe)) {
+                wireframe = mode;
+            }
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Render Settings...")) {
+            for (const auto& panel : panels) {
+                if (panel->Title() == "Settings") {
+                    panel->SetVisible(true);
+                    ImGui::SetWindowFocus(panel->Title().c_str());
+                }
+            }
+        }
+    }
+
+    /// Kit's camera menu: the viewer's perspective camera, it looking from the top, front or
+    /// right, the scene's cameras, and a new camera where the view is.
+    void DrawCameraMenu() {
+        if (ImGui::MenuItem("Perspective", nullptr, activeCamera == PerspectiveCamera())) {
+            SetActive(PerspectiveCamera());
+        }
+        const struct {
+            const char* name;
+            float yaw;
+            float pitch;
+        } views[] = {{"Top", 0.0f, OrbitController::kMaxPitch},
+                     {"Front", 0.0f, OrbitController::kMinPitch},
+                     {"Right", glm::half_pi<float>(), OrbitController::kMinPitch}};
+        for (const auto& view : views) {
+            if (ImGui::MenuItem(view.name)) {
+                if (activeCamera != PerspectiveCamera()) {
+                    SetActive(PerspectiveCamera());
+                }
+                controller.yaw = view.yaw;
+                controller.pitch = view.pitch;
+                WriteActiveCamera();
+            }
+        }
+        const std::vector<Path> cameras = ViewableCameras(scene);
+        if (cameras.size() > 1) {
+            ImGui::SeparatorText("Cameras");
+            for (const Path& camera : cameras) {
+                if (camera == PerspectiveCamera()) {
+                    continue;
+                }
+                if (ImGui::MenuItem(Label(camera).c_str(), nullptr, camera == activeCamera)) {
+                    SetActive(camera);
+                }
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s", camera.String().c_str());
+                }
+            }
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Create Camera from View")) {
+            Path path("/Camera");
+            for (int k = 1; scene.Has(path); ++k) {
+                path = Path("/Camera_" + std::to_string(k));
+            }
+            self.CameraFromView(path);
+            SetSelection({path});
+        }
+    }
+
+    /// Refreshes the heads-up display's lines a few times a second: Kit's frame rate, memory and
+    /// resolution, and applications' items.
+    void RefreshHud() {
+        if (frameInfo.time - hudTime < kHudRefresh) {
+            return;
+        }
+        hudTime = frameInfo.time;
+        hudLines.clear();
+        char line[192];
+        if (display.hudFps) {
+            const double fps = std::max(static_cast<double>(ImGui::GetIO().Framerate), 1e-3);
+            std::snprintf(line, sizeof(line), "FPS: %.1f, Frame time: %.2f ms", fps,
+                          1000.0 / fps);
+            hudLines.emplace_back(line);
+        }
+        if (display.hudDeviceMemory) {
+            const auto [used, total] = DeviceMemory();
+            hudLines.push_back("Device Memory: " + FormatBytes(used) + " / " +
+                               FormatBytes(total) + " (renderer " +
+                               FormatBytes(delegate->Stats().gpuBytes) + ")");
+        }
+        if (display.hudHostMemory) {
+            const std::optional<std::uint64_t> bytes = HostResidentBytes();
+            hudLines.push_back("Host Memory: " + (bytes ? FormatBytes(*bytes) : "unknown"));
+        }
+        if (display.hudResolution) {
+            std::snprintf(line, sizeof(line), "Resolution: %u x %u", ViewportWidth(),
+                          ViewportHeight());
+            hudLines.emplace_back(line);
+        }
+        if (display.hudExposure) {
+            if (const std::optional<double> ev = self.MeteredEv()) {
+                std::snprintf(line, sizeof(line), "Exposure: EV %.1f%s, %+.1f stops", *ev,
+                              AutoExposing() ? " (auto)" : "", autoStops.value_or(0.0) +
+                                                                   compensation);
+            } else {
+                std::snprintf(line, sizeof(line), "Exposure: not metered");
+            }
+            hudLines.emplace_back(line);
+        }
+        if (display.hudTriangles) {
+            hudLines.push_back("Triangles: " + FormatCount(delegate->Stats().triangles));
+        }
+        for (const HudItem& item : hudItems) {
+            if (item.shown) {
+                hudLines.push_back(item.label + ": " + item.value(self));
+            }
+        }
+    }
+
+    /// GPU memory of the device-local heaps: what is in use (the whole process's where the
+    /// driver reports budgets, VK_EXT_memory_budget, else the viewer's own allocations) and the
+    /// heaps' size.
+    std::pair<std::uint64_t, std::uint64_t> DeviceMemory() const {
+        const VkPhysicalDeviceMemoryProperties* properties = nullptr;
+        vmaGetMemoryProperties(gpu->Allocator(), &properties);
+        std::array<VmaBudget, VK_MAX_MEMORY_HEAPS> budgets{};
+        vmaGetHeapBudgets(gpu->Allocator(), budgets.data());
+        std::uint64_t used = 0;
+        std::uint64_t total = 0;
+        for (std::uint32_t heap = 0; heap < properties->memoryHeapCount; ++heap) {
+            if ((properties->memoryHeaps[heap].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) != 0) {
+                used += budgets[heap].usage;
+                total += properties->memoryHeaps[heap].size;
+            }
+        }
+        return {used, total};
+    }
+
+    /// The heads-up display as Kit draws it: lines of text on a translucent box at `corner`.
+    void DrawHud(const ImVec2& corner) {
+        if (!display.hud) {
+            return;
+        }
+        RefreshHud();
+        if (hudLines.empty()) {
+            return;
+        }
+        const float pad = 6.0f * contentScale;
+        const float lineHeight = ImGui::GetTextLineHeight();
+        float width = 0.0f;
+        for (const std::string& text : hudLines) {
+            width = std::max(width, ImGui::CalcTextSize(text.c_str()).x);
+        }
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        ImVec4 box = ToImVec4(theme.overlay);
+        box.w *= 0.85f;
+        draw->AddRectFilled(corner,
+                            ImVec2(corner.x + width + 2.0f * pad,
+                                   corner.y + lineHeight * hudLines.size() + 2.0f * pad),
+                            ImGui::GetColorU32(box), 4.0f * contentScale);
+        ImVec2 at(corner.x + pad, corner.y + pad);
+        for (const std::string& text : hudLines) {
+            // The label muted, its value bright.
+            const std::size_t colon = text.find(": ");
+            const std::string label = text.substr(0, colon == std::string::npos ? 0 : colon + 2);
+            draw->AddText(at, ImGui::GetColorU32(ToImVec4(theme.textMuted)), label.c_str());
+            draw->AddText(ImVec2(at.x + ImGui::CalcTextSize(label.c_str()).x, at.y),
+                          ImGui::GetColorU32(ToImVec4(theme.text)), text.c_str() + label.size());
+            at.y += lineHeight;
+        }
+    }
+
+    /// The viewport's toolbar as Kit draws it, pills over the image: at the top left the settings
+    /// menu, the renderer, the eye menu of what shows and the shown render var; at the top right
+    /// the camera and the lighting; and the heads-up display below.
     void DrawToolbar(const ImVec2& origin, const ImVec2& size) {
         const float pad = 8.0f * contentScale;
         ImGui::SetCursorScreenPos(ImVec2(origin.x + pad, origin.y + pad));
@@ -1202,35 +1722,47 @@ struct Viewer::State {
         constexpr ImGuiComboFlags kPill =
             ImGuiComboFlags_WidthFitPreview | ImGuiComboFlags_NoArrowButton;
         const float comboWidth = 150.0f * contentScale;
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        const ImU32 textColor = ImGui::GetColorU32(ImGuiCol_Text);
 
-        const std::vector<std::string> renderers = RenderBackends();
-        const std::string rendererLabel = std::string(icons::kMonitor) + "  " + renderer;
-        if (ImGui::BeginCombo("##renderer", rendererLabel.c_str(), kPill)) {
-            for (const std::string& name : renderers) {
-                if (ImGui::Selectable(name.c_str(), name == renderer) && name != renderer) {
-                    try {
-                        self.SetRenderer(name);
-                    } catch (const std::exception& error) {
-                        renderError = error.what();
-                        self.Log(LogLevel::Error, error.what());
-                    }
-                }
+        // The settings menu: a pill drawn with Kit's three bars.
+        {
+            const ImVec2 corner = ImGui::GetCursorScreenPos();
+            const bool open = ImGui::BeginCombo("##settings", "   ", kPill);
+            if (open) {
+                DrawSettingsMenu();
+                ImGui::EndCombo();
             }
+            const float height = ImGui::GetFrameHeight();
+            const float half = 0.22f * height;
+            const ImVec2 centre(corner.x + 0.5f * (ImGui::CalcTextSize("   ").x +
+                                                   2.0f * ImGui::GetStyle().FramePadding.x),
+                                corner.y + 0.5f * height);
+            for (const float dy : {-0.6f, 0.0f, 0.6f}) {
+                draw->AddLine(ImVec2(centre.x - half, centre.y + dy * half),
+                              ImVec2(centre.x + half, centre.y + dy * half), textColor,
+                              1.5f * contentScale);
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Viewport settings");
+        }
+        ImGui::SameLine();
+
+        const std::string rendererLabel =
+            std::string(icons::kMonitor) + "  " + DisplayName(renderer);
+        if (ImGui::BeginCombo("##renderer", rendererLabel.c_str(), kPill)) {
+            DrawRendererMenu();
             ImGui::EndCombo();
         }
         ImGui::SameLine();
 
-        const std::string cameraLabel = std::string(icons::kCamera) + "  " + Label(activeCamera);
-        if (ImGui::BeginCombo("##camera", cameraLabel.c_str(), kPill)) {
-            for (const Path& camera : ViewableCameras(scene)) {
-                if (ImGui::Selectable(Label(camera).c_str(), camera == activeCamera)) {
-                    SetActive(camera);
-                }
-                if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("%s", camera.String().c_str());
-                }
-            }
+        if (ImGui::BeginCombo("##show", icons::kEye, kPill)) {
+            DrawShowMenu();
             ImGui::EndCombo();
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("What the viewport shows");
         }
         ImGui::SameLine();
         const std::string varLabel = std::string(icons::kImage) + "  " + viewVar;
@@ -1253,57 +1785,37 @@ struct Viewer::State {
         if (viewVar == render_vars::kSpectralRadiance) {
             DrawBandCombo(comboWidth);
         }
-        ImGui::SameLine();
-        const std::string wireLabel = std::string(icons::kBox) + "  " + WireframeName(wireframe);
-        if (ImGui::BeginCombo("##wireframe", wireLabel.c_str(), kPill)) {
-            for (const std::optional<Wireframe> mode :
-                 {std::optional<Wireframe>(), std::optional(Wireframe::Off),
-                  std::optional(Wireframe::Overlay), std::optional(Wireframe::HiddenLine)}) {
-                if (ImGui::Selectable(WireframeName(mode), mode == wireframe)) {
-                    wireframe = mode;
-                }
-            }
+
+        // The camera and the lighting at the top right, as Kit's "Perspective" and "Stage
+        // Lights".
+        const ImGuiStyle& style = ImGui::GetStyle();
+        const std::string cameraLabel = std::string(icons::kCamera) + "  " + Label(activeCamera);
+        const std::string lightLabel = std::string(icons::kSun) + "  " + LightingName(lighting);
+        const auto pillWidth = [&](const std::string& label) {
+            return ImGui::CalcTextSize(label.c_str()).x + 2.0f * style.FramePadding.x;
+        };
+        ImGui::SetCursorScreenPos(ImVec2(origin.x + size.x - pad - pillWidth(lightLabel) -
+                                             style.ItemSpacing.x - pillWidth(cameraLabel),
+                                         origin.y + pad));
+        if (ImGui::BeginCombo("##camera", cameraLabel.c_str(), kPill)) {
+            DrawCameraMenu();
             ImGui::EndCombo();
         }
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Wireframe (Z cycles)");
-        }
-
-        // The lighting, alone at the top right as Kit's "Stage Lights".
-        const ImGuiStyle& style = ImGui::GetStyle();
-        const std::string lightLabel = std::string(icons::kSun) + "  " + LightingName(lighting);
-        const float lightWidth = ImGui::CalcTextSize(lightLabel.c_str()).x + 2.0f * style.FramePadding.x;
-        ImGui::SetCursorScreenPos(ImVec2(origin.x + size.x - lightWidth - pad, origin.y + pad));
+        ImGui::SameLine();
         if (ImGui::BeginCombo("##lighting", lightLabel.c_str(), kPill)) {
             for (const Lighting mode : {Lighting::Stage, Lighting::Camera, Lighting::Default}) {
-                if (ImGui::Selectable(LightingName(mode), mode == lighting)) {
+                if (ImGui::MenuItem(LightingName(mode), nullptr, mode == lighting)) {
                     lighting = mode;
                 }
             }
             ImGui::EndCombo();
         }
-
-        // The HUD: exposure, image size and frame rate in a pill at the bottom left.
-        char info[96];
-        const std::optional<double> ev = self.MeteredEv();
-        char exposureText[32] = "";
-        if (ev) {
-            std::snprintf(exposureText, sizeof(exposureText), "EV %.1f%s   ", *ev,
-                          AutoExposing() ? " auto" : "");
-        }
-        std::snprintf(info, sizeof(info), "%s%u x %u   %.0f fps", exposureText, ViewportWidth(),
-                      ViewportHeight(), static_cast<double>(ImGui::GetIO().Framerate));
-        const ImVec2 text = ImGui::CalcTextSize(info);
-        const ImVec2 low(origin.x + pad, origin.y + size.y - pad - text.y - 2.0f * style.FramePadding.y);
-        const ImVec2 high(low.x + text.x + 2.0f * style.FramePadding.x,
-                          low.y + text.y + 2.0f * style.FramePadding.y);
-        ImDrawList* draw = ImGui::GetWindowDrawList();
-        draw->AddRectFilled(low, high, ImGui::GetColorU32(ToImVec4(theme.overlay)),
-                            theme.pillRounding * contentScale);
-        draw->AddText(ImVec2(low.x + style.FramePadding.x, low.y + style.FramePadding.y),
-                      ImGui::GetColorU32(ToImVec4(theme.textMuted)), info);
         ImGui::PopStyleVar(3);
         ImGui::PopStyleColor(4);
+
+        // The heads-up display under the toolbar, right of the tool strip.
+        DrawHud(ImVec2(origin.x + 2.0f * pad + 1.15f * ImGui::GetFrameHeight(),
+                       origin.y + 2.0f * pad + ImGui::GetFrameHeight()));
     }
 
     void DrawPanels() {
@@ -1387,13 +1899,11 @@ struct Viewer::State {
             // Exposure: metered every frame, for automatic exposure and the meter.
             overrides.emplace(tokens::kExposureCompensation, ExposureStops());
             overrides.emplace(tokens::kMeter, true);
-            // The selection's outline always shows, besides the overlays the settings choose.
+            // The eye menu's overlays and the selection's outline always show, besides the
+            // overlays the settings choose.
             UpdateSelectionOverlay();
-            overrides.emplace(tokens::kOverlays,
-                              authored(tokens::kOverlays)
-                                  ? GetToken(scene, settingsSource, tokens::kOverlays, "") + " " +
-                                        kSelectionOverlay
-                                  : std::string("*"));
+            UpdateViewportOverlay();
+            overrides.emplace(tokens::kOverlays, ShownOverlays(authored(tokens::kOverlays)));
             MirrorSettings(scene, settingsSource, SessionSettingsPath(), overrides, mirrored);
             delegate->Update(scene, SessionSettingsPath(), viewport->Extent());
             const RenderingTarget target = viewport->Prepare(commands, clear);
@@ -2167,6 +2677,99 @@ void Viewer::AddMenuItem(const std::string& menu, const std::string& label,
         throw std::invalid_argument("Menu items need a menu and a label");
     }
     state_->menuItems.push_back({menu, label, std::move(action)});
+}
+
+const ViewportDisplay& Viewer::GetViewportDisplay() const {
+    return state_->display;
+}
+
+void Viewer::SetViewportDisplay(const ViewportDisplay& display) {
+    state_->display = display;
+    state_->hudTime = -kHudRefresh;
+}
+
+std::uint64_t Viewer::AddViewportToggle(std::string label, bool shown, std::string overlay,
+                                        std::function<void(Viewer&, bool)> changed) {
+    if (label.empty()) {
+        throw std::invalid_argument("Viewport toggles need a label");
+    }
+    State& s = *state_;
+    const std::uint64_t id = s.nextCallback++;
+    s.viewportToggles.push_back(
+        {id, std::move(label), shown, std::move(overlay), std::move(changed)});
+    return id;
+}
+
+namespace {
+
+template <typename Items>
+auto& FindViewportItem(Items& items, std::uint64_t id, const char* kind) {
+    const auto found =
+        std::find_if(items.begin(), items.end(), [id](const auto& item) { return item.id == id; });
+    if (found == items.end()) {
+        throw std::invalid_argument("No " + std::string(kind) + " has id " + std::to_string(id));
+    }
+    return *found;
+}
+
+}  // namespace
+
+bool Viewer::ViewportToggleShown(std::uint64_t id) const {
+    return FindViewportItem(state_->viewportToggles, id, "viewport toggle").shown;
+}
+
+void Viewer::SetViewportToggleShown(std::uint64_t id, bool shown) {
+    auto& toggle = FindViewportItem(state_->viewportToggles, id, "viewport toggle");
+    if (toggle.shown == shown) {
+        return;
+    }
+    toggle.shown = shown;
+    if (toggle.changed) {
+        // Copied: the callback may remove the toggle.
+        const auto changed = toggle.changed;
+        changed(*this, shown);
+    }
+}
+
+std::uint64_t Viewer::AddHudItem(std::string label, std::function<std::string(Viewer&)> value,
+                                 bool shown) {
+    if (label.empty() || !value) {
+        throw std::invalid_argument("Heads-up display items need a label and a value");
+    }
+    State& s = *state_;
+    const std::uint64_t id = s.nextCallback++;
+    s.hudItems.push_back({id, std::move(label), std::move(value), shown});
+    s.hudTime = -kHudRefresh;
+    return id;
+}
+
+bool Viewer::HudItemShown(std::uint64_t id) const {
+    return FindViewportItem(state_->hudItems, id, "heads-up display item").shown;
+}
+
+void Viewer::SetHudItemShown(std::uint64_t id, bool shown) {
+    FindViewportItem(state_->hudItems, id, "heads-up display item").shown = shown;
+    state_->hudTime = -kHudRefresh;
+}
+
+std::uint64_t Viewer::AddViewportMenuItem(std::string label, std::function<void(Viewer&)> action,
+                                          std::function<bool(const Viewer&)> checked) {
+    if (label.empty() || !action) {
+        throw std::invalid_argument("Viewport menu items need a label and an action");
+    }
+    State& s = *state_;
+    const std::uint64_t id = s.nextCallback++;
+    s.viewportMenuItems.push_back({id, std::move(label), std::move(action), std::move(checked)});
+    return id;
+}
+
+void Viewer::RemoveViewportItem(std::uint64_t id) {
+    State& s = *state_;
+    const auto matches = [id](const auto& item) { return item.id == id; };
+    std::erase_if(s.viewportToggles, matches);
+    std::erase_if(s.hudItems, matches);
+    std::erase_if(s.viewportMenuItems, matches);
+    s.hudTime = -kHudRefresh;
 }
 
 void Viewer::SaveLayout(const std::filesystem::path& path) const {

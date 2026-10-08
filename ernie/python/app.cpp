@@ -1,5 +1,6 @@
 #include "bindings.h"
 
+#include <nanobind/operators.h>
 #include <nanobind/stl/array.h>
 #include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/function.h>
@@ -58,6 +59,12 @@ class Callable {
     template <typename... Args> void operator()(Viewer& viewer, Args&&... args) const {
         nb::gil_scoped_acquire gil;
         (*held_)(nb::cast(&viewer, nb::rv_policy::reference), std::forward<Args>(args)...);
+    }
+
+    /// Calls the callable with the viewer and converts what it returns to `Result`.
+    template <typename Result> Result Call(const Viewer& viewer) const {
+        nb::gil_scoped_acquire gil;
+        return nb::cast<Result>((*held_)(nb::cast(&viewer, nb::rv_policy::reference)));
     }
 
   private:
@@ -121,6 +128,26 @@ void BindApp(nb::module_& parent) {
         .def_ro("frame", &FrameInfo::frame, "Frames drawn before this one.")
         .def_ro("time", &FrameInfo::time, "Seconds since the viewer opened.")
         .def_ro("delta", &FrameInfo::delta, "Seconds since the previous frame.");
+
+    using app::ViewportDisplay;
+    nb::class_<ViewportDisplay>(m, "ViewportDisplay",
+                                "What the viewport draws over the scene (the eye menu) and its "
+                                "heads-up display lists. Assign a changed copy to "
+                                "Viewer.viewport_display.")
+        .def(nb::init<>())
+        .def_rw("lights", &ViewportDisplay::lights, "Every light's gizmo.")
+        .def_rw("cameras", &ViewportDisplay::cameras, "Every scene camera's frustum.")
+        .def_rw("grid", &ViewportDisplay::grid, "A grid on the ground (z = 0).")
+        .def_rw("selection", &ViewportDisplay::selection, "The selection's outline.")
+        .def_rw("overlays", &ViewportDisplay::overlays, "The scene's overlays.")
+        .def_rw("hud", &ViewportDisplay::hud, "The heads-up display.")
+        .def_rw("hud_fps", &ViewportDisplay::hudFps, "Frames per second and frame time.")
+        .def_rw("hud_device_memory", &ViewportDisplay::hudDeviceMemory, "GPU memory.")
+        .def_rw("hud_host_memory", &ViewportDisplay::hudHostMemory, "Resident memory.")
+        .def_rw("hud_resolution", &ViewportDisplay::hudResolution, "The image's size.")
+        .def_rw("hud_exposure", &ViewportDisplay::hudExposure, "The metered exposure value.")
+        .def_rw("hud_triangles", &ViewportDisplay::hudTriangles, "Triangles drawn.")
+        .def(nb::self == nb::self);
 
     nb::class_<WidgetPanel>(m, "WidgetPanel",
                             "A dockable panel of simple widgets; each calls its callback when the "
@@ -358,6 +385,60 @@ void BindApp(nb::module_& parent) {
             },
             nb::arg("menu"), nb::arg("label"), nb::arg("action"),
             "Adds `label` to the menu bar's `menu`; calls action(viewer).")
+        .def_prop_rw("viewport_display", &Viewer::GetViewportDisplay,
+                     &Viewer::SetViewportDisplay,
+                     "What the viewport draws over the scene and its heads-up display lists.")
+        .def(
+            "add_viewport_toggle",
+            [](Viewer& viewer, std::string label, bool shown, std::string overlay,
+               std::optional<nb::callable> changed) {
+                std::function<void(Viewer&, bool)> callback;
+                if (changed) {
+                    const Callable call(std::move(*changed));
+                    callback = [call](Viewer& v, bool on) { call(v, on); };
+                }
+                return viewer.AddViewportToggle(std::move(label), shown, std::move(overlay),
+                                                std::move(callback));
+            },
+            nb::arg("label"), nb::arg("shown") = true, nb::arg("overlay") = "",
+            nb::arg("changed").none() = nb::none(),
+            "Adds a toggle to the viewport's eye menu, such as for physics contacts or labels. "
+            "With `overlay`, it shows and hides that scene overlay in the viewport; "
+            "changed(viewer, shown) is told when the user switches it. Returns an id.")
+        .def("viewport_toggle_shown", &Viewer::ViewportToggleShown, nb::arg("id"))
+        .def("set_viewport_toggle_shown", &Viewer::SetViewportToggleShown, nb::arg("id"),
+             nb::arg("shown"))
+        .def(
+            "add_hud_item",
+            [](Viewer& viewer, std::string label, nb::callable value, bool shown) {
+                const Callable call(std::move(value));
+                return viewer.AddHudItem(
+                    std::move(label),
+                    [call](Viewer& v) { return call.Call<std::string>(v); }, shown);
+            },
+            nb::arg("label"), nb::arg("value"), nb::arg("shown") = true,
+            "Adds a line \"label: value(viewer)\" to the viewport's heads-up display, refreshed a "
+            "few times a second; value returns a str. Returns an id.")
+        .def("hud_item_shown", &Viewer::HudItemShown, nb::arg("id"))
+        .def("set_hud_item_shown", &Viewer::SetHudItemShown, nb::arg("id"), nb::arg("shown"))
+        .def(
+            "add_viewport_menu_item",
+            [](Viewer& viewer, std::string label, nb::callable action,
+               std::optional<nb::callable> checked) {
+                const Callable call(std::move(action));
+                std::function<bool(const Viewer&)> isChecked;
+                if (checked) {
+                    const Callable check(std::move(*checked));
+                    isChecked = [check](const Viewer& v) { return check.Call<bool>(v); };
+                }
+                return viewer.AddViewportMenuItem(
+                    std::move(label), [call](Viewer& v) { call(v); }, std::move(isChecked));
+            },
+            nb::arg("label"), nb::arg("action"), nb::arg("checked").none() = nb::none(),
+            "Adds `label` to the viewport's settings menu; calls action(viewer), and shows a "
+            "check while checked(viewer) returns True. Returns an id.")
+        .def("remove_viewport_item", &Viewer::RemoveViewportItem, nb::arg("id"),
+             "Removes a viewport toggle, heads-up display item or viewport menu item.")
         .def("save_layout", &Viewer::SaveLayout, nb::arg("path"))
         .def("load_layout", &Viewer::LoadLayout, nb::arg("path"))
         .def_prop_rw("theme", &Viewer::GetTheme, &Viewer::SetTheme);
