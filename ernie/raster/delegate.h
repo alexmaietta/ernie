@@ -174,7 +174,8 @@ class RasterDelegate : public RenderDelegate {
                      std::span<const SensorFilterStep> filters = {},
                      std::vector<glm::dmat4> poses = {}, std::vector<std::int32_t> worlds = {},
                      std::vector<std::string_view> vars = {},
-                     std::optional<glm::dmat4> posesParent = std::nullopt);
+                     std::optional<glm::dmat4> posesParent = std::nullopt,
+                     const std::optional<std::string>& overlays = std::nullopt);
     /// Takes the next `FrameUploads` slot for a frame, once the frame that last used it has
     /// finished; returns it.
     std::uint32_t BeginFrame();

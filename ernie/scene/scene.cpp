@@ -455,4 +455,34 @@ std::vector<Change> Scene::Changes(ChangeCursor& cursor) const {
     return changes;
 }
 
+Overlay& Scene::GetOverlay(std::string_view name) {
+    const auto found = overlays_.find(name);
+    if (found != overlays_.end()) {
+        return found->second;
+    }
+    return overlays_.emplace(std::string(name), Overlay()).first->second;
+}
+
+const Overlay* Scene::FindOverlay(std::string_view name) const {
+    const auto found = overlays_.find(name);
+    return found != overlays_.end() ? &found->second : nullptr;
+}
+
+bool Scene::RemoveOverlay(std::string_view name) {
+    const auto found = overlays_.find(name);
+    if (found == overlays_.end()) {
+        return false;
+    }
+    overlays_.erase(found);
+    return true;
+}
+
+std::vector<std::string> Scene::OverlayNames() const {
+    std::vector<std::string> names;
+    for (const auto& [name, overlay] : overlays_) {
+        names.push_back(name);
+    }
+    return names;
+}
+
 }  // namespace ernie

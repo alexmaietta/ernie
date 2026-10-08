@@ -138,6 +138,23 @@ TEST(FitCascades, HandlesAnOverheadSun) {
     EXPECT_GE(ndc.z, 0.0f);
 }
 
+TEST(WithShadows, GrowsTheBoxToWhereItsShadowsLand) {
+    // A 2 m box on the ground under a sun 45 degrees up towards -y: its top casts 2 m along +y.
+    const glm::vec3 toSun = glm::normalize(glm::vec3(0.0f, -1.0f, 1.0f));
+    const auto [low, high] = ernie::WithShadows({-1, -1, 0}, {1, 1, 2}, toSun);
+    EXPECT_NEAR(high.y, 3.0f, 1e-5f);
+    EXPECT_NEAR(low.y, -1.0f, 1e-5f);
+    EXPECT_NEAR(low.z, 0.0f, 1e-5f);
+    EXPECT_NEAR(high.z, 2.0f, 1e-5f);
+    // A grazing sun stretches it at most `maxLength` diagonals; one below the horizon not at all.
+    const glm::vec3 grazing = glm::normalize(glm::vec3(0.0f, -1.0f, 1e-3f));
+    const auto [grazingLow, grazingHigh] = ernie::WithShadows({-1, -1, 0}, {1, 1, 2}, grazing, 2.0f);
+    EXPECT_LE(grazingHigh.y, 1.0f + 2.0f * glm::length(glm::vec3(2, 2, 2)) + 1e-4f);
+    const auto [belowLow, belowHigh] =
+        ernie::WithShadows({-1, -1, 0}, {1, 1, 2}, glm::vec3(0.0f, 0.0f, -1.0f));
+    EXPECT_EQ(belowHigh, glm::vec3(1, 1, 2));
+}
+
 TEST(FitLightShadowViews, CoversTheSceneFromEachKindOfLight) {
     const glm::vec3 low(-10.0f, -10.0f, 0.0f);
     const glm::vec3 high(10.0f, 10.0f, 2.0f);

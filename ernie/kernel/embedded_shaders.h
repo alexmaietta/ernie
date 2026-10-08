@@ -20,12 +20,18 @@ extern const char kShadingSlang[];
 extern const char kSensorSlang[];
 extern const char kPresentSlang[];
 
+/// Debug drawing over the display image.
+extern const char kOverlaySlang[];
+
 /// The infinite ground plane's pass.
 extern const char kGroundSlang[];
 
 /// Hierarchical depth (Hi-Z) pyramid for occlusion culling.
 extern const char kHzbSlang[];
 extern const char kViewsSlang[];
+
+/// The visible depth range of a view, for sample distribution shadow maps.
+extern const char kDepthRangeSlang[];
 
 /// GPU instance culling for mesh draws.
 extern const char kCullSlang[];

@@ -40,10 +40,29 @@ std::vector<float> PracticalSplits(float nearPlane, float farPlane, int count, f
     return splits;
 }
 
+std::pair<glm::vec3, glm::vec3> WithShadows(const glm::vec3& low, const glm::vec3& high,
+                                            const glm::vec3& toSun, float maxLength) {
+    if (!(toSun.z > 1e-3f)) {
+        return {low, high};
+    }
+    const float reach = maxLength * glm::length(high - low);
+    glm::vec3 grownLow = low;
+    glm::vec3 grownHigh = high;
+    for (int i = 0; i < 8; ++i) {
+        const glm::vec3 corner((i & 1) ? high.x : low.x, (i & 2) ? high.y : low.y,
+                               (i & 4) ? high.z : low.z);
+        const float along = std::min((corner.z - low.z) / toSun.z, reach);
+        const glm::vec3 landing = corner - toSun * along;
+        grownLow = glm::min(grownLow, landing);
+        grownHigh = glm::max(grownHigh, landing);
+    }
+    return {grownLow, grownHigh};
+}
+
 std::vector<ShadowCascade> FitCascades(const CameraView& camera, float shadowDistance,
                                        const glm::vec3& toSun, const glm::vec3& sceneMin,
                                        const glm::vec3& sceneMax, int count, float lambda,
-                                       std::uint32_t resolution) {
+                                       std::uint32_t resolution, float splitNear) {
     const glm::vec3 up =
         std::fabs(toSun.z) > 0.99f ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(0.0f, 0.0f, 1.0f);
     const glm::mat4 lightView = glm::lookAtRH(toSun, glm::vec3(0.0f), up);
@@ -60,8 +79,9 @@ std::vector<ShadowCascade> FitCascades(const CameraView& camera, float shadowDis
     const float depthPadding = 0.01f * (sceneFar - sceneNear) + 1e-3f;
 
     const float res = static_cast<float>(resolution);
-    const std::vector<float> splits = PracticalSplits(
-        camera.nearPlane, std::max(shadowDistance, camera.nearPlane * 1.001f), count, lambda);
+    const float start = std::max(splitNear, camera.nearPlane);
+    const std::vector<float> splits =
+        PracticalSplits(start, std::max(shadowDistance, start * 1.001f), count, lambda);
     std::vector<ShadowCascade> cascades;
     for (int c = 0; c < count; ++c) {
         ShadowCascade cascade;

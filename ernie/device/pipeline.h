@@ -115,6 +115,9 @@ struct GraphicsPipelineDesc {
     VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
     VkCompareOp depthCompare = VK_COMPARE_OP_LESS;
     float depthBiasSlope = 0.0f;  ///< Slope-scaled depth bias, e.g. for shadow maps.
+    /// Blend colour over the attachment by its alpha (source over), keeping the attachment's
+    /// alpha; otherwise replace it.
+    bool alphaBlend = false;
 };
 
 /// A graphics pipeline for dynamic rendering, with dynamic viewport and scissor and no culling.

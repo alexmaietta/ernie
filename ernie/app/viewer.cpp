@@ -874,6 +874,18 @@ struct Viewer::State {
             if (wireframe) {
                 overrides.emplace(tokens::kWireframe, std::string(WireframeToken(*wireframe)));
             }
+            // The viewport favours sharp shadows over images that repeat exactly, and shows
+            // every overlay, unless the scene's settings choose.
+            const auto authored = [&](std::string_view attribute) {
+                return !settingsSource.IsEmpty() &&
+                       scene.Get(settingsSource, attribute) != nullptr;
+            };
+            if (!authored(tokens::kShadowFit)) {
+                overrides.emplace(tokens::kShadowFit, std::string(tokens::kVisible));
+            }
+            if (!authored(tokens::kOverlays)) {
+                overrides.emplace(tokens::kOverlays, std::string("*"));
+            }
             MirrorSettings(scene, settingsSource, SessionSettingsPath(), overrides, mirrored);
             delegate->Update(scene, SessionSettingsPath(), viewport->Extent());
             const RenderingTarget target = viewport->Prepare(commands, clear);

@@ -231,6 +231,10 @@ inline constexpr std::string_view kWireframe = "ernie:wireframe";
 inline constexpr std::string_view kOff = "off";
 inline constexpr std::string_view kOverlay = "overlay";
 inline constexpr std::string_view kHiddenLine = "hiddenLine";
+/// string, on a RenderProduct or else its RenderSettings: the overlays (`Scene::GetOverlay`) drawn
+/// over its LdrColor, "*" for all, else names separated by commas or spaces; none by default, so
+/// observations stay free of debug drawing.
+inline constexpr std::string_view kOverlays = "ernie:overlays";
 /// token: how the rasterizer culls what lies outside a view: "off", "cpu" (whole draws) or
 /// "gpu" (whole draws, then every instance on the GPU; the default).
 inline constexpr std::string_view kCulling = "ernie:culling";
@@ -261,6 +265,12 @@ inline constexpr std::string_view kShadowWorldFit = "ernie:shadows:worldFit";
 inline constexpr std::string_view kScene = "scene";
 inline constexpr std::string_view kWorldFit = "world";
 inline constexpr std::string_view kShadowWorldMargin = "ernie:shadows:worldMargin";
+/// token: what bounds a single view's sun cascades: "scene" (the default: the casters and where
+/// their shadows land, the same every time a frame renders) or "visible" (sample distribution
+/// shadow maps: the depths a recent frame of the same product saw, tighter and sharper, but an
+/// image then depends on the frames before it; the viewer's choice).
+inline constexpr std::string_view kShadowFit = "ernie:shadows:fit";
+inline constexpr std::string_view kVisible = "visible";
 inline constexpr std::string_view kShadowSoftness = "ernie:shadows:softness";
 inline constexpr std::string_view kShadowNormalOffset = "ernie:shadows:normalOffset";
 inline constexpr std::string_view kShadowSplitLambda = "ernie:shadows:splitLambda";

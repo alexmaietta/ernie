@@ -682,7 +682,8 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
                                  FrameId id, std::span<const SensorFilterStep> filters,
                                  std::vector<glm::dmat4> poses, std::vector<std::int32_t> worlds,
                                  std::vector<std::string_view> vars,
-                                 std::optional<glm::dmat4> posesParent) {
+                                 std::optional<glm::dmat4> posesParent,
+                                 const std::optional<std::string>& overlays) {
     ERNIE_ZONE("UpdatePrims");
     Sync(scene);
     prims_ = prims;
@@ -721,7 +722,16 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
         ground_.SetParams(ground);
     }
     RasterDrawable* drawables[] = {&terrain_, &meshes_, &ground_};
-    renderer_.Update(frame, drawables);
+    if (overlays) {
+        frame.overlays = *overlays;
+    }
+    std::vector<const Overlay*> drawn;
+    if (!frame.overlays.empty()) {
+        for (const std::string& name : SelectOverlays(frame.overlays, scene.OverlayNames())) {
+            drawn.push_back(scene.FindOverlay(name));
+        }
+    }
+    renderer_.Update(frame, drawables, drawn);
 }
 
 std::uint32_t RasterDelegate::PrimIdOf(const Path& path) const {
@@ -893,7 +903,7 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         }
         UpdatePrims(scene, prims, spec.resolution, NextFrame(scene, base.settings, spec.product),
                     spec.filters, std::move(poses), std::move(worlds), std::move(vars),
-                    posesParent);
+                    posesParent, spec.overlays);
         if (gpuPoses != nullptr) {
             // Once no submission reads the pose buffer (`UpdatePrims` waits), on the writer's
             // stream; the submission waits for it (`SubmitWaits`).

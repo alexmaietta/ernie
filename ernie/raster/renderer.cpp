@@ -8,6 +8,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstring>
@@ -220,6 +221,17 @@ constexpr DescriptorBinding kViewsBindings[] = {
     {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
 };
 
+/// depth_range.slang: the views' depth and the range it reduces to.
+constexpr DescriptorBinding kDepthRangeBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+};
+
+/// How far a view may move from the one whose depths a cascade fit reuses (`ShadowFit::Visible`):
+/// its eye by this fraction of the nearest depth seen, its direction by this cosine.
+constexpr double kVisibleFitEyeShift = 0.1;
+constexpr float kVisibleFitTurn = 0.995f;
+
 /// views.slang's camera: parent-to-world, projection and its inverse.
 constexpr VkDeviceSize kPoseCameraBytes = 3 * sizeof(glm::mat4);
 
@@ -415,7 +427,8 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
       lightTable_(context, kMaxLights * sizeof(LightGpu), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                   BufferMemory::Device),
       lightViewMatrices_(context, kMaxLightShadowViews * sizeof(glm::mat4),
-                         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device) {
+                         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device),
+      depthRangeLayout_(context, kDepthRangeBindings, 32) {
     if (brdfs_.Models().empty()) {
         throw std::invalid_argument("RasterRenderer needs at least one BRDF");
     }
@@ -469,6 +482,17 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
     };
     presentFloat_ = presentPipeline("presentFloat");
     presentUint_ = presentPipeline("presentUint");
+    overlays_ = std::make_unique<OverlayPass>(context_, compiler_, uploads_, presentFormat_);
+    const std::vector<ShaderModuleSource> depthRangeModules{
+        {"depth_range", shaders::kDepthRangeSlang}};
+    depthRangePipeline_ = std::make_unique<ComputePipeline>(
+        context_, depthRangeLayout_, compiler_.CompileSpirv(depthRangeModules, "depthRangeMain"));
+    for (std::unique_ptr<GpuBuffer>& range : depthRanges_) {
+        range = std::make_unique<GpuBuffer>(
+            context_, 2 * sizeof(std::uint32_t),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            BufferMemory::Readback);
+    }
 }
 
 RasterRenderer::~RasterRenderer() {
@@ -715,7 +739,8 @@ void RasterRenderer::PlanBatchShadows(const FrameParams& params, const Bounds3& 
     shadowLayers_ = static_cast<std::uint32_t>(shadowPasses_.size());
 }
 
-void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable* const> drawables) {
+void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable* const> drawables,
+                            std::span<const Overlay* const> overlays) {
     ERNIE_ZONE("Renderer::Update");
     ERNIE_PLOT("Views", params.Views());
     const CameraView view = params.View();
@@ -809,7 +834,9 @@ void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable*
         if (shadows.resolution != shadowResolution_) {
             CreateShadowMaps(shadows.resolution, kMaxCascades);
         }
-        const auto [low, high] = *bounds;
+        // Where the shadows land counts too: on a ground plane, which has no bounds, they reach
+        // past the casters.
+        const auto [low, high] = WithShadows(bounds->first, bounds->second, params.sunDirection);
         float farthest = 0.0f;
         for (int i = 0; i < 8; ++i) {
             const glm::vec3 corner((i & 1) ? high.x : low.x, (i & 2) ? high.y : low.y,
@@ -818,15 +845,34 @@ void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable*
         }
         // A margin keeps surfaces at exactly the farthest depth, such as flat ground under a
         // nadir camera, inside the last cascade.
-        const float shadowDistance = std::min(view.farPlane, 1.01f * farthest);
+        float shadowDistance = std::min(view.farPlane, 1.01f * farthest);
+        float splitNear = view.nearPlane;
+        // Sample distribution shadow maps: the cascades span only the depths the view sees,
+        // within those the casters can shadow.
+        if (shadows.fit == ShadowFit::Visible) {
+            if (const std::optional<std::pair<float, float>> seen = VisibleDepths(params)) {
+                shadowDistance = std::max(std::min(shadowDistance, seen->second),
+                                          view.nearPlane * 1.01f);
+                splitNear = std::clamp(seen->first, view.nearPlane, 0.95f * shadowDistance);
+            }
+        }
         cascades_ = FitCascades(view, shadowDistance, params.sunDirection, low, high,
                                 std::clamp(shadows.cascades, 1, kMaxCascades), shadows.splitLambda,
-                                shadowResolution_);
+                                shadowResolution_, splitNear);
         // A single view's cascades hold what it sees: the shared casters and its world's.
         for (std::uint32_t c = 0; c < cascades_.size(); ++c) {
             shadowPasses_.push_back({c, c, ShadowCasters{true, params.ViewWorld(0)}, false});
         }
         shadowLayers_ = static_cast<std::uint32_t>(cascades_.size());
+    }
+    // A visible fit's frame measures what it sees, for later frames' cascades.
+    measureDepth_ = shadowsEnabled_ && !batch && params.shadows.fit == ShadowFit::Visible;
+    if (measureDepth_) {
+        DepthSample& sample = depthSlots_[uploads_.Slot()];
+        sample.measured = true;
+        sample.stream = params.stream;
+        sample.eye = glm::dvec3(params.camera.transform[3]);
+        sample.forward = view.forward;
     }
 
     {
@@ -916,6 +962,13 @@ void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable*
     SensorPipelines(sensorPlan_);
     bands_ = params.camera.bands;
     extent_ = {params.camera.width, params.camera.height};
+    overlays_->Prepare(overlays, params.origin);
+    viewWorlds_.assign(views_, -1);
+    for (std::size_t v = 0; v < std::min<std::size_t>(params.worlds.size(), views_); ++v) {
+        viewWorlds_[v] = params.worlds[v];
+    }
+    clipRange_ = {static_cast<float>(params.camera.nearPlane),
+                  static_cast<float>(params.camera.farPlane)};
     WriteMaterialTable();
     for (const std::size_t model : modelsInUse_) {
         ShadingPipeline(model);
@@ -1151,9 +1204,19 @@ void RasterRenderer::Record(VkCommandBuffer commands, RenderTargets& targets,
         return;
     }
     RecordShadows(commands, drawables);
-    RecordViews(commands, targets, drawables, 0);
+    // With a present target the overlays go over what it shows, whichever var, not LdrColor.
+    RecordViews(commands, targets, drawables, 0, present == nullptr);
     if (present != nullptr) {
         Present(commands, targets, *present, var);
+        if (!overlays_->Empty()) {
+            ERNIE_GPU_ZONE(context_, commands, "Overlays");
+            targets.Depth().Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            OverlayPass::Target target = OverlayTarget(targets, 0, 0);
+            target.color = present->color;
+            target.format = presentFormat_;
+            target.extent = present->extent;
+            overlays_->Record(commands, target);
+        }
     }
 }
 
@@ -1246,7 +1309,7 @@ void RasterRenderer::RecordShadows(VkCommandBuffer commands,
 
 void RasterRenderer::RecordViews(VkCommandBuffer commands, RenderTargets& targets,
                                  std::span<const RasterDrawable* const> drawables,
-                                 std::uint32_t firstView) const {
+                                 std::uint32_t firstView, bool overlays) const {
     if (!updated_) {
         return;
     }
@@ -1303,6 +1366,92 @@ void RasterRenderer::RecordViews(VkCommandBuffer commands, RenderTargets& target
         draw(DrawPhase::Occludees, true);
     }
     ShadeAndFilter(commands, targets, firstView);
+    if (measureDepth_ && firstView == 0) {
+        RecordDepthRange(commands, targets);
+    }
+    if (overlays) {
+        RecordOverlays(commands, targets, firstView);
+    }
+}
+
+void RasterRenderer::RecordDepthRange(VkCommandBuffer commands, RenderTargets& targets) const {
+    ERNIE_GPU_ZONE(context_, commands, "Depth range");
+    const GpuBuffer& range = *depthRanges_[uploads_.Slot()];
+    // Nearest starts at the largest float, farthest at 0.
+    vkCmdFillBuffer(commands, range.Handle(), 0, sizeof(std::uint32_t), 0x7F7FFFFFu);
+    vkCmdFillBuffer(commands, range.Handle(), sizeof(std::uint32_t), sizeof(std::uint32_t), 0u);
+    targets.Depth().Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    ShaderBarrier(commands);
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, depthRangePipeline_->Handle());
+    const DescriptorResource resources[] = {DescriptorResource::Of(targets.Depth().View()),
+                                            DescriptorResource::Of(range)};
+    depthRangeLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+    const struct {
+        std::uint32_t size[4];
+        float clip[4];
+    } constants{{extent_.width, extent_.height, 0, 0}, {clipRange_[0], clipRange_[1], 0.0f, 0.0f}};
+    depthRangeLayout_.PushConstants(commands, &constants, sizeof(constants));
+    vkCmdDispatch(commands, (extent_.width + 15) / 16, (extent_.height + 15) / 16, 1);
+    ShaderBarrier(commands);
+}
+
+std::optional<std::pair<float, float>> RasterRenderer::VisibleDepths(const FrameParams& params) {
+    // This slot's last frame has finished (`BeginFrame`): keep what it saw.
+    DepthSample& slot = depthSlots_[uploads_.Slot()];
+    if (slot.measured) {
+        std::array<std::uint32_t, 2> bits{};
+        depthRanges_[uploads_.Slot()]->Read(std::as_writable_bytes(std::span(bits)));
+        slot.nearest = std::bit_cast<float>(bits[0]);
+        slot.farthest = std::bit_cast<float>(bits[1]);
+        slot.measured = false;
+        if (slot.farthest > 0.0f && slot.nearest <= slot.farthest) {
+            seenDepths_[slot.stream] = slot;
+        }
+    }
+    const auto seen = seenDepths_.find(params.stream);
+    if (seen == seenDepths_.end()) {
+        return std::nullopt;
+    }
+    // Only for a view close to the one that saw them, and with a margin for what it moved.
+    const DepthSample& sample = seen->second;
+    const glm::dvec3 eye(params.camera.transform[3]);
+    const glm::vec3 forward = params.View().forward;
+    if (glm::length(eye - sample.eye) > kVisibleFitEyeShift * sample.nearest ||
+        glm::dot(forward, sample.forward) < kVisibleFitTurn) {
+        return std::nullopt;
+    }
+    return std::pair(0.9f * sample.nearest, 1.1f * sample.farthest);
+}
+
+OverlayPass::Target RasterRenderer::OverlayTarget(RenderTargets& targets, std::uint32_t view,
+                                                  std::uint32_t layer) const {
+    OverlayPass::Target target;
+    target.extent = extent_;
+    target.uniforms = Frame(view).uniforms;
+    target.depth = targets.Depth().View();
+    target.depthLayer = layer;
+    target.world = view < viewWorlds_.size() ? viewWorlds_[view] : -1;
+    target.nearPlane = clipRange_[0];
+    target.farPlane = clipRange_[1];
+    return target;
+}
+
+void RasterRenderer::RecordOverlays(VkCommandBuffer commands, RenderTargets& targets,
+                                    std::uint32_t firstView) const {
+    GpuImage* color = targets.Var(render_vars::kLdrColor);
+    if (overlays_->Empty() || color == nullptr) {
+        return;
+    }
+    ERNIE_GPU_ZONE(context_, commands, "Overlays");
+    targets.Depth().Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    color->Transition(commands, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    for (std::uint32_t v = 0; v < targets.Views(); ++v) {
+        OverlayPass::Target target = OverlayTarget(targets, firstView + v, v);
+        target.color = color->LayerView(v);
+        target.format = VK_FORMAT_R8G8B8A8_UNORM;
+        overlays_->Record(commands, target);
+    }
+    color->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
 }
 
 void RasterRenderer::BeginFrame(std::uint32_t slot) {
@@ -1553,7 +1702,8 @@ std::uint64_t RasterRenderer::GpuBytes() const {
                           lightShadowMaps_->Bytes() + lightTable_.Size() +
                           lightViewMatrices_.Size() + sigmoidTable_.Bytes() +
                           shadingUniforms_.Size() + sensorUniforms_.Size() +
-                          (materialTable_ != nullptr ? materialTable_->Size() : 0);
+                          (materialTable_ != nullptr ? materialTable_->Size() : 0) +
+                          overlays_->GpuBytes();
     for (const auto& [id, material] : materials_) {
         bytes += material->GpuBytes();
     }

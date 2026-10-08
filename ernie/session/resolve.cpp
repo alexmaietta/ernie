@@ -573,6 +573,9 @@ ResolveRenderProducts(const Scene& scene, std::span<const Path> products, const 
         spec.cameras = TargetsOf(scene, path, kCameraRel);
         spec.camera = spec.cameras.empty() ? Path() : spec.cameras.front();
         spec.resolution = extentOf(GetVec2(scene, path, kResolution, settingsResolution));
+        if (scene.Get(path, kOverlays) != nullptr) {
+            spec.overlays = GetToken(scene, path, kOverlays, "");
+        }
         for (const Path& var : TargetsOf(scene, path, kOrderedVars)) {
             if (!scene.Has(var) || scene.TypeOf(var) != kRenderVar) {
                 throw std::invalid_argument("'" + var.String() + "' is not a RenderVar prim");
@@ -844,6 +847,7 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
     const Path& settings = prims.settings;
     params.ambient = Number(scene, settings, kAmbient, params.ambient);
     params.wireframe = WireframeOf(scene, settings);
+    params.overlays = GetToken(scene, settings, kOverlays, "");
     params.culling = CullingOf(scene, settings);
     params.occlusion = OcclusionOf(scene, settings);
     params.meshLodError =
@@ -874,6 +878,12 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
                                     settings.String() + "' must be \"scene\" or \"world\"");
     }
     shadows.worldFit = fit == kWorldFit ? WorldShadowFit::World : WorldShadowFit::Scene;
+    const std::string viewFit = GetToken(scene, settings, kShadowFit, kScene);
+    if (viewFit != kScene && viewFit != kVisible) {
+        throw std::invalid_argument("'" + std::string(kShadowFit) + "' of '" + settings.String() +
+                                    "' must be \"scene\" or \"visible\"");
+    }
+    shadows.fit = viewFit == kVisible ? ShadowFit::Visible : ShadowFit::Scene;
     shadows.worldMargin =
         std::max(Number(scene, settings, kShadowWorldMargin, shadows.worldMargin), 0.0f);
     shadows.softness = Number(scene, settings, kShadowSoftness, shadows.softness);

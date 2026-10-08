@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 namespace ernie {
@@ -27,6 +28,14 @@ struct ShadowCascade {
 /// @return `count + 1` increasing depths, starting at `nearPlane` and ending at `farPlane`.
 std::vector<float> PracticalSplits(float nearPlane, float farPlane, int count, float lambda);
 
+/// The box from `low` to `high` grown to hold the shadows its contents cast along `toSun` (unit,
+/// towards the light) onto the level of its bottom, such as a ground plane under them: each corner
+/// projected along the light onto z = `low.z`, at most `maxLength` times the box's diagonal away,
+/// so a grazing sun does not stretch it without bound. A sun at or below the horizon casts no
+/// shadows to hold, leaving the box as it is.
+std::pair<glm::vec3, glm::vec3> WithShadows(const glm::vec3& low, const glm::vec3& high,
+                                            const glm::vec3& toSun, float maxLength = 8.0f);
+
 /// Fits one orthographic shadow map per split of the camera frustum up to `shadowDistance`.
 ///
 /// Each cascade bounds its frustum slice with a sphere, so its size does not change as the camera
@@ -40,9 +49,11 @@ std::vector<float> PracticalSplits(float nearPlane, float farPlane, int count, f
 ///   2008.
 ///
 /// @param toSun Unit vector pointing towards the light.
+/// @param splitNear Where the first cascade starts, such as the nearest depth the view sees
+/// (sample distribution shadow maps); 0 for the camera's near plane.
 std::vector<ShadowCascade> FitCascades(const CameraView& camera, float shadowDistance,
                                        const glm::vec3& toSun, const glm::vec3& sceneMin,
                                        const glm::vec3& sceneMax, int count, float lambda,
-                                       std::uint32_t resolution);
+                                       std::uint32_t resolution, float splitNear = 0.0f);
 
 }  // namespace ernie

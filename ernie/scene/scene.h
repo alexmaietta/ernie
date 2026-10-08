@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ernie/scene/overlay.h"
 #include "ernie/scene/path.h"
 #include "ernie/scene/value.h"
 #include "ernie/util/tensor.h"
@@ -243,6 +244,19 @@ class Scene {
     /// every prim as added.
     std::vector<Change> Changes(ChangeCursor& cursor) const;
 
+    /// The overlay (debug drawing layer) named `name`, created empty if missing. Overlays are not
+    /// prims: their edits leave `Version()` alone, and each tracks its own (`Overlay::Version`).
+    Overlay& GetOverlay(std::string_view name);
+
+    /// The overlay named `name`, or null.
+    const Overlay* FindOverlay(std::string_view name) const;
+
+    /// Removes the overlay named `name`; returns whether there was one.
+    bool RemoveOverlay(std::string_view name);
+
+    /// The overlays' names, sorted.
+    std::vector<std::string> OverlayNames() const;
+
   private:
     static constexpr std::size_t kStampCount = 9;
 
@@ -277,6 +291,7 @@ class Scene {
 
     std::map<Path, PrimData> prims_;
     std::map<Path, std::uint64_t> removed_;
+    std::map<std::string, Overlay, std::less<>> overlays_;
     std::uint64_t version_ = 0;
     UniqueId id_;
 };

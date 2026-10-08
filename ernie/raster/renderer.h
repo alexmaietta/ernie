@@ -7,6 +7,7 @@
 #include "ernie/device/shader_compiler.h"
 #include "ernie/raster/drawable.h"
 #include "ernie/raster/material.h"
+#include "ernie/raster/overlay_pass.h"
 #include "ernie/raster/render_targets.h"
 #include "ernie/raster/sensor_plan.h"
 #include "ernie/scene/brdf.h"
@@ -175,13 +176,17 @@ class RasterRenderer {
     /// @throws std::invalid_argument for an invalid camera (`Camera::Check`) or filter
     /// chain (`CheckFilterChain`), a sun or light spectrum with the wrong number of bands, more
     /// than `kMaxLights` lights, or a model whose shading pass fails to compile.
-    void Update(const FrameParams& params, std::span<RasterDrawable* const> drawables);
+    /// `overlays` are drawn over LdrColor (`OverlayPass`); the caller selects them by
+    /// `FrameParams::overlays`.
+    void Update(const FrameParams& params, std::span<RasterDrawable* const> drawables,
+                std::span<const Overlay* const> overlays = {});
 
     /// Records a frame of `drawables` into `targets` (`RecordShadows` then `RecordViews` from view
     /// 0): the shadow passes, the G-buffer, spectral shading and the sensor filters of the last
     /// `Update`. With `present`, then draws view 0's render var `var`
     /// into `present.color` (in the colour attachment layout, of `PresentFormat`) as a display
-    /// image (`CanPresent`). Before any `Update` only clears `present`.
+    /// image (`CanPresent`), and the overlays over it, whichever var it shows. Before any
+    /// `Update` only clears `present`.
     /// @throws std::invalid_argument if `targets` do not have the camera's extent and bands, or
     /// `var` cannot be presented.
     void Record(VkCommandBuffer commands, RenderTargets& targets,
@@ -198,12 +203,13 @@ class RasterRenderer {
     /// `targets`, after `RecordShadows`: each view's G-buffer pass, then spectral shading and the
     /// sensor filters, each pass over all the views before the next, so the passes of a batch of
     /// views need no more barriers than one view's. A frame of more views than one set of targets
-    /// holds (`RenderTargets::MaxViews`) records in several calls.
+    /// holds (`RenderTargets::MaxViews`) records in several calls. The `Update`'s overlays are
+    /// drawn over each view's LdrColor last, unless `overlays` is false.
     /// @throws std::invalid_argument if `targets` do not have the camera's extent and bands, or
     /// hold views past the frame's.
     void RecordViews(VkCommandBuffer commands, RenderTargets& targets,
-                     std::span<const RasterDrawable* const> drawables,
-                     std::uint32_t firstView) const;
+                     std::span<const RasterDrawable* const> drawables, std::uint32_t firstView,
+                     bool overlays = true) const;
 
     /// Byte offsets of a view's camera fields in a block of per-view data, for `PatchViews`;
     /// `kNone` leaves a field alone. Matrices are glm's column-major floats.
@@ -315,6 +321,18 @@ class RasterRenderer {
                         std::uint32_t firstView) const;
     void Present(VkCommandBuffer commands, RenderTargets& targets, const RenderingTarget& present,
                  std::string_view var) const;
+    /// Records the measuring of view 0's visible depth range into this slot's buffer.
+    void RecordDepthRange(VkCommandBuffer commands, RenderTargets& targets) const;
+    /// The view depths from which the sun's cascades start and to which they reach for a
+    /// `ShadowFit::Visible` frame: those a recent frame of the same stream saw, if its view was
+    /// close to this one; otherwise none.
+    std::optional<std::pair<float, float>> VisibleDepths(const FrameParams& params);
+    /// Records the overlays over views `firstView` on of `targets`' LdrColor.
+    void RecordOverlays(VkCommandBuffer commands, RenderTargets& targets,
+                        std::uint32_t firstView) const;
+    /// The overlay pass's target for view `view`, reading `targets`' depth layer `layer`.
+    OverlayPass::Target OverlayTarget(RenderTargets& targets, std::uint32_t view,
+                                      std::uint32_t layer) const;
 
     const VulkanContext& context_;
     VkFormat presentFormat_;
@@ -393,6 +411,27 @@ class RasterRenderer {
     SpectralBands bands_;
     std::vector<SensorFilter> filters_;
     VkExtent2D extent_{0, 0};
+    std::unique_ptr<OverlayPass> overlays_;
+
+    /// Sample distribution shadow maps (`ShadowFit::Visible`): each `FrameUploads` slot's
+    /// frame measures its view's visible depth range into its buffer (`RecordDepthRange`), which
+    /// a later frame in the slot reads once that frame has finished.
+    struct DepthSample {
+        bool measured = false;
+        std::uint32_t stream = 0;  ///< `FrameParams::stream`: whose view it saw.
+        glm::dvec3 eye{0.0};
+        glm::vec3 forward{0.0f};
+        float nearest = 0.0f;  ///< The visible view depths, once read.
+        float farthest = 0.0f;
+    };
+    PipelineLayout depthRangeLayout_;
+    std::unique_ptr<ComputePipeline> depthRangePipeline_;
+    std::array<std::unique_ptr<GpuBuffer>, FrameUploads::kSlots> depthRanges_;
+    std::array<DepthSample, FrameUploads::kSlots> depthSlots_;
+    std::map<std::uint32_t, DepthSample> seenDepths_;  ///< The latest read, by stream.
+    bool measureDepth_ = false;  ///< Whether the last `Update`'s frame measures its depths.
+    std::vector<std::int32_t> viewWorlds_;  ///< Per view of the last `Update`, its world.
+    std::array<float, 2> clipRange_{};      ///< The last `Update`'s near and far planes.
 };
 
 }  // namespace ernie

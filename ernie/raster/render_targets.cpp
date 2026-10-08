@@ -67,9 +67,14 @@ RenderTargets::RenderTargets(const VulkanContext& context, VkExtent2D extent, in
         // every view's layer in one dispatch.
         const std::uint32_t width = held ? extent.width : 1;
         const std::uint32_t height = held ? extent.height : 1;
+        // LdrColor is also drawn into, by the overlays.
+        const VkImageUsageFlags usage =
+            kVarNames[i] == render_vars::kLdrColor
+                ? kStorage | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+                : kStorage;
         vars_.push_back(std::make_unique<GpuImage>(
             context, ImageDesc{width, height, spectral ? views * bandLayers : views, 1,
-                               kVarFormats[i], kStorage, held && shared && !spectral && views == 1,
+                               kVarFormats[i], usage, held && shared && !spectral && views == 1,
                                true, spectral ? bandLayers : 0u}));
     }
 }

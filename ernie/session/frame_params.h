@@ -27,6 +27,12 @@ enum class WorldShadows : std::uint32_t {
     Merged = 2,
 };
 
+/// What bounds a single view's sun cascades (`ernie:shadows:fit`).
+enum class ShadowFit : std::uint32_t {
+    Scene = 0,    ///< The casters and where their shadows land; deterministic.
+    Visible = 1,  ///< The depths a recent frame saw (sample distribution shadow maps).
+};
+
 /// What a world's own shadow map covers (`ernie:shadows:worldFit`).
 enum class WorldShadowFit : std::uint32_t {
     Scene = 0,  ///< The whole scene, as every map of the batch.
@@ -43,6 +49,7 @@ struct ShadowSettings {
     float softness = 1.5f;                 ///< Poisson filter radius, in shadow map texels.
     float normalOffset = 1.5f;             ///< Receiver offset along the normal, in texels.
     float splitLambda = 0.8f;              ///< Logarithmic weight of the practical split scheme.
+    ShadowFit fit = ShadowFit::Scene;      ///< What bounds a single view's cascades.
     bool showCascades = false;             ///< Tint fragments by cascade, for tuning.
     std::uint32_t lightResolution = 1024;  ///< Texels along each side of other lights' maps.
     /// Texels along each side of the sun's map of each world in a batch of views of several
@@ -193,6 +200,8 @@ struct FrameParams {
     /// The render vars wanted from the frame; empty for all. Only they are held, and filters
     /// that produce none of them do not run (the sensor fuses the rest, `PlanSensor`).
     std::vector<std::string_view> vars;
+    /// The overlays drawn over LdrColor (`tokens::kOverlays`): "*", names, or empty for none.
+    std::string overlays;
     glm::vec3 clearColor{0.0f};  ///< Linear display colour of the background in LdrColor.
     /// The frame number temporal noise derives from (`FrameSeed`): rendering the same frame again
     /// gives the same image, and consecutive frames independent noise.

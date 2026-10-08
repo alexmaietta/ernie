@@ -10,10 +10,12 @@ set(ernie_shaders
     closure/oren_nayar.slang=kBrdfOrenNayarSlang
     film/sensor.slang=kSensorSlang
     raster/cull.slang=kCullSlang
+    raster/depth_range.slang=kDepthRangeSlang
     raster/hzb.slang=kHzbSlang
     raster/frame.slang=kFrameSlang
     raster/ground.slang=kGroundSlang
     raster/mesh.slang=kMeshSlang
+    raster/overlay.slang=kOverlaySlang
     raster/present.slang=kPresentSlang
     raster/shading.slang=kShadingSlang
     raster/surface.slang=kSurfaceSlang

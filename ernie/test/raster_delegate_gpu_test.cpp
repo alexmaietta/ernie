@@ -528,3 +528,27 @@ TEST_F(RasterDelegateTest, ScenesFarFromTheWorldOriginRenderAsNearIt) {
     // And back near the world origin: the origin follows again.
     EXPECT_LE(BytesDiffering(Bytes(delegate.Render(near)), expected), expected.size() / 1000);
 }
+
+TEST_F(RasterDelegateTest, VisibleShadowFitsSpanOnlyTheDepthsTheViewSees) {
+    // MeshScene's meshes lie 60 below its camera: fitted to what the view saw, the sun's first
+    // cascade starts near them rather than at the near plane.
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    delegate.Render(scene);
+    const float nearPlane = delegate.Renderer().Cascades().front().splitNear;
+    scene.Set("/Render/Settings", tokens::kShadowFit, std::string(tokens::kVisible));
+    for (int i = 0; i < 4; ++i) {
+        delegate.Render(scene);
+    }
+    const float fitted = delegate.Renderer().Cascades().front().splitNear;
+    EXPECT_GT(fitted, 50.0f);
+    EXPECT_LT(fitted, 60.0f);
+    EXPECT_GT(fitted, 10.0f * nearPlane);
+    // A view far from the one measured falls back to the scene's fit until it measures again.
+    scene.Set("/World/Camera", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, 30.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
+    delegate.Render(scene);
+    EXPECT_EQ(delegate.Renderer().Cascades().front().splitNear, nearPlane);
+    scene.Set("/Render/Settings", tokens::kShadowFit, std::string("nearest"));
+    EXPECT_THROW(delegate.Render(scene), std::invalid_argument);
+}

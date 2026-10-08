@@ -214,6 +214,15 @@ GraphicsPipeline::GraphicsPipeline(const VulkanContext& context, const PipelineL
     VkPipelineColorBlendAttachmentState blendAttachment{};
     blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                                      VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    if (desc.alphaBlend) {
+        blendAttachment.blendEnable = VK_TRUE;
+        blendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        blendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        blendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+        blendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+        blendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+        blendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+    }
     const std::vector<VkPipelineColorBlendAttachmentState> blendAttachments(colorFormats.size(),
                                                                             blendAttachment);
     VkPipelineColorBlendStateCreateInfo blend{

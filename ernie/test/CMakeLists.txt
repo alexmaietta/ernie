@@ -15,6 +15,7 @@ ernie_add_test_suite(
     scene_brdf_test.cpp
     scene_camera_test.cpp
     scene_orbit_controller_test.cpp
+    scene_overlay_test.cpp
     scene_path_test.cpp
     scene_scene_test.cpp
     scene_schema_test.cpp
@@ -45,6 +46,7 @@ ernie_add_test_suite(
     raster_hex_tiling_gpu_test.cpp
     raster_lights_gpu_test.cpp
     raster_mesh_drawable_test.cpp
+    raster_overlays_gpu_test.cpp
     raster_products_gpu_test.cpp
     raster_sensor_filters_gpu_test.cpp
     raster_terrain_drawable_test.cpp
