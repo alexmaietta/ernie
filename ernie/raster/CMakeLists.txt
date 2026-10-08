@@ -14,4 +14,5 @@ ernie_add_library(
     PUBLIC
     ernie_session
     PRIVATE
-    ernie_meshoptimizer)
+    ernie_meshoptimizer
+    ernie_kernel)

@@ -9,4 +9,6 @@ ernie_add_library(
     schema.cpp
     sensor_filters.cpp
     PUBLIC
-    ernie_util)
+    ernie_util
+    PRIVATE
+    ernie_kernel)

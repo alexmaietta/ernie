@@ -37,4 +37,10 @@ function(ernie_add_test_suite name)
     endif()
     target_include_directories(${target} PRIVATE "${ERNIE_SOURCE_DIR}/ernie/test")
     target_compile_definitions(${target} PRIVATE ${ARG_DEFINITIONS})
+    # Test code is setup and assertions, whose optimisation at -O2 dominates its compile time
+    # (several times the parse); -O1 keeps it quick to build, while the libraries under test keep
+    # their own optimisation.
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${target} PRIVATE $<$<CONFIG:Release,RelWithDebInfo>:-O1>)
+    endif()
 endfunction()

@@ -39,11 +39,17 @@ ernie_add_test_suite(
     device_frame_uploads_test.cpp
     device_pipeline_test.cpp
     device_vulkan_context_test.cpp
+    raster_batch_gpu_test.cpp
+    raster_culling_gpu_test.cpp
     raster_delegate_gpu_test.cpp
     raster_hex_tiling_gpu_test.cpp
+    raster_lights_gpu_test.cpp
     raster_mesh_drawable_test.cpp
+    raster_products_gpu_test.cpp
+    raster_sensor_filters_gpu_test.cpp
     raster_terrain_drawable_test.cpp
     scene_brdf_vulkan_test.cpp
+    support/delegate_scenes.cpp
     LIBRARIES
     ernie
     LABELS

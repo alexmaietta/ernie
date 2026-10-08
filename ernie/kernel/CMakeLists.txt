@@ -1,32 +1,41 @@
-# The shaders, embedded as strings into ernie/kernel/embedded_shaders.h.
+# The shaders, embedded as strings: ernie/kernel/embedded_shaders.h declares them and a .cpp
+# generated at build time defines them, so a shader edit recompiles one file and does not re-run
+# CMake. Each entry is the shader's path and the name it is embedded under.
 set(ernie_shaders
-    closure/brdf.slang
-    closure/hapke.slang
-    closure/lambert.slang
-    closure/lommel_seeliger.slang
-    closure/lunar_lambert.slang
-    closure/oren_nayar.slang
-    film/sensor.slang
-    raster/cull.slang
-    raster/hzb.slang
-    raster/frame.slang
-    raster/ground.slang
-    raster/mesh.slang
-    raster/present.slang
-    raster/shading.slang
-    raster/surface.slang
-    raster/terrain.slang
-    raster/terrain_color.slang
-    raster/terrain_shadow.slang
-    raster/views.slang)
-foreach(shader ${ernie_shaders})
-    string(MAKE_C_IDENTIFIER "${shader}" shader_id)
-    string(TOUPPER "${shader_id}" shader_upper)
-    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/${shader}" ERNIE_${shader_upper})
-    set_property(
-        DIRECTORY
-        APPEND
-        PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${shader}")
+    closure/brdf.slang=kBrdfSlang
+    closure/hapke.slang=kBrdfHapkeSlang
+    closure/lambert.slang=kBrdfLambertSlang
+    closure/lommel_seeliger.slang=kBrdfLommelSeeligerSlang
+    closure/lunar_lambert.slang=kBrdfLunarLambertSlang
+    closure/oren_nayar.slang=kBrdfOrenNayarSlang
+    film/sensor.slang=kSensorSlang
+    raster/cull.slang=kCullSlang
+    raster/hzb.slang=kHzbSlang
+    raster/frame.slang=kFrameSlang
+    raster/ground.slang=kGroundSlang
+    raster/mesh.slang=kMeshSlang
+    raster/present.slang=kPresentSlang
+    raster/shading.slang=kShadingSlang
+    raster/surface.slang=kSurfaceSlang
+    raster/terrain.slang=kTerrainSlang
+    raster/terrain_color.slang=kTerrainColorSlang
+    raster/terrain_shadow.slang=kTerrainShadowSlang
+    raster/views.slang=kViewsSlang)
+set(shader_files)
+foreach(entry ${ernie_shaders})
+    string(REGEX REPLACE "=.*" "" shader "${entry}")
+    list(APPEND shader_files "${CMAKE_CURRENT_SOURCE_DIR}/${shader}")
 endforeach()
-configure_file(embedded_shaders.h.in
-               "${PROJECT_BINARY_DIR}/generated/ernie/kernel/embedded_shaders.h" @ONLY)
+
+set(embedded "${PROJECT_BINARY_DIR}/generated/ernie/kernel/embedded_shaders.cpp")
+list(JOIN ernie_shaders "," shaders_arg)
+add_custom_command(
+    OUTPUT "${embedded}"
+    COMMAND
+        "${CMAKE_COMMAND}" -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DOUTPUT=${embedded}
+        "-DSHADERS=${shaders_arg}" -P "${PROJECT_SOURCE_DIR}/cmake/EmbedShaders.cmake"
+    DEPENDS ${shader_files} "${PROJECT_SOURCE_DIR}/cmake/EmbedShaders.cmake"
+    COMMENT "Embedding Ernie's shaders"
+    VERBATIM)
+
+ernie_add_library(ernie_kernel SOURCES "${embedded}")
