@@ -69,6 +69,7 @@ include(cmake/third_party/stb.cmake)
 include(cmake/third_party/openexr.cmake)
 include(cmake/third_party/meshoptimizer.cmake)
 include(cmake/third_party/tracy.cmake)
+include(cmake/third_party/json.cmake)
 
 # Warning and coverage flags: TerrainGen's when built inside it, Ernie's own otherwise.
 add_library(ernie_build_options INTERFACE)
@@ -87,7 +88,6 @@ else()
                   -Wsign-conversion
                   -Wdouble-promotion)
 endif()
-include(cmake/third_party/json.cmake)
 
 add_subdirectory(ernie)
 

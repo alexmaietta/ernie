@@ -1901,6 +1901,7 @@ OverlayPass::Target RasterRenderer::OverlayTarget(RenderTargets& targets, std::u
     target.nearPlane = clipRange_[0];
     target.farPlane = clipRange_[1];
     target.orthographic = orthographic_;
+    target.pushbroom = pushbroom_;
     return target;
 }
 
@@ -1913,7 +1914,6 @@ void RasterRenderer::RecordOverlays(VkCommandBuffer commands, RenderTargets& tar
     ERNIE_GPU_ZONE(context_, commands, "Overlays");
     targets.Depth().Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     color->Transition(commands, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    target.pushbroom = pushbroom_;
     for (std::uint32_t v = 0; v < targets.Views(); ++v) {
         OverlayPass::Target target = OverlayTarget(targets, LastSubframeView(firstView + v), v);
         target.color = color->LayerView(v);
