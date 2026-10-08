@@ -874,6 +874,7 @@ void BindScene(nb::module_& m) {
         {"CELL_SIZE", tokens::kCellSize},
         {"NO_DATA", tokens::kNoData},
         {"EXAGGERATION", tokens::kExaggeration},
+        {"HEIGHTS_DIRTY", tokens::kHeightsDirty},
         {"BRDF", tokens::kBrdf},
         {"ALBEDO", tokens::kAlbedo},
         {"ALBEDO_MAP", tokens::kAlbedoMap},

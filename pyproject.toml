@@ -12,6 +12,8 @@ dependencies = ["numpy>=1.26"]
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
+# Demos whose GPU kernels drive the scene (demos/python/demo_gpu_*.py).
+demos = ["warp-lang>=1.0"]
 
 [tool.scikit-build]
 cmake.version = ">=3.22"
