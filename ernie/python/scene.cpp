@@ -1,5 +1,6 @@
 #include "bindings.h"
 
+#include "ernie/scene/isd.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
@@ -697,6 +698,89 @@ void BindScene(nb::module_& m) {
             nb::arg("cursor"),
             "(path, Dirty) for every prim changed since `cursor`, which advances.");
 
+    const auto triple = [](const glm::dvec3& v) { return nb::make_tuple(v.x, v.y, v.z); };
+    nb::class_<IsdLineScanner>(
+        m, "IsdLineScanner",
+        "A line scanner (pushbroom camera) from its image support data (ALE's ISD JSON, as "
+        "usgscsm reads it): its timing, detector and trajectory in the body-fixed frame, metres. "
+        "Image coordinates are CSM's (line, sample), the first pixel's centre at (0.5, 0.5).")
+        .def_static(
+            "from_file",
+            [](const std::string& path) { return IsdLineScanner(ReadIsdFile(path)); },
+            nb::arg("path"), "The line scanner of the ISD file at `path`.")
+        .def_static(
+            "from_json", [](const std::string& json) { return IsdLineScanner(ReadIsd(json)); },
+            nb::arg("json"), "The line scanner of ISD JSON text `json`.")
+        .def_prop_ro("lines", [](const IsdLineScanner& s) { return s.Isd().lines; })
+        .def_prop_ro("samples", [](const IsdLineScanner& s) { return s.Isd().samples; })
+        .def_prop_ro("sensor", [](const IsdLineScanner& s) { return s.Isd().sensor; })
+        .def_prop_ro("platform", [](const IsdLineScanner& s) { return s.Isd().platform; })
+        .def("image_time", &IsdLineScanner::ImageTime, nb::arg("line"),
+             "Ephemeris seconds (TDB past J2000) at which `line` is exposed.")
+        .def(
+            "position",
+            [triple](const IsdLineScanner& s, double time) { return triple(s.Position(time)); },
+            nb::arg("time"), "The sensor's body-fixed position at `time`.")
+        .def(
+            "sun_position",
+            [triple](const IsdLineScanner& s, double time) {
+                return triple(s.SunPosition(time));
+            },
+            nb::arg("time"), "The sun's body-fixed position at `time`.")
+        .def(
+            "image_to_ground",
+            [triple](const IsdLineScanner& s, double line, double sample, double height) {
+                return triple(s.ImageToGround(line, sample, height));
+            },
+            nb::arg("line"), nb::arg("sample"), nb::arg("height") = 0.0,
+            "Where pixel (`line`, `sample`)'s ray meets the body's ellipsoid raised by `height`.")
+        .def(
+            "ground_to_image",
+            [](const IsdLineScanner& s, nb::handle ground) {
+                const glm::dvec2 image = s.GroundToImage(Vec3FromPython(ground));
+                return nb::make_tuple(image.x, image.y);
+            },
+            nb::arg("ground"), "The (line, sample) that sees body-fixed point `ground`.")
+        .def(
+            "strip",
+            [](const IsdLineScanner& s, std::uint32_t first, std::uint32_t lines) {
+                const IsdLineScanner::Strip strip = s.StripOf(first, lines);
+                return nb::make_tuple(MatrixToPython(strip.from), MatrixToPython(strip.to),
+                                      strip.fromTime, strip.toTime);
+            },
+            nb::arg("first_line"), nb::arg("lines"),
+            "(from, to, from_time, to_time): the camera poses and times bounding the strip of "
+            "`lines` lines from `first_line`.")
+        .def(
+            "author_strip",
+            [](const IsdLineScanner& s, Scene& scene, const std::string& path,
+               std::uint32_t first, std::uint32_t lines, bool atEnd) {
+                const IsdLineScanner::Strip strip = s.StripOf(first, lines);
+                const Camera& camera = strip.camera;
+                using namespace tokens;
+                // The camera's geometry only: its exposure, lens and sensor stay as authored.
+                Prim prim = scene.Has(Path(path)) ? scene.GetPrim(Path(path))
+                                                  : scene.Define(Path(path), kCamera);
+                prim.Set(kTransform, atEnd ? strip.to : strip.from)
+                    .Set(kCameraScan, std::string(kPushbroom))
+                    .Set(kFocalLength, camera.focalLengthMm)
+                    .Set(kVerticalAperture, camera.verticalApertureMm)
+                    .Set(kHorizontalAperture,
+                         camera.verticalApertureMm * camera.width / camera.height)
+                    .Set(kHorizontalApertureOffset, camera.horizontalApertureOffsetMm)
+                    .Set(kVerticalApertureOffset, 0.0)
+                    .Set(kPushbroomLineOffset, camera.lineOffsetMm)
+                    .Set(kClippingRange, glm::dvec2(camera.nearPlane, camera.farPlane));
+                return nb::make_tuple(camera.width, camera.height);
+            },
+            nb::arg("scene"), nb::arg("path"), nb::arg("first_line"), nb::arg("lines"),
+            nb::arg("at_end") = true,
+            "Authors the Camera prim at `path` as the pushbroom of the strip of `lines` lines "
+            "from `first_line`, posed at its end (or its start), and returns the render "
+            "resolution it needs, (samples, lines). Render an image strip by strip: author the "
+            "first strip at its start and step once, then author each strip at its end and "
+            "step.");
+
     m.def(
         "look_at_transform",
         [](nb::handle eye, nb::handle target, nb::handle up) {
@@ -882,6 +966,7 @@ void BindScene(nb::module_& m) {
         {"HEIGHTS", tokens::kHeights},
         {"ORIGIN", tokens::kOrigin},
         {"CELL_SIZE", tokens::kCellSize},
+        {"PLANET_RADIUS", tokens::kPlanetRadius},
         {"NO_DATA", tokens::kNoData},
         {"EXAGGERATION", tokens::kExaggeration},
         {"HEIGHTS_DIRTY", tokens::kHeightsDirty},
@@ -966,7 +1051,6 @@ void BindScene(nb::module_& m) {
         {"SHADOW_SOFTNESS", tokens::kShadowSoftness},
         {"SHADOW_NORMAL_OFFSET", tokens::kShadowNormalOffset},
         {"SHADOW_SPLIT_LAMBDA", tokens::kShadowSplitLambda},
-        {"PLANET_RADIUS", tokens::kPlanetRadius},
         {"SHADOW_SHOW_CASCADES", tokens::kShadowShowCascades},
         {"LOD_ENABLE", tokens::kLodEnable},
         {"LOD_DETAIL", tokens::kLodDetail},

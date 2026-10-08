@@ -69,7 +69,8 @@ ernie_add_test_suite(
     LABELS
     gpu
     DEFINITIONS
-    ERNIE_SHADER_DIR="${ERNIE_SOURCE_DIR}/ernie/kernel")
+    ERNIE_SHADER_DIR="${ERNIE_SOURCE_DIR}/ernie/kernel"
+    ERNIE_TEST_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 
 if(TARGET _ernie)
     execute_process(

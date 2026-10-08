@@ -48,10 +48,11 @@ glm::dmat4 DistantLightTransform(glm::dvec3 towardsLight);
 /// Unit vector from the scene towards a DistantLight: the +z axis of its world transform.
 glm::dvec3 TowardsLight(const Scene& scene, const Path& light);
 
-/// Authors `camera` as the Camera prim at `path`: its transform, `focalLength`, apertures (the
-/// horizontal one from the image's aspect) and their offsets, `clippingRange`, `exposure` and the
-/// `exposure:*` attributes, and `ernie:spectral:range` and `ernie:spectral:bands`. Its lens and
-/// sensor are not written. `CameraOf` reads it back.
+/// Authors `camera` as the Camera prim at `path`: its transform, `projection`, `focalLength`,
+/// apertures (the horizontal one from the image's aspect) and their offsets, `clippingRange`,
+/// `exposure` and the `exposure:*` attributes, `ernie:camera:scan` and the pushbroom's line
+/// offset, and `ernie:spectral:range` and `ernie:spectral:bands`. Its lens and sensor are not
+/// written. `CameraOf` reads it back.
 void SetCamera(Scene& scene, const Path& path, const Camera& camera);
 
 }  // namespace ernie

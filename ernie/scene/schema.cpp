@@ -125,7 +125,9 @@ void SetCamera(Scene& scene, const Path& path, const Camera& camera) {
     const double aspect = static_cast<double>(camera.width) / static_cast<double>(camera.height);
     scene.Define(path, kCamera)
         .Set(kTransform, camera.transform)
-        .Set(kProjection, kPerspective)
+        .Set(kProjection, camera.orthographic ? kOrthographic : kPerspective)
+        .Set(kCameraScan, camera.pushbroom ? kPushbroom : kFrameScan)
+        .Set(kPushbroomLineOffset, camera.lineOffsetMm)
         .Set(kFocalLength, camera.focalLengthMm)
         .Set(kVerticalAperture, camera.verticalApertureMm)
         .Set(kHorizontalAperture, camera.verticalApertureMm * aspect)

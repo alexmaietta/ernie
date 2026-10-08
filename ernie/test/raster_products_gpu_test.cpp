@@ -1,6 +1,7 @@
 #include "ernie/device/offscreen_target.h"
 #include "ernie/geometry/primitives.h"
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/isd.h"
 #include "ernie/scene/orbit_controller.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
@@ -16,6 +17,7 @@
 #include <array>
 #include <cmath>
 #include <cstring>
+#include <filesystem>
 #include <functional>
 #include <map>
 #include <memory>
@@ -421,6 +423,46 @@ TEST_F(RasterDelegateTest, PushbroomScansItsRowsAlongItsMotion) {
                     0.05)
             << "across the row as a pinhole sees, from the row's own pose";
         EXPECT_NEAR(At<float>(vars.at("HdrColor"), row, c), 0.5f, 0.02f) << "lit as a frame";
+    }
+}
+
+TEST_F(RasterDelegateTest, AnIsdStripSeesTheGroundWhereUsgscsmPutsIt) {
+    // usgscsm's synthetic orbital line scanner (16 x 16 pixels of about 100 m, 50 km above a
+    // 1000 km body) rendered as one strip: balls of 60 m radius where the camera model puts two
+    // pixels' rays on the ground show on exactly those pixels.
+    const ernie::IsdLineScanner scanner(ernie::ReadIsdFile(
+        (std::filesystem::path(ERNIE_TEST_FIXTURES) / "isd" / "orbitalLineScan.json").string()));
+    const ernie::IsdLineScanner::Strip strip = scanner.StripOf(0, 16);
+    Scene scene = FlatScene();
+    scene.Remove("/World/Terrain");
+    scene.Set("/Render/Settings", tokens::kResolution, glm::ivec2(16, 16));
+    const std::pair<std::size_t, std::size_t> pixels[] = {{8, 8}, {3, 12}, {13, 2}};
+    for (std::size_t i = 0; i < std::size(pixels); ++i) {
+        const auto [row, column] = pixels[i];
+        const glm::dvec3 ground = scanner.ImageToGround(row + 0.5, column + 0.5);
+        scene.Define(Path("/World/Ball" + std::to_string(i)), tokens::kSphere)
+            .Set(tokens::kGeomRadius, 60.0)
+            .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), ground));
+    }
+    ernie::Camera camera = strip.camera;
+    camera.transform = strip.from;
+    ernie::SetCamera(scene, "/World/Camera", camera);
+    scene.Set("/World/Camera", tokens::kSensorNoise, false);
+    RasterDelegate delegate(*context_);
+    delegate.Step(scene);  // the strip's start
+    scene.Set("/World/Camera", tokens::kTransform, strip.to);
+    ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+    const Tensor ids = outputs.at("/Render/Product").vars.at("PrimId").Map(ernie::MapDevice::Cpu).tensor;
+    const auto at = [&](std::size_t row, std::size_t column) {
+        return delegate.PrimPath(ids.As<std::uint32_t>()[row * 16 + column]);
+    };
+    for (std::size_t i = 0; i < std::size(pixels); ++i) {
+        const auto [row, column] = pixels[i];
+        const Path ball("/World/Ball" + std::to_string(i));
+        EXPECT_EQ(at(row, column), ball) << "row " << row << ", column " << column;
+        EXPECT_NE(at(row, column + 1), ball) << "one pixel across";
+        EXPECT_NE(at(row + 1, column), ball) << "one line along";
+        EXPECT_NE(at(row - 1, column), ball);
     }
 }
 
