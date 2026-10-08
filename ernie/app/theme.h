@@ -12,15 +12,16 @@ namespace ernie::app {
 /// lighter bars, a steel-blue accent for selection and changed values, and dark translucent pills
 /// over the viewport.
 struct Theme {
-    glm::vec4 background{0.102f, 0.102f, 0.106f, 1.0f};  ///< Tab bar, menu bar, behind the docks.
-    glm::vec4 panel{0.180f, 0.188f, 0.192f, 1.0f};       ///< Panel bodies.
-    glm::vec4 header{0.235f, 0.243f, 0.259f, 1.0f};      ///< Section headers, inactive tabs.
-    glm::vec4 field{0.137f, 0.141f, 0.149f, 1.0f};       ///< Input fields, combos, sliders.
-    glm::vec4 fieldHovered{0.200f, 0.208f, 0.220f, 1.0f};
-    glm::vec4 separator{0.102f, 0.102f, 0.106f, 1.0f};  ///< One-pixel lines between areas.
-    glm::vec4 text{0.820f, 0.820f, 0.820f, 1.0f};
-    glm::vec4 textMuted{0.600f, 0.608f, 0.604f, 1.0f};  ///< Labels and disabled text.
-    glm::vec4 accent{0.290f, 0.522f, 0.678f, 1.0f};     ///< Selection, changed values, sliders.
+    glm::vec4 background{0.090f, 0.094f, 0.098f, 1.0f};  ///< Tab bar, menu bar, behind the docks.
+    glm::vec4 panel{0.122f, 0.129f, 0.137f, 1.0f};       ///< Panel bodies (Kit's #1F2123).
+    glm::vec4 header{0.196f, 0.204f, 0.204f, 1.0f};      ///< Section bars, table headers.
+    glm::vec4 field{0.165f, 0.173f, 0.184f, 1.0f};       ///< Input fields, combos, sliders.
+    glm::vec4 fieldHovered{0.224f, 0.235f, 0.247f, 1.0f};
+    glm::vec4 separator{0.071f, 0.075f, 0.078f, 1.0f};  ///< One-pixel lines between areas.
+    glm::vec4 text{0.800f, 0.804f, 0.808f, 1.0f};
+    glm::vec4 textMuted{0.557f, 0.573f, 0.580f, 1.0f};  ///< Labels, types and disabled text.
+    glm::vec4 selection{0.176f, 0.220f, 0.247f, 1.0f};  ///< Selected rows (Kit's subtle blue-grey).
+    glm::vec4 accent{0.290f, 0.522f, 0.678f, 1.0f};     ///< Changed values, active tools, sliders.
     glm::vec4 warning{0.910f, 0.698f, 0.235f, 1.0f};
     glm::vec4 error{0.886f, 0.341f, 0.318f, 1.0f};
     glm::vec4 overlay{0.141f, 0.157f, 0.169f, 0.88f};  ///< Viewport toolbar pills and HUD.

@@ -39,15 +39,15 @@ class CameraPanel final : public Panel {
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("A scene camera with the view's pose and lens, looked through");
         }
-        if (ImGui::CollapsingHeader("Viewport Exposure", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (SectionHeader(viewer, "Viewport Exposure")) {
             DrawExposure(viewer, scene, camera);
         }
         const std::string error =
             DrawPropertySections(viewer, camera, schema_, PropertyLabelWidth(viewer));
-        if (ImGui::CollapsingHeader("Quantum Efficiency", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (SectionHeader(viewer, "Quantum Efficiency")) {
             DrawEfficiency(scene, camera);
         }
-        if (ImGui::CollapsingHeader("Filter Chain")) {
+        if (SectionHeader(viewer, "Filter Chain")) {
             std::string chain;
             for (const SensorFilter filter : DefaultFilterChain()) {
                 chain += (chain.empty() ? "" : "  >  ") + std::string(NameOf(filter));

@@ -35,6 +35,7 @@ Theme LightTheme() {
     theme.separator = {0.769f, 0.773f, 0.784f, 1.0f};
     theme.text = {0.133f, 0.141f, 0.153f, 1.0f};
     theme.textMuted = {0.427f, 0.439f, 0.459f, 1.0f};
+    theme.selection = {0.776f, 0.843f, 0.894f, 1.0f};
     theme.overlay = {0.922f, 0.925f, 0.929f, 0.80f};
     return theme;
 }
@@ -97,10 +98,11 @@ void ApplyTheme(const Theme& theme, float contentScale, ImGuiStyle& style) {
     set(ImGuiCol_Button, theme.field);
     set(ImGuiCol_ButtonHovered, theme.fieldHovered);
     set(ImGuiCol_ButtonActive, accentDim);
-    // Headers: section bars, and selected rows of trees and lists.
-    set(ImGuiCol_Header, theme.header);
-    set(ImGuiCol_HeaderHovered, WithAlpha(theme.accent, 0.30f));
-    set(ImGuiCol_HeaderActive, accentDim);
+    // Headers: section bars (drawn with `header` by the panels), and selected rows of trees and
+    // lists, which take the selection colour.
+    set(ImGuiCol_Header, theme.selection);
+    set(ImGuiCol_HeaderHovered, WithAlpha(theme.fieldHovered, 0.8f));
+    set(ImGuiCol_HeaderActive, WithAlpha(theme.selection, 0.9f));
     set(ImGuiCol_Separator, theme.separator);
     set(ImGuiCol_SeparatorHovered, accentDim);
     set(ImGuiCol_SeparatorActive, theme.accent);

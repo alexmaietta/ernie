@@ -1,5 +1,6 @@
 #include "ernie/app/builtin_panels.h"
 #include "ernie/app/icons.h"
+#include "ernie/app/prim_icons.h"
 #include "ernie/app/prim_schemas.h"
 #include "ernie/app/property_fields.h"
 #include "ernie/app/viewer.h"
@@ -105,6 +106,8 @@ class PropertiesPanel final : public Panel {
         ImGui::InputTextWithHint("##search", "Search", search_, sizeof(search_));
         const std::string_view filter(search_);
         const std::string& type = scene.TypeOf(path);
+        PrimIcon(type, ImGui::GetFrameHeight());
+        ImGui::SameLine();
         ImGui::AlignTextToFramePadding();
         ImGui::TextUnformatted(path.String().c_str());
         ImGui::SameLine();
@@ -116,7 +119,7 @@ class PropertiesPanel final : public Panel {
         labelWidth_ = PropertyLabelWidth(viewer);
         if (!path.IsRoot() && HasTransform(type) &&
             MatchesFilter("Translate Rotate Scale", tokens::kTransform, filter) &&
-            ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
+            SectionHeader(viewer, "Transform")) {
             DrawTransform(viewer, scene, path);
         }
         // What Ernie reads on this type, set or not, then whatever else the prim holds.
@@ -140,7 +143,7 @@ class PropertiesPanel final : public Panel {
             }
         }
         if (!others.empty() &&
-            ImGui::CollapsingHeader("Other attributes", ImGuiTreeNodeFlags_DefaultOpen)) {
+            SectionHeader(viewer, "Other attributes")) {
             DrawAttributes(viewer, scene, path, others);
         }
     }

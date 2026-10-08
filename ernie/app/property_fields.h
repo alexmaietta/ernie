@@ -68,6 +68,10 @@ bool ResetSquare(const Viewer& viewer, bool authored);
 /// column; returns false (and nothing to end) when it is clipped.
 bool BeginPropertyTable(const char* id, float labelWidth);
 
+/// A collapsible section bar titled `title` in the theme's header colour, open by default, as
+/// Kit's collapsable frames; returns whether it is open.
+bool SectionHeader(const Viewer& viewer, const char* title);
+
 /// The label column's width in pixels for the viewer's theme and font.
 float PropertyLabelWidth(const Viewer& viewer);
 

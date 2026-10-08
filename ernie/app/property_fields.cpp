@@ -209,6 +209,17 @@ float PropertyLabelWidth(const Viewer& viewer) {
     return viewer.GetTheme().propertyLabelWidth * ImGui::GetFontSize() / viewer.GetTheme().fontSize;
 }
 
+bool SectionHeader(const Viewer& viewer, const char* title) {
+    const Theme& theme = viewer.GetTheme();
+    const auto colour = [](const glm::vec4& c) { return ImVec4(c.r, c.g, c.b, c.a); };
+    ImGui::PushStyleColor(ImGuiCol_Header, colour(theme.header));
+    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, colour(theme.fieldHovered));
+    ImGui::PushStyleColor(ImGuiCol_HeaderActive, colour(theme.header));
+    const bool open = ImGui::CollapsingHeader(title, ImGuiTreeNodeFlags_DefaultOpen);
+    ImGui::PopStyleColor(3);
+    return open;
+}
+
 bool MatchesFilter(std::string_view label, std::string_view attribute, std::string_view filter) {
     if (filter.empty()) {
         return true;
@@ -328,7 +339,7 @@ std::string DrawPropertySections(Viewer& viewer, const Path& path,
         if (!matches) {
             continue;
         }
-        if (ImGui::CollapsingHeader(section.title.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (SectionHeader(viewer, section.title.c_str())) {
             ImGui::PushID(section.title.c_str());
             const std::string failure =
                 DrawPropertyFields(viewer, path, section.fields, labelWidth, filter);
