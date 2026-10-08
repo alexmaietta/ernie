@@ -254,3 +254,45 @@ TEST_F(RasterDelegateTest, DomesLightEverySurfaceDiffusely) {
     ernie::RenderProductSetOutputs lower = delegate.Step(scene);
     EXPECT_LT(At<float>(MapVars(lower).at("HdrColor"), c, c, 1), 0.03f) << "turned upside down";
 }
+
+TEST_F(RasterDelegateTest, PhotometricLightsLightByTheirLuxAndLumens) {
+    // FlatScene's grey floor (albedo 0.5) under a 1 m square panel 5 m up giving 1000 lux at 5 m:
+    // the floor below receives about 990 lux (the panel is not quite a point), so its luminance
+    // is 0.5 x 990 / pi cd/m^2.
+    Scene scene = FlatScene();
+    scene.Remove("/World/Sun");
+    // A plain Lambertian floor, not the hillshaded terrain.
+    scene.Remove("/World/Terrain");
+    scene.Define("/World/Floor", tokens::kGroundPlane)
+        .Set(tokens::kMaterialBinding, Path("/Looks/Grey"));
+    // Close enough that the centre pixel samples the floor within a few centimetres of the axis,
+    // where the illuminance has not yet fallen off (by cos^4 of the angle off it).
+    scene.Set("/World/Camera", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, 20.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
+    scene.Define("/World/Panel", tokens::kRectLight)
+        .Set(tokens::kTransform,
+             ernie::LookAtTransform({0.0, 0.0, 5.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}))
+        .Set(tokens::kPhotometricIlluminance, 1000.0)
+        .Set(tokens::kPhotometricIlluminanceDistance, 5.0)
+        .Set(tokens::kShadowEnable, false);
+    RasterDelegate delegate(*context_);
+    auto outputs = delegate.Step(scene);
+    const std::size_t c = kVarSize / 2;
+    const glm::vec3 hdr(At<float>(MapVars(outputs).at("HdrColor"), c, c, 0),
+                        At<float>(MapVars(outputs).at("HdrColor"), c, c, 1),
+                        At<float>(MapVars(outputs).at("HdrColor"), c, c, 2));
+    const float luminance = glm::dot(hdr, glm::vec3(0.2126f, 0.7152f, 0.0722f));
+    EXPECT_NEAR(M_PI * luminance / 0.5, 990.0, 25.0);
+}
+
+TEST_F(RasterDelegateTest, ARenderersFirstFrameHasItsLightsShadows) {
+    // The shading of a renderer's first frame once read the light shadow maps' size before the
+    // lights made them, losing the spot's shadow for that frame.
+    Scene scene = LampScene(10.0, 60.0f);
+    DefineQuad(scene, "/World/Blocker");
+    scene.Set("/World/Blocker", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 5.0)));
+    RasterDelegate first(*context_);
+    const std::vector<std::uint8_t> once = Bytes(first.Render(scene));
+    EXPECT_EQ(Bytes(first.Render(scene)), once);
+}

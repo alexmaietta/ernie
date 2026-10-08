@@ -980,10 +980,11 @@ void RasterRenderer::Update(const FrameParams& params, std::span<RasterDrawable*
     for (const std::size_t model : modelsInUse_) {
         ShadingPipeline(model);
     }
+    // The lights first: shading reads the size of the light shadow maps they make.
+    WriteLights(params, bounds);
     WriteShading(params);
     WriteSensor(params);
 
-    WriteLights(params, bounds);
     shadowViews_ = cascades_;
     shadowViews_.insert(shadowViews_.end(), lightViews_.begin(), lightViews_.end());
     for (RasterDrawable* drawable : drawables) {

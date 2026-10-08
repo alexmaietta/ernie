@@ -74,9 +74,13 @@ def test_cameras_lighting_and_selection(viewer):
         ernie.tokens.HIDDEN_LINE
     )
     viewer.wireframe = None
-    assert "PrimId" in viewer.view_vars and "SpectralRadiance" not in viewer.view_vars
+    assert "PrimId" in viewer.view_vars and "SpectralRadiance" in viewer.view_vars
     viewer.view_var = "Normal"
     assert viewer.step()
+    viewer.view_var = "SpectralRadiance"
+    viewer.view_band = 3
+    assert viewer.step()
+    viewer.view_band = -1
     viewer.view_var = "LdrColor"
     seen = []
     viewer.on_selection(lambda v, paths: seen.append(paths))
