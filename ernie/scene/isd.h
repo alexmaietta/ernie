@@ -152,7 +152,9 @@ class IsdCameraModel {
 
   protected:
     /// @throws std::invalid_argument if `isd` has no states or rotations, a singular focal plane
-    /// map, or a distortion model other than none, "radial", "transverse" and "lrolrocnac".
+    /// map, or a distortion model other than none, "radial", "transverse", "radtan" (OpenCV's
+    /// radial-tangential, coefficients k1, k2, p1, p2, k3 on coordinates over the focal length)
+    /// and "lrolrocnac".
     explicit IsdCameraModel(IsdSensor isd);
 
     /// The rotation `rotation` describes at `time`: its constant after its time-dependent part.
@@ -182,10 +184,11 @@ class IsdCameraModel {
     /// The camera-to-body pose of Ernie's camera on `axes` at `time`.
     glm::dmat4 PoseAt(double time, const glm::dmat3& axes) const;
     /// Fits the lens's distortion at detector lines `lines` across the samples as Brown-Conrady
-    /// radial terms on `camera` (and a scale into its focal length, from a radial model's
-    /// constant term), with `facing` and `axes` as `ErnieAxes`; returns the fit's largest
-    /// departure from the ISD's, in pixels. One line fits along it only (x), as a pushbroom's
-    /// lens resamples; more fit both of the image's directions.
+    /// terms on `camera` (and a scale into its focal length, from a radial model's constant
+    /// term), with `facing` and `axes` as `ErnieAxes`; returns the fit's largest departure from
+    /// the ISD's, in pixels. One line fits along it only (x) and radially, as a pushbroom's lens
+    /// resamples; more fit both of the image's directions with the tangential terms too, which
+    /// a radtan model's map onto exactly.
     double FitDistortion(Camera& camera, std::span<const double> lines, const glm::dmat3& axes,
                          double facing) const;
     /// The frame camera of `rows` image rows exposed at `time`, row coordinate r (0 the top edge,

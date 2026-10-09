@@ -875,7 +875,9 @@ void BindScene(nb::module_& m) {
                     .Set(kLensDistortion,
                          std::vector<float>{static_cast<float>(camera.lens.k1),
                                             static_cast<float>(camera.lens.k2),
-                                            static_cast<float>(camera.lens.k3), 0.0f, 0.0f})
+                                            static_cast<float>(camera.lens.k3),
+                                            static_cast<float>(camera.lens.p1),
+                                            static_cast<float>(camera.lens.p2)})
                     .Set(kClippingRange, glm::dvec2(camera.nearPlane, camera.farPlane))
                     .Set(kExposureTime, camera.exposureTime);
                 return nb::make_tuple(camera.width, camera.height, framelet.firstLine,
@@ -949,7 +951,9 @@ void BindScene(nb::module_& m) {
                     .Set(kLensDistortion,
                          std::vector<float>{static_cast<float>(camera.lens.k1),
                                             static_cast<float>(camera.lens.k2),
-                                            static_cast<float>(camera.lens.k3), 0.0f, 0.0f})
+                                            static_cast<float>(camera.lens.k3),
+                                            static_cast<float>(camera.lens.p1),
+                                            static_cast<float>(camera.lens.p2)})
                     .Set(kClippingRange, glm::dvec2(camera.nearPlane, camera.farPlane));
                 return nb::make_tuple(camera.width, camera.height, view.rowsReversed);
             },

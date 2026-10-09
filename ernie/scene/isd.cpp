@@ -337,9 +337,14 @@ IsdCameraModel::IsdCameraModel(IsdSensor isd) : isd_(std::move(isd)) {
         throw std::invalid_argument("The ISD's focal plane map to pixels is singular");
     }
     if (!isd_.distortion.empty() && isd_.distortion != "radial" &&
-        isd_.distortion != "transverse" && isd_.distortion != "lrolrocnac") {
-        throw std::invalid_argument("The ISD's distortion model '" + isd_.distortion +
-                                    "' is not supported; use radial, transverse or lrolrocnac");
+        isd_.distortion != "transverse" && isd_.distortion != "radtan" &&
+        isd_.distortion != "lrolrocnac") {
+        throw std::invalid_argument(
+            "The ISD's distortion model '" + isd_.distortion +
+            "' is not supported; use radial, transverse, radtan or lrolrocnac");
+    }
+    if (isd_.distortion == "radtan" && isd_.distortionCoefficients.size() != 5) {
+        throw std::invalid_argument("Radtan distortion takes five coefficients: k1, k2, p1, p2, k3");
     }
     if (isd_.distortion == "lrolrocnac" && isd_.distortionCoefficients.size() != 1) {
         throw std::invalid_argument("LRO NAC distortion takes one coefficient");
@@ -454,34 +459,111 @@ glm::dvec2 TransverseDistort(const std::vector<double>& k, glm::dvec2 u) {
     return d;
 }
 
-// usgscsm's `newtonRaphson` on `TransverseDistort` (with `transverseDistortionJacobian`), as its
-// `removeDistortion` calls it: from the distorted point, to a tolerance of 1e-6 mm in 20 tries,
-// stopping where the Jacobian's determinant falls under 1e-6 (so a singular polynomial, as
-// usgscsm's simple framer has, leaves the point as it is).
-glm::dvec2 TransverseUndistort(const std::vector<double>& k, glm::dvec2 d) {
+// `transverseDistortionJacobian`: d(distorted) / d(undistorted), columns x and y.
+glm::dmat2 TransverseJacobian(const std::vector<double>& k, glm::dvec2 u) {
+    const double dX[10] = {0.0, 1.0, 0.0, 2.0 * u.x, u.y, 0.0,
+                           3.0 * u.x * u.x, 2.0 * u.x * u.y, u.y * u.y, 0.0};
+    const double dY[10] = {0.0, 0.0, 1.0, 0.0, u.x, 2.0 * u.y,
+                           0.0, u.x * u.x, 2.0 * u.x * u.y, 3.0 * u.y * u.y};
+    glm::dmat2 jacobian(0.0);
+    for (std::size_t i = 0; i < 10; ++i) {
+        jacobian[0] += dX[i] * glm::dvec2(k[i], k[i + 10]);
+        jacobian[1] += dY[i] * glm::dvec2(k[i], k[i + 10]);
+    }
+    return jacobian;
+}
+
+// usgscsm's `computeRadTanDistortion`: OpenCV's radial-tangential model on normalised
+// coordinates `u` (focal plane over focal length), coefficients (k1, k2, p1, p2, k3).
+glm::dvec2 RadTanDistort(const std::vector<double>& k, glm::dvec2 u) {
+    const double r2 = glm::dot(u, u);
+    const double radial = 1.0 + r2 * (k[0] + r2 * (k[1] + r2 * k[4]));
+    return {u.x * radial + 2.0 * k[2] * u.x * u.y + k[3] * (r2 + 2.0 * u.x * u.x),
+            u.y * radial + k[2] * (r2 + 2.0 * u.y * u.y) + 2.0 * k[3] * u.x * u.y};
+}
+
+// `radTanDistortionJacobian`.
+glm::dmat2 RadTanJacobian(const std::vector<double>& k, glm::dvec2 u) {
+    const double r2 = glm::dot(u, u);
+    const double radial = 1.0 + r2 * (k[0] + r2 * (k[1] + r2 * k[4]));
+    // d(radial) / d(r^2)
+    const double slope = k[0] + r2 * (2.0 * k[1] + 3.0 * r2 * k[4]);
+    const double xx = radial + 2.0 * u.x * u.x * slope + 2.0 * k[2] * u.y + 6.0 * k[3] * u.x;
+    const double xy = 2.0 * u.x * u.y * slope + 2.0 * k[2] * u.x + 2.0 * k[3] * u.y;
+    const double yx = 2.0 * u.x * u.y * slope + 2.0 * k[2] * u.x + 2.0 * k[3] * u.y;
+    const double yy = radial + 2.0 * u.y * u.y * slope + 6.0 * k[2] * u.y + 2.0 * k[3] * u.x;
+    return glm::dmat2(glm::dvec2(xx, yx), glm::dvec2(xy, yy));
+}
+
+// usgscsm's `newtonRaphson`, as its `removeDistortion` calls it: the undistorted point whose
+// `distort` is `d`, from `d`, to a tolerance of 1e-6 in 20 tries, stopping where the Jacobian's
+// determinant falls under 1e-6 (so a singular polynomial, as usgscsm's simple framer has, leaves
+// the point as it is).
+template <typename Distort, typename Jacobian>
+glm::dvec2 UsgscsmUndistort(glm::dvec2 d, const Distort& distort, const Jacobian& jacobian) {
     constexpr double kTolerance = 1e-6;
     glm::dvec2 u = d;
-    glm::dvec2 f = TransverseDistort(k, u);
+    glm::dvec2 f = distort(u);
     for (int count = 1; std::abs(f.x) + std::abs(f.y) > kTolerance && count < 20; ++count) {
-        f = d - TransverseDistort(k, u);
-        const double dX[10] = {0.0, 1.0, 0.0, 2.0 * u.x, u.y, 0.0,
-                               3.0 * u.x * u.x, 2.0 * u.x * u.y, u.y * u.y, 0.0};
-        const double dY[10] = {0.0, 0.0, 1.0, 0.0, u.x, 2.0 * u.y,
-                               0.0, u.x * u.x, 2.0 * u.x * u.y, 3.0 * u.y * u.y};
-        double xx = 0.0, xy = 0.0, yx = 0.0, yy = 0.0;
-        for (std::size_t i = 0; i < 10; ++i) {
-            xx += dX[i] * k[i];
-            xy += dY[i] * k[i];
-            yx += dX[i] * k[i + 10];
-            yy += dY[i] * k[i + 10];
-        }
-        const double determinant = xx * yy - xy * yx;
+        f = d - distort(u);
+        const glm::dmat2 j = jacobian(u);
+        const double determinant = glm::determinant(j);
         if (std::abs(determinant) < 1e-6) {
             break;
         }
-        u += glm::dvec2(yy * f.x - xy * f.y, xx * f.y - yx * f.x) / determinant;
+        u += glm::inverse(j) * f;
     }
     return u;
+}
+
+// The least-squares solution of the first `n` equations of normal system `normal` x = `right`,
+// scaled by its diagonal (Jacobi) for conditioning; zeros where it is singular.
+template <std::size_t N>
+std::array<double, N> SolveNormal(std::array<std::array<double, N>, N> normal,
+                                  std::array<double, N> right, std::size_t n) {
+    std::array<double, N> scale{};
+    for (std::size_t i = 0; i < n; ++i) {
+        scale[i] = normal[i][i] > 0.0 ? 1.0 / std::sqrt(normal[i][i]) : 0.0;
+    }
+    for (std::size_t i = 0; i < n; ++i) {
+        for (std::size_t j = 0; j < n; ++j) {
+            normal[i][j] *= scale[i] * scale[j];
+        }
+        right[i] *= scale[i];
+    }
+    // Gaussian elimination with partial pivoting.
+    for (std::size_t c = 0; c < n; ++c) {
+        std::size_t pivot = c;
+        for (std::size_t r = c + 1; r < n; ++r) {
+            if (std::abs(normal[r][c]) > std::abs(normal[pivot][c])) {
+                pivot = r;
+            }
+        }
+        if (std::abs(normal[pivot][c]) < 1e-300) {
+            return {};
+        }
+        std::swap(normal[c], normal[pivot]);
+        std::swap(right[c], right[pivot]);
+        for (std::size_t r = c + 1; r < n; ++r) {
+            const double factor = normal[r][c] / normal[c][c];
+            for (std::size_t j = c; j < n; ++j) {
+                normal[r][j] -= factor * normal[c][j];
+            }
+            right[r] -= factor * right[c];
+        }
+    }
+    std::array<double, N> x{};
+    for (std::size_t c = n; c-- > 0;) {
+        double sum = right[c];
+        for (std::size_t j = c + 1; j < n; ++j) {
+            sum -= normal[c][j] * x[j];
+        }
+        x[c] = sum / normal[c][c];
+    }
+    for (std::size_t i = 0; i < n; ++i) {
+        x[i] *= scale[i];
+    }
+    return x;
 }
 
 }  // namespace
@@ -496,7 +578,16 @@ glm::dvec2 IsdCameraModel::Undistort(glm::dvec2 d) const {
         return {d.x, d.y / (1.0 + k[0] * d.y * d.y)};
     }
     if (isd_.distortion == "transverse") {
-        return TransverseUndistort(k, d);
+        return UsgscsmUndistort(
+            d, [&](glm::dvec2 u) { return TransverseDistort(k, u); },
+            [&](glm::dvec2 u) { return TransverseJacobian(k, u); });
+    }
+    if (isd_.distortion == "radtan") {
+        // On coordinates normalised by the focal length, as usgscsm's `removeDistortion`.
+        const double f = isd_.focalLengthMm;
+        return f * UsgscsmUndistort(
+                       d / f, [&](glm::dvec2 u) { return RadTanDistort(k, u); },
+                       [&](glm::dvec2 u) { return RadTanJacobian(k, u); });
     }
     return d;
 }
@@ -507,6 +598,10 @@ glm::dvec2 IsdCameraModel::Distort(glm::dvec2 undistorted) const {
     }
     if (isd_.distortion == "transverse") {
         return TransverseDistort(isd_.distortionCoefficients, undistorted);
+    }
+    if (isd_.distortion == "radtan") {
+        const double f = isd_.focalLengthMm;
+        return f * RadTanDistort(isd_.distortionCoefficients, undistorted / f);
     }
     return NewtonInverse([&](glm::dvec2 d) { return Undistort(d); }, undistorted);
 }
@@ -611,37 +706,54 @@ double IsdCameraModel::FitDistortion(Camera& camera, std::span<const double> lin
             largest = std::max(largest, glm::dot(u, u));
         }
     }
-    // distorted = undistorted (a + b1 r^2 + b2 r^4 + b3 r^6): a scale too, as radial models
-    // with a constant term have, which the camera's focal length takes (f a), leaving
-    // Brown-Conrady's k = b / a on its sensor's coordinates (distorted / a). In powers of
-    // r^2 / largest, for a well-conditioned system, then scaled back.
-    glm::dmat4 normal(0.0);
-    glm::dvec4 right(0.0);
+    // distorted = undistorted (a + b1 r^2 + b2 r^4 + b3 r^6) + the tangential terms of t1 and
+    // t2: a scale too, as radial models with a constant term have, which the camera's focal
+    // length takes (f a), leaving Brown-Conrady's k = b / a and p = t / a on its sensor's
+    // coordinates (distorted / a). The tangential terms only across a frame: a pushbroom's lens
+    // resamples along the line, radially.
+    const std::size_t unknowns = across ? 6 : 4;
+    const auto basis = [](glm::dvec2 u, int axis) {
+        const double r2 = glm::dot(u, u);
+        const double v = u[axis];
+        const double cross = 2.0 * u.x * u.y;
+        const double own = r2 + 2.0 * v * v;
+        return std::array<double, 6>{v,          v * r2,     v * r2 * r2, v * r2 * r2 * r2,
+                                     axis == 0 ? cross : own, axis == 0 ? own : cross};
+    };
+    std::array<std::array<double, 6>, 6> normal{};
+    std::array<double, 6> right{};
     for (const auto& [u, d] : samples) {
-        const double s = glm::dot(u, u) / largest;
-        const glm::dvec4 powers(1.0, s, s * s, s * s * s);
         for (int axis = 0; axis < (across ? 2 : 1); ++axis) {
-            const glm::dvec4 basis = u[axis] * powers;
-            normal += glm::outerProduct(basis, basis);
-            right += basis * d[axis];
+            const std::array<double, 6> row = basis(u, axis);
+            for (std::size_t i = 0; i < unknowns; ++i) {
+                for (std::size_t j = 0; j < unknowns; ++j) {
+                    normal[i][j] += row[i] * row[j];
+                }
+                right[i] += row[i] * d[axis];
+            }
         }
     }
-    glm::dvec4 b(1.0, 0.0, 0.0, 0.0);
-    if (largest > 0.0 && glm::determinant(normal) != 0.0) {
-        b = glm::inverse(normal) * right;
-        b /= glm::dvec4(1.0, largest, largest * largest, largest * largest * largest);
+    std::array<double, 6> b = SolveNormal(normal, right, largest > 0.0 ? unknowns : 0);
+    if (b[0] == 0.0) {
+        b = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
-    const double scale = b.x;
+    const double scale = b[0];
     camera.focalLengthMm = f * scale;
-    camera.lens.k1 = b.y / scale;
-    camera.lens.k2 = b.z / scale;
-    camera.lens.k3 = b.w / scale;
+    camera.lens.k1 = b[1] / scale;
+    camera.lens.k2 = b[2] / scale;
+    camera.lens.k3 = b[3] / scale;
+    camera.lens.p1 = b[4] / scale;
+    camera.lens.p2 = b[5] / scale;
     double residual = 0.0;
     for (const auto& [u, d] : samples) {
-        const double r2 = glm::dot(u, u);
-        const glm::dvec2 fitted = u * (scale + r2 * (b.y + r2 * (b.z + r2 * b.w)));
-        const glm::dvec2 error = glm::abs(fitted - d) * (f / pitch);
-        residual = std::max(residual, across ? std::max(error.x, error.y) : error.x);
+        for (int axis = 0; axis < (across ? 2 : 1); ++axis) {
+            const std::array<double, 6> row = basis(u, axis);
+            double fitted = 0.0;
+            for (std::size_t i = 0; i < unknowns; ++i) {
+                fitted += row[i] * b[i];
+            }
+            residual = std::max(residual, std::abs(fitted - d[axis]) * (f / pitch));
+        }
     }
     return residual;
 }

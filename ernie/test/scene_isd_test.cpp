@@ -259,10 +259,50 @@ TEST(IsdFrame, MatchesUsgscsmOnItsTestCameras) {
                  std::invalid_argument);
 }
 
+TEST(IsdFrame, DawnsFramingCameraSeesVestaThroughItsRadTanLens) {
+    ernie::IsdSensor isd = ernie::ReadIsdFile(Fixture("dawnfc_radtan.json"));
+    EXPECT_EQ(isd.distortion, "radtan");
+    ASSERT_EQ(isd.distortionCoefficients.size(), 5u);
+    EXPECT_DOUBLE_EQ(isd.distortionCoefficients[0], 8.4e-6);
+    const ernie::IsdFrame dawn(isd);
+    const glm::dvec3 ground = dawn.ImageToGround(512.0, 512.0);
+    // On Vesta's ellipsoid (radii 289 and 229 km).
+    const double a = 289e3;
+    const double b = 229e3;
+    EXPECT_NEAR((ground.x * ground.x + ground.y * ground.y) / (a * a) + ground.z * ground.z / (b * b),
+                1.0, 1e-9);
+    // usgscsm's radtan inversion test coefficients (DistortionTests.cpp), and stronger ones:
+    // pixels come back through the lens.
+    for (const std::vector<double>& k : {std::vector<double>{0.000031, -0.000056, 1.3e-5, -1.7e-6,
+                                                             2.9e-8},
+                                         std::vector<double>{1.0, 0.0, 0.05, -0.03, 0.0}}) {
+        isd.distortionCoefficients = k;
+        const ernie::IsdFrame lens(isd);
+        for (const double line : {420.5, 512.0, 600.25}) {
+            for (const double sample : {430.0, 512.0, 590.5}) {
+                const glm::dvec2 back = lens.GroundToImage(lens.ImageToGround(line, sample));
+                EXPECT_NEAR(back.x, line, 1e-6);
+                EXPECT_NEAR(back.y, sample, 1e-6);
+            }
+        }
+    }
+    isd.distortionCoefficients = {1.0};
+    EXPECT_THROW(ernie::IsdFrame{isd}, std::invalid_argument);
+}
+
 // The frame ISD's view as Ernie renders it: the ISD's ground points land on its pixels.
 TEST(IsdFrame, ViewsAreFrameCamerasOnTheIsdsPixels) {
-    for (const char* name : {"simpleFramerISD.json", "orbitalFramer.json"}) {
-        const ernie::IsdFrame frame(ernie::ReadIsdFile(Fixture(name)));
+    std::vector<std::pair<std::string, ernie::IsdSensor>> isds;
+    for (const char* name : {"simpleFramerISD.json", "orbitalFramer.json", "dawnfc_radtan.json"}) {
+        isds.emplace_back(name, ernie::ReadIsdFile(Fixture(name)));
+    }
+    // Dawn's framing camera through a strong radial-tangential lens, which Ernie's Brown-Conrady
+    // lens (the same OpenCV model) takes exactly.
+    ernie::IsdSensor tangential = isds.back().second;
+    tangential.distortionCoefficients = {1.0, 0.0, 0.05, -0.03, 0.0};
+    isds.emplace_back("dawnfc_radtan.json, tangential", tangential);
+    for (const auto& [name, isd] : isds) {
+        const ernie::IsdFrame frame(isd);
         const ernie::IsdFrame::FrameView view = frame.View();
         const ernie::Camera& c = view.camera;
         EXPECT_NO_THROW(c.Check()) << name;
