@@ -855,26 +855,28 @@ struct Viewer::State {
                 return panel->IsVisible() && panel->GetDock() == dock;
             });
         };
+        const auto share = [](float fraction) { return std::clamp(fraction, 0.02f, 0.98f); };
+        const DockSizes& sizes = options.docks;
         ImGuiID center = dockSpace;
         if (wants(Dock::Left)) {
-            dockNodes[Dock::Left] =
-                ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.24f, nullptr, &center);
+            dockNodes[Dock::Left] = ImGui::DockBuilderSplitNode(
+                center, ImGuiDir_Left, share(sizes.left), nullptr, &center);
         }
         // The right column: `Right` above `RightLower`, either taking all of it alone.
         if (wants(Dock::Right) || wants(Dock::RightLower)) {
-            ImGuiID column =
-                ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.28f, nullptr, &center);
+            ImGuiID column = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right,
+                                                         share(sizes.right), nullptr, &center);
             if (wants(Dock::Right) && wants(Dock::RightLower)) {
-                dockNodes[Dock::RightLower] =
-                    ImGui::DockBuilderSplitNode(column, ImGuiDir_Down, 0.62f, nullptr, &column);
+                dockNodes[Dock::RightLower] = ImGui::DockBuilderSplitNode(
+                    column, ImGuiDir_Down, share(sizes.rightLower), nullptr, &column);
                 dockNodes[Dock::Right] = column;
             } else {
                 dockNodes[wants(Dock::Right) ? Dock::Right : Dock::RightLower] = column;
             }
         }
         if (wants(Dock::Bottom)) {
-            dockNodes[Dock::Bottom] =
-                ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.25f, nullptr, &center);
+            dockNodes[Dock::Bottom] = ImGui::DockBuilderSplitNode(
+                center, ImGuiDir_Down, share(sizes.bottom), nullptr, &center);
         }
         ImGui::DockBuilderDockWindow(kViewportTitle, center);
         for (const auto& panel : panels) {

@@ -364,6 +364,35 @@ TEST_F(ViewerTest, PanelsDockWhereTheyAsk) {
     std::filesystem::remove(path);
 }
 
+TEST_F(ViewerTest, DockSizesSetTheDefaultLayout) {
+    // The height of the Log's dock as a fraction of the window's, read during the UI.
+    const auto logShare = [](Viewer& viewer) {
+        float share = 0.0f;
+        const std::uint64_t id = viewer.OnUi([&](Viewer&, const FrameInfo&) {
+            if (const ImGuiWindow* log = ImGui::FindWindowByName("Log")) {
+                share = log->Size.y / ImGui::GetMainViewport()->WorkSize.y;
+            }
+        });
+        for (int frame = 0; frame < 3; ++frame) {
+            viewer.Step();
+        }
+        viewer.RemoveCallback(id);
+        return share;
+    };
+    const float usual = logShare(*viewer_);
+    viewer_.reset();
+    ViewerOptions options;
+    options.hidden = true;
+    options.validation = true;
+    options.width = 640;
+    options.height = 400;
+    options.docks.bottom = 0.1f;
+    viewer_ = std::make_unique<Viewer>(scene_, options);
+    const float small = logShare(*viewer_);
+    EXPECT_NEAR(usual, 0.25f, 0.05f);
+    EXPECT_NEAR(small, 0.1f, 0.05f);
+}
+
 TEST_F(ViewerTest, FunctionPanelsDrawAndPanelsAreFoundByTitle) {
     int draws = 0;
     Panel& panel = viewer_->AddPanel("Function", Dock::Bottom, [&](Viewer& viewer) {

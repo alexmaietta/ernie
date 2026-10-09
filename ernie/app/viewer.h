@@ -31,6 +31,15 @@ enum class Lighting {
     Default,  ///< A white sun from above with shadows, ignoring the scene's lights.
 };
 
+/// The default layout's docks as fractions of the window: what each takes of the space left once
+/// the docks before it are placed (left, then the right column, then the bottom).
+struct DockSizes {
+    float left = 0.24f;        ///< `Dock::Left`'s share of the width.
+    float right = 0.28f;       ///< The right column's share of what the left dock leaves.
+    float rightLower = 0.62f;  ///< `Dock::RightLower`'s share of the right column's height.
+    float bottom = 0.25f;      ///< `Dock::Bottom`'s share of the height beside the side docks.
+};
+
 /// Options for opening a `Viewer`.
 struct ViewerOptions {
     std::string title = "Ernie";      ///< Window title.
@@ -45,6 +54,7 @@ struct ViewerOptions {
     Theme theme = DarkTheme();        ///< Colours and metrics of the UI.
     std::filesystem::path layout;     ///< Docking layout (ImGui .ini) to load; empty uses
                                       ///< the built-in default layout.
+    DockSizes docks;                  ///< The default layout's dock sizes, clamped to (0, 1).
     Path settings;                    ///< RenderSettings prim the viewport starts with;
                                       ///< empty picks the first one, as `ResolveRenderPrims`.
 };
