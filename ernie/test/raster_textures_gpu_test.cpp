@@ -111,8 +111,9 @@ Scene PreviewScene() {
 
 TEST_F(RasterDelegateTest, AlbedoTexturesFollowTextureCoordinatesWithTheImageUpright) {
     // Red, green in the top row; blue, white in the bottom: t = 0 is the image's bottom row, so
-    // the quad shows the image as it is, red top left. Primaries come back through spectral
-    // upsampling and the camera's response less than pure, so each quadrant's own channel leads.
+    // the quad shows the image as it is, red top left. A 2 x 2 image filters bilinearly across
+    // the whole quad (pure only at texel centres, which the sampled pixels miss slightly) and the
+    // preview surface's white highlight greys it, so each quadrant's own channel leads.
     Scene scene = TexturedScene();
     const std::array<std::uint8_t, 16> texels{255, 0, 0,   255, 0,   255, 0,   255,
                                               0,   0, 255, 255, 255, 255, 255, 255};
@@ -246,4 +247,24 @@ TEST_F(RasterDelegateTest, OpacityThresholdsCutSurfacesOutOfImagesAndShadows) {
         << "the ground through the cut half, unshadowed";
     EXPECT_NEAR(GreenAt(scene, cut, 4.0f, 0.0f), GreenAt(scene, opaque, 4.0f, 0.0f), 1e-4f)
         << "the opaque half unchanged";
+}
+
+TEST_F(RasterDelegateTest, TexturesFollowTheSceneTheyComeFrom) {
+    // Two scenes whose texture prims share a path and an attribute version but hold different
+    // images: the second's must not show the first's (a cache keyed without the scene did).
+    RasterDelegate delegate(*context_);
+    const auto render = [&](std::uint8_t red) {
+        Scene scene = TexturedScene();
+        const std::array<std::uint8_t, 4> texel{red, 0, 0, 255};
+        scene.Write("/Looks/M/Tex", tokens::kShaderTexture,
+                    Tensor::Copy<std::uint8_t>(texel, {1, 1, 4}));
+        ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor, "/Looks/M/Tex",
+                       "outputs:rgb");
+        const Tensor hdr = Render(delegate, scene, "HdrColor");
+        const std::size_t centre = (kSize / 2) * kSize + kSize / 2;
+        return hdr.As<float>()[4 * centre];
+    };
+    const float dark = render(0);
+    const float bright = render(255);
+    EXPECT_GT(bright, dark + 0.1f);
 }

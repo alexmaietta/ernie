@@ -69,7 +69,8 @@ def test_meshes_show_an_image_file_through_their_texture_coordinates(renderer, t
     scene.define("/World/Camera", tokens.CAMERA).set(
         tokens.TRANSFORM, ernie.look_at_transform((0, 0, 60), (0, 0, 0), up=(0, 1, 0))
     ).set(tokens.FOCAL_LENGTH, 18.0)
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT)
+    # A dim sun, so nothing clips, on a matte material, so no highlight greys it.
+    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(tokens.INTENSITY, 0.3)
     scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(tokens.RESOLUTION, (48, 48))
     half = 12.0
     points = np.array([[-half, -half, 0], [half, -half, 0], [half, half, 0], [-half, half, 0]])
@@ -79,14 +80,16 @@ def test_meshes_show_an_image_file_through_their_texture_coordinates(renderer, t
         "primvars:st", np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32)
     ).set(tokens.MATERIAL_BINDING, ernie.Path("/Looks/M"))
     texture = preview_surface(scene, "/Looks/M")
+    scene.set("/Looks/M", tokens.BRDF, "lambert")
     scene.set(texture, tokens.FILE, str(tmp_path / "halves.png"))
 
     pixels = renderer.render(scene).astype(np.int32)
-    left = pixels[24, 14, :3]
-    right = pixels[24, 34, :3]
-    # Primaries come back less than pure through the spectral pipeline, so compare the halves.
-    assert left[0] > right[0] + 40 and left[0] > left[2], "red on the left"
-    assert right[2] > left[2] + 40 and right[2] > right[0], "blue on the right"
+    # About 6 m either side of the middle (1.45 m per pixel), well inside each half, where the
+    # filtering blends only texels of one colour: the primaries come back pure.
+    left = pixels[24, 20, :3]
+    right = pixels[24, 28, :3]
+    assert left[0] > 100 and max(left[1], left[2]) < 0.1 * left[0], f"red on the left {left}"
+    assert right[2] > 100 and max(right[0], right[1]) < 0.1 * right[2], f"blue on the right {right}"
     assert renderer.take_validation_messages() == []
 
 

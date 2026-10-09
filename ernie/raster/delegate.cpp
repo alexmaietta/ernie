@@ -2,6 +2,7 @@
 
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/scene/wide_view.h"
 #include "ernie/session/product_frame.h"
 #include "ernie/util/profile.h"
 
@@ -45,14 +46,14 @@ ImageEncoding EncodingOf(const TextureReader& reader) {
                                                        : ImageEncoding::Srgb;
 }
 
-/// What a texture's upload depends on: its source (and its tensor's version), colour space,
-/// wrapping, channel, and the scale and bias that normal maps and one-channel textures apply
-/// before upload.
+/// What a texture's upload depends on: its source (and for a tensor, the scene and its version,
+/// since another scene's prim at the same path holds another one), colour space, wrapping,
+/// channel, and the scale and bias that normal maps and one-channel textures apply before upload.
 std::string TextureKey(const Scene& scene, const TextureReader& reader) {
     std::string key = reader.Source();
     if (!reader.image.empty()) {
-        key += "@" + std::to_string(scene.AttributeVersion(Path(reader.image),
-                                                           tokens::kShaderTexture));
+        key += "@" + std::to_string(scene.Id()) + ":" +
+               std::to_string(scene.AttributeVersion(Path(reader.image), tokens::kShaderTexture));
     }
     key += "|" + std::to_string(static_cast<int>(reader.colorSpace)) + "|" +
            std::to_string(static_cast<int>(reader.wrapS)) + "|" +
@@ -1823,6 +1824,7 @@ void RasterDelegate::Record(VkCommandBuffer commands, const RenderingTarget& tar
     if (viewTargets_ == nullptr || viewTargets_->Extent().width != extent.width ||
         viewTargets_->Extent().height != extent.height ||
         viewTargets_->Bands() != renderer_.Bands().count || viewTargets_->AovNames() != viewAovs_ ||
+        viewTargets_->Faces() != renderer_.Faces() ||
         (viewTargets_->Var(render_vars::kMotionVector) != nullptr) != viewMotion_) {
         if (extent.width == 0 || extent.height == 0) {
             BeginRendering(commands, target);
@@ -1832,7 +1834,8 @@ void RasterDelegate::Record(VkCommandBuffer commands, const RenderingTarget& tar
         vkDeviceWaitIdle(context_.Device());
         const std::vector<std::string_view> vars = ViewHeldVars(viewAovs_.size(), viewMotion_);
         viewTargets_ = std::make_unique<RenderTargets>(context_, extent, renderer_.Bands().count,
-                                                       false, 1, vars, viewAovs_);
+                                                       false, 1, vars, viewAovs_,
+                                                       renderer_.Faces());
     }
     const RasterDrawable* drawables[] = {&terrain_, &planet_, &meshes_, &ground_, &points_};
     renderer_.Record(commands, *viewTargets_, drawables, &target, var);
@@ -1842,7 +1845,8 @@ std::shared_ptr<ProductFrame> RasterDelegate::AcquireFrame(const Path& product, 
                                                            int bands, std::uint32_t views,
                                                            bool batched,
                                                            std::span<const std::string_view> vars,
-                                                           std::span<const std::string> aovs) {
+                                                           std::span<const std::string> aovs,
+                                                           std::uint32_t faces) {
     ERNIE_ZONE("AcquireFrame");
     const std::vector<std::string_view> held = RequiredVars(vars);
     const std::vector<std::string> aovNames(aovs.begin(), aovs.end());
@@ -1854,6 +1858,7 @@ std::shared_ptr<ProductFrame> RasterDelegate::AcquireFrame(const Path& product, 
                            (targets.Extent().width != extent.width ||
                             targets.Extent().height != extent.height || targets.Bands() != bands ||
                             targets.Shared() != shared || frame->images->Views() != views ||
+                            targets.Faces() != faces ||
                             frame->batched != batched || targets.Vars() != held ||
                             targets.AovNames() != aovNames);
         if (stale) {
@@ -1874,15 +1879,16 @@ std::shared_ptr<ProductFrame> RasterDelegate::AcquireFrame(const Path& product, 
     frame->linearPool = &linearPool_;
     frame->batched = batched;
     // A batch of more views than one set of targets holds renders into consecutive chunks.
-    const std::uint32_t chunk = RenderTargets::MaxViews(context_, bands);
+    const std::uint32_t chunk = RenderTargets::MaxViews(context_, bands, faces);
     if (views <= chunk) {
         frame->images = std::make_unique<RenderTargets>(context_, extent, bands, shared, views,
-                                                        held, aovNames);
+                                                        held, aovNames, faces);
     } else {
         std::vector<std::unique_ptr<FrameImages>> chunks;
         for (std::uint32_t first = 0; first < views; first += chunk) {
-            chunks.push_back(std::make_unique<RenderTargets>(
-                context_, extent, bands, shared, std::min(chunk, views - first), held, aovNames));
+            chunks.push_back(std::make_unique<RenderTargets>(context_, extent, bands, shared,
+                                                             std::min(chunk, views - first), held,
+                                                             aovNames, faces));
         }
         frame->images = std::make_unique<ChunkedFrameImages>(std::move(chunks));
     }
@@ -2067,8 +2073,14 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         std::erase_if(chains, [](const FrameParams::SensorChain& chain) {
             return chain.vars.empty();
         });
-        std::shared_ptr<ProductFrame> frame =
-            AcquireFrame(spec.product, spec.resolution, bands, views, batched, vars, aovs);
+        // A wide fisheye draws its views on cube faces, each a layer of the raster images.
+        const std::uint32_t faces =
+            NeedsCubeFaces(CameraOf(scene, cameras.front(), spec.resolution.width,
+                                    spec.resolution.height))
+                ? static_cast<std::uint32_t>(kCubeFaces)
+                : 1u;
+        std::shared_ptr<ProductFrame> frame = AcquireFrame(spec.product, spec.resolution, bands,
+                                                           views, batched, vars, aovs, faces);
         std::optional<glm::dmat4> posesParent;
         if (gpuPoses != nullptr) {
             posesParent = PosesParentOf(scene, cameras.front());
