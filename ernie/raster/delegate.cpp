@@ -1314,10 +1314,31 @@ Tensor RasterDelegate::MapArray(Scene& scene, const Path& path, std::string_view
     } else if (type == kTerrain && attribute == kHeights &&
                path == ResolveRenderPrims(scene, {}).terrain) {
         view = terrain_.MapHeights(stream);
+    } else if (type == kCamera && attribute == kPoses) {
+        // The pose buffer the views read, shaped as the poses written; a frame finds them there
+        // and copies nothing (`StepAsync`).
+        const Tensor* written = GpuPosesOf(scene, path);
+        if (written == nullptr) {
+            throw std::invalid_argument("Cannot map the poses of '" + path.String() +
+                                        "': write them first as a contiguous float32 GPU array");
+        }
+        if (PosesAreQuaternions(*written) && QuaternionsWFirst(scene, path)) {
+            throw std::invalid_argument("Cannot map the poses of '" + path.String() +
+                                        "' with quaternions w first");
+        }
+        ComputeInterop& compute = RequireCompute();
+        const auto views = static_cast<std::uint32_t>(written->Shape()[0]);
+        view = compute.View(renderer_.EnsurePoseBuffer(views), DType::Float32, written->Shape());
+        // Nothing writes it until the frames already submitted have read it.
+        compute.WaitForVulkan(stream);
+        if (view.Data() != written->Data()) {
+            compute.Copy(*written, view, stream);
+        }
     } else {
         throw std::invalid_argument("Cannot map " + std::string(attribute) + " of '" +
                                     path.String() + "': only a Mesh's points, a PointInstancer's "
-                                    "arrays, a Points prim's points and the Terrain's heights map");
+                                    "arrays, a Points prim's points, the Terrain's heights and a "
+                                    "Camera's poses map");
     }
     scene.Write(path, attribute, view, stream);
     return view;
@@ -2096,7 +2117,12 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
             // Once no submission reads the pose buffer (`UpdatePrims` waits), on the writer's
             // stream; the submission waits for it (`SubmitWaits`).
             const std::uintptr_t stream = scene.WriteStream(cameras.front(), tokens::kPoses);
-            if (gpuPosesQuaternions_ && QuaternionsWFirst(scene, cameras.front())) {
+            ComputeInterop& compute = RequireCompute();
+            if (gpuPoses->Data() ==
+                compute.View(renderer_.EnsurePoseBuffer(1), DType::Float32, {1}).Data()) {
+                // Written in place into the pose buffer (`MapArray`): only the writes to wait for.
+                compute.SignalVulkan(stream);
+            } else if (gpuPosesQuaternions_ && QuaternionsWFirst(scene, cameras.front())) {
                 // Position, w, x, y, z into position, x, y, z, w.
                 constexpr std::array<std::size_t, 7> kXyzwOfWxyz{0, 1, 2, 4, 5, 6, 3};
                 RequireCompute().CopyColumnsToBuffer(*gpuPoses, kXyzwOfWxyz,

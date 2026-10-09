@@ -2085,10 +2085,16 @@ void RasterRenderer::WritePoseCamera(const FrameParams& params) {
     const glm::mat4 camera[] = {params.Relative(params.posesParent), projection,
                                 glm::inverse(projection)};
     uploads_.Write(poseCamera_, std::as_bytes(std::span(camera)));
-    const VkDeviceSize bytes = views_ * sizeof(glm::mat4);
+    EnsurePoseBuffer(views_);
+    poseHistoryViews_[uploads_.Slot()] = views_;
+    poseHistoryOrigins_[uploads_.Slot()] = params.origin;
+}
+
+const std::shared_ptr<GpuBuffer>& RasterRenderer::EnsurePoseBuffer(std::uint32_t views) {
+    const VkDeviceSize bytes = std::max(views, 1u) * sizeof(glm::mat4);
     if (poseBuffer_ == nullptr || poseBuffer_->Size() < bytes) {
         vkDeviceWaitIdle(context_.Device());
-        poseBuffer_ = std::make_unique<GpuBuffer>(
+        poseBuffer_ = std::make_shared<GpuBuffer>(
             context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Shared);
         poseHistoryViews_.fill(0);
         for (std::unique_ptr<GpuBuffer>& history : poseHistory_) {
@@ -2096,8 +2102,7 @@ void RasterRenderer::WritePoseCamera(const FrameParams& params) {
                 context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Readback);
         }
     }
-    poseHistoryViews_[uploads_.Slot()] = views_;
-    poseHistoryOrigins_[uploads_.Slot()] = params.origin;
+    return poseBuffer_;
 }
 
 std::vector<glm::dmat4> RasterRenderer::LastGpuPoses(std::uint32_t views) const {

@@ -90,8 +90,8 @@ class RasterDelegate : public RenderDelegate {
     void Update(const Scene& scene, const Path& settings, VkExtent2D extent) override;
 
     /// As `RenderDelegate::MapArray`: a Mesh's `points`, a PointInstancer's `positions`,
-    /// `orientations` or `scales`, a Points prim's `points`, or a Terrain's `heights` once
-    /// written on the GPU.
+    /// `orientations` or `scales`, a Points prim's `points`, a Terrain's `heights`, or a Camera's
+    /// `ernie:poses` once written on the GPU (as float32, quaternions w last).
     Tensor MapArray(Scene& scene, const Path& path, std::string_view attribute,
                     std::uintptr_t stream = 1) override;
 

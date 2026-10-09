@@ -507,8 +507,9 @@ void BindRender(nb::module_& m) {
             nb::arg("stream").none() = nb::none(),
             "Maps an array of `path` for writing in place on the GPU, without copies: a CUDA "
             "array over the renderer's own memory for it (a Mesh's or Points prim's points, a "
-            "PointInstancer's positions, orientations or scales, the Terrain's heights once "
-            "written on the GPU), holding its values, which the scene now holds as the attribute. "
+            "PointInstancer's positions, orientations or scales, the Terrain's heights, a "
+            "Camera's ernie:poses once written on the GPU), holding its values, which the scene "
+            "now holds as the attribute. "
             "Write into it on `stream` (which first waits for frames already submitted), then "
             "`scene.unmap(path, attribute, stream)`; map again every step, as the memory behind "
             "it alternates to keep the last step's values for motion blur.")

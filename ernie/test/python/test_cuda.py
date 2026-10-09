@@ -112,6 +112,50 @@ def test_poses_written_from_cuda_stay_on_the_gpu(cuda_renderer):
     assert cuda_renderer.take_validation_messages() == []
 
 
+def test_mapped_poses_are_written_in_place(cuda_renderer):
+    positions = np.array([[-10.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.0, 10.0, 0.0]], np.float32)
+
+    def poses_at(xs):
+        return np.stack(
+            [
+                np.array(ernie.look_at_transform((x, 0, 60), (x, 0, 0), up=(0, 1, 0)), np.float32)
+                for x in xs
+            ]
+        )
+
+    def batch_scene(poses):
+        scene = instancer_scene(positions)
+        scene.write("/World/Camera", tokens.POSES, cuda_renderer.cuda_upload(poses))
+        scene.define("/Render/Batch", tokens.RENDER_PRODUCT).set(
+            tokens.CAMERA_REL, ernie.Path("/World/Camera")
+        ).set(tokens.RESOLUTION, (48, 48))
+        return scene
+
+    def render(scene):
+        return np.array(
+            cuda_renderer.step(scene, render_products=["/Render/Batch"])["/Render/Batch"]
+            .frames[0]
+            .render_vars["/Render/Batch/LdrColor"]
+            .map()
+        )
+
+    first = poses_at((-10.0, 0.0, 10.0))
+    moved = poses_at((10.0, -10.0, 0.0))
+    scene = batch_scene(first)
+    render(scene)
+    mapped = cuda_renderer.map(scene, "/World/Camera", tokens.POSES)
+    np.testing.assert_array_equal(np.array(cuda_renderer.cuda_download(mapped)), first)
+    cuda_renderer.cuda_copy(cuda_renderer.cuda_upload(moved), mapped)
+    scene.unmap("/World/Camera", tokens.POSES)
+    np.testing.assert_array_equal(render(scene), render(batch_scene(moved)))
+    # Mapped again, it holds what the last frame rendered.
+    again = cuda_renderer.map(scene, "/World/Camera", tokens.POSES)
+    np.testing.assert_array_equal(np.array(cuda_renderer.cuda_download(again)), moved)
+    with pytest.raises(ValueError, match="write them first"):
+        cuda_renderer.map(instancer_scene(positions), "/World/Camera", tokens.POSES)
+    assert cuda_renderer.take_validation_messages() == []
+
+
 def test_mapped_arrays_are_written_in_place(cuda_renderer):
     positions = np.array([[-10.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.0, 10.0, 0.0]], np.float32)
     scene = instancer_scene(positions)

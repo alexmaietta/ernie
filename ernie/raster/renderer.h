@@ -266,10 +266,15 @@ class RasterRenderer {
 
     /// The buffer the views' poses of a frame with `FrameParams::posesOnGpu` are copied into
     /// before it records (`ComputeInterop::CopyToBuffer`), row-major 4x4 float32 per view; valid
-    /// after that frame's `Update`.
+    /// after that frame's `Update` (or `EnsurePoseBuffer`).
     GpuBuffer& PoseBuffer() {
         return *poseBuffer_;
     }
+
+    /// `PoseBuffer` to hold up to `views` views, which a compute API may view in place
+    /// (`ComputeInterop::View`); a larger one waits for the device to idle. A view of the
+    /// previous buffer keeps that buffer alive, so its values can still be copied.
+    const std::shared_ptr<GpuBuffer>& EnsurePoseBuffer(std::uint32_t views);
 
     /// The camera-to-world poses the last frame with poses on the GPU in this `BeginFrame`'s slot
     /// rendered (a finished frame), if it had `views` views; otherwise empty. Estimates of the
@@ -517,7 +522,7 @@ class RasterRenderer {
     PipelineLayout viewsLayout_;
     std::unique_ptr<ComputePipeline> viewsPipeline_;
     GpuBuffer poseCamera_;  ///< views.slang's camera: parent, projection, its inverse.
-    std::unique_ptr<GpuBuffer> poseBuffer_;
+    std::shared_ptr<GpuBuffer> poseBuffer_;
     std::array<std::unique_ptr<GpuBuffer>, FrameUploads::kSlots> poseHistory_;
     std::unique_ptr<GraphicsPipeline> presentFloat_;
     std::unique_ptr<GraphicsPipeline> presentUint_;
