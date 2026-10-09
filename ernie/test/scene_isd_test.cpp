@@ -109,3 +109,23 @@ TEST(IsdLineScanner, LroNacSeesTheMoonBelowIt) {
         EXPECT_NEAR(back.y, sample, 1e-4) << "through the distortion and back";
     }
 }
+
+TEST(IsdLineScanner, StripsFitTheLensDistortionAlongTheLine) {
+    for (const char* name : {"toughLroNacLineScan.json", "ctxLineScan.json"}) {
+        const ernie::IsdLineScanner scanner(ernie::ReadIsdFile(Fixture(name)));
+        const ernie::IsdLineScanner::Strip strip = scanner.StripOf(1000, 64);
+        EXPECT_NO_THROW(strip.camera.Check()) << name;
+        // Real ISDs' boresight is the sensor's +z, away from usgscsm's look: the camera faces
+        // the ground all the same.
+        const glm::dvec3 ground = scanner.ImageToGround(1032.0, 0.5 * scanner.Isd().samples);
+        const glm::dvec3 forward = -glm::dvec3(strip.to[2]);
+        EXPECT_GT(glm::dot(glm::normalize(ground - glm::dvec3(strip.to[3])), forward), 0.99)
+            << name;
+        EXPECT_NE(strip.camera.lens.k1, 0.0) << name;
+        EXPECT_LT(strip.distortionResidualPixels, 0.01) << name;
+        EXPECT_GT(std::abs(strip.camera.lens.Undistort({0.02, 0.0}).x - 0.02) *
+                      strip.camera.FocalLengthPixels(),
+                  1.0)
+            << name << ": the distortion moves the line's ends by pixels";
+    }
+}

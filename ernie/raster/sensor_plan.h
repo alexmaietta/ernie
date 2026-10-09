@@ -51,8 +51,9 @@ struct SensorPlan {
     /// Segments whose spatial filters read their input's pyramid (`SensorFilterModel::pyramid`),
     /// a bit each: the renderer builds the channel images' pyramid before them.
     std::uint32_t pyramids = 0;
-    /// The lens head's projection, a struct of lens.slang: "Pinhole", "BrownConrady" or
-    /// "Fisheye" (`LensKernelOf`). Compiled into the kernel, so a pinhole runs no distortion code.
+    /// The lens head's projection, a struct of lens.slang: "Pinhole", "BrownConrady", "Fisheye"
+    /// or "Pushbroom" (`LensKernelOf`). Compiled into the kernel, so a pinhole runs no distortion
+    /// code.
     std::string lens = "Pinhole";
     /// Whether the camera is a pushbroom, whose pixels' rays come from module `projection`'s
     /// pushbroom strip (projection_pushbroom.slang) rather than one view-projection.
@@ -87,8 +88,9 @@ SensorPlan PlanSensor(std::span<const SensorFilterStep> chain,
                       std::uint32_t aovOffset = 0);
 
 /// The lens projection of lens.slang that `lens` compiles into the sensor kernel
-/// (`SensorPlan::lens`): "Pinhole" without distortion, "BrownConrady" with it, or "Fisheye".
-std::string LensKernelOf(const LensModel& lens);
+/// (`SensorPlan::lens`): "Pinhole" without distortion, "BrownConrady" with it, or "Fisheye"; for
+/// a `pushbroom` camera, "Pushbroom" (its distortion across the line only).
+std::string LensKernelOf(const LensModel& lens, bool pushbroom = false);
 
 /// `PlanSensor` of a chain of built-in filters.
 SensorPlan PlanSensor(std::span<const SensorFilter> chain, std::span<const std::string_view> held);

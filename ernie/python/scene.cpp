@@ -770,13 +770,18 @@ void BindScene(nb::module_& m) {
                     .Set(kHorizontalApertureOffset, camera.horizontalApertureOffsetMm)
                     .Set(kVerticalApertureOffset, 0.0)
                     .Set(kPushbroomLineOffset, camera.lineOffsetMm)
+                    .Set(kLensDistortion,
+                         std::vector<float>{static_cast<float>(camera.lens.k1),
+                                            static_cast<float>(camera.lens.k2),
+                                            static_cast<float>(camera.lens.k3), 0.0f, 0.0f})
                     .Set(kClippingRange, glm::dvec2(camera.nearPlane, camera.farPlane));
                 return nb::make_tuple(camera.width, camera.height);
             },
             nb::arg("scene"), nb::arg("path"), nb::arg("first_line"), nb::arg("lines"),
             nb::arg("at_end") = true,
             "Authors the Camera prim at `path` as the pushbroom of the strip of `lines` lines "
-            "from `first_line`, posed at its end (or its start), and returns the render "
+            "from `first_line` (with the lens's distortion along the detector fitted as "
+            "`ernie:lens:distortion`), posed at its end (or its start), and returns the render "
             "resolution it needs, (samples, lines). Render an image strip by strip: author the "
             "first strip at its start and step once, then author each strip at its end and "
             "step.");

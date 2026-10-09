@@ -534,18 +534,30 @@ IsdLineScanner::Strip IsdLineScanner::StripOf(std::uint32_t firstLine,
     if (lines == 0) {
         throw std::invalid_argument("A strip needs at least one line");
     }
+    // Which way the rays run: usgscsm's look (-x, -y, -f) meets the ellipsoid at its nearer
+    // intersection on either side of the sensor, so ISDs whose boresight is the sensor's +z (as
+    // NAIF's instrument frames have it, ALE's real cameras) and those whose is -z both image the
+    // same. Ernie's camera must face the ground: `facing` is -1 when it lies behind the look.
+    const double middle = ImageTime(firstLine + 0.5 * lines);
+    const glm::dvec3 centre = ImageToGround(firstLine + 0.5 * lines, 0.5 * isd_.samples);
+    const double facing =
+        glm::dot(centre - Position(middle), Look(firstLine + 0.5 * lines, 0.5 * isd_.samples)) <
+                0.0
+            ? -1.0
+            : 1.0;
     // Ernie's camera axes in the sensor's frame: x along the detector as samples increase
     // (the rays' change with the sample), z back from the scene, y completing them.
     const glm::dvec2 first = FocalPlaneOf(0.0);
     const glm::dvec2 along = FocalPlaneOf(1.0) - first;  // mm per image sample
-    const glm::dvec3 x = glm::normalize(glm::dvec3(-along.x, -along.y, 0.0));
-    const glm::dvec3 z(0.0, 0.0, 1.0);
+    const glm::dvec3 x = glm::normalize(facing * glm::dvec3(-along.x, -along.y, 0.0));
+    const glm::dvec3 z(0.0, 0.0, facing);
     const glm::dvec3 y = glm::cross(z, x);
     const glm::dmat3 ernieToSensor(x, y, z);
     // The ray of sample 0 in Ernie's axes, per unit of view depth: where the detector line lies
     // across the image (y) and where its principal point is (x).
     const double f = isd_.focalLengthMm;
-    const glm::dvec3 ray0 = glm::transpose(ernieToSensor) * glm::dvec3(-first.x, -first.y, -f) / f;
+    const glm::dvec3 ray0 =
+        glm::transpose(ernieToSensor) * (facing * glm::dvec3(-first.x, -first.y, -f)) / f;
     const double pitch = glm::length(along);
     const double principalSample = -ray0.x * f / pitch;
 
@@ -558,6 +570,54 @@ IsdLineScanner::Strip IsdLineScanner::StripOf(std::uint32_t firstLine,
     camera.verticalApertureMm = pitch * lines;
     camera.horizontalApertureOffsetMm = (principalSample - 0.5 * isd_.samples) * pitch;
     camera.lineOffsetMm = ray0.y * f;
+    // The lens's distortion along the detector as Brown-Conrady radial terms: distorted =
+    // undistorted (1 + k1 r^2 + k2 r^4 + k3 r^6), fitted by least squares to the ISD's model at
+    // samples along the line, in Ernie's normalised image coordinates.
+    if (!isd_.distortion.empty()) {
+        const auto normalised = [&](glm::dvec2 focal) {
+            const glm::dvec3 ray =
+                glm::transpose(ernieToSensor) * (facing * glm::dvec3(-focal.x, -focal.y, -f));
+            return glm::dvec2(ray.x, ray.y) / -ray.z;
+        };
+        std::vector<std::pair<glm::dvec2, double>> samples;
+        double largest = 0.0;  // r^2
+        constexpr int kSamples = 128;
+        for (int i = 0; i <= kSamples; ++i) {
+            const double sample = isd_.samples * double(i) / kSamples;
+            const glm::dvec2 distorted = FocalPlaneOf(sample);
+            const glm::dvec2 u = normalised(Undistort(distorted));
+            samples.emplace_back(u, normalised(distorted).x);
+            largest = std::max(largest, glm::dot(u, u));
+        }
+        // distorted = undistorted (a + b1 r^2 + b2 r^4 + b3 r^6): a scale too, as radial models
+        // with a constant term have, which the camera's focal length takes (f a), leaving
+        // Brown-Conrady's k = b / a on its sensor's coordinates (distorted / a). In powers of
+        // r^2 / largest, for a well-conditioned system, then scaled back.
+        glm::dmat4 normal(0.0);
+        glm::dvec4 right(0.0);
+        for (const auto& [u, d] : samples) {
+            const double s = glm::dot(u, u) / largest;
+            const glm::dvec4 basis = u.x * glm::dvec4(1.0, s, s * s, s * s * s);
+            normal += glm::outerProduct(basis, basis);
+            right += basis * d;
+        }
+        glm::dvec4 b(1.0, 0.0, 0.0, 0.0);
+        if (largest > 0.0 && glm::determinant(normal) != 0.0) {
+            b = glm::inverse(normal) * right;
+            b /= glm::dvec4(1.0, largest, largest * largest, largest * largest * largest);
+        }
+        const double scale = b.x;
+        camera.focalLengthMm = f * scale;
+        camera.lens.k1 = b.y / scale;
+        camera.lens.k2 = b.z / scale;
+        camera.lens.k3 = b.w / scale;
+        for (const auto& [u, d] : samples) {
+            const double r2 = glm::dot(u, u);
+            const double fitted = u.x * (scale + r2 * (b.y + r2 * (b.z + r2 * b.w)));
+            strip.distortionResidualPixels =
+                std::max(strip.distortionResidualPixels, std::abs(fitted - d) * f / pitch);
+        }
+    }
     // Row r's centre is image line first + r + 0.5, exposed (r + 0.5) / lines of the way from
     // `fromTime` to `toTime` (the rate constant over the strip).
     strip.fromTime = ImageTime(firstLine);

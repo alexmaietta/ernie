@@ -215,8 +215,9 @@ struct Camera {
     /// the image's x axis, `lineOffsetMm` off the principal point along y on the focal plane,
     /// read out once per image row as the camera moves. Row r (from the top) is exposed at the
     /// pose (r + 0.5) / height of the way from the last frame's pose to this frame's, so a frame
-    /// is one strip of the scan. Its lens has no distortion and it has no shutter interval or
-    /// rolling readout of its own.
+    /// is one strip of the scan. Its lens may distort radially (k1 to k3, with r^2 from the line's
+    /// distance off the axis too), moving pixels along the line only; it has no tangential
+    /// distortion, shutter interval or rolling readout of its own.
     ///
     /// Reference: R. Gupta and R. I. Hartley, "Linear Pushbroom Cameras", IEEE TPAMI 19(9):963-975,
     /// 1997.
@@ -290,7 +291,8 @@ struct Camera {
     /// channels or more than four, or a shutter closing before it opens, a negative rolling
     /// readout or shutter samples outside 1 to `kMaxShutterSamples`, an orthographic camera with
     /// lens distortion or a fisheye or a non-positive pixel pitch, a pushbroom that is
-    /// orthographic, has lens distortion or more than one sub-frame, or a fisheye with
+    /// orthographic, has a fisheye or tangential distortion or more than one sub-frame, or a
+    /// fisheye with
     /// Brown-Conrady distortion or a field reaching past `LensModel::kMaxFisheyeFieldAngle`.
     void Check() const;
 

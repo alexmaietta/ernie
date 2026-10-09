@@ -1210,7 +1210,7 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
         SensorPass& pass = passes[c];
         pass.plan = PlanSensor(chain.filters.empty() ? StepsOf(DefaultFilterChain()) : chain.filters,
                                held, sensorFilters_, chain.aovOffset);
-        pass.plan.lens = LensKernelOf(params.camera.lens);
+        pass.plan.lens = LensKernelOf(params.camera.lens, params.camera.pushbroom);
         pass.plan.pushbroom = params.camera.pushbroom;
         // Each pass's parameters in a buffer of its own; kept from the last frame's pass at the
         // same place in the order when large enough, which only ever waits when one grows.
@@ -1424,12 +1424,16 @@ void RasterRenderer::WriteSensor(const FrameParams& params) {
     sensor.intrinsics[2] =
         static_cast<float>(extent_.height / 2.0 * (1.0 + static_cast<double>(projection[2][1])));
     sensor.intrinsics[3] = static_cast<float>(params.overscan);
-    if (camera.orthographic) {
-        // Its principal point is a shift of the projection, not a skew: pixels per scene unit
-        // stand in for the focal length, which the pinhole lens maps through unchanged.
+    if (camera.orthographic || camera.pushbroom) {
+        // An orthographic principal point is a shift of the projection, not a skew: pixels per
+        // scene unit stand in for the focal length, which the pinhole lens maps through
+        // unchanged. A pushbroom's view is its strip's envelope: its own focal length instead.
         const glm::dvec2 centre = camera.PrincipalPoint();
         sensor.intrinsics[1] = static_cast<float>(centre.x);
         sensor.intrinsics[2] = static_cast<float>(centre.y);
+        if (camera.pushbroom) {
+            sensor.intrinsics[0] = static_cast<float>(camera.FocalLengthPixels());
+        }
     }
     sensor.size[0] = extent_.width;
     sensor.size[1] = extent_.height;
@@ -1525,11 +1529,13 @@ void RasterRenderer::WriteSensor(const FrameParams& params) {
     for (std::uint32_t v = 0; v < outputViews_; ++v) {
         const CameraView view = params.View(LastSubframeView(v));
         if (params.camera.pushbroom) {
-            // Its strip, and its intrinsics where a pushbroom has no lens distortion.
+            // Its strip; its distortion across the line and the line (lens.slang's Pushbroom).
             const PushbroomStrip strip = params.Strip(LastSubframeView(v));
             CopyMatrix(sensor.invViewProj, strip.Packed());
-            const glm::vec4 intrinsics = strip.Intrinsics();
-            std::memcpy(sensor.distortion, glm::value_ptr(intrinsics), sizeof(sensor.distortion));
+            sensor.distortion[0] = static_cast<float>(lens.k1);
+            sensor.distortion[1] = static_cast<float>(lens.k2);
+            sensor.distortion[2] = static_cast<float>(lens.k3);
+            sensor.distortion[3] = strip.line;
         } else {
             CopyMatrix(sensor.invViewProj, glm::inverse(view.ViewProjection()));
         }

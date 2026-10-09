@@ -1093,6 +1093,19 @@ double OverscanOf(const Camera& camera) {
     const glm::dvec2 centre = camera.PrincipalPoint();
     const double w = camera.width;
     const double h = camera.height;
+    if (camera.pushbroom) {
+        // Only along the detector line, its rows being time: the undistorted line's ends.
+        const double line = camera.lineOffsetMm / camera.focalLengthMm;
+        double overscan = 1.0;
+        constexpr int kSamples = 256;
+        for (int i = 0; i <= kSamples; ++i) {
+            const double x = (w * i / kSamples - centre.x) / f;
+            const double u = camera.lens.Undistort({x, line}).x;
+            overscan = std::max(overscan, u > 0.0 ? u * f / (w - centre.x)
+                                                  : -u * f / std::max(centre.x, 1e-9));
+        }
+        return overscan * 1.01;
+    }
     double overscan = 1.0;
     const auto include = [&](double x, double y) {
         const glm::dvec2 u = camera.lens.Undistort({(x - centre.x) / f, (centre.y - y) / f});

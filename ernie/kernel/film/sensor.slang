@@ -406,7 +406,7 @@ float2 rasterPositionOf(SensorUniforms cam, int2 at) {
     let f = cam.intrinsics.x;
     let distorted = float2((float(at.x) + 0.5 - cam.intrinsics.y) / f,
                            (cam.intrinsics.z - (float(at.y) + 0.5)) / f);
-    let undistorted = lensPinholeOf(distorted, cam.distortion, cam.lens.x);
+    let undistorted = lensPinholeOf(distorted, cam.distortion, cam.lens.x, cam.intrinsics.w);
     let rasterF = f / cam.intrinsics.w;
     return float2(cam.intrinsics.y + undistorted.x * rasterF,
                   cam.intrinsics.z - undistorted.y * rasterF) - 0.5;
@@ -434,14 +434,17 @@ public float sceneDistance(PixelContext pixel, int2 at) {
 
 // The distances of what raster normalised device coordinates `ndc` (with [0, 1] depth z) see:
 // along the view from the image plane, and from the camera. An orthographic view's camera is its
-// image plane; a pushbroom's is its row's pose (its strip in `invViewProj`, its intrinsics in
-// `distortion`).
+// image plane; a pushbroom's is its row's pose (its strip in `invViewProj`; its raster focal
+// length, principal point and detector line make its intrinsics, `PushbroomStrip::Intrinsics`).
 void distancesAt(SensorUniforms cam, float3 ndc, out float imagePlane, out float camera) {
     if (kPushbroomCamera) {
+        let width = float(cam.size.x);
+        let strip = float4(2.0 * cam.intrinsics.x / cam.intrinsics.w / width,
+                           2.0 * cam.intrinsics.y / width - 1.0, cam.distortion.w, 0.0);
         float3 origin;
         float3 direction;  // one unit of view depth long
-        cameraRayThrough(cam.invViewProj, cam.distortion, ndc.xy, origin, direction);
-        camera = length(cameraPoint(cam.invViewProj, cam.distortion, ndc.xy, ndc.z) - origin);
+        cameraRayThrough(cam.invViewProj, strip, ndc.xy, origin, direction);
+        camera = length(cameraPoint(cam.invViewProj, strip, ndc.xy, ndc.z) - origin);
         imagePlane = camera / length(direction);
         return;
     }
@@ -479,7 +482,7 @@ public struct Lens : ISpatialSource {
         let f = cam.intrinsics.x;
         let distorted = float2((float(id.x) + 0.5 - cam.intrinsics.y) / f,
                                (cam.intrinsics.z - (float(id.y) + 0.5)) / f);
-        let p = lensPinholeOf(distorted, cam.distortion, cam.lens.x);
+        let p = lensPinholeOf(distorted, cam.distortion, cam.lens.x, cam.intrinsics.w);
         let rasterF = f / cam.intrinsics.w;
         let raster =
             float2(cam.intrinsics.y + p.x * rasterF, cam.intrinsics.z - p.y * rasterF) - 0.5;

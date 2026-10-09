@@ -466,6 +466,72 @@ TEST_F(RasterDelegateTest, AnIsdStripSeesTheGroundWhereUsgscsmPutsIt) {
     }
 }
 
+TEST_F(RasterDelegateTest, AnLroNacStripSeesThroughItsLensDistortion) {
+    // LRO's NAC, 2 x 2 summed: pixels about 0.72 m across the track and 20 m along it, 36 km
+    // above the Moon, the lens moving the detector's ends by many pixels. Balls of 0.6 m radius
+    // where usgscsm's model (with the ISD's own distortion) puts pixels' rays on the ground show
+    // on those pixels of a strip rendered through the fitted distortion.
+    const ernie::IsdLineScanner nac(ernie::ReadIsdFile(
+        (std::filesystem::path(ERNIE_TEST_FIXTURES) / "isd" / "toughLroNacLineScan.json")
+            .string()));
+    constexpr std::uint32_t kFirst = 4096;
+    constexpr std::uint32_t kLines = 64;
+    const ernie::IsdLineScanner::Strip strip = nac.StripOf(kFirst, kLines);
+    ASSERT_NE(strip.camera.lens.k1, 0.0);
+    Scene scene = FlatScene();
+    scene.Remove("/World/Terrain");
+    scene.Set("/Render/Settings", tokens::kResolution,
+              glm::ivec2(static_cast<int>(nac.Isd().samples), static_cast<int>(kLines)));
+    const std::pair<std::size_t, std::size_t> pixels[] = {{10, 12}, {40, 1266}, {25, 2515}};
+    for (std::size_t i = 0; i < std::size(pixels); ++i) {
+        const auto [row, column] = pixels[i];
+        const glm::dvec3 ground = nac.ImageToGround(kFirst + row + 0.5, column + 0.5);
+        scene.Define(Path("/World/Ball" + std::to_string(i)), tokens::kSphere)
+            .Set(tokens::kGeomRadius, 0.6)
+            .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), ground));
+    }
+    ernie::Camera camera = strip.camera;
+    camera.transform = strip.from;
+    ernie::SetCamera(scene, "/World/Camera", camera);
+    scene.Set("/World/Camera", tokens::kSensorNoise, false);
+    scene.Set("/World/Camera", tokens::kLensDistortion,
+              std::vector<float>{static_cast<float>(camera.lens.k1),
+                                 static_cast<float>(camera.lens.k2),
+                                 static_cast<float>(camera.lens.k3), 0.0f, 0.0f});
+    RasterDelegate delegate(*context_);
+    delegate.Step(scene);  // the strip's start
+    scene.Set("/World/Camera", tokens::kTransform, strip.to);
+    ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+    const Tensor ids =
+        outputs.at("/Render/Product").vars.at("PrimId").Map(ernie::MapDevice::Cpu).tensor;
+    const std::size_t width = nac.Isd().samples;
+    const auto at = [&](std::size_t row, std::size_t column) {
+        return delegate.PrimPath(ids.As<std::uint32_t>()[row * width + column]);
+    };
+    // Each ball on its row alone, centred on its column within half a pixel: PrimId reads the
+    // raster pixel nearest each sensor pixel's ray, and the raster is wider than the sensor by
+    // the overscan, so ids land within half a pixel.
+    for (std::size_t i = 0; i < std::size(pixels); ++i) {
+        const auto [row, column] = pixels[i];
+        const Path ball("/World/Ball" + std::to_string(i));
+        double sum = 0.0;
+        int hits = 0;
+        for (std::size_t r = 0; r < kLines; ++r) {
+            for (std::size_t c = 0; c < width; ++c) {
+                if (at(r, c) == ball) {
+                    EXPECT_EQ(r, row) << ball.String() << " on another line";
+                    sum += static_cast<double>(c);
+                    ++hits;
+                }
+            }
+        }
+        ASSERT_GT(hits, 0) << ball.String();
+        EXPECT_LE(hits, 3) << ball.String();
+        EXPECT_NEAR(sum / hits, static_cast<double>(column), 0.5)
+            << ball.String() << " at row " << row << ", column " << column;
+    }
+}
+
 TEST_F(RasterDelegateTest, FisheyeSeesFieldAnglesInProportionToRadius) {
     // 50 above flat ground looking straight down: a ray at field angle theta meets it
     // 50 / cos(theta) away. Equidistant, a pixel's theta is its radius over the focal length.

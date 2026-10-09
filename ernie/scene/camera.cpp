@@ -267,10 +267,12 @@ void Camera::Check() const {
                                     "rolling readout and 1 to " +
                                     std::to_string(kMaxShutterSamples) + " samples");
     }
-    if (pushbroom && (orthographic || !lens.IsPinhole() || Subframes() != 1)) {
+    if (pushbroom &&
+        (orthographic || lens.projection != LensProjection::Perspective || lens.p1 != 0.0 ||
+         lens.p2 != 0.0 || Subframes() != 1)) {
         throw std::invalid_argument(
-            "A pushbroom camera needs a perspective projection, a lens without distortion, and "
-            "no shutter interval or rolling readout: its rows are its readout");
+            "A pushbroom camera needs a perspective projection, a lens with radial distortion "
+            "at most, and no shutter interval or rolling readout: its rows are its readout");
     }
     if (orthographic && (!lens.IsPinhole() || !(orthographicPixelPitchUm > 0.0))) {
         throw std::invalid_argument(

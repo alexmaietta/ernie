@@ -299,7 +299,10 @@ std::string SensorPlan::Key() const {
     return key + "~" + lens + (pushbroom ? "~pushbroom" : "");
 }
 
-std::string LensKernelOf(const LensModel& lens) {
+std::string LensKernelOf(const LensModel& lens, bool pushbroom) {
+    if (pushbroom) {
+        return "Pushbroom";
+    }
     if (lens.projection == LensProjection::Fisheye) {
         return "Fisheye";
     }
@@ -310,10 +313,9 @@ std::string SensorPlan::LensSource() const {
     return "// Generated for the lens projection " + lens +
            ".\n"
            "import lens;\n"
-           "public float2 lensPinholeOf(float2 sensor, float4 k, float p2) {\n"
+           "public float2 lensPinholeOf(float2 sensor, float4 k, float p2, float overscan) {\n"
            "    return " +
-           lens +
-           ".pinholeOf(sensor, k, p2);\n"
+           lens + (lens == "Pushbroom" ? ".pinholeOf(sensor, k, overscan);\n" : ".pinholeOf(sensor, k, p2);\n") +
            "}\n"
            "public float lensFalloff(float2 sensor, float2 pinhole, float4 k) {\n"
            "    return " +

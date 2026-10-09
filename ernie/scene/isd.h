@@ -125,7 +125,10 @@ class IsdLineScanner {
     /// The rotation from the sensor's frame to the body's at `time`.
     glm::dquat SensorToBody(double time) const;
 
-    /// The unit body-fixed direction that pixel (`line`, `sample`) looks along.
+    /// The unit body-fixed direction of pixel (`line`, `sample`)'s ray as usgscsm takes it,
+    /// (-x, -y, -f) in the sensor's frame: towards the scene, or away from it for ISDs whose
+    /// boresight is the sensor's +z (ALE's real cameras), which usgscsm images the same, the ray
+    /// meeting the ground on either side of the sensor.
     glm::dvec3 Look(double line, double sample) const;
 
     /// Where pixel (`line`, `sample`)'s ray meets the body's ellipsoid raised by `height` metres:
@@ -149,14 +152,17 @@ class IsdLineScanner {
     ///
     /// The pose between `from` and `to` is a straight line and a great-arc turn, which departs
     /// from the orbit's curve by about a T^2 / 8 for its acceleration a over the strip's time T:
-    /// keep strips short (for LRO's NAC, 64 lines are 0.8 s and 0.1 m). The camera is a pinhole
-    /// along the detector: the lens's distortion is not rendered.
+    /// keep strips short (for LRO's NAC, 64 lines are 0.8 s and 0.1 m). The lens's distortion
+    /// along the detector is fitted as the camera's Brown-Conrady k1 to k3, which the pushbroom's
+    /// lens resamples through.
     struct Strip {
         Camera camera;
         glm::dmat4 from{1.0};
         glm::dmat4 to{1.0};
         double fromTime = 0.0;
         double toTime = 0.0;
+        /// The fitted distortion's largest departure from the ISD's along the line, in pixels.
+        double distortionResidualPixels = 0.0;
     };
     Strip StripOf(std::uint32_t firstLine, std::uint32_t lines) const;
 

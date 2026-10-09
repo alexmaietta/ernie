@@ -54,6 +54,31 @@ public struct BrownConrady {
     }
 }
 
+// A pushbroom's detector line, with Brown-Conrady radial distortion across it: its rows are its
+// readout over time, not space, so only x moves. `k` is (k1, k2, k3, the line's normalised y);
+// the row's coordinate is scaled by `overscan` so the raster row is the sensor's row (the raster
+// image is drawn with the focal length over `overscan`, wide enough for the undistorted line).
+public struct Pushbroom {
+    static float2 distort(float2 p, float4 k) {
+        let r2 = dot(p, p);
+        return p * (1.0 + r2 * (k.x + r2 * (k.y + r2 * k.z)));
+    }
+
+    public static float2 pinholeOf(float2 sensor, float4 k, float overscan) {
+        let distorted = float2(sensor.x, k.w);
+        var p = distorted;
+        for (int i = 0; i < 12; ++i) {
+            p += distorted - distort(p, k);
+        }
+        return float2(p.x, sensor.y * overscan);
+    }
+
+    // cos^4 of the field angle along the line, where the row's ray lies.
+    public static float falloff(float2 sensor, float2 pinhole, float4 k) {
+        return cosine4(float2(pinhole.x, k.w));
+    }
+}
+
 // Kannala-Brandt fisheye: a ray at field angle theta lands at radius
 // theta_d = theta (1 + k1 theta^2 + k2 theta^4 + k3 theta^6 + k4 theta^8) in normalised
 // coordinates, in the ray's azimuth.

@@ -76,8 +76,10 @@ CameraView PushbroomEnvelope(const Camera& camera, const glm::dmat4& from, const
     // between them are straight, and their image coordinates from the eye monotonic along them.
     const double f = camera.FocalLengthPixels();
     const double cx = camera.PrincipalPoint().x;
-    const double edges[] = {-cx / f, (camera.width - cx) / f};
     const double line = camera.lineOffsetMm / camera.focalLengthMm;
+    // The rays of the line's end pixels, through the lens's distortion.
+    const double edges[] = {camera.lens.Undistort({-cx / f, line}).x,
+                            camera.lens.Undistort({(camera.width - cx) / f, line}).x};
     double tanX = 0.0;
     double tanY = 0.0;
     double nearest = std::numeric_limits<double>::max();
@@ -140,7 +142,9 @@ PushbroomStrip FrameParams::Strip(std::size_t view) const {
     strip.nearPlane = static_cast<float>(camera.nearPlane);
     strip.farPlane = static_cast<float>(camera.farPlane);
     const double width = camera.width;
-    strip.scale = static_cast<float>(2.0 * camera.FocalLengthPixels() / width);
+    // The raster image is drawn with the focal length over the overscan, so the undistorted
+    // line's ends stay in it (the lens head resamples it through the distortion).
+    strip.scale = static_cast<float>(2.0 * camera.FocalLengthPixels() / overscan / width);
     strip.shift = static_cast<float>(2.0 * camera.PrincipalPoint().x / width - 1.0);
     strip.line = static_cast<float>(camera.lineOffsetMm / camera.focalLengthMm);
     return strip;
