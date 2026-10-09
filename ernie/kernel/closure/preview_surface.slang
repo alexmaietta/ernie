@@ -17,6 +17,14 @@ import brdf;
 //
 // Parameters: 0 roughness, 1 metallic, 2 ior, 3 useSpecularWorkflow (0 or 1), 4-6 specularColor,
 // 7 clearcoat, 8 clearcoatRoughness.
+//
+// Light from all around (`environment`) follows the split-sum approximation.
+//
+// References:
+// - B. Karis, "Real Shading in Unreal Engine 4", SIGGRAPH 2013 course notes (split sum).
+// - B. Karis, "Physically Based Shading on Mobile", 2014, after D. Lazarov, "Getting More
+//   Physical in Call of Duty: Black Ops II", SIGGRAPH 2013 course (analytic environment BRDF).
+//   https://www.unrealengine.com/en-US/blog/physically-based-shading-on-mobile
 
 // GGX normal distribution D(h) for alpha^2 `a2` (Trowbridge and Reitz 1975; Walter et al. 2007).
 float ggx(float nDotH, float a2) {
@@ -36,7 +44,58 @@ float3 schlick(float3 f0, float vDotH) {
     return f0 + (1.0 - f0) * m;
 }
 
+// The split-sum environment BRDF's scale and bias on f0 for perceptual roughness `roughness` at
+// cos(e) `mu`, from Lazarov's analytic fit (Karis 2014), so no lookup table is needed.
+float2 environmentBrdf(float roughness, float mu) {
+    let c0 = float4(-1.0, -0.0275, -0.572, 0.022);
+    let c1 = float4(1.0, 0.0425, 1.04, -0.04);
+    let r = roughness * c0 + c1;
+    let a004 = min(r.x * r.x, exp2(-9.28 * mu)) * r.x + r.y;
+    return float2(-1.04, 1.04) * a004 + r.zw;
+}
+
+// The perceptual roughness of a lobe of `roughness` widened by unresolved slopes of `variance`.
+float widenedRoughness(float roughness, float variance) {
+    let alpha = roughness * roughness;
+    return sqrt(sqrt(min(alpha * alpha + 2.0 * max(variance, 0.0), 1.0)));
+}
+
 public struct PreviewSurface : IBrdf {
+    // The split-sum approximation (Karis 2013): each lobe's weight is its f0 times the
+    // environment BRDF's scale plus its bias, and the diffuse lobe keeps what the dielectric's
+    // specular does not take.
+    public override EnvironmentResponse environment(BrdfInput s, BrdfParams p) {
+        let mu = saturate(s.mu);
+        let roughness = widenedRoughness(saturate(p.get(0)), s.slopeVariance);
+        let ab = environmentBrdf(roughness, mu);
+        var r = diffuseEnvironment(float3(0.0));
+        r.roughness0 = roughness;
+        if (p.get(3) > 0.5) {
+            let f0 = (p.get(4) + p.get(5) + p.get(6)) / 3.0;
+            let specular = f0 * ab.x + ab.y;
+            r.specular0 = float3(specular);
+            r.diffuse = s.albedo * (1.0 - specular);
+        } else {
+            let metallic = saturate(p.get(1));
+            let ior = max(p.get(2), 1.0);
+            let r0 = (ior - 1.0) / (ior + 1.0);
+            let dielectric = r0 * r0 * ab.x + ab.y;
+            r.specular0 = lerp(float3(dielectric), s.albedo * ab.x + ab.y, metallic);
+            r.diffuse = s.albedo * (1.0 - metallic) * (1.0 - dielectric);
+        }
+        let clearcoat = saturate(p.get(7));
+        if (clearcoat > 0.0) {
+            let coatRoughness = widenedRoughness(saturate(p.get(8)), s.slopeVariance);
+            let coatAb = environmentBrdf(coatRoughness, mu);
+            let coat = (0.04 * coatAb.x + coatAb.y) * clearcoat;
+            r.diffuse *= 1.0 - coat;
+            r.specular0 *= 1.0 - coat;
+            r.specular1 = float3(coat);
+            r.roughness1 = coatRoughness;
+        }
+        return r;
+    }
+
     public float3 radianceFactor(BrdfInput s, BrdfParams p) {
         let mu0 = s.mu0;
         let mu = s.mu;

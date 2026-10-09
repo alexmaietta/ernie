@@ -257,6 +257,66 @@ TEST_F(RasterDelegateTest, DomesLightEverySurfaceDiffusely) {
     EXPECT_LT(At<float>(MapVars(lower).at("HdrColor"), c, c, 1), 0.03f) << "turned upside down";
 }
 
+TEST_F(RasterDelegateTest, MetalsReflectDomesAndAmbientLightThroughTheSplitSum) {
+    // A white metal seen from straight above under a uniform dome reflects the dome's radiance
+    // times the split-sum environment BRDF's scale plus bias (Lazarov's fit at cos(e) = 1), where
+    // a white Lambertian floor reflects it whole; the sun's ambient fraction alike. Before, metals
+    // (no diffuse albedo) went black under both.
+    const auto environmentBrdf = [](float roughness) {
+        const glm::vec4 r = roughness * glm::vec4(-1.0f, -0.0275f, -0.572f, 0.022f) +
+                            glm::vec4(1.0f, 0.0425f, 1.04f, -0.04f);
+        const float a004 = std::min(r.x * r.x, std::exp2(-9.28f)) * r.x + r.y;
+        return (-1.04f * a004 + r.z) + (1.04f * a004 + r.w);
+    };
+    Scene scene = FlatScene();
+    scene.Remove("/World/Sun");
+    scene.Define("/World/Sky", tokens::kDomeLight).Set(tokens::kIntensity, 1.0);
+    scene.Set("/Looks/Grey", tokens::kAlbedo, glm::vec3(1.0f));
+    RasterDelegate delegate(*context_);
+    const std::size_t c = kVarSize / 2;
+    const auto centre = [&] {
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        return At<float>(MapVars(outputs).at("HdrColor"), c, c, 1);
+    };
+    const float lambert = centre();
+    ASSERT_GT(lambert, 0.5f);
+    scene.Set("/Looks/Grey", tokens::kBrdf, std::string("preview_surface"));
+    scene.Set("/Looks/Grey", "inputs:metallic", 1.0);
+    for (const float roughness : {0.2f, 0.6f}) {
+        scene.Set("/Looks/Grey", "inputs:roughness", static_cast<double>(roughness));
+        EXPECT_NEAR(centre() / lambert, environmentBrdf(roughness), 0.03f)
+            << "dome, roughness " << roughness;
+    }
+
+    // The ambient fraction of a sun below the horizon, which lights nothing directly.
+    scene.Remove("/World/Sky");
+    scene.Define("/World/Sun", tokens::kDistantLight)
+        .Set(tokens::kTransform, ernie::DistantLightTransform({0.0, 0.0, -1.0}))
+        .Set(tokens::kShadowEnable, false);
+    scene.Define("/Render/Settings", tokens::kRenderSettings).Set(tokens::kAmbient, 0.5f);
+    scene.Set("/Looks/Grey", tokens::kBrdf, std::string("lambert"));
+    const float ambient = centre();
+    ASSERT_GT(ambient, 0.0f);
+    scene.Set("/Looks/Grey", tokens::kBrdf, std::string("preview_surface"));
+    EXPECT_NEAR(centre() / ambient, environmentBrdf(0.6f), 0.03f) << "ambient";
+
+    // A smooth metal mirrors the dome's map: facing up under a map bright above the horizon it
+    // shows the bright half, and with the dome turned over the dark one.
+    scene.Remove("/World/Sun");
+    scene.Define("/Render/Settings", tokens::kRenderSettings).Set(tokens::kAmbient, 0.0f);
+    std::vector<float> map(8 * 16 * 3, 0.0f);
+    std::fill(map.begin(), map.begin() + map.size() / 2, 1.0f);
+    scene.Define("/World/Sky", tokens::kDomeLight)
+        .Set(tokens::kIntensity, 1.0)
+        .Write(tokens::kLightTexture, Tensor::Copy<float>(map, {8, 16, 3}));
+    scene.Set("/Looks/Grey", "inputs:roughness", 0.05);
+    const float above = centre();
+    EXPECT_GT(above, 0.8f * lambert);
+    scene.Set("/World/Sky", tokens::kTransform,
+              glm::rotate(glm::dmat4(1.0), M_PI, glm::dvec3(1.0, 0.0, 0.0)));
+    EXPECT_LT(centre(), 0.05f * above) << "the dark half mirrored";
+}
+
 TEST_F(RasterDelegateTest, PhotometricLightsLightByTheirLuxAndLumens) {
     // FlatScene's grey floor (albedo 0.5) under a 1 m square panel 5 m up giving 1000 lux at 5 m:
     // the floor below receives about 990 lux (the panel is not quite a point), so its luminance

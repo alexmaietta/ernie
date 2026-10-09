@@ -69,10 +69,12 @@ struct ShadingUniforms {
 };
 static_assert(sizeof(ShadingUniforms) == 1280, "ShadingUniforms must match shading.slang");
 
-/// shading.slang's kSky* bits: what its sky pass draws behind the scene.
+/// shading.slang's kSky* bits: what its sky pass draws behind the scene, and whether a dome
+/// lights it (for shading only; `sky_` holds the others).
 constexpr std::uint32_t kSkyDome = 1;
 constexpr std::uint32_t kSkyMap = 2;
 constexpr std::uint32_t kSkyStars = 4;
+constexpr std::uint32_t kSkyLighting = 8;
 
 struct LightGpu {
     float position[4];
@@ -1403,7 +1405,8 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
     rows(params.dome ? params.dome->toDome : glm::mat3(1.0f), shading.toDome);
     rows(params.stars ? params.stars->toCatalogue : glm::mat3(1.0f), shading.toCatalogue);
     const ImageDesc& map = domeMap_->Desc();
-    shading.sky[0] = sky_;
+    // What the sky pass draws, and for shading whether a dome lights the scene at all.
+    shading.sky[0] = sky_ | (params.dome ? kSkyLighting : 0u);
     shading.sky[1] = map.width;
     shading.sky[2] = map.height;
     shading.sky[3] = map.mips;

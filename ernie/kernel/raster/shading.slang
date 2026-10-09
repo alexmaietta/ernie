@@ -86,6 +86,9 @@ struct ShadingUniforms {
 static const uint kSkyDome = 1;   // the dome's radiance
 static const uint kSkyMap = 2;    // times its map
 static const uint kSkyStars = 4;  // and the stars
+// Not drawn but lighting: a dome lights the scene, visible or not (its map, or a white
+// placeholder without one, bound either way).
+static const uint kSkyLighting = 8;
 
 static const uint kMaxLights = 16;
 
@@ -336,6 +339,26 @@ float3 radianceFactors(float3 n, float3 l, float3 v, float3 albedo, float slopeV
     return max(model.radianceFactor(input, params), float3(0.0));
 }
 
+// The active model's response to light from all around (`IBrdf::environment`) for the viewer
+// along `v` and the bands' albedos `albedo`.
+EnvironmentResponse environmentOf(float3 n, float3 v, float3 albedo, float slopeVariance,
+                                  BrdfParams params) {
+    var input = brdfInputOf(n, v, v, albedo);
+    input.slopeVariance = slopeVariance;
+    ActiveBrdf model;
+    return model.environment(input, params);
+}
+
+// The dome map's RGB around direction `r`, prefiltered for a lobe of perceptual roughness
+// `roughness` by reading the mips whose texels span the lobe (about 2 alpha radians across; the
+// box-filtered mips stand in for a GGX convolution), as sigmoid coefficients (xyz) and scale (w).
+float4 domeLobe(float3 r, float roughness) {
+    let alpha = roughness * roughness;
+    let rgb = max(domeMapAt(r, max(2.0 * alpha, 1e-4)), float3(0.0));
+    let scale = max(rgb.x, max(rgb.y, rgb.z));
+    return float4(scale > 0.0 ? sigmoidCoefficients(rgb / scale) : float3(0.0), scale);
+}
+
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void shadeMain(uint3 id : SV_DispatchThreadID) {
@@ -385,6 +408,19 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     let domeRgb = unlit ? float3(0.0) : domeIrradiance(n);
     let domeScale = max(domeRgb.x, max(domeRgb.y, domeRgb.z));
     let domeCoefficients = domeScale > 0.0 ? sigmoidCoefficients(domeRgb / domeScale) : float3(0.0);
+    // The dome's specular lobes, around the mirror direction, where the model has any: their
+    // roughness does not depend on the albedo, so one probe finds them for every band.
+    float4 lobes[2] = {float4(0.0), float4(0.0)};
+    if (!unlit && (sh.sky.x & kSkyLighting) != 0) {
+        let probe = environmentOf(n, v, float3(1.0), slopeVariance, params);
+        let mirror = 2.0 * dot(n, v) * n - v;
+        if (any(probe.specular0 > 0.0)) {
+            lobes[0] = domeLobe(mirror, probe.roughness0);
+        }
+        if (any(probe.specular1 > 0.0)) {
+            lobes[1] = domeLobe(mirror, probe.roughness1);
+        }
+    }
 
     // Per light: direction towards it and the scale on its spectrum (inverse square, cone and
     // shadow); 0 for lights that cannot reach the point.
@@ -434,20 +470,34 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                             modulationAt(coefficients, scale, wavelength);
             bandIrradiance[k] = bandValue(sh.irradiance, band);
         }
+        // How the model reflects light from all around: the ambient fraction of the sun's (from
+        // every direction alike, so every lobe sees it whole) and the dome's.
+        let environment = unlit ? diffuseEnvironment(bandAlbedo)
+                                : environmentOf(n, v, bandAlbedo, slopeVariance, params);
         float3 response;
         if (unlit) {
             response = bandAlbedo;
         } else {
             let factors = radianceFactors(n, l, v, bandAlbedo, slopeVariance, params);
-            response = ambient * bandAlbedo + (1.0 - ambient) * factors * visibility;
+            let uniform = environment.diffuse + environment.specular0 + environment.specular1;
+            response = ambient * uniform + (1.0 - ambient) * factors * visibility;
         }
         var radiance = bandIrradiance / PI * response;
-        if (domeScale > 0.0) {
-            for (uint j = 0; j < 3; ++j) {
-                let band = min(first + j, bands - 1);
-                let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;
-                radiance[j] += bandAlbedo[j] * bandValue(sh.dome, band) *
+        for (uint j = 0; j < 3; ++j) {
+            let band = min(first + j, bands - 1);
+            let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;
+            let dome = bandValue(sh.dome, band);
+            if (domeScale > 0.0) {
+                radiance[j] += environment.diffuse[j] * dome *
                                modulationAt(domeCoefficients, domeScale, wavelength);
+            }
+            if (lobes[0].w > 0.0) {
+                radiance[j] += environment.specular0[j] * dome *
+                               modulationAt(lobes[0].xyz, lobes[0].w, wavelength);
+            }
+            if (lobes[1].w > 0.0) {
+                radiance[j] += environment.specular1[j] * dome *
+                               modulationAt(lobes[1].xyz, lobes[1].w, wavelength);
             }
         }
         for (uint k = 0; k < lightCount; ++k) {

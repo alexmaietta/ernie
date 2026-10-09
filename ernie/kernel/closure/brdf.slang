@@ -42,8 +42,38 @@ public struct BrdfParams {
     }
 }
 
+// How a surface reflects light arriving from all around it, as from a dome or ambient light: the
+// weight on the irradiance over pi (Lambert's is its albedo), and up to two specular lobes, each a
+// weight on the radiance from around the mirror direction and the lobe's perceptual roughness
+// (the square root of its GGX alpha), over which the host prefilters that radiance.
+public struct EnvironmentResponse {
+    public float3 diffuse;
+    public float3 specular0;
+    public float roughness0;
+    public float3 specular1;
+    public float roughness1;
+}
+
+// A purely diffuse response of weight `albedo`.
+public EnvironmentResponse diffuseEnvironment(float3 albedo) {
+    EnvironmentResponse r;
+    r.diffuse = albedo;
+    r.specular0 = float3(0.0);
+    r.roughness0 = 1.0;
+    r.specular1 = float3(0.0);
+    r.roughness1 = 1.0;
+    return r;
+}
+
 public interface IBrdf {
     float3 radianceFactor(BrdfInput s, BrdfParams p);
+
+    // The response to surrounding light for a viewer at cos(e) `mu` (`s.mu`; the other angles of
+    // `s` are unused), for the dome and ambient terms of a rasterizer. Models that do not
+    // override it reflect it diffusely with their albedo input as the weight.
+    EnvironmentResponse environment(BrdfInput s, BrdfParams p) {
+        return diffuseEnvironment(s.albedo);
+    }
 }
 
 // The geometry of unit directions towards the light l and the viewer v about the unit normal n,
