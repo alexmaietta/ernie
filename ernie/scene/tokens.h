@@ -279,6 +279,54 @@ inline constexpr std::string_view kDetailHexRotation = "inputs:detail:hexRotatio
 inline constexpr std::string_view kDetailHexContrast = "inputs:detail:hexContrast";
 inline constexpr std::string_view kDetailHexSharpness = "inputs:detail:hexSharpness";
 
+// UsdShade networks. A Material's `outputs:surface.connect` names a UsdPreviewSurface Shader, whose
+// inputs are constants or connections to other Shaders' outputs: a connection is the attribute
+// `<input>.connect` holding the source's property path as text, e.g. "/Looks/M/Tex.outputs:rgb"
+// (`GetConnection`). Ernie reads UsdPreviewSurface's diffuseColor and normal, UsdUVTexture,
+// UsdPrimvarReader_float2 and UsdTransform2d; a Material without a surface keeps Ernie's own
+// inputs above.
+//
+// Reference: Pixar, "UsdPreviewSurface Specification",
+// https://openusd.org/release/spec_usdpreviewsurface.html
+inline constexpr std::string_view kShader = "Shader";
+inline constexpr std::string_view kInfoId = "info:id";  ///< The shader's type, a token.
+inline constexpr std::string_view kUsdPreviewSurface = "UsdPreviewSurface";
+inline constexpr std::string_view kUsdUVTexture = "UsdUVTexture";
+inline constexpr std::string_view kUsdPrimvarReaderFloat2 = "UsdPrimvarReader_float2";
+inline constexpr std::string_view kUsdTransform2d = "UsdTransform2d";
+inline constexpr std::string_view kConnectSuffix = ".connect";
+inline constexpr std::string_view kSurfaceOutput = "outputs:surface";
+inline constexpr std::string_view kDiffuseColor = "inputs:diffuseColor";  ///< vec3, 0.18 grey.
+/// Tangent-space normal, +y along the texture's t; a texture's scale and bias decode it.
+inline constexpr std::string_view kNormalInput = "inputs:normal";
+/// UsdUVTexture: an image file (PNG, JPEG or EXR), or the tensor `ernie:texture` (float32 or uint8
+/// (rows, cols, channels), rows top to bottom) in its place; texture coordinates from `inputs:st`.
+inline constexpr std::string_view kFile = "inputs:file";
+inline constexpr std::string_view kShaderTexture = "ernie:texture";
+inline constexpr std::string_view kSt = "inputs:st";
+/// "repeat" (default), "mirror", "clamp", "black" or "useMetadata" (as repeat).
+inline constexpr std::string_view kWrapS = "inputs:wrapS";
+inline constexpr std::string_view kWrapT = "inputs:wrapT";
+/// vec4 scale and bias on the texture's values (and UsdTransform2d's vec2 scale).
+inline constexpr std::string_view kShaderScale = "inputs:scale";
+inline constexpr std::string_view kShaderBias = "inputs:bias";
+/// "auto" (default: sRGB for 8-bit images, raw otherwise), "raw" or "sRGB".
+inline constexpr std::string_view kSourceColorSpace = "inputs:sourceColorSpace";
+inline constexpr std::string_view kVarname = "inputs:varname";  ///< Primvar reader: e.g. "st".
+/// UsdTransform2d: `in` scaled, then rotated (degrees, counter-clockwise), then translated.
+inline constexpr std::string_view kIn = "inputs:in";
+inline constexpr std::string_view kRotation = "inputs:rotation";
+inline constexpr std::string_view kTranslation = "inputs:translation";
+
+// Mesh texture coordinates (UsdGeom primvars): float32 (n, 2). `primvars:<name>:indices` indexes
+// them (an indexed primvar), and `primvars:<name>:interpolation` (USD's metadata, as an
+// attribute: "constant", "uniform", "vertex" or "faceVarying") says what each covers; without it
+// the count decides: one per point is vertex, one per face vertex faceVarying, one per face
+// uniform, one constant.
+inline constexpr std::string_view kPrimvarsPrefix = "primvars:";
+inline constexpr std::string_view kIndicesSuffix = ":indices";
+inline constexpr std::string_view kInterpolationSuffix = ":interpolation";
+
 // Render settings (UsdRender), with Ernie's rasterizer options under `ernie:`.
 inline constexpr std::string_view kCameraRel = "camera";       ///< Path of the camera.
 inline constexpr std::string_view kResolution = "resolution";  ///< ivec2 pixels.

@@ -3,7 +3,9 @@
 // surface.slang) the passes bind
 //   10 points, 11 normals, 12 triangle indices, 13 draws, 14 vertex colours,
 //   15 instance positions, 16 instance orientations, 17 instance scales, 18 instance ids,
-//   19 per-draw records of multi-draws (draw, instance offset, index offset, unused).
+//   19 per-draw records of multi-draws (draw, instance offset, index offset, unused),
+//   21 texture coordinates per triangle corner, 22 the material's albedo texture and 23 its
+//   normal map, each with its own sampler (`RasterMaterial::AppendTextureResources`).
 // The colour pass writes the G-buffer for spectral shading (frame.slang).
 import frame;
 import surface;
@@ -13,6 +15,7 @@ static const uint kHasColors = 2;
 static const uint kInstanced = 4;
 static const uint kHasOrientations = 8;
 static const uint kHasScales = 16;
+static const uint kHasUvs = 32;
 
 struct MeshDraw {
     // World transform of the mesh, or of the instancer for instanced draws.
@@ -32,6 +35,9 @@ struct MeshDraw {
     // current offset and y their last frame's, z the points' current offset and w their last
     // frame's (equal to the current ones when they stood still).
     uint4 motion;
+    // x: the mesh's first corner in `uvs` (its levels of detail's corners follow, as in
+    // `indices`); yzw unused.
+    uint4 uv;
 }
 
 [[vk::binding(10, 0)]] StructuredBuffer<float> points;
@@ -47,6 +53,12 @@ struct MeshDraw {
 [[vk::binding(18, 0)]] StructuredBuffer<uint> instanceIds;
 // Per draw of an indirect multi-draw, what its push constants would hold.
 [[vk::binding(19, 0)]] StructuredBuffer<uint4> drawRecords;
+// Texture coordinates (s, t) per corner of every mesh's triangles, its levels of detail's too.
+[[vk::binding(21, 0)]] StructuredBuffer<float> uvs;
+[[vk::binding(22, 0)]] Sampler2D albedoTexture;
+// Tangent-space normals stored as n * 127 + 128 in 8 bits, with the deviation of the slopes each
+// texel covers in alpha (`MipFilter::NormalSlopes`), as the detail normal map.
+[[vk::binding(23, 0)]] Sampler2D normalTexture;
 
 // What one draw draws: the draw (`draws` entry), its first instance id and its first index past
 // the mesh's own.
@@ -99,6 +111,7 @@ struct MeshVertex {
     float3 world;
     float3 normal;
     float3 color;
+    float2 uv;
     uint corner;
     uint instance;
     uint item;
@@ -161,6 +174,11 @@ MeshVertex meshVertex(uint vertexIndex, uint instanceIndex, DrawCall call, float
         v.normal = lerp(before.normal, now.normal, motion);
     }
     v.color = (flags & kHasColors) != 0 ? load3(colors, index) : d.tint.rgb;
+    v.uv = float2(0.0);
+    if ((flags & kHasUvs) != 0) {
+        let at = d.uv.x + call.indexOffset + vertexIndex;
+        v.uv = float2(uvs[2 * at], uvs[2 * at + 1]);
+    }
     v.corner = vertexIndex % 3;
     v.item = call.item;
     v.instance = (flags & kInstanced) != 0
@@ -174,6 +192,7 @@ struct VertexOutput {
     float3 world : WORLD;
     float3 normal : NORMAL;
     float3 color : COLOR;
+    float2 uv : TEXCOORD;
     float3 barycentric : BARYCENTRIC;
     nointerpolation uint instance : INSTANCE;
     nointerpolation uint item : ITEM;
@@ -187,6 +206,7 @@ struct LayeredVertexOutput {
     float3 world : WORLD;
     float3 normal : NORMAL;
     float3 color : COLOR;
+    float2 uv : TEXCOORD;
     float3 barycentric : BARYCENTRIC;
     nointerpolation uint instance : INSTANCE;
     nointerpolation uint item : ITEM;
@@ -204,6 +224,7 @@ LayeredVertexOutput meshVertexMain(uint vertexIndex : SV_VertexID, uint instance
     out.world = v.world;
     out.normal = v.normal;
     out.color = v.color;
+    out.uv = v.uv;
     out.barycentric = barycentric[v.corner];
     out.instance = v.instance;
     out.item = v.item;
@@ -280,9 +301,72 @@ DetailSample triplanarDetail(float3 world, inout float3 normal) {
     return d;
 }
 
+// Texture coordinates `st` through a UsdTransform2d (the rows of a 2 x 3 matrix), with t running
+// up the image as USD's does (UsdUVTexture reads t = 0 at the image's bottom row).
+float2 transformUv(float4 rows[2], float2 st) {
+    return float2(dot(rows[0].xy, st) + rows[0].z, dot(rows[1].xy, st) + rows[1].z);
+}
+
+float2 imageUv(float2 uv) {
+    return float2(uv.x, 1.0 - uv.y);
+}
+
+struct UvSample {
+    float3 albedo;        // multiplier on the albedo modulation
+    float slopeVariance;  // of the normal map's slopes the pixel covers
+}
+
+// The material's textures through the mesh's texture coordinates `st`: the albedo texture's
+// colour (scaled and biased), and the normal map perturbing `normal` in the tangent frame the
+// coordinates' screen-space derivatives give, so meshes need no stored tangents.
+//
+// References:
+// - C. Schüler, "Normal Mapping without Precomputed Tangents", ShaderX5, 2006, and
+//   "Followup: Normal Mapping Without Precomputed Tangents", 2013.
+//   http://www.thetenthplanet.de/archives/1180
+// - M. S. Mikkelsen, "Surface Gradient-Based Bump Mapping Framework", Journal of Computer
+//   Graphics Techniques 9(3), 2020.
+UvSample uvTextures(float2 st, float3 world, inout float3 normal) {
+    // Derivatives first, outside the branches on the material's textures.
+    let normalUv = transformUv(surface.normalUv, st);
+    let dpdx = ddx(world);
+    let dpdy = ddy(world);
+    let duvdx = ddx(normalUv);
+    let duvdy = ddy(normalUv);
+    UvSample s;
+    s.albedo = float3(1.0);
+    s.slopeVariance = 0.0;
+    if (surface.textures.x > 0.0) {
+        let c = albedoTexture.Sample(imageUv(transformUv(surface.albedoUv, st)));
+        s.albedo = max(c.rgb * surface.albedoTextureScale.rgb + surface.albedoTextureBias.rgb,
+                       float3(0.0));
+    }
+    if (surface.textures.y > 0.0) {
+        // The cotangent frame: tangent along increasing s, bitangent along increasing t, the
+        // gradients of s and t up to the screen Jacobian's determinant, whose sign (negative
+        // with Vulkan's downward y, and on mirrored faces) the frame keeps.
+        let dp2perp = cross(dpdy, normal);
+        let dp1perp = cross(normal, dpdx);
+        let handedness = dot(dpdx, dp2perp) < 0.0 ? -1.0 : 1.0;
+        let tangent = handedness * (dp2perp * duvdx.x + dp1perp * duvdy.x);
+        let bitangent = handedness * (dp2perp * duvdx.y + dp1perp * duvdy.y);
+        let size = max(dot(tangent, tangent), dot(bitangent, bitangent));
+        if (size > 1e-30) {
+            let texel = normalTexture.Sample(imageUv(normalUv));
+            let n = (texel.xyz * 255.0 - 128.0) / 127.0;
+            let scale = rsqrt(size);
+            normal = normalize(tangent * scale * n.x + bitangent * scale * n.y + normal * n.z);
+            let sigma = min(texel.w, 0.999) / (1.0 - min(texel.w, 0.999));
+            s.slopeVariance = sigma * sigma;
+        }
+    }
+    return s;
+}
+
 // Meshes are two-sided: normals turn towards the viewer. Without authored normals each triangle
 // is lit flat with the normal of its plane. The albedo modulation is the mesh's vertex colours or
-// tint times the detail albedo; the material's albedo map scales its reflectance by world x and y.
+// tint times the albedo texture and the detail albedo; the normal map then the detail normals
+// perturb the normal; the material's albedo map scales its reflectance by world x and y.
 [shader("fragment")]
 GBuffer meshFragmentMain(VertexOutput in) {
     let d = draws[in.item];
@@ -295,8 +379,9 @@ GBuffer meshFragmentMain(VertexOutput in) {
         normal = -normal;
     }
     var shadingNormal = normal;
+    let textured = uvTextures(in.uv, in.world, shadingNormal);
     let detail = triplanarDetail(in.world, shadingNormal);
-    let modulation = cascadeTint(in.color * detail.albedo, in.world);
+    let modulation = cascadeTint(in.color * textured.albedo * detail.albedo, in.world);
     let unlit = hiddenLine();
     GBuffer out;
     out.normal =
@@ -304,6 +389,7 @@ GBuffer meshFragmentMain(VertexOutput in) {
     out.albedo = float4(unlit ? 1.0 : surfaceAlbedoScale(in.world),
                         wireframe(modulation, in.barycentric));
     out.ids = uint4(d.points.y, d.points.z, in.instance,
-                    packSurfaceFlags(unlit ? kUnlit : 0u, detail.slopeVariance));
+                    packSurfaceFlags(unlit ? kUnlit : 0u,
+                                     textured.slopeVariance + detail.slopeVariance));
     return out;
 }

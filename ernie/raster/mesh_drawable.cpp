@@ -28,6 +28,7 @@ constexpr std::uint32_t kHasColors = 2;
 constexpr std::uint32_t kInstanced = 4;
 constexpr std::uint32_t kHasOrientations = 8;
 constexpr std::uint32_t kHasScales = 16;
+constexpr std::uint32_t kHasUvs = 32;
 
 /// One draw as `mesh.slang` reads it.
 struct GpuDraw {
@@ -40,8 +41,9 @@ struct GpuDraw {
     /// The instance arrays' and points' offsets in their double-buffered pools, now and at the
     /// last frame.
     std::uint32_t motion[4];
+    std::uint32_t uv[4];  ///< The mesh's first corner in the texture coordinate pool; unused.
 };
-static_assert(sizeof(GpuDraw) == 256, "GpuDraw must match MeshDraw in mesh.slang");
+static_assert(sizeof(GpuDraw) == 272, "GpuDraw must match MeshDraw in mesh.slang");
 
 struct DrawConstants {
     float lightViewProj[16];
@@ -149,7 +151,7 @@ void Reserve(const VulkanContext& context, std::unique_ptr<GpuBuffer>& buffer, V
     buffer = std::make_unique<GpuBuffer>(context, bytes, usage, memory);
 }
 
-/// Frame (0 to 4), material (5 to 9) and mesh (10 to 19) bindings; see mesh.slang.
+/// Frame (0 to 4), material (5 to 9) and mesh (10 to 19, 21 to 23) bindings; see mesh.slang.
 constexpr DescriptorBinding kBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
@@ -171,9 +173,13 @@ constexpr DescriptorBinding kBindings[] = {
     {17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {18, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {19, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {21, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {22, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
+    {23, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
 };
 
-/// The motion pass's: the mesh passes' and 20, the view's MotionUniforms (frame.slang).
+/// The motion pass's: the mesh passes' and 20, the view's MotionUniforms (frame.slang), last as
+/// the pass appends it.
 constexpr DescriptorBinding kMotionBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
@@ -195,6 +201,9 @@ constexpr DescriptorBinding kMotionBindings[] = {
     {17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {18, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {19, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {21, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {22, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
+    {23, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {20, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
 };
 
@@ -277,9 +286,13 @@ std::pair<glm::vec3, glm::vec3> TransformBox(const glm::mat4& transform, const g
 /// - M. Garland and P. S. Heckbert, "Surface Simplification Using Quadric Error Metrics",
 ///   SIGGRAPH '97, 209-216, 1997. https://doi.org/10.1145/258734.258849
 /// - A. Kapoulkine, "meshoptimizer", `meshopt_simplify`. https://github.com/zeux/meshoptimizer
+///
+/// `locked` holds a `meshopt_SimplifyVertex_*` flag per point (or is empty): points on texture
+/// coordinate seams stay, so the seams do.
 template <typename Level>
 std::vector<Level> SimplifiedLevels(const MeshData& data, std::size_t maxLevels,
-                                    std::size_t minTriangles, std::vector<std::uint32_t>& indices) {
+                                    std::size_t minTriangles, std::vector<std::uint32_t>& indices,
+                                    std::span<const unsigned char> locked = {}) {
     std::vector<Level> levels;
     const std::size_t count = data.indices.size();
     const std::size_t vertices = data.points.size() / 3;
@@ -295,9 +308,10 @@ std::vector<Level> SimplifiedLevels(const MeshData& data, std::size_t maxLevels,
             break;
         }
         float error = 0.0f;
-        const std::size_t kept =
-            meshopt_simplify(simplified.data(), data.indices.data(), count, data.points.data(),
-                             vertices, 3 * sizeof(float), target, 1.0f, 0, &error);
+        const std::size_t kept = meshopt_simplifyWithAttributes(
+            simplified.data(), data.indices.data(), count, data.points.data(), vertices,
+            3 * sizeof(float), nullptr, 0, nullptr, 0, locked.empty() ? nullptr : locked.data(),
+            target, 1.0f, 0, &error);
         if (kept == 0 || kept > previous * 9 / 10) {
             break;  // simplification stalled: no level worth its memory
         }
@@ -308,6 +322,58 @@ std::vector<Level> SimplifiedLevels(const MeshData& data, std::size_t maxLevels,
         previous = kept;
     }
     return levels;
+}
+
+/// Per point of `data`, the distinct texture coordinates of the triangle corners at it.
+std::vector<std::vector<glm::vec2>> PointUvs(const MeshData& data) {
+    std::vector<std::vector<glm::vec2>> uvs(data.points.size() / 3);
+    for (std::size_t c = 0; c < data.indices.size(); ++c) {
+        const glm::vec2 uv(data.uvs[2 * c], data.uvs[2 * c + 1]);
+        std::vector<glm::vec2>& at = uvs[data.indices[c]];
+        if (std::find(at.begin(), at.end(), uv) == at.end()) {
+            at.push_back(uv);
+        }
+    }
+    return uvs;
+}
+
+/// Texture coordinates for the corners of simplified triangles `lodIndices`, whose corners are
+/// points of the full mesh: a point's own, or on a seam (several), the one nearest the triangle's
+/// other corners', so each triangle stays on its side of the seam.
+std::vector<float> LodUvs(const std::vector<std::vector<glm::vec2>>& pointUvs,
+                          std::span<const std::uint32_t> lodIndices) {
+    std::vector<float> uvs;
+    uvs.reserve(2 * lodIndices.size());
+    for (std::size_t t = 0; t + 2 < lodIndices.size(); t += 3) {
+        glm::vec2 reference(0.0f);
+        float weight = 0.0f;
+        for (std::size_t k = 0; k < 3; ++k) {
+            const std::vector<glm::vec2>& at = pointUvs[lodIndices[t + k]];
+            if (at.size() == 1) {
+                reference += at[0];
+                weight += 1.0f;
+            }
+        }
+        if (weight == 0.0f) {
+            reference = pointUvs[lodIndices[t]].empty() ? glm::vec2(0.0f)
+                                                        : pointUvs[lodIndices[t]][0];
+        } else {
+            reference /= weight;
+        }
+        for (std::size_t k = 0; k < 3; ++k) {
+            const std::vector<glm::vec2>& at = pointUvs[lodIndices[t + k]];
+            glm::vec2 best(0.0f);
+            float distance = std::numeric_limits<float>::infinity();
+            for (const glm::vec2& uv : at) {
+                if (glm::distance(uv, reference) < distance) {
+                    distance = glm::distance(uv, reference);
+                    best = uv;
+                }
+            }
+            uvs.insert(uvs.end(), {best.x, best.y});
+        }
+    }
+    return uvs;
 }
 
 }  // namespace
@@ -379,12 +445,26 @@ std::uint32_t MeshDrawable::AddMesh(MeshData data) {
             throw std::invalid_argument("Mesh index out of range");
         }
     }
+    if (!data.uvs.empty() && data.uvs.size() != 2 * data.indices.size()) {
+        throw std::invalid_argument("Mesh texture coordinates must come one pair per corner");
+    }
     Mesh mesh;
     std::tie(mesh.low, mesh.high) = PointBounds(data.points);
     mesh.levels.push_back({0, static_cast<std::uint32_t>(data.indices.size()), 0.0f});
-    for (const MeshLevel& level :
-         SimplifiedLevels<MeshLevel>(data, kMaxLevels, kMinLodTriangles, mesh.lodIndices)) {
+    std::vector<std::vector<glm::vec2>> pointUvs;
+    std::vector<unsigned char> locked;
+    if (!data.uvs.empty()) {
+        pointUvs = PointUvs(data);
+        for (const std::vector<glm::vec2>& at : pointUvs) {
+            locked.push_back(at.size() > 1 ? meshopt_SimplifyVertex_Lock : 0);
+        }
+    }
+    for (const MeshLevel& level : SimplifiedLevels<MeshLevel>(data, kMaxLevels, kMinLodTriangles,
+                                                              mesh.lodIndices, locked)) {
         mesh.levels.push_back(level);
+    }
+    if (!data.uvs.empty()) {
+        mesh.lodUvs = LodUvs(pointUvs, mesh.lodIndices);
     }
     mesh.data = std::move(data);
     const std::uint32_t handle = nextHandle_++;
@@ -835,7 +915,11 @@ void MeshDrawable::RebuildGeometry() {
     std::vector<float> colors;
     std::vector<std::uint32_t> indices;
     std::vector<std::uint32_t> adjacency;
+    std::vector<float> uvs;
     for (auto& [handle, mesh] : meshes_) {
+        mesh.firstUv = static_cast<std::uint32_t>(uvs.size() / 2);
+        uvs.insert(uvs.end(), mesh.data.uvs.begin(), mesh.data.uvs.end());
+        uvs.insert(uvs.end(), mesh.lodUvs.begin(), mesh.lodUvs.end());
         mesh.firstIndex = static_cast<std::uint32_t>(indices.size());
         mesh.firstVertex = static_cast<std::uint32_t>(points.size() / 3);
         const std::size_t count = mesh.data.points.size();
@@ -872,6 +956,7 @@ void MeshDrawable::RebuildGeometry() {
     normals_ = Pool(std::as_bytes(std::span(normals)));
     colors_ = Pool(std::as_bytes(std::span(colors)));
     indices_ = StorageBuffer(context_, indices);
+    uvs_ = StorageBuffer(context_, uvs);
     adjacency_ = StorageBuffer(context_, adjacency);
     pendingNormals_.clear();
     for (auto& [handle, mesh] : meshes_) {
@@ -1085,6 +1170,8 @@ void MeshDrawable::WriteDraws() {
         std::uint32_t flags = 0;
         flags |= mesh.data.normals.empty() ? 0u : kHasNormals;
         flags |= item.vertexColors && !mesh.data.colors.empty() ? kHasColors : 0u;
+        flags |= mesh.data.uvs.empty() ? 0u : kHasUvs;
+        draw.uv[0] = mesh.firstUv;
         if (item.instancer) {
             const Instancer& instancer = instancers_.at(*item.instancer);
             flags |= kInstanced;
@@ -1209,6 +1296,8 @@ std::vector<DescriptorResource> MeshDrawable::Resources(const RasterFrame& frame
     for (const GpuBuffer* buffer : buffers) {
         resources.push_back(DescriptorResource::Of(*buffer));
     }
+    resources.push_back(DescriptorResource::Of(*uvs_));
+    renderer_.MaterialOrDefault(draw.material).AppendTextureResources(resources);
     return resources;
 }
 

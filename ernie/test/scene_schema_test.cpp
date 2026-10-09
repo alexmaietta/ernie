@@ -60,6 +60,27 @@ TEST(Schema, ReadersAcceptEveryNumericType) {
     EXPECT_TRUE(ernie::GetTarget(scene, "/P", "token").IsEmpty());
 }
 
+TEST(Schema, ConnectionsRoundTripAsUsdPropertyPaths) {
+    Scene scene;
+    scene.Define("/Looks/M", ernie::tokens::kMaterial);
+    EXPECT_FALSE(ernie::GetConnection(scene, "/Looks/M", "outputs:surface").has_value());
+    ernie::Connect(scene, "/Looks/M", "outputs:surface", "/Looks/M/Preview", "outputs:surface");
+    EXPECT_EQ(scene.Get<std::string>("/Looks/M", "outputs:surface.connect", ""),
+              "/Looks/M/Preview.outputs:surface")
+        << "the text a USD layer holds";
+    const auto connection = ernie::GetConnection(scene, "/Looks/M", "outputs:surface");
+    ASSERT_TRUE(connection.has_value());
+    EXPECT_EQ(connection->prim, Path("/Looks/M/Preview"));
+    EXPECT_EQ(connection->output, "outputs:surface");
+
+    for (const char* bad : {"/Looks/M/Preview", "/Looks/M/Preview.", "Looks.outputs:rgb"}) {
+        scene.Set("/Looks/M", "outputs:surface.connect", std::string(bad));
+        EXPECT_THROW(ernie::GetConnection(scene, "/Looks/M", "outputs:surface"),
+                     std::invalid_argument)
+            << bad;
+    }
+}
+
 TEST(Schema, LookAtTransformPointsTheCameraMinusZAtTheTarget) {
     const glm::dmat4 transform =
         ernie::LookAtTransform({0.0, -10.0, 5.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0});

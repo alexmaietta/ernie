@@ -317,6 +317,10 @@ class MeshDrawable : public RasterDrawable {
         bool pointsInPlace = false;
         std::vector<MeshLevel> levels;          ///< Its levels of detail, the full mesh first.
         std::vector<std::uint32_t> lodIndices;  ///< The coarser levels' indices, one after another.
+        /// Texture coordinates of `lodIndices`' corners (after `data.uvs`, those of the full
+        /// mesh's), and where both start in the texture coordinate pool, in corners.
+        std::vector<float> lodUvs;
+        std::uint32_t firstUv = 0;
     };
 
     struct Instancer {
@@ -441,6 +445,7 @@ class MeshDrawable : public RasterDrawable {
     std::shared_ptr<GpuBuffer> normals_;
     std::shared_ptr<GpuBuffer> colors_;
     std::unique_ptr<GpuBuffer> indices_;
+    std::unique_ptr<GpuBuffer> uvs_;  ///< Meshes' texture coordinates per corner (`Mesh::firstUv`).
     /// Every recomputing mesh's `Mesh::adjacency`, one after another.
     std::unique_ptr<GpuBuffer> adjacency_;
     PipelineLayout normalsLayout_;

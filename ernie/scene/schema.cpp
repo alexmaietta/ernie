@@ -83,6 +83,33 @@ Path GetTarget(const Scene& scene, const Path& path, std::string_view attribute)
     return scene.Get<Path>(path, attribute, Path());
 }
 
+std::optional<Connection> GetConnection(const Scene& scene, const Path& path,
+                                        std::string_view input) {
+    const std::string attribute = std::string(input) + std::string(tokens::kConnectSuffix);
+    const std::string text = scene.Get<std::string>(path, attribute, std::string());
+    if (text.empty()) {
+        return std::nullopt;
+    }
+    const std::size_t dot = text.find('.', text.rfind('/') == std::string::npos ? 0
+                                                                                : text.rfind('/'));
+    if (dot == std::string::npos || dot + 1 == text.size()) {
+        throw std::invalid_argument("'" + path.String() + "' " + attribute + " is '" + text +
+                                    "', not a property path such as /Looks/M/Tex.outputs:rgb");
+    }
+    try {
+        return Connection{Path(std::string_view(text).substr(0, dot)), text.substr(dot + 1)};
+    } catch (const std::invalid_argument&) {
+        throw std::invalid_argument("'" + path.String() + "' " + attribute + " is '" + text +
+                                    "', whose prim path is invalid");
+    }
+}
+
+void Connect(Scene& scene, const Path& path, std::string_view input, const Path& source,
+             std::string_view output) {
+    scene.Set(path, std::string(input) + std::string(tokens::kConnectSuffix),
+              source.String() + "." + std::string(output));
+}
+
 glm::dmat4 LookAtTransform(glm::dvec3 eye, glm::dvec3 target, glm::dvec3 up) {
     const glm::dvec3 back = eye - target;
     if (glm::length(back) == 0.0 || glm::length(glm::cross(up, back)) == 0.0) {

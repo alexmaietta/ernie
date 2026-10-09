@@ -209,6 +209,139 @@ TEST(MeshDataOf, ReadsPointsTopologyNormalsAndVertexColours) {
     EXPECT_THROW(ernie::MeshDataOf(scene, "/Quad"), std::invalid_argument);
 }
 
+TEST(MeshDataOf, ReadsTextureCoordinatesPerTriangleCornerWithAnyInterpolation) {
+    // Two triangles over four points: 6 face vertices, 2 faces.
+    Scene scene;
+    const std::array<float, 12> points{0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0};
+    const std::array<std::int64_t, 2> counts{3, 3};
+    const std::array<std::int32_t, 6> indices{0, 1, 2, 0, 2, 3};
+    scene.Define("/Quad", tokens::kMesh)
+        .Write(tokens::kPoints, Tensor::Copy<float>(points, {4, 3}))
+        .Write(tokens::kFaceVertexCounts, Tensor::Copy<std::int64_t>(counts, {2}))
+        .Write(tokens::kFaceVertexIndices, Tensor::Copy<std::int32_t>(indices, {6}));
+    EXPECT_TRUE(ernie::MeshDataOf(scene, "/Quad").uvs.empty());
+
+    // One per point: vertex, following the point indices.
+    const std::array<float, 8> perPoint{0, 0, 1, 0, 1, 1, 0, 1};
+    scene.Write("/Quad", "primvars:st", Tensor::Copy<float>(perPoint, {4, 2}));
+    EXPECT_EQ(ernie::MeshDataOf(scene, "/Quad").uvs,
+              (std::vector<float>{0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1}));
+
+    // One per face vertex: faceVarying, in face-vertex order.
+    const std::array<float, 12> perCorner{0, 0, 1, 0, 1, 1, 5, 5, 6, 6, 7, 7};
+    scene.Write("/Quad", "primvars:st", Tensor::Copy<float>(perCorner, {6, 2}));
+    EXPECT_EQ(ernie::MeshDataOf(scene, "/Quad").uvs,
+              (std::vector<float>{0, 0, 1, 0, 1, 1, 5, 5, 6, 6, 7, 7}));
+
+    // Indexed: the indices' count decides, here one per face (uniform).
+    const std::array<float, 4> values{0.25f, 0.5f, 0.75f, 1.0f};
+    const std::array<std::int32_t, 2> perFace{1, 0};
+    scene.Write("/Quad", "primvars:st", Tensor::Copy<float>(values, {2, 2}));
+    scene.Write("/Quad", "primvars:st:indices", Tensor::Copy<std::int32_t>(perFace, {2}));
+    const std::vector<float> uniform = ernie::MeshDataOf(scene, "/Quad").uvs;
+    EXPECT_EQ(uniform[0], 0.75f) << "the first face reads value 1";
+    EXPECT_EQ(uniform[6], 0.25f) << "the second value 0";
+
+    // The interpolation attribute overrides the count, and must agree with it.
+    scene.Set("/Quad", "primvars:st:interpolation", std::string("vertex"));
+    EXPECT_THROW(ernie::MeshDataOf(scene, "/Quad"), std::invalid_argument);
+    const std::array<std::int32_t, 1> one{1};
+    scene.Write("/Quad", "primvars:st:indices", Tensor::Copy<std::int32_t>(one, {1}));
+    scene.Set("/Quad", "primvars:st:interpolation", std::string("constant"));
+    EXPECT_EQ(ernie::MeshDataOf(scene, "/Quad").uvs[10], 0.75f);
+    const std::array<std::int32_t, 1> outOfRange{2};
+    scene.Write("/Quad", "primvars:st:indices", Tensor::Copy<std::int32_t>(outOfRange, {1}));
+    EXPECT_THROW(ernie::MeshDataOf(scene, "/Quad"), std::invalid_argument);
+
+    // Coordinates matching nothing are an error, not silently dropped.
+    scene.Clear("/Quad", "primvars:st:indices");
+    scene.Clear("/Quad", "primvars:st:interpolation");
+    scene.Write("/Quad", "primvars:st", Tensor::Zeros(DType::Float32, {5, 2}));
+    EXPECT_THROW(ernie::MeshDataOf(scene, "/Quad"), std::invalid_argument);
+}
+
+TEST(MaterialSettingsOf, ReadsAUsdPreviewSurfaceNetwork) {
+    Scene scene;
+    const BrdfRegistry brdfs = BrdfRegistry::WithBuiltins();
+    scene.Define("/Looks/M", tokens::kMaterial);
+    scene.Define("/Looks/M/Surface", tokens::kShader)
+        .Set(tokens::kInfoId, std::string(tokens::kUsdPreviewSurface))
+        .Set(tokens::kDiffuseColor, glm::vec3(0.5f, 0.25f, 0.125f));
+    EXPECT_EQ(ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs).albedo, glm::vec3(1.0f))
+        << "Ernie's own inputs until the surface is connected";
+    ernie::Connect(scene, "/Looks/M", tokens::kSurfaceOutput, "/Looks/M/Surface",
+                   tokens::kSurfaceOutput);
+    ernie::MaterialSettings settings = ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs);
+    EXPECT_EQ(settings.albedo, glm::vec3(0.5f, 0.25f, 0.125f));
+    EXPECT_FALSE(settings.albedoTexture.has_value());
+
+    // diffuseColor from a texture, its coordinates through a transform from primvar "uv".
+    scene.Define("/Looks/M/Tex", tokens::kShader)
+        .Set(tokens::kInfoId, std::string(tokens::kUsdUVTexture))
+        .Set(tokens::kFile, std::string("rock.png"))
+        .Set(tokens::kWrapS, std::string("clamp"))
+        .Set(tokens::kShaderScale, glm::vec4(2.0f))
+        .Set(tokens::kSourceColorSpace, std::string("raw"));
+    scene.Define("/Looks/M/Place", tokens::kShader)
+        .Set(tokens::kInfoId, std::string(tokens::kUsdTransform2d))
+        .Set(tokens::kShaderScale, glm::dvec2(4.0, 2.0))
+        .Set(tokens::kRotation, 90.0);
+    scene.Define("/Looks/M/Uv", tokens::kShader)
+        .Set(tokens::kInfoId, std::string(tokens::kUsdPrimvarReaderFloat2))
+        .Set(tokens::kVarname, std::string("uv"));
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor, "/Looks/M/Tex", "outputs:rgb");
+    ernie::Connect(scene, "/Looks/M/Tex", tokens::kSt, "/Looks/M/Place", "outputs:result");
+    ernie::Connect(scene, "/Looks/M/Place", tokens::kIn, "/Looks/M/Uv", "outputs:result");
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kNormalInput, "/Looks/M/Tex", "outputs:rgb");
+    settings = ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs);
+    EXPECT_EQ(settings.albedo, glm::vec3(1.0f)) << "the texture carries the colour";
+    ASSERT_TRUE(settings.albedoTexture.has_value());
+    const ernie::TextureReader& texture = *settings.albedoTexture;
+    EXPECT_EQ(texture.file, "rock.png");
+    EXPECT_EQ(texture.uvSet, "uv");
+    EXPECT_EQ(texture.wrapS, ernie::TextureWrap::Clamp);
+    EXPECT_EQ(texture.wrapT, ernie::TextureWrap::Repeat);
+    EXPECT_EQ(texture.colorSpace, ernie::TextureColorSpace::Raw);
+    EXPECT_EQ(texture.scale, glm::vec4(2.0f));
+    EXPECT_EQ(texture.uvScale, glm::vec2(4.0f, 2.0f));
+    EXPECT_EQ(texture.uvRotation, 90.0f);
+    EXPECT_TRUE(settings.normalTexture.has_value());
+
+    // A tensor in place of the file.
+    scene.Write("/Looks/M/Tex", tokens::kShaderTexture, Tensor::Zeros(DType::UInt8, {2, 2, 3}));
+    settings = ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs);
+    EXPECT_TRUE(settings.albedoTexture->file.empty());
+    EXPECT_EQ(settings.albedoTexture->Source(), "/Looks/M/Tex");
+
+    // Malformed networks say what is wrong.
+    scene.Set("/Looks/M/Tex", tokens::kWrapT, std::string("wobble"));
+    EXPECT_THROW(ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs), std::invalid_argument);
+    scene.Set("/Looks/M/Tex", tokens::kWrapT, std::string("repeat"));
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor, "/Looks/M/Tex", "outputs:r");
+    EXPECT_THROW(ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs), std::invalid_argument);
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor, "/Looks/M/Uv", "outputs:rgb");
+    EXPECT_THROW(ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs), std::invalid_argument);
+    scene.Set("/Looks/M", std::string(tokens::kSurfaceOutput) + ".connect",
+              std::string("not a path"));
+    EXPECT_THROW(ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs), std::invalid_argument);
+
+    // A mesh bound to the material reads the coordinate set its textures name.
+    scene.Set("/Looks/M", std::string(tokens::kSurfaceOutput) + ".connect",
+              std::string("/Looks/M/Surface.outputs:surface"));
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor, "/Looks/M/Tex", "outputs:rgb");
+    const std::array<float, 9> points{0, 0, 0, 1, 0, 0, 0, 1, 0};
+    const std::array<std::int64_t, 1> counts{3};
+    const std::array<std::int32_t, 3> indices{0, 1, 2};
+    const std::array<float, 6> uv{0, 0, 1, 0, 0, 1};
+    scene.Define("/Tri", tokens::kMesh)
+        .Write(tokens::kPoints, Tensor::Copy<float>(points, {3, 3}))
+        .Write(tokens::kFaceVertexCounts, Tensor::Copy<std::int64_t>(counts, {1}))
+        .Write(tokens::kFaceVertexIndices, Tensor::Copy<std::int32_t>(indices, {3}))
+        .Write("primvars:uv", Tensor::Copy<float>(uv, {3, 2}))
+        .Set(tokens::kMaterialBinding, Path("/Looks/M"));
+    EXPECT_EQ(ernie::MeshDataOf(scene, "/Tri").uvs.size(), 6u);
+}
+
 TEST(InstanceDataOf, ReadsArraysAndGroupsInstancesByPrototype) {
     Scene scene;
     const std::array<float, 9> positions{0, 0, 0, 1, 0, 0, 2, 0, 0};

@@ -73,6 +73,30 @@ class RasterMaterial {
     /// @throws std::invalid_argument as `SetDetailTextures`.
     void SetDetailNormal(const Image* normal);
 
+    /// Uploads the texture of `MaterialSettings::albedoTexture` (linear colour), sampled through
+    /// mesh texture coordinates as `reader` wraps them; nullptr removes it. Its scale, bias and
+    /// coordinate transform come from the settings of `Update`.
+    /// @throws std::invalid_argument if the image is empty or larger than the device allows.
+    void SetAlbedoTexture(const Image* albedo, const TextureReader& reader);
+
+    /// Uploads the tangent-space normal map of `MaterialSettings::normalTexture`: `normal` holds
+    /// raw values, which `reader`'s scale and bias turn into normals (UsdPreviewSurface's
+    /// convention; scale 2 and bias -1 for the usual n / 2 + 1/2 encoding). nullptr removes it.
+    /// @throws std::invalid_argument as `SetAlbedoTexture`.
+    void SetNormalTexture(const Image* normal, const TextureReader& reader);
+
+    bool HasAlbedoTexture() const {
+        return hasAlbedoTexture_;
+    }
+
+    bool HasNormalTexture() const {
+        return hasNormalTexture_;
+    }
+
+    /// The textures mesh passes read through texture coordinates, albedo then normal map, each
+    /// with its own sampler (bindings 22 and 23 of mesh.slang).
+    void AppendTextureResources(std::vector<DescriptorResource>& resources) const;
+
     bool HasDetailAlbedo() const {
         return hasDetailAlbedo_;
     }
@@ -137,8 +161,14 @@ class RasterMaterial {
     std::unique_ptr<GpuImage> albedoMap_;
     std::unique_ptr<GpuImage> detailAlbedo_;
     std::unique_ptr<GpuImage> detailNormal_;
+    std::unique_ptr<GpuImage> albedoTexture_;
+    std::unique_ptr<GpuImage> normalTexture_;
+    std::unique_ptr<Sampler> albedoSampler_;
+    std::unique_ptr<Sampler> normalSampler_;
 
     bool hasAlbedoMap_ = false;
+    bool hasAlbedoTexture_ = false;
+    bool hasNormalTexture_ = false;
     bool hasDetailAlbedo_ = false;
     bool hasDetailNormal_ = false;
     glm::vec3 detailMean_{1.0f};

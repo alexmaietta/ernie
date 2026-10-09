@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -139,6 +140,10 @@ struct SamplerDesc {
     VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     float maxAnisotropy = 1.0f;  ///< Above 1 enables anisotropic filtering where supported.
     bool compare = false;        ///< Depth comparison (`VK_COMPARE_OP_LESS`) for shadow maps.
+    /// Addressing along v (and w) when it differs from `addressMode`'s along u.
+    std::optional<VkSamplerAddressMode> addressModeV;
+    /// What `VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER` reads outside the image.
+    VkBorderColor borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
 };
 
 /// An owned `VkSampler`.

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <iterator>
 #include <stdexcept>
 
 namespace ernie {
@@ -24,10 +25,50 @@ struct SurfaceUniforms {
     float detailPhase[4];
     float hexPhaseXyYz[4];
     float hexPhaseXz[4];
+    float albedoTextureScale[4];
+    float albedoTextureBias[4];
+    float albedoUv[8];  ///< Rows of the 2 x 3 texture coordinate transform.
+    float normalUv[8];
+    float textures[4];  ///< Has albedo texture, has normal map, unused, unused.
     float params[BrdfRegistry::kMaxParams];
 };
-static_assert(sizeof(SurfaceUniforms) == 208,
+static_assert(sizeof(SurfaceUniforms) == 320,
               "SurfaceUniforms must match Surface in surface.slang");
+
+/// UsdTransform2d as the rows of a 2 x 3 matrix: scale, then rotate counter-clockwise, then
+/// translate.
+void WriteUvTransform(const TextureReader& reader, float (&rows)[8]) {
+    const float angle = glm::radians(reader.uvRotation);
+    const float c = std::cos(angle);
+    const float s = std::sin(angle);
+    const glm::vec2 k = reader.uvScale;
+    const float values[8] = {c * k.x, -s * k.y, reader.uvTranslation.x, 0.0f,
+                             s * k.x, c * k.y,  reader.uvTranslation.y, 0.0f};
+    std::copy(std::begin(values), std::end(values), rows);
+}
+
+VkSamplerAddressMode AddressModeOf(TextureWrap wrap) {
+    switch (wrap) {
+    case TextureWrap::Mirror:
+        return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+    case TextureWrap::Clamp:
+        return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    case TextureWrap::Black:
+        return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    case TextureWrap::Repeat:
+        break;
+    }
+    return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+}
+
+/// A trilinear, anisotropic sampler wrapping as `reader` does.
+std::unique_ptr<Sampler> TextureSampler(const VulkanContext& context, const TextureReader& reader) {
+    SamplerDesc desc{VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_LINEAR, AddressModeOf(reader.wrapS),
+                     16.0f, false};
+    desc.addressModeV = AddressModeOf(reader.wrapT);
+    desc.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+    return std::make_unique<Sampler>(context, desc);
+}
 
 /// surface.slang's hex lattice: its skew (tile coordinates times `kSkewScale`, then x minus
 /// `kSkewX` times y and y times `kSkewY`) and the period of its random rotations.
@@ -72,6 +113,51 @@ RasterMaterial::RasterMaterial(const VulkanContext& context, FrameUploads& uploa
                                     VK_SAMPLER_ADDRESS_MODE_REPEAT, 16.0f, false}) {
     ClearAlbedoMap();
     SetDetailTextures(nullptr, nullptr);
+    SetAlbedoTexture(nullptr, TextureReader());
+    SetNormalTexture(nullptr, TextureReader());
+}
+
+void RasterMaterial::SetAlbedoTexture(const Image* albedo, const TextureReader& reader) {
+    CheckDetailImage(albedo);
+    const Image white(1, 1, glm::vec4(1.0f));
+    auto image = UploadMips(albedo != nullptr ? *albedo : white, MipFilter::Average,
+                            ImageEncoding::Srgb, VK_FORMAT_R8G8B8A8_SRGB);
+    auto sampler = TextureSampler(context_, reader);
+    vkDeviceWaitIdle(context_.Device());
+    albedoTexture_ = std::move(image);
+    albedoSampler_ = std::move(sampler);
+    hasAlbedoTexture_ = albedo != nullptr;
+    WriteUniform();
+}
+
+void RasterMaterial::SetNormalTexture(const Image* normal, const TextureReader& reader) {
+    CheckDetailImage(normal);
+    // The reader's scale and bias turn the raw values into normals, stored as n / 2 + 1/2 for
+    // `MipFilter::NormalSlopes`.
+    Image normals(1, 1, glm::vec4(0.5f, 0.5f, 1.0f, 1.0f));
+    if (normal != nullptr) {
+        normals = *normal;
+        for (glm::vec4& texel : normals.pixels) {
+            glm::vec3 n = glm::vec3(texel) * glm::vec3(reader.scale) + glm::vec3(reader.bias);
+            n = glm::length(n) > 0.0f ? glm::normalize(n) : glm::vec3(0.0f, 0.0f, 1.0f);
+            texel = glm::vec4(0.5f * n + 0.5f, 0.0f);
+        }
+    }
+    auto image = UploadMips(normals, MipFilter::NormalSlopes, ImageEncoding::Linear,
+                            VK_FORMAT_R8G8B8A8_UNORM);
+    auto sampler = TextureSampler(context_, reader);
+    vkDeviceWaitIdle(context_.Device());
+    normalTexture_ = std::move(image);
+    normalSampler_ = std::move(sampler);
+    hasNormalTexture_ = normal != nullptr;
+    WriteUniform();
+}
+
+void RasterMaterial::AppendTextureResources(std::vector<DescriptorResource>& resources) const {
+    resources.push_back(DescriptorResource::Of(
+        albedoTexture_->View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, *albedoSampler_));
+    resources.push_back(DescriptorResource::Of(
+        normalTexture_->View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, *normalSampler_));
 }
 
 void RasterMaterial::AppendResources(std::vector<DescriptorResource>& resources) const {
@@ -237,13 +323,24 @@ void RasterMaterial::WriteUniform() {
     u.hexPhaseXyYz[3] = static_cast<float>(yz.y);
     u.hexPhaseXz[0] = static_cast<float>(xz.x);
     u.hexPhaseXz[1] = static_cast<float>(xz.y);
+    const TextureReader albedoReader = settings.albedoTexture.value_or(TextureReader());
+    const TextureReader normalReader = settings.normalTexture.value_or(TextureReader());
+    for (int c = 0; c < 4; ++c) {
+        u.albedoTextureScale[c] = albedoReader.scale[c];
+        u.albedoTextureBias[c] = albedoReader.bias[c];
+    }
+    WriteUvTransform(albedoReader, u.albedoUv);
+    WriteUvTransform(normalReader, u.normalUv);
+    u.textures[0] = hasAlbedoTexture_ && settings.albedoTexture ? 1.0f : 0.0f;
+    u.textures[1] = hasNormalTexture_ && settings.normalTexture ? 1.0f : 0.0f;
     const std::size_t count = std::min(brdfParams.size(), BrdfRegistry::kMaxParams);
     std::memcpy(u.params, brdfParams.data(), count * sizeof(float));
     uploads_.Write(uniform_, std::as_bytes(std::span(&u, 1)));
 }
 
 std::uint64_t RasterMaterial::GpuBytes() const {
-    return uniform_.Size() + albedoMap_->Bytes() + detailAlbedo_->Bytes() + detailNormal_->Bytes();
+    return uniform_.Size() + albedoMap_->Bytes() + detailAlbedo_->Bytes() + detailNormal_->Bytes() +
+           albedoTexture_->Bytes() + normalTexture_->Bytes();
 }
 
 std::unique_ptr<GpuImage> RasterMaterial::UploadMips(const Image& image, MipFilter filter,

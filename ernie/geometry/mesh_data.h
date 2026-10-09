@@ -13,7 +13,21 @@ struct MeshData {
     std::vector<std::uint32_t> indices;  ///< Three vertex indices per triangle.
     std::vector<float> normals;          ///< Empty, or x, y, z per vertex.
     std::vector<float> colors;           ///< Empty, or linear r, g, b per vertex.
+    /// Empty, or texture coordinates s, t per triangle corner (per entry of `indices`), so
+    /// face-varying coordinates need no split vertices.
+    std::vector<float> uvs;
 };
+
+/// Where each corner of `TriangulateFaces`' triangles comes from: its face and its position in
+/// `faceVertexIndices`, for primvars with uniform and faceVarying interpolation.
+struct TriangleCorners {
+    std::vector<std::uint32_t> faces;
+    std::vector<std::uint32_t> faceVertices;
+};
+
+/// The corners of the fans `TriangulateFaces` makes of faces of `faceVertexCounts` (unchecked:
+/// call after it).
+TriangleCorners TriangulatedCorners(std::span<const std::int64_t> faceVertexCounts);
 
 /// Triangulates polygons given as USD `faceVertexCounts` and `faceVertexIndices` into fans.
 /// @throws std::invalid_argument if a face has fewer than 3 vertices, the counts do not add up to

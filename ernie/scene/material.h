@@ -4,6 +4,7 @@
 
 #include <glm/glm.hpp>
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -21,6 +22,40 @@ struct DetailSettings {
     float hexSharpness = 7.0f;    ///< Exponent on the barycentric blend weights.
 };
 
+/// How a texture repeats outside [0, 1] along one axis (UsdUVTexture's wrapS and wrapT).
+enum class TextureWrap { Repeat, Mirror, Clamp, Black };
+
+/// How a texture's stored values map to linear ones (UsdUVTexture's sourceColorSpace).
+enum class TextureColorSpace {
+    Auto,  ///< sRGB for 8-bit colour images, raw otherwise.
+    Raw,
+    Srgb,
+};
+
+/// A texture read through mesh texture coordinates: a UsdUVTexture with the primvar reader and
+/// UsdTransform2d feeding it, which is also glTF's textureInfo with KHR_texture_transform and
+/// MaterialX's image, texcoord and place2d nodes.
+struct TextureReader {
+    std::string file;  ///< Image file, empty when `image` names the texture's tensor instead.
+    std::string image;  ///< Path of the Shader prim holding `ernie:texture`, else empty.
+    std::string uvSet = "st";  ///< Mesh primvar of the coordinates (without "primvars:").
+    TextureWrap wrapS = TextureWrap::Repeat;
+    TextureWrap wrapT = TextureWrap::Repeat;
+    TextureColorSpace colorSpace = TextureColorSpace::Auto;
+    glm::vec4 scale{1.0f};  ///< Applied to the texture's linear values, then `bias` added.
+    glm::vec4 bias{0.0f};
+    /// UsdTransform2d of the coordinates: scaled, rotated (degrees, counter-clockwise), then
+    /// translated.
+    glm::vec2 uvScale{1.0f};
+    float uvRotation = 0.0f;
+    glm::vec2 uvTranslation{0.0f};
+
+    /// The texture's source: its file, or the prim holding its tensor.
+    const std::string& Source() const {
+        return file.empty() ? image : file;
+    }
+};
+
 /// How a surface reflects light: a material's settings.
 struct MaterialSettings {
     std::string brdf = "lambert";   ///< Id of a model in the renderer's `BrdfRegistry`.
@@ -30,6 +65,11 @@ struct MaterialSettings {
     Spectrum reflectance;
     bool useAlbedoMap = true;  ///< Use the albedo map when one is set.
     DetailSettings detail;
+    /// UsdPreviewSurface's diffuseColor through texture coordinates, multiplying `albedo` (white
+    /// when the colour comes from the texture).
+    std::optional<TextureReader> albedoTexture;
+    /// UsdPreviewSurface's normal: a tangent-space normal map through texture coordinates.
+    std::optional<TextureReader> normalTexture;
 };
 
 }  // namespace ernie

@@ -5,6 +5,7 @@
 
 #include <glm/glm.hpp>
 
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -34,6 +35,23 @@ std::string GetToken(const Scene& scene, const Path& path, std::string_view attr
 
 /// The attribute as a relationship target, or the empty path.
 Path GetTarget(const Scene& scene, const Path& path, std::string_view attribute);
+
+/// The source of a UsdShade connection: a Shader prim and one of its outputs, e.g. "outputs:rgb".
+struct Connection {
+    Path prim;
+    std::string output;
+};
+
+/// The connection of input `input` (e.g. "inputs:diffuseColor") of the prim at `path`: its
+/// `<input>.connect` attribute, the source's property path as text ("/Looks/M/Tex.outputs:rgb"),
+/// or nullopt when it has none.
+/// @throws std::invalid_argument if the text is not a prim path, a dot and a property name.
+std::optional<Connection> GetConnection(const Scene& scene, const Path& path,
+                                        std::string_view input);
+
+/// Connects input `input` of the prim at `path` to output `output` of the prim at `source`.
+void Connect(Scene& scene, const Path& path, std::string_view input, const Path& source,
+             std::string_view output);
 
 /// Camera-to-world transform of a USD camera at `eye` looking at `target`: the camera looks down
 /// its -z axis with +y up, so `up` ends up in the camera's y-z plane.

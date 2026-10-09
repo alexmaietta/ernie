@@ -1217,6 +1217,206 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
     return params;
 }
 
+namespace {
+
+TextureWrap WrapOf(const Scene& scene, const Path& texture, std::string_view attribute) {
+    const std::string wrap = GetToken(scene, texture, attribute, "useMetadata");
+    if (wrap == "repeat" || wrap == "useMetadata") {
+        return TextureWrap::Repeat;
+    }
+    if (wrap == "mirror") {
+        return TextureWrap::Mirror;
+    }
+    if (wrap == "clamp") {
+        return TextureWrap::Clamp;
+    }
+    if (wrap == "black") {
+        return TextureWrap::Black;
+    }
+    throw std::invalid_argument("'" + texture.String() + "' " + std::string(attribute) + " is '" +
+                                wrap + "', not repeat, mirror, clamp, black or useMetadata");
+}
+
+glm::vec4 Vec4Of(const Scene& scene, const Path& path, std::string_view attribute,
+                 glm::vec4 fallback) {
+    const Value* value = scene.Get(path, attribute);
+    if (value == nullptr) {
+        return fallback;
+    }
+    if (const auto* v = value->Get<glm::vec4>()) {
+        return *v;
+    }
+    throw std::invalid_argument("'" + path.String() + "' " + std::string(attribute) +
+                                " must be a 4-vector");
+}
+
+/// The UsdUVTexture that input `input` of the UsdPreviewSurface at `surface` connects to, with
+/// the UsdTransform2d and UsdPrimvarReader_float2 feeding its coordinates.
+TextureReader TextureReaderOf(const Scene& scene, const Connection& connection,
+                              std::string_view input, const Path& surface) {
+    using namespace tokens;
+    const Path& texture = connection.prim;
+    const std::string where = "'" + surface.String() + "' " + std::string(input);
+    if (GetToken(scene, texture, kInfoId, "") != kUsdUVTexture) {
+        throw std::invalid_argument(where + " connects to '" + texture.String() +
+                                    "', which is not a UsdUVTexture");
+    }
+    if (connection.output != "outputs:rgb") {
+        throw std::invalid_argument(where + " reads " + connection.output +
+                                    "; only outputs:rgb is supported");
+    }
+    TextureReader reader;
+    if (scene.Read(texture, kShaderTexture) != nullptr) {
+        reader.image = texture.String();
+    } else {
+        reader.file = GetToken(scene, texture, kFile, "");
+    }
+    if (reader.Source().empty()) {
+        throw std::invalid_argument("'" + texture.String() + "' has neither " +
+                                    std::string(kFile) + " nor " +
+                                    std::string(kShaderTexture));
+    }
+    reader.wrapS = WrapOf(scene, texture, kWrapS);
+    reader.wrapT = WrapOf(scene, texture, kWrapT);
+    const std::string space = GetToken(scene, texture, kSourceColorSpace, "auto");
+    if (space == "auto") {
+        reader.colorSpace = TextureColorSpace::Auto;
+    } else if (space == "raw") {
+        reader.colorSpace = TextureColorSpace::Raw;
+    } else if (space == "sRGB") {
+        reader.colorSpace = TextureColorSpace::Srgb;
+    } else {
+        throw std::invalid_argument("'" + texture.String() + "' " +
+                                    std::string(kSourceColorSpace) + " is '" + space +
+                                    "', not auto, raw or sRGB");
+    }
+    reader.scale = Vec4Of(scene, texture, kShaderScale, reader.scale);
+    reader.bias = Vec4Of(scene, texture, kShaderBias, reader.bias);
+    if (const std::optional<Connection> st = GetConnection(scene, texture, kSt)) {
+        Path source = st->prim;
+        if (GetToken(scene, source, kInfoId, "") == kUsdTransform2d) {
+            reader.uvScale = glm::vec2(GetVec2(scene, source, kShaderScale, glm::dvec2(1.0)));
+            reader.uvRotation = Number(scene, source, kRotation, 0.0f);
+            reader.uvTranslation =
+                glm::vec2(GetVec2(scene, source, kTranslation, glm::dvec2(0.0)));
+            const std::optional<Connection> in = GetConnection(scene, source, kIn);
+            if (!in) {
+                throw std::invalid_argument("'" + source.String() + "' has no " +
+                                            std::string(kIn) + " connection");
+            }
+            source = in->prim;
+        }
+        if (GetToken(scene, source, kInfoId, "") != kUsdPrimvarReaderFloat2) {
+            throw std::invalid_argument("'" + texture.String() + "' " + std::string(kSt) +
+                                        " comes from '" + source.String() +
+                                        "', not a UsdPrimvarReader_float2");
+        }
+        reader.uvSet = GetToken(scene, source, kVarname, reader.uvSet);
+    }
+    return reader;
+}
+
+/// The UsdPreviewSurface the Material at `material` connects its surface to, or the empty path.
+/// @throws std::invalid_argument if it connects to something else.
+Path PreviewSurfaceOf(const Scene& scene, const Path& material) {
+    using namespace tokens;
+    const std::optional<Connection> surface = GetConnection(scene, material, kSurfaceOutput);
+    if (!surface) {
+        return {};
+    }
+    if (GetToken(scene, surface->prim, kInfoId, "") != kUsdPreviewSurface) {
+        throw std::invalid_argument("'" + material.String() + "' " + std::string(kSurfaceOutput) +
+                                    " connects to '" + surface->prim.String() +
+                                    "', which is not a UsdPreviewSurface");
+    }
+    return surface->prim;
+}
+
+/// The texture coordinate set meshes bound to `material` read: its textures' (the first's), else
+/// "st".
+std::string UvSetOf(const Scene& scene, const Path& material) {
+    if (material.IsEmpty()) {
+        return "st";
+    }
+    try {
+        const Path surface = PreviewSurfaceOf(scene, material);
+        if (surface.IsEmpty()) {
+            return "st";
+        }
+        for (const std::string_view input : {tokens::kDiffuseColor, tokens::kNormalInput}) {
+            if (const std::optional<Connection> texture = GetConnection(scene, surface, input)) {
+                return TextureReaderOf(scene, *texture, input, surface).uvSet;
+            }
+        }
+    } catch (const std::invalid_argument&) {
+        // The material's own sync reports what is wrong with it.
+    }
+    return "st";
+}
+
+/// Texture coordinates `primvars:<name>` of the Mesh at `mesh` per corner of `data`'s triangles
+/// (`MeshData::uvs`), or empty without them.
+std::vector<float> TexCoordsOf(const Scene& scene, const Path& mesh, const std::string& name,
+                               const MeshData& data, std::span<const std::int64_t> faceCounts,
+                               std::size_t faceVertexCount) {
+    using namespace tokens;
+    const std::string attribute = std::string(kPrimvarsPrefix) + name;
+    const std::optional<std::vector<float>> values = FloatAttribute(scene, mesh, attribute, 2);
+    if (!values || data.indices.empty()) {
+        return {};
+    }
+    const std::size_t valueCount = values->size() / 2;
+    std::vector<std::int64_t> lookup;
+    const std::string indicesName = attribute + std::string(kIndicesSuffix);
+    const Tensor* indices = scene.Read(mesh, indicesName);
+    if (indices != nullptr) {
+        lookup = IntsOf(*indices, indicesName);
+        for (const std::int64_t index : lookup) {
+            if (index < 0 || static_cast<std::size_t>(index) >= valueCount) {
+                throw std::invalid_argument(indicesName + " has an index out of range");
+            }
+        }
+    }
+    const std::size_t elements = indices != nullptr ? lookup.size() : valueCount;
+    const std::size_t points = data.points.size() / 3;
+    std::string interpolation =
+        GetToken(scene, mesh, attribute + std::string(kInterpolationSuffix), "");
+    if (interpolation.empty()) {
+        interpolation = elements == faceVertexCount   ? "faceVarying"
+                        : elements == points          ? "vertex"
+                        : elements == faceCounts.size() ? "uniform"
+                        : elements == 1               ? "constant"
+                                                      : "";
+    }
+    const std::size_t expected = interpolation == "faceVarying" ? faceVertexCount
+                                 : interpolation == "vertex"    ? points
+                                 : interpolation == "uniform"   ? faceCounts.size()
+                                 : interpolation == "constant"  ? 1
+                                                                : 0;
+    if (expected == 0 || elements != expected) {
+        throw std::invalid_argument(attribute + " of '" + mesh.String() + "' has " +
+                                    std::to_string(elements) +
+                                    " values, one per neither point, face vertex, face nor mesh" +
+                                    (interpolation.empty() ? "" : " (" + interpolation + ")"));
+    }
+    const TriangleCorners corners = TriangulatedCorners(faceCounts);
+    std::vector<float> uvs(2 * data.indices.size());
+    for (std::size_t c = 0; c < data.indices.size(); ++c) {
+        const std::size_t element = interpolation == "faceVarying" ? corners.faceVertices[c]
+                                    : interpolation == "vertex"    ? data.indices[c]
+                                    : interpolation == "uniform"   ? corners.faces[c]
+                                                                   : 0;
+        const auto value =
+            static_cast<std::size_t>(indices != nullptr ? lookup[element]
+                                                        : static_cast<std::int64_t>(element));
+        uvs[2 * c] = (*values)[2 * value];
+        uvs[2 * c + 1] = (*values)[2 * value + 1];
+    }
+    return uvs;
+}
+
+}  // namespace
+
 MaterialSettings MaterialSettingsOf(const Scene& scene, const Path& material,
                                     const BrdfRegistry& brdfs) {
     using namespace tokens;
@@ -1242,6 +1442,21 @@ MaterialSettings MaterialSettingsOf(const Scene& scene, const Path& material,
     detail.hexRotation = Number(scene, material, kDetailHexRotation, detail.hexRotation);
     detail.hexContrast = Number(scene, material, kDetailHexContrast, detail.hexContrast);
     detail.hexSharpness = Number(scene, material, kDetailHexSharpness, detail.hexSharpness);
+
+    // A UsdPreviewSurface network: its diffuse colour (a constant or a texture) is the albedo,
+    // and its normal a normal map.
+    const Path surface = PreviewSurfaceOf(scene, material);
+    if (!surface.IsEmpty()) {
+        if (const std::optional<Connection> diffuse = GetConnection(scene, surface, kDiffuseColor)) {
+            settings.albedoTexture = TextureReaderOf(scene, *diffuse, kDiffuseColor, surface);
+            settings.albedo = glm::vec3(1.0f);
+        } else {
+            settings.albedo = glm::vec3(GetVec3(scene, surface, kDiffuseColor, glm::dvec3(0.18)));
+        }
+        if (const std::optional<Connection> normal = GetConnection(scene, surface, kNormalInput)) {
+            settings.normalTexture = TextureReaderOf(scene, *normal, kNormalInput, surface);
+        }
+    }
     return settings;
 }
 
@@ -1304,9 +1519,13 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh) {
     if ((counts == nullptr) != (indices == nullptr)) {
         throw std::invalid_argument("needs both faceVertexCounts and faceVertexIndices");
     }
+    std::vector<std::int64_t> faceCounts;
+    std::size_t faceVertexCount = 0;
     if (counts != nullptr) {
-        data.indices = TriangulateFaces(IntsOf(*counts, kFaceVertexCounts),
-                                        IntsOf(*indices, kFaceVertexIndices), count);
+        faceCounts = IntsOf(*counts, kFaceVertexCounts);
+        const std::vector<std::int64_t> faceIndices = IntsOf(*indices, kFaceVertexIndices);
+        data.indices = TriangulateFaces(faceCounts, faceIndices, count);
+        faceVertexCount = faceIndices.size();
     }
     // Normals and colours written on the GPU are zeros here, holding their place until the
     // renderer copies them in (as points).
@@ -1327,6 +1546,8 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh) {
                                                          : FloatsOf(*colors, 3, kDisplayColor);
         }
     }
+    data.uvs = TexCoordsOf(scene, mesh, UvSetOf(scene, GetTarget(scene, mesh, kMaterialBinding)),
+                           data, faceCounts, faceVertexCount);
     return data;
 }
 

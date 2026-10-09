@@ -287,8 +287,9 @@ Sampler::Sampler(const VulkanContext& context, const SamplerDesc& desc) : contex
     info.minFilter = desc.filter;
     info.mipmapMode = desc.mipmapMode;
     info.addressModeU = desc.addressMode;
-    info.addressModeV = desc.addressMode;
-    info.addressModeW = desc.addressMode;
+    info.addressModeV = desc.addressModeV.value_or(desc.addressMode);
+    info.addressModeW = info.addressModeV;
+    info.borderColor = desc.borderColor;
     info.maxLod = VK_LOD_CLAMP_NONE;
     const float limit = context.Limits().maxSamplerAnisotropy;
     if (desc.maxAnisotropy > 1.0f && context.SupportsAnisotropy() && limit > 1.0f) {

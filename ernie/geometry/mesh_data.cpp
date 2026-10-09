@@ -35,4 +35,20 @@ std::vector<std::uint32_t> TriangulateFaces(std::span<const std::int64_t> faceVe
     return triangles;
 }
 
+TriangleCorners TriangulatedCorners(std::span<const std::int64_t> faceVertexCounts) {
+    TriangleCorners corners;
+    std::uint32_t next = 0;
+    for (std::size_t face = 0; face < faceVertexCounts.size(); ++face) {
+        const auto count = static_cast<std::uint32_t>(faceVertexCounts[face]);
+        for (std::uint32_t k = 1; k + 1 < count; ++k) {
+            for (const std::uint32_t corner : {next, next + k, next + k + 1}) {
+                corners.faces.push_back(static_cast<std::uint32_t>(face));
+                corners.faceVertices.push_back(corner);
+            }
+        }
+        next += count;
+    }
+    return corners;
+}
+
 }  // namespace ernie

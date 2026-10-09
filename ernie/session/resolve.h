@@ -256,8 +256,11 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
                           std::uint32_t height);
 
 /// The settings of the Material prim at `material` (empty for defaults): BRDF from `ernie:brdf`,
-/// its parameters from `inputs:<parameter>`, albedo and detail options.
-/// @throws std::invalid_argument if the material names a BRDF that is not in `brdfs`.
+/// its parameters from `inputs:<parameter>`, albedo and detail options. A Material whose
+/// `outputs:surface` connects to a UsdPreviewSurface takes its albedo from diffuseColor, a
+/// constant or a UsdUVTexture (`MaterialSettings::albedoTexture`), and a normal map from normal.
+/// @throws std::invalid_argument if the material names a BRDF that is not in `brdfs`, or its
+/// shader network is malformed.
 MaterialSettings MaterialSettingsOf(const Scene& scene, const Path& material,
                                     const BrdfRegistry& brdfs);
 
@@ -266,7 +269,9 @@ MaterialSettings MaterialSettingsOf(const Scene& scene, const Path& material,
 /// has one colour per point. Points, normals and colours may be float32 or float64, shaped
 /// (n, 3) or flat; indices int32, int64 or uint32. Normals and colours of other sizes (such as
 /// face-varying ones) are ignored. Points on a CUDA device come back as zeros of the right
-/// number, for the caller to copy device to device.
+/// number, for the caller to copy device to device. Texture coordinates come per triangle corner
+/// from `primvars:<set>` (constant, uniform, vertex or faceVarying, optionally indexed; see
+/// tokens.h), the set being the one the bound material's textures read, else `st`.
 /// @throws std::invalid_argument naming the attribute for arrays of the wrong type, size or
 /// device, or invalid topology.
 /// For a UsdGeom primitive (Cube, Sphere, Cylinder, Cone, Capsule, Plane) the generated mesh,

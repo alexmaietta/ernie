@@ -11,6 +11,7 @@
 
 #include <nanobind/operators.h>
 #include <nanobind/stl/filesystem.h>
+#include <nanobind/stl/optional.h>
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
@@ -586,6 +587,27 @@ void BindScene(nb::module_& m) {
         .def(nb::init<>())
         .def("define", &Scene::Define, nb::arg("path"), nb::arg("type"), nb::keep_alive<0, 1>(),
              "Defines the prim at `path` with `type`, and any missing ancestors untyped.")
+        .def(
+            "connect",
+            [](Scene& scene, const Path& path, std::string_view input, const Path& source,
+               std::string_view output) { Connect(scene, path, input, source, output); },
+            nb::arg("path"), nb::arg("input"), nb::arg("source"), nb::arg("output"),
+            "Connects shader input `input` (e.g. tokens.DIFFUSE_COLOR) of the prim at `path` to "
+            "output `output` (e.g. 'outputs:rgb') of the Shader at `source`, as UsdShade does: "
+            "the attribute '<input>.connect' holding '<source>.<output>'.")
+        .def(
+            "connection",
+            [](const Scene& scene, const Path& path,
+               std::string_view input) -> std::optional<std::pair<std::string, std::string>> {
+                const std::optional<Connection> connection = GetConnection(scene, path, input);
+                if (!connection) {
+                    return std::nullopt;
+                }
+                return std::pair(connection->prim.String(), connection->output);
+            },
+            nb::arg("path"), nb::arg("input"),
+            "The (source prim path, output) shader input `input` of the prim at `path` connects "
+            "to, or None.")
         .def("clone", &Scene::Clone, nb::arg("source"), nb::arg("destination"),
              nb::keep_alive<0, 1>(),
              "Copies `source` and its descendants to `destination`, sharing tensors and pointing "
@@ -1108,6 +1130,27 @@ void BindScene(nb::module_& m) {
         {"DETAIL_HEX_ROTATION", tokens::kDetailHexRotation},
         {"DETAIL_HEX_CONTRAST", tokens::kDetailHexContrast},
         {"DETAIL_HEX_SHARPNESS", tokens::kDetailHexSharpness},
+        {"SHADER", tokens::kShader},
+        {"INFO_ID", tokens::kInfoId},
+        {"USD_PREVIEW_SURFACE", tokens::kUsdPreviewSurface},
+        {"USD_UV_TEXTURE", tokens::kUsdUVTexture},
+        {"USD_PRIMVAR_READER_FLOAT2", tokens::kUsdPrimvarReaderFloat2},
+        {"USD_TRANSFORM2D", tokens::kUsdTransform2d},
+        {"SURFACE_OUTPUT", tokens::kSurfaceOutput},
+        {"DIFFUSE_COLOR", tokens::kDiffuseColor},
+        {"NORMAL_INPUT", tokens::kNormalInput},
+        {"FILE", tokens::kFile},
+        {"SHADER_TEXTURE", tokens::kShaderTexture},
+        {"ST", tokens::kSt},
+        {"WRAP_S", tokens::kWrapS},
+        {"WRAP_T", tokens::kWrapT},
+        {"SHADER_SCALE", tokens::kShaderScale},
+        {"SHADER_BIAS", tokens::kShaderBias},
+        {"SOURCE_COLOR_SPACE", tokens::kSourceColorSpace},
+        {"VARNAME", tokens::kVarname},
+        {"IN", tokens::kIn},
+        {"ROTATION", tokens::kRotation},
+        {"TRANSLATION", tokens::kTranslation},
         {"CAMERA_REL", tokens::kCameraRel},
         {"RESOLUTION", tokens::kResolution},
         {"POSES", tokens::kPoses},

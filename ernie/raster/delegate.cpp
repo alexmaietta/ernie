@@ -38,6 +38,46 @@ float Number(const Scene& scene, const Path& path, std::string_view attribute, f
     return static_cast<float>(GetNumber(scene, path, attribute, fallback));
 }
 
+/// How 8-bit values of `reader`'s image decode: sRGB unless it says raw.
+ImageEncoding EncodingOf(const TextureReader& reader) {
+    return reader.colorSpace == TextureColorSpace::Raw ? ImageEncoding::Linear
+                                                       : ImageEncoding::Srgb;
+}
+
+/// What a texture's upload depends on: its source (and its tensor's version), colour space and
+/// wrapping, and for normal maps the scale and bias applied before upload.
+std::string TextureKey(const Scene& scene, const TextureReader& reader, bool normal) {
+    std::string key = reader.Source();
+    if (!reader.image.empty()) {
+        key += "@" + std::to_string(scene.AttributeVersion(Path(reader.image),
+                                                           tokens::kShaderTexture));
+    }
+    key += "|" + std::to_string(static_cast<int>(reader.colorSpace)) + "|" +
+           std::to_string(static_cast<int>(reader.wrapS)) + "|" +
+           std::to_string(static_cast<int>(reader.wrapT));
+    if (normal) {
+        for (int c = 0; c < 3; ++c) {
+            key += "|" + std::to_string(reader.scale[c]) + "|" + std::to_string(reader.bias[c]);
+        }
+    }
+    return key;
+}
+
+/// The image `reader` reads: its prim's `ernie:texture` tensor or its file.
+/// @throws std::invalid_argument for a tensor that is no image, std::runtime_error for a file that
+/// cannot be read.
+Image TextureImageOf(const Scene& scene, const TextureReader& reader) {
+    if (!reader.image.empty()) {
+        const Tensor* tensor = scene.Read(Path(reader.image), tokens::kShaderTexture);
+        if (tensor == nullptr) {
+            throw std::invalid_argument("'" + reader.image + "' has no " +
+                                        std::string(tokens::kShaderTexture));
+        }
+        return ImageOfTensor(*tensor, EncodingOf(reader));
+    }
+    return LoadImage(reader.file, EncodingOf(reader));
+}
+
 std::invalid_argument UploadError(const Path& path, std::string_view attribute,
                                   const std::string& why) {
     return std::invalid_argument("Cannot upload " + std::string(attribute) + " of '" +
@@ -327,8 +367,31 @@ void RasterDelegate::SyncMaterials(const Scene& scene) {
 
 void RasterDelegate::SyncMaterial(const Scene& scene, const Path& path, SyncedMaterial& material) {
     using namespace tokens;
-    renderer_.SetMaterial(material.id, MaterialSettingsOf(scene, path, renderer_.Brdfs()));
+    const MaterialSettings settings = MaterialSettingsOf(scene, path, renderer_.Brdfs());
+    renderer_.SetMaterial(material.id, settings);
     RasterMaterial& gpu = renderer_.Material(material.id);
+    for (const bool normal : {false, true}) {
+        const std::optional<TextureReader>& reader =
+            normal ? settings.normalTexture : settings.albedoTexture;
+        std::string& cached = normal ? material.normalTexture : material.albedoTexture;
+        const std::string key = reader ? TextureKey(scene, *reader, normal) : std::string();
+        if (cached == key) {
+            continue;
+        }
+        cached = key;
+        try {
+            const std::optional<Image> image =
+                reader ? std::optional(TextureImageOf(scene, *reader)) : std::nullopt;
+            const TextureReader wrap = reader.value_or(TextureReader());
+            if (normal) {
+                gpu.SetNormalTexture(image ? &*image : nullptr, wrap);
+            } else {
+                gpu.SetAlbedoTexture(image ? &*image : nullptr, wrap);
+            }
+        } catch (const std::exception& error) {
+            throw UploadError(path, normal ? kNormalInput : kDiffuseColor, error.what());
+        }
+    }
 
     const Key albedoKey =
         KeyOf(scene, path, {kAlbedoMap, kAlbedoMapOrigin, kAlbedoMapCellSize, kAlbedoMapNoData});
