@@ -158,4 +158,101 @@ void AuthorLrocWac(Scene& scene, const Path& camera, const Path& product, LrocWa
     scene.GetPrim(product).Set(kFilters, filters);
 }
 
+double Mars2020Navcam::FisheyeK1() {
+    // Each field of view's half angle theta reaches the frame's half width over the focal
+    // length, r: least squares of theta (1 + k1 theta^2) = r over the three.
+    const double halfWidth = 0.5e-3 * kPixelPitchUm * kWidth;  // mm
+    const double halfHeight = 0.5e-3 * kPixelPitchUm * kHeight;
+    const double reaches[3] = {halfWidth, halfHeight, std::hypot(halfWidth, halfHeight)};
+    double numerator = 0.0;
+    double denominator = 0.0;
+    for (int i = 0; i < 3; ++i) {
+        const double theta = 0.5 * kFieldOfViewDeg[i] * M_PI / 180.0;
+        const double r = reaches[i] / kFocalLengthMm;
+        const double cube = theta * theta * theta;
+        numerator += cube * (r - theta);
+        denominator += cube * cube;
+    }
+    return numerator / denominator;
+}
+
+void AuthorMars2020Navcam(Scene& scene, const Path& camera, const Path& product,
+                          BayerPattern pattern, double jpegQuality) {
+    using namespace tokens;
+    if (!scene.Has(camera) || scene.TypeOf(camera) != kCamera) {
+        throw std::invalid_argument("'" + camera.String() + "' is not a Camera");
+    }
+    if (!scene.Has(product) || scene.TypeOf(product) != kRenderProduct) {
+        throw std::invalid_argument("'" + product.String() + "' is not a RenderProduct");
+    }
+    using N = Mars2020Navcam;
+    // Maki et al. 2020, Table 2: the optics and the CMV-20000.
+    scene.GetPrim(camera)
+        .Set(kProjection, std::string(kPerspective))
+        .Set(kLensProjection, std::string(kFisheye))
+        .Set(kLensFisheye, std::vector<float>{static_cast<float>(N::FisheyeK1()), 0.0f, 0.0f, 0.0f})
+        .Set(kLensDistortion, std::vector<float>{0.0f, 0.0f, 0.0f, 0.0f, 0.0f})
+        .Set(kFocalLength, N::kFocalLengthMm)
+        .Set(kVerticalAperture, 1e-3 * N::kPixelPitchUm * N::kHeight)
+        .Set(kHorizontalAperture, 1e-3 * N::kPixelPitchUm * N::kWidth)
+        .Set(kFStop, N::kFNumber)
+        .Set(kFocusDistance, N::kBestFocusM)
+        .Set(kExposureFStop, N::kFNumber)
+        .Set(kSensorType, std::string("rgb"))
+        .Set(kExposureIso, 100.0)  // the gain is the ADC's, at ISO 100
+        .Set(kSensorGain, N::kElectronsPerDn)
+        .Set(kSensorReadNoise, N::kDarkNoiseElectrons)
+        .Set(kSensorFullWell, N::kFullWellElectrons)
+        .Set(kSensorAdcBits, N::kAdcBits)
+        .Set(kSensorBlackLevel, 0.0)
+        .Set(kSensorNoise, true);
+
+    struct Step {
+        const char* name;
+        const char* type;
+    };
+    const Step steps[] = {{"Qe", "qe"},           {"Bayer", "bayer"}, {"Noise", "noise"},
+                          {"Adc", "adc"},         {"Demosaic", "demosaic"}, {"Cie", "cie"},
+                          {"Exposure", "exposure"}, {"Jpeg", "jpeg"}};
+    std::vector<Path> filters;
+    for (const auto& [name, type] : steps) {
+        const Path path = product.Child("Mars2020Navcam").Child(name);
+        if (scene.Has(path)) {
+            scene.Remove(path);
+        }
+        Prim filter = scene.Define(path, kSensorFilter);
+        filter.Set(kFilterType, std::string(type));
+        const std::string kind(type);
+        if (kind == "bayer" || kind == "demosaic") {
+            filter.Set("inputs:pattern", static_cast<double>(pattern));
+        } else if (kind == "jpeg") {
+            filter.Set("inputs:quality", jpegQuality);
+        }
+        filters.push_back(path);
+    }
+    scene.GetPrim(product).Set(kFilters, filters);
+}
+
+void AuthorMars2020NavcamPair(Scene& scene, const Path& rig, const Path& leftProduct,
+                              const Path& rightProduct, BayerPattern pattern,
+                              double jpegQuality) {
+    using namespace tokens;
+    if (!scene.Has(rig)) {
+        scene.Define(rig, kXform);
+    }
+    const double half = 0.5 * Mars2020Navcam::kBaselineM;
+    const std::pair<const char*, std::pair<double, const Path*>> eyes[] = {
+        {"Left", {-half, &leftProduct}}, {"Right", {half, &rightProduct}}};
+    for (const auto& [name, eye] : eyes) {
+        const Path camera = rig.Child(name);
+        if (!scene.Has(camera)) {
+            scene.Define(camera, kCamera);
+        }
+        glm::dmat4 offset(1.0);
+        offset[3] = glm::dvec4(eye.first, 0.0, 0.0, 1.0);
+        scene.GetPrim(camera).Set(kTransform, offset);
+        AuthorMars2020Navcam(scene, camera, *eye.second, pattern, jpegQuality);
+    }
+}
+
 }  // namespace ernie

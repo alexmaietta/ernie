@@ -3,6 +3,8 @@
 #include "ernie/scene/path.h"
 #include "ernie/scene/scene.h"
 
+#include <cstdint>
+
 namespace ernie {
 
 /// LROC's two Narrow Angle Cameras, side by side across the track.
@@ -86,5 +88,65 @@ LrocWacBand LrocWacBandNamed(int nanometres);
 /// @throws std::invalid_argument if `camera` is not a Camera or `product` not a RenderProduct.
 void AuthorLrocWac(Scene& scene, const Path& camera, const Path& product,
                    LrocWacBand band = LrocWacBand::Vis605);
+
+/// The Bayer layouts of the `bayer` and `demosaic` filters' `pattern`.
+enum class BayerPattern { Rggb = 0, Bggr = 1, Grbg = 2, Gbrg = 3 };
+
+/// The Mars 2020 rover Perseverance's Navcam pair (Maki et al. 2020, Table 2).
+struct Mars2020Navcam {
+    static constexpr double kFocalLengthMm = 19.1;
+    static constexpr double kFNumber = 12.0;
+    static constexpr double kBestFocusM = 3.5;
+    static constexpr double kBaselineM = 0.424;
+    /// The CMV-20000's 5120 x 3840 pixels of 6.4 um: a full frame of 32.77 x 24.58 mm.
+    static constexpr std::uint32_t kWidth = 5120;
+    static constexpr std::uint32_t kHeight = 3840;
+    static constexpr double kPixelPitchUm = 6.4;
+    /// Fields of view, degrees: horizontal, vertical and diagonal.
+    static constexpr double kFieldOfViewDeg[3] = {96.0, 73.0, 120.0};
+    static constexpr double kElectronsPerDn = 1.0 / 0.24;  ///< Conversion gain 0.24 DN/e-.
+    static constexpr double kDarkNoiseElectrons = 8.0;     ///< Pixel dark noise, e- RMS.
+    static constexpr double kFullWellElectrons = 15000.0;
+    static constexpr int kAdcBits = 12;
+
+    /// The lens's Kannala-Brandt k1 for the published fields of view: the equidistant (f-theta)
+    /// projection, theta_d = theta (1 + k1 theta^2), fitted by least squares to the three, at
+    /// the image's half widths over the focal length. The paper gives the calibrated model only
+    /// as CAHVORE, without its coefficients.
+    static double FisheyeK1();
+};
+
+/// Authors one of the Mars 2020 Navcams as published, onto Camera `camera` and the readout
+/// chain of RenderProduct `product`:
+/// - The camera: the f-theta lens (`Mars2020Navcam::FisheyeK1`, Ernie's fisheye) of 19.1 mm
+///   over the full 32.77 x 24.58 mm frame, f/12, focused at 3.5 m. Render it at 5120 x 3840 for
+///   the detector's own 6.4 um pixels; a smaller resolution bins them (as the cameras can
+///   downsample), each pixel then wider and collecting more light.
+/// - The sensor: RGB, the CMV-20000's gain, dark noise and full well, a 12-bit ADC. The paper
+///   gives the detector's QE only as 64.5% at 550 nm (monochrome, with microlenses; its table
+///   prints "55 nm"), with no colour responses, so the channels keep Ernie's generic RGB
+///   curves.
+/// - The readout chain, SensorFilter prims under `product`: qe, bayer (`pattern`; the paper
+///   does not give the layout), noise, adc and demosaic (Malvar-He-Cutler), so RawDN holds the
+///   12-bit numbers demosaiced; then cie, exposure and jpeg at `jpegQuality` for the 8-bit
+///   colour images the rover sends JPEG-compressed (the paper gives the quality as
+///   selectable). Fixed-pattern noise and dark current are not published; add `darkCurrent`
+///   or `defectPixels` filters to model them.
+///
+/// Reference: J. N. Maki et al., "The Mars 2020 Engineering Cameras and Microphone on the
+/// Perseverance Rover: A Next-Generation Imaging System for Mars Exploration", Space Science
+/// Reviews 216:137, 2020, https://doi.org/10.1007/s11214-020-00765-9: Table 2 and sections on
+/// the detector and flight software.
+/// @throws std::invalid_argument if `camera` is not a Camera or `product` not a RenderProduct.
+void AuthorMars2020Navcam(Scene& scene, const Path& camera, const Path& product,
+                          BayerPattern pattern = BayerPattern::Rggb, double jpegQuality = 85.0);
+
+/// The Navcam pair on stereo rig `rig` (an Xform, defined if missing, posed by the caller as the
+/// cameras' shared frame, looking down its -z with +y up): Cameras `rig`/Left and `rig`/Right
+/// 42.4 cm apart along its x, each authored as `AuthorMars2020Navcam` with products
+/// `leftProduct` and `rightProduct`.
+void AuthorMars2020NavcamPair(Scene& scene, const Path& rig, const Path& leftProduct,
+                              const Path& rightProduct, BayerPattern pattern = BayerPattern::Rggb,
+                              double jpegQuality = 85.0);
 
 }  // namespace ernie

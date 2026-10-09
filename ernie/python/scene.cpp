@@ -999,6 +999,47 @@ void BindScene(nb::module_& m) {
         "noise, adc). Its geometry comes from the image's ISD "
         "(`IsdPushFrame.author_framelet`).");
 
+    const auto bayerPattern = [](const std::string& name) {
+        const std::pair<const char*, BayerPattern> patterns[] = {{"rggb", BayerPattern::Rggb},
+                                                                 {"bggr", BayerPattern::Bggr},
+                                                                 {"grbg", BayerPattern::Grbg},
+                                                                 {"gbrg", BayerPattern::Gbrg}};
+        for (const auto& [text, pattern] : patterns) {
+            if (name == text) {
+                return pattern;
+            }
+        }
+        throw nb::value_error("pattern must be 'rggb', 'bggr', 'grbg' or 'gbrg'");
+    };
+    m.def(
+        "author_mars2020_navcam",
+        [bayerPattern](Scene& scene, const std::string& camera, const std::string& product,
+                       const std::string& pattern, double jpegQuality) {
+            AuthorMars2020Navcam(scene, Path(camera), Path(product), bayerPattern(pattern),
+                                 jpegQuality);
+        },
+        nb::arg("scene"), nb::arg("camera"), nb::arg("product"), nb::arg("pattern") = "rggb",
+        nb::arg("jpeg_quality") = 85.0,
+        "Authors one of the Mars 2020 rover's Navcams as Maki et al. 2020 publish it (Table 2): "
+        "Camera `camera`'s f-theta fisheye (19.1 mm, f/12, 96 x 73 degrees over 5120 x 3840 "
+        "pixels of 6.4 um) and RGB sensor (gain 0.24 DN/e-, 8 e- dark noise, 15,000 e- full "
+        "well, 12-bit ADC), and RenderProduct `product`'s chain (qe, bayer, noise, adc, "
+        "demosaic; cie, exposure, jpeg). The paper gives neither the Bayer layout (`pattern`) "
+        "nor the JPEG quality (`jpeg_quality`).");
+    m.def(
+        "author_mars2020_navcam_pair",
+        [bayerPattern](Scene& scene, const std::string& rig, const std::string& left,
+                       const std::string& right, const std::string& pattern,
+                       double jpegQuality) {
+            AuthorMars2020NavcamPair(scene, Path(rig), Path(left), Path(right),
+                                     bayerPattern(pattern), jpegQuality);
+        },
+        nb::arg("scene"), nb::arg("rig"), nb::arg("left_product"), nb::arg("right_product"),
+        nb::arg("pattern") = "rggb", nb::arg("jpeg_quality") = 85.0,
+        "The Navcam stereo pair on Xform `rig` (defined if missing; pose it as the cameras' "
+        "frame, looking down -z with +y up): Cameras `rig`/Left and `rig`/Right 42.4 cm apart "
+        "along x, each as `author_mars2020_navcam` with its product.");
+
     m.def(
         "look_at_transform",
         [](nb::handle eye, nb::handle target, nb::handle up) {

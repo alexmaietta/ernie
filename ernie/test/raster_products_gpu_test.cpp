@@ -617,6 +617,67 @@ TEST_F(RasterDelegateTest, TheLrocNacPresetSendsEightBitNumbers) {
     EXPECT_GT(checked, 100) << "lit pixels";
 }
 
+TEST_F(RasterDelegateTest, TheMars2020NavcamPairSeesInStereo) {
+    // Perseverance's Navcams (Maki et al. 2020, Table 2), binned to 64 x 48, 5 m over a 1 m
+    // cube: each eye sends 12-bit demosaiced numbers and an 8-bit JPEG view, and the cube sits
+    // further right in the left eye's image, by the 42.4 cm baseline's disparity.
+    Scene scene = FlatScene();
+    scene.Define("/World/Cube", tokens::kCube)
+        .Set(tokens::kSize, 1.0)
+        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 0.5)));
+    const std::vector<Path> vars = *scene.Get("/Render/Product", tokens::kOrderedVars)
+                                        ->Get<std::vector<Path>>();
+    for (const char* eye : {"Left", "Right"}) {
+        scene.Define(Path("/Render").Child(eye), tokens::kRenderProduct)
+            .Set(tokens::kOrderedVars, vars)
+            .Set(tokens::kCameraRel, Path("/World/Navcam").Child(eye))
+            .Set(tokens::kResolution, glm::ivec2(64, 48));
+    }
+    scene.Set("/Render/Settings", tokens::kProducts,
+              std::vector<Path>{"/Render/Left", "/Render/Right"});
+    ernie::AuthorMars2020NavcamPair(scene, "/World/Navcam", "/Render/Left", "/Render/Right");
+    scene.Set("/World/Navcam", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, 5.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
+    for (const char* eye : {"/World/Navcam/Left", "/World/Navcam/Right"}) {
+        scene.Set(eye, tokens::kExposureTime, 1e-4);
+    }
+    RasterDelegate delegate(*context_);
+    ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+    double cubeColumn[2] = {0.0, 0.0};
+    for (int e = 0; e < 2; ++e) {
+        auto& product = outputs.at(e == 0 ? "/Render/Left" : "/Render/Right");
+        const Tensor raw = product.vars.at("RawDN").Map(ernie::MapDevice::Cpu).tensor;
+        const Tensor ldr = product.vars.at("LdrColor").Map(ernie::MapDevice::Cpu).tensor;
+        const Tensor ids = product.vars.at("PrimId").Map(ernie::MapDevice::Cpu).tensor;
+        EXPECT_EQ(ldr.Type(), DType::UInt8);
+        ASSERT_EQ(raw.Type(), DType::UInt16);
+        int between = 0;
+        for (std::int64_t i = 0; i < raw.Elements(); ++i) {
+            const std::uint16_t dn = raw.As<std::uint16_t>()[i];
+            ASSERT_LE(dn, 4095) << "12 bits";
+            between += dn > 0 && dn < 4095 ? 1 : 0;
+        }
+        EXPECT_GT(between, raw.Elements() / 2) << "exposed within the ADC's range";
+        double sum = 0.0;
+        int hits = 0;
+        for (std::size_t row = 0; row < 48; ++row) {
+            for (std::size_t col = 0; col < 64; ++col) {
+                if (delegate.PrimPath(ids.As<std::uint32_t>()[row * 64 + col]) ==
+                    Path("/World/Cube")) {
+                    sum += static_cast<double>(col);
+                    ++hits;
+                }
+            }
+        }
+        ASSERT_GT(hits, 0);
+        cubeColumn[e] = sum / hits;
+    }
+    // The cube's top, 4 m from the cameras, at f / pitch pixels per unit of x / z: about 4 px.
+    const ernie::Camera left = ernie::CameraOf(scene, "/World/Navcam/Left", 64, 48);
+    const double disparity = cubeColumn[0] - cubeColumn[1];
+    EXPECT_NEAR(disparity, 0.424 * left.FocalLengthPixels() / 4.0, 1.5);
+}
+
 TEST_F(RasterDelegateTest, FisheyeSeesFieldAnglesInProportionToRadius) {
     // 50 above flat ground looking straight down: a ray at field angle theta meets it
     // 50 / cos(theta) away. Equidistant, a pixel's theta is its radius over the focal length.

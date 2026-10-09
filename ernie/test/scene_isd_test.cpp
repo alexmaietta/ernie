@@ -386,3 +386,48 @@ TEST(LrocWac, AuthorsEachBandToItsPublishedResponsivity) {
     EXPECT_EQ(ernie::LrocWacBandNamed(604), ernie::LrocWacBand::Vis605);
     EXPECT_THROW(ernie::LrocWacBandNamed(550), std::invalid_argument);
 }
+
+TEST(Mars2020Navcam, AuthorsAStereoPairAsPublished) {
+    ernie::Scene scene;
+    scene.Define("/Left", ernie::tokens::kRenderProduct);
+    scene.Define("/Right", ernie::tokens::kRenderProduct);
+    ernie::AuthorMars2020NavcamPair(scene, "/Rover/Navcam", "/Left", "/Right",
+                                    ernie::BayerPattern::Grbg, 60.0);
+    using N = ernie::Mars2020Navcam;
+    const ernie::Camera left = ernie::CameraOf(scene, "/Rover/Navcam/Left", N::kWidth, N::kHeight);
+    const ernie::Camera right =
+        ernie::CameraOf(scene, "/Rover/Navcam/Right", N::kWidth, N::kHeight);
+    EXPECT_NO_THROW(left.Check()) << "the f-theta field stays within Ernie's fisheye";
+    // Maki et al. 2020, Table 2.
+    EXPECT_NEAR(glm::length(glm::dvec3(right.transform[3] - left.transform[3])), 0.424, 1e-12);
+    EXPECT_GT(right.transform[3].x, left.transform[3].x) << "the right eye on the rig's +x";
+    EXPECT_DOUBLE_EQ(left.focalLengthMm, 19.1);
+    EXPECT_NEAR(left.PixelPitchMetres(), 6.4e-6, 1e-12);
+    EXPECT_DOUBLE_EQ(left.fStop, 12.0);
+    EXPECT_NEAR(left.sensor.ElectronsPerDn(left.iso), 1.0 / 0.24, 1e-12);
+    EXPECT_DOUBLE_EQ(left.sensor.readNoiseElectrons, 8.0);
+    EXPECT_DOUBLE_EQ(left.sensor.fullWellElectrons, 15000.0);
+    EXPECT_EQ(left.sensor.adcBits, 12);
+    EXPECT_EQ(left.sensor.channels.size(), 3u);
+    // The fitted f-theta lens sees the published fields of view to within a degree.
+    EXPECT_EQ(left.lens.projection, ernie::LensProjection::Fisheye);
+    EXPECT_NEAR(left.lens.fisheye[0], N::FisheyeK1(), 1e-6);
+    const double f = left.FocalLengthPixels();
+    const double fields[3][2] = {{0.5 * N::kWidth, 0.0}, {0.0, 0.5 * N::kHeight},
+                                 {0.5 * N::kWidth, 0.5 * N::kHeight}};
+    for (int i = 0; i < 3; ++i) {
+        const double degrees = 2.0 * left.lens.FieldAngle(glm::dvec2(fields[i][0], fields[i][1]) /
+                                                          f) * 180.0 / M_PI;
+        EXPECT_NEAR(degrees, N::kFieldOfViewDeg[i], 1.0) << i;
+    }
+    const auto* filters = scene.Get("/Right", ernie::tokens::kFilters);
+    ASSERT_NE(filters, nullptr);
+    std::vector<std::string> types;
+    for (const ernie::Path& filter : *filters->Get<std::vector<ernie::Path>>()) {
+        types.push_back(*scene.Get(filter, ernie::tokens::kFilterType)->Get<std::string>());
+    }
+    EXPECT_EQ(types, (std::vector<std::string>{"qe", "bayer", "noise", "adc", "demosaic", "cie",
+                                               "exposure", "jpeg"}));
+    EXPECT_EQ(scene.Get<double>("/Right/Mars2020Navcam/Bayer", "inputs:pattern", -1.0), 2.0);
+    EXPECT_EQ(scene.Get<double>("/Right/Mars2020Navcam/Jpeg", "inputs:quality", -1.0), 60.0);
+}
