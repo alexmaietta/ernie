@@ -343,6 +343,7 @@ class MeshDrawable : public RasterDrawable {
 
     /// The G-buffer pipeline for a frame camera's views, or a pushbroom's.
     void CreateGBufferPipeline(bool pushbroom);
+    void CreateCutoutPipelines(bool pushbroom);
     /// Writes every draw's GPU record and instance ids, and their pipelines and id offsets.
     void WriteDraws();
     /// Rebuilds `transforms_` from the items and the origin.
@@ -418,7 +419,14 @@ class MeshDrawable : public RasterDrawable {
     std::unique_ptr<GraphicsPipeline> shadowPipeline_;
     /// The G-buffer pipelines for frame cameras and, once one is seen, pushbrooms.
     std::array<std::unique_ptr<GraphicsPipeline>, 2> gbufferPipelines_;
+    /// The cutout variants (`MaterialSettings::Cutout`) of the G-buffer pipelines and the shadow
+    /// pipeline, made the first time a frame draws a cutout material.
+    std::array<std::unique_ptr<GraphicsPipeline>, 2> cutoutPipelines_;
+    std::unique_ptr<GraphicsPipeline> shadowCutoutPipeline_;
     bool pushbroom_ = false;  ///< Whether the last `Prepare`'s camera is a pushbroom.
+
+    /// Whether item `item`'s material cuts out part of it.
+    bool Cutout(std::size_t item) const;
 
     std::map<std::uint32_t, Mesh> meshes_;
     std::map<std::uint32_t, Instancer> instancers_;

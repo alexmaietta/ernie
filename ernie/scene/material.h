@@ -78,6 +78,20 @@ struct MaterialSettings {
     /// `metallicParam` per pixel.
     std::optional<TextureReader> metallicTexture;
     int metallicParam = -1;
+    /// UsdPreviewSurface's emissiveColor: linear RGB radiance the surface emits, in cd/m^2 for
+    /// white (the photometric units of lights' luminance), upsampled to a spectrum.
+    glm::vec3 emission{0.0f};
+    /// UsdPreviewSurface's opacity, a constant or one texture channel, and its opacityThreshold:
+    /// above 0, surfaces whose opacity falls below it are cut out (alpha testing), in shadows
+    /// too. Partial opacity without a threshold (blending) is drawn opaque.
+    float opacity = 1.0f;
+    std::optional<TextureReader> opacityTexture;
+    float opacityThreshold = 0.0f;
+
+    /// Whether some of the surface is cut out.
+    bool Cutout() const {
+        return opacityThreshold > 0.0f;
+    }
 };
 
 }  // namespace ernie

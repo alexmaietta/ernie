@@ -215,3 +215,35 @@ TEST_F(RasterDelegateTest, PreviewSurfacesShadeWithGgxAndTheirTexturesPerPixel) 
     EXPECT_NEAR(GreenAt(scene, textured, -4.0f, 0.0f), left, 0.03f * left);
     EXPECT_NEAR(GreenAt(scene, textured, 4.0f, 0.0f), right, 0.03f * right);
 }
+
+TEST_F(RasterDelegateTest, OpacityThresholdsCutSurfacesOutOfImagesAndShadows) {
+    // The quad's left half has opacity 0 (in a texture's a) under a threshold of 0.5, over a
+    // brighter ground 5 m below, with the sun overhead casting shadows: through the cut half the
+    // camera sees the ground lit as it is clear of the quad (no shadow from what is cut out),
+    // and the right half still shows the quad.
+    Scene scene = TexturedScene();
+    scene.Set("/World/Sun", tokens::kShadowEnable, true);
+    // A dark, rough quad, so it shows darker than the ground.
+    scene.Set("/Looks/M/Surface", tokens::kDiffuseColor, glm::vec3(0.05f));
+    scene.Set("/Looks/M/Surface", tokens::kRoughness, 1.0);
+    scene.Define("/Looks/Ground", tokens::kMaterial).Set(tokens::kAlbedo, glm::vec3(0.9f));
+    scene.Define("/World/Ground", tokens::kGroundPlane)
+        .Set(tokens::kGroundHeight, -5.0)
+        .Set(tokens::kMaterialBinding, Path("/Looks/Ground"));
+    const std::array<std::uint8_t, 8> alpha{255, 255, 255, 0, 255, 255, 255, 255};
+    scene.Write("/Looks/M/Tex", tokens::kShaderTexture, Tensor::Copy<std::uint8_t>(alpha, {1, 2, 4}));
+    scene.Set("/Looks/M/Tex", tokens::kWrapS, std::string("clamp"));
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kOpacity, "/Looks/M/Tex", "outputs:a");
+    RasterDelegate delegate(*context_);
+    const Tensor opaque = Render(delegate, scene, "HdrColor");
+    const float clear = GreenAt(scene, opaque, -14.0f, 0.0f);
+    EXPECT_LT(GreenAt(scene, opaque, -4.0f, 0.0f), 0.5f * clear)
+        << "without a threshold opacity draws opaque: the quad, darker than the ground";
+
+    scene.Set("/Looks/M/Surface", tokens::kOpacityThreshold, 0.5);
+    const Tensor cut = Render(delegate, scene, "HdrColor");
+    EXPECT_NEAR(GreenAt(scene, cut, -4.0f, 0.0f), clear, 0.05f * clear)
+        << "the ground through the cut half, unshadowed";
+    EXPECT_NEAR(GreenAt(scene, cut, 4.0f, 0.0f), GreenAt(scene, opaque, 4.0f, 0.0f), 1e-4f)
+        << "the opaque half unchanged";
+}

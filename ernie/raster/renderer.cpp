@@ -65,7 +65,10 @@ struct ShadingUniforms {
     std::uint32_t sky[4];     ///< kSky* bits, the dome map's width, height and mip levels.
     float starGrid[4];        ///< The star grid's columns and rows.
     float strip[4];           ///< A pushbroom's intrinsics (`PushbroomStrip::Intrinsics`).
-    float padding[48];        ///< To the views' stride, so shading reads them as one array.
+    /// Dome lighting: occluded (1), diffuse (1, 0 in the limited mode), the occlusion's world
+    /// radius and its largest radius in pixels.
+    float domeLighting[4];
+    float padding[44];  ///< To the views' stride, so shading reads them as one array.
 };
 static_assert(sizeof(ShadingUniforms) == 1280, "ShadingUniforms must match shading.slang");
 
@@ -91,8 +94,10 @@ struct MaterialGpu {
     std::uint32_t info[4];
     float params[BrdfRegistry::kMaxParams];
     float reflectance[SpectralBands::kMaxBands];
+    /// Spectral radiance the surface emits per band (W m^-2 sr^-1 nm^-1).
+    float emission[SpectralBands::kMaxBands];
 };
-static_assert(sizeof(MaterialGpu) == 336, "MaterialGpu must match shading.slang");
+static_assert(sizeof(MaterialGpu) == 592, "MaterialGpu must match shading.slang");
 
 /// Reflectance luminance below which a material counts as black; its spectrum's shape is flat.
 constexpr float kBlackLuminance = 1e-6f;
@@ -1354,6 +1359,18 @@ void RasterRenderer::WriteMaterialTable() {
             value = luminance > kBlackLuminance ? value / luminance : 1.0f;
         }
         std::copy(shape.begin(), shape.end(), entry.reflectance);
+        // Emission: its colour upsampled as a reflectance is (`RgbToSpectrum`, on its largest
+        // component's scale) under the equal-energy illuminant of 1 cd/m^2 per unit.
+        const glm::vec3 emission = settings.emission;
+        const float peak = std::max({emission.r, emission.g, emission.b});        if (peak > 0.0f) {
+            entry.info[2] = 1;
+            const std::vector<float> emitted =
+                RgbToSpectrum(glm::dvec3(emission / peak)).Bin(bands_);
+            const double perNit = 1.0 / (kLuminousEfficacy * LuminanceIntegral());
+            for (std::size_t b = 0; b < emitted.size(); ++b) {
+                entry.emission[b] = static_cast<float>(emitted[b] * peak * perNit);
+            }
+        }
     }
     modelsInUse_.assign(models.begin(), models.end());
     const VkDeviceSize bytes = table.size() * sizeof(MaterialGpu);
@@ -1407,6 +1424,13 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
     const ImageDesc& map = domeMap_->Desc();
     // What the sky pass draws, and for shading whether a dome lights the scene at all.
     shading.sky[0] = sky_ | (params.dome ? kSkyLighting : 0u);
+    // The dome lighting mode: shadowed (screen-space, so not for pushbroom strips) and diffuse.
+    const bool domeShadowed = params.dome && params.dome->shadow &&
+                              params.domeMode == DomeLightMode::Full && !params.camera.pushbroom;
+    shading.domeLighting[0] = domeShadowed ? 1.0f : 0.0f;
+    shading.domeLighting[1] = params.domeMode == DomeLightMode::Limited ? 0.0f : 1.0f;
+    shading.domeLighting[2] = params.domeShadowRadius;
+    shading.domeLighting[3] = 32.0f;
     shading.sky[1] = map.width;
     shading.sky[2] = map.height;
     shading.sky[3] = map.mips;

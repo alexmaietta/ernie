@@ -78,8 +78,12 @@ struct ShadingUniforms {
     float4 starGrid;
     // A pushbroom's intrinsics (`PushbroomStrip::Intrinsics`), its strip in `invViewProj`'s place.
     float4 strip;
+    // Dome lighting (`tokens::kDomeLightMode`): x 1 when shadowed (`domeOcclusion`), y 1 when it
+    // lights diffusely (0 in the limited mode), z the occlusion's world radius, w its largest
+    // radius in pixels.
+    float4 domeLighting;
     // To the views' stride in the buffer, 1280 bytes.
-    float4 padding[12];
+    float4 padding[11];
 }
 
 // What `skyMain` draws behind the scene.
@@ -112,12 +116,14 @@ struct LightGpu {
 
 struct MaterialGpu {
     // x: model index; y: the parameter a per-pixel value in the G-buffer replaces, plus 1 (0 for
-    // none; `packSurfaceFlags`); zw unused.
+    // none; `packSurfaceFlags`); z: 1 when the surface emits; w unused.
     uint4 info;
     BrdfParams params;
     // Reflectance per band normalised to luminance 1 (G-buffer albedo.x scales it), four per
     // float4.
     float4 reflectance[16];
+    // Emitted spectral radiance per band (W m^-2 sr^-1 nm^-1), four per float4.
+    float4 emission[16];
 }
 
 struct ShadingConstants {
@@ -359,6 +365,105 @@ float4 domeLobe(float3 r, float roughness) {
     return float4(scale > 0.0 ? sigmoidCoefficients(rgb / scale) : float3(0.0), scale);
 }
 
+// The world point the G-buffer holds at `pixel` of view layer `layer`, and whether there is one
+// (not the background, whose depth is the cleared 1).
+bool gbufferPoint(int2 pixel, uint layer, out float3 world) {
+    let size = int2(sh.size.xy);
+    world = float3(0.0);
+    if (any(pixel < 0) || any(pixel >= size)) {
+        return false;
+    }
+    let depth = gDepth.Load(int4(pixel, int(layer), 0));
+    if (depth >= 1.0) {
+        return false;
+    }
+    let ndc = float2((float(pixel.x) + 0.5) / float(size.x) * 2.0 - 1.0,
+                     1.0 - (float(pixel.y) + 0.5) / float(size.y) * 2.0);
+    world = cameraPoint(sh.invViewProj, sh.strip, ndc, depth);
+    return true;
+}
+
+static const uint kOcclusionDirections = 4;
+static const uint kOcclusionSteps = 4;
+
+// The fraction of the dome the point `world` with unit normal `n`, seen along `v` (towards the
+// viewer), sees past geometry within the world radius `sh.domeLighting.z`: ground-truth ambient
+// occlusion's cosine-weighted visibility from the horizons of the depth buffer, in
+// `kOcclusionDirections` screen directions turned per pixel by interleaved gradient noise,
+// `kOcclusionSteps` samples to each side, out to the radius in pixels (at most
+// `sh.domeLighting.w`).
+//
+// Reference: J. Jimenez, X. Wu, A. Pesce and A. Jarabo, "Practical Realtime Strategies for
+// Accurate Indirect Occlusion", SIGGRAPH 2016 course: Physically Based Shading.
+float domeOcclusion(int2 pixel, uint layer, float3 world, float depth, float3 n, float3 v) {
+    let size = float2(sh.size.xy);
+    let radius = sh.domeLighting.z;
+    let ndc = float2((float(pixel.x) + 0.5) / size.x * 2.0 - 1.0,
+                     1.0 - (float(pixel.y) + 0.5) / size.y * 2.0);
+    // The radius in pixels, from the world size of a pixel at this depth.
+    let pixelWorld =
+        length(cameraPoint(sh.invViewProj, sh.strip, ndc + float2(2.0 / size.x, 0.0), depth) -
+               world);
+    let pixels = min(radius / max(pixelWorld, 1e-12), sh.domeLighting.w);
+    if (pixels < 1.0) {
+        return 1.0;
+    }
+    let noise = interleavedGradientNoise(float2(pixel));
+    var visibility = 0.0;
+    for (uint k = 0; k < kOcclusionDirections; ++k) {
+        let angle = (float(k) + noise) * PI / float(kOcclusionDirections);
+        let direction = float2(cos(angle), sin(angle));
+        // The slice through the view direction along this screen direction (pixel y runs down,
+        // ndc y up), and the normal's projection into it.
+        let along = cameraPoint(sh.invViewProj, sh.strip,
+                                ndc + float2(direction.x, -direction.y) * 2.0 / size, depth) -
+                    world;
+        let tangent = normalize(along - dot(along, v) * v);
+        let axis = normalize(cross(tangent, v));
+        let projected = n - axis * dot(n, axis);
+        let projectedLength = length(projected);
+        if (projectedLength < 1e-4) {
+            visibility += 1.0;
+            continue;
+        }
+        let cosN = clamp(dot(projected / projectedLength, v), -1.0, 1.0);
+        let gamma = (dot(projected, tangent) < 0.0 ? -1.0 : 1.0) * acos(cosN);
+        // The highest horizon to each side, as the cosine of its angle from the view direction.
+        float horizons[2] = {-1.0, -1.0};
+        for (uint side = 0; side < 2; ++side) {
+            let sign = side == 0 ? 1.0 : -1.0;
+            for (uint step = 1; step <= kOcclusionSteps; ++step) {
+                let distance = (float(step) - 0.5 + 0.5 * noise) / float(kOcclusionSteps);
+                let at = pixel + int2(round(sign * direction * distance * pixels));
+                float3 sample;
+                if (!gbufferPoint(at, layer, sample)) {
+                    continue;
+                }
+                let offset = sample - world;
+                let length2 = dot(offset, offset);
+                if (length2 > radius * radius || length2 < 1e-12) {
+                    continue;
+                }
+                horizons[side] = max(horizons[side], dot(offset * rsqrt(length2), v));
+            }
+        }
+        // The horizon angles (positive towards the tangent), clamped to the hemisphere about the
+        // normal, and the cosine-weighted arc between them.
+        let h1 = gamma + min(acos(horizons[0]) - gamma, 0.5 * PI);
+        let h0 = gamma + max(-acos(horizons[1]) - gamma, -0.5 * PI);
+        let arc = 0.25 * (-cos(2.0 * h0 - gamma) + cosN + 2.0 * h0 * sin(gamma)) +
+                  0.25 * (-cos(2.0 * h1 - gamma) + cosN + 2.0 * h1 * sin(gamma));
+        visibility += projectedLength * arc;
+    }
+    return saturate(visibility / float(kOcclusionDirections));
+}
+
+// The visibility of a specular lobe of perceptual roughness `roughness` at cos(e) `mu` under
+// ambient occlusion `ao` (Lagarde and de Rousiers 2014).
+float specularOcclusion(float mu, float ao, float roughness) {
+    return saturate(pow(max(mu + ao, 0.0), exp2(-16.0 * roughness - 1.0)) - 1.0 + ao);
+}
+
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void shadeMain(uint3 id : SV_DispatchThreadID) {
@@ -405,20 +510,29 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         let index = material.info.y - 1;
         params.values[index / 4][index % 4] = float((ids.w >> 8) & 0xFFu) / 255.0;
     }
-    let domeRgb = unlit ? float3(0.0) : domeIrradiance(n);
+    // The dome lighting mode: its shadowing (the full mode) and its diffuse light (none in the
+    // limited one). The occlusion darkens the ambient term too.
+    let domeLit = !unlit && (sh.sky.x & kSkyLighting) != 0;
+    let occlusion = domeLit && sh.domeLighting.x > 0.0
+                        ? domeOcclusion(int2(id.xy), id.z, world, ndc.z, n, v)
+                        : 1.0;
+    let domeRgb = unlit ? float3(0.0) : domeIrradiance(n) * (occlusion * sh.domeLighting.y);
     let domeScale = max(domeRgb.x, max(domeRgb.y, domeRgb.z));
     let domeCoefficients = domeScale > 0.0 ? sigmoidCoefficients(domeRgb / domeScale) : float3(0.0);
     // The dome's specular lobes, around the mirror direction, where the model has any: their
     // roughness does not depend on the albedo, so one probe finds them for every band.
     float4 lobes[2] = {float4(0.0), float4(0.0)};
-    if (!unlit && (sh.sky.x & kSkyLighting) != 0) {
+    if (domeLit) {
         let probe = environmentOf(n, v, float3(1.0), slopeVariance, params);
         let mirror = 2.0 * dot(n, v) * n - v;
+        let mu = saturate(dot(n, v));
         if (any(probe.specular0 > 0.0)) {
             lobes[0] = domeLobe(mirror, probe.roughness0);
+            lobes[0].w *= specularOcclusion(mu, occlusion, probe.roughness0);
         }
         if (any(probe.specular1 > 0.0)) {
             lobes[1] = domeLobe(mirror, probe.roughness1);
+            lobes[1].w *= specularOcclusion(mu, occlusion, probe.roughness1);
         }
     }
 
@@ -480,13 +594,16 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         } else {
             let factors = radianceFactors(n, l, v, bandAlbedo, slopeVariance, params);
             let uniform = environment.diffuse + environment.specular0 + environment.specular1;
-            response = ambient * uniform + (1.0 - ambient) * factors * visibility;
+            response = ambient * occlusion * uniform + (1.0 - ambient) * factors * visibility;
         }
         var radiance = bandIrradiance / PI * response;
         for (uint j = 0; j < 3; ++j) {
             let band = min(first + j, bands - 1);
             let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;
             let dome = bandValue(sh.dome, band);
+            if (material.info.z != 0 && !unlit) {
+                radiance[j] += bandValue(material.emission, band);
+            }
             if (domeScale > 0.0) {
                 radiance[j] += environment.diffuse[j] * dome *
                                modulationAt(domeCoefficients, domeScale, wavelength);

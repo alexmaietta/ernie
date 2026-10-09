@@ -198,6 +198,15 @@ struct DomeLight {
     bool visible = true;
     /// The rotation from world directions to the dome's frame, in which its map lies.
     glm::mat3 toDome{1.0f};
+    /// Whether it may be shadowed (`tokens::kShadowEnable`), in `DomeLightMode::Full`.
+    bool shadow = true;
+};
+
+/// How dome lights light the scene (`tokens::kDomeLightMode`), as Omniverse RTX's modes.
+enum class DomeLightMode {
+    Approximate,  ///< Diffuse and specular, unoccluded.
+    Full,         ///< Also shadowed: ambient occlusion from the G-buffer.
+    Limited,      ///< Reflections only: no diffuse dome light.
 };
 
 /// One star of a `StarField`, as renders take it: where it is and the black-body spectrum it
@@ -241,6 +250,9 @@ struct FrameParams {
     std::vector<Light>
         lights;  ///< Other lights; the rasterizer takes `RasterRenderer::kMaxLights`.
     std::optional<DomeLight> dome;
+    DomeLightMode domeMode = DomeLightMode::Approximate;
+    /// World distance within which geometry shadows a dome in `DomeLightMode::Full`.
+    float domeShadowRadius = 1.0f;
     std::optional<StarField> stars;  ///< Stars behind everything, as last uploaded.
     float exposure = 1.0f;                 ///< Extra scale on the photographic output.
     bool meter = false;  ///< Measure the scene's luminance (`tokens::kMeter`).

@@ -310,6 +310,67 @@ TEST_F(RasterDelegateTest, MetalsReflectDomesAndAmbientLightThroughTheSplitSum) 
     EXPECT_LT(centre(), 0.05f * above) << "the dark half mirrored";
 }
 
+TEST_F(RasterDelegateTest, DomeLightModesShadowLimitAndApproximate) {
+    // FlatScene's floor under a uniform dome with a 6 m cube resting on it. The approximate mode
+    // (the default) lights the floor beside the cube as fully as open floor; the full one darkens
+    // it there (the cube hides part of the sky) while open floor stays lit, unless the dome's
+    // shadows are off; the limited one gives the Lambertian floor no dome light at all.
+    Scene scene = FlatScene();
+    scene.Remove("/World/Sun");
+    scene.Define("/World/Sky", tokens::kDomeLight).Set(tokens::kIntensity, 1.0);
+    scene.Define("/World/Box", tokens::kCube)
+        .Set(tokens::kSize, 6.0)
+        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 3.0)))
+        .Set(tokens::kMaterialBinding, Path("/Looks/Grey"));
+    RasterDelegate delegate(*context_);
+    // Floor a metre and a half from the cube's side, and floor beyond the occlusion radius of it.
+    const auto [nearRow, nearCol] = PixelOf(scene, 4.5f, 0.0f);
+    const auto [farRow, farCol] = PixelOf(scene, -12.0f, 12.0f);
+    const auto floor = [&] {
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const auto vars = MapVars(outputs);
+        return std::pair(At<float>(vars.at("HdrColor"), nearRow, nearCol, 1),
+                         At<float>(vars.at("HdrColor"), farRow, farCol, 1));
+    };
+    const auto [approximateNear, approximateFar] = floor();
+    EXPECT_NEAR(approximateNear, approximateFar, 0.02f * approximateFar) << "unoccluded";
+
+    scene.Define("/Render/Settings", tokens::kRenderSettings)
+        .Set(tokens::kDomeLightMode, std::string("full"))
+        .Set(tokens::kDomeShadowRadius, 8.0);
+    const auto [fullNear, fullFar] = floor();
+    EXPECT_LT(fullNear, 0.9f * approximateNear) << "the cube hides some of the sky";
+    EXPECT_NEAR(fullFar, approximateFar, 0.02f * approximateFar) << "open floor sees it all";
+
+    scene.Set("/World/Sky", tokens::kShadowEnable, false);
+    EXPECT_NEAR(floor().first, approximateNear, 0.02f * approximateNear) << "shadows off";
+
+    scene.Set("/Render/Settings", tokens::kDomeLightMode, std::string("limited"));
+    EXPECT_LT(floor().second, 0.01f * approximateFar) << "no diffuse dome light";
+
+    scene.Set("/Render/Settings", tokens::kDomeLightMode, std::string("bright"));
+    EXPECT_THROW(delegate.Step(scene), std::invalid_argument);
+}
+
+TEST_F(RasterDelegateTest, EmissiveSurfacesShowTheirLuminanceUnlit) {
+    // With no light at all, a floor emitting white of 2 cd/m^2 shows a luminance of 2 (HdrColor
+    // is in cd/m^2), and red emission reads red.
+    Scene scene = FlatScene();
+    scene.Remove("/World/Sun");
+    scene.Set("/Looks/Grey", tokens::kEmissiveColor, glm::vec3(2.0f));
+    RasterDelegate delegate(*context_);
+    const std::size_t c = kVarSize / 2;
+    ernie::RenderProductSetOutputs white = delegate.Step(scene);
+    const auto vars = MapVars(white);
+    EXPECT_NEAR(At<float>(vars.at("HdrColor"), c, c, 1), 2.0f, 0.06f);
+    EXPECT_NEAR(At<float>(vars.at("HdrColor"), c, c, 0), 2.0f, 0.1f);
+
+    scene.Set("/Looks/Grey", tokens::kEmissiveColor, glm::vec3(1.0f, 0.0f, 0.0f));
+    ernie::RenderProductSetOutputs red = delegate.Step(scene);
+    const auto reds = MapVars(red);
+    EXPECT_GT(At<float>(reds.at("HdrColor"), c, c, 0), 3.0f * At<float>(reds.at("HdrColor"), c, c, 1));
+}
+
 TEST_F(RasterDelegateTest, PhotometricLightsLightByTheirLuxAndLumens) {
     // FlatScene's grey floor (albedo 0.5) under a 1 m square panel 5 m up giving 1000 lux at 5 m:
     // the floor below receives about 990 lux (the panel is not quite a point), so its luminance

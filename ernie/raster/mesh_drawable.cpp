@@ -151,7 +151,7 @@ void Reserve(const VulkanContext& context, std::unique_ptr<GpuBuffer>& buffer, V
     buffer = std::make_unique<GpuBuffer>(context, bytes, usage, memory);
 }
 
-/// Frame (0 to 4), material (5 to 9) and mesh (10 to 19, 21 to 25) bindings; see mesh.slang.
+/// Frame (0 to 4), material (5 to 9) and mesh (10 to 19, 21 to 26) bindings; see mesh.slang.
 constexpr DescriptorBinding kBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
@@ -178,6 +178,7 @@ constexpr DescriptorBinding kBindings[] = {
     {23, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {24, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {25, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
+    {26, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
 };
 
 /// The motion pass's: the mesh passes' and 20, the view's MotionUniforms (frame.slang), last as
@@ -208,6 +209,7 @@ constexpr DescriptorBinding kMotionBindings[] = {
     {23, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {24, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {25, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
+    {26, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {20, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
 };
 
@@ -434,6 +436,41 @@ void MeshDrawable::CreateGBufferPipeline(bool pushbroom) {
     desc.depthFormat = RenderTargets::kDepthFormat;
     gbufferPipelines_[pushbroom ? 1 : 0] =
         std::make_unique<GraphicsPipeline>(context_, layout_, desc);
+}
+
+void MeshDrawable::CreateCutoutPipelines(bool pushbroom) {
+    std::unique_ptr<GraphicsPipeline>& gbuffer = cutoutPipelines_[pushbroom ? 1 : 0];
+    if (gbuffer == nullptr) {
+        const std::vector<ShaderModuleSource> modules = MeshModules(pushbroom);
+        const std::vector<std::uint32_t> vertex =
+            renderer_.Compiler().CompileSpirv(modules, "meshVertexMain");
+        const std::vector<std::uint32_t> fragment =
+            renderer_.Compiler().CompileSpirv(modules, "meshCutoutFragmentMain");
+        GraphicsPipelineDesc desc;
+        desc.vertexSpirv = vertex;
+        desc.fragmentSpirv = fragment;
+        desc.colorFormats.assign(RenderTargets::kGBufferFormats.begin(),
+                                 RenderTargets::kGBufferFormats.end());
+        desc.depthFormat = RenderTargets::kDepthFormat;
+        gbuffer = std::make_unique<GraphicsPipeline>(context_, layout_, desc);
+    }
+    if (shadowCutoutPipeline_ == nullptr) {
+        const std::vector<ShaderModuleSource> modules = MeshModules();
+        const std::vector<std::uint32_t> vertex =
+            renderer_.Compiler().CompileSpirv(modules, "meshShadowCutoutVertex");
+        const std::vector<std::uint32_t> fragment =
+            renderer_.Compiler().CompileSpirv(modules, "meshShadowCutoutFragment");
+        GraphicsPipelineDesc shadow;
+        shadow.vertexSpirv = vertex;
+        shadow.fragmentSpirv = fragment;
+        shadow.depthFormat = VK_FORMAT_D32_SFLOAT;
+        shadow.depthBiasSlope = 1.5f;
+        shadowCutoutPipeline_ = std::make_unique<GraphicsPipeline>(context_, layout_, shadow);
+    }
+}
+
+bool MeshDrawable::Cutout(std::size_t item) const {
+    return renderer_.MaterialOrDefault(items_[item].material).Settings().Cutout();
 }
 
 std::uint32_t MeshDrawable::AddMesh(MeshData data) {
@@ -1088,6 +1125,14 @@ void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCasc
         pushbroom_ = pushbroom;
         std::fill(itemPipelines_.begin(), itemPipelines_.end(),
                   gbufferPipelines_[pushbroom ? 1 : 0].get());
+    }
+    // Cutout materials draw with their own pipelines, compiled the first time one appears.
+    bool cutout = false;
+    for (std::size_t i = 0; i < items_.size() && !cutout; ++i) {
+        cutout = Cutout(i);
+    }
+    if (cutout) {
+        CreateCutoutPipelines(pushbroom);
     }
     viewWorlds_.clear();
     for (std::size_t v = 0; v < params.Views(); ++v) {
@@ -1773,10 +1818,18 @@ std::size_t MeshDrawable::Record(VkCommandBuffer commands, const RasterFrame& fr
     std::uint32_t pushed = std::numeric_limits<std::uint32_t>::max();
     bool pushedCulled = false;
     const PipelineLayout& layout = motion != nullptr ? motionLayout_ : layout_;
+    // Cutout materials draw with the cutout variants, made by `Prepare` when one appears.
+    const auto cutout = [&](std::uint32_t item) {
+        return Cutout(item) && shadowCutoutPipeline_ != nullptr &&
+               cutoutPipelines_[pushbroom_ ? 1 : 0] != nullptr;
+    };
     const auto bind = [&](std::uint32_t item, bool culled) {
-        const GraphicsPipeline* pipeline = motion != nullptr ? motionPipeline_.get()
-                                           : shadow          ? shadowPipeline_.get()
-                                                             : itemPipelines_[item];
+        const bool cut = cutout(item);
+        const GraphicsPipeline* pipeline =
+            motion != nullptr ? motionPipeline_.get()
+            : shadow          ? (cut ? shadowCutoutPipeline_.get() : shadowPipeline_.get())
+            : cut             ? cutoutPipelines_[pushbroom_ ? 1 : 0].get()
+                              : itemPipelines_[item];
         if (pipeline != bound) {
             bound = pipeline;
             vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, bound->Handle());
@@ -1849,10 +1902,15 @@ std::size_t MeshDrawable::Record(VkCommandBuffer commands, const RasterFrame& fr
             const GpuCullJob& job = cullJobs_[static_cast<std::size_t>(visible.job)];
             const std::uint32_t levels = cullDrawCounts_[static_cast<std::size_t>(visible.job)];
             const std::uint32_t firstDraw = culledSet == 0 ? job.output[1] : job.output[3];
+            // Shadow batches span materials, except cutout ones, which bind their own to test
+            // their opacity.
+            const bool sameMaterial = materialOf(batch ? batch->item : visible.item) ==
+                                          materialOf(visible.item) &&
+                                      itemPipelines_[batch ? batch->item : visible.item] ==
+                                          itemPipelines_[visible.item];
             const bool joins =
                 batch && batch->first + batch->count == firstDraw &&
-                (shadow || (materialOf(batch->item) == materialOf(visible.item) &&
-                            itemPipelines_[batch->item] == itemPipelines_[visible.item]));
+                ((shadow && !cutout(batch->item) && !cutout(visible.item)) || sameMaterial);
             if (!joins) {
                 flush();
                 batch = Batch{visible.item, firstDraw, 0};

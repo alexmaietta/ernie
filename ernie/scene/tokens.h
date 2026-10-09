@@ -311,6 +311,12 @@ inline constexpr std::string_view kUseSpecularWorkflow = "inputs:useSpecularWork
 inline constexpr std::string_view kSpecularColor = "inputs:specularColor";              ///< vec3.
 inline constexpr std::string_view kClearcoat = "inputs:clearcoat";
 inline constexpr std::string_view kClearcoatRoughness = "inputs:clearcoatRoughness";
+/// vec3 linear RGB radiance in cd/m^2 for white (default black), whatever the model.
+inline constexpr std::string_view kEmissiveColor = "inputs:emissiveColor";
+/// Opacity (default 1; one texture channel, often a colour texture's outputs:a) and the threshold
+/// below which a surface is cut out (default 0, none).
+inline constexpr std::string_view kOpacity = "inputs:opacity";
+inline constexpr std::string_view kOpacityThreshold = "inputs:opacityThreshold";
 /// UsdUVTexture: an image file (PNG, JPEG or EXR), or the tensor `ernie:texture` (float32 or uint8
 /// (rows, cols, channels), rows top to bottom) in its place; texture coordinates from `inputs:st`.
 inline constexpr std::string_view kFile = "inputs:file";
@@ -378,6 +384,12 @@ inline constexpr std::string_view kSensorFilter = "SensorFilter";  ///< Prim typ
 inline constexpr std::string_view kFilterType = "ernie:filter:type";
 inline constexpr std::string_view kSourceName = "sourceName";  ///< RenderVar name, e.g. "LdrColor".
 inline constexpr std::string_view kAmbient = "ernie:ambient";  ///< float fraction of sunlight.
+/// How dome lights light the scene, as Omniverse RTX's dome lighting modes: "approximate"
+/// (default; diffuse and specular, unoccluded), "full" (also shadowed, where the dome's
+/// `inputs:shadow:enable` allows: ambient occlusion from the G-buffer over a world radius of
+/// `ernie:domeLight:shadowRadius`, default 1) or "limited" (reflections only, no diffuse).
+inline constexpr std::string_view kDomeLightMode = "ernie:domeLight:mode";
+inline constexpr std::string_view kDomeShadowRadius = "ernie:domeLight:shadowRadius";
 inline constexpr std::string_view kColorMode = "ernie:colorMode";
 inline constexpr std::string_view kHillshade = "hillshade";
 inline constexpr std::string_view kColormap = "colormap";

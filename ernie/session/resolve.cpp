@@ -930,6 +930,7 @@ DomeLight DomeOf(const Scene& scene, const Path& path, const SpectralBands& band
                               glm::normalize(glm::dvec3(world[2])));
     dome.toDome = glm::mat3(glm::transpose(rotation));
     dome.visible = GetBool(scene, path, kVisibleInPrimaryRay, true);
+    dome.shadow = GetBool(scene, path, kShadowEnable, true);
     if (const Tensor* texture = scene.Read(path, kLightTexture)) {
         dome.sh = DomeIrradianceSh(*texture, rotation);
     } else {
@@ -1145,6 +1146,20 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
     params.overscan = OverscanOf(params.camera);
     const Path& settings = prims.settings;
     params.ambient = Number(scene, settings, kAmbient, params.ambient);
+    const std::string domeMode = GetToken(scene, settings, kDomeLightMode, "approximate");
+    if (domeMode == "approximate") {
+        params.domeMode = DomeLightMode::Approximate;
+    } else if (domeMode == "full") {
+        params.domeMode = DomeLightMode::Full;
+    } else if (domeMode == "limited") {
+        params.domeMode = DomeLightMode::Limited;
+    } else {
+        throw std::invalid_argument("'" + settings.String() + "' " +
+                                    std::string(kDomeLightMode) + " is '" + domeMode +
+                                    "', not approximate, full or limited");
+    }
+    params.domeShadowRadius =
+        std::max(Number(scene, settings, kDomeShadowRadius, params.domeShadowRadius), 1e-6f);
     params.wireframe = WireframeOf(scene, settings);
     params.overlays = GetToken(scene, settings, kOverlays, "");
     params.exposure =
@@ -1354,9 +1369,10 @@ std::string UvSetOf(const Scene& scene, const Path& material) {
             return "st";
         }
         for (const std::string_view input : {tokens::kDiffuseColor, tokens::kNormalInput,
-                                             tokens::kRoughness, tokens::kMetallic}) {
+                                             tokens::kRoughness, tokens::kMetallic,
+                                             tokens::kOpacity}) {
             if (const std::optional<Connection> texture = GetConnection(scene, surface, input)) {
-                const bool scalar = input == tokens::kRoughness || input == tokens::kMetallic;
+                const bool scalar = input != tokens::kDiffuseColor && input != tokens::kNormalInput;
                 return TextureReaderOf(scene, *texture, input, surface, scalar).uvSet;
             }
         }
@@ -1501,8 +1517,21 @@ MaterialSettings MaterialSettingsOf(const Scene& scene, const Path& material,
         if (const std::optional<Connection> normal = GetConnection(scene, surface, kNormalInput)) {
             settings.normalTexture = TextureReaderOf(scene, *normal, kNormalInput, surface);
         }
+        if (const std::optional<Connection> opacity = GetConnection(scene, surface, kOpacity)) {
+            settings.opacityTexture = TextureReaderOf(scene, *opacity, kOpacity, surface, true);
+        }
+        settings.opacity = std::clamp(Number(scene, surface, kOpacity, 1.0f), 0.0f, 1.0f);
+        settings.opacityThreshold =
+            std::clamp(Number(scene, surface, kOpacityThreshold, 0.0f), 0.0f, 1.0f);
     }
-    return settings;
+    // Emission, from the preview surface or else the Material itself, whatever the model.
+    const Path& emitter = surface.IsEmpty() ? material : surface;
+    if (GetConnection(scene, emitter, kEmissiveColor)) {
+        throw std::invalid_argument("'" + emitter.String() + "' " + std::string(kEmissiveColor) +
+                                    " is connected; only a constant emissiveColor is supported");
+    }
+    settings.emission = glm::max(
+        glm::vec3(GetVec3(scene, emitter, kEmissiveColor, glm::dvec3(0.0))), glm::vec3(0.0f));    return settings;
 }
 
 bool IsMeshType(std::string_view type) {

@@ -370,11 +370,11 @@ void RasterDelegate::SyncMaterial(const Scene& scene, const Path& path, SyncedMa
     renderer_.SetMaterial(material.id, settings);
     RasterMaterial& gpu = renderer_.Material(material.id);
     // The textures of a UsdPreviewSurface: albedo, normal map, roughness and metallic.
-    const std::array<const std::optional<TextureReader>*, 4> readers{
+    const std::array<const std::optional<TextureReader>*, 5> readers{
         &settings.albedoTexture, &settings.normalTexture, &settings.roughnessTexture,
-        &settings.metallicTexture};
-    constexpr std::array<std::string_view, 4> kInputs{kDiffuseColor, kNormalInput, kRoughness,
-                                                      kMetallic};
+        &settings.metallicTexture, &settings.opacityTexture};
+    constexpr std::array<std::string_view, 5> kInputs{kDiffuseColor, kNormalInput, kRoughness,
+                                                      kMetallic, kOpacity};
     for (std::size_t slot = 0; slot < readers.size(); ++slot) {
         const std::optional<TextureReader>& reader = *readers[slot];
         const std::string key = reader ? TextureKey(scene, *reader) : std::string();
@@ -392,7 +392,7 @@ void RasterDelegate::SyncMaterial(const Scene& scene, const Path& path, SyncedMa
             } else if (slot == 1) {
                 gpu.SetNormalTexture(data, wrap);
             } else {
-                gpu.SetScalarTexture(slot == 3, data, wrap);
+                gpu.SetScalarTexture(static_cast<RasterMaterial::Scalar>(slot - 2), data, wrap);
             }
         } catch (const std::exception& error) {
             throw UploadError(path, kInputs[slot], error.what());

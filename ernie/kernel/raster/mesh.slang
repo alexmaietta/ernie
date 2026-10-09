@@ -5,8 +5,8 @@
 //   15 instance positions, 16 instance orientations, 17 instance scales, 18 instance ids,
 //   19 per-draw records of multi-draws (draw, instance offset, index offset, unused),
 //   21 texture coordinates per triangle corner, 22 the material's albedo texture, 23 its normal
-//   map, 24 its roughness and 25 its metallic texture, each with its own sampler
-//   (`RasterMaterial::AppendTextureResources`).
+//   map, 24 its roughness, 25 its metallic and 26 its opacity texture, each with its own
+//   sampler (`RasterMaterial::AppendTextureResources`).
 // The colour pass writes the G-buffer for spectral shading (frame.slang).
 import frame;
 import surface;
@@ -63,6 +63,8 @@ struct MeshDraw {
 // Roughness and metallic, one channel each in r.
 [[vk::binding(24, 0)]] Sampler2D roughnessTexture;
 [[vk::binding(25, 0)]] Sampler2D metallicTexture;
+// Opacity, one channel in r, for cutouts (`meshCutoutFragmentMain`, `meshShadowCutoutFragment`).
+[[vk::binding(26, 0)]] Sampler2D opacityTexture;
 
 // What one draw draws: the draw (`draws` entry), its first instance id and its first index past
 // the mesh's own.
@@ -384,6 +386,54 @@ UvSample uvTextures(float2 st, float3 world, inout float3 normal) {
 // perturb the normal; the material's albedo map scales its reflectance by world x and y.
 [shader("fragment")]
 GBuffer meshFragmentMain(VertexOutput in) {
+    return meshGBuffer(in);
+}
+
+// The surface's opacity at texture coordinates `st`: its texture's, or its constant.
+float surfaceOpacity(float2 st) {
+    if (surface.opacity.z > 0.0) {
+        return opacityTexture.Sample(imageUv(transformUv(surface.opacityUv, st))).r;
+    }
+    return surface.opacity.x;
+}
+
+// As `meshFragmentMain` for materials with an opacity threshold, cutting out what falls below
+// it (alpha testing), in its own pipeline so the discard costs the others no early depth tests.
+// The G-buffer is shaded first, so derivatives hold across the quad.
+[shader("fragment")]
+GBuffer meshCutoutFragmentMain(VertexOutput in) {
+    let out = meshGBuffer(in);
+    if (surfaceOpacity(in.uv) < surface.opacity.y) {
+        discard;
+    }
+    return out;
+}
+
+// The shadow passes' cutout variant: the caster's texture coordinates, to test its opacity.
+struct ShadowCutoutOutput {
+    float4 position : SV_Position;
+    float2 uv : TEXCOORD;
+}
+
+[shader("vertex")]
+ShadowCutoutOutput meshShadowCutoutVertex(uint vertexIndex : SV_VertexID,
+                                          uint instanceIndex : SV_InstanceID,
+                                          uint drawIndex : SV_DrawIndex) {
+    let v = meshVertex(vertexIndex, instanceIndex, drawCall(drawIndex), u.motion.x);
+    ShadowCutoutOutput out;
+    out.position = mul(draw.lightViewProj, float4(v.world, 1.0));
+    out.uv = v.uv;
+    return out;
+}
+
+[shader("fragment")]
+void meshShadowCutoutFragment(ShadowCutoutOutput in) {
+    if (surfaceOpacity(in.uv) < surface.opacity.y) {
+        discard;
+    }
+}
+
+GBuffer meshGBuffer(VertexOutput in) {
     let d = draws[in.item];
     let toEye = towardsViewer(in.world);
     let flat = cross(ddx(in.world), ddy(in.world));

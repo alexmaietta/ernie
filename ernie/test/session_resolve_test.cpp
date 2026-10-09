@@ -378,6 +378,21 @@ TEST(MaterialSettingsOf, PreviewSurfacesShadeWithTheirOwnModelAndInputs) {
     EXPECT_THROW(ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs), std::invalid_argument)
         << "a scalar reads one channel";
 
+    // Emission and opacity, constants or (opacity) one texture channel.
+    scene.Set("/Looks/M/Surface", tokens::kEmissiveColor, glm::vec3(3.0f, 2.0f, 1.0f));
+    scene.Set("/Looks/M/Surface", tokens::kOpacityThreshold, 0.5);
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kOpacity, "/Looks/M/Mr", "outputs:a");
+    scene.Clear("/Looks/M/Surface", std::string(tokens::kMetallic) + ".connect");
+    settings = ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs);
+    EXPECT_EQ(settings.emission, glm::vec3(3.0f, 2.0f, 1.0f));
+    EXPECT_TRUE(settings.Cutout());
+    ASSERT_TRUE(settings.opacityTexture.has_value());
+    EXPECT_EQ(settings.opacityTexture->channel, 3);
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kEmissiveColor, "/Looks/M/Mr", "outputs:rgb");
+    EXPECT_THROW(ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs), std::invalid_argument)
+        << "emissive textures are not supported yet";
+    scene.Clear("/Looks/M/Surface", std::string(tokens::kEmissiveColor) + ".connect");
+
     // A Material naming another model keeps it, with its parameters from the Material.
     scene.Clear("/Looks/M/Surface", std::string(tokens::kMetallic) + ".connect");
     scene.Set("/Looks/M", tokens::kBrdf, std::string("oren_nayar"));

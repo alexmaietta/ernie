@@ -35,6 +35,10 @@ public struct Surface {
     public float4 roughnessUv[2];
     public float4 metallicUv[2];
     public float4 textures;
+    // The opacity texture's coordinate transform, and opacity (x), the threshold below which a
+    // surface is cut out (y, 0 for none) and whether an opacity texture replaces x (z).
+    public float4 opacityUv[2];
+    public float4 opacity;
     // Parameters of the active reflectance model.
     public BrdfParams brdf;
 }

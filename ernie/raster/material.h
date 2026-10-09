@@ -86,30 +86,29 @@ class RasterMaterial {
     /// @throws std::invalid_argument as `SetAlbedoTexture`.
     void SetNormalTexture(const Image* normal, const TextureReader& reader);
 
-    /// Uploads the one-channel textures of `MaterialSettings::roughnessTexture` (`metallic`
-    /// false) or `metallicTexture` (true): `reader`'s channel of `image`, scaled and biased as it
+    /// The one-channel textures: `MaterialSettings::roughnessTexture`, `metallicTexture` and
+    /// `opacityTexture`.
+    enum class Scalar { Roughness, Metallic, Opacity };
+
+    /// Uploads one-channel texture `which`: `reader`'s channel of `image`, scaled and biased as it
     /// says, clamped to [0, 1]. nullptr removes it.
     /// @throws std::invalid_argument as `SetAlbedoTexture`.
-    void SetScalarTexture(bool metallic, const Image* image, const TextureReader& reader);
+    void SetScalarTexture(Scalar which, const Image* image, const TextureReader& reader);
 
     bool HasAlbedoTexture() const {
         return hasAlbedoTexture_;
     }
 
-    bool HasRoughnessTexture() const {
-        return hasScalarTexture_[0];
-    }
-
-    bool HasMetallicTexture() const {
-        return hasScalarTexture_[1];
+    bool HasScalarTexture(Scalar which) const {
+        return hasScalarTexture_[static_cast<std::size_t>(which)];
     }
 
     bool HasNormalTexture() const {
         return hasNormalTexture_;
     }
 
-    /// The textures mesh passes read through texture coordinates, albedo, normal map, roughness
-    /// and metallic, each with its own sampler (bindings 22 to 25 of mesh.slang).
+    /// The textures mesh passes read through texture coordinates, albedo, normal map, roughness,
+    /// metallic and opacity, each with its own sampler (bindings 22 to 26 of mesh.slang).
     void AppendTextureResources(std::vector<DescriptorResource>& resources) const;
 
     bool HasDetailAlbedo() const {
@@ -180,13 +179,13 @@ class RasterMaterial {
     std::unique_ptr<GpuImage> normalTexture_;
     std::unique_ptr<Sampler> albedoSampler_;
     std::unique_ptr<Sampler> normalSampler_;
-    std::array<std::unique_ptr<GpuImage>, 2> scalarTextures_;  ///< Roughness, metallic.
-    std::array<std::unique_ptr<Sampler>, 2> scalarSamplers_;
+    std::array<std::unique_ptr<GpuImage>, 3> scalarTextures_;  ///< By `Scalar`.
+    std::array<std::unique_ptr<Sampler>, 3> scalarSamplers_;
 
     bool hasAlbedoMap_ = false;
     bool hasAlbedoTexture_ = false;
     bool hasNormalTexture_ = false;
-    std::array<bool, 2> hasScalarTexture_{false, false};
+    std::array<bool, 3> hasScalarTexture_{false, false, false};
     bool hasDetailAlbedo_ = false;
     bool hasDetailNormal_ = false;
     glm::vec3 detailMean_{1.0f};
