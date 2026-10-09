@@ -103,6 +103,11 @@ class RasterDrawable {
     /// replaced only after `vkDeviceWaitIdle`.
     virtual void Prepare(const FrameParams& params, std::span<const ShadowCascade> cascades) = 0;
 
+    /// Records compute work the views' GPU poses and culling depend on, such as poses composed on
+    /// the GPU and the views posed under them, first of the frame's work after its uploads; the
+    /// renderer follows it with a barrier. Nothing by default.
+    virtual void RecordPrepass(VkCommandBuffer /*commands*/) const {}
+
     /// Records compute work the frame's draws depend on, such as culling instances on the GPU,
     /// before any shadow or G-buffer pass; the renderer follows it with a barrier. Nothing by
     /// default.

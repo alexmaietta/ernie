@@ -3,6 +3,7 @@
 #include "ernie/scene/overlay.h"
 #include "ernie/scene/path.h"
 #include "ernie/scene/value.h"
+#include "ernie/scene/xform.h"
 #include "ernie/util/tensor.h"
 
 #include <glm/glm.hpp>
@@ -92,6 +93,9 @@ class Prim {
     /// As `Scene::Write`; returns this handle for chaining.
     Prim& Write(std::string_view attribute, Tensor tensor);
 
+    /// As `SetXform` (ernie/scene/xform.h); returns this handle for chaining.
+    Prim& SetXform(const Xform& xform);
+
     const Value* Get(std::string_view attribute) const;
 
     template <typename T> T Get(std::string_view attribute, T fallback) const;
@@ -101,6 +105,32 @@ class Prim {
   private:
     Scene* scene_ = nullptr;
     Path path_;
+};
+
+/// A fixed list of prims to write rows of one tensor to at once (`Scene::Write`), such as a
+/// simulation's bodies every step: the scene looks the prims up the first time and keeps them,
+/// looking them up again only after prims are removed or for another scene.
+class PrimSet {
+  public:
+    PrimSet() = default;
+    explicit PrimSet(std::vector<Path> paths) : paths_(std::move(paths)) {}
+
+    const std::vector<Path>& Paths() const {
+        return paths_;
+    }
+
+    std::size_t Size() const {
+        return paths_.size();
+    }
+
+  private:
+    friend class Scene;
+    std::vector<Path> paths_;
+    // The scene's prims as last resolved, valid for that scene (`Scene::Id`) until it removes
+    // prims.
+    mutable std::vector<void*> prims_;
+    mutable std::uint64_t sceneId_ = 0;
+    mutable std::uint64_t removals_ = 0;
 };
 
 /// A lightweight, USD-shaped scene for Ernie: a tree of typed prims named by `Path`, each holding
@@ -197,10 +227,29 @@ class Scene {
     std::uintptr_t WriteStream(const Path& path, std::string_view attribute) const;
 
     /// Writes row `i` of `rows` (`Tensor::Row`) as `attribute` of `paths[i]`, so one tensor from a
-    /// simulation updates many prims at once without copying.
+    /// simulation updates many prims at once without copying. For a CUDA tensor, `stream` is the
+    /// stream its contents are written on, as `Write`. Consumers may use the tensor whole
+    /// (`RowOf`), such as a renderer posing many prims from one GPU array.
     /// @throws std::invalid_argument if a prim does not exist or the first dimension of `rows` is
     /// not `paths.size()`; nothing is written then.
-    void Write(std::span<const Path> paths, std::string_view attribute, const Tensor& rows);
+    void Write(std::span<const Path> paths, std::string_view attribute, const Tensor& rows,
+               std::uintptr_t stream = 1);
+
+    /// As the `Write` of many paths, to the prims of `prims`, looked up once and kept (`PrimSet`):
+    /// the way to write a simulation's arrays every step.
+    /// @throws std::invalid_argument as the `Write` of many paths.
+    void Write(const PrimSet& prims, std::string_view attribute, const Tensor& rows,
+               std::uintptr_t stream = 1);
+
+    /// The tensor `attribute` of the prim at `path` was written from as one row by the `Write` of
+    /// many paths, and that row; null if it was written or set otherwise since.
+    const std::pair<Tensor, std::int64_t>* RowOf(const Path& path,
+                                                 std::string_view attribute) const;
+
+    /// The version at which the prim's own transform ops (`xformOpOrder`, `xformOp:*`) last
+    /// changed, as opposed to its ancestors' (which stamp it `Dirty::Transform` too); 0 if never
+    /// or for no prim.
+    std::uint64_t OwnTransformVersion(const Path& path) const;
 
     /// The tensor of `attribute`, or null if it is unset or holds a value.
     const Tensor* Read(const Path& path, std::string_view attribute) const;
@@ -218,11 +267,18 @@ class Scene {
     /// have not changed, such as re-uploading a heightfield when only a display option moved.
     std::uint64_t AttributeVersion(const Path& path, std::string_view attribute) const;
 
-    /// The prim's `xformOp:transform`, or identity.
+    /// The prim's local transform from its transform ops (`ComposeXformOps`, ernie/scene/xform.h):
+    /// `xformOp:transform`, or the ops `xformOpOrder` lists; identity without either.
+    /// @throws std::invalid_argument as `ComposeXformOps`.
     glm::dmat4 LocalTransform(const Path& path) const;
 
-    /// The product of the local transforms from the root down to the prim.
+    /// The product of the local transforms from the root down to the prim, starting below the
+    /// nearest prim (itself included) whose `xformOpOrder` resets the transform stack.
     glm::dmat4 WorldTransform(const Path& path) const;
+
+    /// Gives the prim the local transform `local`, through its own transform ops where they can
+    /// represent it (`LocalTransformEdits`).
+    void SetLocalTransform(const Path& path, const glm::dmat4& local);
 
     /// Whether neither the prim nor any ancestor has `visibility` set to `invisible`.
     bool IsVisible(const Path& path) const;
@@ -279,8 +335,11 @@ class Scene {
         std::map<std::string, Value, std::less<>> values;
         std::map<std::string, Tensor, std::less<>> tensors;
         std::map<std::string, std::uintptr_t, std::less<>> streams;  ///< CUDA tensors' streams.
+        /// Tensors written as rows of one tensor (`Write` of many paths): that tensor and the row.
+        std::map<std::string, std::pair<Tensor, std::int64_t>, std::less<>> rows;
         std::map<std::string, std::uint64_t, std::less<>> versions;
         std::array<std::uint64_t, kStampCount> stamps{};
+        std::uint64_t ownTransform = 0;  ///< `OwnTransformVersion`.
     };
 
     PrimData& Find(const Path& path);
@@ -288,8 +347,14 @@ class Scene {
     void Stamp(const Path& path, PrimData& prim, std::string_view attribute);
     void Stamp(const Path& path, PrimData& prim, Dirty bit);
     PrimData& CreateIfMissing(const Path& path);
+    /// Writes `tensor` as `attribute` of `prim`, replacing any value; `row` records the tensor
+    /// and row it came from (`RowOf`), and without one any such record is forgotten.
+    void WriteTensor(const Path& path, PrimData& prim, std::string_view attribute, Tensor tensor,
+                     std::uintptr_t stream,
+                     std::optional<std::pair<Tensor, std::int64_t>> row = std::nullopt);
 
     std::map<Path, PrimData> prims_;
+    std::uint64_t removals_ = 0;  ///< Counts `Remove`s, which invalidate resolved `PrimSet`s.
     std::map<Path, std::uint64_t> removed_;
     std::map<std::string, Overlay, std::less<>> overlays_;
     std::uint64_t version_ = 0;

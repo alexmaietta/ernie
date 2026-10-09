@@ -7,7 +7,8 @@
 // column-major order.
 //
 // Bindings: 0 the camera (parent-to-world, projection and its inverse, as glm columns), 1 the
-// poses (row-major 4x4, one per view), 2 the per-view blocks written.
+// poses (row-major 4x4, one per view; or with flag bit 1 seven numbers per view, a position and a
+// unit quaternion x, y, z, w), 2 the per-view blocks written.
 //
 // References:
 // - G. Gribb and K. Hartmann, "Fast Extraction of Viewing Frustum Planes from the
@@ -20,7 +21,7 @@ static const uint kNone = 0xFFFFFFFFu;
 
 struct ViewConstants {
     // Views, block stride and first block's byte offset, flags (bit 0: forward.w is the eye's
-    // depth along it).
+    // depth along it; bit 1: the poses are positions and quaternions).
     uint4 layout;
     // Byte offsets in a block: view-projection, its inverse, eye (xyz), forward (xyz).
     uint4 fields;
@@ -107,9 +108,26 @@ void viewsMain(uint3 id : SV_DispatchThreadID) {
         return;
     }
     float4x4 local;
-    for (uint r = 0; r < 4; ++r) {
-        let at = view * 16 + r * 4;
-        local[r] = float4(poses[at], poses[at + 1], poses[at + 2], poses[at + 3]);
+    if ((layout.w & 2u) != 0u) {
+        // A position and a unit quaternion (x, y, z, w): the rotation's matrix, then the move.
+        let at = view * 7;
+        let q = normalize(float4(poses[at + 3], poses[at + 4], poses[at + 5], poses[at + 6]));
+        let x = q.x;
+        let y = q.y;
+        let z = q.z;
+        let w = q.w;
+        local[0] = float4(1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y),
+                          poses[at]);
+        local[1] = float4(2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x),
+                          poses[at + 1]);
+        local[2] = float4(2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y),
+                          poses[at + 2]);
+        local[3] = float4(0, 0, 0, 1);
+    } else {
+        for (uint r = 0; r < 4; ++r) {
+            let at = view * 16 + r * 4;
+            local[r] = float4(poses[at], poses[at + 1], poses[at + 2], poses[at + 3]);
+        }
     }
     // Camera to world is the parent's world transform after the pose, as `ViewPosesOf`.
     let pose = mul(cameraMatrix(0), local);

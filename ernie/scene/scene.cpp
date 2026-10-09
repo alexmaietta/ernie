@@ -1,6 +1,7 @@
 #include "ernie/scene/scene.h"
 
 #include "ernie/scene/tokens.h"
+#include "ernie/scene/xform.h"
 
 #include <atomic>
 #include <bit>
@@ -28,7 +29,7 @@ std::invalid_argument NoPrim(const Path& path) {
 
 Dirty DirtyOf(std::string_view attribute) {
     using namespace tokens;
-    if (attribute == kTransform) {
+    if (IsXformAttribute(attribute)) {
         return Dirty::Transform;
     }
     if (attribute == kVisibility) {
@@ -68,6 +69,14 @@ Prim& Prim::Set(std::string_view attribute, Value value) {
         throw NoPrim(path_);
     }
     scene_->Set(path_, attribute, std::move(value));
+    return *this;
+}
+
+Prim& Prim::SetXform(const Xform& xform) {
+    if (scene_ == nullptr) {
+        throw NoPrim(path_);
+    }
+    ernie::SetXform(*scene_, path_, xform);
     return *this;
 }
 
@@ -131,6 +140,9 @@ void Scene::Stamp(const Path& path, PrimData& prim, std::string_view attribute) 
         it->second = version_;
     } else {
         prim.versions.emplace(std::string(attribute), version_);
+    }
+    if (IsXformAttribute(attribute)) {
+        prim.ownTransform = version_;
     }
     Stamp(path, prim, DirtyOf(attribute));
 }
@@ -231,6 +243,7 @@ bool Scene::Remove(const Path& path) {
         ++last;
     }
     prims_.erase(first, last);
+    ++removals_;
     return true;
 }
 
@@ -273,6 +286,9 @@ void Scene::Set(const Path& path, std::string_view attribute, Value value) {
     if (const auto tensor = prim.tensors.find(attribute); tensor != prim.tensors.end()) {
         prim.tensors.erase(tensor);
     }
+    if (const auto row = prim.rows.find(attribute); row != prim.rows.end()) {
+        prim.rows.erase(row);
+    }
     if (const auto it = prim.values.find(attribute); it != prim.values.end()) {
         it->second = std::move(value);
     } else {
@@ -292,8 +308,27 @@ const Value* Scene::Get(const Path& path, std::string_view attribute) const {
 
 void Scene::Write(const Path& path, std::string_view attribute, Tensor tensor,
                   std::uintptr_t stream) {
-    PrimData& prim = Find(path);
-    prim.streams[std::string(attribute)] = stream;
+    WriteTensor(path, Find(path), attribute, std::move(tensor), stream);
+}
+
+void Scene::WriteTensor(const Path& path, PrimData& prim, std::string_view attribute,
+                        Tensor tensor, std::uintptr_t stream,
+                        std::optional<std::pair<Tensor, std::int64_t>> row) {
+    // Found before inserted, so rewriting an attribute every step allocates no keys.
+    if (const auto it = prim.streams.find(attribute); it != prim.streams.end()) {
+        it->second = stream;
+    } else {
+        prim.streams.emplace(std::string(attribute), stream);
+    }
+    if (const auto it = prim.rows.find(attribute); it != prim.rows.end()) {
+        if (row) {
+            it->second = std::move(*row);
+        } else {
+            prim.rows.erase(it);
+        }
+    } else if (row) {
+        prim.rows.emplace(std::string(attribute), std::move(*row));
+    }
     ++version_;
     if (const auto value = prim.values.find(attribute); value != prim.values.end()) {
         prim.values.erase(value);
@@ -336,16 +371,48 @@ std::uintptr_t Scene::WriteStream(const Path& path, std::string_view attribute) 
     return it != prim.streams.end() ? it->second : 1;
 }
 
-void Scene::Write(std::span<const Path> paths, std::string_view attribute, const Tensor& rows) {
-    if (rows.Rank() == 0 || rows.Shape()[0] != static_cast<std::int64_t>(paths.size())) {
+void Scene::Write(std::span<const Path> paths, std::string_view attribute, const Tensor& rows,
+                  std::uintptr_t stream) {
+    Write(PrimSet(std::vector<Path>(paths.begin(), paths.end())), attribute, rows, stream);
+}
+
+void Scene::Write(const PrimSet& prims, std::string_view attribute, const Tensor& rows,
+                  std::uintptr_t stream) {
+    if (rows.Rank() == 0 || rows.Shape()[0] != static_cast<std::int64_t>(prims.Size())) {
         throw std::invalid_argument("Scene::Write needs one tensor row per path");
     }
-    for (const Path& path : paths) {
-        Find(path);
+    if (prims.sceneId_ != Id() || prims.removals_ != removals_ ||
+        prims.prims_.size() != prims.Size()) {
+        // Looked up all first, so a missing prim writes nothing.
+        std::vector<void*> found;
+        found.reserve(prims.Size());
+        for (const Path& path : prims.Paths()) {
+            found.push_back(&Find(path));
+        }
+        prims.prims_ = std::move(found);
+        prims.sceneId_ = Id();
+        prims.removals_ = removals_;
     }
-    for (std::size_t i = 0; i < paths.size(); ++i) {
-        Write(paths[i], attribute, rows.Row(static_cast<std::int64_t>(i)));
+    for (std::size_t i = 0; i < prims.Size(); ++i) {
+        const auto row = static_cast<std::int64_t>(i);
+        WriteTensor(prims.Paths()[i], *static_cast<PrimData*>(prims.prims_[i]), attribute,
+                    rows.Row(row), stream, std::pair(rows, row));
     }
+}
+
+const std::pair<Tensor, std::int64_t>* Scene::RowOf(const Path& path,
+                                                    std::string_view attribute) const {
+    const auto prim = prims_.find(path);
+    if (prim == prims_.end()) {
+        return nullptr;
+    }
+    const auto it = prim->second.rows.find(attribute);
+    return it != prim->second.rows.end() ? &it->second : nullptr;
+}
+
+std::uint64_t Scene::OwnTransformVersion(const Path& path) const {
+    const auto prim = prims_.find(path);
+    return prim != prims_.end() ? prim->second.ownTransform : 0;
 }
 
 const Tensor* Scene::Read(const Path& path, std::string_view attribute) const {
@@ -383,6 +450,9 @@ bool Scene::Clear(const Path& path, std::string_view attribute) {
     if (tensor != prim.tensors.end()) {
         prim.tensors.erase(tensor);
     }
+    if (const auto row = prim.rows.find(attribute); row != prim.rows.end()) {
+        prim.rows.erase(row);
+    }
     Stamp(path, prim, attribute);
     return true;
 }
@@ -398,15 +468,27 @@ std::uint64_t Scene::AttributeVersion(const Path& path, std::string_view attribu
 
 glm::dmat4 Scene::LocalTransform(const Path& path) const {
     Find(path);
-    return Get<glm::dmat4>(path, tokens::kTransform, glm::dmat4(1.0));
+    return ComposeXformOps(*this, path);
 }
 
 glm::dmat4 Scene::WorldTransform(const Path& path) const {
     glm::dmat4 world = LocalTransform(path);
+    if (ResetsXformStack(*this, path)) {
+        return world;
+    }
     for (Path parent = path.Parent(); !parent.IsEmpty(); parent = parent.Parent()) {
         world = LocalTransform(parent) * world;
+        if (ResetsXformStack(*this, parent)) {
+            break;
+        }
     }
     return world;
+}
+
+void Scene::SetLocalTransform(const Path& path, const glm::dmat4& local) {
+    for (auto& [attribute, value] : LocalTransformEdits(*this, path, local)) {
+        Set(path, attribute, std::move(value));
+    }
 }
 
 bool Scene::IsVisible(const Path& path) const {

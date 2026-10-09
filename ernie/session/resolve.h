@@ -17,6 +17,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <span>
 #include <string>
@@ -53,6 +54,10 @@ struct RenderPrims {
     Path dome;
     Path ground;
     Path stars;  ///< The first visible StarField.
+    /// A stand-in for the camera's world transform, for a camera posed on the GPU (`CameraOf`).
+    std::optional<glm::dmat4> cameraTransform;
+    /// Stand-ins for the world transforms of `lights` posed on the GPU (`LightOf`).
+    std::map<Path, glm::dmat4> lightTransforms;
 };
 
 /// A render product to draw, resolved from UsdRender prims.
@@ -92,15 +97,24 @@ std::vector<glm::dmat4> ViewPosesOf(const Scene& scene, std::span<const Path> ca
                                     std::uint32_t width, std::uint32_t height,
                                     const Tensor* hostPoses = nullptr);
 
+/// Checks that `cameras` can render as one batch: the same projection and spectral bands.
+/// @throws std::invalid_argument naming a camera that differs.
+void CheckBatchCameras(const Scene& scene, std::span<const Path> cameras, std::uint32_t width,
+                       std::uint32_t height);
+
 /// The parent world transform the poses of `camera` (`tokens::kPoses`) are under: its parent's
 /// world transform, or the identity at the root.
 glm::dmat4 PosesParentOf(const Scene& scene, const Path& camera);
 
 /// `camera`'s poses (`tokens::kPoses`) if they stay on the GPU (`tokens::kPosesDevice`): a
-/// contiguous float32 CUDA array of (views, 4, 4) or (views, 16), and "gpu" (the default).
-/// Null for poses on the host or downloaded first.
+/// contiguous float32 CUDA array of (views, 4, 4), (views, 16) or (views, 7), and "gpu" (the
+/// default). Null for poses on the host or downloaded first.
 /// @throws std::invalid_argument for poses of another shape or an unknown device token.
 const Tensor* GpuPosesOf(const Scene& scene, const Path& camera);
+
+/// Whether poses (`tokens::kPoses`) are rows of a position and a unit quaternion, (views, 7) as
+/// x, y, z, qx, qy, qz, qw, rather than 4 x 4 matrices.
+bool PosesAreQuaternions(const Tensor& poses);
 
 /// The world of the prim at `path` (`tokens::kWorld`), from it or its nearest ancestor with one;
 /// -1, shared by every world, if none has one.
@@ -176,6 +190,11 @@ std::vector<float> SunIrradianceOf(const Scene& scene, const Path& light,
 /// @throws std::invalid_argument for another prim type, a negative radius or power, an area light
 /// without area, a degenerate transform, invalid bands or spectrum pairs.
 Light LightOf(const Scene& scene, const Path& path, const SpectralBands& bands);
+
+/// `LightOf` with `world` standing in for the light's world transform, for a light posed on the
+/// GPU (`RenderPrims::lightTransforms`).
+Light LightOf(const Scene& scene, const Path& path, const SpectralBands& bands,
+              const glm::dmat4& world);
 
 /// Diffuse irradiance over pi of a latitude-longitude RGB map (`tokens::kLightTexture` layout)
 /// turned by `rotation` into the world, as order-2 spherical harmonics (Ramamoorthi and Hanrahan
@@ -305,6 +324,42 @@ InstancesByPrototype(const Scene& scene, const Path& instancer, std::size_t prot
 /// The prim's `extent`: six numbers, low then high corner, as a float array value or a CPU array;
 /// none if unset or malformed.
 std::optional<Bounds3> ExtentOf(const Scene& scene, const Path& prim);
+
+/// A prim posed on the GPU: its transform ops are rows of GPU arrays, one row per prim of one
+/// `Scene::Write` of many paths, so a renderer composes its local transform per instance from the
+/// arrays whole, as a PointInstancer's: translate, then orient, then scale.
+struct GpuXform {
+    bool reset = false;  ///< `!resetXformStack!`: ancestors' transforms do not apply.
+    /// Every op in order, the first outermost: its attribute (`xformOp:translate`...) and its
+    /// whole array, (n, width) float32.
+    std::vector<std::pair<std::string, Tensor>> ops;
+    /// For ops that are translate, orient and scale (each optional, in that order), the arrays
+    /// as a PointInstancer's: translations (n, 3), orientations (n, 4) and scales (n, 3), each
+    /// empty when the prim lacks the op. Otherwise `composed`: the ops are multiplied on the GPU.
+    Tensor translate;
+    Tensor orient;
+    Tensor scale;
+    bool composed = false;
+    std::int64_t row = 0;    ///< The prim's row of them.
+    std::uintptr_t stream = 1;  ///< The CUDA stream they were written on.
+    bool wFirst = false;     ///< `orient` is w, x, y, z (`tokens::kQuaternionOrder`).
+};
+
+/// The prim's GPU pose, or none when none of its transform ops is a GPU array.
+/// @throws std::invalid_argument when some are but the prim cannot be posed on the GPU: a
+/// suffixed or inverted op, an op that is not a row of a GPU array written with the others, an
+/// array of the wrong width for its op (3 for translate, scale and Euler angles, or 1 for a uniform
+/// scale; 4 for orient; 1 for rotateX/Y/Z; 16 for transform), or arrays that are not contiguous
+/// float32 of the same number of rows.
+std::optional<GpuXform> GpuXformOf(const Scene& scene, const Path& path);
+
+/// Whether the quaternions in the prim's arrays put w first (`tokens::kQuaternionOrder`).
+/// @throws std::invalid_argument for an order other than "xyzw" or "wxyz".
+bool QuaternionsWFirst(const Scene& scene, const Path& path);
+
+/// The nearest prim from `path` up whose pose is on the GPU (`GpuXformOf`) and whose transform
+/// reaches `path` (no `!resetXformStack!` between), or none.
+std::optional<Path> GpuXformAnchorOf(const Scene& scene, const Path& path);
 
 /// The prim's bounds in its own space: its `extent` if authored, else those of its geometry, a
 /// Mesh's CPU points or a UsdGeom primitive's shape (`PrimitiveMeshOf`); none for other prims or

@@ -35,6 +35,77 @@ struct DeviceInstanceData {
     std::optional<std::pair<glm::vec3, glm::vec3>> extent;
     /// The CUDA stream the arrays are written on (`Scene::WriteStream`); copies follow it.
     std::uintptr_t stream = 1;
+    /// Whether `orientations` (then (n, 4)) put w first; the copy reorders them.
+    bool orientationsWFirst = false;
+};
+
+/// The kinds of transform op instances composed on the GPU take (`ComposedInstanceData`): the
+/// Euler rotations in `RotationOrder`'s order.
+enum class InstanceOpKind : std::uint32_t {
+    Translate = 0,
+    Scale = 1,
+    Orient = 2,
+    RotateX = 3,
+    RotateY = 4,
+    RotateZ = 5,
+    RotateXYZ = 6,
+    RotateXZY = 7,
+    RotateYXZ = 8,
+    RotateYZX = 9,
+    RotateZXY = 10,
+    RotateZYX = 11,
+    Transform = 12,
+};
+
+/// One transform op of composed instances: its rows of a contiguous float32 (n, width) array on
+/// the compute device, one row per instance: 3 numbers for a translation, scale or Euler angles
+/// (degrees), 1 for a uniform scale or a rotation about one axis (degrees), 4 for a quaternion,
+/// 16 for a row-major 4 x 4 transform (column vectors).
+struct DeviceInstanceOp {
+    InstanceOpKind kind = InstanceOpKind::Translate;
+    Tensor rows;
+    bool wFirst = false;  ///< A quaternion as w, x, y, z.
+};
+
+/// What a composed instance is posed under: an instance of another instancer (composed itself,
+/// so its pose is written first), then `between`, the transform from that instance's frame to the
+/// frame of this instance's ops, as translate, rotation and scale.
+struct InstanceParent {
+    std::uint32_t instancer = 0;  ///< 0 for none.
+    std::uint32_t row = 0;
+    glm::vec3 translate{0.0f};
+    glm::vec4 rotation{0.0f, 0.0f, 0.0f, 1.0f};  ///< x, y, z, w.
+    glm::vec3 scale{1.0f};
+};
+
+/// Instances composed on the GPU from transform ops (`SetInstances`): each instance's ops in
+/// order, the first outermost, under its parent's pose. Poses are kept as translate, rotate and
+/// scale, exact unless a non-uniform scale is applied outside a rotation (shear).
+struct ComposedInstanceData {
+    std::vector<DeviceInstanceOp> ops;
+    std::vector<InstanceParent> parents;  ///< One per instance, or empty when none has one.
+    /// Bounds of the instances, posed, in the instancer's frame: required, as the poses never
+    /// reach the host.
+    std::pair<glm::vec3, glm::vec3> extent;
+    std::uintptr_t stream = 1;  ///< The CUDA stream the arrays are written on.
+};
+
+/// A view posed under an instance, such as a camera on a link posed on the GPU: its camera to
+/// world pose is `frame`, then the instance's pose, then `below`; without an instancer (0),
+/// `frame` then `below`.
+struct AnchoredView {
+    std::uint32_t instancer = 0;
+    std::uint32_t row = 0;
+    glm::dmat4 frame{1.0};
+    glm::dmat4 below{1.0};
+};
+
+/// What `MeshDrawable::RecordAnchors` writes per record (instance_anchors.slang): a view's camera
+/// to world pose, row-major, into the renderer's GPU poses; or a point cloud's model matrix into
+/// its draw (`PointsDrawable`).
+enum class AnchorOutput : std::uint32_t {
+    ViewPoses = 0,
+    PointsDraws = 1,
 };
 
 /// One draw of a mesh: either the mesh itself, or the given instances of an instancer with the
@@ -172,6 +243,41 @@ class MeshDrawable : public RasterDrawable {
     /// the compute device or do not match the positions, or without `SetComputeInterop`.
     void SetInstances(std::uint32_t instancer, const DeviceInstanceData& data);
 
+    /// Makes an instancer's poses composed on the GPU from transform ops (`ComposedInstanceData`):
+    /// the ops' arrays are copied device to device at the next `Prepare`, and the instances
+    /// composed level by level, parents before children, before culling. Instances posed under
+    /// another instancer's are composed again whenever that one moves.
+    /// @throws std::invalid_argument for an unknown instancer or parent, no ops, arrays that are
+    /// not float32 (n, width) on the compute device or differ in rows, a width that does not fit
+    /// the op, parents that do not match the rows, or without `SetComputeInterop`.
+    void SetInstances(std::uint32_t instancer, const ComposedInstanceData& data);
+
+    /// Sets the views the next frames pose on the GPU under instances (`AnchoredView`), one per
+    /// view of the frame in order: their poses, relative to the frame's origin, are written into
+    /// the renderer's GPU poses (`RasterRenderer::PoseBuffer`) in `RecordPrepass`, after the
+    /// instances are composed, for a frame with `FrameParams::posesOnGpu`. None, the default,
+    /// writes nothing.
+    /// @throws std::invalid_argument for an unknown instancer or a row out of range.
+    void SetAnchoredViews(std::vector<AnchoredView> views);
+
+    /// The slot of instance `row` of `instancer` in this frame's half of the instance pools, for
+    /// records of `RecordAnchors`: valid from this frame's `Prepare` to the next. ~0 for an
+    /// unknown instance.
+    std::uint32_t AnchorSlot(std::uint32_t instancer, std::uint32_t row) const;
+
+    /// Appends a record of `RecordAnchors` to `records` (nine float4): `frame` (relative to the
+    /// frame's origin), the instance at `slot` (`AnchorSlot`, ~0 for none), then `below`, written
+    /// at index `target`.
+    static void AppendAnchorRecord(std::vector<glm::vec4>& records, const glm::mat4& frame,
+                                   const glm::mat4& below, std::uint32_t slot,
+                                   std::uint32_t target);
+
+    /// Records the pass posing `count` records (`AppendAnchorRecord`) under their instances into
+    /// `target` as `output`, after this frame's compose pass (`RecordPrepass`): for drawables
+    /// posing what they draw under instances, from their own `RecordPrepass`.
+    void RecordAnchors(VkCommandBuffer commands, const GpuBuffer& records, std::uint32_t count,
+                       const GpuBuffer& target, AnchorOutput output) const;
+
     /// Enables GPU inputs: geometry and instance pools move to memory shared with `compute` (CUDA
     /// or HIP), which must outlive the drawable. Null turns GPU inputs off again.
     void SetComputeInterop(ComputeInterop* compute);
@@ -223,6 +329,8 @@ class MeshDrawable : public RasterDrawable {
     /// or shadow view draws is a job whose visible instances cull.slang compacts into an indirect
     /// draw.
     void RecordViewPoses(VkCommandBuffer commands) const override;
+    /// Composes the instances composed on the GPU, then poses the anchored views under them.
+    void RecordPrepass(VkCommandBuffer commands) const override;
     void RecordCull(VkCommandBuffer commands) const override;
 
     /// Whether the last `Prepare` culls instances by occlusion (`FrameParams::occlusion` with GPU
@@ -339,6 +447,15 @@ class MeshDrawable : public RasterDrawable {
         /// already in it.
         std::array<Tensor, 3> mapped;
         std::array<bool, 3> inPlace{};
+        /// Composed on the GPU from transform ops (`ComposedInstanceData`): the data, its first
+        /// float in `composeRaw_`, first op in `composeOps_` and first parent record in
+        /// `composeParents_`, and each instance's level (its depth under composed parents).
+        bool composed = false;
+        ComposedInstanceData composedData;
+        std::uint32_t rawFirst = 0;
+        std::uint32_t opsFirst = 0;
+        std::uint32_t parentsFirst = 0;
+        std::vector<std::uint32_t> levels;
     };
 
     /// The G-buffer pipeline for a frame camera's views, or a pushbroom's.
@@ -350,6 +467,14 @@ class MeshDrawable : public RasterDrawable {
     void UpdateTransforms();
     void RebuildGeometry();
     void RebuildInstances();
+    /// Lays out the composed instancers: their raw arrays' and parents' offsets, their ops, and
+    /// each instance's level, in instance lists per level (`composeJobs_`).
+    void RebuildCompose();
+    /// Picks the composed instancers to compose this frame (those written, and those under them,
+    /// which move with them) and writes every instance's parent record.
+    void PrepareCompose(bool all);
+    /// Records the compose pass (`pendingCompose_`), level by level.
+    void RecordCompose(VkCommandBuffer commands) const;
     /// Writes an instancer's arrays into its half of the pools; with `flip`, into the other half
     /// on its first write of a frame, keeping the last frame's arrays for motion blur.
     void WriteInstancer(Instancer& instancer, bool flip);
@@ -458,6 +583,32 @@ class MeshDrawable : public RasterDrawable {
     std::unique_ptr<GpuBuffer> adjacency_;
     PipelineLayout normalsLayout_;
     std::unique_ptr<ComputePipeline> normalsPipeline_;  ///< mesh_normals.slang.
+    PipelineLayout composeLayout_;
+    std::unique_ptr<ComputePipeline> composePipeline_;  ///< instance_compose.slang.
+    /// Composed instancers' raw op arrays (written by the compute API), their ops (uint4 each),
+    /// the instance lists of each level and instancer, and per instance its parent record.
+    std::shared_ptr<GpuBuffer> composeRaw_;
+    std::unique_ptr<GpuBuffer> composeOps_;
+    std::unique_ptr<GpuBuffer> composeLists_;
+    std::unique_ptr<GpuBuffer> composeParents_;
+    /// One dispatch of the compose pass: an instancer's instances at one level, in level order.
+    struct ComposeJob {
+        std::uint32_t instancer = 0;
+        std::uint32_t list = 0;
+        std::uint32_t count = 0;
+        std::uint32_t level = 0;
+    };
+    std::vector<ComposeJob> composeJobs_;
+    /// The jobs of instancers composed this frame, in level order (`Prepare`).
+    std::vector<ComposeJob> pendingCompose_;
+    bool composeLayoutDirty_ = false;
+    /// Views posed under instances (`SetAnchoredViews`), their records for this frame (nine
+    /// float4 each, instance_anchors.slang), and the pass writing their poses.
+    std::vector<AnchoredView> anchoredViews_;
+    std::unique_ptr<GpuBuffer> anchorRecords_;
+    std::uint32_t anchorViews_ = 0;
+    PipelineLayout anchorLayout_;
+    std::unique_ptr<ComputePipeline> anchorPipeline_;
     /// The meshes whose normals the next frame recomputes, as their handles.
     std::vector<std::uint32_t> pendingNormals_;
     std::shared_ptr<GpuBuffer> positions_;

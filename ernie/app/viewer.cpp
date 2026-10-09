@@ -15,6 +15,7 @@
 #include "ernie/scene/schema.h"
 #include "ernie/scene/sensor_filters.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/scene/xform.h"
 #include "ernie/session/delegate.h"
 #include "ernie/session/resolve.h"
 #include "ernie/device/gpu_profile.h"
@@ -754,8 +755,8 @@ struct Viewer::State {
             AuthorControllerCamera(scene, activeCamera, controller, ViewportWidth(),
                                    ViewportHeight(), orthographicView >= 0);
         } else {
-            scene.Set(activeCamera, tokens::kTransform,
-                      LocalFromWorld(scene, activeCamera, controller.Transform()));
+            scene.SetLocalTransform(activeCamera,
+                                    LocalFromWorld(scene, activeCamera, controller.Transform()));
         }
     }
 
@@ -1155,7 +1156,7 @@ struct Viewer::State {
                                  glm::value_ptr(model))) {
             glm::dmat4 moved(model);
             moved[3] += glm::dvec4(eye, 0.0);
-            self.Edit(path, tokens::kTransform, LocalFromWorld(scene, path, moved), true);
+            self.EditLocalTransform(path, LocalFromWorld(scene, path, moved), true);
         }
         gizmoDrawn = true;
     }
@@ -2684,6 +2685,11 @@ void Viewer::ClearLog() {
 
 void Viewer::Edit(const Path& path, std::string_view attribute, Value value, bool open) {
     state_->history.Set(state_->scene, path, attribute, std::move(value), open);
+}
+
+void Viewer::EditLocalTransform(const Path& path, const glm::dmat4& local, bool open) {
+    state_->history.Set(state_->scene, path, LocalTransformEdits(state_->scene, path, local),
+                        open);
 }
 
 void Viewer::ClearAttribute(const Path& path, std::string_view attribute) {

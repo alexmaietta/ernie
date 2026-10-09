@@ -71,7 +71,9 @@ def test_values_round_trip_by_usd_name():
     assert scene.clear("/P", "b") and prim.get("b") is None
     prim.set("none", None)
     assert prim.get("none") is None
-    for bad in ({}, [True, False], ["a", "b"], [[1, 2], [3, 4]], 2**40, [ernie.Path("/A"), 1]):
+    prim.set("tokens", ["a", "b"])
+    assert prim.get("tokens") == ["a", "b"]
+    for bad in ({}, [True, False], ["a", 1], [[1, 2], [3, 4]], 2**40, [ernie.Path("/A"), 1]):
         with pytest.raises((TypeError, ValueError)):
             prim.set("bad", bad)
     with pytest.raises(ValueError):

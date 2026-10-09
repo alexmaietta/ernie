@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <functional>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -173,6 +174,79 @@ std::optional<glm::vec3> ConstantDisplayColor(const Scene& scene, const Path& me
     return std::nullopt;
 }
 
+/// The instance op of transform op `op` (`xformOp:translate`...), composed on the GPU.
+InstanceOpKind InstanceOpKindOf(std::string_view op) {
+    using namespace tokens;
+    constexpr std::pair<std::string_view, InstanceOpKind> kKinds[] = {
+        {kTranslate, InstanceOpKind::Translate}, {kScale, InstanceOpKind::Scale},
+        {kOrient, InstanceOpKind::Orient},       {kRotateX, InstanceOpKind::RotateX},
+        {kRotateY, InstanceOpKind::RotateY},     {kRotateZ, InstanceOpKind::RotateZ},
+        {kRotateXYZ, InstanceOpKind::RotateXYZ}, {kRotateXZY, InstanceOpKind::RotateXZY},
+        {kRotateYXZ, InstanceOpKind::RotateYXZ}, {kRotateYZX, InstanceOpKind::RotateYZX},
+        {kRotateZXY, InstanceOpKind::RotateZXY}, {kRotateZYX, InstanceOpKind::RotateZYX},
+        {kTransform, InstanceOpKind::Transform}};
+    for (const auto& [name, kind] : kKinds) {
+        if (name == op) {
+            return kind;
+        }
+    }
+    throw std::invalid_argument(std::string(op) + " is not composed on the GPU");
+}
+
+/// `between` as an instance parent's translate, rotation and scale.
+/// @throws std::invalid_argument if it shears, which they cannot hold.
+void SetBetween(InstanceParent& parent, const glm::dmat4& between) {
+    glm::dvec3 scale(glm::length(glm::dvec3(between[0])), glm::length(glm::dvec3(between[1])),
+                     glm::length(glm::dvec3(between[2])));
+    if (glm::determinant(glm::dmat3(between)) < 0.0) {
+        scale.x = -scale.x;
+    }
+    const glm::dmat3 rotation(glm::dvec3(between[0]) / scale.x, glm::dvec3(between[1]) / scale.y,
+                              glm::dvec3(between[2]) / scale.z);
+    const glm::dquat q = glm::normalize(glm::quat_cast(rotation));
+    const glm::dmat4 rebuilt = glm::translate(glm::dmat4(1.0), glm::dvec3(between[3])) *
+                               glm::dmat4(glm::mat3_cast(q)) * glm::scale(glm::dmat4(1.0), scale);
+    for (int c = 0; c < 4; ++c) {
+        for (int r = 0; r < 4; ++r) {
+            if (std::abs(rebuilt[c][r] - between[c][r]) >
+                1e-6 * std::max(1.0, std::abs(between[c][r]))) {
+                throw std::invalid_argument("the transforms between it and the GPU-posed prim "
+                                            "above it shear, which GPU poses cannot hold");
+            }
+        }
+    }
+    parent.translate = glm::vec3(between[3]);
+    parent.rotation = glm::vec4(q.x, q.y, q.z, q.w);
+    parent.scale = glm::vec3(scale);
+}
+
+/// Whether `change` is to a camera or render prim, which the frame resolves anew anyway.
+bool IsViewChange(const Scene& scene, const Change& change) {
+    if (Any(change.bits, Dirty::Removed) || !scene.Has(change.path)) {
+        return false;
+    }
+    const std::string_view type = scene.TypeOf(change.path);
+    return type == tokens::kCamera || type == tokens::kRenderSettings ||
+           type == tokens::kRenderProduct || type == tokens::kRenderVar;
+}
+
+/// A GPU-posed prim's `ernie:xform:extent`: six numbers as a float array value or a CPU array.
+std::optional<Bounds3> XformExtentOf(const Scene& scene, const Path& path) {
+    std::vector<float> box;
+    if (const Value* value = scene.Get(path, tokens::kXformExtent)) {
+        if (const auto* floats = value->Get<std::vector<float>>()) {
+            box = *floats;
+        }
+    } else if (const Tensor* tensor = scene.Read(path, tokens::kXformExtent);
+               tensor != nullptr && tensor->Location().kind == DeviceKind::Cpu) {
+        box = FloatsOf(*tensor, 3, tokens::kXformExtent);
+    }
+    if (box.size() != 6) {
+        return std::nullopt;
+    }
+    return Bounds3({box[0], box[1], box[2]}, {box[3], box[4], box[5]});
+}
+
 std::string Describe(const Path& path, std::string_view what, const std::exception& error) {
     return "'" + path.String() + "' " + std::string(what) + ": " + error.what();
 }
@@ -228,7 +302,9 @@ TerrainParams TerrainParamsOf(const Scene& scene, const RenderPrims& prims) {
 RasterDelegate::RasterDelegate(const VulkanContext& context, VkFormat presentFormat,
                                BrdfRegistry brdfs)
     : context_(context), renderer_(context, presentFormat, std::move(brdfs)), terrain_(renderer_),
-      planet_(renderer_), meshes_(renderer_), ground_(renderer_), points_(renderer_) {}
+      planet_(renderer_), meshes_(renderer_), ground_(renderer_), points_(renderer_) {
+    points_.SetAnchors(&meshes_);
+}
 
 RasterDelegate::~RasterDelegate() {
     context_.WaitForSubmissions();
@@ -726,15 +802,61 @@ void RasterDelegate::SyncInstancers(const Scene& scene) {
     for (const Path& path : scene.Prims(kPointInstancer)) {
         seen.insert(path);
         const Key key = KeyOf(scene, path, {kPositions, kOrientations, kScales});
+        const std::optional<GpuAnchor> anchor = GpuAnchorOf(scene, path);
         auto [it, added] = instancers_.try_emplace(path);
         SyncedInstancer& synced = it->second;
-        if (!added && synced.key == key) {
+        const std::uint32_t anchorInstancer = anchor ? anchor->instancer : 0;
+        const std::uint32_t anchorRow = anchor ? anchor->row : 0;
+        const glm::dmat4 anchorBelow = anchor ? anchor->below : glm::dmat4(1.0);
+        if (!added && synced.key == key && synced.anchorInstancer == anchorInstancer &&
+            synced.anchorRow == anchorRow && synced.anchorBelow == anchorBelow) {
             continue;
         }
         synced.key = key;
+        synced.anchorInstancer = anchorInstancer;
+        synced.anchorRow = anchorRow;
+        synced.anchorBelow = anchorBelow;
         try {
             const Tensor* positions = scene.Read(path, kPositions);
-            if (positions != nullptr && IsGpu(positions->Location().kind)) {
+            if (anchor && positions != nullptr) {
+                // Under a GPU-posed prim: its instances composed on the GPU under that prim's
+                // instance, then the transforms from it down to the instancer.
+                ComputeInterop& compute = RequireCompute();
+                const std::optional<Bounds3> extent = XformExtentOf(scene, anchor->at);
+                if (!extent) {
+                    throw std::invalid_argument("its instances are posed under GPU-posed '" +
+                                                anchor->at.String() + "', which needs '" +
+                                                std::string(kXformExtent) + "'");
+                }
+                ComposedInstanceData data;
+                const auto op = [&](std::string_view attribute, InstanceOpKind kind,
+                                    std::int64_t width) {
+                    const Tensor* tensor = scene.Read(path, attribute);
+                    if (tensor != nullptr && IsGpu(tensor->Location().kind)) {
+                        data.ops.push_back({kind, *tensor});
+                    } else if (const std::optional<std::vector<float>> values =
+                                   FloatAttribute(scene, path, attribute, width)) {
+                        const auto rows = static_cast<std::int64_t>(values->size()) / width;
+                        data.ops.push_back(
+                            {kind, compute.Upload(Tensor::Copy<float>(*values, {rows, width}))});
+                    }
+                };
+                op(kPositions, InstanceOpKind::Translate, 3);
+                op(kOrientations, InstanceOpKind::Orient, 4);
+                op(kScales, InstanceOpKind::Scale, 3);
+                InstanceParent parent;
+                parent.instancer = anchor->instancer;
+                parent.row = anchor->row;
+                SetBetween(parent, anchor->below);
+                data.parents.assign(static_cast<std::size_t>(data.ops.front().rows.Shape()[0]),
+                                    parent);
+                data.extent = *extent;
+                data.stream = scene.WriteStream(path, kPositions);
+                if (synced.handle == 0) {
+                    synced.handle = meshes_.AddInstancer({});
+                }
+                meshes_.SetInstances(synced.handle, data);
+            } else if (positions != nullptr && IsGpu(positions->Location().kind)) {
                 ComputeInterop& compute = RequireCompute();
                 const auto onDevice = [&](std::string_view attribute) {
                     const Tensor* tensor = scene.Read(path, attribute);
@@ -782,6 +904,375 @@ void RasterDelegate::SyncInstancers(const Scene& scene) {
     if (!errors.empty()) {
         throw std::invalid_argument("Cannot upload " + errors.front());
     }
+}
+
+void RasterDelegate::SyncGpuXforms(const Scene& scene) {
+    ERNIE_ZONE("Sync GPU transforms");
+    using namespace tokens;
+    struct Member {
+        Path path;
+        GpuXform pose;
+    };
+    // Prims sharing arrays (one `Scene::Write` of many paths), then each group by its first prim.
+    std::map<std::vector<const void*>, std::vector<Member>> byArrays;
+    std::vector<std::string> errors;
+    for (const Path& path : scene.Prims()) {
+        try {
+            std::optional<GpuXform> pose = GpuXformOf(scene, path);
+            if (!pose || pose->ops.empty()) {
+                continue;
+            }
+            std::vector<const void*> arrays;
+            for (const auto& [op, whole] : pose->ops) {
+                arrays.push_back(whole.Data());
+            }
+            byArrays[arrays].push_back({path, std::move(*pose)});
+        } catch (const std::invalid_argument& error) {
+            errors.emplace_back(error.what());
+        }
+    }
+    std::map<GpuXformKey, std::vector<Member>> groups;
+    for (auto& [arrays, members] : byArrays) {
+        const auto first = std::min_element(
+            members.begin(), members.end(),
+            [](const Member& a, const Member& b) { return a.pose.row < b.pose.row; });
+        const std::int64_t rows = first->pose.ops.front().second.Shape()[0];
+        groups[{first->path, rows}] = std::move(members);
+    }
+
+    // Each GPU-posed prim's group and row, then the GPU-posed prim it is posed under, if any: the
+    // nearest above it whose transform reaches it.
+    std::unordered_map<Path, std::pair<GpuXformGroup*, std::uint32_t>> posedAt;
+    for (const auto& [key, members] : groups) {
+        GpuXformGroup& group = gpuXformGroups_[key];
+        if (group.handle == 0) {
+            group.handle = meshes_.AddInstancer({});
+        }
+        for (const Member& member : members) {
+            posedAt[member.path] = {&group, static_cast<std::uint32_t>(member.pose.row)};
+        }
+    }
+    const auto parentOf = [&](const Member& member) -> std::optional<Path> {
+        if (member.pose.reset) {
+            return std::nullopt;
+        }
+        for (Path at = member.path.Parent(); !at.IsEmpty() && !at.IsRoot(); at = at.Parent()) {
+            if (posedAt.contains(at)) {
+                return at;
+            }
+            if (scene.Has(at) && ResetsXformStack(scene, at)) {
+                return std::nullopt;
+            }
+        }
+        return std::nullopt;
+    };
+    // The prim whose world transform a GPU-posed prim's draws are under: its outermost GPU-posed
+    // ancestor's parent, or none for the world.
+    std::unordered_map<Path, std::optional<Path>> frames;
+    std::unordered_map<Path, const Member*> byPath;
+    for (const auto& [key, members] : groups) {
+        for (const Member& member : members) {
+            byPath[member.path] = &member;
+        }
+    }
+    const std::function<std::optional<Path>(const Member&)> frameOf =
+        [&](const Member& member) -> std::optional<Path> {
+        if (const auto known = frames.find(member.path); known != frames.end()) {
+            return known->second;
+        }
+        std::optional<Path> frame;
+        if (const std::optional<Path> parent = parentOf(member)) {
+            frame = frameOf(*byPath.at(*parent));
+        } else if (!member.pose.reset && !member.path.Parent().IsRoot()) {
+            frame = member.path.Parent();
+        }
+        frames[member.path] = frame;
+        return frame;
+    };
+
+    for (auto it = gpuXformGroups_.begin(); it != gpuXformGroups_.end();) {
+        if (groups.contains(it->first)) {
+            ++it;
+            continue;
+        }
+        if (it->second.handle != 0) {
+            meshes_.RemoveInstancer(it->second.handle);
+        }
+        it = gpuXformGroups_.erase(it);
+    }
+
+    gpuPosed_.clear();
+    for (const auto& [key, members] : groups) {
+        try {
+            GpuXformGroup& group = gpuXformGroups_[key];
+            const GpuXform& first = members.front().pose;
+            // The group's bounds when every prim gives its own (`ernie:xform:extent`, in the
+            // frame of its draws); otherwise the drawable copies the arrays to the host to bound
+            // them, which poses composed on the GPU cannot be.
+            std::uint64_t version = members.size();
+            std::optional<Bounds3> extent;
+            bool bounded = true;
+            bool composed = false;
+            std::vector<InstanceParent> parents(static_cast<std::size_t>(key.second));
+            for (const Member& member : members) {
+                if (member.pose.wFirst != first.wFirst) {
+                    throw std::invalid_argument(
+                        "its prims, written as rows of the same arrays, must share one '" +
+                        std::string(kQuaternionOrder) + "'");
+                }
+                for (std::size_t k = 0; k < member.pose.ops.size(); ++k) {
+                    if (k >= first.ops.size() || member.pose.ops[k].first != first.ops[k].first) {
+                        throw std::invalid_argument(
+                            "its prims, written as rows of the same arrays, must share one "
+                            "xformOpOrder");
+                    }
+                    version += scene.AttributeVersion(member.path, member.pose.ops[k].first);
+                }
+                for (const std::string_view attribute :
+                     {kXformOpOrder, kXformExtent, kQuaternionOrder}) {
+                    version += scene.AttributeVersion(member.path, attribute);
+                }
+                if (const std::optional<Bounds3> box = XformExtentOf(scene, member.path)) {
+                    extent = extent ? Bounds3(glm::min(extent->first, box->first),
+                                              glm::max(extent->second, box->second))
+                                    : *box;
+                } else {
+                    bounded = false;
+                }
+                composed = composed || member.pose.composed;
+                // Posed under another GPU-posed prim: that one's instance, then the transforms of
+                // the prims between, from its child down to this prim's parent.
+                if (const std::optional<Path> above = parentOf(member)) {
+                    composed = true;
+                    InstanceParent& parent = parents[static_cast<std::size_t>(member.pose.row)];
+                    const auto [aboveGroup, aboveRow] = posedAt.at(*above);
+                    parent.instancer = aboveGroup->handle;
+                    parent.row = aboveRow;
+                    glm::dmat4 between(1.0);
+                    for (Path at = member.path.Parent(); at != *above; at = at.Parent()) {
+                        between = scene.LocalTransform(at) * between;
+                        version += scene.OwnTransformVersion(at);
+                    }
+                    SetBetween(parent, between);
+                }
+            }
+            if (composed && !bounded) {
+                throw std::invalid_argument(
+                    "prims whose poses are composed on the GPU (Euler rotations, matrices, scales "
+                    "of one number, ops out of translate, orient, scale order, or GPU-posed prims "
+                    "under others) need '" + std::string(kXformExtent) + "' on each");
+            }
+            group.members = members.size();
+            group.rows = key.second;
+            group.extent = bounded ? extent : std::nullopt;
+            group.wFirst = first.wFirst;
+            group.composed = composed;
+            group.parents = composed ? std::move(parents) : std::vector<InstanceParent>{};
+            group.ops.clear();
+            for (const auto& [op, whole] : first.ops) {
+                group.ops.push_back(op);
+            }
+            if (version != group.version || group.version == 0) {
+                UploadGpuXformGroup(group, first, key.second);
+                group.version = version;
+            }
+            for (const Member& member : members) {
+                gpuPosed_[member.path] = {&group, group.handle,
+                                          static_cast<std::uint32_t>(member.pose.row),
+                                          member.pose.reset, frameOf(member)};
+            }
+        } catch (const std::invalid_argument& error) {
+            errors.push_back(Describe(members.front().path, "GPU transforms", error));
+        }
+    }
+    if (!errors.empty()) {
+        throw std::invalid_argument("Cannot upload " + errors.front());
+    }
+}
+
+void RasterDelegate::UploadGpuXformGroup(GpuXformGroup& group, const GpuXform& pose,
+                                         std::int64_t rows) {
+    ComputeInterop& compute = RequireCompute();
+    if (group.composed) {
+        ComposedInstanceData data;
+        for (const auto& [op, whole] : pose.ops) {
+            const InstanceOpKind kind = InstanceOpKindOf(op);
+            data.ops.push_back({kind, whole, kind == InstanceOpKind::Orient && pose.wFirst});
+        }
+        data.parents = group.parents;
+        data.extent = *group.extent;
+        data.stream = pose.stream;
+        meshes_.SetInstances(group.handle, data);
+        return;
+    }
+    DeviceInstanceData data;
+    if (pose.translate.Empty()) {
+        if (group.zeros.Empty() || group.zeros.Shape()[0] != rows) {
+            group.zeros = compute.Upload(Tensor::Zeros(DType::Float32, {rows, 3}));
+        }
+        data.positions = group.zeros;
+    } else {
+        data.positions = pose.translate;
+    }
+    data.orientations = pose.orient;
+    data.scales = pose.scale;
+    data.extent = group.extent;
+    data.stream = pose.stream;
+    data.orientationsWFirst = pose.wFirst;
+    if (group.handle == 0) {
+        group.handle = meshes_.AddInstancer({});
+    }
+    meshes_.SetInstances(group.handle, data);
+}
+
+std::optional<RasterDelegate::GpuAnchor> RasterDelegate::GpuAnchorOf(const Scene& scene,
+                                                                     const Path& path) const {
+    if (gpuPosed_.empty()) {
+        return std::nullopt;
+    }
+    for (Path at = path; !at.IsEmpty() && !at.IsRoot(); at = at.Parent()) {
+        if (const auto posed = gpuPosed_.find(at); posed != gpuPosed_.end()) {
+            GpuAnchor anchor;
+            anchor.at = at;
+            anchor.instancer = posed->second.instancer;
+            anchor.row = posed->second.row;
+            if (posed->second.frame) {
+                anchor.frame = scene.WorldTransform(*posed->second.frame);
+            }
+            for (Path below = path; below != at; below = below.Parent()) {
+                anchor.below = scene.LocalTransform(below) * anchor.below;
+            }
+            return anchor;
+        }
+        if (scene.Has(at) && ResetsXformStack(scene, at)) {
+            return std::nullopt;
+        }
+    }
+    return std::nullopt;
+}
+
+glm::dmat4 RasterDelegate::HostWorldTransform(const Scene& scene, const Path& path) {
+    Path at;
+    const GpuOpReader read = [&](std::string_view attribute, const Tensor& device) {
+        return RequireCompute().Download(device, scene.WriteStream(at, attribute));
+    };
+    glm::dmat4 world(1.0);
+    for (at = path; !at.IsEmpty(); at = at.Parent()) {
+        world = ComposeXformOps(scene, at, &read) * world;
+        if (ResetsXformStack(scene, at)) {
+            break;
+        }
+    }
+    return world;
+}
+
+std::vector<AnchoredView> RasterDelegate::AnchoredViewsOf(const Scene& scene,
+                                                          std::span<const Path> cameras) const {
+    std::vector<std::optional<GpuAnchor>> anchors;
+    for (const Path& camera : cameras) {
+        anchors.push_back(GpuAnchorOf(scene, camera));
+    }
+    if (std::none_of(anchors.begin(), anchors.end(),
+                     [](const std::optional<GpuAnchor>& anchor) { return anchor.has_value(); })) {
+        return {};
+    }
+    std::vector<AnchoredView> views;
+    for (std::size_t i = 0; i < cameras.size(); ++i) {
+        const Path& camera = cameras[i];
+        if (scene.Read(camera, tokens::kPoses) != nullptr) {
+            throw std::invalid_argument("Camera '" + camera.String() +
+                                        "' renders with cameras under GPU-posed prims, so it "
+                                        "takes no '" + std::string(tokens::kPoses) + "'");
+        }
+        AnchoredView view;
+        if (!anchors[i]) {
+            view.frame = scene.WorldTransform(camera);
+        } else {
+            // Its frame's world transform, its anchor's pose, then the camera's transforms below.
+            view.instancer = anchors[i]->instancer;
+            view.row = anchors[i]->row;
+            view.frame = anchors[i]->frame;
+            view.below = anchors[i]->below;
+        }
+        views.push_back(view);
+    }
+    return views;
+}
+
+bool RasterDelegate::RefreshGpuXforms(const Scene& scene, std::span<const Change> changes) {
+    ERNIE_ZONE("Refresh GPU transforms");
+    // Thousands of prims change every step: each costs a few lookups, and only one prim of each
+    // group is checked in full.
+    struct Touched {
+        const Path* path = nullptr;  ///< A prim of the group the changes rewrote.
+        std::array<const void*, 3> arrays{};
+        std::size_t rewritten = 0;
+    };
+    std::map<GpuXformGroup*, Touched> touched;
+    const auto posedAncestor = [this](const Path& path) {
+        for (Path at = path.Parent(); !at.IsEmpty() && !at.IsRoot(); at = at.Parent()) {
+            if (gpuPosed_.contains(at)) {
+                return true;
+            }
+        }
+        return false;
+    };
+    for (const Change& change : changes) {
+        const auto posed = gpuPosed_.find(change.path);
+        if (posed != gpuPosed_.end()) {
+            // A prim posed on the GPU, its rows rewritten under the same order.
+            GpuXformGroup& group = *posed->second.group;
+            if (change.bits != Dirty::Transform ||
+                scene.AttributeVersion(change.path, tokens::kXformOpOrder) > syncedVersion_) {
+                return false;
+            }
+            Touched& seen = touched[&group];
+            for (std::size_t op = 0; op < group.ops.size(); ++op) {
+                const std::pair<Tensor, std::int64_t>* row = scene.RowOf(change.path, group.ops[op]);
+                if (row == nullptr || row->second != posed->second.row) {
+                    return false;
+                }
+                if (seen.path == nullptr) {
+                    seen.arrays[op] = row->first.Data();
+                } else if (seen.arrays[op] != row->first.Data()) {
+                    return false;  // the group split across arrays
+                }
+            }
+            if (seen.path == nullptr) {
+                seen.path = &change.path;
+            }
+            ++seen.rewritten;
+        } else if (change.bits == Dirty::Transform && posedAncestor(change.path) &&
+                   scene.OwnTransformVersion(change.path) <= syncedVersion_) {
+            // Below a prim posed on the GPU, moved only with it.
+        } else if (!IsViewChange(scene, change)) {
+            return false;
+        }
+    }
+    // Every prim of each touched group rewritten, from arrays of the group's rows (checked in
+    // full for one prim): its draws stand as they are and only its arrays change.
+    std::vector<std::pair<GpuXformGroup*, GpuXform>> uploads;
+    try {
+        for (const auto& [group, seen] : touched) {
+            std::optional<GpuXform> pose = GpuXformOf(scene, *seen.path);
+            if (seen.rewritten != group->members || !pose || pose->wFirst != group->wFirst) {
+                return false;
+            }
+            const Tensor& any = !pose->translate.Empty() ? pose->translate
+                                : !pose->orient.Empty()  ? pose->orient
+                                                         : pose->scale;
+            if (any.Shape()[0] != group->rows) {
+                return false;
+            }
+            uploads.emplace_back(group, std::move(*pose));
+        }
+    } catch (const std::invalid_argument&) {
+        return false;  // the full sync reports it
+    }
+    for (auto& [group, pose] : uploads) {
+        UploadGpuXformGroup(*group, pose, group->rows);
+    }
+    return true;
 }
 
 Tensor RasterDelegate::MapArray(Scene& scene, const Path& path, std::string_view attribute,
@@ -928,7 +1419,24 @@ std::vector<PointsItem> RasterDelegate::PointsItems(const Scene& scene) const {
         }
         PointsItem item;
         item.points = synced.handle;
-        item.transform = scene.WorldTransform(path);
+        if (const std::optional<GpuAnchor> anchor = GpuAnchorOf(scene, path)) {
+            // Under a prim posed on the GPU: posed under its instance on the GPU, bounded by its
+            // extent wherever it goes.
+            const std::optional<Bounds3> extent = XformExtentOf(scene, anchor->at);
+            if (!extent) {
+                throw std::invalid_argument(
+                    "Cannot draw points '" + path.String() + "': GPU-posed prims with points " +
+                    "under them need '" + std::string(tokens::kXformExtent) + "' ('" +
+                    anchor->at.String() + "' has none)");
+            }
+            item.transform = anchor->frame;
+            item.anchorInstancer = anchor->instancer;
+            item.anchorRow = anchor->row;
+            item.below = anchor->below;
+            item.anchorBounds = *extent;
+        } else {
+            item.transform = scene.WorldTransform(path);
+        }
         item.material = MaterialOf(scene, path);
         item.tint = ConstantDisplayColor(scene, path).value_or(glm::vec3(0.5f));
         item.primId = PrimIdOf(path);
@@ -948,15 +1456,13 @@ void RasterDelegate::Sync(const Scene& scene) {
         // Changes only to cameras and render prims, such as a batch's poses and worlds every
         // step, leave the synced materials, terrain, meshes and draws as they are (lights and
         // settings resolve every frame).
-        const auto view = [&scene](const Change& change) {
-            if (Any(change.bits, Dirty::Removed) || !scene.Has(change.path)) {
-                return false;
-            }
-            const std::string_view type = scene.TypeOf(change.path);
-            return type == tokens::kCamera || type == tokens::kRenderSettings ||
-                   type == tokens::kRenderProduct || type == tokens::kRenderVar;
-        };
-        if (std::all_of(changes.begin(), changes.end(), view)) {
+        if (std::all_of(changes.begin(), changes.end(),
+                        [&scene](const Change& change) { return IsViewChange(scene, change); })) {
+            return;
+        }
+        // So does a simulation step that only rewrites the arrays of prims posed on the GPU: the
+        // drawable takes the new arrays.
+        if (RefreshGpuXforms(scene, changes)) {
             return;
         }
     }
@@ -971,11 +1477,14 @@ void RasterDelegate::Sync(const Scene& scene) {
     attempt([&] { SyncMaterials(scene); });
     attempt([&] { SyncHeightfield(scene, ResolveRenderPrims(scene, {}).terrain); });
     attempt([&] { SyncMeshes(scene); });
+    // GPU-posed prims first: instancers under them compose under their instances.
+    attempt([&] { SyncGpuXforms(scene); });
     attempt([&] { SyncInstancers(scene); });
     attempt([&] { SyncPoints(scene); });
     attempt([&] { points_.SetItems(PointsItems(scene)); });
     // The draws, so the meshes' bounds are known as soon as the scene syncs.
     attempt([&] { meshes_.SetItems(Items(scene)); });
+    syncedVersion_ = scene.Version();
     if (!errors.empty()) {
         std::string message = errors.front();
         for (std::size_t i = 1; i < errors.size(); ++i) {
@@ -1011,7 +1520,17 @@ std::vector<MeshItem> RasterDelegate::Items(const Scene& scene) const {
         }
         MeshItem item;
         item.mesh = synced.handle;
-        item.transform = scene.WorldTransform(path);
+        if (const std::optional<GpuAnchor> anchor = GpuAnchorOf(scene, path)) {
+            // Under a prim posed on the GPU: an instance of its group (composed under any
+            // GPU-posed prims above it), between the world transform of its frame (on the CPU)
+            // and the transforms from it down to the mesh (the prototype).
+            item.transform = anchor->frame;
+            item.prototype = glm::mat4(anchor->below);
+            item.instancer = anchor->instancer;
+            item.instances = {anchor->row};
+        } else {
+            item.transform = scene.WorldTransform(path);
+        }
         item.primId = PrimIdOf(path);
         item.world = WorldOf(scene, path);
         shade(path, synced, item);
@@ -1028,7 +1547,11 @@ std::vector<MeshItem> RasterDelegate::Items(const Scene& scene) const {
         const std::vector<std::int32_t> worlds = InstanceWorldsOf(
             scene, path,
             positions != nullptr ? static_cast<std::size_t>(positions->Elements()) / 3 : 0);
-        const glm::dmat4 world = scene.WorldTransform(path);
+        // Under a GPU-posed prim, its instances are composed under that prim's instance
+        // (`SyncInstancers`), drawn in the frame above it.
+        const glm::dmat4 world = synced.anchorInstancer != 0
+                                     ? GpuAnchorOf(scene, path).value_or(GpuAnchor{}).frame
+                                     : scene.WorldTransform(path);
         for (std::size_t k = 0; k < targets.size(); ++k) {
             const auto mesh = syncedMeshes_.find(targets[k]);
             if (mesh == syncedMeshes_.end() || mesh->second.handle == 0 || lists[k].empty()) {
@@ -1064,6 +1587,8 @@ void RasterDelegate::Update(const Scene& scene, const Path& settings, VkExtent2D
     // The caller records and submits the frame itself, so nothing may still be running.
     context_.WaitForSubmissions();
     BeginFrame();
+    anchoredViews_ = false;
+    meshes_.SetAnchoredViews({});
     const RenderPrims prims = ResolveRenderPrims(scene, settings);
     // The view runs the first product's chain (`DefaultFilterChain` without products), holding
     // every var and the AOV slots of what that chain writes.
@@ -1156,6 +1681,13 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
     ERNIE_ZONE("UpdatePrims");
     Sync(scene);
     prims_ = prims;
+    // Lights under prims posed on the GPU (a lamp on a robot's link): planned on the CPU, so their
+    // links' rows come to the host.
+    for (const Path& light : prims_.lights) {
+        if (GpuAnchorOf(scene, light)) {
+            prims_.lightTransforms[light] = HostWorldTransform(scene, light);
+        }
+    }
     SyncSky(scene, prims_);
     FrameParams frame = [&] {
         ERNIE_ZONE("FrameParamsOf");
@@ -1171,6 +1703,7 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
     }
     frame.poses = std::move(poses);
     frame.posesOnGpu = posesParent.has_value();
+    frame.posesQuaternions = frame.posesOnGpu && gpuPosesQuaternions_;
     frame.posesParent = posesParent.value_or(glm::dmat4(1.0));
     // The views' poses at the last frame of `stateKey`, for motion blur: none for the first frame
     // or another view count, which hold the camera still.
@@ -1191,6 +1724,10 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
         origin_ = eye;
     }
     frame.origin = origin_;
+    if (anchoredViews_ && frame.posesOnGpu) {
+        // Anchored views' poses are written relative to the origin (`MeshDrawable`).
+        frame.posesParent = glm::translate(glm::dmat4(1.0), frame.origin);
+    }
     frame.vars = std::move(vars);
     // Without a batch's worlds, the single view sees its camera's world.
     frame.worlds = worlds.empty() && !prims_.camera.IsEmpty()
@@ -1383,19 +1920,44 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         if (prims.camera.IsEmpty()) {
             throw std::invalid_argument("The scene has no Camera");
         }
-        const int bands =
-            CameraOf(scene, prims.camera, spec.resolution.width, spec.resolution.height)
-                .bands.count;
         // The product's cameras, or the settings' one.
         const std::vector<Path> cameras =
             spec.cameras.empty() ? std::vector<Path>{prims.camera} : spec.cameras;
+        // Cameras under prims posed on the GPU (a camera on a robot's link): every view posed on
+        // the GPU under its anchor (`MeshDrawable::SetAnchoredViews`), with the last ones
+        // rendered as the CPU's estimates, or each view's pose without its anchor's at first.
+        Sync(scene);
+        std::vector<AnchoredView> anchored = AnchoredViewsOf(scene, cameras);
+        std::vector<glm::dmat4> estimates;
+        if (!anchored.empty()) {
+            CheckBatchCameras(scene, cameras, spec.resolution.width, spec.resolution.height);
+            estimates = renderer_.LastGpuPoses(static_cast<std::uint32_t>(anchored.size()));
+            if (estimates.empty()) {
+                for (const AnchoredView& view : anchored) {
+                    estimates.push_back(view.frame * view.below);
+                }
+            }
+            prims.cameraTransform = estimates.front();
+        }
+        anchoredViews_ = !anchored.empty();
+        meshes_.SetAnchoredViews(std::move(anchored));
+        const int bands = (prims.cameraTransform
+                               ? CameraOf(scene, prims.camera, spec.resolution.width,
+                                          spec.resolution.height, *prims.cameraTransform)
+                               : CameraOf(scene, prims.camera, spec.resolution.width,
+                                          spec.resolution.height))
+                              .bands.count;
         // Poses written as a GPU array stay on the GPU (`GpuPosesOf`), copied device to device
         // after the work writing them, with the last ones rendered as the CPU's estimates; or
         // come to the host for the views' uniforms.
-        const Tensor* gpuPoses = cameras.size() == 1 ? GpuPosesOf(scene, cameras.front()) : nullptr;
+        const Tensor* gpuPoses = cameras.size() == 1 && !anchoredViews_
+                                     ? GpuPosesOf(scene, cameras.front())
+                                     : nullptr;
         std::optional<Tensor> hostPoses;
         std::vector<glm::dmat4> poses;
-        if (gpuPoses != nullptr) {
+        if (anchoredViews_) {
+            poses = estimates;
+        } else if (gpuPoses != nullptr) {
             const auto count = static_cast<std::uint32_t>(gpuPoses->Shape()[0]);
             poses = renderer_.LastGpuPoses(count);
             if (poses.empty()) {
@@ -1510,15 +2072,26 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         std::optional<glm::dmat4> posesParent;
         if (gpuPoses != nullptr) {
             posesParent = PosesParentOf(scene, cameras.front());
+        } else if (anchoredViews_) {
+            // Their poses come relative to the frame's origin: `UpdatePrims` puts them under it.
+            posesParent = glm::dmat4(1.0);
         }
+        gpuPosesQuaternions_ = gpuPoses != nullptr && PosesAreQuaternions(*gpuPoses);
         UpdatePrims(scene, prims, spec.resolution, NextFrame(scene, base.settings, spec.product),
                     spec.product, spec.filters, std::move(poses), std::move(worlds),
                     std::move(vars), posesParent, spec.overlays, std::move(chains));
         if (gpuPoses != nullptr) {
             // Once no submission reads the pose buffer (`UpdatePrims` waits), on the writer's
             // stream; the submission waits for it (`SubmitWaits`).
-            RequireCompute().CopyToBuffer(*gpuPoses, renderer_.PoseBuffer(), 0,
-                                          scene.WriteStream(cameras.front(), tokens::kPoses));
+            const std::uintptr_t stream = scene.WriteStream(cameras.front(), tokens::kPoses);
+            if (gpuPosesQuaternions_ && QuaternionsWFirst(scene, cameras.front())) {
+                // Position, w, x, y, z into position, x, y, z, w.
+                constexpr std::array<std::size_t, 7> kXyzwOfWxyz{0, 1, 2, 4, 5, 6, 3};
+                RequireCompute().CopyColumnsToBuffer(*gpuPoses, kXyzwOfWxyz,
+                                                     renderer_.PoseBuffer(), 0, stream);
+            } else {
+                RequireCompute().CopyToBuffer(*gpuPoses, renderer_.PoseBuffer(), 0, stream);
+            }
         }
         const std::vector<TimelinePoint> waits = SubmitWaits();
         std::vector<TimelinePoint> signals;

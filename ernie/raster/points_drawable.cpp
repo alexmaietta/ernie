@@ -1,7 +1,9 @@
 #include "ernie/raster/points_drawable.h"
 
+#include "ernie/device/gpu_profile.h"
 #include "ernie/geometry/frustum.h"
 #include "ernie/kernel/embedded_shaders.h"
+#include "ernie/raster/mesh_drawable.h"
 #include "ernie/util/profile.h"
 
 #include <glm/gtc/type_ptr.hpp>
@@ -416,6 +418,9 @@ void PointsDrawable::SetItems(std::vector<PointsItem> items) {
         if (!renderer_.HasMaterial(item.material)) {
             throw std::invalid_argument("Unknown material " + std::to_string(item.material));
         }
+        if (item.anchorInstancer != 0 && anchors_ == nullptr) {
+            throw std::invalid_argument("Points posed under instances need the meshes' drawable");
+        }
     }
     // As `MeshDrawable::SetItems`: a draw of the same prim moves from its transform.
     std::map<std::uint32_t, std::size_t> old;
@@ -456,11 +461,15 @@ std::uint64_t PointsDrawable::PointCount() const {
 
 Bounds3 PointsDrawable::ItemBounds(std::size_t item) const {
     const Cloud& cloud = clouds_.at(items_[item].points);
-    Bounds3 box = TransformBox(Relative(items_[item].transform, origin_), cloud.low, cloud.high);
+    // Under an instance, its bounds wherever the instance goes.
+    const bool anchored = items_[item].anchorInstancer != 0;
+    const glm::vec3 low = anchored ? items_[item].anchorBounds.first : cloud.low;
+    const glm::vec3 high = anchored ? items_[item].anchorBounds.second : cloud.high;
+    Bounds3 box = TransformBox(Relative(items_[item].transform, origin_), low, high);
     if (previous_[item] != items_[item].transform || cloud.moving) {
         // Where it was too; a moving cloud's own last bounds are not kept, so its box at the
         // last transform stands in for them.
-        const Bounds3 was = TransformBox(Relative(previous_[item], origin_), cloud.low, cloud.high);
+        const Bounds3 was = TransformBox(Relative(previous_[item], origin_), low, high);
         box = {glm::min(box.first, was.first), glm::max(box.second, was.second)};
     }
     return box;
@@ -498,6 +507,7 @@ void PointsDrawable::Prepare(const FrameParams& params, std::span<const ShadowCa
     ERNIE_ZONE("Points prepare");
     // Nothing per view without points to draw: batches of thousands of views pay nothing.
     viewItems_.clear();
+    anchored_ = 0;
     if (items_.empty()) {
         return;
     }
@@ -511,12 +521,25 @@ void PointsDrawable::Prepare(const FrameParams& params, std::span<const ShadowCa
         }
     }
     std::vector<GpuPointsDraw> draws(items_.size());
+    // Items under instances: their models are posed on the GPU (`RecordPrepass`), with the
+    // instances' slots in this frame's halves (the meshes prepare first).
+    std::vector<glm::vec4> records;
     for (std::size_t i = 0; i < items_.size(); ++i) {
         const PointsItem& item = items_[i];
         const Cloud& cloud = clouds_.at(item.points);
         GpuPointsDraw& draw = draws[i];
-        const glm::mat4 model = Relative(item.transform, origin_);
-        const glm::mat4 previous = Relative(previous_[i], origin_);
+        const bool anchored = item.anchorInstancer != 0;
+        const glm::mat4 model = Relative(anchored ? item.transform * item.below : item.transform,
+                                         origin_);
+        const glm::mat4 previous =
+            anchored ? model : glm::mat4(Relative(previous_[i], origin_));
+        if (anchored) {
+            MeshDrawable::AppendAnchorRecord(records, Relative(item.transform, origin_),
+                                             glm::mat4(item.below),
+                                             anchors_->AnchorSlot(item.anchorInstancer,
+                                                                  item.anchorRow),
+                                             static_cast<std::uint32_t>(i));
+        }
         std::memcpy(draw.model, glm::value_ptr(model), sizeof(draw.model));
         std::memcpy(draw.previous, glm::value_ptr(previous), sizeof(draw.previous));
         draw.tint[0] = item.tint.r;
@@ -543,6 +566,16 @@ void PointsDrawable::Prepare(const FrameParams& params, std::span<const ShadowCa
     if (!draws.empty()) {
         renderer_.Uploads().Write(*draws_, std::as_bytes(std::span(draws)));
     }
+    anchored_ = static_cast<std::uint32_t>(records.size() / 9);
+    if (anchored_ > 0) {
+        const VkDeviceSize recordBytes = records.size() * sizeof(glm::vec4);
+        if (anchorRecords_ == nullptr || anchorRecords_->Size() < recordBytes) {
+            vkDeviceWaitIdle(context_.Device());
+            anchorRecords_ = std::make_unique<GpuBuffer>(
+                context_, recordBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+        }
+        renderer_.Uploads().Write(*anchorRecords_, std::as_bytes(std::span(records)));
+    }
     // Each view draws the items of its worlds whose bounds meet its frustum.
     viewItems_.assign(params.Views(), {});
     for (std::size_t v = 0; v < params.Views(); ++v) {
@@ -560,6 +593,15 @@ void PointsDrawable::Prepare(const FrameParams& params, std::span<const ShadowCa
             }
         }
     }
+}
+
+void PointsDrawable::RecordPrepass(VkCommandBuffer commands) const {
+    if (anchored_ == 0) {
+        return;
+    }
+    ERNIE_GPU_ZONE(context_, commands, "Anchored points");
+    anchors_->RecordAnchors(commands, *anchorRecords_, anchored_, *draws_,
+                            AnchorOutput::PointsDraws);
 }
 
 std::vector<DescriptorResource> PointsDrawable::Resources(const RasterFrame& frame,

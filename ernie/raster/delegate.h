@@ -22,7 +22,10 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string_view>
+#include <tuple>
+#include <unordered_map>
 #include <vector>
 
 namespace ernie {
@@ -199,12 +202,62 @@ class RasterDelegate : public RenderDelegate {
     struct SyncedInstancer {
         std::uint32_t handle = 0;
         Key key;
+        /// Under a GPU-posed prim: its instance and the transforms from it down to the instancer,
+        /// which its instances are composed under (instancer 0 for none).
+        std::uint32_t anchorInstancer = 0;
+        std::uint32_t anchorRow = 0;
+        glm::dmat4 anchorBelow{1.0};
     };
 
     struct SyncedPoints {
         std::uint32_t handle = 0;
         Key key;
     };
+
+    /// Prims posed on the GPU (`GpuXformOf`), grouped by the arrays they share: an instancer of
+    /// the meshes' drawable over those arrays, one instance per prim, and the attribute versions
+    /// behind its last upload. Kept by the group's first prim and its number of rows, so arrays
+    /// written anew each step for the same prims keep the instancer (and its motion).
+    using GpuXformKey = std::pair<Path, std::int64_t>;
+    struct GpuXformGroup {
+        std::uint32_t handle = 0;
+        std::uint64_t version = 0;
+        Tensor zeros;  ///< Device positions for a group whose prims have no translate.
+        std::size_t members = 0;
+        std::int64_t rows = 0;          ///< Rows of its arrays.
+        std::optional<Bounds3> extent;  ///< The union of its prims' extents, if all have one.
+        std::vector<std::string> ops;  ///< Its prims' ops, in order (`xformOp:*`).
+        bool wFirst = false;           ///< Its orientations put w first.
+        /// Composed on the GPU (`GpuXform::composed`, or posed under other GPU-posed prims): per
+        /// row, the instance it is posed under and the CPU transforms between.
+        bool composed = false;
+        std::vector<InstanceParent> parents;
+    };
+    /// A prim posed on the GPU: its group (in `gpuXformGroups_`), its instancer and its row there,
+    /// and the prim whose world transform its draws are under (none for the world itself).
+    struct GpuPosed {
+        GpuXformGroup* group = nullptr;
+        std::uint32_t instancer = 0;
+        std::uint32_t row = 0;
+        bool reset = false;
+        std::optional<Path> frame;
+    };
+    /// Where a prim under a GPU-posed prim is posed (`GpuAnchorOf`): that prim (`at`) and its
+    /// instance, the world transform of its frame, and the transforms from it down to the prim.
+    struct GpuAnchor {
+        Path at;
+        std::uint32_t instancer = 0;
+        std::uint32_t row = 0;
+        glm::dmat4 frame{1.0};
+        glm::dmat4 below{1.0};
+    };
+
+    /// The nearest prim from `path` up posed on the GPU whose transform reaches it (none past a
+    /// prim resetting the transform stack), as `GpuAnchor`.
+    std::optional<GpuAnchor> GpuAnchorOf(const Scene& scene, const Path& path) const;
+    /// The world transform of `path` under prims posed on the GPU, their rows copied to the host
+    /// (waiting for their streams): for the lights the CPU plans each frame.
+    glm::dmat4 HostWorldTransform(const Scene& scene, const Path& path);
 
     Key KeyOf(const Scene& scene, const Path& path,
               std::initializer_list<std::string_view> attributes) const;
@@ -215,6 +268,21 @@ class RasterDelegate : public RenderDelegate {
     void SyncSky(const Scene& scene, const RenderPrims& prims);
     void SyncMeshes(const Scene& scene);
     void SyncInstancers(const Scene& scene);
+    /// Hands the meshes' drawable the arrays of prims posed on the GPU that changed, one
+    /// instancer per group of prims sharing arrays; the meshes under those prims draw as their
+    /// instances (`Items`).
+    void SyncGpuXforms(const Scene& scene);
+    /// The fast path of a simulation step: when `changes` rewrite only the arrays of whole groups
+    /// of prims already posed on the GPU (the same prims, rows and shapes), hands the drawable
+    /// the new arrays and returns true; false when a full `Sync` is needed.
+    bool RefreshGpuXforms(const Scene& scene, std::span<const Change> changes);
+    /// The views of `cameras` as views posed under GPU-posed prims (`AnchoredView`), one per
+    /// camera; none when no camera is under a GPU-posed prim (their transforms are on the CPU).
+    /// @throws std::invalid_argument for such cameras with `ernie:poses` of their own.
+    std::vector<AnchoredView> AnchoredViewsOf(const Scene& scene,
+                                              std::span<const Path> cameras) const;
+    /// Hands the drawable a group's arrays from one of its prims' pose.
+    void UploadGpuXformGroup(GpuXformGroup& group, const GpuXform& pose, std::int64_t rows);
     /// Uploads the Points prims that changed: their arrays from the host or kept on the GPU.
     void SyncPoints(const Scene& scene);
     std::vector<PointsItem> PointsItems(const Scene& scene) const;
@@ -303,6 +371,17 @@ class RasterDelegate : public RenderDelegate {
     std::map<Path, SyncedMesh> syncedMeshes_;
     std::map<Path, SyncedInstancer> instancers_;
     std::map<Path, SyncedPoints> syncedPoints_;
+    std::map<GpuXformKey, GpuXformGroup> gpuXformGroups_;
+    /// Whether the GPU poses of the product being updated are positions and quaternions
+    /// (`PosesAreQuaternions`), for `UpdatePrims`.
+    bool gpuPosesQuaternions_ = false;
+    /// Whether the product being updated has views posed under GPU-posed prims
+    /// (`AnchoredViewsOf`), whose poses the drawable writes relative to the frame's origin.
+    bool anchoredViews_ = false;
+    std::unordered_map<Path, GpuPosed> gpuPosed_;
+    /// The scene's version at the last full `Sync`: prims below GPU-posed ones whose own
+    /// transform ops are older changed only with their ancestors (`RefreshGpuXforms`).
+    std::uint64_t syncedVersion_ = 0;
 };
 
 }  // namespace ernie

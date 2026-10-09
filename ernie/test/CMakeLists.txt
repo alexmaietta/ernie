@@ -25,8 +25,10 @@ ernie_add_test_suite(
     scene_schema_test.cpp
     scene_sensor_filters_test.cpp
     scene_wide_view_test.cpp
+    scene_xform_test.cpp
     session_delegate_test.cpp
     session_frame_params_test.cpp
+    session_gpu_xform_test.cpp
     session_lights_test.cpp
     session_resolve_test.cpp
     session_sampling_test.cpp

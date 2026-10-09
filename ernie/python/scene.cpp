@@ -391,6 +391,9 @@ Value ValueFromPython(nb::handle object) {
     if (nb::isinstance<Path>(object)) {
         return nb::cast<Path>(object);
     }
+    if (nb::isinstance<glm::dquat>(object)) {
+        return nb::cast<glm::dquat>(object);
+    }
     nb::object sequence = nb::borrow(object);
     if (nb::hasattr(object, "tolist")) {
         sequence = object.attr("tolist")();
@@ -399,8 +402,8 @@ Value ValueFromPython(nb::handle object) {
         }
     }
     if (!nb::isinstance<nb::list>(sequence) && !nb::isinstance<nb::tuple>(sequence)) {
-        throw nb::type_error("Scene values are bool, int, float, str, Path, a sequence of numbers "
-                             "or a 4 x 4 matrix");
+        throw nb::type_error("Scene values are bool, int, float, str, Path, Quat, a sequence of "
+                             "numbers, str or Path, or a 4 x 4 matrix");
     }
     std::vector<nb::object> items;
     for (nb::handle item : sequence) {
@@ -415,6 +418,16 @@ Value ValueFromPython(nb::handle object) {
             paths.push_back(nb::cast<Path>(item));
         }
         return paths;
+    }
+    if (!items.empty() && nb::isinstance<nb::str>(items[0])) {
+        std::vector<std::string> tokens;
+        for (const nb::object& item : items) {
+            if (!nb::isinstance<nb::str>(item)) {
+                throw nb::type_error("A list of tokens must hold only str values");
+            }
+            tokens.push_back(nb::cast<std::string>(item));
+        }
+        return tokens;
     }
     if (items.size() == 4 && !IsNumber(items[0])) {
         glm::dmat4 matrix(1.0);
@@ -452,6 +465,42 @@ Value ValueFromPython(nb::handle object) {
         return glm::vec4(numbers[0], numbers[1], numbers[2], numbers[3]);
     }
     return std::vector<float>(numbers.begin(), numbers.end());
+}
+
+RotationOrder RotationOrderFromPython(std::string_view name) {
+    constexpr std::pair<std::string_view, RotationOrder> kOrders[] = {
+        {"XYZ", RotationOrder::XYZ}, {"XZY", RotationOrder::XZY}, {"YXZ", RotationOrder::YXZ},
+        {"YZX", RotationOrder::YZX}, {"ZXY", RotationOrder::ZXY}, {"ZYX", RotationOrder::ZYX}};
+    for (const auto& [token, order] : kOrders) {
+        if (token == name) {
+            return order;
+        }
+    }
+    throw nb::value_error("rotation_order must be \"XYZ\", \"XZY\", \"YXZ\", \"YZX\", \"ZXY\" or "
+                          "\"ZYX\"");
+}
+
+/// An `Xform` from `set_xform`'s keyword arguments; a single number scales uniformly.
+Xform XformFromPython(nb::handle translate, nb::handle rotate, std::string_view rotationOrder,
+                      nb::handle orient, nb::handle scale) {
+    Xform xform;
+    if (!translate.is_none()) {
+        xform.translate = Vec3FromPython(translate);
+    }
+    if (!rotate.is_none()) {
+        xform.rotate = Vec3FromPython(rotate);
+    }
+    xform.rotationOrder = RotationOrderFromPython(rotationOrder);
+    if (!orient.is_none()) {
+        if (!nb::isinstance<glm::dquat>(orient)) {
+            throw nb::type_error("orient must be a Quat (Quat(w, x, y, z) or Quat.from_xyzw)");
+        }
+        xform.orient = nb::cast<glm::dquat>(orient);
+    }
+    if (!scale.is_none()) {
+        xform.scale = IsNumber(scale) ? glm::dvec3(nb::cast<double>(scale)) : Vec3FromPython(scale);
+    }
+    return xform;
 }
 
 nb::object ValueToPython(const Value& value) {
@@ -526,6 +575,66 @@ void BindScene(nb::module_& m) {
         .def(nb::init<>())
         .def_rw("version", &ChangeCursor::version);
 
+    nb::class_<glm::dquat>(
+        m, "Quat",
+        "A rotation as a quaternion, Quat(w, x, y, z) with the real part first as USD writes one "
+        "(xformOp:orient). Arrays of quaternions (PointInstancer orientations, xformOp:orient "
+        "rows) are x, y, z, w instead, as in USD's memory; Quat.from_xyzw reads that order, as "
+        "SciPy, ROS and Warp use.")
+        .def(nb::init<double, double, double, double>(), nb::arg("w"), nb::arg("x"), nb::arg("y"),
+             nb::arg("z"))
+        .def_static(
+            "from_xyzw",
+            [](double x, double y, double z, double w) { return glm::dquat(w, x, y, z); },
+            nb::arg("x"), nb::arg("y"), nb::arg("z"), nb::arg("w"))
+        .def_static(
+            "from_axis_angle",
+            [](nb::handle axis, double degrees) {
+                return glm::angleAxis(glm::radians(degrees), glm::normalize(Vec3FromPython(axis)));
+            },
+            nb::arg("axis"), nb::arg("degrees"),
+            "The rotation by `degrees` about `axis`, right-handed.")
+        .def_static(
+            "from_euler",
+            [](nb::handle degrees, std::string_view order) {
+                return glm::normalize(glm::quat_cast(
+                    EulerRotation(Vec3FromPython(degrees), RotationOrderFromPython(order))));
+            },
+            nb::arg("degrees"), nb::arg("order") = "XYZ",
+            "The rotation of Euler angles (x, y, z) in degrees applied about fixed axes in "
+            "`order`, as the xformOp:rotate ops (\"XYZ\": about X first, then Y, then Z).")
+        .def_rw("w", &glm::dquat::w)
+        .def_rw("x", &glm::dquat::x)
+        .def_rw("y", &glm::dquat::y)
+        .def_rw("z", &glm::dquat::z)
+        .def_prop_ro("wxyz", [](const glm::dquat& q) { return nb::make_tuple(q.w, q.x, q.y, q.z); })
+        .def_prop_ro("xyzw", [](const glm::dquat& q) { return nb::make_tuple(q.x, q.y, q.z, q.w); })
+        .def(
+            "euler",
+            [](const glm::dquat& q, std::string_view order) {
+                const glm::dvec3 degrees =
+                    EulerAngles(glm::mat3_cast(glm::normalize(q)), RotationOrderFromPython(order));
+                return nb::make_tuple(degrees.x, degrees.y, degrees.z);
+            },
+            nb::arg("order") = "XYZ", "Euler angles (x, y, z) in degrees, as from_euler takes.")
+        .def("__eq__", [](const glm::dquat& a, const glm::dquat& b) { return a == b; })
+        .def("__repr__", [](const glm::dquat& q) {
+            return "Quat(w=" + std::to_string(q.w) + ", x=" + std::to_string(q.x) +
+                   ", y=" + std::to_string(q.y) + ", z=" + std::to_string(q.z) + ")";
+        });
+
+    nb::class_<PrimSet>(
+        m, "PrimSet",
+        "A fixed list of prims to write rows of one array to at once (Scene.write), such as a "
+        "simulation's bodies every step: a scene looks the prims up the first time and keeps "
+        "them, looking them up again only after prims are removed.")
+        .def(nb::init<std::vector<Path>>(), nb::arg("paths"))
+        .def_prop_ro("paths", &PrimSet::Paths)
+        .def("__len__", &PrimSet::Size)
+        .def("__repr__", [](const PrimSet& prims) {
+            return "PrimSet(" + std::to_string(prims.Size()) + " prims)";
+        });
+
     nb::class_<Prim>(m, "Prim", "Handle to a prim in a Scene.")
         .def_prop_ro("path", &Prim::GetPath)
         .def_prop_ro("type", &Prim::Type)
@@ -538,6 +647,19 @@ void BindScene(nb::module_& m) {
             },
             nb::arg("attribute"), nb::arg("value").none(), nb::rv_policy::reference_internal,
             "Sets `attribute`; returns the prim for chaining.")
+        .def(
+            "set_xform",
+            [](Prim& prim, nb::handle translate, nb::handle rotate, std::string_view order,
+               nb::handle orient, nb::handle scale) -> Prim& {
+                return prim.SetXform(XformFromPython(translate, rotate, order, orient, scale));
+            },
+            nb::kw_only(), nb::arg("translate").none() = nb::none(),
+            nb::arg("rotate").none() = nb::none(), nb::arg("rotation_order") = "XYZ",
+            nb::arg("orient").none() = nb::none(), nb::arg("scale").none() = nb::none(),
+            nb::rv_policy::reference_internal,
+            "Sets the prim's transform as translate, rotate (Euler angles in degrees in "
+            "`rotation_order`) or orient (a Quat), and scale (three numbers or one) ops, with "
+            "xformOpOrder listing the given ones in that order; returns the prim.")
         .def(
             "get",
             [](const Prim& prim, std::string_view attribute, nb::object fallback) {
@@ -678,9 +800,26 @@ void BindScene(nb::module_& m) {
         .def(
             "write",
             [](Scene& scene, const std::vector<Path>& paths, std::string_view attribute,
-               const AnyArray& rows) { scene.Write(paths, attribute, TensorFromArray(rows)); },
+               const AnyArray& rows, nb::handle stream) {
+                scene.Write(paths, attribute, TensorFromArray(rows), StreamOf(stream));
+            },
             nb::arg("paths"), nb::arg("attribute"), nb::arg("rows"),
-            "Writes row i of `rows` as `attribute` of `paths[i]`, sharing one array.")
+            nb::arg("stream").none() = nb::none(),
+            "Writes row i of `rows` as `attribute` of `paths[i]`, sharing one array. Transform "
+            "ops written so from CUDA arrays (float32 rows of xformOp:translate, xformOp:orient as "
+            "x, y, z, w, and xformOp:scale) pose the prims on the GPU: the meshes under them "
+            "render without the poses coming to the host (give each prim ernie:xform:extent, or "
+            "the poses are copied to the host to bound them). `stream` is as for `write`.")
+        .def(
+            "write",
+            [](Scene& scene, const PrimSet& prims, std::string_view attribute,
+               const AnyArray& rows, nb::handle stream) {
+                scene.Write(prims, attribute, TensorFromArray(rows), StreamOf(stream));
+            },
+            nb::arg("prims"), nb::arg("attribute"), nb::arg("rows"),
+            nb::arg("stream").none() = nb::none(),
+            "As the write of many paths, to a PrimSet: its prims are looked up once and kept, the "
+            "way to write a simulation's arrays every step.")
         .def(
             "read",
             [](const Scene& scene, const Path& path, std::string_view attribute) -> nb::object {
@@ -704,6 +843,15 @@ void BindScene(nb::module_& m) {
                 return MatrixToPython(scene.WorldTransform(path));
             },
             nb::arg("path"))
+        .def(
+            "set_local_transform",
+            [](Scene& scene, const Path& path, nb::handle matrix) {
+                scene.SetLocalTransform(path, TransformFromPython(matrix));
+            },
+            nb::arg("path"), nb::arg("matrix"),
+            "Gives the prim the local transform `matrix` (4 x 4), through its own transform ops "
+            "(translate, a rotate op or orient, scale) where they can represent it, else as "
+            "xformOp:transform.")
         .def("is_visible", &Scene::IsVisible, nb::arg("path"))
         .def("overlay", &Scene::GetOverlay, nb::arg("name"), nb::rv_policy::reference_internal,
              "The overlay (debug drawing layer) named `name`, created empty if missing.")
@@ -1278,6 +1426,24 @@ void BindScene(nb::module_& m) {
         {"RENDER_PRODUCT", tokens::kRenderProduct},
         {"RENDER_VAR", tokens::kRenderVar},
         {"TRANSFORM", tokens::kTransform},
+        {"XFORM_OP_ORDER", tokens::kXformOpOrder},
+        {"XFORM_EXTENT", tokens::kXformExtent},
+        {"QUATERNION_ORDER", tokens::kQuaternionOrder},
+        {"XYZW", tokens::kXyzw},
+        {"WXYZ", tokens::kWxyz},
+        {"RESET_XFORM_STACK", tokens::kResetXformStack},
+        {"TRANSLATE", tokens::kTranslate},
+        {"SCALE", tokens::kScale},
+        {"ORIENT", tokens::kOrient},
+        {"ROTATE_X", tokens::kRotateX},
+        {"ROTATE_Y", tokens::kRotateY},
+        {"ROTATE_Z", tokens::kRotateZ},
+        {"ROTATE_XYZ", tokens::kRotateXYZ},
+        {"ROTATE_XZY", tokens::kRotateXZY},
+        {"ROTATE_YXZ", tokens::kRotateYXZ},
+        {"ROTATE_YZX", tokens::kRotateYZX},
+        {"ROTATE_ZXY", tokens::kRotateZXY},
+        {"ROTATE_ZYX", tokens::kRotateZYX},
         {"VISIBILITY", tokens::kVisibility},
         {"INHERITED", tokens::kInherited},
         {"INVISIBLE", tokens::kInvisible},

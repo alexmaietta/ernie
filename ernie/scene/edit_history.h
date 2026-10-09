@@ -11,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace ernie {
@@ -35,6 +36,13 @@ class EditHistory {
     /// same attribute.
     /// @throws std::invalid_argument as `Scene::Set`.
     void Set(Scene& scene, const Path& path, std::string_view attribute, Value value,
+             bool open = false);
+
+    /// Sets several attributes of the prim at `path`, such as the transform ops of
+    /// `LocalTransformEdits`, as one step. With `open`, merges into the last step if that is an
+    /// open edit of the same attributes.
+    /// @throws std::invalid_argument as `Scene::Set`.
+    void Set(Scene& scene, const Path& path, std::vector<std::pair<std::string, Value>> edits,
              bool open = false);
 
     /// Clears `attribute` of the prim at `path` (back to its fallback) and records it.

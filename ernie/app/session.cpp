@@ -3,6 +3,7 @@
 #include "ernie/scene/camera.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/scene/xform.h"
 
 #include <algorithm>
 #include <cmath>
@@ -69,7 +70,8 @@ OrbitController ControllerFromTransform(const glm::dmat4& world, float distance,
 
 glm::dmat4 LocalFromWorld(const Scene& scene, const Path& path, const glm::dmat4& world) {
     const Path parent = path.Parent();
-    if (parent.IsEmpty() || parent.IsRoot() || !scene.Has(parent)) {
+    if (parent.IsEmpty() || parent.IsRoot() || !scene.Has(parent) ||
+        (scene.Has(path) && ResetsXformStack(scene, path))) {
         return world;
     }
     return glm::inverse(scene.WorldTransform(parent)) * world;

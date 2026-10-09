@@ -17,6 +17,8 @@
 
 namespace ernie {
 
+class MeshDrawable;
+
 /// A point cloud on the host, as UsdGeomPoints gives it: a position per point, and a width (the
 /// diameter of the sphere drawn) and linear RGB colour per point or for all of them.
 struct PointsData {
@@ -47,6 +49,14 @@ struct PointsItem {
     glm::vec3 tint{0.5f};      ///< Every point's colour without colours of their own.
     std::uint32_t primId = 1;  ///< Written to the PrimId render var; the point's index to InstanceId.
     std::int32_t world = -1;   ///< The world it belongs to (`tokens::kWorld`), -1 for every one.
+    /// Under an instance posed on the GPU (a cloud on a robot's link): its instancer in the
+    /// meshes' drawable (`PointsDrawable::SetAnchors`), 0 for none, and row. The cloud's transform
+    /// is then `transform`, the instance's pose, then `below`, composed on the GPU each frame.
+    std::uint32_t anchorInstancer = 0;
+    std::uint32_t anchorRow = 0;
+    glm::dmat4 below{1.0};
+    /// With an anchor: bounds of the cloud wherever the instance goes, in `transform`'s frame.
+    std::pair<glm::vec3, glm::vec3> anchorBounds{glm::vec3(0.0f), glm::vec3(0.0f)};
 };
 
 /// Point clouds drawn as spheres: a `RasterDrawable` for particles, such as granular or MPM
@@ -102,8 +112,15 @@ class PointsDrawable : public RasterDrawable {
         compute_ = compute;
     }
 
+    /// Sets the drawable whose instances items are posed under (`PointsItem::anchorInstancer`),
+    /// which prepares before this one each frame and must outlive it.
+    void SetAnchors(const MeshDrawable* meshes) {
+        anchors_ = meshes;
+    }
+
     /// Sets the draws of the next frames.
-    /// @throws std::invalid_argument for an unknown cloud or material.
+    /// @throws std::invalid_argument for an unknown cloud or material, or items posed under
+    /// instances without `SetAnchors`.
     void SetItems(std::vector<PointsItem> items);
 
     /// Starts a frame's motion, as `MeshDrawable::SettleMotion`: clouds not written again before
@@ -123,6 +140,8 @@ class PointsDrawable : public RasterDrawable {
     std::optional<Bounds3> Bounds() const override;
     std::optional<Bounds3> WorldBounds(std::int32_t world) const override;
     void Prepare(const FrameParams& params, std::span<const ShadowCascade> cascades) override;
+    /// Poses the items under instances (`PointsItem::anchorInstancer`) in their draws.
+    void RecordPrepass(VkCommandBuffer commands) const override;
     void RecordShadow(VkCommandBuffer commands, const RasterFrame& frame, std::size_t cascade,
                       const glm::mat4& lightViewProjection,
                       const ShadowCasters& casters) const override;
@@ -183,6 +202,10 @@ class PointsDrawable : public RasterDrawable {
     std::vector<glm::dmat4> previous_;  ///< Each item's transform at the last frame.
     glm::dvec3 origin_{0.0};
     std::unique_ptr<GpuBuffer> draws_;  ///< Per item, points.slang's PointsDraw.
+    /// The items posed under instances: the drawable posing them, and this frame's records.
+    const MeshDrawable* anchors_ = nullptr;
+    std::unique_ptr<GpuBuffer> anchorRecords_;
+    std::uint32_t anchored_ = 0;
     /// Per view of the last `Prepare`, the items it draws.
     std::vector<std::vector<std::uint32_t>> viewItems_;
 };

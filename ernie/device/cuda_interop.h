@@ -38,6 +38,9 @@ class CudaInterop final : public ComputeInterop {
     int Device() const override;
     void CopyToBuffer(const Tensor& source, GpuBuffer& buffer, VkDeviceSize offset = 0,
                       std::uintptr_t stream = 1) override;
+    void CopyColumnsToBuffer(const Tensor& source, std::span<const std::size_t> order,
+                             GpuBuffer& buffer, VkDeviceSize offset = 0,
+                             std::uintptr_t stream = 1) override;
     Tensor View(std::shared_ptr<GpuBuffer> buffer, DType type, std::vector<std::int64_t> shape,
                 VkDeviceSize offset = 0) override;
     void Copy(const Tensor& source, const Tensor& destination, std::uintptr_t stream = 1) override;

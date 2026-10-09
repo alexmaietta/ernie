@@ -14,6 +14,7 @@ ernie_add_library(
     schema.cpp
     sensor_filters.cpp
     wide_view.cpp
+    xform.cpp
     PUBLIC
     ernie_util
     PRIVATE

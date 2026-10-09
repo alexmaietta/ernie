@@ -221,16 +221,24 @@ class PropertiesPanel final : public Panel {
         if (!BeginTable("##transform")) {
             return;
         }
-        const bool authored = scene.Get(path, tokens::kTransform) != nullptr;
+        // A prim with transform ops resets to the bare xformOp:transform by clearing its order.
+        const bool ops = scene.Get(path, tokens::kXformOpOrder) != nullptr;
+        const std::string_view attribute = ops ? tokens::kXformOpOrder : tokens::kTransform;
+        const bool authored = scene.Get(path, attribute) != nullptr;
         Trs trs = Decompose(scene.LocalTransform(path));
         const char* labels[] = {"Translate", "Rotate", "Scale"};
         glm::dvec3* fields[] = {&trs.translate, &trs.rotate, &trs.scale};
         const double speeds[] = {0.01, 0.5, 0.01};
         for (int i = 0; i < 3; ++i) {
             ImGui::PushID(i);
-            Row(viewer, path, labels[i], tokens::kTransform, authored);
+            Row(viewer, path, labels[i], attribute, authored);
             if (DragXyz(&(*fields[i])[0], static_cast<float>(speeds[i]))) {
-                Apply(viewer, path, tokens::kTransform, Compose(trs));
+                try {
+                    viewer.EditLocalTransform(path, Compose(trs), ImGui::IsItemActive());
+                    error_.clear();
+                } catch (const std::exception& error) {
+                    error_ = error.what();
+                }
             }
             ImGui::PopID();
         }
@@ -311,6 +319,24 @@ class PropertiesPanel final : public Panel {
                             changed = true;
                         }
                         ImGui::PopID();
+                    }
+                } else if constexpr (std::is_same_v<T, glm::dquat>) {
+                    // w, x, y, z as USD writes a quaternion; renormalised after a drag.
+                    glm::dvec4 wxyz(v.w, v.x, v.y, v.z);
+                    if (ImGui::DragScalarN("##v", ImGuiDataType_Double, &wxyz[0], 4, 0.005f)) {
+                        const double length = glm::length(wxyz);
+                        if (length > 0.0) {
+                            wxyz /= length;
+                            edit = glm::dquat(wxyz[0], wxyz[1], wxyz[2], wxyz[3]);
+                            changed = true;
+                        }
+                    }
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    if (v.empty()) {
+                        ImGui::TextDisabled("(none)");
+                    }
+                    for (const std::string& token : v) {
+                        ImGui::TextUnformatted(token.c_str());
                     }
                 } else if constexpr (std::is_same_v<T, std::string>) {
                     if (const auto text = TextField(path, attribute, v)) {

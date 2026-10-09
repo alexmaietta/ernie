@@ -77,6 +77,7 @@ constexpr int kFormatUnsignedInt32 = 0x03;
 constexpr int kFormatFloat = 0x20;
 constexpr unsigned int kArrayColorAttachment = 0x20;
 constexpr int kMemoryHost = 0x01;
+constexpr int kMemoryDevice = 0x02;
 constexpr int kMemoryArray = 0x03;
 using DevicePtr = unsigned long long;
 
@@ -608,6 +609,52 @@ void CudaInterop::CopyToBuffer(const Tensor& source, GpuBuffer& buffer, VkDevice
     state_->Check(state_->driver.memcpyDtoDAsync(
                       destination, reinterpret_cast<cu::DevicePtr>(source.Data()), bytes, onStream),
                   "cuMemcpyDtoDAsync");
+    SignalVulkanAfter(stream);
+}
+
+void CudaInterop::CopyColumnsToBuffer(const Tensor& source, std::span<const std::size_t> order,
+                                      GpuBuffer& buffer, VkDeviceSize offset,
+                                      std::uintptr_t stream) {
+    ERNIE_ZONE("CUDA copy columns to buffer");
+    CheckOnDevice(source);
+    if (source.Rank() != 2) {
+        throw std::invalid_argument("CudaInterop::CopyColumnsToBuffer needs a (rows, width) tensor");
+    }
+    const auto rows = static_cast<std::size_t>(source.Shape()[0]);
+    const auto width = static_cast<std::size_t>(source.Shape()[1]);
+    for (const std::size_t column : order) {
+        if (column >= width) {
+            throw std::invalid_argument("CudaInterop::CopyColumnsToBuffer column out of range");
+        }
+    }
+    const std::size_t element = SizeOf(source.Type());
+    const VkDeviceSize bytes = rows * order.size() * element;
+    if (offset > buffer.Size() || bytes > buffer.Size() - offset) {
+        throw std::invalid_argument("CudaInterop::CopyColumnsToBuffer past the end of the buffer");
+    }
+    if (bytes == 0) {
+        return;
+    }
+    WaitForVulkan(stream);
+    const State::Scope scope(*state_);
+    const auto onStream = reinterpret_cast<cu::Stream>(stream);
+    for (std::size_t first = 0; first < order.size();) {
+        std::size_t run = 1;
+        while (first + run < order.size() && order[first + run] == order[first] + run) {
+            ++run;
+        }
+        cu::Memcpy2d copy{};
+        copy.srcMemoryType = cu::kMemoryDevice;
+        copy.srcDevice = reinterpret_cast<cu::DevicePtr>(source.Data()) + order[first] * element;
+        copy.srcPitch = width * element;
+        copy.dstMemoryType = cu::kMemoryDevice;
+        copy.dstDevice = DevicePointer(buffer) + offset + first * element;
+        copy.dstPitch = order.size() * element;
+        copy.widthInBytes = run * element;
+        copy.height = rows;
+        state_->Check(state_->driver.memcpy2DAsync(&copy, onStream), "cuMemcpy2DAsync");
+        first += run;
+    }
     SignalVulkanAfter(stream);
 }
 

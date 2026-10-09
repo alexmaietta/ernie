@@ -10,6 +10,37 @@ void EditHistory::Set(Scene& scene, const Path& path, std::string_view attribute
     Record(scene, path, attribute, std::move(value), open);
 }
 
+void EditHistory::Set(Scene& scene, const Path& path,
+                      std::vector<std::pair<std::string, Value>> edits, bool open) {
+    if (edits.size() == 1) {
+        Set(scene, path, edits.front().first, std::move(edits.front().second), open);
+        return;
+    }
+    // A continuing drag: the last steps are this one's attributes, recorded as one open group.
+    const std::size_t n = edits.size();
+    bool merge = open && open_ && n > 0 && next_ == steps_.size() && next_ >= n;
+    for (std::size_t i = 0; merge && i < n; ++i) {
+        const Step& step = steps_[next_ - n + i];
+        merge = step.kind == Step::Kind::Attribute && step.path == path &&
+                step.attribute == edits[i].first && step.group != 0 &&
+                step.group == steps_[next_ - n].group;
+    }
+    if (merge) {
+        for (std::size_t i = 0; i < n; ++i) {
+            Step& step = steps_[next_ - n + i];
+            step.after = std::move(edits[i].second);
+            Apply(scene, step, true);
+        }
+        return;
+    }
+    BeginGroup();
+    for (auto& [attribute, value] : edits) {
+        Record(scene, path, attribute, std::move(value), false);
+    }
+    EndGroup();
+    open_ = open;
+}
+
 void EditHistory::Clear(Scene& scene, const Path& path, std::string_view attribute) {
     Record(scene, path, attribute, std::nullopt, false);
 }

@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -77,6 +78,16 @@ class ComputeInterop {
     /// buffer is not `BufferMemory::Shared`, or the bytes do not fit.
     virtual void CopyToBuffer(const Tensor& source, GpuBuffer& buffer, VkDeviceSize offset = 0,
                               std::uintptr_t stream = 1) = 0;
+
+    /// As `CopyToBuffer`, rearranging the columns of a contiguous (rows, width) tensor: column
+    /// `order[j]` of each row lands at column `j` of the buffer's rows, each `order.size()`
+    /// elements, such as quaternions with w first stored with w last. Each run of consecutive
+    /// columns goes as one strided copy.
+    /// @throws std::invalid_argument as `CopyToBuffer`, or for a tensor that is not 2D or a column
+    /// out of range.
+    virtual void CopyColumnsToBuffer(const Tensor& source, std::span<const std::size_t> order,
+                                     GpuBuffer& buffer, VkDeviceSize offset = 0,
+                                     std::uintptr_t stream = 1) = 0;
 
     /// A tensor of `type` and `shape` on this device over `buffer`'s memory from byte `offset`,
     /// which keeps the buffer alive. The buffer's Vulkan context must outlive the tensor.

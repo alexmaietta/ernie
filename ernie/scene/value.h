@@ -3,6 +3,7 @@
 #include "ernie/scene/path.h"
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include <string>
 #include <string_view>
@@ -15,14 +16,16 @@ namespace ernie {
 /// A scene attribute value: one of the scalar, vector, matrix, token, relationship and small-array
 /// types Ernie's schemas use. Bulk per-element data goes in a `Tensor` instead.
 ///
-/// Strings serve both as USD tokens (`"invisible"`, `"lambert"`) and asset paths; `Path` values are
-/// relationship targets such as `material:binding`, and path lists relationships with several
-/// targets such as a PointInstancer's `prototypes`.
+/// Strings serve both as USD tokens (`"invisible"`, `"lambert"`) and asset paths, and string lists
+/// as token arrays such as `xformOpOrder`; `Path` values are relationship targets such as
+/// `material:binding`, and path lists relationships with several targets such as a
+/// PointInstancer's `prototypes`. Quaternions are rotations such as `xformOp:orient`.
 class Value {
   public:
-    using Data = std::variant<std::monostate, bool, int, float, double, glm::ivec2, glm::vec2,
-                              glm::vec3, glm::vec4, glm::dvec2, glm::dvec3, glm::dmat4, std::string,
-                              Path, std::vector<float>, std::vector<Path>>;
+    using Data =
+        std::variant<std::monostate, bool, int, float, double, glm::ivec2, glm::vec2, glm::vec3,
+                     glm::vec4, glm::dvec2, glm::dvec3, glm::dmat4, glm::dquat, std::string, Path,
+                     std::vector<float>, std::vector<Path>, std::vector<std::string>>;
 
     Value() = default;
     Value(bool value) : data_(value) {}
@@ -36,12 +39,14 @@ class Value {
     Value(glm::dvec2 value) : data_(value) {}
     Value(glm::dvec3 value) : data_(value) {}
     Value(const glm::dmat4& value) : data_(value) {}
+    Value(glm::dquat value) : data_(value) {}
     Value(std::string value) : data_(std::move(value)) {}
     Value(std::string_view value) : data_(std::string(value)) {}
     Value(const char* value) : data_(std::string(value)) {}
     Value(Path value) : data_(std::move(value)) {}
     Value(std::vector<float> value) : data_(std::move(value)) {}
     Value(std::vector<Path> value) : data_(std::move(value)) {}
+    Value(std::vector<std::string> value) : data_(std::move(value)) {}
 
     bool Empty() const {
         return std::holds_alternative<std::monostate>(data_);

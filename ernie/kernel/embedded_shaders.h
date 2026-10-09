@@ -85,6 +85,10 @@ extern const char kCullSlang[];
 extern const char kMeshSlang[];
 /// Vertex normals of meshes whose points move on the GPU.
 extern const char kMeshNormalsSlang[];
+/// Instance poses composed on the GPU from transform ops and parents.
+extern const char kInstanceComposeSlang[];
+/// Views and point clouds posed under prims posed on the GPU.
+extern const char kInstanceAnchorsSlang[];
 
 /// Terrain modules: shared resources and grid vertex, the surface material, and the passes.
 extern const char kTerrainSlang[];

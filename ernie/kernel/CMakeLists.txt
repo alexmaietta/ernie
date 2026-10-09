@@ -38,6 +38,8 @@ set(ernie_shaders
     raster/cull.slang=kCullSlang
     raster/depth_range.slang=kDepthRangeSlang
     raster/hzb.slang=kHzbSlang
+    raster/instance_compose.slang=kInstanceComposeSlang
+    raster/instance_anchors.slang=kInstanceAnchorsSlang
     raster/frame.slang=kFrameSlang
     raster/ground.slang=kGroundSlang
     raster/mesh.slang=kMeshSlang

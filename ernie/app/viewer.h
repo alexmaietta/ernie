@@ -221,6 +221,10 @@ class Viewer {
     /// @throws std::invalid_argument as `Scene::Set`.
     void Edit(const Path& path, std::string_view attribute, Value value, bool open = false);
 
+    /// Gives the prim at `path` the local transform `local` as a GUI edit, as `Edit` does, through
+    /// its own transform ops where they can represent it (`LocalTransformEdits`).
+    void EditLocalTransform(const Path& path, const glm::dmat4& local, bool open = false);
+
     /// Clears `attribute` of the prim at `path`, back to its fallback, as an undoable GUI edit.
     void ClearAttribute(const Path& path, std::string_view attribute);
 

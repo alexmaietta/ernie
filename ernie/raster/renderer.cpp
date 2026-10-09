@@ -1022,6 +1022,7 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
         RenderTargets::MaxViews(context_, params.camera.bands.count);
     EnsureViewBuffers(views_);
     posesOnGpu_ = params.posesOnGpu;
+    posesQuaternions_ = params.posesOnGpu && params.posesQuaternions;
     if (posesOnGpu_) {
         WritePoseCamera(params);
     }
@@ -1751,6 +1752,14 @@ void RasterRenderer::RecordShadows(VkCommandBuffer commands,
         // The frame's host data first, after every earlier frame's use of the buffers it fills.
         uploads_.Record(commands);
     }
+    {
+        ERNIE_GPU_ZONE(context_, commands, "Prepass");
+        // Poses composed on the GPU, and views posed under them, before anything reads them.
+        for (const RasterDrawable* drawable : drawables) {
+            drawable->RecordPrepass(commands);
+        }
+        ShaderBarrier(commands);
+    }
     if (posesOnGpu_) {
         ERNIE_GPU_ZONE(context_, commands, "View poses");
         RecordViewPoses(commands, drawables);
@@ -2122,7 +2131,8 @@ void RasterRenderer::PatchViews(VkCommandBuffer commands, const GpuBuffer& block
     const std::uint32_t constants[12] = {views_,
                                          static_cast<std::uint32_t>(stride),
                                          static_cast<std::uint32_t>(first),
-                                         fields.forwardDepth ? 1u : 0u,
+                                         (fields.forwardDepth ? 1u : 0u) |
+                                             (posesQuaternions_ ? 2u : 0u),
                                          fields.viewProjection,
                                          fields.inverseViewProjection,
                                          fields.eye,

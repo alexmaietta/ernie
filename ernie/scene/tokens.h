@@ -46,7 +46,41 @@ inline constexpr std::string_view kRenderVar = "RenderVar";
 
 // Imageable and Xformable (UsdGeom).
 inline constexpr std::string_view kTransform = "xformOp:transform";  ///< dmat4, column vectors.
-inline constexpr std::string_view kVisibility = "visibility";        ///< kInherited or kInvisible.
+/// UsdGeomXformable's transform ops (ernie/scene/xform.h): a prim's local transform is the product
+/// of the ops `xformOpOrder` lists, in that order (the last applies to points first). Without an
+/// `xformOpOrder`, `xformOp:transform` alone is the local transform. An op may carry a suffix, as
+/// in `xformOp:translate:pivot`, and the order may name it `!invert!xformOp:translate:pivot`.
+inline constexpr std::string_view kXformOpOrder = "xformOpOrder";  ///< Token array.
+/// Leading `xformOpOrder` entry: the prim ignores its ancestors' transforms.
+inline constexpr std::string_view kResetXformStack = "!resetXformStack!";
+inline constexpr std::string_view kTranslate = "xformOp:translate";  ///< dvec3, meters.
+inline constexpr std::string_view kScale = "xformOp:scale";          ///< dvec3, or one number.
+/// dquat: a rotation as a unit quaternion (w, x, y, z); as a tensor, rows of x, y, z, w.
+inline constexpr std::string_view kOrient = "xformOp:orient";
+/// Rotations in degrees about one axis.
+inline constexpr std::string_view kRotateX = "xformOp:rotateX";
+inline constexpr std::string_view kRotateY = "xformOp:rotateY";
+inline constexpr std::string_view kRotateZ = "xformOp:rotateZ";
+/// Euler angles in degrees (dvec3, one angle per axis as x, y, z), applied about fixed axes in
+/// the order the name gives: rotateXYZ rotates about X first, then Y, then Z.
+inline constexpr std::string_view kRotateXYZ = "xformOp:rotateXYZ";
+inline constexpr std::string_view kRotateXZY = "xformOp:rotateXZY";
+inline constexpr std::string_view kRotateYXZ = "xformOp:rotateYXZ";
+inline constexpr std::string_view kRotateYZX = "xformOp:rotateYZX";
+inline constexpr std::string_view kRotateZXY = "xformOp:rotateZXY";
+inline constexpr std::string_view kRotateZYX = "xformOp:rotateZYX";
+/// Ernie: on a prim whose transform ops are rows of GPU arrays (`Scene::Write` of many paths), the
+/// bounds of it and its descendants, posed, in its parent's frame: a float array of low then high
+/// x, y, z. Without it the renderer copies the poses to the host to bound them each step.
+inline constexpr std::string_view kXformExtent = "ernie:xform:extent";
+/// Ernie: the component order of the quaternions in a prim's arrays: "xyzw" (the default, USD's
+/// memory layout, as Warp and PhysX keep them) or "wxyz" (w first, as Isaac Lab and MuJoCo do).
+/// It applies to `xformOp:orient` written as an array and to a Camera's (views, 7) `ernie:poses`;
+/// single `xformOp:orient` values are quaternions either way.
+inline constexpr std::string_view kQuaternionOrder = "ernie:quaternionOrder";
+inline constexpr std::string_view kXyzw = "xyzw";
+inline constexpr std::string_view kWxyz = "wxyz";
+inline constexpr std::string_view kVisibility = "visibility";  ///< kInherited or kInvisible.
 inline constexpr std::string_view kInherited = "inherited";
 inline constexpr std::string_view kInvisible = "invisible";
 
@@ -350,7 +384,9 @@ inline constexpr std::string_view kCameraRel = "camera";       ///< Path of the 
 inline constexpr std::string_view kResolution = "resolution";  ///< ivec2 pixels.
 /// A Camera's batch of view poses (Ernie): float32 or float64 (views, 4, 4), each a local
 /// transform in the math convention (column vectors, translation in the last column) that
-/// replaces the camera's own. A render product through the camera renders one image per pose.
+/// replaces the camera's own; or (views, 7), each a position and a unit quaternion (x, y, z, qx,
+/// qy, qz, qw), as simulators keep poses. A render product through the camera renders one image
+/// per pose.
 inline constexpr std::string_view kPoses = "ernie:poses";
 /// token: on a Camera with `kPoses` written as a CUDA array (`Scene::Write`), where the views'
 /// poses go: "gpu" (the default) copies them device to device and the views' matrices are

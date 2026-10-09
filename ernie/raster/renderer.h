@@ -482,6 +482,7 @@ class RasterRenderer {
     /// Whether the last `Update`'s views take their poses from `poseBuffer_`, and the views of
     /// `poseHistory_` (the poses it last rendered) then.
     bool posesOnGpu_ = false;
+    bool posesQuaternions_ = false;  ///< Whether `poseBuffer_` holds positions and quaternions.
     std::array<std::uint32_t, FrameUploads::kSlots> poseHistoryViews_{};
     std::array<glm::dvec3, FrameUploads::kSlots> poseHistoryOrigins_{};  ///< Their frames' origins.
     /// One pass rendering the sun's casters `casters` for cascade `cascade` into shadow map

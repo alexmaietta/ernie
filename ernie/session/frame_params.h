@@ -299,6 +299,9 @@ struct FrameParams {
     /// transform) for work the CPU plans, such as terrain levels of detail, and CPU frustum
     /// tests of the views are skipped.
     bool posesOnGpu = false;
+    /// With `posesOnGpu`: the GPU poses are rows of seven numbers, a position and a unit
+    /// quaternion (x, y, z, qx, qy, qz, qw), rather than row-major 4 x 4 matrices.
+    bool posesQuaternions = false;
     glm::dmat4 posesParent{1.0};
 
     /// The views' camera-to-world poses at the last frame (time -1), one per view, for motion

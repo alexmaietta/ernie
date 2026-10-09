@@ -317,4 +317,9 @@ struct Camera {
 /// or the result fails `Check`.
 Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::uint32_t height);
 
+/// As `CameraOf`, with `transform` in place of the prim's world transform, such as an estimate for
+/// a camera posed on the GPU, whose transform the CPU cannot read.
+Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::uint32_t height,
+                const glm::dmat4& transform);
+
 }  // namespace ernie

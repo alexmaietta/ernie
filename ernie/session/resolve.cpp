@@ -3,6 +3,7 @@
 #include "ernie/geometry/primitives.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/scene/xform.h"
 #include "ernie/util/astronomy.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -457,14 +458,54 @@ namespace {
 
 void CheckPosesShape(const Tensor& tensor, const Path& camera) {
     const bool shaped = (tensor.Rank() == 3 && tensor.Shape()[1] == 4 && tensor.Shape()[2] == 4) ||
-                        (tensor.Rank() == 2 && tensor.Shape()[1] == 16);
+                        (tensor.Rank() == 2 && tensor.Shape()[1] == 16) ||
+                        (tensor.Rank() == 2 && tensor.Shape()[1] == 7);
     if (!shaped || tensor.Shape()[0] < 1) {
         throw std::invalid_argument("'" + std::string(tokens::kPoses) + "' of '" + camera.String() +
-                                    "' must be shaped (views, 4, 4)");
+                                    "' must be shaped (views, 4, 4), or (views, 7) for positions "
+                                    "and quaternions");
     }
 }
 
 }  // namespace
+
+bool PosesAreQuaternions(const Tensor& poses) {
+    return poses.Rank() == 2 && poses.Shape()[1] == 7;
+}
+
+namespace {
+
+}  // namespace
+
+void CheckBatchCameras(const Scene& scene, std::span<const Path> cameras, std::uint32_t width,
+                       std::uint32_t height) {
+    if (cameras.empty()) {
+        return;
+    }
+    // Projections and bands only: the stand-in transform leaves them alone.
+    const glm::dmat4 any(1.0);
+    const Camera first = CameraOf(scene, cameras.front(), width, height, any);
+    const glm::mat4 projection = first.RasterView().projection;
+    for (const Path& path : cameras) {
+        const Camera camera = CameraOf(scene, path, width, height, any);
+        const glm::mat4 other = camera.RasterView().projection;
+        bool same = camera.bands.count == first.bands.count &&
+                    camera.bands.minNm == first.bands.minNm &&
+                    camera.bands.maxNm == first.bands.maxNm;
+        for (int c = 0; c < 4 && same; ++c) {
+            for (int r = 0; r < 4 && same; ++r) {
+                same = std::abs(other[c][r] - projection[c][r]) <=
+                       1e-5f * std::max(1.0f, std::abs(projection[c][r]));
+            }
+        }
+        if (!same) {
+            throw std::invalid_argument("Camera '" + path.String() +
+                                        "' differs in projection or bands from '" +
+                                        cameras.front().String() +
+                                        "', so they cannot render as one batch");
+        }
+    }
+}
 
 glm::dmat4 PosesParentOf(const Scene& scene, const Path& camera) {
     const Path parent = camera.Parent();
@@ -500,26 +541,9 @@ std::vector<glm::dmat4> ViewPosesOf(const Scene& scene, std::span<const Path> ca
     }
     std::vector<glm::dmat4> poses;
     if (cameras.size() > 1) {
-        const Camera first = CameraOf(scene, cameras.front(), width, height);
-        const glm::mat4 projection = first.RasterView().projection;
+        CheckBatchCameras(scene, cameras, width, height);
         for (const Path& path : cameras) {
-            const Camera camera = CameraOf(scene, path, width, height);
-            const glm::mat4 other = camera.RasterView().projection;
-            bool same = camera.bands.count == first.bands.count &&
-                        camera.bands.minNm == first.bands.minNm &&
-                        camera.bands.maxNm == first.bands.maxNm;
-            for (int c = 0; c < 4 && same; ++c) {
-                for (int r = 0; r < 4 && same; ++r) {
-                    same = std::abs(other[c][r] - projection[c][r]) <=
-                           1e-5f * std::max(1.0f, std::abs(projection[c][r]));
-                }
-            }
-            if (!same) {
-                throw std::invalid_argument(
-                    "Camera '" + path.String() + "' differs in projection or bands from '" +
-                    cameras.front().String() + "', so they cannot render as one batch");
-            }
-            poses.push_back(camera.transform);
+            poses.push_back(scene.WorldTransform(path));
         }
         return poses;
     }
@@ -546,6 +570,19 @@ std::vector<glm::dmat4> ViewPosesOf(const Scene& scene, std::span<const Path> ca
         values.assign(packed.As<double>(), packed.As<double>() + count);
     }
     const glm::dmat4 parentWorld = PosesParentOf(scene, camera);
+    if (PosesAreQuaternions(packed)) {
+        // Rows of a position and a unit quaternion (x, y, z, qx, qy, qz, qw, or with w first).
+        const bool wFirst = QuaternionsWFirst(scene, camera);
+        for (std::size_t first = 0; first < values.size(); first += 7) {
+            const double* row = values.data() + first;
+            const glm::dquat q = wFirst ? glm::dquat(row[3], row[4], row[5], row[6])
+                                        : glm::dquat(row[6], row[3], row[4], row[5]);
+            glm::dmat4 local(glm::mat3_cast(glm::normalize(q)));
+            local[3] = glm::dvec4(row[0], row[1], row[2], 1.0);
+            poses.push_back(parentWorld * local);
+        }
+        return poses;
+    }
     for (std::size_t first = 0; first < values.size(); first += 16) {
         glm::dmat4 local(1.0);
         for (int row = 0; row < 4; ++row) {
@@ -794,6 +831,14 @@ std::vector<float> SunIrradianceOf(const Scene& scene, const Path& light,
 }
 
 Light LightOf(const Scene& scene, const Path& path, const SpectralBands& bands) {
+    const std::string_view type = scene.TypeOf(path);
+    const bool known = type == tokens::kDistantLight || type == tokens::kSphereLight ||
+                       type == tokens::kRectLight || type == tokens::kDiskLight;
+    return LightOf(scene, path, bands, known ? scene.WorldTransform(path) : glm::dmat4(1.0));
+}
+
+Light LightOf(const Scene& scene, const Path& path, const SpectralBands& bands,
+              const glm::dmat4& world) {
     using namespace tokens;
     bands.Check();
     Light light;
@@ -801,7 +846,7 @@ Light LightOf(const Scene& scene, const Path& path, const SpectralBands& bands) 
     const std::string_view type = scene.TypeOf(path);
     if (type == kDistantLight) {
         light.type = LightType::Distant;
-        light.direction = glm::vec3(TowardsLight(scene, path));
+        light.direction = glm::vec3(glm::normalize(glm::dvec3(world[2])));
         light.spectrum = SunIrradianceOf(scene, path, bands);
         return light;
     }
@@ -809,7 +854,6 @@ Light LightOf(const Scene& scene, const Path& path, const SpectralBands& bands) 
         throw std::invalid_argument("'" + path.String() +
                                     "' is not a DistantLight, SphereLight, RectLight or DiskLight");
     }
-    const glm::dmat4 world = scene.WorldTransform(path);
     light.position = glm::dvec3(world[3]);
     const glm::dvec3 axis = -glm::dvec3(world[2]);
     const glm::dvec3 xAxis(world[0]);
@@ -1142,7 +1186,9 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
         throw std::invalid_argument("The scene has no Camera");
     }
     FrameParams params;
-    params.camera = CameraOf(scene, prims.camera, width, height);
+    params.camera = prims.cameraTransform
+                        ? CameraOf(scene, prims.camera, width, height, *prims.cameraTransform)
+                        : CameraOf(scene, prims.camera, width, height);
     params.overscan = OverscanOf(params.camera);
     const Path& settings = prims.settings;
     params.ambient = Number(scene, settings, kAmbient, params.ambient);
@@ -1226,7 +1272,10 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
         params.stars = StarFieldOf(scene, prims.stars);
     }
     for (const Path& light : prims.lights) {
-        params.lights.push_back(LightOf(scene, light, params.camera.bands));
+        const auto posed = prims.lightTransforms.find(light);
+        params.lights.push_back(posed != prims.lightTransforms.end()
+                                    ? LightOf(scene, light, params.camera.bands, posed->second)
+                                    : LightOf(scene, light, params.camera.bands));
         params.lights.back().world = WorldOf(scene, light);
     }
     return params;
@@ -1748,6 +1797,145 @@ Image ImageOfTensor(const Tensor& tensor, ImageEncoding encoding) {
         }
     }
     return image;
+}
+
+std::optional<GpuXform> GpuXformOf(const Scene& scene, const Path& path) {
+    using namespace tokens;
+    const auto onGpu = [&](std::string_view attribute) {
+        const Tensor* tensor = scene.Read(path, attribute);
+        return tensor != nullptr && IsGpu(tensor->Location().kind);
+    };
+    const auto fail = [&](const std::string& why) {
+        return std::invalid_argument("Cannot pose '" + path.String() + "' on the GPU: " + why);
+    };
+    // The order, or `xformOp:transform` alone without one.
+    static const std::vector<std::string> kTransformAlone{std::string(kTransform)};
+    const Value* orderValue = scene.Get(path, kXformOpOrder);
+    const auto* order = orderValue != nullptr ? orderValue->Get<std::vector<std::string>>() : nullptr;
+    if (order == nullptr) {
+        if (!onGpu(kTransform)) {
+            return std::nullopt;
+        }
+        order = &kTransformAlone;
+    }
+    if (std::none_of(order->begin(), order->end(), [&](const std::string& entry) {
+            return entry.starts_with("xformOp:") && onGpu(entry);
+        })) {
+        return std::nullopt;
+    }
+
+    // The widths each op's rows may have.
+    const auto widths = [](std::string_view op) -> std::pair<std::int64_t, std::int64_t> {
+        if (op == kOrient) {
+            return {4, 4};
+        }
+        if (op == kScale) {
+            return {3, 1};
+        }
+        if (op == kRotateX || op == kRotateY || op == kRotateZ) {
+            return {1, 1};
+        }
+        if (op == kTransform) {
+            return {16, 16};
+        }
+        if (op == kTranslate || op == kRotateXYZ || op == kRotateXZY || op == kRotateYXZ ||
+            op == kRotateYZX || op == kRotateZXY || op == kRotateZYX) {
+            return {3, 3};
+        }
+        return {0, 0};
+    };
+
+    GpuXform pose;
+    std::size_t n = 0;
+    if (!order->empty() && order->front() == kResetXformStack) {
+        pose.reset = true;
+        n = 1;
+    }
+    std::optional<std::int64_t> rows;
+    std::optional<std::int64_t> row;
+    for (; n < order->size(); ++n) {
+        const std::string& op = (*order)[n];
+        const auto [width, alternative] = widths(op);
+        if (width == 0) {
+            throw fail("its xformOpOrder lists " + op + ": suffixed and inverted ops are "
+                       "composed on the CPU only");
+        }
+        const std::pair<Tensor, std::int64_t>* source = scene.RowOf(path, op);
+        if (!onGpu(op) || source == nullptr) {
+            throw fail(op + " must be a row of a GPU array written for many prims at once "
+                            "(Scene::Write of paths), as its other ops are");
+        }
+        Tensor whole = source->first;
+        if (op == kTransform && whole.Rank() == 3 && whole.Shape()[1] == 4 &&
+            whole.Shape()[2] == 4 && whole.IsContiguous()) {
+            // (n, 4, 4) matrices as (n, 16) rows, the view keeping the array alive.
+            whole = Tensor(whole.Data(), whole.Type(), {whole.Shape()[0], 16}, {},
+                           whole.Location(), std::make_shared<const Tensor>(whole));
+        }
+        if (whole.Type() != DType::Float32 || whole.Rank() != 2 || !whole.IsContiguous() ||
+            (whole.Shape()[1] != width && whole.Shape()[1] != alternative)) {
+            throw fail(op + " must be rows of a contiguous float32 (n, " + std::to_string(width) +
+                       (op == kTransform ? ") or (n, 4, 4)" : ")") + " array");
+        }
+        if (rows && *rows != whole.Shape()[0]) {
+            throw fail("the arrays of its ops must have the same number of rows");
+        }
+        if (row && *row != source->second) {
+            throw fail("its ops must be the same row of their arrays");
+        }
+        rows = whole.Shape()[0];
+        row = source->second;
+        pose.ops.emplace_back(op, whole);
+        pose.stream = scene.WriteStream(path, op);
+    }
+    pose.row = row.value_or(0);
+    pose.wFirst = QuaternionsWFirst(scene, path);
+
+    // Translate, orient and scale (3 wide), each at most once in that order, are instance arrays
+    // as they are; anything else is composed on the GPU.
+    int stage = 0;
+    for (const auto& [op, whole] : pose.ops) {
+        const int opStage = op == kTranslate ? 1 : op == kOrient ? 2 : op == kScale ? 3 : 0;
+        if (opStage == 0 || opStage <= stage || (opStage == 3 && whole.Shape()[1] != 3)) {
+            pose.composed = true;
+            break;
+        }
+        stage = opStage;
+    }
+    if (!pose.composed) {
+        for (const auto& [op, whole] : pose.ops) {
+            (op == kTranslate ? pose.translate : op == kOrient ? pose.orient : pose.scale) = whole;
+        }
+    }
+    return pose;
+}
+
+bool QuaternionsWFirst(const Scene& scene, const Path& path) {
+    const Value* value = scene.Get(path, tokens::kQuaternionOrder);
+    const auto* order = value != nullptr ? value->Get<std::string>() : nullptr;
+    if (order == nullptr || *order == tokens::kXyzw) {
+        return false;
+    }
+    if (*order == tokens::kWxyz) {
+        return true;
+    }
+    throw std::invalid_argument("'" + std::string(tokens::kQuaternionOrder) + "' of '" +
+                                path.String() + "' must be \"xyzw\" or \"wxyz\"");
+}
+
+std::optional<Path> GpuXformAnchorOf(const Scene& scene, const Path& path) {
+    for (Path at = path; !at.IsEmpty() && !at.IsRoot(); at = at.Parent()) {
+        if (!scene.Has(at)) {
+            continue;
+        }
+        if (GpuXformOf(scene, at)) {
+            return at;
+        }
+        if (ResetsXformStack(scene, at)) {
+            return std::nullopt;
+        }
+    }
+    return std::nullopt;
 }
 
 }  // namespace ernie

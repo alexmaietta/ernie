@@ -327,6 +327,14 @@ double Camera::SubframeTime(int subframe) const {
 }
 
 Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::uint32_t height) {
+    if (!scene.Has(path) || scene.TypeOf(path) != tokens::kCamera) {
+        throw std::invalid_argument("'" + path.String() + "' is not a Camera");
+    }
+    return CameraOf(scene, path, width, height, scene.WorldTransform(path));
+}
+
+Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::uint32_t height,
+                const glm::dmat4& transform) {
     using namespace tokens;
     if (!scene.Has(path) || scene.TypeOf(path) != kCamera) {
         throw std::invalid_argument("'" + path.String() + "' is not a Camera");
@@ -338,7 +346,7 @@ Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::
     }
     Camera camera;
     camera.orthographic = projection == kOrthographic;
-    camera.transform = scene.WorldTransform(path);
+    camera.transform = transform;
     camera.width = width;
     camera.height = height;
     const auto number = [&](std::string_view attribute, double fallback) {

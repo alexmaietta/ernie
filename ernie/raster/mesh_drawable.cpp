@@ -97,6 +97,41 @@ constexpr DescriptorBinding kNormalsBindings[] = {
     {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
+/// instance_compose.slang's bindings: raw arrays, ops, instance lists, parents, and the pools.
+constexpr DescriptorBinding kComposeBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute}, {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute}, {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute}, {5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+};
+
+/// instance_anchors.slang's bindings: records, the pools, and what is written.
+constexpr DescriptorBinding kAnchorBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute}, {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute}, {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+};
+
+/// The row width an instance op of `kind` takes, or both widths it accepts (scale: 3 or 1).
+std::pair<std::int64_t, std::int64_t> OpWidths(InstanceOpKind kind) {
+    switch (kind) {
+    case InstanceOpKind::Translate:
+        return {3, 3};
+    case InstanceOpKind::Scale:
+        return {3, 1};
+    case InstanceOpKind::Orient:
+        return {4, 4};
+    case InstanceOpKind::RotateX:
+    case InstanceOpKind::RotateY:
+    case InstanceOpKind::RotateZ:
+        return {1, 1};
+    case InstanceOpKind::Transform:
+        return {16, 16};
+    default:
+        return {3, 3};  // Euler angles
+    }
+}
+
 /// Per point of a mesh of `count` points, the triangles of `indices` around it: offsets
 /// (count + 1) into the triangle indices that follow them.
 std::vector<std::uint32_t> TrianglesAround(std::span<const std::uint32_t> indices,
@@ -389,10 +424,19 @@ MeshDrawable::MeshDrawable(RasterRenderer& renderer)
       layout_(renderer.Context(), kBindings, sizeof(DrawConstants)),
       motionLayout_(renderer.Context(), kMotionBindings, sizeof(DrawConstants)),
       normalsLayout_(renderer.Context(), kNormalsBindings, 32),
+      composeLayout_(renderer.Context(), kComposeBindings, 32),
+      anchorLayout_(renderer.Context(), kAnchorBindings, 16),
       cullLayout_(renderer.Context(), kCullBindings, 32) {
     const std::vector<ShaderModuleSource> normals{{"mesh_normals", shaders::kMeshNormalsSlang}};
     normalsPipeline_ = std::make_unique<ComputePipeline>(
         context_, normalsLayout_, renderer_.Compiler().CompileSpirv(normals, "normalsMain"));
+    const std::vector<ShaderModuleSource> compose{
+        {"instance_compose", shaders::kInstanceComposeSlang}};
+    composePipeline_ = std::make_unique<ComputePipeline>(
+        context_, composeLayout_, renderer_.Compiler().CompileSpirv(compose, "composeMain"));
+    const std::vector<ShaderModuleSource> anchors{{"instance_anchors", shaders::kInstanceAnchorsSlang}};
+    anchorPipeline_ = std::make_unique<ComputePipeline>(
+        context_, anchorLayout_, renderer_.Compiler().CompileSpirv(anchors, "anchorsMain"));
     // Stands in for a depth pyramid in culling without one.
     noHzb_ =
         std::make_unique<GpuImage>(context_, ImageDesc{1, 1, 1, 1, VK_FORMAT_R32_SFLOAT,
@@ -679,6 +723,9 @@ Tensor MeshDrawable::MapInstances(std::uint32_t instancer, std::size_t array,
     if (array > 2) {
         throw std::invalid_argument("Instance arrays are 0 positions, 1 orientations, 2 scales");
     }
+    if (it->second.composed) {
+        throw std::invalid_argument("Instances composed on the GPU cannot be mapped");
+    }
     EnsurePools();
     Instancer& target = it->second;
     const std::array<const std::shared_ptr<GpuBuffer>*, 3> pools{&positions_, &orientations_,
@@ -755,6 +802,8 @@ void MeshDrawable::SetInstances(std::uint32_t instancer, InstanceData data) {
     }
     CheckInstances(data);
     Instancer& target = it->second;
+    composeLayoutDirty_ = composeLayoutDirty_ || target.composed;
+    target.composed = false;
     const std::size_t count = data.positions.size() / 3;
     instancesDirty_ = instancesDirty_ || count != target.count;
     target.count = count;
@@ -793,6 +842,10 @@ void MeshDrawable::SetInstances(std::uint32_t instancer, const DeviceInstanceDat
         if (static_cast<std::size_t>(data.orientations.Elements()) != 4 * count) {
             throw std::invalid_argument("Instance orientations must have 4 values per instance");
         }
+        if (data.orientationsWFirst &&
+            (data.orientations.Rank() != 2 || data.orientations.Shape()[1] != 4)) {
+            throw std::invalid_argument("Instance orientations with w first must be (n, 4)");
+        }
     }
     if (!data.scales.Empty()) {
         CheckDeviceTensor(data.scales, 3, "Instance scales");
@@ -801,6 +854,8 @@ void MeshDrawable::SetInstances(std::uint32_t instancer, const DeviceInstanceDat
         }
     }
     Instancer& target = it->second;
+    composeLayoutDirty_ = composeLayoutDirty_ || target.composed;
+    target.composed = false;
     instancesDirty_ = instancesDirty_ || count != target.count;
     // Arrays handed back as the views `MapInstances` gave out are written in place.
     const std::array<const Tensor*, 3> arrays{&data.positions, &data.orientations, &data.scales};
@@ -823,6 +878,76 @@ void MeshDrawable::SetInstances(std::uint32_t instancer, const DeviceInstanceDat
     }
 }
 
+void MeshDrawable::SetInstances(std::uint32_t instancer, const ComposedInstanceData& data) {
+    const auto it = instancers_.find(instancer);
+    if (it == instancers_.end()) {
+        throw std::invalid_argument("Unknown instancer " + std::to_string(instancer));
+    }
+    if (data.ops.empty()) {
+        throw std::invalid_argument("Composed instances need at least one transform op");
+    }
+    const std::int64_t rows = data.ops.front().rows.Rank() > 0 ? data.ops.front().rows.Shape()[0] : 0;
+    for (const DeviceInstanceOp& op : data.ops) {
+        const auto [width, alternative] = OpWidths(op.kind);
+        const std::int64_t given = op.rows.Rank() == 2 ? op.rows.Shape()[1] : -1;
+        CheckDeviceTensor(op.rows, static_cast<std::size_t>(std::max<std::int64_t>(given, 1)),
+                          "Instance op rows");
+        if (given != width && given != alternative) {
+            throw std::invalid_argument("Instance op rows must be (n, " + std::to_string(width) +
+                                        ") for this op");
+        }
+        if (op.rows.Shape()[0] != rows) {
+            throw std::invalid_argument("Every instance op needs the same number of rows");
+        }
+    }
+    if (!data.parents.empty() && data.parents.size() != static_cast<std::size_t>(rows)) {
+        throw std::invalid_argument("Composed instances need one parent per instance, or none");
+    }
+    for (const InstanceParent& parent : data.parents) {
+        if (parent.instancer != 0 && !instancers_.contains(parent.instancer)) {
+            throw std::invalid_argument("Unknown parent instancer " +
+                                        std::to_string(parent.instancer));
+        }
+    }
+    Instancer& target = it->second;
+    // The compose layout (raw offsets, ops, levels) follows the ops' shapes and the parents.
+    const auto sameLayout = [&] {
+        const ComposedInstanceData& old = target.composedData;
+        if (!target.composed || old.ops.size() != data.ops.size() ||
+            old.parents.size() != data.parents.size()) {
+            return false;
+        }
+        for (std::size_t k = 0; k < data.ops.size(); ++k) {
+            if (old.ops[k].kind != data.ops[k].kind || old.ops[k].wFirst != data.ops[k].wFirst ||
+                old.ops[k].rows.Shape() != data.ops[k].rows.Shape()) {
+                return false;
+            }
+        }
+        for (std::size_t i = 0; i < data.parents.size(); ++i) {
+            const InstanceParent& a = old.parents[i];
+            const InstanceParent& b = data.parents[i];
+            if (a.instancer != b.instancer || a.row != b.row || a.translate != b.translate ||
+                a.rotation != b.rotation || a.scale != b.scale) {
+                return false;
+            }
+        }
+        return true;
+    };
+    composeLayoutDirty_ = composeLayoutDirty_ || !sameLayout();
+    instancesDirty_ = instancesDirty_ || static_cast<std::size_t>(rows) != target.count;
+    target.count = static_cast<std::size_t>(rows);
+    target.composed = true;
+    target.composedData = data;
+    target.onDevice = true;
+    target.device = {};
+    target.device.extent = data.extent;
+    target.device.stream = data.stream;
+    target.data = {};
+    target.inPlace = {};
+    target.mapped = {};
+    target.dirty = true;
+}
+
 void MeshDrawable::SetComputeInterop(ComputeInterop* compute) {
     compute_ = compute;
     geometryDirty_ = true;
@@ -830,9 +955,12 @@ void MeshDrawable::SetComputeInterop(ComputeInterop* compute) {
 }
 
 void MeshDrawable::RemoveInstancer(std::uint32_t instancer) {
-    if (instancers_.erase(instancer) == 0) {
+    const auto it = instancers_.find(instancer);
+    if (it == instancers_.end()) {
         throw std::invalid_argument("Unknown instancer " + std::to_string(instancer));
     }
+    composeLayoutDirty_ = composeLayoutDirty_ || it->second.composed;
+    instancers_.erase(it);
     std::erase_if(items_,
                   [instancer](const MeshItem& item) { return item.instancer == instancer; });
     itemPipelines_.clear();
@@ -1065,6 +1193,205 @@ void MeshDrawable::RebuildInstances() {
     instancesDirty_ = false;
 }
 
+void MeshDrawable::RebuildCompose() {
+    ERNIE_ZONE("Mesh rebuild compose");
+    std::uint32_t raw = 0;
+    std::uint32_t records = 0;
+    std::vector<glm::uvec4> ops;
+    for (auto& [handle, instancer] : instancers_) {
+        if (!instancer.composed) {
+            continue;
+        }
+        instancer.rawFirst = raw;
+        instancer.opsFirst = static_cast<std::uint32_t>(ops.size());
+        instancer.parentsFirst = records;
+        std::uint32_t offset = 0;
+        for (const DeviceInstanceOp& op : instancer.composedData.ops) {
+            const auto width = static_cast<std::uint32_t>(op.rows.Shape()[1]);
+            ops.emplace_back(static_cast<std::uint32_t>(op.kind), offset, width,
+                             op.wFirst ? 1u : 0u);
+            offset += static_cast<std::uint32_t>(instancer.count) * width;
+        }
+        raw += offset;
+        records += static_cast<std::uint32_t>(instancer.count);
+        instancer.levels.assign(instancer.count, 0);
+        // Its arrays move to their new place in the raw pool.
+        instancer.dirty = true;
+    }
+
+    // Levels: an instance posed under a composed one is one deeper, so its parent is composed
+    // first. A chain deeper than the passes allow is a cycle.
+    constexpr int kMaxDepth = 64;
+    bool changed = true;
+    for (int pass = 0; changed; ++pass) {
+        if (pass > kMaxDepth) {
+            throw std::invalid_argument("Composed instances' parents form a cycle or nest deeper "
+                                        "than " + std::to_string(kMaxDepth));
+        }
+        changed = false;
+        for (auto& [handle, instancer] : instancers_) {
+            if (!instancer.composed) {
+                continue;
+            }
+            const std::vector<InstanceParent>& parents = instancer.composedData.parents;
+            for (std::size_t i = 0; i < parents.size(); ++i) {
+                const auto parent = instancers_.find(parents[i].instancer);
+                if (parent == instancers_.end() || !parent->second.composed ||
+                    parents[i].row >= parent->second.count) {
+                    continue;
+                }
+                const std::uint32_t level = parent->second.levels[parents[i].row] + 1;
+                if (instancer.levels[i] < level) {
+                    instancer.levels[i] = level;
+                    changed = true;
+                }
+            }
+        }
+    }
+
+    // Each instancer's instances per level, the dispatches in level order.
+    std::vector<std::uint32_t> lists;
+    composeJobs_.clear();
+    for (const auto& [handle, instancer] : instancers_) {
+        if (!instancer.composed) {
+            continue;
+        }
+        std::map<std::uint32_t, std::vector<std::uint32_t>> byLevel;
+        for (std::uint32_t i = 0; i < instancer.count; ++i) {
+            byLevel[instancer.levels[i]].push_back(i);
+        }
+        for (const auto& [level, instances] : byLevel) {
+            composeJobs_.push_back({handle, static_cast<std::uint32_t>(lists.size()),
+                                    static_cast<std::uint32_t>(instances.size()), level});
+            lists.insert(lists.end(), instances.begin(), instances.end());
+        }
+    }
+    std::stable_sort(composeJobs_.begin(), composeJobs_.end(),
+                     [](const ComposeJob& a, const ComposeJob& b) { return a.level < b.level; });
+
+    const VkDeviceSize rawBytes = std::max<VkDeviceSize>(VkDeviceSize{raw} * sizeof(float), 16);
+    if (composeRaw_ == nullptr || composeRaw_->Size() < rawBytes) {
+        vkDeviceWaitIdle(context_.Device());
+        composeRaw_ = std::make_shared<GpuBuffer>(context_, rawBytes,
+                                                  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                                  BufferMemory::Shared);
+    }
+    const auto upload = [&](std::unique_ptr<GpuBuffer>& buffer, std::span<const std::byte> bytes) {
+        Reserve(context_, buffer, bytes.size(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                BufferMemory::Device);
+        if (!bytes.empty()) {
+            renderer_.Uploads().Write(*buffer, bytes);
+        }
+    };
+    upload(composeOps_, std::as_bytes(std::span(ops)));
+    upload(composeLists_, std::as_bytes(std::span(lists)));
+    Reserve(context_, composeParents_, VkDeviceSize{records} * 3 * sizeof(glm::vec4),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+    composeLayoutDirty_ = false;
+}
+
+void MeshDrawable::PrepareCompose(bool all) {
+    pendingCompose_.clear();
+    if (composeJobs_.empty()) {
+        return;
+    }
+    // Instances posed under ones that move this frame move with them: composed again, into the
+    // other half, keeping the last frame's poses for motion blur.
+    for (bool changed = true; changed;) {
+        changed = false;
+        for (auto& [handle, instancer] : instancers_) {
+            if (!instancer.composed || instancer.written) {
+                continue;
+            }
+            for (const InstanceParent& parent : instancer.composedData.parents) {
+                const auto it = instancers_.find(parent.instancer);
+                if (it != instancers_.end() && it->second.written) {
+                    FlipInstancer(instancer);
+                    changed = true;
+                    break;
+                }
+            }
+        }
+    }
+    for (const ComposeJob& job : composeJobs_) {
+        if (all || instancers_.at(job.instancer).written) {
+            pendingCompose_.push_back(job);
+        }
+    }
+    if (pendingCompose_.empty()) {
+        return;
+    }
+    // Every instance's parent record, with its parent's slot in this frame's half.
+    std::vector<glm::vec4> records;
+    for (const auto& [handle, instancer] : instancers_) {
+        if (!instancer.composed) {
+            continue;
+        }
+        const std::vector<InstanceParent>& parents = instancer.composedData.parents;
+        for (std::size_t i = 0; i < instancer.count; ++i) {
+            std::uint32_t slot = 0xFFFFFFFFu;
+            InstanceParent parent;
+            if (!parents.empty()) {
+                parent = parents[i];
+                const auto it = instancers_.find(parent.instancer);
+                if (it != instancers_.end() && parent.row < it->second.count) {
+                    slot = InstanceBase(it->second) + it->second.first + parent.row;
+                }
+            }
+            records.emplace_back(std::bit_cast<float>(slot), parent.translate);
+            records.push_back(parent.rotation);
+            records.emplace_back(parent.scale, 0.0f);
+        }
+    }
+    renderer_.Uploads().Write(*composeParents_, std::as_bytes(std::span(records)));
+}
+
+void MeshDrawable::RecordCompose(VkCommandBuffer commands) const {
+    if (pendingCompose_.empty()) {
+        return;
+    }
+    ERNIE_GPU_ZONE(context_, commands, "Instance compose");
+    const auto barrier = [commands](VkPipelineStageFlags2 dstStage) {
+        VkMemoryBarrier2 memory{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+        memory.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        memory.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+        memory.dstStageMask = dstStage;
+        memory.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+        VkDependencyInfo dependency{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        dependency.memoryBarrierCount = 1;
+        dependency.pMemoryBarriers = &memory;
+        vkCmdPipelineBarrier2(commands, &dependency);
+    };
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, composePipeline_->Handle());
+    const DescriptorResource resources[] = {
+        DescriptorResource::Of(*composeRaw_),     DescriptorResource::Of(*composeOps_),
+        DescriptorResource::Of(*composeLists_),   DescriptorResource::Of(*composeParents_),
+        DescriptorResource::Of(*positions_),      DescriptorResource::Of(*orientations_),
+        DescriptorResource::Of(*scales_)};
+    composeLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+    std::uint32_t level = pendingCompose_.front().level;
+    for (const ComposeJob& job : pendingCompose_) {
+        if (job.level != level) {
+            // Parents' poses before their children read them.
+            barrier(VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
+            level = job.level;
+        }
+        const Instancer& instancer = instancers_.at(job.instancer);
+        const std::uint32_t constants[8] = {
+            job.count,
+            job.list,
+            instancer.rawFirst,
+            instancer.opsFirst,
+            static_cast<std::uint32_t>(instancer.composedData.ops.size()),
+            InstanceBase(instancer) + instancer.first,
+            instancer.parentsFirst,
+            static_cast<std::uint32_t>(instancer.count)};
+        composeLayout_.PushConstants(commands, constants, sizeof(constants));
+        vkCmdDispatch(commands, (job.count + 63) / 64, 1, 1);
+    }
+    barrier(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
+}
+
 void MeshDrawable::FlipInstancer(Instancer& instancer) {
     if (!instancer.written) {
         instancer.set ^= 1u;
@@ -1079,6 +1406,16 @@ void MeshDrawable::WriteInstancer(Instancer& instancer, bool flip) {
         FlipInstancer(instancer);
     }
     const VkDeviceSize first = VkDeviceSize{InstanceBase(instancer)} + instancer.first;
+    if (instancer.composed) {
+        // The ops' raw arrays; the compose pass writes the pools from them (`RecordCompose`).
+        const ComposedInstanceData& data = instancer.composedData;
+        VkDeviceSize offset = instancer.rawFirst;
+        for (const DeviceInstanceOp& op : data.ops) {
+            compute_->CopyToBuffer(op.rows, *composeRaw_, offset * sizeof(float), data.stream);
+            offset += static_cast<VkDeviceSize>(op.rows.Elements());
+        }
+        return;
+    }
     if (instancer.onDevice) {
         // Arrays written in place (`MapInstances`) are there already; the frame waits for their
         // stream.
@@ -1092,8 +1429,15 @@ void MeshDrawable::WriteInstancer(Instancer& instancer, bool flip) {
                                    device.stream);
         }
         if (!device.orientations.Empty() && !instancer.inPlace[1]) {
-            compute_->CopyToBuffer(device.orientations, *orientations_, first * 4 * sizeof(float),
-                                   device.stream);
+            if (device.orientationsWFirst) {
+                // w, x, y, z into the pool's x, y, z, w.
+                constexpr std::array<std::size_t, 4> kXyzwOfWxyz{1, 2, 3, 0};
+                compute_->CopyColumnsToBuffer(device.orientations, kXyzwOfWxyz, *orientations_,
+                                              first * 4 * sizeof(float), device.stream);
+            } else {
+                compute_->CopyToBuffer(device.orientations, *orientations_,
+                                       first * 4 * sizeof(float), device.stream);
+            }
         }
         if (!device.scales.Empty() && !instancer.inPlace[2]) {
             compute_->CopyToBuffer(device.scales, *scales_, first * 3 * sizeof(float),
@@ -1175,6 +1519,11 @@ void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCasc
             mesh.pointsDirty = false;
         }
     }
+    if (composeLayoutDirty_) {
+        RebuildCompose();
+        drawsChanged = true;
+    }
+    const bool rebuildInstances = instancesDirty_;
     if (instancesDirty_) {
         RebuildInstances();
     } else {
@@ -1184,6 +1533,26 @@ void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCasc
                 instancer.dirty = false;
             }
         }
+    }
+    // Rebuilt pools hold no composed poses yet: compose every instancer.
+    PrepareCompose(rebuildInstances);
+    // Views posed under instances: their records, relative to the frame's origin, with their
+    // anchors' slots in this frame's halves.
+    anchorViews_ = 0;
+    if (params.posesOnGpu && !anchoredViews_.empty()) {
+        const glm::dmat4 toOrigin = glm::translate(glm::dmat4(1.0), -params.origin);
+        std::vector<glm::vec4> records;
+        records.reserve(anchoredViews_.size() * 9);
+        for (std::size_t v = 0; v < anchoredViews_.size(); ++v) {
+            const AnchoredView& view = anchoredViews_[v];
+            AppendAnchorRecord(records, glm::mat4(toOrigin * view.frame), glm::mat4(view.below),
+                               AnchorSlot(view.instancer, view.row),
+                               static_cast<std::uint32_t>(v));
+        }
+        Reserve(context_, anchorRecords_, records.size() * sizeof(glm::vec4),
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+        renderer_.Uploads().Write(*anchorRecords_, std::as_bytes(std::span(records)));
+        anchorViews_ = static_cast<std::uint32_t>(anchoredViews_.size());
     }
 
     // Flipped halves move the draws' offsets.
@@ -1224,10 +1593,12 @@ void MeshDrawable::WriteDraws() {
         if (item.instancer) {
             const Instancer& instancer = instancers_.at(*item.instancer);
             flags |= kInstanced;
-            const bool orientations = instancer.onDevice ? !instancer.device.orientations.Empty()
-                                                         : !instancer.data.orientations.empty();
-            const bool scales = instancer.onDevice ? !instancer.device.scales.Empty()
-                                                   : !instancer.data.scales.empty();
+            const bool orientations = instancer.composed ||
+                                      (instancer.onDevice ? !instancer.device.orientations.Empty()
+                                                          : !instancer.data.orientations.empty());
+            const bool scales = instancer.composed ||
+                                (instancer.onDevice ? !instancer.device.scales.Empty()
+                                                    : !instancer.data.scales.empty());
             flags |= orientations ? kHasOrientations : 0u;
             flags |= scales ? kHasScales : 0u;
             const std::uint32_t first = instancer.first;
@@ -1623,12 +1994,12 @@ void MeshDrawable::WriteCullJobs(const std::vector<GpuCullJob>& jobs,
         entry.levels[2] = InstanceBase(instancer);
         entry.levels[3] = InstanceBase(instancer, true);
         std::uint32_t flags = 0;
-        if (instancer.onDevice ? !instancer.device.orientations.Empty()
-                               : !instancer.data.orientations.empty()) {
+        if (instancer.composed || (instancer.onDevice ? !instancer.device.orientations.Empty()
+                                                      : !instancer.data.orientations.empty())) {
             flags |= kCullOrientations;
         }
-        if (instancer.onDevice ? !instancer.device.scales.Empty()
-                               : !instancer.data.scales.empty()) {
+        if (instancer.composed || (instancer.onDevice ? !instancer.device.scales.Empty()
+                                                      : !instancer.data.scales.empty())) {
             flags |= kCullScales;
         }
         if (previousTransforms_[i] != transforms_[i]) {
@@ -1693,6 +2064,77 @@ void MeshDrawable::RecordViewPoses(VkCommandBuffer commands) const {
     fields.viewProjection = 6 * sizeof(glm::vec4);
     renderer_.PatchViews(commands, *cullViewBuffer_, 0, kCullViewStride * sizeof(glm::vec4),
                          fields);
+}
+
+void MeshDrawable::SetAnchoredViews(std::vector<AnchoredView> views) {
+    for (const AnchoredView& view : views) {
+        if (view.instancer == 0) {
+            continue;
+        }
+        const auto it = instancers_.find(view.instancer);
+        if (it == instancers_.end() || view.row >= it->second.count) {
+            throw std::invalid_argument("Anchored view under unknown instance " +
+                                        std::to_string(view.instancer) + ", row " +
+                                        std::to_string(view.row));
+        }
+    }
+    anchoredViews_ = std::move(views);
+}
+
+std::uint32_t MeshDrawable::AnchorSlot(std::uint32_t instancer, std::uint32_t row) const {
+    const auto it = instancers_.find(instancer);
+    if (it == instancers_.end() || row >= it->second.count) {
+        return 0xFFFFFFFFu;
+    }
+    return InstanceBase(it->second) + it->second.first + row;
+}
+
+void MeshDrawable::AppendAnchorRecord(std::vector<glm::vec4>& records, const glm::mat4& frame,
+                                      const glm::mat4& below, std::uint32_t slot,
+                                      std::uint32_t target) {
+    for (const glm::mat4* m : {&frame, &below}) {
+        for (int row = 0; row < 4; ++row) {
+            records.emplace_back((*m)[0][row], (*m)[1][row], (*m)[2][row], (*m)[3][row]);
+        }
+    }
+    records.emplace_back(std::bit_cast<float>(slot), std::bit_cast<float>(target), 0.0f, 0.0f);
+}
+
+void MeshDrawable::RecordPrepass(VkCommandBuffer commands) const {
+    RecordCompose(commands);
+    if (anchorViews_ == 0) {
+        return;
+    }
+    ERNIE_GPU_ZONE(context_, commands, "Anchored views");
+    RecordAnchors(commands, *anchorRecords_, anchorViews_, renderer_.PoseBuffer(),
+                  AnchorOutput::ViewPoses);
+}
+
+void MeshDrawable::RecordAnchors(VkCommandBuffer commands, const GpuBuffer& records,
+                                 std::uint32_t count, const GpuBuffer& target,
+                                 AnchorOutput output) const {
+    if (count == 0) {
+        return;
+    }
+    // After the compose pass's poses.
+    VkMemoryBarrier2 barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    barrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    VkDependencyInfo dependency{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    dependency.memoryBarrierCount = 1;
+    dependency.pMemoryBarriers = &barrier;
+    vkCmdPipelineBarrier2(commands, &dependency);
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, anchorPipeline_->Handle());
+    const DescriptorResource resources[] = {
+        DescriptorResource::Of(records), DescriptorResource::Of(*positions_),
+        DescriptorResource::Of(*orientations_), DescriptorResource::Of(*scales_),
+        DescriptorResource::Of(target)};
+    anchorLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+    const std::uint32_t constants[4] = {count, static_cast<std::uint32_t>(output), 0, 0};
+    anchorLayout_.PushConstants(commands, constants, sizeof(constants));
+    vkCmdDispatch(commands, (count + 63) / 64, 1, 1);
 }
 
 void MeshDrawable::RecordCull(VkCommandBuffer commands) const {
