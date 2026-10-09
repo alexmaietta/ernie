@@ -182,9 +182,9 @@ class RasterDelegate : public RenderDelegate {
         std::optional<Key> albedoMap;
         std::optional<Key> detailAlbedo;
         std::optional<Key> detailNormal;
-        /// What the albedo texture and normal map were loaded from (`TextureKey`).
-        std::string albedoTexture;
-        std::string normalTexture;
+        /// What the albedo texture, normal map, roughness and metallic textures were loaded from
+        /// (`TextureKey`).
+        std::array<std::string, 4> textures;
     };
 
     struct SyncedMesh {

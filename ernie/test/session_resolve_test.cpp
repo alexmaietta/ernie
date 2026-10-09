@@ -342,6 +342,52 @@ TEST(MaterialSettingsOf, ReadsAUsdPreviewSurfaceNetwork) {
     EXPECT_EQ(ernie::MeshDataOf(scene, "/Tri").uvs.size(), 6u);
 }
 
+TEST(MaterialSettingsOf, PreviewSurfacesShadeWithTheirOwnModelAndInputs) {
+    Scene scene;
+    const BrdfRegistry brdfs = BrdfRegistry::WithBuiltins();
+    scene.Define("/Looks/M", tokens::kMaterial);
+    scene.Define("/Looks/M/Surface", tokens::kShader)
+        .Set(tokens::kInfoId, std::string(tokens::kUsdPreviewSurface))
+        .Set(tokens::kRoughness, 0.25)
+        .Set(tokens::kUseSpecularWorkflow, true)
+        .Set(tokens::kSpecularColor, glm::vec3(0.1f, 0.2f, 0.3f));
+    ernie::Connect(scene, "/Looks/M", tokens::kSurfaceOutput, "/Looks/M/Surface",
+                   tokens::kSurfaceOutput);
+    ernie::MaterialSettings settings = ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs);
+    EXPECT_EQ(settings.brdf, "preview_surface");
+    const std::vector<float> expected{0.25f, 0.0f, 1.5f, 1.0f, 0.1f, 0.2f, 0.3f, 0.0f, 0.01f};
+    ASSERT_EQ(settings.brdfParams.size(), expected.size());
+    for (std::size_t i = 0; i < expected.size(); ++i) {
+        EXPECT_FLOAT_EQ(settings.brdfParams[i], expected[i]) << i;
+    }
+
+    // Roughness and metallic from channels of one texture (glTF's metallicRoughness).
+    scene.Define("/Looks/M/Mr", tokens::kShader)
+        .Set(tokens::kInfoId, std::string(tokens::kUsdUVTexture))
+        .Set(tokens::kFile, std::string("mr.png"));
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kRoughness, "/Looks/M/Mr", "outputs:g");
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kMetallic, "/Looks/M/Mr", "outputs:b");
+    settings = ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs);
+    ASSERT_TRUE(settings.roughnessTexture.has_value());
+    EXPECT_EQ(settings.roughnessTexture->channel, 1);
+    EXPECT_EQ(settings.brdfParams[0], 0.0f) << "the texture carries the roughness";
+    ASSERT_TRUE(settings.metallicTexture.has_value());
+    EXPECT_EQ(settings.metallicTexture->channel, 2);
+    EXPECT_EQ(settings.metallicParam, 1);
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kMetallic, "/Looks/M/Mr", "outputs:rgb");
+    EXPECT_THROW(ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs), std::invalid_argument)
+        << "a scalar reads one channel";
+
+    // A Material naming another model keeps it, with its parameters from the Material.
+    scene.Clear("/Looks/M/Surface", std::string(tokens::kMetallic) + ".connect");
+    scene.Set("/Looks/M", tokens::kBrdf, std::string("oren_nayar"));
+    scene.Set("/Looks/M", "inputs:sigma", 5.0);
+    settings = ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs);
+    EXPECT_EQ(settings.brdf, "oren_nayar");
+    EXPECT_EQ(settings.brdfParams, std::vector<float>{5.0f});
+    EXPECT_FALSE(settings.roughnessTexture.has_value());
+}
+
 TEST(InstanceDataOf, ReadsArraysAndGroupsInstancesByPrototype) {
     Scene scene;
     const std::array<float, 9> positions{0, 0, 0, 1, 0, 0, 2, 0, 0};

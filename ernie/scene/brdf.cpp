@@ -101,6 +101,46 @@ BrdfModel Hapke() {
             shaders::kBrdfHapkeSlang};
 }
 
+BrdfModel PreviewSurface() {
+    return {"preview_surface",
+            "UsdPreviewSurface",
+            "UsdPreviewSurface's reflectance as glTF 2.0's metallic-roughness BRDF defines it: "
+            "Lambert diffuse and GGX specular (height-correlated Smith visibility, Schlick "
+            "Fresnel), the specular workflow's specularColor as f0, and a clearcoat lobe. The "
+            "albedo input is the diffuseColor. Materials whose surface is a UsdPreviewSurface "
+            "use it unless they name another model.",
+            {"Pixar, \"UsdPreviewSurface Specification\", "
+             "https://openusd.org/release/spec_usdpreviewsurface.html",
+             "The Khronos Group, \"glTF 2.0 Specification\", Appendix B: BRDF Implementation, "
+             "https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html",
+             "B. Walter, S. R. Marschner, H. Li and K. E. Torrance, \"Microfacet Models for "
+             "Refraction through Rough Surfaces\", EGSR 2007.",
+             "E. Heitz, \"Understanding the Masking-Shadowing Function in Microfacet-Based "
+             "BRDFs\", Journal of Computer Graphics Techniques 3(2), 2014.",
+             "C. Schlick, \"An Inexpensive BRDF Model for Physically-based Rendering\", Computer "
+             "Graphics Forum 13(3):233-246, 1994."},
+            {{"roughness", "Roughness", "", 0.5f, 0.0f, 1.0f, false,
+              "Perceptual roughness; the GGX alpha is its square."},
+             {"metallic", "Metallic", "", 0.0f, 0.0f, 1.0f, false,
+              "0 dielectric, 1 metal tinted by the diffuse colour."},
+             {"ior", "Index of refraction", "", 1.5f, 1.0f, 3.0f, false,
+              "Sets a dielectric's reflectance at normal incidence."},
+             {"useSpecularWorkflow", "Specular workflow", "", 0.0f, 0.0f, 1.0f, false,
+              "1 takes the reflectance at normal incidence from specularColor."},
+             {"specularColorR", "Specular colour R", "", 0.0f, 0.0f, 1.0f, false,
+              "inputs:specularColor's red; the model uses the colour's mean."},
+             {"specularColorG", "Specular colour G", "", 0.0f, 0.0f, 1.0f, false,
+              "inputs:specularColor's green."},
+             {"specularColorB", "Specular colour B", "", 0.0f, 0.0f, 1.0f, false,
+              "inputs:specularColor's blue."},
+             {"clearcoat", "Clearcoat", "", 0.0f, 0.0f, 1.0f, false,
+              "Weight of a second, colourless specular layer."},
+             {"clearcoatRoughness", "Clearcoat roughness", "", 0.01f, 0.0f, 1.0f, false,
+              "The clearcoat's perceptual roughness."}},
+            "PreviewSurface",
+            shaders::kBrdfPreviewSurfaceSlang};
+}
+
 }  // namespace
 
 std::vector<float> BrdfModel::Defaults() const {
@@ -119,6 +159,7 @@ BrdfRegistry BrdfRegistry::WithBuiltins() {
     registry.Add(LunarLambert());
     registry.Add(OrenNayar());
     registry.Add(Hapke());
+    registry.Add(PreviewSurface());
     return registry;
 }
 

@@ -88,3 +88,33 @@ def test_meshes_show_an_image_file_through_their_texture_coordinates(renderer, t
     assert left[0] > right[0] + 40 and left[0] > left[2], "red on the left"
     assert right[2] > left[2] + 40 and right[2] > right[0], "blue on the right"
     assert renderer.take_validation_messages() == []
+
+
+def test_preview_surfaces_shade_metals_and_dielectrics_differently(renderer):
+    assert "preview_surface" in renderer.brdfs
+    scene = ernie.Scene()
+    scene.define("/World/Camera", tokens.CAMERA).set(
+        tokens.TRANSFORM, ernie.look_at_transform((0, 0, 60), (0, 0, 0), up=(0, 1, 0))
+    ).set(tokens.FOCAL_LENGTH, 18.0)
+    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+        tokens.TRANSFORM, ernie.distant_light_transform((0.3, 0.0, 1.0))
+    )
+    scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(tokens.RESOLUTION, (48, 48))
+    half = 12.0
+    points = np.array([[-half, -half, 0], [half, -half, 0], [half, half, 0], [-half, half, 0]])
+    scene.define("/World/Quad", tokens.MESH).write(tokens.POINTS, points).write(
+        tokens.FACE_VERTEX_COUNTS, np.array([4])
+    ).write(tokens.FACE_VERTEX_INDICES, np.arange(4)).set(
+        tokens.MATERIAL_BINDING, ernie.Path("/Looks/M")
+    )
+    scene.define("/Looks/M", tokens.MATERIAL)
+    scene.define("/Looks/M/Surface", tokens.SHADER).set(
+        tokens.INFO_ID, tokens.USD_PREVIEW_SURFACE
+    ).set(tokens.DIFFUSE_COLOR, (0.6, 0.6, 0.6)).set(tokens.ROUGHNESS, 0.3)
+    scene.connect("/Looks/M", tokens.SURFACE_OUTPUT, "/Looks/M/Surface", tokens.SURFACE_OUTPUT)
+
+    dielectric = renderer.render(scene).astype(np.int32)
+    scene.set("/Looks/M/Surface", tokens.METALLIC, 1.0)
+    metal = renderer.render(scene).astype(np.int32)
+    assert np.abs(metal - dielectric)[16:32, 16:32, :3].mean() > 5, "metallic changes the shading"
+    assert renderer.take_validation_messages() == []

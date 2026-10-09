@@ -39,6 +39,7 @@ struct TextureReader {
     std::string file;  ///< Image file, empty when `image` names the texture's tensor instead.
     std::string image;  ///< Path of the Shader prim holding `ernie:texture`, else empty.
     std::string uvSet = "st";  ///< Mesh primvar of the coordinates (without "primvars:").
+    int channel = -1;  ///< The output read: -1 rgb, else one channel (0 r to 3 a).
     TextureWrap wrapS = TextureWrap::Repeat;
     TextureWrap wrapT = TextureWrap::Repeat;
     TextureColorSpace colorSpace = TextureColorSpace::Auto;
@@ -70,6 +71,13 @@ struct MaterialSettings {
     std::optional<TextureReader> albedoTexture;
     /// UsdPreviewSurface's normal: a tangent-space normal map through texture coordinates.
     std::optional<TextureReader> normalTexture;
+    /// UsdPreviewSurface's roughness from one texture channel: its alpha^2 / 2 (alpha its
+    /// square) joins the pixel's unresolved slope variance, with the model's roughness then 0.
+    std::optional<TextureReader> roughnessTexture;
+    /// UsdPreviewSurface's metallic from one texture channel, replacing the model's parameter
+    /// `metallicParam` per pixel.
+    std::optional<TextureReader> metallicTexture;
+    int metallicParam = -1;
 };
 
 }  // namespace ernie

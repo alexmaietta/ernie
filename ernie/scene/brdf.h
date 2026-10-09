@@ -59,7 +59,7 @@ class BrdfRegistry {
     BrdfRegistry() = default;
 
     /// A registry with the built-in models: "lambert", "lommel_seeliger", "lunar_lambert",
-    /// "oren_nayar" and "hapke".
+    /// "oren_nayar", "hapke" and "preview_surface".
     static BrdfRegistry WithBuiltins();
 
     /// Adds `model`. Its shader source is only checked superficially here; it is compiled when a

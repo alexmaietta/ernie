@@ -151,7 +151,7 @@ void Reserve(const VulkanContext& context, std::unique_ptr<GpuBuffer>& buffer, V
     buffer = std::make_unique<GpuBuffer>(context, bytes, usage, memory);
 }
 
-/// Frame (0 to 4), material (5 to 9) and mesh (10 to 19, 21 to 23) bindings; see mesh.slang.
+/// Frame (0 to 4), material (5 to 9) and mesh (10 to 19, 21 to 25) bindings; see mesh.slang.
 constexpr DescriptorBinding kBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
@@ -176,6 +176,8 @@ constexpr DescriptorBinding kBindings[] = {
     {21, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {22, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {23, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
+    {24, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
+    {25, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
 };
 
 /// The motion pass's: the mesh passes' and 20, the view's MotionUniforms (frame.slang), last as
@@ -204,6 +206,8 @@ constexpr DescriptorBinding kMotionBindings[] = {
     {21, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {22, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {23, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
+    {24, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
+    {25, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {20, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
 };
 

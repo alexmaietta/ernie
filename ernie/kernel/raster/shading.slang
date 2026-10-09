@@ -108,7 +108,8 @@ struct LightGpu {
 }
 
 struct MaterialGpu {
-    // Model index, unused.
+    // x: model index; y: the parameter a per-pixel value in the G-buffer replaces, plus 1 (0 for
+    // none; `packSurfaceFlags`); zw unused.
     uint4 info;
     BrdfParams params;
     // Reflectance per band normalised to luminance 1 (G-buffer albedo.x scales it), four per
@@ -375,6 +376,12 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     let encodedSigma = float(ids.w >> 16) / 65535.0;
     let sigma = encodedSigma / (1.0 - encodedSigma);
     let slopeVariance = sigma * sigma;
+    // A textured parameter (such as metallic) replaces the material's value per pixel.
+    var params = material.params;
+    if (material.info.y != 0) {
+        let index = material.info.y - 1;
+        params.values[index / 4][index % 4] = float((ids.w >> 8) & 0xFFu) / 255.0;
+    }
     let domeRgb = unlit ? float3(0.0) : domeIrradiance(n);
     let domeScale = max(domeRgb.x, max(domeRgb.y, domeRgb.z));
     let domeCoefficients = domeScale > 0.0 ? sigmoidCoefficients(domeRgb / domeScale) : float3(0.0);
@@ -431,7 +438,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         if (unlit) {
             response = bandAlbedo;
         } else {
-            let factors = radianceFactors(n, l, v, bandAlbedo, slopeVariance, material.params);
+            let factors = radianceFactors(n, l, v, bandAlbedo, slopeVariance, params);
             response = ambient * bandAlbedo + (1.0 - ambient) * factors * visibility;
         }
         var radiance = bandIrradiance / PI * response;
@@ -452,7 +459,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                 lightSpectrum[j] = bandValue(lights[k].spectrum, min(first + j, bands - 1));
             }
             let factors = radianceFactors(n, lightDirections[k], v, bandAlbedo, slopeVariance,
-                                          material.params);
+                                          params);
             radiance += lightScales[k] * lightSpectrum / PI * factors;
         }
         for (uint k = 0; k < 3 && first + k < bands; ++k) {

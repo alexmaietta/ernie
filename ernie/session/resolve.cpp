@@ -1251,9 +1251,10 @@ glm::vec4 Vec4Of(const Scene& scene, const Path& path, std::string_view attribut
 }
 
 /// The UsdUVTexture that input `input` of the UsdPreviewSurface at `surface` connects to, with
-/// the UsdTransform2d and UsdPrimvarReader_float2 feeding its coordinates.
+/// the UsdTransform2d and UsdPrimvarReader_float2 feeding its coordinates. A `scalar` input reads
+/// one channel (outputs:r, g, b or a), any other outputs:rgb.
 TextureReader TextureReaderOf(const Scene& scene, const Connection& connection,
-                              std::string_view input, const Path& surface) {
+                              std::string_view input, const Path& surface, bool scalar = false) {
     using namespace tokens;
     const Path& texture = connection.prim;
     const std::string where = "'" + surface.String() + "' " + std::string(input);
@@ -1261,11 +1262,20 @@ TextureReader TextureReaderOf(const Scene& scene, const Connection& connection,
         throw std::invalid_argument(where + " connects to '" + texture.String() +
                                     "', which is not a UsdUVTexture");
     }
-    if (connection.output != "outputs:rgb") {
-        throw std::invalid_argument(where + " reads " + connection.output +
-                                    "; only outputs:rgb is supported");
-    }
     TextureReader reader;
+    if (scalar) {
+        constexpr std::array<std::string_view, 4> kChannels{"outputs:r", "outputs:g", "outputs:b",
+                                                            "outputs:a"};
+        const auto it = std::find(kChannels.begin(), kChannels.end(), connection.output);
+        if (it == kChannels.end()) {
+            throw std::invalid_argument(where + " reads " + connection.output +
+                                        "; a scalar input reads outputs:r, g, b or a");
+        }
+        reader.channel = static_cast<int>(it - kChannels.begin());
+    } else if (connection.output != "outputs:rgb") {
+        throw std::invalid_argument(where + " reads " + connection.output +
+                                    "; a colour or normal reads outputs:rgb");
+    }
     if (scene.Read(texture, kShaderTexture) != nullptr) {
         reader.image = texture.String();
     } else {
@@ -1343,9 +1353,11 @@ std::string UvSetOf(const Scene& scene, const Path& material) {
         if (surface.IsEmpty()) {
             return "st";
         }
-        for (const std::string_view input : {tokens::kDiffuseColor, tokens::kNormalInput}) {
+        for (const std::string_view input : {tokens::kDiffuseColor, tokens::kNormalInput,
+                                             tokens::kRoughness, tokens::kMetallic}) {
             if (const std::optional<Connection> texture = GetConnection(scene, surface, input)) {
-                return TextureReaderOf(scene, *texture, input, surface).uvSet;
+                const bool scalar = input == tokens::kRoughness || input == tokens::kMetallic;
+                return TextureReaderOf(scene, *texture, input, surface, scalar).uvSet;
             }
         }
     } catch (const std::invalid_argument&) {
@@ -1421,15 +1433,49 @@ MaterialSettings MaterialSettingsOf(const Scene& scene, const Path& material,
                                     const BrdfRegistry& brdfs) {
     using namespace tokens;
     MaterialSettings settings;
-    settings.brdf = GetToken(scene, material, kBrdf, settings.brdf);
+    // A UsdPreviewSurface network shades with the preview surface's model, reading its inputs from
+    // the shader, unless the Material names another model.
+    const Path surface = PreviewSurfaceOf(scene, material);
+    settings.brdf = GetToken(scene, material, kBrdf,
+                             surface.IsEmpty() ? settings.brdf : std::string("preview_surface"));
     const BrdfModel* model = brdfs.Find(settings.brdf);
     if (model == nullptr) {
         throw std::invalid_argument("Material '" + material.String() + "' names unknown BRDF '" +
                                     settings.brdf + "'");
     }
+    const bool preview = !surface.IsEmpty() && settings.brdf == "preview_surface";
+    const Path& inputs = preview ? surface : material;
     for (const BrdfParam& param : model->params) {
         settings.brdfParams.push_back(
-            Number(scene, material, "inputs:" + param.name, param.defaultValue));
+            Number(scene, inputs, "inputs:" + param.name, param.defaultValue));
+    }
+    if (preview) {
+        const auto index = [&](std::string_view name) {
+            for (std::size_t i = 0; i < model->params.size(); ++i) {
+                if (model->params[i].name == name) {
+                    return static_cast<int>(i);
+                }
+            }
+            return -1;
+        };
+        // useSpecularWorkflow is USD's int, or a bool; specularColor is one colour input over
+        // three parameters.
+        settings.brdfParams[static_cast<std::size_t>(index("useSpecularWorkflow"))] =
+            GetBool(scene, surface, kUseSpecularWorkflow, false) ? 1.0f : 0.0f;
+        const glm::dvec3 specular = GetVec3(scene, surface, kSpecularColor, glm::dvec3(0.0));
+        for (int c = 0; c < 3; ++c) {
+            settings.brdfParams[static_cast<std::size_t>(index("specularColorR") + c)] =
+                static_cast<float>(specular[c]);
+        }
+        if (const std::optional<Connection> roughness = GetConnection(scene, surface, kRoughness)) {
+            settings.roughnessTexture =
+                TextureReaderOf(scene, *roughness, kRoughness, surface, true);
+            settings.brdfParams[static_cast<std::size_t>(index("roughness"))] = 0.0f;
+        }
+        if (const std::optional<Connection> metallic = GetConnection(scene, surface, kMetallic)) {
+            settings.metallicTexture = TextureReaderOf(scene, *metallic, kMetallic, surface, true);
+            settings.metallicParam = index("metallic");
+        }
     }
     settings.albedo = glm::vec3(GetVec3(scene, material, kAlbedo, glm::dvec3(settings.albedo)));
     settings.useAlbedoMap = GetBool(scene, material, kAlbedoMapEnable, true);
@@ -1443,9 +1489,8 @@ MaterialSettings MaterialSettingsOf(const Scene& scene, const Path& material,
     detail.hexContrast = Number(scene, material, kDetailHexContrast, detail.hexContrast);
     detail.hexSharpness = Number(scene, material, kDetailHexSharpness, detail.hexSharpness);
 
-    // A UsdPreviewSurface network: its diffuse colour (a constant or a texture) is the albedo,
-    // and its normal a normal map.
-    const Path surface = PreviewSurfaceOf(scene, material);
+    // The network's diffuse colour (a constant or a texture) is the albedo, and its normal a
+    // normal map, whichever model shades it.
     if (!surface.IsEmpty()) {
         if (const std::optional<Connection> diffuse = GetConnection(scene, surface, kDiffuseColor)) {
             settings.albedoTexture = TextureReaderOf(scene, *diffuse, kDiffuseColor, surface);

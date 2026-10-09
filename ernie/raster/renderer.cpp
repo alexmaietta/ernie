@@ -1337,6 +1337,11 @@ void RasterRenderer::WriteMaterialTable() {
                          [&](const BrdfModel& m) { return m.id == material->Settings().brdf; });
         const auto index = static_cast<std::size_t>(model - registered.begin());
         entry.info[0] = static_cast<std::uint32_t>(index);
+        // The parameter the G-buffer's per-pixel value replaces, plus 1 (0 for none).
+        const MaterialSettings& settings = material->Settings();
+        if (settings.metallicTexture && settings.metallicParam >= 0) {
+            entry.info[1] = static_cast<std::uint32_t>(settings.metallicParam) + 1;
+        }
         models.insert(index);
         const std::vector<float>& params = material->Params();
         std::copy_n(params.begin(), std::min<std::size_t>(params.size(), BrdfRegistry::kMaxParams),

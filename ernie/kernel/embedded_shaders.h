@@ -11,6 +11,7 @@ extern const char kBrdfLommelSeeligerSlang[];
 extern const char kBrdfLunarLambertSlang[];
 extern const char kBrdfOrenNayarSlang[];
 extern const char kBrdfHapkeSlang[];
+extern const char kBrdfPreviewSurfaceSlang[];
 
 /// Per-frame resources and helpers every raster pass shares.
 extern const char kFrameSlang[];

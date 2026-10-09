@@ -282,9 +282,11 @@ inline constexpr std::string_view kDetailHexSharpness = "inputs:detail:hexSharpn
 // UsdShade networks. A Material's `outputs:surface.connect` names a UsdPreviewSurface Shader, whose
 // inputs are constants or connections to other Shaders' outputs: a connection is the attribute
 // `<input>.connect` holding the source's property path as text, e.g. "/Looks/M/Tex.outputs:rgb"
-// (`GetConnection`). Ernie reads UsdPreviewSurface's diffuseColor and normal, UsdUVTexture,
+// (`GetConnection`). Ernie reads UsdPreviewSurface's diffuseColor, normal, roughness, metallic,
+// ior, useSpecularWorkflow, specularColor, clearcoat and clearcoatRoughness, UsdUVTexture,
 // UsdPrimvarReader_float2 and UsdTransform2d; a Material without a surface keeps Ernie's own
-// inputs above.
+// inputs above. A Material with one shades with the `preview_surface` model unless it names
+// another in `ernie:brdf`, which then reads its parameters from the Material as before.
 //
 // Reference: Pixar, "UsdPreviewSurface Specification",
 // https://openusd.org/release/spec_usdpreviewsurface.html
@@ -299,6 +301,16 @@ inline constexpr std::string_view kSurfaceOutput = "outputs:surface";
 inline constexpr std::string_view kDiffuseColor = "inputs:diffuseColor";  ///< vec3, 0.18 grey.
 /// Tangent-space normal, +y along the texture's t; a texture's scale and bias decode it.
 inline constexpr std::string_view kNormalInput = "inputs:normal";
+/// The `preview_surface` model's inputs (defaults 0.5, 0, 1.5, 0, black, 0, 0.01); roughness and
+/// metallic may connect to one channel of a texture (outputs:r, g, b or a), as glTF's
+/// metallicRoughness texture does with b and g.
+inline constexpr std::string_view kRoughness = "inputs:roughness";
+inline constexpr std::string_view kMetallic = "inputs:metallic";
+inline constexpr std::string_view kIor = "inputs:ior";
+inline constexpr std::string_view kUseSpecularWorkflow = "inputs:useSpecularWorkflow";  ///< int.
+inline constexpr std::string_view kSpecularColor = "inputs:specularColor";              ///< vec3.
+inline constexpr std::string_view kClearcoat = "inputs:clearcoat";
+inline constexpr std::string_view kClearcoatRoughness = "inputs:clearcoatRoughness";
 /// UsdUVTexture: an image file (PNG, JPEG or EXR), or the tensor `ernie:texture` (float32 or uint8
 /// (rows, cols, channels), rows top to bottom) in its place; texture coordinates from `inputs:st`.
 inline constexpr std::string_view kFile = "inputs:file";

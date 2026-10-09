@@ -103,4 +103,47 @@ inline double HapkeReference(const Geometry& g, double w, const std::vector<floa
     return k * w / 4.0 * mu0e / (mu0e + mue) * (phase * (1.0 + shoe) + multiple) * s;
 }
 
+/// The preview surface's I/F for one channel of base colour `albedo`, written from explicit light,
+/// view and half vectors (glTF 2.0 Appendix B), with unresolved slope variance `variance`:
+/// parameters roughness, metallic, ior, useSpecularWorkflow, specularColor (3), clearcoat,
+/// clearcoatRoughness.
+inline double PreviewSurfaceReference(const Geometry& g, double albedo,
+                                      const std::vector<float>& p, double variance = 0.0) {
+    const double sinI = std::sqrt(std::max(0.0, 1.0 - g.mu0 * g.mu0));
+    const double sinE = std::sqrt(std::max(0.0, 1.0 - g.mu * g.mu));
+    const double sinPsi = std::sqrt(std::max(0.0, 1.0 - g.cosPsi * g.cosPsi));
+    const glm::dvec3 n(0.0, 0.0, 1.0);
+    const glm::dvec3 l(sinI, 0.0, g.mu0);
+    const glm::dvec3 v(sinE * g.cosPsi, sinE * sinPsi, g.mu);
+    const glm::dvec3 h = glm::normalize(l + v);
+    const double nh = glm::dot(n, h);
+    const double vh = glm::dot(v, h);
+    const auto lobe = [&](double roughness) {
+        const double alpha = roughness * roughness;
+        const double a2 = std::clamp(alpha * alpha + 2.0 * variance, 1e-6, 1.0);
+        const double d = a2 / (kPi * std::pow(nh * nh * (a2 - 1.0) + 1.0, 2.0));
+        const double vis = 0.5 / (g.mu0 * std::sqrt(g.mu * g.mu * (1.0 - a2) + a2) +
+                                  g.mu * std::sqrt(g.mu0 * g.mu0 * (1.0 - a2) + a2));
+        return d * vis;
+    };
+    const auto schlick = [&](double f0) { return f0 + (1.0 - f0) * std::pow(1.0 - vh, 5.0); };
+    const double specular = lobe(p[0]);
+    double f = 0.0;
+    if (p[3] > 0.5) {
+        const double fresnel = schlick((p[4] + p[5] + p[6]) / 3.0);
+        f = (1.0 - fresnel) * albedo / kPi + fresnel * specular;
+    } else {
+        const double r0 = std::pow((p[2] - 1.0) / (p[2] + 1.0), 2.0);
+        const double dielectric =
+            (1.0 - schlick(r0)) * albedo / kPi + schlick(r0) * specular;
+        const double metal = schlick(albedo) * specular;
+        f = (1.0 - p[1]) * dielectric + p[1] * metal;
+    }
+    if (p[7] > 0.0) {
+        const double coat = schlick(0.04) * p[7];
+        f = f * (1.0 - coat) + coat * lobe(p[8]);
+    }
+    return kPi * g.mu0 * f;
+}
+
 }  // namespace ernie::testing

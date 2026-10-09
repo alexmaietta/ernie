@@ -29,10 +29,12 @@ struct SurfaceUniforms {
     float albedoTextureBias[4];
     float albedoUv[8];  ///< Rows of the 2 x 3 texture coordinate transform.
     float normalUv[8];
-    float textures[4];  ///< Has albedo texture, has normal map, unused, unused.
+    float roughnessUv[8];
+    float metallicUv[8];
+    float textures[4];  ///< Has albedo texture, normal map, roughness, metallic.
     float params[BrdfRegistry::kMaxParams];
 };
-static_assert(sizeof(SurfaceUniforms) == 320,
+static_assert(sizeof(SurfaceUniforms) == 384,
               "SurfaceUniforms must match Surface in surface.slang");
 
 /// UsdTransform2d as the rows of a 2 x 3 matrix: scale, then rotate counter-clockwise, then
@@ -115,6 +117,32 @@ RasterMaterial::RasterMaterial(const VulkanContext& context, FrameUploads& uploa
     SetDetailTextures(nullptr, nullptr);
     SetAlbedoTexture(nullptr, TextureReader());
     SetNormalTexture(nullptr, TextureReader());
+    SetScalarTexture(false, nullptr, TextureReader());
+    SetScalarTexture(true, nullptr, TextureReader());
+}
+
+void RasterMaterial::SetScalarTexture(bool metallic, const Image* image,
+                                      const TextureReader& reader) {
+    CheckDetailImage(image);
+    Image values(1, 1, glm::vec4(0.0f));
+    if (image != nullptr) {
+        values = *image;
+        const int channel = std::clamp(reader.channel, 0, 3);
+        for (glm::vec4& texel : values.pixels) {
+            const float value = std::clamp(
+                texel[channel] * reader.scale[channel] + reader.bias[channel], 0.0f, 1.0f);
+            texel = glm::vec4(value, value, value, 1.0f);
+        }
+    }
+    auto texture =
+        UploadMips(values, MipFilter::Average, ImageEncoding::Linear, VK_FORMAT_R8G8B8A8_UNORM);
+    auto sampler = TextureSampler(context_, reader);
+    vkDeviceWaitIdle(context_.Device());
+    const std::size_t slot = metallic ? 1 : 0;
+    scalarTextures_[slot] = std::move(texture);
+    scalarSamplers_[slot] = std::move(sampler);
+    hasScalarTexture_[slot] = image != nullptr;
+    WriteUniform();
 }
 
 void RasterMaterial::SetAlbedoTexture(const Image* albedo, const TextureReader& reader) {
@@ -158,6 +186,11 @@ void RasterMaterial::AppendTextureResources(std::vector<DescriptorResource>& res
         albedoTexture_->View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, *albedoSampler_));
     resources.push_back(DescriptorResource::Of(
         normalTexture_->View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, *normalSampler_));
+    for (std::size_t slot = 0; slot < 2; ++slot) {
+        resources.push_back(DescriptorResource::Of(scalarTextures_[slot]->View(),
+                                                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                                   *scalarSamplers_[slot]));
+    }
 }
 
 void RasterMaterial::AppendResources(std::vector<DescriptorResource>& resources) const {
@@ -331,16 +364,20 @@ void RasterMaterial::WriteUniform() {
     }
     WriteUvTransform(albedoReader, u.albedoUv);
     WriteUvTransform(normalReader, u.normalUv);
+    WriteUvTransform(settings.roughnessTexture.value_or(TextureReader()), u.roughnessUv);
+    WriteUvTransform(settings.metallicTexture.value_or(TextureReader()), u.metallicUv);
     u.textures[0] = hasAlbedoTexture_ && settings.albedoTexture ? 1.0f : 0.0f;
     u.textures[1] = hasNormalTexture_ && settings.normalTexture ? 1.0f : 0.0f;
-    const std::size_t count = std::min(brdfParams.size(), BrdfRegistry::kMaxParams);
+    u.textures[2] = hasScalarTexture_[0] && settings.roughnessTexture ? 1.0f : 0.0f;
+    u.textures[3] = hasScalarTexture_[1] && settings.metallicTexture ? 1.0f : 0.0f;    const std::size_t count = std::min(brdfParams.size(), BrdfRegistry::kMaxParams);
     std::memcpy(u.params, brdfParams.data(), count * sizeof(float));
     uploads_.Write(uniform_, std::as_bytes(std::span(&u, 1)));
 }
 
 std::uint64_t RasterMaterial::GpuBytes() const {
     return uniform_.Size() + albedoMap_->Bytes() + detailAlbedo_->Bytes() + detailNormal_->Bytes() +
-           albedoTexture_->Bytes() + normalTexture_->Bytes();
+           albedoTexture_->Bytes() + normalTexture_->Bytes() + scalarTextures_[0]->Bytes() +
+           scalarTextures_[1]->Bytes();
 }
 
 std::unique_ptr<GpuImage> RasterMaterial::UploadMips(const Image& image, MipFilter filter,

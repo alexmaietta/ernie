@@ -27,6 +27,7 @@ using ernie::ShaderModuleSource;
 using ernie::testing::Geometry;
 using ernie::testing::GeometryGrid;
 using ernie::testing::HapkeReference;
+using ernie::testing::PreviewSurfaceReference;
 using ernie::testing::HenyeyGreenstein;
 using ernie::testing::kPi;
 
@@ -225,6 +226,30 @@ TEST_F(BrdfVulkanTest, UnresolvedSlopesWidenTheModelsRoughness) {
     }
 }
 
+TEST_F(BrdfVulkanTest, PreviewSurfaceMatchesTheGltfReferenceBrdf) {
+    // Dielectric, metal, the specular workflow and a clearcoat, against the vector-form reference.
+    const std::vector<std::vector<float>> parameterSets = {
+        BrdfRegistry::WithBuiltins().Find("preview_surface")->Defaults(),
+        {0.3f, 1.0f, 1.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.01f},
+        {0.8f, 0.4f, 2.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.01f},
+        {0.5f, 0.0f, 1.5f, 1.0f, 0.2f, 0.5f, 0.8f, 0.0f, 0.01f},
+        {0.6f, 0.0f, 1.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.7f, 0.2f}};
+    for (const auto& params : parameterSets) {
+        ExpectMatches(
+            "preview_surface", params,
+            [&params](const Geometry& g, double a) { return PreviewSurfaceReference(g, a, params); },
+            1e-3);
+    }
+    // Unresolved slopes widen the lobe as alpha^2 + 2 variance.
+    const std::vector<Geometry> cases = GeometryGrid();
+    const std::vector<float> params = {0.3f, 1.0f, 1.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.01f};
+    const std::vector<glm::dvec3> rough = Evaluate("preview_surface", params, cases, 0.02);
+    for (std::size_t c = 0; c < cases.size(); ++c) {
+        const double expected = PreviewSurfaceReference(cases[c], cases[c].albedo.g, params, 0.02);
+        EXPECT_NEAR(rough[c].g, expected, 1e-3 * std::max(1.0, expected)) << "case " << c;
+    }
+}
+
 TEST_F(BrdfVulkanTest, HapkeHFunctionIsWithinOnePercentOfChandrasekhar) {
     // Isotropic, conservative scattering (w = 1) without opposition effect, roughness or porosity
     // reduces Hapke to I/F = H(mu0) H(mu) / 8 at normal incidence and emission. Chandrasekhar's
@@ -244,7 +269,9 @@ TEST_F(BrdfVulkanTest, SmoothModelsAreReciprocal) {
         std::swap(g.mu0, g.mu);
     }
     const std::vector<std::pair<std::string, std::vector<float>>> models = {
-        {"lommel_seeliger", {0.2f}}, {"hapke", {0.25f, 0.5f, 1.0f, 0.07f, 0.0f, 0.3f}}};
+        {"lommel_seeliger", {0.2f}},
+        {"hapke", {0.25f, 0.5f, 1.0f, 0.07f, 0.0f, 0.3f}},
+        {"preview_surface", {0.4f, 0.5f, 1.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.5f, 0.3f}}};
     for (const auto& [id, params] : models) {
         const std::vector<glm::dvec3> a = Evaluate(id, params, forward);
         const std::vector<glm::dvec3> b = Evaluate(id, params, swapped);

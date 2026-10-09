@@ -262,14 +262,17 @@ TEST_F(MeshDrawableTest, EveryBuiltinBrdfCompilesForMeshes) {
     MeshDrawable& meshes = frame.meshes;
     const std::uint32_t square = meshes.AddMesh(Square(1.0f));
     std::vector<MeshItem> items;
+    // One square per model, spread over the same 24 units of the view however many there are.
+    const std::span<const ernie::BrdfModel> models = frame.renderer.Brdfs().Models();
+    const float step = 24.0f / static_cast<float>(std::max<std::size_t>(models.size() - 1, 1));
     float x = -12.0f;
-    for (const ernie::BrdfModel& model : frame.renderer.Brdfs().Models()) {
+    for (const ernie::BrdfModel& model : models) {
         MeshItem item;
         item.mesh = square;
         item.transform = glm::translate(glm::mat4(1.0f), {x, 0.0f, 0.0f});
         item.material = frame.renderer.AddMaterial({model.id});
         items.push_back(item);
-        x += 6.0f;
+        x += step;
     }
     meshes.SetItems(items);
     const std::vector<Pixel> pixels = Render(frame, 40.0f, glm::vec3(0.3f, 0.2f, 1.0f));

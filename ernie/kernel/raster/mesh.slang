@@ -4,8 +4,9 @@
 //   10 points, 11 normals, 12 triangle indices, 13 draws, 14 vertex colours,
 //   15 instance positions, 16 instance orientations, 17 instance scales, 18 instance ids,
 //   19 per-draw records of multi-draws (draw, instance offset, index offset, unused),
-//   21 texture coordinates per triangle corner, 22 the material's albedo texture and 23 its
-//   normal map, each with its own sampler (`RasterMaterial::AppendTextureResources`).
+//   21 texture coordinates per triangle corner, 22 the material's albedo texture, 23 its normal
+//   map, 24 its roughness and 25 its metallic texture, each with its own sampler
+//   (`RasterMaterial::AppendTextureResources`).
 // The colour pass writes the G-buffer for spectral shading (frame.slang).
 import frame;
 import surface;
@@ -59,6 +60,9 @@ struct MeshDraw {
 // Tangent-space normals stored as n * 127 + 128 in 8 bits, with the deviation of the slopes each
 // texel covers in alpha (`MipFilter::NormalSlopes`), as the detail normal map.
 [[vk::binding(23, 0)]] Sampler2D normalTexture;
+// Roughness and metallic, one channel each in r.
+[[vk::binding(24, 0)]] Sampler2D roughnessTexture;
+[[vk::binding(25, 0)]] Sampler2D metallicTexture;
 
 // What one draw draws: the draw (`draws` entry), its first instance id and its first index past
 // the mesh's own.
@@ -313,12 +317,14 @@ float2 imageUv(float2 uv) {
 
 struct UvSample {
     float3 albedo;        // multiplier on the albedo modulation
-    float slopeVariance;  // of the normal map's slopes the pixel covers
+    float slopeVariance;  // of the normal map's slopes the pixel covers, and the roughness's
+    float metallic;       // the metallic texture's value, 0 without one
 }
 
 // The material's textures through the mesh's texture coordinates `st`: the albedo texture's
-// colour (scaled and biased), and the normal map perturbing `normal` in the tangent frame the
-// coordinates' screen-space derivatives give, so meshes need no stored tangents.
+// colour (scaled and biased), the normal map perturbing `normal` in the tangent frame the
+// coordinates' screen-space derivatives give, so meshes need no stored tangents, the roughness
+// as slope variance alpha^2 / 2 (alpha its square), and the metallic value.
 //
 // References:
 // - C. Schüler, "Normal Mapping without Precomputed Tangents", ShaderX5, 2006, and
@@ -336,6 +342,15 @@ UvSample uvTextures(float2 st, float3 world, inout float3 normal) {
     UvSample s;
     s.albedo = float3(1.0);
     s.slopeVariance = 0.0;
+    s.metallic = 0.0;
+    if (surface.textures.z > 0.0) {
+        let roughness = roughnessTexture.Sample(imageUv(transformUv(surface.roughnessUv, st))).r;
+        let alpha = roughness * roughness;
+        s.slopeVariance = 0.5 * alpha * alpha;
+    }
+    if (surface.textures.w > 0.0) {
+        s.metallic = metallicTexture.Sample(imageUv(transformUv(surface.metallicUv, st))).r;
+    }
     if (surface.textures.x > 0.0) {
         let c = albedoTexture.Sample(imageUv(transformUv(surface.albedoUv, st)));
         s.albedo = max(c.rgb * surface.albedoTextureScale.rgb + surface.albedoTextureBias.rgb,
@@ -357,7 +372,7 @@ UvSample uvTextures(float2 st, float3 world, inout float3 normal) {
             let scale = rsqrt(size);
             normal = normalize(tangent * scale * n.x + bitangent * scale * n.y + normal * n.z);
             let sigma = min(texel.w, 0.999) / (1.0 - min(texel.w, 0.999));
-            s.slopeVariance = sigma * sigma;
+            s.slopeVariance += sigma * sigma;
         }
     }
     return s;
@@ -390,6 +405,7 @@ GBuffer meshFragmentMain(VertexOutput in) {
                         wireframe(modulation, in.barycentric));
     out.ids = uint4(d.points.y, d.points.z, in.instance,
                     packSurfaceFlags(unlit ? kUnlit : 0u,
-                                     textured.slopeVariance + detail.slopeVariance));
+                                     textured.slopeVariance + detail.slopeVariance,
+                                     textured.metallic));
     return out;
 }

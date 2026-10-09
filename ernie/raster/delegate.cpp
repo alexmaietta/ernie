@@ -44,9 +44,10 @@ ImageEncoding EncodingOf(const TextureReader& reader) {
                                                        : ImageEncoding::Srgb;
 }
 
-/// What a texture's upload depends on: its source (and its tensor's version), colour space and
-/// wrapping, and for normal maps the scale and bias applied before upload.
-std::string TextureKey(const Scene& scene, const TextureReader& reader, bool normal) {
+/// What a texture's upload depends on: its source (and its tensor's version), colour space,
+/// wrapping, channel, and the scale and bias that normal maps and one-channel textures apply
+/// before upload.
+std::string TextureKey(const Scene& scene, const TextureReader& reader) {
     std::string key = reader.Source();
     if (!reader.image.empty()) {
         key += "@" + std::to_string(scene.AttributeVersion(Path(reader.image),
@@ -54,11 +55,9 @@ std::string TextureKey(const Scene& scene, const TextureReader& reader, bool nor
     }
     key += "|" + std::to_string(static_cast<int>(reader.colorSpace)) + "|" +
            std::to_string(static_cast<int>(reader.wrapS)) + "|" +
-           std::to_string(static_cast<int>(reader.wrapT));
-    if (normal) {
-        for (int c = 0; c < 3; ++c) {
-            key += "|" + std::to_string(reader.scale[c]) + "|" + std::to_string(reader.bias[c]);
-        }
+           std::to_string(static_cast<int>(reader.wrapT)) + "|" + std::to_string(reader.channel);
+    for (int c = 0; c < 4; ++c) {
+        key += "|" + std::to_string(reader.scale[c]) + "|" + std::to_string(reader.bias[c]);
     }
     return key;
 }
@@ -370,26 +369,33 @@ void RasterDelegate::SyncMaterial(const Scene& scene, const Path& path, SyncedMa
     const MaterialSettings settings = MaterialSettingsOf(scene, path, renderer_.Brdfs());
     renderer_.SetMaterial(material.id, settings);
     RasterMaterial& gpu = renderer_.Material(material.id);
-    for (const bool normal : {false, true}) {
-        const std::optional<TextureReader>& reader =
-            normal ? settings.normalTexture : settings.albedoTexture;
-        std::string& cached = normal ? material.normalTexture : material.albedoTexture;
-        const std::string key = reader ? TextureKey(scene, *reader, normal) : std::string();
-        if (cached == key) {
+    // The textures of a UsdPreviewSurface: albedo, normal map, roughness and metallic.
+    const std::array<const std::optional<TextureReader>*, 4> readers{
+        &settings.albedoTexture, &settings.normalTexture, &settings.roughnessTexture,
+        &settings.metallicTexture};
+    constexpr std::array<std::string_view, 4> kInputs{kDiffuseColor, kNormalInput, kRoughness,
+                                                      kMetallic};
+    for (std::size_t slot = 0; slot < readers.size(); ++slot) {
+        const std::optional<TextureReader>& reader = *readers[slot];
+        const std::string key = reader ? TextureKey(scene, *reader) : std::string();
+        if (material.textures[slot] == key) {
             continue;
         }
-        cached = key;
+        material.textures[slot] = key;
         try {
             const std::optional<Image> image =
                 reader ? std::optional(TextureImageOf(scene, *reader)) : std::nullopt;
+            const Image* data = image ? &*image : nullptr;
             const TextureReader wrap = reader.value_or(TextureReader());
-            if (normal) {
-                gpu.SetNormalTexture(image ? &*image : nullptr, wrap);
+            if (slot == 0) {
+                gpu.SetAlbedoTexture(data, wrap);
+            } else if (slot == 1) {
+                gpu.SetNormalTexture(data, wrap);
             } else {
-                gpu.SetAlbedoTexture(image ? &*image : nullptr, wrap);
+                gpu.SetScalarTexture(slot == 3, data, wrap);
             }
         } catch (const std::exception& error) {
-            throw UploadError(path, normal ? kNormalInput : kDiffuseColor, error.what());
+            throw UploadError(path, kInputs[slot], error.what());
         }
     }
 

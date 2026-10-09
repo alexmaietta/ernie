@@ -26,11 +26,14 @@ public struct Surface {
     public float4 hexPhaseXz;
     // Textures through mesh texture coordinates (mesh.slang): the albedo texture's scale and
     // bias, each texture's coordinate transform (UsdTransform2d) as the rows of a 2 x 3 matrix in
-    // xyz, and whether there is an albedo texture (x) and a normal map (y).
+    // xyz, and whether there is an albedo texture (x), a normal map (y), a roughness texture (z)
+    // and a metallic texture (w).
     public float4 albedoTextureScale;
     public float4 albedoTextureBias;
     public float4 albedoUv[2];
     public float4 normalUv[2];
+    public float4 roughnessUv[2];
+    public float4 metallicUv[2];
     public float4 textures;
     // Parameters of the active reflectance model.
     public BrdfParams brdf;
@@ -229,10 +232,13 @@ public DetailSample sampleDetail(DetailCoords c) {
 }
 
 // Packs the slope variance of `DetailSample` with a pixel's flags into the G-buffer's ids.w: the
-// flags in the low 16 bits, and in the high ones the slopes' deviation sigma as sigma / (1 + sigma)
-// in 16-bit fixed point (shading.slang unpacks it).
-public uint packSurfaceFlags(uint flags, float slopeVariance) {
+// flags in the low 8 bits; a textured model parameter in [0, 1] (`MaterialSettings::
+// metallicParam`), 0 without one, in the next 8 as 8-bit fixed point; and in the high 16 the
+// slopes' deviation sigma as sigma / (1 + sigma) in 16-bit fixed point (shading.slang unpacks
+// them).
+public uint packSurfaceFlags(uint flags, float slopeVariance, float parameter = 0.0) {
     let sigma = sqrt(max(slopeVariance, 0.0));
     let encoded = uint(round(sigma / (1.0 + sigma) * 65535.0));
-    return (flags & 0xFFFFu) | (min(encoded, 65534u) << 16);
+    let value = uint(round(saturate(parameter) * 255.0));
+    return (flags & 0xFFu) | (value << 8) | (min(encoded, 65534u) << 16);
 }

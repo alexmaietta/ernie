@@ -1,4 +1,5 @@
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/camera.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 #include "support/delegate_scenes.h"
@@ -86,6 +87,26 @@ float CentreGreen(RasterDelegate& delegate, const Scene& scene) {
     return hdr.As<float>()[4 * centre + 1];
 }
 
+/// HdrColor's green at the pixel showing quad point (x, y).
+float GreenAt(const Scene& scene, const Tensor& hdr, float x, float y) {
+    const glm::vec4 clip =
+        ernie::CameraOf(scene, "/World/Camera", kSize, kSize).RasterView().ViewProjection() *
+        glm::vec4(x, y, 0.0f, 1.0f);
+    const glm::vec2 ndc = glm::vec2(clip) / clip.w;
+    const auto col = static_cast<std::size_t>((ndc.x * 0.5f + 0.5f) * kSize);
+    const auto row = static_cast<std::size_t>((0.5f - ndc.y * 0.5f) * kSize);
+    return hdr.As<float>()[4 * (row * kSize + col) + 1];
+}
+
+/// /Looks/M as a plain grey preview surface lit and seen from straight above, where its specular
+/// lobe shows.
+Scene PreviewScene() {
+    Scene scene = TexturedScene();
+    scene.Set("/Looks/M/Surface", tokens::kDiffuseColor, glm::vec3(0.6f));
+    scene.Set("/World/Sun", tokens::kTransform, ernie::DistantLightTransform({0.3, 0.0, 1.0}));
+    return scene;
+}
+
 }  // namespace
 
 TEST_F(RasterDelegateTest, AlbedoTexturesFollowTextureCoordinatesWithTheImageUpright) {
@@ -131,8 +152,10 @@ TEST_F(RasterDelegateTest, AlbedoTexturesFollowTextureCoordinatesWithTheImageUpr
 TEST_F(RasterDelegateTest, NormalMapsTiltTheSurfaceAlongItsTextureCoordinates) {
     // A normal map tilted 30 degrees towards +s (+x on the quad), stored as n / 2 + 1/2 with the
     // usual scale 2 and bias -1, under a sun 45 degrees towards +x: Lambert's cos(i) rises from
-    // cos 45 to cos 15; with the coordinates turned 180 degrees the tilt faces away, cos 75.
+    // cos 45 to cos 15; with the coordinates turned 180 degrees the tilt faces away, cos 75. The
+    // Material names Lambert, which a preview surface network then shades with.
     Scene scene = TexturedScene();
+    scene.Set("/Looks/M", tokens::kBrdf, std::string("lambert"));
     scene.Set("/World/Sun", tokens::kTransform, ernie::DistantLightTransform({1.0, 0.0, 1.0}));
     const float tilt = glm::radians(30.0f);
     const std::array<float, 4> normal{0.5f * std::sin(tilt) + 0.5f, 0.5f,
@@ -159,4 +182,36 @@ TEST_F(RasterDelegateTest, NormalMapsTiltTheSurfaceAlongItsTextureCoordinates) {
     ernie::Connect(scene, "/Looks/M/Tex", tokens::kSt, "/Looks/M/Turn", "outputs:result");
     const float away = CentreGreen(delegate, scene);
     EXPECT_NEAR(away / flat, cosine(75.0) / cosine(45.0), 0.03f);
+}
+
+TEST_F(RasterDelegateTest, PreviewSurfacesShadeWithGgxAndTheirTexturesPerPixel) {
+    // A metallic texture with 0 on the image's left and 1 on its right (in b, as glTF's
+    // metallicRoughness), and a roughness texture of 0.3 (in g): each half shades as the plain
+    // material of the same constant metallic and roughness.
+    Scene scene = PreviewScene();
+    RasterDelegate delegate(*context_);
+    const auto render = [&](float metallic, float roughness) {
+        scene.Set("/Looks/M/Surface", tokens::kMetallic, metallic);
+        scene.Set("/Looks/M/Surface", tokens::kRoughness, roughness);
+        return Render(delegate, scene, "HdrColor");
+    };
+    const Tensor dielectric = render(0.0f, 0.3f);
+    const Tensor metal = render(1.0f, 0.3f);
+    const Tensor rougher = render(0.0f, 0.8f);
+    const float left = GreenAt(scene, dielectric, -4.0f, 0.0f);
+    const float right = GreenAt(scene, metal, 4.0f, 0.0f);
+    EXPECT_GT(std::abs(GreenAt(scene, metal, -4.0f, 0.0f) - left), 0.05f * left)
+        << "metal and dielectric differ";
+    EXPECT_GT(std::abs(GreenAt(scene, rougher, -4.0f, 0.0f) - left), 0.02f * left)
+        << "and so does roughness";
+
+    const std::array<std::uint8_t, 8> metallicRoughness{0, 77, 0, 255, 0, 77, 255, 255};
+    scene.Write("/Looks/M/Tex", tokens::kShaderTexture,
+                Tensor::Copy<std::uint8_t>(metallicRoughness, {1, 2, 4}));
+    scene.Set("/Looks/M/Tex", tokens::kWrapS, std::string("clamp"));
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kMetallic, "/Looks/M/Tex", "outputs:b");
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kRoughness, "/Looks/M/Tex", "outputs:g");
+    const Tensor textured = render(0.5f, 0.9f);  // the textures replace these
+    EXPECT_NEAR(GreenAt(scene, textured, -4.0f, 0.0f), left, 0.03f * left);
+    EXPECT_NEAR(GreenAt(scene, textured, 4.0f, 0.0f), right, 0.03f * right);
 }
