@@ -48,3 +48,18 @@ def test_push_frame_round_trips_and_authors_framelets():
     assert time == wac.image_time(first + 0.5)
     assert scene.get(path, tokens.CAMERA_SCAN) == tokens.FRAME_SCAN
     assert math.isclose(scene.get(path, tokens.EXPOSURE_TIME), 0.039)
+
+
+def test_frame_camera_matches_usgscsm_and_authors_its_view():
+    frame = ernie.IsdFrame.from_file(str(FIXTURES / "orbitalFramer.json"))
+    assert (frame.lines, frame.samples) == (16, 16)
+    ground = frame.image_to_ground(8.0, 8.0)
+    assert all(math.isclose(a, b, abs_tol=1e-8) for a, b in zip(ground, (1e6, 0.0, 0.0)))
+    line, sample = frame.ground_to_image(frame.image_to_ground(5.5, 9.5))
+    assert math.isclose(line, 5.5, abs_tol=1e-9)
+    assert math.isclose(sample, 9.5, abs_tol=1e-9)
+
+    scene = ernie.Scene()
+    samples, lines, _ = frame.author_camera(scene, "/World/Camera")
+    assert (samples, lines) == (16, 16)
+    assert scene.get("/World/Camera", tokens.CAMERA_SCAN) == tokens.FRAME_SCAN

@@ -242,6 +242,10 @@ bool IsdSensor::IsPushFrame() const {
     return model == "USGS_ASTRO_PUSH_FRAME_SENSOR_MODEL";
 }
 
+bool IsdSensor::IsFrame() const {
+    return model == "USGS_ASTRO_FRAME_SENSOR_MODEL";
+}
+
 IsdSensor ReadIsd(std::string_view json) {
     Json isd;
     try {
@@ -333,12 +337,15 @@ IsdCameraModel::IsdCameraModel(IsdSensor isd) : isd_(std::move(isd)) {
         throw std::invalid_argument("The ISD's focal plane map to pixels is singular");
     }
     if (!isd_.distortion.empty() && isd_.distortion != "radial" &&
-        isd_.distortion != "lrolrocnac") {
+        isd_.distortion != "transverse" && isd_.distortion != "lrolrocnac") {
         throw std::invalid_argument("The ISD's distortion model '" + isd_.distortion +
-                                    "' is not supported; use radial or lrolrocnac");
+                                    "' is not supported; use radial, transverse or lrolrocnac");
     }
     if (isd_.distortion == "lrolrocnac" && isd_.distortionCoefficients.size() != 1) {
         throw std::invalid_argument("LRO NAC distortion takes one coefficient");
+    }
+    if (isd_.distortion == "transverse" && isd_.distortionCoefficients.size() != 20) {
+        throw std::invalid_argument("Transverse distortion takes ten x and ten y coefficients");
     }
     if (isd_.distortion == "radial") {
         isd_.distortionCoefficients.resize(3, 0.0);
@@ -413,6 +420,72 @@ glm::dquat IsdCameraModel::SensorToBody(double time) const {
     return glm::dquat(q.w, q.x, q.y, q.z);
 }
 
+namespace {
+
+// The point p with f(p) = `target`, by Newton's method from `target`, f's Jacobian by central
+// differences.
+template <typename F>
+glm::dvec2 NewtonInverse(const F& f, glm::dvec2 target) {
+    glm::dvec2 p = target;
+    for (int i = 0; i < 20; ++i) {
+        const glm::dvec2 residual = f(p) - target;
+        if (glm::length(residual) < 1e-14) {
+            break;
+        }
+        constexpr double h = 1e-6;
+        const glm::dvec2 dx = (f(p + glm::dvec2(h, 0.0)) - f(p - glm::dvec2(h, 0.0))) / (2.0 * h);
+        const glm::dvec2 dy = (f(p + glm::dvec2(0.0, h)) - f(p - glm::dvec2(0.0, h))) / (2.0 * h);
+        p -= glm::inverse(glm::dmat2(dx, dy)) * residual;
+    }
+    return p;
+}
+
+// usgscsm's `computeTransverseDistortion`: distorted x and y as cubic polynomials of undistorted
+// `u`, coefficients `k` the x's ten then the y's.
+glm::dvec2 TransverseDistort(const std::vector<double>& k, glm::dvec2 u) {
+    const double terms[10] = {1.0,       u.x,           u.y,           u.x * u.x,
+                              u.x * u.y, u.y * u.y,     u.x * u.x * u.x, u.x * u.x * u.y,
+                              u.x * u.y * u.y, u.y * u.y * u.y};
+    glm::dvec2 d(0.0);
+    for (int i = 0; i < 10; ++i) {
+        d += terms[i] * glm::dvec2(k[static_cast<std::size_t>(i)],
+                                   k[static_cast<std::size_t>(i + 10)]);
+    }
+    return d;
+}
+
+// usgscsm's `newtonRaphson` on `TransverseDistort` (with `transverseDistortionJacobian`), as its
+// `removeDistortion` calls it: from the distorted point, to a tolerance of 1e-6 mm in 20 tries,
+// stopping where the Jacobian's determinant falls under 1e-6 (so a singular polynomial, as
+// usgscsm's simple framer has, leaves the point as it is).
+glm::dvec2 TransverseUndistort(const std::vector<double>& k, glm::dvec2 d) {
+    constexpr double kTolerance = 1e-6;
+    glm::dvec2 u = d;
+    glm::dvec2 f = TransverseDistort(k, u);
+    for (int count = 1; std::abs(f.x) + std::abs(f.y) > kTolerance && count < 20; ++count) {
+        f = d - TransverseDistort(k, u);
+        const double dX[10] = {0.0, 1.0, 0.0, 2.0 * u.x, u.y, 0.0,
+                               3.0 * u.x * u.x, 2.0 * u.x * u.y, u.y * u.y, 0.0};
+        const double dY[10] = {0.0, 0.0, 1.0, 0.0, u.x, 2.0 * u.y,
+                               0.0, u.x * u.x, 2.0 * u.x * u.y, 3.0 * u.y * u.y};
+        double xx = 0.0, xy = 0.0, yx = 0.0, yy = 0.0;
+        for (std::size_t i = 0; i < 10; ++i) {
+            xx += dX[i] * k[i];
+            xy += dY[i] * k[i];
+            yx += dX[i] * k[i + 10];
+            yy += dY[i] * k[i + 10];
+        }
+        const double determinant = xx * yy - xy * yx;
+        if (std::abs(determinant) < 1e-6) {
+            break;
+        }
+        u += glm::dvec2(yy * f.x - xy * f.y, xx * f.y - yx * f.x) / determinant;
+    }
+    return u;
+}
+
+}  // namespace
+
 glm::dvec2 IsdCameraModel::Undistort(glm::dvec2 d) const {
     const std::vector<double>& k = isd_.distortionCoefficients;
     if (isd_.distortion == "radial") {
@@ -422,6 +495,9 @@ glm::dvec2 IsdCameraModel::Undistort(glm::dvec2 d) const {
     if (isd_.distortion == "lrolrocnac") {
         return {d.x, d.y / (1.0 + k[0] * d.y * d.y)};
     }
+    if (isd_.distortion == "transverse") {
+        return TransverseUndistort(k, d);
+    }
     return d;
 }
 
@@ -429,21 +505,10 @@ glm::dvec2 IsdCameraModel::Distort(glm::dvec2 undistorted) const {
     if (isd_.distortion.empty()) {
         return undistorted;
     }
-    // Newton's method on `Undistort`, with its Jacobian by central differences.
-    glm::dvec2 d = undistorted;
-    for (int i = 0; i < 20; ++i) {
-        const glm::dvec2 residual = Undistort(d) - undistorted;
-        if (glm::length(residual) < 1e-14) {
-            break;
-        }
-        constexpr double h = 1e-6;
-        const glm::dvec2 dx =
-            (Undistort(d + glm::dvec2(h, 0.0)) - Undistort(d - glm::dvec2(h, 0.0))) / (2.0 * h);
-        const glm::dvec2 dy =
-            (Undistort(d + glm::dvec2(0.0, h)) - Undistort(d - glm::dvec2(0.0, h))) / (2.0 * h);
-        d -= glm::inverse(glm::dmat2(dx, dy)) * residual;
+    if (isd_.distortion == "transverse") {
+        return TransverseDistort(isd_.distortionCoefficients, undistorted);
     }
-    return d;
+    return NewtonInverse([&](glm::dvec2 d) { return Undistort(d); }, undistorted);
 }
 
 glm::dvec2 IsdCameraModel::FocalPlaneOf(double line, double sample) const {
@@ -480,7 +545,7 @@ glm::dvec3 IsdCameraModel::LookAt(double time, double line, double sample) const
 }
 
 glm::dvec3 IsdCameraModel::EllipsoidIntersect(const glm::dvec3& c, const glm::dvec3& l,
-                                              double height) const {
+                                              double height, bool eitherSide) const {
     // The ray against the ellipsoid of radii a + h, a + h, b + h: (x^2 + y^2 + k z^2) = (a + h)^2.
     const double a = isd_.semiMajorAxis + height;
     const double b = isd_.semiMinorAxis + height;
@@ -490,7 +555,7 @@ glm::dvec3 IsdCameraModel::EllipsoidIntersect(const glm::dvec3& c, const glm::dv
     const double ct = c.x * c.x + c.y * c.y + k * c.z * c.z - a * a;
     const double root = std::sqrt(std::max(bt * bt - 4.0 * at * ct, 0.0));
     double scale = -bt - root;
-    if (std::abs(-bt + root) < std::abs(scale)) {
+    if (eitherSide && std::abs(-bt + root) < std::abs(scale)) {
         scale = -bt + root;
     }
     return c + scale / (2.0 * at) * l;
@@ -796,6 +861,20 @@ IsdPushFrame::Framelet IsdPushFrame::FrameletOf(std::uint32_t index) const {
     const auto detectorLine = [&](double row) {
         return (isd_.frameletsFlipped ? height - row : row) + isd_.frameletOverlap / 2;
     };
+    FrameView view = FrameViewOf(detectorLine, height, framelet.time, facing);
+    framelet.camera = view.camera;
+    framelet.rowsReversed = view.rowsReversed;
+    framelet.distortionResidualPixels = view.distortionResidualPixels;
+    if (isd_.exposureDuration > 0.0) {
+        framelet.camera.exposureTime = isd_.exposureDuration;
+    }
+    return framelet;
+}
+
+IsdCameraModel::FrameView IsdCameraModel::FrameViewOf(
+    const std::function<double(double)>& detectorLine, std::uint32_t rows, double time,
+    double facing) const {
+    const double height = rows;
     const glm::dmat3 axes = ErnieAxes(detectorLine(0.5 * height), facing);
     const double f = isd_.focalLengthMm;
     const double pitch = glm::length(FocalPlaneOf(detectorLine(0.5 * height), 1.0) -
@@ -807,44 +886,73 @@ IsdPushFrame::Framelet IsdPushFrame::FrameletOf(std::uint32_t index) const {
         const glm::dvec3 ray = glm::transpose(axes) * (facing * glm::dvec3(-focal.x, -focal.y, -f));
         return glm::dvec2(ray.x, ray.y) / -ray.z;
     };
-    // Ernie's rows run down its y; the framelet's may run up it, a mirror no pose undoes.
+    FrameView view;
+    // Ernie's rows run down its y; the frame's may run up it, a mirror no pose undoes.
     const double across = 0.5 * isd_.samples;
-    framelet.rowsReversed = normalised(height - 0.5, across).y > normalised(0.5, across).y;
-    const auto rowOf = [&](double row) { return framelet.rowsReversed ? height - row : row; };
+    view.rowsReversed = normalised(height - 0.5, across).y > normalised(0.5, across).y;
+    const auto rowOf = [&](double row) { return view.rowsReversed ? height - row : row; };
     // The principal point, from the top left pixel's centre.
     const glm::dvec2 topLeft = normalised(rowOf(0.5), 0.5);
     const glm::dvec2 principal(0.5 - topLeft.x * pixels, 0.5 + topLeft.y * pixels);
 
-    Camera& camera = framelet.camera;
+    Camera& camera = view.camera;
     camera.width = isd_.samples;
-    camera.height = height;
+    camera.height = rows;
     camera.focalLengthMm = f;
     camera.verticalApertureMm = pitch * height;
     camera.horizontalApertureOffsetMm = (principal.x - 0.5 * isd_.samples) * pitch;
     camera.verticalApertureOffsetMm = (0.5 * height - principal.y) * pitch;
-    if (isd_.exposureDuration > 0.0) {
-        camera.exposureTime = isd_.exposureDuration;
-    }
     std::vector<double> lines;
-    for (std::uint32_t row = 0; row <= height; ++row) {
+    for (std::uint32_t row = 0; row <= rows; ++row) {
         lines.push_back(detectorLine(row));
     }
-    framelet.distortionResidualPixels = FitDistortion(camera, lines, axes, facing);
+    view.distortionResidualPixels = FitDistortion(camera, lines, axes, facing);
     // And how far Ernie's pixel grid departs from the detector's (non-square or skewed pixels).
     for (const double row : {0.5, height - 0.5}) {
         for (const double sample : {0.5, isd_.samples - 0.5}) {
             const glm::dvec2 n = normalised(row, sample);
             const glm::dvec2 ernie = principal + glm::dvec2(n.x, -n.y) * pixels;
             const glm::dvec2 error = glm::abs(ernie - glm::dvec2(sample, rowOf(row)));
-            framelet.distortionResidualPixels =
-                std::max({framelet.distortionResidualPixels, error.x, error.y});
+            view.distortionResidualPixels =
+                std::max({view.distortionResidualPixels, error.x, error.y});
         }
     }
-    camera.transform = PoseAt(framelet.time, axes);
-    const double distance = glm::length(Position(framelet.time));
+    camera.transform = PoseAt(time, axes);
+    const double distance = glm::length(Position(time));
     camera.nearPlane = std::max(0.5 * (distance - isd_.semiMajorAxis), 1e-3);
     camera.farPlane = distance + isd_.semiMajorAxis;
-    return framelet;
+    return view;
+}
+
+IsdFrame::IsdFrame(IsdSensor isd) : IsdCameraModel(std::move(isd)) {
+    if (!isd_.IsFrame()) {
+        throw std::invalid_argument("The ISD's model '" + isd_.model +
+                                    "' is not a frame camera's");
+    }
+}
+
+glm::dvec3 IsdFrame::Look(double line, double sample) const {
+    // usgscsm's frame camera looks along (x, y, f), against the line scanner's (-x, -y, -f).
+    return -LookAt(ImageTime(), line, sample);
+}
+
+glm::dvec3 IsdFrame::ImageToGround(double line, double sample, double height) const {
+    return EllipsoidIntersect(Position(ImageTime()), Look(line, sample), height, false);
+}
+
+glm::dvec2 IsdFrame::GroundToImage(const glm::dvec3& ground) const {
+    return PixelOf(Distort(FocalPlaneView(ground, ImageTime())));
+}
+
+IsdCameraModel::FrameView IsdFrame::View() const {
+    const double time = ImageTime();
+    const double middle = 0.5 * isd_.lines;
+    const glm::dvec3 centre = ImageToGround(middle, 0.5 * isd_.samples);
+    // `facing` against usgscsm's line-scanner look, (-x, -y, -f), as `ErnieAxes` takes it.
+    const double facing =
+        glm::dot(centre - Position(time), LookAt(time, middle, 0.5 * isd_.samples)) < 0.0 ? -1.0
+                                                                                          : 1.0;
+    return FrameViewOf([](double row) { return row; }, isd_.lines, time, facing);
 }
 
 IsdSensor ReadIsdFile(const std::string& path) {

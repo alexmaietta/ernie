@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -63,7 +64,8 @@ struct IsdSensor {
     double lineSumming = 1.0;
     double sampleSumming = 1.0;
     /// `optical_distortion`'s model name (such as "radial", "transverse", "lrolrocnac") and
-    /// coefficients; for "transverse" the x coefficients then the y.
+    /// coefficients; for "transverse" the x coefficients then the y (ten each: the cubic
+    /// polynomial's terms 1, x, y, x^2, xy, y^2, x^3, x^2 y, x y^2, y^3).
     std::string distortion;
     std::vector<double> distortionCoefficients;
 
@@ -101,6 +103,9 @@ struct IsdSensor {
 
     /// Whether the ISD is a push-frame camera's (USGS_ASTRO_PUSH_FRAME_SENSOR_MODEL).
     bool IsPushFrame() const;
+
+    /// Whether the ISD is a frame camera's (USGS_ASTRO_FRAME_SENSOR_MODEL).
+    bool IsFrame() const;
 };
 
 /// What usgscsm's camera models of image support data share, in the body-fixed frame in metres:
@@ -132,9 +137,22 @@ class IsdCameraModel {
     /// rotated into the body's.
     glm::dvec3 SunPosition(double time) const;
 
+    /// A frame of the detector as Ernie renders it: a frame camera of the image's samples by its
+    /// rows, posed (`camera.transform`, camera to body-fixed world) when the frame is exposed,
+    /// the lens's distortion fitted as Brown-Conrady terms (and scale).
+    struct FrameView {
+        Camera camera;
+        /// Whether the camera's rows run up the frame: the detector's map to the image is a
+        /// mirror of Ernie's, so flip the rendered rows.
+        bool rowsReversed = false;
+        /// The camera's largest departure from the ISD's pixels over the frame (the fitted
+        /// distortion, and any non-square or skewed pixels), in pixels.
+        double distortionResidualPixels = 0.0;
+    };
+
   protected:
     /// @throws std::invalid_argument if `isd` has no states or rotations, a singular focal plane
-    /// map, or a distortion model other than none, "radial" and "lrolrocnac".
+    /// map, or a distortion model other than none, "radial", "transverse" and "lrolrocnac".
     explicit IsdCameraModel(IsdSensor isd);
 
     /// The rotation `rotation` describes at `time`: its constant after its time-dependent part.
@@ -152,9 +170,11 @@ class IsdCameraModel {
     /// sample `sample` (`IsdLineScanner::Look`).
     glm::dvec3 LookAt(double time, double line, double sample) const;
     /// Where the ray from `origin` along `look` meets the ellipsoid raised by `height`: the
-    /// intersection nearer the origin (on either side), or the ray's point nearest the ellipsoid.
+    /// intersection nearer the origin (on either side, as usgscsm's line scanner takes it; or the
+    /// first along `look` when not `eitherSide`, as its frame camera does), or the ray's point
+    /// nearest the ellipsoid.
     glm::dvec3 EllipsoidIntersect(const glm::dvec3& origin, const glm::dvec3& look,
-                                  double height) const;
+                                  double height, bool eitherSide = true) const;
     /// Ernie's camera axes (columns) in the sensor's frame for an image of the detector's samples
     /// across x: x along the samples as they increase, z back from the scene (`facing` -1 when
     /// the scene lies behind usgscsm's look, as for NAIF's +z boresights), y completing them.
@@ -168,6 +188,10 @@ class IsdCameraModel {
     /// lens resamples; more fit both of the image's directions.
     double FitDistortion(Camera& camera, std::span<const double> lines, const glm::dmat3& axes,
                          double facing) const;
+    /// The frame camera of `rows` image rows exposed at `time`, row coordinate r (0 the top edge,
+    /// `rows` the bottom) on detector line `detectorLine(r)`, with `facing` as `ErnieAxes`.
+    FrameView FrameViewOf(const std::function<double(double)>& detectorLine, std::uint32_t rows,
+                          double time, double facing) const;
 
     IsdSensor isd_;
 
@@ -300,6 +324,39 @@ class IsdPushFrame : public IsdCameraModel {
     /// usgscsm's `calcFrameDistance`: how many lines `ground` lies from framelet `framelet`'s
     /// middle, through the undistorted focal plane.
     double FrameDistance(int framelet, const glm::dvec3& ground) const;
+};
+
+/// A frame camera from its image support data, its geometry as usgscsm's frame model
+/// (`UsgsAstroFrameSensorModel`) computes it (`IsdCameraModel`): the whole image is exposed at
+/// once, at the ISD's centre time, from one position and orientation. Unlike the line scanner,
+/// the camera looks along (x, y, f) in the sensor's frame, and a ray meets the ellipsoid at its
+/// first intersection along it. Rolling-shutter jitter (`jitter`) is not read.
+///
+/// Reference: usgscsm's `UsgsAstroFrameSensorModel` (`imageToGround`, `groundToImage`,
+/// `losEllipsoidIntersect`, `constructStateFromIsd`).
+class IsdFrame : public IsdCameraModel {
+  public:
+    /// @throws std::invalid_argument if `isd` is not a frame camera's, or as `IsdCameraModel`.
+    explicit IsdFrame(IsdSensor isd);
+
+    /// Ephemeris seconds at which the image is exposed: the ISD's centre time.
+    double ImageTime() const {
+        return isd_.centerTime;
+    }
+
+    /// The unit body-fixed direction of pixel (`line`, `sample`)'s ray.
+    glm::dvec3 Look(double line, double sample) const;
+
+    /// Where pixel (`line`, `sample`)'s ray first meets the body's ellipsoid raised by `height`
+    /// metres, or the ray's point nearest the ellipsoid when it misses.
+    glm::dvec3 ImageToGround(double line, double sample, double height = 0.0) const;
+
+    /// The image coordinates (line, sample) of body-fixed point `ground`.
+    glm::dvec2 GroundToImage(const glm::dvec3& ground) const;
+
+    /// The image as Ernie renders it: a frame camera of the image's samples by its lines, its
+    /// exposure left as authored (frame ISDs carry none).
+    FrameView View() const;
 };
 
 /// The image support data in JSON `json`.

@@ -233,6 +233,62 @@ TEST(IsdPushFrame, FrameletsAreFrameCamerasOnTheIsdsPixels) {
     }
 }
 
+// usgscsm's own expectations for these ISDs (its tests/FrameCameraTests.cpp).
+TEST(IsdFrame, MatchesUsgscsmOnItsTestCameras) {
+    const ernie::IsdFrame simple(ernie::ReadIsdFile(Fixture("simpleFramerISD.json")));
+    EXPECT_EQ(simple.Isd().distortion, "transverse");
+    const auto expectNear = [](const glm::dvec3& actual, const glm::dvec3& expected) {
+        EXPECT_NEAR(actual.x, expected.x, 1e-8);
+        EXPECT_NEAR(actual.y, expected.y, 1e-8);
+        EXPECT_NEAR(actual.z, expected.z, 1e-8);
+    };
+    expectNear(simple.ImageToGround(7.5, 7.5), {10.0, 0.0, 0.0});
+    expectNear(simple.ImageToGround(7.5, 6.5), {9.80194018, 0.0, 1.98039612});
+    // Rays past the body: their points nearest it.
+    expectNear(simple.ImageToGround(15.0, 0.0), {0.44979759, -14.99325304, 14.99325304});
+    expectNear(simple.ImageToGround(0.0, 15.0), {0.44979759, 14.99325304, -14.99325304});
+    expectNear(simple.ImageToGround(0.0, 0.0), {0.44979759, 14.99325304, 14.99325304});
+    expectNear(simple.ImageToGround(15.0, 15.0), {0.44979759, -14.99325304, -14.99325304});
+    const glm::dvec2 back = simple.GroundToImage(simple.ImageToGround(9.0, 9.0));
+    EXPECT_NEAR(back.x, 9.0, 1e-12);
+    EXPECT_NEAR(back.y, 9.0, 1e-12);
+
+    const ernie::IsdFrame orbital(ernie::ReadIsdFile(Fixture("orbitalFramer.json")));
+    expectNear(orbital.ImageToGround(8.0, 8.0), {1000000.0, 0.0, 0.0});
+    EXPECT_THROW(ernie::IsdFrame(ernie::ReadIsdFile(Fixture("orbitalLineScan.json"))),
+                 std::invalid_argument);
+}
+
+// The frame ISD's view as Ernie renders it: the ISD's ground points land on its pixels.
+TEST(IsdFrame, ViewsAreFrameCamerasOnTheIsdsPixels) {
+    for (const char* name : {"simpleFramerISD.json", "orbitalFramer.json"}) {
+        const ernie::IsdFrame frame(ernie::ReadIsdFile(Fixture(name)));
+        const ernie::IsdFrame::FrameView view = frame.View();
+        const ernie::Camera& c = view.camera;
+        EXPECT_NO_THROW(c.Check()) << name;
+        EXPECT_LT(view.distortionResidualPixels, 1e-6) << name;
+        const double lines = frame.Isd().lines;
+        const double samples = frame.Isd().samples;
+        const glm::dmat4 toCamera = glm::inverse(c.transform);
+        // Pixels whose rays meet the body.
+        for (const double line : {0.4 * lines, 0.5 * lines, 0.6 * lines}) {
+            for (const double sample : {0.4 * samples, 0.5 * samples, 0.6 * samples}) {
+                const glm::dvec3 local(toCamera *
+                                       glm::dvec4(frame.ImageToGround(line, sample), 1.0));
+                ASSERT_LT(local.z, 0.0) << name << ": in front of the camera";
+                const glm::dvec2 d = c.lens.Distort(glm::dvec2(local) / -local.z);
+                glm::dvec2 pixel =
+                    c.PrincipalPoint() + glm::dvec2(d.x, -d.y) * c.FocalLengthPixels();
+                if (view.rowsReversed) {
+                    pixel.y = lines - pixel.y;
+                }
+                EXPECT_NEAR(pixel.x, sample, 1e-6) << name << " " << line;
+                EXPECT_NEAR(pixel.y, line, 1e-6) << name << " " << sample;
+            }
+        }
+    }
+}
+
 TEST(LrocNac, AuthorsThePublishedSensorAndReadout) {
     ernie::Scene scene;
     scene.Define("/Camera", ernie::tokens::kCamera);

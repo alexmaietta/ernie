@@ -888,6 +888,77 @@ void BindScene(nb::module_& m) {
             "render at that resolution, flip the rows if `rows_reversed`, and place them at "
             "`first_line` of the image.");
 
+    nb::class_<IsdFrame>(
+        m, "IsdFrame",
+        "A frame camera from its image support data, as usgscsm's frame model reads it: the "
+        "whole image exposed at once from one pose. Body-fixed frame, metres; CSM image "
+        "coordinates.")
+        .def_static(
+            "from_file", [](const std::string& path) { return IsdFrame(ReadIsdFile(path)); },
+            nb::arg("path"), "The frame camera of the ISD file at `path`.")
+        .def_static(
+            "from_json", [](const std::string& json) { return IsdFrame(ReadIsd(json)); },
+            nb::arg("json"), "The frame camera of ISD JSON text `json`.")
+        .def_prop_ro("lines", [](const IsdFrame& s) { return s.Isd().lines; })
+        .def_prop_ro("samples", [](const IsdFrame& s) { return s.Isd().samples; })
+        .def_prop_ro("sensor", [](const IsdFrame& s) { return s.Isd().sensor; })
+        .def_prop_ro("platform", [](const IsdFrame& s) { return s.Isd().platform; })
+        .def_prop_ro("image_time", &IsdFrame::ImageTime,
+                     "Ephemeris seconds (TDB past J2000) at which the image is exposed.")
+        .def(
+            "position",
+            [triple](const IsdFrame& s, double time) { return triple(s.Position(time)); },
+            nb::arg("time"), "The sensor's body-fixed position at `time`.")
+        .def(
+            "sun_position",
+            [triple](const IsdFrame& s, double time) { return triple(s.SunPosition(time)); },
+            nb::arg("time"), "The sun's body-fixed position at `time`.")
+        .def(
+            "image_to_ground",
+            [triple](const IsdFrame& s, double line, double sample, double height) {
+                return triple(s.ImageToGround(line, sample, height));
+            },
+            nb::arg("line"), nb::arg("sample"), nb::arg("height") = 0.0,
+            "Where pixel (`line`, `sample`)'s ray first meets the body's ellipsoid raised by "
+            "`height`.")
+        .def(
+            "ground_to_image",
+            [](const IsdFrame& s, nb::handle ground) {
+                const glm::dvec2 image = s.GroundToImage(Vec3FromPython(ground));
+                return nb::make_tuple(image.x, image.y);
+            },
+            nb::arg("ground"), "The (line, sample) that sees body-fixed point `ground`.")
+        .def(
+            "author_camera",
+            [](const IsdFrame& s, Scene& scene, const std::string& path) {
+                const IsdFrame::FrameView view = s.View();
+                const Camera& camera = view.camera;
+                using namespace tokens;
+                // The camera's geometry only, as `IsdLineScanner.author_strip`.
+                Prim prim = scene.Has(Path(path)) ? scene.GetPrim(Path(path))
+                                                  : scene.Define(Path(path), kCamera);
+                prim.Set(kTransform, camera.transform)
+                    .Set(kCameraScan, std::string(kFrameScan))
+                    .Set(kFocalLength, camera.focalLengthMm)
+                    .Set(kVerticalAperture, camera.verticalApertureMm)
+                    .Set(kHorizontalAperture,
+                         camera.verticalApertureMm * camera.width / camera.height)
+                    .Set(kHorizontalApertureOffset, camera.horizontalApertureOffsetMm)
+                    .Set(kVerticalApertureOffset, camera.verticalApertureOffsetMm)
+                    .Set(kPushbroomLineOffset, 0.0)
+                    .Set(kLensDistortion,
+                         std::vector<float>{static_cast<float>(camera.lens.k1),
+                                            static_cast<float>(camera.lens.k2),
+                                            static_cast<float>(camera.lens.k3), 0.0f, 0.0f})
+                    .Set(kClippingRange, glm::dvec2(camera.nearPlane, camera.farPlane));
+                return nb::make_tuple(camera.width, camera.height, view.rowsReversed);
+            },
+            nb::arg("scene"), nb::arg("path"),
+            "Authors the Camera prim at `path` as the image's frame camera, posed when it is "
+            "exposed, with the lens's distortion fitted as `ernie:lens:distortion`. Returns "
+            "(samples, lines, rows_reversed): render at that resolution and flip the rows if "
+            "`rows_reversed`.");
+
     m.def(
         "author_lroc_nac",
         [](Scene& scene, const std::string& camera, const std::string& product,
