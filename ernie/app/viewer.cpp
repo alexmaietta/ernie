@@ -357,6 +357,9 @@ struct Viewer::State {
     VkExtent2D requestedViewport{640, 360};
 
     OrbitController controller;
+    /// Which of the camera menu's orthographic views (Top, Front, Right) the perspective camera
+    /// shows, or -1 for perspective.
+    int orthographicView = -1;
     Path activeCamera;
     Path settingsSource;
     std::map<std::string, std::uint64_t> mirrored;
@@ -739,13 +742,17 @@ struct Viewer::State {
 
     void WriteActiveCamera() {
         if (activeCamera == PerspectiveCamera()) {
-            // The camera's lens may have changed (the Camera panel): framing follows it.
-            if (scene.Has(activeCamera)) {
-                controller.verticalFov = static_cast<float>(
-                    CameraOf(scene, activeCamera, ViewportWidth(), ViewportHeight()).VerticalFov());
+            // The camera's lens may have changed (the Camera panel): framing follows it. An
+            // orthographic view's aperture is its height, not a field of view.
+            if (scene.Has(activeCamera) && orthographicView < 0) {
+                const Camera camera =
+                    CameraOf(scene, activeCamera, ViewportWidth(), ViewportHeight());
+                if (!camera.orthographic) {
+                    controller.verticalFov = static_cast<float>(camera.VerticalFov());
+                }
             }
             AuthorControllerCamera(scene, activeCamera, controller, ViewportWidth(),
-                                   ViewportHeight());
+                                   ViewportHeight(), orthographicView >= 0);
         } else {
             scene.Set(activeCamera, tokens::kTransform,
                       LocalFromWorld(scene, activeCamera, controller.Transform()));
@@ -769,8 +776,12 @@ struct Viewer::State {
                 ControllerFromTransform(scene.WorldTransform(camera), controller.distance, fov);
         } else if (scene.Has(camera)) {
             const Camera current = CameraOf(scene, camera, ViewportWidth(), ViewportHeight());
-            controller = ControllerFromTransform(current.transform, controller.distance,
-                                                 static_cast<float>(current.VerticalFov()));
+            // An orthographic view's aperture is its height: the controller keeps its own field
+            // of view.
+            controller = ControllerFromTransform(
+                current.transform, controller.distance,
+                current.orthographic ? controller.verticalFov
+                                     : static_cast<float>(current.VerticalFov()));
         }
     }
 
@@ -1130,7 +1141,7 @@ struct Viewer::State {
         glm::dmat4 world = scene.WorldTransform(path);
         world[3] -= glm::dvec4(eye, 0.0);
         glm::mat4 model(world);
-        ImGuizmo::SetOrthographic(false);
+        ImGuizmo::SetOrthographic(camera.orthographic);
         ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
         ImGuizmo::SetRect(origin.x, origin.y, size.x, size.y);
         const ImGuizmo::OPERATION operation = gizmo == Viewer::Gizmo::Rotate ? ImGuizmo::ROTATE
@@ -1657,11 +1668,16 @@ struct Viewer::State {
         }
     }
 
-    /// Kit's camera menu: the viewer's perspective camera, it looking from the top, front or
-    /// right, the scene's cameras, and a new camera where the view is.
+    /// Kit's camera menu: the viewer's perspective camera, its orthographic views from the top,
+    /// front and right, the scene's cameras, and a new camera where the view is.
     void DrawCameraMenu() {
-        if (ImGui::MenuItem("Perspective", nullptr, activeCamera == PerspectiveCamera())) {
-            SetActive(PerspectiveCamera());
+        const bool viewer = activeCamera == PerspectiveCamera();
+        if (ImGui::MenuItem("Perspective", nullptr, viewer && orthographicView < 0)) {
+            orthographicView = -1;
+            if (!viewer) {
+                SetActive(PerspectiveCamera());
+            }
+            WriteActiveCamera();
         }
         const struct {
             const char* name;
@@ -1670,13 +1686,14 @@ struct Viewer::State {
         } views[] = {{"Top", 0.0f, OrbitController::kMaxPitch},
                      {"Front", 0.0f, 0.0f},
                      {"Right", glm::half_pi<float>(), 0.0f}};
-        for (const auto& view : views) {
-            if (ImGui::MenuItem(view.name)) {
-                if (activeCamera != PerspectiveCamera()) {
+        for (int v = 0; v < 3; ++v) {
+            if (ImGui::MenuItem(views[v].name, nullptr, viewer && orthographicView == v)) {
+                if (!viewer) {
                     SetActive(PerspectiveCamera());
                 }
-                controller.yaw = view.yaw;
-                controller.pitch = view.pitch;
+                orthographicView = v;
+                controller.yaw = views[v].yaw;
+                controller.pitch = views[v].pitch;
                 WriteActiveCamera();
             }
         }

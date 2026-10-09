@@ -25,7 +25,7 @@ std::vector<Path> ViewableCameras(const Scene& scene) {
 }
 
 void AuthorControllerCamera(Scene& scene, const Path& path, const OrbitController& controller,
-                            std::uint32_t width, std::uint32_t height) {
+                            std::uint32_t width, std::uint32_t height, bool orthographic) {
     const bool existing = scene.Has(path);
     Camera camera = existing ? CameraOf(scene, path, width, height) : Camera{};
     camera.width = width;
@@ -35,8 +35,20 @@ void AuthorControllerCamera(Scene& scene, const Path& path, const OrbitControlle
         camera.transform = controller.Transform();
         camera.nearPlane = controller.NearPlane();
         camera.farPlane = controller.FarPlane();
+        if (camera.orthographic && !orthographic) {
+            // Back to perspective: the view's field of view, which its aperture held.
+            camera.orthographic = false;
+            camera.SetVerticalFov(controller.verticalFov);
+        }
     } else {
         controller.Apply(camera);
+    }
+    if (orthographic) {
+        // As tall as the perspective view's at the target, in tenths of a scene unit (USD's
+        // orthographic apertures), so zooming the distance zooms it too.
+        camera.orthographic = true;
+        camera.verticalApertureMm = 10.0 * 2.0 * static_cast<double>(controller.distance) *
+                                    std::tan(0.5 * static_cast<double>(controller.verticalFov));
     }
     SetCamera(scene, path, camera);
 }

@@ -27,9 +27,10 @@ std::vector<Path> ViewableCameras(const Scene& scene);
 
 /// Defines the Camera prim at `path` with `controller`'s pose, field of view and clipping range,
 /// for an image of `width` x `height`; an existing one takes the pose and clipping range and
-/// keeps its own lens.
+/// keeps its own lens. With `orthographic`, it is an orthographic camera as tall as the view at
+/// the controller's target (back to the controller's field of view without).
 void AuthorControllerCamera(Scene& scene, const Path& path, const OrbitController& controller,
-                            std::uint32_t width, std::uint32_t height);
+                            std::uint32_t width, std::uint32_t height, bool orthographic = false);
 
 /// An orbit controller reproducing the camera-to-world transform `world`: looking along its -z
 /// axis at a target `distance` ahead, with `verticalFov`. Pitch is clamped to the controller's

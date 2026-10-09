@@ -104,6 +104,27 @@ TEST(SessionTest, AuthorControllerCameraWritesPoseAndFieldOfView) {
     EXPECT_NEAR(camera.farPlane, orbit.FarPlane(), 1e-1);
 }
 
+TEST(SessionTest, AuthorControllerCameraMakesOrthographicViewsAndComesBack) {
+    Scene scene;
+    OrbitController orbit;
+    orbit.distance = 40.0f;
+    orbit.verticalFov = 0.6f;
+    const Path path("/__session/Perspective");
+    AuthorControllerCamera(scene, path, orbit, 320, 200, true);
+    const Camera top = CameraOf(scene, path, 320, 200);
+    EXPECT_TRUE(top.orthographic);
+    // As tall as the perspective view at the target: 2 d tan(fov / 2) scene units.
+    EXPECT_NEAR(top.OrthographicPixelSize() * 200.0, 2.0 * 40.0 * std::tan(0.3), 1e-4);
+    orbit.distance = 20.0f;  // zooming
+    AuthorControllerCamera(scene, path, orbit, 320, 200, true);
+    EXPECT_NEAR(CameraOf(scene, path, 320, 200).OrthographicPixelSize() * 200.0,
+                2.0 * 20.0 * std::tan(0.3), 1e-4);
+    AuthorControllerCamera(scene, path, orbit, 320, 200);
+    const Camera back = CameraOf(scene, path, 320, 200);
+    EXPECT_FALSE(back.orthographic);
+    EXPECT_NEAR(back.VerticalFov(), 0.6, 1e-4) << "the field of view again";
+}
+
 TEST(SessionTest, AuthorControllerCameraKeepsTheCamerasExposure) {
     Scene scene;
     const Path path("/__session/Perspective");
