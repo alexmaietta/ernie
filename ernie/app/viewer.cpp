@@ -450,6 +450,9 @@ struct Viewer::State {
     std::uint64_t nextCallback = 1;
     std::vector<std::unique_ptr<Panel>> panels;
     StatsPanel* stats = nullptr;
+    /// Panels to bring to the front (`FocusPanel`), and those drawn at least once.
+    std::vector<std::string> focusRequests;
+    std::set<std::string, std::less<>> drawnPanels;
     Panel* profilerPanel = nullptr;
     bool showControls = false;  ///< Help > Keyboard and Mouse.
     bool showAbout = false;     ///< Help > About Ernie.
@@ -2004,11 +2007,18 @@ struct Viewer::State {
                 ImGui::SetNextWindowDockID(node->second, ImGuiCond_FirstUseEver);
             }
             bool keepOpen = true;
+            const auto focus =
+                std::find(focusRequests.begin(), focusRequests.end(), panel.Title());
+            if (focus != focusRequests.end() && drawnPanels.contains(panel.Title())) {
+                ImGui::SetNextWindowFocus();
+                focusRequests.erase(focus);
+            }
             if (ImGui::Begin(panel.Title().c_str(), &keepOpen)) {
                 panel.Draw(self);
             }
             ImGui::End();
             if (!keepOpen) {
+            drawnPanels.insert(panel.Title());
                 panel.SetVisible(false);
             }
         }
@@ -2954,6 +2964,17 @@ WidgetPanel& Viewer::AddWidgetPanel(std::string title, Dock dock) {
 
 void Viewer::RemovePanel(const std::string& title) {
     auto& panels = state_->panels;
+void Viewer::FocusPanel(std::string_view title) {
+    Panel* panel = FindPanel(title);
+    if (panel == nullptr) {
+        throw std::invalid_argument("No panel titled '" + std::string(title) + "'");
+    }
+    panel->SetVisible(true);
+    std::vector<std::string>& requests = state_->focusRequests;
+    requests.erase(std::remove(requests.begin(), requests.end(), title), requests.end());
+    requests.emplace_back(title);
+}
+
     const auto found = std::find_if(panels.begin(), panels.end(),
                                     [&](const auto& panel) { return panel->Title() == title; });
     if (found == panels.end()) {
@@ -2970,6 +2991,9 @@ void Viewer::AddMenuItem(const std::string& menu, const std::string& label,
                          std::function<void(Viewer&)> action) {
     if (menu.empty() || label.empty()) {
         throw std::invalid_argument("Menu items need a menu and a label");
+    std::vector<std::string>& requests = state_->focusRequests;
+    requests.erase(std::remove(requests.begin(), requests.end(), title), requests.end());
+    state_->drawnPanels.erase(title);
     }
     state_->menuItems.push_back({menu, label, std::move(action)});
 }

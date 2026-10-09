@@ -400,6 +400,14 @@ class Viewer {
     WidgetPanel& AddWidgetPanel(std::string title, Dock dock = Dock::Right);
 
     /// Removes the panel titled `title`; built-in panels are only hidden.
+    /// Shows the panel titled `title` and brings it to the front: where it shares a dock with other
+    /// panels its tab becomes the selected one, and it takes keyboard focus. Takes effect on the
+    /// next frame in which the panel has already been drawn once, so a panel focused before the
+    /// first frame (such as the Log over Stats at the bottom) is in front once its docked place
+    /// exists. The last panel focused in a dock wins.
+    /// @throws std::invalid_argument if there is no panel titled `title`.
+    void FocusPanel(std::string_view title);
+
     void RemovePanel(const std::string& title);
 
     /// Adds `label` to the menu bar's `menu` (created if needed), running `action` when chosen.

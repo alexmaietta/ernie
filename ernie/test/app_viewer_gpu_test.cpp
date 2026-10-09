@@ -7,6 +7,7 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
+#include <imgui_internal.h>
 #include <stb_image.h>
 
 #include <algorithm>
@@ -14,6 +15,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <map>
 #include <memory>
 #include <set>
 #include <sstream>
@@ -380,6 +382,39 @@ TEST_F(ViewerTest, FunctionPanelsDrawAndPanelsAreFoundByTitle) {
 }
 
 TEST_F(ViewerTest, RendererIsAViewerOptionAndSwitchable) {
+TEST_F(ViewerTest, FocusPanelBringsADockedTabToTheFront) {
+    // Whether each title's window is the selected tab of its dock, read during the UI.
+    std::map<std::string, bool> front;
+    viewer_->OnUi([&](Viewer&, const FrameInfo&) {
+        for (const char* title : {"Stats", "Log"}) {
+            const ImGuiWindow* window = ImGui::FindWindowByName(title);
+            front[title] = window != nullptr && window->DockNode != nullptr &&
+                           window->DockNode->SelectedTabId == window->TabId;
+        }
+    });
+    viewer_->FindPanel("Log")->SetVisible(false);
+    viewer_->FocusPanel("Log");
+    EXPECT_TRUE(viewer_->FindPanel("Log")->IsVisible()) << "focusing shows the panel";
+    for (int frame = 0; frame < 4; ++frame) {
+        viewer_->Step();
+    }
+    EXPECT_TRUE(front["Log"]);
+    EXPECT_FALSE(front["Stats"]);
+
+    viewer_->FocusPanel("Stats");
+    for (int frame = 0; frame < 2; ++frame) {
+        viewer_->Step();
+    }
+    EXPECT_TRUE(front["Stats"]);
+    EXPECT_FALSE(front["Log"]);
+    EXPECT_THROW(viewer_->FocusPanel("Missing"), std::invalid_argument);
+
+    viewer_->AddPanel("Extra", Dock::Bottom, [](Viewer&) {});
+    viewer_->FocusPanel("Extra");
+    viewer_->RemovePanel("Extra");
+    EXPECT_TRUE(viewer_->Step()) << "a removed panel's focus request is dropped";
+}
+
     const std::vector<std::string> renderers = Viewer::Renderers();
     ASSERT_FALSE(renderers.empty());
     EXPECT_EQ(viewer_->Renderer(), "raster");
