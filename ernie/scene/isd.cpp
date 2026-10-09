@@ -238,6 +238,10 @@ bool IsdSensor::IsLineScanner() const {
     return model == "USGS_ASTRO_LINE_SCANNER_SENSOR_MODEL";
 }
 
+bool IsdSensor::IsPushFrame() const {
+    return model == "USGS_ASTRO_PUSH_FRAME_SENSOR_MODEL";
+}
+
 IsdSensor ReadIsd(std::string_view json) {
     Json isd;
     try {
@@ -287,6 +291,12 @@ IsdSensor ReadIsd(std::string_view json) {
         }
         sensor.startingTime = NumberOr(isd, "starting_ephemeris_time", 0.0);
         sensor.centerTime = Number(isd, "center_ephemeris_time");
+        sensor.exposureDuration = NumberOr(isd, "exposure_duration", 0.0);
+        sensor.interframeDelay = NumberOr(isd, "interframe_delay", 0.0);
+        sensor.frameletHeight = static_cast<std::uint32_t>(NumberOr(isd, "framelet_height", 0.0));
+        sensor.frameletOverlap = static_cast<std::uint32_t>(NumberOr(isd, "num_lines_overlap", 0.0));
+        sensor.frameletsFlipped = isd.value("framelets_flipped", false);
+        sensor.frameletOrderReversed = isd.value("framelet_order_reversed", false);
 
         const Json& radii = Field(isd, "radii");
         sensor.semiMajorAxis = Number(radii, "semimajor") * MetresPer(radii);
@@ -311,15 +321,11 @@ IsdSensor ReadIsd(std::string_view json) {
     }
 }
 
-IsdLineScanner::IsdLineScanner(IsdSensor isd) : isd_(std::move(isd)) {
-    if (!isd_.IsLineScanner()) {
-        throw std::invalid_argument("The ISD's model '" + isd_.model +
-                                    "' is not a line scanner's");
-    }
-    if (isd_.lineRates.empty() || isd_.positions.values.empty() ||
-        isd_.pointing.quaternions.values.empty() || isd_.bodyRotation.quaternions.values.empty()) {
+IsdCameraModel::IsdCameraModel(IsdSensor isd) : isd_(std::move(isd)) {
+    if (isd_.positions.values.empty() || isd_.pointing.quaternions.values.empty() ||
+        isd_.bodyRotation.quaternions.values.empty()) {
         throw std::invalid_argument(
-            "A line scanner's ISD needs line rates, positions and pointing and body rotations");
+            "A camera's ISD needs positions and pointing and body rotations");
     }
     const double determinant = isd_.focalToLine[1] * isd_.focalToSample[2] -
                                isd_.focalToLine[2] * isd_.focalToSample[1];
@@ -380,7 +386,7 @@ IsdLineScanner::IsdLineScanner(IsdSensor isd) : isd_(std::move(isd)) {
     }
 }
 
-glm::dquat IsdLineScanner::RotationAt(const IsdRotation& rotation, double time) {
+glm::dquat IsdCameraModel::RotationAt(const IsdRotation& rotation, double time) {
     const IsdSamples<glm::dquat>& q = rotation.quaternions;
     glm::dquat timeDependent = q.values.front();
     if (q.values.size() > 1) {
@@ -396,27 +402,18 @@ glm::dquat IsdLineScanner::RotationAt(const IsdRotation& rotation, double time) 
                                          glm::mat3_cast(glm::normalize(timeDependent))));
 }
 
-double IsdLineScanner::ImageTime(double line) const {
-    std::size_t at = 0;
-    while (at + 1 < isd_.lineRates.size() && isd_.lineRates[at + 1][0] <= line) {
-        ++at;
-    }
-    const std::array<double, 3>& rate = isd_.lineRates[at];
-    return isd_.centerTime + rate[1] + rate[2] * (line - rate[0] + 0.5);
-}
-
-glm::dvec3 IsdLineScanner::Position(double time) const {
+glm::dvec3 IsdCameraModel::Position(double time) const {
     return UniformLagrange(positionNodes_, positionStart_, positionStep_, time);
 }
 
-glm::dquat IsdLineScanner::SensorToBody(double time) const {
+glm::dquat IsdCameraModel::SensorToBody(double time) const {
     // usgscsm interpolates eighth order, fourth with fewer than two quaternions.
     const glm::dvec4 q =
         glm::normalize(UniformLagrange(quaternionNodes_, quaternionStart_, quaternionStep_, time));
     return glm::dquat(q.w, q.x, q.y, q.z);
 }
 
-glm::dvec2 IsdLineScanner::Undistort(glm::dvec2 d) const {
+glm::dvec2 IsdCameraModel::Undistort(glm::dvec2 d) const {
     const std::vector<double>& k = isd_.distortionCoefficients;
     if (isd_.distortion == "radial") {
         const double rr = glm::dot(d, d);
@@ -428,7 +425,7 @@ glm::dvec2 IsdLineScanner::Undistort(glm::dvec2 d) const {
     return d;
 }
 
-glm::dvec2 IsdLineScanner::Distort(glm::dvec2 undistorted) const {
+glm::dvec2 IsdCameraModel::Distort(glm::dvec2 undistorted) const {
     if (isd_.distortion.empty()) {
         return undistorted;
     }
@@ -449,18 +446,19 @@ glm::dvec2 IsdLineScanner::Distort(glm::dvec2 undistorted) const {
     return d;
 }
 
-glm::dvec2 IsdLineScanner::FocalPlaneOf(double sample) const {
+glm::dvec2 IsdCameraModel::FocalPlaneOf(double line, double sample) const {
     const std::array<double, 3>& l = isd_.focalToLine;
     const std::array<double, 3>& s = isd_.focalToSample;
-    // Line 0 of the detector, as usgscsm's line scanner takes it.
-    const double t1 = isd_.startingDetectorLine - isd_.detectorCenterLine - l[0];
+    // usgscsm's `computeDistortedFocalPlaneCoordinates`.
+    const double t1 =
+        line * isd_.lineSumming + isd_.startingDetectorLine - isd_.detectorCenterLine - l[0];
     const double t2 =
         sample * isd_.sampleSumming + isd_.startingDetectorSample - isd_.detectorCenterSample - s[0];
     const double determinant = l[1] * s[2] - l[2] * s[1];
     return {(s[2] * t1 - l[2] * t2) / determinant, (-s[1] * t1 + l[1] * t2) / determinant};
 }
 
-glm::dvec2 IsdLineScanner::PixelOf(glm::dvec2 focal) const {
+glm::dvec2 IsdCameraModel::PixelOf(glm::dvec2 focal) const {
     const std::array<double, 3>& l = isd_.focalToLine;
     const std::array<double, 3>& s = isd_.focalToSample;
     const double detectorSample = s[0] + s[1] * focal.x + s[2] * focal.y + isd_.detectorCenterSample;
@@ -469,16 +467,20 @@ glm::dvec2 IsdLineScanner::PixelOf(glm::dvec2 focal) const {
             (detectorSample - isd_.startingDetectorSample) / isd_.sampleSumming};
 }
 
-glm::dvec3 IsdLineScanner::Look(double line, double sample) const {
-    const double time = ImageTime(line);
-    const glm::dvec2 focal = Undistort(FocalPlaneOf(sample));
+glm::dvec2 IsdCameraModel::FocalPlaneView(const glm::dvec3& ground, double time) const {
+    const glm::dvec3 camera = glm::inverse(SensorToBody(time)) * (ground - Position(time));
+    // The look (-x, -y, -f) scaled to reach `camera`.
+    return glm::dvec2(camera.x, camera.y) * (isd_.focalLengthMm / camera.z);
+}
+
+glm::dvec3 IsdCameraModel::LookAt(double time, double line, double sample) const {
+    const glm::dvec2 focal = Undistort(FocalPlaneOf(line, sample));
     const glm::dvec3 camera = glm::normalize(glm::dvec3(-focal.x, -focal.y, -isd_.focalLengthMm));
     return SensorToBody(time) * camera;
 }
 
-glm::dvec3 IsdLineScanner::ImageToGround(double line, double sample, double height) const {
-    const glm::dvec3 c = Position(ImageTime(line));
-    const glm::dvec3 l = Look(line, sample);
+glm::dvec3 IsdCameraModel::EllipsoidIntersect(const glm::dvec3& c, const glm::dvec3& l,
+                                              double height) const {
     // The ray against the ellipsoid of radii a + h, a + h, b + h: (x^2 + y^2 + k z^2) = (a + h)^2.
     const double a = isd_.semiMajorAxis + height;
     const double b = isd_.semiMinorAxis + height;
@@ -494,12 +496,121 @@ glm::dvec3 IsdLineScanner::ImageToGround(double line, double sample, double heig
     return c + scale / (2.0 * at) * l;
 }
 
+glm::dvec3 IsdCameraModel::SunPosition(double time) const {
+    if (isd_.sunPositions.values.empty()) {
+        throw std::invalid_argument("The ISD has no sun positions");
+    }
+    return RotationAt(isd_.bodyRotation, time) * Linear(isd_.sunPositions, time);
+}
+
+glm::dmat3 IsdCameraModel::ErnieAxes(double line, double facing) const {
+    // x along the detector as samples increase (the rays' change with the sample), z back from
+    // the scene, y completing them.
+    const glm::dvec2 along = FocalPlaneOf(line, 1.0) - FocalPlaneOf(line, 0.0);
+    const glm::dvec3 x = glm::normalize(facing * glm::dvec3(-along.x, -along.y, 0.0));
+    const glm::dvec3 z(0.0, 0.0, facing);
+    return glm::dmat3(x, glm::cross(z, x), z);
+}
+
+glm::dmat4 IsdCameraModel::PoseAt(double time, const glm::dmat3& axes) const {
+    glm::dmat4 pose(glm::mat3_cast(SensorToBody(time)) * axes);
+    pose[3] = glm::dvec4(Position(time), 1.0);
+    return pose;
+}
+
+double IsdCameraModel::FitDistortion(Camera& camera, std::span<const double> lines,
+                                     const glm::dmat3& axes, double facing) const {
+    if (isd_.distortion.empty()) {
+        return 0.0;
+    }
+    // The lens's distortion as Brown-Conrady radial terms: distorted = undistorted (1 + k1 r^2 +
+    // k2 r^4 + k3 r^6), fitted by least squares to the ISD's model at samples along the lines, in
+    // Ernie's normalised image coordinates.
+    const double f = isd_.focalLengthMm;
+    const double pitch = glm::length(FocalPlaneOf(lines.front(), 1.0) -
+                                     FocalPlaneOf(lines.front(), 0.0));
+    const auto normalised = [&](glm::dvec2 focal) {
+        const glm::dvec3 ray = glm::transpose(axes) * (facing * glm::dvec3(-focal.x, -focal.y, -f));
+        return glm::dvec2(ray.x, ray.y) / -ray.z;
+    };
+    const bool across = lines.size() > 1;
+    std::vector<std::pair<glm::dvec2, glm::dvec2>> samples;  // undistorted, distorted
+    double largest = 0.0;                                    // r^2
+    constexpr int kSamples = 128;
+    for (const double line : lines) {
+        for (int i = 0; i <= kSamples; ++i) {
+            const double sample = isd_.samples * double(i) / kSamples;
+            const glm::dvec2 distorted = FocalPlaneOf(line, sample);
+            const glm::dvec2 u = normalised(Undistort(distorted));
+            samples.emplace_back(u, normalised(distorted));
+            largest = std::max(largest, glm::dot(u, u));
+        }
+    }
+    // distorted = undistorted (a + b1 r^2 + b2 r^4 + b3 r^6): a scale too, as radial models
+    // with a constant term have, which the camera's focal length takes (f a), leaving
+    // Brown-Conrady's k = b / a on its sensor's coordinates (distorted / a). In powers of
+    // r^2 / largest, for a well-conditioned system, then scaled back.
+    glm::dmat4 normal(0.0);
+    glm::dvec4 right(0.0);
+    for (const auto& [u, d] : samples) {
+        const double s = glm::dot(u, u) / largest;
+        const glm::dvec4 powers(1.0, s, s * s, s * s * s);
+        for (int axis = 0; axis < (across ? 2 : 1); ++axis) {
+            const glm::dvec4 basis = u[axis] * powers;
+            normal += glm::outerProduct(basis, basis);
+            right += basis * d[axis];
+        }
+    }
+    glm::dvec4 b(1.0, 0.0, 0.0, 0.0);
+    if (largest > 0.0 && glm::determinant(normal) != 0.0) {
+        b = glm::inverse(normal) * right;
+        b /= glm::dvec4(1.0, largest, largest * largest, largest * largest * largest);
+    }
+    const double scale = b.x;
+    camera.focalLengthMm = f * scale;
+    camera.lens.k1 = b.y / scale;
+    camera.lens.k2 = b.z / scale;
+    camera.lens.k3 = b.w / scale;
+    double residual = 0.0;
+    for (const auto& [u, d] : samples) {
+        const double r2 = glm::dot(u, u);
+        const glm::dvec2 fitted = u * (scale + r2 * (b.y + r2 * (b.z + r2 * b.w)));
+        const glm::dvec2 error = glm::abs(fitted - d) * (f / pitch);
+        residual = std::max(residual, across ? std::max(error.x, error.y) : error.x);
+    }
+    return residual;
+}
+
+IsdLineScanner::IsdLineScanner(IsdSensor isd) : IsdCameraModel(std::move(isd)) {
+    if (!isd_.IsLineScanner()) {
+        throw std::invalid_argument("The ISD's model '" + isd_.model +
+                                    "' is not a line scanner's");
+    }
+    if (isd_.lineRates.empty()) {
+        throw std::invalid_argument("A line scanner's ISD needs line rates");
+    }
+}
+
+double IsdLineScanner::ImageTime(double line) const {
+    std::size_t at = 0;
+    while (at + 1 < isd_.lineRates.size() && isd_.lineRates[at + 1][0] <= line) {
+        ++at;
+    }
+    const std::array<double, 3>& rate = isd_.lineRates[at];
+    return isd_.centerTime + rate[1] + rate[2] * (line - rate[0] + 0.5);
+}
+
+// Detector line 0, as usgscsm's line scanner takes it.
+glm::dvec3 IsdLineScanner::Look(double line, double sample) const {
+    return LookAt(ImageTime(line), 0.0, sample);
+}
+
+glm::dvec3 IsdLineScanner::ImageToGround(double line, double sample, double height) const {
+    return EllipsoidIntersect(Position(ImageTime(line)), Look(line, sample), height);
+}
+
 glm::dvec2 IsdLineScanner::DetectorView(const glm::dvec3& ground, double time) const {
-    const glm::dvec3 camera = glm::inverse(SensorToBody(time)) * (ground - Position(time));
-    // The look (-x, -y, -f) scaled to reach `camera`.
-    const glm::dvec2 undistorted =
-        glm::dvec2(camera.x, camera.y) * (isd_.focalLengthMm / camera.z);
-    return PixelOf(Distort(undistorted));
+    return PixelOf(Distort(FocalPlaneView(ground, time)));
 }
 
 glm::dvec2 IsdLineScanner::GroundToImage(const glm::dvec3& ground) const {
@@ -522,13 +633,6 @@ glm::dvec2 IsdLineScanner::GroundToImage(const glm::dvec3& ground) const {
     return {l1, DetectorView(ground, ImageTime(l1)).y};
 }
 
-glm::dvec3 IsdLineScanner::SunPosition(double time) const {
-    if (isd_.sunPositions.values.empty()) {
-        throw std::invalid_argument("The ISD has no sun positions");
-    }
-    return RotationAt(isd_.bodyRotation, time) * Linear(isd_.sunPositions, time);
-}
-
 IsdLineScanner::Strip IsdLineScanner::StripOf(std::uint32_t firstLine,
                                               std::uint32_t lines) const {
     if (lines == 0) {
@@ -545,14 +649,9 @@ IsdLineScanner::Strip IsdLineScanner::StripOf(std::uint32_t firstLine,
                 0.0
             ? -1.0
             : 1.0;
-    // Ernie's camera axes in the sensor's frame: x along the detector as samples increase
-    // (the rays' change with the sample), z back from the scene, y completing them.
-    const glm::dvec2 first = FocalPlaneOf(0.0);
-    const glm::dvec2 along = FocalPlaneOf(1.0) - first;  // mm per image sample
-    const glm::dvec3 x = glm::normalize(facing * glm::dvec3(-along.x, -along.y, 0.0));
-    const glm::dvec3 z(0.0, 0.0, facing);
-    const glm::dvec3 y = glm::cross(z, x);
-    const glm::dmat3 ernieToSensor(x, y, z);
+    const glm::dmat3 ernieToSensor = ErnieAxes(0.0, facing);
+    const glm::dvec2 first = FocalPlaneOf(0.0, 0.0);
+    const glm::dvec2 along = FocalPlaneOf(0.0, 1.0) - first;  // mm per image sample
     // The ray of sample 0 in Ernie's axes, per unit of view depth: where the detector line lies
     // across the image (y) and where its principal point is (x).
     const double f = isd_.focalLengthMm;
@@ -573,70 +672,179 @@ IsdLineScanner::Strip IsdLineScanner::StripOf(std::uint32_t firstLine,
     // Each line integrates over its line time (the ISD's seconds per line where the strip
     // starts).
     camera.exposureTime = ImageTime(firstLine + 1.0) - ImageTime(firstLine);
-    // The lens's distortion along the detector as Brown-Conrady radial terms: distorted =
-    // undistorted (1 + k1 r^2 + k2 r^4 + k3 r^6), fitted by least squares to the ISD's model at
-    // samples along the line, in Ernie's normalised image coordinates.
-    if (!isd_.distortion.empty()) {
-        const auto normalised = [&](glm::dvec2 focal) {
-            const glm::dvec3 ray =
-                glm::transpose(ernieToSensor) * (facing * glm::dvec3(-focal.x, -focal.y, -f));
-            return glm::dvec2(ray.x, ray.y) / -ray.z;
-        };
-        std::vector<std::pair<glm::dvec2, double>> samples;
-        double largest = 0.0;  // r^2
-        constexpr int kSamples = 128;
-        for (int i = 0; i <= kSamples; ++i) {
-            const double sample = isd_.samples * double(i) / kSamples;
-            const glm::dvec2 distorted = FocalPlaneOf(sample);
-            const glm::dvec2 u = normalised(Undistort(distorted));
-            samples.emplace_back(u, normalised(distorted).x);
-            largest = std::max(largest, glm::dot(u, u));
-        }
-        // distorted = undistorted (a + b1 r^2 + b2 r^4 + b3 r^6): a scale too, as radial models
-        // with a constant term have, which the camera's focal length takes (f a), leaving
-        // Brown-Conrady's k = b / a on its sensor's coordinates (distorted / a). In powers of
-        // r^2 / largest, for a well-conditioned system, then scaled back.
-        glm::dmat4 normal(0.0);
-        glm::dvec4 right(0.0);
-        for (const auto& [u, d] : samples) {
-            const double s = glm::dot(u, u) / largest;
-            const glm::dvec4 basis = u.x * glm::dvec4(1.0, s, s * s, s * s * s);
-            normal += glm::outerProduct(basis, basis);
-            right += basis * d;
-        }
-        glm::dvec4 b(1.0, 0.0, 0.0, 0.0);
-        if (largest > 0.0 && glm::determinant(normal) != 0.0) {
-            b = glm::inverse(normal) * right;
-            b /= glm::dvec4(1.0, largest, largest * largest, largest * largest * largest);
-        }
-        const double scale = b.x;
-        camera.focalLengthMm = f * scale;
-        camera.lens.k1 = b.y / scale;
-        camera.lens.k2 = b.z / scale;
-        camera.lens.k3 = b.w / scale;
-        for (const auto& [u, d] : samples) {
-            const double r2 = glm::dot(u, u);
-            const double fitted = u.x * (scale + r2 * (b.y + r2 * (b.z + r2 * b.w)));
-            strip.distortionResidualPixels =
-                std::max(strip.distortionResidualPixels, std::abs(fitted - d) * f / pitch);
-        }
-    }
+    // The lens's distortion along the detector line.
+    const double detectorLine = 0.0;
+    strip.distortionResidualPixels =
+        FitDistortion(camera, std::span(&detectorLine, 1), ernieToSensor, facing);
     // Row r's centre is image line first + r + 0.5, exposed (r + 0.5) / lines of the way from
     // `fromTime` to `toTime` (the rate constant over the strip).
     strip.fromTime = ImageTime(firstLine);
     strip.toTime = ImageTime(static_cast<double>(firstLine) + lines);
-    const auto pose = [&](double time) {
-        glm::dmat4 pose(glm::mat3_cast(SensorToBody(time)) * ernieToSensor);
-        pose[3] = glm::dvec4(Position(time), 1.0);
-        return pose;
-    };
-    strip.from = pose(strip.fromTime);
-    strip.to = pose(strip.toTime);
+    strip.from = PoseAt(strip.fromTime, ernieToSensor);
+    strip.to = PoseAt(strip.toTime, ernieToSensor);
     // Clipping around the body: from half the height above it to past its far side.
     const double distance = glm::length(glm::dvec3(strip.to[3]));
     camera.nearPlane = std::max(0.5 * (distance - isd_.semiMajorAxis), 1e-3);
     camera.farPlane = distance + isd_.semiMajorAxis;
     return strip;
+}
+
+IsdPushFrame::IsdPushFrame(IsdSensor isd) : IsdCameraModel(std::move(isd)) {
+    if (!isd_.IsPushFrame()) {
+        throw std::invalid_argument("The ISD's model '" + isd_.model +
+                                    "' is not a push-frame camera's");
+    }
+    if (isd_.frameletHeight == 0 || isd_.interframeDelay <= 0.0) {
+        throw std::invalid_argument(
+            "A push-frame camera's ISD needs a framelet height and an interframe delay");
+    }
+    // usgscsm removes half the overlap from each end of a framelet, so it must be even.
+    if (isd_.frameletOverlap % 2 != 0 || isd_.frameletOverlap >= isd_.frameletHeight) {
+        throw std::invalid_argument(
+            "A push-frame camera's framelet overlap must be even and less than its height");
+    }
+    if (FrameletLines() == 0 || Framelets() == 0) {
+        throw std::invalid_argument("The push-frame camera's image has no whole framelet");
+    }
+}
+
+std::uint32_t IsdPushFrame::FrameletLines() const {
+    return static_cast<std::uint32_t>(double(isd_.frameletHeight - isd_.frameletOverlap) /
+                                      isd_.lineSumming);
+}
+
+std::uint32_t IsdPushFrame::Framelets() const {
+    // usgscsm's reduced lines: whole framelets of the image, each without its overlap.
+    return isd_.lines / isd_.frameletHeight * (isd_.frameletHeight - isd_.frameletOverlap) /
+           FrameletLines();
+}
+
+int IsdPushFrame::TimeOrder(double line) const {
+    // Truncated, as usgscsm's `getImageTime` takes it.
+    const int framelet = static_cast<int>(line / FrameletLines());
+    return isd_.frameletOrderReversed ? static_cast<int>(Framelets()) - framelet - 1 : framelet;
+}
+
+double IsdPushFrame::DetectorLine(double line) const {
+    const double height = FrameletLines();
+    double frameletLine = std::fmod(line, height);
+    if (isd_.frameletsFlipped) {
+        frameletLine = height - frameletLine;
+    }
+    return frameletLine + isd_.frameletOverlap / 2;
+}
+
+double IsdPushFrame::ImageTime(double line) const {
+    return isd_.startingTime + 0.5 * isd_.exposureDuration +
+           TimeOrder(line) * isd_.interframeDelay;
+}
+
+glm::dvec3 IsdPushFrame::Look(double line, double sample) const {
+    return LookAt(ImageTime(line), DetectorLine(line), sample);
+}
+
+glm::dvec3 IsdPushFrame::ImageToGround(double line, double sample, double height) const {
+    return EllipsoidIntersect(Position(ImageTime(line)), Look(line, sample), height);
+}
+
+double IsdPushFrame::FrameDistance(int framelet, const glm::dvec3& ground) const {
+    const double height = FrameletLines();
+    const double time = ImageTime((framelet + 0.5) * height);
+    // The undistorted focal plane straight to the detector, as usgscsm takes it.
+    const double line = PixelOf(FocalPlaneView(ground, time)).x - isd_.frameletOverlap / 2;
+    return line - 0.5 * height;
+}
+
+glm::dvec2 IsdPushFrame::GroundToImage(const glm::dvec3& ground) const {
+    // The secant method over whole framelets, from the first and the last.
+    const int last = static_cast<int>(Framelets()) - 1;
+    int start = 0;
+    double startDistance = FrameDistance(start, ground);
+    int end = last;
+    double endDistance = FrameDistance(end, ground);
+    for (int i = 0; i < 20 && start != end && startDistance != endDistance; ++i) {
+        const double offset = endDistance * (end - start) / (endDistance - startDistance);
+        start = end;
+        startDistance = endDistance;
+        // usgscsm clips to the framelet count, one past the last; Ernie to the last.
+        end = std::clamp(static_cast<int>(std::round(end - offset)), 0, last);
+        endDistance = FrameDistance(end, ground);
+    }
+    const double height = FrameletLines();
+    const double time = ImageTime(0.5 + height * end);
+    const glm::dvec2 pixel = PixelOf(Distort(FocalPlaneView(ground, time)));
+    return {pixel.x + end * height - isd_.frameletOverlap / 2, pixel.y};
+}
+
+IsdPushFrame::Framelet IsdPushFrame::FrameletOf(std::uint32_t index) const {
+    if (index >= Framelets()) {
+        throw std::invalid_argument("Framelet " + std::to_string(index) + " is past the image's " +
+                                    std::to_string(Framelets()));
+    }
+    const std::uint32_t height = FrameletLines();
+    const double first = double(index) * height;
+    const double middle = first + 0.5 * height;
+    Framelet framelet;
+    framelet.firstLine = index * height;
+    framelet.time = ImageTime(middle);
+    // Which way the rays run, as `IsdLineScanner::StripOf` finds it.
+    const glm::dvec3 centre = ImageToGround(middle, 0.5 * isd_.samples);
+    const double facing =
+        glm::dot(centre - Position(framelet.time), Look(middle, 0.5 * isd_.samples)) < 0.0 ? -1.0
+                                                                                            : 1.0;
+    // The detector line of framelet row coordinate `row` (0 its top edge, `height` its bottom).
+    const auto detectorLine = [&](double row) {
+        return (isd_.frameletsFlipped ? height - row : row) + isd_.frameletOverlap / 2;
+    };
+    const glm::dmat3 axes = ErnieAxes(detectorLine(0.5 * height), facing);
+    const double f = isd_.focalLengthMm;
+    const double pitch = glm::length(FocalPlaneOf(detectorLine(0.5 * height), 1.0) -
+                                     FocalPlaneOf(detectorLine(0.5 * height), 0.0));
+    const double pixels = f / pitch;  // the focal length in pixels
+    // Pixel (row, sample)'s distorted ray in Ernie's normalised image coordinates.
+    const auto normalised = [&](double row, double sample) {
+        const glm::dvec2 focal = FocalPlaneOf(detectorLine(row), sample);
+        const glm::dvec3 ray = glm::transpose(axes) * (facing * glm::dvec3(-focal.x, -focal.y, -f));
+        return glm::dvec2(ray.x, ray.y) / -ray.z;
+    };
+    // Ernie's rows run down its y; the framelet's may run up it, a mirror no pose undoes.
+    const double across = 0.5 * isd_.samples;
+    framelet.rowsReversed = normalised(height - 0.5, across).y > normalised(0.5, across).y;
+    const auto rowOf = [&](double row) { return framelet.rowsReversed ? height - row : row; };
+    // The principal point, from the top left pixel's centre.
+    const glm::dvec2 topLeft = normalised(rowOf(0.5), 0.5);
+    const glm::dvec2 principal(0.5 - topLeft.x * pixels, 0.5 + topLeft.y * pixels);
+
+    Camera& camera = framelet.camera;
+    camera.width = isd_.samples;
+    camera.height = height;
+    camera.focalLengthMm = f;
+    camera.verticalApertureMm = pitch * height;
+    camera.horizontalApertureOffsetMm = (principal.x - 0.5 * isd_.samples) * pitch;
+    camera.verticalApertureOffsetMm = (0.5 * height - principal.y) * pitch;
+    if (isd_.exposureDuration > 0.0) {
+        camera.exposureTime = isd_.exposureDuration;
+    }
+    std::vector<double> lines;
+    for (std::uint32_t row = 0; row <= height; ++row) {
+        lines.push_back(detectorLine(row));
+    }
+    framelet.distortionResidualPixels = FitDistortion(camera, lines, axes, facing);
+    // And how far Ernie's pixel grid departs from the detector's (non-square or skewed pixels).
+    for (const double row : {0.5, height - 0.5}) {
+        for (const double sample : {0.5, isd_.samples - 0.5}) {
+            const glm::dvec2 n = normalised(row, sample);
+            const glm::dvec2 ernie = principal + glm::dvec2(n.x, -n.y) * pixels;
+            const glm::dvec2 error = glm::abs(ernie - glm::dvec2(sample, rowOf(row)));
+            framelet.distortionResidualPixels =
+                std::max({framelet.distortionResidualPixels, error.x, error.y});
+        }
+    }
+    camera.transform = PoseAt(framelet.time, axes);
+    const double distance = glm::length(Position(framelet.time));
+    camera.nearPlane = std::max(0.5 * (distance - isd_.semiMajorAxis), 1e-3);
+    camera.farPlane = distance + isd_.semiMajorAxis;
+    return framelet;
 }
 
 IsdSensor ReadIsdFile(const std::string& path) {

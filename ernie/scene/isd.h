@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -85,45 +86,114 @@ struct IsdSensor {
     IsdRotation pointing;      ///< `instrument_pointing`: to the sensor's frame.
     IsdRotation bodyRotation;  ///< `body_rotation`: to the body-fixed frame.
 
+    /// Push-frame cameras' framelets: `exposure_duration` and `interframe_delay` (seconds),
+    /// `framelet_height` (detector lines, the overlap included), `num_lines_overlap` (lines shared
+    /// with the next framelet, even), `framelets_flipped` and `framelet_order_reversed`.
+    double exposureDuration = 0.0;
+    double interframeDelay = 0.0;
+    std::uint32_t frameletHeight = 0;
+    std::uint32_t frameletOverlap = 0;
+    bool frameletsFlipped = false;
+    bool frameletOrderReversed = false;
+
     /// Whether the ISD is a line scanner's (`model` USGS_ASTRO_LINE_SCANNER_SENSOR_MODEL).
     bool IsLineScanner() const;
+
+    /// Whether the ISD is a push-frame camera's (USGS_ASTRO_PUSH_FRAME_SENSOR_MODEL).
+    bool IsPushFrame() const;
 };
 
-/// A line scanner (pushbroom camera) from its image support data, its geometry as USGS's usgscsm
-/// line scanner model (`UsgsAstroLsSensorModel`) computes it, in the body-fixed frame in metres:
+/// What usgscsm's camera models of image support data share, in the body-fixed frame in metres:
 /// - Image coordinates are CSM's: (line, sample) with the first pixel's centre at (0.5, 0.5).
-///   Line l is exposed around its time `ImageTime(l)`, a rate's start time plus its seconds per
-///   line times (l - its start line + 0.5).
 /// - The sensor's position is sampled as usgscsm samples it: at least 25 even times over the
 ///   states, each a cubic Hermite of the states around it (ALE's spline) rotated into the body's
 ///   frame, then interpolated eighth-order Lagrange (fewer points near the ends). Its orientation,
 ///   sensor to body = body rotation x inverse pointing, is taken at the union of their times
 ///   (each interpolated along the great arc), resampled evenly and interpolated the same way.
-/// - Sample s of the detector, on line 0 of it, lies on the focal plane at the inverse of
-///   `focal2pixel` of (starting detector line - detector centre line, s x summing + starting
-///   detector sample - detector centre sample), in mm; the lens's distortion moves it; the camera
-///   looks along (-x, -y, -f) in the sensor's frame.
+/// - Detector line d and sample s lie on the focal plane at the inverse of `focal2pixel` of
+///   (d x line summing + starting detector line - detector centre line, s x sample summing +
+///   starting detector sample - detector centre sample), in mm; the lens's distortion moves it;
+///   the camera looks along (-x, -y, -f) in the sensor's frame.
 ///
 /// Light-time and aberration corrections are left out, as usgscsm leaves them out.
-class IsdLineScanner {
+class IsdCameraModel {
   public:
-    /// @throws std::invalid_argument if `isd` is not a line scanner's, has no line rates or
-    /// states, a singular focal plane map, or a distortion model other than none, "radial" and
-    /// "lrolrocnac".
-    explicit IsdLineScanner(IsdSensor isd);
-
     const IsdSensor& Isd() const {
         return isd_;
     }
-
-    /// Ephemeris seconds at which line `line` (CSM image coordinates) is exposed.
-    double ImageTime(double line) const;
 
     /// The sensor's body-fixed position at ephemeris time `time`, metres.
     glm::dvec3 Position(double time) const;
 
     /// The rotation from the sensor's frame to the body's at `time`.
     glm::dquat SensorToBody(double time) const;
+
+    /// The sun's body-fixed position at `time`, metres, interpolated in the ISD's frame and
+    /// rotated into the body's.
+    glm::dvec3 SunPosition(double time) const;
+
+  protected:
+    /// @throws std::invalid_argument if `isd` has no states or rotations, a singular focal plane
+    /// map, or a distortion model other than none, "radial" and "lrolrocnac".
+    explicit IsdCameraModel(IsdSensor isd);
+
+    /// The rotation `rotation` describes at `time`: its constant after its time-dependent part.
+    static glm::dquat RotationAt(const IsdRotation& rotation, double time);
+    /// Undistorted focal plane coordinates of distorted `distorted`, and the inverse.
+    glm::dvec2 Undistort(glm::dvec2 distorted) const;
+    glm::dvec2 Distort(glm::dvec2 undistorted) const;
+    /// Focal plane coordinates (distorted, mm) of detector line `line` and image sample `sample`.
+    glm::dvec2 FocalPlaneOf(double line, double sample) const;
+    /// Image (line on the detector, sample) of distorted focal plane point `focal`.
+    glm::dvec2 PixelOf(glm::dvec2 focal) const;
+    /// Undistorted focal plane coordinates of `ground` as the sensor sees it at `time`.
+    glm::dvec2 FocalPlaneView(const glm::dvec3& ground, double time) const;
+    /// The unit body-fixed direction of the ray at `time` through detector line `line` and
+    /// sample `sample` (`IsdLineScanner::Look`).
+    glm::dvec3 LookAt(double time, double line, double sample) const;
+    /// Where the ray from `origin` along `look` meets the ellipsoid raised by `height`: the
+    /// intersection nearer the origin (on either side), or the ray's point nearest the ellipsoid.
+    glm::dvec3 EllipsoidIntersect(const glm::dvec3& origin, const glm::dvec3& look,
+                                  double height) const;
+    /// Ernie's camera axes (columns) in the sensor's frame for an image of the detector's samples
+    /// across x: x along the samples as they increase, z back from the scene (`facing` -1 when
+    /// the scene lies behind usgscsm's look, as for NAIF's +z boresights), y completing them.
+    glm::dmat3 ErnieAxes(double line, double facing) const;
+    /// The camera-to-body pose of Ernie's camera on `axes` at `time`.
+    glm::dmat4 PoseAt(double time, const glm::dmat3& axes) const;
+    /// Fits the lens's distortion at detector lines `lines` across the samples as Brown-Conrady
+    /// radial terms on `camera` (and a scale into its focal length, from a radial model's
+    /// constant term), with `facing` and `axes` as `ErnieAxes`; returns the fit's largest
+    /// departure from the ISD's, in pixels. One line fits along it only (x), as a pushbroom's
+    /// lens resamples; more fit both of the image's directions.
+    double FitDistortion(Camera& camera, std::span<const double> lines, const glm::dmat3& axes,
+                         double facing) const;
+
+    IsdSensor isd_;
+
+  private:
+    /// The body-fixed positions every `positionStep_` seconds from `positionStart_`.
+    std::vector<glm::dvec3> positionNodes_;
+    double positionStart_ = 0.0;
+    double positionStep_ = 1.0;
+    /// The sensor-to-body quaternions (x, y, z, w) every `quaternionStep_` seconds.
+    std::vector<glm::dvec4> quaternionNodes_;
+    double quaternionStart_ = 0.0;
+    double quaternionStep_ = 1.0;
+};
+
+/// A line scanner (pushbroom camera) from its image support data, its geometry as usgscsm's line
+/// scanner model (`UsgsAstroLsSensorModel`) computes it (`IsdCameraModel`): line l is exposed
+/// around its time `ImageTime(l)`, a rate's start time plus its seconds per line times (l - its
+/// start line + 0.5), through detector line 0.
+class IsdLineScanner : public IsdCameraModel {
+  public:
+    /// @throws std::invalid_argument if `isd` is not a line scanner's or has no line rates, or as
+    /// `IsdCameraModel`.
+    explicit IsdLineScanner(IsdSensor isd);
+
+    /// Ephemeris seconds at which line `line` (CSM image coordinates) is exposed.
+    double ImageTime(double line) const;
 
     /// The unit body-fixed direction of pixel (`line`, `sample`)'s ray as usgscsm takes it,
     /// (-x, -y, -f) in the sensor's frame: towards the scene, or away from it for ISDs whose
@@ -139,10 +209,6 @@ class IsdLineScanner {
     /// The image coordinates (line, sample) of body-fixed point `ground`: the line whose exposure
     /// puts it on the detector, by the secant method, and the sample there.
     glm::dvec2 GroundToImage(const glm::dvec3& ground) const;
-
-    /// The sun's body-fixed position at `time`, metres, interpolated in the ISD's frame and
-    /// rotated into the body's.
-    glm::dvec3 SunPosition(double time) const;
 
     /// A strip of `lines` image lines from `firstLine` as Ernie renders it: a pushbroom camera
     /// (`Camera::pushbroom`) whose rows are those lines, posed `from` at the strip's first line's
@@ -167,28 +233,73 @@ class IsdLineScanner {
     Strip StripOf(std::uint32_t firstLine, std::uint32_t lines) const;
 
   private:
-    /// The rotation `rotation` describes at `time`: its constant after its time-dependent part.
-    static glm::dquat RotationAt(const IsdRotation& rotation, double time);
-    /// Undistorted focal plane coordinates of distorted `distorted`, and the inverse.
-    glm::dvec2 Undistort(glm::dvec2 distorted) const;
-    glm::dvec2 Distort(glm::dvec2 undistorted) const;
-    /// Focal plane coordinates (distorted, mm) of detector sample `sample` on the detector line.
-    glm::dvec2 FocalPlaneOf(double sample) const;
-    /// Image (line offset from the detector line, sample) of distorted focal plane point `focal`.
-    glm::dvec2 PixelOf(glm::dvec2 focal) const;
     /// Image coordinates of `ground` as the sensor sees it at `time`: (offset from the detector
     /// line, sample).
     glm::dvec2 DetectorView(const glm::dvec3& ground, double time) const;
+};
 
-    IsdSensor isd_;
-    /// The body-fixed positions every `positionStep_` seconds from `positionStart_`.
-    std::vector<glm::dvec3> positionNodes_;
-    double positionStart_ = 0.0;
-    double positionStep_ = 1.0;
-    /// The sensor-to-body quaternions (x, y, z, w) every `quaternionStep_` seconds.
-    std::vector<glm::dvec4> quaternionNodes_;
-    double quaternionStart_ = 0.0;
-    double quaternionStep_ = 1.0;
+/// A push-frame camera (LROC's WAC, MRO's MARCI) from its image support data, its geometry as
+/// usgscsm's push-frame model (`UsgsAstroPushFrameSensorModel`) computes it (`IsdCameraModel`):
+/// the image is a stack of framelets, each a frame of `FrameletLines` lines exposed at once. The
+/// framelet holding line l is f = l / framelet lines (reversed with `framelet_order_reversed`),
+/// exposed at the image's start + half the exposure + f x the interframe delay; within it, line
+/// l mod framelet lines (flipped with `framelets_flipped`, plus half the overlap) is the detector
+/// line its rays come through.
+///
+/// Reference: usgscsm's `UsgsAstroPushFrameSensorModel` (`getImageTime`, `losToEcf`,
+/// `groundToImage`).
+class IsdPushFrame : public IsdCameraModel {
+  public:
+    /// @throws std::invalid_argument if `isd` is not a push-frame camera's (or misses its
+    /// framelet fields), or as `IsdCameraModel`.
+    explicit IsdPushFrame(IsdSensor isd);
+
+    /// Lines of each framelet in the image (its height less the overlap, over the line summing).
+    std::uint32_t FrameletLines() const;
+
+    /// Framelets in the image.
+    std::uint32_t Framelets() const;
+
+    /// Ephemeris seconds at which line `line`'s framelet is exposed, the middle of its exposure.
+    double ImageTime(double line) const;
+
+    /// As `IsdLineScanner::Look`.
+    glm::dvec3 Look(double line, double sample) const;
+
+    /// As `IsdLineScanner::ImageToGround`.
+    glm::dvec3 ImageToGround(double line, double sample, double height = 0.0) const;
+
+    /// The image coordinates (line, sample) of body-fixed point `ground`, as usgscsm finds them:
+    /// the framelet whose middle line comes nearest it, by the secant method over framelets, and
+    /// its line and sample in that framelet.
+    glm::dvec2 GroundToImage(const glm::dvec3& ground) const;
+
+    /// Framelet `framelet` (in image order, from the top) as Ernie renders it: a frame camera of
+    /// the image's samples by `FrameletLines` lines, posed when it is exposed (camera to
+    /// body-fixed world), its exposure the ISD's, the lens's distortion fitted as Brown-Conrady
+    /// terms (and scale). Render a whole image as a batch of these, one view per framelet, and
+    /// stack the views from the top.
+    struct Framelet {
+        Camera camera;  ///< `transform` its pose.
+        double time = 0.0;
+        std::uint32_t firstLine = 0;
+        /// Whether the camera's rows run up the framelet: the detector's map to the image is a
+        /// mirror of Ernie's, so flip the rendered framelet's rows to stack it.
+        bool rowsReversed = false;
+        /// The camera's largest departure from the ISD's pixels over the framelet (the fitted
+        /// distortion, and any non-square or skewed pixels), in pixels.
+        double distortionResidualPixels = 0.0;
+    };
+    Framelet FrameletOf(std::uint32_t framelet) const;
+
+  private:
+    /// The framelet, counted in time, that image line `line` belongs to.
+    int TimeOrder(double line) const;
+    /// The detector line of image line `line` within its framelet (flipped, less the overlap).
+    double DetectorLine(double line) const;
+    /// usgscsm's `calcFrameDistance`: how many lines `ground` lies from framelet `framelet`'s
+    /// middle, through the undistorted focal plane.
+    double FrameDistance(int framelet, const glm::dvec3& ground) const;
 };
 
 /// The image support data in JSON `json`.

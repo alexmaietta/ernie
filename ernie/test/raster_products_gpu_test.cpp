@@ -533,6 +533,62 @@ TEST_F(RasterDelegateTest, AnLroNacStripSeesThroughItsLensDistortion) {
     }
 }
 
+TEST_F(RasterDelegateTest, AnLroWacFrameletSeesTheGroundWhereUsgscsmPutsIt) {
+    // LRO's WAC, a visible band's framelet of 1024 x 14 pixels about 75 m across, rendered as a
+    // frame camera through the fitted distortion (its constant term in the focal length): balls
+    // where usgscsm's push-frame model puts pixels' rays on the ground show on those pixels.
+    const ernie::IsdPushFrame wac(ernie::ReadIsdFile(
+        (std::filesystem::path(ERNIE_TEST_FIXTURES) / "isd" / "lroWacPushFrame.json").string()));
+    const ernie::IsdPushFrame::Framelet framelet = wac.FrameletOf(182);
+    const std::size_t width = wac.Isd().samples;
+    const std::size_t height = wac.FrameletLines();
+    Scene scene = FlatScene();
+    scene.Remove("/World/Terrain");
+    scene.Set("/Render/Settings", tokens::kResolution,
+              glm::ivec2(static_cast<int>(width), static_cast<int>(height)));
+    const std::pair<std::size_t, std::size_t> pixels[] = {{2, 10}, {7, 512}, {11, 1013}};
+    for (std::size_t i = 0; i < std::size(pixels); ++i) {
+        const auto [row, column] = pixels[i];
+        const double line = framelet.firstLine + row + 0.5;
+        const glm::dvec3 ground = wac.ImageToGround(line, column + 0.5);
+        const double across = glm::length(wac.ImageToGround(line, column + 1.5) - ground);
+        scene.Define(Path("/World/Ball" + std::to_string(i)), tokens::kSphere)
+            .Set(tokens::kGeomRadius, 0.4 * across)
+            .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), ground));
+    }
+    const ernie::Camera& camera = framelet.camera;
+    ernie::SetCamera(scene, "/World/Camera", camera);
+    scene.Set("/World/Camera", tokens::kSensorNoise, false);
+    scene.Set("/World/Camera", tokens::kLensDistortion,
+              std::vector<float>{static_cast<float>(camera.lens.k1),
+                                 static_cast<float>(camera.lens.k2),
+                                 static_cast<float>(camera.lens.k3), 0.0f, 0.0f});
+    RasterDelegate delegate(*context_);
+    ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+    const Tensor ids =
+        outputs.at("/Render/Product").vars.at("PrimId").Map(ernie::MapDevice::Cpu).tensor;
+    for (std::size_t i = 0; i < std::size(pixels); ++i) {
+        const auto [row, column] = pixels[i];
+        const Path ball("/World/Ball" + std::to_string(i));
+        glm::dvec2 sum(0.0);
+        int hits = 0;
+        for (std::size_t r = 0; r < height; ++r) {
+            for (std::size_t c = 0; c < width; ++c) {
+                if (delegate.PrimPath(ids.As<std::uint32_t>()[r * width + c]) == ball) {
+                    // The framelet's rows, flipped back if Ernie's run the other way.
+                    const std::size_t framelet_row = framelet.rowsReversed ? height - 1 - r : r;
+                    sum += glm::dvec2(framelet_row, c);
+                    ++hits;
+                }
+            }
+        }
+        ASSERT_GT(hits, 0) << ball.String();
+        EXPECT_LE(hits, 4) << ball.String();
+        EXPECT_NEAR(sum.x / hits, static_cast<double>(row), 0.5) << ball.String();
+        EXPECT_NEAR(sum.y / hits, static_cast<double>(column), 0.5) << ball.String();
+    }
+}
+
 TEST_F(RasterDelegateTest, TheLrocNacPresetSendsEightBitNumbers) {
     // NAC-L's readout (Robinson et al. 2010, Table 2 and Appendix A): electrons over 90.5 per DN
     // into 12 bits, then the nominal table into 8.

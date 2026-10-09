@@ -134,6 +134,105 @@ TEST(IsdLineScanner, StripsFitTheLensDistortionAlongTheLine) {
     }
 }
 
+TEST(Isd, ReadsTheLroWideAngleCamerasFramelets) {
+    const ernie::IsdSensor wac = ernie::ReadIsdFile(Fixture("lroWacPushFrame.json"));
+    EXPECT_TRUE(wac.IsPushFrame());
+    EXPECT_FALSE(wac.IsLineScanner());
+    EXPECT_EQ(wac.lines, 5096u);
+    EXPECT_EQ(wac.samples, 1024u);
+    EXPECT_EQ(wac.frameletHeight, 14u) << "a visible band's 14 lines";
+    EXPECT_EQ(wac.frameletOverlap, 0u);
+    EXPECT_FALSE(wac.frameletsFlipped);
+    EXPECT_TRUE(wac.frameletOrderReversed);
+    EXPECT_DOUBLE_EQ(wac.exposureDuration, 0.039);
+    EXPECT_DOUBLE_EQ(wac.interframeDelay, 0.515625);
+    EXPECT_THROW(ernie::IsdLineScanner{wac}, std::invalid_argument);
+    EXPECT_THROW(ernie::IsdPushFrame(ernie::ReadIsdFile(Fixture("orbitalLineScan.json"))),
+                 std::invalid_argument);
+}
+
+// usgscsm's own expectations for this ISD (its tests/PushFrameCameraTests.cpp).
+TEST(IsdPushFrame, MatchesUsgscsmOnItsTestCamera) {
+    const ernie::IsdPushFrame camera(ernie::ReadIsdFile(Fixture("orbitalPushFrame.json")));
+    EXPECT_EQ(camera.FrameletLines(), 12u);
+    EXPECT_EQ(camera.Framelets(), 30u);
+    const glm::dvec3 center = camera.ImageToGround(6.0, 8.0);
+    EXPECT_NEAR(center.x, 1000000.0, 1e-9);
+    EXPECT_NEAR(center.y, 0.0, 1e-9);
+    EXPECT_NEAR(center.z, 0.0, 1e-9);
+    const glm::dvec2 image = camera.GroundToImage({1000000.0, 0.0, 0.0});
+    EXPECT_NEAR(image.x, 6.0, 0.001);
+    EXPECT_NEAR(image.y, 8.0, 0.001);
+    // Framelets overlap on the ground, so a point may come back in a neighbour's lines.
+    for (double line = 0.5; line < 360.0; line += 1.0) {
+        for (double sample = 0.5; sample < 16.0; sample += 1.0) {
+            const glm::dvec2 back = camera.GroundToImage(camera.ImageToGround(line, sample));
+            EXPECT_NEAR(back.x, line, 10.0);
+            EXPECT_NEAR(back.y, sample, 10.0);
+        }
+    }
+    EXPECT_NEAR(glm::length(camera.ImageToGround(6.0, 8.0, 100.0) - center), 100.0, 0.01);
+}
+
+TEST(IsdPushFrame, LroWacFrameletsRunBackInTime) {
+    const ernie::IsdPushFrame wac(ernie::ReadIsdFile(Fixture("lroWacPushFrame.json")));
+    EXPECT_EQ(wac.FrameletLines(), 14u);
+    EXPECT_EQ(wac.Framelets(), 364u);
+    // `framelet_order_reversed`: the image's top framelet is exposed last.
+    const ernie::IsdSensor& isd = wac.Isd();
+    EXPECT_DOUBLE_EQ(wac.ImageTime(0.5),
+                     isd.startingTime + 0.5 * isd.exposureDuration + 363 * isd.interframeDelay);
+    EXPECT_DOUBLE_EQ(wac.ImageTime(5095.5), isd.startingTime + 0.5 * isd.exposureDuration);
+    EXPECT_DOUBLE_EQ(wac.ImageTime(14.0) - wac.ImageTime(13.9), -isd.interframeDelay);
+    // A framelet's middle line comes back to itself, through the lens's distortion.
+    for (const double line : {7.0, 2555.0, 5089.0}) {
+        for (const double sample : {10.5, 512.0, 1013.5}) {
+            const glm::dvec3 ground = wac.ImageToGround(line, sample);
+            EXPECT_NEAR(glm::length(ground), isd.semiMajorAxis, 1e-3);
+            const glm::dvec2 back = wac.GroundToImage(ground);
+            EXPECT_NEAR(back.x, line, 1e-4) << line << ", " << sample;
+            EXPECT_NEAR(back.y, sample, 1e-4) << line << ", " << sample;
+        }
+    }
+}
+
+// Each framelet renders as a frame camera: the ISD's ground points land on its pixels.
+TEST(IsdPushFrame, FrameletsAreFrameCamerasOnTheIsdsPixels) {
+    for (const char* name : {"lroWacPushFrame.json", "orbitalPushFrame.json"}) {
+        const ernie::IsdPushFrame camera(ernie::ReadIsdFile(Fixture(name)));
+        const double height = camera.FrameletLines();
+        const double samples = camera.Isd().samples;
+        for (const std::uint32_t index : {0u, camera.Framelets() / 2, camera.Framelets() - 1}) {
+            const ernie::IsdPushFrame::Framelet framelet = camera.FrameletOf(index);
+            const ernie::Camera& c = framelet.camera;
+            EXPECT_NO_THROW(c.Check()) << name;
+            EXPECT_EQ(c.width, camera.Isd().samples);
+            EXPECT_EQ(c.height, camera.FrameletLines());
+            EXPECT_EQ(framelet.firstLine, index * camera.FrameletLines());
+            EXPECT_DOUBLE_EQ(framelet.time, camera.ImageTime(framelet.firstLine + 0.5));
+            EXPECT_LT(framelet.distortionResidualPixels, 0.02) << name;
+            const glm::dmat4 toCamera = glm::inverse(c.transform);
+            for (const double row : {0.5, 0.5 * height, height - 0.5}) {
+                for (const double sample : {0.5, 0.5 * samples, samples - 0.5}) {
+                    const glm::dvec3 ground =
+                        camera.ImageToGround(framelet.firstLine + row, sample);
+                    const glm::dvec3 local(toCamera * glm::dvec4(ground, 1.0));
+                    ASSERT_LT(local.z, 0.0) << name << ": in front of the camera";
+                    const glm::dvec2 d = c.lens.Distort(glm::dvec2(local) / -local.z);
+                    glm::dvec2 pixel = c.PrincipalPoint() + glm::dvec2(d.x, -d.y) *
+                                                                c.FocalLengthPixels();
+                    if (framelet.rowsReversed) {
+                        pixel.y = height - pixel.y;
+                    }
+                    EXPECT_NEAR(pixel.x, sample, 0.02) << name << " " << index << ", " << row;
+                    EXPECT_NEAR(pixel.y, row, 0.02) << name << " " << index << ", " << sample;
+                }
+            }
+        }
+        EXPECT_THROW(camera.FrameletOf(camera.Framelets()), std::invalid_argument);
+    }
+}
+
 TEST(LrocNac, AuthorsThePublishedSensorAndReadout) {
     ernie::Scene scene;
     scene.Define("/Camera", ernie::tokens::kCamera);
@@ -158,4 +257,36 @@ TEST(LrocNac, AuthorsThePublishedSensorAndReadout) {
     EXPECT_EQ(types, (std::vector<std::string>{"qe", "noise", "adc", "readoutTaps", "compandTable",
                                                "cie", "exposure"}));
     EXPECT_THROW(ernie::AuthorLrocNac(scene, "/Product", "/Camera"), std::invalid_argument);
+}
+
+TEST(LrocWac, AuthorsEachBandToItsPublishedResponsivity) {
+    for (const int name : {320, 360, 415, 565, 605, 645, 690}) {
+        const ernie::LrocWacBand band = ernie::LrocWacBandNamed(name);
+        const ernie::LrocWacBandSpec spec = ernie::LrocWacBandOf(band);
+        ernie::Scene scene;
+        scene.Define("/Camera", ernie::tokens::kCamera)
+            .Set(ernie::tokens::kVerticalAperture, spec.pixelPitchUm * 1e-3 * 14.0)
+            .Set(ernie::tokens::kExposureTime, 0.039);
+        scene.Define("/Product", ernie::tokens::kRenderProduct);
+        ernie::AuthorLrocWac(scene, "/Camera", "/Product", band);
+        const ernie::Camera camera = ernie::CameraOf(scene, "/Camera", 1024, 14);
+        // Robinson et al. 2010, Table 3.
+        EXPECT_DOUBLE_EQ(camera.sensor.ElectronsPerDn(camera.iso), 25.9);
+        EXPECT_DOUBLE_EQ(camera.sensor.readNoiseElectrons, 66.0);
+        EXPECT_DOUBLE_EQ(camera.sensor.fullWellElectrons, 46100.0);
+        EXPECT_EQ(camera.sensor.adcBits, 11);
+        EXPECT_DOUBLE_EQ(camera.fStop, name < 400 ? 5.65 : 5.052);
+        // Table 4: a flat spectral radiance of 1 W/m^2/sr/nm (1e9 W/m^3/sr) reads 1e9 / RC DN
+        // per second.
+        double electrons = 0.0;
+        for (const float e : camera.ElectronsPerRadiance(0)) {
+            electrons += e;
+        }
+        const double dnPerSecond = electrons / camera.exposureTime / 25.9;
+        EXPECT_NEAR(dnPerSecond / (1e9 / spec.responsivity), 1.0, 1e-4) << name;
+        EXPECT_GT(spec.EffectiveQe(), 0.005) << name;
+        EXPECT_LT(spec.EffectiveQe(), 0.5) << name;
+    }
+    EXPECT_EQ(ernie::LrocWacBandNamed(604), ernie::LrocWacBand::Vis605);
+    EXPECT_THROW(ernie::LrocWacBandNamed(550), std::invalid_argument);
 }

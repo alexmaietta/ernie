@@ -789,6 +789,83 @@ void BindScene(nb::module_& m) {
             "first strip at its start and step once, then author each strip at its end and "
             "step.");
 
+    nb::class_<IsdPushFrame>(
+        m, "IsdPushFrame",
+        "A push-frame camera (LROC's WAC, MRO's MARCI) from its image support data, as usgscsm's "
+        "push-frame model reads it: the image is a stack of framelets, each a frame of "
+        "`framelet_lines` lines exposed at once. Body-fixed frame, metres; CSM image "
+        "coordinates.")
+        .def_static(
+            "from_file", [](const std::string& path) { return IsdPushFrame(ReadIsdFile(path)); },
+            nb::arg("path"), "The push-frame camera of the ISD file at `path`.")
+        .def_static(
+            "from_json", [](const std::string& json) { return IsdPushFrame(ReadIsd(json)); },
+            nb::arg("json"), "The push-frame camera of ISD JSON text `json`.")
+        .def_prop_ro("lines", [](const IsdPushFrame& s) { return s.Isd().lines; })
+        .def_prop_ro("samples", [](const IsdPushFrame& s) { return s.Isd().samples; })
+        .def_prop_ro("sensor", [](const IsdPushFrame& s) { return s.Isd().sensor; })
+        .def_prop_ro("platform", [](const IsdPushFrame& s) { return s.Isd().platform; })
+        .def_prop_ro("framelet_lines", &IsdPushFrame::FrameletLines)
+        .def_prop_ro("framelets", &IsdPushFrame::Framelets)
+        .def("image_time", &IsdPushFrame::ImageTime, nb::arg("line"),
+             "Ephemeris seconds (TDB past J2000) at the middle of `line`'s framelet's exposure.")
+        .def(
+            "position",
+            [triple](const IsdPushFrame& s, double time) { return triple(s.Position(time)); },
+            nb::arg("time"), "The sensor's body-fixed position at `time`.")
+        .def(
+            "sun_position",
+            [triple](const IsdPushFrame& s, double time) { return triple(s.SunPosition(time)); },
+            nb::arg("time"), "The sun's body-fixed position at `time`.")
+        .def(
+            "image_to_ground",
+            [triple](const IsdPushFrame& s, double line, double sample, double height) {
+                return triple(s.ImageToGround(line, sample, height));
+            },
+            nb::arg("line"), nb::arg("sample"), nb::arg("height") = 0.0,
+            "Where pixel (`line`, `sample`)'s ray meets the body's ellipsoid raised by `height`.")
+        .def(
+            "ground_to_image",
+            [](const IsdPushFrame& s, nb::handle ground) {
+                const glm::dvec2 image = s.GroundToImage(Vec3FromPython(ground));
+                return nb::make_tuple(image.x, image.y);
+            },
+            nb::arg("ground"), "The (line, sample) that sees body-fixed point `ground`.")
+        .def(
+            "author_framelet",
+            [](const IsdPushFrame& s, Scene& scene, const std::string& path,
+               std::uint32_t index) {
+                const IsdPushFrame::Framelet framelet = s.FrameletOf(index);
+                const Camera& camera = framelet.camera;
+                using namespace tokens;
+                // The camera's geometry and exposure only, as `IsdLineScanner.author_strip`.
+                Prim prim = scene.Has(Path(path)) ? scene.GetPrim(Path(path))
+                                                  : scene.Define(Path(path), kCamera);
+                prim.Set(kTransform, camera.transform)
+                    .Set(kCameraScan, std::string(kFrameScan))
+                    .Set(kFocalLength, camera.focalLengthMm)
+                    .Set(kVerticalAperture, camera.verticalApertureMm)
+                    .Set(kHorizontalAperture,
+                         camera.verticalApertureMm * camera.width / camera.height)
+                    .Set(kHorizontalApertureOffset, camera.horizontalApertureOffsetMm)
+                    .Set(kVerticalApertureOffset, camera.verticalApertureOffsetMm)
+                    .Set(kPushbroomLineOffset, 0.0)
+                    .Set(kLensDistortion,
+                         std::vector<float>{static_cast<float>(camera.lens.k1),
+                                            static_cast<float>(camera.lens.k2),
+                                            static_cast<float>(camera.lens.k3), 0.0f, 0.0f})
+                    .Set(kClippingRange, glm::dvec2(camera.nearPlane, camera.farPlane))
+                    .Set(kExposureTime, camera.exposureTime);
+                return nb::make_tuple(camera.width, camera.height, framelet.firstLine,
+                                      framelet.rowsReversed, framelet.time);
+            },
+            nb::arg("scene"), nb::arg("path"), nb::arg("framelet"),
+            "Authors the Camera prim at `path` as framelet `framelet` (in image order, from the "
+            "top): a frame camera posed when it is exposed, with the lens's distortion fitted as "
+            "`ernie:lens:distortion`. Returns (samples, lines, first_line, rows_reversed, time): "
+            "render at that resolution, flip the rows if `rows_reversed`, and place them at "
+            "`first_line` of the image.");
+
     m.def(
         "author_lroc_nac",
         [](Scene& scene, const std::string& camera, const std::string& product,
@@ -806,6 +883,24 @@ void BindScene(nb::module_& m) {
         "(qe, noise, adc, even/odd readoutTaps, compandTable code 0) whose RawDN is the 8-bit "
         "numbers the NAC sends. Its geometry comes from the image's ISD "
         "(`IsdLineScanner.author_strip`).");
+
+    m.def(
+        "author_lroc_wac",
+        [](Scene& scene, const std::string& camera, const std::string& product, int band) {
+            try {
+                AuthorLrocWac(scene, Path(camera), Path(product), LrocWacBandNamed(band));
+            } catch (const std::invalid_argument& error) {
+                throw nb::value_error(error.what());
+            }
+        },
+        nb::arg("scene"), nb::arg("camera"), nb::arg("product"), nb::arg("band") = 605,
+        "Authors one band of LROC's Wide Angle Camera (320, 360, 415, 565, 605, 645 or 690 nm, "
+        "by name or effective wavelength) as Robinson et al. 2010 publish it (Tables 3 and 4): "
+        "Camera `camera`'s sensor (the passband at the effective QE that gives Table 4's "
+        "responsivity, gain, detector noise, full well, 11-bit ADC, f-number; its spectral "
+        "range narrowed to the passband) and RenderProduct `product`'s readout chain (qe, "
+        "noise, adc). Its geometry comes from the image's ISD "
+        "(`IsdPushFrame.author_framelet`).");
 
     m.def(
         "look_at_transform",
