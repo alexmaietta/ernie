@@ -1,10 +1,14 @@
 #include "ernie/scene/isd.h"
 
+#include "ernie/scene/instruments.h"
+#include "ernie/scene/tokens.h"
+
 #include <gtest/gtest.h>
 
 #include <filesystem>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -128,4 +132,30 @@ TEST(IsdLineScanner, StripsFitTheLensDistortionAlongTheLine) {
                   1.0)
             << name << ": the distortion moves the line's ends by pixels";
     }
+}
+
+TEST(LrocNac, AuthorsThePublishedSensorAndReadout) {
+    ernie::Scene scene;
+    scene.Define("/Camera", ernie::tokens::kCamera);
+    scene.Define("/Product", ernie::tokens::kRenderProduct);
+    ernie::AuthorLrocNac(scene, "/Camera", "/Product", ernie::LrocNac::Right);
+    const ernie::Camera camera = ernie::CameraOf(scene, "/Camera", 64, 8);
+    // Robinson et al. 2010, Table 2, NAC-R.
+    EXPECT_DOUBLE_EQ(camera.fStop, 3.590);
+    EXPECT_DOUBLE_EQ(camera.sensor.ElectronsPerDn(camera.iso), 92.5);
+    EXPECT_DOUBLE_EQ(camera.sensor.readNoiseElectrons, 97.0);
+    EXPECT_DOUBLE_EQ(camera.sensor.fullWellElectrons, 352000.0);
+    EXPECT_EQ(camera.sensor.adcBits, 12);
+    ASSERT_EQ(camera.sensor.channels.size(), 1u);
+    EXPECT_NEAR(camera.sensor.channels[0].quantumEfficiency(550.0), 0.6, 1e-6);
+    EXPECT_NEAR(camera.sensor.channels[0].quantumEfficiency(800.0), 0.0, 1e-6);
+    const auto* filters = scene.Get("/Product", ernie::tokens::kFilters);
+    ASSERT_NE(filters, nullptr);
+    std::vector<std::string> types;
+    for (const ernie::Path& filter : *filters->Get<std::vector<ernie::Path>>()) {
+        types.push_back(*scene.Get(filter, ernie::tokens::kFilterType)->Get<std::string>());
+    }
+    EXPECT_EQ(types, (std::vector<std::string>{"qe", "noise", "adc", "readoutTaps", "compandTable",
+                                               "cie", "exposure"}));
+    EXPECT_THROW(ernie::AuthorLrocNac(scene, "/Product", "/Camera"), std::invalid_argument);
 }

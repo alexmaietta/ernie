@@ -14,6 +14,7 @@
 #include <map>
 #include <numeric>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -758,4 +759,49 @@ TEST_F(RasterDelegateTest, JpegKeepsQualityAndLosesDetailAsItFalls) {
     EXPECT_LT(best, good);
     EXPECT_LT(good, poor);
     EXPECT_GT(poor, 2.0) << "quality 5 blocks visibly";
+}
+
+namespace {
+
+/// The NAC's nominal 12- to 8-bit table (Robinson et al. 2010, Appendix A, code 0).
+float NacCode0(float x) {
+    if (x < 32.0f) {
+        return std::floor(x / 2.0f);
+    }
+    if (x < 136.0f) {
+        return std::floor(x / 4.0f + 8.0f);
+    }
+    if (x < 543.0f) {
+        return std::floor(x / 8.0f + 25.0f);
+    }
+    if (x < 2207.0f) {
+        return std::floor(x / 16.0f + 59.0f);
+    }
+    return std::floor(x / 32.0f + 128.0f);
+}
+
+}  // namespace
+
+TEST_F(RasterDelegateTest, CompandTableEncodesTheNacsTwelveBitsInEight) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    std::set<float> seen;
+    // Exposures spanning the 12-bit range, so every segment of the table is crossed.
+    for (const double exposure : {1e-7, 1e-6, 1e-5, 1e-4, 1e-3}) {
+        scene.Set("/World/Camera", tokens::kExposureTime, exposure);
+        const auto raw = VarThrough(delegate, scene, "RawDN", {{"qe", kNone}, {"adc", kNone}});
+        const auto encoded = VarThrough(delegate, scene, "RawDN",
+                                        {{"qe", kNone}, {"adc", kNone}, {"compandTable", kNone}});
+        for (std::size_t i = 0; i < raw.size(); ++i) {
+            if (i % 4 == 3) {
+                continue;
+            }
+            EXPECT_EQ(encoded[i], NacCode0(raw[i])) << "12-bit " << raw[i];
+            EXPECT_LE(encoded[i], 255.0f);
+            seen.insert(raw[i]);
+        }
+    }
+    EXPECT_GT(seen.size(), 15u) << "many 12-bit values";
+    EXPECT_LT(*seen.begin(), 32.0f) << "in the first segment";
+    EXPECT_GT(*seen.rbegin(), 2207.0f) << "into the last segment";
 }

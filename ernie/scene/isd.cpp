@@ -570,6 +570,9 @@ IsdLineScanner::Strip IsdLineScanner::StripOf(std::uint32_t firstLine,
     camera.verticalApertureMm = pitch * lines;
     camera.horizontalApertureOffsetMm = (principalSample - 0.5 * isd_.samples) * pitch;
     camera.lineOffsetMm = ray0.y * f;
+    // Each line integrates over its line time (the ISD's seconds per line where the strip
+    // starts).
+    camera.exposureTime = ImageTime(firstLine + 1.0) - ImageTime(firstLine);
     // The lens's distortion along the detector as Brown-Conrady radial terms: distorted =
     // undistorted (1 + k1 r^2 + k2 r^4 + k3 r^6), fitted by least squares to the ISD's model at
     // samples along the line, in Ernie's normalised image coordinates.

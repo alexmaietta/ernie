@@ -1,6 +1,7 @@
 #include "ernie/device/offscreen_target.h"
 #include "ernie/geometry/primitives.h"
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/instruments.h"
 #include "ernie/scene/isd.h"
 #include "ernie/scene/orbit_controller.h"
 #include "ernie/scene/schema.h"
@@ -530,6 +531,34 @@ TEST_F(RasterDelegateTest, AnLroNacStripSeesThroughItsLensDistortion) {
         EXPECT_NEAR(sum / hits, static_cast<double>(column), 0.5)
             << ball.String() << " at row " << row << ", column " << column;
     }
+}
+
+TEST_F(RasterDelegateTest, TheLrocNacPresetSendsEightBitNumbers) {
+    // NAC-L's readout (Robinson et al. 2010, Table 2 and Appendix A): electrons over 90.5 per DN
+    // into 12 bits, then the nominal table into 8.
+    Scene scene = FlatScene();
+    ernie::AuthorLrocNac(scene, "/World/Camera", "/Render/Product");
+    scene.Set("/World/Camera", tokens::kSensorNoise, false);
+    scene.Set("/World/Camera", tokens::kExposureTime, 0.004);
+    RasterDelegate delegate(*context_);
+    ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+    const auto vars = MapVars(outputs);
+    const auto table = [](double x) {
+        return x < 32 ? std::floor(x / 2) : x < 136 ? std::floor(x / 4 + 8)
+             : x < 543 ? std::floor(x / 8 + 25) : x < 2207 ? std::floor(x / 16 + 59)
+                       : std::floor(x / 32 + 128);
+    };
+    int checked = 0;
+    for (std::size_t row = 0; row < kVarSize; ++row) {
+        for (std::size_t col = 0; col < kVarSize; ++col) {
+            const double e = std::min<double>(At<float>(vars.at("Electrons"), row, col), 334000.0);
+            const double twelve = std::clamp(std::floor(e / 90.5 + 0.5), 0.0, 4095.0);
+            EXPECT_EQ(At<std::uint16_t>(vars.at("RawDN"), row, col), table(twelve))
+                << row << ", " << col << ": " << e << " electrons";
+            checked += e > 1000.0 ? 1 : 0;
+        }
+    }
+    EXPECT_GT(checked, 100) << "lit pixels";
 }
 
 TEST_F(RasterDelegateTest, FisheyeSeesFieldAnglesInProportionToRadius) {

@@ -4,6 +4,7 @@ ernie_add_library(
     brdf.cpp
     camera.cpp
     edit_history.cpp
+    instruments.cpp
     isd.cpp
     orbit_controller.cpp
     overlay.cpp

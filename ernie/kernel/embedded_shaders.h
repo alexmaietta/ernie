@@ -33,6 +33,7 @@ extern const char kFilterBloomingSlang[];
 extern const char kFilterColorMatrixSlang[];
 extern const char kFilterCompandSlang[];
 extern const char kFilterDefocusSlang[];
+extern const char kFilterCompandTableSlang[];
 extern const char kFilterDarkCurrentSlang[];
 extern const char kFilterDefectPixelsSlang[];
 extern const char kFilterDemosaicSlang[];

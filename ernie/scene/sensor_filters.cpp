@@ -399,6 +399,21 @@ std::vector<SensorFilterModel> StandardSensorFilters() {
          Kind::Spatial, Domain::Display,
          {{"quality", 85.0f, "1 to 100, as encoders take it"}},
          "Jpeg", shaders::kFilterJpegSlang},
+        {"compandTable", "Piecewise-linear companding",
+         "Digital numbers through up to five linear segments, truncated, as LROC's cameras "
+         "encode 12 bits in 8; by default the NAC's nominal table (code 0). After adc. Arrays "
+         "take five values each.",
+         {"M. S. Robinson et al., \"Lunar Reconnaissance Orbiter Camera (LROC) Instrument "
+          "Overview\", Space Science Reviews 150, 2010, Appendix A"},
+         Kind::Pixel, Domain::Digital,
+         {{"segments", 5.0f, "Segments used, 1 to 5"},
+          {"starts", 0.0f, "Each segment's first input DN, increasing", 5,
+           {0.0f, 32.0f, 136.0f, 543.0f, 2207.0f}},
+          {"slopes", 0.0f, "Each segment's output DN per input DN", 5,
+           {0.5f, 0.25f, 0.125f, 0.0625f, 0.03125f}},
+          {"offsets", 0.0f, "Each segment's output DN at input 0", 5,
+           {0.0f, 8.0f, 25.0f, 59.0f, 128.0f}}},
+         "CompandTable", shaders::kFilterCompandTableSlang},
     };
 }
 

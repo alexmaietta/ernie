@@ -1,5 +1,6 @@
 #include "bindings.h"
 
+#include "ernie/scene/instruments.h"
 #include "ernie/scene/isd.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/schema.h"
@@ -758,7 +759,8 @@ void BindScene(nb::module_& m) {
                 const IsdLineScanner::Strip strip = s.StripOf(first, lines);
                 const Camera& camera = strip.camera;
                 using namespace tokens;
-                // The camera's geometry only: its exposure, lens and sensor stay as authored.
+                // The camera's geometry and line time only: its f-number, ISO, lens
+                // transmission and sensor stay as authored (`author_lroc_nac`, say).
                 Prim prim = scene.Has(Path(path)) ? scene.GetPrim(Path(path))
                                                   : scene.Define(Path(path), kCamera);
                 prim.Set(kTransform, atEnd ? strip.to : strip.from)
@@ -774,7 +776,8 @@ void BindScene(nb::module_& m) {
                          std::vector<float>{static_cast<float>(camera.lens.k1),
                                             static_cast<float>(camera.lens.k2),
                                             static_cast<float>(camera.lens.k3), 0.0f, 0.0f})
-                    .Set(kClippingRange, glm::dvec2(camera.nearPlane, camera.farPlane));
+                    .Set(kClippingRange, glm::dvec2(camera.nearPlane, camera.farPlane))
+                    .Set(kExposureTime, camera.exposureTime);
                 return nb::make_tuple(camera.width, camera.height);
             },
             nb::arg("scene"), nb::arg("path"), nb::arg("first_line"), nb::arg("lines"),
@@ -785,6 +788,24 @@ void BindScene(nb::module_& m) {
             "resolution it needs, (samples, lines). Render an image strip by strip: author the "
             "first strip at its start and step once, then author each strip at its end and "
             "step.");
+
+    m.def(
+        "author_lroc_nac",
+        [](Scene& scene, const std::string& camera, const std::string& product,
+           const std::string& side) {
+            if (side != "left" && side != "right") {
+                throw nb::value_error("side must be 'left' or 'right'");
+            }
+            AuthorLrocNac(scene, Path(camera), Path(product),
+                          side == "left" ? LrocNac::Left : LrocNac::Right);
+        },
+        nb::arg("scene"), nb::arg("camera"), nb::arg("product"), nb::arg("side") = "left",
+        "Authors one of LROC's Narrow Angle Cameras (NAC-L or NAC-R) as Robinson et al. 2010 "
+        "publish it (Table 2, Appendix A): Camera `camera`'s sensor (400-760 nm, gain, detector "
+        "noise, full well, 12-bit ADC, f-number) and RenderProduct `product`'s readout chain "
+        "(qe, noise, adc, even/odd readoutTaps, compandTable code 0) whose RawDN is the 8-bit "
+        "numbers the NAC sends. Its geometry comes from the image's ISD "
+        "(`IsdLineScanner.author_strip`).");
 
     m.def(
         "look_at_transform",

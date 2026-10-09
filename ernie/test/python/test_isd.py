@@ -24,7 +24,10 @@ def test_line_scanner_round_trips_and_authors_strips():
     path = "/World/Camera"
     assert scene.get(path, tokens.CAMERA_SCAN) == tokens.PUSHBROOM
     assert (scene.get(path, tokens.TRANSFORM) == first).all()
-    scene.set(path, tokens.EXPOSURE_TIME, 0.002)
+    assert math.isclose(scene.get(path, tokens.EXPOSURE_TIME), 0.0118595288, rel_tol=1e-6), (
+        "each line exposed for its line time"
+    )
+    scene.set(path, tokens.EXPOSURE_ISO, 400.0)
     nac.author_strip(scene, path, 64, 64)
     assert (scene.get(path, tokens.TRANSFORM) == last).all()
-    assert scene.get(path, tokens.EXPOSURE_TIME) == 0.002, "the exposure stays as authored"
+    assert scene.get(path, tokens.EXPOSURE_ISO) == 400.0, "the ISO stays as authored"
