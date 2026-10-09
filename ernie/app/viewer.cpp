@@ -453,11 +453,11 @@ struct Viewer::State {
     std::vector<SelectionCallback> selectionCallbacks;
     std::uint64_t nextCallback = 1;
     std::vector<std::unique_ptr<Panel>> panels;
-    StatsPanel* stats = nullptr;
     FileDialog fileDialog;
     /// Panels to bring to the front (`FocusPanel`), and those drawn at least once.
     std::vector<std::string> focusRequests;
     std::set<std::string, std::less<>> drawnPanels;
+    StatsPanel* stats = nullptr;
     Panel* profilerPanel = nullptr;
     bool showControls = false;  ///< Help > Keyboard and Mouse.
     bool showAbout = false;     ///< Help > About Ernie.
@@ -2045,19 +2045,19 @@ struct Viewer::State {
             if (node != dockNodes.end()) {
                 ImGui::SetNextWindowDockID(node->second, ImGuiCond_FirstUseEver);
             }
-            bool keepOpen = true;
             const auto focus =
                 std::find(focusRequests.begin(), focusRequests.end(), panel.Title());
             if (focus != focusRequests.end() && drawnPanels.contains(panel.Title())) {
                 ImGui::SetNextWindowFocus();
                 focusRequests.erase(focus);
             }
+            bool keepOpen = true;
             if (ImGui::Begin(panel.Title().c_str(), &keepOpen)) {
                 panel.Draw(self);
             }
             ImGui::End();
-            if (!keepOpen) {
             drawnPanels.insert(panel.Title());
+            if (!keepOpen) {
                 panel.SetVisible(false);
             }
         }
@@ -3003,13 +3003,6 @@ Panel* Viewer::FindPanel(std::string_view title) {
     return nullptr;
 }
 
-WidgetPanel& Viewer::AddWidgetPanel(std::string title, Dock dock) {
-    return static_cast<WidgetPanel&>(
-        AddPanel(std::make_unique<WidgetPanel>(std::move(title), dock)));
-}
-
-void Viewer::RemovePanel(const std::string& title) {
-    auto& panels = state_->panels;
 void Viewer::OpenFileDialog(FileDialogOptions options,
                             std::function<void(Viewer&, const std::filesystem::path&)> done) {
     state_->fileDialog.Open(std::move(options),
@@ -3035,6 +3028,13 @@ void Viewer::FocusPanel(std::string_view title) {
     requests.emplace_back(title);
 }
 
+WidgetPanel& Viewer::AddWidgetPanel(std::string title, Dock dock) {
+    return static_cast<WidgetPanel&>(
+        AddPanel(std::make_unique<WidgetPanel>(std::move(title), dock)));
+}
+
+void Viewer::RemovePanel(const std::string& title) {
+    auto& panels = state_->panels;
     const auto found = std::find_if(panels.begin(), panels.end(),
                                     [&](const auto& panel) { return panel->Title() == title; });
     if (found == panels.end()) {
@@ -3044,6 +3044,9 @@ void Viewer::FocusPanel(std::string_view title) {
         (*found)->SetVisible(false);
         return;
     }
+    std::vector<std::string>& requests = state_->focusRequests;
+    requests.erase(std::remove(requests.begin(), requests.end(), title), requests.end());
+    state_->drawnPanels.erase(title);
     panels.erase(found);
 }
 
@@ -3051,9 +3054,6 @@ void Viewer::AddMenuItem(const std::string& menu, const std::string& label,
                          std::function<void(Viewer&)> action) {
     if (menu.empty() || label.empty()) {
         throw std::invalid_argument("Menu items need a menu and a label");
-    std::vector<std::string>& requests = state_->focusRequests;
-    requests.erase(std::remove(requests.begin(), requests.end(), title), requests.end());
-    state_->drawnPanels.erase(title);
     }
     state_->menuItems.push_back({menu, label, std::move(action)});
 }

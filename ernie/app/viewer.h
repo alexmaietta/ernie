@@ -417,10 +417,6 @@ class Viewer {
     /// The panel titled `title`, built-in ("Stats") or added; null if there is none.
     Panel* FindPanel(std::string_view title);
 
-    /// Adds a `WidgetPanel` titled `title`, for widgets added without ImGui (Python's panels).
-    WidgetPanel& AddWidgetPanel(std::string title, Dock dock = Dock::Right);
-
-    /// Removes the panel titled `title`; built-in panels are only hidden.
     /// Shows the panel titled `title` and brings it to the front: where it shares a dock with other
     /// panels its tab becomes the selected one, and it takes keyboard focus. Takes effect on the
     /// next frame in which the panel has already been drawn once, so a panel focused before the
@@ -429,6 +425,10 @@ class Viewer {
     /// @throws std::invalid_argument if there is no panel titled `title`.
     void FocusPanel(std::string_view title);
 
+    /// Adds a `WidgetPanel` titled `title`, for widgets added without ImGui (Python's panels).
+    WidgetPanel& AddWidgetPanel(std::string title, Dock dock = Dock::Right);
+
+    /// Removes the panel titled `title`; built-in panels are only hidden.
     void RemovePanel(const std::string& title);
 
     /// Opens the viewer's file dialog (`FileDialog`), modal over the window, to choose a file to
