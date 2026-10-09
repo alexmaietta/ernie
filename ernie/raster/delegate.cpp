@@ -18,14 +18,17 @@ namespace ernie {
 
 namespace {
 
-/// The vars the view holds for a chain writing `aovs` AOVs: every var (empty) without AOVs, else
-/// every var and the first `aovs` AOV slots.
-std::vector<std::string_view> ViewHeldVars(std::size_t aovs) {
-    if (aovs == 0) {
+/// The vars the view holds for a chain writing `aovs` AOVs, with MotionVector when `motion` (it is
+/// shown): every var (empty) without either, else every var and the first `aovs` AOV slots.
+std::vector<std::string_view> ViewHeldVars(std::size_t aovs, bool motion) {
+    if (aovs == 0 && !motion) {
         return {};
     }
-    // Every var (the opt-in MotionVector aside) and the slots.
+    // Every var (the opt-in MotionVector aside unless shown) and the slots.
     std::vector<std::string_view> vars = RequiredVars({});
+    if (motion) {
+        vars.push_back(render_vars::kMotionVector);
+    }
     vars.insert(vars.end(), kAovSlotNames.begin(),
                 kAovSlotNames.begin() + static_cast<std::ptrdiff_t>(aovs));
     return vars;
@@ -1000,7 +1003,7 @@ void RasterDelegate::Update(const Scene& scene, const Path& settings, VkExtent2D
     viewAovs_ = filters.empty() ? std::vector<std::string>{}
                                 : AovOutputsOf(filters, renderer_.SensorFilters());
     UpdatePrims(scene, prims, extent, NextFrame(scene, prims.settings, prims.settings),
-                prims.settings, filters, {}, {}, ViewHeldVars(viewAovs_.size()));
+                prims.settings, filters, {}, {}, ViewHeldVars(viewAovs_.size(), viewMotion_));
     SettleMotion();
 }
 
@@ -1213,14 +1216,15 @@ void RasterDelegate::Record(VkCommandBuffer commands, const RenderingTarget& tar
     const VkExtent2D extent = renderer_.Extent();
     if (viewTargets_ == nullptr || viewTargets_->Extent().width != extent.width ||
         viewTargets_->Extent().height != extent.height ||
-        viewTargets_->Bands() != renderer_.Bands().count || viewTargets_->AovNames() != viewAovs_) {
+        viewTargets_->Bands() != renderer_.Bands().count || viewTargets_->AovNames() != viewAovs_ ||
+        (viewTargets_->Var(render_vars::kMotionVector) != nullptr) != viewMotion_) {
         if (extent.width == 0 || extent.height == 0) {
             BeginRendering(commands, target);
             vkCmdEndRendering(commands);
             return;
         }
         vkDeviceWaitIdle(context_.Device());
-        const std::vector<std::string_view> vars = ViewHeldVars(viewAovs_.size());
+        const std::vector<std::string_view> vars = ViewHeldVars(viewAovs_.size(), viewMotion_);
         viewTargets_ = std::make_unique<RenderTargets>(context_, extent, renderer_.Bands().count,
                                                        false, 1, vars, viewAovs_);
     }

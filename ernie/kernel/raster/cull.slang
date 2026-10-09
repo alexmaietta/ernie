@@ -58,6 +58,8 @@ struct CullItem {
     // x: first level of detail in `lods`, y: level count; z: the instancer's arrays' offset in
     // the double-buffered instance pools now, w: at the last frame (z when it stood still).
     uint4 lods;
+    // `model` at the last frame, when it moved (flag kMoved).
+    float4x4 previousModel;
 }
 
 struct CullJob {
@@ -95,6 +97,7 @@ static const uint kMaxLods = 8;
 static const uint kViewStride = 12;
 static const uint kHasOrientations = 1;
 static const uint kHasScales = 2;
+static const uint kMoved = 4;  // the instancer's transform moved since the last frame
 
 static const uint kFrustum = 0;
 static const uint kOccluders = 1;
@@ -123,7 +126,7 @@ struct Placed {
 
 // Instance `instance` of `item` placed as mesh.slang places it, from its arrays at `base` in the
 // double-buffered instance pools.
-Placed placeAt(CullItem item, uint instance, uint base) {
+Placed placeAt(CullItem item, uint instance, uint base, float4x4 model) {
     let flags = asuint(item.info.y);
     let i = base + instance;
     var centre = item.sphere.xyz;
@@ -139,19 +142,22 @@ Placed placeAt(CullItem item, uint instance, uint base) {
         centre = rotate(q / max(length(q), 1e-20), centre);
     }
     Placed placed;
-    placed.centre = mul(item.model, float4(centre + load3(positions, i), 1.0)).xyz;
+    placed.centre = mul(model, float4(centre + load3(positions, i), 1.0)).xyz;
     placed.radius = item.sphere.w * scale;
     placed.scale = scale;
     return placed;
 }
 
-// Instance `instance` of `item` as its views see it: where it is, or for an instancer that moved
-// since the last frame (`lods.z` and `lods.w` its arrays now and then), a sphere around where it
-// is and where it was, which the sub-frames of a motion-blurred frame see it between.
+// Instance `instance` of `item` as its views see it: where it is, or for an instance that moved
+// since the last frame (its arrays, `lods.z` and `lods.w` now and then, or the instancer's
+// transform), a sphere around where it is and where it was, which the sub-frames of a
+// motion-blurred frame see it between.
 Placed place(CullItem item, uint instance) {
-    var placed = placeAt(item, instance, item.lods.z);
-    if (item.lods.w != item.lods.z) {
-        let was = placeAt(item, instance, item.lods.w);
+    var placed = placeAt(item, instance, item.lods.z, item.model);
+    let moved = (asuint(item.info.y) & kMoved) != 0;
+    if (item.lods.w != item.lods.z || moved) {
+        let was =
+            placeAt(item, instance, item.lods.w, moved ? item.previousModel : item.model);
         let radius = max(placed.radius, was.radius);
         placed.radius = radius + 0.5 * length(placed.centre - was.centre);
         placed.centre = 0.5 * (placed.centre + was.centre);

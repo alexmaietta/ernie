@@ -2099,6 +2099,7 @@ struct Viewer::State {
             delegate->SetHighlight(outlined, theme.outline);
             overrides.emplace(tokens::kOverlays, ShownOverlays(authored(tokens::kOverlays)));
             MirrorSettings(scene, settingsSource, SessionSettingsPath(), overrides, mirrored);
+            delegate->SetViewVar(capture && !capture->var.empty() ? capture->var : viewVar);
             delegate->Update(scene, SessionSettingsPath(), viewport->Extent());
             const RenderingTarget target = viewport->Prepare(commands, clear);
             // An AOV the chain no longer writes shows as LdrColor.

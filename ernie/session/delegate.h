@@ -173,6 +173,13 @@ class RenderDelegate {
         static_cast<void>(band);
     }
 
+    /// The render var the next `Record` draws, for `Update` to prepare the vars only drawing it
+    /// needs (such as the opt-in MotionVector); call before `Update`. Backends that render every
+    /// var regardless ignore it.
+    virtual void SetViewVar(std::string_view var) {
+        static_cast<void>(var);
+    }
+
     /// Outlines the prims at `paths` and their descendants in `Record`'s image, as Omniverse Kit
     /// outlines its selection, in display colour `colour` (sRGB-encoded rgb, alpha its opacity);
     /// none for no paths. Backends that cannot outline ignore it.

@@ -21,6 +21,8 @@ static const uint kShowLinear = 4;     // Linear rgb over range.z.
 static const uint kShowId = 5;         // Integer id as a hashed colour, black for 0 (the
                                        // background, and instance 0).
 static const uint kShowLinearUint = 6; // Integer rgb over range.z.
+static const uint kShowMotion = 8;     // Motion (xy pixels): hue its direction, brightness its
+                                       // length, full at 8 pixels.
 
 // Unknown formats, so one declaration reads vars of any channel count and width.
 [[vk::binding(0, 0)]] [[vk::image_format("unknown")]] Texture2D<float4> floatVar;
@@ -83,6 +85,12 @@ float4 presentFloat(VertexOutput in) : SV_Target {
         return all(value.xyz == 0.0) ? display(float3(0.0)) : display(value.xyz * 0.5 + 0.5);
     case kShowLinear:
         return displayLinear(value.rgb / constants.range.z);
+    case kShowMotion: {
+        // The usual optical-flow colour wheel: hue by direction, brightness by length.
+        let hue = (atan2(-value.y, value.x) / 6.2831853 + 1.0) % 1.0;
+        let rgb = saturate(abs(frac(hue + float3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0);
+        return display(rgb * saturate(length(value.xy) / 8.0));
+    }
     default:
         return display(value.rgb);
     }

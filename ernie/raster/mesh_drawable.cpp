@@ -62,8 +62,9 @@ struct GpuCullItem {
     /// the prototype's transform.
     float info[4];
     std::uint32_t levels[4];  ///< First level of detail in the level table, level count.
+    float previousModel[16];  ///< `model` at the last frame, with flag `kCullMoved`.
 };
-static_assert(sizeof(GpuCullItem) == 112, "GpuCullItem must match CullItem in cull.slang");
+static_assert(sizeof(GpuCullItem) == 176, "GpuCullItem must match CullItem in cull.slang");
 
 static_assert(sizeof(MeshDrawable::GpuCullJob) == 32,
               "GpuCullJob must match CullJob in cull.slang");
@@ -133,6 +134,7 @@ float MaxScale(const glm::mat4& m) {
 /// Bit flags of `GpuCullItem::info[1]`.
 constexpr std::uint32_t kCullOrientations = 1;
 constexpr std::uint32_t kCullScales = 2;
+constexpr std::uint32_t kCullMoved = 4;  ///< The instancer's transform moved since the last frame.
 
 /// Grows `buffer` to hold `bytes`, waiting for the device first if it replaces one in use.
 void Reserve(const VulkanContext& context, std::unique_ptr<GpuBuffer>& buffer, VkDeviceSize bytes,
@@ -1490,6 +1492,11 @@ void MeshDrawable::WriteCullJobs(const std::vector<GpuCullJob>& jobs,
         if (instancer.onDevice ? !instancer.device.scales.Empty()
                                : !instancer.data.scales.empty()) {
             flags |= kCullScales;
+        }
+        if (previousTransforms_[i] != transforms_[i]) {
+            flags |= kCullMoved;
+            std::memcpy(entry.previousModel, glm::value_ptr(previousTransforms_[i]),
+                        sizeof(entry.previousModel));
         }
         std::memcpy(&entry.info[1], &flags, sizeof(flags));
     }

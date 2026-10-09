@@ -117,6 +117,10 @@ class RasterDelegate : public RenderDelegate {
         renderer_.SetPresentBand(band);
     }
 
+    void SetViewVar(std::string_view var) override {
+        viewMotion_ = var == render_vars::kMotionVector;
+    }
+
     void SetHighlight(std::span<const Path> paths, glm::vec4 colour) override {
         highlight_.assign(paths.begin(), paths.end());
         highlightColour_ = colour;
@@ -259,6 +263,8 @@ class RasterDelegate : public RenderDelegate {
     std::unique_ptr<RenderTargets> viewTargets_;
     /// The AOVs the view's chain writes, in slot order, as of the last `Update`.
     std::vector<std::string> viewAovs_;
+    // Whether the view holds the opt-in MotionVector, which it renders only while shown.
+    bool viewMotion_ = false;
     /// Per product (or the settings for the view), its views' camera poses at its last frame,
     /// for motion blur.
     std::map<Path, std::vector<glm::dmat4>> lastPoses_;

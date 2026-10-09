@@ -121,7 +121,7 @@ TEST_F(ViewerTest, RendersTheSceneIntoTheViewport) {
 
 TEST_F(ViewerTest, ShowsEveryRenderVarTheBackendCanDraw) {
     const std::vector<std::string>& vars = viewer_->Delegate().Info().viewVars;
-    EXPECT_EQ(vars.size(), kRenderVarNames.size() - 1) << "every one but the opt-in MotionVector";
+    EXPECT_EQ(vars.size(), kRenderVarNames.size());
     ASSERT_TRUE(viewer_->Step());
     // The centre pixel (the cube) and a corner (background) of a capture of `var`.
     // Without the grid and gizmos over the image.
@@ -149,7 +149,8 @@ TEST_F(ViewerTest, ShowsEveryRenderVarTheBackendCanDraw) {
     const auto sum = [](const std::array<int, 3>& rgb) { return rgb[0] + rgb[1] + rgb[2]; };
     for (const std::string& var : vars) {
         const auto [centre, corner] = sample(var);
-        if (var != "InstanceId") {  // The cube is no instance: id 0, black.
+        // The cube is no instance (id 0) and stands still (no motion): black.
+        if (var != "InstanceId" && var != "MotionVector") {
             EXPECT_GT(sum(centre), 0) << var << " shows the cube";
         }
         // Colour shows the clear colour, and sensor vars the background's noise.
@@ -381,7 +382,6 @@ TEST_F(ViewerTest, FunctionPanelsDrawAndPanelsAreFoundByTitle) {
     EXPECT_EQ(draws, 1);
 }
 
-TEST_F(ViewerTest, RendererIsAViewerOptionAndSwitchable) {
 TEST_F(ViewerTest, FocusPanelBringsADockedTabToTheFront) {
     // Whether each title's window is the selected tab of its dock, read during the UI.
     std::map<std::string, bool> front;
@@ -415,6 +415,7 @@ TEST_F(ViewerTest, FocusPanelBringsADockedTabToTheFront) {
     EXPECT_TRUE(viewer_->Step()) << "a removed panel's focus request is dropped";
 }
 
+TEST_F(ViewerTest, RendererIsAViewerOptionAndSwitchable) {
     const std::vector<std::string> renderers = Viewer::Renderers();
     ASSERT_FALSE(renderers.empty());
     EXPECT_EQ(viewer_->Renderer(), "raster");

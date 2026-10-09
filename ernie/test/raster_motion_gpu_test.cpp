@@ -177,6 +177,20 @@ TEST_F(RasterDelegateTest, InstancesAndDeformingPointsBlurFromHostAndCudaArrays)
     }
 }
 
+TEST_F(RasterDelegateTest, InstancersLeavingTheViewBlurFromWhereTheyWere) {
+    // The rocks' instancer slides 30 m along +x, out of the view (about 25 m to its edge): GPU
+    // culling must keep its instances for the sub-frames that still see them.
+    RasterDelegate delegate(*context_);
+    Scene scene = MotionScene();
+    ExpectMotionBlur(
+        delegate, scene,
+        [&](double s) {
+            scene.Set("/World/Rocks", tokens::kTransform,
+                      glm::translate(glm::dmat4(1.0), glm::dvec3(30.0 * s, 0.0, 0.0)));
+        },
+        5);
+}
+
 TEST_F(RasterDelegateTest, MotionVectorsFollowTheCameraAndWhatMoves) {
     RasterDelegate delegate(*context_);
     Scene scene = MotionScene();

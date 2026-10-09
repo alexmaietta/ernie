@@ -348,7 +348,7 @@ struct PresentMode {
     bool integer;
 };
 
-constexpr std::array<PresentMode, 10> kPresentModes{{
+constexpr std::array<PresentMode, 11> kPresentModes{{
     {render_vars::kSpectralRadiance, kShowSpectral, false},
     {render_vars::kLdrColor, 0, false},
     {render_vars::kHdrColor, 1, false},
@@ -359,6 +359,7 @@ constexpr std::array<PresentMode, 10> kPresentModes{{
     {render_vars::kPrimId, 5, true},
     {render_vars::kInstanceId, 5, true},
     {render_vars::kRawDn, 6, true},
+    {render_vars::kMotionVector, 8, false},
 }};
 
 /// AOVs, as linear rgb over the electrons' white, the scale filters' charge outputs share.
@@ -889,7 +890,10 @@ void RasterRenderer::PlanBatchShadows(const FrameParams& params, const Bounds3& 
     Light sun;
     sun.type = LightType::Distant;
     sun.direction = params.sunDirection;
-    // A fit of the sun's map around `low` to `high`, one cascade covering every view depth.
+    // A fit of the sun's map around `low` to `high`, one cascade covering every view depth. It
+    // reaches receivers below the casters, such as a ground plane, without a floor
+    // (`ShadowFloor`): they lie in the casters' shadow along the light, and the one cascade has
+    // no far split.
     const auto fit = [&](const glm::vec3& low, const glm::vec3& high) {
         std::vector<ShadowCascade> views =
             FitLightShadowViews(sun, glm::vec3(0.0f), low, high, shadowResolution_);

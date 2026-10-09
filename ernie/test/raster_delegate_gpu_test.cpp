@@ -10,6 +10,7 @@
 #include "support/vulkan_fixture.h"
 
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -513,6 +514,36 @@ TEST_F(RasterDelegateTest, FloatingCastersShadowTheGroundFarBelowThem) {
               Path("/World/Ground"));
     EXPECT_LT(At<float>(vars.at("HdrColor"), shadowRow, shadowCol, 1),
               0.2f * At<float>(vars.at("HdrColor"), litRow, litCol, 1));
+}
+
+TEST_F(RasterDelegateTest, FloatingCastersShadowTheGroundInBatchesToo) {
+    // As above, through a batch of two views posed alike: its one shadow map, fitted to the
+    // casters with no far split, reaches the ground below the block.
+    Scene scene = GroundScene(0.0);
+    scene.Set("/World/Sun", tokens::kShadowEnable, true);
+    scene.Set("/World/Sun", tokens::kTransform, ernie::DistantLightTransform({1.0, 0.0, 1.0}));
+    scene.Define("/World/Block", tokens::kCube)
+        .Set(tokens::kSize, 4.0)
+        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 8.0)));
+    const glm::mat4 pose(scene.WorldTransform("/World/Camera"));
+    std::vector<float> poses;
+    for (int v = 0; v < 2; ++v) {
+        poses.insert(poses.end(), glm::value_ptr(pose), glm::value_ptr(pose) + 16);
+    }
+    scene.Write("/World/Camera", tokens::kPoses, Tensor::Copy<float>(poses, {2, 4, 4}));
+    RasterDelegate delegate(*context_);
+    ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+    const auto vars = MapVars(outputs);
+    const Tensor& hdr = vars.at("HdrColor");
+    ASSERT_EQ(hdr.Shape().front(), 2);
+    const auto green = [&](std::size_t view, std::pair<std::size_t, std::size_t> pixel) {
+        return hdr.As<float>()[((view * kVarSize + pixel.first) * kVarSize + pixel.second) * 4 + 1];
+    };
+    for (std::size_t view = 0; view < 2; ++view) {
+        EXPECT_LT(green(view, PixelOf(scene, -8.0f, 0.0f)),
+                  0.2f * green(view, PixelOf(scene, 5.0f, 5.0f)))
+            << "view " << view;
+    }
 }
 
 namespace {
