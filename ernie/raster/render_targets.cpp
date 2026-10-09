@@ -13,12 +13,13 @@ namespace {
 
 constexpr const auto& kVarNames = kRenderVarNames;
 
-constexpr std::array<VkFormat, 10> kVarFormats{
+constexpr std::array<VkFormat, 11> kVarFormats{
     VK_FORMAT_R32_SFLOAT,        VK_FORMAT_R32G32B32A32_SFLOAT,
     VK_FORMAT_R16G16B16A16_UINT, VK_FORMAT_R32G32B32A32_SFLOAT,
     VK_FORMAT_R8G8B8A8_UNORM,    VK_FORMAT_R32_SFLOAT,
     VK_FORMAT_R32_SFLOAT,        VK_FORMAT_R32G32B32A32_SFLOAT,
-    VK_FORMAT_R32_UINT,          VK_FORMAT_R32_UINT};
+    VK_FORMAT_R32_UINT,          VK_FORMAT_R32_UINT,
+    VK_FORMAT_R32G32_SFLOAT};
 
 constexpr VkImageUsageFlags kStorage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
@@ -122,13 +123,15 @@ GpuImage& RenderTargets::RadianceSum() {
     return *radianceSum_;
 }
 
-GpuImage& RenderTargets::Coverage(bool full) {
-    std::unique_ptr<GpuImage>& image = full ? coverage_ : coveragePlaceholder_;
+GpuImage& RenderTargets::Raster(bool full) {
+    std::unique_ptr<GpuImage>& image = full ? raster_ : rasterPlaceholder_;
     if (image == nullptr) {
+        // Drawn into by the drawables' motion passes too.
         image = std::make_unique<GpuImage>(
-            context_, ImageDesc{full ? extent_.width : 1, full ? extent_.height : 1,
-                                full ? views_ : 1, 1, VK_FORMAT_R32_SFLOAT, kStorage, false,
-                                true});
+            context_,
+            ImageDesc{full ? extent_.width : 1, full ? extent_.height : 1, full ? views_ : 1, 1,
+                      VK_FORMAT_R32G32B32A32_SFLOAT,
+                      kStorage | (full ? VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT : 0u), false, true});
     }
     return *image;
 }
@@ -225,7 +228,7 @@ std::uint64_t RenderTargets::GpuBytes() const {
     std::uint64_t bytes =
         depth_->Bytes() + rasterRadiance_->Bytes() + (hzb_ != nullptr ? hzb_->Bytes() : 0) +
         (radianceSum_ != nullptr ? radianceSum_->Bytes() : 0) +
-        (coverage_ != nullptr ? coverage_->Bytes() : 0);
+        (raster_ != nullptr ? raster_->Bytes() : 0);
     for (const std::unique_ptr<GpuImage>& image : gbuffer_) {
         bytes += image->Bytes();
     }

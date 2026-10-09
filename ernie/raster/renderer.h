@@ -404,6 +404,15 @@ class RasterRenderer {
     /// weighted for its share of its exposure; the last leaves the sum in the raster radiance.
     void Accumulate(VkCommandBuffer commands, RenderTargets& targets,
                     std::uint32_t subframe) const;
+    /// Writes each internal view's MotionUniforms for a frame holding the MotionVector var: the
+    /// last frame's view-projection from `frame`'s `PreviousPose`, and makes the camera pass.
+    void WriteMotion(const FrameParams& params, const FrameParams& frame);
+    /// Records the MotionVector var's passes for output views `firstView` on, after their last
+    /// sub-frame: the camera's motion for every pixel (motion_vectors.slang), then each
+    /// drawable's moving draws over it (`RasterDrawable::RecordMotion`), into `targets.Raster`.
+    void RecordMotion(VkCommandBuffer commands, RenderTargets& targets,
+                      std::span<const RasterDrawable* const> drawables,
+                      std::uint32_t firstView) const;
     /// The sensor filters of output views `firstView` on.
     void Filter(VkCommandBuffer commands, RenderTargets& targets, std::uint32_t firstView) const;
     /// The internal view (uniforms, culling) of output view `view` at its last sub-frame, whose
@@ -460,6 +469,13 @@ class RasterRenderer {
     std::uint32_t views_ = 1;
     std::uint32_t outputViews_ = 1;  ///< The frame's own views (`FrameParams::Views`).
     std::uint32_t subframes_ = 1;    ///< Sub-frames per view: above 1 for motion blur.
+    /// Whether the last `Update`'s frame holds the MotionVector var, which runs the motion passes.
+    bool motionVectors_ = false;
+    /// Per internal view, frame.slang's MotionUniforms (256 bytes each), written only for frames
+    /// holding the MotionVector var; and the camera pass (motion_vectors.slang), made then.
+    std::unique_ptr<GpuBuffer> motionUniforms_;
+    std::unique_ptr<PipelineLayout> cameraMotionLayout_;
+    std::unique_ptr<ComputePipeline> cameraMotionPipeline_;
     /// The shutter for motion.slang: the first sub-frame's time and the spacing, the shutter's
     /// opening and closing and the rolling readout, in frames.
     std::array<float, 5> shutter_{};

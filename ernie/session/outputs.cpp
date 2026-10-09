@@ -29,6 +29,8 @@ TexelLayout LayoutOf(VkFormat format) {
         return {DType::Float32, 4};
     case VK_FORMAT_R32_SFLOAT:
         return {DType::Float32, 1};
+    case VK_FORMAT_R32G32_SFLOAT:
+        return {DType::Float32, 2};
     case VK_FORMAT_R32_UINT:
         return {DType::UInt32, 1};
     default:

@@ -472,7 +472,7 @@ std::vector<std::string_view> VarsWrittenBy(std::span<const SensorFilter> chain)
             vars.insert(vars.end(),
                         {render_vars::kSpectralRadiance, render_vars::kDistanceToImagePlane,
                          render_vars::kDistanceToCamera, render_vars::kNormal, render_vars::kPrimId,
-                         render_vars::kInstanceId});
+                         render_vars::kInstanceId, render_vars::kMotionVector});
             break;
         case SensorFilter::Qe:
             vars.push_back(render_vars::kElectrons);
@@ -499,7 +499,10 @@ namespace ernie {
 
 std::vector<std::string_view> RequiredVars(std::span<const std::string_view> requested) {
     if (requested.empty()) {
-        return {kRenderVarNames.begin(), kRenderVarNames.end()};
+        // Every var but the opt-in MotionVector, which costs passes of its own.
+        std::vector<std::string_view> every(kRenderVarNames.begin(), kRenderVarNames.end());
+        std::erase(every, render_vars::kMotionVector);
+        return every;
     }
     // The sensor computes every var from the raster radiance in one pass, keeping what a var is
     // made from in registers, so a frame holds just the requested vars, in binding order.

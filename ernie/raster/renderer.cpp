@@ -171,7 +171,8 @@ constexpr DescriptorBinding kFilterBindings[] = {
     {14, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {16, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
-    {17, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    // Sampled linearly for the channel images' pyramids.
+    {17, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kCompute},
     {18, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {19, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     // The AOV slots.
@@ -186,9 +187,10 @@ constexpr DescriptorBinding kFilterBindings[] = {
     // The temporal filters' state, previous and next.
     {28, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {29, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
-    // Linear filtering of the channel images' pyramids.
-    {30, VK_DESCRIPTOR_TYPE_SAMPLER, kCompute},
-    // With motion blur, the raster pixels' coverage.
+    // The MotionVector var.
+    {30, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    // Per raster pixel, its motion (xy) and motion blur's coverage (z): `RenderTargets::Raster`.
+    // 32 descriptors in all, as many as devices push at least.
     {31, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
 };
 
@@ -268,6 +270,22 @@ constexpr DescriptorBinding kHzbBindings[] = {
 };
 
 /// motion.slang: the sub-frame's radiance, the sum, its ids and the coverage.
+/// motion_vectors.slang: the depth, the raster image written and the views' MotionUniforms.
+constexpr DescriptorBinding kCameraMotionBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+    {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+};
+
+/// frame.slang's MotionUniforms.
+struct MotionUniforms {
+    float previousViewProj[16];
+    float inverseViewProj[16];
+    float size[4];
+    float padding[28];
+};
+static_assert(sizeof(MotionUniforms) == 256, "MotionUniforms must match frame.slang");
+
 constexpr DescriptorBinding kMotionBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
     {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
@@ -1258,6 +1276,11 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
     // The lights first: shading reads the size of the light shadow maps they make.
     WriteLights(params, bounds);
     WriteShading(params);
+    motionVectors_ = std::find(requiredVars_.begin(), requiredVars_.end(),
+                               render_vars::kMotionVector) != requiredVars_.end();
+    if (motionVectors_) {
+        WriteMotion(params, frame);
+    }
     WriteSensor(params);
 
     shadowViews_ = cascades_;
@@ -1551,6 +1574,80 @@ void RasterRenderer::WriteSensor(const FrameParams& params) {
     }
 }
 
+void RasterRenderer::WriteMotion(const FrameParams& params, const FrameParams& frame) {
+    ERNIE_ZONE("Motion uniforms");
+    const VkDeviceSize bytes = VkDeviceSize{views_} * sizeof(MotionUniforms);
+    if (motionUniforms_ == nullptr || motionUniforms_->Size() < bytes) {
+        vkDeviceWaitIdle(context_.Device());
+        motionUniforms_ = std::make_unique<GpuBuffer>(context_, bytes, kViewUniformUsage,
+                                                      BufferMemory::Device);
+    }
+    if (cameraMotionPipeline_ == nullptr) {
+        cameraMotionLayout_ =
+            std::make_unique<PipelineLayout>(context_, kCameraMotionBindings, 16);
+        const std::vector<ShaderModuleSource> modules{
+            {"motion_vectors", shaders::kMotionVectorsSlang}};
+        cameraMotionPipeline_ = std::make_unique<ComputePipeline>(
+            context_, *cameraMotionLayout_, compiler_.CompileSpirv(modules, "cameraMotionMain"));
+    }
+    std::vector<MotionUniforms> uniforms(views_);
+    for (std::uint32_t v = 0; v < views_; ++v) {
+        MotionUniforms& view = uniforms[v];
+        // The view's camera at the last frame, relative to this frame's origin; a pushbroom's
+        // motion is zero.
+        const CameraView before =
+            frame.camera.RasterView(frame.PreviousPose(v % outputViews_), frame.overscan);
+        CopyMatrix(view.previousViewProj, before.ViewProjection());
+        CopyMatrix(view.inverseViewProj, glm::inverse(params.View(v).ViewProjection()));
+        view.size[0] = static_cast<float>(extent_.width);
+        view.size[1] = static_cast<float>(extent_.height);
+        view.size[2] = pushbroom_ ? 0.0f : 1.0f;
+    }
+    uploads_.Write(*motionUniforms_, std::as_bytes(std::span(uniforms)));
+}
+
+void RasterRenderer::RecordMotion(VkCommandBuffer commands, RenderTargets& targets,
+                                  std::span<const RasterDrawable* const> drawables,
+                                  std::uint32_t firstView) const {
+    ERNIE_GPU_ZONE(context_, commands, "Motion vectors");
+    GpuImage& raster = targets.Raster(true);
+    raster.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    // Every pixel's motion from the camera's, reading the last sub-frame's depth.
+    const DescriptorResource camera[] = {
+        DescriptorResource::Of(targets.Depth().View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+        DescriptorResource::Of(raster.View(), VK_IMAGE_LAYOUT_GENERAL),
+        DescriptorResource::Of(*motionUniforms_)};
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, cameraMotionPipeline_->Handle());
+    cameraMotionLayout_->Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, camera);
+    const std::uint32_t constants[4] = {LastSubframeView(firstView), 0, 0, 0};
+    cameraMotionLayout_->PushConstants(commands, constants, sizeof(constants));
+    vkCmdDispatch(commands, Groups(extent_.width), Groups(extent_.height), targets.Views());
+    ShaderBarrier(commands);
+
+    // Then what moved draws its own over it, where its surfaces are the G-buffer's.
+    raster.Transition(commands, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    targets.Depth().Transition(commands, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+    RenderingTarget target;
+    target.colors = {raster.View()};
+    target.loadColor = true;
+    target.depth = targets.Depth().View();
+    target.loadDepth = true;
+    target.extent = extent_;
+    target.layers = targets.Views();
+    BeginRendering(commands, target);
+    for (std::uint32_t v = 0; v < targets.Views(); ++v) {
+        const std::uint32_t view = LastSubframeView(firstView + v);
+        const DescriptorResource motion = DescriptorResource::Of(
+            *motionUniforms_, VkDeviceSize{view} * sizeof(MotionUniforms), sizeof(MotionUniforms));
+        for (const RasterDrawable* drawable : drawables) {
+            drawable->RecordMotion(commands, Frame(view), view, motion);
+        }
+    }
+    vkCmdEndRendering(commands);
+    raster.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    targets.Depth().Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+}
+
 void RasterRenderer::EnsureViewBuffers(std::uint32_t views) {
     if (uniforms_.Size() >= views * kUniformsStride) {
         return;
@@ -1773,6 +1870,10 @@ void RasterRenderer::RecordViews(VkCommandBuffer commands, RenderTargets& target
         if (subframes_ > 1) {
             Accumulate(commands, targets, subframe);
         }
+    }
+    // The MotionVector var's passes, over the last sub-frame's G-buffer, only when it is held.
+    if (motionVectors_) {
+        RecordMotion(commands, targets, drawables, firstView);
     }
     Filter(commands, targets, firstView);
     if (measureDepth_ && firstView == 0) {
@@ -2134,7 +2235,7 @@ void RasterRenderer::Accumulate(VkCommandBuffer commands, RenderTargets& targets
                                 std::uint32_t subframe) const {
     ERNIE_GPU_ZONE(context_, commands, "Motion blur");
     GpuImage& sum = targets.RadianceSum();
-    GpuImage& coverage = targets.Coverage(true);
+    GpuImage& coverage = targets.Raster(true);
     sum.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
     coverage.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
     const DescriptorResource resources[] = {
@@ -2168,14 +2269,17 @@ void RasterRenderer::Filter(VkCommandBuffer commands, RenderTargets& targets,
     const std::uint32_t groupsX = Groups(extent_.width);
     const std::uint32_t groupsY = Groups(extent_.height);
     const std::uint32_t views = targets.Views();
-    GpuImage& coverage = targets.Coverage(subframes_ > 1);
-    coverage.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    GpuImage& raster = targets.Raster(subframes_ > 1 || motionVectors_);
+    raster.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
     ERNIE_GPU_ZONE(context_, commands, "Sensor filters");
     std::vector<DescriptorResource> filters{
         DescriptorResource::Of(sensorUniforms_), general(targets.RasterRadiance()),
         sampled(targets.GBuffer(0)), sampled(targets.GBuffer(2)), sampled(targets.Depth())};
+    // Bindings 5 to 14; MotionVector, bound last, at 30.
     for (const std::string_view name : RenderTargets::VarNames()) {
-        filters.push_back(general(targets.Bound(name)));
+        if (name != render_vars::kMotionVector) {
+            filters.push_back(general(targets.Bound(name)));
+        }
     }
     // Each chain's kernels in turn over the one raster image, each writing its own vars.
     for (const SensorPass& pass : sensorPasses_) {
@@ -2205,7 +2309,9 @@ void RasterRenderer::Filter(VkCommandBuffer commands, RenderTargets& targets,
         for (std::uint32_t segment = 0; segment < plan.segments; ++segment) {
             std::vector<DescriptorResource> resources = bound;
             resources.push_back(general(image(true, segment + 1)));
-            resources.push_back(general(image(false, segment + 1)));
+            // Read through a linear sampler too, for pyramids.
+            resources.push_back(DescriptorResource::Of(image(false, segment + 1).View(),
+                                                       VK_IMAGE_LAYOUT_GENERAL, clampSampler_));
             resources.push_back(general(image(true, segment)));
             resources.push_back(general(image(false, segment)));
             for (std::size_t slot = 0; slot < kMaxAovs; ++slot) {
@@ -2213,8 +2319,8 @@ void RasterRenderer::Filter(VkCommandBuffer commands, RenderTargets& targets,
             }
             resources.push_back(general(previous));
             resources.push_back(general(next));
-            resources.push_back(DescriptorResource::Of(clampSampler_));
-            resources.push_back(general(coverage));
+            resources.push_back(general(targets.Bound(render_vars::kMotionVector)));
+            resources.push_back(general(raster));
             vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                               sensorPipelines_.at(SensorKernelKey(plan, segment))->Handle());
             filterLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);

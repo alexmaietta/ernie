@@ -177,6 +177,51 @@ TEST_F(RasterDelegateTest, InstancesAndDeformingPointsBlurFromHostAndCudaArrays)
     }
 }
 
+TEST_F(RasterDelegateTest, MotionVectorsFollowTheCameraAndWhatMoves) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MotionScene();
+    const Path var("/Render/Vars/MotionVector");
+    scene.Define(var, tokens::kRenderVar).Set(tokens::kSourceName, std::string("MotionVector"));
+    scene.Set("/Render/Out", tokens::kOrderedVars,
+              std::vector<Path>{"/Render/Vars/HdrColor", var});
+    const double focal =
+        ernie::CameraOf(scene, "/World/Camera", kSize, kSize).FocalLengthPixels();
+    const auto at = [](const std::vector<float>& motion, std::size_t x, std::size_t y) {
+        return glm::vec2(motion[(y * kSize + x) * 2], motion[(y * kSize + x) * 2 + 1]);
+    };
+    const std::size_t centre = kSize / 2;
+
+    // A first frame has nothing to move from.
+    scene.Set("/World/Camera", tokens::kTransform, CameraAt(0.0));
+    const std::vector<float> first = Step(delegate, scene, "MotionVector");
+    ASSERT_EQ(first.size(), std::size_t{kSize} * kSize * 2) << "(rows, cols, 2)";
+    for (const float m : first) {
+        ASSERT_NEAR(m, 0.0f, 1e-3f) << "but for the reprojection's rounding";
+    }
+
+    // The camera 1 m along +x: what it sees 60 m away moves f / 60 pixels the other way.
+    scene.Set("/World/Camera", tokens::kTransform, CameraAt(1.0));
+    const std::vector<float> panned = Step(delegate, scene, "MotionVector");
+    const float shift = static_cast<float>(-focal / 60.0);
+    // The red quad, near x = -12 m (left of centre).
+    const auto quadX = static_cast<std::size_t>(centre - 12.0 * focal / 60.0);
+    EXPECT_NEAR(at(panned, quadX, centre).x, shift, 0.05f);
+    EXPECT_NEAR(at(panned, quadX, centre).y, 0.0f, 0.05f);
+    EXPECT_NEAR(at(panned, centre, centre).x, 0.0f, 1e-3f) << "the sky, far away, barely moves";
+
+    // Still again, the middle rock slides 2 m along -y (down the image): only it moves.
+    Step(delegate, scene, "MotionVector");
+    const std::array<float, 9> positions{12, -10, 0, 12, -2, 0, 12, 10, 0};
+    scene.Write("/World/Rocks", tokens::kPositions, Tensor::Copy<float>(positions, {3, 3}));
+    const std::vector<float> slid = Step(delegate, scene, "MotionVector");
+    const auto rockX = static_cast<std::size_t>(centre + 11.0 * focal / 60.0);
+    const auto rockY = static_cast<std::size_t>(centre + 2.0 * focal / 60.0);
+    EXPECT_NEAR(at(slid, rockX, rockY).y, static_cast<float>(2.0 * focal / 60.0), 0.05f)
+        << "down the image";
+    EXPECT_NEAR(at(slid, rockX, rockY).x, 0.0f, 0.05f);
+    EXPECT_LT(glm::length(at(slid, quadX, centre)), 1e-3f) << "the quad stood still";
+}
+
 TEST_F(RasterDelegateTest, MovingCastersShadowEachSubframeFromWhereTheyAre) {
     RasterDelegate delegate(*context_);
     Scene scene = MotionScene();

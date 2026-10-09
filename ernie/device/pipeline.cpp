@@ -51,6 +51,13 @@ DescriptorResource DescriptorResource::Of(const Sampler& sampler) {
     return resource;
 }
 
+DescriptorResource DescriptorResource::Of(VkImageView view, VkImageLayout layout,
+                                          const Sampler& sampler) {
+    DescriptorResource resource;
+    resource.image = {sampler.Handle(), view, layout};
+    return resource;
+}
+
 PipelineLayout::PipelineLayout(const VulkanContext& context,
                                std::span<const DescriptorBinding> bindings,
                                std::uint32_t pushConstantBytes)
@@ -205,15 +212,14 @@ GraphicsPipeline::GraphicsPipeline(const VulkanContext& context, const PipelineL
     VkPipelineDepthStencilStateCreateInfo depth{
         VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
     depth.depthTestEnable = VK_TRUE;
-    depth.depthWriteEnable = VK_TRUE;
+    depth.depthWriteEnable = desc.depthWrite ? VK_TRUE : VK_FALSE;
     depth.depthCompareOp = desc.depthCompare;
     std::vector<VkFormat> colorFormats = desc.colorFormats;
     if (colorFormats.empty() && desc.colorFormat != VK_FORMAT_UNDEFINED) {
         colorFormats.push_back(desc.colorFormat);
     }
     VkPipelineColorBlendAttachmentState blendAttachment{};
-    blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                     VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    blendAttachment.colorWriteMask = desc.colorWriteMask;
     if (desc.alphaBlend) {
         blendAttachment.blendEnable = VK_TRUE;
         blendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;

@@ -10,7 +10,7 @@
 // colour by.
 //
 // Bindings: 0 the sub-frame's raster radiance (the sum after the last), 1 the sum so far, 2 the
-// sub-frame's ids (G-buffer 2), 3 the coverage.
+// sub-frame's ids (G-buffer 2), 3 the coverage (z of an RGBA32F image).
 //
 // References:
 // - P. Haeberli and K. Akeley, "The Accumulation Buffer: Hardware Support for High-Quality
@@ -36,7 +36,8 @@ static const uint kBackground = 0xFFFFFFFF;
 [[vk::binding(0, 0)]] [[vk::image_format("r32f")]] RWTexture2DArray<float> radiance;
 [[vk::binding(1, 0)]] [[vk::image_format("r32f")]] RWTexture2DArray<float> sum;
 [[vk::binding(2, 0)]] Texture2DArray<uint4> ids;
-[[vk::binding(3, 0)]] [[vk::image_format("r32f")]] RWTexture2DArray<float> coverage;
+// The coverage is z of `RenderTargets::Raster`, whose xy are left as they are.
+[[vk::binding(3, 0)]] [[vk::image_format("rgba32f")]] RWTexture2DArray<float4> coverage;
 [[vk::push_constant]] ConstantBuffer<MotionConstants> constants;
 
 // The integral of the hat max(0, 1 - |x|) from minus infinity to u.
@@ -91,6 +92,8 @@ void motionMain(uint3 id : SV_DispatchThreadID) {
     }
     if (id.z % bands == 0) {
         let at = uint3(id.xy, view);
-        coverage[at] = (k == 0 ? 0.0 : coverage[at]) + (covered ? w : 0.0);
+        var texel = coverage[at];
+        texel.z = (k == 0 ? 0.0 : texel.z) + (covered ? w : 0.0);
+        coverage[at] = texel;
     }
 }

@@ -126,6 +126,15 @@ class RasterDrawable {
     virtual void RecordColor(VkCommandBuffer commands, const RasterFrame& frame, std::size_t view,
                              DrawPhase phase = DrawPhase::All) const = 0;
 
+    /// Records, into view `view`'s open motion pass (one RG16 float attachment of raster-pixel
+    /// motion, the G-buffer's depth to test against, not written), the draws of what moved since
+    /// the last frame with the motion each of its pixels made; `motion` is the view's
+    /// motion_vectors.slang `MotionUniforms` (the last frame's view-projection). A camera pass has
+    /// already written every pixel's motion from the camera's alone, so drawables that stand
+    /// still, such as terrain, draw nothing: the default.
+    virtual void RecordMotion(VkCommandBuffer /*commands*/, const RasterFrame& /*frame*/,
+                              std::size_t /*view*/, const DescriptorResource& /*motion*/) const {}
+
     /// Whether the last `Prepare`'s frame culls some of this drawable's instances by occlusion,
     /// so views draw in two phases around a depth pyramid.
     virtual bool CullsOcclusion() const {

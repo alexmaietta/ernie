@@ -119,7 +119,7 @@ TEST_F(ViewerTest, RendersTheSceneIntoTheViewport) {
 
 TEST_F(ViewerTest, ShowsEveryRenderVarTheBackendCanDraw) {
     const std::vector<std::string>& vars = viewer_->Delegate().Info().viewVars;
-    EXPECT_EQ(vars.size(), kRenderVarNames.size()) << "every one";
+    EXPECT_EQ(vars.size(), kRenderVarNames.size() - 1) << "every one but the opt-in MotionVector";
     ASSERT_TRUE(viewer_->Step());
     // The centre pixel (the cube) and a corner (background) of a capture of `var`.
     // Without the grid and gizmos over the image.

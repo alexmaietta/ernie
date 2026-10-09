@@ -24,7 +24,8 @@ std::vector<std::string_view> ViewHeldVars(std::size_t aovs) {
     if (aovs == 0) {
         return {};
     }
-    std::vector<std::string_view> vars(kRenderVarNames.begin(), kRenderVarNames.end());
+    // Every var (the opt-in MotionVector aside) and the slots.
+    std::vector<std::string_view> vars = RequiredVars({});
     vars.insert(vars.end(), kAovSlotNames.begin(),
                 kAovSlotNames.begin() + static_cast<std::ptrdiff_t>(aovs));
     return vars;

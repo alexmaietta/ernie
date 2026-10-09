@@ -270,6 +270,11 @@ class MeshDrawable : public RasterDrawable {
     void RecordColor(VkCommandBuffer commands, const RasterFrame& frame, std::size_t view,
                      DrawPhase phase = DrawPhase::All) const override;
 
+    /// Draws again what view `view` drew of the draws that moved since the last frame (their
+    /// transforms, instance arrays or points), as the colour pass did, with the motion pipeline.
+    void RecordMotion(VkCommandBuffer commands, const RasterFrame& frame, std::size_t view,
+                      const DescriptorResource& motion) const override;
+
   private:
     /// One level of detail of a mesh: `count` indices from `first` past the mesh's own first
     /// index (0 for the full mesh), simplified by at most `error` in mesh units.
@@ -388,9 +393,13 @@ class MeshDrawable : public RasterDrawable {
     /// draw's G-buffer pipeline; GPU-culled ranges draw indirectly.
     /// Records the direct draws among them with `direct`, and the GPU-culled ones from their
     /// first (0) or second (1) set of draws, or none (-1). Returns the draw calls it recorded.
+    /// With `motion`, the view's MotionUniforms: records with the motion pipeline instead.
     std::size_t Record(VkCommandBuffer commands, const RasterFrame& frame,
                        std::span<const VisibleRange> ranges, const glm::mat4& light,
-                       const ShadowCasters* casters, bool shadow, bool direct, int culledSet) const;
+                       const ShadowCasters* casters, bool shadow, bool direct, int culledSet,
+                       const DescriptorResource* motion = nullptr) const;
+    /// Whether draw `item` moved since the last frame: its transform, instance arrays or points.
+    bool Moving(std::size_t item) const;
     /// Records culling jobs `firstJob` to `firstJob + jobs` in cull.slang's mode `mode`, against
     /// the depth pyramid `hzb` whose layer 0 is view `firstView`.
     void Dispatch(VkCommandBuffer commands, VkImageView hzb, std::uint32_t firstJob,
@@ -399,6 +408,9 @@ class MeshDrawable : public RasterDrawable {
     RasterRenderer& renderer_;
     const VulkanContext& context_;
     PipelineLayout layout_;
+    PipelineLayout motionLayout_;  ///< `layout_` and the MotionUniforms at 20.
+    /// The MotionVector var's pipeline, made the first time a frame holds the var.
+    mutable std::unique_ptr<GraphicsPipeline> motionPipeline_;
     std::unique_ptr<GraphicsPipeline> shadowPipeline_;
     /// The G-buffer pipelines for frame cameras and, once one is seen, pushbrooms.
     std::array<std::unique_ptr<GraphicsPipeline>, 2> gbufferPipelines_;

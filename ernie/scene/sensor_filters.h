@@ -25,14 +25,19 @@ inline constexpr std::string_view kDistanceToCamera = "DistanceToCamera";       
 inline constexpr std::string_view kNormal = "Normal";  ///< float32 world shading normal (xyz).
 inline constexpr std::string_view kPrimId = "PrimId";  ///< uint32, 0 for background.
 inline constexpr std::string_view kInstanceId = "InstanceId";  ///< uint32 instance index.
+/// float32 (x, y): how far, in sensor pixels, the point a pixel sees has moved across the image
+/// since the last frame (this frame's position minus the last's, x right and y down), from the
+/// camera's motion and the meshes', instances' and points' own; zero on a camera's first frame and
+/// for pushbroom cameras. Opt-in: "every var" leaves it out, as it costs extra passes.
+inline constexpr std::string_view kMotionVector = "MotionVector";
 }  // namespace render_vars
 
 /// Every render var name, in the order the rasterizer binds their images.
-inline constexpr std::array<std::string_view, 10> kRenderVarNames{
+inline constexpr std::array<std::string_view, 11> kRenderVarNames{
     render_vars::kSpectralRadiance, render_vars::kElectrons, render_vars::kRawDn,
     render_vars::kHdrColor,         render_vars::kLdrColor,  render_vars::kDistanceToImagePlane,
     render_vars::kDistanceToCamera, render_vars::kNormal,    render_vars::kPrimId,
-    render_vars::kInstanceId};
+    render_vars::kInstanceId,       render_vars::kMotionVector};
 
 /// The built-in sensor filters a render product runs in order on its spectral radiance, as
 /// Chrono::Sensor's filter lists; the rasterizer fuses a chain into one kernel (`PlanSensor`), so
@@ -265,7 +270,8 @@ std::vector<std::string> AovOutputsOf(std::span<const SensorFilterStep> chain,
 
 /// The render vars a frame holds to produce `requested`: those, in `kRenderVarNames` order, as
 /// the sensor keeps what they are made from (SpectralRadiance, Electrons, HdrColor) in registers,
-/// then the AOV slots (`kAovSlotNames`) requested. Empty `requested` means every render var.
+/// then the AOV slots (`kAovSlotNames`) requested. Empty `requested` means every render var but
+/// the opt-in MotionVector.
 std::vector<std::string_view> RequiredVars(std::span<const std::string_view> requested);
 
 }  // namespace ernie

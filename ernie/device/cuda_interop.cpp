@@ -501,6 +501,11 @@ CudaArrayView CudaInterop::MapImage(GpuImage& image) {
         view.channels = 1;
         view.type = DType::Float32;
         break;
+    case VK_FORMAT_R32G32_SFLOAT:
+        format = cu::kFormatFloat;
+        view.channels = 2;
+        view.type = DType::Float32;
+        break;
     case VK_FORMAT_R32G32B32A32_SFLOAT:
         format = cu::kFormatFloat;
         view.channels = 4;

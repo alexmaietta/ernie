@@ -29,6 +29,8 @@ struct DescriptorResource {
     static DescriptorResource Of(VkImageView view,
                                  VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     static DescriptorResource Of(const Sampler& sampler);
+    /// `view` with `sampler`, for a combined image sampler.
+    static DescriptorResource Of(VkImageView view, VkImageLayout layout, const Sampler& sampler);
 };
 
 /// A pipeline layout with one push-descriptor set and an optional push-constant block shared by
@@ -114,6 +116,10 @@ struct GraphicsPipelineDesc {
     std::vector<VkFormat> colorFormats;
     VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
     VkCompareOp depthCompare = VK_COMPARE_OP_LESS;
+    bool depthWrite = true;  ///< Off tests against the depth attachment without changing it.
+    /// The channels the colour attachments take, the others kept.
+    VkColorComponentFlags colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                           VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     float depthBiasSlope = 0.0f;  ///< Slope-scaled depth bias, e.g. for shadow maps.
     /// Blend colour over the attachment by its alpha (source over), keeping the attachment's
     /// alpha; otherwise replace it.

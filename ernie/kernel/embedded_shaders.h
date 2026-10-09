@@ -67,6 +67,8 @@ extern const char kMeterSlang[];
 
 /// Motion blur and rolling shutter: the sub-frames' radiance summed per row's exposure.
 extern const char kMotionSlang[];
+/// The MotionVector var's camera pass: each pixel's motion from the camera's alone.
+extern const char kMotionVectorsSlang[];
 
 /// GPU instance culling for mesh draws.
 extern const char kCullSlang[];

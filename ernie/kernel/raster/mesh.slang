@@ -210,6 +210,45 @@ LayeredVertexOutput meshVertexMain(uint vertexIndex : SV_VertexID, uint instance
     return out;
 }
 
+// The MotionVector var's pass (`RasterDrawable::RecordMotion`): the moving draws again over the
+// G-buffer's depth, each pixel's motion from where its point was at the last frame.
+[[vk::binding(20, 0)]] ConstantBuffer<MotionUniforms> motionView;
+
+struct MotionVertexOutput {
+    float4 position : SV_Position;
+    float4 previous : PREVIOUS;  // the point's clip position at the last frame
+    uint layer : SV_RenderTargetArrayIndex;
+}
+
+struct MotionFragmentInput {
+    float4 position : SV_Position;
+    float4 previous : PREVIOUS;
+}
+
+[shader("vertex")]
+MotionVertexOutput meshMotionVertex(uint vertexIndex : SV_VertexID, uint instanceIndex : SV_InstanceID,
+                                    uint drawIndex : SV_DrawIndex) {
+    let call = drawCall(drawIndex);
+    // As meshVertexMain, so the depth matches the G-buffer's.
+    let v = meshVertex(vertexIndex, instanceIndex, call, u.motion.x);
+    let d = draws[call.item];
+    let corner = indices[d.offsets.x + call.indexOffset + vertexIndex];
+    let instance = (d.offsets.w & kInstanced) != 0
+                       ? instanceIds[d.offsets.z + call.instanceOffset + instanceIndex]
+                       : 0u;
+    let before = placeVertex(d, corner, instance, d.motion.w, d.motion.y, d.previous);
+    MotionVertexOutput out;
+    out.layer = u.flags.z;
+    out.position = projectWorld(v.world);
+    out.previous = mul(motionView.previousViewProj, float4(before.world, 1.0));
+    return out;
+}
+
+[shader("fragment")]
+float4 meshMotionFragment(MotionFragmentInput in) : SV_Target0 {
+    return float4(pixelMotion(motionView, in.position.xy, in.previous), 0.0, 0.0);
+}
+
 [shader("vertex")]
 float4 meshShadowVertex(uint vertexIndex : SV_VertexID, uint instanceIndex : SV_InstanceID,
                         uint drawIndex : SV_DrawIndex)

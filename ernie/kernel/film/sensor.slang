@@ -21,8 +21,8 @@
 // 15 the custom filters' parameters; for spatial filters, the images between kernels:
 // 16 and 17 the spectrum and the channels (a layer per channel domain per view) a kernel reads,
 // 18 and 19 those it writes for the next; 20 to 27 the AOV slots; 28 and 29 the temporal filters'
-// state from the previous frame and for the next; 30 the pyramids' sampler; 31 with motion blur,
-// the share of each raster pixel's exposure prims covered (motion.slang).
+// state from the previous frame and for the next (17 is sampled linearly for pyramids); 30 the
+// MotionVector var; 31 per raster pixel, its motion (xy) and motion blur's coverage (z).
 //
 // The lens head's projection comes from module `lensProjection`, which the renderer generates for
 // the camera's lens (`SensorPlan::lens`) from lens.slang's projections.
@@ -115,7 +115,8 @@ public struct SensorConstants {
 // group of `bands` layers per view), and each channel domain's values (`kChannel*` layers per
 // view), as one kernel left them for the spatial filters heading the next.
 [[vk::binding(16, 0)]] Texture2DArray<float> spectrumIn;
-[[vk::binding(17, 0)]] Texture2DArray<float4> channelsIn;
+// With linear filtering for reading the channel images' pyramids (`SpatialImage.valuesAt`).
+[[vk::binding(17, 0)]] Sampler2DArray<float4> channelsIn;
 [[vk::image_format("r32f")]] [[vk::binding(18, 0)]] RWTexture2DArray<float> spectrumOut;
 [[vk::image_format("rgba32f")]] [[vk::binding(19, 0)]] RWTexture2DArray<float4> channelsOut;
 // The product's AOV slots (`kAovSlotNames`), one layer per view, which filters write with
@@ -132,10 +133,13 @@ public struct SensorConstants {
 // frame and what they store on this one, `pass.view.w` slots per view.
 [[vk::image_format("rgba32f")]] [[vk::binding(28, 0)]] RWTexture2DArray<float4> statePrevious;
 [[vk::image_format("rgba32f")]] [[vk::binding(29, 0)]] RWTexture2DArray<float4> stateNext;
-// Linear filtering for reading the channel images' pyramids (`SpatialImage.valuesAt`).
-[[vk::binding(30, 0)]] SamplerState pyramidSampler;
-// With motion blur (`clear.w` 2), the share of each raster pixel's exposure prims covered.
-[[vk::image_format("r32f")]] [[vk::binding(31, 0)]] RWTexture2DArray<float> gCoverage;
+// The MotionVector var (sensor pixels).
+[[vk::image_format("rg32f")]] [[vk::binding(30, 0)]] RWTexture2DArray<float2> motionVector;
+// Per raster pixel (a layer per view): xy, with the MotionVector var, its motion since the last
+// frame in raster pixels (motion_vectors.slang and the drawables' motion passes); z, with motion
+// blur (`clear.w` 2), the share of its exposure prims covered (motion.slang). One image, as
+// devices push at most 32 descriptors.
+[[vk::image_format("rgba32f")]] [[vk::binding(31, 0)]] RWTexture2DArray<float4> gRaster;
 
 // A view's layers of the channel images: one per domain after the spectrum.
 public static const uint kChannelElectrons = 0;
@@ -155,6 +159,7 @@ public static const uint kHoldsDistanceToCamera = 1u << 6;
 public static const uint kHoldsNormal = 1u << 7;
 public static const uint kHoldsPrimId = 1u << 8;
 public static const uint kHoldsInstanceId = 1u << 9;
+public static const uint kHoldsMotionVector = 1u << 10;
 
 // One sensor pixel of one view: where it is, and the view's uniforms.
 public struct PixelContext {
@@ -345,8 +350,8 @@ public struct SpatialImage {
     // the size, each texel the mean of what it covers; fractional levels blend two), clamped at
     // the edges. Level k is a box blur of about 2^k pixels, so wide kernels take a few taps.
     public float4 valuesAt(PixelContext pixel, float2 uv, float level) {
-        return channelsIn.SampleLevel(
-            pyramidSampler, float3(uv, float(pixel.id.z * kChannelDomains + channel)), level);
+        return channelsIn.SampleLevel(float3(uv, float(pixel.id.z * kChannelDomains + channel)),
+                                      level);
     }
 
     // The pyramid's levels (1 without one).
@@ -470,6 +475,8 @@ public struct Lens : ISpatialSource {
     bool background;
     bool dark;  // no radiance: the ray leaves the image, or meets a background without any
     float coverage;
+    int3 nearest;  // the raster texel (x, y, layer) the geometry vars come from
+    bool outside;  // the ray leaves the raster image
     float imagePlane;
     float camera;
     float4 normal;
@@ -499,10 +506,12 @@ public struct Lens : ISpatialSource {
         lens.background = outside || ids.x == kBackground;
         lens.dark = outside || (lens.background && !sky);
         lens.coverage = outside           ? 0.0
-                        : motion          ? gCoverage[uint3(uint2(nearest), uint(layer))]
+                        : motion          ? gRaster[uint3(uint2(nearest), uint(layer))].z
                         : lens.background ? 0.0
                                           : 1.0;
         lens.base = int3(0, 0, layer);
+        lens.nearest = int3(nearest, layer);
+        lens.outside = outside;
         lens.next = int2(0);
         lens.weight = float2(0.0);
         lens.falloff = 1.0;
@@ -573,6 +582,12 @@ public struct Lens : ISpatialSource {
         }
         if ((holds & kHoldsInstanceId) != 0) {
             instanceId[id] = instance;
+        }
+        if ((holds & kHoldsMotionVector) != 0) {
+            // Raster pixels to sensor pixels: the raster image is drawn `overscan` times wider,
+            // so a raster pixel spans `overscan` sensor pixels.
+            let raster = outside ? float2(0.0) : gRaster[uint3(nearest)].xy;
+            motionVector[id] = raster * pixel.uniforms().intrinsics.w;
         }
     }
 }

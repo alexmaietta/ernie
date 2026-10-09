@@ -39,6 +39,31 @@ public float4 projectWorld(float3 world) {
     return cameraProject(u.viewProj, u.strip, world);
 }
 
+// Per view, for the MotionVector var's passes (motion_vectors.slang and drawables' motion
+// pipelines): kept apart from Uniforms, so frames without the var upload nothing more. 256 bytes,
+// so one view's binds as a uniform buffer and the views as an array.
+public struct MotionUniforms {
+    // The view's camera at the last frame, relative to this frame's origin.
+    public float4x4 previousViewProj;
+    // This view's inverse view-projection, for points from depth.
+    public float4x4 inverseViewProj;
+    // x, y: the raster image's width and height; z: 1 when motion applies (frame cameras), 0 for
+    // zero motion (pushbroom).
+    public float4 size;
+    float4 padding[7];
+}
+
+// Pixel motion from the last frame's clip position `previous` to this frame's pixel `pixel`
+// (raster pixels, y down), for view `m`; zero behind the last frame's camera.
+public float2 pixelMotion(MotionUniforms m, float2 pixel, float4 previous) {
+    if (m.size.z < 0.5 || previous.w <= 1e-6) {
+        return float2(0.0);
+    }
+    let ndc = previous.xy / previous.w;
+    let before = float2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * m.size.xy;
+    return pixel - before;
+}
+
 // Per draw: the light's view-projection for shadow passes, the pass's first item (terrain patch
 // or mesh draw) and, for instanced draws, the first instance.
 public struct DrawConstants {

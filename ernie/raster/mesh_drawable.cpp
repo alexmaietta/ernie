@@ -171,6 +171,31 @@ constexpr DescriptorBinding kBindings[] = {
     {19, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
 };
 
+/// The motion pass's: the mesh passes' and 20, the view's MotionUniforms (frame.slang).
+constexpr DescriptorBinding kMotionBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
+    {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
+    {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
+    {3, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
+    {4, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
+    {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
+    {6, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
+    {7, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
+    {8, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
+    {9, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
+    {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {13, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {14, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {18, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {19, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {20, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
+};
+
 /// The mesh passes, which write the renderer's G-buffer.
 std::vector<ShaderModuleSource> MeshModules(bool pushbroom = false) {
     return {{"brdf", std::string(BrdfSlang())},
@@ -288,6 +313,7 @@ std::vector<Level> SimplifiedLevels(const MeshData& data, std::size_t maxLevels,
 MeshDrawable::MeshDrawable(RasterRenderer& renderer)
     : renderer_(renderer), context_(renderer.Context()),
       layout_(renderer.Context(), kBindings, sizeof(DrawConstants)),
+      motionLayout_(renderer.Context(), kMotionBindings, sizeof(DrawConstants)),
       normalsLayout_(renderer.Context(), kNormalsBindings, 32),
       cullLayout_(renderer.Context(), kCullBindings, 32) {
     const std::vector<ShaderModuleSource> normals{{"mesh_normals", shaders::kMeshNormalsSlang}};
@@ -1641,13 +1667,16 @@ std::size_t MeshDrawable::DrawCount(std::size_t view) const {
 std::size_t MeshDrawable::Record(VkCommandBuffer commands, const RasterFrame& frame,
                                  std::span<const VisibleRange> ranges, const glm::mat4& light,
                                  const ShadowCasters* casters, bool shadow, bool direct,
-                                 int culledSet) const {
+                                 int culledSet, const DescriptorResource* motion) const {
     std::size_t calls = 0;
     const GraphicsPipeline* bound = nullptr;
     std::uint32_t pushed = std::numeric_limits<std::uint32_t>::max();
     bool pushedCulled = false;
+    const PipelineLayout& layout = motion != nullptr ? motionLayout_ : layout_;
     const auto bind = [&](std::uint32_t item, bool culled) {
-        const GraphicsPipeline* pipeline = shadow ? shadowPipeline_.get() : itemPipelines_[item];
+        const GraphicsPipeline* pipeline = motion != nullptr ? motionPipeline_.get()
+                                           : shadow          ? shadowPipeline_.get()
+                                                             : itemPipelines_[item];
         if (pipeline != bound) {
             bound = pipeline;
             vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, bound->Handle());
@@ -1655,7 +1684,11 @@ std::size_t MeshDrawable::Record(VkCommandBuffer commands, const RasterFrame& fr
         if (item != pushed || culled != pushedCulled) {
             pushed = item;
             pushedCulled = culled;
-            layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, Resources(frame, item, culled));
+            std::vector<DescriptorResource> resources = Resources(frame, item, culled);
+            if (motion != nullptr) {
+                resources.push_back(*motion);
+            }
+            layout.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, resources);
         }
     };
     DrawConstants constants{};
@@ -1682,14 +1715,14 @@ std::size_t MeshDrawable::Record(VkCommandBuffer commands, const RasterFrame& fr
         const auto stride = static_cast<std::uint32_t>(sizeof(VkDrawIndirectCommand));
         if (context_.SupportsMultiDrawIndirect()) {
             constants.records = batch->first + 1;
-            layout_.PushConstants(commands, &constants, sizeof(constants));
+            layout.PushConstants(commands, &constants, sizeof(constants));
             vkCmdDrawIndirect(commands, cullCommands_->Handle(),
                               VkDeviceSize{batch->first} * stride, batch->count, stride);
             ++calls;
         } else {
             for (std::uint32_t k = 0; k < batch->count; ++k) {
                 constants.records = batch->first + k + 1;
-                layout_.PushConstants(commands, &constants, sizeof(constants));
+                layout.PushConstants(commands, &constants, sizeof(constants));
                 vkCmdDrawIndirect(commands, cullCommands_->Handle(),
                                   VkDeviceSize{batch->first + k} * stride, 1, stride);
                 ++calls;
@@ -1735,12 +1768,58 @@ std::size_t MeshDrawable::Record(VkCommandBuffer commands, const RasterFrame& fr
         constants.first = visible.item;
         constants.instanceOffset = range.first;
         constants.indexOffset = 0;
-        layout_.PushConstants(commands, &constants, sizeof(constants));
+        layout.PushConstants(commands, &constants, sizeof(constants));
         vkCmdDraw(commands, vertices, range.count, 0, 0);
         ++calls;
     }
     flush();
     return calls;
+}
+
+bool MeshDrawable::Moving(std::size_t item) const {
+    const MeshItem& draw = items_[item];
+    if (previousTransforms_[item] != transforms_[item] || meshes_.at(draw.mesh).pointsMoving) {
+        return true;
+    }
+    return draw.instancer && instancers_.at(*draw.instancer).moving;
+}
+
+void MeshDrawable::RecordMotion(VkCommandBuffer commands, const RasterFrame& frame,
+                                std::size_t view, const DescriptorResource& motion) const {
+    if (view >= viewDraws_.size()) {
+        return;
+    }
+    std::vector<VisibleRange> moving;
+    for (const VisibleRange& range : viewDraws_[view]) {
+        if (Moving(range.item)) {
+            moving.push_back(range);
+        }
+    }
+    if (moving.empty()) {
+        return;
+    }
+    if (motionPipeline_ == nullptr) {
+        const std::vector<ShaderModuleSource> modules = MeshModules();
+        const std::vector<std::uint32_t> vertex =
+            renderer_.Compiler().CompileSpirv(modules, "meshMotionVertex");
+        const std::vector<std::uint32_t> fragment =
+            renderer_.Compiler().CompileSpirv(modules, "meshMotionFragment");
+        GraphicsPipelineDesc desc;
+        desc.vertexSpirv = vertex;
+        desc.fragmentSpirv = fragment;
+        desc.colorFormats = {VK_FORMAT_R32G32B32A32_SFLOAT};
+        desc.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT;
+        desc.depthFormat = RenderTargets::kDepthFormat;
+        // The same depths as the colour pass's: only the surfaces it kept.
+        desc.depthCompare = VK_COMPARE_OP_LESS_OR_EQUAL;
+        desc.depthWrite = false;
+        motionPipeline_ = std::make_unique<GraphicsPipeline>(context_, motionLayout_, desc);
+    }
+    // Every draw the colour pass made of them: direct, and GPU-culled from either set.
+    Record(commands, frame, moving, glm::mat4(1.0f), nullptr, false, true, 0, &motion);
+    if (occlusion_ == Occlusion::TwoPass) {
+        Record(commands, frame, moving, glm::mat4(1.0f), nullptr, false, false, 1, &motion);
+    }
 }
 
 void MeshDrawable::RecordShadow(VkCommandBuffer commands, const RasterFrame& frame,

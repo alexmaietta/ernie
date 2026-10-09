@@ -111,21 +111,26 @@ LayeredVertexOutput vertexMain(uint vertexIndex : SV_VertexID, uint point : SV_I
     return out;
 }
 
-[shader("fragment")]
-PointsOutput fragmentMain(VertexOutput in) {
-    let d = draws[draw.first];
-    // The pixel's ray against the sphere, the nearer hit: from the eye, or along the view
-    // through the fragment for orthographic views.
+// The pixel's ray against the sphere, the nearer hit: from the eye, or along the view through
+// the fragment for orthographic views. False when it misses.
+bool sphereHit(VertexOutput in, out float3 hit) {
     let orthographic = u.flags.w != 0;
     let origin = orthographic ? in.world : u.eye.xyz;
     let direction = orthographic ? u.forward.xyz : normalize(in.world - origin);
     let offset = origin - in.sphere.xyz;
     let b = dot(direction, offset);
     let h = b * b - (dot(offset, offset) - in.sphere.w * in.sphere.w);
-    if (h < 0.0) {
+    hit = origin + (-b - sqrt(max(h, 0.0))) * direction;
+    return h >= 0.0;
+}
+
+[shader("fragment")]
+PointsOutput fragmentMain(VertexOutput in) {
+    let d = draws[draw.first];
+    float3 hit;
+    if (!sphereHit(in, hit)) {
         discard;
     }
-    let hit = origin + (-b - sqrt(h)) * direction;
     let normal = normalize(hit - in.sphere.xyz);
     // A pushbroom's rows see from poses along its strip; the ray from its envelope's eye is
     // close for spheres small beside the strip's distance to them.
@@ -134,6 +139,33 @@ PointsOutput fragmentMain(VertexOutput in) {
     out.normal = float4(normal, sunVisibility(hit, normal, in.position.xy));
     out.albedo = float4(surfaceAlbedoScale(hit), cascadeTint(in.color, hit));
     out.ids = uint4(d.ids.x, d.ids.y, in.point, 0u);
+    out.depth = clip.z / clip.w;
+    return out;
+}
+
+// The MotionVector var's pass (`RasterDrawable::RecordMotion`): the moving points again over
+// the G-buffer's depth, from vertexMain, each pixel's motion from where its point of the sphere
+// was at the last frame (moved with the centre).
+[[vk::binding(14, 0)]] ConstantBuffer<MotionUniforms> motionView;
+
+struct MotionOutput {
+    float4 motion : SV_Target0;
+    float depth : SV_Depth;
+}
+
+[shader("fragment")]
+MotionOutput motionFragment(VertexOutput in) {
+    let d = draws[draw.first];
+    float3 hit;
+    if (!sphereHit(in, hit)) {
+        discard;
+    }
+    let before = hit - in.sphere.xyz + sphereOf(d, in.point, 0.0).xyz;
+    let clip = projectWorld(hit);
+    MotionOutput out;
+    out.motion = float4(
+        pixelMotion(motionView, in.position.xy, mul(motionView.previousViewProj, float4(before, 1.0))),
+        0.0, 0.0);
     out.depth = clip.z / clip.w;
     return out;
 }

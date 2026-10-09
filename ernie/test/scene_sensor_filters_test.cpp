@@ -96,7 +96,10 @@ TEST(RequiredVars, HoldsJustTheRequestedVarsInBindingOrder) {
         << "what LdrColor is made from stays in the sensor kernel's registers";
     const std::string_view raw[] = {kRawDn, kSpectralRadiance};
     EXPECT_EQ(ernie::RequiredVars(raw), (std::vector<std::string_view>{kSpectralRadiance, kRawDn}));
-    EXPECT_EQ(ernie::RequiredVars({}).size(), ernie::kRenderVarNames.size()) << "empty is all";
+    const std::vector<std::string_view> every = ernie::RequiredVars({});
+    EXPECT_EQ(every.size(), ernie::kRenderVarNames.size() - 1) << "empty is all but one";
+    EXPECT_EQ(std::count(every.begin(), every.end(), ernie::render_vars::kMotionVector), 0)
+        << "MotionVector is opt-in";
 }
 
 namespace {

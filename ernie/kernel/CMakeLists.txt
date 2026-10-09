@@ -37,6 +37,7 @@ set(ernie_shaders
     raster/mesh_normals.slang=kMeshNormalsSlang
     raster/meter.slang=kMeterSlang
     raster/motion.slang=kMotionSlang
+    raster/motion_vectors.slang=kMotionVectorsSlang
     raster/overlay.slang=kOverlaySlang
     raster/planet.slang=kPlanetSlang
     raster/planet_color.slang=kPlanetColorSlang

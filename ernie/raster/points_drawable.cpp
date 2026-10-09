@@ -60,6 +60,25 @@ constexpr DescriptorBinding kBindings[] = {
     {13, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
 };
 
+/// The motion pass's: the points passes' and 14, the view's MotionUniforms (frame.slang).
+constexpr DescriptorBinding kMotionBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
+    {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
+    {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
+    {3, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
+    {4, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
+    {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
+    {6, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
+    {7, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
+    {8, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
+    {9, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
+    {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {13, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {14, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
+};
+
 /// Bounds of the box [`low`, `high`] after `transform`.
 Bounds3 TransformBox(const glm::mat4& transform, const glm::vec3& low, const glm::vec3& high) {
     glm::vec3 outLow(std::numeric_limits<float>::max());
@@ -109,7 +128,8 @@ std::vector<ShaderModuleSource> PointsModules(bool pushbroom = false) {
 
 PointsDrawable::PointsDrawable(RasterRenderer& renderer)
     : renderer_(renderer), context_(renderer.Context()),
-      layout_(renderer.Context(), kBindings, sizeof(DrawConstants)) {
+      layout_(renderer.Context(), kBindings, sizeof(DrawConstants)),
+      motionLayout_(renderer.Context(), kMotionBindings, sizeof(DrawConstants)) {
     const ShaderCompiler& compiler = renderer_.Compiler();
     const std::vector<ShaderModuleSource> modules = PointsModules();
     // The descriptions view the code, which must outlive them.
@@ -476,6 +496,11 @@ std::optional<Bounds3> PointsDrawable::WorldBounds(std::int32_t world) const {
 
 void PointsDrawable::Prepare(const FrameParams& params, std::span<const ShadowCascade>) {
     ERNIE_ZONE("Points prepare");
+    // Nothing per view without points to draw: batches of thousands of views pay nothing.
+    viewItems_.clear();
+    if (items_.empty()) {
+        return;
+    }
     pushbroom_ = params.camera.pushbroom;
     if (gbufferPipelines_[pushbroom_ ? 1 : 0] == nullptr) {
         CreateGBufferPipeline(pushbroom_);
@@ -548,6 +573,48 @@ std::vector<DescriptorResource> PointsDrawable::Resources(const RasterFrame& fra
         resources.push_back(DescriptorResource::Of(*buffer));
     }
     return resources;
+}
+
+void PointsDrawable::RecordMotion(VkCommandBuffer commands, const RasterFrame& frame,
+                                  std::size_t view, const DescriptorResource& motion) const {
+    if (view >= viewItems_.size()) {
+        return;
+    }
+    bool bound = false;
+    for (const std::uint32_t i : viewItems_[view]) {
+        const Cloud& cloud = clouds_.at(items_[i].points);
+        if (previous_[i] == items_[i].transform && !cloud.moving) {
+            continue;
+        }
+        if (motionPipeline_ == nullptr) {
+            const std::vector<ShaderModuleSource> modules = PointsModules();
+            const std::vector<std::uint32_t> vertex =
+                renderer_.Compiler().CompileSpirv(modules, "vertexMain");
+            const std::vector<std::uint32_t> fragment =
+                renderer_.Compiler().CompileSpirv(modules, "motionFragment");
+            GraphicsPipelineDesc desc;
+            desc.vertexSpirv = vertex;
+            desc.fragmentSpirv = fragment;
+            desc.colorFormats = {VK_FORMAT_R32G32B32A32_SFLOAT};
+            desc.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT;
+            desc.depthFormat = RenderTargets::kDepthFormat;
+            // The same depths as the colour pass's: only the surfaces it kept.
+            desc.depthCompare = VK_COMPARE_OP_LESS_OR_EQUAL;
+            desc.depthWrite = false;
+            motionPipeline_ = std::make_unique<GraphicsPipeline>(context_, motionLayout_, desc);
+        }
+        if (!bound) {
+            vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, motionPipeline_->Handle());
+            bound = true;
+        }
+        std::vector<DescriptorResource> resources = Resources(frame, i);
+        resources.push_back(motion);
+        motionLayout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, resources);
+        DrawConstants constants{};
+        constants.first = i;
+        motionLayout_.PushConstants(commands, &constants, sizeof(constants));
+        vkCmdDraw(commands, 6, static_cast<std::uint32_t>(cloud.count), 0, 0);
+    }
 }
 
 void PointsDrawable::RecordShadow(VkCommandBuffer commands, const RasterFrame& frame,

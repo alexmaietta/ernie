@@ -128,6 +128,10 @@ class PointsDrawable : public RasterDrawable {
                       const ShadowCasters& casters) const override;
     void RecordColor(VkCommandBuffer commands, const RasterFrame& frame, std::size_t view,
                      DrawPhase phase = DrawPhase::All) const override;
+    /// Draws again the clouds view `view` drew that moved since the last frame (their transforms
+    /// or positions), with the motion pipeline.
+    void RecordMotion(VkCommandBuffer commands, const RasterFrame& frame, std::size_t view,
+                      const DescriptorResource& motion) const override;
 
   private:
     struct Cloud {
@@ -166,6 +170,9 @@ class PointsDrawable : public RasterDrawable {
     const VulkanContext& context_;
     ComputeInterop* compute_ = nullptr;
     PipelineLayout layout_;
+    PipelineLayout motionLayout_;  ///< `layout_` and the MotionUniforms at 14.
+    /// The MotionVector var's pipeline, made the first time a frame holds the var.
+    mutable std::unique_ptr<GraphicsPipeline> motionPipeline_;
     /// The G-buffer pipelines for frame cameras and, once one is seen, pushbrooms.
     std::array<std::unique_ptr<GraphicsPipeline>, 2> gbufferPipelines_;
     bool pushbroom_ = false;  ///< Whether the last `Prepare`'s camera is a pushbroom.
