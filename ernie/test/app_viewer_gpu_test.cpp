@@ -415,6 +415,30 @@ TEST_F(ViewerTest, FocusPanelBringsADockedTabToTheFront) {
     EXPECT_TRUE(viewer_->Step()) << "a removed panel's focus request is dropped";
 }
 
+TEST_F(ViewerTest, FileDialogsDrawModallyAndCallBackOnTheViewer) {
+    const std::filesystem::path dir = TempFile("dialog");
+    std::filesystem::create_directories(dir);
+    std::ofstream(dir / "terrain.json") << "{}";
+    std::filesystem::path chosen;
+    Viewer* calledOn = nullptr;
+    viewer_->OpenFileDialog({"Open Terrain", false, {{"Terrains", {".json"}}}, dir},
+                            [&](Viewer& viewer, const std::filesystem::path& path) {
+                                calledOn = &viewer;
+                                chosen = path;
+                            });
+    ASSERT_TRUE(viewer_->GetFileDialog().IsOpen());
+    for (int frame = 0; frame < 3; ++frame) {
+        viewer_->Step();
+    }
+    EXPECT_TRUE(viewer_->GetFileDialog().IsOpen()) << "drawing keeps it open";
+    viewer_->CaptureWindow(TempFile("dialog.png"));
+    EXPECT_TRUE(viewer_->GetFileDialog().Accept("terrain.json"));
+    EXPECT_EQ(calledOn, viewer_.get());
+    EXPECT_EQ(chosen, dir / "terrain.json");
+    viewer_->Step();
+    EXPECT_FALSE(viewer_->GetFileDialog().IsOpen());
+}
+
 TEST_F(ViewerTest, RendererIsAViewerOptionAndSwitchable) {
     const std::vector<std::string> renderers = Viewer::Renderers();
     ASSERT_FALSE(renderers.empty());

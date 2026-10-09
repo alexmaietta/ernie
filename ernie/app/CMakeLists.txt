@@ -3,6 +3,7 @@ ernie_add_library(
     SOURCES
     camera_panel.cpp
     create.cpp
+    file_dialog.cpp
     log_panel.cpp
     panel.cpp
     prim_icons.cpp

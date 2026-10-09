@@ -450,6 +450,7 @@ struct Viewer::State {
     std::uint64_t nextCallback = 1;
     std::vector<std::unique_ptr<Panel>> panels;
     StatsPanel* stats = nullptr;
+    FileDialog fileDialog;
     /// Panels to bring to the front (`FocusPanel`), and those drawn at least once.
     std::vector<std::string> focusRequests;
     std::set<std::string, std::less<>> drawnPanels;
@@ -2054,6 +2055,7 @@ struct Viewer::State {
         DrawViewport();
         DrawPanels();
         DrawHelpWindows();
+        fileDialog.Draw();
         RunCallbacks(Stage::Ui, frameInfo);
         // A drag ends once nothing is held, so the next edit is a new undo step.
         if (!ImGui::IsAnyItemActive() && !ImGuizmo::IsUsing()) {
@@ -2965,6 +2967,20 @@ WidgetPanel& Viewer::AddWidgetPanel(std::string title, Dock dock) {
 
 void Viewer::RemovePanel(const std::string& title) {
     auto& panels = state_->panels;
+void Viewer::OpenFileDialog(FileDialogOptions options,
+                            std::function<void(Viewer&, const std::filesystem::path&)> done) {
+    state_->fileDialog.Open(std::move(options),
+                            [this, done = std::move(done)](const std::filesystem::path& path) {
+                                if (done) {
+                                    done(*this, path);
+                                }
+                            });
+}
+
+FileDialog& Viewer::GetFileDialog() {
+    return state_->fileDialog;
+}
+
 void Viewer::FocusPanel(std::string_view title) {
     Panel* panel = FindPanel(title);
     if (panel == nullptr) {

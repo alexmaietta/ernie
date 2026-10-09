@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ernie/app/file_dialog.h"
 #include "ernie/app/panel.h"
 #include "ernie/app/theme.h"
 #include "ernie/device/vulkan_context.h"
@@ -409,6 +410,15 @@ class Viewer {
     void FocusPanel(std::string_view title);
 
     void RemovePanel(const std::string& title);
+
+    /// Opens the viewer's file dialog (`FileDialog`), modal over the window, to choose a file to
+    /// open or to save as `options` says. `done` runs on the viewer's thread with the chosen path
+    /// once the user confirms, and never if they cancel; a dialog already open is replaced.
+    void OpenFileDialog(FileDialogOptions options,
+                        std::function<void(Viewer&, const std::filesystem::path&)> done);
+
+    /// The file dialog, open or not: for choosing through it from code, as tests do.
+    FileDialog& GetFileDialog();
 
     /// Adds `label` to the menu bar's `menu` (created if needed), running `action` when chosen.
     void AddMenuItem(const std::string& menu, const std::string& label,
