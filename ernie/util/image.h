@@ -18,7 +18,22 @@ enum class ImageEncoding {
 enum class MipFilter {
     Average,     ///< 2 x 2 box filter of every channel.
     UnitVector,  ///< Box filter of tangent-space normals stored as rgb in [0, 1], renormalised.
+    /// Box filter of tangent-space normals (rgb in [0, 1]) in slope space, keeping what averaging
+    /// loses: rgb holds the normal of the texels' mean slope (dz/dx, dz/dy = -x/z, -y/z, with z at
+    /// least `kMinNormalZ`), and alpha the standard deviation of the slopes it covers along each
+    /// axis, sigma, as `EncodeSlopeDeviation(sigma)` (0 at level 0, whose texels are points). A
+    /// shader recovers the variance the filtered normal hides (Toksvig 2005; Olano and Baker 2010
+    /// keep the full second moments, LEAN mapping).
+    NormalSlopes,
 };
+
+/// The least z a normal's slope is taken from, so slopes stay below 1 / kMinNormalZ = 20.
+inline constexpr float kMinNormalZ = 0.05f;
+
+/// A slope standard deviation `sigma` (0 or more) as a value in [0, 1) for 8-bit storage,
+/// sigma / (1 + sigma), finest near 0; `DecodeSlopeDeviation` inverts it.
+float EncodeSlopeDeviation(float sigma);
+float DecodeSlopeDeviation(float encoded);
 
 /// RGBA image with linear float channels, rows top to bottom.
 struct Image {
@@ -59,6 +74,10 @@ float LinearToSrgb(float value);
 /// Mip levels of `image` from full size down to 1 x 1, level `n` being
 /// `max(1, floor(size / 2^n))` on each side as WebGPU expects. Each texel averages the 2 x 2 texels
 /// above it, clamped at odd edges.
+///
+/// References:
+/// - M. Toksvig, "Mipmapping Normal Maps", Journal of Graphics Tools 10(3), 2005.
+/// - M. Olano and D. Baker, "LEAN Mapping", I3D 2010.
 std::vector<Image> MipChain(const Image& image, MipFilter filter);
 
 /// Quantises to 8-bit RGBA, sRGB-encoding rgb when `encoding` is `Srgb`; alpha is always linear.

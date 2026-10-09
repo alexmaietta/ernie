@@ -6,6 +6,7 @@
 #include <stb_image_write.h>
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -14,6 +15,8 @@
 #include <utility>
 #include <vector>
 
+using ernie::DecodeSlopeDeviation;
+using ernie::EncodeSlopeDeviation;
 using ernie::Image;
 using ernie::ImageEncoding;
 using ernie::LinearToSrgb;
@@ -88,6 +91,33 @@ TEST(MipChain, UnitVectorFilterRenormalisesNormals) {
     opposite.At(1, 0) = glm::vec4(0.0f, 0.5f, 0.5f, 1.0f);
     const glm::vec4 flat = MipChain(opposite, MipFilter::UnitVector).back().At(0, 0);
     EXPECT_FLOAT_EQ(flat.b, 1.0f) << "degenerate averages fall back to straight up";
+}
+
+TEST(MipChain, NormalSlopesKeepTheSlopesAveragingHides) {
+    // Slopes of +0.5 and -0.5 along x: flat on average, deviating by 0.5 along x and 0 along y,
+    // so sqrt(0.125) per axis.
+    const auto tilted = [](float slope) {
+        const glm::vec3 n = glm::normalize(glm::vec3(-slope, 0.0f, 1.0f));
+        return glm::vec4(0.5f * n + 0.5f, 1.0f);
+    };
+    Image normals(2, 2);
+    normals.At(0, 0) = normals.At(1, 1) = tilted(0.5f);
+    normals.At(1, 0) = normals.At(0, 1) = tilted(-0.5f);
+    const std::vector<Image> mips = MipChain(normals, MipFilter::NormalSlopes);
+    EXPECT_EQ(mips[0].At(0, 0).a, 0.0f) << "level 0's texels are points";
+    const glm::vec4 top = mips.back().At(0, 0);
+    EXPECT_NEAR(top.b, 1.0f, 1e-6f) << "flat on average";
+    EXPECT_NEAR(DecodeSlopeDeviation(top.a), std::sqrt(0.125f), 1e-5f);
+
+    // Deviations within texels carry up a level, and add to those between them.
+    Image twice(4, 2);
+    for (std::uint32_t x = 0; x < 4; ++x) {
+        twice.At(x, 0) = tilted(x % 2 == 0 ? 0.5f : -0.5f);
+        twice.At(x, 1) = tilted(x % 2 == 0 ? -0.5f : 0.5f);
+    }
+    EXPECT_NEAR(DecodeSlopeDeviation(MipChain(twice, MipFilter::NormalSlopes).back().At(0, 0).a),
+                std::sqrt(0.125f), 1e-5f);
+    EXPECT_NEAR(DecodeSlopeDeviation(EncodeSlopeDeviation(3.0f)), 3.0f, 1e-5f);
 }
 
 TEST(ImageMean, AveragesEveryPixel) {

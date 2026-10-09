@@ -93,6 +93,10 @@ public struct DetailSample {
     public float3 albedo;
     // Slope (dz/dx east, dz/dy north) added to the terrain's.
     public float2 slope;
+    // Variance per axis of the detail slopes the pixel covers about `slope`, which filtering
+    // averaged away: roughness below the pixel that shading adds to the model's
+    // (`BrdfInput::slopeVariance`).
+    public float slopeVariance;
 }
 
 float2 toTexture(float2 tile) {
@@ -106,24 +110,32 @@ float2 rotate(float2 v, float2 cs) {
 public struct DetailTap {
     public float3 albedo;
     public float2 slope;
+    public float slopeVariance;
 }
 
 // One tap of both detail textures at `tile` (tile space, y north) with derivatives, its tangent
-// slope rotated back by `inverse` (cos, sin) into tile space.
+// slope rotated back by `inverse` (cos, sin) into tile space. The normal map's mips hold the mean
+// slope's normal and, in alpha, the deviation of the slopes it covers (`MipFilter::NormalSlopes`:
+// sigma / (1 + sigma)), which is the same along any axis, so needs no rotating.
 DetailTap detailTap(float2 tile, float2 dx, float2 dy, float2 inverse) {
     DetailTap t;
     t.albedo = float3(1.0);
     t.slope = float2(0.0);
+    t.slopeVariance = 0.0;
     if (surface.detail.z > 0.0) {
         t.albedo = detailAlbedo
                        .SampleGrad(detailSampler, toTexture(tile), toTexture(dx), toTexture(dy))
                        .rgb;
     }
     if (surface.detail.w > 0.0) {
-        var n = detailNormal.SampleGrad(detailSampler, toTexture(tile), toTexture(dx),
-                                        toTexture(dy)).xyz * 2.0 - 1.0;
+        let texel =
+            detailNormal.SampleGrad(detailSampler, toTexture(tile), toTexture(dx), toTexture(dy));
+        // Stored as n * 127 + 128 in 8 bits (`RasterMaterial::SetDetailNormal`).
+        var n = (texel.xyz * 255.0 - 128.0) / 127.0;
         n.y = n.y * surface.albedoMapSize.w;
         t.slope = rotate(-n.xy / max(n.z, 0.05), inverse);
+        let sigma = min(texel.w, 0.999) / (1.0 - min(texel.w, 0.999));
+        t.slopeVariance = sigma * sigma;
     }
     return t;
 }
@@ -184,6 +196,12 @@ public DetailTap hexDetail(float2 tile, float2 dx, float2 dy) {
     DetailTap result;
     result.albedo = w.x * taps[0].albedo + w.y * taps[1].albedo + w.z * taps[2].albedo;
     result.slope = w.x * taps[0].slope + w.y * taps[1].slope + w.z * taps[2].slope;
+    // The blend's variance: each tap's own, plus its slope's spread about the blend's.
+    result.slopeVariance = 0.0;
+    for (uint k = 0; k < 3; ++k) {
+        let offset = taps[k].slope - result.slope;
+        result.slopeVariance += w[k] * (taps[k].slopeVariance + 0.5 * dot(offset, offset));
+    }
     return result;
 }
 
@@ -198,5 +216,15 @@ public DetailSample sampleDetail(DetailCoords c) {
     let normalised = tap.albedo / max(surface.detailMean.rgb, float3(1e-4));
     d.albedo = lerp(float3(1.0), normalised, surface.detail.x * surface.detail.z);
     d.slope = tap.slope * surface.detail.y;
+    d.slopeVariance = tap.slopeVariance * surface.detail.y * surface.detail.y;
     return d;
+}
+
+// Packs the slope variance of `DetailSample` with a pixel's flags into the G-buffer's ids.w: the
+// flags in the low 16 bits, and in the high ones the slopes' deviation sigma as sigma / (1 + sigma)
+// in 16-bit fixed point (shading.slang unpacks it).
+public uint packSurfaceFlags(uint flags, float slopeVariance) {
+    let sigma = sqrt(max(slopeVariance, 0.0));
+    let encoded = uint(round(sigma / (1.0 + sigma) * 65535.0));
+    return (flags & 0xFFFFu) | (min(encoded, 65534u) << 16);
 }

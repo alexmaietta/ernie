@@ -20,6 +20,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <numbers>
 #include <string>
 #include <vector>
 
@@ -429,6 +430,53 @@ TEST_F(RasterDelegateTest, GroundPlanesAreLitAndSortedLikeSurfaces) {
     withTerrain.Set("/World/Ground", tokens::kVisibility, tokens::kInvisible);
     delegate.Step(withTerrain);
     EXPECT_FALSE(delegate.Ground().Enabled());
+}
+
+TEST_F(RasterDelegateTest, NormalMapsFinerThanAPixelShadeAsRoughness) {
+    // A normal map of slopes +-0.5 along x in a checker, tiled every centimetre and seen from 90 m:
+    // each pixel covers thousands of tiles, flat on average, with slopes deviating by sqrt(0.125)
+    // per axis. Under a low sun the plane shades as Hapke's theta-bar widened by that variance
+    // (`widenedMeanSlope`), not as the flat average normal.
+    Scene scene = GroundScene(10.0);
+    scene.Set("/World/Sun", tokens::kTransform, ernie::DistantLightTransform({1.0, 0.0, 0.35}));
+    scene.Define("/Render/Settings", tokens::kRenderSettings).Set(tokens::kAmbient, 0.0f);
+    scene.Set("/Looks/Grey", tokens::kBrdf, "hapke");
+    scene.Set("/Looks/Grey", "inputs:theta_bar", 15.0);
+    scene.Set("/Looks/Grey", tokens::kDetailTileSize, 0.01f);
+    scene.Set("/Looks/Grey", tokens::kDetailHexTiling, false);
+    std::vector<float> normals;
+    for (int row = 0; row < 8; ++row) {
+        for (int col = 0; col < 8; ++col) {
+            const float slope = (row + col) % 2 == 0 ? 0.5f : -0.5f;
+            const glm::vec3 n = glm::normalize(glm::vec3(-slope, 0.0f, 1.0f));
+            normals.insert(normals.end(), {0.5f * n.x + 0.5f, 0.5f * n.y + 0.5f,
+                                           0.5f * n.z + 0.5f, 1.0f});
+        }
+    }
+    const auto meanGreen = [&](RasterDelegate& delegate) {
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const auto vars = MapVars(outputs);
+        double sum = 0.0;
+        for (std::size_t row = 0; row < kVarSize; ++row) {
+            for (std::size_t col = 0; col < kVarSize; ++col) {
+                sum += At<float>(vars.at("HdrColor"), row, col, 1);
+            }
+        }
+        return sum / static_cast<double>(kVarSize * kVarSize);
+    };
+    RasterDelegate delegate(*context_);
+    const double smooth = meanGreen(delegate);
+    scene.Write("/Looks/Grey", tokens::kDetailNormal, Tensor::Copy<float>(normals, {8, 8, 4}));
+    const double mapped = meanGreen(delegate);
+
+    scene.Clear("/Looks/Grey", tokens::kDetailNormal);
+    const double tanT = std::tan(15.0 * std::numbers::pi / 180.0);
+    scene.Set("/Looks/Grey", "inputs:theta_bar",
+              std::atan(std::sqrt(tanT * tanT + 2.0 * 0.125 / std::numbers::pi)) * 180.0 /
+                  std::numbers::pi);
+    const double widened = meanGreen(delegate);
+    EXPECT_GT(smooth - widened, 0.02 * smooth) << "the widened roughness shades the plane darker";
+    EXPECT_NEAR(mapped, widened, 0.005 * widened);
 }
 
 TEST_F(RasterDelegateTest, GroundPlanesReachTheHorizonWithACheckerboard) {

@@ -146,7 +146,7 @@ void RasterMaterial::SetDetailAlbedo(const Image* albedo) {
 void RasterMaterial::SetDetailNormal(const Image* normal) {
     CheckDetailImage(normal);
     const Image flat(1, 1, glm::vec4(0.5f, 0.5f, 1.0f, 1.0f));
-    auto image = UploadMips(normal != nullptr ? *normal : flat, MipFilter::UnitVector,
+    auto image = UploadMips(normal != nullptr ? *normal : flat, MipFilter::NormalSlopes,
                             ImageEncoding::Linear, VK_FORMAT_R8G8B8A8_UNORM);
     vkDeviceWaitIdle(context_.Device());
     detailNormal_ = std::move(image);
@@ -249,7 +249,19 @@ std::uint64_t RasterMaterial::GpuBytes() const {
 std::unique_ptr<GpuImage> RasterMaterial::UploadMips(const Image& image, MipFilter filter,
                                                      ImageEncoding encoding,
                                                      VkFormat format) const {
-    const std::vector<Image> mips = MipChain(image, filter);
+    std::vector<Image> mips = MipChain(image, filter);
+    if (filter == MipFilter::NormalSlopes) {
+        // Normals stored as n * 127 + 128 in 8 bits, so flat is exactly byte 128 and decodes to
+        // exactly 0 (surface.slang's `detailTap`); n / 2 + 1/2 would store 0 as 127.5, tilting
+        // every normal by 1/255. Source maps that stored flat as 128 decode to flat too.
+        for (Image& mip : mips) {
+            for (glm::vec4& texel : mip.pixels) {
+                const glm::vec3 n = 2.0f * glm::vec3(texel) - 1.0f;
+                const glm::vec3 bytes = glm::round(glm::clamp(n * 127.0f + 128.0f, 1.0f, 255.0f));
+                texel = glm::vec4(bytes / 255.0f, texel.a);
+            }
+        }
+    }
     auto texture = std::make_unique<GpuImage>(
         context_, ImageDesc{image.width, image.height, 1, static_cast<std::uint32_t>(mips.size()),
                             format, VK_IMAGE_USAGE_SAMPLED_BIT});

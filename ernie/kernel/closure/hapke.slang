@@ -77,7 +77,10 @@ public struct Hapke : IBrdf {
         let w = s.albedo;
         let g = phaseAngle(s);
         let k = hapkePorosityK(p.get(5));
-        let rough = hapkeRoughness(s, radians(p.get(4)));
+        // Unresolved slopes widen theta-bar, held below 60 degrees, beyond which Hapke's
+        // shadowing function is no longer meaningful.
+        let thetaBar = min(widenedMeanSlope(radians(p.get(4)), s.slopeVariance), radians(60.0));
+        let rough = hapkeRoughness(s, thetaBar);
         let mu0e = max(rough.mu0e, 1e-6);
         let mue = max(rough.mue, 1e-6);
 

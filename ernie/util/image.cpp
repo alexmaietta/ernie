@@ -4,6 +4,7 @@
 #include <stb_image.h>
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <cstddef>
@@ -112,8 +113,49 @@ float LinearToSrgb(float value) {
     return value <= 0.0031308f ? value * 12.92f : 1.055f * std::pow(value, 1.0f / 2.4f) - 0.055f;
 }
 
+float EncodeSlopeDeviation(float sigma) {
+    const float s = std::max(sigma, 0.0f);
+    return s / (1.0f + s);
+}
+
+float DecodeSlopeDeviation(float encoded) {
+    const float e = std::clamp(encoded, 0.0f, 0.999f);
+    return e / (1.0f - e);
+}
+
+namespace {
+
+/// The slope (dz/dx, dz/dy) of a normal stored as rgb in [0, 1].
+glm::vec2 SlopeOf(const glm::vec4& texel) {
+    const glm::vec3 n = 2.0f * glm::vec3(texel) - 1.0f;
+    return -glm::vec2(n) / std::max(n.z, kMinNormalZ);
+}
+
+/// The 2 x 2 slope-space filter of `NormalSlopes`: the mean slope's normal, and the slopes'
+/// deviation from it, within and between the four texels, per axis.
+glm::vec4 FilterSlopes(const std::array<glm::vec4, 4>& texels) {
+    glm::vec2 mean(0.0f);
+    float square = 0.0f;  // Mean of sx^2 + sy^2 over everything the texels cover.
+    for (const glm::vec4& texel : texels) {
+        const glm::vec2 slope = SlopeOf(texel);
+        const float sigma = DecodeSlopeDeviation(texel.a);
+        mean += 0.25f * slope;
+        square += 0.25f * (glm::dot(slope, slope) + 2.0f * sigma * sigma);
+    }
+    const float variance = std::max(0.5f * (square - glm::dot(mean, mean)), 0.0f);
+    const glm::vec3 n = glm::normalize(glm::vec3(-mean, 1.0f));
+    return glm::vec4(0.5f * n + 0.5f, EncodeSlopeDeviation(std::sqrt(variance)));
+}
+
+}  // namespace
+
 std::vector<Image> MipChain(const Image& image, MipFilter filter) {
     std::vector<Image> levels{image};
+    if (filter == MipFilter::NormalSlopes) {
+        for (glm::vec4& texel : levels.back().pixels) {
+            texel.a = 0.0f;
+        }
+    }
     while (levels.back().width > 1 || levels.back().height > 1) {
         const Image& above = levels.back();
         Image level(std::max(1u, above.width / 2), std::max(1u, above.height / 2));
@@ -123,6 +165,11 @@ std::vector<Image> MipChain(const Image& image, MipFilter filter) {
             for (std::uint32_t x = 0; x < level.width; ++x) {
                 const std::uint32_t x0 = std::min(2 * x, above.width - 1);
                 const std::uint32_t x1 = std::min(2 * x + 1, above.width - 1);
+                if (filter == MipFilter::NormalSlopes) {
+                    level.At(x, y) = FilterSlopes({above.At(x0, y0), above.At(x1, y0),
+                                                   above.At(x0, y1), above.At(x1, y1)});
+                    continue;
+                }
                 glm::vec4 texel = 0.25f * (above.At(x0, y0) + above.At(x1, y0) + above.At(x0, y1) +
                                            above.At(x1, y1));
                 if (filter == MipFilter::UnitVector) {

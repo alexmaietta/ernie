@@ -29,7 +29,9 @@ struct BrdfParam {
 /// radiance factor I/F (pi times the bidirectional reflectance) for unit incident irradiance.
 /// Parameter `i`, in the order of `params`, is `p.get(i)`.
 /// `BrdfInput` carries cos(i), cos(e), cos(g), the cosine of the azimuth between the incidence and
-/// emission planes, and an rgb albedo input whose meaning each model documents.
+/// emission planes, an rgb albedo input whose meaning each model documents, and the variance per
+/// axis of surface slopes finer than the renderer resolves (a filtered normal map's), which models
+/// with a roughness add to it (`widenedMeanSlope` for Hapke-like ones) and others may ignore.
 ///
 /// A model only defines `radianceFactor`; every render backend evaluates and samples it through the
 /// generic helpers of the `brdf` module (`evaluateBrdf`, `sampleBrdf`, `brdfPdf`), so a model works

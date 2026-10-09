@@ -272,6 +272,7 @@ DetailSample triplanarDetail(float3 world, inout float3 normal) {
     DetailSample d;
     d.albedo = w.x * x.albedo + w.y * y.albedo + w.z * z.albedo;
     d.slope = float2(0.0);
+    d.slopeVariance = w.x * x.slopeVariance + w.y * y.slopeVariance + w.z * z.slopeVariance;
     let perturbation = w.x * float3(0.0, -x.slope.x, -x.slope.y) +
                        w.y * float3(-y.slope.x, 0.0, -y.slope.y) +
                        w.z * float3(-z.slope.x, -z.slope.y, 0.0);
@@ -302,6 +303,7 @@ GBuffer meshFragmentMain(VertexOutput in) {
         float4(shadingNormal, unlit ? 1.0 : sunVisibility(in.world, normal, in.position.xy));
     out.albedo = float4(unlit ? 1.0 : surfaceAlbedoScale(in.world),
                         wireframe(modulation, in.barycentric));
-    out.ids = uint4(d.points.y, d.points.z, in.instance, unlit ? kUnlit : 0u);
+    out.ids = uint4(d.points.y, d.points.z, in.instance,
+                    packSurfaceFlags(unlit ? kUnlit : 0u, detail.slopeVariance));
     return out;
 }

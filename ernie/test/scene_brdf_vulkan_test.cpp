@@ -32,7 +32,8 @@ using ernie::testing::kPi;
 
 namespace {
 
-/// Evaluates a model for every case: geometry is (mu0, mu, cos g, cos psi), albedo in rgb.
+/// Evaluates a model for every case: geometry is (mu0, mu, cos g, cos psi), albedo in rgb, the
+/// unresolved slope variance in a.
 constexpr char kHarness[] = R"(import brdf;
 import MODULE;
 
@@ -61,6 +62,7 @@ void main(uint3 id : SV_DispatchThreadID) {
     s.cosG = c.geometry.z;
     s.cosPsi = c.geometry.w;
     s.albedo = c.albedo.rgb;
+    s.slopeVariance = c.albedo.a;
     TYPE model;
     results[id.x] = float4(model.radianceFactor(s, params[0]), 0.0);
 }
@@ -68,9 +70,11 @@ void main(uint3 id : SV_DispatchThreadID) {
 
 class BrdfVulkanTest : public ernie::testing::VulkanTest {
   protected:
-    /// Evaluates `id`'s `radianceFactor` on the GPU for every geometry.
+    /// Evaluates `id`'s `radianceFactor` on the GPU for every geometry, with unresolved slopes of
+    /// per-axis variance `slopeVariance`.
     std::vector<glm::dvec3> Evaluate(const std::string& id, const std::vector<float>& values,
-                                     const std::vector<Geometry>& cases) {
+                                     const std::vector<Geometry>& cases,
+                                     double slopeVariance = 0.0) {
         const BrdfModel* model = registry_.Find(id);
         if (model == nullptr) {
             throw std::invalid_argument(id);
@@ -85,7 +89,8 @@ class BrdfVulkanTest : public ernie::testing::VulkanTest {
         std::vector<float> packedCases;
         for (const Geometry& g : cases) {
             for (const double v :
-                 {g.mu0, g.mu, g.cosG, g.cosPsi, g.albedo.r, g.albedo.g, g.albedo.b, 0.0}) {
+                 {g.mu0, g.mu, g.cosG, g.cosPsi, g.albedo.r, g.albedo.g, g.albedo.b,
+                  slopeVariance}) {
                 packedCases.push_back(static_cast<float>(v));
             }
         }
@@ -181,6 +186,42 @@ TEST_F(BrdfVulkanTest, HapkeMatchesTheReferenceImplementation) {
         ExpectMatches(
             "hapke", params,
             [&params](const Geometry& g, double w) { return HapkeReference(g, w, params); }, 1e-3);
+    }
+}
+
+TEST_F(BrdfVulkanTest, UnresolvedSlopesWidenTheModelsRoughness) {
+    // Slopes of per-axis variance v shade as Hapke's theta-bar widened to
+    // atan(sqrt(tan^2 theta-bar + 2 v / pi)), and as Oren-Nayar's sigma widened by atan(sqrt(v)).
+    const std::vector<Geometry> cases = GeometryGrid();
+    const double variance = 0.05;
+    std::vector<float> hapke = BrdfRegistry::WithBuiltins().Find("hapke")->Defaults();
+    const std::vector<glm::dvec3> rough = Evaluate("hapke", hapke, cases, variance);
+    const double tanT = std::tan(hapke[4] * kPi / 180.0);
+    hapke[4] = static_cast<float>(std::atan(std::sqrt(tanT * tanT + 2.0 * variance / kPi)) *
+                                  180.0 / kPi);
+    const std::vector<glm::dvec3> widened = Evaluate("hapke", hapke, cases);
+    const std::vector<glm::dvec3> smooth =
+        Evaluate("hapke", BrdfRegistry::WithBuiltins().Find("hapke")->Defaults(), cases);
+    double changed = 0.0;
+    for (std::size_t c = 0; c < cases.size(); ++c) {
+        for (int ch = 0; ch < 3; ++ch) {
+            EXPECT_NEAR(rough[c][ch], widened[c][ch], 1e-4 * std::max(1.0, widened[c][ch]))
+                << "case " << c;
+            changed = std::max(changed, std::abs(rough[c][ch] - smooth[c][ch]));
+        }
+    }
+    EXPECT_GT(changed, 1e-3) << "the variance makes a difference";
+
+    const double unresolved = std::atan(std::sqrt(variance)) * 180.0 / kPi;
+    const std::vector<glm::dvec3> orenNayar = Evaluate("oren_nayar", {0.0f}, cases, variance);
+    const std::vector<glm::dvec3> orenNayarWidened =
+        Evaluate("oren_nayar", {static_cast<float>(unresolved)}, cases);
+    for (std::size_t c = 0; c < cases.size(); ++c) {
+        EXPECT_NEAR(orenNayar[c].r, orenNayarWidened[c].r, 1e-4) << "case " << c;
+    }
+    const std::vector<glm::dvec3> lambert = Evaluate("lambert", {}, cases, variance);
+    for (std::size_t c = 0; c < cases.size(); ++c) {
+        EXPECT_NEAR(lambert[c].r, cases[c].albedo.r * cases[c].mu0, 1e-5) << "Lambert ignores it";
     }
 }
 

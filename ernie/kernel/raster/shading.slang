@@ -324,8 +324,10 @@ float3 facingNormal(float3 n, float3 v) {
 
 // Radiance factors of the active model for three bands at once: the bands' albedos go in the RGB
 // slots of BrdfInput, which models treat independently.
-float3 radianceFactors(float3 n, float3 l, float3 v, float3 albedo, BrdfParams params) {
-    let input = brdfInputOf(n, l, v, albedo);
+float3 radianceFactors(float3 n, float3 l, float3 v, float3 albedo, float slopeVariance,
+                       BrdfParams params) {
+    var input = brdfInputOf(n, l, v, albedo);
+    input.slopeVariance = slopeVariance;
     if (input.mu0 <= 0.0) {
         return float3(0.0);
     }
@@ -368,6 +370,11 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     let ambient = sh.sun.w;
     let bands = uint(sh.range.z);
     let unlit = (ids.w & kUnlit) != 0;
+    // Variance of the slopes below the pixel, which widens the model's roughness: their deviation
+    // sigma as sigma / (1 + sigma) in the high 16 bits (surface.slang's `packSurfaceFlags`).
+    let encodedSigma = float(ids.w >> 16) / 65535.0;
+    let sigma = encodedSigma / (1.0 - encodedSigma);
+    let slopeVariance = sigma * sigma;
     let domeRgb = unlit ? float3(0.0) : domeIrradiance(n);
     let domeScale = max(domeRgb.x, max(domeRgb.y, domeRgb.z));
     let domeCoefficients = domeScale > 0.0 ? sigmoidCoefficients(domeRgb / domeScale) : float3(0.0);
@@ -424,7 +431,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         if (unlit) {
             response = bandAlbedo;
         } else {
-            let factors = radianceFactors(n, l, v, bandAlbedo, material.params);
+            let factors = radianceFactors(n, l, v, bandAlbedo, slopeVariance, material.params);
             response = ambient * bandAlbedo + (1.0 - ambient) * factors * visibility;
         }
         var radiance = bandIrradiance / PI * response;
@@ -444,7 +451,8 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             for (uint j = 0; j < 3; ++j) {
                 lightSpectrum[j] = bandValue(lights[k].spectrum, min(first + j, bands - 1));
             }
-            let factors = radianceFactors(n, lightDirections[k], v, bandAlbedo, material.params);
+            let factors = radianceFactors(n, lightDirections[k], v, bandAlbedo, slopeVariance,
+                                          material.params);
             radiance += lightScales[k] * lightSpectrum / PI * factors;
         }
         for (uint k = 0; k < 3 && first + k < bands; ++k) {

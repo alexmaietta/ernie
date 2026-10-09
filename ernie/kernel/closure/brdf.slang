@@ -19,6 +19,18 @@ public struct BrdfInput {
     public float cosPsi;
     // Albedo input; each model documents how it uses it (e.g. Hapke's single-scattering albedo w).
     public float3 albedo;
+    // Variance per axis of the surface slopes about the normal below what the host resolves (a
+    // filtered normal map's, `MipFilter::NormalSlopes`), 0 when there are none. Models with a
+    // roughness widen it by this, as the same slopes would at a finer scale; others ignore it.
+    public float slopeVariance;
+}
+
+// Hapke's mean slope angle theta-bar (radians) widened by unresolved slopes of per-axis variance
+// `slopeVariance`. Hapke's roughness distribution has Gaussian slopes of variance
+// pi tan^2(theta-bar) / 2 per axis, and independent slopes' variances add.
+public float widenedMeanSlope(float thetaBar, float slopeVariance) {
+    let tanT = tan(thetaBar);
+    return atan(sqrt(tanT * tanT + 2.0 * slopeVariance / PI));
 }
 
 // Up to 16 model parameters in the order the model declares them.
@@ -53,6 +65,7 @@ public BrdfInput brdfInputOf(float3 n, float3 l, float3 v, float3 albedo) {
     input.cosG = dot(l, v);
     input.cosPsi = cosPsi;
     input.albedo = albedo;
+    input.slopeVariance = 0.0;
     return input;
 }
 

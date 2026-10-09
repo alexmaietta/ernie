@@ -97,7 +97,7 @@ GroundOutput fragmentMain(VertexOutput in) {
     out.normal = float4(normalize(float3(-detail.slope, 1.0)), sunVisibility(world, normal,
                                                                              in.position.xy));
     out.albedo = float4(surfaceAlbedoScale(world), cascadeTint(modulation, world));
-    out.ids = uint4(g.ids.x, g.ids.y, 0, 0);
+    out.ids = uint4(g.ids.x, g.ids.y, 0, packSurfaceFlags(0u, detail.slopeVariance));
     out.depth = min(clip.z / clip.w, 0.99999994);
     return out;
 }

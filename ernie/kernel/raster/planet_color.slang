@@ -53,8 +53,9 @@ float3 colormap(float t) {
 }
 
 // Detail textures projected along the three axes and blended by the normal (triplanar), as on
-// meshes, since no one plane suits a whole sphere; their slopes perturb `normal`.
-float3 triplanarDetail(float3 world, inout float3 normal) {
+// meshes, since no one plane suits a whole sphere; their slopes perturb `normal`, and the
+// variance of the slopes below the pixel goes to `slopeVariance`.
+float3 triplanarDetail(float3 world, inout float3 normal, out float slopeVariance) {
     var w = pow(abs(normal), float3(4.0));
     w = w / max(w.x + w.y + w.z, 1e-6);
     let x = sampleDetail(detailCoords(world.yz, kProjectYz));
@@ -64,6 +65,7 @@ float3 triplanarDetail(float3 world, inout float3 normal) {
                        w.y * float3(-y.slope.x, 0.0, -y.slope.y) +
                        w.z * float3(-z.slope.x, -z.slope.y, 0.0);
     normal = normalize(normal + perturbation);
+    slopeVariance = w.x * x.slopeVariance + w.y * y.slopeVariance + w.z * z.slopeVariance;
     return w.x * x.albedo + w.y * y.albedo + w.z * z.albedo;
 }
 
@@ -74,7 +76,8 @@ GBuffer fragmentMain(VertexOutput in) {
     float3 up;
     let normal = planetNormal(in.face, in.grid, up);
     var shadingNormal = normal;
-    var modulation = triplanarDetail(in.world, shadingNormal);
+    float slopeVariance;
+    var modulation = triplanarDetail(in.world, shadingNormal, slopeVariance);
     let range = max(p.body.w - p.body.z, 1e-6);
     let fraction = (in.height - p.body.z) / range;
 
@@ -101,6 +104,6 @@ GBuffer fragmentMain(VertexOutput in) {
                                                                        in.position.xy));
     let scale = flags == kUnlit ? 1.0 : surface.albedo.a;
     out.albedo = float4(scale, wireframe(modulation, in.barycentric));
-    out.ids = uint4(p.ids.x, p.ids.y, 0, flags);
+    out.ids = uint4(p.ids.x, p.ids.y, 0, packSurfaceFlags(flags, slopeVariance));
     return out;
 }
