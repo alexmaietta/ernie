@@ -361,6 +361,44 @@ std::vector<SensorFilterModel> StandardSensorFilters() {
           {"drift", 0.0f, "Pixels the image drifts along the track per stage; 0 in step"},
           {"axis", 0.0f, "0: the track runs down the rows, 1: along the columns"}},
          "Tdi", shaders::kFilterTdiSlang},
+        {"defectPixels", "Defect pixels",
+         "Dead pixels with no response and hot pixels with a high dark current, the same pixels "
+         "every frame. Before noise.",
+         {"EMVA Standard 1288 Release 4.0 Linear, 2021"},
+         Kind::Pixel, Domain::Electrons,
+         {{"dead", 1e-4f, "Fraction of pixels with no response"},
+          {"hot", 1e-4f, "Fraction of pixels with a high dark current"},
+          {"hotRate", 1000.0f, "A hot pixel's typical dark current, electrons per second"}},
+         "DefectPixels", shaders::kFilterDefectPixelsSlang},
+        {"smear", "Frame-transfer smear",
+         "Light collected while a shutterless frame-transfer CCD shifts its image into storage: "
+         "each pixel gains its column's mean signal times the transfer time over the exposure. "
+         "Before noise.",
+         {"J. R. Janesick, \"Scientific Charge-Coupled Devices\", SPIE Press, 2001"},
+         Kind::Spatial, Domain::Electrons,
+         {{"transferTime", 1e-3f, "Seconds to shift the whole frame into storage"},
+          {"axis", 0.0f, "0: charge moves along columns, 1: along rows"}},
+         "Smear", shaders::kFilterSmearSlang},
+        {"darkCurrent", "Thermal dark current",
+         "Dark current doubling every few degrees with the sensor's temperature, each pixel's "
+         "rate off the mean (DSNU). In place of the sensor's constant dark current; before "
+         "noise.",
+         {"EMVA Standard 1288 Release 4.0 Linear, 2021",
+          "J. R. Janesick, \"Photon Transfer\", SPIE Press, 2007"},
+         Kind::Pixel, Domain::Electrons,
+         {{"temperature", 20.0f, "The sensor's temperature, degrees Celsius"},
+          {"referenceTemperature", 20.0f, "Degrees Celsius"},
+          {"referenceRate", 10.0f, "Mean dark current there, electrons per second"},
+          {"doubling", 6.3f, "Degrees Celsius per doubling of the rate"},
+          {"nonuniformity", 0.1f, "Standard deviation of each pixel's rate, relative"}},
+         "DarkCurrent", shaders::kFilterDarkCurrentSlang},
+        {"jpeg", "JPEG",
+         "The display image through baseline JPEG (YCbCr, 8 x 8 DCT, standard quantisation "
+         "tables at a quality, 4:4:4) and back. After exposure.",
+         {"ITU-T Recommendation T.81, 1992", "E. Hamilton, \"JPEG File Interchange Format\", 1992"},
+         Kind::Spatial, Domain::Display,
+         {{"quality", 85.0f, "1 to 100, as encoders take it"}},
+         "Jpeg", shaders::kFilterJpegSlang},
     };
 }
 

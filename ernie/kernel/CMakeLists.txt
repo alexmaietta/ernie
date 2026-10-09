@@ -13,13 +13,17 @@ set(ernie_shaders
     film/filter_color_matrix.slang=kFilterColorMatrixSlang
     film/filter_compand.slang=kFilterCompandSlang
     film/filter_defocus.slang=kFilterDefocusSlang
+    film/filter_dark_current.slang=kFilterDarkCurrentSlang
+    film/filter_defect_pixels.slang=kFilterDefectPixelsSlang
     film/filter_demosaic.slang=kFilterDemosaicSlang
     film/filter_detector_pattern.slang=kFilterDetectorPatternSlang
     film/filter_glare.slang=kFilterGlareSlang
+    film/filter_jpeg.slang=kFilterJpegSlang
     film/filter_lag.slang=kFilterLagSlang
     film/filter_measured_qe.slang=kFilterMeasuredQeSlang
     film/filter_psf.slang=kFilterPsfSlang
     film/filter_readout_taps.slang=kFilterReadoutTapsSlang
+    film/filter_smear.slang=kFilterSmearSlang
     film/filter_spectral_transmission.slang=kFilterSpectralTransmissionSlang
     film/filter_tdi.slang=kFilterTdiSlang
     film/filter_temporal_average.slang=kFilterTemporalAverageSlang

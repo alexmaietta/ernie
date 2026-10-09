@@ -150,7 +150,8 @@ TEST_F(RasterDelegateTest, TheStandardSensorFiltersAreRegistered) {
     RasterDelegate delegate(*context_);
     for (const char* id :
          {"psf", "defocus", "bayer", "demosaic", "whiteBalance", "colorMatrix", "compand",
-          "detectorPattern", "readoutTaps", "tdi"}) {
+          "detectorPattern", "readoutTaps", "tdi", "defectPixels", "smear", "darkCurrent",
+          "jpeg"}) {
         EXPECT_NE(delegate.SensorFilters().Find(id), nullptr) << id;
     }
 }
@@ -655,4 +656,106 @@ TEST_F(RasterDelegateTest, TdiSumsItsStagesAndSmearsWhenOutOfStep) {
             EXPECT_NEAR(drifting[at(x, y)], smeared, 1e-3f * smeared + 1e-3f) << x << ", " << y;
         }
     }
+}
+
+TEST_F(RasterDelegateTest, DefectPixelsAreDeadOrHotAndStayPut) {
+    RasterDelegate delegate(*context_);
+    Scene scene = FlatScene();
+    scene.Set("/World/Camera", tokens::kExposureTime, 1e-6);  // unsaturated
+    const auto base = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
+    const std::map<std::string, float> defects{{"dead", 0.02f}, {"hot", 0.02f}, {"hotRate", 1e8f}};
+    const auto first = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}, {"defectPixels", defects}});
+    const auto second = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}, {"defectPixels", defects}});
+    int dead = 0;
+    int hot = 0;
+    for (std::size_t i = 1; i < base.size(); i += 4) {
+        ASSERT_GT(base[i], 0.0f);
+        if (first[i] == 0.0f) {
+            ++dead;
+        } else if (first[i] > base[i] + 40.0f) {
+            ++hot;  // 50 to 150 electrons over the microsecond
+        } else {
+            EXPECT_EQ(first[i], base[i]);
+        }
+    }
+    const int pixels = static_cast<int>(kSize * kSize);
+    EXPECT_NEAR(dead, 0.02 * pixels, 0.01 * pixels);
+    EXPECT_NEAR(hot, 0.02 * pixels, 0.01 * pixels);
+    EXPECT_EQ(first, second) << "the same pixels every frame";
+}
+
+TEST_F(RasterDelegateTest, SmearAddsEachColumnsMeanForTheTransferTime) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    scene.Set("/World/Camera", tokens::kExposureTime, 1e-6);  // unsaturated
+    const auto at = [](std::size_t x, std::size_t y) { return (y * kSize + x) * 4 + 1; };
+    const auto base = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
+    // A transfer as long as half the exposure: half each column's mean on every pixel of it.
+    const auto smeared = VarThrough(delegate, scene, "Electrons",
+                                    {{"qe", kNone}, {"smear", {{"transferTime", 0.5e-6f}}}});
+    for (std::size_t x = 0; x < kSize; ++x) {
+        double column = 0.0;
+        for (std::size_t y = 0; y < kSize; ++y) {
+            column += base[at(x, y)];
+        }
+        const double added = 0.5 * column / kSize;
+        for (std::size_t y = 0; y < kSize; ++y) {
+            EXPECT_NEAR(smeared[at(x, y)], base[at(x, y)] + added, 1e-3 * (base[at(x, y)] + added) + 1e-3)
+                << x << ", " << y;
+        }
+    }
+}
+
+TEST_F(RasterDelegateTest, DarkCurrentDoublesWithTemperature) {
+    RasterDelegate delegate(*context_);
+    Scene scene = FlatScene();
+    scene.Set("/World/Camera", tokens::kExposureTime, 1e-6);
+    const auto base = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
+    const auto darkAt = [&](float temperature) {
+        return VarThrough(delegate, scene, "Electrons",
+                          {{"qe", kNone},
+                           {"darkCurrent", {{"temperature", temperature},
+                                            {"referenceTemperature", 20.0f},
+                                            {"referenceRate", 1e7f},
+                                            {"doubling", 6.0f},
+                                            {"nonuniformity", 0.0f}}}});
+    };
+    const auto reference = darkAt(20.0f);
+    const auto warm = darkAt(32.0f);  // two doublings
+    for (std::size_t i = 1; i < base.size(); i += 4) {
+        EXPECT_NEAR(reference[i] - base[i], 10.0f, 1e-2f) << "1e7 e/s over a microsecond";
+        EXPECT_NEAR(warm[i] - base[i], 40.0f, 4e-2f);
+    }
+}
+
+TEST_F(RasterDelegateTest, JpegKeepsQualityAndLosesDetailAsItFalls) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    scene.Set("/World/Camera", tokens::kExposureTime, 0.001);
+    const auto plain =
+        VarsThrough(delegate, scene, {"LdrColor"}, {{"cie", kNone}, {"exposure", kNone}})
+            .at("LdrColor");
+    const auto errorAt = [&](float quality) {
+        const auto jpeg = VarsThrough(delegate, scene, {"LdrColor"},
+                                      {{"cie", kNone}, {"exposure", kNone},
+                                       {"jpeg", {{"quality", quality}}}})
+                              .at("LdrColor");
+        double total = 0.0;
+        double largest = 0.0;
+        for (std::size_t i = 0; i < plain.size(); ++i) {
+            if (i % 4 != 3) {
+                const double e = std::abs(double(jpeg[i]) - double(plain[i]));
+                total += e;
+                largest = std::max(largest, e);
+            }
+        }
+        return std::pair(total / (plain.size() * 3 / 4), largest);
+    };
+    const auto [best, bestLargest] = errorAt(100.0f);
+    const auto [good, goodLargest] = errorAt(75.0f);
+    const auto [poor, poorLargest] = errorAt(5.0f);
+    EXPECT_LE(bestLargest, 4.0) << "quality 100 is nearly lossless (DN of 255)";
+    EXPECT_LT(best, good);
+    EXPECT_LT(good, poor);
+    EXPECT_GT(poor, 2.0) << "quality 5 blocks visibly";
 }
