@@ -148,6 +148,14 @@ void BindApp(nb::module_& parent) {
         .def_rw("hud_resolution", &ViewportDisplay::hudResolution, "The image's size.")
         .def_rw("hud_exposure", &ViewportDisplay::hudExposure, "The metered exposure value.")
         .def_rw("hud_triangles", &ViewportDisplay::hudTriangles, "Triangles drawn.")
+        .def_rw("toolbar_renderer", &ViewportDisplay::toolbarRenderer,
+                "The toolbar's renderer menu (renderer, rendering mode, render settings).")
+        .def_rw("toolbar_var", &ViewportDisplay::toolbarVar,
+                "The toolbar's menu of the render var the viewport shows.")
+        .def_rw("toolbar_camera", &ViewportDisplay::toolbarCamera,
+                "The toolbar's menu of the camera the viewport looks through.")
+        .def_rw("toolbar_lighting", &ViewportDisplay::toolbarLighting,
+                "The toolbar's menu of how the viewport lights the scene.")
         .def(nb::self == nb::self);
 
     nb::class_<WidgetPanel>(m, "WidgetPanel",

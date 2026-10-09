@@ -1631,6 +1631,13 @@ struct Viewer::State {
             ImGui::EndDisabled();
             ImGui::EndMenu();
         }
+        if (ImGui::BeginMenu("Toolbar")) {
+            ImGui::MenuItem("Renderer", nullptr, &display.toolbarRenderer);
+            ImGui::MenuItem("Render Var", nullptr, &display.toolbarVar);
+            ImGui::MenuItem("Camera", nullptr, &display.toolbarCamera);
+            ImGui::MenuItem("Lighting", nullptr, &display.toolbarLighting);
+            ImGui::EndMenu();
+        }
         ImGui::PopItemFlag();
         // A switch shows in the heads-up display at once.
         hudTime = -kHudRefresh;
@@ -1877,7 +1884,7 @@ struct Viewer::State {
         }
         ImGui::SameLine();
 
-        {
+        if (display.toolbarRenderer) {
             // Spaces where the drawn icon goes.
             const ImVec2 corner = ImGui::GetCursorScreenPos();
             const std::string rendererLabel = "      " + DisplayName(renderer);
@@ -1885,16 +1892,16 @@ struct Viewer::State {
                 DrawRendererMenu();
                 ImGui::EndCombo();
             }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Renderer, rendering mode and render settings");
+            }
             const float icon = ImGui::GetTextLineHeight() * 1.15f;
             DrawRendererIcon(draw,
                              ImVec2(corner.x + ImGui::GetStyle().FramePadding.x,
                                     corner.y + 0.5f * (ImGui::GetFrameHeight() - icon)),
                              icon);
+            ImGui::SameLine();
         }
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Renderer, rendering mode and render settings");
-        }
-        ImGui::SameLine();
 
         if (ImGui::BeginCombo("##show", icons::kEye, kPill)) {
             DrawShowMenu();
@@ -1903,9 +1910,11 @@ struct Viewer::State {
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("What the viewport shows");
         }
-        ImGui::SameLine();
         const std::string varLabel = std::string(icons::kImage) + "  " + viewVar;
-        if (ImGui::BeginCombo("##var", varLabel.c_str(), kPill)) {
+        if (display.toolbarVar) {
+            ImGui::SameLine();
+        }
+        if (display.toolbarVar && ImGui::BeginCombo("##var", varLabel.c_str(), kPill)) {
             const std::vector<std::string>& shown = delegate->Info().viewVars;
             for (const std::string_view name : kRenderVarNames) {
                 const bool supported = std::find(shown.begin(), shown.end(), name) != shown.end();
@@ -1935,7 +1944,7 @@ struct Viewer::State {
             }
             ImGui::EndCombo();
         }
-        if (viewVar == render_vars::kSpectralRadiance) {
+        if (display.toolbarVar && viewVar == render_vars::kSpectralRadiance) {
             DrawBandCombo(comboWidth);
         }
 
@@ -1948,15 +1957,24 @@ struct Viewer::State {
         const auto pillWidth = [&](const std::string& label) {
             return ImGui::CalcTextSize(label.c_str()).x + 2.0f * style.FramePadding.x;
         };
-        ImGui::SetCursorScreenPos(ImVec2(hudLeft - pillWidth(lightLabel) -
-                                             2.0f * style.ItemSpacing.x - pillWidth(cameraLabel),
-                                         origin.y + pad));
-        if (ImGui::BeginCombo("##camera", cameraLabel.c_str(), kPill)) {
-            DrawCameraMenu();
-            ImGui::EndCombo();
+        float left = hudLeft - style.ItemSpacing.x;
+        if (display.toolbarLighting) {
+            left -= pillWidth(lightLabel);
         }
-        ImGui::SameLine();
-        if (ImGui::BeginCombo("##lighting", lightLabel.c_str(), kPill)) {
+        if (display.toolbarCamera) {
+            const float gap = display.toolbarLighting ? style.ItemSpacing.x : 0.0f;
+            left -= pillWidth(cameraLabel) + gap;
+        }
+        ImGui::SetCursorScreenPos(ImVec2(left, origin.y + pad));
+        if (display.toolbarCamera) {
+            if (ImGui::BeginCombo("##camera", cameraLabel.c_str(), kPill)) {
+                DrawCameraMenu();
+                ImGui::EndCombo();
+            }
+            ImGui::SameLine();
+        }
+        if (display.toolbarLighting &&
+            ImGui::BeginCombo("##lighting", lightLabel.c_str(), kPill)) {
             for (const Lighting mode : {Lighting::Stage, Lighting::Camera, Lighting::Default}) {
                 if (ImGui::MenuItem(LightingName(mode), nullptr, mode == lighting)) {
                     lighting = mode;

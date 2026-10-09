@@ -74,6 +74,12 @@ struct ViewportDisplay {
     bool hudResolution = true;    ///< The viewport image's size.
     bool hudExposure = false;     ///< The metered exposure value and whether it is automatic.
     bool hudTriangles = false;    ///< Triangles the last frame drew.
+    /// The viewport toolbar's menus, which applications may hide; the settings and eye menus
+    /// always show, and the eye menu's Toolbar submenu shows these again.
+    bool toolbarRenderer = true;  ///< The renderer, rendering mode and render settings.
+    bool toolbarVar = true;       ///< The render var the viewport shows.
+    bool toolbarCamera = true;    ///< The camera the viewport looks through.
+    bool toolbarLighting = true;  ///< How the viewport lights the scene.
 
     bool operator==(const ViewportDisplay&) const = default;
 };

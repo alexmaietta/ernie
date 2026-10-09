@@ -364,6 +364,24 @@ TEST_F(ViewerTest, PanelsDockWhereTheyAsk) {
     std::filesystem::remove(path);
 }
 
+TEST_F(ViewerTest, ToolbarMenusCanBeHidden) {
+    ViewportDisplay display = viewer_->GetViewportDisplay();
+    EXPECT_TRUE(display.toolbarRenderer && display.toolbarVar && display.toolbarCamera &&
+                display.toolbarLighting);
+    for (bool ViewportDisplay::*menu :
+         {&ViewportDisplay::toolbarRenderer, &ViewportDisplay::toolbarVar,
+          &ViewportDisplay::toolbarCamera, &ViewportDisplay::toolbarLighting}) {
+        display.*menu = false;
+        viewer_->SetViewportDisplay(display);
+        EXPECT_TRUE(viewer_->Step());
+        EXPECT_EQ(viewer_->GetViewportDisplay(), display);
+    }
+    const std::filesystem::path path = TempFile("toolbar.png");
+    viewer_->CaptureWindow(path);
+    EXPECT_TRUE(std::filesystem::exists(path));
+    std::filesystem::remove(path);
+}
+
 TEST_F(ViewerTest, DockSizesSetTheDefaultLayout) {
     // The height of the Log's dock as a fraction of the window's, read during the UI.
     const auto logShare = [](Viewer& viewer) {

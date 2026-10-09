@@ -120,6 +120,11 @@ def test_widget_panels_and_menus(viewer):
     display = viewer.viewport_display
     display.grid = False
     display.hud_triangles = True
+    assert display.toolbar_camera and display.toolbar_lighting
+    display.toolbar_renderer = False
+    display.toolbar_var = False
+    display.toolbar_camera = False
+    display.toolbar_lighting = False
     viewer.viewport_display = display
     assert viewer.viewport_display == display
     viewer.set_viewport_toggle_shown(toggle, True)
