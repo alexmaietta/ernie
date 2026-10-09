@@ -18,9 +18,16 @@ import brdf;
 // Parameters: 0 roughness, 1 metallic, 2 ior, 3 useSpecularWorkflow (0 or 1), 4-6 specularColor,
 // 7 clearcoat, 8 clearcoatRoughness.
 //
-// Light from all around (`environment`) follows the split-sum approximation.
+// Light from all around (`environment`) follows the split-sum approximation. Both scale the base
+// specular lobe by 1 + f0 (1 / E - 1), E its directional albedo, for the energy single scattering
+// loses on rough surfaces (direct light by the geometric mean of the factors at cos(i) and
+// cos(e), which keeps it reciprocal); the clearcoat, smooth and weak, goes without.
 //
 // References:
+// - E. Turquin, "Practical multiple scattering compensation for microfacet models", Industrial
+//   Light & Magic technical report, 2019.
+// - R. Guy and M. Agopian, "Physically Based Rendering in Filament", 2018, section 4.7.2.
+//   https://google.github.io/filament/Filament.html
 // - B. Karis, "Real Shading in Unreal Engine 4", SIGGRAPH 2013 course notes (split sum).
 // - B. Karis, "Physically Based Shading on Mobile", 2014, after D. Lazarov, "Getting More
 //   Physical in Call of Duty: Black Ops II", SIGGRAPH 2013 course (analytic environment BRDF).
@@ -54,6 +61,20 @@ float2 environmentBrdf(float roughness, float mu) {
     return float2(-1.04, 1.04) * a004 + r.zw;
 }
 
+// The factor restoring the energy a GGX lobe of perceptual roughness `roughness` loses to its
+// single-scattering approximation, for reflectance `f0` at cos(e) `mu`: 1 + f0 (1 / E - 1), E the
+// lobe's directional albedo for f0 = 1 (the environment BRDF's scale plus bias), as Filament does.
+float3 energyCompensation(float3 f0, float roughness, float mu) {
+    let ab = environmentBrdf(roughness, saturate(mu));
+    return 1.0 + f0 * (1.0 / max(ab.x + ab.y, 1e-3) - 1.0);
+}
+
+// `energyCompensation` for direct light: the geometric mean of the factors at the incidence and
+// emission angles, so the BRDF stays reciprocal (it equals the emission one when they match).
+float3 reciprocalCompensation(float3 f0, float roughness, float mu0, float mu) {
+    return sqrt(energyCompensation(f0, roughness, mu0) * energyCompensation(f0, roughness, mu));
+}
+
 // The perceptual roughness of a lobe of `roughness` widened by unresolved slopes of `variance`.
 float widenedRoughness(float roughness, float variance) {
     let alpha = roughness * roughness;
@@ -73,14 +94,16 @@ public struct PreviewSurface : IBrdf {
         if (p.get(3) > 0.5) {
             let f0 = (p.get(4) + p.get(5) + p.get(6)) / 3.0;
             let specular = f0 * ab.x + ab.y;
-            r.specular0 = float3(specular);
+            r.specular0 = specular * energyCompensation(float3(f0), roughness, mu);
             r.diffuse = s.albedo * (1.0 - specular);
         } else {
             let metallic = saturate(p.get(1));
             let ior = max(p.get(2), 1.0);
             let r0 = (ior - 1.0) / (ior + 1.0);
             let dielectric = r0 * r0 * ab.x + ab.y;
-            r.specular0 = lerp(float3(dielectric), s.albedo * ab.x + ab.y, metallic);
+            let metal = (s.albedo * ab.x + ab.y) * energyCompensation(s.albedo, roughness, mu);
+            r.specular0 = lerp(dielectric * energyCompensation(float3(r0 * r0), roughness, mu),
+                               metal, metallic);
             r.diffuse = s.albedo * (1.0 - metallic) * (1.0 - dielectric);
         }
         let clearcoat = saturate(p.get(7));
@@ -109,6 +132,8 @@ public struct PreviewSurface : IBrdf {
         let alpha = roughness * roughness;
         let a2 = clamp(alpha * alpha + unresolved, 1e-6, 1.0);
         let specular = ggx(nDotH, a2) * smithVisibility(mu0, mu, a2);
+        // The energy multiple scattering adds back, per f0 (Turquin 2019).
+        let lobeRoughness = sqrt(sqrt(a2));
 
         let metallic = saturate(p.get(1));
         let ior = max(p.get(2), 1.0);
@@ -118,11 +143,17 @@ public struct PreviewSurface : IBrdf {
         if (p.get(3) > 0.5) {
             let f0 = (p.get(4) + p.get(5) + p.get(6)) / 3.0;
             let fresnel = schlick(float3(f0), vDotH);
-            base = (1.0 - fresnel) * diffuse + fresnel * specular;
+            base = (1.0 - fresnel) * diffuse +
+                   fresnel * specular *
+                       reciprocalCompensation(float3(f0), lobeRoughness, mu0, mu);
         } else {
             let fDielectric = schlick(float3(r0 * r0), vDotH);
-            let dielectric = (1.0 - fDielectric) * diffuse + fDielectric * specular;
-            let metal = schlick(s.albedo, vDotH) * specular;
+            let dielectric =
+                (1.0 - fDielectric) * diffuse +
+                fDielectric * specular *
+                    reciprocalCompensation(float3(r0 * r0), lobeRoughness, mu0, mu);
+            let metal = schlick(s.albedo, vDotH) * specular *
+                        reciprocalCompensation(s.albedo, lobeRoughness, mu0, mu);
             base = lerp(dielectric, metal, metallic);
         }
 

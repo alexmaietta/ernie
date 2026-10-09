@@ -258,16 +258,10 @@ TEST_F(RasterDelegateTest, DomesLightEverySurfaceDiffusely) {
 }
 
 TEST_F(RasterDelegateTest, MetalsReflectDomesAndAmbientLightThroughTheSplitSum) {
-    // A white metal seen from straight above under a uniform dome reflects the dome's radiance
-    // times the split-sum environment BRDF's scale plus bias (Lazarov's fit at cos(e) = 1), where
-    // a white Lambertian floor reflects it whole; the sun's ambient fraction alike. Before, metals
-    // (no diffuse albedo) went black under both.
-    const auto environmentBrdf = [](float roughness) {
-        const glm::vec4 r = roughness * glm::vec4(-1.0f, -0.0275f, -0.572f, 0.022f) +
-                            glm::vec4(1.0f, 0.0425f, 1.04f, -0.04f);
-        const float a004 = std::min(r.x * r.x, std::exp2(-9.28f)) * r.x + r.y;
-        return (-1.04f * a004 + r.z) + (1.04f * a004 + r.w);
-    };
+    // A white metal under a uniform dome is a white furnace: with multiple scattering restored it
+    // reflects the dome's radiance whole at any roughness, as a white Lambertian floor does; the
+    // sun's ambient fraction alike. Before, metals (no diffuse albedo) went black under both, and
+    // without the compensation lost a third of the light when rough.
     Scene scene = FlatScene();
     scene.Remove("/World/Sun");
     scene.Define("/World/Sky", tokens::kDomeLight).Set(tokens::kIntensity, 1.0);
@@ -282,10 +276,9 @@ TEST_F(RasterDelegateTest, MetalsReflectDomesAndAmbientLightThroughTheSplitSum) 
     ASSERT_GT(lambert, 0.5f);
     scene.Set("/Looks/Grey", tokens::kBrdf, std::string("preview_surface"));
     scene.Set("/Looks/Grey", "inputs:metallic", 1.0);
-    for (const float roughness : {0.2f, 0.6f}) {
+    for (const float roughness : {0.2f, 0.6f, 1.0f}) {
         scene.Set("/Looks/Grey", "inputs:roughness", static_cast<double>(roughness));
-        EXPECT_NEAR(centre() / lambert, environmentBrdf(roughness), 0.03f)
-            << "dome, roughness " << roughness;
+        EXPECT_NEAR(centre() / lambert, 1.0f, 0.03f) << "dome, roughness " << roughness;
     }
 
     // The ambient fraction of a sun below the horizon, which lights nothing directly.
@@ -298,7 +291,7 @@ TEST_F(RasterDelegateTest, MetalsReflectDomesAndAmbientLightThroughTheSplitSum) 
     const float ambient = centre();
     ASSERT_GT(ambient, 0.0f);
     scene.Set("/Looks/Grey", tokens::kBrdf, std::string("preview_surface"));
-    EXPECT_NEAR(centre() / ambient, environmentBrdf(0.6f), 0.03f) << "ambient";
+    EXPECT_NEAR(centre() / ambient, 1.0f, 0.03f) << "ambient";
 
     // A smooth metal mirrors the dome's map: facing up under a map bright above the horizon it
     // shows the bright half, and with the dome turned over the dark one.

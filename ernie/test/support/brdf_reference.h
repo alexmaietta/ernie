@@ -128,15 +128,31 @@ inline double PreviewSurfaceReference(const Geometry& g, double albedo,
     };
     const auto schlick = [&](double f0) { return f0 + (1.0 - f0) * std::pow(1.0 - vh, 5.0); };
     const double specular = lobe(p[0]);
+    // Turquin's multiple-scattering compensation, 1 + f0 (1 / E - 1) with E from Lazarov's fit at
+    // the lobe's (widened) roughness, as the geometric mean over cos(i) and cos(e).
+    const double alpha = static_cast<double>(p[0]) * p[0];
+    const double lobeRoughness =
+        std::pow(std::clamp(alpha * alpha + 2.0 * variance, 1e-6, 1.0), 0.25);
+    const auto albedoE = [&](double mu) {
+        const glm::dvec4 r = lobeRoughness * glm::dvec4(-1.0, -0.0275, -0.572, 0.022) +
+                             glm::dvec4(1.0, 0.0425, 1.04, -0.04);
+        const double a004 = std::min(r.x * r.x, std::exp2(-9.28 * mu)) * r.x + r.y;
+        return std::max((-1.04 * a004 + r.z) + (1.04 * a004 + r.w), 1e-3);
+    };
+    const auto compensation = [&](double f0) {
+        return std::sqrt((1.0 + f0 * (1.0 / albedoE(g.mu0) - 1.0)) *
+                         (1.0 + f0 * (1.0 / albedoE(g.mu) - 1.0)));
+    };
     double f = 0.0;
     if (p[3] > 0.5) {
-        const double fresnel = schlick((p[4] + p[5] + p[6]) / 3.0);
-        f = (1.0 - fresnel) * albedo / kPi + fresnel * specular;
+        const double f0 = (p[4] + p[5] + p[6]) / 3.0;
+        const double fresnel = schlick(f0);
+        f = (1.0 - fresnel) * albedo / kPi + fresnel * specular * compensation(f0);
     } else {
         const double r0 = std::pow((p[2] - 1.0) / (p[2] + 1.0), 2.0);
         const double dielectric =
-            (1.0 - schlick(r0)) * albedo / kPi + schlick(r0) * specular;
-        const double metal = schlick(albedo) * specular;
+            (1.0 - schlick(r0)) * albedo / kPi + schlick(r0) * specular * compensation(r0);
+        const double metal = schlick(albedo) * specular * compensation(albedo);
         f = (1.0 - p[1]) * dielectric + p[1] * metal;
     }
     if (p[7] > 0.0) {
