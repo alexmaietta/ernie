@@ -1,0 +1,46 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "package",
+      "hidden": true,
+      "description": "Release build of libernie and the viewer for packages: GLFW linked in, no tests, demos or Python",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "/usr",
+        "ERNIE_INSTALL": "ON",
+        "ERNIE_BUILD_APP": "ON",
+        "ERNIE_BUILD_TESTS": "OFF",
+        "ERNIE_BUILD_DEMOS": "OFF",
+        "ERNIE_BUILD_PYTHON": "OFF",
+        "ERNIE_USE_SYSTEM_GLFW": "OFF"
+      }
+    },
+    {
+      "name": "package-deb",
+      "inherits": "package",
+      "displayName": "DEB and TGZ packages",
+      "description": "Libraries in /usr/lib, which Debian and Ubuntu search on every architecture, whatever the build host",
+      "binaryDir": "${sourceDir}/build/package-deb",
+      "cacheVariables": { "CMAKE_INSTALL_LIBDIR": "lib" }
+    },
+    {
+      "name": "package-rpm",
+      "inherits": "package",
+      "displayName": "RPM packages",
+      "description": "As package-deb, with libraries in lib64 as RPM distributions expect",
+      "binaryDir": "${sourceDir}/build/package-rpm",
+      "cacheVariables": { "CMAKE_INSTALL_LIBDIR": "lib64" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "package-deb", "configurePreset": "package-deb" },
+    { "name": "package-rpm", "configurePreset": "package-rpm" }
+  ],
+  "packagePresets": [
+    { "name": "package-deb", "configurePreset": "package-deb", "generators": ["DEB", "TGZ"] },
+    { "name": "package-rpm", "configurePreset": "package-rpm", "generators": ["RPM"] }
+  ]
+}

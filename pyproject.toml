@@ -1,21 +1,48 @@
 [build-system]
-requires = ["scikit-build-core>=0.10", "nanobind>=2.4"]
+requires = ["scikit-build-core>=0.11", "nanobind>=2.4"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "ernie"
-version = "0.1.0"
+# From `project(Ernie VERSION ...)` in CMakeLists.txt; see tool.scikit-build.metadata.version.
+dynamic = ["version"]
 description = "Efficient Renderer for Natural and Interplanetary Environments: a spectral Vulkan renderer with a USD-style scene and batched cameras"
 readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "Alex Maietta" }]
 requires-python = ">=3.12"
 dependencies = ["numpy>=1.26"]
+keywords = [
+    "rendering",
+    "spectral",
+    "vulkan",
+    "planetary",
+    "space",
+    "sensor-simulation",
+    "reinforcement-learning",
+    "robotics",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Multimedia :: Graphics :: 3D Rendering",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "Topic :: Scientific/Engineering :: Physics",
+]
 
 [project.optional-dependencies]
-test = ["pytest>=8"]
+test = ["pytest>=8", "pillow"]
 # Demos whose GPU kernels drive the scene (demos/python/demo_gpu_*.py).
 demos = ["warp-lang>=1.0"]
 
 [tool.scikit-build]
+minimum-version = "build-system.requires"
 cmake.version = ">=3.22"
 cmake.build-type = "Release"
 # Inside the repository, like Ernie's other builds.
@@ -25,10 +52,37 @@ wheel.py-api = "cp312"
 wheel.packages = []
 # Ernie's package only, not its dependencies' install rules.
 install.components = ["python"]
-sdist.exclude = ["build", "dist", ".venv"]
+sdist.exclude = ["build", "dist", ".venv", "assets"]
+
+# One version for the C++ project, its packages and the wheel.
+[tool.scikit-build.metadata.version]
+provider = "scikit_build_core.metadata.regex"
+input = "CMakeLists.txt"
+regex = 'project\(\s*Ernie\s+VERSION\s+(?P<value>[0-9]+\.[0-9]+\.[0-9]+)'
 
 [tool.scikit-build.cmake.define]
 ERNIE_BUILD_PYTHON = "ON"
 ERNIE_BUILD_TESTS = "OFF"
 ERNIE_BUILD_DEMOS = "OFF"
-ERNIE_BUILD_APP = "OFF"
+# The viewer (ernie.app), with GLFW linked in: the windowing libraries load only when a window opens.
+ERNIE_BUILD_APP = "ON"
+ERNIE_USE_SYSTEM_GLFW = "OFF"
+# The module links Ernie statically; libernie and the C++ install rules are for packages.
+ERNIE_INSTALL = "OFF"
+
+# Release wheels (cibuildwheel): one stable-ABI wheel per architecture, built in manylinux_2_34,
+# the oldest base Slang's prebuilt library runs on (GCC 11's libstdc++), and tested on lavapipe.
+[tool.cibuildwheel]
+build = "cp312-*"
+skip = "*-musllinux_*"
+manylinux-x86_64-image = "manylinux_2_34"
+manylinux-aarch64-image = "manylinux_2_34"
+build-verbosity = 1
+test-extras = ["test"]
+test-command = "VK_DRIVER_FILES=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n 1) python -m pytest -q -p no:cacheprovider {project}/ernie/test/python"
+
+[tool.cibuildwheel.linux]
+# The viewer's window system headers to build; Mesa's lavapipe to test.
+before-all = "dnf install -y -q --enablerepo=crb libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel libXext-devel wayland-devel wayland-protocols-devel libxkbcommon-devel mesa-vulkan-drivers vulkan-loader"
+# Slang's runtime is already in the wheel beside the module, found through $ORIGIN.
+repair-wheel-command = "auditwheel repair --exclude 'libslang-*' -w {dest_dir} {wheel}"

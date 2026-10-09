@@ -1,0 +1,24 @@
+/* The symbols libernie exports on Linux (ErnieInstall.cmake): Ernie's own, with their vtables and
+   type info, and Dear ImGui's and ImPlot's for viewer panels. Everything else, the third-party
+   libraries linked in, stays local. Patterns match demangled names; `?` stands for the spaces in
+   names like "vtable for ernie::Panel". */
+{
+  global:
+    extern "C++" {
+      ernie::*;
+      std::*ernie::*;
+      typeinfo?for?ernie::*;
+      typeinfo?name?for?ernie::*;
+      vtable?for?ernie::*;
+      VTT?for?ernie::*;
+      guard?variable?for?ernie::*;
+      ImGui*;
+      ImDraw*;
+      ImFont*;
+      ImPlot*;
+      GImGui;
+      GImPlot;
+    };
+  local:
+    *;
+};

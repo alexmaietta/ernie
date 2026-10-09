@@ -21,6 +21,7 @@ Options:
   --renderer NAME   Render backend to start with (default: raster)
   --validation      Enable the Vulkan validation layer when installed
   --vsync           Wait for the display's refresh (default: draw as fast as possible)
+  --version         Show Ernie's version and exit
   -h, --help        Show this help and exit
 )";
 
@@ -53,6 +54,10 @@ int main(int argc, char** argv) {
         const std::string_view arg = argv[i];
         if (arg == "-h" || arg == "--help") {
             std::fputs(kUsage, stdout);
+            return 0;
+        }
+        if (arg == "--version") {
+            std::puts("ernie " ERNIE_VERSION);
             return 0;
         }
         if (arg == "--validation") {

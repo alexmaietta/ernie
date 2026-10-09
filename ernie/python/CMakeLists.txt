@@ -35,20 +35,10 @@ if(SKBUILD)
         DESTINATION ernie
         COMPONENT python)
     set_target_properties(_ernie PROPERTIES INSTALL_RPATH "$ORIGIN")
-    get_target_property(slang_library slang::slang IMPORTED_LOCATION_RELEASE)
-    if(NOT slang_library)
-        get_target_property(slang_library slang::slang IMPORTED_LOCATION)
-    endif()
-    get_filename_component(slang_library_dir "${slang_library}" DIRECTORY)
-    file(
-        GLOB
-        slang_runtime
-        "${slang_library_dir}/libslang-compiler.so.*"
-        "${slang_library_dir}/libslang-glslang-*.so"
-        "${slang_library_dir}/libslang-compiler*.dylib"
-        "${slang_library_dir}/libslang-glslang-*.dylib")
+    include("${PROJECT_SOURCE_DIR}/cmake/ErnieLicenses.cmake")
+    ernie_install_licenses(ernie/licenses python)
     install(
-        FILES ${slang_runtime}
+        FILES ${ERNIE_SLANG_RUNTIME}
         DESTINATION ernie
         COMPONENT python)
 endif()

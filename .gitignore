@@ -4,6 +4,8 @@ dist/
 CMakeUserPresets.json
 
 TODO*.md
+# Test assets and demo scenes, kept out of the repository for now.
+assets/
 .vscode/
 .venv/
 

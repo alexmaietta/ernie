@@ -26,7 +26,19 @@ FetchContent_Declare(
     URL "https://cdn.jsdelivr.net/npm/lucide-static@${ERNIE_DEP_VERSION_lucide}/font/lucide.ttf"
     URL_HASH SHA256=${ERNIE_DEP_HASH_lucide}
     DOWNLOAD_NO_EXTRACT TRUE)
-FetchContent_MakeAvailable(ernie_font_inter ernie_font_lucide)
+# Their licenses, which go with the fonts wherever they are redistributed (ErnieInstall.cmake).
+FetchContent_Declare(
+    ernie_font_inter_license
+    URL "https://raw.githubusercontent.com/rsms/inter/${ERNIE_DEP_VERSION_inter}/LICENSE.txt"
+    URL_HASH SHA256=262481e844521b326f5ecd053e59b98c8b2da78c8ee1bdbb6e8174305e54935a
+    DOWNLOAD_NO_EXTRACT TRUE)
+FetchContent_Declare(
+    ernie_font_lucide_license
+    URL "https://cdn.jsdelivr.net/npm/lucide-static@${ERNIE_DEP_VERSION_lucide}/LICENSE"
+    URL_HASH SHA256=b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57
+    DOWNLOAD_NO_EXTRACT TRUE)
+FetchContent_MakeAvailable(ernie_font_inter ernie_font_lucide ernie_font_inter_license
+                           ernie_font_lucide_license)
 
 # The fonts are compiled into the GUI as byte arrays, so it needs no data files at run time.
 set(ernie_gui_font_dir "${CMAKE_BINARY_DIR}/_deps/ernie_gui_fonts")

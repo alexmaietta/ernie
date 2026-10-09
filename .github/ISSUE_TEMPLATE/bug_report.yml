@@ -1,0 +1,58 @@
+name: Bug report
+description: Something renders wrongly, crashes, or doesn't build.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead. Screenshots help with rendering bugs.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: The smallest scene or script that shows it (Python or C++), or the commands for a build failure.
+      render: python
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Ernie version
+      description: "`ernie --version`, `python -c 'import importlib.metadata as m; print(m.version(\"ernie\"))'`, or the commit"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installed from
+      options:
+        - pip
+        - DEB / RPM / TGZ package
+        - Built from source
+        - Docker image
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Ubuntu 24.04
+    validations:
+      required: true
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU and driver
+      description: "`vulkaninfo --summary` shows both; lavapipe counts too."
+      placeholder: NVIDIA RTX 4080, driver 580.65
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log output
+      description: Errors, stack traces, or Vulkan validation messages.
+      render: text

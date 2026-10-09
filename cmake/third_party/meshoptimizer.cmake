@@ -6,6 +6,9 @@ mark_as_advanced(ERNIE_DEP_VERSION_meshoptimizer)
 # meshoptimizer (MIT), for the simplified levels of detail of instanced meshes.
 include(FetchContent)
 
+# Linked into Ernie's libraries, not installed beside them.
+set(MESHOPT_INSTALL OFF)
+
 FetchContent_Declare(
     meshoptimizer
     GIT_REPOSITORY https://github.com/zeux/meshoptimizer.git

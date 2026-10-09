@@ -43,3 +43,19 @@ find_package(
 
 # Visible to applications that install Slang's runtime library beside their binaries.
 set_target_properties(slang::slang PROPERTIES IMPORTED_GLOBAL TRUE)
+
+# The files of Slang's runtime that Ernie's binaries need beside them: the compiler library and the
+# glslang library it loads at run time.
+get_target_property(slang_library slang::slang IMPORTED_LOCATION_RELEASE)
+if(NOT slang_library)
+    get_target_property(slang_library slang::slang IMPORTED_LOCATION)
+endif()
+get_filename_component(slang_library_dir "${slang_library}" DIRECTORY)
+file(
+    GLOB
+    ERNIE_SLANG_RUNTIME
+    "${slang_library_dir}/libslang-compiler.so.*"
+    "${slang_library_dir}/libslang-glslang-*.so"
+    "${slang_library_dir}/libslang-compiler*.dylib"
+    "${slang_library_dir}/libslang-glslang-*.dylib")
+set(ERNIE_SLANG_RUNTIME_DIR "${slang_library_dir}")

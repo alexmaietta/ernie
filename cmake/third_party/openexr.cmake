@@ -20,6 +20,11 @@ set(OPENEXR_TEST_TOOLS OFF)
 set(OPENEXR_TEST_PYTHON OFF)
 set(OPENEXR_FORCE_INTERNAL_IMATH ON)
 set(OPENEXR_FORCE_INTERNAL_DEFLATE ON)
+# Built in rather than the system's libzstd and OpenJPH, which would otherwise become run-time
+# dependencies of Ernie's libraries, wheels and packages.
+set(OPENEXR_FORCE_INTERNAL_ZSTD ON)
+set(OPENEXR_FORCE_INTERNAL_OPENJPH ON)
+set(IMATH_INSTALL_PKG_CONFIG OFF)
 set(IMATH_INSTALL OFF)
 set(BUILD_SHARED_LIBS OFF)
 

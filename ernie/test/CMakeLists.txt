@@ -96,6 +96,17 @@ if(TARGET _ernie)
     endif()
 endif()
 
+# An application built against the installed Ernie (find_package, Ernie::ernie).
+if(ERNIE_INSTALL)
+    add_test(
+        NAME ernie.install.consumer
+        COMMAND
+            "${CMAKE_COMMAND}" "-DBUILD_DIR=${CMAKE_BINARY_DIR}"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/install_test" "-DGENERATOR=${CMAKE_GENERATOR}"
+            "-DCONFIG=$<CONFIG>" -P "${CMAKE_CURRENT_SOURCE_DIR}/install/run_install_test.cmake")
+    set_tests_properties(ernie.install.consumer PROPERTIES LABELS install)
+endif()
+
 if(TARGET ernie_app)
     ernie_add_test_suite(
         app

@@ -23,8 +23,24 @@ jobs:
           python-version: "3.12"
       - uses: pre-commit/action@v3.0.1
 
+  # Ernie built from source and every test (C++, GPU, Python, the install test and the README's
+  # examples) on lavapipe, with GCC and Clang.
   test:
+    name: test (${{ matrix.compiler }})
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: gcc
+            cc: gcc
+            cxx: g++
+          - compiler: clang
+            cc: clang
+            cxx: clang++
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
     steps:
       - uses: actions/checkout@v4
       - name: Install Vulkan (lavapipe, validation layers) and the app's window system headers
@@ -37,44 +53,115 @@ jobs:
       - name: Python environment
         run: |
           uv venv --python 3.12
-          uv pip install numpy pytest nanobind
+          uv pip install numpy pytest pillow nanobind
       - uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: test-${{ runner.os }}
+          key: test-${{ matrix.compiler }}
+      # The fetched dependencies' sources (Slang alone is hundreds of MB), keyed on their pins.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .deps/*-src
+            .deps/*-subbuild
+          key: deps-${{ hashFiles('cmake/third_party/**') }}
       - name: Configure
         run: >
           cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
           -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          "-DFETCHCONTENT_BASE_DIR=$PWD/.deps"
           -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
-          -DPython_EXECUTABLE=$PWD/.venv/bin/python
+          "-DPython_EXECUTABLE=$PWD/.venv/bin/python"
       - name: Build
-        run: cmake --build build -j
+        run: cmake --build build --parallel "$(nproc)"
       - name: Test on lavapipe
         run: |
-          export VK_DRIVER_FILES=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n1)
-          export VK_ICD_FILENAMES=$VK_DRIVER_FILES
+          VK_DRIVER_FILES=$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' | head -n1)
+          export VK_DRIVER_FILES VK_ICD_FILENAMES=$VK_DRIVER_FILES
           xvfb-run -a ctest --test-dir build --output-on-failure -j4 --timeout 900
 
+  # The release wheels: manylinux_2_34, one per architecture, each tested on lavapipe
+  # (configuration in pyproject.toml, [tool.cibuildwheel]).
   wheel:
+    name: wheel (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pypa/cibuildwheel@v4.3.0
+        with:
+          output-dir: wheelhouse
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-linux-${{ matrix.arch }}
+          path: wheelhouse/*.whl
+
+  sdist:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install Vulkan (lavapipe, validation layers)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build mesa-vulkan-drivers vulkan-validationlayers libvulkan1
       - uses: astral-sh/setup-uv@v6
-      - name: Build the wheel
-        run: uv build --wheel --out-dir dist .
-      - name: Test the installed wheel on lavapipe
+      - name: Build and check the sdist
         run: |
-          uv venv --python 3.12 wheel-venv
-          uv pip install --python wheel-venv/bin/python dist/*.whl pytest
-          export VK_DRIVER_FILES=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n1)
-          export VK_ICD_FILENAMES=$VK_DRIVER_FILES
-          cd "$RUNNER_TEMP" && "$GITHUB_WORKSPACE/wheel-venv/bin/python" -m pytest -q \
-            -p no:cacheprovider "$GITHUB_WORKSPACE/ernie/test/python"
+          uv build --sdist --out-dir dist .
+          uvx twine check --strict dist/*
       - uses: actions/upload-artifact@v4
         with:
-          name: wheel-linux-x86_64
-          path: dist/*.whl
+          name: sdist
+          path: dist/*.tar.gz
+
+  # DEB, RPM and TGZ packages, built in manylinux_2_34 as releases are (tools/packaging/).
+  packages:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the packages
+        run: >
+          docker run --rm -e "OWNER=$(id -u):$(id -g)" -v "$PWD":/src -w /src
+          quay.io/pypa/manylinux_2_34_x86_64 tools/packaging/build_packages.sh
+      - name: Collect the packages
+        run: |
+          mkdir packages
+          cp build/package-deb/packages/*.deb build/package-deb/packages/*.tar.gz \
+            build/package-rpm/packages/*.rpm packages/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-linux-x86_64
+          path: packages/*
+
+  # The packages installed on clean systems: the viewer runs, and an application built with
+  # find_package(Ernie) renders on lavapipe.
+  package-test:
+    name: package-test (${{ matrix.image }})
+    needs: packages
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: ubuntu:22.04
+            script: test_deb.sh
+          - image: ubuntu:24.04
+            script: test_deb.sh
+          - image: debian:12
+            script: test_deb.sh
+          - image: rockylinux:9
+            script: test_rpm.sh
+          - image: fedora:latest
+            script: test_rpm.sh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages-linux-x86_64
+          path: packages
+      - name: Install and use the packages
+        run: >
+          docker run --rm -v "$PWD":/src:ro -v "$PWD/packages":/pkgs:ro ${{ matrix.image }}
+          /src/tools/packaging/${{ matrix.script }}

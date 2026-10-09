@@ -19,11 +19,18 @@ set(TRACY_ENABLE
 set(TRACY_ON_DEMAND
     ON
     CACHE BOOL "" FORCE)
+# Tracy's install rules have no switch; leaving its directory out of `all` (CMake 3.28+) keeps
+# them out of Ernie's install.
+set(tracy_exclude_from_all)
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
+    set(tracy_exclude_from_all EXCLUDE_FROM_ALL)
+endif()
 FetchContent_Declare(
     tracy
     GIT_REPOSITORY https://github.com/wolfpld/tracy.git
     GIT_TAG ${ERNIE_DEP_VERSION_tracy}
-    GIT_SHALLOW TRUE)
+    GIT_SHALLOW TRUE
+    ${tracy_exclude_from_all})
 FetchContent_MakeAvailable(tracy)
 set_target_properties(TracyClient PROPERTIES POSITION_INDEPENDENT_CODE ON
                                              COMPILE_WARNING_AS_ERROR OFF)
