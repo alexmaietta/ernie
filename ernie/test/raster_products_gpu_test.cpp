@@ -678,6 +678,41 @@ TEST_F(RasterDelegateTest, TheMars2020NavcamPairSeesInStereo) {
     EXPECT_NEAR(disparity, 0.424 * left.FocalLengthPixels() / 4.0, 1.5);
 }
 
+TEST_F(RasterDelegateTest, MastcamZsNearInfraredFiltersSeeTheSunsBlackBody) {
+    // Mastcam-Z's right camera (Bell et al. 2021, Table 3) through R1 (800 +/- 9 nm) and R6
+    // (1022 +/- 19 nm) over grey ground under a black-body sun at Mars's irradiance: both see it,
+    // R6 the dimmer, silicon nearly blind at 1 um despite its band twice as wide.
+    const auto meanElectrons = [&](int filter) {
+        Scene scene = FlatScene();
+        scene.Set("/World/Sun", tokens::kLightIrradiance, 590.0);
+        ernie::AuthorMastcamZ(scene, "/World/Camera", "/Render/Product", ernie::MastcamZEye::Right,
+                              filter);
+        scene.Set("/World/Camera", tokens::kSensorNoise, false);
+        // The 32 x 32 image bins the detector's pixels about 37 x 37: a short exposure.
+        scene.Set("/World/Camera", tokens::kExposureTime, 2e-6);
+        // A narrow band's sensor numbers; it has no colour to show.
+        scene.Set("/Render/Product", tokens::kOrderedVars,
+                  std::vector<Path>{"/Render/Vars/Electrons", "/Render/Vars/RawDN"});
+        RasterDelegate delegate(*context_);
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const auto vars = MapVars(outputs);
+        double sum = 0.0;
+        for (std::size_t row = 0; row < kVarSize; ++row) {
+            for (std::size_t col = 0; col < kVarSize; ++col) {
+                const float e = At<float>(vars.at("Electrons"), row, col);
+                EXPECT_LT(e, 21818.0f) << "below the full well";
+                sum += e;
+            }
+        }
+        return sum / (kVarSize * kVarSize);
+    };
+    const double r1 = meanElectrons(1);
+    const double r6 = meanElectrons(6);
+    EXPECT_GT(r1, 100.0);
+    EXPECT_GT(r6, 0.0);
+    EXPECT_LT(r6, 0.5 * r1);
+}
+
 TEST_F(RasterDelegateTest, FisheyeSeesFieldAnglesInProportionToRadius) {
     // 50 above flat ground looking straight down: a ray at field angle theta meets it
     // 50 / cos(theta) away. Equidistant, a pixel's theta is its radius over the focal length.

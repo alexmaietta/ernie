@@ -1,7 +1,11 @@
 #include "ernie/scene/instruments.h"
 
+#include "ernie/scene/camera.h"
 #include "ernie/scene/tokens.h"
 
+#include <glm/gtc/matrix_transform.hpp>
+
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 #include <string>
@@ -231,6 +235,172 @@ void AuthorMars2020Navcam(Scene& scene, const Path& camera, const Path& product,
         filters.push_back(path);
     }
     scene.GetPrim(product).Set(kFilters, filters);
+}
+
+MastcamZ::Filter MastcamZ::FilterOf(MastcamZEye eye, int filter) {
+    // Bell et al. 2021, Table 3: effective wavelength and HWHM, nm (filter 0 by its green
+    // channel; filter 7 with its neutral density).
+    static constexpr Filter kLeft[8] = {{544.0, 41.0, 0.0}, {800.0, 9.0, 0.0},
+                                        {754.0, 10.0, 0.0}, {677.0, 11.0, 0.0},
+                                        {605.0, 9.0, 0.0},  {528.0, 11.0, 0.0},
+                                        {442.0, 12.0, 0.0}, {590.0, 88.0, 6.0}};
+    static constexpr Filter kRight[8] = {{544.0, 42.0, 0.0}, {800.0, 9.0, 0.0},
+                                         {866.0, 10.0, 0.0}, {910.0, 12.0, 0.0},
+                                         {939.0, 12.0, 0.0}, {978.0, 10.0, 0.0},
+                                         {1022.0, 19.0, 0.0}, {880.0, 10.0, 5.0}};
+    if (filter < 0 || filter > 7) {
+        throw std::invalid_argument("Mastcam-Z's filter wheels hold filters 0 to 7");
+    }
+    return (eye == MastcamZEye::Left ? kLeft : kRight)[filter];
+}
+
+std::array<MastcamZ::Filter, 3> MastcamZ::BayerOf(MastcamZEye eye) {
+    // Table 3, L0/R0: red, green, blue.
+    if (eye == MastcamZEye::Left) {
+        return {{{630.0, 43.0, 0.0}, {544.0, 41.0, 0.0}, {480.0, 46.0, 0.0}}};
+    }
+    return {{{631.0, 43.0, 0.0}, {544.0, 42.0, 0.0}, {480.0, 46.0, 0.0}}};
+}
+
+double MastcamZ::FNumberAt(double focalLengthMm) {
+    const double t = (focalLengthMm - kShortestFocalMm) / (kLongestFocalMm - kShortestFocalMm);
+    return kWidestFNumber + t * (kNarrowestFNumber - kWidestFNumber);
+}
+
+double MastcamZ::FullWellElectrons(MastcamZEye eye) {
+    return eye == MastcamZEye::Left ? 21826.0 : 21818.0;  // Table 5
+}
+
+double MastcamZ::ReadNoiseElectrons(MastcamZEye eye) {
+    return eye == MastcamZEye::Left ? 22.0 : 21.0;  // Table 5
+}
+
+void AuthorMastcamZ(Scene& scene, const Path& camera, const Path& product, MastcamZEye eye,
+                    int filter, double focalLengthMm, BayerPattern pattern) {
+    using namespace tokens;
+    if (!scene.Has(camera) || scene.TypeOf(camera) != kCamera) {
+        throw std::invalid_argument("'" + camera.String() + "' is not a Camera");
+    }
+    if (!scene.Has(product) || scene.TypeOf(product) != kRenderProduct) {
+        throw std::invalid_argument("'" + product.String() + "' is not a RenderProduct");
+    }
+    if (focalLengthMm < MastcamZ::kShortestFocalMm || focalLengthMm > MastcamZ::kLongestFocalMm) {
+        throw std::invalid_argument("Mastcam-Z zooms from 26 to 110 mm");
+    }
+    const MastcamZ::Filter passband = MastcamZ::FilterOf(eye, filter);
+    using Z = MastcamZ;
+    // Bell et al. 2021, Table 5.
+    Prim prim = scene.GetPrim(camera);
+    prim.Set(kProjection, std::string(kPerspective))
+        .Set(kLensProjection, std::string(kPerspective))
+        .Set(kLensDistortion, std::vector<float>{0.0f, 0.0f, 0.0f, 0.0f, 0.0f})
+        .Set(kFocalLength, focalLengthMm)
+        .Set(kVerticalAperture, 1e-3 * Z::kPixelPitchUm * Z::kHeight)
+        .Set(kHorizontalAperture, 1e-3 * Z::kPixelPitchUm * Z::kWidth)
+        .Set(kExposureFStop, Z::FNumberAt(focalLengthMm))
+        .Set(kExposureIso, 100.0)  // the gain is the ADC's, at ISO 100
+        .Set(kSensorGain, Z::kElectronsPerDn)
+        .Set(kSensorReadNoise, Z::ReadNoiseElectrons(eye))
+        .Set(kSensorFullWell, Z::FullWellElectrons(eye))
+        .Set(kSensorAdcBits, Z::kAdcBits)
+        .Set(kSensorBlackLevel, 0.0)
+        .Set(kSensorNoise, true);
+
+    std::vector<std::pair<const char*, const char*>> steps;
+    if (filter == 0) {
+        // The Bayer channels as Gaussians of Table 3's half widths at the ~40% peak, every
+        // 5 nm over the visible.
+        const std::array<MastcamZ::Filter, 3> bayer = MastcamZ::BayerOf(eye);
+        const char* names[3] = {"r", "g", "b"};
+        for (int c = 0; c < 3; ++c) {
+            const double sigma = bayer[c].hwhmNm / std::sqrt(2.0 * std::log(2.0));
+            std::vector<float> curve;
+            for (double w = 380.0; w <= 780.0; w += 5.0) {
+                const double x = (w - bayer[c].effectiveNm) / sigma;
+                curve.push_back(static_cast<float>(w));
+                curve.push_back(static_cast<float>(Z::kPeakQe * std::exp(-0.5 * x * x)));
+            }
+            prim.Set(std::string(kSensorQePrefix) + names[c], curve);
+        }
+        prim.Set(kSensorType, std::string("rgb"))
+            .Set(kSpectralRange, glm::dvec2(380.0, 780.0))
+            .Set(kSpectralBands, 16);
+        steps = {{"Qe", "qe"},   {"Bayer", "bayer"},       {"Noise", "noise"},
+                 {"Adc", "adc"}, {"Demosaic", "demosaic"}};
+    } else {
+        // The passband on the detector's response (Ernie's generic silicon curve scaled to the
+        // ~40% peak), its edges ramped over 2 nm about the half maxima so its area is the FWHM's.
+        const Spectrum silicon = SensorModel::Mono().channels.front().quantumEfficiency;
+        double siliconPeak = 0.0;
+        for (double w = 350.0; w <= 1100.0; w += 1.0) {
+            siliconPeak = std::max(siliconPeak, silicon(w));
+        }
+        const double transmission = std::pow(10.0, -passband.neutralDensity);
+        const double low = passband.effectiveNm - passband.hwhmNm;
+        const double high = passband.effectiveNm + passband.hwhmNm;
+        std::vector<float> curve;
+        const auto add = [&](double w, double inBand) {
+            curve.push_back(static_cast<float>(w));
+            curve.push_back(
+                static_cast<float>(inBand * transmission * Z::kPeakQe * silicon(w) / siliconPeak));
+        };
+        add(low - 1.0, 0.0);
+        for (double w = low + 1.0; w <= high - 1.0 + 1e-9; w += std::max(1.0, (high - low - 2.0) / 8.0)) {
+            add(w, 1.0);
+        }
+        add(high + 1.0, 0.0);
+        prim.Set(kSensorType, std::string("mono"))
+            .Set(std::string(kSensorQePrefix) + "mono", curve)
+            .Set(kSpectralRange, glm::dvec2(low - 1.0, high + 1.0))
+            .Set(kSpectralBands, 4);
+        steps = {{"Qe", "qe"}, {"Noise", "noise"}, {"Adc", "adc"}};
+    }
+
+    std::vector<Path> filters;
+    for (const auto& [name, type] : steps) {
+        const Path path = product.Child("MastcamZ").Child(name);
+        if (scene.Has(path)) {
+            scene.Remove(path);
+        }
+        Prim step = scene.Define(path, kSensorFilter);
+        step.Set(kFilterType, std::string(type));
+        if (std::string(type) == "bayer" || std::string(type) == "demosaic") {
+            step.Set("inputs:pattern", static_cast<double>(pattern));
+        }
+        filters.push_back(path);
+    }
+    scene.GetPrim(product).Set(kFilters, filters);
+}
+
+void AuthorMastcamZPair(Scene& scene, const Path& rig, const Path& leftProduct,
+                        const Path& rightProduct, int leftFilter, int rightFilter,
+                        double focalLengthMm, BayerPattern pattern) {
+    using namespace tokens;
+    if (!scene.Has(rig)) {
+        scene.Define(rig, kXform);
+    }
+    const double half = 0.5 * MastcamZ::kBaselineM;
+    const double toeIn = MastcamZ::kToeInDeg * M_PI / 180.0;
+    struct Eye {
+        const char* name;
+        MastcamZEye eye;
+        double x;
+        double yaw;  // about the rig's +y: the left camera turns towards +x, the right to -x
+        const Path* product;
+        int filter;
+    };
+    const Eye eyes[] = {{"Left", MastcamZEye::Left, -half, -toeIn, &leftProduct, leftFilter},
+                        {"Right", MastcamZEye::Right, half, toeIn, &rightProduct, rightFilter}};
+    for (const Eye& eye : eyes) {
+        const Path camera = rig.Child(eye.name);
+        if (!scene.Has(camera)) {
+            scene.Define(camera, kCamera);
+        }
+        glm::dmat4 pose = glm::rotate(glm::dmat4(1.0), eye.yaw, glm::dvec3(0.0, 1.0, 0.0));
+        pose[3] = glm::dvec4(eye.x, 0.0, 0.0, 1.0);
+        scene.GetPrim(camera).Set(kTransform, pose);
+        AuthorMastcamZ(scene, camera, *eye.product, eye.eye, eye.filter, focalLengthMm, pattern);
+    }
 }
 
 void AuthorMars2020NavcamPair(Scene& scene, const Path& rig, const Path& leftProduct,

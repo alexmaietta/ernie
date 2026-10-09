@@ -431,3 +431,61 @@ TEST(Mars2020Navcam, AuthorsAStereoPairAsPublished) {
     EXPECT_EQ(scene.Get<double>("/Right/Mars2020Navcam/Bayer", "inputs:pattern", -1.0), 2.0);
     EXPECT_EQ(scene.Get<double>("/Right/Mars2020Navcam/Jpeg", "inputs:quality", -1.0), 60.0);
 }
+
+TEST(MastcamZ, AuthorsTheFilterWheelsAndStereoRigAsPublished) {
+    ernie::Scene scene;
+    scene.Define("/Left", ernie::tokens::kRenderProduct);
+    scene.Define("/Right", ernie::tokens::kRenderProduct);
+    ernie::AuthorMastcamZPair(scene, "/Rover/MastcamZ", "/Left", "/Right", 0, 6, 110.0);
+    using Z = ernie::MastcamZ;
+    const ernie::Camera left = ernie::CameraOf(scene, "/Rover/MastcamZ/Left", Z::kWidth, Z::kHeight);
+    const ernie::Camera right =
+        ernie::CameraOf(scene, "/Rover/MastcamZ/Right", Z::kWidth, Z::kHeight);
+    EXPECT_NO_THROW(left.Check());
+    EXPECT_NO_THROW(right.Check());
+    // Bell et al. 2021, Table 5 and the text: 7.4 um pixels, f/9.5 at 110 mm, 24.4 cm apart and
+    // toed in 2.3 degrees between them.
+    EXPECT_NEAR(right.PixelPitchMetres(), 7.4e-6, 1e-12);
+    EXPECT_DOUBLE_EQ(right.focalLengthMm, 110.0);
+    EXPECT_NEAR(right.fStop, 9.5, 1e-12);
+    EXPECT_NEAR(Z::FNumberAt(26.0), 6.7, 1e-12);
+    EXPECT_NEAR(glm::length(glm::dvec3(right.transform[3] - left.transform[3])), 0.244, 1e-12);
+    const glm::dvec3 leftLook = -glm::dvec3(left.transform[2]);
+    const glm::dvec3 rightLook = -glm::dvec3(right.transform[2]);
+    EXPECT_NEAR(std::acos(glm::dot(leftLook, rightLook)) * 180.0 / M_PI, 2.3, 1e-9);
+    EXPECT_GT(leftLook.x, 0.0) << "toed in";
+    EXPECT_LT(rightLook.x, 0.0);
+    EXPECT_NEAR(left.sensor.ElectronsPerDn(left.iso), 15.6, 1e-12);
+    EXPECT_DOUBLE_EQ(left.sensor.readNoiseElectrons, 22.0);
+    EXPECT_DOUBLE_EQ(right.sensor.fullWellElectrons, 21818.0);
+    EXPECT_EQ(right.sensor.adcBits, 11);
+
+    // Filter 0: RGB, Table 3's Bayer channels peaking at ~40%.
+    ASSERT_EQ(left.sensor.channels.size(), 3u);
+    EXPECT_NEAR(left.sensor.channels[0].quantumEfficiency(630.0), 0.40, 1e-3);
+    EXPECT_NEAR(left.sensor.channels[0].quantumEfficiency(630.0 + 43.0), 0.20, 2e-3)
+        << "half maximum at the half width";
+    EXPECT_NEAR(left.sensor.channels[2].quantumEfficiency(480.0), 0.40, 1e-3);
+    // R6: 1022 +/- 19 nm, on silicon's falling near-IR response.
+    ASSERT_EQ(right.sensor.channels.size(), 1u);
+    const ernie::Spectrum& r6 = right.sensor.channels[0].quantumEfficiency;
+    EXPECT_GT(r6(1022.0), 0.0);
+    EXPECT_LT(r6(1022.0), 0.1) << "silicon is nearly blind at 1 um";
+    EXPECT_EQ(r6(980.0), 0.0f);
+    EXPECT_EQ(r6(1065.0), 0.0f);
+    EXPECT_NEAR(right.bands.minNm, 1002.0, 1e-9);
+    EXPECT_NEAR(right.bands.maxNm, 1042.0, 1e-9);
+    // Every filter of both wheels, as Table 3 lists them.
+    const double table[2][8] = {{544, 800, 754, 677, 605, 528, 442, 590},
+                                {544, 800, 866, 910, 939, 978, 1022, 880}};
+    for (int f = 0; f < 8; ++f) {
+        EXPECT_EQ(Z::FilterOf(ernie::MastcamZEye::Left, f).effectiveNm, table[0][f]);
+        EXPECT_EQ(Z::FilterOf(ernie::MastcamZEye::Right, f).effectiveNm, table[1][f]);
+    }
+    EXPECT_EQ(Z::FilterOf(ernie::MastcamZEye::Left, 7).neutralDensity, 6.0);
+    EXPECT_EQ(Z::FilterOf(ernie::MastcamZEye::Right, 7).neutralDensity, 5.0);
+    EXPECT_THROW(Z::FilterOf(ernie::MastcamZEye::Left, 8), std::invalid_argument);
+    EXPECT_THROW(ernie::AuthorMastcamZ(scene, "/Rover/MastcamZ/Left", "/Left",
+                                       ernie::MastcamZEye::Left, 1, 120.0),
+                 std::invalid_argument);
+}

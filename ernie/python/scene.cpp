@@ -1039,6 +1039,46 @@ void BindScene(nb::module_& m) {
         "The Navcam stereo pair on Xform `rig` (defined if missing; pose it as the cameras' "
         "frame, looking down -z with +y up): Cameras `rig`/Left and `rig`/Right 42.4 cm apart "
         "along x, each as `author_mars2020_navcam` with its product.");
+    m.def(
+        "author_mastcamz",
+        [bayerPattern](Scene& scene, const std::string& camera, const std::string& product,
+                       const std::string& eye, int filter, double focalLength,
+                       const std::string& pattern) {
+            if (eye != "left" && eye != "right") {
+                throw nb::value_error("eye must be 'left' or 'right'");
+            }
+            try {
+                AuthorMastcamZ(scene, Path(camera), Path(product),
+                               eye == "left" ? MastcamZEye::Left : MastcamZEye::Right, filter,
+                               focalLength, bayerPattern(pattern));
+            } catch (const std::invalid_argument& error) {
+                throw nb::value_error(error.what());
+            }
+        },
+        nb::arg("scene"), nb::arg("camera"), nb::arg("product"), nb::arg("eye") = "left",
+        nb::arg("filter") = 0, nb::arg("focal_length") = 26.0, nb::arg("pattern") = "rggb",
+        "Authors one Mastcam-Z camera through filter `filter` as Bell et al. 2021 publish it "
+        "(Tables 3 and 5): the KAI-2020CM (1600 x 1200 pixels of 7.4 um, 15.6 e-/DN, 11-bit) "
+        "behind the zoom at `focal_length` (26 to 110 mm). Filter 0 is the Bayer RGB; 1 to 6 "
+        "the narrow bands (the left eye's 442 to 800 nm, the right's 800 to 1022 nm); 7 the "
+        "neutral-density solar filter.");
+    m.def(
+        "author_mastcamz_pair",
+        [bayerPattern](Scene& scene, const std::string& rig, const std::string& left,
+                       const std::string& right, int leftFilter, int rightFilter,
+                       double focalLength, const std::string& pattern) {
+            try {
+                AuthorMastcamZPair(scene, Path(rig), Path(left), Path(right), leftFilter,
+                                   rightFilter, focalLength, bayerPattern(pattern));
+            } catch (const std::invalid_argument& error) {
+                throw nb::value_error(error.what());
+            }
+        },
+        nb::arg("scene"), nb::arg("rig"), nb::arg("left_product"), nb::arg("right_product"),
+        nb::arg("left_filter") = 0, nb::arg("right_filter") = 0, nb::arg("focal_length") = 26.0,
+        nb::arg("pattern") = "rggb",
+        "The Mastcam-Z pair on Xform `rig`: Cameras `rig`/Left and `rig`/Right 24.4 cm apart "
+        "along x, each toed in 1.15 degrees, through their filters.");
 
     m.def(
         "look_at_transform",

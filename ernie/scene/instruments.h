@@ -3,6 +3,7 @@
 #include "ernie/scene/path.h"
 #include "ernie/scene/scene.h"
 
+#include <array>
 #include <cstdint>
 
 namespace ernie {
@@ -148,5 +149,80 @@ void AuthorMars2020Navcam(Scene& scene, const Path& camera, const Path& product,
 void AuthorMars2020NavcamPair(Scene& scene, const Path& rig, const Path& leftProduct,
                               const Path& rightProduct, BayerPattern pattern = BayerPattern::Rggb,
                               double jpegQuality = 85.0);
+
+/// The Mars 2020 rover Perseverance's Mastcam-Z: two zoom cameras whose filter wheels hold the
+/// Bayer RGB's near-IR cut-off (filter 0), six narrow bands from 442 to 1022 nm (1 to 6) and a
+/// neutral-density solar filter (7), the left camera's bands visible and the right's reaching
+/// into the near infrared (Bell et al. 2021, Tables 3 and 5).
+enum class MastcamZEye { Left, Right };
+
+struct MastcamZ {
+    /// The KAI-2020CM's 1600 x 1200 photoactive pixels of 7.4 um.
+    static constexpr std::uint32_t kWidth = 1600;
+    static constexpr std::uint32_t kHeight = 1200;
+    static constexpr double kPixelPitchUm = 7.4;
+    static constexpr double kElectronsPerDn = 15.6;
+    static constexpr int kAdcBits = 11;
+    /// Zoom: 26 mm at f/6.7 to 110 mm at f/9.5.
+    static constexpr double kShortestFocalMm = 26.0;
+    static constexpr double kLongestFocalMm = 110.0;
+    static constexpr double kWidestFNumber = 6.7;
+    static constexpr double kNarrowestFNumber = 9.5;
+    static constexpr double kBaselineM = 0.244;
+    static constexpr double kToeInDeg = 1.15;  ///< Each camera's, 2.3 degrees between them.
+    /// The detector's peak quantum efficiency through its Bayer microlenses, ~40%.
+    static constexpr double kPeakQe = 0.40;
+
+    /// A filter's Table 3 effective wavelength and half width at half maximum, nm (for filter
+    /// 0, the green Bayer channel's), and its neutral density (filter 7's; 0 otherwise).
+    struct Filter {
+        double effectiveNm;
+        double hwhmNm;
+        double neutralDensity;
+    };
+    /// @throws std::invalid_argument for a filter outside 0 to 7.
+    static Filter FilterOf(MastcamZEye eye, int filter);
+    /// Filter 0's red, green and blue Bayer channels (Table 3).
+    static std::array<Filter, 3> BayerOf(MastcamZEye eye);
+    /// The f-number at focal length `focalLengthMm`, linearly between the zoom's ends (the
+    /// paper gives only those).
+    static double FNumberAt(double focalLengthMm);
+    static double FullWellElectrons(MastcamZEye eye);  ///< 21826 (left), 21818 (right).
+    static double ReadNoiseElectrons(MastcamZEye eye);  ///< 22 (left), 21 (right).
+};
+
+/// Authors one Mastcam-Z camera through filter `filter` as published, onto Camera `camera` and
+/// the readout chain of RenderProduct `product`:
+/// - The camera: a pinhole of `focalLengthMm` (26 to 110) over the 11.84 x 8.88 mm detector at
+///   its f-number (`MastcamZ::FNumberAt`).
+/// - Filter 0: an RGB sensor whose channels are Gaussians at Table 3's Bayer effective
+///   wavelengths and half widths, peaking at the detector's ~40%; the chain qe, bayer
+///   (`pattern`; the paper does not give the layout), noise, adc, demosaic.
+/// - Filters 1 to 7: one channel, the filter's passband (Table 3's 2 x HWHM wide about its
+///   effective wavelength, ramped over 2 nm about the half maxima, times 10^-ND for filter 7)
+///   on the detector's response, Ernie's generic silicon curve scaled to the ~40% peak (the
+///   paper publishes no curve, and the Bayer microfilters' differences in a narrow band are
+///   left out); the camera's spectral range narrowed to the passband, four bands across it; the
+///   chain qe, noise, adc.
+/// - The sensor: the KAI-2020CM's gain, read noise and full well for `eye`, an 11-bit ADC.
+/// Scene radiance past 830 nm follows what the scene gives there: materials' RGB albedo holds
+/// its 830 nm value, so give materials reflectance spectra for the near-IR bands.
+///
+/// Reference: J. F. Bell III et al., "The Mars 2020 Perseverance Rover Mast Camera Zoom
+/// (Mastcam-Z) Multispectral, Stereoscopic Imaging Investigation", Space Science Reviews 217:24,
+/// 2021, https://doi.org/10.1007/s11214-020-00755-x: Tables 3 and 5 and the focal plane section.
+/// @throws std::invalid_argument if `camera` is not a Camera, `product` not a RenderProduct,
+/// `filter` outside 0 to 7 or `focalLengthMm` outside the zoom.
+void AuthorMastcamZ(Scene& scene, const Path& camera, const Path& product, MastcamZEye eye,
+                    int filter, double focalLengthMm = MastcamZ::kShortestFocalMm,
+                    BayerPattern pattern = BayerPattern::Rggb);
+
+/// The Mastcam-Z pair on stereo rig `rig` (an Xform, defined if missing, looking down its -z with
+/// +y up): Cameras `rig`/Left and `rig`/Right 24.4 cm apart along its x, each toed in 1.15
+/// degrees, authored as `AuthorMastcamZ` through filters `leftFilter` and `rightFilter`.
+void AuthorMastcamZPair(Scene& scene, const Path& rig, const Path& leftProduct,
+                        const Path& rightProduct, int leftFilter, int rightFilter,
+                        double focalLengthMm = MastcamZ::kShortestFocalMm,
+                        BayerPattern pattern = BayerPattern::Rggb);
 
 }  // namespace ernie
