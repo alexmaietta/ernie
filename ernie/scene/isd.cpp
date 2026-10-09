@@ -1,5 +1,7 @@
 #include "ernie/scene/isd.h"
 
+#include "ernie/util/least_squares.h"
+
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -514,56 +516,6 @@ glm::dvec2 UsgscsmUndistort(glm::dvec2 d, const Distort& distort, const Jacobian
         u += glm::inverse(j) * f;
     }
     return u;
-}
-
-// The least-squares solution of the first `n` equations of normal system `normal` x = `right`,
-// scaled by its diagonal (Jacobi) for conditioning; zeros where it is singular.
-template <std::size_t N>
-std::array<double, N> SolveNormal(std::array<std::array<double, N>, N> normal,
-                                  std::array<double, N> right, std::size_t n) {
-    std::array<double, N> scale{};
-    for (std::size_t i = 0; i < n; ++i) {
-        scale[i] = normal[i][i] > 0.0 ? 1.0 / std::sqrt(normal[i][i]) : 0.0;
-    }
-    for (std::size_t i = 0; i < n; ++i) {
-        for (std::size_t j = 0; j < n; ++j) {
-            normal[i][j] *= scale[i] * scale[j];
-        }
-        right[i] *= scale[i];
-    }
-    // Gaussian elimination with partial pivoting.
-    for (std::size_t c = 0; c < n; ++c) {
-        std::size_t pivot = c;
-        for (std::size_t r = c + 1; r < n; ++r) {
-            if (std::abs(normal[r][c]) > std::abs(normal[pivot][c])) {
-                pivot = r;
-            }
-        }
-        if (std::abs(normal[pivot][c]) < 1e-300) {
-            return {};
-        }
-        std::swap(normal[c], normal[pivot]);
-        std::swap(right[c], right[pivot]);
-        for (std::size_t r = c + 1; r < n; ++r) {
-            const double factor = normal[r][c] / normal[c][c];
-            for (std::size_t j = c; j < n; ++j) {
-                normal[r][j] -= factor * normal[c][j];
-            }
-            right[r] -= factor * right[c];
-        }
-    }
-    std::array<double, N> x{};
-    for (std::size_t c = n; c-- > 0;) {
-        double sum = right[c];
-        for (std::size_t j = c + 1; j < n; ++j) {
-            sum -= normal[c][j] * x[j];
-        }
-        x[c] = sum / normal[c][c];
-    }
-    for (std::size_t i = 0; i < n; ++i) {
-        x[i] *= scale[i];
-    }
-    return x;
 }
 
 }  // namespace

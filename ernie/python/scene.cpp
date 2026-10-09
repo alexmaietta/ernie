@@ -1,5 +1,6 @@
 #include "bindings.h"
 
+#include "ernie/scene/cahvore.h"
 #include "ernie/scene/instruments.h"
 #include "ernie/scene/isd.h"
 #include "ernie/scene/scene.h"
@@ -889,6 +890,104 @@ void BindScene(nb::module_& m) {
             "`ernie:lens:distortion`. Returns (samples, lines, first_line, rows_reversed, time): "
             "render at that resolution, flip the rows if `rows_reversed`, and place them at "
             "`first_line` of the image.");
+
+    nb::class_<CahvoreModel>(
+        m, "CahvoreModel",
+        "A camera in JPL's CAHV, CAHVOR or CAHVORE model, as Mars rovers' cameras are calibrated. "
+        "Image coordinates are the models': (0, 0) the centre of the upper-left pixel, x right, "
+        "y down.")
+        .def_prop_ro("kind",
+                     [](const CahvoreModel& model) {
+                         return model.kind == CahvoreModel::Kind::Cahv     ? "cahv"
+                                : model.kind == CahvoreModel::Kind::Cahvor ? "cahvor"
+                                                                           : "cahvore";
+                     })
+        .def_prop_ro("width", [](const CahvoreModel& model) { return model.width; })
+        .def_prop_ro("height", [](const CahvoreModel& model) { return model.height; })
+        .def(
+            "image_to_ray",
+            [triple](const CahvoreModel& model, double x, double y) {
+                const CahvoreModel::Ray ray = model.ImageToRay({x, y});
+                return nb::make_tuple(triple(ray.origin), triple(ray.direction));
+            },
+            nb::arg("x"), nb::arg("y"), "(origin, unit direction) of the ray through image (x, y).")
+        .def(
+            "point_to_image",
+            [](const CahvoreModel& model, nb::handle point) {
+                const glm::dvec2 image = model.PointToImage(Vec3FromPython(point));
+                return nb::make_tuple(image.x, image.y);
+            },
+            nb::arg("point"), "The image (x, y) of 3D point `point`.")
+        .def(
+            "fit",
+            [](const CahvoreModel& model, double pixelPitchUm) {
+                const CahvoreModel::ErnieCamera fit = model.ToCamera(pixelPitchUm);
+                nb::dict out;
+                out["residual_pixels"] = fit.residualPixels;
+                out["pupil_shift_max"] = fit.pupilShiftMax;
+                out["field_angle_max"] = fit.fieldAngleMax;
+                out["focal_length_mm"] = fit.camera.focalLengthMm;
+                out["fisheye"] = fit.camera.lens.projection == LensProjection::Fisheye;
+                out["rows_reversed"] = fit.rowsReversed;
+                return out;
+            },
+            nb::arg("pixel_pitch_um"),
+            "How the model converts to Ernie's camera at pixel pitch `pixel_pitch_um`: its "
+            "residual_pixels, pupil_shift_max, field_angle_max (radians), focal_length_mm and "
+            "whether it is a fisheye.")
+        .def(
+            "author_camera",
+            [](const CahvoreModel& model, Scene& scene, const std::string& path,
+               double pixelPitchUm) {
+                const CahvoreModel::ErnieCamera fit = model.ToCamera(pixelPitchUm);
+                const Camera& camera = fit.camera;
+                using namespace tokens;
+                // The camera's geometry only, as `IsdFrame.author_camera`; its pose in the
+                // model's frame (parent the prim to that frame's Xform).
+                Prim prim = scene.Has(Path(path)) ? scene.GetPrim(Path(path))
+                                                  : scene.Define(Path(path), kCamera);
+                const bool fisheye = camera.lens.projection == LensProjection::Fisheye;
+                prim.Set(kTransform, camera.transform)
+                    .Set(kCameraScan, std::string(kFrameScan))
+                    .Set(kLensProjection, std::string(fisheye ? kFisheye : kPerspective))
+                    .Set(kFocalLength, camera.focalLengthMm)
+                    .Set(kVerticalAperture, camera.verticalApertureMm)
+                    .Set(kHorizontalAperture,
+                         camera.verticalApertureMm * camera.width / camera.height)
+                    .Set(kHorizontalApertureOffset, camera.horizontalApertureOffsetMm)
+                    .Set(kVerticalApertureOffset, camera.verticalApertureOffsetMm)
+                    .Set(kLensDistortion,
+                         std::vector<float>{static_cast<float>(camera.lens.k1),
+                                            static_cast<float>(camera.lens.k2),
+                                            static_cast<float>(camera.lens.k3),
+                                            static_cast<float>(camera.lens.p1),
+                                            static_cast<float>(camera.lens.p2)})
+                    .Set(kLensFisheye,
+                         std::vector<float>{static_cast<float>(camera.lens.fisheye[0]),
+                                            static_cast<float>(camera.lens.fisheye[1]),
+                                            static_cast<float>(camera.lens.fisheye[2]),
+                                            static_cast<float>(camera.lens.fisheye[3])})
+                    .Set(kClippingRange, glm::dvec2(camera.nearPlane, camera.farPlane));
+                return nb::make_tuple(camera.width, camera.height, fit.rowsReversed,
+                                      fit.residualPixels);
+            },
+            nb::arg("scene"), nb::arg("path"), nb::arg("pixel_pitch_um"),
+            "Authors the Camera prim at `path` as the model in Ernie's camera (perspective with "
+            "Brown-Conrady terms, or a Kannala-Brandt fisheye for CAHVORE), posed in the model's "
+            "frame, and returns (width, height, rows_reversed, residual_pixels): render at that "
+            "resolution and flip the rows if `rows_reversed`.");
+    m.def(
+        "read_cahvore_models",
+        [](const std::string& path) {
+            nb::list out;
+            for (NamedCahvore& named : ReadCahvoreModelsFile(path)) {
+                out.append(nb::make_tuple(named.name, named.frame, named.model));
+            }
+            return out;
+        },
+        nb::arg("path"),
+        "(name, frame, CahvoreModel) for each model of the camera model JSON file at `path`, "
+        "in NASA-JPL's m2020-urdf-models form.");
 
     nb::class_<IsdFrame>(
         m, "IsdFrame",

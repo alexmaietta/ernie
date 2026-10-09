@@ -2,6 +2,7 @@ ernie_add_library(
     ernie_scene
     SOURCES
     brdf.cpp
+    cahvore.cpp
     camera.cpp
     edit_history.cpp
     instruments.cpp

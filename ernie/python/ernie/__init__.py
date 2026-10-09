@@ -52,6 +52,7 @@ stream wait for the render on the GPU, so the host never blocks.
 
 from ._ernie import (
     AttributeMapping,
+    CahvoreModel,
     ChangeCursor,
     CudaArray,
     CudaArrayMapping,
@@ -83,6 +84,7 @@ from ._ernie import (
     julian_date,
     load_image,
     look_at_transform,
+    read_cahvore_models,
     star_illuminance,
     synthetic_stars,
     tokens,
@@ -90,6 +92,7 @@ from ._ernie import (
 
 __all__ = [
     "AttributeMapping",
+    "CahvoreModel",
     "ChangeCursor",
     "CudaArray",
     "CudaArrayMapping",
@@ -121,6 +124,7 @@ __all__ = [
     "julian_date",
     "load_image",
     "look_at_transform",
+    "read_cahvore_models",
     "star_illuminance",
     "synthetic_stars",
     "tokens",
