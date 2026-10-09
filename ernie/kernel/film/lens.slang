@@ -21,10 +21,18 @@ float cosine4(float2 pinhole) {
     return cosine2 * cosine2;
 }
 
+// Each projection's `rayOf` gives the unit ray, in the camera's frame (x right, y up, looking down
+// -z), that lands at the sensor coordinates: what a camera rendered on cube faces follows
+// (cube_faces.slang), valid past 90 degrees off axis where the pinhole image is not.
+
 // No distortion: the sensor's image is the pinhole image.
 public struct Pinhole {
     public static float2 pinholeOf(float2 sensor, float4 k, float p2) {
         return sensor;
+    }
+
+    public static float3 rayOf(float2 sensor, float4 k, float p2) {
+        return normalize(float3(sensor, -1.0));
     }
 
     public static float falloff(float2 sensor, float2 pinhole, float4 k) {
@@ -49,6 +57,10 @@ public struct BrownConrady {
         return p;
     }
 
+    public static float3 rayOf(float2 sensor, float4 k, float p2) {
+        return normalize(float3(pinholeOf(sensor, k, p2), -1.0));
+    }
+
     public static float falloff(float2 sensor, float2 pinhole, float4 k) {
         return cosine4(pinhole);
     }
@@ -71,6 +83,11 @@ public struct Pushbroom {
             p += distorted - distort(p, k);
         }
         return float2(p.x, sensor.y * overscan);
+    }
+
+    // The ray through the detector line (a pushbroom is never rendered on cube faces).
+    public static float3 rayOf(float2 sensor, float4 k, float p2) {
+        return normalize(float3(pinholeOf(sensor, k, 1.0), -1.0));
     }
 
     // cos^4 of the field angle along the line, where the row's ray lies.
@@ -108,6 +125,16 @@ public struct Fisheye {
             return sensor;
         }
         return sensor * (tan(fieldAngle(rd, k)) / rd);
+    }
+
+    // At the field angle itself, which may pass 90 degrees.
+    public static float3 rayOf(float2 sensor, float4 k, float p2) {
+        let rd = length(sensor);
+        if (rd < 1e-8) {
+            return float3(0.0, 0.0, -1.0);
+        }
+        let theta = fieldAngle(rd, k);
+        return float3(sensor / rd * sin(theta), -cos(theta));
     }
 
     // The irradiance a pixel collects relative to the axis: cos(theta) of the aperture's

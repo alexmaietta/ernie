@@ -325,6 +325,28 @@ CahvoreModel::ErnieCamera CahvoreModel::ToCamera(double pixelPitchUm) const {
     return out;
 }
 
+LensRayTable CahvoreModel::RayTable(std::uint32_t step) const {
+    Require(step > 0, "A ray table's step must be positive");
+    const ErnieCamera fit = ToCamera(1.0);
+    const glm::dmat3 toCamera = glm::transpose(glm::dmat3(fit.camera.transform));
+    LensRayTable table;
+    table.width = width;
+    table.height = height;
+    table.step = step;
+    table.columns = (width + step - 1) / step + 1;
+    table.rows = (height + step - 1) / step + 1;
+    for (std::uint32_t j = 0; j < table.rows; ++j) {
+        for (std::uint32_t i = 0; i < table.columns; ++i) {
+            // Ernie's pixel position, from the top left, to the model's image coordinates.
+            const double px = double(i) * step;
+            const double py = double(j) * step;
+            const glm::dvec2 image(px - 0.5, (fit.rowsReversed ? height - py : py) - 0.5);
+            table.rays.push_back(glm::vec3(toCamera * ImageToRay(image).direction));
+        }
+    }
+    return table;
+}
+
 namespace {
 
 glm::dvec3 VectorOf(const nlohmann::json& model, const char* name) {

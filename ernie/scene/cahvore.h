@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ernie/scene/camera.h"
+#include "ernie/scene/wide_view.h"
 
 #include <glm/glm.hpp>
 
@@ -104,6 +105,13 @@ struct CahvoreModel {
     /// @throws std::invalid_argument without an image size or a positive pitch, or for a model
     /// whose image axes are more than a degree from perpendicular (not a physical camera).
     ErnieCamera ToCamera(double pixelPitchUm) const;
+
+    /// The model's exact rays, every `step` pixels across `ToCamera`'s image, in its camera's
+    /// frame (its rows flipped for a mirrored model): a lens that takes the model's distortion
+    /// about its tilted optical axis, which `ToCamera`'s parametric lens leaves as a residual. The
+    /// entrance pupil's movement is still left out.
+    /// @throws std::invalid_argument as `ToCamera`, or for a step of 0.
+    LensRayTable RayTable(std::uint32_t step = 8) const;
 };
 
 /// A named camera model in a frame, as camera model files list them.

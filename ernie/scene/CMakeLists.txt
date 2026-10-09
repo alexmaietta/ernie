@@ -13,6 +13,7 @@ ernie_add_library(
     scene.cpp
     schema.cpp
     sensor_filters.cpp
+    wide_view.cpp
     PUBLIC
     ernie_util
     PRIVATE
