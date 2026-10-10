@@ -99,6 +99,8 @@ extern const char kTerrainShadowSlang[];
 extern const char kTerrainColorSlang[];
 /// Gradients and LOD leaf ranges of heightfields written on the GPU.
 extern const char kTerrainUpdateSlang[];
+/// Horizon maps of heights, for dome occlusion over terrain.
+extern const char kTerrainHorizonSlang[];
 
 /// Planet modules: shared resources and cube-sphere grid vertex, and the passes.
 extern const char kPlanetSlang[];

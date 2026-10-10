@@ -174,6 +174,27 @@ class RasterRenderer {
     /// @throws std::invalid_argument for an empty map or one larger than the device allows.
     void SetDomeMap(const Image* map);
 
+    /// Whether the frame `Update` last prepared shadows its dome (the full dome lighting mode):
+    /// drawables then provide what occludes it, such as the terrain's horizon map.
+    bool DomeShadowed() const {
+        return domeShadowed_;
+    }
+
+    /// A terrain's horizon map (terrain_horizon.slang) for the dome occlusion of its pixels: the
+    /// image (two layers of four azimuths), where its texels lie relative to the frame's origin
+    /// (north-west corner x and y, texel size, vertical exaggeration), and its width, height, the
+    /// terrain's prim id and 1 to use it.
+    struct TerrainHorizon {
+        const GpuImage* image = nullptr;
+        std::array<float, 4> grid{};
+        std::array<std::uint32_t, 4> info{};
+    };
+
+    /// Sets the terrain horizon this frame's dome occlusion reads; a default one for none.
+    void SetTerrainHorizon(const TerrainHorizon& horizon) {
+        terrainHorizon_ = horizon;
+    }
+
     /// As `SetDomeMap(map)`, with `lighting` (when not nullptr) lighting the scene in its place:
     /// the map without a sun lit as a distant light of its own (`ExtractDomeSun`), while the sky
     /// still shows the sun.
@@ -622,6 +643,8 @@ class RasterRenderer {
     /// does), and their per-view images, raw then filtered, made at the frame's size when first
     /// needed; a placeholder texel binds in their place otherwise.
     bool domeShadowed_ = false;
+    TerrainHorizon terrainHorizon_;
+    std::unique_ptr<GpuImage> noHorizon_;  ///< Binds in place of a terrain's horizon map.
     std::unique_ptr<ComputePipeline> occlusionPipeline_;
     std::unique_ptr<ComputePipeline> occlusionFilterPipeline_;
     mutable std::array<std::unique_ptr<GpuImage>, 2> occlusion_;

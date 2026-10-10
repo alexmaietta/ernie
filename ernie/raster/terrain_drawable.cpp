@@ -97,6 +97,18 @@ constexpr DescriptorBinding kUpdateBindings[] = {
     {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
 };
 
+/// terrain_horizon.slang's bindings: the heights, and the horizon map to write.
+constexpr DescriptorBinding kHorizonBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+};
+
+/// terrain_horizon.slang's constants.
+struct HorizonConstants {
+    std::uint32_t size[4];
+    float values[4];
+};
+
 /// terrain_update.slang's constants.
 struct UpdateConstants {
     std::uint32_t rect[4];
@@ -153,7 +165,8 @@ TerrainDrawable::TerrainDrawable(RasterRenderer& renderer)
     : renderer_(renderer), layout_(renderer.Context(), kBindings, sizeof(DrawConstants)),
       uniforms_(renderer.Context(), kUniformsStride, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 BufferMemory::Device),
-      updateLayout_(renderer.Context(), kUpdateBindings, sizeof(UpdateConstants)) {
+      updateLayout_(renderer.Context(), kUpdateBindings, sizeof(UpdateConstants)),
+      horizonLayout_(renderer.Context(), kHorizonBindings, sizeof(HorizonConstants)) {
     const std::vector<ShaderModuleSource> update{{"terrain_update", shaders::kTerrainUpdateSlang}};
     const auto compile = [&](const char* entry) {
         return std::make_unique<ComputePipeline>(
@@ -226,10 +239,16 @@ void TerrainDrawable::ClearHeightfield() {
     leaves_.reset();
     pendingRect_.reset();
     readbackPending_ = {};
+    horizon_.reset();
+    horizonDirty_ = true;
 }
 
 void TerrainDrawable::SetHeightfield(const RasterView& raster) {
     CheckRasterView(raster, "Heightfield", 2);
+    // The horizon map follows the new heights, at their size.
+    horizon_.reset();
+    horizonDirty_ = true;
+    noData_ = raster.noData;
     const std::uint32_t maxSize = renderer_.Context().Limits().maxImageDimension2D;
     if (raster.width > maxSize || raster.height > maxSize) {
         throw std::invalid_argument("Heightfield exceeds the device's maximum texture size");
@@ -312,6 +331,8 @@ void TerrainDrawable::AllocateHeightfield(std::uint32_t width, std::uint32_t hei
     prepared_ = false;
     width_ = width;
     height_ = height;
+    horizon_.reset();
+    horizonDirty_ = true;
     heights_ = std::make_unique<GpuImage>(
         context, ImageDesc{width, height, 1, 1, VK_FORMAT_R32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT});
     const auto mips = static_cast<std::uint32_t>(std::bit_width(std::max(width, height)));
@@ -377,6 +398,7 @@ void TerrainDrawable::SetHeightfield(const DeviceHeightfield& field) {
     }
     device_ = field;
     device_.heights = Tensor();
+    noData_ = field.noData;
     originX_ = field.originX;
     originY_ = field.originY;
     pixelSize_ = field.cellSize;
@@ -420,14 +442,63 @@ Tensor TerrainDrawable::MapHeights(std::uintptr_t stream) {
 }
 
 void TerrainDrawable::RecordCull(VkCommandBuffer commands) const {
-    if (!pendingRect_) {
-        return;
+    if (pendingRect_) {
+        // Its leaves come back to the host once this frame's slot is next taken (`Prepare`).
+        const std::uint32_t slot = renderer_.Uploads().Slot();
+        RecordHeightUpdate(commands, *pendingRect_, readbacks_[slot].get());
+        readbackPending_[slot] = true;
+        pendingRect_.reset();
+        horizonDirty_ = true;
     }
-    // Its leaves come back to the host once this frame's slot is next taken (`Prepare`).
-    const std::uint32_t slot = renderer_.Uploads().Slot();
-    RecordHeightUpdate(commands, *pendingRect_, readbacks_[slot].get());
-    readbackPending_[slot] = true;
-    pendingRect_.reset();
+    // The horizon map, after the heights it follows, when dome occlusion reads it.
+    if (horizonWanted_ && horizon_ != nullptr && horizonDirty_) {
+        RecordHorizon(commands);
+        horizonDirty_ = false;
+    }
+}
+
+void TerrainDrawable::EnsureHorizon() {
+    if (horizonPipeline_ == nullptr) {
+        const std::vector<ShaderModuleSource> modules{
+            {"terrain_horizon", shaders::kTerrainHorizonSlang}};
+        horizonPipeline_ = std::make_unique<ComputePipeline>(
+            renderer_.Context(), horizonLayout_,
+            renderer_.Compiler().CompileSpirv(modules, "horizonMain"));
+    }
+    if (horizon_ == nullptr) {
+        const auto longest = static_cast<std::uint32_t>(std::max(width_, height_));
+        horizonScale_ = (longest + kMaxHorizon - 1) / kMaxHorizon;
+        const auto width = static_cast<std::uint32_t>((width_ + horizonScale_ - 1) / horizonScale_);
+        const auto height =
+            static_cast<std::uint32_t>((height_ + horizonScale_ - 1) / horizonScale_);
+        horizon_ = std::make_unique<GpuImage>(
+            renderer_.Context(),
+            ImageDesc{width, height, 2, 1, VK_FORMAT_R16G16B16A16_SFLOAT,
+                      VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, false, true});
+        horizonDirty_ = true;
+    }
+}
+
+void TerrainDrawable::RecordHorizon(VkCommandBuffer commands) const {
+    ERNIE_GPU_ZONE(renderer_.Context(), commands, "Terrain horizon");
+    horizon_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, horizonPipeline_->Handle());
+    const DescriptorResource resources[] = {
+        DescriptorResource::Of(heights_->View()),
+        DescriptorResource::Of(horizon_->View(), VK_IMAGE_LAYOUT_GENERAL)};
+    horizonLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+    HorizonConstants constants{};
+    constants.size[0] = static_cast<std::uint32_t>(width_);
+    constants.size[1] = static_cast<std::uint32_t>(height_);
+    constants.size[2] = horizon_->Desc().width;
+    constants.size[3] = horizon_->Desc().height;
+    constants.values[0] = static_cast<float>(horizonScale_);
+    constants.values[1] = static_cast<float>(pixelSize_);
+    constants.values[2] = noData_.value_or(0.0f);
+    constants.values[3] = noData_ ? 1.0f : 0.0f;
+    horizonLayout_.PushConstants(commands, &constants, sizeof(constants));
+    vkCmdDispatch(commands, (constants.size[2] + 7) / 8, (constants.size[3] + 7) / 8, 1);
+    horizon_->Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 void TerrainDrawable::RecordHeightUpdate(VkCommandBuffer commands,
@@ -537,7 +608,8 @@ void TerrainDrawable::TakeLeaves(const GpuBuffer& readback) {
 std::uint64_t TerrainDrawable::GpuBytes() const {
     std::uint64_t bytes = uniforms_.Size() + patchBuffer_->Size();
     if (heights_ != nullptr) {
-        bytes += heights_->Bytes() + gradients_->Bytes();
+        bytes += heights_->Bytes() + gradients_->Bytes() +
+                 (horizon_ != nullptr ? horizon_->Bytes() : 0);
     }
     if (deviceHeights_ != nullptr) {
         bytes += deviceHeights_->Size() + leaves_->Size();
@@ -572,6 +644,18 @@ void TerrainDrawable::Prepare(const FrameParams& frame, std::span<const ShadowCa
     if (gbufferPipelines_[pushbroom_ ? 1 : 0] == nullptr) {
         CreateGBufferPipeline(pushbroom_);
     }
+    // The horizon map for dome occlusion, when the frame shadows its dome.
+    horizonWanted_ = HasHeightfield() && renderer_.DomeShadowed();
+    RasterRenderer::TerrainHorizon horizon;
+    if (horizonWanted_) {
+        EnsureHorizon();
+        horizon.image = horizon_.get();
+        horizon.grid = {static_cast<float>(originX_ - origin_.x),
+                        static_cast<float>(originY_ - origin_.y),
+                        static_cast<float>(pixelSize_ * horizonScale_), params_.exaggeration};
+        horizon.info = {horizon_->Desc().width, horizon_->Desc().height, params_.primId, 1};
+    }
+    renderer_.SetTerrainHorizon(horizon);
     if (!HasHeightfield()) {
         return;
     }

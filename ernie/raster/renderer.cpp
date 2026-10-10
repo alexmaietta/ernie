@@ -6,6 +6,7 @@
 #include "ernie/scene/wide_view.h"
 #include "ernie/session/sampling.h"
 
+#include <glm/gtc/packing.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
 #include <algorithm>
@@ -173,7 +174,17 @@ constexpr DescriptorBinding kShadingBindings[] = {
     {16, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {17, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {18, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {19, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
 };
+
+/// shading.slang's ShadingConstants: the dispatch's model and first view, and the terrain horizon
+/// the dome occlusion reads (`RasterRenderer::TerrainHorizon`).
+struct ShadingConstants {
+    std::uint32_t model[4];
+    float horizonGrid[4];
+    std::uint32_t horizonInfo[4];
+};
+static_assert(sizeof(ShadingConstants) == 48, "ShadingConstants must match shading.slang");
 
 constexpr DescriptorBinding kFilterBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
@@ -551,7 +562,8 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
       clampSampler_(context, SamplerDesc{}),
       shadowSampler_(context, SamplerDesc{VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST,
                                           VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 1.0f, true}),
-      poisson_(PoissonDisk(16)), shadingLayout_(context, kShadingBindings, 16),
+      poisson_(PoissonDisk(16)),
+      shadingLayout_(context, kShadingBindings, sizeof(ShadingConstants)),
       filterLayout_(context, kFilterBindings, 32), presentLayout_(context, kPresentBindings, 32),
       hzbLayout_(context, kHzbBindings, 16), motionLayout_(context, kMotionBindings, 48),
       viewsLayout_(context, kViewsBindings, 48),
@@ -614,6 +626,16 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
     context_.Submit([this](VkCommandBuffer commands) {
         noOcclusion_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
     });
+    // Two layers of horizons at the nadir: nothing occludes.
+    noHorizon_ = std::make_unique<GpuImage>(
+        context_, ImageDesc{1, 1, 2, 1, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT,
+                            false, true});
+    const std::array<std::uint16_t, 4> nadir{
+        glm::packHalf1x16(-100.0f), glm::packHalf1x16(-100.0f), glm::packHalf1x16(-100.0f),
+        glm::packHalf1x16(-100.0f)};
+    const std::span<const std::byte> layers[] = {std::as_bytes(std::span(nadir)),
+                                                 std::as_bytes(std::span(nadir))};
+    noHorizon_->Upload(layers);
 
     const std::vector<ShaderModuleSource> hzbModules{{"hzb", shaders::kHzbSlang}};
     const std::vector<ShaderModuleSource> pyramidModules{{"pyramid", shaders::kPyramidSlang}};
@@ -2484,17 +2506,33 @@ void RasterRenderer::Shade(VkCommandBuffer commands, RenderTargets& targets,
                                               general(occlusion_[0] != nullptr ? *occlusion_[0]
                                                                                : *noOcclusion_),
                                               general(occlusion_[1] != nullptr ? *occlusion_[1]
-                                                                               : *noOcclusion_)};
+                                                                               : *noOcclusion_),
+                                              sampled(terrainHorizon_.image != nullptr
+                                                          ? *terrainHorizon_.image
+                                                          : *noHorizon_)};
+        // The dispatch's model and first view, and the terrain horizon (none without its image).
+        const auto constantsFor = [&](std::uint32_t model) {
+            ShadingConstants constants{};
+            constants.model[0] = model;
+            constants.model[1] = firstView;
+            if (terrainHorizon_.image != nullptr) {
+                std::copy(terrainHorizon_.grid.begin(), terrainHorizon_.grid.end(),
+                          constants.horizonGrid);
+                std::copy(terrainHorizon_.info.begin(), terrainHorizon_.info.end(),
+                          constants.horizonInfo);
+            }
+            return constants;
+        };
         // Dome occlusion for the full dome lighting mode: per pixel, then filtered, before
         // shading reads it.
         if (domeShadowed_ && occlusionPipeline_ != nullptr) {
             ERNIE_GPU_ZONE(context_, commands, "Dome occlusion");
-            const std::uint32_t constants[4] = {0, firstView, 0, 0};
+            const ShadingConstants constants = constantsFor(0);
             for (const ComputePipeline* pipeline :
                  {occlusionPipeline_.get(), occlusionFilterPipeline_.get()}) {
                 vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->Handle());
                 shadingLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, shading);
-                shadingLayout_.PushConstants(commands, constants, sizeof(constants));
+                shadingLayout_.PushConstants(commands, &constants, sizeof(constants));
                 vkCmdDispatch(commands, groupsX, groupsY, views);
                 ShaderBarrier(commands);
             }
@@ -2503,8 +2541,8 @@ void RasterRenderer::Shade(VkCommandBuffer commands, RenderTargets& targets,
             vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                               shadingPipelines_.at({model, pushbroom_})->Handle());
             shadingLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, shading);
-            const std::uint32_t constants[4] = {static_cast<std::uint32_t>(model), firstView, 0, 0};
-            shadingLayout_.PushConstants(commands, constants, sizeof(constants));
+            const ShadingConstants constants = constantsFor(static_cast<std::uint32_t>(model));
+            shadingLayout_.PushConstants(commands, &constants, sizeof(constants));
             vkCmdDispatch(commands, groupsX, groupsY, views);
         }
         // The pixels no geometry covers, when the dome or stars show there; else the lens reads
@@ -2513,8 +2551,8 @@ void RasterRenderer::Shade(VkCommandBuffer commands, RenderTargets& targets,
             vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                               skyPipelines_[pushbroom_ ? 1 : 0]->Handle());
             shadingLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, shading);
-            const std::uint32_t constants[4] = {0, firstView, 0, 0};
-            shadingLayout_.PushConstants(commands, constants, sizeof(constants));
+            const ShadingConstants constants = constantsFor(0);
+            shadingLayout_.PushConstants(commands, &constants, sizeof(constants));
             vkCmdDispatch(commands, groupsX, groupsY, views);
         }
         ShaderBarrier(commands);

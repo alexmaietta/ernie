@@ -28,7 +28,8 @@
 // 4 depth (one layer per view each), 5 materials, 6 RGB-to-spectrum coefficient table, 7 its
 // sampler, 8 spectral radiance, 9 lights, 10 the lights' shadow maps, 11 their comparison sampler,
 // 12 their view-projections, 13 the dome's map, 14 the stars, 15 their grid cells, 16 the map
-// that lights the scene (13's, without its sun when that is lit on its own).
+// that lights the scene (13's, without its sun when that is lit on its own), 17 and 18 the dome
+// occlusion, raw and filtered, 19 the terrain's horizon map.
 //
 // References:
 // - W. Jakob and J. Hanika, "A Low-Dimensional Function Space for Efficient Spectral Upsampling",
@@ -130,6 +131,11 @@ struct MaterialGpu {
 struct ShadingConstants {
     // x: index of the model this dispatch shades, y: the first view's uniforms, zw unused.
     uint4 model;
+    // The terrain's horizon map (`terrainOcclusion`): its north-west corner's x and y relative
+    // to the frame's origin, its texel size and the terrain's vertical exaggeration; and its
+    // width, height, the terrain's prim id and 1 when there is one.
+    float4 horizonGrid;
+    uint4 horizonInfo;
 }
 
 [[vk::binding(0, 0)]] StructuredBuffer<ShadingUniforms> shadingViews;
@@ -424,16 +430,6 @@ float4 domeOcclusion(int2 pixel, uint layer, float3 world, float depth, float3 n
                                 ndc + float2(direction.x, -direction.y) * 2.0 / size, depth) -
                     world;
         let tangent = normalize(along - dot(along, v) * v);
-        let axis = normalize(cross(tangent, v));
-        let projected = n - axis * dot(n, axis);
-        let projectedLength = length(projected);
-        if (projectedLength < 1e-4) {
-            visibility += 1.0;
-            bent += n;
-            continue;
-        }
-        let cosN = clamp(dot(projected / projectedLength, v), -1.0, 1.0);
-        let gamma = (dot(projected, tangent) < 0.0 ? -1.0 : 1.0) * acos(cosN);
         // The highest horizon to each side, as the cosine of its angle from the view direction.
         float horizons[2] = {-1.0, -1.0};
         for (uint side = 0; side < 2; ++side) {
@@ -453,27 +449,90 @@ float4 domeOcclusion(int2 pixel, uint layer, float3 world, float depth, float3 n
                 horizons[side] = max(horizons[side], dot(offset * rsqrt(length2), v));
             }
         }
-        // The horizon angles (positive towards the tangent), clamped to the hemisphere about the
-        // normal, and the cosine-weighted arc between them.
-        let h1 = gamma + min(acos(horizons[0]) - gamma, 0.5 * PI);
-        let h0 = gamma + max(-acos(horizons[1]) - gamma, -0.5 * PI);
-        let arc = 0.25 * (-cos(2.0 * h0 - gamma) + cosN + 2.0 * h0 * sin(gamma)) +
-                  0.25 * (-cos(2.0 * h1 - gamma) + cosN + 2.0 * h1 * sin(gamma));
-        visibility += projectedLength * arc;
-        // The slice's bent normal: the cosine-weighted mean of the directions between the
-        // horizons, sin(h) along the tangent plus cos(h) along the view (Jimenez et al. 2016).
-        let t0 = (6.0 * sin(h0 - gamma) - sin(3.0 * h0 - gamma) + 6.0 * sin(h1 - gamma) -
-                  sin(3.0 * h1 - gamma) + 16.0 * sin(gamma) -
-                  3.0 * (sin(h0 + gamma) + sin(h1 + gamma))) /
-                 12.0;
-        let t1 = (-cos(3.0 * h0 - gamma) - cos(3.0 * h1 - gamma) + 8.0 * cos(gamma) -
-                  3.0 * (cos(h0 + gamma) + cos(h1 + gamma))) /
-                 12.0;
-        bent += projectedLength * (t0 * tangent + t1 * v);
+        let slice = occlusionSlice(n, tangent, v, float2(horizons[0], horizons[1]));
+        bent += slice.xyz;
+        visibility += slice.w;
     }
     let length = sqrt(dot(bent, bent));
     return float4(length > 1e-6 ? bent / length : n,
                   saturate(visibility / float(kOcclusionDirections)));
+}
+
+// One slice of ground-truth ambient occlusion about axis `v`: the plane through `v` and unit
+// `tangent` (perpendicular to it), with the highest horizons towards +tangent (x) and -tangent
+// (y) as the cosines of their angles from `v`. Returns the slice's bent normal contribution (xyz)
+// and its cosine-weighted visibility (w), both weighted by the normal's projection into it.
+float4 occlusionSlice(float3 n, float3 tangent, float3 v, float2 horizons) {
+    let axis = normalize(cross(tangent, v));
+    let projected = n - axis * dot(n, axis);
+    let projectedLength = length(projected);
+    if (projectedLength < 1e-4) {
+        return float4(n, 1.0);
+    }
+    let cosN = clamp(dot(projected / projectedLength, v), -1.0, 1.0);
+    let gamma = (dot(projected, tangent) < 0.0 ? -1.0 : 1.0) * acos(cosN);
+    // The horizon angles (positive towards the tangent), clamped to the hemisphere about the
+    // normal, and the cosine-weighted arc between them.
+    let h1 = gamma + min(acos(clamp(horizons.x, -1.0, 1.0)) - gamma, 0.5 * PI);
+    let h0 = gamma + max(-acos(clamp(horizons.y, -1.0, 1.0)) - gamma, -0.5 * PI);
+    let arc = 0.25 * (-cos(2.0 * h0 - gamma) + cosN + 2.0 * h0 * sin(gamma)) +
+              0.25 * (-cos(2.0 * h1 - gamma) + cosN + 2.0 * h1 * sin(gamma));
+    // The slice's bent normal: the cosine-weighted mean of the directions between the horizons,
+    // sin(h) along the tangent plus cos(h) along `v` (Jimenez et al. 2016).
+    let t0 = (6.0 * sin(h0 - gamma) - sin(3.0 * h0 - gamma) + 6.0 * sin(h1 - gamma) -
+              sin(3.0 * h1 - gamma) + 16.0 * sin(gamma) -
+              3.0 * (sin(h0 + gamma) + sin(h1 + gamma))) /
+             12.0;
+    let t1 = (-cos(3.0 * h0 - gamma) - cos(3.0 * h1 - gamma) + 8.0 * cos(gamma) -
+              3.0 * (cos(h0 + gamma) + cos(h1 + gamma))) /
+             12.0;
+    return float4(projectedLength * (t0 * tangent + t1 * v), projectedLength * arc);
+}
+
+// The terrain's horizon map (terrain_horizon.slang): per texel, the tangents of the horizon's
+// elevation towards azimuths 0 to 135 degrees (layer 0) and 180 to 315 (layer 1), before
+// vertical exaggeration.
+[[vk::binding(19, 0)]] Texture2DArray<float4> horizonMap;
+
+// The horizon tangents around texel `texel` (clamped to the map), as eight values.
+void horizonTexel(int2 texel, out float4 first, out float4 second) {
+    let at = clamp(texel, int2(0), int2(pass.horizonInfo.xy) - 1);
+    first = horizonMap.Load(int4(at, 0, 0));
+    second = horizonMap.Load(int4(at, 1, 0));
+}
+
+// The dome's visibility and bent normal over terrain at world point `world` (relative to the
+// frame's origin) with unit normal `n`, from the terrain's horizon map: the horizons around the
+// point (bilinear in its texels), in four vertical slices whose horizons to either side are the
+// map's opposite azimuths, integrated as `occlusionSlice` does about the vertical. They see the
+// whole terrain, on screen or not, at the map's resolution.
+float4 terrainOcclusion(float3 world, float3 n) {
+    let grid = pass.horizonGrid;
+    let cell = float2(world.x - grid.x, grid.y - world.y) / grid.z - 0.5;
+    let base = int2(floor(cell));
+    let f = cell - float2(base);
+    float4 a0, a1, b0, b1, c0, c1, d0, d1;
+    horizonTexel(base, a0, a1);
+    horizonTexel(base + int2(1, 0), b0, b1);
+    horizonTexel(base + int2(0, 1), c0, c1);
+    horizonTexel(base + int2(1, 1), d0, d1);
+    let first = lerp(lerp(a0, b0, f.x), lerp(c0, d0, f.x), f.y) * grid.w;
+    let second = lerp(lerp(a1, b1, f.x), lerp(c1, d1, f.x), f.y) * grid.w;
+    // Elevation tangents as cosines of the angle from the vertical: sin(atan(t)).
+    let up = float3(0.0, 0.0, 1.0);
+    let towards = first * rsqrt(1.0 + first * first);
+    let opposite = second * rsqrt(1.0 + second * second);
+    var visibility = 0.0;
+    var bent = float3(0.0);
+    for (uint k = 0; k < 4; ++k) {
+        let azimuth = float(k) * 0.25 * PI;
+        let slice = occlusionSlice(n, float3(cos(azimuth), sin(azimuth), 0.0), up,
+                                   float2(towards[k], opposite[k]));
+        bent += slice.xyz;
+        visibility += slice.w;
+    }
+    let length = sqrt(dot(bent, bent));
+    return float4(length > 1e-6 ? bent / length : n, saturate(visibility / 4.0));
 }
 
 // The view vector at world point `world` of a pixel at `ndc`: back along its ray, towards the eye,
@@ -507,7 +566,16 @@ void occlusionMain(uint3 id : SV_DispatchThreadID) {
     let world = cameraPoint(sh.invViewProj, sh.strip, ndc.xy, ndc.z);
     let v = viewVector(ndc.xy, world);
     let n = facingNormal(normalize(gNormal.Load(pixel).xyz), v);
-    occlusionRaw[id] = domeOcclusion(int2(id.xy), id.z, world, ndc.z, n, v);
+    var occlusion = domeOcclusion(int2(id.xy), id.z, world, ndc.z, n, v);
+    // Over terrain, the horizon map's occlusion too, which sees the whole terrain: the less
+    // visible of the two (as Unreal combines distance field and screen-space occlusion).
+    if (pass.horizonInfo.w != 0 && gIds.Load(pixel).y == pass.horizonInfo.z) {
+        let terrain = terrainOcclusion(world, n);
+        if (terrain.w < occlusion.w) {
+            occlusion = terrain;
+        }
+    }
+    occlusionRaw[id] = occlusion;
 }
 
 // `occlusionMain`'s results averaged over 5 x 5 pixels of the same surface, weighted by how far

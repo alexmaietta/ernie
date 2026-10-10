@@ -419,6 +419,44 @@ TEST_F(RasterDelegateTest, TheFullDomeModeShadowsTheSunOfAnHdrSky) {
         << "the sun's light moved out of the map, not added";
 }
 
+TEST_F(RasterDelegateTest, TerrainHorizonsShadowTheDomeFromOffScreen) {
+    // FlatScene's floor, 65 x 65 cells of 2 m, with a cliff 50 m tall at x = 25 to 35 m, outside
+    // the view (which spans about 16 m either side of the centre), under a uniform dome. The full
+    // mode's horizon map sees the cliff: floor near it (x = 14) loses much of its sky, floor
+    // farther (x = -14) less; the approximate mode lights both alike. The screen-space radius
+    // stays at its 1 m default, so the horizon map does the shadowing.
+    Scene scene = FlatScene();
+    scene.Remove("/World/Sun");
+    std::vector<float> heights(65 * 65, 0.0f);
+    for (int row = 0; row < 65; ++row) {
+        for (int col = 0; col < 65; ++col) {
+            const double x = -65.0 + (col + 0.5) * 2.0;
+            if (x >= 25.0 && x <= 35.0) {
+                heights[static_cast<std::size_t>(row * 65 + col)] = 50.0f;
+            }
+        }
+    }
+    scene.Write("/World/Terrain", tokens::kHeights, Tensor::Copy<float>(heights, {65, 65}));
+    scene.Define("/World/Sky", tokens::kDomeLight).Set(tokens::kIntensity, 1.0);
+    RasterDelegate delegate(*context_);
+    const auto [nearRow, nearCol] = PixelOf(scene, 14.0f, 0.0f);
+    const auto [farRow, farCol] = PixelOf(scene, -14.0f, 0.0f);
+    const auto floor = [&] {
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const auto vars = MapVars(outputs);
+        return std::pair(At<float>(vars.at("HdrColor"), nearRow, nearCol, 1),
+                         At<float>(vars.at("HdrColor"), farRow, farCol, 1));
+    };
+    const auto [approximateNear, approximateFar] = floor();
+    EXPECT_NEAR(approximateNear, approximateFar, 0.02f * approximateFar);
+
+    scene.Define("/Render/Settings", tokens::kRenderSettings)
+        .Set(tokens::kDomeLightMode, std::string("full"));
+    const auto [fullNear, fullFar] = floor();
+    EXPECT_LT(fullNear, 0.8f * approximateNear) << "the cliff hides much of the sky";
+    EXPECT_GT(fullFar, fullNear + 0.05f * approximateFar) << "less so farther from it";
+}
+
 TEST_F(RasterDelegateTest, EmissiveSurfacesShowTheirLuminanceUnlit) {
     // With no light at all, a floor emitting white of 2 cd/m^2 shows a luminance of 2 (HdrColor
     // is in cd/m^2), and red emission reads red.

@@ -287,6 +287,22 @@ class TerrainDrawable : public RasterDrawable {
     /// Per frame slot, the leaf ranges its frame copies back, and whether it did.
     std::array<std::unique_ptr<GpuBuffer>, FrameUploads::kSlots> readbacks_;
     mutable std::array<bool, FrameUploads::kSlots> readbackPending_{};
+
+    /// The horizon map (terrain_horizon.slang) dome occlusion reads in the full dome lighting
+    /// mode: made the first time a frame shadows its dome, at `horizonScale_` cells per texel (so
+    /// at most `kMaxHorizon` texels a side), and recomputed when the heights change.
+    static constexpr std::uint32_t kMaxHorizon = 512;
+    PipelineLayout horizonLayout_;
+    std::unique_ptr<ComputePipeline> horizonPipeline_;
+    std::unique_ptr<GpuImage> horizon_;
+    std::uint32_t horizonScale_ = 1;
+    mutable bool horizonDirty_ = true;
+    bool horizonWanted_ = false;
+    std::optional<float> noData_;  ///< The heights' no-data value, host or device ones.
+    /// Makes the horizon map and its pipeline for the current heights, when missing.
+    void EnsureHorizon();
+    /// Records the horizon map's computation from the heights image.
+    void RecordHorizon(VkCommandBuffer commands) const;
 };
 
 }  // namespace ernie
