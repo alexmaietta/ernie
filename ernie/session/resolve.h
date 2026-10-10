@@ -263,6 +263,22 @@ struct DomeSunExtraction {
 std::optional<DomeSunExtraction> ExtractDomeSun(const Image& map);
 inline constexpr double kDomeSunThreshold = 0.1;
 
+/// One of a dome map's regions of about equal energy (`DomeDirectionsOf`), in the map's frame.
+struct DomeDirection {
+    glm::dvec3 direction{0.0, 0.0, 1.0};  ///< The region's energy-weighted mean direction.
+    glm::dvec3 irradiance{0.0};  ///< Its RGB values times each texel's solid angle, summed.
+};
+
+/// `count` directions standing for latitude-longitude dome map `map`, for lighting with it as
+/// shadowed distant lights: Debevec's median cut, splitting the most energetic region along its
+/// longer side (in angle) where half its energy (luminance times solid angle) lies on each side,
+/// until there are `count`. Their irradiance adds up to the map's. Fewer when the map has fewer
+/// texels with energy.
+///
+/// Reference: P. Debevec, "A Median Cut Algorithm for Light Probe Sampling", SIGGRAPH 2005
+/// posters. https://vgl.ict.usc.edu/Research/MedianCut/MedianCutSampling.pdf
+std::vector<DomeDirection> DomeDirectionsOf(const Image& map, std::size_t count);
+
 /// The stars of the StarField at `path`: each one's place from `ernie:stars:rightAscension` and
 /// `ernie:stars:declination` (or `ernie:stars:direction`), and its black-body spectrum from its
 /// temperature (`ernie:stars:temperature`, else `ernie:stars:colorIndex` through

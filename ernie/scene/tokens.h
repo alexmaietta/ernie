@@ -434,10 +434,14 @@ inline constexpr std::string_view kSourceName = "sourceName";  ///< RenderVar na
 inline constexpr std::string_view kAmbient = "ernie:ambient";  ///< float fraction of sunlight.
 /// How dome lights light the scene, as Omniverse RTX's dome lighting modes: "approximate"
 /// (default; diffuse and specular, unoccluded), "full" (also shadowed, where the dome's
-/// `inputs:shadow:enable` allows: ambient occlusion from the G-buffer over a world radius of
-/// `ernie:domeLight:shadowRadius`, default 1) or "limited" (reflections only, no diffuse).
+/// `inputs:shadow:enable` allows: an HDR sky's sun as a shadowed sun, terrain horizon maps, and
+/// ambient occlusion from the G-buffer over a world radius of `ernie:domeLight:shadowRadius`,
+/// default 1), "directions" (the full mode, with the dome's diffuse light from
+/// `ernie:domeLight:directions` shadowed directions of about equal energy, default 16, as many as
+/// light slots allow) or "limited" (reflections only, no diffuse).
 inline constexpr std::string_view kDomeLightMode = "ernie:domeLight:mode";
 inline constexpr std::string_view kDomeShadowRadius = "ernie:domeLight:shadowRadius";
+inline constexpr std::string_view kDomeDirections = "ernie:domeLight:directions";
 inline constexpr std::string_view kColorMode = "ernie:colorMode";
 inline constexpr std::string_view kHillshade = "hillshade";
 inline constexpr std::string_view kColormap = "colormap";

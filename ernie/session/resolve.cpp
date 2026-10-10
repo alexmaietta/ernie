@@ -1162,6 +1162,111 @@ std::optional<DomeSunExtraction> ExtractDomeSun(const Image& map) {
     return extraction;
 }
 
+std::vector<DomeDirection> DomeDirectionsOf(const Image& map, std::size_t count) {
+    const auto rows = static_cast<std::int64_t>(map.height);
+    const auto cols = static_cast<std::int64_t>(map.width);
+    if (rows < 1 || cols < 1 || count == 0) {
+        return {};
+    }
+    const double dTheta = M_PI / static_cast<double>(rows);
+    const double dPhi = 2.0 * M_PI / static_cast<double>(cols);
+    const auto solidAngle = [&](std::int64_t r) {
+        return (std::cos(static_cast<double>(r) * dTheta) -
+                std::cos(static_cast<double>(r + 1) * dTheta)) *
+               dPhi;
+    };
+    const auto texel = [&](std::int64_t r, std::int64_t c) {
+        return glm::dvec3(map.At(static_cast<std::uint32_t>(c), static_cast<std::uint32_t>(r)));
+    };
+    // The energy's summed-area table: sums[(r, c)] covers rows < r and columns < c.
+    std::vector<double> sums(static_cast<std::size_t>((rows + 1) * (cols + 1)), 0.0);
+    const auto sum = [&](std::int64_t r, std::int64_t c) -> double& {
+        return sums[static_cast<std::size_t>(r * (cols + 1) + c)];
+    };
+    for (std::int64_t r = 0; r < rows; ++r) {
+        double row = 0.0;
+        for (std::int64_t c = 0; c < cols; ++c) {
+            const glm::dvec3 v = glm::max(texel(r, c), glm::dvec3(0.0));
+            row += (0.2126 * v.r + 0.7152 * v.g + 0.0722 * v.b) * solidAngle(r);
+            sum(r + 1, c + 1) = sum(r, c + 1) + row;
+        }
+    }
+    struct Region {
+        std::int64_t r0, r1, c0, c1;
+    };
+    const auto energyOf = [&](const Region& region) {
+        return sum(region.r1, region.c1) - sum(region.r0, region.c1) - sum(region.r1, region.c0) +
+               sum(region.r0, region.c0);
+    };
+    std::vector<Region> regions{{0, rows, 0, cols}};
+    while (regions.size() < count) {
+        // The most energetic region that can still be split.
+        std::size_t best = regions.size();
+        double most = 0.0;
+        for (std::size_t i = 0; i < regions.size(); ++i) {
+            const Region& region = regions[i];
+            const double energy = energyOf(region);
+            if ((region.r1 - region.r0 > 1 || region.c1 - region.c0 > 1) && energy > most) {
+                most = energy;
+                best = i;
+            }
+        }
+        if (best == regions.size()) {
+            break;
+        }
+        const Region region = regions[best];
+        const double middle =
+            std::sin(0.5 * static_cast<double>(region.r0 + region.r1) * dTheta);
+        const double width = static_cast<double>(region.c1 - region.c0) * dPhi * middle;
+        const double height = static_cast<double>(region.r1 - region.r0) * dTheta;
+        const bool acrossColumns =
+            region.c1 - region.c0 > 1 && (width >= height || region.r1 - region.r0 == 1);
+        Region first = region;
+        Region second = region;
+        if (acrossColumns) {
+            std::int64_t cut = region.c0 + 1;
+            while (cut < region.c1 - 1 &&
+                   energyOf(Region{region.r0, region.r1, region.c0, cut}) < 0.5 * most) {
+                ++cut;
+            }
+            first.c1 = cut;
+            second.c0 = cut;
+        } else {
+            std::int64_t cut = region.r0 + 1;
+            while (cut < region.r1 - 1 &&
+                   energyOf(Region{region.r0, cut, region.c0, region.c1}) < 0.5 * most) {
+                ++cut;
+            }
+            first.r1 = cut;
+            second.r0 = cut;
+        }
+        regions[best] = first;
+        regions.push_back(second);
+    }
+    std::vector<DomeDirection> directions;
+    for (const Region& region : regions) {
+        DomeDirection out;
+        glm::dvec3 direction(0.0);
+        for (std::int64_t r = region.r0; r < region.r1; ++r) {
+            const double theta = (static_cast<double>(r) + 0.5) * dTheta;
+            const double omega = solidAngle(r);
+            for (std::int64_t c = region.c0; c < region.c1; ++c) {
+                const glm::dvec3 v = glm::max(texel(r, c), glm::dvec3(0.0));
+                const double phi = (static_cast<double>(c) + 0.5) * dPhi;
+                out.irradiance += v * omega;
+                direction += (0.2126 * v.r + 0.7152 * v.g + 0.0722 * v.b) * omega *
+                             glm::dvec3(std::sin(theta) * std::cos(phi),
+                                        std::sin(theta) * std::sin(phi), std::cos(theta));
+            }
+        }
+        if (glm::length(direction) > 0.0) {
+            out.direction = glm::normalize(direction);
+            directions.push_back(out);
+        }
+    }
+    return directions;
+}
+
 std::optional<Image> DomeMapOf(const Scene& scene, const Path& path) {
     const Tensor* texture = scene.Read(path, tokens::kLightTexture);
     if (texture == nullptr) {
@@ -1362,13 +1467,17 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
         params.domeMode = DomeLightMode::Full;
     } else if (domeMode == "limited") {
         params.domeMode = DomeLightMode::Limited;
+    } else if (domeMode == "directions") {
+        params.domeMode = DomeLightMode::Directions;
     } else {
         throw std::invalid_argument("'" + settings.String() + "' " +
                                     std::string(kDomeLightMode) + " is '" + domeMode +
-                                    "', not approximate, full or limited");
+                                    "', not approximate, full, directions or limited");
     }
     params.domeShadowRadius =
         std::max(Number(scene, settings, kDomeShadowRadius, params.domeShadowRadius), 1e-6f);
+    params.domeDirections = static_cast<std::uint32_t>(std::clamp(
+        GetNumber(scene, settings, kDomeDirections, params.domeDirections), 1.0, 1024.0));
     params.wireframe = WireframeOf(scene, settings);
     params.overlays = GetToken(scene, settings, kOverlays, "");
     params.minimal = MinimalModeOf(scene, settings, MinimalMode::Off);

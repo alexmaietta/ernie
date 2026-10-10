@@ -420,6 +420,36 @@ TEST_F(RasterDelegateTest, TheFullDomeModeShadowsTheSunOfAnHdrSky) {
         << "the sun's light moved out of the map, not added";
 }
 
+TEST_F(RasterDelegateTest, TheDirectionsModeShadowsTheDomeFromTheWholeScene) {
+    // FlatScene's floor and a 6 m cube under a uniform dome. In the directions mode the dome's
+    // diffuse light comes from 16 shadowed directions: open floor gets as much as unshadowed, while
+    // floor beside the cube loses the directions the cube blocks, from the cube's shadows rather
+    // than the (1 m) screen-space radius.
+    Scene scene = FlatScene();
+    scene.Remove("/World/Sun");
+    scene.Define("/World/Sky", tokens::kDomeLight).Set(tokens::kIntensity, 1.0);
+    scene.Define("/World/Box", tokens::kCube)
+        .Set(tokens::kSize, 6.0)
+        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 3.0)))
+        .Set(tokens::kMaterialBinding, Path("/Looks/Grey"));
+    RasterDelegate delegate(*context_);
+    const auto [nearRow, nearCol] = PixelOf(scene, 4.0f, 0.0f);
+    const auto [openRow, openCol] = PixelOf(scene, -12.0f, 12.0f);
+    const auto floor = [&] {
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const auto vars = MapVars(outputs);
+        return std::pair(At<float>(vars.at("HdrColor"), nearRow, nearCol, 1),
+                         At<float>(vars.at("HdrColor"), openRow, openCol, 1));
+    };
+    const auto [approximateNear, approximateOpen] = floor();
+    scene.Define("/Render/Settings", tokens::kRenderSettings)
+        .Set(tokens::kDomeLightMode, std::string("directions"));
+    const auto [directionsNear, directionsOpen] = floor();
+    EXPECT_NEAR(directionsOpen, approximateOpen, 0.08f * approximateOpen)
+        << "the directions carry the dome's diffuse light";
+    EXPECT_LT(directionsNear, 0.85f * approximateNear) << "the cube blocks some of them";
+}
+
 TEST_F(RasterDelegateTest, TerrainHorizonsShadowTheDomeFromOffScreen) {
     // FlatScene's floor, 65 x 65 cells of 2 m, with a cliff 50 m tall at x = 25 to 35 m, outside
     // the view (which spans about 16 m either side of the centre), under a uniform dome. The full

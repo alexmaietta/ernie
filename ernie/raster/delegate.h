@@ -280,6 +280,10 @@ class RasterDelegate : public RenderDelegate {
     /// sky) when it has none, else as a shadowed distant light; the dome then lights with its
     /// map without the sun.
     void ApplyDomeSun(FrameParams& frame) const;
+    /// In the directions mode, lights `frame` with its dome's shadowed directions
+    /// (`DomeDirectionsOf`) as distant lights of the dome's diffuse light, as many as light slots
+    /// remain, so the dome lights without its own diffuse light.
+    void ApplyDomeDirections(FrameParams& frame) const;
     void SyncMeshes(const Scene& scene);
     void SyncInstancers(const Scene& scene);
     /// Hands the meshes' drawable the arrays of prims posed on the GPU that changed, one
@@ -381,6 +385,12 @@ class RasterDelegate : public RenderDelegate {
     bool domeSunWanted_ = false;
     std::optional<DomeSun> domeSun_;
     Tensor domeLightingMap_;
+    /// The map that lights the scene (the dome's, without its sun when lit on its own), and its
+    /// shadowed directions for the directions mode, made for `domeDirectionCount_` of them when a
+    /// frame first asks.
+    std::optional<Image> domeLightingImage_;
+    mutable std::vector<DomeDirection> domeDirections_;
+    mutable std::size_t domeDirectionCount_ = 0;
     /// The temporal filters' state per product: two images, the last frame's and the next's.
     struct SensorState {
         std::array<std::unique_ptr<GpuImage>, 2> images;

@@ -187,6 +187,10 @@ struct Light {
     float coneAngle = 180.0f;   ///< Degrees off the axis that are lit; 180 lights every direction.
     float coneSoftness = 0.0f;  ///< Fraction of the cone, at its edge, over which light fades out.
     bool shadows = true;
+    /// A direction of a dome (`DomeLightMode::Directions`): it lights with the model's diffuse
+    /// response to surrounding light (`IBrdf::environment`), as the dome's diffuse light would,
+    /// while the dome keeps its specular light.
+    bool domeDiffuse = false;
     /// The world the light shines in (`tokens::kWorld`): views of a batch see their world's
     /// lights and the shared ones (-1).
     std::int32_t world = -1;
@@ -226,6 +230,8 @@ enum class DomeLightMode {
     Approximate,  ///< Diffuse and specular, unoccluded.
     Full,         ///< Also shadowed: ambient occlusion from the G-buffer.
     Limited,      ///< Reflections only: no diffuse dome light.
+    /// Full, with the diffuse dome light from shadowed directions (`DomeDirectionsOf`).
+    Directions,
 };
 
 /// One star of a `StarField`, as renders take it: where it is and the black-body spectrum it
@@ -272,6 +278,11 @@ struct FrameParams {
     DomeLightMode domeMode = DomeLightMode::Approximate;
     /// World distance within which geometry shadows a dome in `DomeLightMode::Full`.
     float domeShadowRadius = 1.0f;
+    /// How many shadowed directions light the dome's diffuse light in `DomeLightMode::Directions`
+    /// (`tokens::kDomeDirections`), and whether `lights` holds them this frame, so the dome's
+    /// own diffuse light stays off.
+    std::uint32_t domeDirections = 16;
+    bool domeDirectionsLit = false;
     std::optional<StarField> stars;  ///< Stars behind everything, as last uploaded.
     float exposure = 1.0f;                 ///< Extra scale on the photographic output.
     bool meter = false;  ///< Measure the scene's luminance (`tokens::kMeter`).

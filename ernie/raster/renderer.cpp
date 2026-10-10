@@ -937,6 +937,8 @@ void RasterRenderer::WriteLights(const FrameParams& params, const std::optional<
         entry.position[1] = where.y;
         entry.position[2] = where.z;
         entry.position[3] = static_cast<float>(light.type);
+        // A dome's direction lights with the model's diffuse response alone (shading.slang).
+        entry.shadow[1] = light.domeDiffuse ? 1.0f : 0.0f;
         entry.axis[0] = axis.x;
         entry.axis[1] = axis.y;
         entry.axis[2] = axis.z;
@@ -1654,8 +1656,10 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
     // What the sky pass draws, and for shading whether a dome lights the scene at all.
     shading.sky[0] = sky_ | (params.dome ? kSkyLighting : 0u);
     // The dome lighting mode: shadowed (screen-space, so not for pushbroom strips) and diffuse.
-    const bool domeShadowed = params.dome && params.dome->shadow &&
-                              params.domeMode == DomeLightMode::Full && !params.camera.pushbroom;
+    const bool domeShadowed =
+        params.dome && params.dome->shadow &&
+        (params.domeMode == DomeLightMode::Full || params.domeMode == DomeLightMode::Directions) &&
+        !params.camera.pushbroom;
     shading.domeLighting[0] = domeShadowed ? 1.0f : 0.0f;
     domeShadowed_ = domeShadowed;
     if (domeShadowed && occlusionPipeline_ == nullptr) {
@@ -1667,7 +1671,9 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
         occlusionFilterPipeline_ = std::make_unique<ComputePipeline>(
             context_, shadingLayout_, compiler_.CompileSpirv(modules, "occlusionFilterMain"));
     }
-    shading.domeLighting[1] = params.domeMode == DomeLightMode::Limited ? 0.0f : 1.0f;
+    // No diffuse dome light in the limited mode, nor when shadowed directions carry it.
+    shading.domeLighting[1] =
+        params.domeMode == DomeLightMode::Limited || params.domeDirectionsLit ? 0.0f : 1.0f;
     shading.domeLighting[2] = params.domeShadowRadius;
     shading.domeLighting[3] = 32.0f;
     shading.sky[1] = map.width;

@@ -628,3 +628,35 @@ TEST(ExtractDomeSun, FindsACompactBrightSunAndLeavesTheSky) {
     EXPECT_FALSE(ernie::ExtractDomeSun(broad).has_value()) << "too wide for a sun";
     EXPECT_FALSE(ernie::ExtractDomeSun(mild).has_value()) << "not bright enough over the sky";
 }
+
+TEST(DomeDirectionsOf, SplitsTheDomesEnergyEvenlyAndFollowsItsBrightRegions) {
+    // A uniform map: eight directions of about an eighth of the sphere's irradiance each (4 pi /
+    // 8, within the snapping of cuts to whole rows and columns), adding up to the whole sphere's
+    // exactly and spread so their mean direction vanishes.
+    const ernie::Image uniform(64, 32, glm::vec4(1.0f));
+    const std::vector<ernie::DomeDirection> even = ernie::DomeDirectionsOf(uniform, 8);
+    ASSERT_EQ(even.size(), 8u);
+    glm::dvec3 total(0.0);
+    glm::dvec3 mean(0.0);
+    for (const ernie::DomeDirection& d : even) {
+        EXPECT_NEAR(d.irradiance.g, 4.0 * M_PI / 8.0, 0.25 * 4.0 * M_PI / 8.0);
+        total += d.irradiance;
+        mean += d.direction;
+    }
+    EXPECT_NEAR(total.g, 4.0 * M_PI, 1e-6);
+    EXPECT_LT(glm::length(mean / 8.0), 0.1);
+
+    // A bright upper hemisphere draws the directions up.
+    ernie::Image sky(64, 32, glm::vec4(0.01f));
+    for (std::uint32_t r = 0; r < 16; ++r) {
+        for (std::uint32_t c = 0; c < 64; ++c) {
+            sky.At(c, r) = glm::vec4(1.0f);
+        }
+    }
+    int up = 0;
+    for (const ernie::DomeDirection& d : ernie::DomeDirectionsOf(sky, 16)) {
+        up += d.direction.z > 0.0 ? 1 : 0;
+    }
+    EXPECT_GE(up, 14);
+    EXPECT_TRUE(ernie::DomeDirectionsOf(ernie::Image(64, 32, glm::vec4(0.0f)), 4).empty());
+}

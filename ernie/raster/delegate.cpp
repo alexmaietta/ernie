@@ -621,8 +621,48 @@ void RasterDelegate::SyncHeightfield(const Scene& scene, const Path& terrain) {
     }
 }
 
+void RasterDelegate::ApplyDomeDirections(FrameParams& frame) const {
+    if (!frame.dome || frame.domeMode != DomeLightMode::Directions || !frame.dome->shadow ||
+        !domeLightingImage_) {
+        return;
+    }
+    const std::size_t free = RasterRenderer::kMaxLights -
+                             std::min(frame.lights.size(), RasterRenderer::kMaxLights);
+    const std::size_t count = std::min<std::size_t>(frame.domeDirections, free);
+    if (count == 0) {
+        return;
+    }
+    if (count != domeDirectionCount_) {
+        domeDirections_ = DomeDirectionsOf(*domeLightingImage_, count);
+        domeDirectionCount_ = count;
+    }
+    const glm::dmat3 rotation = glm::transpose(glm::dmat3(frame.dome->toDome));
+    for (const DomeDirection& direction : domeDirections_) {
+        // As the dome's light: its spectral radiance times the region's colour, upsampled as
+        // the map is, times its RGB irradiance.
+        const glm::dvec3 rgb = direction.irradiance;
+        const double peak = std::max({rgb.r, rgb.g, rgb.b});
+        if (!(peak > 0.0)) {
+            continue;
+        }
+        const std::vector<float> shape = RgbToSpectrum(rgb / peak).Bin(frame.camera.bands);
+        Light light;
+        light.type = LightType::Distant;
+        light.direction = glm::vec3(glm::normalize(rotation * direction.direction));
+        light.spectrum.assign(frame.dome->radiance.size(), 0.0f);
+        for (std::size_t b = 0; b < light.spectrum.size() && b < shape.size(); ++b) {
+            light.spectrum[b] = static_cast<float>(frame.dome->radiance[b] * shape[b] * peak);
+        }
+        light.shadows = true;
+        light.domeDiffuse = true;
+        frame.lights.push_back(std::move(light));
+    }
+    frame.domeDirectionsLit = true;
+}
+
 void RasterDelegate::ApplyDomeSun(FrameParams& frame) const {
-    if (!domeSun_ || !frame.dome || frame.domeMode != DomeLightMode::Full ||
+    if (!domeSun_ || !frame.dome ||
+        (frame.domeMode != DomeLightMode::Full && frame.domeMode != DomeLightMode::Directions) ||
         !frame.dome->shadow || domeLightingMap_.Empty()) {
         return;
     }
@@ -662,20 +702,30 @@ void RasterDelegate::SyncSky(const Scene& scene, const RenderPrims& prims) {
     const std::optional<Key> map =
         prims.dome.IsEmpty() ? std::nullopt
                              : std::optional(KeyOf(scene, prims.dome, {kLightTexture}));
-    // The full dome lighting mode, with the dome's shadows on, lights its map's sun on its own.
-    const bool wantSun = !prims.dome.IsEmpty() &&
-                         GetToken(scene, prims.settings, kDomeLightMode, "approximate") == "full" &&
+    // The full and directions dome lighting modes, with the dome's shadows on, light its map's
+    // sun on its own.
+    const std::string mode = GetToken(scene, prims.settings, kDomeLightMode, "approximate");
+    const bool wantSun = !prims.dome.IsEmpty() && (mode == "full" || mode == "directions") &&
                          GetBool(scene, prims.dome, kShadowEnable, true);
     if (map != domeMap_ || wantSun != domeSunWanted_) {
         domeMap_ = map;
         domeSunWanted_ = wantSun;
         domeSun_.reset();
         domeLightingMap_ = Tensor();
+        domeLightingImage_.reset();
+        domeDirections_.clear();
+        domeDirectionCount_ = 0;
         try {
             const std::optional<Image> image =
                 prims.dome.IsEmpty() ? std::nullopt : DomeMapOf(scene, prims.dome);
             const std::optional<DomeSunExtraction> extraction =
                 wantSun && image ? ExtractDomeSun(*image) : std::nullopt;
+            if (wantSun) {
+                // A uniform map stands for a dome without one.
+                domeLightingImage_ = extraction ? extraction->lighting
+                                     : image    ? *image
+                                                : Image(32, 16, glm::vec4(1.0f));
+            }
             if (extraction) {
                 domeSun_ = extraction->sun;
                 const Image& lit = extraction->lighting;
@@ -1843,6 +1893,7 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
         frame.lights[i].posedOnGpu = anchoredLights[i];
     }
     ApplyDomeSun(frame);
+    ApplyDomeDirections(frame);
     frame.filters.assign(filters.begin(), filters.end());
     // One chain needs no chains of its own: `filters` and `vars` run as it (its filters, which
     // are a var's own when every var has the same).

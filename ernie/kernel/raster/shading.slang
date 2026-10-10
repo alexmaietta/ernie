@@ -108,7 +108,8 @@ struct LightGpu {
     // Cosine of the cone's angle (-2 without a cone), cosine where its falloff starts, first
     // shadow view, shadow view count (0 without shadows, 1, or 6 for a cube).
     float4 cone;
-    // x: world size of a shadow texel, at unit distance for perspective views.
+    // x: world size of a shadow texel, at unit distance for perspective views; y: 1 for a dome's
+    // direction (`Light::domeDiffuse`), which lights with the model's diffuse response alone.
     float4 shadow;
     // Rect and disk: half width along the light's +x and half height along its +y, as vectors.
     float4 extentX;
@@ -799,8 +800,13 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             for (uint j = 0; j < 3; ++j) {
                 lightSpectrum[j] = bandValue(lights[k].spectrum, min(first + j, bands - 1));
             }
-            let factors = radianceFactors(n, lightDirections[k], v, bandAlbedo, slopeVariance,
-                                          params);
+            // A dome's direction stands for its diffuse light alone: the model's diffuse
+            // response to surrounding light times cos(i), as a Lambertian radiance factor (the
+            // dome keeps its specular light).
+            let factors =
+                lights[k].shadow.y > 0.5
+                    ? environment.diffuse * max(dot(n, lightDirections[k]), 0.0)
+                    : radianceFactors(n, lightDirections[k], v, bandAlbedo, slopeVariance, params);
             radiance += lightScales[k] * lightSpectrum / PI * factors;
         }
         for (uint k = 0; k < 3 && first + k < bands; ++k) {
