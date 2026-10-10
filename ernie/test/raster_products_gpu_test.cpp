@@ -6,6 +6,7 @@
 #include "ernie/scene/orbit_controller.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/scene/wide_view.h"
 #include "ernie/session/renderer.h"
 #include "support/delegate_scenes.h"
 #include "support/test_raster.h"
@@ -711,6 +712,69 @@ TEST_F(RasterDelegateTest, MastcamZsNearInfraredFiltersSeeTheSunsBlackBody) {
     EXPECT_GT(r1, 100.0);
     EXPECT_GT(r6, 0.0);
     EXPECT_LT(r6, 0.5 * r1);
+}
+
+TEST_F(RasterDelegateTest, AFisheyeWiderThan180DegreesSeesPastItsHorizonOnCubeFaces) {
+    // An equidistant fisheye 5 m over flat ground looking straight down, its corners 2 radians
+    // (115 degrees) off axis, drawn on cube faces: the ground at 5 / cos(theta) for each pixel's
+    // own ray, a cube 95 degrees off axis (above the horizon) where the lens puts it, and nothing
+    // past the horizon elsewhere.
+    Scene scene = FlatScene();
+    scene.Set("/World/Camera", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, 5.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
+    scene.Set("/World/Camera", tokens::kLensProjection, std::string(tokens::kFisheye));
+    const double corner = std::sqrt(2.0) * 0.5 * kVarSize;  // pixels from the centre
+    const double focalPixels = corner / 2.0;
+    const double aperture = 20.0;
+    scene.Set("/World/Camera", tokens::kVerticalAperture, aperture);
+    scene.Set("/World/Camera", tokens::kHorizontalAperture, aperture);
+    scene.Set("/World/Camera", tokens::kFocalLength, aperture * focalPixels / kVarSize);
+    // 95 degrees off axis along the image's diagonal (camera x and y = world x and y here).
+    const double theta = 95.0 * M_PI / 180.0;
+    const glm::dvec3 towards(std::sin(theta) / std::sqrt(2.0), std::sin(theta) / std::sqrt(2.0),
+                             -std::cos(theta));
+    scene.Define("/World/Cube", tokens::kCube)
+        .Set(tokens::kSize, 2.0)
+        .Set(tokens::kTransform,
+             glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 5.0) + 12.0 * towards));
+    const ernie::Camera camera = ernie::CameraOf(scene, "/World/Camera", kVarSize, kVarSize);
+    ASSERT_TRUE(ernie::NeedsCubeFaces(camera));
+    RasterDelegate delegate(*context_);
+    ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+    const auto vars = MapVars(outputs);
+    const glm::dvec2 centre = camera.PrincipalPoint();
+    const double f = camera.FocalLengthPixels();
+    glm::dvec2 cubeSum(0.0);
+    int cubeHits = 0;
+    int ground = 0;
+    for (std::size_t row = 0; row < kVarSize; ++row) {
+        for (std::size_t col = 0; col < kVarSize; ++col) {
+            const glm::dvec2 distorted((col + 0.5 - centre.x) / f, (centre.y - (row + 0.5)) / f);
+            const glm::dvec3 ray = ernie::LensRay(camera.lens, distorted);
+            const double offAxis = std::acos(-ray.z);
+            const Path prim = delegate.PrimPath(At<std::uint32_t>(vars.at("PrimId"), row, col));
+            if (prim == Path("/World/Cube")) {
+                cubeSum += glm::dvec2(col + 0.5, row + 0.5);
+                ++cubeHits;
+                continue;
+            }
+            if (offAxis < 60.0 * M_PI / 180.0) {
+                ASSERT_EQ(prim, Path("/World/Terrain")) << row << ", " << col;
+                EXPECT_NEAR(At<float>(vars.at("DistanceToCamera"), row, col), 5.0 / -ray.z,
+                            0.05 * 5.0 / -ray.z)
+                    << row << ", " << col;
+                ++ground;
+            } else if (offAxis > 92.0 * M_PI / 180.0) {
+                EXPECT_EQ(At<std::uint32_t>(vars.at("PrimId"), row, col), 0u)
+                    << "past the horizon at " << row << ", " << col;
+            }
+        }
+    }
+    EXPECT_GT(ground, 100);
+    ASSERT_GT(cubeHits, 0) << "the cube above the horizon";
+    // Where the lens puts its centre: radius theta f along the diagonal (up and right).
+    const glm::dvec2 expected = centre + theta * f * glm::dvec2(1.0, -1.0) / std::sqrt(2.0);
+    EXPECT_LT(glm::distance(cubeSum / double(cubeHits), expected), 1.5);
 }
 
 TEST_F(RasterDelegateTest, FisheyeSeesFieldAnglesInProportionToRadius) {

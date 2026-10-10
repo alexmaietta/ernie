@@ -54,8 +54,9 @@ enum class LensProjection : std::uint8_t {
 ///   y' = y (1 + k1 r^2 + k2 r^4 + k3 r^6) + p1 (r^2 + 2 y^2) + 2 p2 x y
 /// A fisheye lens maps them to theta_d / r (x, y), with theta = atan(r) (OpenCV's fisheye model).
 ///
-/// The rasterizer draws a pinhole image and the sensor resamples it through the lens, so a
-/// fisheye's field angle must stay below `kMaxFisheyeFieldAngle`.
+/// The rasterizer draws a pinhole image and the sensor resamples it through the lens; a fisheye
+/// reaching past 60 degrees off axis is drawn on cube faces instead (wide_view.h), its field
+/// angle below `kMaxFisheyeFieldAngle`.
 ///
 /// References:
 /// - D. C. Brown, "Decentering Distortion of Lenses", Photogrammetric Engineering 32(3):444-462,
@@ -77,9 +78,10 @@ struct LensModel {
     bool vignetting = false;    ///< Natural falloff of irradiance off axis (cos^4 for pinholes).
     double transmission = 1.0;  ///< Fraction of light the optics pass.
 
-    /// The largest field angle a fisheye may see, in radians (80 degrees): the pinhole image the
-    /// sensor resamples grows as its tangent.
-    static constexpr double kMaxFisheyeFieldAngle = 1.3962634015954636;
+    /// The largest field angle a fisheye may see, in radians (125 degrees off axis, a 250 degree
+    /// field): one fisheye reaching past 60 degrees renders on cube faces (wide_view.h), which
+    /// cover every ray within 125.3 degrees of the axis.
+    static constexpr double kMaxFisheyeFieldAngle = 2.1816615649929116;
 
     /// Whether the lens is a pinhole: perspective without distortion.
     bool IsPinhole() const {

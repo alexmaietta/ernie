@@ -58,6 +58,9 @@ struct SensorPlan {
     /// Whether the camera is a pushbroom, whose pixels' rays come from module `projection`'s
     /// pushbroom strip (projection_pushbroom.slang) rather than one view-projection.
     bool pushbroom = false;
+    /// Whether the camera is rendered on cube faces (`NeedsCubeFaces`): the lens follows each
+    /// pixel's ray (`lensRayOf`) onto its face's layer rather than through one pinhole image.
+    bool cube = false;
 
     /// Identifies the kernels: plans with the same key share them (parameter values aside, which
     /// the kernels read from a buffer).
@@ -68,8 +71,8 @@ struct SensorPlan {
     /// stored (sensor.slang's bindings 16 and 17) and stores those segment `s + 1` reads (18, 19).
     std::string Source(std::uint32_t segment = 0) const;
 
-    /// The Slang source of module `lensProjection`, which module `sensor` imports: `lensPinholeOf`
-    /// and `lensFalloff` of projection `lens`, from module `lens`.
+    /// The Slang source of module `lensProjection`, which module `sensor` imports: `lensPinholeOf`,
+    /// `lensRayOf` and `lensFalloff` of projection `lens`, from module `lens`, and `kLensCube`.
     std::string LensSource() const;
 
     /// The custom filters' modules as (name, source), for the shader compiler.

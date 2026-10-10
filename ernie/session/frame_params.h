@@ -381,6 +381,21 @@ struct FrameParams {
     /// seeing its view's world. A copy for a frame of one sub-frame.
     /// @throws std::invalid_argument for `previousPoses` of another view count.
     FrameParams Subframes() const;
+
+    /// The frame as the `faces` cube faces of a wide camera see it (wide_view.h): a view per
+    /// view and face, view `v`'s face `f` at `v * faces + f`, posed at the view's pose turned
+    /// onto the face (`CubeFaceAxes`, its previous pose too) and seeing the view's world, and
+    /// `camera` a centred pinhole of the same image whose square of 90 degrees plus a margin
+    /// (`CubeFaceExtent`) spans the image's shorter side. The raster passes draw these; the
+    /// sensor follows the original camera's lens rays onto them. A copy for one face.
+    /// @throws std::invalid_argument for faces other than 1 and `kCubeFaces`, or with the poses on
+    /// the GPU.
+    FrameParams Faces(int faces) const;
+
+    /// The tangent-plane focal length, in raster pixels, and the principal point of a cube face
+    /// of a camera of `width` x `height` pixels (`Faces`): the face's image-plane coordinates
+    /// (x, y) land at (cx + f x, cy - f y).
+    static glm::dvec3 FaceIntrinsics(std::uint32_t width, std::uint32_t height);
 };
 
 /// Camera-to-world pose `s` of the way from `from` (0) to `to` (1), extrapolating outside: the

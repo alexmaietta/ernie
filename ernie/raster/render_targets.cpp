@@ -25,41 +25,49 @@ constexpr VkImageUsageFlags kStorage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USA
 
 }  // namespace
 
-std::uint32_t RenderTargets::MaxViews(const VulkanContext& context, int bands) {
-    return context.Limits().maxImageArrayLayers / static_cast<std::uint32_t>(std::max(bands, 1));
+std::uint32_t RenderTargets::MaxViews(const VulkanContext& context, int bands,
+                                      std::uint32_t faces) {
+    return context.Limits().maxImageArrayLayers /
+           (static_cast<std::uint32_t>(std::max(bands, 1)) * std::max(faces, 1u));
 }
 
 RenderTargets::RenderTargets(const VulkanContext& context, VkExtent2D extent, int bands,
                              bool shared, std::uint32_t views,
                              std::span<const std::string_view> vars,
-                             std::span<const std::string> aovs)
-    : context_(context), extent_(extent), bands_(bands), views_(views), shared_(shared),
-      aovNames_(aovs.begin(), aovs.end()) {
+                             std::span<const std::string> aovs, std::uint32_t faces)
+    : context_(context), extent_(extent), bands_(bands), views_(views), faces_(faces),
+      shared_(shared), aovNames_(aovs.begin(), aovs.end()) {
     if (extent.width == 0 || extent.height == 0) {
         throw std::invalid_argument("Render targets need a non-zero extent");
     }
     SpectralBands{380.0, 780.0, bands}.Check();
-    if (views == 0 || views > MaxViews(context, bands)) {
-        throw std::invalid_argument("Render targets hold 1 to " +
-                                    std::to_string(MaxViews(context, bands)) + " views of " +
-                                    std::to_string(bands) + " bands, not " + std::to_string(views));
+    if (faces == 0) {
+        throw std::invalid_argument("Render targets need at least one raster layer per view");
     }
+    if (views == 0 || views > MaxViews(context, bands, faces)) {
+        throw std::invalid_argument("Render targets hold 1 to " +
+                                    std::to_string(MaxViews(context, bands, faces)) +
+                                    " views of " + std::to_string(bands) + " bands and " +
+                                    std::to_string(faces) + " faces, not " +
+                                    std::to_string(views));
+    }
+    const std::uint32_t layers = views * faces;
     for (std::size_t i = 0; i < gbuffer_.size(); ++i) {
         // Arrays even for one view, so shading reads every view's layer in one dispatch.
         gbuffer_[i] = std::make_unique<GpuImage>(
-            context, ImageDesc{extent.width, extent.height, views, 1, kGBufferFormats[i],
+            context, ImageDesc{extent.width, extent.height, layers, 1, kGBufferFormats[i],
                                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                                false, true});
     }
     // An array even for one view, so a depth pyramid builds from every view's layer at once.
     depth_ = std::make_unique<GpuImage>(
-        context, ImageDesc{extent.width, extent.height, views, 1, kDepthFormat,
+        context, ImageDesc{extent.width, extent.height, layers, 1, kDepthFormat,
                            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                            false, true});
     const auto bandLayers = static_cast<std::uint32_t>(bands);
     rasterRadiance_ = std::make_unique<GpuImage>(
-        context, ImageDesc{extent.width, extent.height, views * bandLayers, 1, VK_FORMAT_R32_SFLOAT,
-                           kStorage, false, true, bandLayers});
+        context, ImageDesc{extent.width, extent.height, layers * bandLayers, 1,
+                           VK_FORMAT_R32_SFLOAT, kStorage, false, true, bandLayers});
     held_ = RequiredVars(vars);
     for (std::size_t i = 0; i < kVarNames.size(); ++i) {
         const bool spectral = kVarNames[i] == render_vars::kSpectralRadiance;
@@ -108,7 +116,8 @@ GpuImage& RenderTargets::Hzb() {
         const auto mips = static_cast<std::uint32_t>(std::bit_width(std::max(width, height)));
         hzb_ = std::make_unique<GpuImage>(
             context_,
-            ImageDesc{width, height, views_, mips, VK_FORMAT_R32_SFLOAT, kStorage, false, true});
+            ImageDesc{width, height, RasterLayers(), mips, VK_FORMAT_R32_SFLOAT, kStorage, false,
+                      true});
     }
     return *hzb_;
 }
@@ -117,7 +126,7 @@ GpuImage& RenderTargets::RadianceSum() {
     if (radianceSum_ == nullptr) {
         const auto bandLayers = static_cast<std::uint32_t>(bands_);
         radianceSum_ = std::make_unique<GpuImage>(
-            context_, ImageDesc{extent_.width, extent_.height, views_ * bandLayers, 1,
+            context_, ImageDesc{extent_.width, extent_.height, RasterLayers() * bandLayers, 1,
                                 VK_FORMAT_R32_SFLOAT, kStorage, false, true, bandLayers});
     }
     return *radianceSum_;
@@ -129,7 +138,8 @@ GpuImage& RenderTargets::Raster(bool full) {
         // Drawn into by the drawables' motion passes too.
         image = std::make_unique<GpuImage>(
             context_,
-            ImageDesc{full ? extent_.width : 1, full ? extent_.height : 1, full ? views_ : 1, 1,
+            ImageDesc{full ? extent_.width : 1, full ? extent_.height : 1,
+                      full ? RasterLayers() : 1, 1,
                       VK_FORMAT_R32G32B32A32_SFLOAT,
                       kStorage | (full ? VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT : 0u), false, true});
     }
@@ -175,7 +185,7 @@ RenderingTarget RenderTargets::GBufferTarget(bool load) const {
     target.clearColors = {VkClearColorValue{}, VkClearColorValue{}, background};
     target.depth = depth_->View();
     target.extent = extent_;
-    target.layers = views_;
+    target.layers = RasterLayers();
     return target;
 }
 

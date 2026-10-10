@@ -2094,10 +2094,11 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         std::erase_if(chains, [](const FrameParams::SensorChain& chain) {
             return chain.vars.empty();
         });
-        // A wide fisheye draws its views on cube faces, each a layer of the raster images.
+        // A wide fisheye draws its views on cube faces, each a layer of the raster images. Its
+        // lens alone decides, not its pose (which may be on the GPU).
         const std::uint32_t faces =
             NeedsCubeFaces(CameraOf(scene, cameras.front(), spec.resolution.width,
-                                    spec.resolution.height))
+                                    spec.resolution.height, glm::dmat4(1.0)))
                 ? static_cast<std::uint32_t>(kCubeFaces)
                 : 1u;
         std::shared_ptr<ProductFrame> frame = AcquireFrame(spec.product, spec.resolution, bands,

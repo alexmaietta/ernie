@@ -1,5 +1,7 @@
 #include "ernie/session/frame_params.h"
 
+#include "ernie/scene/wide_view.h"
+
 #include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
@@ -170,6 +172,52 @@ FrameParams FrameParams::Subframes() const {
             result.poses.push_back(previousPoses.empty()
                                        ? pose
                                        : InterpolatePose(previousPoses[v], pose, s));
+            result.worlds.push_back(ViewWorld(v));
+        }
+    }
+    return result;
+}
+
+glm::dvec3 FrameParams::FaceIntrinsics(std::uint32_t width, std::uint32_t height) {
+    const double side = std::min(width, height);
+    const double focal = 0.5 * side / CubeFaceExtent(side);
+    return {focal, 0.5 * width, 0.5 * height};
+}
+
+FrameParams FrameParams::Faces(int faces) const {
+    if (faces != 1 && faces != kCubeFaces) {
+        throw std::invalid_argument("A frame renders on 1 or " + std::to_string(kCubeFaces) +
+                                    " cube faces, not " + std::to_string(faces));
+    }
+    FrameParams result = *this;
+    if (faces == 1) {
+        return result;
+    }
+    if (posesOnGpu) {
+        throw std::invalid_argument("A camera rendered on cube faces needs its poses on the host");
+    }
+    // The faces' camera: a centred pinhole, its focal length in pixels the face's.
+    Camera& face = result.camera;
+    face.lens = LensModel{};
+    face.lens.transmission = camera.lens.transmission;
+    face.lens.vignetting = camera.lens.vignetting;
+    const glm::dvec3 intrinsics = FaceIntrinsics(camera.width, camera.height);
+    face.focalLengthMm = intrinsics.x * camera.verticalApertureMm / camera.height;
+    face.horizontalApertureOffsetMm = 0.0;
+    face.verticalApertureOffsetMm = 0.0;
+    result.overscan = 1.0;
+    const std::size_t views = Views();
+    result.poses.clear();
+    result.worlds.clear();
+    result.previousPoses.clear();
+    for (std::size_t v = 0; v < views; ++v) {
+        const glm::dmat4& pose = poses.empty() ? camera.transform : poses[v];
+        for (int f = 0; f < faces; ++f) {
+            const glm::dmat4 turn(CubeFaceAxes(static_cast<CubeFace>(f)));
+            result.poses.push_back(pose * turn);
+            if (!previousPoses.empty()) {
+                result.previousPoses.push_back(previousPoses.at(v) * turn);
+            }
             result.worlds.push_back(ViewWorld(v));
         }
     }

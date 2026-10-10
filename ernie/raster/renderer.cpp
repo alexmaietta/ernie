@@ -3,6 +3,7 @@
 #include "ernie/device/gpu_profile.h"
 #include "ernie/kernel/embedded_shaders.h"
 #include "ernie/raster/poisson_disk.h"
+#include "ernie/scene/wide_view.h"
 #include "ernie/session/sampling.h"
 
 #include <glm/gtc/type_ptr.hpp>
@@ -119,8 +120,14 @@ struct SensorUniforms {
     float range[4];   ///< First band's lower wavelength, band width (nm), the lens f-number.
     float optics[4];  ///< Diffraction f-number, pixel pitch (um), focal length (mm), focus.
     float photons[SpectralBands::kMaxBands];  ///< Per band: photons per unit radiance (no QE).
+    /// A cube camera's faces (`FrameParams::Faces`): their shared projection's inverse, from clip
+    /// space to the face's camera frame.
+    float faceInvProj[16];
+    /// Faces (1 without), the faces' focal length in raster pixels, their principal point.
+    float faces[4];
+    float facesPadding[44];
 };
-static_assert(sizeof(SensorUniforms) == 2560, "SensorUniforms must match sensor.slang");
+static_assert(sizeof(SensorUniforms) == 2816, "SensorUniforms must match sensor.slang");
 
 /// Per-view uniforms sit in one buffer at multiples of this, the largest
 /// `minUniformBufferOffsetAlignment` Vulkan allows.
@@ -256,6 +263,7 @@ std::vector<ShaderModuleSource> ShadingModules(const BrdfModel& brdf, bool pushb
 std::vector<ShaderModuleSource> SensorModules(const SensorPlan& plan, std::uint32_t segment) {
     std::vector<ShaderModuleSource> modules{ProjectionModule(plan.pushbroom),
                                             {"lens", shaders::kLensSlang},
+                                            {"cube_faces", shaders::kCubeFacesSlang},
                                             {"lensProjection", plan.LensSource()},
                                             {"sensor", shaders::kSensorSlang}};
     for (auto& [name, source] : plan.Modules()) {
@@ -986,6 +994,19 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
         expanded = frame.Subframes();
     }
     const FrameParams& params = expanded ? *expanded : frame;
+    // A wide fisheye draws each view on cube faces (`FrameParams::Faces`): the raster passes see
+    // `raster`, its views the faces' and its camera theirs; the sensor keeps `params`' camera,
+    // following its lens's rays onto them.
+    faces_ = NeedsCubeFaces(frame.camera) ? static_cast<std::uint32_t>(kCubeFaces) : 1u;
+    if (faces_ > 1 && frame.camera.rollingShutter > 0.0) {
+        // Motion blur weights sub-frames by the raster's rows, which a face's are not.
+        throw std::invalid_argument("A camera rendered on cube faces has no rolling shutter yet");
+    }
+    std::optional<FrameParams> facesOf;
+    if (faces_ > 1) {
+        facesOf = params.Faces(static_cast<int>(faces_));
+    }
+    const FrameParams& raster = facesOf ? *facesOf : params;
     outputViews_ = static_cast<std::uint32_t>(frame.Views());
     const Camera& shutter = frame.camera;
     const double first = shutter.SubframeTime(0);
@@ -1017,17 +1038,18 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
         params.dome->radiance.size() != static_cast<std::size_t>(params.camera.bands.count)) {
         throw std::invalid_argument("The dome's radiance needs one value per camera band");
     }
-    views_ = static_cast<std::uint32_t>(params.Views());
+    views_ = static_cast<std::uint32_t>(raster.Views());
     const std::uint32_t viewsPerTargets =
-        RenderTargets::MaxViews(context_, params.camera.bands.count);
+        RenderTargets::MaxViews(context_, params.camera.bands.count, faces_);
     EnsureViewBuffers(views_);
     posesOnGpu_ = params.posesOnGpu;
     posesQuaternions_ = params.posesOnGpu && params.posesQuaternions;
     if (posesOnGpu_) {
         WritePoseCamera(params);
     }
-    // Views posed on the GPU are planned as a batch, whose shadows do not follow the views.
-    const bool batch = outputViews_ > 1 || posesOnGpu_;
+    // Views posed on the GPU are planned as a batch, whose shadows do not follow the views; so
+    // are a cube camera's faces, whose shadows then cover all of them.
+    const bool batch = outputViews_ > 1 || posesOnGpu_ || faces_ > 1;
     const SensorModel& sensor = params.camera.sensor;
     presentRange_ = {static_cast<float>(params.camera.nearPlane),
                      static_cast<float>(params.camera.farPlane),
@@ -1077,7 +1099,7 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
         if (resolution != shadowResolution_) {
             CreateShadowMaps(resolution, kMaxCascades);
         }
-        PlanBatchShadows(params, *bounds, drawables);
+        PlanBatchShadows(raster, *bounds, drawables);
         if (shadowLayers_ > shadowMaps_->Desc().layers) {
             CreateShadowMaps(resolution, shadowLayers_);
         }
@@ -1140,7 +1162,7 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
     {
         ERNIE_ZONE("Frame uniforms");
         for (std::uint32_t v = 0; v < views_; ++v) {
-            const CameraView viewOf = params.View(v);
+            const CameraView viewOf = raster.View(v);
             Uniforms uniforms{};
             // A pushbroom projects through its strip in place of a view-projection (`projectWorld`).
             if (params.camera.pushbroom) {
@@ -1166,13 +1188,15 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
             uniforms.flags[0] = static_cast<std::uint32_t>(params.wireframe);
             uniforms.flags[1] = viewShadowLayers_[v];
             // Its layer of the render targets it draws into: a frame of more views renders them in
-            // chunks of `RenderTargets::MaxViews`, and each sub-frame into the same targets.
-            uniforms.flags[2] = (v % outputViews_) % viewsPerTargets;
+            // chunks of `RenderTargets::MaxViews`, and each sub-frame into the same targets; a
+            // cube camera's view its faces' consecutive layers.
+            const std::uint32_t outputView = (v / faces_) % outputViews_;
+            uniforms.flags[2] = (outputView % viewsPerTargets) * faces_ + v % faces_;
             uniforms.flags[3] = params.camera.orthographic ? 1u : 0u;
             uniforms.motion[0] =
                 subframes_ > 1
                     ? static_cast<float>(1.0 + frame.camera.SubframeTime(
-                                                   static_cast<int>(v / outputViews_)))
+                                                   static_cast<int>(v / (outputViews_ * faces_))))
                     : 1.0f;
             if (viewSunCascades_[v] >= 0) {
                 // A view of a world with its own fitted map samples it in place of cascade 0.
@@ -1242,6 +1266,7 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
                                held, sensorFilters_, chain.aovOffset);
         pass.plan.lens = LensKernelOf(params.camera.lens, params.camera.pushbroom);
         pass.plan.pushbroom = params.camera.pushbroom;
+        pass.plan.cube = faces_ > 1;
         // Each pass's parameters in a buffer of its own; kept from the last frame's pass at the
         // same place in the order when large enough, which only ever waits when one grows.
         const VkDeviceSize bytes = std::max<VkDeviceSize>(pass.plan.params.size(), 1) *
@@ -1266,8 +1291,8 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
     extent_ = {params.camera.width, params.camera.height};
     overlays_->Prepare(overlays, params.origin, params.camera.pushbroom);
     viewWorlds_.assign(views_, -1);
-    for (std::size_t v = 0; v < std::min<std::size_t>(params.worlds.size(), views_); ++v) {
-        viewWorlds_[v] = params.worlds[v];
+    for (std::size_t v = 0; v < std::min<std::size_t>(raster.worlds.size(), views_); ++v) {
+        viewWorlds_[v] = raster.worlds[v];
     }
     clipRange_ = {static_cast<float>(params.camera.nearPlane),
                   static_cast<float>(params.camera.farPlane)};
@@ -1287,18 +1312,20 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
     }
     // The lights first: shading reads the size of the light shadow maps they make.
     WriteLights(params, bounds);
-    WriteShading(params);
-    motionVectors_ = std::find(requiredVars_.begin(), requiredVars_.end(),
-                               render_vars::kMotionVector) != requiredVars_.end();
+    WriteShading(raster);
+    // A cube camera's MotionVector is zero for now: its pixels' motion would come through the
+    // faces' projections.
+    motionVectors_ = faces_ == 1 && std::find(requiredVars_.begin(), requiredVars_.end(),
+                                              render_vars::kMotionVector) != requiredVars_.end();
     if (motionVectors_) {
         WriteMotion(params, frame);
     }
-    WriteSensor(params);
+    WriteSensor(params, raster);
 
     shadowViews_ = cascades_;
     shadowViews_.insert(shadowViews_.end(), lightViews_.begin(), lightViews_.end());
     for (RasterDrawable* drawable : drawables) {
-        drawable->Prepare(params, shadowViews_);
+        drawable->Prepare(raster, shadowViews_);
     }
     updated_ = true;
 }
@@ -1471,7 +1498,7 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
     }
 }
 
-void RasterRenderer::WriteSensor(const FrameParams& params) {
+void RasterRenderer::WriteSensor(const FrameParams& params, const FrameParams& raster) {
     ERNIE_ZONE("Sensor uniforms");
     const Camera& camera = params.camera;
     const glm::mat4& projection = params.View().projection;
@@ -1585,12 +1612,24 @@ void RasterRenderer::WriteSensor(const FrameParams& params) {
             sensor.qe[i][c] = factors[static_cast<std::size_t>(i)];
         }
     }
-    // The sensor filters the output views, reading the G-buffer of their last sub-frame.
+    // A cube camera's faces: where their image planes land in the raster, and their depth back
+    // to their camera frames (every face shares the projection).
+    sensor.faces[0] = static_cast<float>(faces_);
+    if (faces_ > 1) {
+        const glm::dvec3 face = FrameParams::FaceIntrinsics(extent_.width, extent_.height);
+        sensor.faces[1] = static_cast<float>(face.x);
+        sensor.faces[2] = static_cast<float>(face.y);
+        sensor.faces[3] = static_cast<float>(face.z);
+        CopyMatrix(sensor.faceInvProj, glm::inverse(raster.View(0).projection));
+    }
+    // The sensor filters the output views, reading the G-buffer of their last sub-frame (`params`
+    // holds a view per sub-frame and output view).
     for (std::uint32_t v = 0; v < outputViews_; ++v) {
-        const CameraView view = params.View(LastSubframeView(v));
+        const std::uint32_t last = (subframes_ - 1) * outputViews_ + v;
+        const CameraView view = params.View(last);
         if (params.camera.pushbroom) {
             // Its strip; its distortion across the line and the line (lens.slang's Pushbroom).
-            const PushbroomStrip strip = params.Strip(LastSubframeView(v));
+            const PushbroomStrip strip = params.Strip(last);
             CopyMatrix(sensor.invViewProj, strip.Packed());
             sensor.distortion[0] = static_cast<float>(lens.k1);
             sensor.distortion[1] = static_cast<float>(lens.k2);
@@ -1852,6 +1891,10 @@ void RasterRenderer::RecordViews(VkCommandBuffer commands, RenderTargets& target
         targets.Bands() != bands_.count) {
         throw std::invalid_argument("Render targets need the camera's extent and band count");
     }
+    if (targets.Faces() != faces_) {
+        throw std::invalid_argument("Render targets need " + std::to_string(faces_) +
+                                    " raster layers per view for the camera (cube faces)");
+    }
     if (firstView + targets.Views() > outputViews_) {
         throw std::invalid_argument("Render targets hold views past the frame's " +
                                     std::to_string(outputViews_));
@@ -1871,20 +1914,22 @@ void RasterRenderer::RecordViews(VkCommandBuffer commands, RenderTargets& target
     ERNIE_ZONE("RecordViews");
     // Each sub-frame in turn draws and shades its views into the one set of targets; with motion
     // blur their radiance sums into what each row's exposure sees, which the sensor filters.
+    // A cube camera's views draw their faces, consecutive internal views and layers.
+    const std::uint32_t layers = targets.RasterLayers();
     for (std::uint32_t subframe = 0; subframe < subframes_; ++subframe) {
-        const std::uint32_t first = subframe * outputViews_ + firstView;
+        const std::uint32_t first = (subframe * outputViews_ + firstView) * faces_;
         // Each sub-frame's shadows from its casters where they are at its time (the first's
         // come from `RecordShadows`, unless an earlier chunk of views left the last one's); the
         // cascades stay fitted to the frame's own view.
         if (subframes_ > 1 && (subframe > 0 || firstView > 0)) {
-            RecordShadowMaps(commands, drawables, Frame(subframe * outputViews_));
+            RecordShadowMaps(commands, drawables, Frame(subframe * outputViews_ * faces_));
         }
         // One layered pass for all the views: each view's draws go to its layer
         // (`Uniforms::flags`).
         const auto draw = [&](DrawPhase phase, bool load) {
             targets.PrepareGBuffer(commands);
             BeginRendering(commands, targets.GBufferTarget(load));
-            for (std::uint32_t v = 0; v < targets.Views(); ++v) {
+            for (std::uint32_t v = 0; v < layers; ++v) {
                 const RasterFrame frame = Frame(first + v);
                 for (const RasterDrawable* drawable : drawables) {
                     drawable->RecordColor(commands, frame, first + v, phase);
@@ -1904,7 +1949,7 @@ void RasterRenderer::RecordViews(VkCommandBuffer commands, RenderTargets& target
                 ERNIE_GPU_ZONE(context_, commands, "Hi-Z and occlusion cull");
                 BuildHzb(commands, targets);
                 for (const RasterDrawable* drawable : drawables) {
-                    drawable->RecordOcclusionCull(commands, targets.Hzb(), first, targets.Views());
+                    drawable->RecordOcclusionCull(commands, targets.Hzb(), first, layers);
                 }
                 ShaderBarrier(commands);
             }
@@ -1927,7 +1972,8 @@ void RasterRenderer::RecordViews(VkCommandBuffer commands, RenderTargets& target
     if (meter_ && firstView == 0) {
         RecordMeter(commands, targets);
     }
-    if (overlays) {
+    // Overlays draw through a pinhole view onto the sensor's image, which a cube camera's is not.
+    if (overlays && faces_ == 1) {
         RecordOverlays(commands, targets, firstView);
     }
 }
@@ -2197,7 +2243,7 @@ void RasterRenderer::BuildHzb(VkCommandBuffer commands, RenderTargets& targets) 
         hzbLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
         const std::uint32_t size[4] = {sourceWidth, sourceHeight, width, height};
         hzbLayout_.PushConstants(commands, size, sizeof(size));
-        vkCmdDispatch(commands, Groups(width), Groups(height), targets.Views());
+        vkCmdDispatch(commands, Groups(width), Groups(height), targets.RasterLayers());
         ShaderBarrier(commands);
         sourceWidth = width;
         sourceHeight = height;
@@ -2232,7 +2278,8 @@ void RasterRenderer::Shade(VkCommandBuffer commands, RenderTargets& targets,
     targets.PrepareCompute(commands);
 
     // Every pass covers all the views in one dispatch, view `z` in layer `z` of each image (a
-    // group of a layer per band of the spectral ones) with uniforms `firstView + z`.
+    // group of a layer per band of the spectral ones) with uniforms `firstView + z`; a cube
+    // camera's views are its faces, internal views and raster layers alike.
     const auto sampled = [](const GpuImage& image) {
         return DescriptorResource::Of(image.View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     };
@@ -2241,7 +2288,7 @@ void RasterRenderer::Shade(VkCommandBuffer commands, RenderTargets& targets,
     };
     const std::uint32_t groupsX = Groups(extent_.width);
     const std::uint32_t groupsY = Groups(extent_.height);
-    const std::uint32_t views = targets.Views();
+    const std::uint32_t views = targets.RasterLayers();
     {
         ERNIE_GPU_ZONE(context_, commands, "Shading");
         const DescriptorResource shading[] = {DescriptorResource::Of(shadingUniforms_),
@@ -2305,7 +2352,7 @@ void RasterRenderer::Accumulate(VkCommandBuffer commands, RenderTargets& targets
                 {shutter_[4], 0.0f, 0.0f, 0.0f}};
     motionLayout_.PushConstants(commands, &constants, sizeof(constants));
     vkCmdDispatch(commands, Groups(extent_.width), Groups(extent_.height),
-                  targets.Views() * static_cast<std::uint32_t>(bands_.count));
+                  targets.RasterLayers() * static_cast<std::uint32_t>(bands_.count));
     ShaderBarrier(commands);
 }
 

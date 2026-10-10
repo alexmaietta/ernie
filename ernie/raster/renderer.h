@@ -291,6 +291,12 @@ class RasterRenderer {
         return subframes_;
     }
 
+    /// The raster layers each view of the last `Update` draws: its camera's cube faces
+    /// (`NeedsCubeFaces`), else 1. Render targets must hold as many (`RenderTargets::Faces`).
+    std::uint32_t Faces() const {
+        return faces_;
+    }
+
     /// Whether `Record` can present render var `name`: every one. LdrColor shows as is; HdrColor
     /// clipped at 1; SpectralRadiance as grey, one band or their mean (`SetPresentBand`);
     /// distances from white at the camera's near plane to black at its far plane on a log scale;
@@ -384,7 +390,9 @@ class RasterRenderer {
     void SensorPipelines(const SensorPlan& plan);
     void WriteMaterialTable();
     void WriteShading(const FrameParams& params);
-    void WriteSensor(const FrameParams& params);
+    /// The sensor's uniforms for `params`' camera, its views a sub-frame's each; `raster` the
+    /// views the raster passes draw (a cube camera's faces).
+    void WriteSensor(const FrameParams& params, const FrameParams& raster);
     void EnsureViewBuffers(std::uint32_t views);
     /// Writes views.slang's camera and sizes the pose buffers for a frame posed on the GPU.
     void WritePoseCamera(const FrameParams& params);
@@ -421,9 +429,9 @@ class RasterRenderer {
     /// The sensor filters of output views `firstView` on.
     void Filter(VkCommandBuffer commands, RenderTargets& targets, std::uint32_t firstView) const;
     /// The internal view (uniforms, culling) of output view `view` at its last sub-frame, whose
-    /// G-buffer the sensor and overlays read.
+    /// G-buffer the sensor and overlays read; its first face's for a cube camera.
     std::uint32_t LastSubframeView(std::uint32_t view) const {
-        return (subframes_ - 1) * outputViews_ + view;
+        return ((subframes_ - 1) * outputViews_ + view) * faces_;
     }
     void Present(VkCommandBuffer commands, RenderTargets& targets, const RenderingTarget& present,
                  std::string_view var) const;
@@ -469,11 +477,13 @@ class RasterRenderer {
     std::vector<glm::vec2> poisson_;
     bool shadowsEnabled_ = false;
     bool updated_ = false;
-    /// Internal views: a view per sub-frame and output view (`FrameParams::Subframes`), sub-frame
-    /// `k`'s from `k * outputViews_` on, which uniforms, culling and drawables index.
+    /// Internal views: a view per sub-frame, output view and face (`FrameParams::Subframes`, then
+    /// `FrameParams::Faces`), sub-frame `k`'s output view `v`'s face `f` at
+    /// `(k * outputViews_ + v) * faces_ + f`, which uniforms, culling and drawables index.
     std::uint32_t views_ = 1;
     std::uint32_t outputViews_ = 1;  ///< The frame's own views (`FrameParams::Views`).
     std::uint32_t subframes_ = 1;    ///< Sub-frames per view: above 1 for motion blur.
+    std::uint32_t faces_ = 1;        ///< Raster layers per view: a cube camera's faces.
     /// Whether the last `Update`'s frame holds the MotionVector var, which runs the motion passes.
     bool motionVectors_ = false;
     /// Per internal view, frame.slang's MotionUniforms (256 bytes each), written only for frames

@@ -39,6 +39,7 @@
 
 module sensor;
 
+import cube_faces;
 import lensProjection;
 import projection;
 
@@ -83,8 +84,14 @@ public struct SensorUniforms {
     // distance (scene units; 0 is infinity).
     public float4 optics;
     // Per band: photons a pixel collects over the exposure per unit radiance, before quantum
-    // efficiency, four per float4. The views' stride in the buffer is 2560 bytes.
+    // efficiency, four per float4. The views' stride in the buffer is 2816 bytes.
     public float4 photons[16];
+    // A camera rendered on cube faces (`kLensCube`): their shared projection's inverse, clip
+    // space to the face's camera frame; and x the faces per view, y their focal length in raster
+    // pixels, zw their principal point.
+    public float4x4 faceInvProj;
+    public float4 faces;
+    float4 facesPadding[11];
 }
 
 public struct SensorConstants {
@@ -405,16 +412,58 @@ public void storeChannel(SensorPixel value, PixelContext pixel, uint channel) {
     channelsOut[int3(pixel.id.xy, pixel.id.z * kChannelDomains + channel)] = stored;
 }
 
-// The raster image position (pixels, before rounding) that sensor pixel `at` of `cam` sees
-// through the lens's projection.
-float2 rasterPositionOf(SensorUniforms cam, int2 at) {
+// Where sensor pixel `at` of `cam` (output view `view` of the pass) looks in the raster images.
+struct RasterTap {
+    float2 raster;     // the raster image position, pixels before rounding
+    int layer;         // the raster layer: the view's, or its cube face's
+    float2 distorted;  // the pixel's normalised image coordinates
+    float2 pinhole;    // its pinhole image point (a cube camera's is unused)
+    float3 ray;        // its lens ray in the camera's frame (a cube camera's)
+}
+
+// Through the lens's projection onto the pinhole raster image; for a camera rendered on cube
+// faces (`kLensCube`), along the lens's ray onto the face it leaves through, which the view's
+// faces' consecutive layers hold.
+RasterTap rasterTapOf(SensorUniforms cam, int2 at, int view) {
     let f = cam.intrinsics.x;
-    let distorted = float2((float(at.x) + 0.5 - cam.intrinsics.y) / f,
+    RasterTap tap;
+    tap.distorted = float2((float(at.x) + 0.5 - cam.intrinsics.y) / f,
                            (cam.intrinsics.z - (float(at.y) + 0.5)) / f);
-    let undistorted = lensPinholeOf(distorted, cam.distortion, cam.lens.x, cam.intrinsics.w);
+    if (kLensCube) {
+        tap.ray = lensRayOf(tap.distorted, cam.distortion, cam.lens.x);
+        let face = cubeFaceOf(tap.ray);
+        let plane = cubeFacePlane(face, tap.ray);
+        tap.raster = float2(cam.faces.z + plane.x * cam.faces.y,
+                            cam.faces.w - plane.y * cam.faces.y) - 0.5;
+        tap.layer = view * int(cam.faces.x) + face;
+        tap.pinhole = float2(0.0);
+        return tap;
+    }
+    tap.pinhole = lensPinholeOf(tap.distorted, cam.distortion, cam.lens.x, cam.intrinsics.w);
     let rasterF = f / cam.intrinsics.w;
-    return float2(cam.intrinsics.y + undistorted.x * rasterF,
-                  cam.intrinsics.z - undistorted.y * rasterF) - 0.5;
+    tap.raster = float2(cam.intrinsics.y + tap.pinhole.x * rasterF,
+                        cam.intrinsics.z - tap.pinhole.y * rasterF) - 0.5;
+    tap.layer = view;
+    tap.ray = normalize(float3(tap.pinhole, -1.0));
+    return tap;
+}
+
+// The distances of what raster texel `nearest` of layer `layer` sees, at the end of tap `tap`.
+void distancesOf(SensorUniforms cam, RasterTap tap, int2 nearest, out float imagePlane,
+                 out float camera) {
+    let size = float2(cam.size.xy);
+    let ndc = float3((float(nearest.x) + 0.5) / size.x * 2.0 - 1.0,
+                     1.0 - (float(nearest.y) + 0.5) / size.y * 2.0,
+                     gDepth.Load(int4(nearest, tap.layer, 0)));
+    if (kLensCube) {
+        // From the face's own frame, at the camera: along the ray, and along the view's axis
+        // (negative behind the image plane, for rays past 90 degrees).
+        let clip = mul(cam.faceInvProj, float4(ndc, 1.0));
+        camera = length(clip.xyz / clip.w);
+        imagePlane = camera * -tap.ray.z;
+        return;
+    }
+    distancesAt(cam, ndc, imagePlane, camera);
 }
 
 // The distance from the camera, in scene units, of what sensor pixel `at` of the pixel's view
@@ -422,18 +471,14 @@ float2 rasterPositionOf(SensorUniforms cam, int2 at) {
 public float sceneDistance(PixelContext pixel, int2 at) {
     let cam = pixel.uniforms();
     let size = float2(cam.size.xy);
-    let raster = rasterPositionOf(cam, clamp(at, int2(0), int2(cam.size.xy) - 1));
-    let nearest = int2(clamp(floor(raster + 0.5), float2(0.0), size - 1.0));
-    let layer = int(pixel.id.z);
-    if (gIds.Load(int4(nearest, layer, 0)).x == kBackground) {
+    let tap = rasterTapOf(cam, clamp(at, int2(0), int2(cam.size.xy) - 1), int(pixel.id.z));
+    let nearest = int2(clamp(floor(tap.raster + 0.5), float2(0.0), size - 1.0));
+    if (gIds.Load(int4(nearest, tap.layer, 0)).x == kBackground) {
         return asfloat(0x7f800000u);
     }
-    let ndc = float3((float(nearest.x) + 0.5) / size.x * 2.0 - 1.0,
-                     1.0 - (float(nearest.y) + 0.5) / size.y * 2.0,
-                     gDepth.Load(int4(nearest, layer, 0)));
     float imagePlane;
     float camera;
-    distancesAt(cam, ndc, imagePlane, camera);
+    distancesOf(cam, tap, nearest, imagePlane, camera);
     return camera;
 }
 
@@ -486,18 +531,15 @@ public struct Lens : ISpatialSource {
     public static Lens at(PixelContext pixel) {
         let cam = pixel.uniforms();
         let id = pixel.id;
-        let f = cam.intrinsics.x;
-        let distorted = float2((float(id.x) + 0.5 - cam.intrinsics.y) / f,
-                               (cam.intrinsics.z - (float(id.y) + 0.5)) / f);
-        let p = lensPinholeOf(distorted, cam.distortion, cam.lens.x, cam.intrinsics.w);
-        let rasterF = f / cam.intrinsics.w;
-        let raster =
-            float2(cam.intrinsics.y + p.x * rasterF, cam.intrinsics.z - p.y * rasterF) - 0.5;
+        let tap = rasterTapOf(cam, int2(id.xy), int(id.z));
+        let distorted = tap.distorted;
+        let p = tap.pinhole;
+        let raster = tap.raster;
         let size = float2(cam.size.xy);
         let infinity = asfloat(0x7f800000u);
         let outside = any(raster < float2(-0.5)) || any(raster > size - 0.5);
         let nearest = int2(clamp(floor(raster + 0.5), float2(0.0), size - 1.0));
-        let layer = int(id.z);
+        let layer = tap.layer;
         let ids = gIds.Load(int4(nearest, layer, 0));
         Lens lens;
         // With motion blur every pixel holds radiance, the sub-frames' sum, as with a sky.
@@ -540,10 +582,7 @@ public struct Lens : ISpatialSource {
         if (lens.background) {
             return lens;  // the sky's radiance, at infinity with no prim
         }
-        let ndc = float3((float(nearest.x) + 0.5) / size.x * 2.0 - 1.0,
-                         1.0 - (float(nearest.y) + 0.5) / size.y * 2.0,
-                         gDepth.Load(int4(nearest, layer, 0)));
-        distancesAt(cam, ndc, lens.imagePlane, lens.camera);
+        distancesOf(cam, tap, nearest, lens.imagePlane, lens.camera);
         lens.normal = float4(normalize(gNormal.Load(int4(nearest, layer, 0)).xyz), 0.0);
         lens.prim = ids.y;
         lens.instance = ids.z;
@@ -554,7 +593,8 @@ public struct Lens : ISpatialSource {
         if (dark) {
             return 0.0;
         }
-        let slice = pixel.slice(band);
+        // The band's layer in the raster's group: the view's, or its cube face's.
+        let slice = int(uint(base.z) * pixel.bands() + band);
         let a = lit.x ? rasterRadiance.Load(int4(base.x, base.y, slice, 0)) : 0.0;
         let b = lit.y ? rasterRadiance.Load(int4(next.x, base.y, slice, 0)) : 0.0;
         let c = lit.z ? rasterRadiance.Load(int4(base.x, next.y, slice, 0)) : 0.0;
@@ -586,7 +626,8 @@ public struct Lens : ISpatialSource {
         if ((holds & kHoldsMotionVector) != 0) {
             // Raster pixels to sensor pixels: the raster image is drawn `overscan` times wider,
             // so a raster pixel spans `overscan` sensor pixels.
-            let raster = outside ? float2(0.0) : gRaster[uint3(nearest)].xy;
+            // A cube camera's is zero for now (its faces' motion is not mapped through the lens).
+            let raster = outside || kLensCube ? float2(0.0) : gRaster[uint3(nearest)].xy;
             motionVector[id] = raster * pixel.uniforms().intrinsics.w;
         }
     }

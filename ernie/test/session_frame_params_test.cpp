@@ -1,5 +1,7 @@
 #include "ernie/session/frame_params.h"
 
+#include "ernie/scene/wide_view.h"
+
 #include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
 
@@ -148,4 +150,39 @@ TEST(Pushbroom, EnvelopeHoldsEveryRayOfTheStrip) {
         }
     }
     EXPECT_EQ(inside, 41 * 9 * 4);
+}
+
+TEST(FrameParams, CubeFacesTurnEachViewOntoItsFaces) {
+    ernie::FrameParams frame;
+    frame.camera.width = 640;
+    frame.camera.height = 480;
+    frame.camera.lens.projection = ernie::LensProjection::Fisheye;
+    frame.poses = {glm::translate(glm::dmat4(1.0), glm::dvec3(1.0, 2.0, 3.0)),
+                   glm::rotate(glm::dmat4(1.0), 0.5, glm::dvec3(0.0, 0.0, 1.0))};
+    frame.worlds = {4, 7};
+    const ernie::FrameParams faces = frame.Faces(ernie::kCubeFaces);
+    ASSERT_EQ(faces.Views(), 2u * ernie::kCubeFaces);
+    EXPECT_EQ(faces.camera.lens.projection, ernie::LensProjection::Perspective);
+    // A centred square pinhole: 90 degrees plus the margin across the image's height.
+    const glm::dvec3 face = ernie::FrameParams::FaceIntrinsics(640, 480);
+    EXPECT_NEAR(faces.camera.FocalLengthPixels(), face.x, 1e-9);
+    EXPECT_EQ(faces.camera.PrincipalPoint(), glm::dvec2(320.0, 240.0));
+    EXPECT_NEAR(240.0 / face.x, ernie::CubeFaceExtent(480.0), 1e-12);
+    for (std::size_t v = 0; v < 2; ++v) {
+        for (int f = 0; f < ernie::kCubeFaces; ++f) {
+            const std::size_t i = v * ernie::kCubeFaces + static_cast<std::size_t>(f);
+            const glm::dmat4& pose = faces.poses[i];
+            // The view's position, looking along its face's direction.
+            EXPECT_EQ(glm::dvec3(pose[3]), glm::dvec3(frame.poses[v][3]));
+            const glm::dvec3 look = -glm::dvec3(pose[2]);
+            const glm::dvec3 expected =
+                glm::dmat3(frame.poses[v]) * -ernie::CubeFaceAxes(static_cast<ernie::CubeFace>(f))[2];
+            EXPECT_NEAR(glm::distance(look, expected), 0.0, 1e-12) << v << ", " << f;
+            EXPECT_EQ(faces.ViewWorld(i), frame.worlds[v]);
+        }
+    }
+    EXPECT_EQ(frame.Faces(1).Views(), 2u);
+    EXPECT_THROW(frame.Faces(3), std::invalid_argument);
+    frame.posesOnGpu = true;
+    EXPECT_THROW(frame.Faces(ernie::kCubeFaces), std::invalid_argument);
 }

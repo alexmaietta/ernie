@@ -310,10 +310,12 @@ class RasterDelegate : public RenderDelegate {
     /// Takes the next `FrameUploads` slot for a frame, once the frame that last used it has
     /// finished; returns it.
     std::uint32_t BeginFrame();
+    /// `faces` raster layers per view: a camera rendered on cube faces' (`NeedsCubeFaces`).
     std::shared_ptr<ProductFrame> AcquireFrame(const Path& product, VkExtent2D extent, int bands,
                                                std::uint32_t views, bool batched,
                                                std::span<const std::string_view> vars,
-                                               std::span<const std::string> aovs = {});
+                                               std::span<const std::string> aovs = {},
+                                               std::uint32_t faces = 1);
     std::uint32_t PrimIdOf(const Path& path) const;
     void SetMeshPoints(const Scene& scene, const Path& path, std::uint32_t handle);
     /// Hands the mesh its normals and colours written on the GPU.

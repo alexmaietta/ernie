@@ -3,6 +3,7 @@
 #include "ernie/geometry/primitives.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/scene/wide_view.h"
 #include "ernie/scene/xform.h"
 #include "ernie/util/astronomy.h"
 
@@ -1131,7 +1132,8 @@ StarField StarFieldOf(const Scene& scene, const Path& path) {
 }
 
 double OverscanOf(const Camera& camera) {
-    if (camera.lens.IsPinhole()) {
+    // A camera rendered on cube faces resamples their own projection, not one pinhole image.
+    if (camera.lens.IsPinhole() || NeedsCubeFaces(camera)) {
         return 1.0;
     }
     const double f = camera.FocalLengthPixels();

@@ -39,13 +39,28 @@ class RenderTargets : public FrameImages {
     /// placeholders of one texel per view that passes bind but do not write.
     /// `aovs` names the AOV slots in order (`AovOutputsOf` of the frame's chain); `vars` may hold
     /// slots by their `kAovSlotNames`, which `Var` also finds as "aov:<name>".
+    /// A camera rendered on cube faces (wide_view.h) draws `faces` raster layers per view: the
+    /// G-buffer, depth, raster radiance and the raster images below hold view `v`'s face `f` at
+    /// layer `v * faces + f` (`RasterLayers` of them), while the render vars, AOVs and sensor
+    /// images keep a layer per view.
     RenderTargets(const VulkanContext& context, VkExtent2D extent, int bands, bool shared,
                   std::uint32_t views = 1, std::span<const std::string_view> vars = {},
-                  std::span<const std::string> aovs = {});
+                  std::span<const std::string> aovs = {}, std::uint32_t faces = 1);
 
-    /// The most views one set of targets with `bands` bands can hold on `context`'s device: its
-    /// `maxImageArrayLayers` over the bands.
-    static std::uint32_t MaxViews(const VulkanContext& context, int bands);
+    /// The most views one set of targets with `bands` bands and `faces` raster layers per view
+    /// can hold on `context`'s device: its `maxImageArrayLayers` over the bands and faces.
+    static std::uint32_t MaxViews(const VulkanContext& context, int bands,
+                                  std::uint32_t faces = 1);
+
+    /// Raster layers per view: 1, or a cube camera's faces.
+    std::uint32_t Faces() const {
+        return faces_;
+    }
+
+    /// The raster images' layers: the views' faces.
+    std::uint32_t RasterLayers() const {
+        return views_ * faces_;
+    }
 
     VkExtent2D Extent() const override {
         return extent_;
@@ -146,6 +161,7 @@ class RenderTargets : public FrameImages {
     VkExtent2D extent_;
     int bands_;
     std::uint32_t views_;
+    std::uint32_t faces_ = 1;
     bool shared_;
     std::array<std::unique_ptr<GpuImage>, 3> gbuffer_;
     std::unique_ptr<GpuImage> depth_;
