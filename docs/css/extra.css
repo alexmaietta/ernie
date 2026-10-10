@@ -1,0 +1,9 @@
+/* Room for the API reference's signatures and member tables beside the sidebar. */
+.wy-nav-content {
+    max-width: 1200px;
+}
+
+/* A little space between the API's classes and functions. */
+.doc-object {
+    margin-bottom: 2em;
+}

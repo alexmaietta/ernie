@@ -1,3 +1,7 @@
+# Viewer
+
+The interactive viewer and its panels, themes and callbacks (`ernie.app`).
+
 ::: ernie._ernie.app
     options:
-      heading: ernie.app
+      show_root_heading: false

@@ -11,7 +11,13 @@ exclude_docs: |
 
 theme:
   name: readthedocs
+  # The API pages' classes and functions listed in the sidebar under their page.
   navigation_depth: 3
+  collapse_navigation: true
+  sticky_navigation: true
+
+extra_css:
+  - css/extra.css
 
 nav:
   - Home: index.md
@@ -30,24 +36,38 @@ nav:
       - Shadows: concepts/shadows.md
       - Terrain and planets: concepts/terrain.md
       - Star fields: concepts/star-fields.md
+  - Extending Ernie:
+      - Overview: extending/index.md
+      - Materials:
+          - Custom BRDFs: extending/custom-brdfs.md
+      - Cameras and sensors:
+          - Custom sensor filters: extending/custom-sensor-filters.md
+          - Custom AOVs: extending/custom-aovs.md
+          - Custom lenses: extending/custom-lenses.md
+      - Light and sky:
+          - Custom spectra: extending/custom-spectra.md
+          - Custom star catalogs: extending/custom-star-catalogs.md
+      - Viewer:
+          - Custom panels and menus: extending/custom-panels.md
+          - Frame callbacks: extending/frame-callbacks.md
+          - Debug drawing and overlays: extending/debug-draw.md
+      - Rendering:
+          - Custom render delegates: extending/custom-render-delegates.md
   - Guides:
       - Batched rendering for RL: guides/batched-rendering.md
       - GPU interop: guides/gpu-interop.md
-      - Extending Ernie:
-          - Custom BRDFs: guides/extending/custom-brdfs.md
-          - Custom sensor filters: guides/extending/custom-sensor-filters.md
-          - Custom lenses: guides/extending/custom-lenses.md
-          - Custom spectra and star catalogs: guides/extending/custom-spectra.md
-          - Debug drawing and overlays: guides/extending/debug-draw.md
-          - Custom panels and menus: guides/extending/custom-panels.md
-          - Custom render delegates: guides/extending/custom-render-delegates.md
   - API reference:
       - Python:
-          - ernie: api/python/ernie.md
-          - ernie.tokens: api/python/tokens.md
-          - ernie.batch: api/python/batch.md
-          - ernie.app: api/python/app.md
+          - Scene: api/python/scene.md
+          - Schemas and lights: api/python/schemas.md
+          - Rendering: api/python/rendering.md
+          - Cameras and sensor models: api/python/cameras.md
+          - Astronomy: api/python/astronomy.md
+          - Batched cameras: api/python/batch.md
+          - Viewer: api/python/app.md
+          - Tokens: api/python/tokens.md
       - C++:
+          - Overview: api/cpp.md
           - Classes: cpp/annotated.md
           - Class hierarchy: cpp/hierarchy.md
           - Functions: cpp/namespace_member_functions.md
@@ -81,11 +101,22 @@ plugins:
           paths: [build/python]
           options:
             docstring_style: google
+            docstring_section_style: table
             show_source: false
             show_root_heading: true
             show_root_full_path: false
-            members_order: source
+            # Each page's classes and functions as level-2 headings (the sidebar lists them), and
+            # their members below, each class opening with a table of them.
+            heading_level: 2
+            members_order: alphabetical
+            group_by_category: true
+            show_category_heading: false
+            summary: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
             show_signature_annotations: true
             separate_signature: true
+            line_length: 88
             merge_init_into_class: true
             show_if_no_docstring: true
+            show_bases: true
