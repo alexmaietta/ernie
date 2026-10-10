@@ -23,6 +23,10 @@ class Demo(ernie.demo.Demo):
                          translate=(3.0 * (i - 2), 0, 1),
                          display_color=(0.2 + 0.15 * i, 0.4, 0.8 - 0.15 * i))
         self.sun = world.define("Sun", ernie.DistantLight)
+        # The viewer frames the scene with its own camera; this one renders it without a viewer
+        # (--viewer null, --benchmark) and for --test.
+        world.define("Camera", ernie.Camera, focal_length=24.0).set(
+            tokens.TRANSFORM, ernie.look_at_transform((0.0, -14.0, 6.0), (0.0, 0.0, 0.5)))
         self.elevation = 45.0
         self.azimuth = 30.0
         self.aim_sun()

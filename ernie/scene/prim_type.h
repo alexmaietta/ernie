@@ -11,6 +11,7 @@
 #include <glm/glm.hpp>
 
 #include <cstddef>
+#include <initializer_list>
 #include <optional>
 #include <span>
 #include <string>
@@ -45,10 +46,12 @@ enum class AttributeKind {
     Double,
     Vec2,
     Vec3,
-    Token,         ///< A string: a token, or an asset path (`AttributeMeta::asset`).
-    Relationship,  ///< A target `Path`.
-    FloatArray,    ///< A small `std::vector<float>`, such as (nm, value) pairs.
-    Tensor,        ///< Bulk data, written and read as a `Tensor`.
+    Vec4,
+    Token,          ///< A string: a token, or an asset path (`AttributeMeta::asset`).
+    Relationship,   ///< A target `Path`.
+    Relationships,  ///< A list of target `Path`s; one `Path` authored alone is a list of one.
+    FloatArray,     ///< A small `std::vector<float>`, such as (nm, value) pairs.
+    Tensor,         ///< Bulk data, written and read as a `Tensor`.
 };
 
 /// How an attribute is described and edited. Declared with designated initializers in this order.
@@ -59,7 +62,7 @@ struct AttributeMeta {
     double min = 0.0;        ///< Edit limits; none when equal.
     double max = 0.0;
     std::vector<std::string_view> options;  ///< A token's choices, or a relationship's target type.
-    bool color = false;                     ///< A `Vec3` that is a linear RGB colour.
+    bool color = false;                     ///< A `Vec3` (`Vec4`) that is linear RGB (RGBA).
     bool asset = false;                     ///< A `Token` that is a file path.
 };
 
@@ -123,6 +126,16 @@ template <> struct AttributeTraits<glm::dvec3> {
     static std::optional<glm::dvec3> From(const Value& value);
 };
 
+template <> struct AttributeTraits<glm::dvec4> {
+    static constexpr AttributeKind kKind = AttributeKind::Vec4;
+    using Result = glm::dvec4;
+    using Arg = glm::dvec4;
+    /// From a `vec4` or `dvec4`; `fallback` when unset or of another type.
+    static glm::dvec4 Read(const Scene& scene, const Path& path, std::string_view name,
+                           glm::dvec4 fallback);
+    static std::optional<glm::dvec4> From(const Value& value);
+};
+
 template <> struct AttributeTraits<std::string> {
     static constexpr AttributeKind kKind = AttributeKind::Token;
     using Result = std::string;
@@ -144,6 +157,46 @@ template <> struct AttributeTraits<Path> {
     static std::optional<Path> From(const Value& value);
 };
 
+/// Relationship targets given to a setter: one target (a `Path` or its text), stored as a single
+/// `Path`, or a list of them, stored as a list; reads take either.
+class Targets {
+  public:
+    Targets(Path target) : paths_{std::move(target)}, single_(true) {}
+    Targets(const char* target) : Targets(Path(target)) {}
+    Targets(std::string_view target) : Targets(Path(target)) {}
+    Targets(const std::string& target) : Targets(Path(target)) {}
+    Targets(std::vector<Path> targets) : paths_(std::move(targets)) {}
+    Targets(std::initializer_list<Path> targets) : paths_(targets) {}
+
+    const std::vector<Path>& Paths() const {
+        return paths_;
+    }
+
+    /// As the scene stores it: a `Path` for one target given alone, else the list.
+    Value ToValue() const {
+        return single_ ? Value(paths_.front()) : Value(paths_);
+    }
+
+  private:
+    std::vector<Path> paths_;
+    bool single_ = false;
+};
+
+template <> struct AttributeTraits<std::vector<Path>> {
+    static constexpr AttributeKind kKind = AttributeKind::Relationships;
+    using Result = std::vector<Path>;
+    using Arg = const Targets&;
+    /// The targets of one `Path` or a list; `fallback` when unset or of another type.
+    static std::vector<Path> Read(const Scene& scene, const Path& path, std::string_view name,
+                                  const std::vector<Path>& fallback);
+    /// A `Path`, a string, or a list of either (an empty list arrives from Python as an empty
+    /// float array) as the list of targets.
+    static std::optional<std::vector<Path>> From(const Value& value);
+    /// `value` as the scene stores it (`AttributeDef::Coerce`): a single target (a `Path` or a
+    /// string) as a `Path`, a list as a list of `Path`s.
+    static std::optional<Value> Store(const Value& value);
+};
+
 template <> struct AttributeTraits<std::vector<float>> {
     static constexpr AttributeKind kKind = AttributeKind::FloatArray;
     /// The authored array or the fallback; empty when neither has values.
@@ -151,6 +204,7 @@ template <> struct AttributeTraits<std::vector<float>> {
     using Arg = std::vector<float>;
     static std::vector<float> Read(const Scene& scene, const Path& path, std::string_view name,
                                    const std::vector<float>& fallback);
+    /// A float array, a 2- to 4-vector or a single number (an array of one) as an array.
     static std::optional<std::vector<float>> From(const Value& value);
 };
 
@@ -173,7 +227,7 @@ class AttributeDef {
     std::string pyName;     ///< Its snake_case name, such as "radius".
     std::string label;      ///< `meta.label`, or the member name in words ("Color temperature").
     AttributeKind kind = AttributeKind::Double;
-    Value fallback;  ///< Empty for relationships and tensors.
+    Value fallback;  ///< Empty for single relationships and tensors.
     AttributeMeta meta;
 
     /// The attribute of the prim at `path` as its declared type, or the fallback when unset;
@@ -183,7 +237,8 @@ class AttributeDef {
     }
 
     /// `value` as the declared type, converting as `Read` would (an int to a double, a `vec3` to
-    /// a `dvec3`, a string to a `Path`).
+    /// a `dvec3`, a string to a `Path`); for a list of relationship targets, as the scene stores
+    /// it: one target given alone a `Path`, a list a list of `Path`s.
     /// @throws std::invalid_argument if it cannot be one, and for tensors.
     Value Coerce(const Value& value) const;
 
@@ -253,6 +308,12 @@ class SchemaView {
         return *scene_;
     }
 
+    /// A handle to the prim, for what the view does not cover (`Prim::Get`, `Prim::Define`).
+    /// @throws std::logic_error if the view was made from a const scene.
+    Prim GetPrim() const {
+        return Prim(&Edit(), path_);
+    }
+
     /// The prim's registered type: this view's type or one derived from it.
     const PrimTypeDef& PrimType() const {
         return *type_;
@@ -281,7 +342,8 @@ class SchemaView {
 }  // namespace ernie
 
 /// One attribute's accessors in a view class: `Get<Name>` (the fallback when unset), `Has<Name>`
-/// (whether it is authored) and `Set<Name>` (returning the view, for chaining).
+/// (whether it is authored), and `Set<Name>` and `Clear<Name>` (removing it, `Scene::Clear`),
+/// which return the view for chaining.
 #define ERNIE_ATTRIBUTE_ACCESSORS(Type, Name, token, fallback, meta)                               \
     ::ernie::AttributeTraits<Type>::Result Get##Name() const {                                     \
         return ::ernie::AttributeTraits<Type>::Read(GetScene(), GetPath(), token, fallback);       \
@@ -291,6 +353,10 @@ class SchemaView {
     }                                                                                              \
     Self& Set##Name(::ernie::AttributeTraits<Type>::Arg value) {                                   \
         ::ernie::detail::WriteAttribute<Type>(Edit(), GetPath(), token, value);                    \
+        return static_cast<Self&>(*this);                                                          \
+    }                                                                                              \
+    Self& Clear##Name() {                                                                          \
+        Edit().Clear(GetPath(), token);                                                            \
         return static_cast<Self&>(*this);                                                          \
     }
 
@@ -320,6 +386,16 @@ class SchemaView {
     /** The prim's local transform, from its ops (`Scene::LocalTransform`). */                     \
     glm::dmat4 GetLocalTransform() const {                                                         \
         return GetScene().LocalTransform(GetPath());                                               \
+    }                                                                                              \
+    /** Sets any attribute by USD name, as `Scene::Set`: what the declarations do not cover. */    \
+    Self& Set(std::string_view attribute, ::ernie::Value value) {                                  \
+        Edit().Set(GetPath(), attribute, std::move(value));                                        \
+        return static_cast<Self&>(*this);                                                          \
+    }                                                                                              \
+    /** Writes any array attribute by USD name, as `Scene::Write`. */                              \
+    Self& Write(std::string_view attribute, ::ernie::Tensor tensor) {                              \
+        Edit().Write(GetPath(), attribute, std::move(tensor));                                     \
+        return static_cast<Self&>(*this);                                                          \
     }                                                                                              \
                                                                                                    \
   protected:                                                                                       \
@@ -360,6 +436,8 @@ void WriteAttribute(Scene& scene, const Path& path, std::string_view name,
         scene.Write(path, name, std::move(value));
     } else if constexpr (std::is_same_v<T, std::string>) {
         scene.Set(path, name, Value(std::string(value)));
+    } else if constexpr (std::is_same_v<T, std::vector<Path>>) {
+        scene.Set(path, name, value.ToValue());
     } else {
         scene.Set(path, name, Value(value));
     }
@@ -397,7 +475,9 @@ AttributeDef AttributeDef::Make(std::string_view name, std::string_view member, 
         }
     };
     def.from_ = [](const Value& value) -> std::optional<Value> {
-        if (auto converted = AttributeTraits<T>::From(value)) {
+        if constexpr (std::is_same_v<T, std::vector<Path>>) {
+            return AttributeTraits<T>::Store(value);
+        } else if (auto converted = AttributeTraits<T>::From(value)) {
             return Value(std::move(*converted));
         }
         return std::nullopt;

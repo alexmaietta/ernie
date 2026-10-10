@@ -34,7 +34,7 @@ def build_scene():
         env = env0 if world == 0 else ernie.Xform(scene.clone("/Envs/Env0", f"/Envs/Env{world}"))
         env.world = world
         t = world / WORLDS
-        box = ernie.Cube(scene.get_prim(f"{env.path}/Box"))
+        box = ernie.Cube.at(env, "Box")
         box.set(translate=(3.0 * np.cos(2 * np.pi * t), 3.0 * np.sin(2 * np.pi * t), 1.0),
                 display_color=(t, 0.4, 1.0 - t))
 

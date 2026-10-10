@@ -23,10 +23,10 @@ namespace ernie {
 /// PointInstancer's `prototypes`. Quaternions are rotations such as `xformOp:orient`.
 class Value {
   public:
-    using Data =
-        std::variant<std::monostate, bool, int, float, double, glm::ivec2, glm::vec2, glm::vec3,
-                     glm::vec4, glm::dvec2, glm::dvec3, glm::dmat4, glm::dquat, std::string, Path,
-                     std::vector<float>, std::vector<Path>, std::vector<std::string>>;
+    using Data = std::variant<std::monostate, bool, int, float, double, glm::ivec2, glm::vec2,
+                              glm::vec3, glm::vec4, glm::dvec2, glm::dvec3, glm::dvec4, glm::dmat4,
+                              glm::dquat, std::string, Path, std::vector<float>, std::vector<Path>,
+                              std::vector<std::string>>;
 
     Value() = default;
     Value(bool value) : data_(value) {}
@@ -39,6 +39,7 @@ class Value {
     Value(glm::vec4 value) : data_(value) {}
     Value(glm::dvec2 value) : data_(value) {}
     Value(glm::dvec3 value) : data_(value) {}
+    Value(glm::dvec4 value) : data_(value) {}
     Value(const glm::dmat4& value) : data_(value) {}
     Value(glm::dquat value) : data_(value) {}
     Value(std::string value) : data_(std::move(value)) {}

@@ -81,7 +81,7 @@ def test_meshes_show_an_image_file_through_their_texture_coordinates(renderer, t
         material_binding="/Looks/M",
     ).write("primvars:st", np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32))
     texture = preview_surface(scene, "/Looks/M")
-    ernie.Material(scene.get_prim("/Looks/M")).brdf = "lambert"
+    ernie.Material.at(scene, "/Looks/M").brdf = "lambert"
     texture.file = str(tmp_path / "halves.png")
 
     pixels = renderer.render(scene).astype(np.int32)

@@ -94,6 +94,11 @@ TEST(Scene, PrimsDefineChildrenAtRelativePaths) {
     EXPECT_THROW(world.Define("/Rock", tokens::kCube), std::invalid_argument);
     EXPECT_THROW(world.Define("../Rock", tokens::kCube), std::invalid_argument);
     EXPECT_THROW(Prim().Define("Rock", tokens::kCube), std::invalid_argument);
+
+    EXPECT_EQ(world.GetPrim("Rig/Arm").GetPath(), Path("/World/Rig/Arm"));
+    EXPECT_FALSE(world.GetPrim("Missing").IsValid());
+    EXPECT_FALSE(Prim().GetPrim("Rock").IsValid());
+    EXPECT_THROW(world.GetPrim("../Rock"), std::invalid_argument);
 }
 
 TEST(Scene, SetsAndGetsValuesByUsdName) {

@@ -119,7 +119,7 @@ def build_scene(camera, band):
     raw_dn = scene.define("/Render/Vars/RawDN", ernie.RenderVar, source_name="RawDN")
     wac = scene.define("/Render/Wac", ernie.RenderProduct, camera=wac_camera).set(
         tokens.ORDERED_VARS, [raw_dn.path])
-    ernie.author_lroc_wac(scene, "/World/Camera", "/Render/Wac", band=band)
+    ernie.author_lroc_wac(scene, wac_camera, wac, band=band)
     # No sky to light the shadows: only the sun.
     scene.define("/Render/Settings", ernie.RenderSettings, ambient=0.0, camera=wac_camera).set(
         tokens.PRODUCTS, [wac.path])

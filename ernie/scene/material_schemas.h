@@ -16,8 +16,9 @@
 ///
 /// Not declared, and read generically: a BRDF's own parameters (`inputs:<param>` per model in the
 /// `BrdfRegistry`, an open namespace), connections (`<input>.connect`, through `GetConnection`),
-/// UsdUVTexture's 4-vector scale and bias and UsdTransform2d's 2-vector scale, which share the name
-/// `inputs:scale` on the one Shader type.
+/// and `inputs:scale`, which is UsdUVTexture's 4-vector scale and UsdTransform2d's 2-vector one
+/// under one name on the one Shader type: a declaration of either type would author the other
+/// Shader's scale as the wrong USD type.
 ///
 /// References:
 /// - Pixar, UsdShade, https://openusd.org/release/api/usd_shade_page_front.html
@@ -154,6 +155,9 @@
       (::ernie::AttributeMeta{.label = "Colour space",                                             \
                               .doc = "auto: sRGB for 8-bit images, raw otherwise.",                \
                               .group = "Texture", .options = {"auto", "raw", "sRGB"}}))            \
+    X(glm::dvec4, Bias, ::ernie::tokens::kShaderBias, glm::dvec4(0.0),                             \
+      (::ernie::AttributeMeta{.doc = "Added to the texture's linear values after its scale.",      \
+                              .group = "Texture"}))                                                \
     X(double, Rotation, ::ernie::tokens::kRotation, 0.0,                                           \
       (::ernie::AttributeMeta{.doc = "Degrees, counter-clockwise, after the scale.",               \
                               .group = "Transform 2D", .min = -360.0, .max = 360.0}))              \

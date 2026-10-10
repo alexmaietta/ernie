@@ -128,5 +128,38 @@ TEST(PrimSchemasTest, GeometryPanelsComeFromTheRegistry) {
     EXPECT_EQ(FieldOf(ground, tokens::kDisplayColor), nullptr);
 }
 
+TEST(PrimSchemasTest, RenderPanelsEditTheCameraAsOneTarget) {
+    Scene scene;
+    scene.Define("/Settings", tokens::kRenderSettings);
+    scene.Define("/Product", tokens::kRenderProduct);
+    scene.Define("/Tex", tokens::kShader);
+    const BrdfRegistry brdfs = BrdfRegistry::WithBuiltins();
+    const SensorFilterRegistry filters = SensorFilterRegistry::WithStandard();
+
+    // The camera, a list of targets in the registry, leads the image section as one target;
+    // the other lists of targets are not edited.
+    for (const std::vector<PropertySection>& sections :
+         {RenderSettingsSchema(), SchemaOf(scene, "/Settings", brdfs, filters),
+          SchemaOf(scene, "/Product", brdfs, filters)}) {
+        const PropertyField* camera = FieldOf(sections, tokens::kCameraRel);
+        ASSERT_NE(camera, nullptr);
+        EXPECT_EQ(camera->kind, PropertyField::Kind::Target);
+        EXPECT_EQ(camera->options, std::vector<std::string>{std::string(tokens::kCamera)});
+        EXPECT_EQ(sections[0].fields[0].attribute, tokens::kCameraRel);
+        EXPECT_EQ(sections[0].fields[1].attribute, tokens::kResolution);
+        int cameras = 0;
+        for (const PropertySection& section : sections) {
+            for (const PropertyField& field : section.fields) {
+                cameras += field.attribute == tokens::kCameraRel ? 1 : 0;
+            }
+        }
+        EXPECT_EQ(cameras, 1);
+        EXPECT_EQ(FieldOf(sections, tokens::kProducts), nullptr);
+        EXPECT_EQ(FieldOf(sections, tokens::kOrderedVars), nullptr);
+    }
+    // A 4-vector that is not a colour has no field.
+    EXPECT_EQ(FieldOf(SchemaOf(scene, "/Tex", brdfs, filters), tokens::kShaderBias), nullptr);
+}
+
 }  // namespace
 }  // namespace ernie::app

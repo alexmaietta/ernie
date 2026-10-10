@@ -22,7 +22,7 @@ def test_material_edits_change_the_image(renderer, terrain_scene):
     scene = terrain_scene
     bright = renderer.render(scene).astype(np.int32)
     dark = scene.define("/Looks/Dark", ernie.Material, albedo=(0.2, 0.2, 0.2))
-    ernie.Terrain(scene.get_prim("/World/Terrain")).material_binding = dark
+    ernie.Terrain.at(scene, "/World/Terrain").material_binding = dark
     dark = renderer.render(scene).astype(np.int32)
     terrain = np.any(bright[..., :3] != (0, 0, 255), axis=-1)
     assert dark[terrain, :3].sum() < bright[terrain, :3].sum()

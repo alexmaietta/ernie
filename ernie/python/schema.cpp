@@ -29,8 +29,10 @@ void BindSchema(nb::module_& m) {
         .value("DOUBLE", AttributeKind::Double)
         .value("VEC2", AttributeKind::Vec2)
         .value("VEC3", AttributeKind::Vec3)
+        .value("VEC4", AttributeKind::Vec4)
         .value("TOKEN", AttributeKind::Token)
         .value("RELATIONSHIP", AttributeKind::Relationship)
+        .value("RELATIONSHIPS", AttributeKind::Relationships)
         .value("FLOAT_ARRAY", AttributeKind::FloatArray)
         .value("TENSOR", AttributeKind::Tensor);
 
@@ -45,7 +47,7 @@ void BindSchema(nb::module_& m) {
         .def_ro("kind", &AttributeDef::kind)
         .def_prop_ro(
             "default", [](const AttributeDef& def) { return ValueToPython(def.fallback); },
-            "What Ernie uses while it is unset; None for relationships and arrays.")
+            "What Ernie uses while it is unset; None for single relationships and arrays.")
         .def_prop_ro("doc", [](const AttributeDef& def) { return std::string(def.meta.doc); })
         .def_prop_ro("group", [](const AttributeDef& def) { return std::string(def.meta.group); })
         .def_prop_ro("min", [](const AttributeDef& def) { return def.meta.min; })
@@ -65,11 +67,16 @@ void BindSchema(nb::module_& m) {
                     return tensor != nullptr ? ArrayFromTensor(*tensor) : nb::none();
                 }
                 const Value* value = prim.Get(def.name);
+                if (def.kind == AttributeKind::Relationships && value != nullptr) {
+                    // A list, also of the one target stored alone; `Coerce` throws for others.
+                    def.Coerce(*value);
+                    return ValueToPython(Value(*AttributeTraits<std::vector<Path>>::From(*value)));
+                }
                 return ValueToPython(value != nullptr ? def.Coerce(*value) : def.fallback);
             },
             nb::arg("prim"),
-            "The attribute of `prim` as its declared type, or its default while unset; an array "
-            "(or None) for tensors.")
+            "The attribute of `prim` as its declared type, or its default while unset; a list of "
+            "paths for a relationship to several prims; an array (or None) for tensors.")
         .def(
             "write",
             [](const AttributeDef& def, Prim& prim, nb::handle value) {
@@ -81,7 +88,8 @@ void BindSchema(nb::module_& m) {
             },
             nb::arg("prim"), nb::arg("value"),
             "Sets the attribute of `prim`, converted to its declared type (an int to a float, a "
-            "str to a Path); writes an array for tensors.")
+            "str to a Path; a relationship to several prims takes one target or a list); writes "
+            "an array for tensors.")
         .def("__repr__", [](const AttributeDef& def) {
             return "AttributeDef('" + def.pyName + "', '" + std::string(def.name) + "')";
         });

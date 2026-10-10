@@ -60,12 +60,18 @@ std::optional<PropertyField> FieldOf(const AttributeDef& def) {
             kind = Kind::Color;
         }
         break;
+    case AttributeKind::Vec4:
+        if (def.meta.color) {
+            kind = Kind::Color4;
+        }
+        break;
     case AttributeKind::Token:
         kind = def.meta.options.empty() ? Kind::Text : Kind::Token;
         break;
     case AttributeKind::Relationship:
         kind = Kind::Target;
         break;
+    case AttributeKind::Relationships:  // Not edited in panels yet, but a render's camera.
     case AttributeKind::FloatArray:
     case AttributeKind::Tensor:
         break;
@@ -169,10 +175,20 @@ void ShaderSections(const ernie::Shader& shader, std::vector<PropertySection>& s
     });
 }
 
-/// A render settings' or product's sections with the resolution edited as whole pixels, which the
-/// registry's 2-vector cannot say, and the camera and resolution leading their section.
+/// A render settings' or product's sections with the camera as one target (its first, of a
+/// product's batch), the resolution edited as whole pixels, which the registry's list of targets
+/// and 2-vector cannot say, and the camera and resolution leading their section.
 void RenderImageFields(std::vector<PropertySection>& sections) {
+    const AttributeDef& camera = *RenderSettingsBase::Definition().Find(kCameraRel);
     for (PropertySection& section : sections) {
+        const bool hasCamera = std::ranges::any_of(section.fields, [](const PropertyField& field) {
+            return field.attribute == kCameraRel;
+        });
+        if (section.title == camera.meta.group && !hasCamera) {
+            section.fields.insert(section.fields.begin(),
+                                  Field(camera.name, camera.label, Kind::Target, Value(), 0, 0,
+                                        {S(kCamera)}, S(camera.meta.doc)));
+        }
         for (PropertyField& field : section.fields) {
             if (field.attribute == kResolution) {
                 field.kind = Kind::Int2;

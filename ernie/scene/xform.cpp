@@ -138,7 +138,8 @@ std::optional<std::vector<double>> NumbersOf(const Scene& scene, const Path& pat
                     return rows;
                 } else if constexpr (std::is_same_v<T, std::vector<float>>) {
                     return {v.begin(), v.end()};
-                } else if constexpr (std::is_same_v<T, glm::vec4>) {
+                } else if constexpr (std::is_same_v<T, glm::vec4> ||
+                                     std::is_same_v<T, glm::dvec4>) {
                     // Four numbers are ambiguous for a quaternion (w first or last); see kOrient.
                     throw BadOp(path, attribute, "a quaternion, not four numbers");
                 } else {

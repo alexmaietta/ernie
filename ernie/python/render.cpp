@@ -120,8 +120,7 @@ std::vector<Path> PathsOf(nb::handle products) {
         return paths;
     }
     for (nb::handle product : products) {
-        paths.push_back(nb::isinstance<Path>(product) ? nb::cast<Path>(product)
-                                                      : Path(nb::cast<std::string>(product)));
+        paths.push_back(PathFromPython(product));
     }
     return paths;
 }

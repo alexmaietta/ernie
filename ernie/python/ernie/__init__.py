@@ -1,20 +1,24 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Ernie: a standalone Vulkan renderer with a USD-style scene.
 
-Build a Scene of typed prims named by path, set their attributes by USD name, write bulk data as
-arrays from any DLPack-capable framework (NumPy, PyTorch, JAX, CuPy, Warp) without copying, and
-render it::
+Build a Scene of typed prims named by path (`ernie.Terrain`, `ernie.Camera`, ...; see
+`ernie.schema`), set their attributes by name, write bulk data as arrays from any DLPack-capable
+framework (NumPy, PyTorch, JAX, CuPy, Warp) without copying, and render it::
 
     import numpy as np
     import ernie
     from ernie import tokens
 
     scene = ernie.Scene()
-    scene.define("/World/Terrain", tokens.TERRAIN).write(tokens.HEIGHTS, heights).set(
-        tokens.CELL_SIZE, 2.0)
-    scene.define("/World/Camera", tokens.CAMERA).set(
-        tokens.TRANSFORM, ernie.look_at_transform((0, -500, 300), (0, 0, 0)))
+    scene.define("/World/Terrain", ernie.Terrain, heights=heights, cell_size=2.0)
+    camera = scene.define("/World/Camera", ernie.Camera, focal_length=35.0)
+    camera.set(tokens.TRANSFORM, ernie.look_at_transform((0, -500, 300), (0, 0, 0)))
     image = ernie.Renderer().render(scene)  # uint8 (rows, cols, 4)
+
+`ernie.Camera.at(scene, path)` types an existing prim, and `ernie.typed(prim)` gives a prim its
+own class. Any attribute can also be set by USD name, `prim.set(tokens.FOCAL_LENGTH, 35.0)`. The
+authoring functions (`author_lroc_nac`, `IsdLineScanner.author_strip`, ...) and render products
+take a prim as a str, a Path, a Prim or a typed prim.
 
 Attribute values map from Python as follows:
 

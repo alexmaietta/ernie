@@ -19,7 +19,7 @@ def link_scene(points=True, instancer=True, extent=EXTENT, depth=1):
     PointInstancer of boxes; the sun casts no shadows, whose map is fitted to the bounds (the
     extents on the GPU, the posed prims on the CPU)."""
     scene = staged_scene()
-    ernie.DistantLight(scene.get_prim("/World/Sun")).shadow_enable = False
+    ernie.DistantLight.at(scene, "/World/Sun").shadow_enable = False
     levels = [[] for _ in range(depth)]
     for i, offset in enumerate(OFFSETS):
         link = scene.define(f"/World/Env{i}", ernie.Xform, translate=offset, scale=2.0)

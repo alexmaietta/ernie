@@ -16,10 +16,9 @@
 /// fallback is the value Ernie renders an unset attribute with, the default of the `FrameParams`,
 /// `ShadowSettings` or `LodSettings` field it sets.
 ///
-/// Not declared, as the registry holds single targets only: the relationships to several prims
-/// (`products`, `orderedVars`, `ernie:filters`, `ernie:lights`, and a product's `camera` when it
-/// names a batch of cameras), and a SensorFilter's `inputs:*`, which its filter type's model
-/// (`SensorFilterRegistry`) defines.
+/// The relationships (`camera`, `products`, `ernie:lights`, `orderedVars`, `ernie:filters`) are
+/// lists of targets; `camera` is one target, or on a product a batch of cameras. Not declared: a
+/// SensorFilter's `inputs:*`, which its filter type's model (`SensorFilterRegistry`) defines.
 ///
 /// References:
 /// - Pixar, UsdRender, https://openusd.org/release/api/usd_render_page_front.html
@@ -28,8 +27,11 @@
 
 // clang-format off
 #define ERNIE_RENDER_SETTINGS_BASE_ATTRIBUTES(X)                                                   \
-    X(::ernie::Path, Camera, ::ernie::tokens::kCameraRel, ::ernie::Path(),                         \
-      (::ernie::AttributeMeta{.doc = "The camera rendered; unset, the scene's first.",             \
+    X(std::vector<::ernie::Path>, Camera, ::ernie::tokens::kCameraRel,                             \
+      std::vector<::ernie::Path>{},                                                                \
+      (::ernie::AttributeMeta{.doc = "The camera rendered, or a product's batch of cameras (one "  \
+                                     "view each); unset, the settings' camera, else the scene's "  \
+                                     "first.",                                                     \
                               .group = "Image", .options = {::ernie::tokens::kCamera}}))           \
     X(glm::dvec2, Resolution, ::ernie::tokens::kResolution, glm::dvec2(2048.0, 1080.0),            \
       (::ernie::AttributeMeta{.doc = "Pixels, width and height; a product's, unset, its "          \
@@ -53,6 +55,16 @@
                               .group = "Minimal", .color = true}))
 
 #define ERNIE_RENDER_SETTINGS_ATTRIBUTES(X)                                                        \
+    X(std::vector<::ernie::Path>, Products, ::ernie::tokens::kProducts,                            \
+      std::vector<::ernie::Path>{},                                                                \
+      (::ernie::AttributeMeta{.doc = "The RenderProducts rendered; none, one image of the "        \
+                                     "settings' own.",                                             \
+                              .group = "Image", .options = {::ernie::tokens::kRenderProduct}}))    \
+    X(std::vector<::ernie::Path>, Lights, ::ernie::tokens::kLightsRel,                             \
+      std::vector<::ernie::Path>{},                                                                \
+      (::ernie::AttributeMeta{.doc = "The lights rendered, when set (empty: none); unset, every "  \
+                                     "visible light.",                                             \
+                              .group = "Image"}))                                                  \
     X(std::string, ColorMode, ::ernie::tokens::kColorMode, ::ernie::tokens::kShadedColormap,       \
       (::ernie::AttributeMeta{.label = "Terrain colour", .group = "Image",                         \
                               .options = {::ernie::tokens::kHillshade, ::ernie::tokens::kColormap, \
@@ -171,6 +183,17 @@
                               .doc = "Shadowed directions lighting the dome's diffuse light.",     \
                               .group = "Dome light", .min = 1.0, .max = 1024.0}))
 
+#define ERNIE_RENDER_PRODUCT_ATTRIBUTES(X)                                                         \
+    X(std::vector<::ernie::Path>, OrderedVars, ::ernie::tokens::kOrderedVars,                      \
+      std::vector<::ernie::Path>{},                                                                \
+      (::ernie::AttributeMeta{.label = "Render vars",                                              \
+                              .doc = "The RenderVars written; none, LdrColor alone.",              \
+                              .group = "Image", .options = {::ernie::tokens::kRenderVar}}))        \
+    X(std::vector<::ernie::Path>, Filters, ::ernie::tokens::kFilters,                              \
+      std::vector<::ernie::Path>{},                                                                \
+      (::ernie::AttributeMeta{.doc = "The SensorFilter prims of its sensor chain, in order.",      \
+                              .group = "Image", .options = {::ernie::tokens::kSensorFilter}}))
+
 #define ERNIE_RENDER_VAR_ATTRIBUTES(X)                                                             \
     X(std::string, SourceName, ::ernie::tokens::kSourceName, ::ernie::tokens::kLdrColor,           \
       (::ernie::AttributeMeta{                                                                     \
@@ -178,7 +201,12 @@
           .doc = "The output: a render var name, or \"aov:<output>\" of a custom filter.",         \
           .group = "Var",                                                                          \
           .options = std::vector<std::string_view>(::ernie::kRenderVarNames.begin(),               \
-                                                   ::ernie::kRenderVarNames.end())}))
+                                                   ::ernie::kRenderVarNames.end())}))              \
+    X(std::vector<::ernie::Path>, Filters, ::ernie::tokens::kFilters,                              \
+      std::vector<::ernie::Path>{},                                                                \
+      (::ernie::AttributeMeta{.doc = "Its own sensor chain's SensorFilter prims, in place of "     \
+                                     "its product's, when set.",                                   \
+                              .group = "Var", .options = {::ernie::tokens::kSensorFilter}}))
 
 #define ERNIE_SENSOR_FILTER_ATTRIBUTES(X)                                                          \
     X(std::string, FilterType, ::ernie::tokens::kFilterType, "",                                   \
@@ -193,7 +221,8 @@
     ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_RENDER_SETTINGS_BASE_ATTRIBUTES(X)
 #define ERNIE_RENDER_SETTINGS_ALL(X)                                                               \
     ERNIE_RENDER_SETTINGS_BASE_ALL(X) ERNIE_RENDER_SETTINGS_ATTRIBUTES(X)
-#define ERNIE_RENDER_PRODUCT_ALL(X) ERNIE_RENDER_SETTINGS_BASE_ALL(X)
+#define ERNIE_RENDER_PRODUCT_ALL(X)                                                                \
+    ERNIE_RENDER_SETTINGS_BASE_ALL(X) ERNIE_RENDER_PRODUCT_ATTRIBUTES(X)
 #define ERNIE_RENDER_VAR_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_RENDER_VAR_ATTRIBUTES(X)
 #define ERNIE_SENSOR_FILTER_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_SENSOR_FILTER_ATTRIBUTES(X)
 // clang-format on

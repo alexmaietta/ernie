@@ -6,7 +6,7 @@ from its own pose of its own world, and every step hands back the observations a
     from ernie.batch import BatchCamera
 
     renderer = ernie.Renderer()
-    scene = ...  # environments cloned under prims with tokens.WORLD 0, 1, ... (see Scene.clone)
+    scene = ...  # environments cloned under Xforms with world=0, 1, ... (see Scene.clone)
     camera = BatchCamera(renderer, scene, "/World/Camera", views=4096, resolution=(64, 64),
                          render_vars=("LdrColor", "DistanceToCamera"))
     camera.set_worlds(numpy.arange(4096, dtype=numpy.int32))

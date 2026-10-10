@@ -51,4 +51,16 @@ def test_shader_network_through_classes():
     texture.texture = np.zeros((2, 2, 3), np.float32)
     assert texture.texture.shape == (2, 2, 3)
     with pytest.raises(TypeError, match="not a Material"):
-        ernie.Material(scene.get_prim("/Looks/Wood/Surface"))
+        ernie.Material.at(scene, "/Looks/Wood/Surface")
+
+
+def test_texture_bias_is_a_four_vector():
+    scene = ernie.Scene()
+    texture = ernie.Shader.define(scene, "/Looks/Tex", info_id=tokens.USD_UV_TEXTURE)
+    assert ernie.Shader.bias.kind == ernie.AttributeKind.VEC4
+    assert texture.bias == (0.0, 0.0, 0.0, 0.0)
+    texture.bias = (-1, -1, -1, 0)
+    assert texture.bias == (-1.0, -1.0, -1.0, 0.0)
+    assert scene.get("/Looks/Tex", tokens.SHADER_BIAS) == (-1.0, -1.0, -1.0, 0.0)
+    with pytest.raises(ValueError, match="4-vector"):
+        texture.bias = (1.0, 2.0, 3.0)

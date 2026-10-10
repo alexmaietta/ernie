@@ -36,7 +36,7 @@ def test_define_with_keyword_attributes():
     assert ground.material_binding == ernie.Path("/Looks/Grass")
 
     cloud = scene.define("/World/Cloud", ernie.Points, widths=0.1)
-    assert cloud.widths == 0.1
+    assert cloud.widths == pytest.approx([0.1])
 
 
 def test_bulk_arrays_are_tensors():
@@ -48,3 +48,21 @@ def test_bulk_arrays_are_tensors():
     instancer = ernie.PointInstancer.define(scene, "/Rocks")
     instancer.write(tokens.POSITIONS, np.zeros((5, 3), np.float32))
     assert instancer.positions.shape == (5, 3) and instancer.proto_indices is None
+
+
+def test_boundables_instancers_and_point_widths():
+    assert issubclass(ernie.Gprim, ernie.Boundable) and issubclass(ernie.PointInstancer, ernie.Boundable)
+    assert ernie.Boundable.prim_type.abstract
+    scene = ernie.Scene()
+    mesh = scene.define("/Mesh", ernie.Mesh, extent=[-1, -1, -1, 1, 1, 1])
+    assert mesh.extent == [-1.0, -1.0, -1.0, 1.0, 1.0, 1.0]
+    rock = scene.define("/Protos/Rock", ernie.Mesh)
+    instancer = scene.define("/Rocks", ernie.PointInstancer, prototypes=[rock, "/Protos/Tree"])
+    assert instancer.prototypes == [ernie.Path("/Protos/Rock"), ernie.Path("/Protos/Tree")]
+    assert ernie.PointInstancer.prototypes.kind == ernie.AttributeKind.RELATIONSHIPS
+    assert instancer.worlds is None
+    instancer.worlds = np.array([0, 1], np.int32)
+    assert instancer.worlds.tolist() == [0, 1]
+    cloud = scene.define("/Cloud", ernie.Points, widths=[0.5, 0.6, 0.7])
+    assert cloud.widths == pytest.approx([0.5, 0.6, 0.7])
+    assert ernie.Points.widths.default == [1.0]

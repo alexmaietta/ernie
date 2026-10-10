@@ -75,10 +75,9 @@
                               .group = "Geometry"}))
 
 #define ERNIE_POINTS_ATTRIBUTES(X)                                                                 \
-    X(double, Widths, ::ernie::tokens::kWidths, 1.0,                                               \
-      (::ernie::AttributeMeta{.label = "Width",                                                    \
-                              .doc = "Diameter of every point; widths per point are written as "   \
-                                     "an array instead.",                                          \
+    X(std::vector<float>, Widths, ::ernie::tokens::kWidths, std::vector<float>{1.0f},             \
+      (::ernie::AttributeMeta{.doc = "Diameters: one for every point, or one per point. Many "     \
+                                     "points' widths may be written as an array instead.",         \
                               .group = "Geometry", .min = 0.0, .max = 1000.0}))
 
 #define ERNIE_POINT_INSTANCER_ATTRIBUTES(X)                                                        \
@@ -94,6 +93,14 @@
     X(::ernie::Tensor, ProtoIndices, ::ernie::tokens::kProtoIndices, nullptr,                      \
       (::ernie::AttributeMeta{.doc = "Integer prototype of each instance, of the prototypes "      \
                                      "relationship's targets; the first for all when unset.",      \
+                              .group = "Instances"}))                                              \
+    X(std::vector<::ernie::Path>, Prototypes, ::ernie::tokens::kPrototypes,                        \
+      std::vector<::ernie::Path>{},                                                                \
+      (::ernie::AttributeMeta{.doc = "The prims instanced, indexed by the proto indices.",         \
+                              .group = "Instances"}))                                              \
+    X(::ernie::Tensor, Worlds, ::ernie::tokens::kWorlds, nullptr,                                  \
+      (::ernie::AttributeMeta{.doc = "int (n,): each instance's world, in place of the "           \
+                                     "instancer's world.",                                         \
                               .group = "Instances"}))
 
 #define ERNIE_GROUND_PLANE_ATTRIBUTES(X)                                                           \
@@ -126,7 +133,7 @@
 #define ERNIE_POINT_BASED_ALL(X) ERNIE_GPRIM_ALL(X) ERNIE_POINT_BASED_ATTRIBUTES(X)
 #define ERNIE_MESH_ALL(X) ERNIE_POINT_BASED_ALL(X) ERNIE_MESH_ATTRIBUTES(X)
 #define ERNIE_POINTS_ALL(X) ERNIE_POINT_BASED_ALL(X) ERNIE_POINTS_ATTRIBUTES(X)
-#define ERNIE_POINT_INSTANCER_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_POINT_INSTANCER_ATTRIBUTES(X)
+#define ERNIE_POINT_INSTANCER_ALL(X) ERNIE_BOUNDABLE_ALL(X) ERNIE_POINT_INSTANCER_ATTRIBUTES(X)
 #define ERNIE_GROUND_PLANE_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_GROUND_PLANE_ATTRIBUTES(X)
 // clang-format on
 
@@ -191,10 +198,10 @@ class Points : public PointBased {
     ERNIE_SCHEMA_DEFINE(Points)
 };
 
-/// Instances of its prototypes (the `prototypes` relationship's targets, read by name: a list of
-/// paths) at rows of positions, orientations and scales.
-class PointInstancer : public Imageable {
-    ERNIE_SCHEMA_BODY(PointInstancer, Imageable, ERNIE_POINT_INSTANCER_ALL)
+/// Instances of its prototypes (the `prototypes` relationship's targets) at rows of positions,
+/// orientations and scales.
+class PointInstancer : public Boundable {
+    ERNIE_SCHEMA_BODY(PointInstancer, Boundable, ERNIE_POINT_INSTANCER_ALL)
     ERNIE_SCHEMA_DEFINE(PointInstancer)
 };
 

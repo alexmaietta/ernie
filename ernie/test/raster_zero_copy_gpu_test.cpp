@@ -62,7 +62,7 @@ TEST_F(RasterDelegateTest, MappedMeshInstancerAndPointsArraysDrawWithoutCopies) 
     const std::array<float, 9> grains{-4, -12, 0, 0, -12, 0, 4, -12, 0};
     ernie::Points::Define(scene, "/World/Grains")
         .SetPoints(Tensor::Copy<float>(grains, {3, 3}))
-        .SetWidths(2.0);
+        .SetWidths({2.0f});
     scene.Set("/World/Quad", tokens::kExtent,
               std::vector<float>{-14.0f, -4.0f, -1.0f, -10.0f, 4.0f, 1.0f});
     scene.Set("/World/Rocks", tokens::kExtent,
@@ -96,7 +96,7 @@ TEST_F(RasterDelegateTest, MappedMeshInstancerAndPointsArraysDrawWithoutCopies) 
     Scene host = MeshScene();
     ernie::Points::Define(host, "/World/Grains")
         .SetPoints(Tensor::Copy<float>(raisedGrains, {3, 3}))
-        .SetWidths(2.0);
+        .SetWidths({2.0f});
     for (const auto& [path, extent] :
          {std::pair{"/World/Quad", std::vector<float>{-14.0f, -4.0f, -1.0f, -10.0f, 4.0f, 1.0f}},
           std::pair{"/World/Rocks", std::vector<float>{-2.0f, -12.0f, -1.0f, 14.0f, 12.0f, 1.0f}},

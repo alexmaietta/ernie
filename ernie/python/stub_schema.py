@@ -17,8 +17,10 @@ _TYPES = {
     AttributeKind.DOUBLE: "float",
     AttributeKind.VEC2: "tuple[float, float]",
     AttributeKind.VEC3: "tuple[float, float, float]",
+    AttributeKind.VEC4: "tuple[float, float, float, float]",
     AttributeKind.TOKEN: "str",
     AttributeKind.RELATIONSHIP: "Path | None",
+    AttributeKind.RELATIONSHIPS: "list[Path]",
     AttributeKind.FLOAT_ARRAY: "list[float]",
     AttributeKind.TENSOR: "Any",
 }
@@ -28,8 +30,10 @@ _ARGUMENTS = {
     AttributeKind.DOUBLE: "float",
     AttributeKind.VEC2: "Sequence[float]",
     AttributeKind.VEC3: "Sequence[float]",
+    AttributeKind.VEC4: "Sequence[float]",
     AttributeKind.RELATIONSHIP: "str | Path | Prim | Schema",
-    AttributeKind.FLOAT_ARRAY: "Sequence[float]",
+    AttributeKind.RELATIONSHIPS: "str | Path | Prim | Schema | Sequence[str | Path | Prim | Schema]",
+    AttributeKind.FLOAT_ARRAY: "float | Sequence[float]",
 }
 
 _XFORM = (
@@ -76,7 +80,7 @@ def main(output):
         "",
         "from ._ernie import AttributeDef, Path, Prim, PrimType, Quat, Scene",
         "",
-        f"__all__ = {['Schema', *[t.name for t in ernie.prim_types()]]!r}",
+        f"__all__ = {['Schema', 'typed', *[t.name for t in ernie.prim_types()]]!r}",
         "",
         "classes: dict[str, type[Schema]]",
         "",
@@ -87,6 +91,8 @@ def main(output):
         "    def __init__(self, prim: Prim) -> None: ...",
         "    @classmethod",
         "    def define(cls, parent: Scene | Prim | Schema, path: str | Path, **attributes: Any) -> Self: ...",
+        "    @classmethod",
+        "    def at(cls, parent: Scene | Prim | Schema, path: str | Path) -> Self: ...",
         "    @classmethod",
         "    def attributes(cls) -> list[AttributeDef]: ...",
         "    def set(self, *attribute: Any, **attributes: Any) -> Self: ...",
@@ -114,6 +120,8 @@ def main(output):
             )
         lines.append(f"    def set(self, *attribute: Any, {keywords}) -> Self: ...")
         lines.append("")
+    lines.append("def typed(prim: Prim | Schema) -> Schema | Prim: ...")
+    lines.append("")
     with open(output, "w") as stub:
         stub.write("\n".join(lines))
 

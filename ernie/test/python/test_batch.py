@@ -11,8 +11,8 @@ def noiseless(scene):
     """The terrain scene without sensor noise or sun shadows, so a batch's views render as single
     views of the same poses do (a batch fits its sun shadows to the scene, a single view to its
     frustum)."""
-    ernie.Camera(scene.get_prim("/World/Camera")).sensor_noise = False
-    ernie.DistantLight(scene.get_prim("/World/Sun")).shadow_enable = False
+    ernie.Camera.at(scene, "/World/Camera").sensor_noise = False
+    ernie.DistantLight.at(scene, "/World/Sun").shadow_enable = False
     return scene
 
 
@@ -68,8 +68,8 @@ def test_each_view_sees_its_world(renderer, terrain_scene, on_gpu):
     env = scene.define("/Envs/Env0", ernie.Xform, world=0)
     env.define("Box", ernie.Cube, size=40.0, display_color=(1.0, 0.0, 0.0))
     scene.clone("/Envs/Env0", "/Envs/Env1")
-    ernie.Xform(scene.get_prim("/Envs/Env1")).world = 1
-    ernie.Cube(scene.get_prim("/Envs/Env1/Box")).display_color = (0.0, 1.0, 0.0)
+    ernie.Xform.at(scene, "/Envs/Env1").world = 1
+    ernie.Cube.at(scene, "/Envs/Env1/Box").display_color = (0.0, 1.0, 0.0)
     pose = np.array(scene.get("/World/Camera", tokens.TRANSFORM), np.float32)
     camera = BatchCamera(renderer, scene, "/World/Camera", 2, resolution=(48, 48))
     for order in ([0, 1], [1, 0]):  # written again, the views see the new worlds

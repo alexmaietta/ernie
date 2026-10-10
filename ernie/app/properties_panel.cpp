@@ -307,6 +307,8 @@ class PropertiesPanel final : public Panel {
                     changed = ImGui::DragScalarN("##v", ImGuiDataType_Double, &edit[0], 2, 0.01f);
                 } else if constexpr (std::is_same_v<T, glm::dvec3>) {
                     changed = ImGui::DragScalarN("##v", ImGuiDataType_Double, &edit[0], 3, 0.01f);
+                } else if constexpr (std::is_same_v<T, glm::dvec4>) {
+                    changed = ImGui::DragScalarN("##v", ImGuiDataType_Double, &edit[0], 4, 0.01f);
                 } else if constexpr (std::is_same_v<T, glm::dmat4>) {
                     for (int row = 0; row < 4; ++row) {
                         ImGui::PushID(row);

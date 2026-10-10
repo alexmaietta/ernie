@@ -51,6 +51,16 @@ glm::dvec3 Vec3Of(const Value& value) {
     return glm::dvec3(0.0);
 }
 
+glm::dvec4 Vec4Of(const Value& value) {
+    if (const auto* v = value.Get<glm::vec4>()) {
+        return glm::dvec4(*v);
+    }
+    if (const auto* d = value.Get<glm::dvec4>()) {
+        return *d;
+    }
+    return glm::dvec4(0.0);
+}
+
 glm::dvec2 Vec2Of(const Value& value) {
     if (const auto* v = value.Get<glm::vec2>()) {
         return glm::dvec2(*v);
@@ -93,6 +103,10 @@ Value Shown(const Scene& scene, const Path& path, const PropertyField& field) {
         return GetToken(scene, path, field.attribute, TextOf(field.fallback));
     case Kind::Color:
         return GetVec3(scene, path, field.attribute, Vec3Of(field.fallback));
+    case Kind::Color4:
+        return authored->Get<glm::vec4>() != nullptr || authored->Get<glm::dvec4>() != nullptr
+                   ? Value(Vec4Of(*authored))
+                   : field.fallback;
     case Kind::Vec2:
     case Kind::Int2:
         return Vec2Of(*authored);
@@ -250,6 +264,13 @@ std::optional<Value> Widget(Viewer& viewer, const PropertyField& field, const Va
         glm::vec3 value(Vec3Of(shown));
         if (ImGui::ColorEdit3("##v", &value[0], ImGuiColorEditFlags_Float)) {
             return value;
+        }
+        break;
+    }
+    case Kind::Color4: {
+        glm::vec4 value(Vec4Of(shown));
+        if (ImGui::ColorEdit4("##v", &value[0], ImGuiColorEditFlags_Float)) {
+            return glm::dvec4(value);
         }
         break;
     }

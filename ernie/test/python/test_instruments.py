@@ -55,6 +55,26 @@ def test_mastcamz_pair_reaches_the_near_infrared():
         ernie.author_mastcamz(scene, "/Rover/MastcamZ/Left", "/Render/Left", filter=9)
 
 
+def test_prim_paths_are_strs_paths_prims_or_typed_prims():
+    scene = ernie.Scene()
+    camera = scene.define("/World/Camera", ernie.Camera, focal_length=50.0)
+    product = scene.define("/Render/Product", ernie.RenderProduct)
+    ernie.author_lroc_nac(scene, camera, product)
+    assert camera.sensor_adc_bits == 12
+    ernie.author_lroc_wac(scene, camera.prim, ernie.Path("/Render/Product"), band=415)
+    assert camera.sensor_adc_bits == 11
+    ernie.author_singlet_chromatic(scene, camera)
+    assert scene.get("/World/Camera", tokens.LENS_CHROMATIC_FOCUS) is not None
+    rig = scene.define("/Rover/Navcam", ernie.Xform)
+    left = scene.define("/Render/Left", ernie.RenderProduct)
+    ernie.author_mars2020_navcam_pair(scene, rig, left, left.prim)
+    assert ernie.Camera.at(rig, "Right").focal_length == 19.1
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        ernie.author_lroc_nac(scene, 3, product)
+    with pytest.raises(ValueError, match="not absolute"):
+        ernie.author_lroc_nac(scene, "World/Camera", product)
+
+
 def test_singlet_chromatic_follows_its_glass():
     scene = ernie.Scene()
     scene.define("/Camera", ernie.Camera, focal_length=50.0)

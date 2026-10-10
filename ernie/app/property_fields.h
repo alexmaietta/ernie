@@ -21,8 +21,9 @@ struct PropertyField {
         Float,
         Token,   ///< One of `options`.
         Color,   ///< Linear RGB.
+        Color4,  ///< Linear RGBA.
         Vec2,
-        Int2,    ///< Such as a resolution.
+        Int2,  ///< Such as a resolution.
         Text,
         Target,  ///< A relationship to one prim, of type `options[0]` when given.
         /// A float array as a curve over [0, 1], edited by dragging across it, which sets the

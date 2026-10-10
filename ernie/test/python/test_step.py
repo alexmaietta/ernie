@@ -23,7 +23,9 @@ def product_scene():
 
 def test_step_returns_outputs_by_product(renderer):
     scene = product_scene()
-    products = renderer.step(scene, render_products={"/Render/Camera", "/Render/Side"})
+    # Products by path, or as prims and typed prims.
+    side_product = ernie.RenderProduct.at(scene, "/Render/Side")
+    products = renderer.step(scene, render_products=["/Render/Camera", side_product])
     assert set(products) == {"/Render/Camera", "/Render/Side"}
     for _name, product in products.items():
         for frame in product.frames:
@@ -143,7 +145,7 @@ def test_a_camera_with_poses_renders_a_batch_of_views(renderer, terrain_scene):
             for a in np.linspace(0.0, np.pi, 5)
         ]
     )
-    camera = ernie.Camera(scene.get_prim("/World/Camera"))
+    camera = ernie.Camera.at(scene, "/World/Camera")
     camera.poses = poses
     scene.define("/Render/Batch", ernie.RenderProduct, camera=camera, resolution=(24, 16))
     batch = renderer.step(scene, render_products=["/Render/Batch"])["/Render/Batch"]
@@ -164,8 +166,8 @@ def test_cloned_worlds_render_one_per_view(renderer):
     env.define("Box", ernie.Cube, size=4.0)
     for i in range(1, 3):
         scene.clone("/Envs/Env0", f"/Envs/Env{i}")
-        ernie.Xform(scene.get_prim(f"/Envs/Env{i}")).world = i
-        ernie.Cube(scene.get_prim(f"/Envs/Env{i}/Box")).size = 4.0 + 4.0 * i
+        ernie.Xform.at(scene, f"/Envs/Env{i}").world = i
+        ernie.Cube.at(scene, f"/Envs/Env{i}/Box").size = 4.0 + 4.0 * i
     above = ernie.look_at_transform((0, 0, 60), (0, 0, 0), up=(0, 1, 0))
     camera = scene.define(
         "/World/Camera",
@@ -187,9 +189,9 @@ def test_cloned_worlds_render_apart_in_one_batch(renderer, terrain_scene):
     env = scene.define("/Envs/Env0", ernie.Xform, world=0)
     env.define("Box", ernie.Cube, size=40.0, display_color=(1.0, 0.0, 0.0))
     scene.clone("/Envs/Env0", "/Envs/Env1")
-    ernie.Xform(scene.get_prim("/Envs/Env1")).world = 1
-    ernie.Cube(scene.get_prim("/Envs/Env1/Box")).display_color = (0.0, 1.0, 0.0)
-    camera = ernie.Camera(scene.get_prim("/World/Camera"))
+    ernie.Xform.at(scene, "/Envs/Env1").world = 1
+    ernie.Cube.at(scene, "/Envs/Env1/Box").display_color = (0.0, 1.0, 0.0)
+    camera = ernie.Camera.at(scene, "/World/Camera")
     pose = camera.get(tokens.TRANSFORM)
     camera.set(poses=np.stack([pose, pose]), worlds=np.array([0, 1], dtype=np.int32))
     scene.define("/Render/Batch", ernie.RenderProduct, camera=camera, resolution=(48, 48))

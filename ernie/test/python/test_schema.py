@@ -76,14 +76,44 @@ def test_define_takes_names_classes_and_relative_paths():
     disk = scene.define("/World/Disk", tokens.DISK_LIGHT, radius=0.25)
     assert type(disk) is ernie.Prim and ernie.DiskLight(disk).radius == 0.25
     # Typed prims from existing prims check the type.
-    assert ernie.Light(scene.get_prim("/World/Sun")).color_temperature == 6500.0
+    assert ernie.Light.at(scene, "/World/Sun").color_temperature == 6500.0
     with pytest.raises(TypeError, match="not a SphereLight"):
-        ernie.SphereLight(scene.get_prim("/World/Sun"))
+        ernie.SphereLight.at(scene, "/World/Sun")
     with pytest.raises(TypeError, match="abstract"):
         ernie.Light.define(scene, "/Abstract")
     # The raw USD-name form still works on typed prims.
     sun.set(tokens.INTENSITY, 2.0)
     assert sun.intensity == 2.0
+
+
+def test_existing_prims_are_typed_by_lookup():
+    scene = ernie.Scene()
+    world = scene.define("/World", ernie.Xform)
+    lamp = world.define("Rig/Lamp", ernie.SphereLight, radius=0.25)
+    # Class.at: in a scene by path, or below a prim or typed prim by relative path.
+    assert type(ernie.SphereLight.at(scene, "/World/Rig/Lamp")) is ernie.SphereLight
+    assert ernie.SphereLight.at(scene, ernie.Path("/World/Rig/Lamp")) == lamp
+    assert ernie.SphereLight.at(world, "Rig/Lamp") == lamp
+    assert ernie.SphereLight.at(scene.get_prim("/World/Rig"), "Lamp").radius == 0.25
+    assert type(ernie.Light.at(scene, "/World/Rig/Lamp")) is ernie.Light
+    with pytest.raises(LookupError, match="No prim at '/World/Nope'"):
+        ernie.SphereLight.at(scene, "/World/Nope")
+    with pytest.raises(LookupError, match="'Nope' below '/World'"):
+        ernie.SphereLight.at(world, "Nope")
+    with pytest.raises(TypeError, match="is a SphereLight, not a DistantLight"):
+        ernie.DistantLight.at(scene, "/World/Rig/Lamp")
+    with pytest.raises(TypeError, match="Scene or below a prim"):
+        ernie.SphereLight.at("/World", "Rig/Lamp")
+    # Prim.get_prim looks below a prim, as Scene.get_prim does in a scene.
+    assert world.get_prim("Rig/Lamp").path == lamp.path
+    assert world.get_prim("Nope") is None
+    # typed: the prim's own class, the most derived, or the Prim when it has none.
+    assert type(ernie.typed(scene.get_prim("/World/Rig/Lamp"))) is ernie.SphereLight
+    assert type(ernie.typed(ernie.Light.at(scene, "/World/Rig/Lamp"))) is ernie.SphereLight
+    untyped = ernie.typed(scene.get_prim("/World/Rig"))
+    assert type(untyped) is ernie.Prim and untyped.path == ernie.Path("/World/Rig")
+    with pytest.raises(TypeError, match="typed needs"):
+        ernie.typed(scene.get_prim("/Missing"))
 
 
 def test_tensor_attributes_write_and_read_arrays():

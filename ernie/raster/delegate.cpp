@@ -169,21 +169,6 @@ std::optional<std::vector<float>> FloatAttribute(const Scene& scene, const Path&
     return std::nullopt;
 }
 
-/// Targets of a relationship holding one path or a list of them.
-std::vector<Path> TargetsOf(const Scene& scene, const Path& path, std::string_view attribute) {
-    const Value* value = scene.Get(path, attribute);
-    if (value == nullptr) {
-        return {};
-    }
-    if (const auto* list = value->Get<std::vector<Path>>()) {
-        return *list;
-    }
-    if (const auto* single = value->Get<Path>()) {
-        return {*single};
-    }
-    return {};
-}
-
 /// The constant colour of a Gprim's `primvars:displayColor`: a colour value or a one-row array,
 /// else the declared fallback (colours per vertex are read as arrays, by name).
 glm::vec3 ConstantDisplayColor(const Gprim& gprim) {
@@ -1553,10 +1538,15 @@ void RasterDelegate::SyncPoints(const Scene& scene) {
         synced.key = key;
         try {
             const ernie::Points cloud(scene, path);
-            // A width for all from a value or a one-element array, else one per point (an array
-            // the declared width does not cover, read by name).
-            const auto widthsOf = [&](float& width) -> const Tensor* {
-                width = static_cast<float>(cloud.GetWidths());
+            // A width for all from one value (a number, or an array of one written or not), else
+            // one per point: a float array, or a written array (`tensor`, the declared widths'
+            // array form, read by name).
+            const auto widthsOf = [&](float& width, std::vector<float>& perPoint) -> const Tensor* {
+                std::vector<float> widths = cloud.GetWidths();
+                width = widths.size() == 1 ? widths.front() : 1.0f;
+                if (widths.size() > 1) {
+                    perPoint = std::move(widths);
+                }
                 const Tensor* tensor = scene.Read(path, kWidths);
                 if (tensor != nullptr && tensor->Elements() == 1 &&
                     tensor->Location().kind == DeviceKind::Cpu) {
@@ -1576,7 +1566,12 @@ void RasterDelegate::SyncPoints(const Scene& scene) {
                 };
                 DevicePointsData data;
                 data.points = *points;
-                data.widths = onDevice(widthsOf(data.width));
+                std::vector<float> perPoint;
+                const Tensor* widths = widthsOf(data.width, perPoint);
+                data.widths = widths == nullptr && !perPoint.empty()
+                                  ? compute.Upload(Tensor::Copy<float>(
+                                        perPoint, {static_cast<std::int64_t>(perPoint.size())}))
+                                  : onDevice(widths);
                 const Tensor* colors = scene.Read(path, kDisplayColor);
                 if (colors != nullptr && colors->Elements() == points->Elements()) {
                     data.colors = onDevice(colors);
@@ -1590,7 +1585,7 @@ void RasterDelegate::SyncPoints(const Scene& scene) {
             } else {
                 PointsData data;
                 data.points = FloatAttribute(scene, path, kPoints, 3).value_or(std::vector<float>());
-                if (const Tensor* widths = widthsOf(data.width)) {
+                if (const Tensor* widths = widthsOf(data.width, data.widths)) {
                     data.widths = FloatsOf(*widths, 1, kWidths);
                 }
                 if (const Tensor* colors = scene.Read(path, kDisplayColor);
@@ -1715,7 +1710,7 @@ std::vector<MeshItem> RasterDelegate::Items(const Scene& scene) const {
     ERNIE_ZONE("Sync items");
     std::set<Path> prototypes;
     for (const auto& [path, synced] : instancers_) {
-        for (const Path& prototype : TargetsOf(scene, path, tokens::kPrototypes)) {
+        for (const Path& prototype : PointInstancer(scene, path).GetPrototypes()) {
             prototypes.insert(prototype);
         }
     }
@@ -1757,10 +1752,11 @@ std::vector<MeshItem> RasterDelegate::Items(const Scene& scene) const {
         if (synced.handle == 0 || !scene.IsVisible(path)) {
             continue;
         }
-        const std::vector<Path> targets = TargetsOf(scene, path, tokens::kPrototypes);
+        const PointInstancer instancer(scene, path);
+        const std::vector<Path> targets = instancer.GetPrototypes();
         std::vector<std::vector<std::uint32_t>> lists =
             InstancesByPrototype(scene, path, targets.size());
-        const Tensor* positions = PointInstancer(scene, path).GetPositions();
+        const Tensor* positions = instancer.GetPositions();
         const std::vector<std::int32_t> worlds = InstanceWorldsOf(
             scene, path,
             positions != nullptr ? static_cast<std::size_t>(positions->Elements()) / 3 : 0,

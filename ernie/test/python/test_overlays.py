@@ -46,7 +46,7 @@ def test_overlays_draw_over_products_that_ask_for_them(renderer):
     plain = np.array(renderer.render(scene))
     scene.overlay("debug").line((-60, 0, 0), (60, 0, 0), color=(1, 0, 1), width=4, depth="always")
     np.testing.assert_array_equal(np.array(renderer.render(scene)), plain)
-    ernie.RenderSettings(scene.get_prim("/Render/Settings")).overlays = "*"
+    ernie.RenderSettings.at(scene, "/Render/Settings").overlays = "*"
     drawn = np.array(renderer.render(scene))
     magenta = (drawn[..., 0] == 255) & (drawn[..., 1] == 0) & (drawn[..., 2] == 255)
     assert magenta.sum() > 20

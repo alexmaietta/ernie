@@ -43,7 +43,7 @@ Scene PointsScene() {
     const std::array<float, 9> colors{1, 0, 0, 0, 1, 0, 0, 0, 1};
     ernie::Points::Define(scene, "/World/Grains")
         .SetPoints(Tensor::Copy<float>(points, {3, 3}))
-        .SetWidths(4.0);
+        .SetWidths({4.0f});
     // A colour per point: an array, where the schema's displayColor is one colour.
     scene.Write("/World/Grains", tokens::kDisplayColor, Tensor::Copy<float>(colors, {3, 3}));
     std::vector<Path> vars;
@@ -120,7 +120,7 @@ TEST_F(RasterDelegateTest, PointsDrawAsSpheresWithTheirIdsColoursAndDepth) {
     EXPECT_GT(ldr[blue + 2], 4.0f * ldr[blue]);
 
     // Wider points.
-    ernie::Points(scene, "/World/Grains").SetWidths(6.0);
+    ernie::Points(scene, "/World/Grains").SetWidths({6.0f});
     EXPECT_NEAR(Step(delegate, scene).at("DistanceToCamera")[PixelOf(0.0, 0.0)], 37.0f, 0.05f);
 }
 

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/light_schemas.h"
+#include "ernie/scene/material_schemas.h"
 #include "ernie/scene/prim_type.h"
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/tokens.h"
 
@@ -10,6 +12,7 @@
 
 #include <set>
 #include <string>
+#include <vector>
 
 using ernie::AttributeDef;
 using ernie::AttributeKind;
@@ -151,4 +154,115 @@ TEST(PrimType, ViewsSetTransformsInTheirChains) {
     ops.translate = glm::dvec3(1.0, 2.0, 3.0);
     const ernie::DistantLight sun = ernie::DistantLight::Define(scene, "/Sun").SetXform(ops);
     EXPECT_EQ(glm::dvec3(sun.GetLocalTransform()[3]), glm::dvec3(1.0, 2.0, 3.0));
+}
+
+TEST(PrimType, ViewsClearAndPassThroughInTheirChains) {
+    Scene scene;
+    // Clear, Set and Write return the derived view, so typed setters chain after them.
+    ernie::SphereLight lamp =
+        ernie::SphereLight::Define(scene, "/Lamp")
+            .SetRadius(0.2)
+            .Set("ernie:custom", Value(3))
+            .Write("ernie:samples", ernie::Tensor::Copy<float>(std::vector<float>{1, 2}, {2}))
+            .ClearRadius()
+            .SetIntensity(2.0);
+    EXPECT_FALSE(lamp.HasRadius());
+    EXPECT_EQ(lamp.GetRadius(), 0.5) << "the fallback again";
+    EXPECT_EQ(scene.Get("/Lamp", tokens::kRadius), nullptr);
+    EXPECT_EQ(*scene.Get("/Lamp", "ernie:custom"), Value(3));
+    EXPECT_EQ(scene.Read("/Lamp", "ernie:samples")->Elements(), 2);
+    EXPECT_EQ(lamp.GetIntensity(), 2.0);
+    lamp.ClearRadius();  // Clearing what is unset changes nothing.
+
+    // Clearing a tensor removes the written array.
+    ernie::Mesh mesh =
+        ernie::Mesh::Define(scene, "/Mesh")
+            .SetPoints(ernie::Tensor::Copy<float>(std::vector<float>(9, 0.0f), {3, 3}));
+    EXPECT_TRUE(mesh.ClearPoints().GetPoints() == nullptr);
+
+    // The prim handle, for what views do not cover.
+    const ernie::Prim prim = lamp.GetPrim();
+    EXPECT_EQ(prim.GetPath(), Path("/Lamp"));
+    EXPECT_EQ(prim.Type(), "SphereLight");
+    const Scene& constScene = scene;
+    EXPECT_THROW(ernie::SphereLight(constScene, "/Lamp").GetPrim(), std::logic_error);
+    EXPECT_THROW(ernie::SphereLight(constScene, "/Lamp").ClearIntensity(), std::logic_error);
+}
+
+TEST(PrimType, Vec4AttributesReadFourVectors) {
+    Scene scene;
+    scene.Define("/Tex", tokens::kShader);
+    const ernie::Shader texture(scene, "/Tex");
+    const AttributeDef& bias = *texture.PrimType().Find(tokens::kShaderBias);
+    EXPECT_EQ(bias.kind, AttributeKind::Vec4);
+    EXPECT_EQ(bias.fallback, Value(glm::dvec4(0.0)));
+    EXPECT_EQ(texture.GetBias(), glm::dvec4(0.0));
+    // A vec4 (four numbers from Python) or a dvec4 reads; other types read as the fallback.
+    scene.Set("/Tex", tokens::kShaderBias, glm::vec4(-1.0f, -1.0f, -1.0f, 0.0f));
+    EXPECT_EQ(texture.GetBias(), glm::dvec4(-1.0, -1.0, -1.0, 0.0));
+    ernie::Shader(scene, "/Tex").SetBias(glm::dvec4(0.5));
+    EXPECT_EQ(*scene.Get("/Tex", tokens::kShaderBias), Value(glm::dvec4(0.5)));
+    EXPECT_EQ(bias.Read(scene, "/Tex"), Value(glm::dvec4(0.5)));
+    scene.Set("/Tex", tokens::kShaderBias, glm::dvec3(1.0));
+    EXPECT_EQ(texture.GetBias(), glm::dvec4(0.0));
+
+    EXPECT_EQ(bias.Coerce(Value(glm::vec4(1.0f))), Value(glm::dvec4(1.0)));
+    try {
+        bias.Coerce(Value(glm::dvec3(1.0)));
+        ADD_FAILURE() << "a 3-vector is not a 4-vector";
+    } catch (const std::invalid_argument& error) {
+        EXPECT_EQ(std::string(error.what()), "'inputs:bias' must be a 4-vector");
+    }
+}
+
+TEST(PrimType, RelationshipListsTakeOneTargetOrSeveral) {
+    Scene scene;
+    ernie::RenderProduct product = ernie::RenderProduct::Define(scene, "/Render/Product");
+    EXPECT_TRUE(product.GetCamera().empty());
+    EXPECT_FALSE(product.HasCamera());
+
+    // One target (a Path or its text) is stored as a Path, as before; a list as a list.
+    product.SetCamera("/Cam");
+    EXPECT_EQ(*scene.Get("/Render/Product", tokens::kCameraRel), Value(Path("/Cam")));
+    EXPECT_EQ(product.GetCamera(), std::vector<Path>{Path("/Cam")});
+    product.SetCamera(std::string("/Other")).SetCamera(Path("/Cam"));
+    EXPECT_EQ(product.GetCamera(), std::vector<Path>{Path("/Cam")});
+    product.SetCamera({"/A", "/B"});
+    EXPECT_EQ(*scene.Get("/Render/Product", tokens::kCameraRel),
+              Value(std::vector<Path>{Path("/A"), Path("/B")}));
+    EXPECT_EQ(product.GetCamera(), (std::vector<Path>{Path("/A"), Path("/B")}));
+    product.SetCamera(std::vector<Path>{Path("/A")});
+    EXPECT_EQ(*scene.Get("/Render/Product", tokens::kCameraRel),
+              Value(std::vector<Path>{Path("/A")}));
+
+    // An empty list is authored, apart from unset.
+    product.SetOrderedVars({});
+    EXPECT_TRUE(product.HasOrderedVars());
+    EXPECT_TRUE(product.GetOrderedVars().empty());
+    EXPECT_FALSE(product.ClearOrderedVars().HasOrderedVars());
+
+    const AttributeDef& camera = *product.PrimType().Find(tokens::kCameraRel);
+    EXPECT_EQ(camera.kind, AttributeKind::Relationships);
+    EXPECT_EQ(camera.fallback, Value(std::vector<Path>{}));
+    EXPECT_EQ(camera.Read(scene, "/Render/Product"), Value(std::vector<Path>{Path("/A")}));
+    // Coerce keeps one target a Path, as stored, and makes lists of strings paths.
+    EXPECT_EQ(camera.Coerce(Value("/Cam")), Value(Path("/Cam")));
+    EXPECT_EQ(camera.Coerce(Value(Path("/Cam"))), Value(Path("/Cam")));
+    EXPECT_EQ(camera.Coerce(Value(std::vector<std::string>{"/A", "/B"})),
+              Value(std::vector<Path>{Path("/A"), Path("/B")}));
+    EXPECT_EQ(camera.Coerce(Value(std::vector<float>{})), Value(std::vector<Path>{}));
+    EXPECT_THROW(camera.Coerce(Value(2.0)), std::invalid_argument);
+    EXPECT_THROW(camera.Coerce(Value(std::vector<std::string>{"not a path"})),
+                 std::invalid_argument);
+    // Another type authored reads as the fallback.
+    scene.Set("/Render/Product", tokens::kCameraRel, 3);
+    EXPECT_TRUE(product.GetCamera().empty());
+}
+
+TEST(PrimType, FloatArraysTakeOneNumber) {
+    const AttributeDef& widths = *ernie::GetPrimType(tokens::kGeomPoints).Find(tokens::kWidths);
+    EXPECT_EQ(widths.kind, AttributeKind::FloatArray);
+    EXPECT_EQ(widths.Coerce(Value(0.5)), Value(std::vector<float>{0.5f}));
+    EXPECT_EQ(widths.Coerce(Value(2)), Value(std::vector<float>{2.0f}));
+    EXPECT_EQ(widths.Coerce(Value(glm::dvec4(1.0))), Value(std::vector<float>(4, 1.0f)));
 }

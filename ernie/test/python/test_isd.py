@@ -29,7 +29,7 @@ def test_line_scanner_round_trips_and_authors_strips():
         "each line exposed for its line time"
     )
     scene.set(path, tokens.EXPOSURE_ISO, 400.0)
-    nac.author_strip(scene, path, 64, 64)
+    nac.author_strip(scene, scene.get_prim(path), 64, 64)
     assert (scene.get(path, tokens.TRANSFORM) == last).all()
     assert scene.get(path, tokens.EXPOSURE_ISO) == 400.0, "the ISO stays as authored"
 
@@ -44,7 +44,9 @@ def test_push_frame_round_trips_and_authors_framelets():
 
     scene = ernie.Scene()
     path = "/World/Camera"
-    samples, lines, first, _, time = wac.author_framelet(scene, path, 182)
+    # The camera as a typed prim, as any prim path argument may be.
+    camera = scene.define(path, ernie.Camera)
+    samples, lines, first, _, time = wac.author_framelet(scene, camera, 182)
     assert (samples, lines, first) == (1024, 14, 182 * 14)
     assert time == wac.image_time(first + 0.5)
     assert scene.get(path, tokens.CAMERA_SCAN) == tokens.FRAME_SCAN
@@ -61,6 +63,6 @@ def test_frame_camera_matches_usgscsm_and_authors_its_view():
     assert math.isclose(sample, 9.5, abs_tol=1e-9)
 
     scene = ernie.Scene()
-    samples, lines, _ = frame.author_camera(scene, "/World/Camera")
+    samples, lines, _ = frame.author_camera(scene, ernie.Path("/World/Camera"))
     assert (samples, lines) == (16, 16)
     assert scene.get("/World/Camera", tokens.CAMERA_SCAN) == tokens.FRAME_SCAN

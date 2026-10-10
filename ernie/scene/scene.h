@@ -93,6 +93,11 @@ class Prim {
     /// @throws std::invalid_argument if the handle is empty or a name is not valid.
     Prim Define(std::string_view relative, std::string_view type) const;
 
+    /// As `Scene::GetPrim` at `relative` below this prim, as `Define` names it: invalid if there
+    /// is none or the handle is empty.
+    /// @throws std::invalid_argument if a name is not valid.
+    Prim GetPrim(std::string_view relative) const;
+
     /// As `Scene::Set`; returns this handle for chaining.
     Prim& Set(std::string_view attribute, Value value);
 

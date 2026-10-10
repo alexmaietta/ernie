@@ -3,6 +3,7 @@
 #include "ernie/scene/prim_type.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/session/resolve.h"
 #include "ernie/util/tensor.h"
 
 #include <gtest/gtest.h>
@@ -11,6 +12,7 @@
 #include <cstdint>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 using ernie::AttributeKind;
 using ernie::Path;
@@ -48,7 +50,7 @@ TEST(GeometrySchemas, ShapesReadUsdGeomFallbacks) {
     EXPECT_EQ(ground.GetCheckerSize(), 1.0);
     EXPECT_EQ(ground.GetCheckerColor0(), glm::dvec3(1.0));
     EXPECT_EQ(ground.GetCheckerColor1(), glm::dvec3(0.5));
-    EXPECT_EQ(ernie::Points::Define(scene, "/Cloud").GetWidths(), 1.0);
+    EXPECT_EQ(ernie::Points::Define(scene, "/Cloud").GetWidths(), std::vector<float>{1.0f});
     EXPECT_EQ(ernie::Mesh::Define(scene, "/Mesh").GetPoints(), nullptr);
     EXPECT_EQ(ernie::PointInstancer::Define(scene, "/Instancer").GetProtoIndices(), nullptr);
     EXPECT_NO_THROW(ernie::Volume::Define(scene, "/Volume"));
@@ -88,8 +90,8 @@ TEST(GeometrySchemas, ViewsSetByUsdName) {
     EXPECT_FALSE(mesh.HasNormals());
 
     ernie::Points cloud = ernie::Points::Define(scene, "/Cloud");
-    cloud.SetWidths(0.1);
-    EXPECT_EQ(*scene.Get("/Cloud", tokens::kWidths), Value(0.1));
+    cloud.SetWidths({0.1f});
+    EXPECT_EQ(*scene.Get("/Cloud", tokens::kWidths), Value(std::vector<float>{0.1f}));
 }
 
 TEST(GeometrySchemas, ViewsCheckTypes) {
@@ -117,6 +119,61 @@ TEST(GeometrySchemas, ViewsCheckTypes) {
     EXPECT_THROW(readOnly.SetHeight(1.0), std::logic_error);
 }
 
+TEST(GeometrySchemas, BoundablesDeclareTheirExtent) {
+    Scene scene;
+    ernie::Mesh mesh = ernie::Mesh::Define(scene, "/Mesh");
+    ernie::PointInstancer instancer = ernie::PointInstancer::Define(scene, "/Instancer");
+    ernie::GroundPlane::Define(scene, "/Ground");
+    EXPECT_NO_THROW(ernie::Boundable(scene, "/Mesh"));
+    EXPECT_NO_THROW(ernie::Boundable(scene, "/Instancer"));
+    EXPECT_THROW(ernie::Boundable(scene, "/Ground"), std::invalid_argument);
+    EXPECT_TRUE(mesh.GetExtent().empty());
+
+    // Six numbers as a value, or a (2, 3) array written in its place, are the local bounds.
+    mesh.SetExtent({-1, -2, -3, 1, 2, 3});
+    ASSERT_TRUE(ernie::ExtentOf(scene, "/Mesh").has_value());
+    EXPECT_EQ(ernie::ExtentOf(scene, "/Mesh")->first, glm::vec3(-1.0f, -2.0f, -3.0f));
+    const std::array<float, 6> box{0, 0, 0, 4, 4, 4};
+    instancer.Write(tokens::kExtent, Tensor::Copy<float>(box, {2, 3}));
+    EXPECT_TRUE(instancer.HasExtent());
+    EXPECT_TRUE(instancer.GetExtent().empty()) << "the declared value is not the array";
+    EXPECT_EQ(ernie::ExtentOf(scene, "/Instancer")->second, glm::vec3(4.0f));
+    mesh.SetExtent({1, 2});
+    EXPECT_FALSE(ernie::ExtentOf(scene, "/Mesh").has_value());
+}
+
+TEST(GeometrySchemas, InstancersDeclarePrototypesAndWorlds) {
+    Scene scene;
+    ernie::Mesh::Define(scene, "/Protos/Rock");
+    ernie::Mesh::Define(scene, "/Protos/Tree");
+    ernie::PointInstancer instancer =
+        ernie::PointInstancer::Define(scene, "/Instancer")
+            .SetPrototypes({"/Protos/Rock", "/Protos/Tree"})
+            .SetWorlds(Tensor::Copy<std::int32_t>(std::array<std::int32_t, 2>{0, 1}, {2}));
+    EXPECT_EQ(instancer.GetPrototypes(),
+              (std::vector<Path>{Path("/Protos/Rock"), Path("/Protos/Tree")}));
+    EXPECT_EQ(instancer.GetWorlds()->Elements(), 2);
+    // One prototype given alone is stored as a path, and still reads as a list.
+    instancer.SetPrototypes("/Protos/Rock");
+    EXPECT_EQ(*scene.Get("/Instancer", tokens::kPrototypes), Value(Path("/Protos/Rock")));
+    EXPECT_EQ(instancer.GetPrototypes(), std::vector<Path>{Path("/Protos/Rock")});
+}
+
+TEST(GeometrySchemas, PointsWidthsAreOneForAllOrOnePerPoint) {
+    Scene scene;
+    ernie::Points cloud = ernie::Points::Define(scene, "/Cloud");
+    EXPECT_EQ(cloud.GetWidths(), std::vector<float>{1.0f});
+    cloud.SetWidths({0.5f, 0.6f, 0.7f});
+    EXPECT_EQ(cloud.GetWidths(), (std::vector<float>{0.5f, 0.6f, 0.7f}));
+    // A single number, as written before widths were a list, reads as a list of one.
+    scene.Set("/Cloud", tokens::kWidths, 0.25);
+    EXPECT_EQ(cloud.GetWidths(), std::vector<float>{0.25f});
+    // Widths written as an array are readable by name; the declared value is the fallback then.
+    cloud.Write(tokens::kWidths, Tensor::Copy<float>(std::array<float, 3>{1, 2, 3}, {3}));
+    EXPECT_EQ(scene.Read("/Cloud", tokens::kWidths)->Elements(), 3);
+    EXPECT_EQ(cloud.GetWidths(), std::vector<float>{1.0f});
+}
+
 TEST(GeometrySchemas, RegistryDescribesTheTypes) {
     const PrimTypeDef& capsule = ernie::GetPrimType("Capsule");
     EXPECT_FALSE(capsule.abstract);
@@ -139,12 +196,17 @@ TEST(GeometrySchemas, RegistryDescribesTheTypes) {
     EXPECT_EQ(mesh.Find(tokens::kDisplayColor)->kind, AttributeKind::Vec3);
     const PrimTypeDef& points = ernie::GetPrimType(tokens::kGeomPoints);
     EXPECT_TRUE(points.IsA(ernie::GetPrimType("PointBased")));
-    EXPECT_EQ(points.Find(tokens::kWidths)->fallback, Value(1.0));
+    EXPECT_EQ(points.Find(tokens::kWidths)->fallback, Value(std::vector<float>{1.0f}));
 
+    EXPECT_EQ(ernie::Gprim::Definition().base, &ernie::Boundable::Definition());
+    EXPECT_TRUE(ernie::Boundable::Definition().abstract);
+    EXPECT_EQ(mesh.Find(tokens::kExtent)->kind, AttributeKind::FloatArray);
     const PrimTypeDef& instancer = ernie::GetPrimType(tokens::kPointInstancer);
     EXPECT_FALSE(instancer.IsA(ernie::GetPrimType("Gprim")));
+    EXPECT_EQ(instancer.base, &ernie::Boundable::Definition());
+    EXPECT_EQ(instancer.Find(tokens::kWorlds)->kind, AttributeKind::Tensor);
     EXPECT_EQ(instancer.Find(tokens::kOrientations)->kind, AttributeKind::Tensor);
-    EXPECT_EQ(instancer.Find(tokens::kPrototypes), nullptr) << "a list of paths, read by name";
+    EXPECT_EQ(instancer.Find(tokens::kPrototypes)->kind, AttributeKind::Relationships);
     EXPECT_TRUE(ernie::GetPrimType(tokens::kVolume).attributes.empty());
 
     const PrimTypeDef& ground = ernie::GetPrimType(tokens::kGroundPlane);

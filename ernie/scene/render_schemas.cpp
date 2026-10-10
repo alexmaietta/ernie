@@ -3,9 +3,6 @@
 
 namespace ernie {
 
-// A product declares nothing beyond what it shares with settings.
-#define ERNIE_NO_RENDER_ATTRIBUTES(X)
-
 ERNIE_DEFINE_SCHEMA(RenderSettingsBase, "RenderSettingsBase", &Imageable::Definition(), true,
                     "What render settings and products share: the camera, the resolution, and "
                     "what a product sets in place of its settings'.",
@@ -18,7 +15,7 @@ ERNIE_DEFINE_SCHEMA(RenderSettings, tokens::kRenderSettings, &RenderSettingsBase
 ERNIE_DEFINE_SCHEMA(RenderProduct, tokens::kRenderProduct, &RenderSettingsBase::Definition(), false,
                     "One image a render writes: its camera, resolution, render vars and sensor "
                     "filters.",
-                    ERNIE_NO_RENDER_ATTRIBUTES)
+                    ERNIE_RENDER_PRODUCT_ATTRIBUTES)
 ERNIE_DEFINE_SCHEMA(RenderVar, tokens::kRenderVar, &Imageable::Definition(), false,
                     "An output of a render product, named by its source.",
                     ERNIE_RENDER_VAR_ATTRIBUTES)

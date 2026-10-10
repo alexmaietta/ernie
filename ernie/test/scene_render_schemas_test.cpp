@@ -12,6 +12,7 @@
 
 #include <cmath>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -77,7 +78,7 @@ TEST(RenderSchemas, FallbacksAreTheRenderDefaults) {
 
     // UsdRender's resolution; the other types'.
     EXPECT_EQ(settings.GetResolution(), glm::dvec2(2048.0, 1080.0));
-    EXPECT_TRUE(settings.GetCamera().IsEmpty());
+    EXPECT_TRUE(settings.GetCamera().empty());
     EXPECT_EQ(settings.GetFrame(), 0);
     EXPECT_EQ(ernie::RenderVar::Define(scene, "/Render/Var").GetSourceName(), tokens::kLdrColor);
     EXPECT_EQ(ernie::SensorFilterPrim::Define(scene, "/Render/Filter").GetFilterType(), "");
@@ -97,7 +98,7 @@ TEST(RenderSchemas, SetsAndReadsByUsdName) {
         .SetShadowCascades(2);
     EXPECT_EQ(*scene.Get("/Render/Settings", tokens::kCameraRel), Value(Path("/Cam")));
     EXPECT_EQ(*scene.Get("/Render/Settings", tokens::kAmbient), Value(0.3));
-    EXPECT_EQ(settings.GetCamera(), Path("/Cam"));
+    EXPECT_EQ(settings.GetCamera(), std::vector<Path>{Path("/Cam")});
     EXPECT_EQ(settings.GetResolution(), glm::dvec2(640.0, 480.0));
     EXPECT_EQ(settings.GetCulling(), "cpu");
     EXPECT_EQ(settings.GetShadowCascades(), 2);
@@ -144,6 +145,57 @@ TEST(RenderSchemas, ViewsCheckTypes) {
     EXPECT_THROW(ernie::RenderSettings::OrFallbacks(scene, "/Cam"), std::invalid_argument);
 }
 
+TEST(RenderSchemas, TypedRelationshipsChooseWhatRenders) {
+    Scene scene;
+    scene.Define("/Cams/A", tokens::kCamera);
+    scene.Define("/Cams/B", tokens::kCamera);
+    scene.Define("/Sun", tokens::kDistantLight);
+    scene.Define("/Lamp", tokens::kSphereLight);
+    ernie::RenderSettings settings = ernie::RenderSettings::Define(scene, "/Render/Settings")
+                                         .SetCamera("/Cams/B")
+                                         .SetProducts({"/Render/Product"});
+    const ernie::RenderVar var = ernie::RenderVar::Define(scene, "/Render/Product/Color");
+    ernie::SensorFilterPrim::Define(scene, "/Render/Mine").SetFilterType("mine");
+    ernie::RenderProduct::Define(scene, "/Render/Product")
+        .SetCamera({"/Cams/A", "/Cams/B"})
+        .SetOrderedVars({var.GetPath()})
+        .SetFilters({"/Render/Mine"});
+
+    ernie::RenderPrims prims = ernie::ResolveRenderPrims(scene, "/Render/Settings");
+    EXPECT_EQ(prims.camera, Path("/Cams/B"));
+    EXPECT_EQ(prims.light, Path("/Sun")) << "every visible light while ernie:lights is unset";
+    EXPECT_EQ(prims.lights, std::vector<Path>{Path("/Lamp")});
+    settings.SetLights({});
+    prims = ernie::ResolveRenderPrims(scene, "/Render/Settings");
+    EXPECT_TRUE(prims.light.IsEmpty()) << "an empty list names none";
+    EXPECT_TRUE(prims.lights.empty());
+    settings.SetLights("/Lamp");
+    prims = ernie::ResolveRenderPrims(scene, "/Render/Settings");
+    EXPECT_TRUE(prims.light.IsEmpty());
+    EXPECT_EQ(prims.lights, std::vector<Path>{Path("/Lamp")});
+    settings.ClearLights().SetCamera({"/Cams/A", "/Cams/B"});
+    prims = ernie::ResolveRenderPrims(scene, "/Render/Settings");
+    EXPECT_EQ(prims.light, Path("/Sun"));
+    EXPECT_EQ(prims.camera, Path("/Cams/A")) << "the first of a list";
+
+    std::vector<ernie::RenderProductSpec> specs =
+        ernie::ResolveRenderProducts(scene, {}, "/Render/Settings");
+    ASSERT_EQ(specs.size(), 1u);
+    EXPECT_EQ(specs[0].product, Path("/Render/Product"));
+    EXPECT_EQ(specs[0].cameras, (std::vector<Path>{Path("/Cams/A"), Path("/Cams/B")}));
+    EXPECT_EQ(specs[0].camera, Path("/Cams/A"));
+    ASSERT_EQ(specs[0].vars.size(), 1u);
+    EXPECT_EQ(specs[0].vars[0].first, var.GetPath());
+    ASSERT_EQ(specs[0].filters.size(), 1u);
+    EXPECT_EQ(specs[0].filters[0].type, "mine");
+    EXPECT_FALSE(specs[0].varFilters[0].has_value()) << "the var's filters unset: the product's";
+    // A var's own empty chain is a chain of its own, unlike none.
+    ernie::RenderVar(scene, var.GetPath()).SetFilters({});
+    specs = ernie::ResolveRenderProducts(scene, {}, "/Render/Settings");
+    ASSERT_TRUE(specs[0].varFilters[0].has_value());
+    EXPECT_TRUE(specs[0].varFilters[0]->empty());
+}
+
 TEST(RenderSchemas, RegistryDescribesTheTypes) {
     const PrimTypeDef& base = ernie::GetPrimType("RenderSettingsBase");
     EXPECT_TRUE(base.abstract);
@@ -153,13 +205,16 @@ TEST(RenderSchemas, RegistryDescribesTheTypes) {
     EXPECT_FALSE(settings.abstract);
     EXPECT_EQ(settings.base, &base);
     EXPECT_EQ(product.base, &base);
-    EXPECT_TRUE(product.attributes.empty()) << "a product's attributes are its base's";
+    ASSERT_EQ(product.attributes.size(), 2u) << "its vars and filters; the rest its base's";
+    EXPECT_EQ(product.attributes[0].name, tokens::kOrderedVars);
+    EXPECT_EQ(product.attributes[0].pyName, "ordered_vars");
+    EXPECT_EQ(product.attributes[1].name, tokens::kFilters);
     EXPECT_EQ(&ernie::GetPrimType(tokens::kSensorFilter), &ernie::SensorFilterPrim::Definition());
     EXPECT_TRUE(ernie::GetPrimType(tokens::kRenderVar).IsA(ernie::Imageable::Definition()));
 
     const ernie::AttributeDef* camera = product.Find(tokens::kCameraRel);
     ASSERT_NE(camera, nullptr);
-    EXPECT_EQ(camera->kind, AttributeKind::Relationship);
+    EXPECT_EQ(camera->kind, AttributeKind::Relationships) << "one camera, or a batch";
     const ernie::AttributeDef* cascades = settings.Find(tokens::kShadowCascades);
     ASSERT_NE(cascades, nullptr);
     EXPECT_EQ(cascades->pyName, "shadow_cascades");
@@ -169,7 +224,10 @@ TEST(RenderSchemas, RegistryDescribesTheTypes) {
     EXPECT_EQ(cascades->fallback, Value(3));
     EXPECT_EQ(settings.Find(tokens::kResolution)->kind, AttributeKind::Vec2);
     EXPECT_EQ(settings.Find(tokens::kMinimalMode)->meta.options.size(), 4u);
-    EXPECT_EQ(settings.Find(tokens::kProducts), nullptr) << "lists of targets are not declared";
+    EXPECT_EQ(settings.Find(tokens::kProducts)->kind, AttributeKind::Relationships);
+    EXPECT_EQ(settings.Find(tokens::kLightsRel)->pyName, "lights");
+    EXPECT_EQ(ernie::GetPrimType(tokens::kRenderVar).Find(tokens::kFilters)->kind,
+              AttributeKind::Relationships);
     const ernie::AttributeDef* source =
         ernie::GetPrimType(tokens::kRenderVar).Find(tokens::kSourceName);
     ASSERT_NE(source, nullptr);

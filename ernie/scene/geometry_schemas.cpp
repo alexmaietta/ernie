@@ -30,7 +30,7 @@ ERNIE_DEFINE_SCHEMA(Mesh, tokens::kMesh, &PointBased::Definition(), false,
 ERNIE_DEFINE_SCHEMA(Points, tokens::kGeomPoints, &PointBased::Definition(), false,
                     "Points drawn as spheres widths across, coloured by their display colour.",
                     ERNIE_POINTS_ATTRIBUTES)
-ERNIE_DEFINE_SCHEMA(PointInstancer, tokens::kPointInstancer, &Imageable::Definition(), false,
+ERNIE_DEFINE_SCHEMA(PointInstancer, tokens::kPointInstancer, &Boundable::Definition(), false,
                     "Instances of its prototypes (the prototypes relationship's targets) at rows "
                     "of positions, orientations and scales.",
                     ERNIE_POINT_INSTANCER_ATTRIBUTES)

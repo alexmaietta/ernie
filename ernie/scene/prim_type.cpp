@@ -108,6 +108,22 @@ std::optional<glm::dvec3> AttributeTraits<glm::dvec3>::From(const Value& value) 
     return std::nullopt;
 }
 
+glm::dvec4 AttributeTraits<glm::dvec4>::Read(const Scene& scene, const Path& path,
+                                             std::string_view name, glm::dvec4 fallback) {
+    const Value* value = scene.Get(path, name);
+    return value != nullptr ? From(*value).value_or(fallback) : fallback;
+}
+
+std::optional<glm::dvec4> AttributeTraits<glm::dvec4>::From(const Value& value) {
+    if (const auto* d = value.Get<glm::dvec4>()) {
+        return *d;
+    }
+    if (const auto* f = value.Get<glm::vec4>()) {
+        return glm::dvec4(*f);
+    }
+    return std::nullopt;
+}
+
 std::optional<std::string> AttributeTraits<std::string>::From(const Value& value) {
     if (const auto* s = value.Get<std::string>()) {
         return *s;
@@ -125,6 +141,57 @@ std::optional<Path> AttributeTraits<Path>::From(const Value& value) {
         } catch (const std::invalid_argument&) {
             return std::nullopt;
         }
+    }
+    return std::nullopt;
+}
+
+std::vector<Path> AttributeTraits<std::vector<Path>>::Read(const Scene& scene, const Path& path,
+                                                           std::string_view name,
+                                                           const std::vector<Path>& fallback) {
+    const Value* value = scene.Get(path, name);
+    if (value == nullptr) {
+        return fallback;
+    }
+    if (const auto* list = value->Get<std::vector<Path>>()) {
+        return *list;
+    }
+    if (const auto* single = value->Get<Path>()) {
+        return {*single};
+    }
+    return fallback;
+}
+
+std::optional<std::vector<Path>> AttributeTraits<std::vector<Path>>::From(const Value& value) {
+    if (const auto* list = value.Get<std::vector<Path>>()) {
+        return *list;
+    }
+    if (const auto* texts = value.Get<std::vector<std::string>>()) {
+        std::vector<Path> paths;
+        try {
+            for (const std::string& text : *texts) {
+                paths.emplace_back(text);
+            }
+        } catch (const std::invalid_argument&) {
+            return std::nullopt;
+        }
+        return paths;
+    }
+    if (const auto* floats = value.Get<std::vector<float>>();
+        floats != nullptr && floats->empty()) {
+        return std::vector<Path>{};
+    }
+    if (std::optional<Path> single = AttributeTraits<Path>::From(value)) {
+        return std::vector<Path>{std::move(*single)};
+    }
+    return std::nullopt;
+}
+
+std::optional<Value> AttributeTraits<std::vector<Path>>::Store(const Value& value) {
+    if (std::optional<Path> single = AttributeTraits<Path>::From(value)) {
+        return Value(std::move(*single));
+    }
+    if (std::optional<std::vector<Path>> list = From(value)) {
+        return Value(std::move(*list));
     }
     return std::nullopt;
 }
@@ -152,6 +219,14 @@ std::optional<std::vector<float>> AttributeTraits<std::vector<float>>::From(cons
     }
     if (const auto* v = value.Get<glm::vec4>()) {
         return std::vector<float>{v->x, v->y, v->z, v->w};
+    }
+    if (const auto* v = value.Get<glm::dvec4>()) {
+        return std::vector<float>{static_cast<float>(v->x), static_cast<float>(v->y),
+                                  static_cast<float>(v->z), static_cast<float>(v->w)};
+    }
+    // One number is an array of one, as `GetFloats` reads it.
+    if (const std::optional<double> number = NumberOf(value)) {
+        return std::vector<float>{static_cast<float>(*number)};
     }
     return std::nullopt;
 }
@@ -181,9 +256,17 @@ Value AttributeDef::Coerce(const Value& value) const {
             return std::move(*converted);
         }
     }
-    static constexpr std::array<std::string_view, 9> kKinds{
-        "a bool",  "an int",      "a number",      "a 2-vector",         "a 3-vector",
-        "a token", "a prim path", "a float array", "an array (write it)"};
+    static constexpr std::array<std::string_view, 11> kKinds{"a bool",
+                                                             "an int",
+                                                             "a number",
+                                                             "a 2-vector",
+                                                             "a 3-vector",
+                                                             "a 4-vector",
+                                                             "a token",
+                                                             "a prim path",
+                                                             "a prim path or a list of them",
+                                                             "a float array",
+                                                             "an array (write it)"};
     throw std::invalid_argument("'" + std::string(name) + "' must be " +
                                 std::string(kKinds[static_cast<std::size_t>(kind)]));
 }

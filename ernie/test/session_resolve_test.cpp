@@ -56,12 +56,11 @@ TEST(WorldOf, InheritsAndResolvesViewAndInstanceWorlds) {
     EXPECT_EQ(ernie::ViewWorldsOf(scene, one, 2), (std::vector<std::int32_t>{4, 7}));
     EXPECT_THROW(ernie::ViewWorldsOf(scene, one, 3), std::invalid_argument) << "one per view";
 
-    // An instancer's worlds per instance are not a declared attribute: written by name.
-    ernie::PointInstancer::Define(scene, "/Envs/Env3/Rocks");
+    // An instancer's worlds per instance.
+    ernie::PointInstancer rocks = ernie::PointInstancer::Define(scene, "/Envs/Env3/Rocks");
     EXPECT_EQ(ernie::InstanceWorldsOf(scene, "/Envs/Env3/Rocks", 2),
               (std::vector<std::int32_t>{3, 3}));
-    scene.Write("/Envs/Env3/Rocks", tokens::kWorlds,
-                Tensor::Copy<std::int64_t>(std::vector<std::int64_t>{1, 0}, {2}));
+    rocks.SetWorlds(Tensor::Copy<std::int64_t>(std::vector<std::int64_t>{1, 0}, {2}));
     EXPECT_EQ(ernie::InstanceWorldsOf(scene, "/Envs/Env3/Rocks", 2),
               (std::vector<std::int32_t>{1, 0}));
 }
@@ -149,11 +148,9 @@ TEST(RenderPrims, LightsRelationshipChoosesTheLights) {
     ernie::DomeLight::Define(scene, "/World/Sky");
     ernie::DistantLight::Define(scene, "/__session/Lights/Head");
     ernie::DistantLight::Define(scene, "/__session/Lights/Fill");
-    // ernie:lights is a list relationship, which no schema declares: set by name.
-    scene.Define("/Render/Settings", tokens::kRenderSettings)
-        .Set(tokens::kLightsRel,
-             std::vector<Path>{Path("/__session/Lights/Head"), Path("/__session/Lights/Fill"),
-                               Path("/Missing"), Path("/World/Terrain")});
+    ernie::RenderSettings::Define(scene, "/Render/Settings")
+        .SetLights(
+            {"/__session/Lights/Head", "/__session/Lights/Fill", "/Missing", "/World/Terrain"});
     RenderPrims prims = ernie::ResolveRenderPrims(scene, {});
     EXPECT_EQ(prims.light, Path("/__session/Lights/Fill"));
     EXPECT_EQ(prims.lights, std::vector<Path>{Path("/__session/Lights/Head")});

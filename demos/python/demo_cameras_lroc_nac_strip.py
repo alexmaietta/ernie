@@ -115,7 +115,7 @@ def build_scene(scanner):
     raw_dn = scene.define("/Render/Vars/RawDN", ernie.RenderVar, source_name="RawDN")
     nac = scene.define("/Render/Nac", ernie.RenderProduct, camera=camera).set(
         tokens.ORDERED_VARS, [raw_dn.path])
-    ernie.author_lroc_nac(scene, "/World/Camera", "/Render/Nac", side="left")
+    ernie.author_lroc_nac(scene, camera, nac, side="left")
     # No sky to light the shadows: only the sun (the default ambient term would saturate the
     # NAC everywhere).
     scene.define("/Render/Settings", ernie.RenderSettings, ambient=0.0, camera=camera).set(

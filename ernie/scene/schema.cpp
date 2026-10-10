@@ -95,6 +95,9 @@ std::optional<std::vector<float>> GetFloats(const Scene& scene, const Path& path
     if (const auto* v = value->Get<glm::vec4>()) {
         return from(*v);
     }
+    if (const auto* v = value->Get<glm::dvec4>()) {
+        return from(*v);
+    }
     if (const auto* v = value->Get<glm::vec3>()) {
         return from(*v);
     }

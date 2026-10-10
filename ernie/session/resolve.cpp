@@ -45,23 +45,6 @@ Path FirstOutsideSession(const Scene& scene, std::string_view type) {
     return {};
 }
 
-/// The targets of the relationship `attribute`, one path or a list; none when unset.
-std::optional<std::vector<Path>> RelationshipOf(const Scene& scene, const Path& prim,
-                                                std::string_view attribute) {
-    const Value* value = prim.IsEmpty() ? nullptr : scene.Get(prim, attribute);
-    if (value == nullptr) {
-        return std::nullopt;
-    }
-    if (const Path* one = value->Get<Path>()) {
-        return std::vector<Path>{*one};
-    }
-    if (const std::vector<Path>* many = value->Get<std::vector<Path>>()) {
-        return *many;
-    }
-    throw std::invalid_argument("'" + std::string(attribute) + "' of '" + prim.String() +
-                                "' is not a relationship");
-}
-
 Path FirstVisible(const Scene& scene, std::string_view type) {
     for (const Path& path : scene.Prims(type)) {
         if (scene.IsVisible(path)) {
@@ -122,21 +105,6 @@ std::optional<std::vector<float>> FloatAttribute(const Scene& scene, const Path&
         return FloatsOf(*tensor, components, attribute);
     }
     return std::nullopt;
-}
-
-/// Targets of a relationship holding one path or a list of them.
-std::vector<Path> TargetsOf(const Scene& scene, const Path& path, std::string_view attribute) {
-    const Value* value = scene.Get(path, attribute);
-    if (value == nullptr) {
-        return {};
-    }
-    if (const auto* list = value->Get<std::vector<Path>>()) {
-        return *list;
-    }
-    if (const auto* single = value->Get<Path>()) {
-        return {*single};
-    }
-    return {};
 }
 
 /// The `ernie:spectrum` pairs of a light, if it has them.
@@ -422,8 +390,23 @@ RenderPrims ResolveRenderPrims(const Scene& scene, const Path& settings) {
     } else {
         prims.settings = FirstOutsideSession(scene, tokens::kRenderSettings);
     }
+    // The lights the settings name, when they name any (an empty list naming none).
+    std::optional<std::vector<Path>> chosen;
     if (!prims.settings.IsEmpty()) {
-        prims.camera = RenderSettings(scene, prims.settings).GetCamera();
+        const RenderSettings view(scene, prims.settings);
+        const std::vector<Path> cameras = view.GetCamera();
+        if (!cameras.empty()) {
+            prims.camera = cameras.front();
+        }
+        if (view.HasLights()) {
+            // Checked, so that a value of another type is an error rather than no lights.
+            const Value* value = scene.Get(prims.settings, tokens::kLightsRel);
+            if (value == nullptr || !(value->Is<Path>() || value->Is<std::vector<Path>>())) {
+                throw std::invalid_argument("'" + std::string(tokens::kLightsRel) + "' of '" +
+                                            prims.settings.String() + "' is not a relationship");
+            }
+            chosen = view.GetLights();
+        }
     }
     if (prims.camera.IsEmpty()) {
         prims.camera = FirstOutsideSession(scene, tokens::kCamera);
@@ -432,8 +415,6 @@ RenderPrims ResolveRenderPrims(const Scene& scene, const Path& settings) {
     if (!prims.terrain.IsEmpty()) {
         prims.material = BoundMaterial(scene, prims.terrain);
     }
-    const std::optional<std::vector<Path>> chosen =
-        RelationshipOf(scene, prims.settings, tokens::kLightsRel);
     std::vector<Path> candidates;
     if (chosen) {
         for (const Path& path : *chosen) {
@@ -624,11 +605,10 @@ std::int32_t WorldOf(const Scene& scene, const Path& path) {
 
 namespace {
 
-/// The `ernie:worlds` of `path` if it has `count` of them, as worlds.
-std::optional<std::vector<std::int32_t>> WorldsAttribute(const Scene& scene, const Path& path,
+/// `tensor`, the `ernie:worlds` of `path`, if it has `count` of them, as worlds.
+std::optional<std::vector<std::int32_t>> WorldsAttribute(const Path& path, const Tensor* tensor,
                                                          std::size_t count,
                                                          const HostArrayReader& read) {
-    const Tensor* tensor = scene.Read(path, tokens::kWorlds);
     if (tensor == nullptr) {
         return std::nullopt;
     }
@@ -660,7 +640,8 @@ std::vector<std::int32_t> ViewWorldsOf(const Scene& scene, std::span<const Path>
         return std::vector<std::int32_t>(views, -1);
     }
     if (scene.Read(cameras.front(), tokens::kPoses) != nullptr) {
-        if (auto perView = WorldsAttribute(scene, cameras.front(), views, read)) {
+        if (auto perView = WorldsAttribute(
+                cameras.front(), scene.Read(cameras.front(), tokens::kWorlds), views, read)) {
             return *perView;
         }
     }
@@ -669,7 +650,8 @@ std::vector<std::int32_t> ViewWorldsOf(const Scene& scene, std::span<const Path>
 
 std::vector<std::int32_t> InstanceWorldsOf(const Scene& scene, const Path& instancer,
                                            std::size_t count, const HostArrayReader& read) {
-    if (auto perInstance = WorldsAttribute(scene, instancer, count, read)) {
+    if (auto perInstance =
+            WorldsAttribute(instancer, PointInstancer(scene, instancer).GetWorlds(), count, read)) {
         return *perInstance;
     }
     return std::vector<std::int32_t>(count, WorldOf(scene, instancer));
@@ -677,12 +659,12 @@ std::vector<std::int32_t> InstanceWorldsOf(const Scene& scene, const Path& insta
 
 namespace {
 
-/// The sensor filter chain a product or render var names in `ernie:filters`: each SensorFilter
-/// prim's type, with every number or float array under its inputs:.
-std::vector<SensorFilterStep> FilterStepsOf(const Scene& scene, const Path& prim) {
+/// The sensor filter chain of `filters`, a product's or render var's `ernie:filters`: each
+/// SensorFilter prim's type, with every number or float array under its inputs:.
+std::vector<SensorFilterStep> FilterStepsOf(const Scene& scene, const std::vector<Path>& filters) {
     using namespace tokens;
     std::vector<SensorFilterStep> steps;
-    for (const Path& filter : TargetsOf(scene, prim, kFilters)) {
+    for (const Path& filter : filters) {
         if (!scene.Has(filter) || scene.TypeOf(filter) != kSensorFilter) {
             throw std::invalid_argument("'" + filter.String() + "' is not a SensorFilter prim");
         }
@@ -728,7 +710,7 @@ ResolveRenderProducts(const Scene& scene, std::span<const Path> products, const 
         RenderSettings::OrFallbacks(scene, resolved).GetResolution();
     std::vector<Path> paths(products.begin(), products.end());
     if (paths.empty() && !resolved.IsEmpty()) {
-        paths = TargetsOf(scene, resolved, kProducts);
+        paths = RenderSettings(scene, resolved).GetProducts();
     }
     const auto extentOf = [](glm::dvec2 resolution) {
         if (!(resolution.x >= 1.0) || !(resolution.y >= 1.0)) {
@@ -756,8 +738,8 @@ ResolveRenderProducts(const Scene& scene, std::span<const Path> products, const 
         const RenderProduct product(scene, path);
         RenderProductSpec spec;
         spec.product = path;
-        // One camera, or a batch of them: a list, which the view's single target cannot hold.
-        spec.cameras = TargetsOf(scene, path, kCameraRel);
+        // One camera, or a batch of them.
+        spec.cameras = product.GetCamera();
         spec.camera = spec.cameras.empty() ? Path() : spec.cameras.front();
         // What the product leaves unset comes from its settings.
         spec.resolution = extentOf(product.HasResolution() ? product.GetResolution()
@@ -772,21 +754,21 @@ ResolveRenderProducts(const Scene& scene, std::span<const Path> products, const 
             spec.minimalColor = glm::vec3(product.GetMinimalConstantColor());
         }
         bool ownChains = false;
-        for (const Path& var : TargetsOf(scene, path, kOrderedVars)) {
+        for (const Path& var : product.GetOrderedVars()) {
             if (!scene.Has(var) || scene.TypeOf(var) != kRenderVar) {
                 throw std::invalid_argument("'" + var.String() + "' is not a RenderVar prim");
             }
-            const std::string name = RenderVar(scene, var).GetSourceName();
-            spec.vars.emplace_back(var, name);
+            const RenderVar view(scene, var);
+            spec.vars.emplace_back(var, view.GetSourceName());
             // A var with its own `ernie:filters` comes from that chain, not the product's.
-            if (scene.Get(var, kFilters) != nullptr) {
-                spec.varFilters.push_back(FilterStepsOf(scene, var));
+            if (view.HasFilters()) {
+                spec.varFilters.push_back(FilterStepsOf(scene, view.GetFilters()));
                 ownChains = true;
             } else {
                 spec.varFilters.push_back(std::nullopt);
             }
         }
-        spec.filters = FilterStepsOf(scene, path);
+        spec.filters = FilterStepsOf(scene, product.GetFilters());
         // The built-in filters decide which vars the chain writes. A chain with custom filters
         // (which may integrate in place of qe or cie), or vars with chains of their own, are
         // checked by the renderer, which knows the custom filters (`VarsWrittenBy` with its
@@ -1588,6 +1570,9 @@ glm::vec4 Vec4Of(const Scene& scene, const Path& path, std::string_view attribut
     if (const auto* v = value->Get<glm::vec4>()) {
         return *v;
     }
+    if (const auto* v = value->Get<glm::dvec4>()) {
+        return glm::vec4(*v);
+    }
     throw std::invalid_argument("'" + path.String() + "' " + std::string(attribute) +
                                 " must be a 4-vector");
 }
@@ -1643,8 +1628,9 @@ TextureReader TextureReaderOf(const Scene& scene, const Connection& connection,
                                     std::string(kSourceColorSpace) + " is '" + space +
                                     "', not auto, raw or sRGB");
     }
+    // UsdUVTexture's 4-vector scale, undeclared as it shares its name with UsdTransform2d's.
     reader.scale = Vec4Of(scene, texture, kShaderScale, reader.scale);
-    reader.bias = Vec4Of(scene, texture, kShaderBias, reader.bias);
+    reader.bias = glm::vec4(shader.GetBias());
     if (const std::optional<Connection> st = GetConnection(scene, texture, kSt)) {
         Path source = st->prim;
         if (ShaderIdOf(scene, source) == kUsdTransform2d) {
@@ -1986,7 +1972,11 @@ std::optional<Bounds3> ExtentOf(const Scene& scene, const Path& prim) {
             return std::nullopt;
         }
         values = FloatsOf(*tensor, 3, tokens::kExtent);
+    } else if (const PrimTypeDef* type = scene.Has(prim) ? PrimTypeOf(scene, prim) : nullptr;
+               type != nullptr && type->IsA(Boundable::Definition())) {
+        values = Boundable(scene, prim).GetExtent();
     } else if (const Value* value = scene.Get(prim, tokens::kExtent)) {
+        // A prim of a type without bounds of its own, such as an untyped one.
         if (const auto* floats = value->Get<std::vector<float>>()) {
             values = *floats;
         }

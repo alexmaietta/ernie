@@ -3,18 +3,24 @@
 through a bare renderer, with a Demos panel to switch between them.
 
 A demo subclasses Demo, builds its scene into `self.scene` in `__init__`, advances it in `step`
-and checks itself in `test_final`::
+and checks itself in `test_final`. Its scene has a Camera of its own, even when the demo is meant
+for the viewer (which frames the scene with its own camera): without a viewer (`--viewer null`,
+`--benchmark`) and in tests (`render_image`) the scene renders through it::
 
+    import ernie
     import ernie.demo
     from ernie import tokens
 
     class Demo(ernie.demo.Demo):
         def __init__(self, viewer, args):
             super().__init__(viewer, args)
-            self.scene.define("/World/Ball", tokens.SPHERE)
+            self.ball = self.scene.define("/World/Ball", ernie.Sphere, radius=0.5)
+            self.scene.define("/World/Sun", ernie.DistantLight)
+            self.scene.define("/World/Camera", ernie.Camera).set(
+                tokens.TRANSFORM, ernie.look_at_transform((0, -5, 2), (0, 0, 0)))
 
         def step(self):
-            ...  # move things by self.frame_dt
+            self.ball.set(translate=(0, 0, self.time))  # moved by self.frame_dt each step
 
         def test_final(self):
             assert self.render_image()[..., :3].any()
@@ -131,8 +137,9 @@ class Demo:
             self.image = np.asarray(self.renderer.render(self.scene))
 
     def render_image(self):
-        """The scene's LdrColor as its RenderSettings describe, uint8 (rows, cols, 4): the last
-        frame without a viewer, else rendered now with `renderer`, for tests."""
+        """The scene's LdrColor as its RenderSettings (or its first Camera) describe, uint8
+        (rows, cols, 4): the last frame without a viewer, else rendered now with `renderer`, for
+        tests. Not the viewport: the viewer's own camera is not the scene's."""
         if self.viewer is None and self.image is not None:
             return self.image
         return np.asarray(self.renderer.render(self.scene))

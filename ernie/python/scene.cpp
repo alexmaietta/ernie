@@ -368,7 +368,41 @@ void BindOverlay(nb::module_& m) {
         });
 }
 
+/// The Prim a typed prim wraps (its `prim` attribute), or null.
+nb::object WrappedPrim(nb::handle object) noexcept {
+    PyObject* prim = PyObject_GetAttrString(object.ptr(), "prim");
+    if (prim == nullptr) {
+        PyErr_Clear();
+        return {};
+    }
+    nb::object owned = nb::steal(prim);
+    return nb::isinstance<Prim>(owned) ? owned : nb::object();
+}
+
 }  // namespace
+
+bool IsPrimPath(nb::handle object) noexcept {
+    return nb::isinstance<nb::str>(object) || nb::isinstance<Path>(object) ||
+           nb::isinstance<Prim>(object) || WrappedPrim(object).is_valid();
+}
+
+Path PathFromPython(nb::handle object) {
+    if (nb::isinstance<nb::str>(object)) {
+        return Path(nb::cast<std::string_view>(object));
+    }
+    if (nb::isinstance<Path>(object)) {
+        return nb::cast<const Path&>(object);
+    }
+    if (nb::isinstance<Prim>(object)) {
+        return nb::cast<const Prim&>(object).GetPath();
+    }
+    if (nb::object prim = WrappedPrim(object); prim.is_valid()) {
+        return nb::cast<const Prim&>(prim).GetPath();
+    }
+    throw nb::type_error(("A prim path is a str, Path, Prim or typed prim, not " +
+                          std::string(nb::type_name(object.type()).c_str()))
+                             .c_str());
+}
 
 Value ValueFromPython(nb::handle object) {
     if (object.is_none()) {
@@ -517,7 +551,7 @@ nb::object ValueToPython(const Value& value) {
                 return nb::make_tuple(double(v.x), double(v.y));
             } else if constexpr (std::is_same_v<T, glm::vec3> || std::is_same_v<T, glm::dvec3>) {
                 return nb::make_tuple(double(v.x), double(v.y), double(v.z));
-            } else if constexpr (std::is_same_v<T, glm::vec4>) {
+            } else if constexpr (std::is_same_v<T, glm::vec4> || std::is_same_v<T, glm::dvec4>) {
                 return nb::make_tuple(double(v.x), double(v.y), double(v.z), double(v.w));
             } else if constexpr (std::is_same_v<T, glm::dmat4>) {
                 return MatrixToPython(v);
@@ -645,6 +679,15 @@ void BindScene(nb::module_& m) {
         .def("define", &Prim::Define, nb::arg("relative"), nb::arg("type"), nb::keep_alive<0, 1>(),
              "Defines the prim at `relative` below this one (\"Rock\", or \"Rig/Arm\") with "
              "`type`, as Scene.define.")
+        .def(
+            "get_prim",
+            [](const Prim& prim, std::string_view relative) -> nb::object {
+                Prim found = prim.GetPrim(relative);
+                return found ? nb::cast(found) : nb::none();
+            },
+            nb::arg("relative"), nb::keep_alive<0, 1>(),
+            "The prim at `relative` below this one (\"Rock\", or \"Rig/Arm\"), or None, as "
+            "Scene.get_prim.")
         .def(
             "set",
             [](Prim& prim, std::string_view attribute, nb::handle value) -> Prim& {
@@ -944,8 +987,9 @@ void BindScene(nb::module_& m) {
             "`lines` lines from `first_line`.")
         .def(
             "author_strip",
-            [](const IsdLineScanner& s, Scene& scene, const std::string& path,
-               std::uint32_t first, std::uint32_t lines, bool atEnd) {
+            [](const IsdLineScanner& s, Scene& scene, const PrimPath& pathArg, std::uint32_t first,
+               std::uint32_t lines, bool atEnd) {
+                const Path path = pathArg;
                 const IsdLineScanner::Strip strip = s.StripOf(first, lines);
                 const CameraParams& camera =strip.camera;
                 using namespace tokens;
@@ -972,8 +1016,8 @@ void BindScene(nb::module_& m) {
             },
             nb::arg("scene"), nb::arg("path"), nb::arg("first_line"), nb::arg("lines"),
             nb::arg("at_end") = true,
-            "Authors the Camera prim at `path` as the pushbroom of the strip of `lines` lines "
-            "from `first_line` (with the lens's distortion along the detector fitted as "
+            "Authors the Camera prim at `path` (a str, Path, Prim or typed prim) as the pushbroom "
+            "of the strip of `lines` lines from `first_line` (with the lens's distortion along the detector fitted as "
             "`ernie:lens:distortion`), posed at its end (or its start), and returns the render "
             "resolution it needs, (samples, lines). Render an image strip by strip: author the "
             "first strip at its start and step once, then author each strip at its end and "
@@ -1023,8 +1067,8 @@ void BindScene(nb::module_& m) {
             nb::arg("ground"), "The (line, sample) that sees body-fixed point `ground`.")
         .def(
             "author_framelet",
-            [](const IsdPushFrame& s, Scene& scene, const std::string& path,
-               std::uint32_t index) {
+            [](const IsdPushFrame& s, Scene& scene, const PrimPath& pathArg, std::uint32_t index) {
+                const Path path = pathArg;
                 const IsdPushFrame::Framelet framelet = s.FrameletOf(index);
                 const CameraParams& camera =framelet.camera;
                 using namespace tokens;
@@ -1052,8 +1096,8 @@ void BindScene(nb::module_& m) {
                                       framelet.rowsReversed, framelet.time);
             },
             nb::arg("scene"), nb::arg("path"), nb::arg("framelet"),
-            "Authors the Camera prim at `path` as framelet `framelet` (in image order, from the "
-            "top): a frame camera posed when it is exposed, with the lens's distortion fitted as "
+            "Authors the Camera prim at `path` (a str, Path, Prim or typed prim) as framelet "
+            "`framelet` (in image order, from the top): a frame camera posed when it is exposed, with the lens's distortion fitted as "
             "`ernie:lens:distortion`. Returns (samples, lines, first_line, rows_reversed, time): "
             "render at that resolution, flip the rows if `rows_reversed`, and place them at "
             "`first_line` of the image.");
@@ -1104,8 +1148,9 @@ void BindScene(nb::module_& m) {
             "whether it is a fisheye.")
         .def(
             "author_camera",
-            [](const CahvoreModel& model, Scene& scene, const std::string& path,
+            [](const CahvoreModel& model, Scene& scene, const PrimPath& pathArg,
                double pixelPitchUm, std::uint32_t raysStep) {
+                const Path path = pathArg;
                 const CahvoreModel::ErnieCamera fit = model.ToCamera(pixelPitchUm);
                 const CameraParams& camera =fit.camera;
                 using namespace tokens;
@@ -1154,7 +1199,8 @@ void BindScene(nb::module_& m) {
             },
             nb::arg("scene"), nb::arg("path"), nb::arg("pixel_pitch_um"),
             nb::arg("rays_step") = 8,
-            "Authors the Camera prim at `path` as the model in Ernie's camera (perspective with "
+            "Authors the Camera prim at `path` (a str, Path, Prim or typed prim) as the model in "
+            "Ernie's camera (perspective with "
             "Brown-Conrady terms, or a Kannala-Brandt fisheye for CAHVORE), posed in the model's "
             "frame, and with `rays_step` above 0 the model's own rays every that many pixels "
             "(`ernie:lens:rays`), which the sensor follows in place of the fit: exact but for "
@@ -1216,7 +1262,8 @@ void BindScene(nb::module_& m) {
             nb::arg("ground"), "The (line, sample) that sees body-fixed point `ground`.")
         .def(
             "author_camera",
-            [](const IsdFrame& s, Scene& scene, const std::string& path) {
+            [](const IsdFrame& s, Scene& scene, const PrimPath& pathArg) {
+                const Path path = pathArg;
                 const IsdFrame::FrameView view = s.View();
                 const CameraParams& camera =view.camera;
                 using namespace tokens;
@@ -1242,14 +1289,15 @@ void BindScene(nb::module_& m) {
                 return nb::make_tuple(camera.width, camera.height, view.rowsReversed);
             },
             nb::arg("scene"), nb::arg("path"),
-            "Authors the Camera prim at `path` as the image's frame camera, posed when it is "
+            "Authors the Camera prim at `path` (a str, Path, Prim or typed prim) as the image's "
+            "frame camera, posed when it is "
             "exposed, with the lens's distortion fitted as `ernie:lens:distortion`. Returns "
             "(samples, lines, rows_reversed): render at that resolution and flip the rows if "
             "`rows_reversed`.");
 
     m.def(
         "author_lroc_nac",
-        [](Scene& scene, const std::string& camera, const std::string& product,
+        [](Scene& scene, const PrimPath& camera, const PrimPath& product,
            const std::string& side) {
             if (side != "left" && side != "right") {
                 throw nb::value_error("side must be 'left' or 'right'");
@@ -1263,11 +1311,12 @@ void BindScene(nb::module_& m) {
         "noise, full well, 12-bit ADC, f-number) and RenderProduct `product`'s readout chain "
         "(qe, noise, adc, even/odd readoutTaps, compandTable code 0) whose RawDN is the 8-bit "
         "numbers the NAC sends. Its geometry comes from the image's ISD "
-        "(`IsdLineScanner.author_strip`).");
+        "(`IsdLineScanner.author_strip`). `camera` and `product` are each a str, Path, Prim or "
+        "typed prim.");
 
     m.def(
         "author_lroc_wac",
-        [](Scene& scene, const std::string& camera, const std::string& product, int band) {
+        [](Scene& scene, const PrimPath& camera, const PrimPath& product, int band) {
             try {
                 AuthorLrocWac(scene, Path(camera), Path(product), LrocWacBandNamed(band));
             } catch (const std::invalid_argument& error) {
@@ -1281,7 +1330,8 @@ void BindScene(nb::module_& m) {
         "responsivity, gain, detector noise, full well, 11-bit ADC, f-number; its spectral "
         "range narrowed to the passband) and RenderProduct `product`'s readout chain (qe, "
         "noise, adc). Its geometry comes from the image's ISD "
-        "(`IsdPushFrame.author_framelet`).");
+        "(`IsdPushFrame.author_framelet`). `camera` and `product` are each a str, Path, Prim or "
+        "typed prim.");
 
     const auto bayerPattern = [](const std::string& name) {
         const std::pair<const char*, BayerPattern> patterns[] = {{"rggb", BayerPattern::Rggb},
@@ -1297,7 +1347,7 @@ void BindScene(nb::module_& m) {
     };
     m.def(
         "author_mars2020_navcam",
-        [bayerPattern](Scene& scene, const std::string& camera, const std::string& product,
+        [bayerPattern](Scene& scene, const PrimPath& camera, const PrimPath& product,
                        const std::string& pattern, double jpegQuality) {
             AuthorMars2020Navcam(scene, Path(camera), Path(product), bayerPattern(pattern),
                                  jpegQuality);
@@ -1309,12 +1359,12 @@ void BindScene(nb::module_& m) {
         "pixels of 6.4 um) and RGB sensor (gain 0.24 DN/e-, 8 e- dark noise, 15,000 e- full "
         "well, 12-bit ADC), and RenderProduct `product`'s chain (qe, bayer, noise, adc, "
         "demosaic; cie, exposure, jpeg). The paper gives neither the Bayer layout (`pattern`) "
-        "nor the JPEG quality (`jpeg_quality`).");
+        "nor the JPEG quality (`jpeg_quality`). `camera` and `product` are each a str, Path, "
+        "Prim or typed prim.");
     m.def(
         "author_mars2020_navcam_pair",
-        [bayerPattern](Scene& scene, const std::string& rig, const std::string& left,
-                       const std::string& right, const std::string& pattern,
-                       double jpegQuality) {
+        [bayerPattern](Scene& scene, const PrimPath& rig, const PrimPath& left,
+                       const PrimPath& right, const std::string& pattern, double jpegQuality) {
             AuthorMars2020NavcamPair(scene, Path(rig), Path(left), Path(right),
                                      bayerPattern(pattern), jpegQuality);
         },
@@ -1322,10 +1372,11 @@ void BindScene(nb::module_& m) {
         nb::arg("pattern") = "rggb", nb::arg("jpeg_quality") = 85.0,
         "The Navcam stereo pair on Xform `rig` (defined if missing; pose it as the cameras' "
         "frame, looking down -z with +y up): Cameras `rig`/Left and `rig`/Right 42.4 cm apart "
-        "along x, each as `author_mars2020_navcam` with its product.");
+        "along x, each as `author_mars2020_navcam` with its product. `rig` and the products are "
+        "each a str, Path, Prim or typed prim.");
     m.def(
         "author_mars2020_hazcam",
-        [bayerPattern](Scene& scene, const std::string& camera, const std::string& product,
+        [bayerPattern](Scene& scene, const PrimPath& camera, const PrimPath& product,
                        const std::string& pattern, double jpegQuality) {
             AuthorMars2020Hazcam(scene, Path(camera), Path(product), bayerPattern(pattern),
                                  jpegQuality);
@@ -1334,11 +1385,12 @@ void BindScene(nb::module_& m) {
         nb::arg("jpeg_quality") = 85.0,
         "Authors one of the Mars 2020 rover's Hazcams as Maki et al. 2020 publish it (Table 2), as "
         "`author_mars2020_navcam` does a Navcam but through the Hazcam's f-theta fisheye (14.0 mm, "
-        "f/12, 136 x 102 degrees, focused at 0.9 m), which renders on cube faces.");
+        "f/12, 136 x 102 degrees, focused at 0.9 m), which renders on cube faces. `camera` and "
+        "`product` are each a str, Path, Prim or typed prim.");
     m.def(
         "author_mars2020_hazcam_pair",
-        [bayerPattern](Scene& scene, const std::string& rig, const std::string& left,
-                       const std::string& right, const std::string& which,
+        [bayerPattern](Scene& scene, const PrimPath& rig, const PrimPath& left,
+                       const PrimPath& right, const std::string& which,
                        const std::string& pattern, double jpegQuality) {
             if (which != "front" && which != "rear") {
                 throw nb::value_error("which must be 'front' or 'rear'");
@@ -1351,14 +1403,15 @@ void BindScene(nb::module_& m) {
         nb::arg("scene"), nb::arg("rig"), nb::arg("left_product"), nb::arg("right_product"),
         nb::arg("which") = "front", nb::arg("pattern") = "rggb", nb::arg("jpeg_quality") = 85.0,
         "A Hazcam stereo pair on Xform `rig`: Cameras `rig`/Left and `rig`/Right 24.8 cm apart "
-        "(front) or 93.4 cm (rear) along x, each as `author_mars2020_hazcam` with its product.");
+        "(front) or 93.4 cm (rear) along x, each as `author_mars2020_hazcam` with its product. "
+        "`rig` and the products are each a str, Path, Prim or typed prim.");
     m.def(
         "author_singlet_chromatic",
-        [](Scene& scene, const std::string& camera, double nd, double abbe, double lateral) {
+        [](Scene& scene, const PrimPath& camera, double nd, double abbe, double lateral) {
             using namespace tokens;
-            const Path path(camera);
+            const Path path = camera;
             if (!scene.Has(path) || scene.TypeOf(path) != kCamera) {
-                throw nb::value_error(("'" + camera + "' is not a Camera").c_str());
+                throw nb::value_error(("'" + path.String() + "' is not a Camera").c_str());
             }
             LensModel lens;
             try {
@@ -1385,10 +1438,11 @@ void BindScene(nb::module_& m) {
         "`abbe` (by default SCHOTT N-BK7) would have: axial colour from the glass's dispersion "
         "(Cauchy, f_C - f_F = f / V), lateral colour `lateral` times its relative focal change "
         "(0 with the stop at the lens, up to 1 for a distant stop). The `defocus` filter blurs "
-        "by the axial colour; the lens resamples each band by the lateral.");
+        "by the axial colour; the lens resamples each band by the lateral. `camera` is a str, "
+        "Path, Prim or typed prim.");
     m.def(
         "author_mastcamz",
-        [bayerPattern](Scene& scene, const std::string& camera, const std::string& product,
+        [bayerPattern](Scene& scene, const PrimPath& camera, const PrimPath& product,
                        const std::string& eye, int filter, double focalLength,
                        const std::string& pattern) {
             if (eye != "left" && eye != "right") {
@@ -1408,11 +1462,12 @@ void BindScene(nb::module_& m) {
         "(Tables 3 and 5): the KAI-2020CM (1600 x 1200 pixels of 7.4 um, 15.6 e-/DN, 11-bit) "
         "behind the zoom at `focal_length` (26 to 110 mm). Filter 0 is the Bayer RGB; 1 to 6 "
         "the narrow bands (the left eye's 442 to 800 nm, the right's 800 to 1022 nm); 7 the "
-        "neutral-density solar filter.");
+        "neutral-density solar filter. `camera` and `product` are each a str, Path, Prim or "
+        "typed prim.");
     m.def(
         "author_mastcamz_pair",
-        [bayerPattern](Scene& scene, const std::string& rig, const std::string& left,
-                       const std::string& right, int leftFilter, int rightFilter,
+        [bayerPattern](Scene& scene, const PrimPath& rig, const PrimPath& left,
+                       const PrimPath& right, int leftFilter, int rightFilter,
                        double focalLength, const std::string& pattern) {
             try {
                 AuthorMastcamZPair(scene, Path(rig), Path(left), Path(right), leftFilter,
@@ -1425,7 +1480,8 @@ void BindScene(nb::module_& m) {
         nb::arg("left_filter") = 0, nb::arg("right_filter") = 0, nb::arg("focal_length") = 26.0,
         nb::arg("pattern") = "rggb",
         "The Mastcam-Z pair on Xform `rig`: Cameras `rig`/Left and `rig`/Right 24.4 cm apart "
-        "along x, each toed in 1.15 degrees, through their filters.");
+        "along x, each toed in 1.15 degrees, through their filters. `rig` and the products are "
+        "each a str, Path, Prim or typed prim.");
 
     m.def(
         "look_at_transform",
