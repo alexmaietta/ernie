@@ -1,0 +1,25 @@
+{
+  "/World": {
+    "type": "Xform",
+    "Ground": {"type": "GroundPlane", "checker": true, "checker_size": 2.0},
+    "Rock": {"type": "Sphere", "radius": 1.0, "translate": [0, 0, 1]},
+    "Sun": {"type": "DistantLight", "angle": 0.53, "intensity": 2.0, "rotate": [30, 0, 45]},
+    "Camera": {
+      "type": "Camera",
+      "focal_length": 35.0,
+      "clipping_range": [0.1, 1000.0],
+      "transform": [
+        [1, 0, 0, 0],
+        [0, 0.4472135954999579, -0.8944271909999159, -10],
+        [0, 0.8944271909999159, 0.4472135954999579, 5],
+        [0, 0, 0, 1]
+      ]
+    }
+  },
+  "/Render/Settings": {
+    "type": "RenderSettings",
+    "camera": "/World/Camera",
+    "resolution": [640, 480],
+    "ambient": 0.2
+  }
+}

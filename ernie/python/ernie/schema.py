@@ -49,6 +49,7 @@ from ._ernie import (
     Path,
     Prim,
     PrimType,
+    Quat,
     Scene,
     find_prim_type,
     prim_types,
@@ -273,7 +274,8 @@ def load_scene(description: Any, scene: Scene | None = None) -> Scene:
     leave an existing prim's type alone), whose dict values are its children by name, and whose
     other values are its attributes, by Python name (``radius``) or USD name
     (``"inputs:radius"``), with ``translate``, ``rotate``, ``rotation_order``, ``orient`` and
-    ``scale`` setting its transform ops and ``transform`` a 4 x 4 matrix (rows of four)::
+    ``scale`` setting its transform ops (``orient`` a ``Quat`` or [w, x, y, z]) and ``transform``
+    a 4 x 4 matrix (rows of four); C++ reads the same format (``ernie/scene/scene_json.h``)::
 
         ernie.load_scene({
             "/World": {"type": "Xform",
@@ -312,6 +314,8 @@ def _load_prim(scene: Scene, path: str, body: Any) -> None:
     attributes = {k: v for k, v in body.items() if k != "type" and not isinstance(v, dict)}
     transform = attributes.pop("transform", None)
     xform = {key: attributes.pop(key) for key in _XFORM_KEYS if key in attributes}
+    if isinstance(xform.get("orient"), (list, tuple)):
+        xform["orient"] = Quat(*xform["orient"])  # [w, x, y, z], as JSON writes one
     keywords = {}
     for name, value in attributes.items():
         definition = cls._attributes.get(name) if cls is not None else None

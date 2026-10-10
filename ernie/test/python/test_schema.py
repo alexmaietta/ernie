@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 import json
+import pathlib
 
 import numpy as np
 import pytest
@@ -174,3 +175,19 @@ def test_scenes_load_from_descriptions(tmp_path):
         ernie.load_scene({"/X": {"type": "Sphere", "radus": 1.0}})
     with pytest.raises(TypeError, match="dict of prim paths"):
         ernie.load_scene([1, 2])
+
+
+def test_scene_files_load_as_cpp_loads_them():
+    # The fixture C++'s LoadSceneFile test loads (scene_json_test.cpp), with the same results.
+    fixture = pathlib.Path(__file__).resolve().parents[1] / "fixtures" / "scene_basic.json"
+    scene = ernie.load_scene(fixture)
+    assert ernie.GroundPlane.at(scene, "/World/Ground").checker
+    assert ernie.Camera.at(scene, "/World/Camera").focal_length == 35.0
+    expected = ernie.look_at_transform((0, -10, 5), (0, 0, 0), (0, 0, 1))
+    assert np.allclose(scene.local_transform("/World/Camera"), expected)
+    assert ernie.RenderSettings.at(scene, "/Render/Settings").resolution == (640.0, 480.0)
+
+    # A quaternion in a description is [w, x, y, z], as Quat(w, x, y, z) takes it.
+    scene = ernie.load_scene({"/A": {"orient": [0.5**0.5, 0, 0, 0.5**0.5]}})
+    scene.define("/B", "").set_xform(orient=ernie.Quat.from_axis_angle((0, 0, 1), 90.0))
+    assert np.allclose(scene.local_transform("/A"), scene.local_transform("/B"))

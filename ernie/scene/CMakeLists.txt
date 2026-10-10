@@ -19,6 +19,7 @@ ernie_add_library(
     prim_type.cpp
     render_schemas.cpp
     scene.cpp
+    scene_json.cpp
     schema.cpp
     sensor_filters.cpp
     terrain_schemas.cpp
