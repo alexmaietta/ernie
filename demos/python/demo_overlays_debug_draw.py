@@ -21,28 +21,18 @@ GRAVITY = 9.81
 RADIUS = 0.5
 
 
-def translation(x, y, z):
-    m = np.eye(4)
-    m[:3, 3] = (x, y, z)
-    return m
-
-
 def build_scene():
     scene = ernie.Scene()
-    scene.define("/World/Ground", tokens.GROUND_PLANE).set(tokens.CHECKER, True).set(
-        tokens.CHECKER_SIZE, 1.0
-    )
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+    world = scene.define("/World", ernie.Xform)
+    world.define("Ground", ernie.GroundPlane, checker=True, checker_size=1.0)
+    world.define("Sun", ernie.DistantLight).set(
         tokens.TRANSFORM, ernie.distant_light_transform((0.4, -0.5, 0.8))
     )
     for i, x in enumerate((-4.0, 4.0)):
-        scene.define(f"/World/Box{i}", tokens.CUBE).set(tokens.SIZE, 2.0).set(
-            tokens.TRANSFORM, translation(x, 2.0, 1.0)
-        ).set(tokens.DISPLAY_COLOR, (0.75, 0.45, 0.3))
-    scene.define("/World/Ball", tokens.SPHERE).set(tokens.GEOM_RADIUS, RADIUS).set(
-        tokens.DISPLAY_COLOR, (0.25, 0.55, 0.9)
-    )
-    return scene
+        world.define(f"Box{i}", ernie.Cube, size=2.0, translate=(x, 2.0, 1.0),
+                     display_color=(0.75, 0.45, 0.3))
+    ball = world.define("Ball", ernie.Sphere, radius=RADIUS, display_color=(0.25, 0.55, 0.9))
+    return scene, ball
 
 
 class Ball:
@@ -102,13 +92,13 @@ def main():
     parser.add_argument("--capture", help="render without a window and save the image here")
     args = parser.parse_args()
 
-    scene = build_scene()
+    scene, sphere = build_scene()
     ball = Ball()
     viewer = Viewer(scene, title="Ernie overlays", hidden=args.capture is not None)
 
     def update(v, info):
         ball.step(min(info.delta, 1.0 / 30.0) if args.capture is None else 1.0 / 60.0)
-        v.scene.set("/World/Ball", tokens.TRANSFORM, translation(*ball.position()))
+        sphere.set(translate=ball.position())
         draw(v.scene, ball)
 
     viewer.on_frame(update)

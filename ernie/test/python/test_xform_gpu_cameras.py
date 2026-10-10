@@ -19,30 +19,32 @@ def world_scene(count, ops=(tokens.TRANSLATE, tokens.ORIENT)):
     scene = ernie.Scene()
     # No shadows: the sun's map is fitted to the scene's bounds, the extents on the GPU and the
     # posed boxes on the CPU, shading the ground a little differently.
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+    scene.define("/World/Sun", ernie.DistantLight, shadow_enable=False).set(
         tokens.TRANSFORM, ernie.distant_light_transform((0.3, -0.5, 0.8))
-    ).set(tokens.SHADOW_ENABLE, False)
-    scene.define("/World/Ground", tokens.GROUND_PLANE)
+    )
+    scene.define("/World/Ground", ernie.GroundPlane)
     links, cameras = [], []
     for i in range(count):
-        env = scene.define(f"/Envs/Env{i}", tokens.XFORM).set(tokens.WORLD, i)
-        env.set_xform(translate=(100.0 * i, 0.0, 0.0))
+        env = scene.define(f"/Envs/Env{i}", ernie.Xform, world=i, translate=(100.0 * i, 0.0, 0.0))
         for k in range(3):
-            scene.define(f"/Envs/Env{i}/Box{k}", tokens.CUBE).set_xform(
-                translate=(4.0 + 2.0 * k, -2.0 + 2.0 * k, 0.5 + k)
-            ).set(tokens.DISPLAY_COLOR, (0.2 + 0.3 * k, 0.5, 0.9 - 0.3 * k))
-        link = scene.define(f"/Envs/Env{i}/Link", tokens.XFORM)
+            env.define(
+                f"Box{k}",
+                ernie.Cube,
+                translate=(4.0 + 2.0 * k, -2.0 + 2.0 * k, 0.5 + k),
+                display_color=(0.2 + 0.3 * k, 0.5, 0.9 - 0.3 * k),
+            )
+        link = env.define("Link", ernie.Xform)
         link.set(tokens.XFORM_OP_ORDER, list(ops)).set(tokens.XFORM_EXTENT, EXTENT)
-        scene.define(f"/Envs/Env{i}/Link/Box", tokens.CUBE).set_xform(scale=(0.5, 0.5, 0.5))
+        link.define("Box", ernie.Cube, scale=(0.5, 0.5, 0.5))
         # The camera: up the link and turned to look along +x (cameras look down their -z).
-        scene.define(f"/Envs/Env{i}/Link/Mount", tokens.XFORM).set_xform(translate=(0.0, 0.0, 1.0))
-        camera = scene.define(f"/Envs/Env{i}/Link/Mount/Camera", tokens.CAMERA)
+        mount = link.define("Mount", ernie.Xform, translate=(0.0, 0.0, 1.0))
+        camera = mount.define("Camera", ernie.Camera, focal_length=12.0)
         camera.set(tokens.TRANSFORM, ernie.look_at_transform((0, 0, 0), (1, 0, -0.2)))
-        camera.set(tokens.FOCAL_LENGTH, 12.0)
         links.append(str(link.path))
-        cameras.append(ernie.Path(f"/Envs/Env{i}/Link/Mount/Camera"))
-    scene.define("/Render/Wrists", tokens.RENDER_PRODUCT).set(tokens.CAMERA_REL, cameras).set(
-        tokens.RESOLUTION, (64, 48)
+        cameras.append(camera.path)
+    # One product, many cameras: a list relationship, set by name.
+    scene.define("/Render/Wrists", ernie.RenderProduct, resolution=(64, 48)).set(
+        tokens.CAMERA_REL, cameras
     )
     return scene, links
 
@@ -100,9 +102,12 @@ def test_one_wrist_camera(cuda_renderer):
     images = []
     for upload in (None, cuda_renderer.cuda_upload):
         scene, links = world_scene(3)
-        scene.define("/Render/One", tokens.RENDER_PRODUCT).set(
-            tokens.CAMERA_REL, ernie.Path("/Envs/Env1/Link/Mount/Camera")
-        ).set(tokens.RESOLUTION, (64, 48))
+        scene.define(
+            "/Render/One",
+            ernie.RenderProduct,
+            camera="/Envs/Env1/Link/Mount/Camera",
+            resolution=(64, 48),
+        )
         for op, rows in arrays.items():
             scene.write(links, op, upload(rows) if upload else rows)
         images.append(views(cuda_renderer, scene, "/Render/One"))
@@ -158,17 +163,17 @@ def test_wrist_cameras_two_posed_links_deep(cuda_renderer):
         bases = []
         for i in range(count):
             # The link moves under a new base between the world and it.
-            base = scene.define(f"/Envs/Env{i}/Base", tokens.XFORM)
+            base = scene.define(f"/Envs/Env{i}/Base", ernie.Xform)
             base.set(tokens.XFORM_OP_ORDER, [tokens.TRANSLATE, tokens.ORIENT])
             base.set(tokens.XFORM_EXTENT, [-4.0, -4.0, -0.5, 4.0, 4.0, 0.5])
-            scene.define(f"/Envs/Env{i}/Base/Link", tokens.XFORM).set(
+            link = base.define("Link", ernie.Xform).set(
                 tokens.XFORM_OP_ORDER, [tokens.TRANSLATE, tokens.ORIENT]
             ).set(tokens.XFORM_EXTENT, EXTENT)
-            scene.define(f"/Envs/Env{i}/Base/Link/Box", tokens.CUBE).set_xform(scale=(0.5, 0.5, 0.5))
-            scene.define(f"/Envs/Env{i}/Base/Link/Mount", tokens.XFORM).set_xform(translate=(0.0, 0.0, 1.0))
-            scene.define(f"/Envs/Env{i}/Base/Link/Mount/Camera", tokens.CAMERA).set(
+            link.define("Box", ernie.Cube, scale=(0.5, 0.5, 0.5))
+            mount = link.define("Mount", ernie.Xform, translate=(0.0, 0.0, 1.0))
+            mount.define("Camera", ernie.Camera, focal_length=12.0).set(
                 tokens.TRANSFORM, ernie.look_at_transform((0, 0, 0), (1, 0, -0.2))
-            ).set(tokens.FOCAL_LENGTH, 12.0)
+            )
             scene.remove(links[i])
             bases.append(str(base.path))
         cameras = [ernie.Path(f"/Envs/Env{i}/Base/Link/Mount/Camera") for i in range(count)]

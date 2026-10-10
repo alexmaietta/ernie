@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/geometry_schemas.h"
+#include "ernie/scene/light_schemas.h"
+#include "ernie/scene/material_schemas.h"
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
+#include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
 
 #include <gtest/gtest.h>
@@ -25,7 +31,7 @@ Scene MinimalScene() {
     scene.Define("/World/Camera", tokens::kCamera)
         .Set(tokens::kTransform,
              ernie::LookAtTransform({0.0, -100.0, 100.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}));
-    scene.Define("/World/Terrain", tokens::kTerrain);
+    ernie::Terrain::Define(scene, "/World/Terrain");
     return scene;
 }
 
@@ -62,29 +68,28 @@ TEST(FrameParamsOf, DefaultsMatchTheRendererAndAnUnlitSceneHasNoSun) {
 
 TEST(FrameParamsOf, ReadsLightMaterialTerrainAndSettings) {
     Scene scene = MinimalScene();
-    scene.Define("/World/Sun", tokens::kDistantLight)
-        .Set(tokens::kTransform, ernie::DistantLightTransform({1.0, 0.0, 1.0}))
-        .Set(tokens::kIntensity, 2.0)
-        .Set(tokens::kExposure, 1.0f)
-        .Set(tokens::kShadowEnable, false);
-    scene.Set("/World/Camera", tokens::kCameraExposure, 1.0f);
-    scene.Define("/Looks/Rock", tokens::kMaterial)
-        .Set(tokens::kBrdf, "hapke")
-        .Set("inputs:b", 0.33)
-        .Set(tokens::kAlbedo, glm::vec3(0.5f, 0.4f, 0.3f))
-        .Set(tokens::kAlbedoMapEnable, false)
-        .Set(tokens::kDetailTileSize, 8.0f)
-        .Set(tokens::kDetailHexTiling, false);
-    scene.Set("/World/Terrain", tokens::kMaterialBinding, Path("/Looks/Rock"));
-    scene.Set("/World/Terrain", tokens::kExaggeration, 3.0f);
-    scene.Define("/Render/Settings", tokens::kRenderSettings)
-        .Set(tokens::kAmbient, 0.3f)
-        .Set(tokens::kColorMode, tokens::kHillshade)
-        .Set(tokens::kWireframe, true)
-        .Set(tokens::kShadowCascades, 2)
-        .Set(tokens::kShadowResolution, 1024)
-        .Set(tokens::kLodEnable, false)
-        .Set(tokens::kLodDetail, 6.0f);
+    ernie::DistantLight::Define(scene, "/World/Sun")
+        .SetIntensity(2.0)
+        .SetExposure(1.0)
+        .SetShadowEnable(false);
+    scene.Set("/World/Sun", tokens::kTransform, ernie::DistantLightTransform({1.0, 0.0, 1.0}));
+    ernie::Camera(scene, "/World/Camera").SetExposure(1.0);
+    ernie::Material::Define(scene, "/Looks/Rock")
+        .SetBrdf("hapke")
+        .SetAlbedo({0.5, 0.4, 0.3})
+        .SetAlbedoMapEnable(false)
+        .SetDetailTileSize(8.0)
+        .SetDetailHexTiling(false);
+    scene.Set("/Looks/Rock", "inputs:b", 0.33);  // a BRDF parameter: an open namespace
+    ernie::Terrain(scene, "/World/Terrain").SetMaterialBinding("/Looks/Rock").SetExaggeration(3.0);
+    ernie::RenderSettings::Define(scene, "/Render/Settings")
+        .SetAmbient(0.3)
+        .SetColorMode(tokens::kHillshade)
+        .SetWireframe(tokens::kOverlay)
+        .SetShadowCascades(2)
+        .SetShadowResolution(1024)
+        .SetLodEnable(false)
+        .SetLodDetail(6.0);
 
     const BrdfRegistry brdfs = BrdfRegistry::WithBuiltins();
     const RenderPrims prims = ernie::ResolveRenderPrims(scene, {});
@@ -127,29 +132,26 @@ TEST(FrameParamsOf, ReadsLightMaterialTerrainAndSettings) {
     EXPECT_FALSE(terrain.lod.enabled);
     EXPECT_EQ(terrain.lod.detail, 6.0f);
 
-    scene.Set("/Render/Settings", tokens::kColorMode, tokens::kColormap);
+    ernie::RenderSettings(scene, "/Render/Settings").SetColorMode(tokens::kColormap);
     EXPECT_EQ(ernie::TerrainParamsOf(scene, prims).colorMode, TerrainColorMode::Colormap);
-    scene.Set("/Looks/Rock", tokens::kBrdf, "nope");
+    ernie::Material(scene, "/Looks/Rock").SetBrdf("nope");
     EXPECT_THROW(ernie::MaterialSettingsOf(scene, prims.material, brdfs), std::invalid_argument);
 }
 
 TEST(GroundParamsOf, ReadsHeightAndCheckerboard) {
     Scene scene;
-    scene.Define("/Ground", tokens::kGroundPlane);
+    ernie::GroundPlane ground = ernie::GroundPlane::Define(scene, "/Ground");
     ernie::GroundParams params = ernie::GroundParamsOf(scene, "/Ground");
     EXPECT_EQ(params.height, 0.0f);
     EXPECT_FALSE(params.checker);
     EXPECT_EQ(params.checkerColors[1], glm::vec3(0.5f));
-    scene.Set("/Ground", tokens::kGroundHeight, -2.5);
-    scene.Set("/Ground", tokens::kChecker, true);
-    scene.Set("/Ground", tokens::kCheckerSize, 10.0);
-    scene.Set("/Ground", tokens::kCheckerColor0, glm::vec3(0.2f, 0.3f, 0.4f));
+    ground.SetHeight(-2.5).SetChecker(true).SetCheckerSize(10.0).SetCheckerColor0({0.2, 0.3, 0.4});
     params = ernie::GroundParamsOf(scene, "/Ground");
     EXPECT_EQ(params.height, -2.5f);
     EXPECT_TRUE(params.checker);
     EXPECT_EQ(params.checkerSize, 10.0f);
     EXPECT_EQ(params.checkerColors[0], glm::vec3(0.2f, 0.3f, 0.4f));
     EXPECT_EQ(ernie::ResolveRenderPrims(scene, {}).ground, Path("/Ground"));
-    scene.Set("/Ground", tokens::kCheckerSize, 0.0);
+    ground.SetCheckerSize(0.0);
     EXPECT_THROW(ernie::GroundParamsOf(scene, "/Ground"), std::invalid_argument);
 }

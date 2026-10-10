@@ -51,26 +51,23 @@ pip install ernie
 ```
 
 ```python
-import numpy as np
 from PIL import Image
 
 import ernie
 from ernie import tokens
 
 scene = ernie.Scene()
-scene.define("/World/Ground", tokens.GROUND_PLANE)
-rock = np.eye(4)
-rock[2, 3] = 1.0  # 1 m up
-scene.define("/World/Rock", tokens.SPHERE).set(tokens.TRANSFORM, rock)
-scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+scene.define("/World/Ground", ernie.GroundPlane)
+scene.define("/World/Rock", ernie.Sphere, translate=(0, 0, 1))  # 1 m up
+scene.define("/World/Sun", ernie.DistantLight).set(
     tokens.TRANSFORM, ernie.distant_light_transform((0.4, -0.6, 0.7))
 )
-scene.define("/World/Camera", tokens.CAMERA).set(
+scene.define("/World/Camera", ernie.Camera).set(
     tokens.TRANSFORM, ernie.look_at_transform((0, -8, 3), (0, 0, 1))
 )
-scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(
-    tokens.CAMERA_REL, ernie.Path("/World/Camera")
-).set(tokens.RESOLUTION, (640, 480))
+scene.define(
+    "/Render/Settings", ernie.RenderSettings, camera="/World/Camera", resolution=(640, 480)
+)
 
 renderer = ernie.Renderer()
 image = renderer.render(scene)  # a (480, 640, 4) uint8 NumPy array
@@ -87,25 +84,29 @@ target_link_libraries(my_app PRIVATE Ernie::ernie)
 ```
 
 ```cpp
+#include <ernie/scene/camera_schemas.h>
+#include <ernie/scene/geometry_schemas.h>
+#include <ernie/scene/light_schemas.h>
+#include <ernie/scene/render_schemas.h>
 #include <ernie/scene/schema.h>
 #include <ernie/scene/tokens.h>
+#include <ernie/scene/xform.h>
 #include <ernie/session/renderer.h>
-
-#include <glm/gtc/matrix_transform.hpp>
 
 int main() {
     using namespace ernie;
     Scene scene;
-    scene.Define("/World/Ground", tokens::kGroundPlane);
-    scene.Define("/World/Rock", tokens::kSphere)
-        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 1.0)));
-    scene.Define("/World/Sun", tokens::kDistantLight)
-        .Set(tokens::kTransform, DistantLightTransform({0.4, -0.6, 0.7}));
-    scene.Define("/World/Camera", tokens::kCamera)
-        .Set(tokens::kTransform, LookAtTransform({0.0, -8.0, 3.0}, {0.0, 0.0, 1.0}, {0.0, 0.0, 1.0}));
-    scene.Define("/Render/Settings", tokens::kRenderSettings)
-        .Set(tokens::kCameraRel, Path("/World/Camera"))
-        .Set(tokens::kResolution, glm::ivec2(640, 480));
+    GroundPlane::Define(scene, "/World/Ground");
+    Sphere::Define(scene, "/World/Rock");
+    SetXform(scene, "/World/Rock", {.translate = glm::dvec3(0.0, 0.0, 1.0)});  // 1 m up
+    DistantLight::Define(scene, "/World/Sun");
+    scene.Set("/World/Sun", tokens::kTransform, DistantLightTransform({0.4, -0.6, 0.7}));
+    Camera::Define(scene, "/World/Camera");
+    scene.Set("/World/Camera", tokens::kTransform,
+              LookAtTransform({0.0, -8.0, 3.0}, {0.0, 0.0, 1.0}, {0.0, 0.0, 1.0}));
+    RenderSettings::Define(scene, "/Render/Settings")
+        .SetCamera("/World/Camera")
+        .SetResolution({640, 480});
 
     Renderer renderer;
     Tensor image = renderer.Render(scene);  // 480 x 640 x 4 bytes of LdrColor on the CPU

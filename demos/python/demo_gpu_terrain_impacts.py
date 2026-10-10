@@ -76,26 +76,23 @@ def impact(heights: wp.array2d(dtype=float), first: wp.vec2i, centre: wp.vec2, r
 
 def build_scene(heights):
     scene = ernie.Scene()
-    regolith = ernie.Path("/Looks/Regolith")
-    scene.define(regolith, tokens.MATERIAL).set(tokens.BRDF, "hapke").set(
-        tokens.ALBEDO, (0.25, 0.25, 0.25))
+    regolith = scene.define("/Looks/Regolith", ernie.Material, brdf="hapke",
+                            albedo=(0.25, 0.25, 0.25))
     extent = CELLS * CELL
-    terrain = ernie.Path("/World/Terrain")
-    scene.define(terrain, tokens.TERRAIN).set(tokens.ORIGIN, (-0.5 * extent, 0.5 * extent)).set(
-        tokens.CELL_SIZE, CELL).set(tokens.MATERIAL_BINDING, regolith)
-    scene.write(terrain, tokens.HEIGHTS, heights)
+    terrain = scene.define("/World/Terrain", ernie.Terrain, origin=(-0.5 * extent, 0.5 * extent),
+                           cell_size=CELL, material_binding=regolith)
+    # The relief kernel's Warp array as the heights.
+    terrain.write(tokens.HEIGHTS, heights)
     # A low sun, so the craters cast long shadows.
     altitude, azimuth = math.radians(12.0), math.radians(250.0)
     towards = (math.cos(altitude) * math.sin(azimuth), math.cos(altitude) * math.cos(azimuth),
                math.sin(altitude))
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
-        tokens.TRANSFORM, ernie.distant_light_transform(towards)).set(tokens.ANGLE, 0.53)
-    scene.define("/World/Camera", tokens.CAMERA).set(
-        tokens.TRANSFORM, ernie.look_at_transform((0.0, -150.0, 70.0), (0.0, 0.0, 0.0))).set(
-        tokens.FOCAL_LENGTH, 24.0)
-    scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")).set(tokens.AMBIENT, 0.02).set(
-        tokens.COLOR_MODE, tokens.HILLSHADE)
+    scene.define("/World/Sun", ernie.DistantLight, angle=0.53).set(
+        tokens.TRANSFORM, ernie.distant_light_transform(towards))
+    camera = scene.define("/World/Camera", ernie.Camera, focal_length=24.0).set(
+        tokens.TRANSFORM, ernie.look_at_transform((0.0, -150.0, 70.0), (0.0, 0.0, 0.0)))
+    scene.define("/Render/Settings", ernie.RenderSettings, camera=camera, ambient=0.02,
+                 color_mode=tokens.HILLSHADE)
     return scene
 
 

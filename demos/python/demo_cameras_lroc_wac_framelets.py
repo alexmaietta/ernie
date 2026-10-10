@@ -101,34 +101,28 @@ def build_scene(camera, band):
     radius = float(np.linalg.norm(centre))
 
     scene = ernie.Scene()
-    regolith = ernie.Path("/Looks/Regolith")
     # Hapke's model with its lunar defaults; single-scattering albedo about 0.25 for lunar soil.
-    scene.define(regolith, tokens.MATERIAL).set(tokens.BRDF, "hapke").set(
-        tokens.ALBEDO, (0.25, 0.25, 0.25))
-    scene.define("/World/Terrain", tokens.TERRAIN).write(
-        tokens.HEIGHTS, terrain_heights(radius)).set(
-        tokens.ORIGIN, (-0.5 * EXTENT, 0.5 * EXTENT)).set(tokens.CELL_SIZE, CELL).set(
-        tokens.MATERIAL_BINDING, regolith)
+    regolith = scene.define("/Looks/Regolith", ernie.Material, brdf="hapke",
+                            albedo=(0.25, 0.25, 0.25))
+    scene.define("/World/Terrain", ernie.Terrain, heights=terrain_heights(radius),
+                 origin=(-0.5 * EXTENT, 0.5 * EXTENT), cell_size=CELL, material_binding=regolith)
 
     # The sun where the ISD has it at the run's middle, as bright as at the Moon.
     sun = np.array(camera.sun_position(camera.image_time(middle))) - centre
     towards = frame[:3, :3] @ (sun / np.linalg.norm(sun))
     print(f"sun {math.degrees(math.asin(towards[2])):.1f} degrees above the horizon")
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
-        tokens.TRANSFORM, ernie.distant_light_transform(tuple(towards))).set(
-        tokens.PHOTOMETRIC_ILLUMINANCE, 128000.0).set(tokens.ANGLE, 0.53).set(
-        tokens.PHYSICAL_ILLUMINANT, tokens.BLACKBODY).set(tokens.COLOR_TEMPERATURE, 5772.0)
+    scene.define("/World/Sun", ernie.DistantLight, photometric_illuminance=128000.0, angle=0.53,
+                 physical_illuminant=tokens.BLACKBODY, color_temperature=5772.0).set(
+        tokens.TRANSFORM, ernie.distant_light_transform(tuple(towards)))
 
-    scene.define("/World/Camera", tokens.CAMERA)
-    scene.define("/Render/Vars/RawDN", tokens.RENDER_VAR).set(tokens.SOURCE_NAME, "RawDN")
-    scene.define("/Render/Wac", tokens.RENDER_PRODUCT).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")).set(
-        tokens.ORDERED_VARS, [ernie.Path("/Render/Vars/RawDN")])
+    wac_camera = scene.define("/World/Camera", ernie.Camera)
+    raw_dn = scene.define("/Render/Vars/RawDN", ernie.RenderVar, source_name="RawDN")
+    wac = scene.define("/Render/Wac", ernie.RenderProduct, camera=wac_camera).set(
+        tokens.ORDERED_VARS, [raw_dn.path])
     ernie.author_lroc_wac(scene, "/World/Camera", "/Render/Wac", band=band)
     # No sky to light the shadows: only the sun.
-    scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(tokens.AMBIENT, 0.0).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")).set(
-        tokens.PRODUCTS, [ernie.Path("/Render/Wac")])
+    scene.define("/Render/Settings", ernie.RenderSettings, ambient=0.0, camera=wac_camera).set(
+        tokens.PRODUCTS, [wac.path])
     return scene, frame
 
 

@@ -84,13 +84,6 @@ def load_maps(source, scratch):
     return maps
 
 
-def placed(x, y, z, sx=1.0, sy=1.0, sz=1.0):
-    m = np.eye(4)
-    m[:3, 3] = (x, y, z)
-    m[0, 0], m[1, 1], m[2, 2] = sx, sy, sz
-    return m
-
-
 def terrain_heights(displacement, tiles=32, per_tile=128):
     """Heights over `tiles` x `tiles` texture tiles (about 100 m, its far edge the horizon): the
     displacement map tiled (it is seamless) at `per_tile` samples a tile, on a few shallow
@@ -113,54 +106,48 @@ def terrain_heights(displacement, tiles=32, per_tile=128):
 
 def build_scene(maps):
     scene = ernie.Scene()
-    regolith = ernie.Path("/Looks/Regolith")
     # Hapke's model with Sato et al.'s lunar parameters (the BRDF's defaults): its albedo input
     # is the single-scattering albedo w, about 0.25 for lunar soil, which gives the regolith's
     # normal albedo of about 0.12; the scan's colour varies it about that mean.
-    scene.define(regolith, tokens.MATERIAL).set(tokens.BRDF, "hapke").set(
-        tokens.ALBEDO, (0.25, 0.25, 0.25)).write(tokens.DETAIL_ALBEDO, maps["Diffuse"]).write(
-        tokens.DETAIL_NORMAL, maps["nor_gl"]).set(tokens.DETAIL_TILE_SIZE, TILE).set(
-        tokens.DETAIL_NORMAL_STRENGTH, 1.0)
+    regolith = scene.define(
+        "/Looks/Regolith", ernie.Material, brdf="hapke", albedo=(0.25, 0.25, 0.25),
+        detail_albedo=maps["Diffuse"], detail_normal=maps["nor_gl"], detail_tile_size=TILE,
+        detail_normal_strength=1.0)
 
+    world = scene.define("/World", ernie.Xform)
     heights, cell, extent = terrain_heights(maps["Displacement"])
-    scene.define("/World/Terrain", tokens.TERRAIN).write(tokens.HEIGHTS, heights).set(
-        tokens.ORIGIN, (-0.5 * extent, 0.5 * extent)).set(tokens.CELL_SIZE, cell).set(
-        tokens.MATERIAL_BINDING, regolith)
+    world.define("Terrain", ernie.Terrain, heights=heights, origin=(-0.5 * extent, 0.5 * extent),
+                 cell_size=cell, material_binding=regolith)
+    boulders = world.define("Boulders", ernie.Xform)
     for k, (x, y, r) in enumerate([(2.2, 1.5, 0.45), (-1.0, 4.0, 0.7), (0.4, 0.2, 0.18),
                                    (3.5, 7.5, 1.1), (-2.4, 0.8, 0.25)]):
-        scene.define(f"/World/Boulders/B{k}", tokens.SPHERE).set(tokens.GEOM_RADIUS, 1.0).set(
-            tokens.TRANSFORM, placed(x, y, 0.35 * r, r, 0.8 * r, 0.6 * r)).set(
-            tokens.MATERIAL_BINDING, regolith)
+        boulders.define(f"B{k}", ernie.Sphere, radius=1.0, translate=(x, y, 0.35 * r),
+                        scale=(r, 0.8 * r, 0.6 * r), material_binding=regolith)
 
     # The Sun 15 degrees up in the west-south-west, as bright as above the atmosphere.
     altitude, azimuth = math.radians(15.0), math.radians(250.0)
     towards = (math.cos(altitude) * math.sin(azimuth), math.cos(altitude) * math.cos(azimuth),
                math.sin(altitude))
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
-        tokens.TRANSFORM, ernie.distant_light_transform(towards)).set(
-        tokens.PHOTOMETRIC_ILLUMINANCE, 128000.0).set(tokens.ANGLE, 0.53).set(
-        tokens.PHYSICAL_ILLUMINANT, tokens.BLACKBODY).set(tokens.COLOR_TEMPERATURE, 5772.0)
+    world.define("Sun", ernie.DistantLight, photometric_illuminance=128000.0, angle=0.53,
+                 physical_illuminant=tokens.BLACKBODY, color_temperature=5772.0).set(
+        tokens.TRANSFORM, ernie.distant_light_transform(towards))
     stars = ernie.synthetic_stars(9000, seed=11)
-    scene.define("/World/Stars", tokens.STAR_FIELD).write(
-        tokens.STARS_RIGHT_ASCENSION, np.array(stars["right_ascension"], np.float32)).write(
-        tokens.STARS_DECLINATION, np.array(stars["declination"], np.float32)).write(
-        tokens.STARS_MAGNITUDE, np.array(stars["magnitude"], np.float32)).write(
-        tokens.STARS_COLOR_INDEX, np.array(stars["color_index"], np.float32))
+    world.define("Stars", ernie.StarField,
+                 right_ascension=np.array(stars["right_ascension"], np.float32),
+                 declination=np.array(stars["declination"], np.float32),
+                 magnitude=np.array(stars["magnitude"], np.float32),
+                 color_index=np.array(stars["color_index"], np.float32))
 
-    scene.define("/World/Camera", tokens.CAMERA).set(
-        tokens.TRANSFORM, ernie.look_at_transform((0.5, -7.0, 1.7), (0.0, 6.0, 0.6))).set(
-        tokens.FOCAL_LENGTH, 20.0).set(tokens.SENSOR_NOISE, False)
-    scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")).set(tokens.RESOLUTION, SIZE).set(
-        tokens.SHADOW_FIT, tokens.VISIBLE).set(tokens.AMBIENT, 0.0).set(
-        tokens.COLOR_MODE, tokens.HILLSHADE)  # the material's own colour, not elevation's
-    return scene
+    camera = world.define("Camera", ernie.Camera, focal_length=20.0, sensor_noise=False).set(
+        tokens.TRANSFORM, ernie.look_at_transform((0.5, -7.0, 1.7), (0.0, 6.0, 0.6)))
+    scene.define("/Render/Settings", ernie.RenderSettings, camera=camera, resolution=SIZE,
+                 shadow_fit=tokens.VISIBLE, ambient=0.0,
+                 color_mode=tokens.HILLSHADE)  # the material's own colour, not elevation's
+    return scene, camera
 
 
-def expose(scene, iso, seconds, fstop):
-    scene.set("/World/Camera", tokens.EXPOSURE_ISO, iso)
-    scene.set("/World/Camera", tokens.EXPOSURE_TIME, seconds)
-    scene.set("/World/Camera", tokens.EXPOSURE_FSTOP, fstop)
+def expose(camera, iso, seconds, fstop):
+    camera.set(exposure_iso=iso, exposure_time=seconds, exposure_f_stop=fstop)
 
 
 def main():
@@ -172,15 +159,15 @@ def main():
     args = parser.parse_args()
     with tempfile.TemporaryDirectory() as scratch:
         maps = load_maps(os.path.expanduser(args.textures), scratch)
-    scene = build_scene(maps)
+    scene, camera = build_scene(maps)
     renderer = ernie.Renderer()
-    expose(scene, 100.0, 1.0 / 250.0, 5.6)
+    expose(camera, 100.0, 1.0 / 250.0, 5.6)
     day = np.array(renderer.render(scene))[..., :3]
     if not args.output:
         from ernie.app import Viewer
         Viewer(scene).run()
         return
-    expose(scene, 1600.0, 15.0, 2.8)
+    expose(camera, 1600.0, 15.0, 2.8)
     night = np.array(renderer.render(scene))[..., :3]
     write_png(args.output, side_by_side([day, night]))
 

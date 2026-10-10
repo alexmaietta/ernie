@@ -16,14 +16,13 @@ class Demo(ernie.demo.Demo):
 
     def __init__(self, viewer, args):
         super().__init__(viewer, args)
-        scene = self.scene
-        scene.define("/World/Ground", tokens.GROUND_PLANE)
+        world = self.scene.define("/World", ernie.Xform)
+        world.define("Ground", ernie.GroundPlane)
         for i in range(5):
-            scene.define(f"/World/Box{i}", tokens.CUBE).set(tokens.SIZE, 1.0 + 0.25 * i).set(
-                tokens.TRANSFORM,
-                [[1, 0, 0, 3.0 * (i - 2)], [0, 1, 0, 0], [0, 0, 1, 1], [0, 0, 0, 1]],
-            ).set(tokens.DISPLAY_COLOR, (0.2 + 0.15 * i, 0.4, 0.8 - 0.15 * i))
-        scene.define("/World/Sun", tokens.DISTANT_LIGHT)
+            world.define(f"Box{i}", ernie.Cube, size=1.0 + 0.25 * i,
+                         translate=(3.0 * (i - 2), 0, 1),
+                         display_color=(0.2 + 0.15 * i, 0.4, 0.8 - 0.15 * i))
+        self.sun = world.define("Sun", ernie.DistantLight)
         self.elevation = 45.0
         self.azimuth = 30.0
         self.aim_sun()
@@ -41,7 +40,7 @@ class Demo(ernie.demo.Demo):
         self.azimuth = self.azimuth if azimuth is None else azimuth
         e, a = math.radians(self.elevation), math.radians(self.azimuth)
         direction = (math.cos(e) * math.cos(a), math.cos(e) * math.sin(a), math.sin(e))
-        self.scene.set("/World/Sun", tokens.TRANSFORM, ernie.distant_light_transform(direction))
+        self.sun.set(tokens.TRANSFORM, ernie.distant_light_transform(direction))
 
     def test_final(self):
         image = self.render_image()[..., :3]

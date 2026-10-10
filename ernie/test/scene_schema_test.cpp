@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include "ernie/scene/base_schemas.h"
+#include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/orbit_controller.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
@@ -145,23 +147,21 @@ TEST(Schema, CamerasAuthoredFromAnOrbitControllerReadBackTheSameView) {
 
 TEST(Schema, CameraOfUsesUsdDefaultsAndRejectsBadCameras) {
     Scene scene;
-    scene.Define("/Camera", tokens::kCamera);
+    ernie::Camera camera = ernie::Camera::Define(scene, "/Camera");
     const ernie::CameraView view = ernie::CameraParamsOf(scene, "/Camera", 8, 8).RasterView();
     EXPECT_NEAR(view.verticalFov, 2.0 * std::atan(15.2908 / 100.0), 1e-6);
     EXPECT_FLOAT_EQ(view.nearPlane, 1.0f);
     EXPECT_FLOAT_EQ(view.farPlane, 1e6f);
     EXPECT_EQ(view.forward, glm::vec3(0.0f, 0.0f, -1.0f));
 
-    scene.Define("/Xform", tokens::kXform);
+    ernie::Xform::Define(scene, "/Xform");
     EXPECT_THROW(ernie::CameraParamsOf(scene, "/Xform", 8, 8), std::invalid_argument);
     EXPECT_THROW(ernie::CameraParamsOf(scene, "/Missing", 8, 8), std::invalid_argument);
-    scene.Set("/Camera", tokens::kFocalLength, 0.0f);
+    camera.SetFocalLength(0.0);
     EXPECT_THROW(ernie::CameraParamsOf(scene, "/Camera", 8, 8), std::invalid_argument);
-    scene.Set("/Camera", tokens::kFocalLength, 35.0);
-    scene.Set("/Camera", tokens::kClippingRange, glm::vec2(5.0f, 1.0f));
+    camera.SetFocalLength(35.0).SetClippingRange({5.0, 1.0});
     EXPECT_THROW(ernie::CameraParamsOf(scene, "/Camera", 8, 8), std::invalid_argument);
-    scene.Set("/Camera", tokens::kClippingRange, glm::vec2(1.0f, 5.0f));
-    scene.Set("/Camera", tokens::kProjection, std::string("panoramic"));
+    camera.SetClippingRange({1.0, 5.0}).SetProjection("panoramic");
     EXPECT_THROW(ernie::CameraParamsOf(scene, "/Camera", 8, 8), std::invalid_argument);
 }
 

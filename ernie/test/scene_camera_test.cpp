@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include "ernie/scene/base_schemas.h"
 #include "ernie/scene/camera.h"
+#include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 
@@ -116,9 +118,9 @@ TEST(Camera, SingletChromaticAberrationFollowsItsGlass) {
     // Read from the prim's attributes, and checked; two pairs also read as the vec4 a
     // four-number Python list becomes.
     ernie::Scene scene;
-    scene.Define("/Camera", ernie::tokens::kCamera)
-        .Set(ernie::tokens::kLensChromaticScale, std::vector<float>{400.0f, 0.99f, 700.0f, 1.01f})
-        .Set(ernie::tokens::kLensChromaticFocus, glm::vec4(400.0f, -0.2f, 700.0f, 0.3f));
+    ernie::Camera::Define(scene, "/Camera").SetLensChromaticScale({400.0f, 0.99f, 700.0f, 1.01f});
+    scene.Set("/Camera", ernie::tokens::kLensChromaticFocus,
+              glm::vec4(400.0f, -0.2f, 700.0f, 0.3f));
     CameraParams camera = ernie::CameraParamsOf(scene, "/Camera", 64, 48);
     EXPECT_NEAR(camera.lens.chromaticScale(550.0), 1.0, 1e-6);
     EXPECT_NEAR(camera.lens.chromaticFocusMm(700.0), 0.3, 1e-6);
@@ -215,25 +217,24 @@ TEST(Camera, SensorPresetsAndGain) {
 
 TEST(Camera, ReadsUsdAndErnieAttributes) {
     Scene scene;
-    scene.Define("/Camera", tokens::kCamera)
-        .Set(tokens::kFocalLength, 35.0f)
-        .Set(tokens::kVerticalAperture, 10.0f)
-        .Set(tokens::kVerticalApertureOffset, 0.5)
-        .Set(tokens::kClippingRange, glm::vec2(0.5f, 500.0f))
-        .Set(tokens::kCameraExposure, -1.0)
-        .Set(tokens::kExposureTime, 0.004)
-        .Set(tokens::kExposureIso, 400.0)
-        .Set(tokens::kExposureFStop, 5.6)
-        .Set(tokens::kSpectralRange, glm::dvec2(400.0, 1000.0))
-        .Set(tokens::kSpectralBands, 24)
-        .Set(tokens::kLensDistortion, std::vector<float>{-0.1f, 0.01f})
-        .Set(tokens::kLensVignetting, false)
-        .Set(tokens::kSensorType, "mono")
-        .Set(std::string(tokens::kSensorQePrefix) + "mono",
-             std::vector<float>{400, 0.3f, 900, 0.3f})
-        .Set(tokens::kSensorAdcBits, 14)
-        .Set(tokens::kSensorNoise, false)
-        .Set(tokens::kSensorSeed, 7);
+    ernie::Camera authored = ernie::Camera::Define(scene, "/Camera")
+                                 .SetFocalLength(35.0)
+                                 .SetVerticalAperture(10.0)
+                                 .SetVerticalApertureOffset(0.5)
+                                 .SetClippingRange({0.5, 500.0})
+                                 .SetExposure(-1.0)
+                                 .SetExposureTime(0.004)
+                                 .SetExposureIso(400.0)
+                                 .SetExposureFStop(5.6)
+                                 .SetSpectralRange({400.0, 1000.0})
+                                 .SetSpectralBands(24)
+                                 .SetLensDistortion({-0.1f, 0.01f})
+                                 .SetLensVignetting(false)
+                                 .SetSensorType("mono")
+                                 .SetSensorQeMono({400, 0.3f, 900, 0.3f})
+                                 .SetSensorAdcBits(14)
+                                 .SetSensorNoise(false)
+                                 .SetSensorSeed(7);
     const CameraParams camera = ernie::CameraParamsOf(scene, "/Camera", 64, 48);
     EXPECT_EQ(camera.width, 64u);
     EXPECT_DOUBLE_EQ(camera.focalLengthMm, 35.0);
@@ -255,42 +256,39 @@ TEST(Camera, ReadsUsdAndErnieAttributes) {
     EXPECT_FALSE(camera.orthographic);
     EXPECT_EQ(camera.lens.projection, ernie::LensProjection::Perspective);
 
-    scene.Set("/Camera", tokens::kLensDistortion, std::vector<float>{});
-    scene.Set("/Camera", tokens::kLensProjection, std::string(tokens::kFisheye));
-    scene.Set("/Camera", tokens::kLensFisheye, std::vector<float>{-0.01f, 0.002f});
+    authored.SetLensDistortion({})
+        .SetLensProjection(tokens::kFisheye)
+        .SetLensFisheye({-0.01f, 0.002f});
     const CameraParams fisheye = ernie::CameraParamsOf(scene, "/Camera", 64, 48);
     EXPECT_EQ(fisheye.lens.projection, ernie::LensProjection::Fisheye);
     EXPECT_DOUBLE_EQ(fisheye.lens.fisheye[1], 0.002f);
     EXPECT_DOUBLE_EQ(fisheye.lens.fisheye[3], 0.0);
-    scene.Set("/Camera", tokens::kLensProjection, std::string("panoramic"));
+    authored.SetLensProjection("panoramic");
     EXPECT_THROW(ernie::CameraParamsOf(scene, "/Camera", 64, 48), std::invalid_argument);
-    scene.Set("/Camera", tokens::kLensProjection, std::string(tokens::kPerspective));
+    authored.SetLensProjection(tokens::kPerspective);
 
-    scene.Set("/Camera", tokens::kProjection, std::string(tokens::kOrthographic));
-    scene.Set("/Camera", tokens::kSensorPixelPitch, 3.45);
+    authored.SetProjection(tokens::kOrthographic).SetSensorPixelPitch(3.45);
     const CameraParams orthographic = ernie::CameraParamsOf(scene, "/Camera", 64, 48);
     EXPECT_TRUE(orthographic.orthographic);
     EXPECT_DOUBLE_EQ(orthographic.orthographicPixelPitchUm, 3.45);
     EXPECT_DOUBLE_EQ(orthographic.OrthographicPixelSize(),
                      0.1 * orthographic.verticalApertureMm / 48.0)
         << "apertures in tenths of a scene unit, as UsdGeomCamera";
-    scene.Set("/Camera", tokens::kProjection, std::string(tokens::kPerspective));
+    authored.SetProjection(tokens::kPerspective);
 
-    scene.Set("/Camera", tokens::kCameraScan, std::string(tokens::kPushbroom));
-    scene.Set("/Camera", tokens::kPushbroomLineOffset, 1.5);
+    authored.SetScan(tokens::kPushbroom).SetPushbroomLineOffset(1.5);
     const CameraParams pushbroom = ernie::CameraParamsOf(scene, "/Camera", 64, 48);
     EXPECT_TRUE(pushbroom.pushbroom);
     EXPECT_DOUBLE_EQ(pushbroom.lineOffsetMm, 1.5);
-    scene.Set("/Camera", tokens::kCameraScan, std::string("whiskbroom"));
+    authored.SetScan("whiskbroom");
     EXPECT_THROW(ernie::CameraParamsOf(scene, "/Camera", 64, 48), std::invalid_argument);
-    scene.Set("/Camera", tokens::kCameraScan, std::string(tokens::kFrameScan));
+    authored.SetScan(tokens::kFrameScan);
 
-    scene.Set("/Camera", tokens::kSensorType, "infrared");
+    authored.SetSensorType("infrared");
     EXPECT_THROW(ernie::CameraParamsOf(scene, "/Camera", 64, 48), std::invalid_argument);
-    scene.Set("/Camera", tokens::kSensorType, "rgb");
-    scene.Set("/Camera", tokens::kExposureTime, 0.0);
+    authored.SetSensorType("rgb").SetExposureTime(0.0);
     EXPECT_THROW(ernie::CameraParamsOf(scene, "/Camera", 64, 48), std::invalid_argument);
-    scene.Define("/NotACamera", tokens::kXform);
+    ernie::Xform::Define(scene, "/NotACamera");
     EXPECT_THROW(ernie::CameraParamsOf(scene, "/NotACamera", 64, 48), std::invalid_argument);
 }
 
@@ -356,6 +354,6 @@ TEST(Camera, SetCameraAndCameraParamsOfRoundTrip) {
     EXPECT_DOUBLE_EQ(ernie::GetNumber(scene, "/Camera", tokens::kHorizontalAperture, 0.0), 24.0)
         << "the horizontal aperture follows the aspect";
 
-    scene.Set("/Camera", tokens::kProjection, tokens::kOrthographic);
+    ernie::Camera(scene, "/Camera").SetProjection(tokens::kOrthographic);
     EXPECT_TRUE(ernie::CameraParamsOf(scene, "/Camera", 40, 20).orthographic);
 }

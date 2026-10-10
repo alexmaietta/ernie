@@ -11,8 +11,8 @@ def noiseless(scene):
     """The terrain scene without sensor noise or sun shadows, so a batch's views render as single
     views of the same poses do (a batch fits its sun shadows to the scene, a single view to its
     frustum)."""
-    scene.set("/World/Camera", tokens.SENSOR_NOISE, False)
-    scene.set("/World/Sun", tokens.SHADOW_ENABLE, False)
+    ernie.Camera(scene.get_prim("/World/Camera")).sensor_noise = False
+    ernie.DistantLight(scene.get_prim("/World/Sun")).shadow_enable = False
     return scene
 
 
@@ -44,14 +44,16 @@ def test_views_render_as_single_cameras_at_their_poses(renderer, terrain_scene):
     assert distance.shape == (3, 48, 48) and distance.dtype == np.float32
 
     # The same camera without poses, rendered alone at each view's pose.
-    scene.define("/World/Single", tokens.CAMERA).set(tokens.FOCAL_LENGTH, 18.0).set(
-        tokens.SENSOR_NOISE, False
+    single = scene.define("/World/Single", ernie.Camera, focal_length=18.0, sensor_noise=False)
+    scene.define(
+        "/Render/Single",
+        ernie.RenderSettings,
+        camera=single,
+        resolution=(48, 48),
+        clear_color=(0.0, 0.0, 1.0),
     )
-    scene.define("/Render/Single", tokens.RENDER_SETTINGS).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Single")
-    ).set(tokens.RESOLUTION, (48, 48)).set(tokens.CLEAR_COLOR, (0.0, 0.0, 1.0))
     for view in range(3):
-        scene.set("/World/Single", tokens.TRANSFORM, poses[view].astype(np.float64))
+        single.set(tokens.TRANSFORM, poses[view].astype(np.float64))
         expected = np.array(renderer.render(scene, ernie.Path("/Render/Single")))
         np.testing.assert_array_equal(colour[view], expected, err_msg=f"view {view}")
     assert renderer.take_validation_messages() == []
@@ -63,13 +65,11 @@ def test_each_view_sees_its_world(renderer, terrain_scene, on_gpu):
         pytest.skip("No CUDA interop on this machine")
     worlds = renderer.cuda_upload if on_gpu else (lambda array: array)
     scene = noiseless(terrain_scene)
-    scene.define("/Envs/Env0", tokens.XFORM).set(tokens.WORLD, 0)
-    scene.define("/Envs/Env0/Box", tokens.CUBE).set(tokens.SIZE, 40.0).set(
-        tokens.DISPLAY_COLOR, (1.0, 0.0, 0.0)
-    )
+    env = scene.define("/Envs/Env0", ernie.Xform, world=0)
+    env.define("Box", ernie.Cube, size=40.0, display_color=(1.0, 0.0, 0.0))
     scene.clone("/Envs/Env0", "/Envs/Env1")
-    scene.set("/Envs/Env1", tokens.WORLD, 1)
-    scene.set("/Envs/Env1/Box", tokens.DISPLAY_COLOR, (0.0, 1.0, 0.0))
+    ernie.Xform(scene.get_prim("/Envs/Env1")).world = 1
+    ernie.Cube(scene.get_prim("/Envs/Env1/Box")).display_color = (0.0, 1.0, 0.0)
     pose = np.array(scene.get("/World/Camera", tokens.TRANSFORM), np.float32)
     camera = BatchCamera(renderer, scene, "/World/Camera", 2, resolution=(48, 48))
     for order in ([0, 1], [1, 0]):  # written again, the views see the new worlds

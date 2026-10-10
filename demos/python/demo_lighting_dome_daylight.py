@@ -30,13 +30,6 @@ from demo_support import write_png
 SIZE = (900, 520)
 
 
-def placed(x, y, z, sx=1.0, sy=1.0, sz=1.0):
-    m = np.eye(4)
-    m[:3, 3] = (x, y, z)
-    m[0, 0], m[1, 1], m[2, 2] = sx, sy, sz
-    return m
-
-
 def sky_map(rows=64, cols=128, sun=(-0.45, -0.55, 0.7)):
     """A latitude-longitude sky (rows from +z down to -z): blue sky above, brightening towards
     the horizon, a bright sun region around `sun`, and dim ground light below. The dome's
@@ -54,60 +47,50 @@ def sky_map(rows=64, cols=128, sun=(-0.45, -0.55, 0.7)):
     return (sky + 60.0 * glow * np.array([1.0, 0.95, 0.85])).astype(np.float32)
 
 
-def material(scene, name, albedo):
-    path = ernie.Path(f"/Looks/{name}")
-    scene.define(path, tokens.MATERIAL).set(tokens.ALBEDO, albedo)
-    return path
-
-
 def build_scene():
     scene = ernie.Scene()
-    grass = material(scene, "DryGrass", (0.22, 0.16, 0.09))
-    white = material(scene, "Render", (0.8, 0.8, 0.78))
-    wood = material(scene, "Deck", (0.32, 0.18, 0.1))
-    water = material(scene, "Water", (0.15, 0.55, 0.6))
-    paving = material(scene, "Paving", (0.55, 0.53, 0.5))
-    leaves = material(scene, "Leaves", (0.08, 0.2, 0.06))
-    autumn = material(scene, "Autumn", (0.35, 0.2, 0.05))
-    bark = material(scene, "Bark", (0.15, 0.1, 0.07))
+    looks = scene.define("/Looks", ernie.Scope)
 
-    scene.define("/World/Ground", tokens.GROUND_PLANE).set(tokens.MATERIAL_BINDING, grass)
+    def material(name, albedo):
+        return looks.define(name, ernie.Material, albedo=albedo)
 
-    def cube(path, transform, look):
-        scene.define(path, tokens.CUBE).set(tokens.SIZE, 1.0).set(
-            tokens.TRANSFORM, transform
-        ).set(tokens.MATERIAL_BINDING, look)
+    grass = material("DryGrass", (0.22, 0.16, 0.09))
+    white = material("Render", (0.8, 0.8, 0.78))
+    wood = material("Deck", (0.32, 0.18, 0.1))
+    water = material("Water", (0.15, 0.55, 0.6))
+    paving = material("Paving", (0.55, 0.53, 0.5))
+    leaves = material("Leaves", (0.08, 0.2, 0.06))
+    autumn = material("Autumn", (0.35, 0.2, 0.05))
+    bark = material("Bark", (0.15, 0.1, 0.07))
+
+    world = scene.define("/World", ernie.Xform)
+    world.define("Ground", ernie.GroundPlane, material_binding=grass)
+
+    def cube(path, centre, size, look):
+        world.define(path, ernie.Cube, size=1.0, translate=centre, scale=size,
+                     material_binding=look)
 
     # The house: two stacked white blocks with a terrace, beside a deck, a pool and a patio.
-    cube("/World/House/Ground", placed(0.0, 4.0, 1.6, 10.0, 7.0, 3.2), white)
-    cube("/World/House/Upper", placed(1.5, 5.0, 4.6, 7.0, 5.0, 2.8), white)
-    cube("/World/Deck", placed(0.0, -4.5, 0.1, 12.0, 10.0, 0.2), wood)
-    cube("/World/Pool", placed(0.5, -4.0, 0.21, 5.0, 7.0, 0.02), water)
-    cube("/World/Patio", placed(-4.5, -8.0, 0.21, 4.0, 4.0, 0.02), paving)
+    cube("House/Ground", (0.0, 4.0, 1.6), (10.0, 7.0, 3.2), white)
+    cube("House/Upper", (1.5, 5.0, 4.6), (7.0, 5.0, 2.8), white)
+    cube("Deck", (0.0, -4.5, 0.1), (12.0, 10.0, 0.2), wood)
+    cube("Pool", (0.5, -4.0, 0.21), (5.0, 7.0, 0.02), water)
+    cube("Patio", (-4.5, -8.0, 0.21), (4.0, 4.0, 0.02), paving)
     for k, (x, y) in enumerate([(-6.5, 3.0), (6.8, 1.0), (8.0, -6.0), (-8.0, -3.5), (-3.0, 10.0),
                                 (7.0, 9.0), (-9.0, 8.0), (10.0, 3.5), (-10.5, -9.0), (3.0, -12.0)]):
-        scene.define(f"/World/Trees/T{k}/Trunk", tokens.CYLINDER).set(tokens.GEOM_RADIUS, 0.15).set(
-            tokens.GEOM_HEIGHT, 2.0
-        ).set(tokens.TRANSFORM, placed(x, y, 1.0)).set(tokens.MATERIAL_BINDING, bark)
-        scene.define(f"/World/Trees/T{k}/Crown", tokens.SPHERE).set(
-            tokens.GEOM_RADIUS, 1.4 + 0.3 * (k % 3)
-        ).set(tokens.TRANSFORM, placed(x, y, 3.0)).set(
-            tokens.MATERIAL_BINDING, autumn if k % 4 == 1 else leaves
-        )
+        tree = world.define(f"Trees/T{k}", ernie.Xform)
+        tree.define("Trunk", ernie.Cylinder, radius=0.15, height=2.0, translate=(x, y, 1.0),
+                    material_binding=bark)
+        tree.define("Crown", ernie.Sphere, radius=1.4 + 0.3 * (k % 3), translate=(x, y, 3.0),
+                    material_binding=autumn if k % 4 == 1 else leaves)
 
     # 100,000 lux on the ground: bright daylight, from a sky with the sun in it.
-    scene.define("/World/Sky", tokens.DOME_LIGHT).set(
-        tokens.PHOTOMETRIC_ILLUMINANCE, 100000.0
-    ).write(tokens.LIGHT_TEXTURE, sky_map())
+    world.define("Sky", ernie.DomeLight, photometric_illuminance=100000.0, texture=sky_map())
     # Sunny 16: ISO 100, 1/100 s, f/16.
-    scene.define("/World/Camera", tokens.CAMERA).set(
-        tokens.TRANSFORM, ernie.look_at_transform((-16.0, -24.0, 20.0), (1.0, -1.0, 1.0))
-    ).set(tokens.FOCAL_LENGTH, 24.0).set(tokens.EXPOSURE_ISO, 100.0).set(
-        tokens.EXPOSURE_TIME, 0.01
-    ).set(tokens.EXPOSURE_FSTOP, 16.0).set(tokens.SENSOR_NOISE, False)
-    scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")
-    ).set(tokens.RESOLUTION, SIZE)
+    camera = world.define("Camera", ernie.Camera, focal_length=24.0, exposure_iso=100.0,
+                          exposure_time=0.01, exposure_f_stop=16.0, sensor_noise=False).set(
+        tokens.TRANSFORM, ernie.look_at_transform((-16.0, -24.0, 20.0), (1.0, -1.0, 1.0)))
+    scene.define("/Render/Settings", ernie.RenderSettings, camera=camera, resolution=SIZE)
     return scene
 
 

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/compute_interop.h"
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/geometry_schemas.h"
+#include "ernie/scene/light_schemas.h"
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/session/frame_params.h"
@@ -31,17 +35,17 @@ namespace {
 /// MeshScene without noise, rendering HdrColor and LdrColor through /Render/Out.
 Scene MotionScene() {
     Scene scene = MeshScene();
-    scene.Set("/World/Camera", tokens::kSensorNoise, false);
+    ernie::Camera(scene, "/World/Camera").SetSensorNoise(false);
     std::vector<Path> vars;
     for (const std::string_view name : {"HdrColor", "LdrColor"}) {
         const Path var("/Render/Vars/" + std::string(name));
-        scene.Define(var, tokens::kRenderVar).Set(tokens::kSourceName, std::string(name));
+        ernie::RenderVar::Define(scene, var).SetSourceName(name);
         vars.push_back(var);
     }
-    scene.Define("/Render/Out", tokens::kRenderProduct)
-        .Set(tokens::kCameraRel, Path("/World/Camera"))
-        .Set(tokens::kResolution, glm::ivec2(kSize, kSize))
-        .Set(tokens::kOrderedVars, vars);
+    ernie::RenderProduct::Define(scene, "/Render/Out")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(kSize, kSize));
+    scene.Set("/Render/Out", tokens::kOrderedVars, vars);
     return scene;
 }
 
@@ -71,10 +75,11 @@ float RelativeError(const std::vector<float>& a, const std::vector<float>& b) {
 }
 
 void SetShutter(Scene& scene, double open, double close, int samples, double rolling = 0.0) {
-    scene.Set("/World/Camera", tokens::kShutterOpen, open);
-    scene.Set("/World/Camera", tokens::kShutterClose, close);
-    scene.Set("/World/Camera", tokens::kShutterSamples, samples);
-    scene.Set("/World/Camera", tokens::kShutterRolling, rolling);
+    ernie::Camera(scene, "/World/Camera")
+        .SetShutterOpen(open)
+        .SetShutterClose(close)
+        .SetShutterSamples(samples)
+        .SetShutterRolling(rolling);
 }
 
 glm::dmat4 CameraAt(double x) {
@@ -130,14 +135,15 @@ TEST_F(RasterDelegateTest, InstancesAndDeformingPointsBlurFromHostAndCudaArrays)
         const std::array<float, 9> positions{12, -10, 0, static_cast<float>(12.0 - 6.0 * s),
                                              0,  0,   12, 10, 0};
         const Tensor host = Tensor::Copy<float>(positions, {3, 3});
-        scene.Write("/World/Rocks", tokens::kPositions, device ? cuda->Upload(host) : host);
+        ernie::PointInstancer(scene, "/World/Rocks")
+            .SetPositions(device ? cuda->Upload(host) : host);
     };
     // The quad: its points stretched up to twice as wide.
     const auto quad = [&](double s, bool device) {
         const auto w = static_cast<float>(2.0 * (1.0 + s));
         const std::array<float, 12> points{-w, -2, 0, w, -2, 0, w, 2, 0, -w, 2, 0};
         const Tensor host = Tensor::Copy<float>(points, {4, 3});
-        scene.Write("/World/Quad", tokens::kPoints, device ? cuda->Upload(host) : host);
+        ernie::Mesh(scene, "/World/Quad").SetPoints(device ? cuda->Upload(host) : host);
     };
     {
         SCOPED_TRACE("instances on the host");
@@ -196,7 +202,7 @@ TEST_F(RasterDelegateTest, MotionVectorsFollowTheCameraAndWhatMoves) {
     RasterDelegate delegate(*context_);
     Scene scene = MotionScene();
     const Path var("/Render/Vars/MotionVector");
-    scene.Define(var, tokens::kRenderVar).Set(tokens::kSourceName, std::string("MotionVector"));
+    ernie::RenderVar::Define(scene, var).SetSourceName("MotionVector");
     scene.Set("/Render/Out", tokens::kOrderedVars,
               std::vector<Path>{"/Render/Vars/HdrColor", var});
     const double focal =
@@ -227,7 +233,8 @@ TEST_F(RasterDelegateTest, MotionVectorsFollowTheCameraAndWhatMoves) {
     // Still again, the middle rock slides 2 m along -y (down the image): only it moves.
     Step(delegate, scene, "MotionVector");
     const std::array<float, 9> positions{12, -10, 0, 12, -2, 0, 12, 10, 0};
-    scene.Write("/World/Rocks", tokens::kPositions, Tensor::Copy<float>(positions, {3, 3}));
+    ernie::PointInstancer(scene, "/World/Rocks")
+        .SetPositions(Tensor::Copy<float>(positions, {3, 3}));
     const std::vector<float> slid = Step(delegate, scene, "MotionVector");
     const auto rockX = static_cast<std::size_t>(centre + 11.0 * focal / 60.0);
     const auto rockY = static_cast<std::size_t>(centre + 2.0 * focal / 60.0);
@@ -241,9 +248,9 @@ TEST_F(RasterDelegateTest, MovingCastersShadowEachSubframeFromWhereTheyAre) {
     RasterDelegate delegate(*context_);
     Scene scene = MotionScene();
     // A ground the raised quad shadows under a low sun, the quad sliding across it.
-    scene.Define("/World/Ground", tokens::kGroundPlane).Set(tokens::kGroundHeight, -6.0);
+    ernie::GroundPlane::Define(scene, "/World/Ground").SetHeight(-6.0);
     scene.Set("/World/Sun", tokens::kTransform, ernie::DistantLightTransform({0.6, 0.2, 0.8}));
-    scene.Set("/World/Sun", tokens::kShadowEnable, true);
+    ernie::DistantLight(scene, "/World/Sun").SetShadowEnable(true);
     scene.Remove("/World/Rocks");
     ExpectMotionBlur(
         delegate, scene,
@@ -360,7 +367,7 @@ TEST_F(RasterDelegateTest, RollingShutterExposesEachRowAtItsOwnTime) {
 TEST_F(RasterDelegateTest, MotionBlurBlendsTheClearColourByCoverage) {
     RasterDelegate delegate(*context_);
     Scene scene = MotionScene();
-    scene.Set("/Render/Settings", tokens::kClearColor, glm::vec3(0.0f, 0.0f, 1.0f));
+    ernie::RenderSettings(scene, "/Render/Settings").SetClearColor(glm::dvec3(0.0, 0.0, 1.0));
     SetShutter(scene, -1.0, 0.0, 6);
     scene.Set("/World/Camera", tokens::kTransform, CameraAt(0.0));
     Step(delegate, scene, "LdrColor");

@@ -24,25 +24,25 @@ def test_astronomy_helpers():
 
 def test_stars_and_the_dome_show_behind_the_scene(renderer):
     scene = ernie.Scene()
-    scene.define("/World/Camera", tokens.CAMERA).set(
-        tokens.TRANSFORM, ernie.look_at_transform((0.0, 0.0, 0.0), (1.0, 0.0, 0.0))
-    ).set(tokens.SENSOR_NOISE, False).set(tokens.EXPOSURE_TIME, 1e6)
-    scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")
-    ).set(tokens.RESOLUTION, (32, 32))
+    camera = scene.define(
+        "/World/Camera", ernie.Camera, sensor_noise=False, exposure_time=1e6
+    ).set(tokens.TRANSFORM, ernie.look_at_transform((0.0, 0.0, 0.0), (1.0, 0.0, 0.0)))
+    scene.define("/Render/Settings", ernie.RenderSettings, camera=camera, resolution=(32, 32))
     # One bright star straight ahead: right ascension 0 on the equator is +x.
-    scene.define("/World/Stars", tokens.STAR_FIELD).write(
-        tokens.STARS_RIGHT_ASCENSION, np.array([0.0], np.float32)
-    ).write(tokens.STARS_DECLINATION, np.array([0.0], np.float32)).write(
-        tokens.STARS_MAGNITUDE, np.array([0.0], np.float32)
+    scene.define(
+        "/World/Stars",
+        ernie.StarField,
+        right_ascension=np.array([0.0], np.float32),
+        declination=np.array([0.0], np.float32),
+        magnitude=np.array([0.0], np.float32),
     )
     image = np.asarray(renderer.render(scene))
     assert image[15:17, 15:17, :3].max() > 200, "the star at the centre"
     assert image[2, 2, :3].max() < 60, "dark sky elsewhere"
 
-    scene.define("/World/Sky", tokens.DOME_LIGHT).set(tokens.INTENSITY, 1e-6)
+    sky = scene.define("/World/Sky", ernie.DomeLight, intensity=1e-6)
     lit = np.asarray(renderer.render(scene))
     assert lit[2, 2, :3].min() > image[2, 2, :3].max(), "the dome fills the background"
-    scene.set("/World/Sky", tokens.VISIBLE_IN_PRIMARY_RAY, False)
+    sky.visible_in_primary_ray = False
     assert np.asarray(renderer.render(scene))[2, 2, :3].max() == image[2, 2, :3].max()
     assert renderer.take_validation_messages() == []

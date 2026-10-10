@@ -62,31 +62,25 @@ def flag_triangles():
 
 def build_scene(points, colors):
     scene = ernie.Scene()
-    scene.define("/World/Ground", tokens.GROUND_PLANE).set(tokens.CHECKER, True).set(
-        tokens.CHECKER_SIZE, 1.0)
-    scene.define("/World/Pole", tokens.CYLINDER).set(tokens.GEOM_RADIUS, 0.05).set(
-        tokens.GEOM_HEIGHT, FOOT + HEIGHT + 0.2).set(
-        tokens.TRANSFORM, [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0.5 * (FOOT + HEIGHT + 0.2)],
-                           [0, 0, 0, 1]]).set(
-        tokens.DISPLAY_COLOR, (0.7, 0.7, 0.7))
+    world = scene.define("/World", ernie.Xform)
+    world.define("Ground", ernie.GroundPlane, checker=True, checker_size=1.0)
+    world.define("Pole", ernie.Cylinder, radius=0.05, height=FOOT + HEIGHT + 0.2,
+                 translate=(0.0, 0.0, 0.5 * (FOOT + HEIGHT + 0.2)), display_color=(0.7, 0.7, 0.7))
     indices = flag_triangles()
     count = COLUMNS * ROWS
-    normals = np.tile(np.array([0.0, -1.0, 0.0], np.float32), (count, 1))
-    flag = ernie.Path("/World/Flag")
-    scene.define(flag, tokens.MESH).write(tokens.FACE_VERTEX_COUNTS,
-                                          np.full(indices.size // 3, 3, np.int32)).write(
-        tokens.FACE_VERTEX_INDICES, indices).write(tokens.NORMALS, normals).set(
-        # Every pose the kernel can give, so bounds never need the points on the host.
-        tokens.EXTENT, [-0.1, -1.2, FOOT - 0.3, WIDTH + 0.1, 1.2, FOOT + HEIGHT + 0.1])
-    scene.write(flag, tokens.POINTS, points)
-    scene.write(flag, tokens.DISPLAY_COLOR, colors)
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+    flag = world.define(
+        "Flag", ernie.Mesh, face_vertex_counts=np.full(indices.size // 3, 3, np.int32),
+        face_vertex_indices=indices,
+        normals=np.tile(np.array([0.0, -1.0, 0.0], np.float32), (count, 1)))
+    # Every pose the kernel can give, so bounds never need the points on the host.
+    flag.set(tokens.EXTENT, [-0.1, -1.2, FOOT - 0.3, WIDTH + 0.1, 1.2, FOOT + HEIGHT + 0.1])
+    # The kernel's arrays, on the GPU: the points, and the vertex colours as displayColor.
+    flag.write(tokens.POINTS, points).write(tokens.DISPLAY_COLOR, colors)
+    world.define("Sun", ernie.DistantLight).set(
         tokens.TRANSFORM, ernie.distant_light_transform((-0.5, -0.8, 0.6)))
-    scene.define("/World/Camera", tokens.CAMERA).set(
-        tokens.TRANSFORM, ernie.look_at_transform((8.5, -4.5, 4.2), (1.6, 0.0, 2.9))).set(
-        tokens.FOCAL_LENGTH, 30.0)
-    scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera"))
+    camera = world.define("Camera", ernie.Camera, focal_length=30.0).set(
+        tokens.TRANSFORM, ernie.look_at_transform((8.5, -4.5, 4.2), (1.6, 0.0, 2.9)))
+    scene.define("/Render/Settings", ernie.RenderSettings, camera=camera)
     return scene
 
 

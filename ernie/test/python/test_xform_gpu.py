@@ -18,13 +18,17 @@ def cuda_renderer(renderer):
 
 def staged_scene():
     scene = ernie.Scene()
-    scene.define("/World/Camera", tokens.CAMERA).set(
+    camera = scene.define("/World/Camera", ernie.Camera, focal_length=35.0).set(
         tokens.TRANSFORM, ernie.look_at_transform((0, -30, 18), (0, 0, 0))
-    ).set(tokens.FOCAL_LENGTH, 35.0)
-    scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")
-    ).set(tokens.RESOLUTION, (96, 64)).set(tokens.CLEAR_COLOR, (0.0, 0.0, 0.0))
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+    )
+    scene.define(
+        "/Render/Settings",
+        ernie.RenderSettings,
+        camera=camera,
+        resolution=(96, 64),
+        clear_color=(0.0, 0.0, 0.0),
+    )
+    scene.define("/World/Sun", ernie.DistantLight).set(
         tokens.TRANSFORM, ernie.distant_light_transform((0.3, -0.5, 0.8))
     )
     return scene
@@ -41,13 +45,11 @@ def robots(scene, count, offsets=None, ops=(tokens.TRANSLATE, tokens.ORIENT, tok
     world prim offset on the CPU."""
     links = []
     for i in range(count):
-        world = scene.define(f"/World/Env{i}", tokens.XFORM)
+        world = scene.define(f"/World/Env{i}", ernie.Xform)
         if offsets is not None:
-            world.set_xform(translate=offsets[i])
-        link = scene.define(f"/World/Env{i}/Link", tokens.XFORM).set(tokens.XFORM_OP_ORDER, list(ops))
-        scene.define(f"/World/Env{i}/Link/Box", tokens.CUBE).set_xform(
-            translate=(1.0, 0.0, 0.0), scale=(2.0, 1.0, 1.0)
-        )
+            world.set(translate=offsets[i])
+        link = world.define("Link", ernie.Xform).set(tokens.XFORM_OP_ORDER, list(ops))
+        link.define("Box", ernie.Cube, translate=(1.0, 0.0, 0.0), scale=(2.0, 1.0, 1.0))
         links.append(str(link.path))
     return links
 
@@ -248,9 +250,7 @@ def batch_images(renderer, poses):
     scene = staged_scene()
     write_poses(scene, robots(scene, 3, [(-6.0, 0.0, 0.0), (0.0, 0.0, 0.0), (6.0, 0.0, 0.0)]), pose_arrays(3, 50))
     scene.write("/World/Camera", tokens.POSES, poses)
-    scene.define("/Render/Batch", tokens.RENDER_PRODUCT).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")
-    ).set(tokens.RESOLUTION, (64, 48))
+    scene.define("/Render/Batch", ernie.RenderProduct, camera="/World/Camera", resolution=(64, 48))
     outputs = renderer.step(scene, render_products=["/Render/Batch"])["/Render/Batch"]
     return np.array(outputs.frames[0].render_vars["/Render/Batch/LdrColor"].map()).astype(np.int32)
 
@@ -338,9 +338,9 @@ def test_w_first_camera_poses(cuda_renderer):
         write_poses(scene, robots(scene, 3, [(-6.0, 0.0, 0.0), (0.0, 0.0, 0.0), (6.0, 0.0, 0.0)]), pose_arrays(3, 50))
         scene.set("/World/Camera", tokens.QUATERNION_ORDER, tokens.WXYZ)
         scene.write("/World/Camera", tokens.POSES, poses)
-        scene.define("/Render/Batch", tokens.RENDER_PRODUCT).set(
-            tokens.CAMERA_REL, ernie.Path("/World/Camera")
-        ).set(tokens.RESOLUTION, (64, 48))
+        scene.define(
+            "/Render/Batch", ernie.RenderProduct, camera="/World/Camera", resolution=(64, 48)
+        )
         outputs = cuda_renderer.step(scene, render_products=["/Render/Batch"])["/Render/Batch"]
         return np.array(outputs.frames[0].render_vars["/Render/Batch/LdrColor"].map()).astype(np.int32)
 

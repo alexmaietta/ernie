@@ -11,8 +11,8 @@ view's matrices are computed on the GPU, so a step never waits for the host to r
 prepares the frame while the simulator's queued GPU work still runs, which downloading the poses
 would have to wait for. Stepping with `step_async` and mapping the outputs to CUDA without
 waiting lets the CPU prepare the next step while the GPU renders this one.
-Setting `ernie:poses:device` (`tokens.POSES_DEVICE`) to "host" on the camera downloads them
-instead, which lets CPU stages see exact poses (see `tokens.POSES_DEVICE`).
+Setting the camera's `poses_device` (`ernie:poses:device`) to "host" downloads them instead,
+which lets CPU stages see exact poses (see `tokens.POSES_DEVICE`).
 """
 
 import sys
@@ -28,19 +28,15 @@ SIZE = 64
 
 def build_scene(views):
     scene = ernie.Scene()
-    scene.define("/World/Ground", tokens.GROUND_PLANE)
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+    world = scene.define("/World", ernie.Xform)
+    world.define("Ground", ernie.GroundPlane)
+    world.define("Sun", ernie.DistantLight).set(
         tokens.TRANSFORM, ernie.distant_light_transform((0.4, -0.6, 0.7))
     )
-    scene.define("/World/Box", tokens.CUBE).set(tokens.SIZE, 2.0).set(
-        tokens.TRANSFORM, np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 1], [0, 0, 0, 1.0]])
-    )
-    scene.define("/World/Camera", tokens.CAMERA).set(tokens.FOCAL_LENGTH, 18.0)
-    scene.write("/World/Camera", tokens.POSES, orbit(views, 0.0))
-    scene.define("/Render/Batch", tokens.RENDER_PRODUCT).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")
-    ).set(tokens.RESOLUTION, (SIZE, SIZE))
-    return scene
+    world.define("Box", ernie.Cube, size=2.0, translate=(0.0, 0.0, 1.0))
+    camera = world.define("Camera", ernie.Camera, focal_length=18.0, poses=orbit(views, 0.0))
+    scene.define("/Render/Batch", ernie.RenderProduct, camera=camera, resolution=(SIZE, SIZE))
+    return scene, camera
 
 
 def orbit(views, angle):
@@ -60,18 +56,18 @@ def main():
     if not renderer.cuda_available:
         print("This demo needs CUDA interop")
         return
-    scene = build_scene(views)
+    scene, camera = build_scene(views)
     # The simulator's poses for every step, already on the GPU, and a stand-in for its physics:
     # a large device-to-device copy queued on the same stream before each step's poses.
     on_gpu = [renderer.cuda_upload(orbit(views, 0.05 * s)) for s in range(steps)]
     state = [renderer.cuda_upload(np.zeros(64 << 20, np.float32)) for _ in range(2)]
     def time_steps(device, physics):
-        scene.set("/World/Camera", tokens.POSES_DEVICE, device)
+        camera.poses_device = device
         start = time.perf_counter()
         for poses in on_gpu:
             if physics:
                 renderer.cuda_copy(state[0], state[1])
-            scene.write("/World/Camera", tokens.POSES, poses)
+            camera.write(tokens.POSES, poses)
             # Submit and take the outputs without waiting: the CUDA mapping orders on the GPU,
             # and the next step is prepared while this one renders.
             step = renderer.step_async(scene, render_products=["/Render/Batch"])

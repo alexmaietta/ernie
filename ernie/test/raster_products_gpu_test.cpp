@@ -3,9 +3,14 @@
 #include "ernie/geometry/primitives.h"
 #include "ernie/raster/delegate.h"
 #include "ernie/scene/cahvore.h"
+#include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/instruments.h"
 #include "ernie/scene/isd.h"
+#include "ernie/scene/light_schemas.h"
+#include "ernie/scene/material_schemas.h"
 #include "ernie/scene/orbit_controller.h"
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/wide_view.h"
@@ -44,18 +49,17 @@ namespace {
 /// side at 16 x 24, each with an LdrColor RenderVar.
 Scene ProductScene() {
     Scene scene = MeshScene();
-    scene.Define("/World/Side", tokens::kCamera)
-        .Set(tokens::kTransform,
-             ernie::LookAtTransform({60.0, 0.0, 20.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}))
-        .Set(tokens::kFocalLength, 18.0f);
-    scene.Define("/Render/Vars/Color", tokens::kRenderVar).Set(tokens::kSourceName, "LdrColor");
-    scene.Define("/Render/Top", tokens::kRenderProduct)
-        .Set(tokens::kCameraRel, Path("/World/Camera"))
-        .Set(tokens::kResolution, glm::ivec2(32, 32))
-        .Set(tokens::kOrderedVars, std::vector<Path>{"/Render/Vars/Color"});
-    scene.Define("/Render/SideView", tokens::kRenderProduct)
-        .Set(tokens::kCameraRel, Path("/World/Side"))
-        .Set(tokens::kResolution, glm::ivec2(16, 24));
+    ernie::Camera::Define(scene, "/World/Side").SetFocalLength(18.0);
+    scene.Set("/World/Side", tokens::kTransform,
+              ernie::LookAtTransform({60.0, 0.0, 20.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}));
+    ernie::RenderVar::Define(scene, "/Render/Vars/Color").SetSourceName("LdrColor");
+    ernie::RenderProduct::Define(scene, "/Render/Top")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(32, 32));
+    scene.Set("/Render/Top", tokens::kOrderedVars, std::vector<Path>{"/Render/Vars/Color"});
+    ernie::RenderProduct::Define(scene, "/Render/SideView")
+        .SetCamera("/World/Side")
+        .SetResolution(glm::dvec2(16, 24));
     scene.Set("/Render/Settings", tokens::kProducts,
               std::vector<Path>{"/Render/Top", "/Render/SideView"});
     return scene;
@@ -84,7 +88,7 @@ TEST(ResolveRenderProducts, FollowsUsdRender) {
 
     const Path bad[] = {"/World/Camera"};
     EXPECT_THROW(ernie::ResolveRenderProducts(scene, bad, {}), std::invalid_argument);
-    scene.Set("/Render/Vars/Color", tokens::kSourceName, "Depth");
+    ernie::RenderVar(scene, "/Render/Vars/Color").SetSourceName("Depth");
     const Path top[] = {"/Render/Top"};
     EXPECT_THROW(ernie::ResolveRenderProducts(scene, top, {}), std::invalid_argument);
 }
@@ -101,9 +105,9 @@ TEST_F(RasterDelegateTest, StepsRenderEveryProductSyncOrAsync) {
     const Tensor side =
         outputs.at("/Render/SideView").vars.at("LdrColor").Map(ernie::MapDevice::Cpu).tensor;
     EXPECT_EQ(side.Shape(), (std::vector<std::int64_t>{24, 16, 4}));
-    scene.Define("/Render/TopSmall", tokens::kRenderProduct)
-        .Set(tokens::kCameraRel, Path("/World/Camera"))
-        .Set(tokens::kResolution, glm::ivec2(16, 24));
+    ernie::RenderProduct::Define(scene, "/Render/TopSmall")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(16, 24));
     const Path pair[] = {"/Render/TopSmall", "/Render/SideView"};
     ernie::RenderProductSetOutputs both = delegate.Step(scene, pair);
     const Tensor small =
@@ -134,7 +138,7 @@ TEST_F(RasterDelegateTest, FramesHeldByOutputsAreNotRenderedOver) {
     ernie::RenderProductSetOutputs first = delegate.Step(scene, top);
     const Tensor before =
         first.at("/Render/Top").vars.at("LdrColor").Map(ernie::MapDevice::Cpu).tensor;
-    scene.Set("/Looks/Red", tokens::kAlbedo, glm::vec3(0.0f, 0.0f, 1.0f));
+    ernie::Material(scene, "/Looks/Red").SetAlbedo(glm::dvec3(0.0, 0.0, 1.0));
     ernie::RenderProductSetOutputs second = delegate.Step(scene, top);
     const Tensor held =
         first.at("/Render/Top").vars.at("LdrColor").Map(ernie::MapDevice::Cpu).tensor;
@@ -197,8 +201,8 @@ TEST_F(RasterDelegateTest, CudaArraysMappedInTheSceneAreWrittenInPlace) {
               std::vector<float>{-14.0f, -14.0f, -1.0f, 14.0f, 14.0f, 1.0f});
     // A simulation keeps its state in CUDA arrays, written into the scene once.
     const std::array<float, 9> start{12, -10, 0, 12, 0, 0, 12, 10, 0};
-    scene.Write("/World/Rocks", tokens::kPositions,
-                cuda->Upload(Tensor::Copy<float>(start, {3, 3})));
+    ernie::PointInstancer(scene, "/World/Rocks")
+        .SetPositions(cuda->Upload(Tensor::Copy<float>(start, {3, 3})));
     Tensor image = delegate.Render(scene);
     EXPECT_GT(TexelAt(scene, image, {12, -10, 0})[1], 200) << "drawn from the CUDA array";
 
@@ -215,7 +219,7 @@ TEST_F(RasterDelegateTest, CudaArraysMappedInTheSceneAreWrittenInPlace) {
     EXPECT_EQ(TexelAt(scene, image, {12, -10, 0})[1], 0);
 
     const std::array<float, 12> shifted{-2, 6, 0, 2, 6, 0, 2, 10, 0, -2, 10, 0};
-    scene.Write("/World/Quad", tokens::kPoints, cuda->Upload(Tensor::Copy<float>(shifted, {4, 3})));
+    ernie::Mesh(scene, "/World/Quad").SetPoints(cuda->Upload(Tensor::Copy<float>(shifted, {4, 3})));
     DefineQuad(scene, "/World/Extra", 1.0f);
     scene.Set("/World/Extra", tokens::kTransform,
               glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, -12.0, 0.0)));
@@ -231,9 +235,8 @@ TEST_F(RasterDelegateTest, CudaArraysMappedInTheSceneAreWrittenInPlace) {
 
 TEST(ResolveRenderProducts, ReadsSensorFilterChains) {
     Scene scene = ProductScene();
-    scene.Define("/Render/Filters/Cie", tokens::kSensorFilter).Set(tokens::kFilterType, "cie");
-    scene.Define("/Render/Filters/Exposure", tokens::kSensorFilter)
-        .Set(tokens::kFilterType, "exposure");
+    ernie::SensorFilterPrim::Define(scene, "/Render/Filters/Cie").SetFilterType("cie");
+    ernie::SensorFilterPrim::Define(scene, "/Render/Filters/Exposure").SetFilterType("exposure");
     scene.Set("/Render/Top", tokens::kFilters,
               std::vector<Path>{"/Render/Filters/Cie", "/Render/Filters/Exposure"});
     const Path top[] = {"/Render/Top"};
@@ -243,18 +246,18 @@ TEST(ResolveRenderProducts, ReadsSensorFilterChains) {
     EXPECT_EQ(specs[0].filters, ernie::StepsOf(std::vector<ernie::SensorFilter>{
                                     ernie::SensorFilter::Cie, ernie::SensorFilter::Exposure}));
 
-    scene.Define("/Render/Vars/Dn", tokens::kRenderVar).Set(tokens::kSourceName, "RawDN");
+    ernie::RenderVar::Define(scene, "/Render/Vars/Dn").SetSourceName("RawDN");
     scene.Set("/Render/Top", tokens::kOrderedVars, std::vector<Path>{"/Render/Vars/Dn"});
     EXPECT_THROW(ernie::ResolveRenderProducts(scene, top, {}), std::invalid_argument)
         << "the chain has no ADC";
     scene.Set("/Render/Top", tokens::kOrderedVars, std::vector<Path>{"/Render/Vars/Color"});
     // A chain with a type that is not built in may hold a custom integrator standing for cie:
     // the renderer, which knows the custom filters, checks it.
-    scene.Set("/Render/Filters/Cie", tokens::kFilterType, "bloom");
+    ernie::SensorFilterPrim(scene, "/Render/Filters/Cie").SetFilterType("bloom");
     EXPECT_NO_THROW(ernie::ResolveRenderProducts(scene, top, {}));
     scene.Set("/Render/Top", tokens::kFilters, std::vector<Path>{"/World/Camera"});
     EXPECT_THROW(ernie::ResolveRenderProducts(scene, top, {}), std::invalid_argument);
-    scene.Define("/Render/Filters/Adc", tokens::kSensorFilter).Set(tokens::kFilterType, "adc");
+    ernie::SensorFilterPrim::Define(scene, "/Render/Filters/Adc").SetFilterType("adc");
     scene.Set("/Render/Top", tokens::kFilters, std::vector<Path>{"/Render/Filters/Adc"});
     EXPECT_THROW(ernie::ResolveRenderProducts(scene, top, {}), std::invalid_argument)
         << "adc needs qe";
@@ -318,7 +321,7 @@ TEST_F(RasterDelegateTest, ExposureNoiseAndDistortionFollowTheCamera) {
     const auto before = MapVars(plain);
     const std::size_t c = kVarSize / 2;
 
-    scene.Set("/World/Camera", tokens::kCameraExposure, 1.0f);
+    ernie::Camera(scene, "/World/Camera").SetExposure(1.0);
     ernie::RenderProductSetOutputs brighter = delegate.Step(scene);
     const auto stop = MapVars(brighter);
     EXPECT_FLOAT_EQ(At<float>(stop.at("HdrColor"), c, c), At<float>(before.at("HdrColor"), c, c))
@@ -327,11 +330,12 @@ TEST_F(RasterDelegateTest, ExposureNoiseAndDistortionFollowTheCamera) {
 
     // Noise on pixels well below the full well (saturated pixels read the full well, without
     // noise).
-    scene.Set("/World/Camera", tokens::kCameraExposure, 0.0f);
-    scene.Set("/World/Camera", tokens::kExposureTime, 1e-6);  // its pixels are 0.5 mm, at f/1
+    ernie::Camera(scene, "/World/Camera")
+        .SetExposure(0.0)
+        .SetExposureTime(1e-6);  // its pixels are 0.5 mm, at f/1
     ernie::RenderProductSetOutputs noiseless = delegate.Step(scene);
     const auto cleanVars = MapVars(noiseless);
-    scene.Set("/World/Camera", tokens::kSensorNoise, true);
+    ernie::Camera(scene, "/World/Camera").SetSensorNoise(true);
     ernie::RenderProductSetOutputs first = delegate.Step(scene);
     ernie::RenderProductSetOutputs second = delegate.Step(scene);
     const Tensor a =
@@ -355,8 +359,9 @@ TEST_F(RasterDelegateTest, ExposureNoiseAndDistortionFollowTheCamera) {
     EXPECT_GT(differing, static_cast<int>(kVarSize * kVarSize / 2)) << "temporal noise";
     EXPECT_NEAR(mean / clean, 1.0, 0.02) << "noise keeps the mean";
 
-    scene.Set("/World/Camera", tokens::kSensorNoise, false);
-    scene.Set("/World/Camera", tokens::kLensDistortion, std::vector<float>{-0.3f, 0, 0, 0, 0});
+    ernie::Camera(scene, "/World/Camera")
+        .SetSensorNoise(false)
+        .SetLensDistortion({-0.3f, 0, 0, 0, 0});
     ernie::RenderProductSetOutputs distorted = delegate.Step(scene);
     const auto barrel = MapVars(distorted);
     EXPECT_NEAR(At<float>(barrel.at("DistanceToCamera"), c, c), 100.0f, 0.5f);
@@ -374,9 +379,10 @@ TEST_F(RasterDelegateTest, OrthographicSeesItsApertureInTheScene) {
     Scene scene = FlatScene();
     scene.Set("/World/Camera", tokens::kTransform,
               ernie::LookAtTransform({0.0, 0.0, 50.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
-    scene.Set("/World/Camera", tokens::kProjection, std::string(tokens::kOrthographic));
-    scene.Set("/World/Camera", tokens::kVerticalAperture, 2000.0f);
-    scene.Set("/World/Camera", tokens::kClippingRange, glm::dvec2(1.0, 1000.0));
+    ernie::Camera(scene, "/World/Camera")
+        .SetProjection(tokens::kOrthographic)
+        .SetVerticalAperture(2000.0)
+        .SetClippingRange(glm::dvec2(1.0, 1000.0));
     RasterDelegate delegate(*context_);
     ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
     const auto vars = MapVars(outputs);
@@ -398,14 +404,13 @@ TEST_F(RasterDelegateTest, PushbroomScansItsRowsAlongItsMotion) {
     // under the camera (r + 0.5) / 32 of the way along, y = r + 0.5 - 16, one unit per row, and
     // across it a pinhole's view of x. A 2-unit cube at y = 5 shows on rows 20 and 21 only.
     Scene scene = FlatScene();
-    scene.Define("/World/Box", tokens::kCube)
-        .Set(tokens::kSize, 2.0)
-        .Set(tokens::kTransform,
-             glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 5.0, 1.0)));
+    ernie::Cube::Define(scene, "/World/Box").SetSize(2.0);
+    scene.Set("/World/Box", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 5.0, 1.0)));
     const auto at = [](double y) {
         return ernie::LookAtTransform({0.0, y, 50.0}, {0.0, y, 0.0}, {0.0, 1.0, 0.0});
     };
-    scene.Set("/World/Camera", tokens::kCameraScan, std::string(tokens::kPushbroom));
+    ernie::Camera(scene, "/World/Camera").SetScan(tokens::kPushbroom);
     scene.Set("/World/Camera", tokens::kTransform, at(-16.0));
     RasterDelegate delegate(*context_);
     delegate.Step(scene);  // the strip's start
@@ -442,19 +447,19 @@ TEST_F(RasterDelegateTest, AnIsdStripSeesTheGroundWhereUsgscsmPutsIt) {
     const ernie::IsdLineScanner::Strip strip = scanner.StripOf(0, 16);
     Scene scene = FlatScene();
     scene.Remove("/World/Terrain");
-    scene.Set("/Render/Settings", tokens::kResolution, glm::ivec2(16, 16));
+    ernie::RenderSettings(scene, "/Render/Settings").SetResolution(glm::dvec2(16, 16));
     const std::pair<std::size_t, std::size_t> pixels[] = {{8, 8}, {3, 12}, {13, 2}};
     for (std::size_t i = 0; i < std::size(pixels); ++i) {
         const auto [row, column] = pixels[i];
         const glm::dvec3 ground = scanner.ImageToGround(row + 0.5, column + 0.5);
-        scene.Define(Path("/World/Ball" + std::to_string(i)), tokens::kSphere)
-            .Set(tokens::kGeomRadius, 60.0)
-            .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), ground));
+        const Path ball("/World/Ball" + std::to_string(i));
+        ernie::Sphere::Define(scene, ball).SetRadius(60.0);
+        scene.Set(ball, tokens::kTransform, glm::translate(glm::dmat4(1.0), ground));
     }
     ernie::CameraParams camera = strip.camera;
     camera.transform = strip.from;
     ernie::SetCamera(scene, "/World/Camera", camera);
-    scene.Set("/World/Camera", tokens::kSensorNoise, false);
+    ernie::Camera(scene, "/World/Camera").SetSensorNoise(false);
     RasterDelegate delegate(*context_);
     delegate.Step(scene);  // the strip's start
     scene.Set("/World/Camera", tokens::kTransform, strip.to);
@@ -487,24 +492,23 @@ TEST_F(RasterDelegateTest, AnLroNacStripSeesThroughItsLensDistortion) {
     ASSERT_NE(strip.camera.lens.k1, 0.0);
     Scene scene = FlatScene();
     scene.Remove("/World/Terrain");
-    scene.Set("/Render/Settings", tokens::kResolution,
-              glm::ivec2(static_cast<int>(nac.Isd().samples), static_cast<int>(kLines)));
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetResolution(glm::dvec2(nac.Isd().samples, kLines));
     const std::pair<std::size_t, std::size_t> pixels[] = {{10, 12}, {40, 1266}, {25, 2515}};
     for (std::size_t i = 0; i < std::size(pixels); ++i) {
         const auto [row, column] = pixels[i];
         const glm::dvec3 ground = nac.ImageToGround(kFirst + row + 0.5, column + 0.5);
-        scene.Define(Path("/World/Ball" + std::to_string(i)), tokens::kSphere)
-            .Set(tokens::kGeomRadius, 0.6)
-            .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), ground));
+        const Path ball("/World/Ball" + std::to_string(i));
+        ernie::Sphere::Define(scene, ball).SetRadius(0.6);
+        scene.Set(ball, tokens::kTransform, glm::translate(glm::dmat4(1.0), ground));
     }
     ernie::CameraParams camera = strip.camera;
     camera.transform = strip.from;
     ernie::SetCamera(scene, "/World/Camera", camera);
-    scene.Set("/World/Camera", tokens::kSensorNoise, false);
-    scene.Set("/World/Camera", tokens::kLensDistortion,
-              std::vector<float>{static_cast<float>(camera.lens.k1),
-                                 static_cast<float>(camera.lens.k2),
-                                 static_cast<float>(camera.lens.k3), 0.0f, 0.0f});
+    ernie::Camera(scene, "/World/Camera")
+        .SetSensorNoise(false)
+        .SetLensDistortion({static_cast<float>(camera.lens.k1), static_cast<float>(camera.lens.k2),
+                            static_cast<float>(camera.lens.k3), 0.0f, 0.0f});
     RasterDelegate delegate(*context_);
     delegate.Step(scene);  // the strip's start
     scene.Set("/World/Camera", tokens::kTransform, strip.to);
@@ -550,25 +554,23 @@ TEST_F(RasterDelegateTest, AnLroWacFrameletSeesTheGroundWhereUsgscsmPutsIt) {
     const std::size_t height = wac.FrameletLines();
     Scene scene = FlatScene();
     scene.Remove("/World/Terrain");
-    scene.Set("/Render/Settings", tokens::kResolution,
-              glm::ivec2(static_cast<int>(width), static_cast<int>(height)));
+    ernie::RenderSettings(scene, "/Render/Settings").SetResolution(glm::dvec2(width, height));
     const std::pair<std::size_t, std::size_t> pixels[] = {{2, 10}, {7, 512}, {11, 1013}};
     for (std::size_t i = 0; i < std::size(pixels); ++i) {
         const auto [row, column] = pixels[i];
         const double line = framelet.firstLine + row + 0.5;
         const glm::dvec3 ground = wac.ImageToGround(line, column + 0.5);
         const double across = glm::length(wac.ImageToGround(line, column + 1.5) - ground);
-        scene.Define(Path("/World/Ball" + std::to_string(i)), tokens::kSphere)
-            .Set(tokens::kGeomRadius, 0.4 * across)
-            .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), ground));
+        const Path ball("/World/Ball" + std::to_string(i));
+        ernie::Sphere::Define(scene, ball).SetRadius(0.4 * across);
+        scene.Set(ball, tokens::kTransform, glm::translate(glm::dmat4(1.0), ground));
     }
     const ernie::CameraParams& camera = framelet.camera;
     ernie::SetCamera(scene, "/World/Camera", camera);
-    scene.Set("/World/Camera", tokens::kSensorNoise, false);
-    scene.Set("/World/Camera", tokens::kLensDistortion,
-              std::vector<float>{static_cast<float>(camera.lens.k1),
-                                 static_cast<float>(camera.lens.k2),
-                                 static_cast<float>(camera.lens.k3), 0.0f, 0.0f});
+    ernie::Camera(scene, "/World/Camera")
+        .SetSensorNoise(false)
+        .SetLensDistortion({static_cast<float>(camera.lens.k1), static_cast<float>(camera.lens.k2),
+                            static_cast<float>(camera.lens.k3), 0.0f, 0.0f});
     RasterDelegate delegate(*context_);
     ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
     const Tensor ids =
@@ -600,8 +602,7 @@ TEST_F(RasterDelegateTest, TheLrocNacPresetSendsEightBitNumbers) {
     // into 12 bits, then the nominal table into 8.
     Scene scene = FlatScene();
     ernie::AuthorLrocNac(scene, "/World/Camera", "/Render/Product");
-    scene.Set("/World/Camera", tokens::kSensorNoise, false);
-    scene.Set("/World/Camera", tokens::kExposureTime, 0.004);
+    ernie::Camera(scene, "/World/Camera").SetSensorNoise(false).SetExposureTime(0.004);
     RasterDelegate delegate(*context_);
     ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
     const auto vars = MapVars(outputs);
@@ -637,16 +638,17 @@ TEST_F(RasterDelegateTest, TheMars2020NavcamAndHazcamPairsSeeInStereo) {
     for (const Pair pair :
          {Pair{"/World/Navcam", 0.424, 5.0, false}, Pair{"/World/Hazcam", 0.248, 3.0, true}}) {
         Scene scene = FlatScene();
-        scene.Define("/World/Cube", tokens::kCube)
-            .Set(tokens::kSize, 1.0)
-            .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 0.5)));
+        ernie::Cube::Define(scene, "/World/Cube").SetSize(1.0);
+        scene.Set("/World/Cube", tokens::kTransform,
+                  glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 0.5)));
         const std::vector<Path> vars =
             *scene.Get("/Render/Product", tokens::kOrderedVars)->Get<std::vector<Path>>();
         for (const char* eye : {"Left", "Right"}) {
-            scene.Define(Path("/Render").Child(eye), tokens::kRenderProduct)
-                .Set(tokens::kOrderedVars, vars)
-                .Set(tokens::kCameraRel, Path(pair.rig).Child(eye))
-                .Set(tokens::kResolution, glm::ivec2(64, 48));
+            const Path product = Path("/Render").Child(eye);
+            ernie::RenderProduct::Define(scene, product)
+                .SetCamera(Path(pair.rig).Child(eye))
+                .SetResolution(glm::dvec2(64, 48));
+            scene.Set(product, tokens::kOrderedVars, vars);
         }
         scene.Set("/Render/Settings", tokens::kProducts,
                   std::vector<Path>{"/Render/Left", "/Render/Right"});
@@ -659,7 +661,7 @@ TEST_F(RasterDelegateTest, TheMars2020NavcamAndHazcamPairsSeeInStereo) {
             pair.rig, tokens::kTransform,
             ernie::LookAtTransform({0.0, 0.0, pair.height}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
         for (const char* eye : {"Left", "Right"}) {
-            scene.Set(Path(pair.rig).Child(eye), tokens::kExposureTime, 1e-4);
+            ernie::Camera(scene, Path(pair.rig).Child(eye)).SetExposureTime(1e-4);
         }
         RasterDelegate delegate(*context_);
         ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
@@ -708,12 +710,11 @@ TEST_F(RasterDelegateTest, MastcamZsNearInfraredFiltersSeeTheSunsBlackBody) {
     // R6 the dimmer, silicon nearly blind at 1 um despite its band twice as wide.
     const auto meanElectrons = [&](int filter) {
         Scene scene = FlatScene();
-        scene.Set("/World/Sun", tokens::kLightIrradiance, 590.0);
+        ernie::DistantLight(scene, "/World/Sun").SetIrradiance(590.0);
         ernie::AuthorMastcamZ(scene, "/World/Camera", "/Render/Product", ernie::MastcamZEye::Right,
                               filter);
-        scene.Set("/World/Camera", tokens::kSensorNoise, false);
         // The 32 x 32 image bins the detector's pixels about 37 x 37: a short exposure.
-        scene.Set("/World/Camera", tokens::kExposureTime, 2e-6);
+        ernie::Camera(scene, "/World/Camera").SetSensorNoise(false).SetExposureTime(2e-6);
         // A narrow band's sensor numbers; it has no colour to show.
         scene.Set("/Render/Product", tokens::kOrderedVars,
                   std::vector<Path>{"/Render/Vars/Electrons", "/Render/Vars/RawDN"});
@@ -745,21 +746,21 @@ TEST_F(RasterDelegateTest, AFisheyeWiderThan180DegreesSeesPastItsHorizonOnCubeFa
     Scene scene = FlatScene();
     scene.Set("/World/Camera", tokens::kTransform,
               ernie::LookAtTransform({0.0, 0.0, 5.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
-    scene.Set("/World/Camera", tokens::kLensProjection, std::string(tokens::kFisheye));
     const double corner = std::sqrt(2.0) * 0.5 * kVarSize;  // pixels from the centre
     const double focalPixels = corner / 2.0;
     const double aperture = 20.0;
-    scene.Set("/World/Camera", tokens::kVerticalAperture, aperture);
-    scene.Set("/World/Camera", tokens::kHorizontalAperture, aperture);
-    scene.Set("/World/Camera", tokens::kFocalLength, aperture * focalPixels / kVarSize);
+    ernie::Camera(scene, "/World/Camera")
+        .SetLensProjection(tokens::kFisheye)
+        .SetVerticalAperture(aperture)
+        .SetHorizontalAperture(aperture)
+        .SetFocalLength(aperture * focalPixels / kVarSize);
     // 95 degrees off axis along the image's diagonal (camera x and y = world x and y here).
     const double theta = 95.0 * M_PI / 180.0;
     const glm::dvec3 towards(std::sin(theta) / std::sqrt(2.0), std::sin(theta) / std::sqrt(2.0),
                              -std::cos(theta));
-    scene.Define("/World/Cube", tokens::kCube)
-        .Set(tokens::kSize, 2.0)
-        .Set(tokens::kTransform,
-             glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 5.0) + 12.0 * towards));
+    ernie::Cube::Define(scene, "/World/Cube").SetSize(2.0);
+    scene.Set("/World/Cube", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 5.0) + 12.0 * towards));
     const ernie::CameraParams camera =
         ernie::CameraParamsOf(scene, "/World/Camera", kVarSize, kVarSize);
     ASSERT_TRUE(ernie::NeedsCubeFaces(camera));
@@ -824,25 +825,24 @@ TEST_F(RasterDelegateTest, CahvoreCamerasSeeThroughTheirRayTablesExactly) {
 
         Scene scene = FlatScene();
         scene.Remove("/World/Terrain");
-        scene.Set("/Render/Settings", tokens::kResolution,
-                  glm::ivec2(static_cast<int>(model.width), static_cast<int>(model.height)));
+        ernie::RenderSettings(scene, "/Render/Settings")
+            .SetResolution(glm::dvec2(model.width, model.height));
         scene.Set("/Render/Product", tokens::kOrderedVars,
                   std::vector<Path>{"/Render/Vars/PrimId"});
         ernie::CameraParams camera = fit.camera;
         camera.bands.count = 3;
         ernie::SetCamera(scene, "/World/Camera", camera);
-        scene.Set("/World/Camera", tokens::kLensProjection, std::string(tokens::kFisheye));
-        scene.Set("/World/Camera", tokens::kLensFisheye,
-                  std::vector<float>{float(camera.lens.fisheye[0]), float(camera.lens.fisheye[1]),
-                                     float(camera.lens.fisheye[2]), float(camera.lens.fisheye[3])});
         std::vector<float> rays;
         for (const glm::vec3& ray : table.rays) {
             rays.insert(rays.end(), {ray.x, ray.y, ray.z});
         }
-        scene.Write("/World/Camera", tokens::kLensRays,
-                    Tensor::Copy(std::span<const float>(rays),
-                                 {std::int64_t(table.rows), std::int64_t(table.columns), 3}));
-        scene.Set("/World/Camera", tokens::kLensRaysStep, 4);
+        ernie::Camera(scene, "/World/Camera")
+            .SetLensProjection(tokens::kFisheye)
+            .SetLensFisheye({float(camera.lens.fisheye[0]), float(camera.lens.fisheye[1]),
+                             float(camera.lens.fisheye[2]), float(camera.lens.fisheye[3])})
+            .SetLensRays(Tensor::Copy(std::span<const float>(rays),
+                                      {std::int64_t(table.rows), std::int64_t(table.columns), 3}))
+            .SetLensRaysStep(4);
         // Spheres 30 m along the model's rays of pixels across the image, 1.5 pixels in radius:
         // far enough that the CAHVORE entrance pupil's movement (up to 12.5 mm, which Ernie's
         // central camera leaves out) moves them by under a fifth of a pixel.
@@ -857,10 +857,10 @@ TEST_F(RasterDelegateTest, CahvoreCamerasSeeThroughTheirRayTablesExactly) {
         const double pixelAngle = 1.0 / fit.camera.FocalLengthPixels();
         for (std::size_t i = 0; i < pixels.size(); ++i) {
             const ernie::CahvoreModel::Ray ray = model.ImageToRay(pixels[i] - 0.5);
-            scene.Define(Path("/World/Ball" + std::to_string(i)), tokens::kSphere)
-                .Set(tokens::kGeomRadius, kDistance * 1.5 * pixelAngle)
-                .Set(tokens::kTransform,
-                     glm::translate(glm::dmat4(1.0), ray.origin + kDistance * ray.direction));
+            const Path ball("/World/Ball" + std::to_string(i));
+            ernie::Sphere::Define(scene, ball).SetRadius(kDistance * 1.5 * pixelAngle);
+            scene.Set(ball, tokens::kTransform,
+                      glm::translate(glm::dmat4(1.0), ray.origin + kDistance * ray.direction));
         }
         const ernie::CameraParams rendered =
             ernie::CameraParamsOf(scene, "/World/Camera", model.width, model.height);
@@ -899,15 +899,15 @@ TEST_F(RasterDelegateTest, LateralColourScalesEachBandsImageAboutThePrincipalPoi
     const auto centroids = [&](bool fringed) {
         Scene scene = FlatScene();
         scene.Remove("/World/Terrain");
-        scene.Set("/Render/Settings", tokens::kResolution, glm::ivec2(96, 96));
+        ernie::RenderSettings(scene, "/Render/Settings").SetResolution(glm::dvec2(96, 96));
         scene.Set("/Render/Product", tokens::kOrderedVars,
                   std::vector<Path>{"/Render/Vars/SpectralRadiance"});
-        scene.Define("/World/Cube", tokens::kCube)
-            .Set(tokens::kSize, 4.0)
-            .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(9.0, 5.0, 2.0)));
+        ernie::Cube::Define(scene, "/World/Cube").SetSize(4.0);
+        scene.Set("/World/Cube", tokens::kTransform,
+                  glm::translate(glm::dmat4(1.0), glm::dvec3(9.0, 5.0, 2.0)));
         if (fringed) {
-            scene.Set("/World/Camera", tokens::kLensChromaticScale,
-                      std::vector<float>{400.0f, 0.9f, 700.0f, 1.1f});
+            ernie::Camera(scene, "/World/Camera")
+                .SetLensChromaticScale({400.0f, 0.9f, 700.0f, 1.1f});
         }
         RasterDelegate delegate(*context_);
         ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
@@ -958,23 +958,21 @@ TEST_F(RasterDelegateTest, AxialColourDefocusesTheBandsAwayFromTheReference) {
         scene.Set("/Render/Product", tokens::kOrderedVars,
                   std::vector<Path>{"/Render/Vars/HdrColor"});
         for (int i = 0; i < 3; ++i) {
-            scene.Define(Path("/World/Cube" + std::to_string(i)), tokens::kCube)
-                .Set(tokens::kSize, 6.0)
-                .Set(tokens::kTransform,
-                     glm::translate(glm::dmat4(1.0), glm::dvec3(10.0 * i - 10.0, 2.0, 0.0)));
+            const Path cube("/World/Cube" + std::to_string(i));
+            ernie::Cube::Define(scene, cube).SetSize(6.0);
+            scene.Set(cube, tokens::kTransform,
+                      glm::translate(glm::dmat4(1.0), glm::dvec3(10.0 * i - 10.0, 2.0, 0.0)));
         }
-        scene.Set("/World/Camera", tokens::kFStop, 1.4);
-        scene.Set("/World/Camera", tokens::kFocusDistance, 100.0);
+        ernie::Camera(scene, "/World/Camera").SetFStop(1.4).SetFocusDistance(100.0);
         if (coloured) {
-            scene.Set("/World/Camera", tokens::kLensChromaticFocus,
-                      std::vector<float>{400.0f, 4.0f, 480.0f, 0.0f, 580.0f, 0.0f, 700.0f, 4.0f});
+            ernie::Camera(scene, "/World/Camera")
+                .SetLensChromaticFocus({400.0f, 4.0f, 480.0f, 0.0f, 580.0f, 0.0f, 700.0f, 4.0f});
         }
         const Path defocus("/Render/Filters/Defocus");
-        scene.Define(defocus, tokens::kSensorFilter)
-            .Set(tokens::kFilterType, std::string("defocus"))
-            .Set("inputs:maxRadius", 4.0);
+        ernie::SensorFilterPrim::Define(scene, defocus).SetFilterType("defocus");
+        scene.Set(defocus, "inputs:maxRadius", 4.0);
         const Path cie("/Render/Filters/Cie");
-        scene.Define(cie, tokens::kSensorFilter).Set(tokens::kFilterType, std::string("cie"));
+        ernie::SensorFilterPrim::Define(scene, cie).SetFilterType("cie");
         scene.Set("/Render/Product", tokens::kFilters, std::vector<Path>{defocus, cie});
         RasterDelegate delegate(*context_);
         ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
@@ -1005,8 +1003,7 @@ TEST_F(RasterDelegateTest, FisheyeSeesFieldAnglesInProportionToRadius) {
     Scene scene = FlatScene();
     scene.Set("/World/Camera", tokens::kTransform,
               ernie::LookAtTransform({0.0, 0.0, 50.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
-    scene.Set("/World/Camera", tokens::kFocalLength, 12.0f);
-    scene.Set("/World/Camera", tokens::kLensProjection, std::string(tokens::kFisheye));
+    ernie::Camera(scene, "/World/Camera").SetFocalLength(12.0).SetLensProjection(tokens::kFisheye);
     RasterDelegate delegate(*context_);
     ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
     const auto vars = MapVars(outputs);
@@ -1040,8 +1037,7 @@ std::vector<float> ElectronsOf(ernie::RenderProductSetOutputs& outputs, const Pa
 /// `/Render/Other` of the same camera.
 Scene NoisyScene() {
     Scene scene = FlatScene();
-    scene.Set("/World/Camera", tokens::kSensorNoise, true);
-    scene.Set("/World/Camera", tokens::kExposureTime, 1e-6);
+    ernie::Camera(scene, "/World/Camera").SetSensorNoise(true).SetExposureTime(1e-6);
     scene.Define("/Render/Other", tokens::kRenderProduct)
         .Set(tokens::kOrderedVars, *scene.Get("/Render/Product", tokens::kOrderedVars));
     return scene;
@@ -1075,12 +1071,12 @@ TEST_F(RasterDelegateTest, NoiseIsDeterministicPerProductAndFrame) {
     }
     EXPECT_NE(otherNoise, frames[0]) << "products of one camera have their own noise";
 
-    scene.Set("/Render/Settings", tokens::kFrame, 7);
+    ernie::RenderSettings(scene, "/Render/Settings").SetFrame(7);
     ernie::RenderProductSetOutputs seventh = a.Step(scene, one);
     ernie::RenderProductSetOutputs again = b.Step(scene, one);
     EXPECT_EQ(ElectronsOf(seventh, product), ElectronsOf(again, product))
         << "an authored frame renders the same noise";
-    scene.Set("/Render/Settings", tokens::kFrame, 0);
+    ernie::RenderSettings(scene, "/Render/Settings").SetFrame(0);
     ernie::RenderProductSetOutputs zeroth = a.Step(scene, one);
     EXPECT_EQ(ElectronsOf(zeroth, product), frames[0]) << "frame 0 again";
 }
@@ -1122,7 +1118,7 @@ TEST_F(RasterDelegateTest, MonochromeSensorsMakeGreyPhotographicImages) {
     const Tensor colour = delegate.Render(scene);
     const std::uint8_t* red = TexelAt(scene, colour, quad);
     EXPECT_GT(red[0], red[1] + 50) << "the red quad through an RGB sensor";
-    scene.Set("/World/Camera", tokens::kSensorType, std::string("mono"));
+    ernie::Camera(scene, "/World/Camera").SetSensorType("mono");
     const Tensor grey = delegate.Render(scene);
     const std::uint8_t* mono = TexelAt(scene, grey, quad);
     EXPECT_EQ(mono[0], mono[1]);

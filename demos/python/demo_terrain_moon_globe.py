@@ -130,47 +130,42 @@ def moon_heights(seed=7, craters=6000, smallest=8000.0, largest=250000.0):
 
 def build_scene(heights, maps=None):
     scene = ernie.Scene()
-    regolith = ernie.Path("/Looks/Regolith")
-    material = scene.define(regolith, tokens.MATERIAL).set(tokens.BRDF, "hapke").set(
-        tokens.ALBEDO, (0.25, 0.25, 0.25))
+    regolith = scene.define("/Looks/Regolith", ernie.Material, brdf="hapke",
+                            albedo=(0.25, 0.25, 0.25))
     if maps is not None:
         from demo_materials_lunar_regolith import TILE
-        material.write(tokens.DETAIL_ALBEDO, maps["Diffuse"]).write(
-            tokens.DETAIL_NORMAL, maps["nor_gl"]).set(tokens.DETAIL_TILE_SIZE, TILE).set(
-            tokens.DETAIL_HEX_TILING, True)
-    scene.define("/World/Moon", tokens.TERRAIN).write(tokens.HEIGHTS, heights).set(
-        tokens.PLANET_RADIUS, RADIUS).set(tokens.MATERIAL_BINDING, regolith)
+        regolith.set(detail_albedo=maps["Diffuse"], detail_normal=maps["nor_gl"],
+                     detail_tile_size=TILE, detail_hex_tiling=True)
+    world = scene.define("/World", ernie.Xform)
+    world.define("Moon", ernie.Terrain, heights=heights, planet_radius=RADIUS,
+                 material_binding=regolith)
 
     # The Sun, as bright as above an atmosphere.
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
-        tokens.TRANSFORM, ernie.distant_light_transform(tuple(SUN))).set(
-        tokens.PHOTOMETRIC_ILLUMINANCE, 128000.0).set(tokens.ANGLE, 0.53).set(
-        tokens.PHYSICAL_ILLUMINANT, tokens.BLACKBODY).set(tokens.COLOR_TEMPERATURE, 5772.0)
+    world.define("Sun", ernie.DistantLight, photometric_illuminance=128000.0, angle=0.53,
+                 physical_illuminant=tokens.BLACKBODY, color_temperature=5772.0).set(
+        tokens.TRANSFORM, ernie.distant_light_transform(tuple(SUN)))
     stars = ernie.synthetic_stars(9000, seed=11)
-    scene.define("/World/Stars", tokens.STAR_FIELD).write(
-        tokens.STARS_RIGHT_ASCENSION, np.array(stars["right_ascension"], np.float32)).write(
-        tokens.STARS_DECLINATION, np.array(stars["declination"], np.float32)).write(
-        tokens.STARS_MAGNITUDE, np.array(stars["magnitude"], np.float32)).write(
-        tokens.STARS_COLOR_INDEX, np.array(stars["color_index"], np.float32))
+    world.define("Stars", ernie.StarField,
+                 right_ascension=np.array(stars["right_ascension"], np.float32),
+                 declination=np.array(stars["declination"], np.float32),
+                 magnitude=np.array(stars["magnitude"], np.float32),
+                 color_index=np.array(stars["color_index"], np.float32))
 
-    scene.define("/World/Camera", tokens.CAMERA).set(tokens.FOCAL_LENGTH, 24.0).set(
-        tokens.SENSOR_NOISE, False).set(tokens.EXPOSURE_ISO, 100.0).set(
-        tokens.EXPOSURE_TIME, 1.0 / 250.0).set(tokens.EXPOSURE_FSTOP, 5.6)
-    scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")).set(tokens.RESOLUTION, SIZE).set(
-        tokens.SHADOW_FIT, tokens.VISIBLE).set(tokens.AMBIENT, 0.0).set(
-        tokens.COLOR_MODE, tokens.HILLSHADE)
-    return scene
+    camera = world.define("Camera", ernie.Camera, focal_length=24.0, sensor_noise=False,
+                          exposure_iso=100.0, exposure_time=1.0 / 250.0, exposure_f_stop=5.6)
+    scene.define("/Render/Settings", ernie.RenderSettings, camera=camera, resolution=SIZE,
+                 shadow_fit=tokens.VISIBLE, ambient=0.0, color_mode=tokens.HILLSHADE)
+    return scene, camera
 
 
-def in_orbit(scene):
+def in_orbit(camera):
     """The near side from 4 radii out, the terminator crossing it."""
     eye = (4.0 * RADIUS, 0.8 * RADIUS, 1.0 * RADIUS)
-    scene.set("/World/Camera", tokens.TRANSFORM, ernie.look_at_transform(eye, (0.0, 0.0, 0.0)))
-    scene.set("/World/Camera", tokens.CLIPPING_RANGE, (1.0e4, 1.0e8))
+    camera.set(tokens.TRANSFORM, ernie.look_at_transform(eye, (0.0, 0.0, 0.0)))
+    camera.clipping_range = (1.0e4, 1.0e8)
 
 
-def low_over_the_terminator(scene):
+def low_over_the_terminator(camera):
     """15 km up where the Sun stands 8 degrees above the horizon, looking across its light so
     the craters cast long shadows."""
     north = np.array([0.0, 0.0, 1.0]) - SUN * SUN[2]
@@ -181,9 +176,8 @@ def low_over_the_terminator(scene):
     ahead /= np.linalg.norm(ahead)
     eye = up * (RADIUS + 15000.0)
     target = eye + 100000.0 * ahead - 15000.0 * up
-    scene.set("/World/Camera", tokens.TRANSFORM,
-              ernie.look_at_transform(tuple(eye), tuple(target), tuple(up)))
-    scene.set("/World/Camera", tokens.CLIPPING_RANGE, (10.0, 4.0e5))
+    camera.set(tokens.TRANSFORM, ernie.look_at_transform(tuple(eye), tuple(target), tuple(up)))
+    camera.clipping_range = (10.0, 4.0e5)
 
 
 def main():
@@ -198,15 +192,15 @@ def main():
         from demo_materials_lunar_regolith import load_maps
         with tempfile.TemporaryDirectory() as scratch:
             maps = load_maps(os.path.expanduser(args.textures), scratch)
-    scene = build_scene(moon_heights(), maps)
-    in_orbit(scene)
+    scene, camera = build_scene(moon_heights(), maps)
+    in_orbit(camera)
     if not args.output:
         from ernie.app import Viewer
         Viewer(scene).run()
         return
     renderer = ernie.Renderer()
     orbit = np.array(renderer.render(scene))[..., :3]
-    low_over_the_terminator(scene)
+    low_over_the_terminator(camera)
     low = np.array(renderer.render(scene))[..., :3]
     write_png(args.output, side_by_side([orbit, low]))
 

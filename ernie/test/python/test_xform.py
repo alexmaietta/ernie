@@ -285,7 +285,7 @@ def test_set_local_transform_falls_back_to_the_transform_op():
 def make_links(scene, n):
     paths = [f"/World_{i}/Link" for i in range(n)]
     for path in paths:
-        scene.define(path, tokens.XFORM).set(tokens.XFORM_OP_ORDER, [tokens.TRANSLATE, tokens.ORIENT])
+        scene.define(path, ernie.Xform).set(tokens.XFORM_OP_ORDER, [tokens.TRANSLATE, tokens.ORIENT])
     return paths
 
 
@@ -311,7 +311,7 @@ def test_transform_rows_are_row_major_matrices():
     scene = ernie.Scene()
     paths = [f"/P{i}" for i in range(4)]
     for path in paths:
-        scene.define(path, tokens.XFORM)
+        scene.define(path, ernie.Xform)
     matrices = np.stack([translate((i, 2 * i, 3 * i)) for i in range(4)])
     scene.write(paths, tokens.TRANSFORM, matrices)
     for i, path in enumerate(paths):
@@ -334,13 +334,17 @@ def test_rewriting_rows_moves_the_prims():
 
 def staged_scene():
     scene = ernie.Scene()
-    scene.define("/World/Camera", tokens.CAMERA).set(
+    camera = scene.define("/World/Camera", ernie.Camera, focal_length=24.0).set(
         tokens.TRANSFORM, ernie.look_at_transform((0, -20, 12), (0, 0, 0))
-    ).set(tokens.FOCAL_LENGTH, 24.0)
-    scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")
-    ).set(tokens.RESOLUTION, (64, 48)).set(tokens.CLEAR_COLOR, (0.0, 0.0, 0.0))
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+    )
+    scene.define(
+        "/Render/Settings",
+        ernie.RenderSettings,
+        camera=camera,
+        resolution=(64, 48),
+        clear_color=(0.0, 0.0, 0.0),
+    )
+    scene.define("/World/Sun", ernie.DistantLight).set(
         tokens.TRANSFORM, ernie.distant_light_transform((0.3, -0.5, 0.8))
     )
     return scene
@@ -367,8 +371,8 @@ def reference_matrix(pose):
 def test_ops_render_like_the_equivalent_matrices(renderer):
     by_ops, by_matrix = staged_scene(), staged_scene()
     for i, pose in enumerate(POSES):
-        by_ops.define(f"/World/Box{i}", tokens.CUBE).set_xform(**pose)
-        by_matrix.define(f"/World/Box{i}", tokens.CUBE).set(tokens.TRANSFORM, reference_matrix(pose))
+        by_ops.define(f"/World/Box{i}", ernie.Cube, **pose)
+        by_matrix.define(f"/World/Box{i}", ernie.Cube).set(tokens.TRANSFORM, reference_matrix(pose))
     ops_image = renderer.render(by_ops).astype(np.int32)
     matrix_image = renderer.render(by_matrix).astype(np.int32)
     assert (ops_image[..., :3] > 0).any(), "the boxes are in view"
@@ -378,12 +382,12 @@ def test_ops_render_like_the_equivalent_matrices(renderer):
 
 def test_editing_ops_moves_what_renders(renderer):
     scene = staged_scene()
-    box = scene.define("/World/Box", tokens.CUBE).set_xform(translate=(-4.0, 0.0, 0.0))
+    box = scene.define("/World/Box", ernie.Cube, translate=(-4.0, 0.0, 0.0))
     left = renderer.render(scene).astype(np.int32)
     box.set(tokens.TRANSLATE, (4.0, 0.0, 0.0))
     right = renderer.render(scene).astype(np.int32)
     expected = staged_scene()
-    expected.define("/World/Box", tokens.CUBE).set(tokens.TRANSFORM, translate((4.0, 0.0, 0.0)))
+    expected.define("/World/Box", ernie.Cube).set(tokens.TRANSFORM, translate((4.0, 0.0, 0.0)))
     assert np.abs(right - left).max() > 50, "the box moved"
     assert np.abs(right - renderer.render(expected).astype(np.int32)).max() <= 1
 
@@ -392,13 +396,13 @@ def test_row_written_poses_render(renderer):
     scene, expected = staged_scene(), staged_scene()
     paths = [f"/World/Box{i}" for i in range(3)]
     for path in paths:
-        scene.define(path, tokens.CUBE).set(tokens.XFORM_OP_ORDER, [tokens.TRANSLATE, tokens.ORIENT])
+        scene.define(path, ernie.Cube).set(tokens.XFORM_OP_ORDER, [tokens.TRANSLATE, tokens.ORIENT])
     positions = np.array([[-4.0, 0.0, 0.0], [0.0, 0.0, 2.0], [4.0, 0.0, 0.0]])
     wxyz = [ernie.Quat.from_euler((0.0, 0.0, 30.0 * i)).wxyz for i in range(3)]
     scene.write(paths, tokens.TRANSLATE, positions)
     scene.write(paths, tokens.ORIENT, np.roll(np.array(wxyz), -1, axis=1))
     for i, path in enumerate(paths):
-        expected.define(path, tokens.CUBE).set(
+        expected.define(path, ernie.Cube).set(
             tokens.TRANSFORM, translate(positions[i]) @ quat_matrix(*wxyz[i])
         )
     assert np.abs(

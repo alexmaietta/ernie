@@ -10,18 +10,14 @@ from test_cuda import instancer_scene
 def product_scene():
     """Instances seen from above by two products: the top camera and a side camera."""
     scene = instancer_scene(np.array([[-10.0, 0.0, 0.0], [10.0, 0.0, 0.0]], np.float32))
-    scene.define("/World/Side", tokens.CAMERA).set(
+    side = scene.define("/World/Side", ernie.Camera, focal_length=18.0).set(
         tokens.TRANSFORM, ernie.look_at_transform((60, 0, 20), (0, 0, 0))
-    ).set(tokens.FOCAL_LENGTH, 18.0)
-    scene.define("/Render/Camera", tokens.RENDER_PRODUCT).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")
-    ).set(tokens.RESOLUTION, (32, 32)).set(
-        tokens.ORDERED_VARS, [ernie.Path("/Render/Camera/LdrColor")]
     )
-    scene.define("/Render/Camera/LdrColor", tokens.RENDER_VAR).set(tokens.SOURCE_NAME, "LdrColor")
-    scene.define("/Render/Side", tokens.RENDER_PRODUCT).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Side")
-    ).set(tokens.RESOLUTION, (24, 16))
+    scene.define(
+        "/Render/Camera", ernie.RenderProduct, camera="/World/Camera", resolution=(32, 32)
+    ).set(tokens.ORDERED_VARS, [ernie.Path("/Render/Camera/LdrColor")])
+    scene.define("/Render/Camera/LdrColor", ernie.RenderVar, source_name="LdrColor")
+    scene.define("/Render/Side", ernie.RenderProduct, camera=side, resolution=(24, 16))
     return scene
 
 
@@ -93,7 +89,7 @@ def test_maps_every_render_var_with_its_shape_and_type(renderer):
     scene = product_scene()
     names = ["SpectralRadiance", "Electrons", "RawDN", "HdrColor", "DistanceToCamera", "PrimId"]
     for name in names:
-        scene.define(f"/Render/Vars/{name}", tokens.RENDER_VAR).set(tokens.SOURCE_NAME, name)
+        scene.define(f"/Render/Vars/{name}", ernie.RenderVar, source_name=name)
     scene.set(
         "/Render/Camera", tokens.ORDERED_VARS, [ernie.Path(f"/Render/Vars/{n}") for n in names]
     )
@@ -126,9 +122,9 @@ def test_maps_every_render_var_with_its_shape_and_type(renderer):
 
 def test_products_choose_their_sensor_filters(renderer):
     scene = product_scene()
-    scene.define("/Render/Filters/Cie", tokens.SENSOR_FILTER).set(tokens.FILTER_TYPE, "cie")
+    scene.define("/Render/Filters/Cie", ernie.SensorFilter, filter_type="cie")
     scene.set("/Render/Camera", tokens.FILTERS, [ernie.Path("/Render/Filters/Cie")])
-    scene.define("/Render/Vars/Hdr", tokens.RENDER_VAR).set(tokens.SOURCE_NAME, "HdrColor")
+    scene.define("/Render/Vars/Hdr", ernie.RenderVar, source_name="HdrColor")
     scene.set("/Render/Camera", tokens.ORDERED_VARS, [ernie.Path("/Render/Vars/Hdr")])
     products = renderer.step(scene, render_products={"/Render/Camera"})
     hdr = products["/Render/Camera"].frames[0].render_vars["/Render/Vars/Hdr"].map()
@@ -147,10 +143,9 @@ def test_a_camera_with_poses_renders_a_batch_of_views(renderer, terrain_scene):
             for a in np.linspace(0.0, np.pi, 5)
         ]
     )
-    scene.write("/World/Camera", tokens.POSES, poses)
-    scene.define("/Render/Batch", tokens.RENDER_PRODUCT).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")
-    ).set(tokens.RESOLUTION, (24, 16))
+    camera = ernie.Camera(scene.get_prim("/World/Camera"))
+    camera.poses = poses
+    scene.define("/Render/Batch", ernie.RenderProduct, camera=camera, resolution=(24, 16))
     batch = renderer.step(scene, render_products=["/Render/Batch"])["/Render/Batch"]
     var = batch.frames[0].render_vars["/Render/Batch/LdrColor"]
     assert var.shape == (5, 16, 24, 4)
@@ -162,22 +157,24 @@ def test_a_camera_with_poses_renders_a_batch_of_views(renderer, terrain_scene):
 
 def test_cloned_worlds_render_one_per_view(renderer):
     scene = ernie.Scene()
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+    scene.define("/World/Sun", ernie.DistantLight).set(
         tokens.TRANSFORM, ernie.distant_light_transform((0.0, 0.0, 1.0))
     )
-    scene.define("/Envs/Env0", tokens.XFORM).set(tokens.WORLD, 0)
-    scene.define("/Envs/Env0/Box", tokens.CUBE).set(tokens.SIZE, 4.0)
+    env = scene.define("/Envs/Env0", ernie.Xform, world=0)
+    env.define("Box", ernie.Cube, size=4.0)
     for i in range(1, 3):
         scene.clone("/Envs/Env0", f"/Envs/Env{i}")
-        scene.set(f"/Envs/Env{i}", tokens.WORLD, i)
-        scene.set(f"/Envs/Env{i}/Box", tokens.SIZE, 4.0 + 4.0 * i)
+        ernie.Xform(scene.get_prim(f"/Envs/Env{i}")).world = i
+        ernie.Cube(scene.get_prim(f"/Envs/Env{i}/Box")).size = 4.0 + 4.0 * i
     above = ernie.look_at_transform((0, 0, 60), (0, 0, 0), up=(0, 1, 0))
-    scene.define("/World/Camera", tokens.CAMERA).set(tokens.SENSOR_NOISE, False)
-    scene.write("/World/Camera", tokens.POSES, np.stack([above] * 3))
-    scene.write("/World/Camera", tokens.WORLDS, np.arange(3, dtype=np.int32))
-    scene.define("/Render/Batch", tokens.RENDER_PRODUCT).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")
-    ).set(tokens.RESOLUTION, (32, 32))
+    camera = scene.define(
+        "/World/Camera",
+        ernie.Camera,
+        sensor_noise=False,
+        poses=np.stack([above] * 3),
+        worlds=np.arange(3, dtype=np.int32),
+    )
+    scene.define("/Render/Batch", ernie.RenderProduct, camera=camera, resolution=(32, 32))
     batch = renderer.step(scene, render_products=["/Render/Batch"])["/Render/Batch"]
     images = batch.frames[0].render_vars["/Render/Batch/LdrColor"].map()
     covered = (images[..., :3].sum(axis=-1) > 0).sum(axis=(1, 2))
@@ -187,19 +184,15 @@ def test_cloned_worlds_render_one_per_view(renderer):
 
 def test_cloned_worlds_render_apart_in_one_batch(renderer, terrain_scene):
     scene = terrain_scene
-    scene.define("/Envs/Env0", tokens.XFORM).set(tokens.WORLD, 0)
-    scene.define("/Envs/Env0/Box", tokens.CUBE).set(tokens.SIZE, 40.0).set(
-        tokens.DISPLAY_COLOR, (1.0, 0.0, 0.0)
-    )
+    env = scene.define("/Envs/Env0", ernie.Xform, world=0)
+    env.define("Box", ernie.Cube, size=40.0, display_color=(1.0, 0.0, 0.0))
     scene.clone("/Envs/Env0", "/Envs/Env1")
-    scene.set("/Envs/Env1", tokens.WORLD, 1)
-    scene.set("/Envs/Env1/Box", tokens.DISPLAY_COLOR, (0.0, 1.0, 0.0))
-    pose = scene.get("/World/Camera", tokens.TRANSFORM)
-    scene.write("/World/Camera", tokens.POSES, np.stack([pose, pose]))
-    scene.write("/World/Camera", tokens.WORLDS, np.array([0, 1], dtype=np.int32))
-    scene.define("/Render/Batch", tokens.RENDER_PRODUCT).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")
-    ).set(tokens.RESOLUTION, (48, 48))
+    ernie.Xform(scene.get_prim("/Envs/Env1")).world = 1
+    ernie.Cube(scene.get_prim("/Envs/Env1/Box")).display_color = (0.0, 1.0, 0.0)
+    camera = ernie.Camera(scene.get_prim("/World/Camera"))
+    pose = camera.get(tokens.TRANSFORM)
+    camera.set(poses=np.stack([pose, pose]), worlds=np.array([0, 1], dtype=np.int32))
+    scene.define("/Render/Batch", ernie.RenderProduct, camera=camera, resolution=(48, 48))
     images = (
         renderer.step(scene, render_products=["/Render/Batch"])["/Render/Batch"]
         .frames[0]

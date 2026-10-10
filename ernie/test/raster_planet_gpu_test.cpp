@@ -2,7 +2,11 @@
 #include "ernie/geometry/cube_sphere_lod.h"
 #include "ernie/raster/delegate.h"
 #include "ernie/raster/planet_drawable.h"
+#include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/material_schemas.h"
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
+#include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
 #include "support/delegate_scenes.h"
 #include "support/vulkan_fixture.h"
@@ -18,7 +22,6 @@
 #include <vector>
 
 using ernie::CubeSphereLod;
-using ernie::Path;
 using ernie::RasterDelegate;
 using ernie::Scene;
 using ernie::Tensor;
@@ -50,27 +53,25 @@ Scene PlanetScene(std::uint32_t n) {
     const std::vector<float> heights = PlanetHeights(n);
     const auto side = static_cast<std::int64_t>(n + 1);
     Scene scene;
-    scene.Define("/World/Moon", tokens::kTerrain)
-        .Write(tokens::kHeights, Tensor::Copy<float>(heights, {6, side, side}))
-        .Set(tokens::kPlanetRadius, kMoon)
-        .Set(tokens::kMaterialBinding, Path("/Looks/Regolith"));
-    scene.Define("/Looks/Regolith", tokens::kMaterial).Set(tokens::kAlbedo, glm::vec3(0.5f));
+    ernie::Terrain::Define(scene, "/World/Moon")
+        .SetHeights(Tensor::Copy<float>(heights, {6, side, side}))
+        .SetPlanetRadius(kMoon)
+        .SetMaterialBinding("/Looks/Regolith");
+    ernie::Material::Define(scene, "/Looks/Regolith").SetAlbedo(glm::dvec3(0.5));
     scene.Define("/World/Sun", tokens::kDistantLight)
         .Set(tokens::kTransform, ernie::DistantLightTransform({1.0, 0.3, 0.2}));
-    scene.Define("/Render/Settings", tokens::kRenderSettings)
-        .Set(tokens::kCameraRel, Path("/World/Camera"))
-        .Set(tokens::kResolution, glm::ivec2(kSize, kSize))
-        .Set(tokens::kClearColor, glm::vec3(0.0f, 0.0f, 1.0f))
-        .Set(tokens::kColorMode, tokens::kHillshade);
+    ernie::RenderSettings::Define(scene, "/Render/Settings")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(kSize, kSize))
+        .SetClearColor(glm::dvec3(0.0, 0.0, 1.0))
+        .SetColorMode(tokens::kHillshade);
     return scene;
 }
 
 void PlaceCamera(Scene& scene, const glm::dvec3& eye, const glm::dvec3& target,
-                 const glm::dvec3& up, glm::vec2 clipping) {
-    scene.Define("/World/Camera", tokens::kCamera)
-        .Set(tokens::kTransform, ernie::LookAtTransform(eye, target, up))
-        .Set(tokens::kFocalLength, 18.0f)
-        .Set(tokens::kClippingRange, clipping);
+                 const glm::dvec3& up, glm::dvec2 clipping) {
+    ernie::Camera::Define(scene, "/World/Camera").SetFocalLength(18.0).SetClippingRange(clipping);
+    scene.Set("/World/Camera", tokens::kTransform, ernie::LookAtTransform(eye, target, up));
 }
 
 bool IsClear(const std::uint8_t* texel) {
@@ -91,7 +92,7 @@ std::size_t Covered(const Tensor& image) {
 TEST_F(RasterDelegateTest, APlanetFromOrbitIsADiscOfItsAngularSize) {
     Scene scene = PlanetScene(128);
     const double distance = 4.0 * kMoon;
-    PlaceCamera(scene, {distance, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}, {1e4f, 1e8f});
+    PlaceCamera(scene, {distance, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}, {1e4, 1e8});
     RasterDelegate delegate(*context_);
     delegate.Sync(scene);
     ASSERT_TRUE(delegate.Planet().HasHeights());
@@ -117,7 +118,7 @@ TEST_F(RasterDelegateTest, APlanetSeenFromLowAltitudeFillsBelowTheHorizon) {
     const glm::dvec3 up = glm::normalize(glm::dvec3(0.2, 0.9, 0.4));
     const glm::dvec3 east = glm::normalize(glm::cross(glm::dvec3(0.0, 0.0, 1.0), up));
     const glm::dvec3 eye = up * (kMoon + 8000.0);
-    PlaceCamera(scene, eye, eye + east, up, {1.0f, 1e7f});
+    PlaceCamera(scene, eye, eye + east, up, {1.0, 1e7});
     RasterDelegate delegate(*context_);
     delegate.Sync(scene);
     const Tensor image = delegate.Render(scene);
@@ -139,12 +140,12 @@ TEST_F(RasterDelegateTest, APlanetStaysStillUnderCentimetreCameraMoves) {
     const glm::dvec3 north = glm::normalize(glm::dvec3(0.0, 0.0, 1.0) - up * up.z);
     const glm::dvec3 eye = up * (kMoon + 3000.0 + 400.0);
     const glm::dvec3 target = eye + 2000.0 * north - 600.0 * up;
-    PlaceCamera(scene, eye, target, up, {1.0f, 1e7f});
+    PlaceCamera(scene, eye, target, up, {1.0, 1e7});
     RasterDelegate delegate(*context_);
     delegate.Sync(scene);
     const std::vector<std::uint8_t> before = Bytes(delegate.Render(scene));
     PlaceCamera(scene, eye + glm::dvec3(0.01, 0.0, 0.0), target + glm::dvec3(0.01, 0.0, 0.0), up,
-                {1.0f, 1e7f});
+                {1.0, 1e7});
     const std::vector<std::uint8_t> after = Bytes(delegate.Render(scene));
     EXPECT_GT(Covered(Tensor::Copy<std::uint8_t>(before, {kSize, kSize, 4})), kSize * kSize / 4);
     EXPECT_LE(BytesDiffering(before, after), before.size() / 100);
@@ -173,7 +174,7 @@ TEST_F(RasterDelegateTest, PlanetsNeedFacesOfAtLeastALeafAndSixLayers) {
     EXPECT_FALSE(planet.HasHeights());
 
     Scene scene = PlanetScene(64);
-    scene.Write("/World/Moon", tokens::kHeights, Tensor::Copy<float>(enough, {1, 65, 65}));
+    ernie::Terrain(scene, "/World/Moon").SetHeights(Tensor::Copy<float>(enough, {1, 65, 65}));
     RasterDelegate delegate(*context_);
     EXPECT_THROW(delegate.Sync(scene), std::exception);
 }

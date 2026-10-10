@@ -13,9 +13,9 @@ app = pytest.importorskip("ernie.app", reason="Ernie was built without its app",
 
 def cube_scene(lit=True):
     scene = ernie.Scene()
-    scene.define("/World/Cube", tokens.CUBE).set(tokens.SIZE, 2.0)
+    scene.define("/World/Cube", ernie.Cube, size=2.0)
     if lit:
-        scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+        scene.define("/World/Sun", ernie.DistantLight).set(
             tokens.TRANSFORM, ernie.distant_light_transform((0.4, -0.6, 1.0))
         )
     return scene
@@ -263,9 +263,9 @@ def test_auto_exposure_keys_bright_scenes_to_middle_grey():
     # camera's own exposure is white; automatic exposure brings it to the middle.
     image_module = pytest.importorskip("PIL.Image")
     scene = cube_scene(lit=False)
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+    scene.define("/World/Sun", ernie.DistantLight, photometric_illuminance=100000.0).set(
         tokens.TRANSFORM, ernie.distant_light_transform((0.0, -0.3, 1.0))
-    ).set(tokens.PHOTOMETRIC_ILLUMINANCE, 100000.0)
+    )
     try:
         viewer = app.Viewer(scene, hidden=True, width=320, height=240)
     except RuntimeError as error:

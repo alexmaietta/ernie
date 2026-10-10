@@ -3,6 +3,7 @@
 #include "ernie/geometry/primitives.h"
 #include "ernie/raster/delegate.h"
 #include "ernie/scene/orbit_controller.h"
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/session/renderer.h"
@@ -79,7 +80,7 @@ std::vector<float> HdrThrough(RasterDelegate& delegate, Scene& scene,
     for (std::size_t i = 0; i < types.size(); ++i) {
         const Path path("/Render/Filters/F" + std::to_string(i));
         scene.Remove(path);  // a fresh prim: no inputs left from an earlier chain
-        scene.Define(path, tokens::kSensorFilter).Set(tokens::kFilterType, types[i]);
+        ernie::SensorFilterPrim::Define(scene, path).SetFilterType(types[i]);
         for (const auto& [name, value] : inputs) {
             if (types[i] != "cie") {
                 scene.Set(path, "inputs:" + name, value);
@@ -87,12 +88,12 @@ std::vector<float> HdrThrough(RasterDelegate& delegate, Scene& scene,
         }
         filters.push_back(path);
     }
-    scene.Define("/Render/Vars/Hdr", tokens::kRenderVar).Set(tokens::kSourceName, "HdrColor");
-    scene.Define("/Render/Hdr", tokens::kRenderProduct)
-        .Set(tokens::kCameraRel, Path("/World/Camera"))
-        .Set(tokens::kResolution, glm::ivec2(kSize, kSize))
-        .Set(tokens::kOrderedVars, std::vector<Path>{"/Render/Vars/Hdr"})
-        .Set(tokens::kFilters, filters);
+    ernie::RenderVar::Define(scene, "/Render/Vars/Hdr").SetSourceName("HdrColor");
+    ernie::RenderProduct::Define(scene, "/Render/Hdr")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(kSize, kSize));
+    scene.Set("/Render/Hdr", tokens::kOrderedVars, std::vector<Path>{"/Render/Vars/Hdr"});
+    scene.Set("/Render/Hdr", tokens::kFilters, filters);
     const Path product[] = {"/Render/Hdr"};
     const Tensor hdr = delegate.Step(scene, product)
                            .at("/Render/Hdr")

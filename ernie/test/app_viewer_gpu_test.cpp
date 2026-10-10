@@ -3,6 +3,8 @@
 #include "ernie/device/vulkan_context.h"
 #include "ernie/raster/delegate.h"
 #include "ernie/scene/camera.h"
+#include "ernie/scene/geometry_schemas.h"
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 
@@ -31,10 +33,10 @@ namespace tokens = ernie::tokens;
 /// A white cube at the origin lit by a sun, with render settings.
 Scene CubeScene() {
     Scene scene;
-    scene.Define("/World/Cube", tokens::kCube).Set(tokens::kSize, 2.0);
+    Cube::Define(scene, "/World/Cube").SetSize(2.0);
     scene.Define("/World/Sun", tokens::kDistantLight)
         .Set(tokens::kTransform, DistantLightTransform({0.4, -0.6, 1.0}));
-    scene.Define("/Render/Settings", tokens::kRenderSettings);
+    RenderSettings::Define(scene, "/Render/Settings");
     return scene;
 }
 
@@ -206,10 +208,11 @@ TEST_F(ViewerTest, RecreatesItsCameraIfTheSceneRemovesIt) {
 }
 
 TEST_F(ViewerTest, FrameAimsAtTheGivenPrims) {
-    scene_.Define("/World/Far", tokens::kCube)
-        .Set(tokens::kSize, 1.0)
-        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(30.0, 0.0, 0.0)))
-        .Set(tokens::kExtent, std::vector<float>{-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f});
+    Cube::Define(scene_, "/World/Far").SetSize(1.0);
+    scene_.Set("/World/Far", tokens::kTransform,
+               glm::translate(glm::dmat4(1.0), glm::dvec3(30.0, 0.0, 0.0)));
+    scene_.Set("/World/Far", tokens::kExtent,
+               std::vector<float>{-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f});
     const std::vector<Path> far{Path("/World/Far")};
     viewer_->Frame(far);
     const CameraParams camera = CameraParamsOf(scene_, Viewer::PerspectiveCamera(), 64, 64);
@@ -502,7 +505,7 @@ TEST_F(ViewerTest, RendererIsAViewerOptionAndSwitchable) {
 
 TEST_F(ViewerTest, SyncReportsDataTheRendererCannotUse) {
     EXPECT_NO_THROW(viewer_->Sync());
-    scene_.Define("/World/Broken", tokens::kCube).Set(tokens::kSize, -1.0);
+    Cube::Define(scene_, "/World/Broken").SetSize(-1.0);
     EXPECT_THROW(viewer_->Sync(), std::invalid_argument);
 }
 
@@ -645,7 +648,7 @@ TEST_F(ViewerTest, ViewportTogglesShowOverlaysAndHudItemsList) {
 }
 
 TEST_F(ViewerTest, DuplicateAndRenameAreSingleUndoSteps) {
-    scene_.Define("/World/Cube/Child", tokens::kSphere).Set(tokens::kGeomRadius, 0.5);
+    Sphere::Define(scene_, "/World/Cube/Child").SetRadius(0.5);
     const std::vector<Path> copies = viewer_->Duplicate(std::vector<Path>{Path("/World/Cube")});
     ASSERT_EQ(copies, std::vector<Path>{Path("/World/Cube_01")});
     EXPECT_EQ(scene_.TypeOf("/World/Cube_01"), tokens::kCube);
@@ -717,7 +720,7 @@ TEST_F(ViewerTest, LayoutsRoundTripThroughFiles) {
 }
 
 TEST_F(ViewerTest, ShowsRenderErrorsWithoutThrowing) {
-    scene_.Define("/World/Broken", tokens::kCube).Set(tokens::kSize, -1.0);
+    Cube::Define(scene_, "/World/Broken").SetSize(-1.0);
     EXPECT_NO_THROW(viewer_->Step());
     scene_.Remove(Path("/World/Broken"));
     EXPECT_TRUE(viewer_->Step());
@@ -731,7 +734,7 @@ TEST_F(ViewerTest, RejectsVarsAndSettingsItCannotShowYet) {
     EXPECT_NO_THROW(viewer_->SetViewVar("LdrColor"));
     EXPECT_THROW(viewer_->SetSettings(Path("/World/Cube")), std::invalid_argument);
     EXPECT_THROW(viewer_->SetSettings(Path("/__session/RenderSettings")), std::invalid_argument);
-    scene_.Define("/Render/Other", tokens::kRenderSettings);
+    RenderSettings::Define(scene_, "/Render/Other");
     viewer_->SetSettings(Path("/Render/Other"));
     EXPECT_EQ(viewer_->Settings(), Path("/Render/Other"));
     EXPECT_THROW(viewer_->Capture(TempFile("x.png"), "Depth"), std::invalid_argument);
@@ -796,7 +799,7 @@ TEST(ViewerLightingTest, AnUnlitSceneOpensWithTheDefaultLightAndIsLit) {
         GTEST_SKIP() << "No Vulkan device: " << error.what();
     }
     Scene scene;
-    scene.Define("/World/Cube", tokens::kCube).Set(tokens::kSize, 2.0);
+    Cube::Define(scene, "/World/Cube").SetSize(2.0);
     ViewerOptions options;
     options.hidden = true;
     options.width = 320;

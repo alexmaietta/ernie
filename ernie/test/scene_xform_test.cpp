@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include "ernie/scene/base_schemas.h"
 #include "ernie/scene/edit_history.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/tokens.h"
@@ -99,7 +100,7 @@ glm::dmat4 Trs(glm::dvec3 translate, const glm::dmat3& rotation, glm::dvec3 scal
 
 Scene OnePrim(const Path& path = Path("/World/Rock")) {
     Scene scene;
-    scene.Define(path, tokens::kXform);
+    ernie::Xform::Define(scene, path);
     return scene;
 }
 
@@ -405,7 +406,7 @@ TEST(Xform, InvertingAnyOpUndoesIt) {
 
 TEST(Xform, WorldTransformsComposeOpsDownTheHierarchy) {
     Scene scene;
-    scene.Define(Path("/World/Robot/Arm"), tokens::kXform);
+    ernie::Xform::Define(scene, "/World/Robot/Arm");
     scene.GetPrim(Path("/World")).SetXform({.translate = glm::dvec3(100, 0, 0)});
     scene.GetPrim(Path("/World/Robot")).SetXform({.rotate = glm::dvec3(0, 0, 90)});
     scene.GetPrim(Path("/World/Robot/Arm")).SetXform({.translate = glm::dvec3(1, 0, 0)});
@@ -414,7 +415,7 @@ TEST(Xform, WorldTransformsComposeOpsDownTheHierarchy) {
 
 TEST(Xform, ResettingTheStackIgnoresAncestors) {
     Scene scene;
-    scene.Define(Path("/World/Robot/Arm/Hand"), tokens::kXform);
+    ernie::Xform::Define(scene, "/World/Robot/Arm/Hand");
     scene.GetPrim(Path("/World")).SetXform({.translate = glm::dvec3(100, 0, 0)});
     scene.GetPrim(Path("/World/Robot")).SetXform({.translate = glm::dvec3(0, 10, 0)});
     scene.Set(Path("/World/Robot/Arm"), tokens::kTranslate, glm::dvec3(0, 0, 1));
@@ -582,7 +583,7 @@ TEST(Xform, OneTensorPosesManyPrimsRowByRow) {
     for (int world = 0; world < 8; ++world) {
         for (int link = 0; link < 3; ++link) {
             links.emplace_back("/World_" + std::to_string(world) + "/Link" + std::to_string(link));
-            scene.Define(links.back(), tokens::kXform);
+            ernie::Xform::Define(scene, links.back());
             scene.Set(links.back(), tokens::kXformOpOrder,
                       Order({tokens::kTranslate, tokens::kOrient}));
         }

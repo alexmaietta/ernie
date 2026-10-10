@@ -2,8 +2,14 @@
 #include "ernie/device/offscreen_target.h"
 #include "ernie/geometry/primitives.h"
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/geometry_schemas.h"
+#include "ernie/scene/light_schemas.h"
+#include "ernie/scene/material_schemas.h"
 #include "ernie/scene/orbit_controller.h"
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
+#include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/session/renderer.h"
 #include "ernie/session/resolve.h"
@@ -28,7 +34,6 @@
 using ernie::DeviceKind;
 using ernie::DType;
 using ernie::OrbitController;
-using ernie::Path;
 using ernie::RasterDelegate;
 using ernie::Scene;
 using ernie::Tensor;
@@ -42,12 +47,12 @@ namespace {
 Scene LampScene(double height, float coneAngle = 180.0f) {
     Scene scene = FlatScene();
     scene.Remove("/World/Sun");
-    scene.Define("/World/Lamp", tokens::kSphereLight)
-        .Set(tokens::kTransform,
-             ernie::LookAtTransform({0.0, 0.0, height}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}))
-        .Set(tokens::kTreatAsPoint, true)
-        .Set(tokens::kLightPower, 1000.0)
-        .Set(tokens::kShapingConeAngle, coneAngle);
+    ernie::SphereLight::Define(scene, "/World/Lamp")
+        .SetTreatAsPoint(true)
+        .SetPower(1000.0)
+        .SetShapingConeAngle(coneAngle);
+    scene.Set("/World/Lamp", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, height}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
     return scene;
 }
 
@@ -96,7 +101,7 @@ TEST_F(RasterDelegateTest, LampsCastShadowsFromSpotAndCubeMaps) {
         EXPECT_NEAR(RadianceAt(delegate, scene, 6.0f, 6.0f),
                     RadianceAt(delegate, LampScene(10.0, cone), 6.0f, 6.0f), 0.05f * lit)
             << "beside the shadow, cone " << cone;
-        scene.Set("/World/Lamp", tokens::kShadowEnable, false);
+        ernie::SphereLight(scene, "/World/Lamp").SetShadowEnable(false);
         EXPECT_NEAR(RadianceAt(delegate, scene, 3.0f, 0.0f), lit, 0.02f * lit);
     }
     EXPECT_EQ(delegate.Renderer().LightShadowViews().size(), 0u) << "shadows off";
@@ -104,9 +109,8 @@ TEST_F(RasterDelegateTest, LampsCastShadowsFromSpotAndCubeMaps) {
 
 TEST_F(RasterDelegateTest, OtherDistantLightsAddToTheSun) {
     Scene scene = FlatScene();
-    scene.Define("/World/Zenith", tokens::kDistantLight)
-        .Set(tokens::kTransform, ernie::DistantLightTransform({0.0, 0.0, 1.0}))
-        .Set(tokens::kIntensity, 0.5f);
+    ernie::DistantLight::Define(scene, "/World/Zenith").SetIntensity(0.5);
+    scene.Set("/World/Zenith", tokens::kTransform, ernie::DistantLightTransform({0.0, 0.0, 1.0}));
     RasterDelegate delegate(*context_);
     ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
     const auto vars = MapVars(outputs);
@@ -118,14 +122,15 @@ TEST_F(RasterDelegateTest, OtherDistantLightsAddToTheSun) {
 
 TEST_F(RasterDelegateTest, TheSunsDiskWidensPenumbrae) {
     Scene scene = FlatScene();
-    scene.Set("/World/Sun", tokens::kShadowEnable, true);
+    ernie::DistantLight sun(scene, "/World/Sun");
+    sun.SetShadowEnable(true);
     scene.Set("/World/Sun", tokens::kTransform, ernie::DistantLightTransform({0.3, 0.0, 1.0}));
     DefineQuad(scene, "/World/Blocker", 4.0f);
     scene.Set("/World/Blocker", tokens::kTransform,
               glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 30.0)));
     RasterDelegate delegate(*context_);
     const auto partial = [&](float angle) {
-        scene.Set("/World/Sun", tokens::kAngle, angle);
+        sun.SetAngle(angle);
         ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
         const Tensor hdr =
             outputs.at("/Render/Product").vars.at("HdrColor").Map(ernie::MapDevice::Cpu).tensor;
@@ -168,9 +173,8 @@ Scene AreaLightScene(std::string_view type) {
     scene.Remove("/World/Sun");
     scene.Define("/World/Panel", type)
         .Set(tokens::kTransform,
-             ernie::LookAtTransform({0.0, 0.0, 10.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}))
-        .Set(tokens::kIntensity, 1000.0)
-        .Set(tokens::kShadowEnable, false);
+             ernie::LookAtTransform({0.0, 0.0, 10.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
+    ernie::Light(scene, "/World/Panel").SetIntensity(1000.0).SetShadowEnable(false);
     return scene;
 }
 
@@ -199,15 +203,14 @@ TEST_F(RasterDelegateTest, RectAndDiskLightsMatchTheirFormFactors) {
     const double radiance = 1000.0 * UnitLuminanceRadiance();
 
     Scene rect = AreaLightScene(tokens::kRectLight);
-    rect.Set("/World/Panel", tokens::kWidth, 8.0);
-    rect.Set("/World/Panel", tokens::kHeight, 6.0);
+    ernie::RectLight(rect, "/World/Panel").SetWidth(8.0).SetHeight(6.0);
     const double rectExpected =
         0.5 / M_PI * radiance * M_PI * 4.0 * CornerFormFactor(4.0, 3.0, 10.0);
     EXPECT_NEAR(RadianceAt(delegate, rect, 0.0f, 0.0f), rectExpected, 0.03 * rectExpected)
         << "albedo / pi times E = pi L F";
 
     Scene disk = AreaLightScene(tokens::kDiskLight);
-    disk.Set("/World/Panel", tokens::kRadius, 5.0);
+    ernie::DiskLight(disk, "/World/Panel").SetRadius(5.0);
     const double diskExpected = 0.5 * radiance * 25.0 / (25.0 + 100.0);
     EXPECT_NEAR(RadianceAt(delegate, disk, 0.0f, 0.0f), diskExpected, 0.03 * diskExpected)
         << "E = pi L r^2 / (r^2 + h^2) on the axis";
@@ -225,7 +228,7 @@ TEST_F(RasterDelegateTest, RectAndDiskLightsMatchTheirFormFactors) {
 TEST_F(RasterDelegateTest, AreaLightsCastShadows) {
     RasterDelegate delegate(*context_);
     Scene scene = AreaLightScene(tokens::kRectLight);
-    scene.Set("/World/Panel", tokens::kShadowEnable, true);
+    ernie::RectLight(scene, "/World/Panel").SetShadowEnable(true);
     const float lit = RadianceAt(delegate, scene, 3.0f, 0.0f);
     DefineQuad(scene, "/World/Blocker");
     scene.Set("/World/Blocker", tokens::kTransform,
@@ -237,7 +240,7 @@ TEST_F(RasterDelegateTest, AreaLightsCastShadows) {
 TEST_F(RasterDelegateTest, DomesLightEverySurfaceDiffusely) {
     Scene scene = FlatScene();
     scene.Remove("/World/Sun");
-    scene.Define("/World/Sky", tokens::kDomeLight).Set(tokens::kIntensity, 1.0);
+    ernie::DomeLight sky = ernie::DomeLight::Define(scene, "/World/Sky").SetIntensity(1.0);
     RasterDelegate delegate(*context_);
     ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
     const auto vars = MapVars(outputs);
@@ -248,7 +251,7 @@ TEST_F(RasterDelegateTest, DomesLightEverySurfaceDiffusely) {
 
     std::vector<float> map(8 * 16 * 3, 0.0f);
     std::fill(map.begin(), map.begin() + map.size() / 2, 1.0f);
-    scene.Write("/World/Sky", tokens::kLightTexture, Tensor::Copy<float>(map, {8, 16, 3}));
+    sky.SetTexture(Tensor::Copy<float>(map, {8, 16, 3}));
     ernie::RenderProductSetOutputs upper = delegate.Step(scene);
     EXPECT_NEAR(At<float>(MapVars(upper).at("HdrColor"), c, c, 1), 0.5f, 0.03f)
         << "the upper hemisphere alone lights upward surfaces fully";
@@ -265,8 +268,9 @@ TEST_F(RasterDelegateTest, MetalsReflectDomesAndAmbientLightThroughTheSplitSum) 
     // without the compensation lost a third of the light when rough.
     Scene scene = FlatScene();
     scene.Remove("/World/Sun");
-    scene.Define("/World/Sky", tokens::kDomeLight).Set(tokens::kIntensity, 1.0);
-    scene.Set("/Looks/Grey", tokens::kAlbedo, glm::vec3(1.0f));
+    ernie::DomeLight::Define(scene, "/World/Sky").SetIntensity(1.0);
+    ernie::Material grey(scene, "/Looks/Grey");
+    grey.SetAlbedo(glm::dvec3(1.0));
     RasterDelegate delegate(*context_);
     const std::size_t c = kVarSize / 2;
     const auto centre = [&] {
@@ -275,7 +279,7 @@ TEST_F(RasterDelegateTest, MetalsReflectDomesAndAmbientLightThroughTheSplitSum) 
     };
     const float lambert = centre();
     ASSERT_GT(lambert, 0.5f);
-    scene.Set("/Looks/Grey", tokens::kBrdf, std::string("preview_surface"));
+    grey.SetBrdf("preview_surface");
     scene.Set("/Looks/Grey", "inputs:metallic", 1.0);
     for (const float roughness : {0.2f, 0.6f, 1.0f}) {
         scene.Set("/Looks/Grey", "inputs:roughness", static_cast<double>(roughness));
@@ -284,25 +288,24 @@ TEST_F(RasterDelegateTest, MetalsReflectDomesAndAmbientLightThroughTheSplitSum) 
 
     // The ambient fraction of a sun below the horizon, which lights nothing directly.
     scene.Remove("/World/Sky");
-    scene.Define("/World/Sun", tokens::kDistantLight)
-        .Set(tokens::kTransform, ernie::DistantLightTransform({0.0, 0.0, -1.0}))
-        .Set(tokens::kShadowEnable, false);
-    scene.Define("/Render/Settings", tokens::kRenderSettings).Set(tokens::kAmbient, 0.5f);
-    scene.Set("/Looks/Grey", tokens::kBrdf, std::string("lambert"));
+    ernie::DistantLight::Define(scene, "/World/Sun").SetShadowEnable(false);
+    scene.Set("/World/Sun", tokens::kTransform, ernie::DistantLightTransform({0.0, 0.0, -1.0}));
+    ernie::RenderSettings::Define(scene, "/Render/Settings").SetAmbient(0.5);
+    grey.SetBrdf("lambert");
     const float ambient = centre();
     ASSERT_GT(ambient, 0.0f);
-    scene.Set("/Looks/Grey", tokens::kBrdf, std::string("preview_surface"));
+    grey.SetBrdf("preview_surface");
     EXPECT_NEAR(centre() / ambient, 1.0f, 0.03f) << "ambient";
 
     // A smooth metal mirrors the dome's map: facing up under a map bright above the horizon it
     // shows the bright half, and with the dome turned over the dark one.
     scene.Remove("/World/Sun");
-    scene.Define("/Render/Settings", tokens::kRenderSettings).Set(tokens::kAmbient, 0.0f);
+    ernie::RenderSettings::Define(scene, "/Render/Settings").SetAmbient(0.0);
     std::vector<float> map(8 * 16 * 3, 0.0f);
     std::fill(map.begin(), map.begin() + map.size() / 2, 1.0f);
-    scene.Define("/World/Sky", tokens::kDomeLight)
-        .Set(tokens::kIntensity, 1.0)
-        .Write(tokens::kLightTexture, Tensor::Copy<float>(map, {8, 16, 3}));
+    ernie::DomeLight::Define(scene, "/World/Sky")
+        .SetIntensity(1.0)
+        .SetTexture(Tensor::Copy<float>(map, {8, 16, 3}));
     scene.Set("/Looks/Grey", "inputs:roughness", 0.05);
     const float above = centre();
     EXPECT_GT(above, 0.8f * lambert);
@@ -318,11 +321,10 @@ TEST_F(RasterDelegateTest, DomeLightModesShadowLimitAndApproximate) {
     // shadows are off; the limited one gives the Lambertian floor no dome light at all.
     Scene scene = FlatScene();
     scene.Remove("/World/Sun");
-    scene.Define("/World/Sky", tokens::kDomeLight).Set(tokens::kIntensity, 1.0);
-    scene.Define("/World/Box", tokens::kCube)
-        .Set(tokens::kSize, 6.0)
-        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 3.0)))
-        .Set(tokens::kMaterialBinding, Path("/Looks/Grey"));
+    ernie::DomeLight sky = ernie::DomeLight::Define(scene, "/World/Sky").SetIntensity(1.0);
+    ernie::Cube::Define(scene, "/World/Box").SetSize(6.0).SetMaterialBinding("/Looks/Grey");
+    scene.Set("/World/Box", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 3.0)));
     RasterDelegate delegate(*context_);
     // Floor a metre and a half from the cube's side, and floor beyond the occlusion radius of it.
     const auto [nearRow, nearCol] = PixelOf(scene, 4.5f, 0.0f);
@@ -336,9 +338,10 @@ TEST_F(RasterDelegateTest, DomeLightModesShadowLimitAndApproximate) {
     const auto [approximateNear, approximateFar] = floor();
     EXPECT_NEAR(approximateNear, approximateFar, 0.02f * approximateFar) << "unoccluded";
 
-    scene.Define("/Render/Settings", tokens::kRenderSettings)
-        .Set(tokens::kDomeLightMode, std::string("full"))
-        .Set(tokens::kDomeShadowRadius, 8.0);
+    ernie::RenderSettings settings =
+        ernie::RenderSettings::Define(scene, "/Render/Settings")
+            .SetDomeLightMode("full")
+            .SetDomeShadowRadius(8.0);
     const auto [fullNear, fullFar] = floor();
     EXPECT_LT(fullNear, 0.9f * approximateNear) << "the cube hides some of the sky";
     EXPECT_NEAR(fullFar, approximateFar, 0.02f * approximateFar) << "open floor sees it all";
@@ -358,13 +361,13 @@ TEST_F(RasterDelegateTest, DomeLightModesShadowLimitAndApproximate) {
         EXPECT_LT(high - low, 0.05f * high) << "smooth along the face";
     }
 
-    scene.Set("/World/Sky", tokens::kShadowEnable, false);
+    sky.SetShadowEnable(false);
     EXPECT_NEAR(floor().first, approximateNear, 0.02f * approximateNear) << "shadows off";
 
-    scene.Set("/Render/Settings", tokens::kDomeLightMode, std::string("limited"));
+    settings.SetDomeLightMode("limited");
     EXPECT_LT(floor().second, 0.01f * approximateFar) << "no diffuse dome light";
 
-    scene.Set("/Render/Settings", tokens::kDomeLightMode, std::string("bright"));
+    settings.SetDomeLightMode("bright");
     EXPECT_THROW(delegate.Step(scene), std::invalid_argument);
 }
 
@@ -382,13 +385,12 @@ TEST_F(RasterDelegateTest, TheFullDomeModeShadowsTheSunOfAnHdrSky) {
     for (int c = 0; c < 3; ++c) {
         map[static_cast<std::size_t>((sunRow * cols + 0) * 3 + c)] = 3000.0f;  // azimuth 0, +x
     }
-    scene.Define("/World/Sky", tokens::kDomeLight)
-        .Set(tokens::kIntensity, 1.0)
-        .Write(tokens::kLightTexture, Tensor::Copy<float>(map, {rows, cols, 3}));
-    scene.Define("/World/Box", tokens::kCube)
-        .Set(tokens::kSize, 6.0)
-        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 3.0)))
-        .Set(tokens::kMaterialBinding, Path("/Looks/Grey"));
+    ernie::DomeLight::Define(scene, "/World/Sky")
+        .SetIntensity(1.0)
+        .SetTexture(Tensor::Copy<float>(map, {rows, cols, 3}));
+    ernie::Cube::Define(scene, "/World/Box").SetSize(6.0).SetMaterialBinding("/Looks/Grey");
+    scene.Set("/World/Box", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 3.0)));
     RasterDelegate delegate(*context_);
     const auto [shadeRow, shadeCol] = PixelOf(scene, -4.5f, 0.0f);
     const auto [sunnyRow, sunnyCol] = PixelOf(scene, 4.5f, 0.0f);
@@ -409,8 +411,7 @@ TEST_F(RasterDelegateTest, TheFullDomeModeShadowsTheSunOfAnHdrSky) {
     EXPECT_NEAR(approximate.shade, approximate.sunny, 0.05f * approximate.sunny)
         << "the sun in the map casts no shadow";
 
-    scene.Define("/Render/Settings", tokens::kRenderSettings)
-        .Set(tokens::kDomeLightMode, std::string("full"));
+    ernie::RenderSettings::Define(scene, "/Render/Settings").SetDomeLightMode("full");
     const Floor full = floor();
     // The sun gives about a third of the light here, so its shadow leaves about two thirds.
     EXPECT_LT(full.shade, 0.75f * full.sunny) << "the cube shadows the sun";
@@ -427,11 +428,10 @@ TEST_F(RasterDelegateTest, TheDirectionsModeShadowsTheDomeFromTheWholeScene) {
     // than the (1 m) screen-space radius.
     Scene scene = FlatScene();
     scene.Remove("/World/Sun");
-    scene.Define("/World/Sky", tokens::kDomeLight).Set(tokens::kIntensity, 1.0);
-    scene.Define("/World/Box", tokens::kCube)
-        .Set(tokens::kSize, 6.0)
-        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 3.0)))
-        .Set(tokens::kMaterialBinding, Path("/Looks/Grey"));
+    ernie::DomeLight::Define(scene, "/World/Sky").SetIntensity(1.0);
+    ernie::Cube::Define(scene, "/World/Box").SetSize(6.0).SetMaterialBinding("/Looks/Grey");
+    scene.Set("/World/Box", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 3.0)));
     RasterDelegate delegate(*context_);
     const auto [nearRow, nearCol] = PixelOf(scene, 4.0f, 0.0f);
     const auto [openRow, openCol] = PixelOf(scene, -12.0f, 12.0f);
@@ -442,8 +442,7 @@ TEST_F(RasterDelegateTest, TheDirectionsModeShadowsTheDomeFromTheWholeScene) {
                          At<float>(vars.at("HdrColor"), openRow, openCol, 1));
     };
     const auto [approximateNear, approximateOpen] = floor();
-    scene.Define("/Render/Settings", tokens::kRenderSettings)
-        .Set(tokens::kDomeLightMode, std::string("directions"));
+    ernie::RenderSettings::Define(scene, "/Render/Settings").SetDomeLightMode("directions");
     const auto [directionsNear, directionsOpen] = floor();
     EXPECT_NEAR(directionsOpen, approximateOpen, 0.08f * approximateOpen)
         << "the directions carry the dome's diffuse light";
@@ -467,8 +466,8 @@ TEST_F(RasterDelegateTest, TerrainHorizonsShadowTheDomeFromOffScreen) {
             }
         }
     }
-    scene.Write("/World/Terrain", tokens::kHeights, Tensor::Copy<float>(heights, {65, 65}));
-    scene.Define("/World/Sky", tokens::kDomeLight).Set(tokens::kIntensity, 1.0);
+    ernie::Terrain(scene, "/World/Terrain").SetHeights(Tensor::Copy<float>(heights, {65, 65}));
+    ernie::DomeLight::Define(scene, "/World/Sky").SetIntensity(1.0);
     RasterDelegate delegate(*context_);
     const auto [nearRow, nearCol] = PixelOf(scene, 14.0f, 0.0f);
     const auto [farRow, farCol] = PixelOf(scene, -14.0f, 0.0f);
@@ -481,8 +480,7 @@ TEST_F(RasterDelegateTest, TerrainHorizonsShadowTheDomeFromOffScreen) {
     const auto [approximateNear, approximateFar] = floor();
     EXPECT_NEAR(approximateNear, approximateFar, 0.02f * approximateFar);
 
-    scene.Define("/Render/Settings", tokens::kRenderSettings)
-        .Set(tokens::kDomeLightMode, std::string("full"));
+    ernie::RenderSettings::Define(scene, "/Render/Settings").SetDomeLightMode("full");
     const auto [fullNear, fullFar] = floor();
     EXPECT_LT(fullNear, 0.8f * approximateNear) << "the cliff hides much of the sky";
     EXPECT_GT(fullFar, fullNear + 0.05f * approximateFar) << "less so farther from it";
@@ -493,7 +491,8 @@ TEST_F(RasterDelegateTest, EmissiveSurfacesShowTheirLuminanceUnlit) {
     // is in cd/m^2), and red emission reads red.
     Scene scene = FlatScene();
     scene.Remove("/World/Sun");
-    scene.Set("/Looks/Grey", tokens::kEmissiveColor, glm::vec3(2.0f));
+    ernie::Material grey(scene, "/Looks/Grey");
+    grey.SetEmissiveColor(glm::dvec3(2.0));
     RasterDelegate delegate(*context_);
     const std::size_t c = kVarSize / 2;
     ernie::RenderProductSetOutputs white = delegate.Step(scene);
@@ -501,7 +500,7 @@ TEST_F(RasterDelegateTest, EmissiveSurfacesShowTheirLuminanceUnlit) {
     EXPECT_NEAR(At<float>(vars.at("HdrColor"), c, c, 1), 2.0f, 0.06f);
     EXPECT_NEAR(At<float>(vars.at("HdrColor"), c, c, 0), 2.0f, 0.1f);
 
-    scene.Set("/Looks/Grey", tokens::kEmissiveColor, glm::vec3(1.0f, 0.0f, 0.0f));
+    grey.SetEmissiveColor(glm::dvec3(1.0, 0.0, 0.0));
     ernie::RenderProductSetOutputs red = delegate.Step(scene);
     const auto reds = MapVars(red);
     EXPECT_GT(At<float>(reds.at("HdrColor"), c, c, 0), 3.0f * At<float>(reds.at("HdrColor"), c, c, 1));
@@ -515,18 +514,17 @@ TEST_F(RasterDelegateTest, PhotometricLightsLightByTheirLuxAndLumens) {
     scene.Remove("/World/Sun");
     // A plain Lambertian floor, not the hillshaded terrain.
     scene.Remove("/World/Terrain");
-    scene.Define("/World/Floor", tokens::kGroundPlane)
-        .Set(tokens::kMaterialBinding, Path("/Looks/Grey"));
+    ernie::GroundPlane::Define(scene, "/World/Floor").SetMaterialBinding("/Looks/Grey");
     // Close enough that the centre pixel samples the floor within a few centimetres of the axis,
     // where the illuminance has not yet fallen off (by cos^4 of the angle off it).
     scene.Set("/World/Camera", tokens::kTransform,
               ernie::LookAtTransform({0.0, 0.0, 20.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
-    scene.Define("/World/Panel", tokens::kRectLight)
-        .Set(tokens::kTransform,
-             ernie::LookAtTransform({0.0, 0.0, 5.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}))
-        .Set(tokens::kPhotometricIlluminance, 1000.0)
-        .Set(tokens::kPhotometricIlluminanceDistance, 5.0)
-        .Set(tokens::kShadowEnable, false);
+    ernie::RectLight::Define(scene, "/World/Panel")
+        .SetPhotometricIlluminance(1000.0)
+        .SetPhotometricIlluminanceDistance(5.0)
+        .SetShadowEnable(false);
+    scene.Set("/World/Panel", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, 5.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
     RasterDelegate delegate(*context_);
     auto outputs = delegate.Step(scene);
     const std::size_t c = kVarSize / 2;
@@ -554,13 +552,13 @@ TEST_F(RasterDelegateTest, MeteringMeasuresTheScenesLuminance) {
     // everywhere, which the meter reads a frame or two later.
     Scene scene = FlatScene();
     scene.Remove("/World/Terrain");
-    scene.Define("/World/Floor", tokens::kGroundPlane)
-        .Set(tokens::kMaterialBinding, Path("/Looks/Grey"));
-    scene.Set("/World/Sun", tokens::kPhotometricIlluminance, 20000.0);
+    ernie::GroundPlane::Define(scene, "/World/Floor").SetMaterialBinding("/Looks/Grey");
+    ernie::DistantLight(scene, "/World/Sun").SetPhotometricIlluminance(20000.0);
     RasterDelegate delegate(*context_);
     delegate.Render(scene);
     EXPECT_FALSE(delegate.MeteredLuminance()) << "metering is off by default";
-    scene.Set("/Render/Settings", tokens::kMeter, true);
+    ernie::RenderSettings settings(scene, "/Render/Settings");
+    settings.SetMeter(true);
     for (int i = 0; i < 3; ++i) {
         delegate.Render(scene);
     }
@@ -573,9 +571,9 @@ TEST_F(RasterDelegateTest, MeteringMeasuresTheScenesLuminance) {
         const Tensor image = delegate.Render(scene);
         return static_cast<int>(image.As<std::uint8_t>()[4 * (kVarSize / 2 * kVarSize + kVarSize / 2)]);
     };
-    scene.Set("/World/Camera", tokens::kExposureTime, 1.0 / 20000.0);
+    ernie::Camera(scene, "/World/Camera").SetExposureTime(1.0 / 20000.0);
     const int base = centre();
-    scene.Set("/Render/Settings", tokens::kExposureCompensation, 2.0);
+    settings.SetExposureCompensation(2.0);
     EXPECT_GT(centre(), base + 40);
 }
 
@@ -602,7 +600,7 @@ float SpectralAt(const Tensor& spectral, std::size_t band, std::size_t row, std:
 
 TEST_F(RasterDelegateTest, DomesShowBehindTheScene) {
     Scene scene = SkyScene({0.0, 0.0, 1.0}, {0.0, 1.0, 0.0});
-    scene.Define("/World/Sky", tokens::kDomeLight).Set(tokens::kIntensity, 1.0);
+    ernie::DomeLight sky = ernie::DomeLight::Define(scene, "/World/Sky").SetIntensity(1.0);
     RasterDelegate delegate(*context_);
     ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
     auto vars = MapVars(outputs);
@@ -628,7 +626,7 @@ TEST_F(RasterDelegateTest, DomesShowBehindTheScene) {
     for (std::size_t texel = 0; texel < 8 * 16; ++texel) {
         map[3 * texel + (texel < 4 * 16 ? 0 : 2)] = 1.0f;
     }
-    scene.Write("/World/Sky", tokens::kLightTexture, Tensor::Copy<float>(map, {8, 16, 3}));
+    sky.SetTexture(Tensor::Copy<float>(map, {8, 16, 3}));
     ernie::RenderProductSetOutputs upper = delegate.Step(scene);
     auto up = MapVars(upper);
     EXPECT_GT(At<float>(up.at("HdrColor"), c, c, 0), 10.0f * At<float>(up.at("HdrColor"), c, c, 2));
@@ -639,7 +637,7 @@ TEST_F(RasterDelegateTest, DomesShowBehindTheScene) {
     EXPECT_GT(At<float>(down.at("HdrColor"), c, c, 2),
               10.0f * At<float>(down.at("HdrColor"), c, c, 0));
 
-    scene.Set("/World/Sky", tokens::kVisibleInPrimaryRay, false);
+    sky.SetVisibleInPrimaryRay(false);
     ernie::RenderProductSetOutputs hidden = delegate.Step(scene);
     EXPECT_EQ(SpectralAt(MapVars(hidden).at("SpectralRadiance"), 8, c, c, kVarSize), 0.0f)
         << "not in camera rays, though it still lights";
@@ -650,15 +648,16 @@ TEST_F(RasterDelegateTest, StarsKeepTheirIrradianceAtAnyResolutionBehindTheScene
     // radiance of its pixels times their solid angles gives back its spectral irradiance, at any
     // resolution.
     Scene scene = SkyScene({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
-    scene.Define("/World/Stars", tokens::kStarField)
-        .Set(tokens::kStarsRightAscension, std::vector<float>{0.7f})
-        .Set(tokens::kStarsDeclination, std::vector<float>{-0.4f})
-        .Set(tokens::kStarsMagnitude, std::vector<float>{0.0f})
-        .Set(tokens::kStarsTemperature, std::vector<float>{5772.0f});
+    const auto one = [](float value) { return Tensor::Copy<float>(std::array{value}, {1}); };
+    ernie::StarField::Define(scene, "/World/Stars")
+        .SetRightAscension(one(0.7f))
+        .SetDeclination(one(-0.4f))
+        .SetMagnitude(one(0.0f))
+        .SetTemperature(one(5772.0f));
     RasterDelegate delegate(*context_);
     const auto irradiance = [&](std::size_t size, std::size_t band) {
-        scene.Set("/Render/Settings", tokens::kResolution,
-                  glm::ivec2(static_cast<int>(size), static_cast<int>(size)));
+        ernie::RenderSettings(scene, "/Render/Settings")
+            .SetResolution(glm::dvec2(static_cast<double>(size), static_cast<double>(size)));
         ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
         const Tensor spectral =
             outputs.at("/Render/Product").vars.at("SpectralRadiance").Map(ernie::MapDevice::Cpu).tensor;

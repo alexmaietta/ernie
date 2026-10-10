@@ -33,34 +33,27 @@ EYE = np.array([0.0, -16.0, 11.0])
 
 def build_scene():
     scene = ernie.Scene()
-    scene.define("/Looks/Grey", tokens.MATERIAL).set(tokens.ALBEDO, (ALBEDO, ALBEDO, ALBEDO))
-    scene.define("/World/Floor", tokens.GROUND_PLANE).set(
-        tokens.MATERIAL_BINDING, ernie.Path("/Looks/Grey")
-    )
+    grey = scene.define("/Looks/Grey", ernie.Material, albedo=(ALBEDO, ALBEDO, ALBEDO))
+    scene.define("/World/Floor", ernie.GroundPlane, material_binding=grey)
     # 1 m square, 5 m up, facing down: 1000 lux on a surface facing it 5 m away.
-    scene.define("/World/Panel", tokens.RECT_LIGHT).set(
+    scene.define("/World/Panel", ernie.RectLight, width=1.0, height=1.0,
+                 photometric_illuminance=1000.0, photometric_illuminance_distance=5.0,
+                 shadow_enable=False).set(
         tokens.TRANSFORM, ernie.look_at_transform((0.0, 0.0, 5.0), (0.0, 0.0, 0.0), (0.0, 1.0, 0.0))
-    ).set(tokens.WIDTH, 1.0).set(tokens.HEIGHT, 1.0).set(
-        tokens.PHOTOMETRIC_ILLUMINANCE, 1000.0
-    ).set(tokens.PHOTOMETRIC_ILLUMINANCE_DISTANCE, 5.0).set(tokens.SHADOW_ENABLE, False)
+    )
     # Exposed so that the floor under the light (about 160 cd/m^2) is a light grey.
-    scene.define("/World/Camera", tokens.CAMERA).set(
+    camera = scene.define("/World/Camera", ernie.Camera, focal_length=24.0, sensor_noise=False,
+                          exposure_time=1.0 / 60.0, exposure_iso=200.0, exposure_f_stop=2.8).set(
         tokens.TRANSFORM, ernie.look_at_transform(tuple(EYE), (0.0, 0.0, 0.0))
-    ).set(tokens.FOCAL_LENGTH, 24.0).set(tokens.SENSOR_NOISE, False).set(
-        tokens.EXPOSURE_TIME, 1.0 / 60.0
-    ).set(tokens.EXPOSURE_ISO, 200.0).set(tokens.EXPOSURE_FSTOP, 2.8)
-    for name in ("HdrColor", "LdrColor"):
-        scene.define(f"/Render/Vars/{name}", tokens.RENDER_VAR).set(tokens.SOURCE_NAME, name)
-    scene.define("/Render/Product", tokens.RENDER_PRODUCT).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")
-    ).set(tokens.RESOLUTION, SIZE).set(
-        tokens.ORDERED_VARS, [ernie.Path("/Render/Vars/HdrColor"), ernie.Path("/Render/Vars/LdrColor")]
     )
-    scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")
-    ).set(tokens.RESOLUTION, SIZE).set(tokens.AMBIENT, 0.0).set(
-        tokens.PRODUCTS, [ernie.Path("/Render/Product")]
+    render = scene.define("/Render", ernie.Scope)
+    render_vars = [render.define(f"Vars/{name}", ernie.RenderVar, source_name=name).path
+                   for name in ("HdrColor", "LdrColor")]
+    product = render.define("Product", ernie.RenderProduct, camera=camera, resolution=SIZE).set(
+        tokens.ORDERED_VARS, render_vars
     )
+    render.define("Settings", ernie.RenderSettings, camera=camera, resolution=SIZE,
+                  ambient=0.0).set(tokens.PRODUCTS, [product.path])
     return scene
 
 

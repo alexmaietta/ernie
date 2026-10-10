@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/delegate.h"
 #include "ernie/scene/overlay.h"
-#include "ernie/scene/tokens.h"
+#include "ernie/scene/render_schemas.h"
 #include "support/delegate_scenes.h"
 
 #include <gtest/gtest.h>
@@ -18,14 +18,13 @@ using ernie::RasterDelegate;
 using ernie::Scene;
 using ernie::Tensor;
 using namespace ernie::testing;
-namespace tokens = ernie::tokens;
 
 namespace {
 
 /// MeshScene drawing the overlays `overlays` (`ernie:overlays`) over its image.
 Scene OverlayScene(const std::string& overlays = "*") {
     Scene scene = MeshScene();
-    scene.Set("/Render/Settings", tokens::kOverlays, overlays);
+    ernie::RenderSettings(scene, "/Render/Settings").SetOverlays(overlays);
     return scene;
 }
 

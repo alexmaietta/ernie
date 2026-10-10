@@ -2,7 +2,11 @@
 #include "ernie/device/offscreen_target.h"
 #include "ernie/geometry/primitives.h"
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/geometry_schemas.h"
+#include "ernie/scene/light_schemas.h"
 #include "ernie/scene/orbit_controller.h"
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/session/renderer.h"
@@ -44,10 +48,9 @@ TEST_F(RasterDelegateTest, MeshesOutsideAViewAreCulled) {
     DefineQuad(scene, "/World/Behind", 2.0f);
     scene.Set("/World/Behind", tokens::kTransform,
               glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 100.0)));
-    scene.Define("/World/FarRocks", tokens::kPointInstancer)
-        .Write(tokens::kPositions,
-               Tensor::Copy<float>(std::vector<float>{500, 0, 0, 600, 0, 0}, {2, 3}))
-        .Set(tokens::kPrototypes, std::vector<Path>{"/World/Rocks/Rock"});
+    ernie::PointInstancer::Define(scene, "/World/FarRocks")
+        .SetPositions(Tensor::Copy<float>(std::vector<float>{500, 0, 0, 600, 0, 0}, {2, 3}));
+    scene.Set("/World/FarRocks", tokens::kPrototypes, std::vector<Path>{"/World/Rocks/Rock"});
     const Tensor after = delegate.Render(scene);
     EXPECT_EQ(delegate.Meshes().DrawCount(0), drawn) << "neither new draw is in view";
     EXPECT_EQ(Bytes(after), Bytes(before));
@@ -99,7 +102,7 @@ TEST_F(RasterDelegateTest, EveryCullingModeRendersTheSameImage) {
     std::map<std::string, std::vector<std::uint8_t>> images;
     std::map<std::string, std::size_t> draws;
     for (const std::string_view mode : {tokens::kOff, tokens::kCpu, tokens::kGpu}) {
-        scene.Set("/Render/Settings", tokens::kCulling, std::string(mode));
+        ernie::RenderSettings(scene, "/Render/Settings").SetCulling(mode);
         images[std::string(mode)] = Bytes(delegate.Render(scene));
         draws[std::string(mode)] = delegate.Meshes().DrawCount(0);
     }
@@ -110,7 +113,7 @@ TEST_F(RasterDelegateTest, EveryCullingModeRendersTheSameImage) {
 
 TEST_F(RasterDelegateTest, GpuCullingKeepsExactlyTheInstancesInView) {
     Scene scene = CullingScene();
-    scene.Set("/World/Sun", tokens::kShadowEnable, false);  // only the view's jobs
+    ernie::DistantLight(scene, "/World/Sun").SetShadowEnable(false);  // only the view's jobs
     RasterDelegate delegate(*context_);
     delegate.Render(scene);
     // Jobs in order: the quad is no instancer; then the rocks (3 instances, all in view), then
@@ -132,7 +135,7 @@ TEST_F(RasterDelegateTest, InstancesWrittenAsCudaArraysAreCulledOnTheGpu) {
         GTEST_SKIP() << "No CUDA interop: " << why;
     }
     Scene scene = CullingScene();
-    scene.Set("/World/Sun", tokens::kShadowEnable, false);
+    ernie::DistantLight(scene, "/World/Sun").SetShadowEnable(false);
     // With an extent, the positions never come to the host: only the GPU sees each instance.
     scene.Set("/World/Row", tokens::kExtent,
               std::vector<float>{-101.0f, -21.0f, -1.0f, 101.0f, -19.0f, 1.0f});
@@ -150,25 +153,23 @@ namespace {
 /// from 6 m to 400 m, lit from above without shadows.
 Scene RecedingSpheres() {
     Scene scene;
-    scene.Define("/World/Camera", tokens::kCamera)
-        .Set(tokens::kTransform,
-             ernie::LookAtTransform({0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}))
-        .Set(tokens::kSensorNoise, false);
-    scene.Define("/World/Sun", tokens::kDistantLight)
-        .Set(tokens::kTransform, ernie::DistantLightTransform({0.2, -0.5, 1.0}))
-        .Set(tokens::kShadowEnable, false);
+    ernie::Camera::Define(scene, "/World/Camera").SetSensorNoise(false);
+    scene.Set("/World/Camera", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}));
+    ernie::DistantLight::Define(scene, "/World/Sun").SetShadowEnable(false);
+    scene.Set("/World/Sun", tokens::kTransform, ernie::DistantLightTransform({0.2, -0.5, 1.0}));
     std::vector<float> positions;
     for (float y = 6.0f; y <= 400.0f; y += 4.0f) {
         positions.insert(positions.end(), {0.0f, y, 0.0f});
     }
-    scene.Define("/World/Balls", tokens::kPointInstancer)
-        .Write(tokens::kPositions,
-               Tensor::Copy<float>(positions, {static_cast<std::int64_t>(positions.size() / 3), 3}))
-        .Set(tokens::kPrototypes, std::vector<Path>{"/World/Balls/Ball"});
-    scene.Define("/World/Balls/Ball", tokens::kSphere).Set(tokens::kGeomRadius, 1.0);
-    scene.Define("/Render/Settings", tokens::kRenderSettings)
-        .Set(tokens::kCameraRel, Path("/World/Camera"))
-        .Set(tokens::kResolution, glm::ivec2(64, 64));
+    ernie::PointInstancer::Define(scene, "/World/Balls")
+        .SetPositions(
+            Tensor::Copy<float>(positions, {static_cast<std::int64_t>(positions.size() / 3), 3}));
+    scene.Set("/World/Balls", tokens::kPrototypes, std::vector<Path>{"/World/Balls/Ball"});
+    ernie::Sphere::Define(scene, "/World/Balls/Ball").SetRadius(1.0);
+    ernie::RenderSettings::Define(scene, "/Render/Settings")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(64, 64));
     return scene;
 }
 
@@ -178,7 +179,7 @@ TEST_F(RasterDelegateTest, DistantInstancesDrawCoarserLevelsOfDetail) {
     Scene scene = RecedingSpheres();
     RasterDelegate delegate(*context_);
     const Tensor detailed = [&] {
-        scene.Set("/Render/Settings", tokens::kLodMeshError, 0.0f);
+        ernie::RenderSettings(scene, "/Render/Settings").SetLodMeshError(0.0);
         return delegate.Render(scene);
     }();
     std::vector<std::vector<std::uint32_t>> levels = delegate.Meshes().CulledLevelCounts();
@@ -189,7 +190,7 @@ TEST_F(RasterDelegateTest, DistantInstancesDrawCoarserLevelsOfDetail) {
         EXPECT_EQ(levels[0][l], 0u) << "an error of 0 draws the full meshes";
     }
 
-    scene.Set("/Render/Settings", tokens::kLodMeshError, 1.0f);
+    ernie::RenderSettings(scene, "/Render/Settings").SetLodMeshError(1.0);
     const Tensor simplified = delegate.Render(scene);
     levels = delegate.Meshes().CulledLevelCounts();
     ASSERT_EQ(levels.size(), 1u);
@@ -232,10 +233,10 @@ TEST(MeshDrawableLevels, SimplifyOnlyMeshesWorthIt) {
 TEST_F(RasterDelegateTest, GpuCulledInstancersShareOneMultiDraw) {
     Scene scene = CullingScene();  // a quad, and two instancers of the same mesh and material
     RasterDelegate delegate(*context_);
-    scene.Set("/Render/Settings", tokens::kCulling, std::string(tokens::kCpu));
+    ernie::RenderSettings(scene, "/Render/Settings").SetCulling(tokens::kCpu);
     const Tensor direct = delegate.Render(scene);
     EXPECT_EQ(delegate.Meshes().DrawCalls(0), 3u) << "one call per draw";
-    scene.Set("/Render/Settings", tokens::kCulling, std::string(tokens::kGpu));
+    ernie::RenderSettings(scene, "/Render/Settings").SetCulling(tokens::kGpu);
     const Tensor batched = delegate.Render(scene);
     EXPECT_EQ(delegate.Meshes().DrawCalls(0), context_->SupportsMultiDrawIndirect() ? 2u : 3u)
         << "the quad, then both instancers in one multi-draw";
@@ -248,18 +249,16 @@ namespace {
 /// an instance of a cube), with spheres hidden behind it at 40 m and one in front at 10 m.
 Scene WallScene(bool instancedWall) {
     Scene scene;
-    scene.Define("/World/Camera", tokens::kCamera)
-        .Set(tokens::kTransform,
-             ernie::LookAtTransform({0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}))
-        .Set(tokens::kSensorNoise, false);
-    scene.Define("/World/Sun", tokens::kDistantLight)
-        .Set(tokens::kTransform, ernie::DistantLightTransform({0.2, -1.0, 0.5}))
-        .Set(tokens::kShadowEnable, false);
+    ernie::Camera::Define(scene, "/World/Camera").SetSensorNoise(false);
+    scene.Set("/World/Camera", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}));
+    ernie::DistantLight::Define(scene, "/World/Sun").SetShadowEnable(false);
+    scene.Set("/World/Sun", tokens::kTransform, ernie::DistantLightTransform({0.2, -1.0, 0.5}));
     if (instancedWall) {
-        scene.Define("/World/Walls", tokens::kPointInstancer)
-            .Write(tokens::kPositions, Tensor::Copy<float>(std::vector<float>{0, 20, 0}, {1, 3}))
-            .Set(tokens::kPrototypes, std::vector<Path>{"/World/Walls/Wall"});
-        scene.Define("/World/Walls/Wall", tokens::kCube).Set(tokens::kSize, 60.0);
+        ernie::PointInstancer::Define(scene, "/World/Walls")
+            .SetPositions(Tensor::Copy<float>(std::vector<float>{0, 20, 0}, {1, 3}));
+        scene.Set("/World/Walls", tokens::kPrototypes, std::vector<Path>{"/World/Walls/Wall"});
+        ernie::Cube::Define(scene, "/World/Walls/Wall").SetSize(60.0);
         scene.Set("/World/Walls/Wall", tokens::kTransform,
                   glm::scale(glm::dmat4(1.0), glm::dvec3(1.0, 0.05, 1.0)));
     } else {
@@ -272,13 +271,13 @@ Scene WallScene(bool instancedWall) {
     for (int i = -4; i <= 4; ++i) {
         positions.insert(positions.end(), {static_cast<float>(i), 40.0f, 0.0f});
     }
-    scene.Define("/World/Balls", tokens::kPointInstancer)
-        .Write(tokens::kPositions, Tensor::Copy<float>(positions, {10, 3}))
-        .Set(tokens::kPrototypes, std::vector<Path>{"/World/Balls/Ball"});
-    scene.Define("/World/Balls/Ball", tokens::kSphere).Set(tokens::kGeomRadius, 0.5);
-    scene.Define("/Render/Settings", tokens::kRenderSettings)
-        .Set(tokens::kCameraRel, Path("/World/Camera"))
-        .Set(tokens::kResolution, glm::ivec2(64, 64));
+    ernie::PointInstancer::Define(scene, "/World/Balls")
+        .SetPositions(Tensor::Copy<float>(positions, {10, 3}));
+    scene.Set("/World/Balls", tokens::kPrototypes, std::vector<Path>{"/World/Balls/Ball"});
+    ernie::Sphere::Define(scene, "/World/Balls/Ball").SetRadius(0.5);
+    ernie::RenderSettings::Define(scene, "/Render/Settings")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(64, 64));
     return scene;
 }
 
@@ -303,7 +302,7 @@ TEST_F(RasterDelegateTest, OccludersHideTheInstancesBehindThem) {
     EXPECT_EQ(delegate.Meshes().CulledInstanceCounts(), std::vector<std::uint32_t>{10u})
         << "frustum culling keeps every ball";
 
-    scene.Set("/Render/Settings", tokens::kOcclusion, std::string(tokens::kOccluders));
+    ernie::RenderSettings(scene, "/Render/Settings").SetOcclusion(tokens::kOccluders);
     const Tensor occluded = delegate.Render(scene);
     EXPECT_TRUE(delegate.Meshes().CullsOcclusion());
     EXPECT_EQ(delegate.Meshes().CulledInstanceCounts(), std::vector<std::uint32_t>{1u})
@@ -315,13 +314,13 @@ TEST_F(RasterDelegateTest, TwoPassOcclusionLetsInstancesHideEachOther) {
     Scene scene = WallScene(true);
     RasterDelegate delegate(*context_);
     const Tensor unculled = delegate.Render(scene);
-    scene.Set("/Render/Settings", tokens::kOcclusion, std::string(tokens::kOccluders));
+    ernie::RenderSettings(scene, "/Render/Settings").SetOcclusion(tokens::kOccluders);
     delegate.Render(scene);
     // Jobs in draw order: the balls, then the wall.
     EXPECT_EQ(delegate.Meshes().CulledInstanceCounts(), (std::vector<std::uint32_t>{10u, 1u}))
         << "an instanced wall occludes nothing in a single pass";
 
-    scene.Set("/Render/Settings", tokens::kOcclusion, std::string(tokens::kTwoPass));
+    ernie::RenderSettings(scene, "/Render/Settings").SetOcclusion(tokens::kTwoPass);
     for (int frame = 0; frame < 3; ++frame) {
         const Tensor image = delegate.Render(scene);
         EXPECT_EQ(Bytes(image), Bytes(unculled)) << "frame " << frame;
@@ -344,11 +343,11 @@ TEST_F(RasterDelegateTest, OcclusionCullsEveryChunkOfABatch) {
             }
         }
     }
-    scene.Write("/World/Camera", tokens::kPoses,
-                Tensor::Copy<double>(poses, {static_cast<std::int64_t>(views), 4, 4}));
-    scene.Define("/Render/Batch", tokens::kRenderProduct)
-        .Set(tokens::kCameraRel, Path("/World/Camera"))
-        .Set(tokens::kResolution, glm::ivec2(16, 16));
+    ernie::Camera(scene, "/World/Camera")
+        .SetPoses(Tensor::Copy<double>(poses, {static_cast<std::int64_t>(views), 4, 4}));
+    ernie::RenderProduct::Define(scene, "/Render/Batch")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(16, 16));
     RasterDelegate delegate(*context_);
     const Path batchOnly[] = {"/Render/Batch"};
     const auto render = [&] {
@@ -359,7 +358,7 @@ TEST_F(RasterDelegateTest, OcclusionCullsEveryChunkOfABatch) {
             .tensor;
     };
     const Tensor unculled = render();
-    scene.Set("/Render/Settings", tokens::kOcclusion, std::string(tokens::kOccluders));
+    ernie::RenderSettings(scene, "/Render/Settings").SetOcclusion(tokens::kOccluders);
     const Tensor occluded = render();
     EXPECT_EQ(Bytes(occluded), Bytes(unculled));
     const std::vector<std::uint32_t> kept = delegate.Meshes().CulledInstanceCounts();

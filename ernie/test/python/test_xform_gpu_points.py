@@ -19,35 +19,39 @@ def link_scene(points=True, instancer=True, extent=EXTENT, depth=1):
     PointInstancer of boxes; the sun casts no shadows, whose map is fitted to the bounds (the
     extents on the GPU, the posed prims on the CPU)."""
     scene = staged_scene()
-    scene.set("/World/Sun", tokens.SHADOW_ENABLE, False)
+    ernie.DistantLight(scene.get_prim("/World/Sun")).shadow_enable = False
     levels = [[] for _ in range(depth)]
     for i, offset in enumerate(OFFSETS):
-        scene.define(f"/World/Env{i}", tokens.XFORM).set_xform(translate=offset, scale=2.0)
-        path = f"/World/Env{i}"
+        link = scene.define(f"/World/Env{i}", ernie.Xform, translate=offset, scale=2.0)
         for level in range(depth):
-            path += "/Link" if level == depth - 1 else "/Base"
-            link = scene.define(path, tokens.XFORM)
+            link = link.define("Link" if level == depth - 1 else "Base", ernie.Xform)
             link.set(tokens.XFORM_OP_ORDER, [tokens.TRANSLATE, tokens.ORIENT])
             if extent is not None:
                 link.set(tokens.XFORM_EXTENT, extent)
-            levels[level].append(path)
-        scene.define(f"{path}/Box", tokens.CUBE).set_xform(scale=(0.4, 0.4, 0.4))
+            levels[level].append(str(link.path))
+        link.define("Box", ernie.Cube, scale=(0.4, 0.4, 0.4))
         if points:
-            cloud = scene.define(f"{path}/Cloud", tokens.GEOM_POINTS).set_xform(translate=(1.5, 0.0, 0.0))
-            cloud.write(tokens.POINTS, np.array([[0, 0, 0], [0, 1, 0], [0, -1, 0.5]], np.float32))
-            cloud.write(tokens.WIDTHS, np.array([0.8, 0.6, 0.7], np.float32))
-            cloud.set(tokens.DISPLAY_COLOR, (0.9, 0.2, 0.2))
+            link.define(
+                "Cloud",
+                ernie.Points,
+                translate=(1.5, 0.0, 0.0),
+                points=np.array([[0, 0, 0], [0, 1, 0], [0, -1, 0.5]], np.float32),
+                display_color=(0.9, 0.2, 0.2),
+            ).write(tokens.WIDTHS, np.array([0.8, 0.6, 0.7], np.float32))  # widths per point
         if instancer:
-            parts = scene.define(f"{path}/Parts", tokens.POINT_INSTANCER).set_xform(
-                translate=(0.0, 1.5, 0.0), rotate=(0.0, 0.0, 30.0)
+            parts = link.define(
+                "Parts",
+                ernie.PointInstancer,
+                translate=(0.0, 1.5, 0.0),
+                rotate=(0.0, 0.0, 30.0),
+                positions=np.array([[0, 0, 0], [1, 0, 0], [0, 0, 1]], np.float32),
+                orientations=quats(3, seed=7),
+                scales=np.array([[1, 1, 1], [0.5, 1, 1], [1, 0.5, 1.5]], np.float32),
             )
-            parts.write(tokens.POSITIONS, np.array([[0, 0, 0], [1, 0, 0], [0, 0, 1]], np.float32))
-            parts.write(tokens.ORIENTATIONS, quats(3, seed=7))
-            parts.write(tokens.SCALES, np.array([[1, 1, 1], [0.5, 1, 1], [1, 0.5, 1.5]], np.float32))
-            parts.set(tokens.PROTOTYPES, [ernie.Path(f"{path}/Parts/Part")])
-            scene.define(f"{path}/Parts/Part", tokens.CUBE).set_xform(scale=(0.3, 0.3, 0.3)).set(
-                tokens.DISPLAY_COLOR, (0.2, 0.8, 0.3)
+            part = parts.define(
+                "Part", ernie.Cube, scale=(0.3, 0.3, 0.3), display_color=(0.2, 0.8, 0.3)
             )
+            parts.set(tokens.PROTOTYPES, [part.path])
     return scene, levels
 
 

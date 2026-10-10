@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/compute_interop.h"
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/schema.h"
+#include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
 #include "support/delegate_scenes.h"
 #include "support/test_raster.h"
@@ -58,9 +60,9 @@ TEST_F(RasterDelegateTest, MappedMeshInstancerAndPointsArraysDrawWithoutCopies) 
     }
     Scene scene = MeshScene();
     const std::array<float, 9> grains{-4, -12, 0, 0, -12, 0, 4, -12, 0};
-    scene.Define("/World/Grains", tokens::kGeomPoints)
-        .Write(tokens::kPoints, Tensor::Copy<float>(grains, {3, 3}))
-        .Set(tokens::kWidths, 2.0);
+    ernie::Points::Define(scene, "/World/Grains")
+        .SetPoints(Tensor::Copy<float>(grains, {3, 3}))
+        .SetWidths(2.0);
     scene.Set("/World/Quad", tokens::kExtent,
               std::vector<float>{-14.0f, -4.0f, -1.0f, -10.0f, 4.0f, 1.0f});
     scene.Set("/World/Rocks", tokens::kExtent,
@@ -92,9 +94,9 @@ TEST_F(RasterDelegateTest, MappedMeshInstancerAndPointsArraysDrawWithoutCopies) 
     const Tensor image = delegate.Render(scene);
 
     Scene host = MeshScene();
-    host.Define("/World/Grains", tokens::kGeomPoints)
-        .Write(tokens::kPoints, Tensor::Copy<float>(raisedGrains, {3, 3}))
-        .Set(tokens::kWidths, 2.0);
+    ernie::Points::Define(host, "/World/Grains")
+        .SetPoints(Tensor::Copy<float>(raisedGrains, {3, 3}))
+        .SetWidths(2.0);
     for (const auto& [path, extent] :
          {std::pair{"/World/Quad", std::vector<float>{-14.0f, -4.0f, -1.0f, -10.0f, 4.0f, 1.0f}},
           std::pair{"/World/Rocks", std::vector<float>{-2.0f, -12.0f, -1.0f, 14.0f, 12.0f, 1.0f}},
@@ -102,11 +104,11 @@ TEST_F(RasterDelegateTest, MappedMeshInstancerAndPointsArraysDrawWithoutCopies) 
                     std::vector<float>{-6.0f, -14.0f, -2.0f, 6.0f, -10.0f, 2.0f}}}) {
         host.Set(path, tokens::kExtent, extent);
     }
-    host.Write("/World/Quad", tokens::kPoints, cuda->Upload(Tensor::Copy<float>(wideQuad, {4, 3})));
-    host.Write("/World/Rocks", tokens::kPositions,
-               cuda->Upload(Tensor::Copy<float>(movedRocks, {3, 3})));
-    host.Write("/World/Grains", tokens::kPoints,
-               cuda->Upload(Tensor::Copy<float>(raisedGrains, {3, 3})));
+    ernie::Mesh(host, "/World/Quad").SetPoints(cuda->Upload(Tensor::Copy<float>(wideQuad, {4, 3})));
+    ernie::PointInstancer(host, "/World/Rocks")
+        .SetPositions(cuda->Upload(Tensor::Copy<float>(movedRocks, {3, 3})));
+    ernie::Points(host, "/World/Grains")
+        .SetPoints(cuda->Upload(Tensor::Copy<float>(raisedGrains, {3, 3})));
     RasterDelegate reference(*context_);
     reference.Compute();
     EXPECT_EQ(Differing(image, reference.Render(host)), 0u);
@@ -144,7 +146,7 @@ TEST_F(RasterDelegateTest, MappedHeightsDrawWhereDirtyWithoutCopies) {
     EXPECT_THROW(delegate.MapArray(scene, "/World/Terrain", tokens::kHeights),
                  std::invalid_argument)
         << "heights on the host";
-    scene.Write("/World/Terrain", tokens::kHeights, cuda->Upload(HeightsOf(raster)));
+    ernie::Terrain(scene, "/World/Terrain").SetHeights(cuda->Upload(HeightsOf(raster)));
     const Tensor before = delegate.Render(scene);
 
     Tensor heights = delegate.MapArray(scene, "/World/Terrain", tokens::kHeights);

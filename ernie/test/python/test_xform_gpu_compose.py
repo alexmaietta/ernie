@@ -25,13 +25,14 @@ def links(scene, count, ops, offsets=None, box_scale=(2.0, 1.0, 1.0)):
     """One link per world, its box moved off its origin, the link's ops in `ops`."""
     paths = []
     for i in range(count):
-        world = scene.define(f"/World/Env{i}", tokens.XFORM)
-        world.set_xform(translate=offsets[i] if offsets is not None else (-6.0 + 4.0 * i, 0.0, 0.0))
-        link = scene.define(f"/World/Env{i}/Link", tokens.XFORM)
-        link.set(tokens.XFORM_OP_ORDER, list(ops)).set(tokens.XFORM_EXTENT, EXTENT)
-        scene.define(f"/World/Env{i}/Link/Box", tokens.CUBE).set_xform(
-            translate=(1.0, 0.0, 0.0), scale=box_scale
+        world = scene.define(
+            f"/World/Env{i}",
+            ernie.Xform,
+            translate=offsets[i] if offsets is not None else (-6.0 + 4.0 * i, 0.0, 0.0),
         )
+        link = world.define("Link", ernie.Xform)
+        link.set(tokens.XFORM_OP_ORDER, list(ops)).set(tokens.XFORM_EXTENT, EXTENT)
+        link.define("Box", ernie.Cube, translate=(1.0, 0.0, 0.0), scale=box_scale)
         paths.append(str(link.path))
     return paths
 
@@ -154,13 +155,13 @@ def arm(scene, count):
     links posed by GPU rows (translate, then a rotation about Y)."""
     link0, link1 = [], []
     for i in range(count):
-        scene.define(f"/World/Env{i}", tokens.XFORM).set_xform(translate=(-6.0 + 6.0 * i, 0.0, 0.0))
+        scene.define(f"/World/Env{i}", ernie.Xform, translate=(-6.0 + 6.0 * i, 0.0, 0.0))
         for path, length in ((f"/World/Env{i}/Link0", 2.0), (f"/World/Env{i}/Link0/Elbow/Link1", 1.5)):
-            scene.define(path, tokens.XFORM).set(
+            link = scene.define(path, ernie.Xform).set(
                 tokens.XFORM_OP_ORDER, [tokens.TRANSLATE, tokens.ROTATE_Y]
             ).set(tokens.XFORM_EXTENT, EXTENT)
-            scene.define(f"{path}/Box", tokens.CUBE).set_xform(
-                translate=(length / 2, 0.0, 0.0), scale=(length, 0.4, 0.4)
+            link.define(
+                "Box", ernie.Cube, translate=(length / 2, 0.0, 0.0), scale=(length, 0.4, 0.4)
             )
         # The elbow: at the end of link0, turned a little, on the CPU.
         scene.get_prim(f"/World/Env{i}/Link0/Elbow").set_xform(

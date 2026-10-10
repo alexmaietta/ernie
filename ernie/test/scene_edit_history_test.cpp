@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/scene/edit_history.h"
+#include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/tokens.h"
 
 #include <gtest/gtest.h>
@@ -14,7 +15,7 @@ namespace tokens = ernie::tokens;
 
 TEST(EditHistory, UndoesAndRedoesSetsAndClears) {
     Scene scene;
-    scene.Define("/A", tokens::kCube).Set(tokens::kSize, 1.0);
+    ernie::Cube::Define(scene, "/A").SetSize(1.0);
     EditHistory history;
     EXPECT_FALSE(history.CanUndo());
     history.Set(scene, "/A", tokens::kSize, 2.0);
@@ -41,7 +42,7 @@ TEST(EditHistory, UndoesAndRedoesSetsAndClears) {
 
 TEST(EditHistory, OpenEditsMergeUntilClosed) {
     Scene scene;
-    scene.Define("/A", tokens::kCube).Set(tokens::kSize, 1.0);
+    ernie::Cube::Define(scene, "/A").SetSize(1.0);
     EditHistory history;
     for (double size = 1.5; size <= 3.0; size += 0.5) {
         history.Set(scene, "/A", tokens::kSize, size, true);
@@ -74,8 +75,8 @@ TEST(EditHistory, DefinesAndRemovesUndoWithTheirSubtrees) {
     EXPECT_EQ(scene.Get<double>("/World/Box", tokens::kSize, 0.0), 3.0);
 
     const std::array<float, 3> points{1, 2, 3};
-    scene.Define("/World/Box/Child", tokens::kMesh)
-        .Write(tokens::kPoints, ernie::Tensor::Copy<float>(points, {1, 3}));
+    ernie::Mesh::Define(scene, "/World/Box/Child")
+        .SetPoints(ernie::Tensor::Copy<float>(points, {1, 3}));
     ASSERT_TRUE(history.Remove(scene, "/World"));
     EXPECT_FALSE(scene.Has("/World/Box"));
     EXPECT_FALSE(history.Remove(scene, "/World"));
@@ -94,7 +95,7 @@ TEST(EditHistory, AddsPrimsAuthoredInAnotherScene) {
     scratch.Define("/World/Mesh", tokens::kMesh)
         .Set(tokens::kDisplayColor, glm::vec3(1.0f))
         .Write(tokens::kPoints, ernie::Tensor::Copy<float>(points, {1, 3}));
-    scratch.Define("/World/Mesh/Child", tokens::kCube);
+    ernie::Cube::Define(scratch, "/World/Mesh/Child");
     Scene scene;
     EditHistory history;
     history.Add(scene, scratch, "/World/Mesh");
@@ -111,8 +112,8 @@ TEST(EditHistory, AddsPrimsAuthoredInAnotherScene) {
 
 TEST(EditHistory, SkipsPrimsRemovedSince) {
     Scene scene;
-    scene.Define("/A", tokens::kCube);
-    scene.Define("/B", tokens::kCube);
+    ernie::Cube::Define(scene, "/A");
+    ernie::Cube::Define(scene, "/B");
     EditHistory history;
     history.Set(scene, "/A", tokens::kSize, 2.0);
     history.Set(scene, "/B", tokens::kSize, 3.0);

@@ -23,33 +23,27 @@ WORLDS, SIZE, COLUMNS = 16, 128, 4
 
 def build_scene():
     scene = ernie.Scene()
-    scene.define("/World/Ground", tokens.GROUND_PLANE)
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+    scene.define("/World/Ground", ernie.GroundPlane)
+    scene.define("/World/Sun", ernie.DistantLight).set(
         tokens.TRANSFORM, ernie.distant_light_transform((0.4, -0.6, 0.7))
     )
     # One environment, then clones of it; each world moves and recolours its box.
-    scene.define("/Envs/Env0", tokens.XFORM)
-    scene.define("/Envs/Env0/Box", tokens.CUBE)
+    env0 = scene.define("/Envs/Env0", ernie.Xform)
+    env0.define("Box", ernie.Cube)
     for world in range(WORLDS):
-        env = f"/Envs/Env{world}"
-        if world > 0:
-            scene.clone("/Envs/Env0", env)
-        scene.set(env, tokens.WORLD, world)
+        env = env0 if world == 0 else ernie.Xform(scene.clone("/Envs/Env0", f"/Envs/Env{world}"))
+        env.world = world
         t = world / WORLDS
-        offset = (3.0 * np.cos(2 * np.pi * t), 3.0 * np.sin(2 * np.pi * t), 1.0)
-        transform = np.eye(4)
-        transform[:3, 3] = offset
-        scene.set(f"{env}/Box", tokens.TRANSFORM, transform)
-        scene.set(f"{env}/Box", tokens.DISPLAY_COLOR, (t, 0.4, 1.0 - t))
+        box = ernie.Cube(scene.get_prim(f"{env.path}/Box"))
+        box.set(translate=(3.0 * np.cos(2 * np.pi * t), 3.0 * np.sin(2 * np.pi * t), 1.0),
+                display_color=(t, 0.4, 1.0 - t))
 
     # One camera, one pose and one world per view.
     pose = ernie.look_at_transform((0.0, -12.0, 8.0), (0.0, 0.0, 0.0), up=(0.0, 0.0, 1.0))
-    scene.define("/World/Camera", tokens.CAMERA).set(tokens.FOCAL_LENGTH, 18.0)
-    scene.write("/World/Camera", tokens.POSES, np.stack([pose] * WORLDS))
-    scene.write("/World/Camera", tokens.WORLDS, np.arange(WORLDS, dtype=np.int32))
-    scene.define("/Render/Batch", tokens.RENDER_PRODUCT).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")
-    ).set(tokens.RESOLUTION, (SIZE, SIZE))
+    camera = scene.define("/World/Camera", ernie.Camera, focal_length=18.0,
+                          poses=np.stack([pose] * WORLDS),
+                          worlds=np.arange(WORLDS, dtype=np.int32))
+    scene.define("/Render/Batch", ernie.RenderProduct, camera=camera, resolution=(SIZE, SIZE))
     return scene
 
 

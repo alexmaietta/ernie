@@ -27,27 +27,20 @@ STEPS = 60
 
 def build_scene(worlds, bands):
     scene = ernie.Scene()
-    scene.define("/World/Ground", tokens.GROUND_PLANE)
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+    scene.define("/World/Ground", ernie.GroundPlane)
+    scene.define("/World/Sun", ernie.DistantLight).set(
         tokens.TRANSFORM, ernie.distant_light_transform((0.4, -0.6, 0.7))
     )
-    scene.define("/Envs/Env0", tokens.XFORM)
+    env0 = scene.define("/Envs/Env0", ernie.Xform)
     rng = np.random.default_rng(7)
     for i in range(6):
-        shape = tokens.CUBE if i % 2 == 0 else tokens.SPHERE
-        prim = scene.define(f"/Envs/Env0/Thing{i}", shape)
-        prim.set(tokens.DISPLAY_COLOR, tuple(rng.uniform(0.2, 1.0, 3)))
-        transform = np.eye(4)
-        transform[:3, 3] = (*rng.uniform(-3.0, 3.0, 2), 0.5)
-        prim.set(tokens.TRANSFORM, transform)
+        shape = ernie.Cube if i % 2 == 0 else ernie.Sphere
+        env0.define(f"Thing{i}", shape, display_color=tuple(rng.uniform(0.2, 1.0, 3)),
+                    translate=(*rng.uniform(-3.0, 3.0, 2), 0.5))
     for world in range(worlds):
-        env = f"/Envs/Env{world}"
-        if world > 0:
-            scene.clone("/Envs/Env0", env)
-        scene.set(env, tokens.WORLD, world)
-    scene.define("/World/Camera", tokens.CAMERA).set(tokens.FOCAL_LENGTH, 18.0).set(
-        tokens.SPECTRAL_BANDS, bands
-    )
+        env = env0 if world == 0 else ernie.Xform(scene.clone("/Envs/Env0", f"/Envs/Env{world}"))
+        env.world = world
+    scene.define("/World/Camera", ernie.Camera, focal_length=18.0, spectral_bands=bands)
     return scene
 
 

@@ -88,34 +88,28 @@ def camera_poses(t: float, views: int, poses: wp.array2d(dtype=float)):
 
 def build_scene(worlds):
     scene = ernie.Scene()
-    scene.define("/World/Ground", tokens.GROUND_PLANE)
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+    scene.define("/World/Ground", ernie.GroundPlane)
+    scene.define("/World/Sun", ernie.DistantLight).set(
         tokens.TRANSFORM, ernie.distant_light_transform((0.4, -0.6, 0.7))
     )
-    scene.define("/Envs/Env0/Base", tokens.CYLINDER).set(tokens.GEOM_RADIUS, 0.35).set(
-        tokens.GEOM_HEIGHT, 0.6
-    ).set_xform(translate=(0.0, 0.0, 0.3)).set(tokens.DISPLAY_COLOR, (0.3, 0.3, 0.35))
+    env0 = scene.define("/Envs/Env0", ernie.Xform)
+    env0.define("Base", ernie.Cylinder, radius=0.35, height=0.6, translate=(0.0, 0.0, 0.3),
+                display_color=(0.3, 0.3, 0.35))
     colors = [(0.9, 0.5, 0.1), (0.2, 0.6, 0.9), (0.9, 0.9, 0.9)]
-    parent = "/Envs/Env0"
     for k in range(LINKS):
         # Each link is posed in its world's frame (not its parent link's), as simulators report
         # bodies, so the links are siblings.
-        link = scene.define(f"{parent}/Link{k}", tokens.XFORM)
+        link = env0.define(f"Link{k}", ernie.Xform)
         link.set(tokens.XFORM_OP_ORDER, [tokens.TRANSLATE, tokens.ORIENT])
         link.set(tokens.XFORM_EXTENT, [-3.5, -3.5, -1.0, 3.5, 3.5, 4.0])
-        scene.define(f"{parent}/Link{k}/Shape", tokens.CUBE).set_xform(
-            translate=(LENGTHS[k] / 2, 0.0, 0.0), scale=(LENGTHS[k], 0.18, 0.18)
-        ).set(tokens.DISPLAY_COLOR, colors[k])
+        link.define("Shape", ernie.Cube, translate=(LENGTHS[k] / 2, 0.0, 0.0),
+                    scale=(LENGTHS[k], 0.18, 0.18), display_color=colors[k])
     links = []
     for world in range(worlds):
-        env = f"/Envs/Env{world}"
-        if world > 0:
-            scene.clone("/Envs/Env0", env)
-        scene.set(env, tokens.WORLD, world)
-        links += [f"{env}/Link{k}" for k in range(LINKS)]
-    scene.define("/World/Camera", tokens.CAMERA).set(tokens.FOCAL_LENGTH, 18.0).set(
-        tokens.SPECTRAL_BANDS, 3
-    )
+        env = env0 if world == 0 else ernie.Xform(scene.clone("/Envs/Env0", f"/Envs/Env{world}"))
+        env.world = world
+        links += [f"{env.path}/Link{k}" for k in range(LINKS)]
+    scene.define("/World/Camera", ernie.Camera, focal_length=18.0, spectral_bands=3)
     # Looked up once and kept, as every step writes all of them.
     return scene, ernie.PrimSet(links)
 

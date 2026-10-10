@@ -128,13 +128,6 @@ def sky_map(rows=64, cols=128):
     return np.where(up > 0.0, sky, 0.05).astype(np.float32)
 
 
-def placed(x, y, z, sx=1.0, sy=1.0, sz=1.0):
-    m = np.eye(4)
-    m[:3, 3] = (x, y, z)
-    m[0, 0], m[1, 1], m[2, 2] = sx, sy, sz
-    return m
-
-
 def direction_of(ra, dec, transform):
     """World direction of a star at `ra`, `dec` (degrees) under the StarField's `transform`."""
     r, d = math.radians(ra), math.radians(dec)
@@ -144,41 +137,36 @@ def direction_of(ra, dec, transform):
 
 def build_scene(catalogue_path):
     scene = ernie.Scene()
-    ground = ernie.Path("/Looks/Ground")
-    scene.define(ground, tokens.MATERIAL).set(tokens.ALBEDO, (0.18, 0.16, 0.14))
-    scene.define("/World/Ground", tokens.GROUND_PLANE).set(tokens.MATERIAL_BINDING, ground)
+    ground = scene.define("/Looks/Ground", ernie.Material, albedo=(0.18, 0.16, 0.14))
+    world = scene.define("/World", ernie.Xform)
+    world.define("Ground", ernie.GroundPlane, material_binding=ground)
     # A house and a tree in silhouette to the south-east.
-    for path, transform in [("/World/House", placed(9.0, -26.0, 2.5, 9.0, 6.0, 5.0)),
-                            ("/World/Roof", placed(9.0, -26.0, 5.6, 9.5, 6.5, 1.2))]:
-        scene.define(path, tokens.CUBE).set(tokens.SIZE, 1.0).set(
-            tokens.TRANSFORM, transform).set(tokens.MATERIAL_BINDING, ground)
-    scene.define("/World/Tree", tokens.SPHERE).set(tokens.GEOM_RADIUS, 3.0).set(
-        tokens.TRANSFORM, placed(-12.0, -22.0, 5.5)).set(tokens.MATERIAL_BINDING, ground)
+    world.define("House", ernie.Cube, size=1.0, translate=(9.0, -26.0, 2.5),
+                 scale=(9.0, 6.0, 5.0), material_binding=ground)
+    world.define("Roof", ernie.Cube, size=1.0, translate=(9.0, -26.0, 5.6),
+                 scale=(9.5, 6.5, 1.2), material_binding=ground)
+    world.define("Tree", ernie.Sphere, radius=3.0, translate=(-12.0, -22.0, 5.5),
+                 material_binding=ground)
 
     # A moonless night: about 6e-4 lux from the sky's glow.
-    scene.define("/World/Night", tokens.DOME_LIGHT).set(
-        tokens.PHOTOMETRIC_ILLUMINANCE, 6e-4).write(tokens.LIGHT_TEXTURE, sky_map())
+    world.define("Night", ernie.DomeLight, photometric_illuminance=6e-4, texture=sky_map())
     sky = ernie.celestial_to_local(LATITUDE, LONGITUDE, WHEN)
     ra, dec, mag, bv = catalogue(catalogue_path)
-    scene.define("/World/Stars", tokens.STAR_FIELD).set(tokens.TRANSFORM, sky).write(
-        tokens.STARS_RIGHT_ASCENSION, ra).write(tokens.STARS_DECLINATION, dec).write(
-        tokens.STARS_MAGNITUDE, mag).write(tokens.STARS_COLOR_INDEX, bv)
+    world.define("Stars", ernie.StarField, right_ascension=ra, declination=dec, magnitude=mag,
+                 color_index=bv).set(tokens.TRANSFORM, sky)
 
     # A night exposure, ISO 1600, f/2.8, 15 s: the brightest stars clip to white, magnitude 6
     # ones are just visible, and the sky's glow is dark grey.
-    scene.define("/World/Camera", tokens.CAMERA).set(tokens.EXPOSURE_ISO, 1600.0).set(
-        tokens.EXPOSURE_TIME, 15.0).set(tokens.EXPOSURE_FSTOP, 2.8).set(
-        tokens.SENSOR_NOISE, False)
-    scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")).set(tokens.RESOLUTION, SIZE)
-    return scene, sky
+    camera = world.define("Camera", ernie.Camera, exposure_iso=1600.0, exposure_time=15.0,
+                          exposure_f_stop=2.8, sensor_noise=False)
+    scene.define("/Render/Settings", ernie.RenderSettings, camera=camera, resolution=SIZE)
+    return scene, sky, camera
 
 
-def aim(scene, target, focal_length):
+def aim(camera, target, focal_length):
     eye = np.array([0.0, 0.0, 1.6])
-    scene.set("/World/Camera", tokens.TRANSFORM,
-              ernie.look_at_transform(tuple(eye), tuple(eye + 100.0 * target)))
-    scene.set("/World/Camera", tokens.FOCAL_LENGTH, focal_length)
+    camera.set(tokens.TRANSFORM, ernie.look_at_transform(tuple(eye), tuple(eye + 100.0 * target)))
+    camera.focal_length = focal_length
 
 
 def main():
@@ -187,23 +175,23 @@ def main():
     parser.add_argument("--catalogue", help="CSV of ra_deg,dec_deg,vmag,bv in place of the "
                                             "built-in stars")
     args = parser.parse_args()
-    scene, sky = build_scene(args.catalogue)
+    scene, sky, camera = build_scene(args.catalogue)
     alnilam = direction_of(84.05, -1.20, sky)
     print(f"Orion's belt: {math.degrees(math.asin(alnilam[2])):.0f} degrees up, azimuth "
           f"{math.degrees(math.atan2(alnilam[0], alnilam[1])) % 360:.0f}")
     renderer = ernie.Renderer()
     # Wide, south and up; then 35 mm on Orion.
     south = np.array([0.0, -math.cos(math.radians(30.0)), math.sin(math.radians(30.0))])
-    aim(scene, south, 14.0)
+    aim(camera, south, 14.0)
     wide = np.array(renderer.render(scene))[..., :3]
-    aim(scene, alnilam, 35.0)
+    aim(camera, alnilam, 35.0)
     orion = np.array(renderer.render(scene))[..., :3]
     image = side_by_side([wide, orion])
     if args.output:
         write_png(args.output, image)
     else:
         from ernie.app import Viewer
-        aim(scene, south, 14.0)
+        aim(camera, south, 14.0)
         Viewer(scene).run()
 
 

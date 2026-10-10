@@ -4,10 +4,13 @@
 //     ./build/bin/demo_viewer_sun_panel
 
 #include "ernie/app/app.h"
+#include "ernie/scene/geometry_schemas.h"
+#include "ernie/scene/light_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/scene/xform.h"
 
-#include <glm/gtc/matrix_transform.hpp>
+#include <glm/trigonometric.hpp>
 #include <imgui.h>
 
 #include <cmath>
@@ -17,15 +20,15 @@
 int main() {
     using namespace ernie;
     Scene scene;
-    scene.Define("/World/Ground", tokens::kGroundPlane);
+    GroundPlane::Define(scene, "/World/Ground");
     for (int i = 0; i < 5; ++i) {
-        const double x = 3.0 * (i - 2);
-        scene.Define(Path("/World/Box" + std::to_string(i)), tokens::kCube)
-            .Set(tokens::kSize, 1.0 + 0.25 * i)
-            .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(x, 0.0, 1.0)))
-            .Set(tokens::kDisplayColor, glm::vec3(0.2f + 0.15f * i, 0.4f, 0.8f - 0.15f * i));
+        const Path box("/World/Box" + std::to_string(i));
+        Cube::Define(scene, box)
+            .SetSize(1.0 + 0.25 * i)
+            .SetDisplayColor({0.2 + 0.15 * i, 0.4, 0.8 - 0.15 * i});
+        SetXform(scene, box, {.translate = glm::dvec3(3.0 * (i - 2), 0.0, 1.0)});
     }
-    scene.Define("/World/Sun", tokens::kDistantLight);
+    DistantLight::Define(scene, "/World/Sun");
 
     try {
         app::Viewer viewer(scene, {.title = "Ernie demo"});

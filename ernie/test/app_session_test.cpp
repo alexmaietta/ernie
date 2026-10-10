@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/app/session.h"
 #include "ernie/scene/camera.h"
+#include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/light_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 
@@ -41,10 +43,10 @@ TEST(SessionTest, SessionPathsAreTheRootAndItsDescendants) {
 
 TEST(SessionTest, ViewableCamerasListSessionCamerasFirst) {
     Scene scene;
-    scene.Define("/A/Camera", tokens::kCamera);
-    scene.Define("/__session/Perspective", tokens::kCamera);
-    scene.Define("/z/Camera", tokens::kCamera);
-    scene.Define("/World/Light", tokens::kDistantLight);
+    Camera::Define(scene, "/A/Camera");
+    Camera::Define(scene, "/__session/Perspective");
+    Camera::Define(scene, "/z/Camera");
+    DistantLight::Define(scene, "/World/Light");
     const std::vector<Path> cameras = ViewableCameras(scene);
     ASSERT_EQ(cameras.size(), 3u);
     EXPECT_EQ(cameras[0], Path("/__session/Perspective"));
@@ -82,7 +84,7 @@ TEST(SessionTest, LocalFromWorldUndoesTheParentsTransform) {
     const glm::dmat4 parent = glm::translate(glm::dmat4(1.0), glm::dvec3(5.0, 0.0, 0.0)) *
                               glm::rotate(glm::dmat4(1.0), 0.5, glm::dvec3(0.0, 0.0, 1.0));
     scene.Define("/Rig", "Xform").Set(tokens::kTransform, parent);
-    scene.Define("/Rig/Camera", tokens::kCamera);
+    Camera::Define(scene, "/Rig/Camera");
     const glm::dmat4 world = glm::translate(glm::dmat4(1.0), glm::dvec3(1.0, 2.0, 3.0));
     const glm::dmat4 local = LocalFromWorld(scene, Path("/Rig/Camera"), world);
     scene.Set(Path("/Rig/Camera"), tokens::kTransform, local);
@@ -141,7 +143,7 @@ TEST(SessionTest, AuthorControllerCameraKeepsAnAuthoredLens) {
     Scene scene;
     const Path path("/__session/Perspective");
     AuthorControllerCamera(scene, path, OrbitController{}, 64, 64);
-    scene.Set(path, tokens::kFocalLength, 85.0);
+    Camera(scene, path).SetFocalLength(85.0);
     OrbitController moved;
     moved.yaw = 1.0f;
     AuthorControllerCamera(scene, path, moved, 64, 64);
@@ -241,9 +243,9 @@ TEST(SessionTest, SessionLightsAreDefinedOnceAndFollowTheCamera) {
     UpdateSessionLights(scene, camera);
     EXPECT_EQ(scene.Version(), version);
 
-    scene.Define("/World/Sun", tokens::kDistantLight);
+    DistantLight sun = DistantLight::Define(scene, "/World/Sun");
     EXPECT_TRUE(HasStageLights(scene));
-    scene.Set("/World/Sun", tokens::kVisibility, tokens::kInvisible);
+    sun.SetVisibility(tokens::kInvisible);
     EXPECT_FALSE(HasStageLights(scene));
 }
 

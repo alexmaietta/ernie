@@ -74,24 +74,20 @@ struct Glow : ISpatialPixelFilter {
 
 def build_scene():
     scene = ernie.Scene()
-    scene.define("/World/Ground", tokens.GROUND_PLANE)
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+    world = scene.define("/World", ernie.Xform)
+    world.define("Ground", ernie.GroundPlane)
+    world.define("Sun", ernie.DistantLight).set(
         tokens.TRANSFORM, ernie.distant_light_transform((0.4, -0.6, 0.7))
     )
-    box = np.eye(4)
-    box[2, 3] = 1.0
-    scene.define("/World/Box", tokens.CUBE).set(tokens.SIZE, 2.0).set(tokens.TRANSFORM, box).set(
-        tokens.DISPLAY_COLOR, (0.8, 0.3, 0.2)
-    )
+    world.define("Box", ernie.Cube, size=2.0, translate=(0.0, 0.0, 1.0),
+                 display_color=(0.8, 0.3, 0.2))
     # One pose, two exposures: the photographic default, and a short one leaving the sensor
     # unsaturated for the raw numbers.
     pose = ernie.look_at_transform((6.0, -6.0, 4.0), (0.0, 0.0, 1.0))
-    scene.define("/World/Photo", tokens.CAMERA).set(tokens.TRANSFORM, pose).set(
-        tokens.FOCAL_LENGTH, 18.0
+    photo = world.define("Photo", ernie.Camera, focal_length=18.0).set(tokens.TRANSFORM, pose)
+    raw = world.define("Raw", ernie.Camera, focal_length=18.0, exposure_time=0.0002).set(
+        tokens.TRANSFORM, pose
     )
-    scene.define("/World/Raw", tokens.CAMERA).set(tokens.TRANSFORM, pose).set(
-        tokens.FOCAL_LENGTH, 18.0
-    ).set(tokens.EXPOSURE_TIME, 0.0002)
 
     # The chain: lens (implied), IR cut, QE, hot pixels, noise, ADC, CIE, glow, exposure. The glow
     # splits the colour branch into a second kernel; the raw branch stays in the first.
@@ -105,20 +101,18 @@ def build_scene():
         ("Glow", "glow", {"radius": 6.0, "strength": 0.2}),
         ("Exposure", "exposure", {}),
     ]
+    render = scene.define("/Render", ernie.Scope)
     paths = []
     for name, kind, inputs in chain:
-        prim = scene.define(f"/Render/Filters/{name}", tokens.SENSOR_FILTER).set(
-            tokens.FILTER_TYPE, kind
-        )
+        prim = render.define(f"Filters/{name}", ernie.SensorFilter, filter_type=kind)
+        # A filter's parameters are its own, so they have no Python names: set them by USD name.
         for input_name, value in inputs.items():
             prim.set(f"inputs:{input_name}", value)
-        paths.append(ernie.Path(f"/Render/Filters/{name}"))
-    for product, var in (("Raw", "RawDN"), ("Photo", "LdrColor")):
-        scene.define(f"/Render/Vars/{var}", tokens.RENDER_VAR).set(tokens.SOURCE_NAME, var)
-        scene.define(f"/Render/{product}", tokens.RENDER_PRODUCT).set(
-            tokens.CAMERA_REL, ernie.Path(f"/World/{product}")
-        ).set(tokens.RESOLUTION, (320, 240)).set(
-            tokens.ORDERED_VARS, [ernie.Path(f"/Render/Vars/{var}")]
+        paths.append(prim.path)
+    for product, camera, var in (("Raw", raw, "RawDN"), ("Photo", photo, "LdrColor")):
+        render_var = render.define(f"Vars/{var}", ernie.RenderVar, source_name=var)
+        render.define(product, ernie.RenderProduct, camera=camera, resolution=(320, 240)).set(
+            tokens.ORDERED_VARS, [render_var.path]
         ).set(tokens.FILTERS, paths)
     return scene
 

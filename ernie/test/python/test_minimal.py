@@ -16,30 +16,35 @@ def boxes_scene(mode=None, color=None, views=None):
     """Red, green and blue boxes on a ground plane under the sun, seen by one camera or a batch
     of `views` views around them."""
     scene = ernie.Scene()
-    scene.define("/World/Camera", tokens.CAMERA).set(
+    camera = scene.define("/World/Camera", ernie.Camera, focal_length=35.0).set(
         tokens.TRANSFORM, ernie.look_at_transform((0, -24, 14), (0, 0, 1))
-    ).set(tokens.FOCAL_LENGTH, 35.0)
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+    )
+    scene.define("/World/Sun", ernie.DistantLight).set(
         tokens.TRANSFORM, ernie.distant_light_transform((0.3, -0.5, 0.8))
     )
-    scene.define("/World/Ground", tokens.GROUND_PLANE)
+    scene.define("/World/Ground", ernie.GroundPlane)
     for i, rgb in enumerate(((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))):
-        scene.define(f"/World/Box{i}", tokens.CUBE).set_xform(
-            translate=(-6.0 + 6.0 * i, 0.0, 2.0), scale=(2.0, 2.0, 2.0)
-        ).set(tokens.DISPLAY_COLOR, rgb)
-    scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")
-    ).set(tokens.SHADOW_ENABLE, False)
-    product = scene.define("/Render/Camera", tokens.RENDER_PRODUCT).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")
-    ).set(tokens.RESOLUTION, (96, 64))
+        scene.define(
+            f"/World/Box{i}",
+            ernie.Cube,
+            translate=(-6.0 + 6.0 * i, 0.0, 2.0),
+            scale=(2.0, 2.0, 2.0),
+            display_color=rgb,
+        )
+    # inputs:shadow:enable is a light's attribute, not one RenderSettings declares: set by name.
+    scene.define("/Render/Settings", ernie.RenderSettings, camera=camera).set(
+        tokens.SHADOW_ENABLE, False
+    )
+    product = scene.define(
+        "/Render/Camera", ernie.RenderProduct, camera=camera, resolution=(96, 64)
+    )
     for name in VARS:
-        scene.define(f"/Render/Vars/{name}", tokens.RENDER_VAR).set(tokens.SOURCE_NAME, name)
+        scene.define(f"/Render/Vars/{name}", ernie.RenderVar, source_name=name)
     product.set(tokens.ORDERED_VARS, [ernie.Path(f"/Render/Vars/{n}") for n in VARS])
     if mode is not None:
-        product.set(tokens.MINIMAL_MODE, mode)
+        product.minimal_mode = mode
     if color is not None:
-        product.set(tokens.MINIMAL_CONSTANT_COLOR, color)
+        product.minimal_constant_color = color
     if views is not None:
         poses = np.stack(
             [
@@ -133,7 +138,7 @@ def test_a_batch_maps_to_cuda_without_copies(renderer):
 
 def test_refuses_what_it_does_not_render(renderer):
     scene = boxes_scene(tokens.TEXTURED_DIFFUSE)
-    scene.define("/Render/Vars/Hdr", tokens.RENDER_VAR).set(tokens.SOURCE_NAME, "HdrColor")
+    scene.define("/Render/Vars/Hdr", ernie.RenderVar, source_name="HdrColor")
     scene.set("/Render/Camera", tokens.ORDERED_VARS, [ernie.Path("/Render/Vars/Hdr")])
     with pytest.raises(ValueError, match="minimal shading does not render"):
         renderer.step(scene, render_products=["/Render/Camera"])

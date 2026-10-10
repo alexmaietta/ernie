@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/session/delegate.h"
 #include "ernie/session/resolve.h"
@@ -74,9 +75,9 @@ class FakeDelegate : public RenderDelegate {
 
 TEST(RenderDelegate, FramesCountPerProductUnlessTheSettingsAuthorOne) {
     Scene scene;
-    scene.Define("/Render/Settings", tokens::kRenderSettings);
+    ernie::RenderSettings renderSettings = ernie::RenderSettings::Define(scene, "/Render/Settings");
     FakeDelegate delegate;
-    const Path settings("/Render/Settings");
+    const Path settings = renderSettings.GetPath();
     const Path left("/Render/Left");
     const Path right("/Render/Right");
     EXPECT_EQ(delegate.NextFrame(scene, settings, left).frame, 0u);
@@ -88,7 +89,7 @@ TEST(RenderDelegate, FramesCountPerProductUnlessTheSettingsAuthorOne) {
     EXPECT_EQ(id.stream, ernie::StreamOf("/Render/Left"));
     EXPECT_NE(id.stream, delegate.NextFrame(scene, settings, right).stream);
 
-    scene.Set(settings, tokens::kFrame, 41);
+    renderSettings.SetFrame(41);
     EXPECT_EQ(delegate.NextFrame(scene, settings, left).frame, 41u);
     EXPECT_EQ(delegate.NextFrame(scene, settings, left).frame, 41u) << "authored frames repeat";
     EXPECT_EQ(delegate.NextFrame(scene, {}, left).frame, 5u) << "no settings: the count";

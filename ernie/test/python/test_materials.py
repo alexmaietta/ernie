@@ -33,18 +33,15 @@ def write_png(path, rgb):
 def preview_surface(scene, material):
     """A Material whose surface is a UsdPreviewSurface with a UsdUVTexture on diffuseColor,
     reading primvar st."""
-    scene.define(material, tokens.MATERIAL)
-    surface = f"{material}/Surface"
-    texture = f"{material}/Tex"
-    reader = f"{material}/St"
-    scene.define(surface, tokens.SHADER).set(tokens.INFO_ID, tokens.USD_PREVIEW_SURFACE)
-    scene.define(texture, tokens.SHADER).set(tokens.INFO_ID, tokens.USD_UV_TEXTURE)
-    scene.define(reader, tokens.SHADER).set(tokens.INFO_ID, tokens.USD_PRIMVAR_READER_FLOAT2).set(
-        tokens.VARNAME, "st"
+    looks = scene.define(material, ernie.Material)
+    surface = looks.define("Surface", ernie.Shader, info_id=tokens.USD_PREVIEW_SURFACE)
+    texture = looks.define("Tex", ernie.Shader, info_id=tokens.USD_UV_TEXTURE)
+    reader = looks.define(
+        "St", ernie.Shader, info_id=tokens.USD_PRIMVAR_READER_FLOAT2, varname="st"
     )
-    scene.connect(material, tokens.SURFACE_OUTPUT, surface, tokens.SURFACE_OUTPUT)
-    scene.connect(surface, tokens.DIFFUSE_COLOR, texture, "outputs:rgb")
-    scene.connect(texture, tokens.ST, reader, "outputs:result")
+    scene.connect(looks.path, tokens.SURFACE_OUTPUT, surface.path, tokens.SURFACE_OUTPUT)
+    scene.connect(surface.path, tokens.DIFFUSE_COLOR, texture.path, "outputs:rgb")
+    scene.connect(texture.path, tokens.ST, reader.path, "outputs:result")
     return texture
 
 
@@ -67,22 +64,25 @@ def test_meshes_show_an_image_file_through_their_texture_coordinates(renderer, t
     write_png(tmp_path / "halves.png", image)
 
     scene = ernie.Scene()
-    scene.define("/World/Camera", tokens.CAMERA).set(
+    scene.define("/World/Camera", ernie.Camera, focal_length=18.0).set(
         tokens.TRANSFORM, ernie.look_at_transform((0, 0, 60), (0, 0, 0), up=(0, 1, 0))
-    ).set(tokens.FOCAL_LENGTH, 18.0)
+    )
     # A dim sun, so nothing clips, on a matte material, so no highlight greys it.
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(tokens.INTENSITY, 0.3)
-    scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(tokens.RESOLUTION, (48, 48))
+    scene.define("/World/Sun", ernie.DistantLight, intensity=0.3)
+    scene.define("/Render/Settings", ernie.RenderSettings, resolution=(48, 48))
     half = 12.0
     points = np.array([[-half, -half, 0], [half, -half, 0], [half, half, 0], [-half, half, 0]])
-    scene.define("/World/Quad", tokens.MESH).write(tokens.POINTS, points).write(
-        tokens.FACE_VERTEX_COUNTS, np.array([4])
-    ).write(tokens.FACE_VERTEX_INDICES, np.arange(4)).write(
-        "primvars:st", np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32)
-    ).set(tokens.MATERIAL_BINDING, ernie.Path("/Looks/M"))
+    scene.define(
+        "/World/Quad",
+        ernie.Mesh,
+        points=points,
+        face_vertex_counts=np.array([4]),
+        face_vertex_indices=np.arange(4),
+        material_binding="/Looks/M",
+    ).write("primvars:st", np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32))
     texture = preview_surface(scene, "/Looks/M")
-    scene.set("/Looks/M", tokens.BRDF, "lambert")
-    scene.set(texture, tokens.FILE, str(tmp_path / "halves.png"))
+    ernie.Material(scene.get_prim("/Looks/M")).brdf = "lambert"
+    texture.file = str(tmp_path / "halves.png")
 
     pixels = renderer.render(scene).astype(np.int32)
     # About 6 m either side of the middle (1.45 m per pixel), well inside each half, where the
@@ -97,28 +97,35 @@ def test_meshes_show_an_image_file_through_their_texture_coordinates(renderer, t
 def test_preview_surfaces_shade_metals_and_dielectrics_differently(renderer):
     assert "preview_surface" in renderer.brdfs
     scene = ernie.Scene()
-    scene.define("/World/Camera", tokens.CAMERA).set(
+    scene.define("/World/Camera", ernie.Camera, focal_length=18.0).set(
         tokens.TRANSFORM, ernie.look_at_transform((0, 0, 60), (0, 0, 0), up=(0, 1, 0))
-    ).set(tokens.FOCAL_LENGTH, 18.0)
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+    )
+    scene.define("/World/Sun", ernie.DistantLight).set(
         tokens.TRANSFORM, ernie.distant_light_transform((0.3, 0.0, 1.0))
     )
-    scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(tokens.RESOLUTION, (48, 48))
+    scene.define("/Render/Settings", ernie.RenderSettings, resolution=(48, 48))
     half = 12.0
     points = np.array([[-half, -half, 0], [half, -half, 0], [half, half, 0], [-half, half, 0]])
-    scene.define("/World/Quad", tokens.MESH).write(tokens.POINTS, points).write(
-        tokens.FACE_VERTEX_COUNTS, np.array([4])
-    ).write(tokens.FACE_VERTEX_INDICES, np.arange(4)).set(
-        tokens.MATERIAL_BINDING, ernie.Path("/Looks/M")
+    material = scene.define("/Looks/M", ernie.Material)
+    scene.define(
+        "/World/Quad",
+        ernie.Mesh,
+        points=points,
+        face_vertex_counts=np.array([4]),
+        face_vertex_indices=np.arange(4),
+        material_binding=material,
     )
-    scene.define("/Looks/M", tokens.MATERIAL)
-    scene.define("/Looks/M/Surface", tokens.SHADER).set(
-        tokens.INFO_ID, tokens.USD_PREVIEW_SURFACE
-    ).set(tokens.DIFFUSE_COLOR, (0.6, 0.6, 0.6)).set(tokens.ROUGHNESS, 0.3)
-    scene.connect("/Looks/M", tokens.SURFACE_OUTPUT, "/Looks/M/Surface", tokens.SURFACE_OUTPUT)
+    surface = material.define(
+        "Surface",
+        ernie.Shader,
+        info_id=tokens.USD_PREVIEW_SURFACE,
+        diffuse_color=(0.6, 0.6, 0.6),
+        roughness=0.3,
+    )
+    scene.connect(material.path, tokens.SURFACE_OUTPUT, surface.path, tokens.SURFACE_OUTPUT)
 
     dielectric = renderer.render(scene).astype(np.int32)
-    scene.set("/Looks/M/Surface", tokens.METALLIC, 1.0)
+    surface.metallic = 1.0
     metal = renderer.render(scene).astype(np.int32)
     assert np.abs(metal - dielectric)[16:32, 16:32, :3].mean() > 5, "metallic changes the shading"
     assert renderer.take_validation_messages() == []

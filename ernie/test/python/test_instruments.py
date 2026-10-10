@@ -11,7 +11,7 @@ from ernie import tokens
 def test_navcam_pair_is_authored_on_its_rig():
     scene = ernie.Scene()
     for product in ("/Render/Left", "/Render/Right"):
-        scene.define(product, tokens.RENDER_PRODUCT)
+        scene.define(product, ernie.RenderProduct)
     ernie.author_mars2020_navcam_pair(scene, "/Rover/Navcam", "/Render/Left", "/Render/Right",
                                       pattern="bggr", jpeg_quality=70.0)
     left = np.array(scene.get("/Rover/Navcam/Left", tokens.TRANSFORM))
@@ -26,7 +26,7 @@ def test_navcam_pair_is_authored_on_its_rig():
 def test_hazcam_pairs_front_and_rear():
     scene = ernie.Scene()
     for product in ("/Render/Left", "/Render/Right"):
-        scene.define(product, tokens.RENDER_PRODUCT)
+        scene.define(product, ernie.RenderProduct)
     # Maki et al. 2020, Table 2: 24.8 cm (front) and 93.4 cm (rear) baselines, 14.0 mm lenses.
     for which, baseline in (("front", 0.248), ("rear", 0.934)):
         ernie.author_mars2020_hazcam_pair(scene, "/Rover/Hazcam", "/Render/Left", "/Render/Right",
@@ -43,7 +43,7 @@ def test_hazcam_pairs_front_and_rear():
 def test_mastcamz_pair_reaches_the_near_infrared():
     scene = ernie.Scene()
     for product in ("/Render/Left", "/Render/Right"):
-        scene.define(product, tokens.RENDER_PRODUCT)
+        scene.define(product, ernie.RenderProduct)
     ernie.author_mastcamz_pair(scene, "/Rover/MastcamZ", "/Render/Left", "/Render/Right",
                                left_filter=6, right_filter=6, focal_length=63.0)
     # Bell et al. 2021, Table 3: L6 is 442 +/- 12 nm, R6 1022 +/- 19 nm.
@@ -57,7 +57,7 @@ def test_mastcamz_pair_reaches_the_near_infrared():
 
 def test_singlet_chromatic_follows_its_glass():
     scene = ernie.Scene()
-    scene.define("/Camera", tokens.CAMERA).set(tokens.FOCAL_LENGTH, 50.0)
+    scene.define("/Camera", ernie.Camera, focal_length=50.0)
     # SCHOTT N-BK7 by default: the C line focuses about f / V = 0.78 mm further than the F line.
     ernie.author_singlet_chromatic(scene, "/Camera", lateral=0.5)
     focus = dict(zip(*[iter(scene.get("/Camera", tokens.LENS_CHROMATIC_FOCUS))] * 2))

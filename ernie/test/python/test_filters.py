@@ -21,17 +21,15 @@ def hdr_through(renderer, scene, types, inputs=None):
     paths = []
     for i, kind in enumerate(types):
         path = f"/Render/Filters/F{i}"
-        prim = scene.define(path, tokens.SENSOR_FILTER).set(tokens.FILTER_TYPE, kind)
+        prim = scene.define(path, ernie.SensorFilter, filter_type=kind)
         for name, value in (inputs or {}).items():
             if kind != "cie":
                 prim.set(f"inputs:{name}", value)
         paths.append(ernie.Path(path))
-    scene.define("/Render/Vars/Hdr", tokens.RENDER_VAR).set(tokens.SOURCE_NAME, "HdrColor")
-    scene.define("/Render/Hdr", tokens.RENDER_PRODUCT).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")
-    ).set(tokens.RESOLUTION, (48, 48)).set(
-        tokens.ORDERED_VARS, [ernie.Path("/Render/Vars/Hdr")]
-    ).set(tokens.FILTERS, paths)
+    scene.define("/Render/Vars/Hdr", ernie.RenderVar, source_name="HdrColor")
+    scene.define(
+        "/Render/Hdr", ernie.RenderProduct, camera="/World/Camera", resolution=(48, 48)
+    ).set(tokens.ORDERED_VARS, [ernie.Path("/Render/Vars/Hdr")]).set(tokens.FILTERS, paths)
     frame = renderer.step(scene, render_products=["/Render/Hdr"])["/Render/Hdr"].frames[0]
     return np.array(frame.render_vars["/Render/Vars/Hdr"].map())
 

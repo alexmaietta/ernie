@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/delegate.h"
 #include "ernie/scene/camera.h"
+#include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/geometry_schemas.h"
+#include "ernie/scene/light_schemas.h"
+#include "ernie/scene/material_schemas.h"
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 #include "support/delegate_scenes.h"
@@ -29,31 +34,29 @@ namespace {
 /// UsdUVTexture /Looks/M/Tex reads primvar st. Its two products render LdrColor and HdrColor.
 Scene TexturedScene() {
     Scene scene;
-    scene.Define("/World/Camera", tokens::kCamera)
-        .Set(tokens::kTransform,
-             ernie::LookAtTransform({0.0, 0.0, 60.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}))
-        .Set(tokens::kFocalLength, 18.0f)
-        .Set(tokens::kSensorNoise, false);
+    ernie::Camera::Define(scene, "/World/Camera").SetFocalLength(18.0).SetSensorNoise(false);
+    scene.Set("/World/Camera", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, 60.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
     scene.Define("/World/Sun", tokens::kDistantLight)
         .Set(tokens::kTransform, ernie::DistantLightTransform({0.0, 0.0, 1.0}));
-    scene.Define("/Render/Settings", tokens::kRenderSettings)
-        .Set(tokens::kResolution, glm::ivec2(kSize, kSize))
-        .Set(tokens::kAmbient, 0.0f);
+    ernie::RenderSettings::Define(scene, "/Render/Settings")
+        .SetResolution(glm::dvec2(kSize, kSize))
+        .SetAmbient(0.0);
     DefineQuad(scene, "/World/Quad", 8.0f);
     const std::array<float, 8> st{0, 0, 1, 0, 1, 1, 0, 1};
     scene.Write("/World/Quad", "primvars:st", Tensor::Copy<float>(st, {4, 2}));
-    scene.Set("/World/Quad", tokens::kMaterialBinding, Path("/Looks/M"));
+    ernie::Mesh(scene, "/World/Quad").SetMaterialBinding("/Looks/M");
 
-    scene.Define("/Looks/M", tokens::kMaterial);
-    scene.Define("/Looks/M/Surface", tokens::kShader)
-        .Set(tokens::kInfoId, std::string(tokens::kUsdPreviewSurface))
-        .Set(tokens::kDiffuseColor, glm::vec3(0.5f));
-    scene.Define("/Looks/M/Tex", tokens::kShader)
-        .Set(tokens::kInfoId, std::string(tokens::kUsdUVTexture))
-        .Set(tokens::kSourceColorSpace, std::string("raw"));
-    scene.Define("/Looks/M/St", tokens::kShader)
-        .Set(tokens::kInfoId, std::string(tokens::kUsdPrimvarReaderFloat2))
-        .Set(tokens::kVarname, std::string("st"));
+    ernie::Material::Define(scene, "/Looks/M");
+    ernie::Shader::Define(scene, "/Looks/M/Surface")
+        .SetInfoId(tokens::kUsdPreviewSurface)
+        .SetDiffuseColor(glm::dvec3(0.5));
+    ernie::Shader::Define(scene, "/Looks/M/Tex")
+        .SetInfoId(tokens::kUsdUVTexture)
+        .SetSourceColorSpace("raw");
+    ernie::Shader::Define(scene, "/Looks/M/St")
+        .SetInfoId(tokens::kUsdPrimvarReaderFloat2)
+        .SetVarname("st");
     ernie::Connect(scene, "/Looks/M", tokens::kSurfaceOutput, "/Looks/M/Surface",
                    tokens::kSurfaceOutput);
     ernie::Connect(scene, "/Looks/M/Tex", tokens::kSt, "/Looks/M/St", "outputs:result");
@@ -61,13 +64,13 @@ Scene TexturedScene() {
     std::vector<Path> vars;
     for (const std::string_view name : {"HdrColor", "LdrColor"}) {
         const Path var("/Render/Vars/" + std::string(name));
-        scene.Define(var, tokens::kRenderVar).Set(tokens::kSourceName, std::string(name));
+        ernie::RenderVar::Define(scene, var).SetSourceName(name);
         vars.push_back(var);
     }
-    scene.Define("/Render/Out", tokens::kRenderProduct)
-        .Set(tokens::kCameraRel, Path("/World/Camera"))
-        .Set(tokens::kResolution, glm::ivec2(kSize, kSize))
-        .Set(tokens::kOrderedVars, vars);
+    ernie::RenderProduct::Define(scene, "/Render/Out")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(kSize, kSize));
+    scene.Set("/Render/Out", tokens::kOrderedVars, vars);
     return scene;
 }
 
@@ -103,7 +106,7 @@ float GreenAt(const Scene& scene, const Tensor& hdr, float x, float y) {
 /// lobe shows.
 Scene PreviewScene() {
     Scene scene = TexturedScene();
-    scene.Set("/Looks/M/Surface", tokens::kDiffuseColor, glm::vec3(0.6f));
+    ernie::Shader(scene, "/Looks/M/Surface").SetDiffuseColor(glm::dvec3(0.6));
     scene.Set("/World/Sun", tokens::kTransform, ernie::DistantLightTransform({0.3, 0.0, 1.0}));
     return scene;
 }
@@ -118,10 +121,10 @@ TEST_F(RasterDelegateTest, AlbedoTexturesFollowTextureCoordinatesWithTheImageUpr
     Scene scene = TexturedScene();
     const std::array<std::uint8_t, 16> texels{255, 0, 0,   255, 0,   255, 0,   255,
                                               0,   0, 255, 255, 255, 255, 255, 255};
-    scene.Write("/Looks/M/Tex", tokens::kShaderTexture,
-                Tensor::Copy<std::uint8_t>(texels, {2, 2, 4}));
-    scene.Set("/Looks/M/Tex", tokens::kWrapS, std::string("clamp"));
-    scene.Set("/Looks/M/Tex", tokens::kWrapT, std::string("clamp"));
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetTexture(Tensor::Copy<std::uint8_t>(texels, {2, 2, 4}))
+        .SetWrapS("clamp")
+        .SetWrapT("clamp");
     ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor, "/Looks/M/Tex",
                    "outputs:rgb");
     RasterDelegate delegate(*context_);
@@ -157,12 +160,12 @@ TEST_F(RasterDelegateTest, NormalMapsTiltTheSurfaceAlongItsTextureCoordinates) {
     // cos 45 to cos 15; with the coordinates turned 180 degrees the tilt faces away, cos 75. The
     // Material names Lambert, which a preview surface network then shades with.
     Scene scene = TexturedScene();
-    scene.Set("/Looks/M", tokens::kBrdf, std::string("lambert"));
+    ernie::Material(scene, "/Looks/M").SetBrdf("lambert");
     scene.Set("/World/Sun", tokens::kTransform, ernie::DistantLightTransform({1.0, 0.0, 1.0}));
     const float tilt = glm::radians(30.0f);
     const std::array<float, 4> normal{0.5f * std::sin(tilt) + 0.5f, 0.5f,
                                       0.5f * std::cos(tilt) + 0.5f, 1.0f};
-    scene.Write("/Looks/M/Tex", tokens::kShaderTexture, Tensor::Copy<float>(normal, {1, 1, 4}));
+    ernie::Shader(scene, "/Looks/M/Tex").SetTexture(Tensor::Copy<float>(normal, {1, 1, 4}));
     scene.Set("/Looks/M/Tex", tokens::kShaderScale, glm::vec4(2.0f, 2.0f, 2.0f, 1.0f));
     scene.Set("/Looks/M/Tex", tokens::kShaderBias, glm::vec4(-1.0f, -1.0f, -1.0f, 0.0f));
     RasterDelegate delegate(*context_);
@@ -177,9 +180,9 @@ TEST_F(RasterDelegateTest, NormalMapsTiltTheSurfaceAlongItsTextureCoordinates) {
     };
     EXPECT_NEAR(towards / flat, cosine(15.0) / cosine(45.0), 0.03f);
 
-    scene.Define("/Looks/M/Turn", tokens::kShader)
-        .Set(tokens::kInfoId, std::string(tokens::kUsdTransform2d))
-        .Set(tokens::kRotation, 180.0);
+    ernie::Shader::Define(scene, "/Looks/M/Turn")
+        .SetInfoId(tokens::kUsdTransform2d)
+        .SetRotation(180.0);
     ernie::Connect(scene, "/Looks/M/Turn", tokens::kIn, "/Looks/M/St", "outputs:result");
     ernie::Connect(scene, "/Looks/M/Tex", tokens::kSt, "/Looks/M/Turn", "outputs:result");
     const float away = CentreGreen(delegate, scene);
@@ -193,8 +196,7 @@ TEST_F(RasterDelegateTest, PreviewSurfacesShadeWithGgxAndTheirTexturesPerPixel) 
     Scene scene = PreviewScene();
     RasterDelegate delegate(*context_);
     const auto render = [&](float metallic, float roughness) {
-        scene.Set("/Looks/M/Surface", tokens::kMetallic, metallic);
-        scene.Set("/Looks/M/Surface", tokens::kRoughness, roughness);
+        ernie::Shader(scene, "/Looks/M/Surface").SetMetallic(metallic).SetRoughness(roughness);
         return Render(delegate, scene, "HdrColor");
     };
     const Tensor dielectric = render(0.0f, 0.3f);
@@ -208,9 +210,9 @@ TEST_F(RasterDelegateTest, PreviewSurfacesShadeWithGgxAndTheirTexturesPerPixel) 
         << "and so does roughness";
 
     const std::array<std::uint8_t, 8> metallicRoughness{0, 77, 0, 255, 0, 77, 255, 255};
-    scene.Write("/Looks/M/Tex", tokens::kShaderTexture,
-                Tensor::Copy<std::uint8_t>(metallicRoughness, {1, 2, 4}));
-    scene.Set("/Looks/M/Tex", tokens::kWrapS, std::string("clamp"));
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetTexture(Tensor::Copy<std::uint8_t>(metallicRoughness, {1, 2, 4}))
+        .SetWrapS("clamp");
     ernie::Connect(scene, "/Looks/M/Surface", tokens::kMetallic, "/Looks/M/Tex", "outputs:b");
     ernie::Connect(scene, "/Looks/M/Surface", tokens::kRoughness, "/Looks/M/Tex", "outputs:g");
     const Tensor textured = render(0.5f, 0.9f);  // the textures replace these
@@ -224,17 +226,17 @@ TEST_F(RasterDelegateTest, OpacityThresholdsCutSurfacesOutOfImagesAndShadows) {
     // camera sees the ground lit as it is clear of the quad (no shadow from what is cut out),
     // and the right half still shows the quad.
     Scene scene = TexturedScene();
-    scene.Set("/World/Sun", tokens::kShadowEnable, true);
+    ernie::DistantLight(scene, "/World/Sun").SetShadowEnable(true);
     // A dark, rough quad, so it shows darker than the ground.
-    scene.Set("/Looks/M/Surface", tokens::kDiffuseColor, glm::vec3(0.05f));
-    scene.Set("/Looks/M/Surface", tokens::kRoughness, 1.0);
-    scene.Define("/Looks/Ground", tokens::kMaterial).Set(tokens::kAlbedo, glm::vec3(0.9f));
-    scene.Define("/World/Ground", tokens::kGroundPlane)
-        .Set(tokens::kGroundHeight, -5.0)
-        .Set(tokens::kMaterialBinding, Path("/Looks/Ground"));
+    ernie::Shader(scene, "/Looks/M/Surface").SetDiffuseColor(glm::dvec3(0.05)).SetRoughness(1.0);
+    ernie::Material::Define(scene, "/Looks/Ground").SetAlbedo(glm::dvec3(0.9));
+    ernie::GroundPlane::Define(scene, "/World/Ground")
+        .SetHeight(-5.0)
+        .SetMaterialBinding("/Looks/Ground");
     const std::array<std::uint8_t, 8> alpha{255, 255, 255, 0, 255, 255, 255, 255};
-    scene.Write("/Looks/M/Tex", tokens::kShaderTexture, Tensor::Copy<std::uint8_t>(alpha, {1, 2, 4}));
-    scene.Set("/Looks/M/Tex", tokens::kWrapS, std::string("clamp"));
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetTexture(Tensor::Copy<std::uint8_t>(alpha, {1, 2, 4}))
+        .SetWrapS("clamp");
     ernie::Connect(scene, "/Looks/M/Surface", tokens::kOpacity, "/Looks/M/Tex", "outputs:a");
     RasterDelegate delegate(*context_);
     const Tensor opaque = Render(delegate, scene, "HdrColor");
@@ -242,7 +244,7 @@ TEST_F(RasterDelegateTest, OpacityThresholdsCutSurfacesOutOfImagesAndShadows) {
     EXPECT_LT(GreenAt(scene, opaque, -4.0f, 0.0f), 0.5f * clear)
         << "without a threshold opacity draws opaque: the quad, darker than the ground";
 
-    scene.Set("/Looks/M/Surface", tokens::kOpacityThreshold, 0.5);
+    ernie::Shader(scene, "/Looks/M/Surface").SetOpacityThreshold(0.5);
     const Tensor cut = Render(delegate, scene, "HdrColor");
     EXPECT_NEAR(GreenAt(scene, cut, -4.0f, 0.0f), clear, 0.05f * clear)
         << "the ground through the cut half, unshadowed";
@@ -257,8 +259,8 @@ TEST_F(RasterDelegateTest, TexturesFollowTheSceneTheyComeFrom) {
     const auto render = [&](std::uint8_t red) {
         Scene scene = TexturedScene();
         const std::array<std::uint8_t, 4> texel{red, 0, 0, 255};
-        scene.Write("/Looks/M/Tex", tokens::kShaderTexture,
-                    Tensor::Copy<std::uint8_t>(texel, {1, 1, 4}));
+        ernie::Shader(scene, "/Looks/M/Tex")
+            .SetTexture(Tensor::Copy<std::uint8_t>(texel, {1, 1, 4}));
         ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor, "/Looks/M/Tex",
                        "outputs:rgb");
         const Tensor hdr = Render(delegate, scene, "HdrColor");

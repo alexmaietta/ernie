@@ -8,11 +8,16 @@
 // the origin, yet every view sees only its own world plus what no world claims (the ground and
 // the sun). One camera carries a pose and a world per view.
 
+#include "ernie/scene/base_schemas.h"
+#include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/geometry_schemas.h"
+#include "ernie/scene/light_schemas.h"
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/scene/xform.h"
 #include "ernie/session/renderer.h"
 
-#include <glm/gtc/matrix_transform.hpp>
 #include <stb_image_write.h>
 
 #include <cmath>
@@ -31,29 +36,27 @@ constexpr int kColumns = 4;
 ernie::Scene BuildScene() {
     using namespace ernie;
     Scene scene;
-    scene.Define("/World/Ground", tokens::kGroundPlane);
-    scene.Define("/World/Sun", tokens::kDistantLight)
-        .Set(tokens::kTransform, DistantLightTransform({0.4, -0.6, 0.7}));
+    GroundPlane::Define(scene, "/World/Ground");
+    DistantLight::Define(scene, "/World/Sun");
+    scene.Set("/World/Sun", tokens::kTransform, DistantLightTransform({0.4, -0.6, 0.7}));
 
     // One environment, then clones of it; each world moves and recolours its box.
-    scene.Define("/Envs/Env0", tokens::kXform);
-    scene.Define("/Envs/Env0/Box", tokens::kCube);
+    Xform::Define(scene, "/Envs/Env0");
+    Cube::Define(scene, "/Envs/Env0/Box");
     for (int world = 0; world < kWorlds; ++world) {
         const Path env("/Envs/Env" + std::to_string(world));
         if (world > 0) {
             scene.Clone("/Envs/Env0", env);
         }
-        scene.Set(env, tokens::kWorld, world);
+        Xform(scene, env).SetWorld(world);
         const double t = world / static_cast<double>(kWorlds);
-        scene.Set(env.Child("Box"), tokens::kTransform,
-                  glm::translate(glm::dmat4(1.0), glm::dvec3(3.0 * std::cos(6.28 * t),
-                                                             3.0 * std::sin(6.28 * t), 1.0)));
-        scene.Set(env.Child("Box"), tokens::kDisplayColor,
-                  glm::vec3(static_cast<float>(t), 0.4f, 1.0f - static_cast<float>(t)));
+        Cube(scene, env.Child("Box")).SetDisplayColor({t, 0.4, 1.0 - t});
+        SetXform(
+            scene, env.Child("Box"),
+            {.translate = glm::dvec3(3.0 * std::cos(6.28 * t), 3.0 * std::sin(6.28 * t), 1.0)});
     }
 
     // One camera, one pose and one world per view (poses in the math convention, row-major).
-    scene.Define("/World/Camera", tokens::kCamera).Set(tokens::kFocalLength, 18.0f);
     std::vector<double> poses;
     std::vector<std::int32_t> worlds;
     for (int view = 0; view < kWorlds; ++view) {
@@ -66,11 +69,13 @@ ernie::Scene BuildScene() {
         }
         worlds.push_back(view);
     }
-    scene.Write("/World/Camera", tokens::kPoses, Tensor::Copy<double>(poses, {kWorlds, 4, 4}));
-    scene.Write("/World/Camera", tokens::kWorlds, Tensor::Copy<std::int32_t>(worlds, {kWorlds}));
-    scene.Define("/Render/Batch", tokens::kRenderProduct)
-        .Set(tokens::kCameraRel, Path("/World/Camera"))
-        .Set(tokens::kResolution, glm::ivec2(kSize, kSize));
+    Camera::Define(scene, "/World/Camera")
+        .SetFocalLength(18.0)
+        .SetPoses(Tensor::Copy<double>(poses, {kWorlds, 4, 4}))
+        .SetWorlds(Tensor::Copy<std::int32_t>(worlds, {kWorlds}));
+    RenderProduct::Define(scene, "/Render/Batch")
+        .SetCamera("/World/Camera")
+        .SetResolution({kSize, kSize});
     return scene;
 }
 

@@ -54,16 +54,20 @@ def make_terrain_scene():
     heights = rolling_heights()
     rows, cols = heights.shape
     scene = ernie.Scene()
-    scene.define("/World/Terrain", tokens.TERRAIN).write(tokens.HEIGHTS, heights).set(
-        tokens.ORIGIN, (-cols, rows)
-    ).set(tokens.CELL_SIZE, 2.0)
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+    scene.define(
+        "/World/Terrain", ernie.Terrain, heights=heights, origin=(-cols, rows), cell_size=2.0
+    )
+    scene.define("/World/Sun", ernie.DistantLight).set(
         tokens.TRANSFORM, ernie.distant_light_transform((1.0, 1.0, 0.6))
     )
-    scene.define("/World/Camera", tokens.CAMERA).set(
+    scene.define("/World/Camera", ernie.Camera, focal_length=18.0).set(
         tokens.TRANSFORM, ernie.look_at_transform((0.0, -150.0, 200.0), (0.0, 0.0, 0.0))
-    ).set(tokens.FOCAL_LENGTH, 18.0)
-    scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")
-    ).set(tokens.RESOLUTION, (48, 48)).set(tokens.CLEAR_COLOR, (0.0, 0.0, 1.0))
+    )
+    scene.define(
+        "/Render/Settings",
+        ernie.RenderSettings,
+        camera="/World/Camera",
+        resolution=(48, 48),
+        clear_color=(0.0, 0.0, 1.0),
+    )
     return scene

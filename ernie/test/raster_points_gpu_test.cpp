@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/compute_interop.h"
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/geometry_schemas.h"
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 #include "support/delegate_scenes.h"
@@ -31,29 +34,28 @@ constexpr std::uint32_t kPixels = 64;
 /// render vars of each kind through /Render/Out.
 Scene PointsScene() {
     Scene scene;
-    scene.Define("/World/Camera", tokens::kCamera)
-        .Set(tokens::kTransform,
-             ernie::LookAtTransform({0.0, 0.0, 40.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}))
-        .Set(tokens::kFocalLength, 25.0f)
-        .Set(tokens::kSensorNoise, false);
+    ernie::Camera::Define(scene, "/World/Camera").SetFocalLength(25.0).SetSensorNoise(false);
+    scene.Set("/World/Camera", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, 40.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
     scene.Define("/World/Sun", tokens::kDistantLight)
         .Set(tokens::kTransform, ernie::DistantLightTransform({0.3, 0.2, 1.0}));
     const std::array<float, 9> points{-8, 0, 0, 0, 0, 0, 8, 0, 0};
     const std::array<float, 9> colors{1, 0, 0, 0, 1, 0, 0, 0, 1};
-    scene.Define("/World/Grains", tokens::kGeomPoints)
-        .Write(tokens::kPoints, Tensor::Copy<float>(points, {3, 3}))
-        .Write(tokens::kDisplayColor, Tensor::Copy<float>(colors, {3, 3}))
-        .Set(tokens::kWidths, 4.0);
+    ernie::Points::Define(scene, "/World/Grains")
+        .SetPoints(Tensor::Copy<float>(points, {3, 3}))
+        .SetWidths(4.0);
+    // A colour per point: an array, where the schema's displayColor is one colour.
+    scene.Write("/World/Grains", tokens::kDisplayColor, Tensor::Copy<float>(colors, {3, 3}));
     std::vector<Path> vars;
     for (const std::string_view name : {"LdrColor", "DistanceToCamera", "InstanceId", "PrimId"}) {
         const Path var("/Render/Vars/" + std::string(name));
-        scene.Define(var, tokens::kRenderVar).Set(tokens::kSourceName, std::string(name));
+        ernie::RenderVar::Define(scene, var).SetSourceName(name);
         vars.push_back(var);
     }
-    scene.Define("/Render/Out", tokens::kRenderProduct)
-        .Set(tokens::kCameraRel, Path("/World/Camera"))
-        .Set(tokens::kResolution, glm::ivec2(kPixels, kPixels))
-        .Set(tokens::kOrderedVars, vars);
+    ernie::RenderProduct::Define(scene, "/Render/Out")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(kPixels, kPixels));
+    scene.Set("/Render/Out", tokens::kOrderedVars, vars);
     return scene;
 }
 
@@ -118,7 +120,7 @@ TEST_F(RasterDelegateTest, PointsDrawAsSpheresWithTheirIdsColoursAndDepth) {
     EXPECT_GT(ldr[blue + 2], 4.0f * ldr[blue]);
 
     // Wider points.
-    scene.Set("/World/Grains", tokens::kWidths, 6.0);
+    ernie::Points(scene, "/World/Grains").SetWidths(6.0);
     EXPECT_NEAR(Step(delegate, scene).at("DistanceToCamera")[PixelOf(0.0, 0.0)], 37.0f, 0.05f);
 }
 
@@ -144,12 +146,11 @@ TEST_F(RasterDelegateTest, PointsFromCudaMatchTheHostsAndBlurAsTheyMove) {
 
     // The middle sphere moves 6 m along y over a frame with the shutter open: its colour smears
     // along the way, and less of it stays where it started.
-    device.Set("/World/Camera", tokens::kShutterOpen, -1.0);
-    device.Set("/World/Camera", tokens::kShutterSamples, 8);
+    ernie::Camera(device, "/World/Camera").SetShutterOpen(-1.0).SetShutterSamples(8);
     const auto moved = [&](float y) {
         const std::array<float, 9> points{-8, 0, 0, 0, y, 0, 8, 0, 0};
-        device.Write("/World/Grains", tokens::kPoints,
-                     cuda->Upload(Tensor::Copy<float>(points, {3, 3})));
+        ernie::Points(device, "/World/Grains")
+            .SetPoints(cuda->Upload(Tensor::Copy<float>(points, {3, 3})));
     };
     moved(0.0f);
     Step(delegate, device);

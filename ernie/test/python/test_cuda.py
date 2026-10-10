@@ -19,15 +19,15 @@ def cuda_renderer(renderer):
 
 def instancer_scene(positions):
     scene = ernie.Scene()
-    scene.define("/World/Camera", tokens.CAMERA).set(
+    scene.define("/World/Camera", ernie.Camera, focal_length=18.0).set(
         tokens.TRANSFORM, ernie.look_at_transform((0, 0, 60), (0, 0, 0), up=(0, 1, 0))
-    ).set(tokens.FOCAL_LENGTH, 18.0)
-    scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(tokens.RESOLUTION, (48, 48))
-    scene.define("/World/Rocks", tokens.POINT_INSTANCER).write(tokens.POSITIONS, positions).set(
+    )
+    scene.define("/Render/Settings", ernie.RenderSettings, resolution=(48, 48))
+    scene.define("/World/Rocks", ernie.PointInstancer, positions=positions).set(
         tokens.PROTOTYPES, [ernie.Path("/World/Rocks/Rock")]
     ).set(tokens.EXTENT, [-15.0, -15.0, -1.0, 15.0, 15.0, 1.0])
-    quad(scene, "/World/Rocks/Rock", 1.5).set(tokens.DISPLAY_COLOR, (0.0, 1.0, 0.0))
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+    quad(scene, "/World/Rocks/Rock", 1.5).set(display_color=(0.0, 1.0, 0.0))
+    scene.define("/World/Sun", ernie.DistantLight).set(
         tokens.TRANSFORM, ernie.distant_light_transform((0.0, 0.0, 1.0))
     )
     return scene
@@ -94,9 +94,9 @@ def test_poses_written_from_cuda_stay_on_the_gpu(cuda_renderer):
         scene.write("/World/Camera", tokens.POSES, scene_poses)
         if device is not None:
             scene.set("/World/Camera", tokens.POSES_DEVICE, device)
-        scene.define("/Render/Batch", tokens.RENDER_PRODUCT).set(
-            tokens.CAMERA_REL, ernie.Path("/World/Camera")
-        ).set(tokens.RESOLUTION, (48, 48))
+        scene.define(
+            "/Render/Batch", ernie.RenderProduct, camera="/World/Camera", resolution=(48, 48)
+        )
         return np.array(
             cuda_renderer.step(scene, render_products=["/Render/Batch"])["/Render/Batch"]
             .frames[0]
@@ -127,9 +127,9 @@ def test_mapped_poses_are_written_in_place(cuda_renderer):
     def batch_scene(poses):
         scene = instancer_scene(positions)
         scene.write("/World/Camera", tokens.POSES, cuda_renderer.cuda_upload(poses))
-        scene.define("/Render/Batch", tokens.RENDER_PRODUCT).set(
-            tokens.CAMERA_REL, ernie.Path("/World/Camera")
-        ).set(tokens.RESOLUTION, (48, 48))
+        scene.define(
+            "/Render/Batch", ernie.RenderProduct, camera="/World/Camera", resolution=(48, 48)
+        )
         return scene
 
     def render(scene):

@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include "ernie/scene/base_schemas.h"
+#include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/session/resolve.h"
@@ -37,7 +40,7 @@ std::vector<Path> Links(Scene& scene, int count, std::vector<std::string> ops) {
     std::vector<Path> links;
     for (int i = 0; i < count; ++i) {
         links.emplace_back("/Env" + std::to_string(i) + "/Link");
-        scene.Define(links.back(), tokens::kXform);
+        ernie::Xform::Define(scene, links.back());
         scene.Set(links.back(), tokens::kXformOpOrder, ops);
     }
     return links;
@@ -75,7 +78,7 @@ TEST(SceneRows, WritesOfManyPathsRememberTheTensorAndRow) {
 
 TEST(SceneRows, OwnTransformVersionsIgnoreAncestors) {
     Scene scene;
-    scene.Define(Path("/A/B"), tokens::kXform);
+    ernie::Xform::Define(scene, "/A/B");
     EXPECT_EQ(scene.OwnTransformVersion(Path("/A/B")), 0u);
     scene.Set(Path("/A"), tokens::kTranslate, glm::dvec3(1.0));
     EXPECT_EQ(scene.OwnTransformVersion(Path("/A/B")), 0u) << "the parent moved, not B";
@@ -107,7 +110,7 @@ TEST(GpuXform, CpuOpsAreNoGpuPose) {
     scene.Set(links[0], tokens::kTranslate, glm::dvec3(1.0));
     EXPECT_FALSE(ernie::GpuXformOf(scene, links[0]).has_value());
     EXPECT_FALSE(ernie::GpuXformOf(scene, links[1]).has_value()) << "no value at all";
-    scene.Define(Path("/Plain"), tokens::kXform);
+    ernie::Xform::Define(scene, "/Plain");
     EXPECT_FALSE(ernie::GpuXformOf(scene, Path("/Plain")).has_value());
 }
 
@@ -269,7 +272,7 @@ TEST(GpuXform, ATransformArrayAloneIsComposed) {
     Scene scene;
     const std::vector<Path> links{Path("/A"), Path("/B")};
     for (const Path& link : links) {
-        scene.Define(link, tokens::kXform);
+        ernie::Xform::Define(scene, link);
     }
     scene.Write(links, tokens::kTransform, Cuda({2, 16}));
     const std::optional<GpuXform> pose = ernie::GpuXformOf(scene, links[0]);
@@ -285,7 +288,7 @@ TEST(GpuXform, AnchorsAreTheNearestGpuPoseAbove) {
     Scene scene;
     const std::vector<Path> links = Links(scene, 2, Order({tokens::kTranslate}));
     scene.Write(links, tokens::kTranslate, Cuda({2, 3}));
-    scene.Define(Path("/Env0/Link/Visuals/Box"), tokens::kCube);
+    ernie::Cube::Define(scene, "/Env0/Link/Visuals/Box");
     EXPECT_EQ(ernie::GpuXformAnchorOf(scene, Path("/Env0/Link/Visuals/Box")), links[0]);
     EXPECT_EQ(ernie::GpuXformAnchorOf(scene, links[1]), links[1]) << "a prim anchors itself";
     EXPECT_FALSE(ernie::GpuXformAnchorOf(scene, Path("/Env0")).has_value());
@@ -295,7 +298,7 @@ TEST(GpuXform, AResetBelowTheAnchorCutsItOff) {
     Scene scene;
     const std::vector<Path> links = Links(scene, 1, Order({tokens::kTranslate}));
     scene.Write(links, tokens::kTranslate, Cuda({1, 3}));
-    scene.Define(Path("/Env0/Link/Free/Box"), tokens::kCube);
+    ernie::Cube::Define(scene, "/Env0/Link/Free/Box");
     scene.Set(Path("/Env0/Link/Free"), tokens::kXformOpOrder, Order({tokens::kResetXformStack}));
     EXPECT_FALSE(ernie::GpuXformAnchorOf(scene, Path("/Env0/Link/Free/Box")).has_value());
 }
@@ -304,7 +307,7 @@ TEST(GpuXform, AResetBelowTheAnchorCutsItOff) {
 
 TEST(CameraPoses, RowsOfPositionsAndQuaternionsMatchMatrices) {
     Scene scene;
-    scene.Define(Path("/World/Rig/Camera"), tokens::kCamera);
+    ernie::Camera::Define(scene, "/World/Rig/Camera");
     scene.Set(Path("/World/Rig"), tokens::kTranslate, glm::dvec3(100.0, 0.0, 0.0));
     scene.Set(Path("/World/Rig"), tokens::kXformOpOrder, Order({tokens::kTranslate}));
     const glm::dquat q = glm::angleAxis(glm::radians(30.0), glm::normalize(glm::dvec3(1, 2, 3)));
@@ -330,7 +333,7 @@ TEST(CameraPoses, RowsOfPositionsAndQuaternionsMatchMatrices) {
 TEST(CameraPoses, OtherShapesAreRefused) {
     Scene scene;
     const Path camera("/Camera");
-    scene.Define(camera, tokens::kCamera);
+    ernie::Camera::Define(scene, camera);
     scene.Write(camera, tokens::kPoses, Tensor::Zeros(DType::Float32, {2, 6}));
     EXPECT_THROW(ernie::ViewPosesOf(scene, std::span(&camera, 1), 64, 48), std::invalid_argument);
     scene.Write(camera, tokens::kPoses, Cuda({2, 7}));
@@ -368,7 +371,7 @@ TEST(PrimSets, LookPrimsUpAgainAfterRemovalsOrInAnotherScene) {
     scene.Remove(links[1]);
     EXPECT_THROW(scene.Write(prims, tokens::kTranslate, Tensor::Zeros(DType::Float32, {2, 3})),
                  std::invalid_argument);
-    scene.Define(links[1], tokens::kXform);
+    ernie::Xform::Define(scene, links[1]);
     scene.Set(links[1], tokens::kXformOpOrder, Order({tokens::kTranslate}));
     const std::array<float, 6> moved{0, 0, 0, 5, 5, 5};
     scene.Write(prims, tokens::kTranslate, Tensor::Copy<float>(moved, {2, 3}));
@@ -437,7 +440,7 @@ TEST(QuaternionOrder, GpuPosesAndCamerasCarryIt) {
     EXPECT_THROW(ernie::GpuXformOf(scene, links[0]), std::invalid_argument);
 
     const Path camera("/Camera");
-    scene.Define(camera, tokens::kCamera);
+    ernie::Camera::Define(scene, camera);
     scene.Set(camera, tokens::kQuaternionOrder, tokens::kWxyz);
     const glm::dquat q = glm::angleAxis(glm::radians(20.0), glm::dvec3(0, 0, 1));
     const std::array<float, 7> row{1, 2, 3, float(q.w), float(q.x), float(q.y), float(q.z)};

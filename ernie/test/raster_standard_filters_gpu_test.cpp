@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/offscreen_target.h"
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/geometry_schemas.h"
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 #include "support/delegate_scenes.h"
@@ -39,12 +42,12 @@ std::map<std::string, std::vector<float>> VarsThrough(RasterDelegate& delegate, 
                                                       const std::vector<std::string>& vars,
                                                       const Steps& steps,
                                                       const Arrays& arrays = {}) {
-    scene.Set("/World/Camera", tokens::kSensorNoise, false);
+    ernie::Camera(scene, "/World/Camera").SetSensorNoise(false);
     std::vector<Path> filters;
     for (std::size_t i = 0; i < steps.size(); ++i) {
         const Path path("/Render/Filters/F" + std::to_string(i));
         scene.Remove(path);
-        scene.Define(path, tokens::kSensorFilter).Set(tokens::kFilterType, steps[i].first);
+        ernie::SensorFilterPrim::Define(scene, path).SetFilterType(steps[i].first);
         for (const auto& [name, value] : steps[i].second) {
             scene.Set(path, "inputs:" + name, value);
         }
@@ -58,15 +61,15 @@ std::map<std::string, std::vector<float>> VarsThrough(RasterDelegate& delegate, 
     std::vector<Path> varPaths;
     for (std::size_t i = 0; i < vars.size(); ++i) {
         const Path varPath("/Render/Vars/V" + std::to_string(i));
-        scene.Define(varPath, tokens::kRenderVar).Set(tokens::kSourceName, vars[i]);
+        ernie::RenderVar::Define(scene, varPath).SetSourceName(vars[i]);
         varPaths.push_back(varPath);
     }
     scene.Remove("/Render/Many");
-    scene.Define("/Render/Many", tokens::kRenderProduct)
-        .Set(tokens::kCameraRel, Path("/World/Camera"))
-        .Set(tokens::kResolution, glm::ivec2(kSize, kSize))
-        .Set(tokens::kOrderedVars, varPaths)
-        .Set(tokens::kFilters, filters);
+    ernie::RenderProduct::Define(scene, "/Render/Many")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(kSize, kSize));
+    scene.Set("/Render/Many", tokens::kOrderedVars, varPaths);
+    scene.Set("/Render/Many", tokens::kFilters, filters);
     const Path product[] = {"/Render/Many"};
     auto outputs = delegate.Step(scene, product);
     std::map<std::string, std::vector<float>> values;
@@ -91,24 +94,24 @@ std::map<std::string, std::vector<float>> VarsThrough(RasterDelegate& delegate, 
 std::vector<float> VarThrough(RasterDelegate& delegate, Scene& scene, std::string_view var,
                               const std::vector<std::pair<std::string,
                                                           std::map<std::string, float>>>& steps) {
-    scene.Set("/World/Camera", tokens::kSensorNoise, false);
+    ernie::Camera(scene, "/World/Camera").SetSensorNoise(false);
     std::vector<Path> filters;
     for (std::size_t i = 0; i < steps.size(); ++i) {
         const Path path("/Render/Filters/F" + std::to_string(i));
         scene.Remove(path);
-        scene.Define(path, tokens::kSensorFilter).Set(tokens::kFilterType, steps[i].first);
+        ernie::SensorFilterPrim::Define(scene, path).SetFilterType(steps[i].first);
         for (const auto& [name, value] : steps[i].second) {
             scene.Set(path, "inputs:" + name, value);
         }
         filters.push_back(path);
     }
     const Path varPath("/Render/Vars/" + std::string(var));
-    scene.Define(varPath, tokens::kRenderVar).Set(tokens::kSourceName, std::string(var));
-    scene.Define("/Render/Out", tokens::kRenderProduct)
-        .Set(tokens::kCameraRel, Path("/World/Camera"))
-        .Set(tokens::kResolution, glm::ivec2(kSize, kSize))
-        .Set(tokens::kOrderedVars, std::vector<Path>{varPath})
-        .Set(tokens::kFilters, filters);
+    ernie::RenderVar::Define(scene, varPath).SetSourceName(var);
+    ernie::RenderProduct::Define(scene, "/Render/Out")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(kSize, kSize));
+    scene.Set("/Render/Out", tokens::kOrderedVars, std::vector<Path>{varPath});
+    scene.Set("/Render/Out", tokens::kFilters, filters);
     const Path product[] = {"/Render/Out"};
     const Tensor tensor = delegate.Step(scene, product)
                               .at("/Render/Out")
@@ -179,8 +182,7 @@ TEST_F(RasterDelegateTest, DefocusBlursOutOfFocusPointsAndPinholesStaySharp) {
         << "a pinhole (fStop 0) is untouched";
     // A fast 18 mm lens focused 10 cm away; the scene is 60 m away, so a point there blurs into
     // a disc about 9 pixels across (these pixels are 0.3 mm).
-    scene.Set("/World/Camera", tokens::kFStop, 1.4);
-    scene.Set("/World/Camera", tokens::kFocusDistance, 0.1);
+    ernie::Camera(scene, "/World/Camera").SetFStop(1.4).SetFocusDistance(0.1);
     const auto blurred = VarThrough(delegate, scene, "HdrColor",
                                     {{"defocus", {{"maxRadius", 4.0f}}}, {"cie", kNone}});
     EXPECT_LT(Variation(blurred, 0), 0.8 * Variation(base, 0));
@@ -210,7 +212,7 @@ TEST_F(RasterDelegateTest, BayerMosaicsDemosaicRestoresAndCompandingCompresses) 
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();
     // Short enough not to saturate.
-    scene.Set("/World/Camera", tokens::kExposureTime, 0.001);
+    ernie::Camera(scene, "/World/Camera").SetExposureTime(0.001);
     const auto raw = VarThrough(delegate, scene, "RawDN", {{"qe", kNone}, {"adc", kNone}});
     const auto mosaic = VarThrough(delegate, scene, "RawDN",
                                    {{"qe", kNone}, {"bayer", kNone}, {"adc", kNone}});
@@ -235,7 +237,7 @@ TEST_F(RasterDelegateTest, BayerMosaicsDemosaicRestoresAndCompandingCompresses) 
     Scene close = MeshScene();
     close.Set("/World/Camera", tokens::kTransform,
               ernie::LookAtTransform({-12.0, 0.0, 3.0}, {-12.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
-    close.Set("/World/Camera", tokens::kExposureTime, 0.001);
+    ernie::Camera(close, "/World/Camera").SetExposureTime(0.001);
     const auto full = VarThrough(delegate, close, "RawDN", {{"qe", kNone}, {"adc", kNone}});
     ASSERT_GT(full[(kSize / 2 * kSize + kSize / 2) * 4], black + 10.0f) << "the quad is lit";
     for (const float method : {0.0f, 1.0f}) {
@@ -283,7 +285,7 @@ TEST_F(RasterDelegateTest, CurveParametersTakeArraysOfAnyLength) {
 
     // An array, resampled: transmission falling to nothing above 570 nm (ten samples over 360 to
     // 830 nm) dims white rocks' red and keeps their blue.
-    scene.Set("/World/Rocks/Rock", tokens::kDisplayColor, glm::vec3(1.0f));
+    ernie::Mesh(scene, "/World/Rocks/Rock").SetDisplayColor(glm::dvec3(1.0));
     const auto white = VarThrough(delegate, scene, "HdrColor", {{"cie", kNone}});
     const auto cut =
         VarsThrough(delegate, scene, {"HdrColor"}, {{"spectralTransmission", kNone}, {"cie", kNone}},
@@ -353,7 +355,7 @@ TEST_F(RasterDelegateTest, BloomingSpillsSaturatedChargeAlongColumns) {
 TEST_F(RasterDelegateTest, AovsRunTheirFiltersAndNameTheirOutputs) {
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();
-    scene.Set("/World/Camera", tokens::kExposureTime, 0.001);
+    ernie::Camera(scene, "/World/Camera").SetExposureTime(0.001);
     const Steps chain = {{"qe", kNone}, {"bayer", kNone}, {"adc", kNone}, {"demosaic", kNone}};
     // RawDN through bayer and adc alone is the mosaic itself.
     const auto mosaic =
@@ -378,7 +380,7 @@ TEST_F(RasterDelegateTest, AovsRunTheirFiltersAndNameTheirOutputs) {
 TEST_F(RasterDelegateTest, TheViewRunsTheFirstProductsChainAndShowsItsAovs) {
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();
-    scene.Set("/World/Camera", tokens::kExposureTime, 0.001);
+    ernie::Camera(scene, "/World/Camera").SetExposureTime(0.001);
     const Steps chain = {{"qe", kNone}, {"bayer", kNone}, {"adc", kNone}, {"demosaic", kNone}};
     VarsThrough(delegate, scene, {"aov:mosaic"}, chain);  // defines /Render/Many
     scene.Set("/Render/Settings", tokens::kProducts, std::vector<Path>{"/Render/Many"});
@@ -409,7 +411,7 @@ TEST_F(RasterDelegateTest, CustomIntegratorsStandInForQe) {
     // electrons where its curves are zero.
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();
-    scene.Set("/World/Camera", tokens::kExposureTime, 1e-6);  // unsaturated
+    ernie::Camera(scene, "/World/Camera").SetExposureTime(1e-6);  // unsaturated
     const ernie::CameraParams camera = ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize);
     std::vector<float> red(48);
     for (std::size_t i = 0; i < red.size(); ++i) {
@@ -457,8 +459,7 @@ TEST_F(RasterDelegateTest, GlareSpreadsAHaloFromItsPyramidAndKeepsTheLight) {
 TEST_F(RasterDelegateTest, RenderVarsCanNameTheirOwnChains) {
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();
-    scene.Set("/World/Camera", tokens::kSensorNoise, false);
-    scene.Set("/World/Camera", tokens::kExposureTime, 0.001);
+    ernie::Camera(scene, "/World/Camera").SetSensorNoise(false).SetExposureTime(0.001);
     const auto balancedAlone = VarThrough(delegate, scene, "HdrColor",
                                           {{"cie", kNone}, {"whiteBalance", {{"red", 2.0f}}}});
     const auto mosaicAlone =
@@ -468,7 +469,7 @@ TEST_F(RasterDelegateTest, RenderVarsCanNameTheirOwnChains) {
     const auto define = [&](const std::string& name, const std::string& type,
                             std::map<std::string, float> inputs = {}) {
         const Path path("/Render/Chains/" + name);
-        scene.Define(path, tokens::kSensorFilter).Set(tokens::kFilterType, type);
+        ernie::SensorFilterPrim::Define(scene, path).SetFilterType(type);
         for (const auto& [input, value] : inputs) {
             scene.Set(path, "inputs:" + input, value);
         }
@@ -478,16 +479,15 @@ TEST_F(RasterDelegateTest, RenderVarsCanNameTheirOwnChains) {
                                      define("Balance", "whiteBalance", {{"red", 2.0f}})};
     const std::vector<Path> raw = {define("Qe", "qe"), define("Bayer", "bayer"),
                                    define("Adc", "adc")};
-    scene.Define("/Render/Vars/Photo", tokens::kRenderVar)
-        .Set(tokens::kSourceName, std::string("HdrColor"))
-        .Set(tokens::kFilters, photo);
-    scene.Define("/Render/Vars/Raw", tokens::kRenderVar)
-        .Set(tokens::kSourceName, std::string("RawDN"))
-        .Set(tokens::kFilters, raw);
-    scene.Define("/Render/Both", tokens::kRenderProduct)
-        .Set(tokens::kCameraRel, Path("/World/Camera"))
-        .Set(tokens::kResolution, glm::ivec2(kSize, kSize))
-        .Set(tokens::kOrderedVars, std::vector<Path>{"/Render/Vars/Photo", "/Render/Vars/Raw"});
+    ernie::RenderVar::Define(scene, "/Render/Vars/Photo").SetSourceName("HdrColor");
+    scene.Set("/Render/Vars/Photo", tokens::kFilters, photo);
+    ernie::RenderVar::Define(scene, "/Render/Vars/Raw").SetSourceName("RawDN");
+    scene.Set("/Render/Vars/Raw", tokens::kFilters, raw);
+    ernie::RenderProduct::Define(scene, "/Render/Both")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(kSize, kSize));
+    scene.Set("/Render/Both", tokens::kOrderedVars,
+              std::vector<Path>{"/Render/Vars/Photo", "/Render/Vars/Raw"});
     const Path product[] = {"/Render/Both"};
     auto outputs = delegate.Step(scene, product);
     const Tensor hdr = outputs.at("/Render/Both").vars.at("HdrColor").Map(ernie::MapDevice::Cpu).tensor;
@@ -498,8 +498,7 @@ TEST_F(RasterDelegateTest, RenderVarsCanNameTheirOwnChains) {
     }
 
     // The same source from two different chains is ambiguous.
-    scene.Define("/Render/Vars/Raw2", tokens::kRenderVar)
-        .Set(tokens::kSourceName, std::string("RawDN"));
+    ernie::RenderVar::Define(scene, "/Render/Vars/Raw2").SetSourceName("RawDN");
     scene.Set("/Render/Both", tokens::kOrderedVars,
               std::vector<Path>{"/Render/Vars/Raw", "/Render/Vars/Raw2"});
     EXPECT_THROW(delegate.Step(scene, product), std::invalid_argument);
@@ -510,7 +509,7 @@ TEST_F(RasterDelegateTest, TemporalFiltersKeepStateBetweenAProductsFrames) {
     const auto frames = [&](const Steps& chain, const std::string& var) {
         RasterDelegate delegate(*context_);
         Scene scene = MeshScene();
-        scene.Set("/World/Camera", tokens::kExposureTime, 1e-6);  // unsaturated
+        ernie::Camera(scene, "/World/Camera").SetExposureTime(1e-6);  // unsaturated
         const auto first = VarThrough(delegate, scene, var, chain);
         scene.Remove("/World/Quad");
         const auto second = VarThrough(delegate, scene, var, chain);
@@ -531,7 +530,7 @@ TEST_F(RasterDelegateTest, TemporalFiltersKeepStateBetweenAProductsFrames) {
         const auto [first, second] = frames(chain, "Electrons");
         RasterDelegate reference(*context_);
         Scene plain = MeshScene();
-        plain.Set("/World/Camera", tokens::kExposureTime, 1e-6);
+        ernie::Camera(plain, "/World/Camera").SetExposureTime(1e-6);
         const auto collected = VarThrough(reference, plain, "Electrons", {{"qe", kNone}});
         const std::size_t i = brightest(collected);
         ASSERT_GT(collected[i], 0.0f);
@@ -564,7 +563,7 @@ TEST_F(RasterDelegateTest, TemporalFiltersKeepStateBetweenAProductsFrames) {
 TEST_F(RasterDelegateTest, DetectorPatternsStripeAlongTheTrack) {
     RasterDelegate delegate(*context_);
     Scene scene = FlatScene();  // grey terrain filling the image
-    scene.Set("/World/Camera", tokens::kExposureTime, 1e-6);  // unsaturated
+    ernie::Camera(scene, "/World/Camera").SetExposureTime(1e-6);  // unsaturated
     const auto at = [](std::size_t x, std::size_t y) { return (y * kSize + x) * 4 + 1; };
     const auto base = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
     // Gain alone: each column's electrons scale by its detector's gain, all down the column.
@@ -641,7 +640,7 @@ TEST_F(RasterDelegateTest, ReadoutTapsOffsetInterleavedPixels) {
 TEST_F(RasterDelegateTest, TdiSumsItsStagesAndSmearsWhenOutOfStep) {
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();
-    scene.Set("/World/Camera", tokens::kExposureTime, 1e-6);  // unsaturated
+    ernie::Camera(scene, "/World/Camera").SetExposureTime(1e-6);  // unsaturated
     const auto at = [](std::size_t x, std::size_t y) { return (y * kSize + x) * 4 + 1; };
     const auto line = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
     ASSERT_LT(*std::max_element(line.begin(), line.end()), 2000.0f) << "four stages unsaturated";
@@ -663,7 +662,7 @@ TEST_F(RasterDelegateTest, TdiSumsItsStagesAndSmearsWhenOutOfStep) {
 TEST_F(RasterDelegateTest, DefectPixelsAreDeadOrHotAndStayPut) {
     RasterDelegate delegate(*context_);
     Scene scene = FlatScene();
-    scene.Set("/World/Camera", tokens::kExposureTime, 1e-6);  // unsaturated
+    ernie::Camera(scene, "/World/Camera").SetExposureTime(1e-6);  // unsaturated
     const auto base = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
     const std::map<std::string, float> defects{{"dead", 0.02f}, {"hot", 0.02f}, {"hotRate", 1e8f}};
     const auto first = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}, {"defectPixels", defects}});
@@ -689,7 +688,7 @@ TEST_F(RasterDelegateTest, DefectPixelsAreDeadOrHotAndStayPut) {
 TEST_F(RasterDelegateTest, SmearAddsEachColumnsMeanForTheTransferTime) {
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();
-    scene.Set("/World/Camera", tokens::kExposureTime, 1e-6);  // unsaturated
+    ernie::Camera(scene, "/World/Camera").SetExposureTime(1e-6);  // unsaturated
     const auto at = [](std::size_t x, std::size_t y) { return (y * kSize + x) * 4 + 1; };
     const auto base = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
     // A transfer as long as half the exposure: half each column's mean on every pixel of it.
@@ -711,7 +710,7 @@ TEST_F(RasterDelegateTest, SmearAddsEachColumnsMeanForTheTransferTime) {
 TEST_F(RasterDelegateTest, DarkCurrentDoublesWithTemperature) {
     RasterDelegate delegate(*context_);
     Scene scene = FlatScene();
-    scene.Set("/World/Camera", tokens::kExposureTime, 1e-6);
+    ernie::Camera(scene, "/World/Camera").SetExposureTime(1e-6);
     const auto base = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
     const auto darkAt = [&](float temperature) {
         return VarThrough(delegate, scene, "Electrons",
@@ -733,7 +732,7 @@ TEST_F(RasterDelegateTest, DarkCurrentDoublesWithTemperature) {
 TEST_F(RasterDelegateTest, JpegKeepsQualityAndLosesDetailAsItFalls) {
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();
-    scene.Set("/World/Camera", tokens::kExposureTime, 0.001);
+    ernie::Camera(scene, "/World/Camera").SetExposureTime(0.001);
     const auto plain =
         VarsThrough(delegate, scene, {"LdrColor"}, {{"cie", kNone}, {"exposure", kNone}})
             .at("LdrColor");
@@ -789,7 +788,7 @@ TEST_F(RasterDelegateTest, CompandTableEncodesTheNacsTwelveBitsInEight) {
     std::set<float> seen;
     // Exposures spanning the 12-bit range, so every segment of the table is crossed.
     for (const double exposure : {1e-7, 1e-6, 1e-5, 1e-4, 1e-3}) {
-        scene.Set("/World/Camera", tokens::kExposureTime, exposure);
+        ernie::Camera(scene, "/World/Camera").SetExposureTime(exposure);
         const auto raw = VarThrough(delegate, scene, "RawDN", {{"qe", kNone}, {"adc", kNone}});
         const auto encoded = VarThrough(delegate, scene, "RawDN",
                                         {{"qe", kNone}, {"adc", kNone}, {"compandTable", kNone}});

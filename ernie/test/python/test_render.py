@@ -21,8 +21,8 @@ def test_renders_ldr_color_as_a_uint8_array(renderer, terrain_scene):
 def test_material_edits_change_the_image(renderer, terrain_scene):
     scene = terrain_scene
     bright = renderer.render(scene).astype(np.int32)
-    scene.define("/Looks/Dark", tokens.MATERIAL).set(tokens.ALBEDO, (0.2, 0.2, 0.2))
-    scene.set("/World/Terrain", tokens.MATERIAL_BINDING, ernie.Path("/Looks/Dark"))
+    dark = scene.define("/Looks/Dark", ernie.Material, albedo=(0.2, 0.2, 0.2))
+    ernie.Terrain(scene.get_prim("/World/Terrain")).material_binding = dark
     dark = renderer.render(scene).astype(np.int32)
     terrain = np.any(bright[..., :3] != (0, 0, 255), axis=-1)
     assert dark[terrain, :3].sum() < bright[terrain, :3].sum()
@@ -39,7 +39,7 @@ def test_missing_camera_and_bad_settings_raise(renderer):
     scene = ernie.Scene()
     with pytest.raises(ValueError, match="no Camera"):
         renderer.render(scene)
-    scene.define("/NotSettings", tokens.XFORM)
+    scene.define("/NotSettings", ernie.Xform)
     with pytest.raises(ValueError, match="RenderSettings"):
         renderer.render(scene, "/NotSettings")
 
@@ -47,36 +47,33 @@ def test_missing_camera_and_bad_settings_raise(renderer):
 def quad(scene, path, half=2.0):
     """A square of side 2 * half in the x-y plane, from plain NumPy arrays."""
     points = np.array([[-half, -half, 0], [half, -half, 0], [half, half, 0], [-half, half, 0]])
-    return (
-        scene.define(path, tokens.MESH)
-        .write(tokens.POINTS, points)
-        .write(tokens.FACE_VERTEX_COUNTS, np.array([4]))
-        .write(tokens.FACE_VERTEX_INDICES, np.arange(4))
+    return scene.define(
+        path,
+        ernie.Mesh,
+        points=points,
+        face_vertex_counts=np.array([4]),
+        face_vertex_indices=np.arange(4),
     )
 
 
 def test_renders_meshes_and_point_instancers(renderer):
     scene = ernie.Scene()
-    scene.define("/World/Camera", tokens.CAMERA).set(
+    scene.define("/World/Camera", ernie.Camera, focal_length=18.0).set(
         tokens.TRANSFORM, ernie.look_at_transform((0, 0, 60), (0, 0, 0), up=(0, 1, 0))
-    ).set(tokens.FOCAL_LENGTH, 18.0)
-    scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(tokens.RESOLUTION, (48, 48)).set(
-        tokens.AMBIENT, 0.0
     )
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+    scene.define("/Render/Settings", ernie.RenderSettings, resolution=(48, 48), ambient=0.0)
+    scene.define("/World/Sun", ernie.DistantLight).set(
         tokens.TRANSFORM, ernie.distant_light_transform((0.0, 0.0, 1.0))
     )
-    scene.define("/Looks/Red", tokens.MATERIAL).set(tokens.ALBEDO, (1.0, 0.0, 0.0))
+    red = scene.define("/Looks/Red", ernie.Material, albedo=(1.0, 0.0, 0.0))
     move = np.eye(4)
     move[0, 3] = -12.0
-    quad(scene, "/World/Quad").set(tokens.TRANSFORM, move).set(
-        tokens.MATERIAL_BINDING, ernie.Path("/Looks/Red")
-    )
+    quad(scene, "/World/Quad").set(tokens.TRANSFORM, move).set(material_binding=red)
     positions = np.array([[12.0, -10.0, 0.0], [12.0, 0.0, 0.0], [12.0, 10.0, 0.0]], np.float32)
-    scene.define("/World/Rocks", tokens.POINT_INSTANCER).write(tokens.POSITIONS, positions).set(
+    rocks = scene.define("/World/Rocks", ernie.PointInstancer, positions=positions).set(
         tokens.PROTOTYPES, [ernie.Path("/World/Rocks/Rock")]
     )
-    quad(scene, "/World/Rocks/Rock", 1.5).set(tokens.DISPLAY_COLOR, (0.0, 1.0, 0.0))
+    quad(scene, "/World/Rocks/Rock", 1.5).set(display_color=(0.0, 1.0, 0.0))
 
     image = renderer.render(scene)
     pixels = image.astype(np.int32)
@@ -88,8 +85,8 @@ def test_renders_meshes_and_point_instancers(renderer):
 
     positions[:, 0] = -12.0
     positions[:, 1] += 20.0
-    scene.write("/World/Rocks", tokens.POSITIONS, positions)
-    moved = renderer.render(scene)
+    rocks.positions = positions
+    moved =renderer.render(scene)
     moved_pixels = moved.astype(np.int32)
     moved_green = (moved_pixels[..., 1] > 200) & (2 * moved_pixels[..., 0] < moved_pixels[..., 1])
     assert not moved_green[:, 32:].any(), "instances left the right side"
@@ -98,10 +95,14 @@ def test_renders_meshes_and_point_instancers(renderer):
 
 def test_sphere_lights_alone_light_the_scene(renderer, terrain_scene):
     terrain_scene.remove("/World/Sun")
-    terrain_scene.define("/World/Lamp", tokens.SPHERE_LIGHT).set(
+    terrain_scene.define(
+        "/World/Lamp",
+        ernie.SphereLight,
+        power=2.0e6,
+        shaping_cone_angle=20.0,
+        treat_as_point=True,
+    ).set(
         tokens.TRANSFORM, ernie.look_at_transform((0.0, 0.0, 60.0), (0.0, 0.0, 0.0), (0.0, 1.0, 0.0))
-    ).set(tokens.LIGHT_POWER, 2.0e6).set(tokens.SHAPING_CONE_ANGLE, 20.0).set(
-        tokens.TREAT_AS_POINT, True
     )
     image = renderer.render(terrain_scene)
     centre = image[24, 24, :3].astype(int)
@@ -113,23 +114,23 @@ def test_sphere_lights_alone_light_the_scene(renderer, terrain_scene):
 
 def test_primitives_stand_on_a_checkered_ground_plane(renderer):
     scene = ernie.Scene()
-    scene.define("/World/Camera", tokens.CAMERA).set(
+    camera = scene.define("/World/Camera", ernie.Camera, focal_length=18.0).set(
         tokens.TRANSFORM, ernie.look_at_transform((0.0, -30.0, 8.0), (0.0, 0.0, 4.0))
-    ).set(tokens.FOCAL_LENGTH, 18.0)
-    scene.define("/World/Sun", tokens.DISTANT_LIGHT).set(
+    )
+    scene.define("/World/Sun", ernie.DistantLight).set(
         tokens.TRANSFORM, ernie.distant_light_transform((0.3, -0.5, 1.0))
     )
-    scene.define("/World/Ground", tokens.GROUND_PLANE).set(tokens.CHECKER, True).set(
-        tokens.CHECKER_SIZE, 2.0
+    scene.define("/World/Ground", ernie.GroundPlane, checker=True, checker_size=2.0)
+    scene.define(
+        "/World/Ball", ernie.Sphere, radius=4.0, display_color=(1.0, 0.0, 0.0), translate=(0, 0, 4)
     )
-    lift = np.eye(4)
-    lift[2, 3] = 4.0
-    scene.define("/World/Ball", tokens.SPHERE).set(tokens.GEOM_RADIUS, 4.0).set(
-        tokens.DISPLAY_COLOR, (1.0, 0.0, 0.0)
-    ).set(tokens.TRANSFORM, lift)
-    scene.define("/Render/Settings", tokens.RENDER_SETTINGS).set(
-        tokens.CAMERA_REL, ernie.Path("/World/Camera")
-    ).set(tokens.RESOLUTION, (64, 48)).set(tokens.CLEAR_COLOR, (0.0, 0.0, 1.0))
+    scene.define(
+        "/Render/Settings",
+        ernie.RenderSettings,
+        camera=camera,
+        resolution=(64, 48),
+        clear_color=(0.0, 0.0, 1.0),
+    )
 
     image = renderer.render(scene).astype(int)
     centre = image[24, 32, :3]

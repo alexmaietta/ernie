@@ -2,6 +2,7 @@
 #include "ernie/device/compute_interop.h"
 #include "ernie/geometry/primitives.h"
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 #include "support/delegate_scenes.h"
@@ -38,13 +39,14 @@ Scene BallScene(const MeshData& ball) {
         const float t = 0.5f + ball.points[i + 2] / 16.0f;
         colors.insert(colors.end(), {t, 0.2f, 1.0f - t});
     }
-    scene.Define("/World/Ball", tokens::kMesh)
-        .Write(tokens::kPoints, Tensor::Copy<float>(ball.points, {n, 3}))
-        .Write(tokens::kNormals, Tensor::Copy<float>(ball.normals, {n, 3}))
-        .Write(tokens::kDisplayColor, Tensor::Copy<float>(colors, {n, 3}))
-        .Write(tokens::kFaceVertexCounts, Tensor::Copy<std::int32_t>(counts, {triangles}))
-        .Write(tokens::kFaceVertexIndices,
-               Tensor::Copy<std::int32_t>(indices, {static_cast<std::int64_t>(indices.size())}));
+    ernie::Mesh::Define(scene, "/World/Ball")
+        .SetPoints(Tensor::Copy<float>(ball.points, {n, 3}))
+        .SetNormals(Tensor::Copy<float>(ball.normals, {n, 3}))
+        .SetFaceVertexCounts(Tensor::Copy<std::int32_t>(counts, {triangles}))
+        .SetFaceVertexIndices(
+            Tensor::Copy<std::int32_t>(indices, {static_cast<std::int64_t>(indices.size())}));
+    // Colours per vertex are an array, not the schema's single displayColor.
+    scene.Write("/World/Ball", tokens::kDisplayColor, Tensor::Copy<float>(colors, {n, 3}));
     return scene;
 }
 

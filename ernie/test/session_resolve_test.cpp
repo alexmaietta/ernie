@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include "ernie/scene/base_schemas.h"
+#include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/geometry_schemas.h"
+#include "ernie/scene/light_schemas.h"
+#include "ernie/scene/material_schemas.h"
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
+#include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/session/resolve.h"
 
@@ -24,7 +31,7 @@ Scene MinimalScene() {
     scene.Define("/World/Camera", tokens::kCamera)
         .Set(tokens::kTransform,
              ernie::LookAtTransform({0.0, -100.0, 100.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}));
-    scene.Define("/World/Terrain", tokens::kTerrain);
+    ernie::Terrain::Define(scene, "/World/Terrain");
     return scene;
 }
 
@@ -32,26 +39,25 @@ Scene MinimalScene() {
 
 TEST(WorldOf, InheritsAndResolvesViewAndInstanceWorlds) {
     Scene scene;
-    scene.Define("/Envs/Env3", tokens::kXform).Set(tokens::kWorld, 3);
-    scene.Define("/Envs/Env3/Rock", tokens::kMesh);
-    scene.Define("/Shared", tokens::kMesh);
+    ernie::Xform::Define(scene, "/Envs/Env3").SetWorld(3);
+    ernie::Mesh::Define(scene, "/Envs/Env3/Rock");
+    ernie::Mesh::Define(scene, "/Shared");
     EXPECT_EQ(ernie::WorldOf(scene, "/Envs/Env3/Rock"), 3) << "inherited";
     EXPECT_EQ(ernie::WorldOf(scene, "/Shared"), -1) << "shared by every world";
 
-    scene.Define("/Envs/Env3/Cam", tokens::kCamera);
-    scene.Define("/Cam", tokens::kCamera);
+    ernie::Camera::Define(scene, "/Envs/Env3/Cam");
+    ernie::Camera cam = ernie::Camera::Define(scene, "/Cam");
     const Path two[] = {"/Envs/Env3/Cam", "/Cam"};
     EXPECT_EQ(ernie::ViewWorldsOf(scene, two, 2), (std::vector<std::int32_t>{3, -1}));
     const Path one[] = {"/Cam"};
-    scene.Write("/Cam", tokens::kPoses,
-                Tensor::Copy<float>(std::vector<float>(32, 0.0f), {2, 4, 4}));
+    cam.SetPoses(Tensor::Copy<float>(std::vector<float>(32, 0.0f), {2, 4, 4}));
     EXPECT_EQ(ernie::ViewWorldsOf(scene, one, 2), (std::vector<std::int32_t>{-1, -1}));
-    scene.Write("/Cam", tokens::kWorlds,
-                Tensor::Copy<std::int32_t>(std::vector<std::int32_t>{4, 7}, {2}));
+    cam.SetWorlds(Tensor::Copy<std::int32_t>(std::vector<std::int32_t>{4, 7}, {2}));
     EXPECT_EQ(ernie::ViewWorldsOf(scene, one, 2), (std::vector<std::int32_t>{4, 7}));
     EXPECT_THROW(ernie::ViewWorldsOf(scene, one, 3), std::invalid_argument) << "one per view";
 
-    scene.Define("/Envs/Env3/Rocks", tokens::kPointInstancer);
+    // An instancer's worlds per instance are not a declared attribute: written by name.
+    ernie::PointInstancer::Define(scene, "/Envs/Env3/Rocks");
     EXPECT_EQ(ernie::InstanceWorldsOf(scene, "/Envs/Env3/Rocks", 2),
               (std::vector<std::int32_t>{3, 3}));
     scene.Write("/Envs/Env3/Rocks", tokens::kWorlds,
@@ -64,28 +70,30 @@ TEST(WireframeOf, ReadsTokensAndBools) {
     using ernie::Wireframe;
     Scene scene;
     const Path settings("/Render/Settings");
-    scene.Define(settings, tokens::kRenderSettings);
+    ernie::RenderSettings renderSettings = ernie::RenderSettings::Define(scene, settings);
     EXPECT_EQ(ernie::WireframeOf(scene, settings), Wireframe::Off);
     EXPECT_EQ(ernie::WireframeOf(scene, Path()), Wireframe::Off);
     for (const Wireframe mode : {Wireframe::Off, Wireframe::Overlay, Wireframe::HiddenLine}) {
-        scene.Set(settings, tokens::kWireframe, std::string(ernie::WireframeToken(mode)));
+        renderSettings.SetWireframe(ernie::WireframeToken(mode));
         EXPECT_EQ(ernie::WireframeOf(scene, settings), mode);
     }
+    // Bools, as the viewport's toggle once wrote them, are not the declared token: by name.
     scene.Set(settings, tokens::kWireframe, true);
     EXPECT_EQ(ernie::WireframeOf(scene, settings), Wireframe::Overlay);
     scene.Set(settings, tokens::kWireframe, false);
     EXPECT_EQ(ernie::WireframeOf(scene, settings), Wireframe::Off);
-    scene.Set(settings, tokens::kWireframe, std::string("dotted"));
+    renderSettings.SetWireframe("dotted");
     EXPECT_THROW(ernie::WireframeOf(scene, settings), std::invalid_argument);
 }
 
 TEST(RenderPrims, ResolveFollowsSettingsBindingsAndVisibility) {
     Scene scene = MinimalScene();
-    scene.Define("/World/Other", tokens::kCamera);
-    scene.Define("/World/Sun", tokens::kDistantLight);
-    scene.Define("/Looks/Rock", tokens::kMaterial);
-    scene.Define("/Looks/NotAMaterial", tokens::kXform);
-    scene.Set("/World/Terrain", tokens::kMaterialBinding, Path("/Looks/Rock"));
+    ernie::Camera::Define(scene, "/World/Other");
+    ernie::DistantLight sun = ernie::DistantLight::Define(scene, "/World/Sun");
+    ernie::Material::Define(scene, "/Looks/Rock");
+    ernie::Xform::Define(scene, "/Looks/NotAMaterial");
+    ernie::Terrain terrain(scene, "/World/Terrain");
+    terrain.SetMaterialBinding("/Looks/Rock");
 
     RenderPrims prims = ernie::ResolveRenderPrims(scene, {});
     EXPECT_TRUE(prims.settings.IsEmpty());
@@ -94,10 +102,9 @@ TEST(RenderPrims, ResolveFollowsSettingsBindingsAndVisibility) {
     EXPECT_EQ(prims.material, Path("/Looks/Rock"));
     EXPECT_EQ(prims.light, Path("/World/Sun"));
 
-    scene.Define("/Render/Settings", tokens::kRenderSettings)
-        .Set(tokens::kCameraRel, Path("/World/Other"));
-    scene.Set("/World/Sun", tokens::kVisibility, tokens::kInvisible);
-    scene.Set("/World/Terrain", tokens::kMaterialBinding, Path("/Looks/NotAMaterial"));
+    ernie::RenderSettings::Define(scene, "/Render/Settings").SetCamera("/World/Other");
+    sun.SetVisibility(tokens::kInvisible);
+    terrain.SetMaterialBinding("/Looks/NotAMaterial");
     prims = ernie::ResolveRenderPrims(scene, {});
     EXPECT_EQ(prims.settings, Path("/Render/Settings"));
     EXPECT_EQ(prims.camera, Path("/World/Other"));
@@ -112,19 +119,19 @@ TEST(RenderPrims, ResolveFollowsSettingsBindingsAndVisibility) {
 
 TEST(RenderPrims, FallbacksSkipTheSessionRoot) {
     Scene scene;
-    scene.Define("/__session/Perspective", tokens::kCamera);
-    scene.Define("/__session/RenderSettings", tokens::kRenderSettings);
-    scene.Define("/__session/Lights/Default", tokens::kDistantLight);
-    scene.Define("/__session/Lights/Dome", tokens::kDomeLight);
+    ernie::Camera::Define(scene, "/__session/Perspective");
+    ernie::RenderSettings::Define(scene, "/__session/RenderSettings");
+    ernie::DistantLight::Define(scene, "/__session/Lights/Default");
+    ernie::DomeLight::Define(scene, "/__session/Lights/Dome");
     RenderPrims prims = ernie::ResolveRenderPrims(scene, {});
     EXPECT_TRUE(prims.settings.IsEmpty());
     EXPECT_TRUE(prims.camera.IsEmpty());
     EXPECT_TRUE(prims.light.IsEmpty());
     EXPECT_TRUE(prims.dome.IsEmpty());
 
-    scene.Define("/z/Camera", tokens::kCamera);
-    scene.Define("/z/Settings", tokens::kRenderSettings);
-    scene.Define("/z/Lamp", tokens::kSphereLight);
+    ernie::Camera::Define(scene, "/z/Camera");
+    ernie::RenderSettings::Define(scene, "/z/Settings");
+    ernie::SphereLight::Define(scene, "/z/Lamp");
     prims = ernie::ResolveRenderPrims(scene, {});
     EXPECT_EQ(prims.settings, Path("/z/Settings"));
     EXPECT_EQ(prims.camera, Path("/z/Camera"));
@@ -137,11 +144,12 @@ TEST(RenderPrims, FallbacksSkipTheSessionRoot) {
 
 TEST(RenderPrims, LightsRelationshipChoosesTheLights) {
     Scene scene = MinimalScene();
-    scene.Define("/World/Sun", tokens::kDistantLight);
-    scene.Define("/World/Lamp", tokens::kSphereLight);
-    scene.Define("/World/Sky", tokens::kDomeLight);
-    scene.Define("/__session/Lights/Head", tokens::kDistantLight);
-    scene.Define("/__session/Lights/Fill", tokens::kDistantLight);
+    ernie::DistantLight::Define(scene, "/World/Sun");
+    ernie::SphereLight::Define(scene, "/World/Lamp");
+    ernie::DomeLight::Define(scene, "/World/Sky");
+    ernie::DistantLight::Define(scene, "/__session/Lights/Head");
+    ernie::DistantLight::Define(scene, "/__session/Lights/Fill");
+    // ernie:lights is a list relationship, which no schema declares: set by name.
     scene.Define("/Render/Settings", tokens::kRenderSettings)
         .Set(tokens::kLightsRel,
              std::vector<Path>{Path("/__session/Lights/Head"), Path("/__session/Lights/Fill"),
@@ -180,12 +188,13 @@ TEST(MeshDataOf, ReadsPointsTopologyNormalsAndVertexColours) {
     const std::array<std::int32_t, 4> indices{0, 1, 2, 3};
     const std::array<float, 12> normals{0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1};
     const std::array<float, 12> colors{1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1};
-    scene.Define("/Quad", tokens::kMesh)
-        .Write(tokens::kPoints, Tensor::Copy<double>(points, {4, 3}))
-        .Write(tokens::kFaceVertexCounts, Tensor::Copy<std::int64_t>(counts, {1}))
-        .Write(tokens::kFaceVertexIndices, Tensor::Copy<std::int32_t>(indices, {4}))
-        .Write(tokens::kNormals, Tensor::Copy<float>(normals, {12}))
-        .Write(tokens::kDisplayColor, Tensor::Copy<float>(colors, {4, 3}));
+    ernie::Mesh quad = ernie::Mesh::Define(scene, "/Quad")
+                           .SetPoints(Tensor::Copy<double>(points, {4, 3}))
+                           .SetFaceVertexCounts(Tensor::Copy<std::int64_t>(counts, {1}))
+                           .SetFaceVertexIndices(Tensor::Copy<std::int32_t>(indices, {4}))
+                           .SetNormals(Tensor::Copy<float>(normals, {12}));
+    // Colours per vertex: an array in place of the declared single colour.
+    scene.Write("/Quad", tokens::kDisplayColor, Tensor::Copy<float>(colors, {4, 3}));
     const ernie::MeshData data = ernie::MeshDataOf(scene, "/Quad");
     EXPECT_EQ(data.points.size(), 12u);
     EXPECT_EQ(data.points[3], 1.0f);
@@ -194,17 +203,16 @@ TEST(MeshDataOf, ReadsPointsTopologyNormalsAndVertexColours) {
     EXPECT_EQ(data.colors.size(), 12u);
 
     const std::array<float, 6> faceVarying{0, 0, 1, 0, 0, 1};
-    scene.Write("/Quad", tokens::kNormals, Tensor::Copy<float>(faceVarying, {2, 3}));
-    scene.Set("/Quad", tokens::kDisplayColor, glm::vec3(0.2f));
+    quad.SetNormals(Tensor::Copy<float>(faceVarying, {2, 3})).SetDisplayColor(glm::dvec3(0.2));
     scene.Clear("/Quad", tokens::kDisplayColor);
     EXPECT_TRUE(ernie::MeshDataOf(scene, "/Quad").normals.empty()) << "not one per point";
 
-    scene.Write("/Quad", tokens::kPoints, Tensor::Zeros(DType::Int32, {4, 3}));
+    quad.SetPoints(Tensor::Zeros(DType::Int32, {4, 3}));
     EXPECT_THROW(ernie::MeshDataOf(scene, "/Quad"), std::invalid_argument);
-    scene.Write("/Quad", tokens::kPoints, Tensor::Zeros(DType::Float32, {4, 2}));
+    quad.SetPoints(Tensor::Zeros(DType::Float32, {4, 2}));
     EXPECT_THROW(ernie::MeshDataOf(scene, "/Quad"), std::invalid_argument);
-    scene.Write("/Quad", tokens::kPoints, Tensor::Copy<double>(points, {4, 3}));
-    scene.Write("/Quad", tokens::kFaceVertexIndices, Tensor::Zeros(DType::Float32, {4}));
+    quad.SetPoints(Tensor::Copy<double>(points, {4, 3}))
+        .SetFaceVertexIndices(Tensor::Zeros(DType::Float32, {4}));
     EXPECT_THROW(ernie::MeshDataOf(scene, "/Quad"), std::invalid_argument);
     scene.Clear("/Quad", tokens::kFaceVertexIndices);
     EXPECT_THROW(ernie::MeshDataOf(scene, "/Quad"), std::invalid_argument);
@@ -216,10 +224,10 @@ TEST(MeshDataOf, ReadsTextureCoordinatesPerTriangleCornerWithAnyInterpolation) {
     const std::array<float, 12> points{0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0};
     const std::array<std::int64_t, 2> counts{3, 3};
     const std::array<std::int32_t, 6> indices{0, 1, 2, 0, 2, 3};
-    scene.Define("/Quad", tokens::kMesh)
-        .Write(tokens::kPoints, Tensor::Copy<float>(points, {4, 3}))
-        .Write(tokens::kFaceVertexCounts, Tensor::Copy<std::int64_t>(counts, {2}))
-        .Write(tokens::kFaceVertexIndices, Tensor::Copy<std::int32_t>(indices, {6}));
+    ernie::Mesh::Define(scene, "/Quad")
+        .SetPoints(Tensor::Copy<float>(points, {4, 3}))
+        .SetFaceVertexCounts(Tensor::Copy<std::int64_t>(counts, {2}))
+        .SetFaceVertexIndices(Tensor::Copy<std::int32_t>(indices, {6}));
     EXPECT_TRUE(ernie::MeshDataOf(scene, "/Quad").uvs.empty());
 
     // One per point: vertex, following the point indices.
@@ -264,10 +272,10 @@ TEST(MeshDataOf, ReadsTextureCoordinatesPerTriangleCornerWithAnyInterpolation) {
 TEST(MaterialSettingsOf, ReadsAUsdPreviewSurfaceNetwork) {
     Scene scene;
     const BrdfRegistry brdfs = BrdfRegistry::WithBuiltins();
-    scene.Define("/Looks/M", tokens::kMaterial);
-    scene.Define("/Looks/M/Surface", tokens::kShader)
-        .Set(tokens::kInfoId, std::string(tokens::kUsdPreviewSurface))
-        .Set(tokens::kDiffuseColor, glm::vec3(0.5f, 0.25f, 0.125f));
+    ernie::Material::Define(scene, "/Looks/M");
+    ernie::Shader::Define(scene, "/Looks/M/Surface")
+        .SetInfoId(tokens::kUsdPreviewSurface)
+        .SetDiffuseColor({0.5, 0.25, 0.125});
     EXPECT_EQ(ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs).albedo, glm::vec3(1.0f))
         << "Ernie's own inputs until the surface is connected";
     ernie::Connect(scene, "/Looks/M", tokens::kSurfaceOutput, "/Looks/M/Surface",
@@ -277,19 +285,20 @@ TEST(MaterialSettingsOf, ReadsAUsdPreviewSurfaceNetwork) {
     EXPECT_FALSE(settings.albedoTexture.has_value());
 
     // diffuseColor from a texture, its coordinates through a transform from primvar "uv".
-    scene.Define("/Looks/M/Tex", tokens::kShader)
-        .Set(tokens::kInfoId, std::string(tokens::kUsdUVTexture))
-        .Set(tokens::kFile, std::string("rock.png"))
-        .Set(tokens::kWrapS, std::string("clamp"))
-        .Set(tokens::kShaderScale, glm::vec4(2.0f))
-        .Set(tokens::kSourceColorSpace, std::string("raw"));
-    scene.Define("/Looks/M/Place", tokens::kShader)
-        .Set(tokens::kInfoId, std::string(tokens::kUsdTransform2d))
-        .Set(tokens::kShaderScale, glm::dvec2(4.0, 2.0))
-        .Set(tokens::kRotation, 90.0);
-    scene.Define("/Looks/M/Uv", tokens::kShader)
-        .Set(tokens::kInfoId, std::string(tokens::kUsdPrimvarReaderFloat2))
-        .Set(tokens::kVarname, std::string("uv"));
+    // inputs:scale, a vec4 on a texture and a vec2 on a transform, is read by name.
+    ernie::Shader tex = ernie::Shader::Define(scene, "/Looks/M/Tex")
+                            .SetInfoId(tokens::kUsdUVTexture)
+                            .SetFile("rock.png")
+                            .SetWrapS("clamp")
+                            .SetSourceColorSpace("raw");
+    scene.Set("/Looks/M/Tex", tokens::kShaderScale, glm::vec4(2.0f));
+    ernie::Shader::Define(scene, "/Looks/M/Place")
+        .SetInfoId(tokens::kUsdTransform2d)
+        .SetRotation(90.0);
+    scene.Set("/Looks/M/Place", tokens::kShaderScale, glm::dvec2(4.0, 2.0));
+    ernie::Shader::Define(scene, "/Looks/M/Uv")
+        .SetInfoId(tokens::kUsdPrimvarReaderFloat2)
+        .SetVarname("uv");
     ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor, "/Looks/M/Tex", "outputs:rgb");
     ernie::Connect(scene, "/Looks/M/Tex", tokens::kSt, "/Looks/M/Place", "outputs:result");
     ernie::Connect(scene, "/Looks/M/Place", tokens::kIn, "/Looks/M/Uv", "outputs:result");
@@ -309,15 +318,15 @@ TEST(MaterialSettingsOf, ReadsAUsdPreviewSurfaceNetwork) {
     EXPECT_TRUE(settings.normalTexture.has_value());
 
     // A tensor in place of the file.
-    scene.Write("/Looks/M/Tex", tokens::kShaderTexture, Tensor::Zeros(DType::UInt8, {2, 2, 3}));
+    tex.SetTexture(Tensor::Zeros(DType::UInt8, {2, 2, 3}));
     settings = ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs);
     EXPECT_TRUE(settings.albedoTexture->file.empty());
     EXPECT_EQ(settings.albedoTexture->Source(), "/Looks/M/Tex");
 
     // Malformed networks say what is wrong.
-    scene.Set("/Looks/M/Tex", tokens::kWrapT, std::string("wobble"));
+    tex.SetWrapT("wobble");
     EXPECT_THROW(ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs), std::invalid_argument);
-    scene.Set("/Looks/M/Tex", tokens::kWrapT, std::string("repeat"));
+    tex.SetWrapT("repeat");
     ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor, "/Looks/M/Tex", "outputs:r");
     EXPECT_THROW(ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs), std::invalid_argument);
     ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor, "/Looks/M/Uv", "outputs:rgb");
@@ -334,24 +343,24 @@ TEST(MaterialSettingsOf, ReadsAUsdPreviewSurfaceNetwork) {
     const std::array<std::int64_t, 1> counts{3};
     const std::array<std::int32_t, 3> indices{0, 1, 2};
     const std::array<float, 6> uv{0, 0, 1, 0, 0, 1};
-    scene.Define("/Tri", tokens::kMesh)
-        .Write(tokens::kPoints, Tensor::Copy<float>(points, {3, 3}))
-        .Write(tokens::kFaceVertexCounts, Tensor::Copy<std::int64_t>(counts, {1}))
-        .Write(tokens::kFaceVertexIndices, Tensor::Copy<std::int32_t>(indices, {3}))
-        .Write("primvars:uv", Tensor::Copy<float>(uv, {3, 2}))
-        .Set(tokens::kMaterialBinding, Path("/Looks/M"));
+    ernie::Mesh::Define(scene, "/Tri")
+        .SetPoints(Tensor::Copy<float>(points, {3, 3}))
+        .SetFaceVertexCounts(Tensor::Copy<std::int64_t>(counts, {1}))
+        .SetFaceVertexIndices(Tensor::Copy<std::int32_t>(indices, {3}))
+        .SetMaterialBinding("/Looks/M");
+    scene.Write("/Tri", "primvars:uv", Tensor::Copy<float>(uv, {3, 2}));
     EXPECT_EQ(ernie::MeshDataOf(scene, "/Tri").uvs.size(), 6u);
 }
 
 TEST(MaterialSettingsOf, PreviewSurfacesShadeWithTheirOwnModelAndInputs) {
     Scene scene;
     const BrdfRegistry brdfs = BrdfRegistry::WithBuiltins();
-    scene.Define("/Looks/M", tokens::kMaterial);
-    scene.Define("/Looks/M/Surface", tokens::kShader)
-        .Set(tokens::kInfoId, std::string(tokens::kUsdPreviewSurface))
-        .Set(tokens::kRoughness, 0.25)
-        .Set(tokens::kUseSpecularWorkflow, true)
-        .Set(tokens::kSpecularColor, glm::vec3(0.1f, 0.2f, 0.3f));
+    ernie::Material material = ernie::Material::Define(scene, "/Looks/M");
+    ernie::Shader surface = ernie::Shader::Define(scene, "/Looks/M/Surface")
+                                .SetInfoId(tokens::kUsdPreviewSurface)
+                                .SetRoughness(0.25)
+                                .SetUseSpecularWorkflow(true)
+                                .SetSpecularColor({0.1, 0.2, 0.3});
     ernie::Connect(scene, "/Looks/M", tokens::kSurfaceOutput, "/Looks/M/Surface",
                    tokens::kSurfaceOutput);
     ernie::MaterialSettings settings = ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs);
@@ -363,9 +372,7 @@ TEST(MaterialSettingsOf, PreviewSurfacesShadeWithTheirOwnModelAndInputs) {
     }
 
     // Roughness and metallic from channels of one texture (glTF's metallicRoughness).
-    scene.Define("/Looks/M/Mr", tokens::kShader)
-        .Set(tokens::kInfoId, std::string(tokens::kUsdUVTexture))
-        .Set(tokens::kFile, std::string("mr.png"));
+    ernie::Shader::Define(scene, "/Looks/M/Mr").SetInfoId(tokens::kUsdUVTexture).SetFile("mr.png");
     ernie::Connect(scene, "/Looks/M/Surface", tokens::kRoughness, "/Looks/M/Mr", "outputs:g");
     ernie::Connect(scene, "/Looks/M/Surface", tokens::kMetallic, "/Looks/M/Mr", "outputs:b");
     settings = ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs);
@@ -380,8 +387,7 @@ TEST(MaterialSettingsOf, PreviewSurfacesShadeWithTheirOwnModelAndInputs) {
         << "a scalar reads one channel";
 
     // Emission and opacity, constants or (opacity) one texture channel.
-    scene.Set("/Looks/M/Surface", tokens::kEmissiveColor, glm::vec3(3.0f, 2.0f, 1.0f));
-    scene.Set("/Looks/M/Surface", tokens::kOpacityThreshold, 0.5);
+    surface.SetEmissiveColor({3.0, 2.0, 1.0}).SetOpacityThreshold(0.5);
     ernie::Connect(scene, "/Looks/M/Surface", tokens::kOpacity, "/Looks/M/Mr", "outputs:a");
     scene.Clear("/Looks/M/Surface", std::string(tokens::kMetallic) + ".connect");
     settings = ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs);
@@ -396,8 +402,8 @@ TEST(MaterialSettingsOf, PreviewSurfacesShadeWithTheirOwnModelAndInputs) {
 
     // A Material naming another model keeps it, with its parameters from the Material.
     scene.Clear("/Looks/M/Surface", std::string(tokens::kMetallic) + ".connect");
-    scene.Set("/Looks/M", tokens::kBrdf, std::string("oren_nayar"));
-    scene.Set("/Looks/M", "inputs:sigma", 5.0);
+    material.SetBrdf("oren_nayar");
+    scene.Set("/Looks/M", "inputs:sigma", 5.0);  // a BRDF parameter: an open namespace
     settings = ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs);
     EXPECT_EQ(settings.brdf, "oren_nayar");
     EXPECT_EQ(settings.brdfParams, std::vector<float>{5.0f});
@@ -408,9 +414,9 @@ TEST(InstanceDataOf, ReadsArraysAndGroupsInstancesByPrototype) {
     Scene scene;
     const std::array<float, 9> positions{0, 0, 0, 1, 0, 0, 2, 0, 0};
     const std::array<std::int32_t, 3> protoIndices{1, 0, 7};
-    scene.Define("/Rocks", tokens::kPointInstancer)
-        .Write(tokens::kPositions, Tensor::Copy<float>(positions, {3, 3}))
-        .Write(tokens::kScales, Tensor::Copy<float>(positions, {9}));
+    ernie::PointInstancer rocks = ernie::PointInstancer::Define(scene, "/Rocks")
+                                      .SetPositions(Tensor::Copy<float>(positions, {3, 3}))
+                                      .SetScales(Tensor::Copy<float>(positions, {9}));
     const ernie::InstanceData data = ernie::InstanceDataOf(scene, "/Rocks");
     EXPECT_EQ(data.positions.size(), 9u);
     EXPECT_TRUE(data.orientations.empty());
@@ -419,23 +425,23 @@ TEST(InstanceDataOf, ReadsArraysAndGroupsInstancesByPrototype) {
     using Lists = std::vector<std::vector<std::uint32_t>>;
     EXPECT_EQ(ernie::InstancesByPrototype(scene, "/Rocks", 2), (Lists{{0, 1, 2}, {}}))
         << "without protoIndices every instance uses prototype 0";
-    scene.Write("/Rocks", tokens::kProtoIndices, Tensor::Copy<std::int32_t>(protoIndices, {3}));
+    rocks.SetProtoIndices(Tensor::Copy<std::int32_t>(protoIndices, {3}));
     EXPECT_EQ(ernie::InstancesByPrototype(scene, "/Rocks", 2), (Lists{{1}, {0}}))
         << "out-of-range indices are dropped";
     EXPECT_TRUE(ernie::InstancesByPrototype(scene, "/Rocks", 0).empty());
-    scene.Write("/Rocks", tokens::kProtoIndices, Tensor::Zeros(DType::Float32, {3}));
+    rocks.SetProtoIndices(Tensor::Zeros(DType::Float32, {3}));
     EXPECT_THROW(ernie::InstancesByPrototype(scene, "/Rocks", 2), std::invalid_argument);
-    scene.Write("/Rocks", tokens::kOrientations, Tensor::Zeros(DType::Float32, {3, 3}));
+    rocks.SetOrientations(Tensor::Zeros(DType::Float32, {3, 3}));
     EXPECT_THROW(ernie::InstanceDataOf(scene, "/Rocks"), std::invalid_argument);
 }
 
 TEST(BoundMaterial, FollowsBindingsToMaterialsOnly) {
     Scene scene;
-    scene.Define("/Looks/Rock", tokens::kMaterial);
-    scene.Define("/Looks/Group", tokens::kScope);
-    scene.Define("/Mesh", tokens::kMesh).Set(tokens::kMaterialBinding, Path("/Looks/Rock"));
+    ernie::Material::Define(scene, "/Looks/Rock");
+    ernie::Scope::Define(scene, "/Looks/Group");
+    ernie::Mesh mesh = ernie::Mesh::Define(scene, "/Mesh").SetMaterialBinding("/Looks/Rock");
     EXPECT_EQ(ernie::BoundMaterial(scene, "/Mesh"), Path("/Looks/Rock"));
-    scene.Set("/Mesh", tokens::kMaterialBinding, Path("/Looks/Group"));
+    mesh.SetMaterialBinding("/Looks/Group");
     EXPECT_TRUE(ernie::BoundMaterial(scene, "/Mesh").IsEmpty());
     EXPECT_TRUE(ernie::BoundMaterial(scene, "/Missing").IsEmpty());
 }
@@ -474,22 +480,21 @@ TEST(ImageOfTensor, ConvertsFloatAndByteTextures) {
 
 TEST(SunIrradianceOf, PhysicalLightsCarryTheirIrradianceAndSpectrum) {
     Scene scene;
-    scene.Define("/Sun", tokens::kDistantLight).Set(tokens::kLightIrradiance, 1361.0);
+    ernie::DistantLight light = ernie::DistantLight::Define(scene, "/Sun").SetIrradiance(1361.0);
     const ernie::SpectralBands bands;
     const std::vector<float> sun = ernie::SunIrradianceOf(scene, "/Sun", bands);
     EXPECT_EQ(sun, ernie::BlackbodyIrradiance(bands, 5772.0, 1361.0)) << "the Sun's black body";
 
-    scene.Set("/Sun", tokens::kLightSpectrum, std::vector<float>{400.0f, 1.0f, 800.0f, 1.0f});
-    scene.Set("/Sun", tokens::kLightIrradiance, 800.0);
+    light.SetSpectrum({400.0f, 1.0f, 800.0f, 1.0f}).SetIrradiance(800.0);
     for (const float value : ernie::SunIrradianceOf(scene, "/Sun", {400.0, 780.0, 4})) {
         EXPECT_NEAR(value, 2.0f, 1e-5f) << "a flat 400 W/m^2 spectrum scaled to 800 W/m^2";
     }
 
     Scene hot;
-    hot.Define("/Sun", tokens::kDistantLight)
-        .Set(tokens::kLightIrradiance, 1000.0)
-        .Set(tokens::kEnableColorTemperature, true)
-        .Set(tokens::kColorTemperature, 3000.0);
+    ernie::DistantLight::Define(hot, "/Sun")
+        .SetIrradiance(1000.0)
+        .SetEnableColorTemperature(true)
+        .SetColorTemperature(3000.0);
     EXPECT_EQ(ernie::SunIrradianceOf(hot, "/Sun", bands),
               ernie::BlackbodyIrradiance(bands, 3000.0, 1000.0));
     EXPECT_THROW(ernie::SunIrradianceOf(hot, "/Sun", {500.0, 400.0, 4}), std::invalid_argument);
@@ -497,17 +502,15 @@ TEST(SunIrradianceOf, PhysicalLightsCarryTheirIrradianceAndSpectrum) {
 
 TEST(SunIrradianceOf, RelativeLightsFollowTheirColourAndTemperature) {
     Scene scene;
-    scene.Define("/Sun", tokens::kDistantLight).Set(tokens::kColor, glm::vec3(1.0f, 0.2f, 0.1f));
+    ernie::DistantLight sun = ernie::DistantLight::Define(scene, "/Sun").SetColor({1.0, 0.2, 0.1});
     const ernie::SpectralBands bands;
     const std::vector<float> red = ernie::SunIrradianceOf(scene, "/Sun", bands);
     EXPECT_GT(red[13], 3.0f * red[2]) << "650 nm against 430 nm";
 
-    scene.Set("/Sun", tokens::kColor, glm::vec3(1.0f));
-    scene.Set("/Sun", tokens::kEnableColorTemperature, true);
-    scene.Set("/Sun", tokens::kColorTemperature, 2500.0);
+    sun.SetColor(glm::dvec3(1.0)).SetEnableColorTemperature(true).SetColorTemperature(2500.0);
     const std::vector<float> warm = ernie::SunIrradianceOf(scene, "/Sun", bands);
     EXPECT_GT(warm[13], warm[2]);
-    scene.Set("/Sun", tokens::kColorTemperature, 20000.0);
+    sun.SetColorTemperature(20000.0);
     const std::vector<float> cool = ernie::SunIrradianceOf(scene, "/Sun", bands);
     EXPECT_LT(cool[13], cool[2]);
 }
@@ -527,13 +530,10 @@ TEST(OverscanOf, WidensTheRasterViewForDistortion) {
 
 TEST(PrimitiveMeshOf, ReadsUsdGeomAttributesAndDefaults) {
     Scene scene;
-    scene.Define("/Cube", tokens::kCube);
-    scene.Define("/Rod", tokens::kCylinder)
-        .Set(tokens::kGeomRadius, 0.25)
-        .Set(tokens::kGeomHeight, 3.0)
-        .Set(tokens::kAxis, "X");
-    scene.Define("/Floor", tokens::kPlane).Set(tokens::kGeomWidth, 10.0);
-    scene.Define("/Bad", tokens::kCone).Set(tokens::kAxis, "W");
+    ernie::Cube::Define(scene, "/Cube");
+    ernie::Cylinder::Define(scene, "/Rod").SetRadius(0.25).SetHeight(3.0).SetAxis("X");
+    ernie::Plane::Define(scene, "/Floor").SetWidth(10.0);
+    ernie::Cone::Define(scene, "/Bad").SetAxis("W");
 
     const auto bounds = [](const ernie::MeshData& mesh) {
         glm::vec3 low(1e30f);
@@ -555,14 +555,15 @@ TEST(PrimitiveMeshOf, ReadsUsdGeomAttributesAndDefaults) {
     EXPECT_THROW(ernie::MeshDataOf(scene, "/Bad"), std::invalid_argument);
     EXPECT_TRUE(ernie::IsMeshType(tokens::kCapsule));
     EXPECT_FALSE(ernie::IsMeshType(tokens::kTerrain));
-    scene.Define("/Xform", tokens::kXform);
+    ernie::Xform::Define(scene, "/Xform");
     EXPECT_THROW(ernie::PrimitiveMeshOf(scene, "/Xform"), std::invalid_argument);
 }
 
 TEST(FrameOf, ReadsTheAuthoredFrame) {
     Scene scene;
-    scene.Define("/Render/Settings", tokens::kRenderSettings);
+    ernie::RenderSettings::Define(scene, "/Render/Settings");
     EXPECT_FALSE(ernie::FrameOf(scene, Path("/Render/Settings")).has_value());
+    // A frame of any number type reads, so each is set by name as that type.
     EXPECT_FALSE(ernie::FrameOf(scene, Path()).has_value());
     scene.Set("/Render/Settings", tokens::kFrame, 12);
     EXPECT_EQ(ernie::FrameOf(scene, Path("/Render/Settings")), 12u);

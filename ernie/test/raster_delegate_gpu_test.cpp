@@ -2,8 +2,14 @@
 #include "ernie/device/offscreen_target.h"
 #include "ernie/geometry/primitives.h"
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/geometry_schemas.h"
+#include "ernie/scene/light_schemas.h"
+#include "ernie/scene/material_schemas.h"
 #include "ernie/scene/orbit_controller.h"
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
+#include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/session/renderer.h"
 #include "support/delegate_scenes.h"
@@ -94,7 +100,7 @@ TEST_F(RasterDelegateTest, RendersTheSameImageAsTheRendererDrivenDirectly) {
 TEST_F(RasterDelegateTest, AnUnlitSceneRendersBlackAndChosenLightsLightIt) {
     const TestRaster raster = RollingTerrain(33, 33, 2.0);
     Scene scene = TerrainScene(raster);
-    scene.Set("/Render/Settings", tokens::kClearColor, glm::vec3(0.0f));
+    ernie::RenderSettings(scene, "/Render/Settings").SetClearColor(glm::dvec3(0.0));
     RasterDelegate delegate(*context_);
     delegate.Sync(scene);
     ernie::SetCamera(scene, "/World/Camera", FramingCamera(delegate));
@@ -127,7 +133,7 @@ TEST_F(RasterDelegateTest, WireframeModesDrawEdgesOverShadedOrFlatSurfaces) {
     delegate.Sync(scene);
     ernie::SetCamera(scene, "/World/Camera", FramingCamera(delegate));
     const auto render = [&](std::string_view mode) {
-        scene.Set("/Render/Settings", tokens::kWireframe, std::string(mode));
+        ernie::RenderSettings(scene, "/Render/Settings").SetWireframe(mode);
         const Tensor image = delegate.Render(scene);
         const auto* pixels = image.As<std::uint8_t>();
         return std::vector<std::uint8_t>(pixels, pixels + image.Elements());
@@ -172,13 +178,14 @@ TEST_F(RasterDelegateTest, SyncsHeightfieldEditsRemovalsAndTextures) {
     EXPECT_EQ(delegate.Terrain().Width(), 33u);
     EXPECT_EQ(delegate.Terrain().Height(), 17u);
 
-    scene.Write("/World/Terrain", tokens::kHeights, HeightsOf(RollingTerrain(9, 5, 2.0)));
+    ernie::Terrain(scene, "/World/Terrain").SetHeights(HeightsOf(RollingTerrain(9, 5, 2.0)));
     delegate.Sync(scene);
     EXPECT_EQ(delegate.Terrain().Width(), 9u);
 
-    scene.Write("/Looks/Rock", tokens::kDetailAlbedo, Tensor::Zeros(DType::UInt8, {8, 8, 3}));
-    scene.Write("/Looks/Rock", tokens::kDetailNormal, Tensor::Zeros(DType::Float32, {8, 8, 4}));
-    scene.Write("/Looks/Rock", tokens::kAlbedoMap, Tensor::Zeros(DType::Float32, {4, 4}));
+    ernie::Material(scene, "/Looks/Rock")
+        .SetDetailAlbedo(Tensor::Zeros(DType::UInt8, {8, 8, 3}))
+        .SetDetailNormal(Tensor::Zeros(DType::Float32, {8, 8, 4}))
+        .SetAlbedoMap(Tensor::Zeros(DType::Float32, {4, 4}));
     delegate.Sync(scene);
     ASSERT_TRUE(delegate.MaterialId("/Looks/Rock").has_value());
     const ernie::RasterMaterial& rock =
@@ -195,17 +202,17 @@ TEST_F(RasterDelegateTest, SyncsHeightfieldEditsRemovalsAndTextures) {
     delegate.Sync(scene);
     EXPECT_FALSE(delegate.MaterialId("/Looks/Rock").has_value());
 
-    scene.Set("/World/Terrain", tokens::kVisibility, tokens::kInvisible);
+    ernie::Terrain(scene, "/World/Terrain").SetVisibility(tokens::kInvisible);
     delegate.Sync(scene);
     EXPECT_FALSE(delegate.Terrain().HasHeightfield());
-    scene.Set("/World/Terrain", tokens::kVisibility, tokens::kInherited);
+    ernie::Terrain(scene, "/World/Terrain").SetVisibility(tokens::kInherited);
     delegate.Sync(scene);
     EXPECT_TRUE(delegate.Terrain().HasHeightfield());
 }
 
 TEST_F(RasterDelegateTest, ReportsBadTensorsOnceWithThePrimAndAttribute) {
     Scene scene = TerrainScene(RollingTerrain(9, 9, 2.0));
-    scene.Write("/World/Terrain", tokens::kHeights, Tensor::Zeros(DType::Float64, {9, 9}));
+    ernie::Terrain(scene, "/World/Terrain").SetHeights(Tensor::Zeros(DType::Float64, {9, 9}));
     RasterDelegate delegate(*context_);
     try {
         delegate.Sync(scene);
@@ -214,19 +221,19 @@ TEST_F(RasterDelegateTest, ReportsBadTensorsOnceWithThePrimAndAttribute) {
         EXPECT_NE(std::string(error.what()).find("heights of '/World/Terrain'"), std::string::npos)
             << error.what();
     }
-    scene.Set("/World/Terrain", tokens::kExaggeration, 2.0f);
+    ernie::Terrain(scene, "/World/Terrain").SetExaggeration(2.0);
     EXPECT_NO_THROW(delegate.Sync(scene)) << "not retried until the heights change";
 
-    scene.Write("/Looks/Rock", tokens::kDetailNormal, Tensor::Zeros(DType::Int32, {2, 2}));
+    ernie::Material(scene, "/Looks/Rock").SetDetailNormal(Tensor::Zeros(DType::Int32, {2, 2}));
     EXPECT_THROW(delegate.Sync(scene), std::invalid_argument);
-    scene.Write("/Looks/Rock", tokens::kAlbedoMap, Tensor::Zeros(DType::Float32, {4}));
+    ernie::Material(scene, "/Looks/Rock").SetAlbedoMap(Tensor::Zeros(DType::Float32, {4}));
     EXPECT_THROW(delegate.Sync(scene), std::invalid_argument);
 }
 
 TEST_F(RasterDelegateTest, SwitchingScenesResyncsEverything) {
     Scene first = TerrainScene(RollingTerrain(33, 17, 2.0));
     for (int i = 0; i < 20; ++i) {
-        first.Set("/World/Terrain", tokens::kExaggeration, 1.0f);
+        ernie::Terrain(first, "/World/Terrain").SetExaggeration(1.0);
     }
     RasterDelegate delegate(*context_);
     delegate.Sync(first);
@@ -269,9 +276,9 @@ TEST_F(RasterDelegateTest, MovesInstancesAndDeformsMeshesInPlace) {
     delegate.Render(scene);
 
     const std::array<float, 9> moved{0, -10, 0, 12, 0, 0, 12, 10, 0};
-    scene.Write("/World/Rocks", tokens::kPositions, Tensor::Copy<float>(moved, {3, 3}));
+    ernie::PointInstancer(scene, "/World/Rocks").SetPositions(Tensor::Copy<float>(moved, {3, 3}));
     const std::array<float, 12> points{-2, 6, 0, 2, 6, 0, 2, 10, 0, -2, 10, 0};
-    scene.Write("/World/Quad", tokens::kPoints, Tensor::Copy<float>(points, {4, 3}));
+    ernie::Mesh(scene, "/World/Quad").SetPoints(Tensor::Copy<float>(points, {4, 3}));
     const Tensor image = delegate.Render(scene);
     EXPECT_EQ(delegate.Meshes().MeshCount(), 2u);
     EXPECT_GT(TexelAt(scene, image, {0, -10, 0})[1], 200) << "the instance moved";
@@ -290,7 +297,7 @@ TEST_F(RasterDelegateTest, ABadMeshDoesNotBlockTheOthers) {
     Scene scene = MeshScene();
     DefineQuad(scene, "/World/Broken");
     const std::array<std::int64_t, 4> bad{0, 1, 2, 9};
-    scene.Write("/World/Broken", tokens::kFaceVertexIndices, Tensor::Copy<std::int64_t>(bad, {4}));
+    ernie::Mesh(scene, "/World/Broken").SetFaceVertexIndices(Tensor::Copy<std::int64_t>(bad, {4}));
     RasterDelegate delegate(*context_);
     try {
         delegate.Sync(scene);
@@ -366,13 +373,12 @@ TEST_F(RasterDelegateTest, DrawsUsdGeomPrimitivesAndInstancesThem) {
     Scene scene = MeshScene();
     scene.Remove("/World/Quad");
     scene.Remove("/World/Rocks/Rock");
-    scene.Define("/World/Ball", tokens::kSphere)
-        .Set(tokens::kGeomRadius, 3.0)
-        .Set(tokens::kMaterialBinding, Path("/Looks/Red"))
-        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(-12.0, 0.0, 0.0)));
-    scene.Define("/World/Rocks/Rock", tokens::kCube)
-        .Set(tokens::kSize, 3.0)
-        .Set(tokens::kDisplayColor, glm::vec3(0.0f, 1.0f, 0.0f));
+    ernie::Sphere::Define(scene, "/World/Ball").SetRadius(3.0).SetMaterialBinding("/Looks/Red");
+    scene.Set("/World/Ball", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0), glm::dvec3(-12.0, 0.0, 0.0)));
+    ernie::Cube::Define(scene, "/World/Rocks/Rock")
+        .SetSize(3.0)
+        .SetDisplayColor(glm::dvec3(0.0, 1.0, 0.0));
     RasterDelegate delegate(*context_);
     const Tensor image = delegate.Render(scene);
     EXPECT_EQ(delegate.Meshes().MeshCount(), 2u);
@@ -386,7 +392,7 @@ TEST_F(RasterDelegateTest, DrawsUsdGeomPrimitivesAndInstancesThem) {
     const std::uint8_t* origin = TexelAt(scene, image, {0, 0, 0});
     EXPECT_EQ(origin[0] + origin[1] + origin[2], 0) << "the prototype draws only as instances";
 
-    scene.Set("/World/Ball", tokens::kGeomRadius, 0.5);
+    ernie::Sphere(scene, "/World/Ball").SetRadius(0.5);
     const Tensor smaller = delegate.Render(scene);
     const std::uint8_t* rim = TexelAt(scene, smaller, {-10, 0, 0});
     EXPECT_EQ(rim[0], 0) << "editing the radius regenerates the mesh";
@@ -398,9 +404,9 @@ namespace {
 Scene GroundScene(double height) {
     Scene scene = FlatScene();
     scene.Remove("/World/Terrain");
-    scene.Define("/World/Ground", tokens::kGroundPlane)
-        .Set(tokens::kGroundHeight, height)
-        .Set(tokens::kMaterialBinding, Path("/Looks/Grey"));
+    ernie::GroundPlane::Define(scene, "/World/Ground")
+        .SetHeight(height)
+        .SetMaterialBinding("/Looks/Grey");
     return scene;
 }
 
@@ -421,14 +427,14 @@ TEST_F(RasterDelegateTest, GroundPlanesAreLitAndSortedLikeSurfaces) {
     EXPECT_EQ(delegate.PrimPath(At<std::uint32_t>(vars.at("PrimId"), 0, 0)), Path("/World/Ground"));
 
     Scene withTerrain = FlatScene();
-    withTerrain.Define("/World/Ground", tokens::kGroundPlane).Set(tokens::kGroundHeight, -5.0);
+    ernie::GroundPlane::Define(withTerrain, "/World/Ground").SetHeight(-5.0);
     ernie::RenderProductSetOutputs both = delegate.Step(withTerrain);
     vars = MapVars(both);
     EXPECT_EQ(delegate.PrimPath(At<std::uint32_t>(vars.at("PrimId"), c, c)), Path("/World/Terrain"))
         << "the terrain is in front of a plane below it";
     EXPECT_NEAR(At<float>(vars.at("DistanceToImagePlane"), c, c), 100.0f, 0.5f);
 
-    withTerrain.Set("/World/Ground", tokens::kVisibility, tokens::kInvisible);
+    ernie::GroundPlane(withTerrain, "/World/Ground").SetVisibility(tokens::kInvisible);
     delegate.Step(withTerrain);
     EXPECT_FALSE(delegate.Ground().Enabled());
 }
@@ -440,11 +446,12 @@ TEST_F(RasterDelegateTest, NormalMapsFinerThanAPixelShadeAsRoughness) {
     // (`widenedMeanSlope`), not as the flat average normal.
     Scene scene = GroundScene(10.0);
     scene.Set("/World/Sun", tokens::kTransform, ernie::DistantLightTransform({1.0, 0.0, 0.35}));
-    scene.Define("/Render/Settings", tokens::kRenderSettings).Set(tokens::kAmbient, 0.0f);
-    scene.Set("/Looks/Grey", tokens::kBrdf, "hapke");
+    ernie::RenderSettings::Define(scene, "/Render/Settings").SetAmbient(0.0);
+    ernie::Material(scene, "/Looks/Grey")
+        .SetBrdf("hapke")
+        .SetDetailTileSize(0.01)
+        .SetDetailHexTiling(false);
     scene.Set("/Looks/Grey", "inputs:theta_bar", 15.0);
-    scene.Set("/Looks/Grey", tokens::kDetailTileSize, 0.01f);
-    scene.Set("/Looks/Grey", tokens::kDetailHexTiling, false);
     std::vector<float> normals;
     for (int row = 0; row < 8; ++row) {
         for (int col = 0; col < 8; ++col) {
@@ -467,7 +474,7 @@ TEST_F(RasterDelegateTest, NormalMapsFinerThanAPixelShadeAsRoughness) {
     };
     RasterDelegate delegate(*context_);
     const double smooth = meanGreen(delegate);
-    scene.Write("/Looks/Grey", tokens::kDetailNormal, Tensor::Copy<float>(normals, {8, 8, 4}));
+    ernie::Material(scene, "/Looks/Grey").SetDetailNormal(Tensor::Copy<float>(normals, {8, 8, 4}));
     const double mapped = meanGreen(delegate);
 
     scene.Clear("/Looks/Grey", tokens::kDetailNormal);
@@ -482,9 +489,10 @@ TEST_F(RasterDelegateTest, NormalMapsFinerThanAPixelShadeAsRoughness) {
 
 TEST_F(RasterDelegateTest, GroundPlanesReachTheHorizonWithACheckerboard) {
     Scene scene = GroundScene(0.0);
-    scene.Set("/World/Ground", tokens::kChecker, true);
-    scene.Set("/World/Ground", tokens::kCheckerSize, 4.0);
-    scene.Set("/World/Ground", tokens::kCheckerColor1, glm::vec3(0.0f));
+    ernie::GroundPlane(scene, "/World/Ground")
+        .SetChecker(true)
+        .SetCheckerSize(4.0)
+        .SetCheckerColor1(glm::dvec3(0.0));
     RasterDelegate delegate(*context_);
     ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
     const auto vars = MapVars(outputs);
@@ -524,11 +532,11 @@ TEST_F(RasterDelegateTest, GroundPlanesReachTheHorizonWithACheckerboard) {
 
 TEST_F(RasterDelegateTest, PrimitivesStandOnTheGroundAndShadowIt) {
     Scene scene = GroundScene(0.0);
-    scene.Set("/World/Sun", tokens::kShadowEnable, true);
+    ernie::DistantLight(scene, "/World/Sun").SetShadowEnable(true);
     scene.Set("/World/Sun", tokens::kTransform, ernie::DistantLightTransform({1.0, 0.0, 1.0}));
-    scene.Define("/World/Block", tokens::kCube)
-        .Set(tokens::kSize, 6.0)
-        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 3.0)));
+    ernie::Cube::Define(scene, "/World/Block").SetSize(6.0);
+    scene.Set("/World/Block", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 3.0)));
     RasterDelegate delegate(*context_);
     ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
     const auto vars = MapVars(outputs);
@@ -548,11 +556,11 @@ TEST_F(RasterDelegateTest, FloatingCastersShadowTheGroundFarBelowThem) {
     // A block 8 above the ground: its shadow lands below the level of its own bottom, where
     // cascades fitted to the casters alone would not reach.
     Scene scene = GroundScene(0.0);
-    scene.Set("/World/Sun", tokens::kShadowEnable, true);
+    ernie::DistantLight(scene, "/World/Sun").SetShadowEnable(true);
     scene.Set("/World/Sun", tokens::kTransform, ernie::DistantLightTransform({1.0, 0.0, 1.0}));
-    scene.Define("/World/Block", tokens::kCube)
-        .Set(tokens::kSize, 4.0)
-        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 8.0)));
+    ernie::Cube::Define(scene, "/World/Block").SetSize(4.0);
+    scene.Set("/World/Block", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 8.0)));
     RasterDelegate delegate(*context_);
     ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
     const auto vars = MapVars(outputs);
@@ -569,17 +577,17 @@ TEST_F(RasterDelegateTest, FloatingCastersShadowTheGroundInBatchesToo) {
     // As above, through a batch of two views posed alike: its one shadow map, fitted to the
     // casters with no far split, reaches the ground below the block.
     Scene scene = GroundScene(0.0);
-    scene.Set("/World/Sun", tokens::kShadowEnable, true);
+    ernie::DistantLight(scene, "/World/Sun").SetShadowEnable(true);
     scene.Set("/World/Sun", tokens::kTransform, ernie::DistantLightTransform({1.0, 0.0, 1.0}));
-    scene.Define("/World/Block", tokens::kCube)
-        .Set(tokens::kSize, 4.0)
-        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 8.0)));
+    ernie::Cube::Define(scene, "/World/Block").SetSize(4.0);
+    scene.Set("/World/Block", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 8.0)));
     const glm::mat4 pose(scene.WorldTransform("/World/Camera"));
     std::vector<float> poses;
     for (int v = 0; v < 2; ++v) {
         poses.insert(poses.end(), glm::value_ptr(pose), glm::value_ptr(pose) + 16);
     }
-    scene.Write("/World/Camera", tokens::kPoses, Tensor::Copy<float>(poses, {2, 4, 4}));
+    ernie::Camera(scene, "/World/Camera").SetPoses(Tensor::Copy<float>(poses, {2, 4, 4}));
     RasterDelegate delegate(*context_);
     ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
     const auto vars = MapVars(outputs);
@@ -604,13 +612,13 @@ Scene MovedScene(const glm::dvec3& offset) {
     Scene scene = MeshScene();
     scene.Define("/World", tokens::kXform)
         .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), offset));
-    scene.Define("/World/Ground", tokens::kGroundPlane)
-        .Set(tokens::kGroundHeight, offset.z - 1.0)
-        .Set(tokens::kChecker, true)
-        .Set(tokens::kCheckerSize, 2.0);
-    scene.Define("/World/Lamp", tokens::kSphereLight)
-        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(4.0, 4.0, 6.0)))
-        .Set(tokens::kIntensity, 30.0f);
+    ernie::GroundPlane::Define(scene, "/World/Ground")
+        .SetHeight(offset.z - 1.0)
+        .SetChecker(true)
+        .SetCheckerSize(2.0);
+    ernie::SphereLight::Define(scene, "/World/Lamp").SetIntensity(30.0);
+    scene.Set("/World/Lamp", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0), glm::dvec3(4.0, 4.0, 6.0)));
     return scene;
 }
 
@@ -637,7 +645,7 @@ TEST_F(RasterDelegateTest, VisibleShadowFitsSpanOnlyTheDepthsTheViewSees) {
     Scene scene = MeshScene();
     delegate.Render(scene);
     const float nearPlane = delegate.Renderer().Cascades().front().splitNear;
-    scene.Set("/Render/Settings", tokens::kShadowFit, std::string(tokens::kVisible));
+    ernie::RenderSettings(scene, "/Render/Settings").SetShadowFit(tokens::kVisible);
     for (int i = 0; i < 4; ++i) {
         delegate.Render(scene);
     }
@@ -650,6 +658,6 @@ TEST_F(RasterDelegateTest, VisibleShadowFitsSpanOnlyTheDepthsTheViewSees) {
               ernie::LookAtTransform({0.0, 0.0, 30.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
     delegate.Render(scene);
     EXPECT_EQ(delegate.Renderer().Cascades().front().splitNear, nearPlane);
-    scene.Set("/Render/Settings", tokens::kShadowFit, std::string("nearest"));
+    ernie::RenderSettings(scene, "/Render/Settings").SetShadowFit("nearest");
     EXPECT_THROW(delegate.Render(scene), std::invalid_argument);
 }
