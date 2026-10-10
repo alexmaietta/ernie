@@ -798,6 +798,20 @@ void BindScene(nb::module_& m) {
             "Commits writes into a mapped array: renderers read it again, on the GPU after the "
             "work queued on `stream`.")
         .def(
+            "unmap",
+            [](Scene& scene, const PrimSet& prims, std::string_view attribute, nb::handle stream) {
+                scene.Unmap(prims, attribute, StreamOf(stream));
+            },
+            nb::arg("prims"), nb::arg("attribute"), nb::arg("stream").none() = nb::none(),
+            "As the unmap of one path, for each prim of a PrimSet: rows of one array mapped over "
+            "them (`Renderer.map` of a PrimSet).")
+        .def(
+            "unmap",
+            [](Scene& scene, const std::vector<Path>& paths, std::string_view attribute,
+               nb::handle stream) { scene.Unmap(PrimSet(paths), attribute, StreamOf(stream)); },
+            nb::arg("paths"), nb::arg("attribute"), nb::arg("stream").none() = nb::none(),
+            "As the unmap of a PrimSet, for a list of paths.")
+        .def(
             "write",
             [](Scene& scene, const std::vector<Path>& paths, std::string_view attribute,
                const AnyArray& rows, nb::handle stream) {

@@ -362,6 +362,18 @@ void Scene::Unmap(const Path& path, std::string_view attribute, std::uintptr_t s
     Stamp(path, prim, attribute);
 }
 
+void Scene::Unmap(const PrimSet& prims, std::string_view attribute, std::uintptr_t stream) {
+    for (const Path& path : prims.Paths()) {
+        if (!Find(path).tensors.contains(attribute)) {
+            throw std::invalid_argument("Cannot unmap " + std::string(attribute) + " of '" +
+                                        path.String() + "', which is not a written array");
+        }
+    }
+    for (const Path& path : prims.Paths()) {
+        Unmap(path, attribute, stream);
+    }
+}
+
 std::uintptr_t Scene::WriteStream(const Path& path, std::string_view attribute) const {
     if (!Has(path)) {
         return 1;

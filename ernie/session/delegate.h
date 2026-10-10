@@ -112,6 +112,13 @@ class RenderDelegate {
     virtual Tensor MapArray(Scene& scene, const Path& path, std::string_view attribute,
                             std::uintptr_t stream = 1);
 
+    /// Maps array `attribute` written as rows of one array over `prims` (`Scene::Write` of a
+    /// PrimSet), as the single prim's `MapArray`: writes the tensor as those rows, prim i's row
+    /// i, and returns it. Unmap every prim (`Scene::Unmap` of the PrimSet) after writing.
+    /// @throws std::invalid_argument as the single prim's.
+    virtual Tensor MapArray(Scene& scene, const PrimSet& prims, std::string_view attribute,
+                            std::uintptr_t stream = 1);
+
     /// The render vars `Record` can draw of the frame the last `Update` prepared: `Info().viewVars`
     /// and what that frame adds, such as the AOVs its sensor filters write ("aov:<name>").
     virtual std::vector<std::string> ViewVars() const {

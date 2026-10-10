@@ -402,7 +402,8 @@ inline constexpr std::string_view kHost = "host";
 /// world its views see; -1 sees every world.
 inline constexpr std::string_view kWorld = "ernie:world";
 /// Per-element worlds (Ernie): int array. On a PointInstancer, each instance's world (in place of
-/// the instancer's `ernie:world`); on a Camera with `ernie:poses`, each view's world.
+/// the instancer's `ernie:world`); on a Camera with `ernie:poses`, each view's world. A GPU array
+/// is copied to the host once per write, as the CPU plans the views' worlds.
 inline constexpr std::string_view kWorlds = "ernie:worlds";
 /// int: the frame number noise and samples derive from (Ernie); unset counts the images of each
 /// render product a delegate renders.

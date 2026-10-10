@@ -44,6 +44,10 @@ Tensor RenderDelegate::MapArray(Scene&, const Path&, std::string_view, std::uint
     throw std::invalid_argument("The " + Info().name + " renderer maps no arrays");
 }
 
+Tensor RenderDelegate::MapArray(Scene&, const PrimSet&, std::string_view, std::uintptr_t) {
+    throw std::invalid_argument("The " + Info().name + " renderer maps no arrays");
+}
+
 FrameId RenderDelegate::NextFrame(const Scene& scene, const Path& settings, const Path& product) {
     std::uint64_t& count = frameCounts_[product];
     FrameId id;

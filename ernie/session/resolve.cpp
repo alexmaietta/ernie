@@ -609,12 +609,17 @@ namespace {
 
 /// The `ernie:worlds` of `path` if it has `count` of them, as worlds.
 std::optional<std::vector<std::int32_t>> WorldsAttribute(const Scene& scene, const Path& path,
-                                                         std::size_t count) {
+                                                         std::size_t count,
+                                                         const HostArrayReader& read) {
     const Tensor* tensor = scene.Read(path, tokens::kWorlds);
     if (tensor == nullptr) {
         return std::nullopt;
     }
-    const std::vector<std::int64_t> values = IntsOf(*tensor, tokens::kWorlds);
+    std::optional<Tensor> host;
+    if (tensor->Location().kind != DeviceKind::Cpu && read) {
+        host = read(path, tokens::kWorlds, *tensor);
+    }
+    const std::vector<std::int64_t> values = IntsOf(host ? *host : *tensor, tokens::kWorlds);
     if (values.size() != count) {
         throw std::invalid_argument("'" + std::string(tokens::kWorlds) + "' of '" + path.String() +
                                     "' has " + std::to_string(values.size()) + " worlds for " +
@@ -626,7 +631,7 @@ std::optional<std::vector<std::int32_t>> WorldsAttribute(const Scene& scene, con
 }  // namespace
 
 std::vector<std::int32_t> ViewWorldsOf(const Scene& scene, std::span<const Path> cameras,
-                                       std::size_t views) {
+                                       std::size_t views, const HostArrayReader& read) {
     std::vector<std::int32_t> worlds;
     if (cameras.size() > 1) {
         for (const Path& camera : cameras) {
@@ -638,7 +643,7 @@ std::vector<std::int32_t> ViewWorldsOf(const Scene& scene, std::span<const Path>
         return std::vector<std::int32_t>(views, -1);
     }
     if (scene.Read(cameras.front(), tokens::kPoses) != nullptr) {
-        if (auto perView = WorldsAttribute(scene, cameras.front(), views)) {
+        if (auto perView = WorldsAttribute(scene, cameras.front(), views, read)) {
             return *perView;
         }
     }
@@ -646,8 +651,8 @@ std::vector<std::int32_t> ViewWorldsOf(const Scene& scene, std::span<const Path>
 }
 
 std::vector<std::int32_t> InstanceWorldsOf(const Scene& scene, const Path& instancer,
-                                           std::size_t count) {
-    if (auto perInstance = WorldsAttribute(scene, instancer, count)) {
+                                           std::size_t count, const HostArrayReader& read) {
+    if (auto perInstance = WorldsAttribute(scene, instancer, count, read)) {
         return *perInstance;
     }
     return std::vector<std::int32_t>(count, WorldOf(scene, instancer));

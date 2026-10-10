@@ -222,6 +222,15 @@ class MeshDrawable : public RasterDrawable {
     /// `SetComputeInterop`.
     Tensor MapInstances(std::uint32_t instancer, std::size_t array, std::uintptr_t stream = 1);
 
+    /// Maps the rows of transform op `op` of an instancer composed on the GPU for writing in
+    /// place: a float32 tensor shaped as the rows last set, over the raw array the compose pass
+    /// reads, holding those rows. Writes go on `stream`, which first waits for the frames already
+    /// submitted; the composed `SetInstances` takes it back without copying. Map again for each
+    /// frame.
+    /// @throws std::invalid_argument for an unknown or uncomposed instancer, an op past its ops,
+    /// or without `SetComputeInterop`.
+    Tensor MapComposedOp(std::uint32_t instancer, std::size_t op, std::uintptr_t stream = 1);
+
     /// @throws std::invalid_argument for an unknown mesh.
     void RemoveMesh(std::uint32_t mesh);
 
@@ -443,8 +452,8 @@ class MeshDrawable : public RasterDrawable {
         std::uint32_t set = 0;
         bool moving = false;
         bool written = false;
-        /// Per array, the view `MapInstances` last gave out, and whether the array written is
-        /// already in it.
+        /// Per array, the view `MapInstances` last gave out this frame, and whether the array
+        /// written is already in it.
         std::array<Tensor, 3> mapped;
         std::array<bool, 3> inPlace{};
         /// Composed on the GPU from transform ops (`ComposedInstanceData`): the data, its first

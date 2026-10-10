@@ -222,6 +222,9 @@ class Scene {
     /// tensor that its contents are written on `stream` (as `Write`).
     /// @throws std::invalid_argument if the prim does not exist or `attribute` is not a tensor.
     void Unmap(const Path& path, std::string_view attribute, std::uintptr_t stream = 1);
+    /// `Unmap` of each prim of `prims`, such as rows of one array mapped over them.
+    /// @throws std::invalid_argument as `Unmap`, unmapping none.
+    void Unmap(const PrimSet& prims, std::string_view attribute, std::uintptr_t stream = 1);
 
     /// The CUDA stream the latest contents of tensor `attribute` were written on (as `Write`).
     std::uintptr_t WriteStream(const Path& path, std::string_view attribute) const;

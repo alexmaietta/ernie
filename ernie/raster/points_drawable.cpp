@@ -448,6 +448,10 @@ void PointsDrawable::SettleMotion() {
     for (auto& [handle, cloud] : clouds_) {
         cloud.moving = false;
         cloud.written = false;
+        // As `MeshDrawable::SettleMotion`: a view mapped for this frame expires.
+        if (cloud.onDevice) {
+            cloud.mapped = {};
+        }
     }
 }
 

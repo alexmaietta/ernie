@@ -514,6 +514,33 @@ void BindRender(nb::module_& m) {
             "`scene.unmap(path, attribute, stream)`; map again every step, as the memory behind "
             "it alternates to keep the last step's values for motion blur.")
         .def(
+            "map",
+            [](nb::pointer_and_handle<Renderer> self, Scene& scene, const PrimSet& prims,
+               std::string_view attribute, nb::handle stream) {
+                return ArrayFromTensor(KeepingAlive(
+                    self.p->Delegate().MapArray(scene, prims, attribute, StreamOf(stream)),
+                    self.h), true);
+            },
+            nb::arg("scene"), nb::arg("prims"), nb::arg("attribute"),
+            nb::arg("stream").none() = nb::none(),
+            "Maps a transform op (xformOp:translate, xformOp:orient, xformOp:scale, or any op "
+            "composed on the GPU) written as rows of one CUDA array over `prims`, which must be "
+            "exactly the prims of those rows in row order: a CUDA array over the renderer's own "
+            "memory, holding the rows, which the scene now holds as the attribute. Write into it "
+            "on `stream`, then `scene.unmap(prims, attribute, stream)`; map again every step.")
+        .def(
+            "map",
+            [](nb::pointer_and_handle<Renderer> self, Scene& scene, const std::vector<Path>& paths,
+               std::string_view attribute, nb::handle stream) {
+                return ArrayFromTensor(
+                    KeepingAlive(self.p->Delegate().MapArray(scene, PrimSet(paths), attribute,
+                                                             StreamOf(stream)),
+                                 self.h),
+                    true);
+            },
+            nb::arg("scene"), nb::arg("paths"), nb::arg("attribute"),
+            nb::arg("stream").none() = nb::none(), "As the map of a PrimSet, for a list of paths.")
+        .def(
             "cuda_download",
             [](Renderer& r, const AnyArray& array) {
                 return ArrayFromTensor(RequireCuda(r).Download(TensorFromArray(array)));

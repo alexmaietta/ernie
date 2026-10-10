@@ -91,8 +91,15 @@ class RasterDelegate : public RenderDelegate {
 
     /// As `RenderDelegate::MapArray`: a Mesh's `points`, a PointInstancer's `positions`,
     /// `orientations` or `scales`, a Points prim's `points`, a Terrain's `heights`, or a Camera's
-    /// `ernie:poses` once written on the GPU (as float32, quaternions w last).
+    /// `ernie:poses` once written on the GPU (as float32, quaternions w last); or a transform op
+    /// of a prim posed on the GPU alone in its group (as the PrimSet's).
     Tensor MapArray(Scene& scene, const Path& path, std::string_view attribute,
+                    std::uintptr_t stream = 1) override;
+
+    /// As `RenderDelegate::MapArray` of a PrimSet: transform op `attribute` (`xformOp:*`) of
+    /// prims posed on the GPU as one group, rows of one array written to exactly `prims` in row
+    /// order. Orientations map as x, y, z, w unless composed on the GPU (then as written).
+    Tensor MapArray(Scene& scene, const PrimSet& prims, std::string_view attribute,
                     std::uintptr_t stream = 1) override;
 
     /// `Info().viewVars`, then the AOVs of the view's chain as "aov:<name>".
@@ -222,6 +229,7 @@ class RasterDelegate : public RenderDelegate {
     struct GpuXformGroup {
         std::uint32_t handle = 0;
         std::uint64_t version = 0;
+        std::uint64_t scene = 0;  ///< `Scene::Id` of the scene `version` counts in.
         Tensor zeros;  ///< Device positions for a group whose prims have no translate.
         std::size_t members = 0;
         std::int64_t rows = 0;          ///< Rows of its arrays.
@@ -258,6 +266,9 @@ class RasterDelegate : public RenderDelegate {
     /// The world transform of `path` under prims posed on the GPU, their rows copied to the host
     /// (waiting for their streams): for the lights the CPU plans each frame.
     glm::dmat4 HostWorldTransform(const Scene& scene, const Path& path);
+    /// `HostArrayReader` of `scene`: GPU arrays the CPU plans with (worlds), copied to the host
+    /// once per write (waiting for their streams) and kept until written again.
+    HostArrayReader HostArrays(const Scene& scene) const;
 
     Key KeyOf(const Scene& scene, const Path& path,
               std::initializer_list<std::string_view> attributes) const;
@@ -384,6 +395,13 @@ class RasterDelegate : public RenderDelegate {
     /// The scene's version at the last full `Sync`: prims below GPU-posed ones whose own
     /// transform ops are older changed only with their ancestors (`RefreshGpuXforms`).
     std::uint64_t syncedVersion_ = 0;
+    /// `HostArrays`' copies by prim and attribute: the scene and attribute version they hold.
+    struct HostArray {
+        std::uint64_t scene = 0;
+        std::uint64_t version = 0;
+        Tensor host;
+    };
+    mutable std::map<std::pair<Path, std::string>, HostArray> hostArrays_;
 };
 
 }  // namespace ernie

@@ -750,6 +750,44 @@ Tensor MeshDrawable::MapInstances(std::uint32_t instancer, std::size_t array,
     return target.mapped[array];
 }
 
+Tensor MeshDrawable::MapComposedOp(std::uint32_t instancer, std::size_t op,
+                                   std::uintptr_t stream) {
+    const auto it = instancers_.find(instancer);
+    if (it == instancers_.end()) {
+        throw std::invalid_argument("Unknown instancer " + std::to_string(instancer));
+    }
+    if (compute_ == nullptr) {
+        throw std::invalid_argument("Mapping arrays needs compute interop");
+    }
+    const Instancer& target = it->second;
+    if (!target.composed) {
+        throw std::invalid_argument("Instancer " + std::to_string(instancer) +
+                                    " is not composed on the GPU");
+    }
+    const std::vector<DeviceInstanceOp>& ops = target.composedData.ops;
+    if (op >= ops.size()) {
+        throw std::invalid_argument("Instancer " + std::to_string(instancer) + " has " +
+                                    std::to_string(ops.size()) + " transform ops");
+    }
+    if (composeLayoutDirty_) {
+        // Laid out now, as `Prepare` would, so the rows' place in the raw arrays is known.
+        RebuildCompose();
+        drawsDirty_ = true;
+    }
+    VkDeviceSize offset = target.rawFirst;
+    for (std::size_t k = 0; k < op; ++k) {
+        offset += static_cast<VkDeviceSize>(ops[k].rows.Elements());
+    }
+    const Tensor view =
+        compute_->View(composeRaw_, DType::Float32, ops[op].rows.Shape(), offset * sizeof(float));
+    // Nothing writes the rows until the frames already submitted have composed from them.
+    compute_->WaitForVulkan(stream);
+    if (ops[op].rows.Data() != view.Data()) {
+        compute_->Copy(ops[op].rows, view, stream);
+    }
+    return view;
+}
+
 void MeshDrawable::CopyDeviceAttributes(Mesh& mesh, bool all) {
     const VkDeviceSize offset = VkDeviceSize{mesh.firstVertex} * 3 * sizeof(float);
     if (!mesh.deviceNormals.Empty() && (all || mesh.normalsDirty)) {
@@ -1045,11 +1083,15 @@ void MeshDrawable::SettleMotion() {
         drawsDirty_ = drawsDirty_ || mesh.pointsMoving;
         mesh.pointsMoving = false;
         mesh.pointsWritten = false;
+        mesh.mappedPoints = {};
     }
     for (auto& [handle, instancer] : instancers_) {
         drawsDirty_ = drawsDirty_ || instancer.moving;
         instancer.moving = false;
         instancer.written = false;
+        // Views mapped for this frame expire: one handed back later is copied from, as the half
+        // behind it is no longer the one the next frame draws.
+        instancer.mapped = {};
     }
     if (drawsDirty_) {
         UpdateTransforms();
@@ -1408,11 +1450,24 @@ void MeshDrawable::WriteInstancer(Instancer& instancer, bool flip) {
     const VkDeviceSize first = VkDeviceSize{InstanceBase(instancer)} + instancer.first;
     if (instancer.composed) {
         // The ops' raw arrays; the compose pass writes the pools from them (`RecordCompose`).
+        // Rows written in place (`MapComposedOp`) are there already; the frame waits for their
+        // stream.
         const ComposedInstanceData& data = instancer.composedData;
         VkDeviceSize offset = instancer.rawFirst;
+        bool inPlace = false;
         for (const DeviceInstanceOp& op : data.ops) {
-            compute_->CopyToBuffer(op.rows, *composeRaw_, offset * sizeof(float), data.stream);
+            const Tensor raw = compute_->View(composeRaw_, DType::Float32, {1},
+                                              offset * sizeof(float));
+            if (op.rows.Data() == raw.Data()) {
+                inPlace = true;
+            } else {
+                compute_->CopyToBuffer(op.rows, *composeRaw_, offset * sizeof(float),
+                                       data.stream);
+            }
             offset += static_cast<VkDeviceSize>(op.rows.Elements());
+        }
+        if (inPlace) {
+            compute_->SignalVulkan(data.stream);
         }
         return;
     }

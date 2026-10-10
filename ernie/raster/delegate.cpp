@@ -1073,9 +1073,11 @@ void RasterDelegate::SyncGpuXforms(const Scene& scene) {
             for (const auto& [op, whole] : first.ops) {
                 group.ops.push_back(op);
             }
-            if (version != group.version || group.version == 0) {
+            // Versions count within one scene: another scene's prims at the same paths upload.
+            if (version != group.version || group.version == 0 || group.scene != scene.Id()) {
                 UploadGpuXformGroup(group, first, key.second);
                 group.version = version;
+                group.scene = scene.Id();
             }
             for (const Member& member : members) {
                 gpuPosed_[member.path] = {&group, group.handle,
@@ -1167,6 +1169,23 @@ glm::dmat4 RasterDelegate::HostWorldTransform(const Scene& scene, const Path& pa
     return world;
 }
 
+HostArrayReader RasterDelegate::HostArrays(const Scene& scene) const {
+    return [this, &scene](const Path& path, std::string_view attribute, const Tensor& device) {
+        HostArray& kept = hostArrays_[{path, std::string(attribute)}];
+        const std::uint64_t version = scene.AttributeVersion(path, attribute);
+        if (kept.host.Empty() || kept.scene != scene.Id() || kept.version != version) {
+            if (compute_ == nullptr) {
+                throw std::invalid_argument("'" + std::string(attribute) + "' of '" +
+                                            path.String() + "' on a GPU needs compute interop");
+            }
+            kept.host = compute_->Download(device, scene.WriteStream(path, attribute));
+            kept.scene = scene.Id();
+            kept.version = version;
+        }
+        return kept.host;
+    };
+}
+
 std::vector<AnchoredView> RasterDelegate::AnchoredViewsOf(const Scene& scene,
                                                           std::span<const Path> cameras) const {
     std::vector<std::optional<GpuAnchor>> anchors;
@@ -1256,13 +1275,12 @@ bool RasterDelegate::RefreshGpuXforms(const Scene& scene, std::span<const Change
     try {
         for (const auto& [group, seen] : touched) {
             std::optional<GpuXform> pose = GpuXformOf(scene, *seen.path);
-            if (seen.rewritten != group->members || !pose || pose->wFirst != group->wFirst) {
+            if (seen.rewritten != group->members || !pose || pose->wFirst != group->wFirst ||
+                pose->ops.empty()) {
                 return false;
             }
-            const Tensor& any = !pose->translate.Empty() ? pose->translate
-                                : !pose->orient.Empty()  ? pose->orient
-                                                         : pose->scale;
-            if (any.Shape()[0] != group->rows) {
+            // Every op's array has the group's rows (`GpuXformOf`); composed poses fill only ops.
+            if (pose->ops.front().second.Shape()[0] != group->rows) {
                 return false;
             }
             uploads.emplace_back(group, std::move(*pose));
@@ -1284,6 +1302,9 @@ Tensor RasterDelegate::MapArray(Scene& scene, const Path& path, std::string_view
     if (!scene.Has(path)) {
         throw std::invalid_argument("Cannot map " + std::string(attribute) + " of '" +
                                     path.String() + "', which does not exist");
+    }
+    if (attribute.starts_with("xformOp:") && gpuPosed_.contains(path)) {
+        return MapArray(scene, PrimSet({path}), attribute, stream);
     }
     const std::string_view type = scene.TypeOf(path);
     const auto unsynced = [&] {
@@ -1341,6 +1362,57 @@ Tensor RasterDelegate::MapArray(Scene& scene, const Path& path, std::string_view
                                     "Camera's poses map");
     }
     scene.Write(path, attribute, view, stream);
+    return view;
+}
+
+Tensor RasterDelegate::MapArray(Scene& scene, const PrimSet& prims, std::string_view attribute,
+                                std::uintptr_t stream) {
+    RequireCompute();
+    Sync(scene);
+    const std::vector<Path>& paths = prims.Paths();
+    const auto refuse = [&](const std::string& why) {
+        return std::invalid_argument("Cannot map " + std::string(attribute) + " of " +
+                                     (paths.empty() ? "no prims" : "'" + paths.front().String() +
+                                                                       "'...") + ": " + why);
+    };
+    if (paths.empty()) {
+        throw refuse("give the prims of a group posed on the GPU");
+    }
+    const auto first = gpuPosed_.find(paths.front());
+    if (first == gpuPosed_.end()) {
+        throw refuse("its transform ops are not rows of a GPU array posing it on the GPU");
+    }
+    GpuXformGroup& group = *first->second.group;
+    // Exactly the group's prims, prim i at row i, so the tensor written back is the whole array.
+    if (paths.size() != group.members || static_cast<std::int64_t>(paths.size()) != group.rows) {
+        throw refuse("give every prim the array's rows pose, in row order");
+    }
+    for (std::size_t i = 0; i < paths.size(); ++i) {
+        const auto posed = gpuPosed_.find(paths[i]);
+        if (posed == gpuPosed_.end() || posed->second.group != &group || posed->second.row != i) {
+            throw refuse("'" + paths[i].String() + "' is not row " + std::to_string(i) +
+                         " of the same array");
+        }
+    }
+    const auto op = std::find(group.ops.begin(), group.ops.end(), attribute);
+    if (op == group.ops.end()) {
+        throw refuse("the prims have no such transform op");
+    }
+    Tensor view;
+    if (group.composed) {
+        view = meshes_.MapComposedOp(group.handle,
+                                     static_cast<std::size_t>(op - group.ops.begin()), stream);
+    } else {
+        const InstanceOpKind kind = InstanceOpKindOf(*op);
+        if (kind == InstanceOpKind::Orient && group.wFirst) {
+            throw refuse("orientations map with w last");
+        }
+        const std::size_t array = kind == InstanceOpKind::Translate ? 0
+                                  : kind == InstanceOpKind::Orient  ? 1
+                                                                    : 2;
+        view = meshes_.MapInstances(group.handle, array, stream);
+    }
+    scene.Write(prims, attribute, view, stream);
     return view;
 }
 
@@ -1568,7 +1640,8 @@ std::vector<MeshItem> RasterDelegate::Items(const Scene& scene) const {
         const Tensor* positions = scene.Read(path, tokens::kPositions);
         const std::vector<std::int32_t> worlds = InstanceWorldsOf(
             scene, path,
-            positions != nullptr ? static_cast<std::size_t>(positions->Elements()) / 3 : 0);
+            positions != nullptr ? static_cast<std::size_t>(positions->Elements()) / 3 : 0,
+            HostArrays(scene));
         // Under a GPU-posed prim, its instances are composed under that prim's instance
         // (`SyncInstancers`), drawn in the frame above it.
         const glm::dmat4 world = synced.anchorInstancer != 0
@@ -2006,7 +2079,7 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         }
         const bool batched = !poses.empty();
         const auto views = static_cast<std::uint32_t>(std::max<std::size_t>(poses.size(), 1));
-        std::vector<std::int32_t> worlds = ViewWorldsOf(scene, cameras, views);
+        std::vector<std::int32_t> worlds = ViewWorldsOf(scene, cameras, views, HostArrays(scene));
         // Only the vars the product asks for, as the static names of `kRenderVarNames`, and its
         // AOVs ("aov:<output>") as the slots its chains lay them in (`kAovSlotNames`), each from
         // its chain: the product's, or a var's own (`RenderProductSpec::varFilters`).

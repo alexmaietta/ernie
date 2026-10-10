@@ -17,6 +17,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <optional>
 #include <span>
@@ -120,19 +121,27 @@ bool PosesAreQuaternions(const Tensor& poses);
 /// -1, shared by every world, if none has one.
 std::int32_t WorldOf(const Scene& scene, const Path& path);
 
+/// A host copy of array `attribute` of `path`, written as `device` on a GPU: for the few arrays
+/// the CPU plans with, such as worlds. A delegate with compute interop gives one, which may keep
+/// the copy until the attribute is written again.
+using HostArrayReader =
+    std::function<Tensor(const Path& path, std::string_view attribute, const Tensor& device)>;
+
 /// The world each of the `views` views through `cameras` sees (see `ViewPosesOf`): each camera's
 /// world for several cameras; for one camera, its `ernie:worlds` per pose (`tokens::kWorlds`),
-/// or else its world for every view.
-/// @throws std::invalid_argument if `ernie:worlds` is not an integer array of one world per view.
+/// or else its world for every view. Worlds written on a GPU are read through `read`.
+/// @throws std::invalid_argument if `ernie:worlds` is not an integer array of one world per view,
+/// or is on a GPU without `read`.
 std::vector<std::int32_t> ViewWorldsOf(const Scene& scene, std::span<const Path> cameras,
-                                       std::size_t views);
+                                       std::size_t views, const HostArrayReader& read = {});
 
 /// The world of each of the `count` instances of the PointInstancer at `instancer`: its
-/// `ernie:worlds`, or else the instancer's world for every instance.
+/// `ernie:worlds`, or else the instancer's world for every instance. Worlds written on a GPU are
+/// read through `read`.
 /// @throws std::invalid_argument if `ernie:worlds` is not an integer array of one world per
-/// instance.
+/// instance, or is on a GPU without `read`.
 std::vector<std::int32_t> InstanceWorldsOf(const Scene& scene, const Path& instancer,
-                                           std::size_t count);
+                                           std::size_t count, const HostArrayReader& read = {});
 
 /// The render products a step of `scene` draws, following UsdRender: the given RenderProduct
 /// prims, or else the RenderSettings' `products`, or else one default product keyed by the

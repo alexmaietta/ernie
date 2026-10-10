@@ -109,7 +109,8 @@ class BatchCamera:
 
     def set_worlds(self, worlds: Any, stream: Any = None) -> None:
         """Sets the world each view sees (`tokens.WORLD` of the environments' prims): a (views,)
-        int32 array, -1 for every world."""
+        int32 array, -1 for every world. A CUDA array is copied to the host once per write, after
+        the work queued on `stream`, for planning the views' shadows."""
         self._check_views(worlds, "worlds")
         self.scene.write(self.camera, tokens.WORLDS, worlds, stream=stream)
 

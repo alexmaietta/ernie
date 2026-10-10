@@ -56,7 +56,11 @@ def test_views_render_as_single_cameras_at_their_poses(renderer, terrain_scene):
     assert renderer.take_validation_messages() == []
 
 
-def test_each_view_sees_its_world(renderer, terrain_scene):
+@pytest.mark.parametrize("on_gpu", [False, True], ids=["cpu", "cuda"])
+def test_each_view_sees_its_world(renderer, terrain_scene, on_gpu):
+    if on_gpu and not renderer.cuda_available:
+        pytest.skip("No CUDA interop on this machine")
+    worlds = renderer.cuda_upload if on_gpu else (lambda array: array)
     scene = noiseless(terrain_scene)
     scene.define("/Envs/Env0", tokens.XFORM).set(tokens.WORLD, 0)
     scene.define("/Envs/Env0/Box", tokens.CUBE).set(tokens.SIZE, 40.0).set(
@@ -67,12 +71,16 @@ def test_each_view_sees_its_world(renderer, terrain_scene):
     scene.set("/Envs/Env1/Box", tokens.DISPLAY_COLOR, (0.0, 1.0, 0.0))
     pose = np.array(scene.get("/World/Camera", tokens.TRANSFORM), np.float32)
     camera = BatchCamera(renderer, scene, "/World/Camera", 2, resolution=(48, 48))
-    colour = np.array(
-        camera.step(np.stack([pose, pose]), np.array([0, 1], np.int32), device="cpu")["LdrColor"]
-    )
-    centre = colour[:, 24, 24, :3].astype(int)
-    assert centre[0, 0] > centre[0, 1], "view 0 sees world 0's red box"
-    assert centre[1, 1] > centre[1, 0], "view 1 sees world 1's green box"
+    for order in ([0, 1], [1, 0]):  # written again, the views see the new worlds
+        colour = np.array(
+            camera.step(
+                np.stack([pose, pose]), worlds(np.array(order, np.int32)), device="cpu"
+            )["LdrColor"]
+        )
+        centre = colour[:, 24, 24, :3].astype(int)
+        red, green = (0, 1) if order == [0, 1] else (1, 0)
+        assert centre[red, 0] > centre[red, 1], "a view of world 0 sees its red box"
+        assert centre[green, 1] > centre[green, 0], "a view of world 1 sees its green box"
 
 
 def test_rejects_arrays_of_another_view_count(renderer, terrain_scene):
