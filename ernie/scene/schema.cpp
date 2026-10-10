@@ -75,6 +75,49 @@ glm::dvec3 GetVec3(const Scene& scene, const Path& path, std::string_view attrib
     return fallback;
 }
 
+std::optional<std::vector<float>> GetFloats(const Scene& scene, const Path& path,
+                                            std::string_view attribute) {
+    const Value* value = scene.Get(path, attribute);
+    if (value == nullptr) {
+        return std::nullopt;
+    }
+    if (const auto* list = value->Get<std::vector<float>>()) {
+        return *list;
+    }
+    const auto from = [](const auto& vector) {
+        std::vector<float> out;
+        for (int i = 0; i < vector.length(); ++i) {
+            out.push_back(static_cast<float>(vector[i]));
+        }
+        return out;
+    };
+    if (const auto* v = value->Get<glm::vec4>()) {
+        return from(*v);
+    }
+    if (const auto* v = value->Get<glm::vec3>()) {
+        return from(*v);
+    }
+    if (const auto* v = value->Get<glm::dvec3>()) {
+        return from(*v);
+    }
+    if (const auto* v = value->Get<glm::vec2>()) {
+        return from(*v);
+    }
+    if (const auto* v = value->Get<glm::dvec2>()) {
+        return from(*v);
+    }
+    if (const auto* v = value->Get<glm::ivec2>()) {
+        return from(*v);
+    }
+    if (const auto* d = value->Get<double>()) {
+        return std::vector<float>{static_cast<float>(*d)};
+    }
+    if (const auto* f = value->Get<float>()) {
+        return std::vector<float>{*f};
+    }
+    return std::nullopt;
+}
+
 std::string GetToken(const Scene& scene, const Path& path, std::string_view attribute,
                      std::string_view fallback) {
     return scene.Get<std::string>(path, attribute, std::string(fallback));

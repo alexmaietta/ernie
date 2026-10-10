@@ -9,6 +9,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 /// Helpers for authoring and reading the schemas in `tokens.h`.
 ///
@@ -29,6 +30,12 @@ glm::dvec2 GetVec2(const Scene& scene, const Path& path, std::string_view attrib
 /// The attribute as a 3-vector (from `vec3` or `dvec3`), or `fallback`.
 glm::dvec3 GetVec3(const Scene& scene, const Path& path, std::string_view attribute,
                    glm::dvec3 fallback);
+
+/// The attribute as a list of numbers, or nullopt if it is unset or not numeric: a float array,
+/// or a 2-, 3- or 4-vector (`vec`, `dvec` or `ivec`), which is how short lists arrive from
+/// bindings such as Python's (a list of four numbers is a `vec4`), or a single number.
+std::optional<std::vector<float>> GetFloats(const Scene& scene, const Path& path,
+                                            std::string_view attribute);
 
 /// The attribute as a token or string, or `fallback`.
 std::string GetToken(const Scene& scene, const Path& path, std::string_view attribute,

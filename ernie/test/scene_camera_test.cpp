@@ -113,11 +113,12 @@ TEST(Camera, SingletChromaticAberrationFollowsItsGlass) {
     EXPECT_THROW(ernie::SetSingletChromatic(lens, 50.0, 0.9, 64.17), std::invalid_argument);
     EXPECT_THROW(ernie::SetSingletChromatic(lens, 50.0, 1.5, 64.17, 2.0), std::invalid_argument);
 
-    // Read from the prim's attributes, and checked.
+    // Read from the prim's attributes, and checked; two pairs also read as the vec4 a
+    // four-number Python list becomes.
     ernie::Scene scene;
     scene.Define("/Camera", ernie::tokens::kCamera)
         .Set(ernie::tokens::kLensChromaticScale, std::vector<float>{400.0f, 0.99f, 700.0f, 1.01f})
-        .Set(ernie::tokens::kLensChromaticFocus, std::vector<float>{400.0f, -0.2f, 700.0f, 0.3f});
+        .Set(ernie::tokens::kLensChromaticFocus, glm::vec4(400.0f, -0.2f, 700.0f, 0.3f));
     Camera camera = ernie::CameraOf(scene, "/Camera", 64, 48);
     EXPECT_NEAR(camera.lens.chromaticScale(550.0), 1.0, 1e-6);
     EXPECT_NEAR(camera.lens.chromaticFocusMm(700.0), 0.3, 1e-6);

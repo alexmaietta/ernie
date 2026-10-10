@@ -134,9 +134,8 @@ std::vector<Path> TargetsOf(const Scene& scene, const Path& path, std::string_vi
 }
 
 /// The `ernie:spectrum` pairs of a light, if it has them.
-const std::vector<float>* SpectrumPairs(const Scene& scene, const Path& light) {
-    const Value* value = scene.Get(light, tokens::kLightSpectrum);
-    return value != nullptr ? value->Get<std::vector<float>>() : nullptr;
+std::optional<std::vector<float>> SpectrumPairs(const Scene& scene, const Path& light) {
+    return GetFloats(scene, light, tokens::kLightSpectrum);
 }
 
 /// UsdLux's `inputs:intensity` times 2^`inputs:exposure`.
@@ -193,9 +192,9 @@ std::function<double(double)> IlluminantShape(const Scene& scene, const Path& li
         CieDaylight(560.0, kelvin);  // checks the temperature
         base = [kelvin](double w) { return CieDaylight(w, kelvin); };
     } else if (illuminant == kCustom) {
-        const Value* value = scene.Get(light, kPhysicalCustomIlluminant);
-        const auto* pairs = value != nullptr ? value->Get<std::vector<float>>() : nullptr;
-        if (pairs == nullptr || pairs->size() < 4) {
+        const std::optional<std::vector<float>> pairs =
+            GetFloats(scene, light, kPhysicalCustomIlluminant);
+        if (!pairs || pairs->size() < 4) {
             throw std::invalid_argument("Light '" + light.String() + "' has a custom illuminant "
                                         "but no '" + std::string(kPhysicalCustomIlluminant) +
                                         "' pairs");
@@ -683,8 +682,14 @@ std::vector<SensorFilterStep> FilterStepsOf(const Scene& scene, const Path& prim
             }
             const std::string name = attribute.substr(kInputs.size());
             const Value* value = scene.Get(filter, attribute);
-            if (const auto* list = value != nullptr ? value->Get<std::vector<float>>() : nullptr) {
-                step.arrays[name] = *list;
+            const bool scalar = value != nullptr && (value->Get<double>() != nullptr ||
+                                                     value->Get<float>() != nullptr ||
+                                                     value->Get<int>() != nullptr ||
+                                                     value->Get<bool>() != nullptr);
+            // Arrays, also from the vectors short lists arrive as (`GetFloats`).
+            if (std::optional<std::vector<float>> list =
+                    scalar ? std::nullopt : GetFloats(scene, filter, attribute)) {
+                step.arrays[name] = std::move(*list);
             } else if (const Tensor* tensor = scene.Read(filter, attribute)) {
                 step.arrays[name] = FloatsOf(*tensor, 1, attribute);
             } else {
@@ -813,10 +818,10 @@ std::vector<float> SunIrradianceOf(const Scene& scene, const Path& light,
     const double temperature = GetBool(scene, light, kEnableColorTemperature, false)
                                    ? GetNumber(scene, light, kColorTemperature, 6500.0)
                                    : 0.0;
-    const std::vector<float>* pairs = SpectrumPairs(scene, light);
-    const bool physical = scene.Get(light, kLightIrradiance) != nullptr || pairs != nullptr;
+    const std::optional<std::vector<float>> pairs = SpectrumPairs(scene, light);
+    const bool physical = scene.Get(light, kLightIrradiance) != nullptr || pairs.has_value();
     if (physical) {
-        if (pairs != nullptr) {
+        if (pairs) {
             const Spectrum spectrum = Spectrum::FromPairs(*pairs);
             std::vector<float> binned = spectrum.Bin(bands);
             if (scene.Get(light, kLightIrradiance) != nullptr && !spectrum.Empty()) {
@@ -892,13 +897,14 @@ Light LightOf(const Scene& scene, const Path& path, const SpectralBands& bands,
         if (!(area > 0.0)) {
             throw std::invalid_argument("Light '" + path.String() + "' has no area");
         }
-        const std::vector<float>* pairs = SpectrumPairs(scene, path);
+        const std::optional<std::vector<float>> pairs = SpectrumPairs(scene, path);
         if (IsPhotometric(scene, path)) {
             light.spectrum = RelativeSpectrum(
                 scene, path, bands, PhotometricAreaValue(scene, path, M_PI * area, area));
         } else {
-            light.spectrum = scene.Get(path, kLightPower) != nullptr || pairs != nullptr
-                                 ? LampSpectrum(scene, path, bands, pairs, M_PI * area)
+            light.spectrum = scene.Get(path, kLightPower) != nullptr || pairs
+                                 ? LampSpectrum(scene, path, bands, pairs ? &*pairs : nullptr,
+                                                M_PI * area)
                                  : RelativeSpectrum(scene, path, bands,
                                                     LightIntensity(scene, path));
         }
@@ -916,9 +922,9 @@ Light LightOf(const Scene& scene, const Path& path, const SpectralBands& bands,
                                           PhotometricAreaValue(scene, path, 4.0 * M_PI, 0.0));
         return light;
     }
-    const std::vector<float>* pairs = SpectrumPairs(scene, path);
-    if (scene.Get(path, kLightPower) != nullptr || pairs != nullptr) {
-        light.spectrum = LampSpectrum(scene, path, bands, pairs, 4.0 * M_PI);
+    const std::optional<std::vector<float>> pairs = SpectrumPairs(scene, path);
+    if (scene.Get(path, kLightPower) != nullptr || pairs) {
+        light.spectrum = LampSpectrum(scene, path, bands, pairs ? &*pairs : nullptr, 4.0 * M_PI);
         return light;
     }
     const double radius = light.radius;
@@ -1005,8 +1011,8 @@ DomeLight DomeOf(const Scene& scene, const Path& path, const SpectralBands& band
             GetNumber(scene, path, kPhotometricIlluminance, 10000.0) / (M_PI * luminance));
         return dome;
     }
-    const std::vector<float>* pairs = SpectrumPairs(scene, path);
-    dome.radiance = pairs != nullptr
+    const std::optional<std::vector<float>> pairs = SpectrumPairs(scene, path);
+    dome.radiance = pairs
                         ? Spectrum::FromPairs(*pairs).Bin(bands)
                         : RelativeSpectrum(scene, path, bands, LightIntensity(scene, path));
     return dome;
@@ -1152,15 +1158,13 @@ std::optional<std::vector<float>> FloatArray(const Scene& scene, const Path& pat
             FloatAttribute(scene, path, attribute, components)) {
         return values;
     }
-    if (const Value* value = scene.Get(path, attribute)) {
-        if (const auto* list = value->Get<std::vector<float>>()) {
-            if (list->size() % components != 0) {
-                throw std::invalid_argument("'" + std::string(attribute) + "' of '" +
-                                            path.String() + "' needs " +
-                                            std::to_string(components) + " values per element");
-            }
-            return *list;
+    if (std::optional<std::vector<float>> list = GetFloats(scene, path, attribute)) {
+        if (list->size() % components != 0) {
+            throw std::invalid_argument("'" + std::string(attribute) + "' of '" + path.String() +
+                                        "' needs " + std::to_string(components) +
+                                        " values per element");
         }
+        return list;
     }
     return std::nullopt;
 }

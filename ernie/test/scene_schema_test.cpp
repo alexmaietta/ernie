@@ -35,6 +35,8 @@ TEST(Schema, ReadersAcceptEveryNumericType) {
         .Set("iv2", glm::ivec2(5, 6))
         .Set("v3", glm::vec3(1.0f, 2.0f, 3.0f))
         .Set("dv3", glm::dvec3(4.0, 5.0, 6.0))
+        .Set("v4", glm::vec4(1.0f, 2.0f, 3.0f, 4.0f))
+        .Set("list", std::vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f})
         .Set("token", "lambert")
         .Set("target", Path("/Looks/Rock"));
     EXPECT_EQ(ernie::GetNumber(scene, "/P", "f", 0.0), 1.5);
@@ -55,6 +57,14 @@ TEST(Schema, ReadersAcceptEveryNumericType) {
     EXPECT_EQ(ernie::GetVec3(scene, "/P", "dv3", {}), glm::dvec3(4.0, 5.0, 6.0));
     EXPECT_EQ(ernie::GetVec3(scene, "/P", "f", glm::dvec3(1.0)), glm::dvec3(1.0));
     EXPECT_EQ(ernie::GetVec3(scene, "/P", "missing", glm::dvec3(1.0)), glm::dvec3(1.0));
+    // Float arrays also read from the vectors short Python lists become.
+    EXPECT_EQ(ernie::GetFloats(scene, "/P", "list"), (std::vector<float>{1, 2, 3, 4, 5}));
+    EXPECT_EQ(ernie::GetFloats(scene, "/P", "v4"), (std::vector<float>{1, 2, 3, 4}));
+    EXPECT_EQ(ernie::GetFloats(scene, "/P", "dv3"), (std::vector<float>{4, 5, 6}));
+    EXPECT_EQ(ernie::GetFloats(scene, "/P", "iv2"), (std::vector<float>{5, 6}));
+    EXPECT_EQ(ernie::GetFloats(scene, "/P", "d"), (std::vector<float>{2.5f}));
+    EXPECT_FALSE(ernie::GetFloats(scene, "/P", "token"));
+    EXPECT_FALSE(ernie::GetFloats(scene, "/P", "missing"));
     EXPECT_EQ(ernie::GetToken(scene, "/P", "token", ""), "lambert");
     EXPECT_EQ(ernie::GetToken(scene, "/P", "f", "x"), "x");
     EXPECT_EQ(ernie::GetTarget(scene, "/P", "target"), Path("/Looks/Rock"));

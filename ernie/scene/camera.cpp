@@ -28,10 +28,10 @@ Spectrum Bump(double centre, double width, double peak) {
     return Spectrum(std::move(wavelengths), std::move(values));
 }
 
-const std::vector<float>* FloatArray(const Scene& scene, const Path& path,
-                                     std::string_view attribute) {
-    const Value* value = scene.Get(path, attribute);
-    return value != nullptr ? value->Get<std::vector<float>>() : nullptr;
+// A float array attribute, also from the vectors short lists arrive as (`GetFloats`).
+std::optional<std::vector<float>> FloatArray(const Scene& scene, const Path& path,
+                                             std::string_view attribute) {
+    return GetFloats(scene, path, attribute);
 }
 
 }  // namespace
@@ -449,8 +449,8 @@ Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::
     camera.bands = {range.x, range.y, static_cast<int>(number(kSpectralBands, camera.bands.count))};
 
     LensModel& lens = camera.lens;
-    if (const std::vector<float>* k = FloatArray(scene, path, kLensDistortion)) {
-        const auto at = [k](std::size_t i) { return i < k->size() ? double((*k)[i]) : 0.0; };
+    if (const std::optional<std::vector<float>> k = FloatArray(scene, path, kLensDistortion)) {
+        const auto at = [&k](std::size_t i) { return i < k->size() ? double((*k)[i]) : 0.0; };
         lens.k1 = at(0);
         lens.k2 = at(1);
         lens.k3 = at(2);
@@ -464,25 +464,17 @@ Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::
         throw std::invalid_argument("Camera '" + path.String() + "' has lens projection '" +
                                     lensProjection + "'; use perspective or fisheye");
     }
-    if (const std::vector<float>* k = FloatArray(scene, path, kLensFisheye)) {
+    if (const std::optional<std::vector<float>> k = FloatArray(scene, path, kLensFisheye)) {
         for (std::size_t i = 0; i < lens.fisheye.size(); ++i) {
             lens.fisheye[i] = i < k->size() ? double((*k)[i]) : 0.0;
         }
     }
     lens.vignetting = GetBool(scene, path, kLensVignetting, lens.vignetting);
     lens.transmission = number(kLensTransmission, lens.transmission);
-    // Curves of (wavelength, value) pairs; two pairs may come as a 4-vector (Python's lists of
-    // four numbers do).
+    // Curves of (wavelength, value) pairs.
     const auto curve = [&](std::string_view attribute) -> Spectrum {
-        if (const std::vector<float>* pairs = FloatArray(scene, path, attribute)) {
-            return Spectrum::FromPairs(*pairs);
-        }
-        if (const Value* value = scene.Get(path, attribute)) {
-            if (const auto* v = value->Get<glm::vec4>()) {
-                return Spectrum::FromPairs(std::vector<float>{v->x, v->y, v->z, v->w});
-            }
-        }
-        return {};
+        const std::optional<std::vector<float>> pairs = FloatArray(scene, path, attribute);
+        return pairs ? Spectrum::FromPairs(*pairs) : Spectrum();
     };
     lens.chromaticScale = curve(kLensChromaticScale);
     lens.chromaticFocusMm = curve(kLensChromaticFocus);
@@ -520,7 +512,7 @@ Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::
     SensorModel& sensor = camera.sensor;
     for (SensorChannel& channel : sensor.channels) {
         const std::string attribute = std::string(kSensorQePrefix) + channel.name;
-        if (const std::vector<float>* pairs = FloatArray(scene, path, attribute)) {
+        if (const std::optional<std::vector<float>> pairs = FloatArray(scene, path, attribute)) {
             channel.quantumEfficiency = Spectrum::FromPairs(*pairs);
         }
     }
