@@ -3,7 +3,9 @@
 
 #include "ernie/scene/scene.h"
 #include "ernie/scene/schema.h"
+#include "ernie/scene/tokens.h"
 #include "ernie/scene/value.h"
+#include "ernie/scene/xform.h"
 #include "ernie/util/tensor.h"
 
 #include <glm/glm.hpp>
@@ -305,6 +307,20 @@ class SchemaView {
     /** The type's registry entry. */                                                              \
     static const ::ernie::PrimTypeDef& Definition();                                               \
     ATTRIBUTES(ERNIE_ATTRIBUTE_ACCESSORS)                                                          \
+    /** Sets the prim's transform as one matrix op (`tokens::kTransform`, column vectors). */      \
+    Self& SetTransform(const glm::dmat4& matrix) {                                                 \
+        Edit().Set(GetPath(), ::ernie::tokens::kTransform, ::ernie::Value(matrix));                \
+        return static_cast<Self&>(*this);                                                          \
+    }                                                                                              \
+    /** Sets the prim's transform as translate, rotate or orient, and scale ops (`SetXform`). */   \
+    Self& SetXform(const ::ernie::XformOps& ops) {                                                 \
+        ::ernie::SetXform(Edit(), GetPath(), ops);                                                 \
+        return static_cast<Self&>(*this);                                                          \
+    }                                                                                              \
+    /** The prim's local transform, from its ops (`Scene::LocalTransform`). */                     \
+    glm::dmat4 GetLocalTransform() const {                                                         \
+        return GetScene().LocalTransform(GetPath());                                               \
+    }                                                                                              \
                                                                                                    \
   protected:                                                                                       \
     Class(const ::ernie::Scene& scene, ::ernie::Path path, const ::ernie::PrimTypeDef& type)       \

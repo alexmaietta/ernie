@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/light_schemas.h"
 #include "ernie/scene/prim_type.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/tokens.h"
 
+#include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
 
 #include <set>
@@ -136,4 +138,17 @@ TEST(PrimType, CoerceConvertsToTheDeclaredType) {
                  std::invalid_argument);
     EXPECT_EQ(ernie::SnakeCase("PhotometricIlluminanceDistance"),
               "photometric_illuminance_distance");
+}
+
+TEST(PrimType, ViewsSetTransformsInTheirChains) {
+    Scene scene;
+    const glm::dmat4 lifted = glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 2.0));
+    const ernie::Sphere rock =
+        ernie::Sphere::Define(scene, "/Rock").SetTransform(lifted).SetRadius(0.5);
+    EXPECT_EQ(rock.GetLocalTransform(), lifted);
+    EXPECT_EQ(rock.GetRadius(), 0.5);
+    ernie::XformOps ops;
+    ops.translate = glm::dvec3(1.0, 2.0, 3.0);
+    const ernie::DistantLight sun = ernie::DistantLight::Define(scene, "/Sun").SetXform(ops);
+    EXPECT_EQ(glm::dvec3(sun.GetLocalTransform()[3]), glm::dvec3(1.0, 2.0, 3.0));
 }
