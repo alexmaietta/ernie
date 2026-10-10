@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Renders 16 environments ("worlds") in one batch, as a reinforcement learning loop renders one
 camera per environment, and saves the views as a 4 x 4 contact sheet.
 

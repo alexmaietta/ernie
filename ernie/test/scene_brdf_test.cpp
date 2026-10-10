@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/scene/brdf.h"
 
 #include <gtest/gtest.h>

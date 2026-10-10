@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Terrain horizon maps for dome occlusion: for each texel of a grid coarser than the heights by
 // `scale` cells, the tangent of the horizon's elevation (before vertical exaggeration) towards
 // eight azimuths, 45 degrees apart from east counter-clockwise: layer 0 holds azimuths 0 to 135

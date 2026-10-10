@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """An LROC Wide Angle Camera image, framelet by framelet: the WAC's real push-frame geometry from
 its ISD over cratered ground, through one band's published sensor and readout to the 11-bit
 numbers it digitises.

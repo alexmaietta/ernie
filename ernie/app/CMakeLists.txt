@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 ernie_add_library(
     ernie_app
     SOURCES

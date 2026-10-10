@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Shadow map pass: planet depth from the light, one cascade per draw.
 import planet;
 

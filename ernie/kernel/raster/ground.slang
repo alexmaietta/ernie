@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Ground plane G-buffer pass: an infinite horizontal plane at z = height, drawn with a full-screen
 // triangle. Each fragment intersects its camera ray with the plane and writes the hit's depth, so
 // other drawables sort against it; rays that miss (or hit behind the camera) are discarded, and

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Thermal dark current: electrons the sensor generates without light over the exposure, at a
 // rate doubling every `doubling` degrees above `referenceTemperature` (where it is
 // `referenceRate`), each pixel's own rate off the mean by a fixed relative `nonuniformity` (dark

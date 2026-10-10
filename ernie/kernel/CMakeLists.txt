@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 # The shaders, embedded as strings: ernie/kernel/embedded_shaders.h declares them and a .cpp
 # generated at build time defines them, so a shader edit recompiles one file and does not re-run
 # CMake. Each entry is the shader's path and the name it is embedded under.

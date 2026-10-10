@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Tone curve: each display channel (sRGB-encoded, 0 to 1) through `curve`, 33 samples from
 // input 0 to 1 (identity by default), as a camera's picture style shapes contrast after its
 // encoding; a SensorFilter prim sets it as a float array of any length, resampled. On display

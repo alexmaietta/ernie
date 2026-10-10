@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Overlay pass: debug drawing over a view's display image, after the sensor filters. Segments
 // become quads `width` pixels wide facing the image, sprites (markers and label text) rectangles of
 // fixed pixel size around their anchor's projection, and triangles stay as they are; each is

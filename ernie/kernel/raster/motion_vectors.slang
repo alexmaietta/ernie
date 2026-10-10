@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // The MotionVector var's camera pass: every raster pixel's motion since the last frame from the
 // camera's alone, reprojecting the point its depth gives (the far plane for the sky) with the last
 // frame's view-projection. Drawables that moved then draw their own motion over it

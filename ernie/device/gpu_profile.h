@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
 // GPU zones: the time a command buffer spends between a zone's start and end on the device,

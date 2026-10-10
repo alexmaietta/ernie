@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Time delay integration: a TDI line scanner's `stages` rows each expose the same strip of the
 // scene for one line time while its charge moves along with the image, so a line collects the sum
 // of the stages' signal, `stages` times one line's, while it is read (and its read noise added)

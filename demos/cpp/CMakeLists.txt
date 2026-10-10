@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 # C++ demos, each an executable named after its file: demo_<category>_<description>.
 
 add_executable(demo_worlds_batched_clones demo_worlds_batched_clones.cpp)

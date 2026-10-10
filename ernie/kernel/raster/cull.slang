@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // GPU instance culling and level-of-detail selection: for each job, a run of one instanced mesh
 // draw's instances (one world's, say) seen from one view or shadow view, tests every instance's
 // bounding sphere against the view's frustum and, with occlusion culling, against the view's

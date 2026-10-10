@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // JPEG compression: the display image through baseline JPEG and back, as a camera that stores
 // JPEGs would deliver it: 8-bit sRGB to YCbCr (JFIF), level-shifted 8 x 8 blocks through the
 // discrete cosine transform, each coefficient quantised by the standard tables (ITU T.81 Annex K)

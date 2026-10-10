@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Terrain resources and the CDLOD grid vertex, used by the terrain's shadow and colour passes.
 // Besides the frame (bindings 0 to 4, frame.slang) and material (5 to 9, surface.slang) the
 // passes bind

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Debug drawing with overlays: a ball bouncing among boxes, drawn over with its trajectory,
 velocity, contacts, bounding boxes, frames and labels, redrawn every frame. The Overlays panel
 shows or clears each layer.

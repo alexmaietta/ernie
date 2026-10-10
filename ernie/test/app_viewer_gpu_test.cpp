@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/app/app.h"
 #include "ernie/device/vulkan_context.h"
 #include "ernie/raster/delegate.h"

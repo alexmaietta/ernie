@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/scene/edit_history.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/tokens.h"

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """USD transform ops (xformOp:translate, :orient, :rotateXYZ..., :scale, xformOpOrder): values,
 composition, Quat, set_xform, set_local_transform, row writes, and rendering."""
 

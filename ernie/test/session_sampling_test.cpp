@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/session/sampling.h"
 
 #include <gtest/gtest.h>

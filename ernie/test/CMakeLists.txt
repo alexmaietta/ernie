@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 include("${ERNIE_SOURCE_DIR}/cmake/ErnieTesting.cmake")
 
 ernie_add_test_suite(

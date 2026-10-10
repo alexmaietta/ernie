@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Square-root companding: digital numbers of `inputBits` mapped to `outputBits` as the square
 // root of their fraction of full scale, out = round((2^outputBits - 1) sqrt(in / (2^inputBits -
 // 1))), as spacecraft cameras (LROC's NAC and WAC among them) compress 12-bit samples to 8 bits

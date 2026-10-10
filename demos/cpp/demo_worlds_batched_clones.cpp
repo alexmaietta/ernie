@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Renders 16 environments ("worlds") headless in one batch, the way a reinforcement learning
 // loop renders one camera per environment, and writes the views as a 4 x 4 contact sheet.
 //

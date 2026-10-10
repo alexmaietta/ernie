@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/buffer.h"
 #include "ernie/device/frame_uploads.h"
 #include "support/vulkan_fixture.h"

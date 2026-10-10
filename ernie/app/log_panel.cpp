@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/app/builtin_panels.h"
 #include "ernie/app/viewer.h"
 

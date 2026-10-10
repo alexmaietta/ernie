@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Camera poses straight from the GPU: each view's camera fields from a pose another API wrote
 // (`ernie:poses` as a CUDA array, copied device to device into `poses`), patched into a buffer
 // of per-view blocks (uniforms, cull views) the CPU wrote everything else of. One thread per

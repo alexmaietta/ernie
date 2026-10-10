@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/geometry/primitives.h"
 
 #include <glm/glm.hpp>

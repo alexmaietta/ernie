@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Ernie: a standalone Vulkan renderer with a USD-style scene.
 
 Build a Scene of typed prims named by path, set their attributes by USD name, write bulk data as

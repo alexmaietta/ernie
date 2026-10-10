@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Hierarchical depth (Hi-Z) for occlusion culling: one level of a depth pyramid of a batch of
 // views (one layer each) from the level before, or level 0 from the depth buffer. Each texel
 // keeps the farthest depth of the source texels it covers (depth grows away from the camera), so

@@ -34,6 +34,17 @@ repos:
           - "--suppress=normalCheckLevelMaxBranches"
           - "--error-exitcode=1"
 
+  # Every source file of Ernie's own starts with its license: `// SPDX-License-Identifier:
+  # BSD-3-Clause` (C++, Slang) or `# ...` (Python, CMake).
+  - repo: local
+    hooks:
+      - id: spdx-license
+        name: SPDX license line
+        language: pygrep
+        entry: "SPDX-License-Identifier: BSD-3-Clause"
+        args: [--negate]
+        files: (\.(cpp|h|slang|py|cmake)|\.cmake\.in|(^|/)CMakeLists\.txt)$
+
   - repo: https://github.com/cheshirekow/cmake-format-precommit
     rev: v0.6.13
     hooks:

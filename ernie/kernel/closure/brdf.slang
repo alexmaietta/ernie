@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Shared inputs and helpers for reflectance models. A model is a struct implementing IBrdf whose
 // radianceFactor returns the radiance factor I/F (pi times the bidirectional reflectance) for unit
 // incident irradiance.

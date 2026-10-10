@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Spectral shading pass: turns the G-buffer into spectral radiance, one image layer per band of
 // the camera's spectral range. The host composes it with a reflectance model by prepending
 //     import <model module>;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Uses the installed headers and libernie the way an application does: a scene, the render
 // backends, a Renderer when a GPU is there, and a viewer panel drawn with Dear ImGui when the app
 // is installed. Building it checks that the headers are complete and the symbols exported.

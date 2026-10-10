@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Defect pixels: a fixed fraction of the sensor's pixels dead (no response to light) and another
 // hot (a dark current far above the rest, each its own rate between half and one and a half
 // times `hotRate`), the same pixels every frame from the sensor's seed. On electrons, after `qe`

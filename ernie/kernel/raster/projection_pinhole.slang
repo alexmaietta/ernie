@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // The camera projection of frame cameras, loaded as module `projection` (projection_pushbroom.slang
 // is the pushbroom's, with the same functions): a view-projection matrix and its inverse. The
 // renderer compiles its passes with one of them, so a frame camera's passes run only this.

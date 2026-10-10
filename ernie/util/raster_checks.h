@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
 #include "ernie/util/raster_view.h"

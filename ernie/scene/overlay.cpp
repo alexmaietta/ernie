@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/scene/overlay.h"
 
 #include <stb_easy_font.h>

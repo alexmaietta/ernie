@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 # Installing Ernie (ERNIE_INSTALL): one shared library, libernie, holding every module and their
 # third-party dependencies; the headers, with the third-party headers they include; Slang's runtime
 # in a private directory; the viewer; the licenses of everything bundled; and a CMake package, so

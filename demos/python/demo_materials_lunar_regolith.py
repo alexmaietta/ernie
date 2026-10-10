@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Lunar regolith under a low Sun and a black sky: Poly Haven's "Moon 01" scan as a tiling detail
 material, shaded with Hapke's lunar BRDF, on a terrain raised from its displacement map, with
 boulders, the Sun at the solar constant (about 128,000 lux, with no atmosphere to dim or redden

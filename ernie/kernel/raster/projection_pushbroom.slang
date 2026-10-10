@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // The camera projection of pushbroom cameras, loaded as module `projection` in place of
 // projection_pinhole.slang: a detector line along the camera's x axis, at normalised image y
 // `line`, read out row by row as the camera moves from the strip's first pose (top row) to its

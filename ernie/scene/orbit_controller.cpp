@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/scene/orbit_controller.h"
 
 #include <glm/gtc/matrix_transform.hpp>

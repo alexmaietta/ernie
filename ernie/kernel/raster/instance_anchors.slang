@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Transforms posed under prims posed on the GPU (a camera or a point cloud on a robot's link):
 // each one relative to the frame's origin, from its frame's transform (the CPU's), its anchor's
 // pose in the instance pools (as the compose pass or a compute API left it), and the transforms

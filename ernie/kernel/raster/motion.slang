@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Motion blur and rolling shutter: sums the sub-frames' raster radiance, rendered at evenly spaced
 // times t_k across the shutter and readout, into what each row integrates over its exposure. The
 // radiance between sub-frames is taken as their linear interpolation, so sub-frame k weighs, for a

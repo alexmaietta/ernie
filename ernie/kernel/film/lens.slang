@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Lens projections for the sensor's lens head: each maps a sensor pixel's normalised image
 // coordinates (x, y) = ((u - cx) / f, (cy - v) / f) to the pinhole image plane the raster image is
 // drawn in (tan of the field angle along each axis), and gives the natural fall-off of irradiance

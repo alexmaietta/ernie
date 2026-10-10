@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Daylight from a dome light of 100,000 lux (photometric:illuminance) seen through a camera set by
 the "sunny 16" rule (ISO 100, 1/100 s, f/16), after the Omniverse RTX physical lighting page's
 "dome-light-100k-lx" figure: a house with a pool and deck among trees.

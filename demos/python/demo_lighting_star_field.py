@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """A star field over a house at night: real bright stars placed for a site and time, their
 brightness from their magnitudes and their colour from their B-V indices, behind a dim airglow
 dome, through a wide lens and a 35 mm one on Orion, both at a long night exposure. Stars are points

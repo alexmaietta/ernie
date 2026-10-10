@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Glare: light a lens and the eye scatter far from where it lands, a wide halo whose point-spread
 // falls as a power of the distance (about r^-3 for lens scatter), around every bright source:
 // out = (1 - strength) c + strength sum_k w_k blur_k / sum_k w_k, blur_k the image's pyramid level

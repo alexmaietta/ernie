@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """One spot light, four illuminants (physical:illuminant), after the Omniverse RTX physical
 lighting page's illuminant figure: "white", "illuminant D" at 4000 K, "blackbody" at 2000 K and a
 "custom" fluorescent spectrum, each at the same 1600 lumens (photometric:power), lighting a

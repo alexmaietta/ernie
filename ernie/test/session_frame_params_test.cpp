@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/session/frame_params.h"
 
 #include "ernie/scene/wide_view.h"

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/geometry/cube_sphere_lod.h"
 #include "ernie/raster/delegate.h"
 #include "ernie/raster/planet_drawable.h"

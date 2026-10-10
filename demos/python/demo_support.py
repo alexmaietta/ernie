@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Small helpers the demos share: writing PNGs without extra packages, heatmaps, side by side.
 
 Not a demo itself; the demos import it from this directory.

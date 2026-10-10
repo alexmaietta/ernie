@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
 /// The Slang shaders, embedded at build time (ernie/kernel/CMakeLists.txt) as null-terminated

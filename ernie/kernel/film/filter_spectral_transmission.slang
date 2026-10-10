@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Spectral transmission: each band's radiance times a measured transmission curve, `curve`, 48
 // samples from 360 to 830 nm (every 10 nm; all 1 by default), such as an IR-cut, band-pass or
 // neutral density filter, a lens's or window's transmission, or a filter wheel position; a

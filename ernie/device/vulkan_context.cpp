@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/vulkan_context.h"
 
 #include "ernie/device/gpu_profile.h"

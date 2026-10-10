@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/render_targets.h"
 
 #include "ernie/util/spectrum.h"

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Piecewise-linear companding: digital numbers compressed through up to five linear segments, as
 // LROC's cameras encode their 12-bit samples into 8 bits. Segment i covers inputs from
 // `starts[i]` up to the next segment's start, and maps an input x to floor(slopes[i] x +

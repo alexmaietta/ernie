@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // The nearest and farthest view depth of any surface in one layer of the depth, for sample
 // distribution shadow maps: the sun's cascades are fitted to the depths the view sees rather than
 // to its whole clipping range. Each wave reduces its pixels and one lane folds them into the

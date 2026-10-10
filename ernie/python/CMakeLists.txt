@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 set(ernie_package_dir "${CMAKE_BINARY_DIR}/python/ernie")
 
 nanobind_add_module(

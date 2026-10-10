@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/scene/tokens.h"
 #include "ernie/session/delegate.h"
 #include "ernie/session/resolve.h"

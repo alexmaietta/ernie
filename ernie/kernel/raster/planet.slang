@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Planet resources and the cube-sphere CDLOD grid vertex, used by the planet's shadow and colour
 // passes. Besides the frame (bindings 0 to 4, frame.slang) and material (5 to 9, surface.slang)
 // the passes bind

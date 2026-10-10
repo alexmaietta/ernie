@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Demosaicing: the full RGB digital numbers of each pixel interpolated from a Bayer mosaic of the
 // same `pattern` (`bayer`), by `method` 0 bilinear interpolation of each channel's neighbours, or
 // 1 Malvar, He and Cutler's gradient-corrected linear filters, which add the local gradient of

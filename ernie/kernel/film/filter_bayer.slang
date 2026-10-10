@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Bayer colour filter array: each pixel of a three-channel (RGB) sensor keeps the electrons of the
 // one channel its filter passes, in a 2 x 2 tile of `pattern` 0 RGGB, 1 BGGR, 2 GRBG or 3 GBRG
 // (the top-left pixel first, row by row), so the raw image is a mosaic, as real colour sensors

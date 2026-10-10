@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/app/file_dialog.h"
 
 #include "ernie/app/icons.h"

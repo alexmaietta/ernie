@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/app/prim_icons.h"
 
 #include "ernie/scene/tokens.h"

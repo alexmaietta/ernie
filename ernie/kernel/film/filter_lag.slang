@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Image lag: a fraction `fraction` of the charge each frame collects is left in the pixel and
 // read out with the next frame, as incomplete charge transfer leaves it in CMOS pinned photodiodes
 // and some CCDs, so moving bright objects trail a ghost of where they were: frame k reads

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Lights under prims posed on the GPU (a lamp on a robot's link): planned on the CPU from their
 links' rows copied back, rendered against the same links posed on the CPU."""
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 import brdf;
 
 // Lunar-Lambert (McEwen 1991): I/F = A [2 L mu0 / (mu0 + mu) + (1 - L) mu0], blending

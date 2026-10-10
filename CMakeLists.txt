@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 cmake_minimum_required(VERSION 3.22)
 # Files extracted from URL downloads (Slang, fonts, JSON) get the time of extraction, so a new
 # download rebuilds what depends on them.

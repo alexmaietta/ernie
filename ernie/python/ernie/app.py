@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 from . import _ernie
 
 if not hasattr(_ernie, "app"):

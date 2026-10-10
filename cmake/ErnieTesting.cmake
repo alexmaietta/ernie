@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 # ernie_add_test_suite(<name> SOURCES ... [LIBRARIES ...] [LABELS ...] [DEFINITIONS ...])
 #
 # Inside a TerrainGen build the suite goes through terraingen_add_test_suite, so it shares

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 # Ernie's modules, one library each, every module depending only on the ones before it:
 #   util      images, spectra, raster views, tensors; no Vulkan
 #   geometry  frusta, the LOD quadtree, mesh data and primitive shapes

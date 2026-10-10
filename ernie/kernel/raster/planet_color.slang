@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Planet G-buffer pass: the planet's normals, shadows, albedo and ids for spectral shading.
 import planet;
 import surface;

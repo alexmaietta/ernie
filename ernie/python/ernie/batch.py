@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Batched cameras for reinforcement learning: one camera renders a view per environment, each
 from its own pose of its own world, and every step hands back the observations as GPU arrays.
 

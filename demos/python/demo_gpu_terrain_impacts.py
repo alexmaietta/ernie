@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """A lunar plain cratered by impacts as you watch: Warp kernels make the terrain and carve every
 crater on the GPU, and Ernie rebuilds only the patch each one changed.
 

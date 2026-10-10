@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/sensor_plan.h"
 
 #include <algorithm>

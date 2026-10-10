@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Points and PointInstancers under prims posed on the GPU (particles or parts on a robot's link):
 posed on the GPU under their link's pose, rendered against the same links posed on the CPU."""
 

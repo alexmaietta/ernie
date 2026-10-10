@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/image.h"
 
 #include "ernie/device/buffer.h"

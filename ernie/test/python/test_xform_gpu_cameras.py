@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Cameras under prims posed on the GPU (a camera on a robot's link): each view posed on the GPU
 under its link's pose, rendered against the same links posed on the CPU."""
 

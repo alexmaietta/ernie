@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/scene/cahvore.h"
 
 #include "ernie/util/least_squares.h"

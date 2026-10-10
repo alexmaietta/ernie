@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """A flag waving on its pole, its mesh deformed every frame by a Warp kernel on the GPU.
 
     PYTHONPATH=build/python python demos/python/demo_gpu_deforming_flag.py [--capture flag.png]

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 import brdf;
 
 // UsdPreviewSurface's reflectance, as glTF 2.0's metallic-roughness BRDF defines it (which the

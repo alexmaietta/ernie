@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/session/outputs.h"
 
 #include "ernie/scene/sensor_filters.h"

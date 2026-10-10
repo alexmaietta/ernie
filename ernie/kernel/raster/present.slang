@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Present pass: draws one of a frame's render vars into a colour attachment with a full-screen
 // triangle, as a display image, decoding to linear last when the attachment encodes sRGB itself.
 // Float vars bind at 0, integer vars at 1 and SpectralRadiance's bands at 2; each entry point

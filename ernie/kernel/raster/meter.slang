@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Exposure metering: a histogram of the base-2 logarithm of luminance (cd/m^2) over one layer of
 // HdrColor, for automatic exposure and exposure meters. Each workgroup counts its pixels into
 // shared bins, then adds them to the result with one atomic per bin; pixels without light

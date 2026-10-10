@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Transform ops of prims posed on the GPU mapped over the renderer's own memory: rows written in
 place render as rows written from the simulator's arrays, with nothing copied."""
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Robot arms in thousands of worlds, posed on the GPU: a Warp kernel computes every arm's forward
 kinematics into link positions and quaternions, and Ernie renders one view per world from those
 arrays without the poses ever coming to the host, as a reinforcement learning loop whose

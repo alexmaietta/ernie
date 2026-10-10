@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Adds three custom sensor filters written in Slang and renders through them: an IR-cut filter on
 the spectrum (a band filter, before the sensor integrates the bands), hot pixels on the
 electrons (a pixel filter, between QE and the ADC) and a glow on linear colour (a spatial

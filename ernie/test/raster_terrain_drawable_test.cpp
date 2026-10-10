@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/offscreen_target.h"
 #include "ernie/raster/terrain_drawable.h"
 #include "ernie/scene/brdf.h"

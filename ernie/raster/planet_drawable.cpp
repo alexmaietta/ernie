@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/planet_drawable.h"
 
 #include "ernie/kernel/embedded_shaders.h"

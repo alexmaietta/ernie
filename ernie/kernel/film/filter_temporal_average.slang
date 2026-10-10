@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Temporal average: an exponential moving average of linear colour over the product's frames,
 // out_k = alpha c_k + (1 - alpha) out_(k-1), the first frame as it is: noise averages down by
 // about sqrt(alpha / (2 - alpha)) on a still scene, and moving objects smear, as in temporal

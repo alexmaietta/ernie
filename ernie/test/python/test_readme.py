@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Runs the README's Python examples as written, so they keep working as the API changes."""
 
 import pathlib

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/points_drawable.h"
 
 #include "ernie/device/gpu_profile.h"

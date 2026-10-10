@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Transform ops composed on the GPU: Euler rotations, rotations about one axis, matrices, other op
 orders, and GPU-posed prims under GPU-posed prims, each rendered against the same ops composed on
 the CPU."""

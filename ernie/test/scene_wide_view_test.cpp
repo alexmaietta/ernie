@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/scene/wide_view.h"
 
 #include "ernie/scene/cahvore.h"

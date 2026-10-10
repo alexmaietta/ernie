@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/shadow_cascades.h"
 
 #include <glm/gtc/matrix_transform.hpp>

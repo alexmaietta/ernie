@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/scene/xform.h"
 
 #include "ernie/scene/scene.h"

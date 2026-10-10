@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/app/property_fields.h"
 
 #include "ernie/app/session.h"

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/poisson_disk.h"
 
 #include "ernie/session/sampling.h"

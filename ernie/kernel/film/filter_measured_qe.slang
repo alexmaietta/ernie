@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Measured quantum efficiency: electrons per channel from the bands, through red, green and blue
 // QE curves the SensorFilter prim gives (each 48 samples, 360 to 830 nm every 10 nm; float arrays
 // of any length, resampled), in place of the camera's own sensor model: electrons_c = sum over

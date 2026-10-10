@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // The sensor: turns a frame's raster spectral radiance into its render vars through a chain of
 // filters (`SensorFilter`). A planner (sensor_plan.cpp) fuses the chain into one compute kernel per
 // plan that imports this module: a spatial head (the lens) resamples the raster radiance into each

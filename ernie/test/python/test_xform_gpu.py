@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Transform ops written as rows of CUDA arrays: prims posed on the GPU, rendered against the same
 poses on the CPU."""
 

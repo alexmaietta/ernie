@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Detector pattern: a fixed gain and offset per detector of a line scanner, the same down its
 // whole column (or row, with `axis` 1), so a pushbroom image shows the along-track stripes of its
 // detectors' differing responses and dark levels; the per-pixel PRNU and DSNU of `noise` stand for

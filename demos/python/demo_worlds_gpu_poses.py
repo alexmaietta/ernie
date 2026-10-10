@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Steps a batch of cameras whose poses live in CUDA memory, as a reinforcement learning loop
 whose simulator keeps its state on the GPU, and times a step with the poses kept on the GPU
 against downloading them first.

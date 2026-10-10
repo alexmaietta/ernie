@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/compute_interop.h"
 
 #include "ernie/device/cuda_interop.h"

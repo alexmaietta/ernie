@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 # Ernie's packages (CPack): one `ernie` package with everything in ErnieInstall.cmake's components
 # (libernie and Slang's runtime, the viewer, the headers and the CMake package), as a TGZ to unpack
 # anywhere, a DEB and an RPM.

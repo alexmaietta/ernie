@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Vertex normals of a mesh whose points moved on the GPU: each point's normal the sum of the
 // normals of the triangles around it, weighted by their areas (the cross products' lengths), from
 // a list of the triangles around each point built once with the mesh. No atomics, so the sums

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "support/delegate_scenes.h"
 
 #include "ernie/raster/render_targets.h"

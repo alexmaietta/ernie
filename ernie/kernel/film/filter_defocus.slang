@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Thin-lens depth of field: a point at distance d, with the lens of focal length f and f-number N
 // focused at distance s, images as a disc of diameter c = (f / N) |d - s| / d * f / (s - f) on
 // the sensor (c = f^2 / (N d) when focused at infinity). Each pixel gathers the neighbours whose

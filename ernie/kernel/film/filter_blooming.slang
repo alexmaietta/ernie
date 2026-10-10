@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Blooming: charge beyond a pixel's full well spills into its neighbours along its column, half
 // up and half down, filling each to its full well before moving on, as in a CCD without
 // anti-blooming: saturated stars and highlights grow vertical streaks whose length is their excess

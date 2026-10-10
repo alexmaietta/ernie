@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
 // CPU zones, recorded by Ernie's own profiler (ernie/util/profiler.h) for the viewer's Profiler

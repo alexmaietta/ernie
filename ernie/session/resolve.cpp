@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/session/resolve.h"
 
 #include "ernie/geometry/primitives.h"

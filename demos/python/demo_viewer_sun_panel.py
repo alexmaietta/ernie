@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Opens the viewer on a scene built in code, with a panel of its own that moves the sun.
 
     PYTHONPATH=build/python python demos/python/demo_viewer_sun_panel.py

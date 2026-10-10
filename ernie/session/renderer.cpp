@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/session/renderer.h"
 
 #include "ernie/device/vulkan_context.h"

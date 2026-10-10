@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Updates of a heightfield written on the GPU, over the rectangle of cells that changed: the
 // central-difference gradients and their mips that terrain shading samples, and each LOD leaf's
 // min and max height (`LodQuadtree`), the same as `TerrainDrawable::SetHeightfield` computes on the

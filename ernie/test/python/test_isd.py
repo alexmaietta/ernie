@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 import math
 from pathlib import Path
 

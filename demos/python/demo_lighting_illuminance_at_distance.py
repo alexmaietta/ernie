@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """A rect light 5 m above a floor, set to give 1000 lux at 5 m (photometric:illuminance and
 photometric:illuminance:distance), after the Omniverse RTX physical lighting page's
 "illuminance-at-distance" figure.

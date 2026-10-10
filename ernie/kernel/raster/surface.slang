@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Materials, shared by every raster drawable: the material uniform, albedo map, and tileable detail
 // albedo and normal textures with hex-tiling, at bindings 5 to 9.
 import brdf;

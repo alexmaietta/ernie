@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // The cube faces a wide camera's views are rendered on (ernie/scene/wide_view.h holds the same
 // conventions on the CPU): in the camera's frame (x right, y up, looking down -z), face 0 looks
 // down -z, 1 along +x, 2 along -x, 3 along +y and 4 along -y, each a square pinhole view of 90

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Point-spread function: each band blurred by the lens's diffraction, the Gaussian fit to the
 // Airy pattern of a circular aperture, sigma = 0.42 lambda N in the image plane, so redder bands
 // spread wider; combined with a Gaussian of `blur` pixels for aberrations and the sensor's

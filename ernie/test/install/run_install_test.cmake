@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 # cmake -DBUILD_DIR=<Ernie's build> -DWORK_DIR=<scratch> -DGENERATOR=<generator> [-DCONFIG=<config>]
 #       -P run_install_test.cmake
 #

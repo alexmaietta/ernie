@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // The `ernie` executable: opens the viewer on a small default scene, a ground plane with a few
 // primitives under a sun, until the window closes.
 

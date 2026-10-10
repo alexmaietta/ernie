@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "bindings.h"
 
 #include "ernie/device/vulkan_context.h"

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 # An application built against an installed Ernie, as users build theirs: find_package(Ernie) and
 # link Ernie::ernie. Configured and run by run_install_test.cmake.
 cmake_minimum_required(VERSION 3.22)

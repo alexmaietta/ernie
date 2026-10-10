@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """An LROC Narrow Angle Camera image, strip by strip: the NAC-L's real geometry from its ISD over
 cratered ground near the Moon's south pole, through the NAC's published sensor and readout to
 the 8-bit numbers it sends.

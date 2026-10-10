@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/geometry/cube_sphere_lod.h"
 #include "ernie/geometry/frustum.h"
 #include "support/test_raster.h"

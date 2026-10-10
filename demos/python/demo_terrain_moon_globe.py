@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """The whole Moon as one terrain: a Moon-sized body of cratered relief drawn with planet-scale
 level of detail, from orbit down to a few kilometres above the ground.
 

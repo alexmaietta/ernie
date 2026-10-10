@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Terrain G-buffer pass: the terrain's normals, shadows, albedo and ids for spectral shading.
 import terrain;
 import surface;

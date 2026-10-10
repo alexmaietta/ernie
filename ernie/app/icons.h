@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
 /// Lucide icon glyphs (lucide-static 1.52.0, private-use codepoints) as UTF-8 strings, for text

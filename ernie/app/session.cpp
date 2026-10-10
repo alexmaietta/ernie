@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/app/session.h"
 
 #include "ernie/scene/camera.h"

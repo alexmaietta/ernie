@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // White balance: gains on linear colour's red, green and blue (von Kries scaling in the output
 // space), as a camera's white balance multiplies its channels so a grey under the scene's light
 // comes out grey. On linear colour, after `cie` and before `exposure`.

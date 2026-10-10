@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/shader_compiler.h"
 #include "ernie/scene/brdf.h"
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Frame-transfer smear: a frame-transfer CCD without a shutter keeps collecting light while it
 // shifts its image into the storage area, each pixel passing under every row of its column for
 // `transferTime` over the rows. A pixel gains the column's mean signal times `transferTime` over

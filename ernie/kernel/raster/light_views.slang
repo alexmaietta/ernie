@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Lights posed on the GPU (a lamp on a robot's link): from each one's pose, which the anchors pass
 // composed under its instance (instance_anchors.slang), its entry of the shading pass's light
 // table and its shadow views, fitted as `FitLightShadowViews` fits them on the CPU; and the cull

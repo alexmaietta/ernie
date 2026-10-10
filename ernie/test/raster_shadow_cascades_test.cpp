@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/renderer.h"
 #include "ernie/raster/shadow_cascades.h"
 #include "ernie/scene/orbit_controller.h"

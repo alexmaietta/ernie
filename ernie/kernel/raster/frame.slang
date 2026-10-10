@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Per-frame resources every raster pass shares, at fixed bindings of its push-descriptor set:
 //   0 Uniforms (view and light), 1 Shadows, 2 cascaded shadow maps, 3 shadow comparison sampler,
 //   4 clamping linear sampler;

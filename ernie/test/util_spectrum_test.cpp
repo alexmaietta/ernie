@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/util/spectrum.h"
 
 #include <gtest/gtest.h>

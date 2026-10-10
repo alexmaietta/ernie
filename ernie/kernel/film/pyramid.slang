@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // A level of an image pyramid for spatial sensor filters that read far around a pixel (`glare`):
 // each texel the mean of the texels of the level before it covers, every layer (view and channel
 // domain) at once. Sources need not be twice the size: each texel averages every source texel it

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Point clouds drawn as ray-cast spheres (UsdGeomPoints): each point a quad facing the viewer that
 // covers its sphere's silhouette, whose fragments intersect their ray with the sphere and write
 // the hit's depth, so the spheres are exact at any distance and sort against everything else.

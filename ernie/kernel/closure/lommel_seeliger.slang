@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 import brdf;
 
 // Lommel-Seeliger single scattering: I/F = (w / 4) mu0 / (mu0 + mu) p(g), with the albedo input as

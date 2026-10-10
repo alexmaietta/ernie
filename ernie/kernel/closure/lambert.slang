@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 import brdf;
 
 // Lambert: I/F = A cos(i), with the albedo input A as the Lambert albedo.

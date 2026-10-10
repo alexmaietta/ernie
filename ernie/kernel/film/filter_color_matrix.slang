@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Colour correction matrix: linear colour times a 3 x 3 matrix, row by row (m00 m01 m02 make the
 // red output from the red, green and blue inputs), as a camera's pipeline maps its channels'
 // colour space to the output's; the identity by default. On linear colour, after `cie` and

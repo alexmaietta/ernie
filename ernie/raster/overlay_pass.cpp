@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/overlay_pass.h"
 
 #include "ernie/kernel/embedded_shaders.h"

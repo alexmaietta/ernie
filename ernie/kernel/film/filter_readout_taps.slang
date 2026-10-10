@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Readout taps: a sensor read out through `taps` interleaved output amplifiers and ADCs, pixel x
 // on tap x mod taps (even and odd pixels for two), each with its own gain and offset, so the image
 // carries a fine column pattern of period `taps`, as LROC's narrow-angle cameras show between

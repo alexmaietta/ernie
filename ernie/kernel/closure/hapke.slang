@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 import brdf;
 
 // Hapke model as parameterised for the LROC WAC Hapke maps (Sato et al. 2014): the Hapke 2012

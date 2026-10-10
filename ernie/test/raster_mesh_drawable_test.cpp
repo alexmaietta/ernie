@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/cuda_interop.h"
 #include "ernie/device/offscreen_target.h"
 #include "ernie/raster/mesh_drawable.h"

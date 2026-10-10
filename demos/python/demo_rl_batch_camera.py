@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Benchmarks batched cameras for reinforcement learning: one environment ("world") per view,
 each a clone of the first, with camera poses that change every step on the GPU, and reports the
 time per step and views rendered per second.

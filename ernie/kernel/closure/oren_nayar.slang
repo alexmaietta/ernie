@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 import brdf;
 
 // Oren-Nayar qualitative model (Oren and Nayar 1994): Lambertian V-cavities with Gaussian slope

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
 /// Ernie's GUI viewer in one include, with Dear ImGui and ImPlot for drawing panels:

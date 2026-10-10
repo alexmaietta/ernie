@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/gpu_timer.h"
 
 #include "ernie/util/profiler.h"

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 // Instance transforms composed on the GPU: each instance's transform ops, read as rows of the raw
 // arrays a compute API wrote (translations, scales, quaternions, Euler angles, 4x4 matrices),
 // multiplied in order, then put under the instance it is posed beneath, written to the instance
