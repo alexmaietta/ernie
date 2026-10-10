@@ -57,6 +57,8 @@ function(ernie_install_licenses destination component)
     license(glm "${glm_SOURCE_DIR}/copying.txt")
     license(dlpack "${PROJECT_SOURCE_DIR}/third_party/dlpack/LICENSE")
     license(stb "${PROJECT_SOURCE_DIR}/third_party/stb/LICENSE")
+    # Not a dependency: the source Ernie's CAHVORE rays follow (third_party/README.md, Derived).
+    license(cameramodelutilsjs "${PROJECT_SOURCE_DIR}/third_party/cameramodelutilsjs/LICENSE")
     license(openexr "${openexr_SOURCE_DIR}/LICENSE.md")
     license(imath "${imath_SOURCE_DIR}/LICENSE.md")
     # Vendored by OpenEXR and built into it (openexr.cmake).

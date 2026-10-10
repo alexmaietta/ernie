@@ -40,3 +40,11 @@ Everything else is fetched at configure time (`cmake/third_party/<name>.cmake`, 
 | [nanobind](https://github.com/wjakob/nanobind) | `v3.1.0` when not installed | BSD-3-Clause | The Python module (Python only) |
 | [Tracy](https://github.com/wolfpld/tracy) | `v0.14.1` | BSD-3-Clause | Profiling (`ERNIE_TRACY` builds only) |
 | [GoogleTest](https://github.com/google/googletest) | `v1.18.0` | BSD-3-Clause | Tests only; not distributed |
+
+## Derived
+
+Ernie's own code that follows another project's source closely, under that project's license; the license is in `third_party/<project>/` and installed with Ernie's.
+
+| Project | License | Ernie's code |
+| --- | --- | --- |
+| [CameraModelUtilsJS](https://github.com/NASA-AMMOS/CameraModelUtilsJS) (NASA-AMMOS's port of T. Litwin's cmod) | Apache-2.0 | `ernie/scene/cahvore.{h,cpp}`: `CahvoreModel::ImageToRay` follows `cahvore-utilities/cahvore.js` |
