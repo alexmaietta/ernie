@@ -194,11 +194,26 @@ MappedRenderVar RenderVar::Map(MapDevice device, std::uintptr_t syncStream) {
             *frame.context, bytes, VK_BUFFER_USAGE_TRANSFER_DST_BIT, BufferMemory::Shared);
         frame.linearPool->push_back(buffer);
     }
+    // A buffer back in the pool may still be read by work its last consumer queued: the copy
+    // waits for the signals its release queued (below).
+    std::vector<TimelinePoint> waits;
+    if (frame.compute->VulkanWait().semaphore != VK_NULL_HANDLE) {
+        waits.push_back(frame.compute->VulkanWait());
+    }
     const TimelinePoint signal = frame.compute->NextVulkanSignal();
     frame.context->SubmitAsync([&](VkCommandBuffer commands) { recordCopies(commands, *buffer); },
-                               {}, std::span(&signal, 1));
+                               waits, std::span(&signal, 1));
     frame.compute->WaitForVulkan(syncStream);
-    mapped.tensor = frame.compute->View(buffer, type, shape);
+    const Tensor view = frame.compute->View(buffer, type, shape);
+    // Released, the tensor queues on `syncStream` a signal after the reads queued there, and
+    // only then returns the buffer to the pool (`use_count`).
+    ComputeInterop* compute = frame.compute;
+    const std::shared_ptr<const void> owner(
+        buffer.get(), [buffer, compute, syncStream](const void*) mutable {
+            compute->SignalVulkan(syncStream);
+            buffer.reset();
+        });
+    mapped.tensor = Tensor(view.Data(), type, shape, {}, view.Location(), owner);
     return mapped;
 }
 
