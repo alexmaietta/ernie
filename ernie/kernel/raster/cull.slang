@@ -24,7 +24,9 @@
 //
 // Bindings: 0 draws' culling data, 1 jobs, 2 views (12 float4 each: 6 normalised frustum planes,
 // the view-projection's 4 columns, then pixels per world unit at w = 1 and the error in pixels,
-// then the depth pyramid's level-0 width and height and level count, 0 without one), 3 instance
+// then the depth pyramid's level-0 width and height and level count, 0 without one; a pushbroom's
+// view holds its strip in the matrix's place, the strip's intrinsics' first two after the error
+// and its line after the level count, its planes those of the strip's envelope), 3 instance
 // ids of the draws (mesh.slang's binding 18), 4 positions, 5 orientations, 6 scales, 7 the
 // compacted visible ids (a run of the job's instance count per level), 8 the indirect draws
 // (VkDrawIndirectCommand, 4 uints each, one per level), 9 the levels of detail (first index
@@ -47,6 +49,9 @@
 //   detail).
 // - A. Kapoulkine, "niagara", 2018-, a Vulkan renderer whose culling pass selects mesh levels of
 //   detail and culls occlusion in two passes. https://github.com/zeux/niagara
+
+// A pushbroom's strip projection (projection_pushbroom.slang), for views of its strip.
+import projection;
 
 struct CullItem {
     // World transform of the instancer.
@@ -167,7 +172,20 @@ Placed place(CullItem item, uint instance) {
     return placed;
 }
 
+// Whether the view is a pushbroom's strip, its intrinsics' first two in the error's float4 and
+// the line in the pyramid's.
+bool isStrip(uint view) {
+    return views[view + 10].z > 0.0;
+}
+
 float4 project(uint view, float3 p) {
+    if (isStrip(view)) {
+        // The strip's columns in the matrix's place (`PushbroomStrip::Packed`).
+        let strip = transpose(
+            float4x4(views[view + 6], views[view + 7], views[view + 8], views[view + 9]));
+        let intrinsics = float4(views[view + 10].zw, views[view + 11].w, 0.0);
+        return cameraProject(strip, intrinsics, p);
+    }
     return views[view + 6] * p.x + views[view + 7] * p.y + views[view + 8] * p.z + views[view + 9];
 }
 
@@ -207,9 +225,24 @@ bool occluded(Placed placed, uint view, uint layer) {
         high = max(high, uv);
         nearest = min(nearest, ndc.z);
     }
+    let size = float2(pyramid.x, pyramid.y);
+    if (isStrip(view)) {
+        // A strip bends straight lines slightly, so its corners' rectangle widens by a tenth and
+        // a pixel each way, and its nearest depth is also the sphere's nearest from its centre's
+        // row: the view depth there less the radius, in the strip's [0, 1] depth.
+        let margin = 0.1 * (high - low) + 1.0 / size;
+        low -= margin;
+        high += margin;
+        let near = views[view + 6].w;
+        let far = views[view + 7].w;
+        let depth = project(view, placed.centre).w - placed.radius;
+        if (depth <= near) {
+            return false;
+        }
+        nearest = min(nearest, far * (depth - near) / ((far - near) * depth));
+    }
     low = saturate(low);
     high = saturate(high);
-    let size = float2(pyramid.x, pyramid.y);
     let extent = (high - low) * size;
     let level = min(uint(ceil(log2(max(max(extent.x, extent.y), 1.0)))), mips - 1);
     let levelSize = max(uint2(size) >> level, uint2(1));

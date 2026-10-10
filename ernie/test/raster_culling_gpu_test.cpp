@@ -310,6 +310,37 @@ TEST_F(RasterDelegateTest, OccludersHideTheInstancesBehindThem) {
     EXPECT_EQ(Bytes(occluded), Bytes(unculled)) << "hidden instances change nothing";
 }
 
+TEST_F(RasterDelegateTest, OccludersHideInstancesFromAPushbroomsStrip) {
+    // The wall scene scanned by a pushbroom rising past it: instances test against its strip's
+    // depth pyramid through the strip's projection.
+    Scene scene = WallScene(false);
+    ernie::Camera(scene, "/World/Camera").SetScan(tokens::kPushbroom);
+    const auto scan = [&](RasterDelegate& delegate) {
+        const auto at = [](double z) {
+            return ernie::LookAtTransform({0.0, 0.0, z}, {0.0, 1.0, z}, {0.0, 0.0, 1.0});
+        };
+        scene.Set("/World/Camera", tokens::kTransform, at(-3.0));
+        delegate.Render(scene);  // the strip's start
+        scene.Set("/World/Camera", tokens::kTransform, at(3.0));
+        return delegate.Render(scene);
+    };
+    RasterDelegate delegate(*context_);
+    const Tensor unculled = scan(delegate);
+    EXPECT_EQ(delegate.Meshes().CulledInstanceCounts(), std::vector<std::uint32_t>{10u});
+
+    ernie::RenderSettings(scene, "/Render/Settings").SetOcclusion(tokens::kOccluders);
+    const Tensor occluded = scan(delegate);
+    EXPECT_TRUE(delegate.Meshes().CullsOcclusion());
+    EXPECT_EQ(delegate.Meshes().CulledInstanceCounts(), std::vector<std::uint32_t>{1u})
+        << "only the ball in front of the wall";
+    EXPECT_EQ(Bytes(occluded), Bytes(unculled)) << "hidden instances change nothing";
+
+    // With the wall gone the strip sees them all again.
+    scene.Remove("/World/Wall");
+    scan(delegate);
+    EXPECT_EQ(delegate.Meshes().CulledInstanceCounts(), std::vector<std::uint32_t>{10u});
+}
+
 TEST_F(RasterDelegateTest, TwoPassOcclusionLetsInstancesHideEachOther) {
     Scene scene = WallScene(true);
     RasterDelegate delegate(*context_);

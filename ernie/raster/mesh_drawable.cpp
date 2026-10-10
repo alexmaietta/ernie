@@ -466,7 +466,8 @@ MeshDrawable::MeshDrawable(RasterRenderer& renderer)
     context_.Submit([this](VkCommandBuffer commands) {
         noHzb_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
     });
-    const std::vector<ShaderModuleSource> cull{{"cull", shaders::kCullSlang}};
+    const std::vector<ShaderModuleSource> cull{ProjectionModule(true),
+                                               {"cull", shaders::kCullSlang}};
     cullPipeline_ = std::make_unique<ComputePipeline>(
         context_, cullLayout_, renderer_.Compiler().CompileSpirv(cull, "cullMain"));
     CreateGBufferPipeline(false);
@@ -2015,8 +2016,22 @@ void MeshDrawable::Cull(const FrameParams& params, std::span<const ShadowCascade
         const float perUnit = glm::length(glm::vec3(viewProjection[0][1], viewProjection[1][1],
                                                     viewProjection[2][1])) *
                               0.5f * static_cast<float>(params.camera.height);
+        const std::size_t slot = views.size();
         viewDraws_.push_back(
             list(viewProjection, perUnit, occlusion_ != Occlusion::Off, &seen, !params.posesOnGpu));
+        if (params.camera.pushbroom) {
+            // Its depth pyramid is its strip's: instances project through the strip (cull.slang's
+            // `project`), within the envelope's planes.
+            const PushbroomStrip strip = params.Strip(v);
+            const glm::mat4 packed = strip.Packed();
+            const glm::vec4 intrinsics = strip.Intrinsics();
+            for (int column = 0; column < 4; ++column) {
+                views[slot + 6 + column] = packed[column];
+            }
+            views[slot + 10].z = intrinsics.x;
+            views[slot + 10].w = intrinsics.y;
+            views[slot + 11].w = intrinsics.z;
+        }
     }
     viewJobStarts_.push_back(static_cast<std::uint32_t>(jobs.size()));
     // Two-pass occlusion culling draws each view job twice; its second draws follow all the
