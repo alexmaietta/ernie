@@ -113,6 +113,8 @@ int main() {
 }
 ```
 
+For the prim types and their attributes, transforms, relationships, arrays, validation, loading scenes from JSON and declaring your own types, see [Describing scenes](docs/guides/scenes.md).
+
 ### Examples
 
 Planned future examples.
