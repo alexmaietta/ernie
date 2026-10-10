@@ -212,7 +212,7 @@ uv build --wheel --out-dir dist .
 uv pip install dist/ernie-*.whl
 ```
 
-Packages are built with `cmake --preset package-deb` (or `package-rpm`) and `cpack --preset package-deb`; `tools/packaging/` builds them in the same container as our releases.
+Packages are built with `cmake --preset package-deb` (or `package-rpm`), `cmake --build --preset package-deb` and `cpack --preset package-deb`.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the build options, testing without a GPU on lavapipe, and benchmarks.
 

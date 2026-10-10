@@ -555,7 +555,12 @@ void BindRender(nb::module_& m) {
         .def(
             "take_validation_messages",
             [](Renderer& r) { return r.Context().TakeValidationMessages(); },
-            "Vulkan validation messages since the last call.");
+            "Vulkan validation messages since the last call.")
+        .def_prop_ro(
+            "validation_enabled",
+            [](const Renderer& r) { return r.Context().ValidationEnabled(); },
+            "Whether the Vulkan validation layer is on: asked for with `validation` and "
+            "installed.");
 }
 
 }  // namespace ernie::python

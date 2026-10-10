@@ -50,9 +50,7 @@ sudo apt install mesa-vulkan-drivers vulkan-validationlayers xvfb
 VK_DRIVER_FILES=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json) xvfb-run -a ctest --test-dir build -j4
 ```
 
-Performance changes: `tools/benchmark.py --check` compares batched rendering against the baselines recorded for your GPU.
-
-Packages: `tools/packaging/` builds the DEB, RPM and TGZ packages in a manylinux container and installs them on clean Ubuntu and Rocky Linux; each script's header shows how to run it.
+Packages: `cmake --preset package-deb` (or `package-rpm`), then `cmake --build --preset package-deb` and `cpack --preset package-deb`. CI builds them in a manylinux_2_34 container and installs them on clean Ubuntu, Debian, Rocky Linux and Fedora (the `packages` and `package-test` jobs).
 
 ## Code style
 

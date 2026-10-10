@@ -86,3 +86,6 @@ test-command = "VK_DRIVER_FILES=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | hea
 before-all = "dnf install -y -q --enablerepo=crb libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel libXext-devel wayland-devel wayland-protocols-devel libxkbcommon-devel mesa-vulkan-drivers vulkan-loader"
 # Slang's runtime is already in the wheel beside the module, found through $ORIGIN.
 repair-wheel-command = "auditwheel repair --exclude 'libslang-*' -w {dest_dir} {wheel}"
+# Builds in the container's own directory: a local run copies the checkout in, and a build/wheel
+# tree configured on the host would be refused there.
+environment = { SKBUILD_BUILD_DIR = "/tmp/ernie-wheel" }

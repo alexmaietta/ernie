@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
+import os
+
 import numpy as np
 import pytest
 
@@ -6,13 +8,32 @@ import ernie
 from ernie import tokens
 
 
+# CI sets ERNIE_TEST_REQUIRE_VALIDATION=1: without a Vulkan device or the validation layer the
+# tests fail rather than skipping or running unvalidated (as the C++ tests' VulkanTest does).
+REQUIRE_VALIDATION = os.environ.get("ERNIE_TEST_REQUIRE_VALIDATION") == "1"
+
+
 @pytest.fixture(scope="session")
 def renderer():
     """A validating renderer, or a skip without a Vulkan device."""
     try:
-        return ernie.Renderer(validation=True)
+        renderer = ernie.Renderer(validation=True)
     except RuntimeError as error:
+        if REQUIRE_VALIDATION:
+            pytest.fail(f"No Vulkan device: {error}")
         pytest.skip(f"No Vulkan device: {error}")
+    if REQUIRE_VALIDATION and not renderer.validation_enabled:
+        pytest.fail("The Vulkan validation layer is not installed")
+    return renderer
+
+
+@pytest.fixture(autouse=True)
+def no_validation_messages(request):
+    """Fails a test whose renderer reported Vulkan validation messages."""
+    yield
+    if "renderer" in request.fixturenames:
+        messages = request.getfixturevalue("renderer").take_validation_messages()
+        assert messages == [], "Vulkan validation:\n" + "\n".join(messages)
 
 
 def rolling_heights(rows=65, cols=65):
