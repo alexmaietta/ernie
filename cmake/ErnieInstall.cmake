@@ -110,13 +110,14 @@ endif()
 
 # --- Headers ----------------------------------------------------------------------------------
 
+# The public API: the scene, sessions and the app, with the device types they take (a Vulkan
+# context, compute interop, images and buffers). raster/ and kernel/ are internal.
 set(ernie_header_modules
     util
     geometry
     scene
     device
-    session
-    raster)
+    session)
 if(TARGET ernie_app)
     list(APPEND ernie_header_modules app)
 endif()

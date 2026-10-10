@@ -22,6 +22,21 @@ foreach(nanobind_library nanobind-static nanobind-static-abi3)
     endif()
 endforeach()
 set_target_properties(_ernie PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${ernie_package_dir}")
+# Type stubs beside the module, for IDEs, type checkers and the Python API docs: _ernie/ holds a
+# .pyi per module (the extension still imports first), and py.typed marks the package as typed.
+set(ernie_stubs "${ernie_package_dir}/_ernie/__init__.pyi" "${ernie_package_dir}/_ernie/tokens.pyi")
+if(TARGET ernie_app)
+    list(APPEND ernie_stubs "${ernie_package_dir}/_ernie/app.pyi")
+endif()
+nanobind_add_stub(
+    _ernie_stub
+    RECURSIVE
+    MODULE ernie._ernie
+    OUTPUT_PATH "${ernie_package_dir}"
+    OUTPUT ${ernie_stubs}
+    MARKER_FILE "${ernie_package_dir}/py.typed"
+    PYTHON_PATH "${CMAKE_BINARY_DIR}/python"
+    DEPENDS _ernie)
 configure_file(ernie/__init__.py "${ernie_package_dir}/__init__.py" COPYONLY)
 configure_file(ernie/app.py "${ernie_package_dir}/app.py" COPYONLY)
 configure_file(ernie/batch.py "${ernie_package_dir}/batch.py" COPYONLY)
@@ -31,8 +46,12 @@ configure_file(ernie/batch.py "${ernie_package_dir}/batch.py" COPYONLY)
 if(SKBUILD)
     install(TARGETS _ernie LIBRARY DESTINATION ernie COMPONENT python)
     install(
-        FILES ernie/__init__.py ernie/app.py ernie/batch.py
+        FILES ernie/__init__.py ernie/app.py ernie/batch.py "${ernie_package_dir}/py.typed"
         DESTINATION ernie
+        COMPONENT python)
+    install(
+        FILES ${ernie_stubs}
+        DESTINATION ernie/_ernie
         COMPONENT python)
     set_target_properties(_ernie PROPERTIES INSTALL_RPATH "$ORIGIN")
     include("${PROJECT_SOURCE_DIR}/cmake/ErnieLicenses.cmake")

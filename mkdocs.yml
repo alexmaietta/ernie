@@ -1,0 +1,85 @@
+site_name: Ernie
+site_description: Efficient Renderer for Natural and Interplanetary Environments
+repo_name: ernie
+docs_dir: docs
+site_dir: site
+strict: true
+exclude_docs: |
+  Makefile
+  README.md
+  requirements.txt
+
+theme:
+  name: readthedocs
+  navigation_depth: 3
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+      - Viewer: getting-started/viewer.md
+  - Concepts:
+      - Scene description: concepts/scene.md
+      - Transforms: concepts/transforms.md
+      - Spectral rendering: concepts/spectral.md
+      - Lighting: concepts/lighting.md
+      - Cameras and lenses: concepts/cameras.md
+      - Sensor filters: concepts/sensor-filters.md
+      - Materials and BRDFs: concepts/materials.md
+      - Shadows: concepts/shadows.md
+      - Terrain and planets: concepts/terrain.md
+      - Star fields: concepts/star-fields.md
+  - Guides:
+      - Batched rendering for RL: guides/batched-rendering.md
+      - GPU interop: guides/gpu-interop.md
+      - Debug drawing and overlays: guides/debug-draw.md
+      - Custom panels: guides/custom-panels.md
+  - API reference:
+      - Python:
+          - ernie: api/python/ernie.md
+          - ernie.tokens: api/python/tokens.md
+          - ernie.batch: api/python/batch.md
+          - ernie.app: api/python/app.md
+      - C++:
+          - Classes: cpp/annotated.md
+          - Class hierarchy: cpp/hierarchy.md
+          - Functions: cpp/namespace_member_functions.md
+          - Namespace ernie: cpp/namespaceernie.md
+          - Files: cpp/files.md
+
+plugins:
+  - search
+  - mkdoxy:
+      projects:
+        cpp:
+          # The public API's headers: device/ for the types the others take; raster/ and kernel/
+          # are internal (cmake/ErnieInstall.cmake installs the same).
+          src-dirs: ernie/scene ernie/session ernie/app ernie/geometry ernie/util ernie/device
+          full-doc: true
+          doxy-cfg:
+            FILE_PATTERNS: "*.h"
+            RECURSIVE: true
+            EXTRACT_ALL: true
+            JAVADOC_AUTOBRIEF: true
+            # Includes as users write them: "ernie/scene/scene.h".
+            FULL_PATH_NAMES: true
+            STRIP_FROM_PATH: .
+            STRIP_FROM_INC_PATH: .
+      save-api: .mkdoxy
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          # The built package: the module's stubs (nanobind's stubgen) beside its Python files.
+          paths: [build/python]
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: true
+            show_root_full_path: false
+            members_order: source
+            show_signature_annotations: true
+            separate_signature: true
+            merge_init_into_class: true
+            show_if_no_docstring: true
