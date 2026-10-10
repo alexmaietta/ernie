@@ -25,15 +25,15 @@ glm::dmat4 OrbitController::Transform() const {
     return glm::inverse(glm::dmat4(glm::lookAtRH(Eye(), target, glm::vec3(0.0f, 0.0f, 1.0f))));
 }
 
-void OrbitController::Apply(Camera& camera) const {
+void OrbitController::Apply(CameraParams& camera) const {
     camera.transform = Transform();
     camera.SetVerticalFov(verticalFov);
     camera.nearPlane = NearPlane();
     camera.farPlane = FarPlane();
 }
 
-Camera OrbitController::MakeCamera(std::uint32_t width, std::uint32_t height) const {
-    Camera camera;
+CameraParams OrbitController::MakeCamera(std::uint32_t width, std::uint32_t height) const {
+    CameraParams camera;
     camera.width = width;
     camera.height = height;
     Apply(camera);

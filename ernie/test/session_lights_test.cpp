@@ -12,7 +12,7 @@
 #include <stdexcept>
 #include <vector>
 
-using ernie::Light;
+using ernie::LightParams;
 using ernie::LightType;
 using ernie::Path;
 using ernie::Scene;
@@ -30,7 +30,7 @@ double LuminanceIntegral() {
 
 }  // namespace
 
-TEST(LightOf, SphereLightsInRelativeUnitsCarryTheirSurfaceLuminance) {
+TEST(LightParamsOf,SphereLightsInRelativeUnitsCarryTheirSurfaceLuminance) {
     Scene scene;
     scene.Define("/Lamp", tokens::kSphereLight)
         .Set(tokens::kTransform,
@@ -38,7 +38,7 @@ TEST(LightOf, SphereLightsInRelativeUnitsCarryTheirSurfaceLuminance) {
         .Set(tokens::kIntensity, 4.0)
         .Set(tokens::kRadius, 0.5);
     const ernie::SpectralBands bands;
-    const Light lamp = ernie::LightOf(scene, "/Lamp", bands);
+    const LightParams lamp =ernie::LightParamsOf(scene, "/Lamp", bands);
     EXPECT_EQ(lamp.type, LightType::Sphere);
     EXPECT_EQ(lamp.position, glm::dvec3(1.0, 2.0, 10.0));
     EXPECT_NEAR(lamp.direction.z, -1.0f, 1e-6f) << "emits along its -z axis";
@@ -53,7 +53,7 @@ TEST(LightOf, SphereLightsInRelativeUnitsCarryTheirSurfaceLuminance) {
     scene.Set("/Lamp", tokens::kShapingConeAngle, 30.0f);
     scene.Set("/Lamp", tokens::kShapingConeSoftness, 0.2f);
     scene.Set("/Lamp", tokens::kShadowEnable, false);
-    const Light spot = ernie::LightOf(scene, "/Lamp", bands);
+    const LightParams spot =ernie::LightParamsOf(scene, "/Lamp", bands);
     EXPECT_EQ(spot.radius, 0.0f);
     EXPECT_EQ(spot.coneAngle, 30.0f);
     EXPECT_FLOAT_EQ(spot.coneSoftness, 0.2f);
@@ -62,35 +62,35 @@ TEST(LightOf, SphereLightsInRelativeUnitsCarryTheirSurfaceLuminance) {
         << "a point's luminous intensity is its intensity";
 }
 
-TEST(LightOf, PhysicalLampsSpreadTheirPowerOverTheSphere) {
+TEST(LightParamsOf,PhysicalLampsSpreadTheirPowerOverTheSphere) {
     Scene scene;
     scene.Define("/Lamp", tokens::kSphereLight).Set(tokens::kLightPower, 470.0);
     const ernie::SpectralBands bands;
-    for (const float value : ernie::LightOf(scene, "/Lamp", bands).spectrum) {
+    for (const float value : ernie::LightParamsOf(scene, "/Lamp", bands).spectrum) {
         EXPECT_NEAR(value, 1.0 / (4.0 * M_PI), 1e-6) << "470 W flat over 470 nm, over 4 pi sr";
     }
     scene.Set("/Lamp", tokens::kLightSpectrum, std::vector<float>{400.0f, 2.0f, 700.0f, 2.0f});
-    for (const float value : ernie::LightOf(scene, "/Lamp", {400.0, 700.0, 3}).spectrum) {
+    for (const float value : ernie::LightParamsOf(scene, "/Lamp", {400.0, 700.0, 3}).spectrum) {
         EXPECT_NEAR(value, 470.0 / 300.0 / (4.0 * M_PI), 1e-5) << "the spectrum's shape";
     }
     scene.Clear("/Lamp", tokens::kLightPower);
-    EXPECT_EQ(ernie::LightOf(scene, "/Lamp", {400.0, 700.0, 3}).spectrum,
+    EXPECT_EQ(ernie::LightParamsOf(scene, "/Lamp", {400.0, 700.0, 3}).spectrum,
               (std::vector<float>{2.0f, 2.0f, 2.0f}))
         << "a spectrum alone is the intensity";
 
     scene.Set("/Lamp", tokens::kLightPower, -1.0);
-    EXPECT_THROW(ernie::LightOf(scene, "/Lamp", bands), std::invalid_argument);
+    EXPECT_THROW(ernie::LightParamsOf(scene, "/Lamp", bands), std::invalid_argument);
     scene.Define("/Sky", tokens::kDomeLight);
-    EXPECT_THROW(ernie::LightOf(scene, "/Sky", bands), std::invalid_argument) << "see DomeOf";
+    EXPECT_THROW(ernie::LightParamsOf(scene, "/Sky", bands), std::invalid_argument) << "see DomeParamsOf";
 }
 
-TEST(LightOf, DistantLightsShineFromTheirAxis) {
+TEST(LightParamsOf,DistantLightsShineFromTheirAxis) {
     Scene scene;
     scene.Define("/Earth", tokens::kDistantLight)
         .Set(tokens::kTransform, ernie::DistantLightTransform({0.0, 1.0, 1.0}))
         .Set(tokens::kLightIrradiance, 0.1);
     const ernie::SpectralBands bands;
-    const Light earth = ernie::LightOf(scene, "/Earth", bands);
+    const LightParams earth =ernie::LightParamsOf(scene, "/Earth", bands);
     EXPECT_EQ(earth.type, LightType::Distant);
     EXPECT_NEAR(earth.direction.y, std::sqrt(0.5f), 1e-6f);
     EXPECT_EQ(earth.spectrum, ernie::SunIrradianceOf(scene, "/Earth", bands));
@@ -121,7 +121,7 @@ TEST(FrameParamsOf, ResolvesEveryLightAndTheSunsDisk) {
     EXPECT_EQ(ernie::FrameParamsOf(scene, prims, 8, 8).sunAngle, 2.0f);
 }
 
-TEST(LightOf, RectAndDiskLightsTakeTheirSizeAndRadiance) {
+TEST(LightParamsOf,RectAndDiskLightsTakeTheirSizeAndRadiance) {
     Scene scene;
     scene.Define("/Panel", tokens::kRectLight)
         .Set(tokens::kTransform,
@@ -131,7 +131,7 @@ TEST(LightOf, RectAndDiskLightsTakeTheirSizeAndRadiance) {
         .Set(tokens::kHeight, 4.0)
         .Set(tokens::kIntensity, 10.0);
     const ernie::SpectralBands bands;
-    const Light panel = ernie::LightOf(scene, "/Panel", bands);
+    const LightParams panel =ernie::LightParamsOf(scene, "/Panel", bands);
     EXPECT_EQ(panel.type, LightType::Rect);
     EXPECT_EQ(panel.size, glm::vec2(6.0f, 4.0f)) << "scaled by the transform";
     EXPECT_NEAR(panel.direction.z, -1.0f, 1e-6f);
@@ -140,15 +140,15 @@ TEST(LightOf, RectAndDiskLightsTakeTheirSizeAndRadiance) {
         << "relative units are the face's luminance";
 
     scene.Set("/Panel", tokens::kLightPower, 470.0 * M_PI * 24.0);
-    EXPECT_NEAR(ernie::LightOf(scene, "/Panel", bands).spectrum[3], 1.0, 1e-5)
+    EXPECT_NEAR(ernie::LightParamsOf(scene, "/Panel", bands).spectrum[3], 1.0, 1e-5)
         << "power = pi x area x radiance for a Lambertian face";
 
     scene.Define("/Disk", tokens::kDiskLight).Set(tokens::kRadius, 2.0);
-    const Light disk = ernie::LightOf(scene, "/Disk", bands);
+    const LightParams disk =ernie::LightParamsOf(scene, "/Disk", bands);
     EXPECT_EQ(disk.type, LightType::Disk);
     EXPECT_EQ(disk.radius, 2.0f);
     scene.Set("/Disk", tokens::kRadius, 0.0);
-    EXPECT_THROW(ernie::LightOf(scene, "/Disk", bands), std::invalid_argument);
+    EXPECT_THROW(ernie::LightParamsOf(scene, "/Disk", bands), std::invalid_argument);
 }
 
 namespace {
@@ -202,7 +202,7 @@ TEST(DomeIrradianceSh, ProjectsUniformAndHemisphericalMaps) {
         std::invalid_argument);
 }
 
-TEST(DomeOf, ResolvesTheDomeAndTurnsOffTheDefaultSun) {
+TEST(DomeParamsOf,ResolvesTheDomeAndTurnsOffTheDefaultSun) {
     Scene scene;
     scene.Define("/World/Camera", tokens::kCamera);
     scene.Define("/World/Sky", tokens::kDomeLight).Set(tokens::kIntensity, 2.0);
@@ -214,7 +214,7 @@ TEST(DomeOf, ResolvesTheDomeAndTurnsOffTheDefaultSun) {
     EXPECT_NEAR(frame.dome->radiance[8], 2.0 / (ernie::kLuminousEfficacy * LuminanceIntegral()),
                 1e-7);
     EXPECT_NEAR(frame.dome->sh[0].r, std::sqrt(4.0 * M_PI), 1e-5);
-    EXPECT_THROW(ernie::DomeOf(scene, "/World/Camera", {}), std::invalid_argument);
+    EXPECT_THROW(ernie::DomeParamsOf(scene, "/World/Camera", {}), std::invalid_argument);
 }
 
 namespace {
@@ -231,7 +231,7 @@ glm::dvec2 Chromaticity(const std::vector<float>& spectrum, const ernie::Spectra
 
 }  // namespace
 
-TEST(LightOf, PhotometricUnitsSetTheBrightnessInLuxAndLumens) {
+TEST(LightParamsOf,PhotometricUnitsSetTheBrightnessInLuxAndLumens) {
     const ernie::SpectralBands bands{380.0, 780.0, 40};
     Scene scene;
     // A sun of 50000 lux, whatever its intensity and exposure say.
@@ -239,40 +239,40 @@ TEST(LightOf, PhotometricUnitsSetTheBrightnessInLuxAndLumens) {
         .Set(tokens::kIntensity, 7.0)
         .Set(tokens::kExposure, 3.0)
         .Set(tokens::kPhotometricIlluminance, 50000.0);
-    EXPECT_NEAR(Luminous(ernie::LightOf(scene, "/Sun", bands).spectrum, bands), 50000.0, 500.0);
+    EXPECT_NEAR(Luminous(ernie::LightParamsOf(scene, "/Sun", bands).spectrum, bands), 50000.0, 500.0);
 
     // A sphere of 1600 lumens: 1600 / 4 pi candela; or 100 lux at 2 m: 400 cd.
     scene.Define("/Bulb", tokens::kSphereLight).Set(tokens::kPhotometricPower, 1600.0);
-    EXPECT_NEAR(Luminous(ernie::LightOf(scene, "/Bulb", bands).spectrum, bands),
+    EXPECT_NEAR(Luminous(ernie::LightParamsOf(scene, "/Bulb", bands).spectrum, bands),
                 1600.0 / (4.0 * M_PI), 1.5);
     scene.Set("/Bulb", tokens::kPhotometricIlluminance, 100.0);
     scene.Set("/Bulb", tokens::kPhotometricIlluminanceDistance, 2.0);
-    EXPECT_NEAR(Luminous(ernie::LightOf(scene, "/Bulb", bands).spectrum, bands), 400.0, 4.0);
+    EXPECT_NEAR(Luminous(ernie::LightParamsOf(scene, "/Bulb", bands).spectrum, bands), 400.0, 4.0);
 
     // A 2 m x 1 m panel of 1000 lumens: luminance 1000 / (pi 2) nits; or 50 lux at 3 m.
     scene.Define("/Panel", tokens::kRectLight)
         .Set(tokens::kWidth, 2.0)
         .Set(tokens::kHeight, 1.0)
         .Set(tokens::kPhotometricPower, 1000.0);
-    EXPECT_NEAR(Luminous(ernie::LightOf(scene, "/Panel", bands).spectrum, bands),
+    EXPECT_NEAR(Luminous(ernie::LightParamsOf(scene, "/Panel", bands).spectrum, bands),
                 1000.0 / (2.0 * M_PI), 1.6);
     scene.Set("/Panel", tokens::kPhotometricIlluminance, 50.0);
     scene.Set("/Panel", tokens::kPhotometricIlluminanceDistance, 3.0);
-    EXPECT_NEAR(Luminous(ernie::LightOf(scene, "/Panel", bands).spectrum, bands), 225.0, 2.3);
+    EXPECT_NEAR(Luminous(ernie::LightParamsOf(scene, "/Panel", bands).spectrum, bands), 225.0, 2.3);
 
     // A uniform dome giving 20000 lux on the ground: luminance 20000 / pi.
     scene.Define("/Sky", tokens::kDomeLight).Set(tokens::kPhotometricIlluminance, 20000.0);
-    EXPECT_NEAR(Luminous(ernie::DomeOf(scene, "/Sky", bands).radiance, bands), 20000.0 / M_PI,
+    EXPECT_NEAR(Luminous(ernie::DomeParamsOf(scene, "/Sky", bands).radiance, bands), 20000.0 / M_PI,
                 64.0);
 }
 
-TEST(LightOf, IlluminantsShapeTheSpectrum) {
+TEST(LightParamsOf,IlluminantsShapeTheSpectrum) {
     const ernie::SpectralBands bands{380.0, 780.0, 40};
     Scene scene;
     scene.Define("/Sun", tokens::kDistantLight).Set(tokens::kPhotometricIlluminance, 1000.0);
     const auto shape = [&](std::string_view illuminant) {
         scene.Set("/Sun", tokens::kPhysicalIlluminant, std::string(illuminant));
-        return ernie::LightOf(scene, "/Sun", bands).spectrum;
+        return ernie::LightParamsOf(scene, "/Sun", bands).spectrum;
     };
     const glm::dvec2 white = Chromaticity(shape(tokens::kWhite), bands);
     EXPECT_NEAR(white.x, 1.0 / 3.0, 0.005) << "flat: the equal-energy point";
@@ -299,7 +299,7 @@ TEST(LightOf, IlluminantsShapeTheSpectrum) {
         .Set(tokens::kIntensity, 2.0)
         .Set(tokens::kPhysicalIlluminant, std::string(tokens::kBlackbody))
         .Set(tokens::kColorTemperature, 3000.0);
-    const std::vector<float> spectrum = ernie::LightOf(relative, "/Sun", bands).spectrum;
+    const std::vector<float> spectrum = ernie::LightParamsOf(relative, "/Sun", bands).spectrum;
     EXPECT_NEAR(Luminous(spectrum, bands), 2.0 * M_PI, 0.1) << "pi x intensity lux, as before";
     EXPECT_NEAR(Chromaticity(spectrum, bands).x, 0.4369, 0.005);
 }

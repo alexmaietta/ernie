@@ -206,7 +206,7 @@ TEST(IsdPushFrame, FrameletsAreFrameCamerasOnTheIsdsPixels) {
         const double samples = camera.Isd().samples;
         for (const std::uint32_t index : {0u, camera.Framelets() / 2, camera.Framelets() - 1}) {
             const ernie::IsdPushFrame::Framelet framelet = camera.FrameletOf(index);
-            const ernie::Camera& c = framelet.camera;
+            const ernie::CameraParams& c = framelet.camera;
             EXPECT_NO_THROW(c.Check()) << name;
             EXPECT_EQ(c.width, camera.Isd().samples);
             EXPECT_EQ(c.height, camera.FrameletLines());
@@ -307,7 +307,7 @@ TEST(IsdFrame, ViewsAreFrameCamerasOnTheIsdsPixels) {
     for (const auto& [name, isd] : isds) {
         const ernie::IsdFrame frame(isd);
         const ernie::IsdFrame::FrameView view = frame.View();
-        const ernie::Camera& c = view.camera;
+        const ernie::CameraParams& c = view.camera;
         EXPECT_NO_THROW(c.Check()) << name;
         EXPECT_LT(view.distortionResidualPixels, 1e-6) << name;
         const double lines = frame.Isd().lines;
@@ -337,7 +337,7 @@ TEST(LrocNac, AuthorsThePublishedSensorAndReadout) {
     scene.Define("/Camera", ernie::tokens::kCamera);
     scene.Define("/Product", ernie::tokens::kRenderProduct);
     ernie::AuthorLrocNac(scene, "/Camera", "/Product", ernie::LrocNac::Right);
-    const ernie::Camera camera = ernie::CameraOf(scene, "/Camera", 64, 8);
+    const ernie::CameraParams camera = ernie::CameraParamsOf(scene, "/Camera", 64, 8);
     // Robinson et al. 2010, Table 2, NAC-R.
     EXPECT_DOUBLE_EQ(camera.fStop, 3.590);
     EXPECT_DOUBLE_EQ(camera.sensor.ElectronsPerDn(camera.iso), 92.5);
@@ -368,7 +368,7 @@ TEST(LrocWac, AuthorsEachBandToItsPublishedResponsivity) {
             .Set(ernie::tokens::kExposureTime, 0.039);
         scene.Define("/Product", ernie::tokens::kRenderProduct);
         ernie::AuthorLrocWac(scene, "/Camera", "/Product", band);
-        const ernie::Camera camera = ernie::CameraOf(scene, "/Camera", 1024, 14);
+        const ernie::CameraParams camera = ernie::CameraParamsOf(scene, "/Camera", 1024, 14);
         // Robinson et al. 2010, Table 3.
         EXPECT_DOUBLE_EQ(camera.sensor.ElectronsPerDn(camera.iso), 25.9);
         EXPECT_DOUBLE_EQ(camera.sensor.readNoiseElectrons, 66.0);
@@ -397,9 +397,10 @@ TEST(Mars2020Navcam, AuthorsAStereoPairAsPublished) {
     ernie::AuthorMars2020NavcamPair(scene, "/Rover/Navcam", "/Left", "/Right",
                                     ernie::BayerPattern::Grbg, 60.0);
     using N = ernie::Mars2020Navcam;
-    const ernie::Camera left = ernie::CameraOf(scene, "/Rover/Navcam/Left", N::kWidth, N::kHeight);
-    const ernie::Camera right =
-        ernie::CameraOf(scene, "/Rover/Navcam/Right", N::kWidth, N::kHeight);
+    const ernie::CameraParams left =
+        ernie::CameraParamsOf(scene, "/Rover/Navcam/Left", N::kWidth, N::kHeight);
+    const ernie::CameraParams right =
+        ernie::CameraParamsOf(scene, "/Rover/Navcam/Right", N::kWidth, N::kHeight);
     EXPECT_NO_THROW(left.Check()) << "the f-theta field stays within Ernie's fisheye";
     // Maki et al. 2020, Table 2.
     EXPECT_NEAR(glm::length(glm::dvec3(right.transform[3] - left.transform[3])), 0.424, 1e-12);
@@ -444,10 +445,10 @@ TEST(Mars2020Hazcam, AuthorsBothPairsAsPublishedOnCubeFaces) {
         scene.Define("/Left", ernie::tokens::kRenderProduct);
         scene.Define("/Right", ernie::tokens::kRenderProduct);
         ernie::AuthorMars2020HazcamPair(scene, "/Rover/Hazcam", "/Left", "/Right", which);
-        const ernie::Camera left =
-            ernie::CameraOf(scene, "/Rover/Hazcam/Left", N::kWidth, N::kHeight);
-        const ernie::Camera right =
-            ernie::CameraOf(scene, "/Rover/Hazcam/Right", N::kWidth, N::kHeight);
+        const ernie::CameraParams left =
+            ernie::CameraParamsOf(scene, "/Rover/Hazcam/Left", N::kWidth, N::kHeight);
+        const ernie::CameraParams right =
+            ernie::CameraParamsOf(scene, "/Rover/Hazcam/Right", N::kWidth, N::kHeight);
         // Maki et al. 2020, Table 2: 24.8 cm (front) or 93.4 cm (rear) apart, 14.0 mm at f/12 on
         // the Navcams' detector.
         EXPECT_NEAR(glm::length(glm::dvec3(right.transform[3] - left.transform[3])),
@@ -482,10 +483,10 @@ TEST(MastcamZ, AuthorsTheFilterWheelsAndStereoRigAsPublished) {
     scene.Define("/Right", ernie::tokens::kRenderProduct);
     ernie::AuthorMastcamZPair(scene, "/Rover/MastcamZ", "/Left", "/Right", 0, 6, 110.0);
     using Z = ernie::MastcamZ;
-    const ernie::Camera left =
-        ernie::CameraOf(scene, "/Rover/MastcamZ/Left", Z::kWidth, Z::kHeight);
-    const ernie::Camera right =
-        ernie::CameraOf(scene, "/Rover/MastcamZ/Right", Z::kWidth, Z::kHeight);
+    const ernie::CameraParams left =
+        ernie::CameraParamsOf(scene, "/Rover/MastcamZ/Left", Z::kWidth, Z::kHeight);
+    const ernie::CameraParams right =
+        ernie::CameraParamsOf(scene, "/Rover/MastcamZ/Right", Z::kWidth, Z::kHeight);
     EXPECT_NO_THROW(left.Check());
     EXPECT_NO_THROW(right.Check());
     // Bell et al. 2021, Table 5 and the text: 7.4 um pixels, f/9.5 at 110 mm, 24.4 cm apart and

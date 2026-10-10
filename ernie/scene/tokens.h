@@ -136,7 +136,7 @@ inline constexpr std::string_view kExposureResponsivity = "exposure:responsivity
 inline constexpr std::string_view kFStop = "fStop";
 inline constexpr std::string_view kFocusDistance = "focusDistance";
 /// UsdGeomCamera's shutter interval, in frames relative to the frame's time (0): motion blurs
-/// over it (`Camera::shutterOpen`).
+/// over it (`CameraParams::shutterOpen`).
 inline constexpr std::string_view kShutterOpen = "shutter:open";
 inline constexpr std::string_view kShutterClose = "shutter:close";
 /// Sub-frames rendered across the shutter and readout for motion blur (int, default 8).
@@ -144,7 +144,7 @@ inline constexpr std::string_view kShutterSamples = "ernie:shutter:samples";
 /// Rolling shutter: frames between the top row's exposure and the bottom row's (0, global).
 inline constexpr std::string_view kShutterRolling = "ernie:shutter:rolling";
 /// How the camera reads out: "frame" (the default) or "pushbroom", a line scanner whose rows are
-/// read one after another along the camera's motion (`Camera::pushbroom`).
+/// read one after another along the camera's motion (`CameraParams::pushbroom`).
 inline constexpr std::string_view kCameraScan = "ernie:camera:scan";
 inline constexpr std::string_view kFrameScan = "frame";
 inline constexpr std::string_view kPushbroom = "pushbroom";
@@ -185,7 +185,7 @@ inline constexpr std::string_view kSensorGain = "ernie:sensor:electronsPerDn";  
 inline constexpr std::string_view kSensorAdcBits = "ernie:sensor:adcBits";
 inline constexpr std::string_view kSensorBlackLevel = "ernie:sensor:blackLevel";  ///< DN.
 /// An orthographic (telecentric) camera's pixel pitch on its sensor, in micrometres: its apertures
-/// span the scene, so they do not give it (`Camera::orthographicPixelPitchUm`).
+/// span the scene, so they do not give it (`CameraParams::orthographicPixelPitchUm`).
 inline constexpr std::string_view kSensorPixelPitch = "ernie:sensor:pixelPitch";
 inline constexpr std::string_view kSensorNoise = "ernie:sensor:noise";            ///< bool.
 inline constexpr std::string_view kSensorSeed = "ernie:sensor:seed";              ///< int.

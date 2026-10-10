@@ -120,7 +120,7 @@ TEST_F(RasterDelegateTest, ABatchOfCamerasRendersAsThoseCamerasDoAlone) {
         const Path one[] = {single};
         ernie::RenderProductSetOutputs alone = delegate.Step(scene, one);
         for (const std::string name : {"LdrColor", "DistanceToCamera", "SpectralRadiance"}) {
-            ernie::RenderVar& var = alone.at(single).vars.at(name);
+            ernie::RenderVarOutput& var = alone.at(single).vars.at(name);
             EXPECT_EQ(var.Views(), 1u);
             const Tensor image = var.Map(ernie::MapDevice::Cpu).tensor;
             EXPECT_EQ(ViewBytes(batched[name], i), Bytes(image)) << name << " of view " << i;

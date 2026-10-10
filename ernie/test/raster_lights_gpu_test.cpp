@@ -607,8 +607,8 @@ TEST_F(RasterDelegateTest, DomesShowBehindTheScene) {
     ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
     auto vars = MapVars(outputs);
     const ernie::SpectralBands bands =
-        ernie::CameraOf(scene, "/World/Camera", kVarSize, kVarSize).bands;
-    const std::vector<float> dome = ernie::DomeOf(scene, "/World/Sky", bands).radiance;
+        ernie::CameraParamsOf(scene, "/World/Camera", kVarSize, kVarSize).bands;
+    const std::vector<float> dome = ernie::DomeParamsOf(scene, "/World/Sky", bands).radiance;
     const std::size_t c = kVarSize / 2;
     for (int band = 0; band < bands.count; ++band) {
         EXPECT_NEAR(SpectralAt(vars.at("SpectralRadiance"), band, c, c, kVarSize), dome[band],
@@ -662,7 +662,8 @@ TEST_F(RasterDelegateTest, StarsKeepTheirIrradianceAtAnyResolutionBehindTheScene
         ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
         const Tensor spectral =
             outputs.at("/Render/Product").vars.at("SpectralRadiance").Map(ernie::MapDevice::Cpu).tensor;
-        const ernie::Camera camera = ernie::CameraOf(scene, "/World/Camera", size, size);
+        const ernie::CameraParams camera =
+            ernie::CameraParamsOf(scene, "/World/Camera", size, size);
         const double f = camera.FocalLengthPixels();
         double sum = 0.0;
         for (std::size_t row = 0; row < size; ++row) {
@@ -676,7 +677,7 @@ TEST_F(RasterDelegateTest, StarsKeepTheirIrradianceAtAnyResolutionBehindTheScene
         }
         return sum;
     };
-    const ernie::SpectralBands bands = ernie::CameraOf(scene, "/World/Camera", 32, 32).bands;
+    const ernie::SpectralBands bands = ernie::CameraParamsOf(scene, "/World/Camera", 32, 32).bands;
     for (const std::size_t band : {std::size_t{2}, std::size_t{12}}) {
         const double expected = ernie::BlackbodySpectralIrradiance(
             bands.Lower(static_cast<int>(band)) + 0.5 * bands.Width(), 5772.0, 2.54e-6);

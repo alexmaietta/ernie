@@ -7,9 +7,9 @@
 
 namespace ernie {
 
-/// Interactive orbit control of a `Camera` around a target point in a z-up world, for inspecting
-/// terrain. It holds no camera of its own: `Apply` writes its pose, field of view and clipping
-/// range into one.
+/// Interactive orbit control of a `CameraParams` around a target point in a z-up world, for
+/// inspecting terrain. It holds no camera of its own: `Apply` writes its pose, field of view and
+/// clipping range into one.
 ///
 /// Yaw rotates around the vertical axis (0 looks north, positive turns the view clockwise seen from
 /// above); pitch is the elevation angle of the eye above the target's horizontal plane.
@@ -43,10 +43,10 @@ class OrbitController {
 
     /// Sets `camera`'s transform, vertical field of view (through its aperture, keeping its focal
     /// length) and clipping range.
-    void Apply(Camera& camera) const;
+    void Apply(CameraParams& camera) const;
 
     /// A default camera of `width` x `height` with this pose, field of view and clipping range.
-    Camera MakeCamera(std::uint32_t width, std::uint32_t height) const;
+    CameraParams MakeCamera(std::uint32_t width, std::uint32_t height) const;
 
     /// Rotates by `deltaYaw` and `deltaPitch` radians, clamping pitch.
     void Orbit(float deltaYaw, float deltaPitch);

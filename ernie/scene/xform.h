@@ -41,7 +41,7 @@ glm::dvec3 EulerAngles(const glm::dmat3& rotation, RotationOrder order);
 
 /// A prim's local transform as translate, rotate (Euler angles or a quaternion) and scale, the
 /// ops of USD's UsdGeomXformCommonAPI. Unset parts are left out.
-struct Xform {
+struct XformOps {
     std::optional<glm::dvec3> translate;
     std::optional<glm::dvec3> rotate;  ///< Euler angles in degrees, in `rotationOrder`.
     RotationOrder rotationOrder = RotationOrder::XYZ;
@@ -54,7 +54,7 @@ struct Xform {
 /// points scale, then rotate, then move), after a leading `!resetXformStack!` if it had one.
 /// @throws std::invalid_argument if the prim does not exist, or `xform` has both `rotate` and
 /// `orient`.
-void SetXform(Scene& scene, const Path& path, const Xform& xform);
+void SetXform(Scene& scene, const Path& path, const XformOps& xform);
 
 /// The local transform of the prim at `path` from its transform ops (`Scene::LocalTransform`):
 /// the product of the ops `xformOpOrder` lists, or `xformOp:transform` without an order. An op

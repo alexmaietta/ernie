@@ -59,7 +59,7 @@ double CubeFaceExtent(double facePixels, double marginPixels = 2.0);
 /// Whether `camera` needs its views on cube faces: a fisheye or a lens of rays whose field
 /// reaches past `kMaxSingleViewAngle` off axis somewhere in its image, where one pinhole raster
 /// image would spread its pixels too thin at the centre.
-bool NeedsCubeFaces(const Camera& camera);
+bool NeedsCubeFaces(const CameraParams& camera);
 
 /// The field angle (radians) past which a fisheye renders on cube faces: 60 degrees, where a
 /// single raster image's centre is already twice as coarse as its sensor's (tan 60 / (pi / 3)).
@@ -67,11 +67,11 @@ inline constexpr double kMaxSingleViewAngle = 1.0471975511965976;
 
 /// The largest field angle `camera` sees, at the corner of its image farthest from its principal
 /// point (its edges' midpoints for a fisheye whose field folds no earlier).
-double MaxFieldAngle(const Camera& camera);
+double MaxFieldAngle(const CameraParams& camera);
 
 /// The unit ray, in the camera's frame, of sensor position `pixel` of `camera` (pixels from the
 /// top left corner, centres at + 0.5): its lens's ray table's, or `LensRay` of its normalised
 /// image coordinates.
-glm::dvec3 CameraRay(const Camera& camera, glm::dvec2 pixel);
+glm::dvec3 CameraRay(const CameraParams& camera, glm::dvec2 pixel);
 
 }  // namespace ernie

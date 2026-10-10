@@ -92,7 +92,7 @@ TEST_F(ViewerTest, DefinesItsPerspectiveCameraAndLooksThroughIt) {
 }
 
 TEST_F(ViewerTest, OpensFramingTheScene) {
-    const Camera camera = CameraOf(scene_, Viewer::PerspectiveCamera(), 64, 64);
+    const CameraParams camera = CameraParamsOf(scene_, Viewer::PerspectiveCamera(), 64, 64);
     const glm::dvec3 toCube = glm::normalize(-camera.Eye());
     EXPECT_GT(glm::dot(toCube, camera.Forward()), 0.999);
 }
@@ -178,7 +178,7 @@ TEST_F(ViewerTest, ShowsEveryRenderVarTheBackendCanDraw) {
 }
 
 TEST_F(ViewerTest, SwitchesCamerasAndFallsBackWhenOneIsRemoved) {
-    Camera top;
+    CameraParams top;
     top.transform = glm::inverse(
         glm::lookAtRH(glm::dvec3(0.0, 0.0, 20.0), glm::dvec3(0.0), glm::dvec3(0.0, 1.0, 0.0)));
     SetCamera(scene_, Path("/Cameras/Top"), top);
@@ -212,7 +212,7 @@ TEST_F(ViewerTest, FrameAimsAtTheGivenPrims) {
         .Set(tokens::kExtent, std::vector<float>{-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f});
     const std::vector<Path> far{Path("/World/Far")};
     viewer_->Frame(far);
-    const Camera camera = CameraOf(scene_, Viewer::PerspectiveCamera(), 64, 64);
+    const CameraParams camera = CameraParamsOf(scene_, Viewer::PerspectiveCamera(), 64, 64);
     const glm::dvec3 toFar = glm::normalize(glm::dvec3(30.0, 0.0, 0.0) - camera.Eye());
     EXPECT_GT(glm::dot(toFar, camera.Forward()), 0.999);
 }
@@ -221,8 +221,8 @@ TEST_F(ViewerTest, CameraFromViewCopiesTheActiveCamera) {
     const Path made = viewer_->CameraFromView(Path("/Cameras/Saved"));
     EXPECT_EQ(made, Path("/Cameras/Saved"));
     EXPECT_EQ(scene_.TypeOf(made), tokens::kCamera);
-    const Camera saved = CameraOf(scene_, made, 64, 64);
-    const Camera view = CameraOf(scene_, Viewer::PerspectiveCamera(), 64, 64);
+    const CameraParams saved = CameraParamsOf(scene_, made, 64, 64);
+    const CameraParams view = CameraParamsOf(scene_, Viewer::PerspectiveCamera(), 64, 64);
     EXPECT_NEAR(glm::length(saved.Eye() - view.Eye()), 0.0, 1e-6);
     EXPECT_THROW(viewer_->CameraFromView(made), std::invalid_argument);
     EXPECT_THROW(viewer_->CameraFromView(Path("/__session/Other")), std::invalid_argument);
@@ -747,7 +747,7 @@ TEST_F(ViewerTest, LightingModesChooseTheSessionLights) {
     viewer_->Step();
     EXPECT_EQ(scene_.Get(session, tokens::kLightsRel, std::vector<Path>{}),
               std::vector<Path>{Path("/__session/Lights/Camera")});
-    const Camera view = CameraOf(scene_, viewer_->ActiveCamera(), 64, 64);
+    const CameraParams view = CameraParamsOf(scene_, viewer_->ActiveCamera(), 64, 64);
     EXPECT_NEAR(glm::dot(TowardsLight(scene_, Path("/__session/Lights/Camera")), -view.Forward()),
                 1.0, 1e-6);
 

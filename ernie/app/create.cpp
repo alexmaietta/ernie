@@ -163,7 +163,7 @@ void AuthorDefaultPrim(Scene& scene, const Path& path, std::string_view type,
             scene.Set(path, kRadius, 0.5 * s);
         }
     } else if (type == kCamera) {
-        Camera camera = context.camera;
+        CameraParams camera = context.camera;
         camera.transform = glm::inverse(context.parentWorld) * camera.transform;
         SetCamera(scene, path, camera);
     } else if (type == kMaterial) {

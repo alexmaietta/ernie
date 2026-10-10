@@ -119,7 +119,7 @@ TEST(LensRays, Mars2020HazcamsNeedCubeFacesAndNavcamsDoNot) {
     }
     EXPECT_LT(worst, 0.05);
 
-    ernie::Camera pinhole;
+    ernie::CameraParams pinhole;
     pinhole.width = 640;
     pinhole.height = 480;
     pinhole.focalLengthMm = 2.0;  // a 150 degree pinhole is stretched, not a cube camera

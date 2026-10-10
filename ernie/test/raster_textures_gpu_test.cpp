@@ -91,7 +91,7 @@ float CentreGreen(RasterDelegate& delegate, const Scene& scene) {
 /// HdrColor's green at the pixel showing quad point (x, y).
 float GreenAt(const Scene& scene, const Tensor& hdr, float x, float y) {
     const glm::vec4 clip =
-        ernie::CameraOf(scene, "/World/Camera", kSize, kSize).RasterView().ViewProjection() *
+        ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize).RasterView().ViewProjection() *
         glm::vec4(x, y, 0.0f, 1.0f);
     const glm::vec2 ndc = glm::vec2(clip) / clip.w;
     const auto col = static_cast<std::size_t>((ndc.x * 0.5f + 0.5f) * kSize);

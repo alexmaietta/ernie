@@ -15,8 +15,8 @@
 
 namespace ernie {
 
-/// The raster view of a camera for one frame, derived from a `Camera` by `Camera::RasterView`:
-/// what the rasterizer's passes need.
+/// The raster view of a camera for one frame, derived from a `CameraParams` by
+/// `CameraParams::RasterView`: what the rasterizer's passes need.
 struct CameraView {
     glm::mat4 view{1.0f};
     glm::mat4 projection{1.0f};
@@ -183,7 +183,8 @@ struct SensorModel {
     double ElectronsPerDn(double iso) const;
 };
 
-/// Ernie's camera: a physically based pinhole camera for one image, with UsdGeomCamera's pose,
+/// A camera's parameters resolved from its Camera prim (`CameraParamsOf`): a physically based
+/// pinhole camera for one image, with UsdGeomCamera's pose,
 /// projection and exposure attributes, a spectral range, a lens and a sensor.
 ///
 /// The pose `transform` maps camera to world coordinates; as in USD the camera looks down its -z
@@ -211,7 +212,7 @@ struct SensorModel {
 /// - B. K. P. Horn, "Robot Vision", MIT Press, 1986 (the image irradiance equation
 ///   E = L (pi / 4) (d / f)^2 cos^4(alpha), with N = f / d).
 /// - Pixar, "UsdGeomCamera", https://openusd.org/release/api/class_usd_geom_camera.html
-struct Camera {
+struct CameraParams {
     glm::dmat4 transform{1.0};  ///< Camera to world.
     std::uint32_t width = 1;
     std::uint32_t height = 1;
@@ -346,10 +347,11 @@ struct Camera {
 /// transform, and UsdGeomCamera's `focalLength`, `verticalAperture`, aperture offsets,
 /// `clippingRange`, `exposure`, `exposure:time`, `exposure:iso`, `exposure:fStop` and
 /// `exposure:responsivity`, and Ernie's `ernie:spectral:*`, `ernie:lens:*` and `ernie:sensor:*`
-/// attributes (see `tokens.h`). Unset attributes keep `Camera`'s defaults.
+/// attributes (see `tokens.h`). Unset attributes keep `CameraParams`'s defaults.
 /// @throws std::invalid_argument if the prim is not a Camera, its projection is not perspective,
 /// or the result fails `Check`.
-Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::uint32_t height);
+CameraParams CameraParamsOf(const Scene& scene, const Path& path, std::uint32_t width,
+                            std::uint32_t height);
 
 /// Sets `lens`'s chromatic aberration (`LensModel::chromaticScale`, `chromaticFocusMm`) for a thin
 /// singlet of focal length `focalLengthMm` at the d line (587.56 nm) in a glass of refractive
@@ -371,9 +373,9 @@ Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::
 void SetSingletChromatic(LensModel& lens, double focalLengthMm, double nd, double abbe,
                          double lateral = 0.0);
 
-/// As `CameraOf`, with `transform` in place of the prim's world transform, such as an estimate for
-/// a camera posed on the GPU, whose transform the CPU cannot read.
-Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::uint32_t height,
-                const glm::dmat4& transform);
+/// As `CameraParamsOf`, with `transform` in place of the prim's world transform, such as an
+/// estimate for a camera posed on the GPU, whose transform the CPU cannot read.
+CameraParams CameraParamsOf(const Scene& scene, const Path& path, std::uint32_t width,
+                            std::uint32_t height, const glm::dmat4& transform);
 
 }  // namespace ernie

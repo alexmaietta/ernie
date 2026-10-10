@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include "ernie/scene/base_schemas.h"
 #include "ernie/scene/prim_type.h"
 #include "ernie/scene/tokens.h"
 
@@ -133,9 +134,9 @@
                               .group = "Shape"}))
 
 // Every attribute of each type, its bases' first, for its accessors.
-#define ERNIE_BOUNDABLE_LIGHT_ALL(X) ERNIE_LIGHT_ATTRIBUTES(X) ERNIE_BOUNDABLE_LIGHT_ATTRIBUTES(X)
-#define ERNIE_NONBOUNDABLE_LIGHT_ALL(X)                                                            \
-    ERNIE_LIGHT_ATTRIBUTES(X) ERNIE_NONBOUNDABLE_LIGHT_ATTRIBUTES(X)
+#define ERNIE_LIGHT_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_LIGHT_ATTRIBUTES(X)
+#define ERNIE_BOUNDABLE_LIGHT_ALL(X) ERNIE_LIGHT_ALL(X) ERNIE_BOUNDABLE_LIGHT_ATTRIBUTES(X)
+#define ERNIE_NONBOUNDABLE_LIGHT_ALL(X) ERNIE_LIGHT_ALL(X) ERNIE_NONBOUNDABLE_LIGHT_ATTRIBUTES(X)
 #define ERNIE_DISTANT_LIGHT_ALL(X) ERNIE_NONBOUNDABLE_LIGHT_ALL(X) ERNIE_DISTANT_LIGHT_ATTRIBUTES(X)
 #define ERNIE_DOME_LIGHT_ALL(X) ERNIE_NONBOUNDABLE_LIGHT_ALL(X) ERNIE_DOME_LIGHT_ATTRIBUTES(X)
 #define ERNIE_SPHERE_LIGHT_ALL(X) ERNIE_BOUNDABLE_LIGHT_ALL(X) ERNIE_SPHERE_LIGHT_ATTRIBUTES(X)
@@ -143,11 +144,11 @@
 #define ERNIE_DISK_LIGHT_ALL(X) ERNIE_BOUNDABLE_LIGHT_ALL(X) ERNIE_DISK_LIGHT_ATTRIBUTES(X)
 // clang-format on
 
-namespace ernie::schema {
+namespace ernie {
 
 /// Any light: UsdLux's LightAPI inputs, its spectrum's shape and Ernie's physical spectrum.
-class Light : public SchemaView {
-    ERNIE_SCHEMA_BODY(Light, SchemaView, ERNIE_LIGHT_ATTRIBUTES)
+class Light : public Imageable {
+    ERNIE_SCHEMA_BODY(Light, Imageable, ERNIE_LIGHT_ALL)
 
     /// Whether the light gives its brightness in photometric units: it has a `photometric:` value.
     bool IsPhotometric() const;
@@ -193,4 +194,7 @@ class DiskLight : public BoundableLight {
     ERNIE_SCHEMA_DEFINE(DiskLight)
 };
 
-}  // namespace ernie::schema
+/// This file's types' registry entries, bases first (`PrimTypes`).
+std::vector<const PrimTypeDef*> LightSchemaTypes();
+
+}  // namespace ernie

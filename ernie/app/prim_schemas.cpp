@@ -120,7 +120,8 @@ std::optional<PropertyField> FieldOf(const AttributeDef& def) {
 }
 
 /// A registered type's sections, one per `AttributeMeta::group` in `kGroups`' order (others after,
-/// as they come); within one, the type's own attributes before its bases'.
+/// as they come, then "Prim", what every prim has); within one, the type's own attributes before
+/// its bases'.
 std::vector<PropertySection> SectionsOf(const PrimTypeDef& type) {
     static constexpr std::array<std::string_view, 4> kGroups{"Light", "Shape", "Spectrum",
                                                              "Photometric"};
@@ -139,7 +140,11 @@ std::vector<PropertySection> SectionsOf(const PrimTypeDef& type) {
         }
     }
     const auto rank = [](const PropertySection& section) {
-        return std::ranges::find(kGroups, section.title) - kGroups.begin();
+        if (section.title == "Prim") {
+            return kGroups.size() + 1;
+        }
+        return static_cast<std::size_t>(std::ranges::find(kGroups, section.title) -
+                                        kGroups.begin());
     };
     std::ranges::stable_sort(sections, {}, rank);
     return sections;
@@ -193,10 +198,18 @@ std::vector<PropertySection> MaterialOf(const Scene& scene, const Path& path,
     return sections;
 }
 
+/// Adds to a registered type's `sections` the fields its declaration cannot hold, which depend on
+/// the prim's values: a Material's chosen BRDF's parameters, a SensorFilter's type's inputs.
+void DynamicSectionsOf(const Scene& scene, const Path& path, std::string_view type,
+                       const BrdfRegistry& brdfs, const SensorFilterRegistry& filters,
+                       std::vector<PropertySection>& sections) {
+    (void)scene, (void)path, (void)type, (void)brdfs, (void)filters, (void)sections;
+}
+
 }  // namespace
 
 std::vector<PropertySection> CameraSchema() {
-    const Camera camera;
+    const CameraParams camera;
     const SensorModel& sensor = camera.sensor;
     return {
         {"Lens",
@@ -233,7 +246,7 @@ std::vector<PropertySection> CameraSchema() {
           Field(kShutterClose, "Close", Kind::Float, camera.shutterClose, -2.0, 1.0, {},
                 "Frames from the frame's time"),
           Field(kShutterSamples, "Samples", Kind::Int, camera.shutterSamples, 1,
-                Camera::kMaxShutterSamples, {}, "Sub-frames rendered across the shutter"),
+                CameraParams::kMaxShutterSamples, {}, "Sub-frames rendered across the shutter"),
           Field(kShutterRolling, "Rolling readout", Kind::Float, camera.rollingShutter, 0.0, 2.0,
                 {}, "Frames between the top row's exposure and the bottom row's; 0 is global"),
           Field(kCameraScan, "Scan", Kind::Token, S(kFrameScan), 0, 0,
@@ -325,6 +338,13 @@ std::vector<PropertySection> SchemaOf(const Scene& scene, const Path& path,
                                       const BrdfRegistry& brdfs,
                                       const SensorFilterRegistry& filters) {
     const std::string& type = scene.TypeOf(path);
+    // Registered types' sections come from their declarations, "Prim" among them, then what
+    // their declarations cannot hold (`DynamicSectionsOf`).
+    if (const PrimTypeDef* registered = FindPrimType(type)) {
+        std::vector<PropertySection> sections = SectionsOf(*registered);
+        DynamicSectionsOf(scene, path, type, brdfs, filters, sections);
+        return sections;
+    }
     std::vector<PropertySection> sections;
     if (type == kCube || type == kSphere || type == kCylinder || type == kCone ||
         type == kCapsule || type == kPlane) {
@@ -350,8 +370,6 @@ std::vector<PropertySection> SchemaOf(const Scene& scene, const Path& path,
               Field(kExaggeration, "Exaggeration", Kind::Float, 1.0, 0.0, 100.0),
               Field(kNoData, "No data", Kind::Float, 0.0, 0, 0, {}, "Height marking missing cells"),
               Field(kMaterialBinding, "Material", Kind::Target, Value(), 0, 0, {S(kMaterial)})}});
-    } else if (const PrimTypeDef* registered = FindPrimType(type)) {
-        sections = SectionsOf(*registered);
     } else if (type == kStarField) {
         sections.push_back(
             {"Stars",

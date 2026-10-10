@@ -200,7 +200,7 @@ TEST_F(RasterDelegateTest, MotionVectorsFollowTheCameraAndWhatMoves) {
     scene.Set("/Render/Out", tokens::kOrderedVars,
               std::vector<Path>{"/Render/Vars/HdrColor", var});
     const double focal =
-        ernie::CameraOf(scene, "/World/Camera", kSize, kSize).FocalLengthPixels();
+        ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize).FocalLengthPixels();
     const auto at = [](const std::vector<float>& motion, std::size_t x, std::size_t y) {
         return glm::vec2(motion[(y * kSize + x) * 2], motion[(y * kSize + x) * 2 + 1]);
     };

@@ -94,7 +94,7 @@ TEST_F(RasterDelegateTest, StepsRenderEveryProductSyncOrAsync) {
     RasterDelegate delegate(*context_);
     ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
     ASSERT_EQ(outputs.size(), 2u);
-    ernie::RenderVar& top = outputs.at("/Render/Top").vars.at("LdrColor");
+    ernie::RenderVarOutput& top = outputs.at("/Render/Top").vars.at("LdrColor");
     EXPECT_EQ(top.GetPath(), Path("/Render/Vars/Color"));
     const Tensor topImage = top.Map(ernie::MapDevice::Cpu).tensor;
     EXPECT_EQ(topImage.Shape(), (std::vector<std::int64_t>{32, 32, 4}));
@@ -157,7 +157,7 @@ TEST_F(RasterDelegateTest, MapsRenderVarsToCudaArraysWithoutCopying) {
     Scene scene = ProductScene();
     const Path top[] = {"/Render/Top"};
     ernie::StepOperation operation = delegate.StepAsync(scene, top);
-    ernie::RenderVar var = operation.Outputs().at("/Render/Top").vars.at("LdrColor");
+    ernie::RenderVarOutput var = operation.Outputs().at("/Render/Top").vars.at("LdrColor");
     const Tensor expected = var.Map(ernie::MapDevice::Cpu).tensor;
 
     const ernie::MappedRenderVar array = var.Map(ernie::MapDevice::CudaArray);
@@ -301,7 +301,8 @@ TEST_F(RasterDelegateTest, RenderVarsMeasureTheScene) {
     EXPECT_EQ(delegate.PrimPath(0), Path());
     EXPECT_EQ(At<std::uint32_t>(vars.at("InstanceId"), c, c), 0u);
 
-    const ernie::Camera camera = ernie::CameraOf(scene, "/World/Camera", kVarSize, kVarSize);
+    const ernie::CameraParams camera =
+        ernie::CameraParamsOf(scene, "/World/Camera", kVarSize, kVarSize);
     const float electrons = At<float>(vars.at("Electrons"), c, c, 1);
     EXPECT_GT(electrons, 0.0f);
     EXPECT_EQ(At<float>(vars.at("Electrons"), c, c, 3), 0.0f) << "an RGB sensor has 3 channels";
@@ -347,7 +348,8 @@ TEST_F(RasterDelegateTest, ExposureNoiseAndDistortionFollowTheCamera) {
             differing += At<float>(a, row, col, 1) != At<float>(b, row, col, 1) ? 1 : 0;
         }
     }
-    const ernie::Camera camera = ernie::CameraOf(scene, "/World/Camera", kVarSize, kVarSize);
+    const ernie::CameraParams camera =
+        ernie::CameraParamsOf(scene, "/World/Camera", kVarSize, kVarSize);
     ASSERT_LT(clean / (kVarSize * kVarSize), 0.5 * camera.sensor.fullWellElectrons)
         << "unsaturated";
     EXPECT_GT(differing, static_cast<int>(kVarSize * kVarSize / 2)) << "temporal noise";
@@ -419,7 +421,8 @@ TEST_F(RasterDelegateTest, PushbroomScansItsRowsAlongItsMotion) {
         EXPECT_EQ(delegate.PrimPath(id), Path(box ? "/World/Box" : "/World/Terrain"))
             << "row " << row;
     }
-    const ernie::Camera camera = ernie::CameraOf(scene, "/World/Camera", kVarSize, kVarSize);
+    const ernie::CameraParams camera =
+        ernie::CameraParamsOf(scene, "/World/Camera", kVarSize, kVarSize);
     const double x = (0.5 - camera.PrincipalPoint().x) / camera.FocalLengthPixels();
     for (const std::size_t row : {std::size_t{2}, std::size_t{12}, std::size_t{30}}) {
         EXPECT_NEAR(At<float>(vars.at("DistanceToImagePlane"), row, 0), 50.0f, 0.05f);
@@ -448,7 +451,7 @@ TEST_F(RasterDelegateTest, AnIsdStripSeesTheGroundWhereUsgscsmPutsIt) {
             .Set(tokens::kGeomRadius, 60.0)
             .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), ground));
     }
-    ernie::Camera camera = strip.camera;
+    ernie::CameraParams camera = strip.camera;
     camera.transform = strip.from;
     ernie::SetCamera(scene, "/World/Camera", camera);
     scene.Set("/World/Camera", tokens::kSensorNoise, false);
@@ -494,7 +497,7 @@ TEST_F(RasterDelegateTest, AnLroNacStripSeesThroughItsLensDistortion) {
             .Set(tokens::kGeomRadius, 0.6)
             .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), ground));
     }
-    ernie::Camera camera = strip.camera;
+    ernie::CameraParams camera = strip.camera;
     camera.transform = strip.from;
     ernie::SetCamera(scene, "/World/Camera", camera);
     scene.Set("/World/Camera", tokens::kSensorNoise, false);
@@ -559,7 +562,7 @@ TEST_F(RasterDelegateTest, AnLroWacFrameletSeesTheGroundWhereUsgscsmPutsIt) {
             .Set(tokens::kGeomRadius, 0.4 * across)
             .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), ground));
     }
-    const ernie::Camera& camera = framelet.camera;
+    const ernie::CameraParams& camera = framelet.camera;
     ernie::SetCamera(scene, "/World/Camera", camera);
     scene.Set("/World/Camera", tokens::kSensorNoise, false);
     scene.Set("/World/Camera", tokens::kLensDistortion,
@@ -690,7 +693,8 @@ TEST_F(RasterDelegateTest, TheMars2020NavcamAndHazcamPairsSeeInStereo) {
             cubeColumn[e] = sum / hits;
         }
         // The cube's top, 1 m below the camera's height, at f / pitch pixels per unit of x / z.
-        const ernie::Camera left = ernie::CameraOf(scene, Path(pair.rig).Child("Left"), 64, 48);
+        const ernie::CameraParams left =
+            ernie::CameraParamsOf(scene, Path(pair.rig).Child("Left"), 64, 48);
         EXPECT_EQ(ernie::NeedsCubeFaces(left), pair.hazcam);
         const double disparity = cubeColumn[0] - cubeColumn[1];
         EXPECT_NEAR(disparity, pair.baseline * left.FocalLengthPixels() / (pair.height - 1.0), 1.5)
@@ -756,7 +760,8 @@ TEST_F(RasterDelegateTest, AFisheyeWiderThan180DegreesSeesPastItsHorizonOnCubeFa
         .Set(tokens::kSize, 2.0)
         .Set(tokens::kTransform,
              glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 5.0) + 12.0 * towards));
-    const ernie::Camera camera = ernie::CameraOf(scene, "/World/Camera", kVarSize, kVarSize);
+    const ernie::CameraParams camera =
+        ernie::CameraParamsOf(scene, "/World/Camera", kVarSize, kVarSize);
     ASSERT_TRUE(ernie::NeedsCubeFaces(camera));
     RasterDelegate delegate(*context_);
     ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
@@ -823,7 +828,7 @@ TEST_F(RasterDelegateTest, CahvoreCamerasSeeThroughTheirRayTablesExactly) {
                   glm::ivec2(static_cast<int>(model.width), static_cast<int>(model.height)));
         scene.Set("/Render/Product", tokens::kOrderedVars,
                   std::vector<Path>{"/Render/Vars/PrimId"});
-        ernie::Camera camera = fit.camera;
+        ernie::CameraParams camera = fit.camera;
         camera.bands.count = 3;
         ernie::SetCamera(scene, "/World/Camera", camera);
         scene.Set("/World/Camera", tokens::kLensProjection, std::string(tokens::kFisheye));
@@ -857,8 +862,8 @@ TEST_F(RasterDelegateTest, CahvoreCamerasSeeThroughTheirRayTablesExactly) {
                 .Set(tokens::kTransform,
                      glm::translate(glm::dmat4(1.0), ray.origin + kDistance * ray.direction));
         }
-        const ernie::Camera rendered =
-            ernie::CameraOf(scene, "/World/Camera", model.width, model.height);
+        const ernie::CameraParams rendered =
+            ernie::CameraParamsOf(scene, "/World/Camera", model.width, model.height);
         ASSERT_NE(rendered.lens.rays, nullptr);
         EXPECT_EQ(ernie::NeedsCubeFaces(rendered), std::string(name) == "HAZFLA");
         RasterDelegate delegate(*context_);
@@ -911,7 +916,7 @@ TEST_F(RasterDelegateTest, LateralColourScalesEachBandsImageAboutThePrincipalPoi
                                     .Map(ernie::MapDevice::Cpu)
                                     .tensor;
         const auto bands = static_cast<std::size_t>(spectral.Shape()[0]);
-        const ernie::Camera camera = ernie::CameraOf(scene, "/World/Camera", 96, 96);
+        const ernie::CameraParams camera = ernie::CameraParamsOf(scene, "/World/Camera", 96, 96);
         std::vector<std::pair<glm::dvec2, double>> result;  // offset, the band's scale
         for (std::size_t b = 0; b < bands; ++b) {
             glm::dvec2 sum(0.0);
@@ -1005,7 +1010,8 @@ TEST_F(RasterDelegateTest, FisheyeSeesFieldAnglesInProportionToRadius) {
     RasterDelegate delegate(*context_);
     ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
     const auto vars = MapVars(outputs);
-    const ernie::Camera camera = ernie::CameraOf(scene, "/World/Camera", kVarSize, kVarSize);
+    const ernie::CameraParams camera =
+        ernie::CameraParamsOf(scene, "/World/Camera", kVarSize, kVarSize);
     const std::size_t c = kVarSize / 2;
     for (const std::size_t col : {std::size_t{0}, std::size_t{4}, c}) {
         const double x = (col + 0.5 - camera.PrincipalPoint().x) / camera.FocalLengthPixels();

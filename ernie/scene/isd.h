@@ -141,7 +141,7 @@ class IsdCameraModel {
     /// rows, posed (`camera.transform`, camera to body-fixed world) when the frame is exposed,
     /// the lens's distortion fitted as Brown-Conrady terms (and scale).
     struct FrameView {
-        Camera camera;
+        CameraParams camera;
         /// Whether the camera's rows run up the frame: the detector's map to the image is a
         /// mirror of Ernie's, so flip the rendered rows.
         bool rowsReversed = false;
@@ -189,8 +189,8 @@ class IsdCameraModel {
     /// the ISD's, in pixels. One line fits along it only (x) and radially, as a pushbroom's lens
     /// resamples; more fit both of the image's directions with the tangential terms too, which
     /// a radtan model's map onto exactly.
-    double FitDistortion(Camera& camera, std::span<const double> lines, const glm::dmat3& axes,
-                         double facing) const;
+    double FitDistortion(CameraParams& camera, std::span<const double> lines,
+                         const glm::dmat3& axes, double facing) const;
     /// The frame camera of `rows` image rows exposed at `time`, row coordinate r (0 the top edge,
     /// `rows` the bottom) on detector line `detectorLine(r)`, with `facing` as `ErnieAxes`.
     FrameView FrameViewOf(const std::function<double(double)>& detectorLine, std::uint32_t rows,
@@ -238,9 +238,9 @@ class IsdLineScanner : public IsdCameraModel {
     glm::dvec2 GroundToImage(const glm::dvec3& ground) const;
 
     /// A strip of `lines` image lines from `firstLine` as Ernie renders it: a pushbroom camera
-    /// (`Camera::pushbroom`) whose rows are those lines, posed `from` at the strip's first line's
-    /// start and `to` at its end (camera to body-fixed world). Consecutive strips chain: each's
-    /// `from` is the last one's `to`, so stepping the camera's transform through the strips'
+    /// (`CameraParams::pushbroom`) whose rows are those lines, posed `from` at the strip's first
+    /// line's start and `to` at its end (camera to body-fixed world). Consecutive strips chain:
+    /// each's `from` is the last one's `to`, so stepping the camera's transform through the strips'
     /// `to`s (after a first step at the first `from`) renders the image strip by strip.
     ///
     /// The pose between `from` and `to` is a straight line and a great-arc turn, which departs
@@ -249,7 +249,7 @@ class IsdLineScanner : public IsdCameraModel {
     /// along the detector is fitted as the camera's Brown-Conrady k1 to k3, which the pushbroom's
     /// lens resamples through.
     struct Strip {
-        Camera camera;
+        CameraParams camera;
         glm::dmat4 from{1.0};
         glm::dmat4 to{1.0};
         double fromTime = 0.0;
@@ -307,7 +307,7 @@ class IsdPushFrame : public IsdCameraModel {
     /// terms (and scale). Render a whole image as a batch of these, one view per framelet, and
     /// stack the views from the top.
     struct Framelet {
-        Camera camera;  ///< `transform` its pose.
+        CameraParams camera;  ///< `transform` its pose.
         double time = 0.0;
         std::uint32_t firstLine = 0;
         /// Whether the camera's rows run up the framelet: the detector's map to the image is a

@@ -86,7 +86,7 @@ struct CahvoreModel {
         /// Its pose (`transform`), focal length, apertures and principal point, and the lens:
         /// CAHV and CAHVOR as perspective with Brown-Conrady terms, CAHVORE as a Kannala-Brandt
         /// fish-eye, each fitted to the model's rays over the image.
-        Camera camera;
+        CameraParams camera;
         /// The fit's largest departure from the model, pixels, over the image: from its
         /// distortion's optical axis O lying off the image plane's normal A (a tilt Ernie's
         /// lenses, centred on the normal, cannot take; pixels for long focal lengths), and any

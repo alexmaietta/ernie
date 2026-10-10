@@ -191,7 +191,7 @@ glm::dvec3 TowardsLight(const Scene& scene, const Path& light) {
     return glm::normalize(glm::dvec3(scene.WorldTransform(light)[2]));
 }
 
-void SetCamera(Scene& scene, const Path& path, const Camera& camera) {
+void SetCamera(Scene& scene, const Path& path, const CameraParams& camera) {
     using namespace tokens;
     const double aspect = static_cast<double>(camera.width) / static_cast<double>(camera.height);
     scene.Define(path, kCamera)

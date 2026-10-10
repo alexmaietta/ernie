@@ -20,7 +20,8 @@ def test_registry_describes_types_and_attributes():
     assert sphere.find("physical_illuminant").options == ["white", "blackbody", "illuminant D", "custom"]
     assert [a.py_name for a in sphere.attributes] == [
         "radius", "treat_as_point", "shaping_cone_angle", "shaping_cone_softness"]
-    assert sphere.all_attributes()[0].py_name == "intensity"
+    assert [a.py_name for a in sphere.all_attributes()][:3] == ["visibility", "world", "intensity"]
+    assert sphere.is_a("Imageable") and ernie.find_prim_type("Xform").base.name == "Imageable"
 
 
 def test_typed_prims_read_defaults_and_convert_on_set():

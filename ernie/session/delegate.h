@@ -157,7 +157,7 @@ class RenderDelegate {
     /// `ComputeInterop::WaitForVulkan` (Python's `__dlpack__` does so on the consumer's stream;
     /// `ComputeInterop::Download` does so itself). It stays valid while the tensor lives, but not
     /// beyond the delegate's Vulkan context.
-    /// @throws std::invalid_argument as `StepAsync` and `RenderVar::Map`, or for a GPU device
+    /// @throws std::invalid_argument as `StepAsync` and `RenderVarOutput::Map`, or for a GPU device
     /// other than the delegate's.
     Tensor Render(const Scene& scene, const Path& settings = {}, Device device = {});
 

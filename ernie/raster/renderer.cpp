@@ -526,7 +526,7 @@ std::vector<ShaderModuleSource> BrdfCheckModules(const BrdfModel& model) {
 
 }  // namespace
 
-std::vector<ShadowCascade> FitLightShadowViews(const Light& light, const glm::vec3& position,
+std::vector<ShadowCascade> FitLightShadowViews(const LightParams& light, const glm::vec3& position,
                                                const glm::vec3& sceneMin, const glm::vec3& sceneMax,
                                                std::uint32_t resolution) {
     if (!light.shadows) {
@@ -558,7 +558,7 @@ std::vector<ShadowCascade> FitLightShadowViews(const Light& light, const glm::ve
         view.texelWorldSize = 2.0f * std::tan(0.5f * fov) / texels;
         return view;
     };
-    if (light.coneAngle <= Light::kMaxSpotConeDegrees) {
+    if (light.coneAngle <= LightParams::kMaxSpotConeDegrees) {
         return {perspective(glm::normalize(light.direction),
                             2.0f * glm::radians(std::max(light.coneAngle, 0.5f)))};
     }
@@ -928,7 +928,7 @@ void RasterRenderer::WriteLights(const FrameParams& params, const std::optional<
     std::vector<LightGpu> table(params.lights.size());
     std::vector<glm::vec4> lightRecords;  ///< The light pass's, for lights posed on the GPU.
     for (std::size_t i = 0; i < params.lights.size(); ++i) {
-        const Light& light = params.lights[i];
+        const LightParams& light = params.lights[i];
         LightGpu& entry = table[i];
         const glm::vec3 axis = glm::normalize(light.direction);
         const bool distant = light.type == LightType::Distant;
@@ -975,7 +975,7 @@ void RasterRenderer::WriteLights(const FrameParams& params, const std::optional<
         if (light.posedOnGpu) {
             // The light pass poses it and fits its views as `FitLightShadowViews` would.
             const auto kind = distant                                       ? 0u
-                              : light.coneAngle <= Light::kMaxSpotConeDegrees ? 1u
+                              : light.coneAngle <= LightParams::kMaxSpotConeDegrees ? 1u
                                                                               : 2u;
             const std::uint32_t record[4] = {static_cast<std::uint32_t>(i),
                                              static_cast<std::uint32_t>(entry.cone[2]),
@@ -1058,7 +1058,7 @@ void RasterRenderer::PlanBatchShadows(const FrameParams& params, const Bounds3& 
                                       std::span<RasterDrawable* const> drawables) {
     ERNIE_ZONE("Plan batch shadows");
     const ShadowSettings& shadows = params.shadows;
-    Light sun;
+    LightParams sun;
     sun.type = LightType::Distant;
     sun.direction = params.sunDirection;
     // A fit of the sun's map around `low` to `high`, one cascade covering every view depth. It
@@ -1164,7 +1164,7 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
     }
     const FrameParams& raster = facesOf ? *facesOf : params;
     outputViews_ = static_cast<std::uint32_t>(frame.Views());
-    const Camera& shutter = frame.camera;
+    const CameraParams& shutter = frame.camera;
     const double first = shutter.SubframeTime(0);
     shutter_ = {static_cast<float>(first),
                 static_cast<float>(subframes_ > 1 ? shutter.SubframeTime(1) - first : 1.0),
@@ -1176,7 +1176,7 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
         throw std::invalid_argument("A frame has at most " + std::to_string(kMaxLights) +
                                     " lights besides the sun");
     }
-    for (const Light& light : params.lights) {
+    for (const LightParams& light : params.lights) {
         if (light.spectrum.size() != static_cast<std::size_t>(params.camera.bands.count)) {
             throw std::invalid_argument("Every light's spectrum needs one value per camera band");
         }
@@ -1717,7 +1717,7 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
 
 void RasterRenderer::WriteSensor(const FrameParams& params, const FrameParams& raster) {
     ERNIE_ZONE("Sensor uniforms");
-    const Camera& camera = params.camera;
+    const CameraParams& camera = params.camera;
     const glm::mat4& projection = params.View().projection;
     const double rasterFocal =
         static_cast<double>(projection[1][1]) * static_cast<double>(extent_.height) / 2.0;

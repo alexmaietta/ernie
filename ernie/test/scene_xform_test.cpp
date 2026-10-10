@@ -20,7 +20,7 @@ using ernie::RotationOrder;
 using ernie::Scene;
 using ernie::Tensor;
 using ernie::Value;
-using ernie::Xform;
+using ernie::XformOps;
 namespace tokens = ernie::tokens;
 
 namespace {

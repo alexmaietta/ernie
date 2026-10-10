@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/scene/prim_type.h"
 
+#include "ernie/scene/base_schemas.h"
+#include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/light_schemas.h"
+#include "ernie/scene/material_schemas.h"
+#include "ernie/scene/render_schemas.h"
+#include "ernie/scene/terrain_schemas.h"
 
 #include <array>
 #include <cctype>
@@ -126,9 +132,7 @@ std::optional<Path> AttributeTraits<Path>::From(const Value& value) {
 std::vector<float> AttributeTraits<std::vector<float>>::Read(const Scene& scene, const Path& path,
                                                              std::string_view name,
                                                              const std::vector<float>& fallback) {
-    const Value* value = scene.Get(path, name);
-    const auto* floats = value != nullptr ? value->Get<std::vector<float>>() : nullptr;
-    return floats != nullptr ? *floats : fallback;
+    return GetFloats(scene, path, name).value_or(fallback);
 }
 
 std::optional<std::vector<float>> AttributeTraits<std::vector<float>>::From(const Value& value) {
@@ -230,15 +234,16 @@ std::vector<const AttributeDef*> PrimTypeDef::AllAttributes() const {
 }
 
 std::span<const PrimTypeDef* const> PrimTypes() {
-    using namespace schema;
-    static const std::array<const PrimTypeDef*, 8> types{&Light::Definition(),
-                                                         &BoundableLight::Definition(),
-                                                         &NonboundableLight::Definition(),
-                                                         &DistantLight::Definition(),
-                                                         &DomeLight::Definition(),
-                                                         &SphereLight::Definition(),
-                                                         &RectLight::Definition(),
-                                                         &DiskLight::Definition()};
+    // Each schema file's types, bases first, after the bases' file.
+    static const std::vector<const PrimTypeDef*> types = [] {
+        std::vector<const PrimTypeDef*> all;
+        for (std::vector<const PrimTypeDef*> family :
+             {BaseSchemaTypes(), LightSchemaTypes(), GeometrySchemaTypes(), CameraSchemaTypes(),
+              MaterialSchemaTypes(), RenderSchemaTypes(), TerrainSchemaTypes()}) {
+            all.insert(all.end(), family.begin(), family.end());
+        }
+        return all;
+    }();
     return types;
 }
 
@@ -264,8 +269,6 @@ const PrimTypeDef& GetPrimType(std::string_view name) {
 const PrimTypeDef* PrimTypeOf(const Scene& scene, const Path& path) {
     return FindPrimType(scene.TypeOf(path));
 }
-
-namespace schema {
 
 namespace {
 
@@ -295,7 +298,5 @@ Scene& SchemaView::Edit() const {
     }
     return *mutable_;
 }
-
-}  // namespace schema
 
 }  // namespace ernie

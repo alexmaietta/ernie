@@ -127,34 +127,34 @@ double SensorModel::ElectronsPerDn(double iso) const {
     return atIso100 * 100.0 / iso;
 }
 
-double Camera::LinearExposureScale() const {
+double CameraParams::LinearExposureScale() const {
     return responsivity * exposureTime * (iso / 100.0) * std::exp2(exposureStops) / (fStop * fStop);
 }
 
-double Camera::PixelPitchMetres() const {
+double CameraParams::PixelPitchMetres() const {
     return orthographic ? orthographicPixelPitchUm * 1e-6 : verticalApertureMm * 1e-3 / height;
 }
 
-double Camera::FocalLengthPixels() const {
+double CameraParams::FocalLengthPixels() const {
     return focalLengthMm / (verticalApertureMm / height);
 }
 
-double Camera::OrthographicPixelSize() const {
+double CameraParams::OrthographicPixelSize() const {
     return 0.1 * verticalApertureMm / height;
 }
 
-glm::dvec2 Camera::PrincipalPoint() const {
+glm::dvec2 CameraParams::PrincipalPoint() const {
     // Offsets share the apertures' units, millimetres or tenths of a scene unit.
     const double pitch = verticalApertureMm / height;
     return {0.5 * width + horizontalApertureOffsetMm / pitch,
             0.5 * height - verticalApertureOffsetMm / pitch};
 }
 
-double Camera::VerticalFov() const {
+double CameraParams::VerticalFov() const {
     return 2.0 * std::atan(0.5 * verticalApertureMm / focalLengthMm);
 }
 
-double Camera::IrradiancePerRadiance(glm::dvec2 normalised) const {
+double CameraParams::IrradiancePerRadiance(glm::dvec2 normalised) const {
     double factor = M_PI * lens.transmission / (4.0 * fStop * fStop);
     // Telecentric optics see every pixel's scene head on.
     if (lens.vignetting && !orthographic) {
@@ -163,7 +163,7 @@ double Camera::IrradiancePerRadiance(glm::dvec2 normalised) const {
     return factor;
 }
 
-std::vector<float> Camera::ElectronsPerRadiance(std::size_t channel) const {
+std::vector<float> CameraParams::ElectronsPerRadiance(std::size_t channel) const {
     const SensorChannel& sensorChannel = sensor.channels.at(channel);
     std::vector<float> factors = PhotonsPerRadiance();
     for (int i = 0; i < bands.count; ++i) {
@@ -175,7 +175,7 @@ std::vector<float> Camera::ElectronsPerRadiance(std::size_t channel) const {
     return factors;
 }
 
-std::vector<float> Camera::PhotonsPerRadiance() const {
+std::vector<float> CameraParams::PhotonsPerRadiance() const {
     const double area = PixelPitchMetres() * PixelPitchMetres();
     const double optics = IrradiancePerRadiance({0.0, 0.0});
     std::vector<float> factors(static_cast<std::size_t>(bands.count));
@@ -187,11 +187,11 @@ std::vector<float> Camera::PhotonsPerRadiance() const {
     return factors;
 }
 
-double Camera::Electrons(std::span<const float> radiance, std::size_t channel,
-                         glm::dvec2 normalised) const {
+double CameraParams::Electrons(std::span<const float> radiance, std::size_t channel,
+                               glm::dvec2 normalised) const {
     const std::vector<float> factors = ElectronsPerRadiance(channel);
     if (radiance.size() != factors.size()) {
-        throw std::invalid_argument("Camera::Electrons needs one radiance per band");
+        throw std::invalid_argument("CameraParams::Electrons needs one radiance per band");
     }
     double electrons = 0.0;
     for (std::size_t i = 0; i < factors.size(); ++i) {
@@ -200,19 +200,19 @@ double Camera::Electrons(std::span<const float> radiance, std::size_t channel,
     return electrons * IrradiancePerRadiance(normalised) / IrradiancePerRadiance({0.0, 0.0});
 }
 
-glm::dvec3 Camera::Forward() const {
+glm::dvec3 CameraParams::Forward() const {
     return glm::normalize(-glm::dvec3(transform[2]));
 }
 
-void Camera::SetVerticalFov(double radians) {
+void CameraParams::SetVerticalFov(double radians) {
     verticalApertureMm = 2.0 * focalLengthMm * std::tan(0.5 * radians);
 }
 
-CameraView Camera::RasterView(double overscan) const {
+CameraView CameraParams::RasterView(double overscan) const {
     return RasterView(transform, overscan);
 }
 
-CameraView Camera::RasterView(const glm::dmat4& pose, double overscan) const {
+CameraView CameraParams::RasterView(const glm::dmat4& pose, double overscan) const {
     const double w = width;
     const double h = height;
     const glm::dvec2 centre = PrincipalPoint();
@@ -241,7 +241,7 @@ CameraView Camera::RasterView(const glm::dmat4& pose, double overscan) const {
     return view;
 }
 
-void Camera::Check() const {
+void CameraParams::Check() const {
     bands.Check();
     if (width == 0 || height == 0 || !(focalLengthMm > 0.0) || !(verticalApertureMm > 0.0) ||
         !(exposureTime > 0.0) || !(iso > 0.0) || !(fStop > 0.0) || !(responsivity > 0.0)) {
@@ -350,12 +350,12 @@ void Camera::Check() const {
     }
 }
 
-int Camera::Subframes() const {
+int CameraParams::Subframes() const {
     const bool moving = shutterClose > shutterOpen || rollingShutter > 0.0;
     return moving ? std::max(shutterSamples, 2) : 1;
 }
 
-double Camera::SubframeTime(int subframe) const {
+double CameraParams::SubframeTime(int subframe) const {
     const int count = Subframes();
     const double start = shutterOpen - rollingShutter;
     return count == 1 ? shutterClose
@@ -391,15 +391,16 @@ void SetSingletChromatic(LensModel& lens, double focalLengthMm, double nd, doubl
     lens.chromaticFocusMm = Spectrum(wavelengths, focus);
 }
 
-Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::uint32_t height) {
+CameraParams CameraParamsOf(const Scene& scene, const Path& path, std::uint32_t width,
+                            std::uint32_t height) {
     if (!scene.Has(path) || scene.TypeOf(path) != tokens::kCamera) {
         throw std::invalid_argument("'" + path.String() + "' is not a Camera");
     }
-    return CameraOf(scene, path, width, height, scene.WorldTransform(path));
+    return CameraParamsOf(scene, path, width, height, scene.WorldTransform(path));
 }
 
-Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::uint32_t height,
-                const glm::dmat4& transform) {
+CameraParams CameraParamsOf(const Scene& scene, const Path& path, std::uint32_t width,
+                            std::uint32_t height, const glm::dmat4& transform) {
     using namespace tokens;
     if (!scene.Has(path) || scene.TypeOf(path) != kCamera) {
         throw std::invalid_argument("'" + path.String() + "' is not a Camera");
@@ -409,7 +410,7 @@ Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::
         throw std::invalid_argument("Camera '" + path.String() + "' has projection '" +
                                     projection + "'; use perspective or orthographic");
     }
-    Camera camera;
+    CameraParams camera;
     camera.orthographic = projection == kOrthographic;
     camera.transform = transform;
     camera.width = width;

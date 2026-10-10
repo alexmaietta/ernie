@@ -66,7 +66,8 @@ glm::mat4 PushbroomStrip::Packed() const {
     return packed;
 }
 
-CameraView PushbroomEnvelope(const Camera& camera, const glm::dmat4& from, const glm::dmat4& to) {
+CameraView PushbroomEnvelope(const CameraParams& camera, const glm::dmat4& from,
+                             const glm::dmat4& to) {
     const glm::dmat4 middle = InterpolatePose(from, to, 0.5);
     const glm::dmat3 rotation = glm::mat3_cast(RotationOf(middle));
     const glm::dvec3 forward = -rotation[2];
@@ -198,7 +199,7 @@ FrameParams FrameParams::Faces(int faces) const {
         throw std::invalid_argument("A camera rendered on cube faces needs its poses on the host");
     }
     // The faces' camera: a centred pinhole, its focal length in pixels the face's.
-    Camera& face = result.camera;
+    CameraParams& face = result.camera;
     face.lens = LensModel{};
     face.lens.transmission = camera.lens.transmission;
     face.lens.vignetting = camera.lens.vignetting;

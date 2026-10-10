@@ -395,8 +395,9 @@ struct Viewer::State {
         }
         if (const std::optional<double> luminance = delegate->MeteredLuminance();
             luminance && scene.Has(activeCamera)) {
-            const double scale = CameraOf(scene, activeCamera, ViewportWidth(), ViewportHeight())
-                                     .LinearExposureScale();
+            const double scale =
+                CameraParamsOf(scene, activeCamera, ViewportWidth(), ViewportHeight())
+                    .LinearExposureScale();
             const double target = std::log2(kMiddleGrey / (*luminance * scale));
             autoStops = autoStops ? *autoStops + (target - *autoStops) *
                                                      (1.0 - std::exp(-frameInfo.delta / kAdaptation))
@@ -761,8 +762,8 @@ struct Viewer::State {
             // The camera's lens may have changed (the Camera panel): framing follows it. An
             // orthographic view's aperture is its height, not a field of view.
             if (scene.Has(activeCamera) && orthographicView < 0) {
-                const Camera camera =
-                    CameraOf(scene, activeCamera, ViewportWidth(), ViewportHeight());
+                const CameraParams camera =
+                    CameraParamsOf(scene, activeCamera, ViewportWidth(), ViewportHeight());
                 if (!camera.orthographic) {
                     controller.verticalFov = static_cast<float>(camera.VerticalFov());
                 }
@@ -787,11 +788,12 @@ struct Viewer::State {
         activeCamera = camera;
         if (camera != PerspectiveCamera()) {
             const float fov = static_cast<float>(
-                CameraOf(scene, camera, ViewportWidth(), ViewportHeight()).VerticalFov());
+                CameraParamsOf(scene, camera, ViewportWidth(), ViewportHeight()).VerticalFov());
             controller =
                 ControllerFromTransform(scene.WorldTransform(camera), controller.distance, fov);
         } else if (scene.Has(camera)) {
-            const Camera current = CameraOf(scene, camera, ViewportWidth(), ViewportHeight());
+            const CameraParams current =
+                CameraParamsOf(scene, camera, ViewportWidth(), ViewportHeight());
             // An orthographic view's aperture is its height: the controller keeps its own field
             // of view.
             controller = ControllerFromTransform(
@@ -1150,7 +1152,8 @@ struct Viewer::State {
             !scene.Has(activeCamera)) {
             return;
         }
-        const Camera camera = CameraOf(scene, activeCamera, ViewportWidth(), ViewportHeight());
+        const CameraParams camera =
+            CameraParamsOf(scene, activeCamera, ViewportWidth(), ViewportHeight());
         const glm::dvec3 eye(camera.transform[3]);
         glm::dmat4 orientation = camera.transform;
         orientation[3] = glm::dvec4(0.0, 0.0, 0.0, 1.0);
@@ -1207,7 +1210,7 @@ struct Viewer::State {
             return true;
         }
         if (sphere) {
-            const schema::SphereLight light(std::as_const(scene), path);
+            const SphereLight light(std::as_const(scene), path);
             const double radius = light.GetTreatAsPoint() ? 0.0 : light.GetRadius();
             overlay.Sphere(centre, std::max(radius, 0.05 * reach), style);
             const double cone = light.GetShapingConeAngle();
@@ -1228,13 +1231,13 @@ struct Viewer::State {
         }
         // Rect and disk lights: their outline, scaled with the prim, and their normal.
         if (rect) {
-            const schema::RectLight light(std::as_const(scene), path);
+            const RectLight light(std::as_const(scene), path);
             const double w = 0.5 * light.GetWidth();
             const double h = 0.5 * light.GetHeight();
             overlay.Box({-w, -h, 0.0}, {w, h, 0.0}, style, world);
         } else {
-            const double radius = schema::DiskLight(std::as_const(scene), path).GetRadius() *
-                                  glm::length(glm::dvec3(world[0]));
+            const double radius =
+                DiskLight(std::as_const(scene), path).GetRadius() * glm::length(glm::dvec3(world[0]));
             overlay.Circle(centre, down, radius, style);
         }
         overlay.Arrow(centre, centre + down * reach, style, 0.18 * reach);
@@ -1355,9 +1358,9 @@ struct Viewer::State {
     /// The frustum of the camera at `path` as a pyramid from its eye, its size following the
     /// view's distance, with a triangle over its top edge showing which way is up.
     void DrawCameraFrustum(Overlay& overlay, const Path& path, const OverlayStyle& style) {
-        Camera camera;
+        CameraParams camera;
         try {
-            camera = CameraOf(scene, path, ViewportWidth(), ViewportHeight());
+            camera = CameraParamsOf(scene, path, ViewportWidth(), ViewportHeight());
         } catch (const std::exception&) {
             return;  // a camera that cannot resolve draws nothing
         }
@@ -1452,7 +1455,7 @@ struct Viewer::State {
     void DrawBandCombo(float width) {
         SpectralBands bands;
         try {
-            bands = CameraOf(scene, activeCamera, 16, 16).bands;
+            bands = CameraParamsOf(scene, activeCamera, 16, 16).bands;
         } catch (const std::exception&) {
             return;
         }
@@ -1576,7 +1579,8 @@ struct Viewer::State {
         const bool perspective = activeCamera == PerspectiveCamera();
         ImGui::BeginDisabled(!perspective || !scene.Has(activeCamera));
         if (scene.Has(activeCamera)) {
-            Camera lens = CameraOf(scene, activeCamera, ViewportWidth(), ViewportHeight());
+            CameraParams lens =
+                CameraParamsOf(scene, activeCamera, ViewportWidth(), ViewportHeight());
             float fov = static_cast<float>(glm::degrees(lens.VerticalFov()));
             ImGui::SetNextItemWidth(160.0f * contentScale);
             if (ImGui::SliderFloat("Vertical FOV", &fov, 5.0f, 120.0f, "%.0f deg")) {
@@ -2647,7 +2651,8 @@ Path Viewer::CameraFromView(const Path& path) {
     if (s.scene.Has(path)) {
         throw std::invalid_argument("'" + path.String() + "' already exists");
     }
-    Camera camera = CameraOf(s.scene, s.activeCamera, s.ViewportWidth(), s.ViewportHeight());
+    CameraParams camera =
+        CameraParamsOf(s.scene, s.activeCamera, s.ViewportWidth(), s.ViewportHeight());
     s.scene.Define(path, tokens::kCamera);
     camera.transform = LocalFromWorld(s.scene, path, camera.transform);
     SetCamera(s.scene, path, camera);
@@ -2751,7 +2756,7 @@ Path Viewer::Create(std::string_view type) {
                                        static_cast<double>(s.controller.distance) / 10.0, 1e-3))));
     context.parentWorld = s.scene.Has(parent) ? s.scene.WorldTransform(parent) : glm::dmat4(1.0);
     context.camera =
-        CameraOf(s.scene, s.activeCamera, s.ViewportWidth(), s.ViewportHeight());
+        CameraParamsOf(s.scene, s.activeCamera, s.ViewportWidth(), s.ViewportHeight());
     if (!IsSessionPath(s.activeCamera)) {
         context.activeCamera = s.activeCamera;
     }

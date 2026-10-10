@@ -513,7 +513,7 @@ TEST(SunIrradianceOf, RelativeLightsFollowTheirColourAndTemperature) {
 }
 
 TEST(OverscanOf, WidensTheRasterViewForDistortion) {
-    ernie::Camera camera;
+    ernie::CameraParams camera;
     camera.width = 64;
     camera.height = 48;
     EXPECT_EQ(ernie::OverscanOf(camera), 1.0);

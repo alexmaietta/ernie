@@ -29,7 +29,7 @@ std::vector<Path> ViewableCameras(const Scene& scene) {
 void AuthorControllerCamera(Scene& scene, const Path& path, const OrbitController& controller,
                             std::uint32_t width, std::uint32_t height, bool orthographic) {
     const bool existing = scene.Has(path);
-    Camera camera = existing ? CameraOf(scene, path, width, height) : Camera{};
+    CameraParams camera = existing ? CameraParamsOf(scene, path, width, height) : CameraParams{};
     camera.width = width;
     camera.height = height;
     if (existing) {

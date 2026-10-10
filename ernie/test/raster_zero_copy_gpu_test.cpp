@@ -134,7 +134,7 @@ TEST_F(RasterDelegateTest, MappedHeightsDrawWhereDirtyWithoutCopies) {
     Scene scene = TerrainScene(raster);
     ernie::SetCamera(scene, "/World/Camera",
                      [] {
-                         ernie::Camera camera;
+                         ernie::CameraParams camera;
                          camera.width = kSize;
                          camera.height = kSize;
                          camera.transform = ernie::LookAtTransform(
@@ -168,7 +168,8 @@ TEST_F(RasterDelegateTest, MappedHeightsDrawWhereDirtyWithoutCopies) {
     TestRaster raised = raster;
     raised.values = values;
     Scene host = TerrainScene(raised);
-    ernie::SetCamera(host, "/World/Camera", ernie::CameraOf(scene, "/World/Camera", kSize, kSize));
+    ernie::SetCamera(host, "/World/Camera",
+                     ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize));
     RasterDelegate reference(*context_);
     EXPECT_LT(Differing(after, reference.Render(host), 2), 10u);
 }

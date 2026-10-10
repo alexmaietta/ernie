@@ -10,7 +10,7 @@
 #include <stdexcept>
 #include <vector>
 
-using ernie::Camera;
+using ernie::CameraParams;
 using ernie::FrameParams;
 
 namespace {
@@ -26,7 +26,7 @@ void ExpectNear(const glm::dmat4& a, const glm::dmat4& b, double tolerance = 1e-
 }  // namespace
 
 TEST(Shutter, SubframesSpanTheShutterAndReadout) {
-    Camera camera;
+    CameraParams camera;
     EXPECT_EQ(camera.Subframes(), 1) << "closed by default";
     EXPECT_EQ(camera.SubframeTime(0), 0.0);
     camera.shutterOpen = -0.5;
@@ -117,7 +117,7 @@ TEST(Pushbroom, StripRunsFromTheLastPoseToThisOne) {
 }
 
 TEST(Pushbroom, EnvelopeHoldsEveryRayOfTheStrip) {
-    Camera camera;
+    CameraParams camera;
     camera.width = 64;
     camera.height = 64;
     camera.pushbroom = true;

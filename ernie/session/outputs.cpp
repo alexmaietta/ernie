@@ -10,7 +10,7 @@
 
 namespace ernie {
 
-RenderVar::RenderVar(std::shared_ptr<ProductFrame> frame, Path path, std::string name)
+RenderVarOutput::RenderVarOutput(std::shared_ptr<ProductFrame> frame, Path path, std::string name)
     : frame_(std::move(frame)), path_(std::move(path)), name_(std::move(name)) {}
 
 namespace {
@@ -84,23 +84,23 @@ void RecordCopy(VkCommandBuffer commands, GpuImage& image, GpuBuffer& buffer,
 
 }  // namespace
 
-std::uint32_t RenderVar::Width() const {
+std::uint32_t RenderVarOutput::Width() const {
     return frame_->images->Extent().width;
 }
 
-std::uint32_t RenderVar::Height() const {
+std::uint32_t RenderVarOutput::Height() const {
     return frame_->images->Extent().height;
 }
 
-std::uint32_t RenderVar::Views() const {
+std::uint32_t RenderVarOutput::Views() const {
     return frame_ == nullptr ? 1 : frame_->images->Views();
 }
 
-bool RenderVar::IsMapped() const {
+bool RenderVarOutput::IsMapped() const {
     return frame_ != nullptr && frame_->arrayMaps > 0;
 }
 
-std::vector<std::int64_t> RenderVar::Shape() const {
+std::vector<std::int64_t> RenderVarOutput::Shape() const {
     if (frame_ == nullptr) {
         throw std::invalid_argument("Empty render var");
     }
@@ -128,7 +128,7 @@ std::vector<std::int64_t> RenderVar::Shape() const {
     return shape;
 }
 
-DType RenderVar::Type() const {
+DType RenderVarOutput::Type() const {
     if (frame_ != nullptr) {
         if (const FrameImages::LinearVar linear = frame_->images->Linear(name_); linear.buffer) {
             return LayoutOf(linear.format).type;
@@ -137,7 +137,7 @@ DType RenderVar::Type() const {
     return LayoutOf(Images().front()->Desc().format).type;
 }
 
-std::vector<GpuImage*> RenderVar::Images() const {
+std::vector<GpuImage*> RenderVarOutput::Images() const {
     if (frame_ == nullptr) {
         throw std::invalid_argument("Empty render var");
     }
@@ -157,10 +157,10 @@ std::vector<GpuImage*> RenderVar::Images() const {
     return images;
 }
 
-MappedRenderVar RenderVar::Map(MapDevice device, std::uintptr_t syncStream) {
+MappedRenderVar RenderVarOutput::Map(MapDevice device, std::uintptr_t syncStream) {
     ERNIE_ZONE("Map render var");
     if (frame_ == nullptr) {
-        throw std::invalid_argument("RenderVar::Map on an empty render var");
+        throw std::invalid_argument("RenderVarOutput::Map on an empty render var");
     }
     ProductFrame& frame = *frame_;
     if (const FrameImages::LinearVar linear = frame.images->Linear(name_); linear.buffer) {
@@ -241,8 +241,8 @@ MappedRenderVar RenderVar::Map(MapDevice device, std::uintptr_t syncStream) {
     return mapped;
 }
 
-MappedRenderVar RenderVar::MapLinear(const FrameImages::LinearVar& linear, MapDevice device,
-                                     std::uintptr_t syncStream) {
+MappedRenderVar RenderVarOutput::MapLinear(const FrameImages::LinearVar& linear, MapDevice device,
+                                           std::uintptr_t syncStream) {
     ProductFrame& frame = *frame_;
     const std::vector<std::int64_t> shape = Shape();
     const DType type = LayoutOf(linear.format).type;
@@ -283,7 +283,7 @@ MappedRenderVar RenderVar::MapLinear(const FrameImages::LinearVar& linear, MapDe
     return mapped;
 }
 
-void RenderVar::Unmap(std::uintptr_t stream) {
+void RenderVarOutput::Unmap(std::uintptr_t stream) {
     if (frame_ == nullptr || frame_->arrayMaps == 0) {
         return;
     }

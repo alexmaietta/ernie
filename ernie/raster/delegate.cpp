@@ -646,7 +646,7 @@ void RasterDelegate::ApplyDomeDirections(FrameParams& frame) const {
             continue;
         }
         const std::vector<float> shape = RgbToSpectrum(rgb / peak).Bin(frame.camera.bands);
-        Light light;
+        LightParams light;
         light.type = LightType::Distant;
         light.direction = glm::vec3(glm::normalize(rotation * direction.direction));
         light.spectrum.assign(frame.dome->radiance.size(), 0.0f);
@@ -666,7 +666,7 @@ void RasterDelegate::ApplyDomeSun(FrameParams& frame) const {
         !frame.dome->shadow || domeLightingMap_.Empty()) {
         return;
     }
-    // The dome's frame turned into the world, as `DomeOf` turned its map.
+    // The dome's frame turned into the world, as `DomeParamsOf` turned its map.
     const glm::dmat3 rotation = glm::transpose(glm::dmat3(frame.dome->toDome));
     frame.dome->sh = DomeIrradianceSh(domeLightingMap_, rotation);
     // The sun's spectral irradiance: the dome's spectral radiance times the sun's colour,
@@ -688,7 +688,7 @@ void RasterDelegate::ApplyDomeSun(FrameParams& frame) const {
         frame.ambient = 0.0f;
         return;
     }
-    Light sun;
+    LightParams sun;
     sun.type = LightType::Distant;
     sun.direction = towards;
     sun.spectrum = std::move(spectrum);
@@ -2164,10 +2164,10 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         anchoredViews_ = !anchored.empty();
         meshes_.SetAnchoredViews(std::move(anchored));
         const int bands = (prims.cameraTransform
-                               ? CameraOf(scene, prims.camera, spec.resolution.width,
-                                          spec.resolution.height, *prims.cameraTransform)
-                               : CameraOf(scene, prims.camera, spec.resolution.width,
-                                          spec.resolution.height))
+                               ? CameraParamsOf(scene, prims.camera, spec.resolution.width,
+                                                spec.resolution.height, *prims.cameraTransform)
+                               : CameraParamsOf(scene, prims.camera, spec.resolution.width,
+                                                spec.resolution.height))
                               .bands.count;
         // Poses written as a GPU array stay on the GPU (`GpuPosesOf`), copied device to device
         // after the work writing them, with the last ones rendered as the CPU's estimates; or
@@ -2184,7 +2184,8 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
             poses = renderer_.LastGpuPoses(count);
             if (poses.empty()) {
                 const glm::dmat4 own =
-                    CameraOf(scene, cameras.front(), spec.resolution.width, spec.resolution.height)
+                    CameraParamsOf(scene, cameras.front(), spec.resolution.width,
+                                   spec.resolution.height)
                         .transform;
                 poses.assign(count, own);
             }
@@ -2312,8 +2313,8 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         // lens alone decides, not its pose (which may be on the GPU).
         const std::uint32_t faces =
             minimal == MinimalMode::Off &&
-                    NeedsCubeFaces(CameraOf(scene, cameras.front(), spec.resolution.width,
-                                            spec.resolution.height, glm::dmat4(1.0)))
+                    NeedsCubeFaces(CameraParamsOf(scene, cameras.front(), spec.resolution.width,
+                                                  spec.resolution.height, glm::dmat4(1.0)))
                 ? static_cast<std::uint32_t>(kCubeFaces)
                 : 1u;
         std::shared_ptr<ProductFrame> frame =
@@ -2379,7 +2380,7 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         RenderProductOutput& output = outputs[spec.product];
         output.product = spec.product;
         for (const auto& [path, name] : spec.vars) {
-            output.vars.emplace(name, RenderVar(frame, path, name));
+            output.vars.emplace(name, RenderVarOutput(frame, path, name));
         }
     }
     SettleMotion();

@@ -44,6 +44,16 @@ configure_file(ernie/app.py "${ernie_package_dir}/app.py" COPYONLY)
 configure_file(ernie/batch.py "${ernie_package_dir}/batch.py" COPYONLY)
 configure_file(ernie/demo.py "${ernie_package_dir}/demo.py" COPYONLY)
 configure_file(ernie/schema.py "${ernie_package_dir}/schema.py" COPYONLY)
+# Stubs of the typed prim classes, which ernie.schema builds from the prim type registry at import
+# where nanobind's stubgen cannot see them; -P keeps this directory's ernie/ off the path.
+add_custom_command(
+    OUTPUT "${ernie_package_dir}/schema.pyi"
+    COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${CMAKE_BINARY_DIR}/python" ${Python_EXECUTABLE}
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/stub_schema.py" "${ernie_package_dir}/schema.pyi"
+    DEPENDS _ernie stub_schema.py ernie/schema.py ernie/__init__.py
+    COMMENT "Generating the typed prim classes' stubs"
+    VERBATIM)
+add_custom_target(_ernie_schema_stub ALL DEPENDS "${ernie_package_dir}/schema.pyi")
 # A wheel (pyproject.toml, scikit-build-core): the package, with Slang's compiler and the glslang
 # library it loads at run time beside the module, found through $ORIGIN; the `python` component
 # only, not dependencies' own install rules.
@@ -51,7 +61,7 @@ if(SKBUILD)
     install(TARGETS _ernie LIBRARY DESTINATION ernie COMPONENT python)
     install(
         FILES ernie/__init__.py ernie/app.py ernie/batch.py ernie/demo.py ernie/schema.py
-              "${ernie_package_dir}/py.typed"
+              "${ernie_package_dir}/schema.pyi" "${ernie_package_dir}/py.typed"
         DESTINATION ernie
         COMPONENT python)
     install(

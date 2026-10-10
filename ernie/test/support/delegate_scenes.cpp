@@ -92,7 +92,7 @@ Scene CullingScene() {
 
 const std::uint8_t* TexelAt(const Scene& scene, const Tensor& image, glm::vec3 p) {
     const glm::vec4 clip =
-        CameraOf(scene, "/World/Camera", kSize, kSize).RasterView().ViewProjection() *
+        CameraParamsOf(scene, "/World/Camera", kSize, kSize).RasterView().ViewProjection() *
         glm::vec4(p, 1.0f);
     const glm::vec2 ndc = glm::vec2(clip) / clip.w;
     const auto col = static_cast<std::size_t>((ndc.x * 0.5f + 0.5f) * kSize);
@@ -141,7 +141,7 @@ std::map<std::string, Tensor, std::less<>> MapVars(RenderProductSetOutputs& outp
 
 std::pair<std::size_t, std::size_t> PixelOf(const Scene& scene, float x, float y) {
     const glm::vec4 clip =
-        CameraOf(scene, "/World/Camera", kSize, kSize).RasterView().ViewProjection() *
+        CameraParamsOf(scene, "/World/Camera", kSize, kSize).RasterView().ViewProjection() *
         glm::vec4(x, y, 0.0f, 1.0f);
     const glm::vec2 ndc = glm::vec2(clip) / clip.w;
     return {static_cast<std::size_t>((0.5f - ndc.y * 0.5f) * kVarSize),

@@ -639,7 +639,7 @@ glm::dmat4 IsdCameraModel::PoseAt(double time, const glm::dmat3& axes) const {
     return pose;
 }
 
-double IsdCameraModel::FitDistortion(Camera& camera, std::span<const double> lines,
+double IsdCameraModel::FitDistortion(CameraParams& camera, std::span<const double> lines,
                                      const glm::dmat3& axes, double facing) const {
     if (isd_.distortion.empty()) {
         return 0.0;
@@ -800,7 +800,7 @@ IsdLineScanner::Strip IsdLineScanner::StripOf(std::uint32_t firstLine, std::uint
     const double principalSample = -ray0.x * f / pitch;
 
     Strip strip;
-    Camera& camera = strip.camera;
+    CameraParams& camera = strip.camera;
     camera.pushbroom = true;
     camera.width = isd_.samples;
     camera.height = lines;
@@ -968,7 +968,7 @@ IsdCameraModel::FrameViewOf(const std::function<double(double)>& detectorLine, s
     const glm::dvec2 topLeft = normalised(rowOf(0.5), 0.5);
     const glm::dvec2 principal(0.5 - topLeft.x * pixels, 0.5 + topLeft.y * pixels);
 
-    Camera& camera = view.camera;
+    CameraParams& camera = view.camera;
     camera.width = isd_.samples;
     camera.height = rows;
     camera.focalLengthMm = f;

@@ -215,7 +215,7 @@ TEST_F(RasterDelegateTest, BayerMosaicsDemosaicRestoresAndCompandingCompresses) 
     const auto mosaic = VarThrough(delegate, scene, "RawDN",
                                    {{"qe", kNone}, {"bayer", kNone}, {"adc", kNone}});
     // RGGB: each pixel's other channels hold the black level alone, its own the full value.
-    const ernie::Camera camera = ernie::CameraOf(scene, "/World/Camera", kSize, kSize);
+    const ernie::CameraParams camera = ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize);
     const float black = static_cast<float>(camera.sensor.blackLevelDn);
     for (std::size_t y = 0; y < kSize; ++y) {
         for (std::size_t x = 0; x < kSize; ++x) {
@@ -312,7 +312,7 @@ TEST_F(RasterDelegateTest, BloomingSpillsSaturatedChargeAlongColumns) {
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();
     const float well = static_cast<float>(
-        ernie::CameraOf(scene, "/World/Camera", kSize, kSize).sensor.fullWellElectrons);
+        ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize).sensor.fullWellElectrons);
     const auto clipped = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
     const auto bloomed =
         VarsThrough(delegate, scene, {"Electrons", "aov:overflow"},
@@ -410,7 +410,7 @@ TEST_F(RasterDelegateTest, CustomIntegratorsStandInForQe) {
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();
     scene.Set("/World/Camera", tokens::kExposureTime, 1e-6);  // unsaturated
-    const ernie::Camera camera = ernie::CameraOf(scene, "/World/Camera", kSize, kSize);
+    const ernie::CameraParams camera = ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize);
     std::vector<float> red(48);
     for (std::size_t i = 0; i < red.size(); ++i) {
         const double nm = 360.0 + 10.0 * static_cast<double>(i);

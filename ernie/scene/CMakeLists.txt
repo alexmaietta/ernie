@@ -2,20 +2,26 @@
 ernie_add_library(
     ernie_scene
     SOURCES
+    base_schemas.cpp
     brdf.cpp
     cahvore.cpp
     camera.cpp
+    camera_schemas.cpp
     edit_history.cpp
+    geometry_schemas.cpp
     instruments.cpp
     isd.cpp
     light_schemas.cpp
+    material_schemas.cpp
     orbit_controller.cpp
     overlay.cpp
     path.cpp
     prim_type.cpp
+    render_schemas.cpp
     scene.cpp
     schema.cpp
     sensor_filters.cpp
+    terrain_schemas.cpp
     wide_view.cpp
     xform.cpp
     PUBLIC

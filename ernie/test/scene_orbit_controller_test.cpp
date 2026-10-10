@@ -126,7 +126,7 @@ TEST(OrbitController, AppliesItsPoseFieldOfViewAndClippingToACamera) {
     orbit.target = {1.0f, 2.0f, 3.0f};
     orbit.distance = 40.0f;
     orbit.verticalFov = 0.5f;
-    ernie::Camera camera;
+    ernie::CameraParams camera;
     camera.focalLengthMm = 35.0;
     camera.exposureStops = 2.0;
     orbit.Apply(camera);

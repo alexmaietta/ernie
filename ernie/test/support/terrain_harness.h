@@ -16,7 +16,7 @@ struct TerrainDrawParams {
         float exposure = 1.0f;
     };
 
-    Camera camera;              ///< Its width and height are replaced by `extent`.
+    CameraParams camera;        ///< Its width and height are replaced by `extent`.
     VkExtent2D extent{64, 64};  ///< Image size, which `Record`'s target must have.
     glm::vec3 sunDirection{0.0f, 0.0f, 1.0f};
     float ambient = 0.15f;

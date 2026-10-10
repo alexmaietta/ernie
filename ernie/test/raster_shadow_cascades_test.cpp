@@ -11,7 +11,7 @@
 
 using ernie::CameraView;
 using ernie::FitCascades;
-using ernie::Light;
+using ernie::LightParams;
 using ernie::LightType;
 using ernie::OrbitController;
 using ernie::PracticalSplits;
@@ -159,7 +159,7 @@ TEST(WithShadows, GrowsTheBoxToWhereItsShadowsLand) {
 TEST(FitLightShadowViews, CoversTheSceneFromEachKindOfLight) {
     const glm::vec3 low(-10.0f, -10.0f, 0.0f);
     const glm::vec3 high(10.0f, 10.0f, 2.0f);
-    Light distant;
+    LightParams distant;
     distant.type = LightType::Distant;
     distant.direction = glm::normalize(glm::vec3(1.0f, 0.0f, 1.0f));
     const std::vector<ShadowCascade> ortho =
@@ -172,7 +172,7 @@ TEST(FitLightShadowViews, CoversTheSceneFromEachKindOfLight) {
     }
     EXPECT_NEAR(ortho[0].texelWorldSize, glm::length(high - low) / 512.0f, 1e-4f);
 
-    Light spot;
+    LightParams spot;
     const glm::vec3 position(0.0f, 0.0f, 10.0f);
     spot.position = position;
     spot.direction = glm::vec3(0.0f, 0.0f, -1.0f);

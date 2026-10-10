@@ -239,8 +239,6 @@ const PrimTypeDef* PrimTypeOf(const Scene& scene, const Path& path);
 /// "ColorTemperature" as "color_temperature".
 std::string SnakeCase(std::string_view member);
 
-namespace schema {
-
 /// Base of the typed views: a handle to one prim of a registered type, read-only when made from a
 /// const scene. Copies are cheap and name the same prim.
 class SchemaView {
@@ -278,8 +276,6 @@ class SchemaView {
     const PrimTypeDef* type_ = nullptr;
 };
 
-}  // namespace schema
-
 }  // namespace ernie
 
 /// One attribute's accessors in a view class: `Get<Name>` (the fallback when unset), `Has<Name>`
@@ -292,7 +288,7 @@ class SchemaView {
         return Has(token);                                                                         \
     }                                                                                              \
     Self& Set##Name(::ernie::AttributeTraits<Type>::Arg value) {                                   \
-        ::ernie::schema::WriteAttribute<Type>(Edit(), GetPath(), token, value);                    \
+        ::ernie::detail::WriteAttribute<Type>(Edit(), GetPath(), token, value);                    \
         return static_cast<Self&>(*this);                                                          \
     }
 
@@ -327,7 +323,7 @@ class SchemaView {
 
 /// One `AttributeDef` of an attribute list entry, for `ERNIE_DEFINE_SCHEMA`.
 #define ERNIE_ATTRIBUTE_DEF(Type, Name, token, fallback, meta)                                     \
-    ::ernie::schema::MakeAttribute<Type>(token, #Name, fallback, meta),
+    ::ernie::detail::MakeAttribute<Type>(token, #Name, fallback, meta),
 
 /// Defines `Class::Definition()`: the type `typeName`, deriving from `base` (a `PrimTypeDef*`, or
 /// nullptr), declaring the attributes of `OWN_ATTRIBUTES`.
@@ -338,7 +334,8 @@ class SchemaView {
         return definition;                                                                         \
     }
 
-namespace ernie::schema {
+/// What the view macros expand to.
+namespace ernie::detail {
 
 template <typename T>
 void WriteAttribute(Scene& scene, const Path& path, std::string_view name,
@@ -364,7 +361,7 @@ AttributeDef MakeAttribute(std::string_view name, std::string_view member, const
     }
 }
 
-}  // namespace ernie::schema
+}  // namespace ernie::detail
 
 namespace ernie {
 

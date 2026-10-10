@@ -17,8 +17,8 @@
 
 namespace ernie {
 
-/// Where `RenderVar::Map` delivers an output. The GPU kinds are on the delegate's compute device
-/// (CUDA or ROCm, see `ComputeInterop`); `Cuda` and `CudaArray` are their earlier names.
+/// Where `RenderVarOutput::Map` delivers an output. The GPU kinds are on the delegate's compute
+/// device (CUDA or ROCm, see `ComputeInterop`); `Cuda` and `CudaArray` are their earlier names.
 enum class MapDevice {
     Cpu,       ///< A host tensor; the texels are copied to the host.
     /// A linear tensor on the compute device; the GPU detiles the image into it. Its memory goes
@@ -38,7 +38,7 @@ struct MappedRenderVar {
 };
 
 /// The images a backend renders one frame of a render product into, by render var name: what
-/// `RenderVar` reads, whatever the backend.
+/// `RenderVarOutput` reads, whatever the backend.
 class FrameImages {
   public:
     virtual ~FrameImages() = default;
@@ -99,13 +99,13 @@ struct ProductFrame;
 
 /// One render var of one rendered frame, such as `LdrColor`, named after UsdRender's RenderVar.
 ///
-/// Outputs stay valid while any `RenderVar` of the frame lives, and keep its image from being
-/// rendered over: drop them (after unmapping) so later steps can reuse the frame. They must not
-/// outlive the delegate that rendered them.
-class RenderVar {
+/// Outputs stay valid while any `RenderVarOutput` of the frame lives, and keep its image from
+/// being rendered over: drop them (after unmapping) so later steps can reuse the frame. They must
+/// not outlive the delegate that rendered them.
+class RenderVarOutput {
   public:
-    RenderVar() = default;
-    RenderVar(std::shared_ptr<ProductFrame> frame, Path path, std::string name);
+    RenderVarOutput() = default;
+    RenderVarOutput(std::shared_ptr<ProductFrame> frame, Path path, std::string name);
 
     /// The RenderVar prim's path, or the product's path plus the var's name for default vars.
     const Path& GetPath() const {
@@ -165,7 +165,7 @@ class RenderVar {
 /// The outputs of one render product in a step: its render vars by name.
 struct RenderProductOutput {
     Path product;
-    std::map<std::string, RenderVar> vars;
+    std::map<std::string, RenderVarOutput> vars;
 };
 
 /// Outputs of a step by render product path.

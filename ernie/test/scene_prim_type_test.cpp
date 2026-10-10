@@ -15,12 +15,11 @@ using ernie::Path;
 using ernie::PrimTypeDef;
 using ernie::Scene;
 using ernie::Value;
-namespace schema = ernie::schema;
 namespace tokens = ernie::tokens;
 
 TEST(PrimType, ViewsReadFallbacksAndSetByUsdName) {
     Scene scene;
-    schema::SphereLight lamp = schema::SphereLight::Define(scene, "/World/Lamp");
+    ernie::SphereLight lamp = ernie::SphereLight::Define(scene, "/World/Lamp");
     EXPECT_EQ(scene.TypeOf("/World/Lamp"), "SphereLight");
     EXPECT_EQ(lamp.GetRadius(), 0.5);
     EXPECT_FALSE(lamp.HasRadius());
@@ -44,21 +43,21 @@ TEST(PrimType, ViewsReadFallbacksAndSetByUsdName) {
 
 TEST(PrimType, ViewsCheckTypesAndConstness) {
     Scene scene;
-    schema::DistantLight::Define(scene, "/Sun");
+    ernie::DistantLight::Define(scene, "/Sun");
     scene.Define("/Rock", tokens::kSphere);
-    EXPECT_NO_THROW(schema::Light(scene, "/Sun"));
-    EXPECT_NO_THROW(schema::NonboundableLight(scene, "/Sun"));
-    EXPECT_THROW(schema::BoundableLight(scene, "/Sun"), std::invalid_argument);
-    EXPECT_THROW(schema::SphereLight(scene, "/Rock"), std::invalid_argument);
-    EXPECT_THROW(schema::Light(scene, "/Missing"), std::invalid_argument);
+    EXPECT_NO_THROW(ernie::Light(scene, "/Sun"));
+    EXPECT_NO_THROW(ernie::NonboundableLight(scene, "/Sun"));
+    EXPECT_THROW(ernie::BoundableLight(scene, "/Sun"), std::invalid_argument);
+    EXPECT_THROW(ernie::SphereLight(scene, "/Rock"), std::invalid_argument);
+    EXPECT_THROW(ernie::Light(scene, "/Missing"), std::invalid_argument);
 
     // A generic light view reads what every light has, with the derived type's registry entry.
-    const schema::Light light(scene, "/Sun");
+    const ernie::Light light(scene, "/Sun");
     EXPECT_EQ(light.PrimType().name, "DistantLight");
     EXPECT_EQ(light.GetColorTemperature(), 6500.0);
 
     const Scene& constScene = scene;
-    schema::DistantLight readOnly(constScene, "/Sun");
+    ernie::DistantLight readOnly(constScene, "/Sun");
     EXPECT_EQ(readOnly.GetAngle(), 0.53);
     EXPECT_THROW(readOnly.SetAngle(1.0), std::logic_error);
 }
@@ -88,7 +87,8 @@ TEST(PrimType, RegistryListsTypesWithBasesAndAttributes) {
 
     // Bases' attributes first, each once.
     const std::vector<const AttributeDef*> all = sphere.AllAttributes();
-    EXPECT_EQ(all.front()->name, tokens::kIntensity);
+    EXPECT_EQ(all.front()->name, tokens::kVisibility);
+    EXPECT_EQ(all[2]->name, tokens::kIntensity);
     EXPECT_EQ(all.back()->name, tokens::kShapingConeSoftness);
     std::set<std::string_view> names;
     for (const AttributeDef* def : all) {

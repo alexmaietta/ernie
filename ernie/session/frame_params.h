@@ -18,10 +18,10 @@
 
 namespace ernie {
 
-/// A pushbroom camera's strip for one frame (`Camera::pushbroom`), as its shaders project with it
-/// (projection_pushbroom.slang): its rows' poses run from `from` (the top row's camera position)
-/// to `to` (the bottom row's), turning from `fromRotation` to `toRotation` along the great arc.
-/// Positions are relative to the frame's origin.
+/// A pushbroom camera's strip for one frame (`CameraParams::pushbroom`), as its shaders project
+/// with it (projection_pushbroom.slang): its rows' poses run from `from` (the top row's camera
+/// position) to `to` (the bottom row's), turning from `fromRotation` to `toRotation` along the
+/// great arc. Positions are relative to the frame's origin.
 struct PushbroomStrip {
     glm::vec3 from{0.0f};
     glm::vec3 to{0.0f};
@@ -47,7 +47,8 @@ struct PushbroomStrip {
 /// between its clipping planes, for culling, levels of detail and shadow cascades: its eye at the
 /// middle pose pulled back along the view by the strip's length, its field of view the widest
 /// the rays reach from there, sampled along the strip and padded.
-CameraView PushbroomEnvelope(const Camera& camera, const glm::dmat4& from, const glm::dmat4& to);
+CameraView PushbroomEnvelope(const CameraParams& camera, const glm::dmat4& from,
+                             const glm::dmat4& to);
 
 /// Which casters shadow a batch of views of several worlds (`ernie:shadows:worlds`).
 enum class WorldShadows : std::uint32_t {
@@ -146,7 +147,7 @@ enum class MinimalMode : std::uint32_t {
     Textured = 3,  ///< Surfaces lit in their diffuse colour: material, textures, vertex colours.
 };
 
-/// Kinds of `Light`.
+/// Kinds of `LightParams`.
 enum class LightType : std::uint32_t {
     Distant = 0,  ///< Parallel light from a direction, such as Earthshine (UsdLux DistantLight).
     Sphere = 1,   ///< A point or sphere, optionally limited to a cone (UsdLux SphereLight with
@@ -155,9 +156,10 @@ enum class LightType : std::uint32_t {
     Disk = 3,     ///< A one-sided Lambertian disk (UsdLux DiskLight).
 };
 
-/// A light besides the sun. In the rasterizer, distant lights get one orthographic shadow map over
-/// the scene; sphere lights a perspective map when their cone is at most `kMaxSpotConeDegrees`,
-/// else six (a cube); rect and disk lights a cube at their centre.
+/// A light besides the sun, resolved for a frame from its prim (`LightParamsOf`). In the
+/// rasterizer, distant lights get one orthographic shadow map over the scene; sphere lights a
+/// perspective map when their cone is at most `kMaxSpotConeDegrees`, else six (a cube); rect and
+/// disk lights a cube at their centre.
 ///
 /// The rasterizer shades rect and disk lights with their exact Lambertian irradiance, the vector
 /// form factor of the emitter clipped to the receiver's horizon (Lambert's polygon formula; Arvo
@@ -166,7 +168,7 @@ enum class LightType : std::uint32_t {
 ///
 /// Reference: J. Arvo, "The Irradiance Jacobian for Partially Occluded Polyhedral Sources",
 /// SIGGRAPH '94, 343-350, 1994. https://doi.org/10.1145/192161.192250
-struct Light {
+struct LightParams {
     LightType type = LightType::Sphere;
     glm::dvec3 position{0.0};  ///< Sphere, rect and disk: world centre.
     /// Distant: unit vector towards the light. Others: unit axis the light emits along (its -z):
@@ -204,14 +206,14 @@ struct Light {
     static constexpr float kMaxSpotConeDegrees = 75.0f;
 };
 
-/// An environment light at infinity (UsdLux DomeLight): radiance from every direction, the
-/// spectrum `radiance` (W m^-2 sr^-1 nm^-1 per camera band) times a relative RGB map whose
-/// cosine-convolved spherical harmonics are `sh`. It lights surfaces diffusely, with the BRDF's
-/// albedo, and is not occluded.
+/// An environment light at infinity (UsdLux DomeLight) resolved for a frame (`DomeParamsOf`):
+/// radiance from every direction, the spectrum `radiance` (W m^-2 sr^-1 nm^-1 per camera band)
+/// times a relative RGB map whose cosine-convolved spherical harmonics are `sh`. It lights
+/// surfaces diffusely, with the BRDF's albedo, and is not occluded.
 ///
 /// Reference: R. Ramamoorthi and P. Hanrahan, "An Efficient Representation for Irradiance
 /// Environment Maps", SIGGRAPH 2001, 497-500. https://doi.org/10.1145/383259.383317
-struct DomeLight {
+struct DomeParams {
     std::vector<float> radiance;
     /// Irradiance over pi of the RGB map as order-2 spherical harmonics in world space
     /// (`DomeIrradianceSh`): a uniform map of 1 has sh[0] = sqrt(4 pi) and zeros elsewhere.
@@ -246,8 +248,8 @@ struct Star {
 };
 
 /// The stars of a StarField prim (`StarsOf`) are uploaded when they change; each frame takes only
-/// where the catalogue's frame lies (`StarFieldOf`).
-struct StarField {
+/// where the catalogue's frame lies (`StarFieldParamsOf`).
+struct StarFieldParams {
     /// The rotation from world directions to the catalogue's frame.
     glm::mat3 toCatalogue{1.0f};
 };
@@ -258,7 +260,7 @@ struct StarField {
 struct FrameParams {
     /// The camera: pose, projection, spectral bands, exposure, lens and sensor. Its `width` and
     /// `height` are the image size, which the render targets must have.
-    Camera camera;
+    CameraParams camera;
     /// How much wider than the camera's the raster view's field of view is, so that with lens
     /// distortion it covers the undistorted rays of every sensor pixel (`OverscanOf`).
     double overscan = 1.0;
@@ -272,9 +274,9 @@ struct FrameParams {
     /// sun has a luminance of 1 cd/m^2 (relative units).
     std::vector<float> sunIrradiance;
     float ambient = 0.15f;  ///< Fraction of sunlight reaching surfaces without shading.
-    std::vector<Light>
-        lights;  ///< Other lights; the rasterizer takes `RasterRenderer::kMaxLights`.
-    std::optional<DomeLight> dome;
+    /// Other lights; the rasterizer takes `RasterRenderer::kMaxLights`.
+    std::vector<LightParams> lights;
+    std::optional<DomeParams> dome;
     DomeLightMode domeMode = DomeLightMode::Approximate;
     /// World distance within which geometry shadows a dome in `DomeLightMode::Full`.
     float domeShadowRadius = 1.0f;
@@ -283,7 +285,7 @@ struct FrameParams {
     /// own diffuse light stays off.
     std::uint32_t domeDirections = 16;
     bool domeDirectionsLit = false;
-    std::optional<StarField> stars;  ///< Stars behind everything, as last uploaded.
+    std::optional<StarFieldParams> stars;  ///< Stars behind everything, as last uploaded.
     float exposure = 1.0f;                 ///< Extra scale on the photographic output.
     bool meter = false;  ///< Measure the scene's luminance (`tokens::kMeter`).
     Culling culling = Culling::Gpu;        ///< How draws outside a view are culled.
@@ -356,8 +358,8 @@ struct FrameParams {
     }
 
     /// The camera of view `view`: `camera` at that view's pose.
-    Camera ViewCamera(std::size_t view) const {
-        Camera result = camera;
+    CameraParams ViewCamera(std::size_t view) const {
+        CameraParams result = camera;
         if (!poses.empty()) {
             result.transform = poses.at(view);
         }
@@ -408,7 +410,7 @@ struct FrameParams {
     /// A pushbroom camera's strip of view `view`, from its last frame's pose to this one's.
     PushbroomStrip Strip(std::size_t view = 0) const;
 
-    /// The frame as its sub-frames see it, for motion blur (`Camera::Subframes`): a view per
+    /// The frame as its sub-frames see it, for motion blur (`CameraParams::Subframes`): a view per
     /// sub-frame and view, sub-frame `k`'s from `k * Views()` on, each posed at
     /// `camera.SubframeTime(k)` between `previousPoses` and its pose (`InterpolatePose`) and
     /// seeing its view's world. A copy for a frame of one sub-frame.

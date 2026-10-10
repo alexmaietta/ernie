@@ -67,7 +67,7 @@ namespace {
 /// centres: the ones GPU culling must keep (the prototype is small next to their spacing).
 std::uint32_t RowInstancesInView(const Scene& scene) {
     const glm::mat4 viewProjection =
-        ernie::CameraOf(scene, "/World/Camera", kSize, kSize).RasterView().ViewProjection();
+        ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize).RasterView().ViewProjection();
     std::uint32_t inside = 0;
     for (int i = -20; i <= 20; ++i) {
         const glm::vec4 clip =

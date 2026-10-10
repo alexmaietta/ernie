@@ -8,12 +8,12 @@
 #include <cmath>
 #include <vector>
 
-using ernie::Camera;
+using ernie::CameraParams;
 using ernie::Scene;
 namespace tokens = ernie::tokens;
 
 TEST(Camera, ExposureScaleFollowsUsd) {
-    Camera camera;
+    CameraParams camera;
     EXPECT_DOUBLE_EQ(camera.LinearExposureScale(), 1.0) << "USD's defaults";
     camera.exposureTime = 0.01;
     camera.iso = 200.0;
@@ -24,7 +24,7 @@ TEST(Camera, ExposureScaleFollowsUsd) {
 }
 
 TEST(Camera, IntrinsicsFollowTheApertureAndOffsets) {
-    Camera camera;
+    CameraParams camera;
     camera.width = 640;
     camera.height = 480;
     camera.focalLengthMm = 24.0;
@@ -119,7 +119,7 @@ TEST(Camera, SingletChromaticAberrationFollowsItsGlass) {
     scene.Define("/Camera", ernie::tokens::kCamera)
         .Set(ernie::tokens::kLensChromaticScale, std::vector<float>{400.0f, 0.99f, 700.0f, 1.01f})
         .Set(ernie::tokens::kLensChromaticFocus, glm::vec4(400.0f, -0.2f, 700.0f, 0.3f));
-    Camera camera = ernie::CameraOf(scene, "/Camera", 64, 48);
+    CameraParams camera = ernie::CameraParamsOf(scene, "/Camera", 64, 48);
     EXPECT_NEAR(camera.lens.chromaticScale(550.0), 1.0, 1e-6);
     EXPECT_NEAR(camera.lens.chromaticFocusMm(700.0), 0.3, 1e-6);
     camera.lens.chromaticScale = ernie::Spectrum::FromPairs(std::vector<float>{400.0f, -1.0f});
@@ -127,7 +127,7 @@ TEST(Camera, SingletChromaticAberrationFollowsItsGlass) {
 }
 
 TEST(Camera, FisheyeFieldIsLimited) {
-    Camera camera;
+    CameraParams camera;
     camera.width = 100;
     camera.height = 100;
     camera.lens.projection = ernie::LensProjection::Fisheye;
@@ -143,7 +143,7 @@ TEST(Camera, FisheyeFieldIsLimited) {
 }
 
 TEST(Camera, OrthographicSpansItsAperturesInTheScene) {
-    Camera camera;
+    CameraParams camera;
     camera.width = 200;
     camera.height = 100;
     camera.orthographic = true;
@@ -155,7 +155,7 @@ TEST(Camera, OrthographicSpansItsAperturesInTheScene) {
     EXPECT_EQ(camera.PrincipalPoint(), glm::dvec2(100.0, 40.0));
     const ernie::CameraView view = camera.RasterView();
     EXPECT_TRUE(view.IsOrthographic());
-    EXPECT_FALSE(Camera().RasterView().IsOrthographic());
+    EXPECT_FALSE(CameraParams().RasterView().IsOrthographic());
     // The axis lands on the principal point at every depth, and a pixel is 0.04 units.
     for (const double depth : {2.0, 9.0}) {
         const glm::vec4 clip = view.ViewProjection() * glm::vec4(1.0f, 2.0f, 10.0f - depth, 1.0f);
@@ -178,7 +178,7 @@ TEST(Camera, OrthographicSpansItsAperturesInTheScene) {
 }
 
 TEST(Camera, ElectronsFollowTheCameraEquation) {
-    Camera camera;
+    CameraParams camera;
     camera.width = 100;
     camera.height = 100;
     camera.verticalApertureMm = 1.0;
@@ -234,7 +234,7 @@ TEST(Camera, ReadsUsdAndErnieAttributes) {
         .Set(tokens::kSensorAdcBits, 14)
         .Set(tokens::kSensorNoise, false)
         .Set(tokens::kSensorSeed, 7);
-    const Camera camera = ernie::CameraOf(scene, "/Camera", 64, 48);
+    const CameraParams camera = ernie::CameraParamsOf(scene, "/Camera", 64, 48);
     EXPECT_EQ(camera.width, 64u);
     EXPECT_DOUBLE_EQ(camera.focalLengthMm, 35.0);
     EXPECT_DOUBLE_EQ(camera.verticalApertureOffsetMm, 0.5);
@@ -258,17 +258,17 @@ TEST(Camera, ReadsUsdAndErnieAttributes) {
     scene.Set("/Camera", tokens::kLensDistortion, std::vector<float>{});
     scene.Set("/Camera", tokens::kLensProjection, std::string(tokens::kFisheye));
     scene.Set("/Camera", tokens::kLensFisheye, std::vector<float>{-0.01f, 0.002f});
-    const Camera fisheye = ernie::CameraOf(scene, "/Camera", 64, 48);
+    const CameraParams fisheye = ernie::CameraParamsOf(scene, "/Camera", 64, 48);
     EXPECT_EQ(fisheye.lens.projection, ernie::LensProjection::Fisheye);
     EXPECT_DOUBLE_EQ(fisheye.lens.fisheye[1], 0.002f);
     EXPECT_DOUBLE_EQ(fisheye.lens.fisheye[3], 0.0);
     scene.Set("/Camera", tokens::kLensProjection, std::string("panoramic"));
-    EXPECT_THROW(ernie::CameraOf(scene, "/Camera", 64, 48), std::invalid_argument);
+    EXPECT_THROW(ernie::CameraParamsOf(scene, "/Camera", 64, 48), std::invalid_argument);
     scene.Set("/Camera", tokens::kLensProjection, std::string(tokens::kPerspective));
 
     scene.Set("/Camera", tokens::kProjection, std::string(tokens::kOrthographic));
     scene.Set("/Camera", tokens::kSensorPixelPitch, 3.45);
-    const Camera orthographic = ernie::CameraOf(scene, "/Camera", 64, 48);
+    const CameraParams orthographic = ernie::CameraParamsOf(scene, "/Camera", 64, 48);
     EXPECT_TRUE(orthographic.orthographic);
     EXPECT_DOUBLE_EQ(orthographic.orthographicPixelPitchUm, 3.45);
     EXPECT_DOUBLE_EQ(orthographic.OrthographicPixelSize(),
@@ -278,24 +278,24 @@ TEST(Camera, ReadsUsdAndErnieAttributes) {
 
     scene.Set("/Camera", tokens::kCameraScan, std::string(tokens::kPushbroom));
     scene.Set("/Camera", tokens::kPushbroomLineOffset, 1.5);
-    const Camera pushbroom = ernie::CameraOf(scene, "/Camera", 64, 48);
+    const CameraParams pushbroom = ernie::CameraParamsOf(scene, "/Camera", 64, 48);
     EXPECT_TRUE(pushbroom.pushbroom);
     EXPECT_DOUBLE_EQ(pushbroom.lineOffsetMm, 1.5);
     scene.Set("/Camera", tokens::kCameraScan, std::string("whiskbroom"));
-    EXPECT_THROW(ernie::CameraOf(scene, "/Camera", 64, 48), std::invalid_argument);
+    EXPECT_THROW(ernie::CameraParamsOf(scene, "/Camera", 64, 48), std::invalid_argument);
     scene.Set("/Camera", tokens::kCameraScan, std::string(tokens::kFrameScan));
 
     scene.Set("/Camera", tokens::kSensorType, "infrared");
-    EXPECT_THROW(ernie::CameraOf(scene, "/Camera", 64, 48), std::invalid_argument);
+    EXPECT_THROW(ernie::CameraParamsOf(scene, "/Camera", 64, 48), std::invalid_argument);
     scene.Set("/Camera", tokens::kSensorType, "rgb");
     scene.Set("/Camera", tokens::kExposureTime, 0.0);
-    EXPECT_THROW(ernie::CameraOf(scene, "/Camera", 64, 48), std::invalid_argument);
+    EXPECT_THROW(ernie::CameraParamsOf(scene, "/Camera", 64, 48), std::invalid_argument);
     scene.Define("/NotACamera", tokens::kXform);
-    EXPECT_THROW(ernie::CameraOf(scene, "/NotACamera", 64, 48), std::invalid_argument);
+    EXPECT_THROW(ernie::CameraParamsOf(scene, "/NotACamera", 64, 48), std::invalid_argument);
 }
 
 TEST(Camera, PoseGivesTheEyeForwardAndRasterView) {
-    Camera camera;
+    CameraParams camera;
     camera.width = 64;
     camera.height = 32;
     camera.transform = ernie::LookAtTransform({10.0, -20.0, 30.0}, {10.0, 0.0, 30.0}, {0, 0, 1});
@@ -324,8 +324,8 @@ TEST(Camera, PoseGivesTheEyeForwardAndRasterView) {
     EXPECT_THROW(camera.Check(), std::invalid_argument);
 }
 
-TEST(Camera, SetCameraAndCameraOfRoundTrip) {
-    Camera camera;
+TEST(Camera, SetCameraAndCameraParamsOfRoundTrip) {
+    CameraParams camera;
     camera.width = 40;
     camera.height = 20;
     camera.transform = ernie::LookAtTransform({1.0, 2.0, 3.0}, {0.0, 0.0, 0.0}, {0, 0, 1});
@@ -341,7 +341,7 @@ TEST(Camera, SetCameraAndCameraOfRoundTrip) {
     camera.bands = {400.0, 700.0, 6};
     Scene scene;
     ernie::SetCamera(scene, "/Camera", camera);
-    const Camera back = ernie::CameraOf(scene, "/Camera", 40, 20);
+    const CameraParams back = ernie::CameraParamsOf(scene, "/Camera", 40, 20);
     for (int c = 0; c < 4; ++c) {
         for (int r = 0; r < 4; ++r) {
             EXPECT_NEAR(back.transform[c][r], camera.transform[c][r], 1e-12);
@@ -357,5 +357,5 @@ TEST(Camera, SetCameraAndCameraOfRoundTrip) {
         << "the horizontal aperture follows the aspect";
 
     scene.Set("/Camera", tokens::kProjection, tokens::kOrthographic);
-    EXPECT_TRUE(ernie::CameraOf(scene, "/Camera", 40, 20).orthographic);
+    EXPECT_TRUE(ernie::CameraParamsOf(scene, "/Camera", 40, 20).orthographic);
 }

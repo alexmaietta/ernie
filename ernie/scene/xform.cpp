@@ -300,7 +300,7 @@ glm::dvec3 EulerAngles(const glm::dmat3& rotation, RotationOrder order) {
     return degrees;
 }
 
-void SetXform(Scene& scene, const Path& path, const Xform& xform) {
+void SetXform(Scene& scene, const Path& path, const XformOps& xform) {
     if (xform.rotate && xform.orient) {
         throw std::invalid_argument("An xform takes rotate or orient, not both");
     }

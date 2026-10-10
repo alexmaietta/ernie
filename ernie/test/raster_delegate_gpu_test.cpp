@@ -38,7 +38,7 @@ namespace tokens = ernie::tokens;
 namespace {
 
 /// A camera framing the delegate's terrain from 0.8 rad above the horizon.
-ernie::Camera FramingCamera(const RasterDelegate& delegate) {
+ernie::CameraParams FramingCamera(const RasterDelegate& delegate) {
     OrbitController orbit;
     orbit.pitch = 0.8f;
     const auto [low, high] = delegate.Terrain().Bounds(1.0f);
@@ -54,7 +54,7 @@ TEST_F(RasterDelegateTest, RendersTheSameImageAsTheRendererDrivenDirectly) {
     RasterDelegate delegate(*context_);
     delegate.Sync(scene);
     ASSERT_TRUE(delegate.Terrain().HasHeightfield());
-    const ernie::Camera camera = FramingCamera(delegate);
+    const ernie::CameraParams camera = FramingCamera(delegate);
     ernie::SetCamera(scene, "/World/Camera", camera);
 
     const Tensor image = delegate.Render(scene);

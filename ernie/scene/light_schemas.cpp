@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/scene/light_schemas.h"
 
-namespace ernie::schema {
+namespace ernie {
 
-ERNIE_DEFINE_SCHEMA(Light, "Light", nullptr, true,
+ERNIE_DEFINE_SCHEMA(Light, "Light", &Imageable::Definition(), true,
                     "Any light: UsdLux's LightAPI inputs and the shape of its spectrum.",
                     ERNIE_LIGHT_ATTRIBUTES)
 ERNIE_DEFINE_SCHEMA(BoundableLight, "BoundableLightBase", &Light::Definition(), true,
@@ -31,4 +31,11 @@ bool Light::IsPhotometric() const {
            Has(tokens::kPhotometricPower);
 }
 
-}  // namespace ernie::schema
+std::vector<const PrimTypeDef*> LightSchemaTypes() {
+    return {&Light::Definition(),        &BoundableLight::Definition(),
+            &NonboundableLight::Definition(), &DistantLight::Definition(),
+            &DomeLight::Definition(),    &SphereLight::Definition(),
+            &RectLight::Definition(),    &DiskLight::Definition()};
+}
+
+}  // namespace ernie

@@ -63,7 +63,7 @@ double CubeFaceExtent(double facePixels, double marginPixels) {
     return facePixels / (facePixels - 2.0 * marginPixels);
 }
 
-glm::dvec3 CameraRay(const Camera& camera, glm::dvec2 pixel) {
+glm::dvec3 CameraRay(const CameraParams& camera, glm::dvec2 pixel) {
     if (camera.lens.rays != nullptr) {
         return camera.lens.rays->RayAt(pixel);
     }
@@ -72,7 +72,7 @@ glm::dvec3 CameraRay(const Camera& camera, glm::dvec2 pixel) {
     return LensRay(camera.lens, glm::dvec2(pixel.x - centre.x, centre.y - pixel.y) / f);
 }
 
-double MaxFieldAngle(const Camera& camera) {
+double MaxFieldAngle(const CameraParams& camera) {
     // The image's border, where the field is widest.
     const double w = camera.width;
     const double h = camera.height;
@@ -103,7 +103,7 @@ glm::dvec3 LensRayTable::RayAt(glm::dvec2 pixel) const {
     return glm::normalize(glm::mix(top, bottom, t.y));
 }
 
-bool NeedsCubeFaces(const Camera& camera) {
+bool NeedsCubeFaces(const CameraParams& camera) {
     const bool wideLens =
         camera.lens.projection == LensProjection::Fisheye || camera.lens.rays != nullptr;
     return wideLens && !camera.orthographic && !camera.pushbroom &&

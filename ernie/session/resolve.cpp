@@ -2,6 +2,7 @@
 #include "ernie/session/resolve.h"
 
 #include "ernie/geometry/primitives.h"
+#include "ernie/scene/light_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/wide_view.h"
@@ -134,21 +135,18 @@ std::vector<Path> TargetsOf(const Scene& scene, const Path& path, std::string_vi
 }
 
 /// The `ernie:spectrum` pairs of a light, if it has them.
-std::optional<std::vector<float>> SpectrumPairs(const Scene& scene, const Path& light) {
-    return GetFloats(scene, light, tokens::kLightSpectrum);
+std::optional<std::vector<float>> SpectrumPairs(const Light& light) {
+    return light.HasSpectrum() ? std::optional(light.GetSpectrum()) : std::nullopt;
 }
 
 /// UsdLux's `inputs:intensity` times 2^`inputs:exposure`.
-double LightIntensity(const Scene& scene, const Path& light) {
-    return GetNumber(scene, light, tokens::kIntensity, 1.0) *
-           std::exp2(GetNumber(scene, light, tokens::kExposure, 0.0));
+double LightIntensity(const Light& light) {
+    return light.GetIntensity() * std::exp2(light.GetExposure());
 }
 
 /// The black body temperature of a light with `inputs:enableColorTemperature`, else 0.
-double ColorTemperature(const Scene& scene, const Path& light) {
-    return GetBool(scene, light, tokens::kEnableColorTemperature, false)
-               ? GetNumber(scene, light, tokens::kColorTemperature, 6500.0)
-               : 0.0;
+double ColorTemperature(const Light& light) {
+    return light.GetEnableColorTemperature() ? light.GetColorTemperature() : 0.0;
 }
 
 /// `shape` averaged over each of `bands` (eight samples per band) times `scale`.
@@ -170,13 +168,13 @@ std::vector<float> BinShape(const Shape& shape, const SpectralBands& bands, doub
 /// shape of `inputs:color` (upsampled with `RgbToSigmoid`).
 /// @throws std::invalid_argument for an unknown illuminant, a "custom" one without pairs, or
 /// illuminant D outside 4000 to 25000 K.
-std::function<double(double)> IlluminantShape(const Scene& scene, const Path& light) {
+std::function<double(double)> IlluminantShape(const Light& light) {
     using namespace tokens;
-    const std::string illuminant = GetToken(scene, light, kPhysicalIlluminant, "");
-    const double kelvin = GetNumber(scene, light, kColorTemperature, 6500.0);
+    const std::string illuminant = light.GetPhysicalIlluminant();
+    const double kelvin = light.GetColorTemperature();
     std::function<double(double)> base;
     if (illuminant.empty()) {
-        const double temperature = ColorTemperature(scene, light);
+        const double temperature = ColorTemperature(light);
         base = [temperature](double w) {
             return temperature > 0.0 ? PlanckRadiance(w, temperature) : 1.0;
         };
@@ -184,7 +182,7 @@ std::function<double(double)> IlluminantShape(const Scene& scene, const Path& li
         base = [](double) { return 1.0; };
     } else if (illuminant == kBlackbody) {
         if (!(kelvin > 0.0)) {
-            throw std::invalid_argument("Light '" + light.String() +
+            throw std::invalid_argument("Light '" + light.GetPath().String() +
                                         "' needs a positive colour temperature");
         }
         base = [kelvin](double w) { return PlanckRadiance(w, kelvin); };
@@ -192,24 +190,23 @@ std::function<double(double)> IlluminantShape(const Scene& scene, const Path& li
         CieDaylight(560.0, kelvin);  // checks the temperature
         base = [kelvin](double w) { return CieDaylight(w, kelvin); };
     } else if (illuminant == kCustom) {
-        const std::optional<std::vector<float>> pairs =
-            GetFloats(scene, light, kPhysicalCustomIlluminant);
-        if (!pairs || pairs->size() < 4) {
-            throw std::invalid_argument("Light '" + light.String() + "' has a custom illuminant "
-                                        "but no '" + std::string(kPhysicalCustomIlluminant) +
-                                        "' pairs");
+        const std::vector<float> pairs = light.GetPhysicalCustomIlluminant();
+        if (pairs.size() < 4) {
+            throw std::invalid_argument("Light '" + light.GetPath().String() +
+                                        "' has a custom illuminant but no '" +
+                                        std::string(kPhysicalCustomIlluminant) + "' pairs");
         }
-        const auto spectrum = std::make_shared<Spectrum>(Spectrum::FromPairs(*pairs));
+        const auto spectrum = std::make_shared<Spectrum>(Spectrum::FromPairs(pairs));
         const double low = spectrum->Wavelengths().front();
         const double high = spectrum->Wavelengths().back();
         base = [spectrum, low, high](double w) {
             return w < low || w > high ? 0.0 : std::max((*spectrum)(w), 0.0);
         };
     } else {
-        throw std::invalid_argument("Light '" + light.String() + "' has unknown illuminant '" +
-                                    illuminant + "'");
+        throw std::invalid_argument("Light '" + light.GetPath().String() +
+                                    "' has unknown illuminant '" + illuminant + "'");
     }
-    const glm::dvec3 color = GetVec3(scene, light, kColor, glm::dvec3(1.0));
+    const glm::dvec3 color = light.GetColor();
     if (color == glm::dvec3(1.0)) {
         return base;
     }
@@ -217,42 +214,32 @@ std::function<double(double)> IlluminantShape(const Scene& scene, const Path& li
     return [base, tint](double w) { return base(w) * tint(w); };
 }
 
-/// Whether the light gives its brightness in photometric units (`tokens::kPhotometricPower`).
-bool IsPhotometric(const Scene& scene, const Path& light) {
-    using namespace tokens;
-    return scene.Get(light, kPhotometricIlluminance) != nullptr ||
-           scene.Get(light, kPhotometricIlluminanceDistance) != nullptr ||
-           scene.Get(light, kPhotometricPower) != nullptr;
-}
-
 /// A photometric area light's luminous value over `spread` (4 pi sr for a sphere's luminous
 /// intensity, pi times the area for a flat emitter's luminance): its power in lumens over the
 /// spread, or, with an illuminance distance d, the illuminance at d times d^2 (a luminous
 /// intensity), over the area for a flat emitter.
-double PhotometricAreaValue(const Scene& scene, const Path& light, double spread, double area) {
-    using namespace tokens;
-    const double distance = GetNumber(scene, light, kPhotometricIlluminanceDistance, 0.0);
+double PhotometricAreaValue(const BoundableLight& light, double spread, double area) {
+    const double distance = light.GetPhotometricIlluminanceDistance();
     if (distance > 0.0) {
-        const double intensity =
-            GetNumber(scene, light, kPhotometricIlluminance, 0.0) * distance * distance;
+        const double intensity = light.GetPhotometricIlluminance() * distance * distance;
         return area > 0.0 ? intensity / area : intensity;
     }
-    return GetNumber(scene, light, kPhotometricPower, 1600.0) / spread;
+    return light.GetPhotometricPower() / spread;
 }
 
 /// A light's spectrum in relative units, per band of `bands`: its shape (`IlluminantShape`)
 /// scaled so that its luminous value (683 lm/W times its integral against the CIE y function) is
 /// `luminous`.
-std::vector<float> RelativeSpectrum(const Scene& scene, const Path& light,
-                                    const SpectralBands& bands, double luminous) {
-    const std::function<double(double)> shape = IlluminantShape(scene, light);
+std::vector<float> RelativeSpectrum(const Light& light, const SpectralBands& bands,
+                                    double luminous) {
+    const std::function<double(double)> shape = IlluminantShape(light);
     // Midpoints of 1 nm steps, so narrow spectra integrate as wide as they are.
     double luminance = 0.0;
     for (double w = 360.5; w < 830.0; w += 1.0) {
         luminance += shape(w) * CieXyz(w).y;
     }
     if (!(luminance > 0.0)) {
-        throw std::invalid_argument("Light '" + light.String() +
+        throw std::invalid_argument("Light '" + light.GetPath().String() +
                                     "' has no visible light to scale to a luminous value");
     }
     return BinShape(shape, bands, luminous / (kLuminousEfficacy * luminance));
@@ -260,12 +247,13 @@ std::vector<float> RelativeSpectrum(const Scene& scene, const Path& light,
 
 /// A physical lamp's spectrum per band (see `tokens::kLightPower`): its power over `spread`, which
 /// is 4 pi sr for a sphere's radiant intensity and pi times the area for an area light's radiance.
-std::vector<float> LampSpectrum(const Scene& scene, const Path& light, const SpectralBands& bands,
+std::vector<float> LampSpectrum(const BoundableLight& light, const SpectralBands& bands,
                                 const std::vector<float>* pairs, double spread) {
-    const bool hasPower = scene.Get(light, tokens::kLightPower) != nullptr;
-    const double power = GetNumber(scene, light, tokens::kLightPower, 0.0);
+    const bool hasPower = light.HasPower();
+    const double power = light.GetPower();
     if (power < 0.0) {
-        throw std::invalid_argument("Light '" + light.String() + "' has a negative power");
+        throw std::invalid_argument("Light '" + light.GetPath().String() +
+                                    "' has a negative power");
     }
     if (pairs != nullptr) {
         const Spectrum spectrum = Spectrum::FromPairs(*pairs);
@@ -281,7 +269,7 @@ std::vector<float> LampSpectrum(const Scene& scene, const Path& light, const Spe
         }
         return binned;
     }
-    const double temperature = ColorTemperature(scene, light);
+    const double temperature = ColorTemperature(light);
     const auto shape = [temperature](double w) {
         return temperature > 0.0 ? PlanckRadiance(w, temperature) : 1.0;
     };
@@ -507,10 +495,10 @@ void CheckBatchCameras(const Scene& scene, std::span<const Path> cameras, std::u
     }
     // Projections and bands only: the stand-in transform leaves them alone.
     const glm::dmat4 any(1.0);
-    const Camera first = CameraOf(scene, cameras.front(), width, height, any);
+    const CameraParams first = CameraParamsOf(scene, cameras.front(), width, height, any);
     const glm::mat4 projection = first.RasterView().projection;
     for (const Path& path : cameras) {
-        const Camera camera = CameraOf(scene, path, width, height, any);
+        const CameraParams camera = CameraParamsOf(scene, path, width, height, any);
         const glm::mat4 other = camera.RasterView().projection;
         bool same = camera.bands.count == first.bands.count &&
                     camera.bands.minNm == first.bands.minNm &&
@@ -835,29 +823,25 @@ ResolveRenderProducts(const Scene& scene, std::span<const Path> products, const 
     return specs;
 }
 
-std::vector<float> SunIrradianceOf(const Scene& scene, const Path& light,
+std::vector<float> SunIrradianceOf(const Scene& scene, const Path& path,
                                    const SpectralBands& bands) {
-    using namespace tokens;
     bands.Check();
-    if (IsPhotometric(scene, light)) {
-        return RelativeSpectrum(scene, light, bands,
-                                GetNumber(scene, light, kPhotometricIlluminance, 10000.0));
+    const DistantLight sun(scene, path);
+    if (sun.IsPhotometric()) {
+        return RelativeSpectrum(sun, bands, sun.GetPhotometricIlluminance());
     }
-    const double temperature = GetBool(scene, light, kEnableColorTemperature, false)
-                                   ? GetNumber(scene, light, kColorTemperature, 6500.0)
-                                   : 0.0;
-    const std::optional<std::vector<float>> pairs = SpectrumPairs(scene, light);
-    const bool physical = scene.Get(light, kLightIrradiance) != nullptr || pairs.has_value();
-    if (physical) {
+    const double temperature = ColorTemperature(sun);
+    const std::optional<std::vector<float>> pairs = SpectrumPairs(sun);
+    if (sun.HasIrradiance() || pairs) {
         if (pairs) {
             const Spectrum spectrum = Spectrum::FromPairs(*pairs);
             std::vector<float> binned = spectrum.Bin(bands);
-            if (scene.Get(light, kLightIrradiance) != nullptr && !spectrum.Empty()) {
+            if (sun.HasIrradiance() && !spectrum.Empty()) {
                 const double total =
                     spectrum.Average(spectrum.Wavelengths().front(),
                                      spectrum.Wavelengths().back()) *
                     (spectrum.Wavelengths().back() - spectrum.Wavelengths().front());
-                const double scale = GetNumber(scene, light, kLightIrradiance, total) / total;
+                const double scale = sun.GetIrradiance() / total;
                 for (float& value : binned) {
                     value = static_cast<float>(static_cast<double>(value) * scale);
                 }
@@ -865,27 +849,27 @@ std::vector<float> SunIrradianceOf(const Scene& scene, const Path& light,
             return binned;
         }
         return BlackbodyIrradiance(bands, temperature > 0.0 ? temperature : 5772.0,
-                                   GetNumber(scene, light, kLightIrradiance, 1361.0));
+                                   sun.GetIrradiance());
     }
-    return RelativeSpectrum(scene, light, bands, M_PI * LightIntensity(scene, light));
+    return RelativeSpectrum(sun, bands, M_PI * LightIntensity(sun));
 }
 
-Light LightOf(const Scene& scene, const Path& path, const SpectralBands& bands) {
+LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBands& bands) {
     const std::string_view type = scene.TypeOf(path);
     const bool known = type == tokens::kDistantLight || type == tokens::kSphereLight ||
                        type == tokens::kRectLight || type == tokens::kDiskLight;
-    return LightOf(scene, path, bands, known ? scene.WorldTransform(path) : glm::dmat4(1.0));
+    return LightParamsOf(scene, path, bands, known ? scene.WorldTransform(path) : glm::dmat4(1.0));
 }
 
-Light LightOf(const Scene& scene, const Path& path, const SpectralBands& bands,
-              const glm::dmat4& world) {
+LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBands& bands,
+                          const glm::dmat4& world) {
     using namespace tokens;
     bands.Check();
-    Light light;
-    light.shadows = GetBool(scene, path, kShadowEnable, true);
+    LightParams light;
     const std::string_view type = scene.TypeOf(path);
     if (type == kDistantLight) {
         light.type = LightType::Distant;
+        light.shadows = DistantLight(scene, path).GetShadowEnable();
         light.direction = glm::vec3(glm::normalize(glm::dvec3(world[2])));
         light.spectrum = SunIrradianceOf(scene, path, bands);
         return light;
@@ -894,6 +878,8 @@ Light LightOf(const Scene& scene, const Path& path, const SpectralBands& bands,
         throw std::invalid_argument("'" + path.String() +
                                     "' is not a DistantLight, SphereLight, RectLight or DiskLight");
     }
+    const BoundableLight emitter(scene, path);
+    light.shadows = emitter.GetShadowEnable();
     light.position = glm::dvec3(world[3]);
     const glm::dvec3 axis = -glm::dvec3(world[2]);
     const glm::dvec3 xAxis(world[0]);
@@ -911,53 +897,55 @@ Light LightOf(const Scene& scene, const Path& path, const SpectralBands& bands,
         light.tangent = glm::vec3(glm::normalize(x));
         double area = 0.0;
         if (type == kRectLight) {
+            const RectLight rect(scene, path);
             light.type = LightType::Rect;
-            light.size = glm::vec2(GetNumber(scene, path, kWidth, 1.0) * glm::length(xAxis),
-                                   GetNumber(scene, path, kHeight, 1.0) * glm::length(yAxis));
+            light.size = glm::vec2(rect.GetWidth() * glm::length(xAxis),
+                                   rect.GetHeight() * glm::length(yAxis));
             area = static_cast<double>(light.size.x) * static_cast<double>(light.size.y);
         } else {
             light.type = LightType::Disk;
             light.radius =
-                static_cast<float>(GetNumber(scene, path, kRadius, 0.5) * glm::length(xAxis));
+                static_cast<float>(DiskLight(scene, path).GetRadius() * glm::length(xAxis));
             const double radius = light.radius;
             area = M_PI * radius * radius;
         }
         if (!(area > 0.0)) {
             throw std::invalid_argument("Light '" + path.String() + "' has no area");
         }
-        const std::optional<std::vector<float>> pairs = SpectrumPairs(scene, path);
-        if (IsPhotometric(scene, path)) {
-            light.spectrum = RelativeSpectrum(
-                scene, path, bands, PhotometricAreaValue(scene, path, M_PI * area, area));
+        const std::optional<std::vector<float>> pairs = SpectrumPairs(emitter);
+        if (emitter.IsPhotometric()) {
+            light.spectrum =
+                RelativeSpectrum(emitter, bands, PhotometricAreaValue(emitter, M_PI * area, area));
         } else {
-            light.spectrum = scene.Get(path, kLightPower) != nullptr || pairs
-                                 ? LampSpectrum(scene, path, bands, pairs ? &*pairs : nullptr,
-                                                M_PI * area)
-                                 : RelativeSpectrum(scene, path, bands,
-                                                    LightIntensity(scene, path));
+            light.spectrum =
+                emitter.HasPower() || pairs
+                    ? LampSpectrum(emitter, bands, pairs ? &*pairs : nullptr, M_PI * area)
+                    : RelativeSpectrum(emitter, bands, LightIntensity(emitter));
         }
         return light;
     }
-    light.radius =
-        GetBool(scene, path, kTreatAsPoint, false) ? 0.0f : Number(scene, path, kRadius, 0.5f);
-    light.coneAngle = std::clamp(Number(scene, path, kShapingConeAngle, 180.0f), 0.0f, 180.0f);
-    light.coneSoftness = std::clamp(Number(scene, path, kShapingConeSoftness, 0.0f), 0.0f, 1.0f);
+    const SphereLight sphere(scene, path);
+    light.radius = sphere.GetTreatAsPoint() ? 0.0f : static_cast<float>(sphere.GetRadius());
+    light.coneAngle =
+        std::clamp(static_cast<float>(sphere.GetShapingConeAngle()), 0.0f, 180.0f);
+    light.coneSoftness =
+        std::clamp(static_cast<float>(sphere.GetShapingConeSoftness()), 0.0f, 1.0f);
     if (light.radius < 0.0f) {
         throw std::invalid_argument("SphereLight '" + path.String() + "' has a negative radius");
     }
-    if (IsPhotometric(scene, path)) {
-        light.spectrum = RelativeSpectrum(scene, path, bands,
-                                          PhotometricAreaValue(scene, path, 4.0 * M_PI, 0.0));
+    if (sphere.IsPhotometric()) {
+        light.spectrum =
+            RelativeSpectrum(sphere, bands, PhotometricAreaValue(sphere, 4.0 * M_PI, 0.0));
         return light;
     }
-    const std::optional<std::vector<float>> pairs = SpectrumPairs(scene, path);
-    if (scene.Get(path, kLightPower) != nullptr || pairs) {
-        light.spectrum = LampSpectrum(scene, path, bands, pairs ? &*pairs : nullptr, 4.0 * M_PI);
+    const std::optional<std::vector<float>> pairs = SpectrumPairs(sphere);
+    if (sphere.HasPower() || pairs) {
+        light.spectrum = LampSpectrum(sphere, bands, pairs ? &*pairs : nullptr, 4.0 * M_PI);
         return light;
     }
     const double radius = light.radius;
     const double area = radius > 0.0 ? M_PI * radius * radius : 1.0;
-    light.spectrum = RelativeSpectrum(scene, path, bands, LightIntensity(scene, path) * area);
+    light.spectrum = RelativeSpectrum(sphere, bands, LightIntensity(sphere) * area);
     return light;
 }
 
@@ -1002,26 +990,27 @@ std::array<glm::vec3, 9> DomeIrradianceSh(const Tensor& latlong, const glm::dmat
     return sh;
 }
 
-DomeLight DomeOf(const Scene& scene, const Path& path, const SpectralBands& bands) {
+DomeParams DomeParamsOf(const Scene& scene, const Path& path, const SpectralBands& bands) {
     using namespace tokens;
     bands.Check();
     if (scene.TypeOf(path) != kDomeLight) {
         throw std::invalid_argument("'" + path.String() + "' is not a DomeLight");
     }
-    DomeLight dome;
+    const DomeLight prim(scene, path);
+    DomeParams dome;
     const glm::dmat4 world = scene.WorldTransform(path);
     const glm::dmat3 rotation(glm::normalize(glm::dvec3(world[0])),
                               glm::normalize(glm::dvec3(world[1])),
                               glm::normalize(glm::dvec3(world[2])));
     dome.toDome = glm::mat3(glm::transpose(rotation));
-    dome.visible = GetBool(scene, path, kVisibleInPrimaryRay, true);
-    dome.shadow = GetBool(scene, path, kShadowEnable, true);
-    if (const Tensor* texture = scene.Read(path, kLightTexture)) {
+    dome.visible = prim.GetVisibleInPrimaryRay();
+    dome.shadow = prim.GetShadowEnable();
+    if (const Tensor* texture = prim.GetTexture()) {
         dome.sh = DomeIrradianceSh(*texture, rotation);
     } else {
         dome.sh[0] = glm::vec3(static_cast<float>(std::sqrt(4.0 * M_PI)));
     }
-    if (IsPhotometric(scene, path)) {
+    if (prim.IsPhotometric()) {
         // An upward-facing surface receives pi times the luminance times the map's irradiance
         // there (1 for a uniform dome), as its spherical harmonics give it.
         const std::array<double, 9> up = ShBasis({0.0, 0.0, 1.0});
@@ -1035,14 +1024,12 @@ DomeLight DomeOf(const Scene& scene, const Path& path, const SpectralBands& band
                                         "' lights no upward surface to give an illuminance");
         }
         dome.radiance = RelativeSpectrum(
-            scene, path, bands,
-            GetNumber(scene, path, kPhotometricIlluminance, 10000.0) / (M_PI * luminance));
+            prim, bands, prim.GetPhotometricIlluminance() / (M_PI * luminance));
         return dome;
     }
-    const std::optional<std::vector<float>> pairs = SpectrumPairs(scene, path);
-    dome.radiance = pairs
-                        ? Spectrum::FromPairs(*pairs).Bin(bands)
-                        : RelativeSpectrum(scene, path, bands, LightIntensity(scene, path));
+    const std::optional<std::vector<float>> pairs = SpectrumPairs(prim);
+    dome.radiance = pairs ? Spectrum::FromPairs(*pairs).Bin(bands)
+                          : RelativeSpectrum(prim, bands, LightIntensity(prim));
     return dome;
 }
 
@@ -1268,7 +1255,7 @@ std::vector<DomeDirection> DomeDirectionsOf(const Image& map, std::size_t count)
 }
 
 std::optional<Image> DomeMapOf(const Scene& scene, const Path& path) {
-    const Tensor* texture = scene.Read(path, tokens::kLightTexture);
+    const Tensor* texture = DomeLight(scene, path).GetTexture();
     if (texture == nullptr) {
         return std::nullopt;
     }
@@ -1381,16 +1368,16 @@ std::vector<Star> StarsOf(const Scene& scene, const Path& path) {
     return stars;
 }
 
-StarField StarFieldOf(const Scene& scene, const Path& path) {
+StarFieldParams StarFieldParamsOf(const Scene& scene, const Path& path) {
     if (scene.TypeOf(path) != tokens::kStarField) {
         throw std::invalid_argument("'" + path.String() + "' is not a StarField");
     }
-    StarField field;
+    StarFieldParams field;
     field.toCatalogue = glm::mat3(glm::transpose(WorldRotation(scene, path)));
     return field;
 }
 
-double OverscanOf(const Camera& camera) {
+double OverscanOf(const CameraParams& camera) {
     // A camera rendered on cube faces resamples their own projection, not one pinhole image.
     if (camera.lens.IsPinhole() || NeedsCubeFaces(camera)) {
         return 1.0;
@@ -1455,8 +1442,8 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
     }
     FrameParams params;
     params.camera = prims.cameraTransform
-                        ? CameraOf(scene, prims.camera, width, height, *prims.cameraTransform)
-                        : CameraOf(scene, prims.camera, width, height);
+                        ? CameraParamsOf(scene, prims.camera, width, height, *prims.cameraTransform)
+                        : CameraParamsOf(scene, prims.camera, width, height);
     params.overscan = OverscanOf(params.camera);
     const Path& settings = prims.settings;
     params.ambient = Number(scene, settings, kAmbient, params.ambient);
@@ -1536,21 +1523,22 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
     if (!prims.light.IsEmpty()) {
         params.sunDirection = glm::vec3(TowardsLight(scene, prims.light));
         params.sunIrradiance = SunIrradianceOf(scene, prims.light, params.camera.bands);
-        params.sunAngle = std::max(Number(scene, prims.light, kAngle, params.sunAngle), 0.0f);
-        shadows.enabled = GetBool(scene, prims.light, kShadowEnable, true);
+        const DistantLight sun(scene, prims.light);
+        params.sunAngle = std::max(static_cast<float>(sun.GetAngle()), 0.0f);
+        shadows.enabled = sun.GetShadowEnable();
     }
     params.sun = !prims.light.IsEmpty();
     if (!prims.dome.IsEmpty()) {
-        params.dome = DomeOf(scene, prims.dome, params.camera.bands);
+        params.dome = DomeParamsOf(scene, prims.dome, params.camera.bands);
     }
     if (!prims.stars.IsEmpty()) {
-        params.stars = StarFieldOf(scene, prims.stars);
+        params.stars = StarFieldParamsOf(scene, prims.stars);
     }
     for (const Path& light : prims.lights) {
         const auto posed = prims.lightTransforms.find(light);
         params.lights.push_back(posed != prims.lightTransforms.end()
-                                    ? LightOf(scene, light, params.camera.bands, posed->second)
-                                    : LightOf(scene, light, params.camera.bands));
+                                    ? LightParamsOf(scene, light, params.camera.bands, posed->second)
+                                    : LightParamsOf(scene, light, params.camera.bands));
         params.lights.back().world = WorldOf(scene, light);
     }
     return params;

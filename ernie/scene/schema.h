@@ -78,7 +78,7 @@ glm::dvec3 TowardsLight(const Scene& scene, const Path& light);
 /// apertures (the horizontal one from the image's aspect) and their offsets, `clippingRange`,
 /// `exposure` and the `exposure:*` attributes, `ernie:camera:scan` and the pushbroom's line
 /// offset, and `ernie:spectral:range` and `ernie:spectral:bands`. Its lens and sensor are not
-/// written. `CameraOf` reads it back.
-void SetCamera(Scene& scene, const Path& path, const Camera& camera);
+/// written. `CameraParamsOf` reads it back.
+void SetCamera(Scene& scene, const Path& path, const CameraParams& camera);
 
 }  // namespace ernie

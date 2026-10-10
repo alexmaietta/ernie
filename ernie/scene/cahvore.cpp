@@ -218,7 +218,7 @@ CahvoreModel::ErnieCamera CahvoreModel::ToCamera(double pixelPitchUm) const {
     // A model whose V runs up the image against H x A (as cmod allows) is a mirror of Ernie's
     // camera: its rows are flipped.
     out.rowsReversed = glm::dot(y, -vPrime) < 0.0;
-    Camera& camera = out.camera;
+    CameraParams& camera = out.camera;
     const double pitch = pixelPitchUm * 1e-3;  // mm
     const double f = vs;                       // pixels
     camera.width = width;

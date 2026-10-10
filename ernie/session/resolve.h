@@ -56,9 +56,10 @@ struct RenderPrims {
     Path dome;
     Path ground;
     Path stars;  ///< The first visible StarField.
-    /// A stand-in for the camera's world transform, for a camera posed on the GPU (`CameraOf`).
+    /// A stand-in for the camera's world transform, for a camera posed on the GPU
+    /// (`CameraParamsOf`).
     std::optional<glm::dmat4> cameraTransform;
-    /// Stand-ins for the world transforms of `lights` posed on the GPU (`LightOf`).
+    /// Stand-ins for the world transforms of `lights` posed on the GPU (`LightParamsOf`).
     std::map<Path, glm::dmat4> lightTransforms;
 };
 
@@ -207,12 +208,12 @@ std::vector<float> SunIrradianceOf(const Scene& scene, const Path& light,
 /// Shadows follow `inputs:shadow:enable`.
 /// @throws std::invalid_argument for another prim type, a negative radius or power, an area light
 /// without area, a degenerate transform, invalid bands or spectrum pairs.
-Light LightOf(const Scene& scene, const Path& path, const SpectralBands& bands);
+LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBands& bands);
 
-/// `LightOf` with `world` standing in for the light's world transform, for a light posed on the
-/// GPU (`RenderPrims::lightTransforms`).
-Light LightOf(const Scene& scene, const Path& path, const SpectralBands& bands,
-              const glm::dmat4& world);
+/// `LightParamsOf` with `world` standing in for the light's world transform, for a light posed on
+/// the GPU (`RenderPrims::lightTransforms`).
+LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBands& bands,
+                          const glm::dmat4& world);
 
 /// Diffuse irradiance over pi of a latitude-longitude RGB map (`tokens::kLightTexture` layout)
 /// turned by `rotation` into the world, as order-2 spherical harmonics (Ramamoorthi and Hanrahan
@@ -226,7 +227,7 @@ std::array<glm::vec3, 9> DomeIrradianceSh(const Tensor& latlong, const glm::dmat
 /// shape of `inputs:color` and the enabled colour temperature; its map `ernie:texture` (uniform
 /// without one) rotated by its transform.
 /// @throws std::invalid_argument for another prim type, an invalid map, bands or spectrum pairs.
-DomeLight DomeOf(const Scene& scene, const Path& path, const SpectralBands& bands);
+DomeParams DomeParamsOf(const Scene& scene, const Path& path, const SpectralBands& bands);
 
 /// The DomeLight at `path`'s map (`tokens::kLightTexture`) as a linear RGB image for drawing
 /// behind the scene; none without one.
@@ -299,12 +300,12 @@ std::vector<Star> StarsOf(const Scene& scene, const Path& path);
 
 /// Where the StarField at `path`'s catalogue frame lies in the world, from its transform.
 /// @throws std::invalid_argument for another prim type.
-StarField StarFieldOf(const Scene& scene, const Path& path);
+StarFieldParams StarFieldParamsOf(const Scene& scene, const Path& path);
 
 /// How much wider than the sensor's the raster image's field of view must be for every sensor
 /// pixel's undistorted ray to land in it: 1 without distortion, else the largest ratio along the
 /// sensor's border, plus one percent.
-double OverscanOf(const Camera& camera);
+double OverscanOf(const CameraParams& camera);
 
 /// The token naming `mode` in `ernie:wireframe`: "off", "overlay" or "hiddenLine".
 std::string_view WireframeToken(Wireframe mode);
@@ -324,13 +325,13 @@ Occlusion OcclusionOf(const Scene& scene, const Path& settings);
 Culling CullingOf(const Scene& scene, const Path& settings);
 
 /// The frame parameters for `prims` of `scene`, for an image of `width` x `height`:
-/// - the camera from the Camera prim (`CameraOf`) and the overscan its lens distortion needs
-///   (`OverscanOf`);
+/// - the camera from the Camera prim (`CameraParamsOf`) and the overscan its lens distortion
+///   needs (`OverscanOf`);
 /// - sun direction from the light's transform (`TowardsLight`), its spectral irradiance
 ///   (`SunIrradianceOf`), angular diameter (`inputs:angle`, default 0.53 degrees) and shadows from
 ///   its `inputs:shadow:enable`; without a sun, no sunlight and no ambient;
-/// - the other lights (`LightOf`, each in its world, `WorldOf`) and the dome (`DomeOf`); the sun
-///   and the dome shine in every world;
+/// - the other lights (`LightParamsOf`, each in its world, `WorldOf`) and the dome
+///   (`DomeParamsOf`); the sun and the dome shine in every world;
 /// - ambient, wireframe (`WireframeOf`), culling (`CullingOf`, `OcclusionOf`), mesh level-of-detail
 /// error, clear colour (linear) and shadow options from the render settings.
 /// @throws std::invalid_argument if there is no camera, it is not perspective, or it or the light

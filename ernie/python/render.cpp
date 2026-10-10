@@ -68,20 +68,20 @@ struct CudaArray {
 };
 
 /// A render var of a step's outputs, keeping its renderer alive.
-struct PyRenderVar {
+struct PyRenderVarOutput {
     nb::object renderer;  // first, so it is released after the var's GPU memory
-    RenderVar var;
+    RenderVarOutput var;
 };
 
 /// A render var mapped as a compute array: the frame's own image, read in place.
 struct PyCudaArrayMapping {
     ComputeArrayView view;
-    PyRenderVar var;
+    PyRenderVarOutput var;
 };
 
 /// One frame of a render product: its render vars by path.
 struct PyFrame {
-    std::map<std::string, PyRenderVar> renderVars;
+    std::map<std::string, PyRenderVarOutput> renderVars;
 };
 
 /// The outputs of one render product of a step.
@@ -100,7 +100,7 @@ PyOutputs Wrap(const RenderProductSetOutputs& outputs, nb::handle renderer) {
         PyFrame frame;
         for (const auto& [name, var] : output.vars) {
             frame.renderVars.emplace(var.GetPath().String(),
-                                     PyRenderVar{nb::borrow(renderer), var});
+                                     PyRenderVarOutput{nb::borrow(renderer), var});
         }
         product.frames.push_back(std::move(frame));
         wrapped.emplace(path.String(), std::move(product));
@@ -170,7 +170,7 @@ void BindRender(nb::module_& m) {
         .value("HIDDEN_LINE", Wireframe::HiddenLine,
                "Triangle edges on flat, unlit surfaces that hide the edges behind them.");
 
-    nb::enum_<MapDevice>(m, "Device", "Where RenderVar.map delivers an output.")
+    nb::enum_<MapDevice>(m, "Device", "Where RenderVarOutput.map delivers an output.")
         .value("CPU", MapDevice::Cpu, "A NumPy array; the texels are copied to the host.")
         .value("CUDA", MapDevice::Cuda,
                "A linear CUDA array the GPU fills from the render, without the host.")
@@ -193,14 +193,14 @@ void BindRender(nb::module_& m) {
         .def_prop_ro("device_id",
                      [](const PyCudaArrayMapping& mapping) { return mapping.view.device; });
 
-    nb::class_<PyRenderVar>(m, "RenderVar",
-                            "One output of a rendered frame, such as LdrColor, as UsdRender's "
-                            "RenderVar.")
-        .def_prop_ro("path", [](const PyRenderVar& v) { return v.var.GetPath(); })
-        .def_prop_ro("name", [](const PyRenderVar& v) { return v.var.Name(); })
+    nb::class_<PyRenderVarOutput>(m, "RenderVarOutput",
+                                  "One output of a rendered frame, such as LdrColor, of a "
+                                  "UsdRender RenderVar.")
+        .def_prop_ro("path", [](const PyRenderVarOutput& v) { return v.var.GetPath(); })
+        .def_prop_ro("name", [](const PyRenderVarOutput& v) { return v.var.Name(); })
         .def_prop_ro(
             "shape",
-            [](const PyRenderVar& v) {
+            [](const PyRenderVarOutput& v) {
                 nb::list shape;
                 for (const std::int64_t extent : v.var.Shape()) {
                     shape.append(extent);
@@ -211,7 +211,7 @@ void BindRender(nb::module_& m) {
             "height, width) for SpectralRadiance.")
         .def_prop_ro(
             "dtype",
-            [](const PyRenderVar& v) {
+            [](const PyRenderVarOutput& v) {
                 const nb::dlpack::dtype type = DlpackOf(v.var.Type());
                 const char* kind =
                     type.code == static_cast<std::uint8_t>(nb::dlpack::dtype_code::Float) ? "float"
@@ -221,7 +221,7 @@ void BindRender(nb::module_& m) {
             "The NumPy name of the element type: uint8, uint16, uint32 or float32.")
         .def(
             "map",
-            [](PyRenderVar& v, MapDevice device, nb::handle syncStream) -> nb::object {
+            [](PyRenderVarOutput& v, MapDevice device, nb::handle syncStream) -> nb::object {
                 MappedRenderVar mapped;
                 const std::uintptr_t stream = StreamOf(syncStream);  // needs the GIL
                 {
@@ -239,11 +239,11 @@ void BindRender(nb::module_& m) {
             "or DLPack stream number, default the legacy stream) wait for the render on the GPU "
             "and return at once.")
         .def(
-            "unmap", [](PyRenderVar& v, nb::handle stream) { v.var.Unmap(StreamOf(stream)); },
+            "unmap", [](PyRenderVarOutput& v, nb::handle stream) { v.var.Unmap(StreamOf(stream)); },
             nb::arg("stream").none() = nb::none(),
             "Ends a CUDA_ARRAY mapping; the renderer waits for the work queued on `stream` before "
             "rendering into the frame again.")
-        .def_prop_ro("mapped", [](const PyRenderVar& v) { return v.var.IsMapped(); });
+        .def_prop_ro("mapped", [](const PyRenderVarOutput& v) { return v.var.IsMapped(); });
 
     nb::class_<PyFrame>(m, "Frame", "A rendered frame of a render product.")
         .def_ro("render_vars", &PyFrame::renderVars, "Render vars by RenderVar path.");

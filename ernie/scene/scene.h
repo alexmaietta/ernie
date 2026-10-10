@@ -100,7 +100,7 @@ class Prim {
     Prim& Write(std::string_view attribute, Tensor tensor);
 
     /// As `SetXform` (ernie/scene/xform.h); returns this handle for chaining.
-    Prim& SetXform(const Xform& xform);
+    Prim& SetXform(const XformOps& xform);
 
     const Value* Get(std::string_view attribute) const;
 

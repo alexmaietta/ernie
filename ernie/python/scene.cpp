@@ -481,10 +481,10 @@ RotationOrder RotationOrderFromPython(std::string_view name) {
                           "\"ZYX\"");
 }
 
-/// An `Xform` from `set_xform`'s keyword arguments; a single number scales uniformly.
-Xform XformFromPython(nb::handle translate, nb::handle rotate, std::string_view rotationOrder,
-                      nb::handle orient, nb::handle scale) {
-    Xform xform;
+/// An `XformOps` from `set_xform`'s keyword arguments; a single number scales uniformly.
+XformOps XformFromPython(nb::handle translate, nb::handle rotate, std::string_view rotationOrder,
+                         nb::handle orient, nb::handle scale) {
+    XformOps xform;
     if (!translate.is_none()) {
         xform.translate = Vec3FromPython(translate);
     }
@@ -946,7 +946,7 @@ void BindScene(nb::module_& m) {
             [](const IsdLineScanner& s, Scene& scene, const std::string& path,
                std::uint32_t first, std::uint32_t lines, bool atEnd) {
                 const IsdLineScanner::Strip strip = s.StripOf(first, lines);
-                const Camera& camera = strip.camera;
+                const CameraParams& camera =strip.camera;
                 using namespace tokens;
                 // The camera's geometry and line time only: its f-number, ISO, lens
                 // transmission and sensor stay as authored (`author_lroc_nac`, say).
@@ -1025,7 +1025,7 @@ void BindScene(nb::module_& m) {
             [](const IsdPushFrame& s, Scene& scene, const std::string& path,
                std::uint32_t index) {
                 const IsdPushFrame::Framelet framelet = s.FrameletOf(index);
-                const Camera& camera = framelet.camera;
+                const CameraParams& camera =framelet.camera;
                 using namespace tokens;
                 // The camera's geometry and exposure only, as `IsdLineScanner.author_strip`.
                 Prim prim = scene.Has(Path(path)) ? scene.GetPrim(Path(path))
@@ -1106,7 +1106,7 @@ void BindScene(nb::module_& m) {
             [](const CahvoreModel& model, Scene& scene, const std::string& path,
                double pixelPitchUm, std::uint32_t raysStep) {
                 const CahvoreModel::ErnieCamera fit = model.ToCamera(pixelPitchUm);
-                const Camera& camera = fit.camera;
+                const CameraParams& camera =fit.camera;
                 using namespace tokens;
                 // The camera's geometry only, as `IsdFrame.author_camera`; its pose in the
                 // model's frame (parent the prim to that frame's Xform).
@@ -1217,7 +1217,7 @@ void BindScene(nb::module_& m) {
             "author_camera",
             [](const IsdFrame& s, Scene& scene, const std::string& path) {
                 const IsdFrame::FrameView view = s.View();
-                const Camera& camera = view.camera;
+                const CameraParams& camera =view.camera;
                 using namespace tokens;
                 // The camera's geometry only, as `IsdLineScanner.author_strip`.
                 Prim prim = scene.Has(Path(path)) ? scene.GetPrim(Path(path))

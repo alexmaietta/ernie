@@ -16,16 +16,21 @@ ernie_add_test_suite(
     raster_shadow_cascades_test.cpp
     scene_brdf_test.cpp
     scene_cahvore_test.cpp
+    scene_camera_schemas_test.cpp
     scene_camera_test.cpp
     scene_edit_history_test.cpp
+    scene_geometry_schemas_test.cpp
     scene_isd_test.cpp
+    scene_material_schemas_test.cpp
     scene_orbit_controller_test.cpp
     scene_overlay_test.cpp
     scene_path_test.cpp
     scene_prim_type_test.cpp
+    scene_render_schemas_test.cpp
     scene_scene_test.cpp
     scene_schema_test.cpp
     scene_sensor_filters_test.cpp
+    scene_terrain_schemas_test.cpp
     scene_wide_view_test.cpp
     scene_xform_test.cpp
     session_delegate_test.cpp

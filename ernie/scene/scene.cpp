@@ -90,7 +90,7 @@ Prim& Prim::Set(std::string_view attribute, Value value) {
     return *this;
 }
 
-Prim& Prim::SetXform(const Xform& xform) {
+Prim& Prim::SetXform(const XformOps& xform) {
     if (scene_ == nullptr) {
         throw NoPrim(path_);
     }

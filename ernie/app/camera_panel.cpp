@@ -84,7 +84,7 @@ class CameraPanel final : public Panel {
         }
         try {
             // The exposure value the camera's settings make, at ISO 100 (EV100).
-            const Camera settings = CameraOf(scene, camera, 64, 64);
+            const CameraParams settings = CameraParamsOf(scene, camera, 64, 64);
             const double ev = std::log2(settings.fStop * settings.fStop / settings.exposureTime) -
                               std::log2(settings.iso / 100.0) - settings.exposureStops;
             ImGui::TextDisabled("Camera EV100 %.1f (f/%.1f, %.4g s, ISO %.0f)", ev,
@@ -104,9 +104,9 @@ class CameraPanel final : public Panel {
 
     /// Each channel's quantum efficiency over wavelength, and as binned into the camera's bands.
     static void DrawEfficiency(const Scene& scene, const Path& path) {
-        Camera camera;
+        CameraParams camera;
         try {
-            camera = CameraOf(scene, path, 64, 64);
+            camera = CameraParamsOf(scene, path, 64, 64);
         } catch (const std::exception& error) {
             ImGui::TextDisabled("%s", error.what());
             return;

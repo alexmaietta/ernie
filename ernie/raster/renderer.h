@@ -39,7 +39,7 @@ namespace ernie {
 /// scene's farthest corner, and their `texelWorldSize` is the size of a texel one unit away. None
 /// for a light without shadows. `position` is the light's position in the coordinates of the
 /// bounds, relative to the frame's origin (`FrameParams::Relative`); distant lights ignore it.
-std::vector<ShadowCascade> FitLightShadowViews(const Light& light, const glm::vec3& position,
+std::vector<ShadowCascade> FitLightShadowViews(const LightParams& light, const glm::vec3& position,
                                                const glm::vec3& sceneMin, const glm::vec3& sceneMax,
                                                std::uint32_t resolution);
 
@@ -218,7 +218,7 @@ class RasterRenderer {
     /// cascades around the drawables' bounds and prepares every drawable. Call once per frame
     /// after `BeginFrame` and before `Record`; earlier frames may still be running, since host
     /// data reaches the buffers through `Uploads` when the frame records.
-    /// @throws std::invalid_argument for an invalid camera (`Camera::Check`) or filter
+    /// @throws std::invalid_argument for an invalid camera (`CameraParams::Check`) or filter
     /// chain (`CheckFilterChain`), a sun or light spectrum with the wrong number of bands, more
     /// than `kMaxLights` lights, or a model whose shading pass fails to compile.
     /// `overlays` are drawn over LdrColor (`OverlayPass`); the caller selects them by
@@ -251,11 +251,11 @@ class RasterRenderer {
     /// holds (`RenderTargets::MaxViews`) records in several calls. The `Update`'s overlays are
     /// drawn over each view's LdrColor last, unless `overlays` is false.
     ///
-    /// With motion blur (`Camera::Subframes` above 1) each sub-frame draws and shades the views at
-    /// its time in turn, the camera between its last frame's pose and this one's and meshes
-    /// between their last frame's transforms and these; their radiance sums into what each row's
-    /// exposure sees (motion.slang, a rolling shutter shifting the rows' exposures), which the
-    /// sensor filters. The geometry vars and overlays are the last sub-frame's. Per-instance
+    /// With motion blur (`CameraParams::Subframes` above 1) each sub-frame draws and shades the
+    /// views at its time in turn, the camera between its last frame's pose and this one's and
+    /// meshes between their last frame's transforms and these; their radiance sums into what each
+    /// row's exposure sees (motion.slang, a rolling shutter shifting the rows' exposures), which
+    /// the sensor filters. The geometry vars and overlays are the last sub-frame's. Per-instance
     /// positions and deforming points do not blur, and shadows are the frame's.
     /// @throws std::invalid_argument if `targets` do not have the camera's extent and bands, or
     /// hold views past the frame's.
@@ -337,7 +337,7 @@ class RasterRenderer {
         return outputViews_;
     }
 
-    /// The sub-frames each view of the last `Update` renders (`Camera::Subframes`).
+    /// The sub-frames each view of the last `Update` renders (`CameraParams::Subframes`).
     std::uint32_t Subframes() const {
         return subframes_;
     }
