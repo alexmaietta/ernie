@@ -65,6 +65,23 @@ const std::string& Prim::Type() const {
     return scene_->TypeOf(path_);
 }
 
+Prim Prim::Define(std::string_view relative, std::string_view type) const {
+    if (scene_ == nullptr) {
+        throw NoPrim(path_);
+    }
+    Path path = path_;
+    std::size_t start = 0;
+    while (true) {
+        const std::size_t slash = relative.find('/', start);
+        path = path.Child(relative.substr(start, slash - start));
+        if (slash == std::string_view::npos) {
+            break;
+        }
+        start = slash + 1;
+    }
+    return scene_->Define(path, type);
+}
+
 Prim& Prim::Set(std::string_view attribute, Value value) {
     if (scene_ == nullptr) {
         throw NoPrim(path_);

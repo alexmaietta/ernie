@@ -80,6 +80,22 @@ TEST(Scene, DefinesPrimsWithTypelessAncestors) {
     EXPECT_THROW(scene.TypeOf("/Nope"), std::invalid_argument);
 }
 
+TEST(Scene, PrimsDefineChildrenAtRelativePaths) {
+    Scene scene;
+    const Prim world = scene.Define("/World", tokens::kXform);
+    const Prim rock = world.Define("Rock", tokens::kSphere);
+    EXPECT_EQ(rock.GetPath(), Path("/World/Rock"));
+    EXPECT_EQ(rock.Type(), "Sphere");
+    const Prim arm = world.Define("Rig/Arm", tokens::kCube);
+    EXPECT_EQ(arm.GetPath(), Path("/World/Rig/Arm"));
+    EXPECT_EQ(scene.TypeOf("/World/Rig"), "");
+    EXPECT_THROW(world.Define("", tokens::kCube), std::invalid_argument);
+    EXPECT_THROW(world.Define("Rig/", tokens::kCube), std::invalid_argument);
+    EXPECT_THROW(world.Define("/Rock", tokens::kCube), std::invalid_argument);
+    EXPECT_THROW(world.Define("../Rock", tokens::kCube), std::invalid_argument);
+    EXPECT_THROW(Prim().Define("Rock", tokens::kCube), std::invalid_argument);
+}
+
 TEST(Scene, SetsAndGetsValuesByUsdName) {
     Scene scene;
     Prim sun = scene.Define("/Sun", tokens::kDistantLight);

@@ -45,6 +45,18 @@ def test_define_builds_typeless_ancestors_and_lists_prims():
         scene.type_of("/World/Lights")
 
 
+def test_prims_define_children_at_relative_paths():
+    scene = ernie.Scene()
+    world = scene.define("/World", tokens.XFORM)
+    rock = world.define("Rock", tokens.SPHERE).set(tokens.RADIUS, 0.5)
+    assert rock.path == ernie.Path("/World/Rock") and rock.type == "Sphere"
+    assert rock.get(tokens.RADIUS) == 0.5
+    assert world.define("Rig/Arm", tokens.CUBE).path == ernie.Path("/World/Rig/Arm")
+    assert scene.type_of("/World/Rig") == ""
+    with pytest.raises(ValueError):
+        world.define("/Rock", tokens.CUBE)
+
+
 def test_values_round_trip_by_usd_name():
     scene = ernie.Scene()
     prim = scene.define("/P", tokens.XFORM)

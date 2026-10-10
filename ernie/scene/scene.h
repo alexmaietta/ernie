@@ -88,6 +88,11 @@ class Prim {
     /// @throws std::invalid_argument if the prim does not exist.
     const std::string& Type() const;
 
+    /// As `Scene::Define` at `relative` below this prim: a name such as "Rock", or names joined by
+    /// '/' such as "Rig/Arm".
+    /// @throws std::invalid_argument if the handle is empty or a name is not valid.
+    Prim Define(std::string_view relative, std::string_view type) const;
+
     /// As `Scene::Set`; returns this handle for chaining.
     Prim& Set(std::string_view attribute, Value value);
 

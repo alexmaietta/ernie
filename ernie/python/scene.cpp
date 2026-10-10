@@ -641,6 +641,9 @@ void BindScene(nb::module_& m) {
         .def_prop_ro("type", &Prim::Type)
         .def_prop_ro("valid", &Prim::IsValid)
         .def("__bool__", &Prim::IsValid)
+        .def("define", &Prim::Define, nb::arg("relative"), nb::arg("type"), nb::keep_alive<0, 1>(),
+             "Defines the prim at `relative` below this one (\"Rock\", or \"Rig/Arm\") with "
+             "`type`, as Scene.define.")
         .def(
             "set",
             [](Prim& prim, std::string_view attribute, nb::handle value) -> Prim& {
