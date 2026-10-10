@@ -22,16 +22,16 @@ glm::dvec3 LensRay(const LensModel& lens, glm::dvec2 distorted) {
 glm::dmat3 CubeFaceAxes(CubeFace face) {
     // Columns x, y, z: each face looks down its -z, as the camera does on the front.
     switch (face) {
-        case CubeFace::Front:
-            return glm::dmat3(1.0);
-        case CubeFace::Right:  // looks along +x
-            return glm::dmat3(glm::dvec3(0, 0, 1), glm::dvec3(0, 1, 0), glm::dvec3(-1, 0, 0));
-        case CubeFace::Left:  // looks along -x
-            return glm::dmat3(glm::dvec3(0, 0, -1), glm::dvec3(0, 1, 0), glm::dvec3(1, 0, 0));
-        case CubeFace::Up:  // looks along +y
-            return glm::dmat3(glm::dvec3(1, 0, 0), glm::dvec3(0, 0, 1), glm::dvec3(0, -1, 0));
-        case CubeFace::Down:  // looks along -y
-            return glm::dmat3(glm::dvec3(1, 0, 0), glm::dvec3(0, 0, -1), glm::dvec3(0, 1, 0));
+    case CubeFace::Front:
+        return glm::dmat3(1.0);
+    case CubeFace::Right:  // looks along +x
+        return glm::dmat3(glm::dvec3(0, 0, 1), glm::dvec3(0, 1, 0), glm::dvec3(-1, 0, 0));
+    case CubeFace::Left:  // looks along -x
+        return glm::dmat3(glm::dvec3(0, 0, -1), glm::dvec3(0, 1, 0), glm::dvec3(1, 0, 0));
+    case CubeFace::Up:  // looks along +y
+        return glm::dmat3(glm::dvec3(1, 0, 0), glm::dvec3(0, 0, 1), glm::dvec3(0, -1, 0));
+    case CubeFace::Down:  // looks along -y
+        return glm::dmat3(glm::dvec3(1, 0, 0), glm::dvec3(0, 0, -1), glm::dvec3(0, 1, 0));
     }
     return glm::dmat3(1.0);
 }
@@ -89,8 +89,8 @@ double MaxFieldAngle(const Camera& camera) {
 }
 
 glm::dvec3 LensRayTable::RayAt(glm::dvec2 pixel) const {
-    const glm::dvec2 at = glm::clamp(pixel / double(step), glm::dvec2(0.0),
-                                     glm::dvec2(columns - 1, rows - 1));
+    const glm::dvec2 at =
+        glm::clamp(pixel / double(step), glm::dvec2(0.0), glm::dvec2(columns - 1, rows - 1));
     const std::uint32_t x0 = std::min(static_cast<std::uint32_t>(at.x), columns - 2);
     const std::uint32_t y0 = std::min(static_cast<std::uint32_t>(at.y), rows - 2);
     const glm::dvec2 t = at - glm::dvec2(x0, y0);

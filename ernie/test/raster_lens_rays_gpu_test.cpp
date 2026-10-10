@@ -76,10 +76,18 @@ TEST_F(LensRaysGpuTest, TheSensorKernelsRaysAndFacesMatchTheCpus) {
     for (const glm::dvec2 p : points) {
         cases.insert(cases.end(), {float(p.x), float(p.y), 0.0f, 0.0f});
     }
-    const std::vector<float> params = {float(fisheye.fisheye[0]), float(fisheye.fisheye[1]),
-                                       float(fisheye.fisheye[2]), float(fisheye.fisheye[3]),
-                                       float(brown.k1), float(brown.k2), float(brown.k3),
-                                       float(brown.p1), float(brown.p2), 0.0f, 0.0f, 0.0f};
+    const std::vector<float> params = {float(fisheye.fisheye[0]),
+                                       float(fisheye.fisheye[1]),
+                                       float(fisheye.fisheye[2]),
+                                       float(fisheye.fisheye[3]),
+                                       float(brown.k1),
+                                       float(brown.k2),
+                                       float(brown.k3),
+                                       float(brown.p1),
+                                       float(brown.p2),
+                                       0.0f,
+                                       0.0f,
+                                       0.0f};
     const std::vector<ernie::ShaderModuleSource> modules = {
         {"lens", ernie::shaders::kLensSlang},
         {"cube_faces", ernie::shaders::kCubeFacesSlang},
@@ -95,7 +103,7 @@ TEST_F(LensRaysGpuTest, TheSensorKernelsRaysAndFacesMatchTheCpus) {
     caseBuffer.Write(std::as_bytes(std::span(cases)));
     paramBuffer.Write(std::as_bytes(std::span(params)));
     const std::array<const ernie::GpuBuffer*, 3> buffers = {&caseBuffer, &paramBuffer,
-                                                           &resultBuffer};
+                                                            &resultBuffer};
     context_->Submit([&](VkCommandBuffer commands) {
         pipeline.Dispatch(commands, buffers, static_cast<std::uint32_t>((points.size() + 63) / 64));
     });
@@ -109,8 +117,8 @@ TEST_F(LensRaysGpuTest, TheSensorKernelsRaysAndFacesMatchTheCpus) {
         const glm::dvec3 brownRay = ernie::LensRay(brown, 0.25 * points[i]);
         EXPECT_NEAR(glm::distance(glm::dvec3(r[4], r[5], r[6]), brownRay), 0.0, 1e-5) << i;
         // The face, but for rays all but on a seam, where float and double may pick either.
-        std::array<double, 5> forward = {-fisheyeRay.z, fisheyeRay.x, -fisheyeRay.x,
-                                         fisheyeRay.y, -fisheyeRay.y};
+        std::array<double, 5> forward = {-fisheyeRay.z, fisheyeRay.x, -fisheyeRay.x, fisheyeRay.y,
+                                         -fisheyeRay.y};
         std::sort(forward.begin(), forward.end());
         if (forward[4] - forward[3] < 1e-4) {
             continue;

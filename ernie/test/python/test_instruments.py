@@ -22,6 +22,23 @@ def test_navcam_pair_is_authored_on_its_rig():
         ernie.author_mars2020_navcam(scene, "/Rover/Navcam/Left", "/Render/Left", pattern="rgb")
 
 
+def test_hazcam_pairs_front_and_rear():
+    scene = ernie.Scene()
+    for product in ("/Render/Left", "/Render/Right"):
+        scene.define(product, tokens.RENDER_PRODUCT)
+    # Maki et al. 2020, Table 2: 24.8 cm (front) and 93.4 cm (rear) baselines, 14.0 mm lenses.
+    for which, baseline in (("front", 0.248), ("rear", 0.934)):
+        ernie.author_mars2020_hazcam_pair(scene, "/Rover/Hazcam", "/Render/Left", "/Render/Right",
+                                          which=which)
+        left = np.array(scene.get("/Rover/Hazcam/Left", tokens.TRANSFORM))
+        right = np.array(scene.get("/Rover/Hazcam/Right", tokens.TRANSFORM))
+        assert math.isclose(right[0, 3] - left[0, 3], baseline)
+    assert math.isclose(scene.get("/Rover/Hazcam/Left", tokens.FOCAL_LENGTH), 14.0)
+    with pytest.raises(ValueError):
+        ernie.author_mars2020_hazcam_pair(scene, "/Rover/Hazcam", "/Render/Left", "/Render/Right",
+                                          which="side")
+
+
 def test_mastcamz_pair_reaches_the_near_infrared():
     scene = ernie.Scene()
     for product in ("/Render/Left", "/Render/Right"):

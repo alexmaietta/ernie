@@ -54,9 +54,8 @@ TEST(CubeFaces, CoverEveryRayWithin125DegreesOfTheAxis) {
         ++checked;
     }
     // Past 125.3 degrees along a diagonal, the back face would be needed.
-    const glm::dvec3 behind =
-        glm::normalize(glm::dvec3(std::sin(2.25) / std::sqrt(2.0), std::sin(2.25) / std::sqrt(2.0),
-                                  -std::cos(2.25)));
+    const glm::dvec3 behind = glm::normalize(glm::dvec3(
+        std::sin(2.25) / std::sqrt(2.0), std::sin(2.25) / std::sqrt(2.0), -std::cos(2.25)));
     const glm::dvec2 plane = ernie::CubeFacePlane(ernie::CubeFaceOf(behind), behind);
     EXPECT_GT(std::max(std::abs(plane.x), std::abs(plane.y)), 1.0);
     // A face of 512 pixels with a margin of 2 reaches 2 pixels past 45 degrees.
@@ -82,8 +81,7 @@ TEST(LensRays, FollowFisheyesPastNinetyDegrees) {
     barrel.k1 = -0.1;
     const glm::dvec2 distorted(0.4, 0.3);
     const glm::dvec3 bent = ernie::LensRay(barrel, distorted);
-    EXPECT_NEAR(glm::distance(glm::dvec2(bent) / -bent.z, barrel.Undistort(distorted)), 0.0,
-                1e-12);
+    EXPECT_NEAR(glm::distance(glm::dvec2(bent) / -bent.z, barrel.Undistort(distorted)), 0.0, 1e-12);
 }
 
 TEST(LensRays, Mars2020HazcamsNeedCubeFacesAndNavcamsDoNot) {

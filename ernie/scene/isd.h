@@ -16,8 +16,7 @@
 namespace ernie {
 
 /// States sampled over time: ephemeris times (seconds past J2000, TDB) and a value at each.
-template <typename T>
-struct IsdSamples {
+template <typename T> struct IsdSamples {
     std::vector<double> times;
     std::vector<T> values;
 };
@@ -175,8 +174,8 @@ class IsdCameraModel {
     /// intersection nearer the origin (on either side, as usgscsm's line scanner takes it; or the
     /// first along `look` when not `eitherSide`, as its frame camera does), or the ray's point
     /// nearest the ellipsoid.
-    glm::dvec3 EllipsoidIntersect(const glm::dvec3& origin, const glm::dvec3& look,
-                                  double height, bool eitherSide = true) const;
+    glm::dvec3 EllipsoidIntersect(const glm::dvec3& origin, const glm::dvec3& look, double height,
+                                  bool eitherSide = true) const;
     /// Ernie's camera axes (columns) in the sensor's frame for an image of the detector's samples
     /// across x: x along the samples as they increase, z back from the scene (`facing` -1 when
     /// the scene lies behind usgscsm's look, as for NAIF's +z boresights), y completing them.

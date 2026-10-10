@@ -619,65 +619,82 @@ TEST_F(RasterDelegateTest, TheLrocNacPresetSendsEightBitNumbers) {
     EXPECT_GT(checked, 100) << "lit pixels";
 }
 
-TEST_F(RasterDelegateTest, TheMars2020NavcamPairSeesInStereo) {
-    // Perseverance's Navcams (Maki et al. 2020, Table 2), binned to 64 x 48, 5 m over a 1 m
-    // cube: each eye sends 12-bit demosaiced numbers and an 8-bit JPEG view, and the cube sits
-    // further right in the left eye's image, by the 42.4 cm baseline's disparity.
-    Scene scene = FlatScene();
-    scene.Define("/World/Cube", tokens::kCube)
-        .Set(tokens::kSize, 1.0)
-        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 0.5)));
-    const std::vector<Path> vars = *scene.Get("/Render/Product", tokens::kOrderedVars)
-                                        ->Get<std::vector<Path>>();
-    for (const char* eye : {"Left", "Right"}) {
-        scene.Define(Path("/Render").Child(eye), tokens::kRenderProduct)
-            .Set(tokens::kOrderedVars, vars)
-            .Set(tokens::kCameraRel, Path("/World/Navcam").Child(eye))
-            .Set(tokens::kResolution, glm::ivec2(64, 48));
-    }
-    scene.Set("/Render/Settings", tokens::kProducts,
-              std::vector<Path>{"/Render/Left", "/Render/Right"});
-    ernie::AuthorMars2020NavcamPair(scene, "/World/Navcam", "/Render/Left", "/Render/Right");
-    scene.Set("/World/Navcam", tokens::kTransform,
-              ernie::LookAtTransform({0.0, 0.0, 5.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
-    for (const char* eye : {"/World/Navcam/Left", "/World/Navcam/Right"}) {
-        scene.Set(eye, tokens::kExposureTime, 1e-4);
-    }
-    RasterDelegate delegate(*context_);
-    ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
-    double cubeColumn[2] = {0.0, 0.0};
-    for (int e = 0; e < 2; ++e) {
-        auto& product = outputs.at(e == 0 ? "/Render/Left" : "/Render/Right");
-        const Tensor raw = product.vars.at("RawDN").Map(ernie::MapDevice::Cpu).tensor;
-        const Tensor ldr = product.vars.at("LdrColor").Map(ernie::MapDevice::Cpu).tensor;
-        const Tensor ids = product.vars.at("PrimId").Map(ernie::MapDevice::Cpu).tensor;
-        EXPECT_EQ(ldr.Type(), DType::UInt8);
-        ASSERT_EQ(raw.Type(), DType::UInt16);
-        int between = 0;
-        for (std::int64_t i = 0; i < raw.Elements(); ++i) {
-            const std::uint16_t dn = raw.As<std::uint16_t>()[i];
-            ASSERT_LE(dn, 4095) << "12 bits";
-            between += dn > 0 && dn < 4095 ? 1 : 0;
+TEST_F(RasterDelegateTest, TheMars2020NavcamAndHazcamPairsSeeInStereo) {
+    // Perseverance's Navcams and front Hazcams (Maki et al. 2020, Table 2; the Hazcams on cube
+    // faces), binned to 64 x 48, over a 1 m cube: each eye sends 12-bit demosaiced numbers and
+    // an 8-bit JPEG view, and the cube sits further right in the left eye's image, by the
+    // baseline's disparity (42.4 cm from 5 m up, 24.8 cm from 3 m).
+    struct Pair {
+        const char* rig;
+        double baseline;
+        double height;
+        bool hazcam;
+    };
+    for (const Pair pair :
+         {Pair{"/World/Navcam", 0.424, 5.0, false}, Pair{"/World/Hazcam", 0.248, 3.0, true}}) {
+        Scene scene = FlatScene();
+        scene.Define("/World/Cube", tokens::kCube)
+            .Set(tokens::kSize, 1.0)
+            .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 0.5)));
+        const std::vector<Path> vars =
+            *scene.Get("/Render/Product", tokens::kOrderedVars)->Get<std::vector<Path>>();
+        for (const char* eye : {"Left", "Right"}) {
+            scene.Define(Path("/Render").Child(eye), tokens::kRenderProduct)
+                .Set(tokens::kOrderedVars, vars)
+                .Set(tokens::kCameraRel, Path(pair.rig).Child(eye))
+                .Set(tokens::kResolution, glm::ivec2(64, 48));
         }
-        EXPECT_GT(between, raw.Elements() / 2) << "exposed within the ADC's range";
-        double sum = 0.0;
-        int hits = 0;
-        for (std::size_t row = 0; row < 48; ++row) {
-            for (std::size_t col = 0; col < 64; ++col) {
-                if (delegate.PrimPath(ids.As<std::uint32_t>()[row * 64 + col]) ==
-                    Path("/World/Cube")) {
-                    sum += static_cast<double>(col);
-                    ++hits;
+        scene.Set("/Render/Settings", tokens::kProducts,
+                  std::vector<Path>{"/Render/Left", "/Render/Right"});
+        if (pair.hazcam) {
+            ernie::AuthorMars2020HazcamPair(scene, pair.rig, "/Render/Left", "/Render/Right");
+        } else {
+            ernie::AuthorMars2020NavcamPair(scene, pair.rig, "/Render/Left", "/Render/Right");
+        }
+        scene.Set(
+            pair.rig, tokens::kTransform,
+            ernie::LookAtTransform({0.0, 0.0, pair.height}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
+        for (const char* eye : {"Left", "Right"}) {
+            scene.Set(Path(pair.rig).Child(eye), tokens::kExposureTime, 1e-4);
+        }
+        RasterDelegate delegate(*context_);
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        double cubeColumn[2] = {0.0, 0.0};
+        for (int e = 0; e < 2; ++e) {
+            auto& product = outputs.at(e == 0 ? "/Render/Left" : "/Render/Right");
+            const Tensor raw = product.vars.at("RawDN").Map(ernie::MapDevice::Cpu).tensor;
+            const Tensor ldr = product.vars.at("LdrColor").Map(ernie::MapDevice::Cpu).tensor;
+            const Tensor ids = product.vars.at("PrimId").Map(ernie::MapDevice::Cpu).tensor;
+            EXPECT_EQ(ldr.Type(), DType::UInt8);
+            ASSERT_EQ(raw.Type(), DType::UInt16);
+            int between = 0;
+            for (std::int64_t i = 0; i < raw.Elements(); ++i) {
+                const std::uint16_t dn = raw.As<std::uint16_t>()[i];
+                ASSERT_LE(dn, 4095) << "12 bits";
+                between += dn > 0 && dn < 4095 ? 1 : 0;
+            }
+            EXPECT_GT(between, raw.Elements() / 2) << "exposed within the ADC's range";
+            double sum = 0.0;
+            int hits = 0;
+            for (std::size_t row = 0; row < 48; ++row) {
+                for (std::size_t col = 0; col < 64; ++col) {
+                    if (delegate.PrimPath(ids.As<std::uint32_t>()[row * 64 + col]) ==
+                        Path("/World/Cube")) {
+                        sum += static_cast<double>(col);
+                        ++hits;
+                    }
                 }
             }
+            ASSERT_GT(hits, 0);
+            cubeColumn[e] = sum / hits;
         }
-        ASSERT_GT(hits, 0);
-        cubeColumn[e] = sum / hits;
+        // The cube's top, 1 m below the camera's height, at f / pitch pixels per unit of x / z.
+        const ernie::Camera left = ernie::CameraOf(scene, Path(pair.rig).Child("Left"), 64, 48);
+        EXPECT_EQ(ernie::NeedsCubeFaces(left), pair.hazcam);
+        const double disparity = cubeColumn[0] - cubeColumn[1];
+        EXPECT_NEAR(disparity, pair.baseline * left.FocalLengthPixels() / (pair.height - 1.0), 1.5)
+            << pair.rig;
     }
-    // The cube's top, 4 m from the cameras, at f / pitch pixels per unit of x / z: about 4 px.
-    const ernie::Camera left = ernie::CameraOf(scene, "/World/Navcam/Left", 64, 48);
-    const double disparity = cubeColumn[0] - cubeColumn[1];
-    EXPECT_NEAR(disparity, 0.424 * left.FocalLengthPixels() / 4.0, 1.5);
 }
 
 TEST_F(RasterDelegateTest, MastcamZsNearInfraredFiltersSeeTheSunsBlackBody) {
@@ -803,7 +820,8 @@ TEST_F(RasterDelegateTest, CahvoreCamerasSeeThroughTheirRayTablesExactly) {
         scene.Remove("/World/Terrain");
         scene.Set("/Render/Settings", tokens::kResolution,
                   glm::ivec2(static_cast<int>(model.width), static_cast<int>(model.height)));
-        scene.Set("/Render/Product", tokens::kOrderedVars, std::vector<Path>{"/Render/Vars/PrimId"});
+        scene.Set("/Render/Product", tokens::kOrderedVars,
+                  std::vector<Path>{"/Render/Vars/PrimId"});
         ernie::Camera camera = fit.camera;
         camera.bands.count = 3;
         ernie::SetCamera(scene, "/World/Camera", camera);
@@ -852,7 +870,8 @@ TEST_F(RasterDelegateTest, CahvoreCamerasSeeThroughTheirRayTablesExactly) {
             int hits = 0;
             for (std::uint32_t row = 0; row < model.height; ++row) {
                 for (std::uint32_t col = 0; col < model.width; ++col) {
-                    if (delegate.PrimPath(ids.As<std::uint32_t>()[row * model.width + col]) == ball) {
+                    if (delegate.PrimPath(ids.As<std::uint32_t>()[row * model.width + col]) ==
+                        ball) {
                         sum += glm::dvec2(col + 0.5, row + 0.5);
                         ++hits;
                     }

@@ -48,14 +48,14 @@ enum class LrocWacBand {
 
 /// One WAC band's published values.
 struct LrocWacBandSpec {
-    double nameNm;           ///< Table 4's band name.
-    double effectiveNm;      ///< Table 4's effective wavelength.
-    double fwhmNm;           ///< Table 4's full width at half maximum.
-    double responsivity;     ///< Table 4's responsivity coefficient, (W/m^3/sr) / (DN/s).
+    double nameNm;        ///< Table 4's band name.
+    double effectiveNm;   ///< Table 4's effective wavelength.
+    double fwhmNm;        ///< Table 4's full width at half maximum.
+    double responsivity;  ///< Table 4's responsivity coefficient, (W/m^3/sr) / (DN/s).
     /// Table 3: the visible optics' or the UV optics' (section 3.2.1's text gives 5.5 and 5.1
     /// for the lens designs; the table's are the system's).
     double fNumber;
-    double pixelPitchUm;     ///< The 9 um pixels, 4 x 4 summed in the UV (section 3.2).
+    double pixelPitchUm;  ///< The 9 um pixels, 4 x 4 summed in the UV (section 3.2).
     /// The band's effective quantum efficiency, which with Ernie's camera equation turns a flat
     /// spectral radiance into Table 4's DN per second: gain h c / (RC FWHM pi / (4 N^2) A
     /// lambda_eff), the optics', filter's and fill factor's losses all in it.
@@ -150,6 +150,47 @@ void AuthorMars2020NavcamPair(Scene& scene, const Path& rig, const Path& leftPro
                               const Path& rightProduct, BayerPattern pattern = BayerPattern::Rggb,
                               double jpegQuality = 85.0);
 
+/// Perseverance's hazard cameras: two stereo pairs on the front of the rover body (looking down
+/// past the front wheels) and one on the back.
+enum class Mars2020Hazcams { Front, Rear };
+
+/// The Hazcams' optics (Maki et al. 2020, Table 2), on the Navcams' camera body and detector
+/// (`Mars2020Navcam`'s sensor values).
+struct Mars2020Hazcam {
+    static constexpr double kFocalLengthMm = 14.0;
+    static constexpr double kFNumber = 12.0;
+    static constexpr double kBestFocusM = 0.9;
+    static constexpr double kFrontBaselineM = 0.248;
+    static constexpr double kRearBaselineM = 0.934;
+    /// Fields of view, degrees: horizontal, vertical and diagonal.
+    static constexpr double kFieldOfViewDeg[3] = {136.0, 102.0, 172.0};
+
+    /// The lens's Kannala-Brandt k1 for the published fields of view, as
+    /// `Mars2020Navcam::FisheyeK1`. Its corners reach 86 degrees off axis, so it renders on cube
+    /// faces (`NeedsCubeFaces`).
+    static double FisheyeK1();
+};
+
+/// Authors one of the Mars 2020 Hazcams as published, as `AuthorMars2020Navcam` does a Navcam
+/// but through the Hazcam's f-theta lens of 14.0 mm (`Mars2020Hazcam::FisheyeK1`), f/12,
+/// focused at 0.9 m. The flight cameras' own calibrations (CAHVORE, `CahvoreModel`) see a little
+/// less than the published fields (128.7 x 98.6 degrees for the front left); author one of them
+/// with `CahvoreModel`'s ray table for a particular camera's exact geometry.
+///
+/// Reference: J. N. Maki et al., "The Mars 2020 Engineering Cameras and Microphone on the
+/// Perseverance Rover", Space Science Reviews 216:137, 2020, Table 2.
+/// @throws std::invalid_argument if `camera` is not a Camera or `product` not a RenderProduct.
+void AuthorMars2020Hazcam(Scene& scene, const Path& camera, const Path& product,
+                          BayerPattern pattern = BayerPattern::Rggb, double jpegQuality = 85.0);
+
+/// A Hazcam pair on stereo rig `rig` (as `AuthorMars2020NavcamPair`): Cameras `rig`/Left and
+/// `rig`/Right, 24.8 cm apart for the front pair or 93.4 cm for the rear, each authored as
+/// `AuthorMars2020Hazcam`.
+void AuthorMars2020HazcamPair(Scene& scene, const Path& rig, const Path& leftProduct,
+                              const Path& rightProduct,
+                              Mars2020Hazcams which = Mars2020Hazcams::Front,
+                              BayerPattern pattern = BayerPattern::Rggb, double jpegQuality = 85.0);
+
 /// The Mars 2020 rover Perseverance's Mastcam-Z: two zoom cameras whose filter wheels hold the
 /// Bayer RGB's near-IR cut-off (filter 0), six narrow bands from 442 to 1022 nm (1 to 6) and a
 /// neutral-density solar filter (7), the left camera's bands visible and the right's reaching
@@ -187,7 +228,7 @@ struct MastcamZ {
     /// The f-number at focal length `focalLengthMm`, linearly between the zoom's ends (the
     /// paper gives only those).
     static double FNumberAt(double focalLengthMm);
-    static double FullWellElectrons(MastcamZEye eye);  ///< 21826 (left), 21818 (right).
+    static double FullWellElectrons(MastcamZEye eye);   ///< 21826 (left), 21818 (right).
     static double ReadNoiseElectrons(MastcamZEye eye);  ///< 22 (left), 21 (right).
 };
 

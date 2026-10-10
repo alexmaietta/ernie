@@ -116,8 +116,8 @@ CahvoreModel::Ray CahvoreModel::ImageToRay(glm::dvec2 image) const {
         const double chi2 = chi * chi;
         const double deriv = 1.0 + r.x + 3.0 * r.y * chi2 + 5.0 * r.z * chi2 * chi2;
         Require(std::abs(deriv) > kEpsilon, "The CAHVORE distortion folds here");
-        const double dchi = ((1.0 + r.x) * chi + r.y * chi2 * chi + r.z * chi2 * chi2 * chi - chip) /
-                            deriv;
+        const double dchi =
+            ((1.0 + r.x) * chi + r.y * chi2 * chi + r.z * chi2 * chi2 * chi - chip) / deriv;
         chi -= dchi;
         if (std::abs(dchi) < 1e-8) {
             break;
@@ -226,13 +226,14 @@ CahvoreModel::ErnieCamera CahvoreModel::ToCamera(double pixelPitchUm) const {
     camera.verticalApertureMm = pitch * height;
     // Ernie's pixel of model image point `image`: centres at + 0.5, the rows flipped for a mirror.
     const auto ernieOf = [&](glm::dvec2 image) {
-        return glm::dvec2(image.x + 0.5, out.rowsReversed ? height - (image.y + 0.5) : image.y + 0.5);
+        return glm::dvec2(image.x + 0.5,
+                          out.rowsReversed ? height - (image.y + 0.5) : image.y + 0.5);
     };
     const glm::dvec2 principal = ernieOf({hc, vc});
     camera.horizontalApertureOffsetMm = (principal.x - 0.5 * width) * pitch;
     camera.verticalApertureOffsetMm = (0.5 * height - principal.y) * pitch;
-    camera.transform = glm::dmat4(glm::dvec4(x, 0.0), glm::dvec4(y, 0.0), glm::dvec4(z, 0.0),
-                                  glm::dvec4(c, 1.0));
+    camera.transform =
+        glm::dmat4(glm::dvec4(x, 0.0), glm::dvec4(y, 0.0), glm::dvec4(z, 0.0), glm::dvec4(c, 1.0));
     camera.nearPlane = 0.01;
     camera.farPlane = 1e4;
 
@@ -252,10 +253,11 @@ CahvoreModel::ErnieCamera CahvoreModel::ToCamera(double pixelPitchUm) const {
             const glm::dvec3 local(glm::dot(ray.direction, x), glm::dot(ray.direction, y),
                                    glm::dot(ray.direction, z));
             const glm::dvec2 pixel = ernieOf(image);
-            samples.push_back({local, glm::dvec2(pixel.x - principal.x, principal.y - pixel.y) / f,
-                               pixel});
+            samples.push_back(
+                {local, glm::dvec2(pixel.x - principal.x, principal.y - pixel.y) / f, pixel});
             out.pupilShiftMax = std::max(out.pupilShiftMax, glm::length(ray.origin - c));
-            out.fieldAngleMax = std::max(out.fieldAngleMax, std::acos(std::clamp(-local.z, -1.0, 1.0)));
+            out.fieldAngleMax =
+                std::max(out.fieldAngleMax, std::acos(std::clamp(-local.z, -1.0, 1.0)));
         }
     }
 
@@ -275,7 +277,8 @@ CahvoreModel::ErnieCamera CahvoreModel::ToCamera(double pixelPitchUm) const {
         const std::array<double, 5> b = fit.Solve();
         scale = b[0] != 0.0 ? b[0] : 1.0;
         for (int k = 0; k < 4; ++k) {
-            camera.lens.fisheye[static_cast<std::size_t>(k)] = b[static_cast<std::size_t>(k) + 1] / scale;
+            camera.lens.fisheye[static_cast<std::size_t>(k)] =
+                b[static_cast<std::size_t>(k) + 1] / scale;
         }
     } else {
         // Brown-Conrady, radial and tangential, on the pinhole coordinates, as the ISD fits.
@@ -285,7 +288,10 @@ CahvoreModel::ErnieCamera CahvoreModel::ToCamera(double pixelPitchUm) const {
             const double value = u[axisIndex];
             const double crossTerm = 2.0 * u.x * u.y;
             const double own = r2 + 2.0 * value * value;
-            return std::array<double, 6>{value, value * r2, value * r2 * r2, value * r2 * r2 * r2,
+            return std::array<double, 6>{value,
+                                         value * r2,
+                                         value * r2 * r2,
+                                         value * r2 * r2 * r2,
                                          axisIndex == 0 ? crossTerm : own,
                                          axisIndex == 0 ? own : crossTerm};
         };
@@ -313,7 +319,8 @@ CahvoreModel::ErnieCamera CahvoreModel::ToCamera(double pixelPitchUm) const {
             const double theta = std::acos(std::clamp(-s.ray.z, -1.0, 1.0));
             const double t2 = theta * theta;
             const std::array<double, 4>& k = camera.lens.fisheye;
-            const double radius = theta * (1.0 + t2 * (k[0] + t2 * (k[1] + t2 * (k[2] + t2 * k[3]))));
+            const double radius =
+                theta * (1.0 + t2 * (k[0] + t2 * (k[1] + t2 * (k[2] + t2 * k[3]))));
             const double across = glm::length(glm::dvec2(s.ray));
             d = across > kEpsilon ? glm::dvec2(s.ray) / across * radius : glm::dvec2(0.0);
         } else {
@@ -407,8 +414,8 @@ std::vector<NamedCahvore> ReadCahvoreModels(std::string_view text) {
             models.push_back(std::move(named));
         }
     } catch (const nlohmann::json::exception& error) {
-        throw std::invalid_argument(std::string("A camera model has a missing or mistyped field: ") +
-                                    error.what());
+        throw std::invalid_argument(
+            std::string("A camera model has a missing or mistyped field: ") + error.what());
     }
     return models;
 }

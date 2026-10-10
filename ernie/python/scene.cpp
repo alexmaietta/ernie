@@ -1319,6 +1319,35 @@ void BindScene(nb::module_& m) {
         "frame, looking down -z with +y up): Cameras `rig`/Left and `rig`/Right 42.4 cm apart "
         "along x, each as `author_mars2020_navcam` with its product.");
     m.def(
+        "author_mars2020_hazcam",
+        [bayerPattern](Scene& scene, const std::string& camera, const std::string& product,
+                       const std::string& pattern, double jpegQuality) {
+            AuthorMars2020Hazcam(scene, Path(camera), Path(product), bayerPattern(pattern),
+                                 jpegQuality);
+        },
+        nb::arg("scene"), nb::arg("camera"), nb::arg("product"), nb::arg("pattern") = "rggb",
+        nb::arg("jpeg_quality") = 85.0,
+        "Authors one of the Mars 2020 rover's Hazcams as Maki et al. 2020 publish it (Table 2), as "
+        "`author_mars2020_navcam` does a Navcam but through the Hazcam's f-theta fisheye (14.0 mm, "
+        "f/12, 136 x 102 degrees, focused at 0.9 m), which renders on cube faces.");
+    m.def(
+        "author_mars2020_hazcam_pair",
+        [bayerPattern](Scene& scene, const std::string& rig, const std::string& left,
+                       const std::string& right, const std::string& which,
+                       const std::string& pattern, double jpegQuality) {
+            if (which != "front" && which != "rear") {
+                throw nb::value_error("which must be 'front' or 'rear'");
+            }
+            AuthorMars2020HazcamPair(scene, Path(rig), Path(left), Path(right),
+                                     which == "front" ? Mars2020Hazcams::Front
+                                                      : Mars2020Hazcams::Rear,
+                                     bayerPattern(pattern), jpegQuality);
+        },
+        nb::arg("scene"), nb::arg("rig"), nb::arg("left_product"), nb::arg("right_product"),
+        nb::arg("which") = "front", nb::arg("pattern") = "rggb", nb::arg("jpeg_quality") = 85.0,
+        "A Hazcam stereo pair on Xform `rig`: Cameras `rig`/Left and `rig`/Right 24.8 cm apart "
+        "(front) or 93.4 cm (rear) along x, each as `author_mars2020_hazcam` with its product.");
+    m.def(
         "author_mastcamz",
         [bayerPattern](Scene& scene, const std::string& camera, const std::string& product,
                        const std::string& eye, int filter, double focalLength,

@@ -58,8 +58,7 @@ std::array<double, N> SolveNormal(std::array<std::array<double, N>, N> normal,
 }
 
 /// Accumulates the normal equations of a linear least-squares fit, row by row.
-template <std::size_t N>
-struct NormalEquations {
+template <std::size_t N> struct NormalEquations {
     std::array<std::array<double, N>, N> normal{};
     std::array<double, N> right{};
 

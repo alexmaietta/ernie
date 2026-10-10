@@ -2,6 +2,7 @@
 
 #include "ernie/scene/instruments.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/scene/wide_view.h"
 
 #include <gtest/gtest.h>
 
@@ -219,8 +220,8 @@ TEST(IsdPushFrame, FrameletsAreFrameCamerasOnTheIsdsPixels) {
                     const glm::dvec3 local(toCamera * glm::dvec4(ground, 1.0));
                     ASSERT_LT(local.z, 0.0) << name << ": in front of the camera";
                     const glm::dvec2 d = c.lens.Distort(glm::dvec2(local) / -local.z);
-                    glm::dvec2 pixel = c.PrincipalPoint() + glm::dvec2(d.x, -d.y) *
-                                                                c.FocalLengthPixels();
+                    glm::dvec2 pixel =
+                        c.PrincipalPoint() + glm::dvec2(d.x, -d.y) * c.FocalLengthPixels();
                     if (framelet.rowsReversed) {
                         pixel.y = height - pixel.y;
                     }
@@ -269,13 +270,14 @@ TEST(IsdFrame, DawnsFramingCameraSeesVestaThroughItsRadTanLens) {
     // On Vesta's ellipsoid (radii 289 and 229 km).
     const double a = 289e3;
     const double b = 229e3;
-    EXPECT_NEAR((ground.x * ground.x + ground.y * ground.y) / (a * a) + ground.z * ground.z / (b * b),
+    EXPECT_NEAR((ground.x * ground.x + ground.y * ground.y) / (a * a) +
+                    ground.z * ground.z / (b * b),
                 1.0, 1e-9);
     // usgscsm's radtan inversion test coefficients (DistortionTests.cpp), and stronger ones:
     // pixels come back through the lens.
-    for (const std::vector<double>& k : {std::vector<double>{0.000031, -0.000056, 1.3e-5, -1.7e-6,
-                                                             2.9e-8},
-                                         std::vector<double>{1.0, 0.0, 0.05, -0.03, 0.0}}) {
+    for (const std::vector<double>& k :
+         {std::vector<double>{0.000031, -0.000056, 1.3e-5, -1.7e-6, 2.9e-8},
+          std::vector<double>{1.0, 0.0, 0.05, -0.03, 0.0}}) {
         isd.distortionCoefficients = k;
         const ernie::IsdFrame lens(isd);
         for (const double line : {420.5, 512.0, 600.25}) {
@@ -413,11 +415,11 @@ TEST(Mars2020Navcam, AuthorsAStereoPairAsPublished) {
     EXPECT_EQ(left.lens.projection, ernie::LensProjection::Fisheye);
     EXPECT_NEAR(left.lens.fisheye[0], N::FisheyeK1(), 1e-6);
     const double f = left.FocalLengthPixels();
-    const double fields[3][2] = {{0.5 * N::kWidth, 0.0}, {0.0, 0.5 * N::kHeight},
-                                 {0.5 * N::kWidth, 0.5 * N::kHeight}};
+    const double fields[3][2] = {
+        {0.5 * N::kWidth, 0.0}, {0.0, 0.5 * N::kHeight}, {0.5 * N::kWidth, 0.5 * N::kHeight}};
     for (int i = 0; i < 3; ++i) {
-        const double degrees = 2.0 * left.lens.FieldAngle(glm::dvec2(fields[i][0], fields[i][1]) /
-                                                          f) * 180.0 / M_PI;
+        const double degrees =
+            2.0 * left.lens.FieldAngle(glm::dvec2(fields[i][0], fields[i][1]) / f) * 180.0 / M_PI;
         EXPECT_NEAR(degrees, N::kFieldOfViewDeg[i], 1.0) << i;
     }
     const auto* filters = scene.Get("/Right", ernie::tokens::kFilters);
@@ -432,13 +434,55 @@ TEST(Mars2020Navcam, AuthorsAStereoPairAsPublished) {
     EXPECT_EQ(scene.Get<double>("/Right/Mars2020Navcam/Jpeg", "inputs:quality", -1.0), 60.0);
 }
 
+TEST(Mars2020Hazcam, AuthorsBothPairsAsPublishedOnCubeFaces) {
+    using H = ernie::Mars2020Hazcam;
+    using N = ernie::Mars2020Navcam;
+    for (const ernie::Mars2020Hazcams which :
+         {ernie::Mars2020Hazcams::Front, ernie::Mars2020Hazcams::Rear}) {
+        ernie::Scene scene;
+        scene.Define("/Left", ernie::tokens::kRenderProduct);
+        scene.Define("/Right", ernie::tokens::kRenderProduct);
+        ernie::AuthorMars2020HazcamPair(scene, "/Rover/Hazcam", "/Left", "/Right", which);
+        const ernie::Camera left =
+            ernie::CameraOf(scene, "/Rover/Hazcam/Left", N::kWidth, N::kHeight);
+        const ernie::Camera right =
+            ernie::CameraOf(scene, "/Rover/Hazcam/Right", N::kWidth, N::kHeight);
+        // Maki et al. 2020, Table 2: 24.8 cm (front) or 93.4 cm (rear) apart, 14.0 mm at f/12 on
+        // the Navcams' detector.
+        EXPECT_NEAR(glm::length(glm::dvec3(right.transform[3] - left.transform[3])),
+                    which == ernie::Mars2020Hazcams::Front ? 0.248 : 0.934, 1e-12);
+        EXPECT_DOUBLE_EQ(left.focalLengthMm, 14.0);
+        EXPECT_DOUBLE_EQ(left.fStop, 12.0);
+        EXPECT_DOUBLE_EQ(left.focusDistance, 0.9);
+        EXPECT_NEAR(left.PixelPitchMetres(), 6.4e-6, 1e-12);
+        EXPECT_DOUBLE_EQ(left.sensor.fullWellElectrons, 15000.0);
+        EXPECT_NO_THROW(left.Check());
+        EXPECT_TRUE(ernie::NeedsCubeFaces(left)) << "its corners 86 degrees off axis";
+        // The fitted f-theta lens sees the published fields within a degree and a half.
+        const double f = left.FocalLengthPixels();
+        const double fields[3][2] = {
+            {0.5 * N::kWidth, 0.0}, {0.0, 0.5 * N::kHeight}, {0.5 * N::kWidth, 0.5 * N::kHeight}};
+        for (int i = 0; i < 3; ++i) {
+            const double degrees =
+                2.0 * left.lens.FieldAngle(glm::dvec2(fields[i][0], fields[i][1]) / f) * 180.0 /
+                M_PI;
+            EXPECT_NEAR(degrees, H::kFieldOfViewDeg[i], 1.5) << i;
+        }
+        const auto* filters = scene.Get("/Left", ernie::tokens::kFilters);
+        ASSERT_NE(filters, nullptr);
+        EXPECT_EQ(filters->Get<std::vector<ernie::Path>>()->front(),
+                  ernie::Path("/Left/Mars2020Hazcam/Qe"));
+    }
+}
+
 TEST(MastcamZ, AuthorsTheFilterWheelsAndStereoRigAsPublished) {
     ernie::Scene scene;
     scene.Define("/Left", ernie::tokens::kRenderProduct);
     scene.Define("/Right", ernie::tokens::kRenderProduct);
     ernie::AuthorMastcamZPair(scene, "/Rover/MastcamZ", "/Left", "/Right", 0, 6, 110.0);
     using Z = ernie::MastcamZ;
-    const ernie::Camera left = ernie::CameraOf(scene, "/Rover/MastcamZ/Left", Z::kWidth, Z::kHeight);
+    const ernie::Camera left =
+        ernie::CameraOf(scene, "/Rover/MastcamZ/Left", Z::kWidth, Z::kHeight);
     const ernie::Camera right =
         ernie::CameraOf(scene, "/Rover/MastcamZ/Right", Z::kWidth, Z::kHeight);
     EXPECT_NO_THROW(left.Check());

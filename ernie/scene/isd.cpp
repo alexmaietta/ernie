@@ -281,8 +281,8 @@ IsdSensor ReadIsd(std::string_view json) {
             } else if (model.contains("x") && model.contains("y")) {
                 sensor.distortionCoefficients = Numbers(model["x"], "x");
                 const std::vector<double> y = Numbers(model["y"], "y");
-                sensor.distortionCoefficients.insert(sensor.distortionCoefficients.end(),
-                                                     y.begin(), y.end());
+                sensor.distortionCoefficients.insert(sensor.distortionCoefficients.end(), y.begin(),
+                                                     y.end());
             }
         }
 
@@ -300,7 +300,8 @@ IsdSensor ReadIsd(std::string_view json) {
         sensor.exposureDuration = NumberOr(isd, "exposure_duration", 0.0);
         sensor.interframeDelay = NumberOr(isd, "interframe_delay", 0.0);
         sensor.frameletHeight = static_cast<std::uint32_t>(NumberOr(isd, "framelet_height", 0.0));
-        sensor.frameletOverlap = static_cast<std::uint32_t>(NumberOr(isd, "num_lines_overlap", 0.0));
+        sensor.frameletOverlap =
+            static_cast<std::uint32_t>(NumberOr(isd, "num_lines_overlap", 0.0));
         sensor.frameletsFlipped = isd.value("framelets_flipped", false);
         sensor.frameletOrderReversed = isd.value("framelet_order_reversed", false);
 
@@ -333,8 +334,8 @@ IsdCameraModel::IsdCameraModel(IsdSensor isd) : isd_(std::move(isd)) {
         throw std::invalid_argument(
             "A camera's ISD needs positions and pointing and body rotations");
     }
-    const double determinant = isd_.focalToLine[1] * isd_.focalToSample[2] -
-                               isd_.focalToLine[2] * isd_.focalToSample[1];
+    const double determinant =
+        isd_.focalToLine[1] * isd_.focalToSample[2] - isd_.focalToLine[2] * isd_.focalToSample[1];
     if (determinant == 0.0) {
         throw std::invalid_argument("The ISD's focal plane map to pixels is singular");
     }
@@ -346,7 +347,8 @@ IsdCameraModel::IsdCameraModel(IsdSensor isd) : isd_(std::move(isd)) {
             "' is not supported; use radial, transverse, radtan or lrolrocnac");
     }
     if (isd_.distortion == "radtan" && isd_.distortionCoefficients.size() != 5) {
-        throw std::invalid_argument("Radtan distortion takes five coefficients: k1, k2, p1, p2, k3");
+        throw std::invalid_argument(
+            "Radtan distortion takes five coefficients: k1, k2, p1, p2, k3");
     }
     if (isd_.distortion == "lrolrocnac" && isd_.distortionCoefficients.size() != 1) {
         throw std::invalid_argument("LRO NAC distortion takes one coefficient");
@@ -380,10 +382,9 @@ IsdCameraModel::IsdCameraModel(IsdSensor isd) : isd_(std::move(isd)) {
     const glm::dmat3 inverseConstant = glm::transpose(isd_.bodyRotation.constantRotation);
     for (const double time : merged) {
         sensorToBody.quaternions.times.push_back(time);
-        sensorToBody.quaternions.values.push_back(glm::normalize(
-            glm::quat_cast(inverseConstant * glm::mat3_cast(RotationAt(isd_.bodyRotation, time) *
-                                                            glm::inverse(RotationAt(
-                                                                isd_.pointing, time))))));
+        sensorToBody.quaternions.values.push_back(glm::normalize(glm::quat_cast(
+            inverseConstant * glm::mat3_cast(RotationAt(isd_.bodyRotation, time) *
+                                             glm::inverse(RotationAt(isd_.pointing, time))))));
     }
     quaternionStart_ = merged.front();
     quaternionStep_ =
@@ -412,8 +413,8 @@ glm::dquat IsdCameraModel::RotationAt(const IsdRotation& rotation, double time) 
         }
         timeDependent = glm::slerp(q.values[at], next, t);
     }
-    return glm::normalize(glm::quat_cast(rotation.constantRotation *
-                                         glm::mat3_cast(glm::normalize(timeDependent))));
+    return glm::normalize(
+        glm::quat_cast(rotation.constantRotation * glm::mat3_cast(glm::normalize(timeDependent))));
 }
 
 glm::dvec3 IsdCameraModel::Position(double time) const {
@@ -431,8 +432,7 @@ namespace {
 
 // The point p with f(p) = `target`, by Newton's method from `target`, f's Jacobian by central
 // differences.
-template <typename F>
-glm::dvec2 NewtonInverse(const F& f, glm::dvec2 target) {
+template <typename F> glm::dvec2 NewtonInverse(const F& f, glm::dvec2 target) {
     glm::dvec2 p = target;
     for (int i = 0; i < 20; ++i) {
         const glm::dvec2 residual = f(p) - target;
@@ -450,23 +450,30 @@ glm::dvec2 NewtonInverse(const F& f, glm::dvec2 target) {
 // usgscsm's `computeTransverseDistortion`: distorted x and y as cubic polynomials of undistorted
 // `u`, coefficients `k` the x's ten then the y's.
 glm::dvec2 TransverseDistort(const std::vector<double>& k, glm::dvec2 u) {
-    const double terms[10] = {1.0,       u.x,           u.y,           u.x * u.x,
-                              u.x * u.y, u.y * u.y,     u.x * u.x * u.x, u.x * u.x * u.y,
-                              u.x * u.y * u.y, u.y * u.y * u.y};
+    const double terms[10] = {1.0,
+                              u.x,
+                              u.y,
+                              u.x * u.x,
+                              u.x * u.y,
+                              u.y * u.y,
+                              u.x * u.x * u.x,
+                              u.x * u.x * u.y,
+                              u.x * u.y * u.y,
+                              u.y * u.y * u.y};
     glm::dvec2 d(0.0);
     for (int i = 0; i < 10; ++i) {
-        d += terms[i] * glm::dvec2(k[static_cast<std::size_t>(i)],
-                                   k[static_cast<std::size_t>(i + 10)]);
+        d += terms[i] *
+             glm::dvec2(k[static_cast<std::size_t>(i)], k[static_cast<std::size_t>(i + 10)]);
     }
     return d;
 }
 
 // `transverseDistortionJacobian`: d(distorted) / d(undistorted), columns x and y.
 glm::dmat2 TransverseJacobian(const std::vector<double>& k, glm::dvec2 u) {
-    const double dX[10] = {0.0, 1.0, 0.0, 2.0 * u.x, u.y, 0.0,
-                           3.0 * u.x * u.x, 2.0 * u.x * u.y, u.y * u.y, 0.0};
-    const double dY[10] = {0.0, 0.0, 1.0, 0.0, u.x, 2.0 * u.y,
-                           0.0, u.x * u.x, 2.0 * u.x * u.y, 3.0 * u.y * u.y};
+    const double dX[10] = {
+        0.0, 1.0, 0.0, 2.0 * u.x, u.y, 0.0, 3.0 * u.x * u.x, 2.0 * u.x * u.y, u.y * u.y, 0.0};
+    const double dY[10] = {
+        0.0, 0.0, 1.0, 0.0, u.x, 2.0 * u.y, 0.0, u.x * u.x, 2.0 * u.x * u.y, 3.0 * u.y * u.y};
     glm::dmat2 jacobian(0.0);
     for (std::size_t i = 0; i < 10; ++i) {
         jacobian[0] += dX[i] * glm::dvec2(k[i], k[i + 10]);
@@ -564,8 +571,8 @@ glm::dvec2 IsdCameraModel::FocalPlaneOf(double line, double sample) const {
     // usgscsm's `computeDistortedFocalPlaneCoordinates`.
     const double t1 =
         line * isd_.lineSumming + isd_.startingDetectorLine - isd_.detectorCenterLine - l[0];
-    const double t2 =
-        sample * isd_.sampleSumming + isd_.startingDetectorSample - isd_.detectorCenterSample - s[0];
+    const double t2 = sample * isd_.sampleSumming + isd_.startingDetectorSample -
+                      isd_.detectorCenterSample - s[0];
     const double determinant = l[1] * s[2] - l[2] * s[1];
     return {(s[2] * t1 - l[2] * t2) / determinant, (-s[1] * t1 + l[1] * t2) / determinant};
 }
@@ -573,7 +580,8 @@ glm::dvec2 IsdCameraModel::FocalPlaneOf(double line, double sample) const {
 glm::dvec2 IsdCameraModel::PixelOf(glm::dvec2 focal) const {
     const std::array<double, 3>& l = isd_.focalToLine;
     const std::array<double, 3>& s = isd_.focalToSample;
-    const double detectorSample = s[0] + s[1] * focal.x + s[2] * focal.y + isd_.detectorCenterSample;
+    const double detectorSample =
+        s[0] + s[1] * focal.x + s[2] * focal.y + isd_.detectorCenterSample;
     const double detectorLine = l[0] + l[1] * focal.x + l[2] * focal.y + isd_.detectorCenterLine;
     return {(detectorLine - isd_.startingDetectorLine) / isd_.lineSumming,
             (detectorSample - isd_.startingDetectorSample) / isd_.sampleSumming};
@@ -639,8 +647,8 @@ double IsdCameraModel::FitDistortion(Camera& camera, std::span<const double> lin
     // k2 r^4 + k3 r^6), fitted by least squares to the ISD's model at samples along the lines, in
     // Ernie's normalised image coordinates.
     const double f = isd_.focalLengthMm;
-    const double pitch = glm::length(FocalPlaneOf(lines.front(), 1.0) -
-                                     FocalPlaneOf(lines.front(), 0.0));
+    const double pitch =
+        glm::length(FocalPlaneOf(lines.front(), 1.0) - FocalPlaneOf(lines.front(), 0.0));
     const auto normalised = [&](glm::dvec2 focal) {
         const glm::dvec3 ray = glm::transpose(axes) * (facing * glm::dvec3(-focal.x, -focal.y, -f));
         return glm::dvec2(ray.x, ray.y) / -ray.z;
@@ -669,8 +677,12 @@ double IsdCameraModel::FitDistortion(Camera& camera, std::span<const double> lin
         const double v = u[axis];
         const double cross = 2.0 * u.x * u.y;
         const double own = r2 + 2.0 * v * v;
-        return std::array<double, 6>{v,          v * r2,     v * r2 * r2, v * r2 * r2 * r2,
-                                     axis == 0 ? cross : own, axis == 0 ? own : cross};
+        return std::array<double, 6>{v,
+                                     v * r2,
+                                     v * r2 * r2,
+                                     v * r2 * r2 * r2,
+                                     axis == 0 ? cross : own,
+                                     axis == 0 ? own : cross};
     };
     std::array<std::array<double, 6>, 6> normal{};
     std::array<double, 6> right{};
@@ -712,8 +724,7 @@ double IsdCameraModel::FitDistortion(Camera& camera, std::span<const double> lin
 
 IsdLineScanner::IsdLineScanner(IsdSensor isd) : IsdCameraModel(std::move(isd)) {
     if (!isd_.IsLineScanner()) {
-        throw std::invalid_argument("The ISD's model '" + isd_.model +
-                                    "' is not a line scanner's");
+        throw std::invalid_argument("The ISD's model '" + isd_.model + "' is not a line scanner's");
     }
     if (isd_.lineRates.empty()) {
         throw std::invalid_argument("A line scanner's ISD needs line rates");
@@ -762,8 +773,7 @@ glm::dvec2 IsdLineScanner::GroundToImage(const glm::dvec3& ground) const {
     return {l1, DetectorView(ground, ImageTime(l1)).y};
 }
 
-IsdLineScanner::Strip IsdLineScanner::StripOf(std::uint32_t firstLine,
-                                              std::uint32_t lines) const {
+IsdLineScanner::Strip IsdLineScanner::StripOf(std::uint32_t firstLine, std::uint32_t lines) const {
     if (lines == 0) {
         throw std::invalid_argument("A strip needs at least one line");
     }
@@ -774,8 +784,7 @@ IsdLineScanner::Strip IsdLineScanner::StripOf(std::uint32_t firstLine,
     const double middle = ImageTime(firstLine + 0.5 * lines);
     const glm::dvec3 centre = ImageToGround(firstLine + 0.5 * lines, 0.5 * isd_.samples);
     const double facing =
-        glm::dot(centre - Position(middle), Look(firstLine + 0.5 * lines, 0.5 * isd_.samples)) <
-                0.0
+        glm::dot(centre - Position(middle), Look(firstLine + 0.5 * lines, 0.5 * isd_.samples)) < 0.0
             ? -1.0
             : 1.0;
     const glm::dmat3 ernieToSensor = ErnieAxes(0.0, facing);
@@ -864,8 +873,7 @@ double IsdPushFrame::DetectorLine(double line) const {
 }
 
 double IsdPushFrame::ImageTime(double line) const {
-    return isd_.startingTime + 0.5 * isd_.exposureDuration +
-           TimeOrder(line) * isd_.interframeDelay;
+    return isd_.startingTime + 0.5 * isd_.exposureDuration + TimeOrder(line) * isd_.interframeDelay;
 }
 
 glm::dvec3 IsdPushFrame::Look(double line, double sample) const {
@@ -920,7 +928,7 @@ IsdPushFrame::Framelet IsdPushFrame::FrameletOf(std::uint32_t index) const {
     const glm::dvec3 centre = ImageToGround(middle, 0.5 * isd_.samples);
     const double facing =
         glm::dot(centre - Position(framelet.time), Look(middle, 0.5 * isd_.samples)) < 0.0 ? -1.0
-                                                                                            : 1.0;
+                                                                                           : 1.0;
     // The detector line of framelet row coordinate `row` (0 its top edge, `height` its bottom).
     const auto detectorLine = [&](double row) {
         return (isd_.frameletsFlipped ? height - row : row) + isd_.frameletOverlap / 2;
@@ -935,9 +943,9 @@ IsdPushFrame::Framelet IsdPushFrame::FrameletOf(std::uint32_t index) const {
     return framelet;
 }
 
-IsdCameraModel::FrameView IsdCameraModel::FrameViewOf(
-    const std::function<double(double)>& detectorLine, std::uint32_t rows, double time,
-    double facing) const {
+IsdCameraModel::FrameView
+IsdCameraModel::FrameViewOf(const std::function<double(double)>& detectorLine, std::uint32_t rows,
+                            double time, double facing) const {
     const double height = rows;
     const glm::dmat3 axes = ErnieAxes(detectorLine(0.5 * height), facing);
     const double f = isd_.focalLengthMm;
@@ -990,8 +998,7 @@ IsdCameraModel::FrameView IsdCameraModel::FrameViewOf(
 
 IsdFrame::IsdFrame(IsdSensor isd) : IsdCameraModel(std::move(isd)) {
     if (!isd_.IsFrame()) {
-        throw std::invalid_argument("The ISD's model '" + isd_.model +
-                                    "' is not a frame camera's");
+        throw std::invalid_argument("The ISD's model '" + isd_.model + "' is not a frame camera's");
     }
 }
 

@@ -45,10 +45,13 @@ void AuthorLrocNac(Scene& scene, const Path& camera, const Path& product, LrocNa
     // The readout: electrons, their noise, the 12-bit ADC, the even and odd channels (sections
     // 3.1.2 and 4.1.1) and the nominal 12- to 8-bit table (Appendix A, code 0); and the
     // photographic outputs, for products that show it (they run only when held).
-    const std::pair<const char*, const char*> steps[] = {
-        {"Qe", "qe"},           {"Noise", "noise"},   {"Adc", "adc"},
-        {"EvenOdd", "readoutTaps"}, {"Compand", "compandTable"}, {"Cie", "cie"},
-        {"Exposure", "exposure"}};
+    const std::pair<const char*, const char*> steps[] = {{"Qe", "qe"},
+                                                         {"Noise", "noise"},
+                                                         {"Adc", "adc"},
+                                                         {"EvenOdd", "readoutTaps"},
+                                                         {"Compand", "compandTable"},
+                                                         {"Cie", "cie"},
+                                                         {"Exposure", "exposure"}};
     std::vector<Path> filters;
     for (const auto& [name, type] : steps) {
         const Path path = product.Child("LrocNac").Child(name);
@@ -75,7 +78,7 @@ constexpr double kWacFullWell = 46100.0;
 }  // namespace
 
 double LrocWacBandSpec::EffectiveQe() const {
-    constexpr double kPlanck = 6.62607015e-34;    // J s
+    constexpr double kPlanck = 6.62607015e-34;     // J s
     constexpr double kSpeedOfLight = 299792458.0;  // m / s
     // A flat spectral radiance L (W/m^3/sr) gives L / RC DN per second; Ernie's camera equation
     // gives L FWHM pi / (4 N^2) A (lambda / h c) QE / gain over the band.
@@ -91,13 +94,20 @@ LrocWacBandSpec LrocWacBandOf(LrocWacBand band) {
     constexpr double kVisible = 5.052;
     constexpr double kUv = 5.65;
     switch (band) {
-        case LrocWacBand::Uv320: return {320.0, 321.0, 32.0, 865.0, kUv, 36.0};
-        case LrocWacBand::Uv360: return {360.0, 360.0, 15.0, 918.0, kUv, 36.0};
-        case LrocWacBand::Vis415: return {415.0, 415.0, 36.0, 3727.0, kVisible, 9.0};
-        case LrocWacBand::Vis565: return {565.0, 566.0, 20.0, 3310.0, kVisible, 9.0};
-        case LrocWacBand::Vis605: return {605.0, 604.0, 20.0, 3377.0, kVisible, 9.0};
-        case LrocWacBand::Vis645: return {645.0, 643.0, 23.0, 3273.0, kVisible, 9.0};
-        case LrocWacBand::Vis690: return {690.0, 689.0, 39.0, 2612.0, kVisible, 9.0};
+    case LrocWacBand::Uv320:
+        return {320.0, 321.0, 32.0, 865.0, kUv, 36.0};
+    case LrocWacBand::Uv360:
+        return {360.0, 360.0, 15.0, 918.0, kUv, 36.0};
+    case LrocWacBand::Vis415:
+        return {415.0, 415.0, 36.0, 3727.0, kVisible, 9.0};
+    case LrocWacBand::Vis565:
+        return {565.0, 566.0, 20.0, 3310.0, kVisible, 9.0};
+    case LrocWacBand::Vis605:
+        return {605.0, 604.0, 20.0, 3377.0, kVisible, 9.0};
+    case LrocWacBand::Vis645:
+        return {645.0, 643.0, 23.0, 3273.0, kVisible, 9.0};
+    case LrocWacBand::Vis690:
+        return {690.0, 689.0, 39.0, 2612.0, kVisible, 9.0};
     }
     throw std::invalid_argument("Unknown WAC band");
 }
@@ -131,7 +141,7 @@ void AuthorLrocWac(Scene& scene, const Path& camera, const Path& product, LrocWa
     const double low = spec.effectiveNm - 0.5 * spec.fwhmNm;
     const double high = spec.effectiveNm + 0.5 * spec.fwhmNm;
     const std::vector<float> curve{
-        static_cast<float>(low - 1.0),  0.0f, static_cast<float>(low + 1.0),  float(qe),
+        static_cast<float>(low - 1.0),  0.0f,      static_cast<float>(low + 1.0),  float(qe),
         static_cast<float>(high - 1.0), float(qe), static_cast<float>(high + 1.0), 0.0f};
     scene.GetPrim(camera)
         .Set(kSensorType, std::string("mono"))
@@ -162,17 +172,22 @@ void AuthorLrocWac(Scene& scene, const Path& camera, const Path& product, LrocWa
     scene.GetPrim(product).Set(kFilters, filters);
 }
 
-double Mars2020Navcam::FisheyeK1() {
-    // Each field of view's half angle theta reaches the frame's half width over the focal
-    // length, r: least squares of theta (1 + k1 theta^2) = r over the three.
-    const double halfWidth = 0.5e-3 * kPixelPitchUm * kWidth;  // mm
-    const double halfHeight = 0.5e-3 * kPixelPitchUm * kHeight;
+namespace {
+
+// The f-theta lens's Kannala-Brandt k1 for an engineering camera of focal length `focal` (mm) on
+// the CMV-20000 whose published fields of view (horizontal, vertical, diagonal; degrees) are
+// `fields`: each field's half angle theta reaches the frame's half width over the focal length,
+// r, and k1 is the least squares of theta (1 + k1 theta^2) = r over the three.
+double FThetaK1(double focal, const double (&fields)[3]) {
+    using N = Mars2020Navcam;
+    const double halfWidth = 0.5e-3 * N::kPixelPitchUm * N::kWidth;  // mm
+    const double halfHeight = 0.5e-3 * N::kPixelPitchUm * N::kHeight;
     const double reaches[3] = {halfWidth, halfHeight, std::hypot(halfWidth, halfHeight)};
     double numerator = 0.0;
     double denominator = 0.0;
     for (int i = 0; i < 3; ++i) {
-        const double theta = 0.5 * kFieldOfViewDeg[i] * M_PI / 180.0;
-        const double r = reaches[i] / kFocalLengthMm;
+        const double theta = 0.5 * fields[i] * M_PI / 180.0;
+        const double r = reaches[i] / focal;
         const double cube = theta * theta * theta;
         numerator += cube * (r - theta);
         denominator += cube * cube;
@@ -180,8 +195,12 @@ double Mars2020Navcam::FisheyeK1() {
     return numerator / denominator;
 }
 
-void AuthorMars2020Navcam(Scene& scene, const Path& camera, const Path& product,
-                          BayerPattern pattern, double jpegQuality) {
+// A Mars 2020 engineering camera (Maki et al. 2020, Table 2): the CMV-20000 camera body with its
+// readout chain under `product`/`name`, behind an f-theta lens of focal length `focal` (mm),
+// f-number `fNumber`, focused at `focus` (m), its Kannala-Brandt k1 `k1`.
+void AuthorEngineeringCamera(Scene& scene, const Path& camera, const Path& product,
+                             const char* name, double focal, double fNumber, double focus,
+                             double k1, BayerPattern pattern, double jpegQuality) {
     using namespace tokens;
     if (!scene.Has(camera) || scene.TypeOf(camera) != kCamera) {
         throw std::invalid_argument("'" + camera.String() + "' is not a Camera");
@@ -194,14 +213,14 @@ void AuthorMars2020Navcam(Scene& scene, const Path& camera, const Path& product,
     scene.GetPrim(camera)
         .Set(kProjection, std::string(kPerspective))
         .Set(kLensProjection, std::string(kFisheye))
-        .Set(kLensFisheye, std::vector<float>{static_cast<float>(N::FisheyeK1()), 0.0f, 0.0f, 0.0f})
+        .Set(kLensFisheye, std::vector<float>{static_cast<float>(k1), 0.0f, 0.0f, 0.0f})
         .Set(kLensDistortion, std::vector<float>{0.0f, 0.0f, 0.0f, 0.0f, 0.0f})
-        .Set(kFocalLength, N::kFocalLengthMm)
+        .Set(kFocalLength, focal)
         .Set(kVerticalAperture, 1e-3 * N::kPixelPitchUm * N::kHeight)
         .Set(kHorizontalAperture, 1e-3 * N::kPixelPitchUm * N::kWidth)
-        .Set(kFStop, N::kFNumber)
-        .Set(kFocusDistance, N::kBestFocusM)
-        .Set(kExposureFStop, N::kFNumber)
+        .Set(kFStop, fNumber)
+        .Set(kFocusDistance, focus)
+        .Set(kExposureFStop, fNumber)
         .Set(kSensorType, std::string("rgb"))
         .Set(kExposureIso, 100.0)  // the gain is the ADC's, at ISO 100
         .Set(kSensorGain, N::kElectronsPerDn)
@@ -215,12 +234,17 @@ void AuthorMars2020Navcam(Scene& scene, const Path& camera, const Path& product,
         const char* name;
         const char* type;
     };
-    const Step steps[] = {{"Qe", "qe"},           {"Bayer", "bayer"}, {"Noise", "noise"},
-                          {"Adc", "adc"},         {"Demosaic", "demosaic"}, {"Cie", "cie"},
-                          {"Exposure", "exposure"}, {"Jpeg", "jpeg"}};
+    const Step steps[] = {{"Qe", "qe"},
+                          {"Bayer", "bayer"},
+                          {"Noise", "noise"},
+                          {"Adc", "adc"},
+                          {"Demosaic", "demosaic"},
+                          {"Cie", "cie"},
+                          {"Exposure", "exposure"},
+                          {"Jpeg", "jpeg"}};
     std::vector<Path> filters;
-    for (const auto& [name, type] : steps) {
-        const Path path = product.Child("Mars2020Navcam").Child(name);
+    for (const auto& [step, type] : steps) {
+        const Path path = product.Child(name).Child(step);
         if (scene.Has(path)) {
             scene.Remove(path);
         }
@@ -237,17 +261,73 @@ void AuthorMars2020Navcam(Scene& scene, const Path& camera, const Path& product,
     scene.GetPrim(product).Set(kFilters, filters);
 }
 
+// Cameras `rig`/Left and `rig`/Right `baseline` apart along the rig's x, each authored by
+// `author` with its product.
+template <typename Author>
+void AuthorStereoPair(Scene& scene, const Path& rig, const Path& leftProduct,
+                      const Path& rightProduct, double baseline, const Author& author) {
+    using namespace tokens;
+    if (!scene.Has(rig)) {
+        scene.Define(rig, kXform);
+    }
+    const std::pair<const char*, std::pair<double, const Path*>> eyes[] = {
+        {"Left", {-0.5 * baseline, &leftProduct}}, {"Right", {0.5 * baseline, &rightProduct}}};
+    for (const auto& [name, eye] : eyes) {
+        const Path camera = rig.Child(name);
+        if (!scene.Has(camera)) {
+            scene.Define(camera, kCamera);
+        }
+        glm::dmat4 offset(1.0);
+        offset[3] = glm::dvec4(eye.first, 0.0, 0.0, 1.0);
+        scene.GetPrim(camera).Set(kTransform, offset);
+        author(camera, *eye.second);
+    }
+}
+
+}  // namespace
+
+double Mars2020Navcam::FisheyeK1() {
+    return FThetaK1(kFocalLengthMm, kFieldOfViewDeg);
+}
+
+double Mars2020Hazcam::FisheyeK1() {
+    return FThetaK1(kFocalLengthMm, kFieldOfViewDeg);
+}
+
+void AuthorMars2020Navcam(Scene& scene, const Path& camera, const Path& product,
+                          BayerPattern pattern, double jpegQuality) {
+    using N = Mars2020Navcam;
+    AuthorEngineeringCamera(scene, camera, product, "Mars2020Navcam", N::kFocalLengthMm,
+                            N::kFNumber, N::kBestFocusM, N::FisheyeK1(), pattern, jpegQuality);
+}
+
+void AuthorMars2020Hazcam(Scene& scene, const Path& camera, const Path& product,
+                          BayerPattern pattern, double jpegQuality) {
+    using H = Mars2020Hazcam;
+    AuthorEngineeringCamera(scene, camera, product, "Mars2020Hazcam", H::kFocalLengthMm,
+                            H::kFNumber, H::kBestFocusM, H::FisheyeK1(), pattern, jpegQuality);
+}
+
+void AuthorMars2020HazcamPair(Scene& scene, const Path& rig, const Path& leftProduct,
+                              const Path& rightProduct, Mars2020Hazcams which, BayerPattern pattern,
+                              double jpegQuality) {
+    const double baseline = which == Mars2020Hazcams::Front ? Mars2020Hazcam::kFrontBaselineM
+                                                            : Mars2020Hazcam::kRearBaselineM;
+    AuthorStereoPair(scene, rig, leftProduct, rightProduct, baseline,
+                     [&](const Path& camera, const Path& product) {
+                         AuthorMars2020Hazcam(scene, camera, product, pattern, jpegQuality);
+                     });
+}
+
 MastcamZ::Filter MastcamZ::FilterOf(MastcamZEye eye, int filter) {
     // Bell et al. 2021, Table 3: effective wavelength and HWHM, nm (filter 0 by its green
     // channel; filter 7 with its neutral density).
-    static constexpr Filter kLeft[8] = {{544.0, 41.0, 0.0}, {800.0, 9.0, 0.0},
-                                        {754.0, 10.0, 0.0}, {677.0, 11.0, 0.0},
-                                        {605.0, 9.0, 0.0},  {528.0, 11.0, 0.0},
+    static constexpr Filter kLeft[8] = {{544.0, 41.0, 0.0}, {800.0, 9.0, 0.0}, {754.0, 10.0, 0.0},
+                                        {677.0, 11.0, 0.0}, {605.0, 9.0, 0.0}, {528.0, 11.0, 0.0},
                                         {442.0, 12.0, 0.0}, {590.0, 88.0, 6.0}};
-    static constexpr Filter kRight[8] = {{544.0, 42.0, 0.0}, {800.0, 9.0, 0.0},
-                                         {866.0, 10.0, 0.0}, {910.0, 12.0, 0.0},
-                                         {939.0, 12.0, 0.0}, {978.0, 10.0, 0.0},
-                                         {1022.0, 19.0, 0.0}, {880.0, 10.0, 5.0}};
+    static constexpr Filter kRight[8] = {
+        {544.0, 42.0, 0.0}, {800.0, 9.0, 0.0},  {866.0, 10.0, 0.0},  {910.0, 12.0, 0.0},
+        {939.0, 12.0, 0.0}, {978.0, 10.0, 0.0}, {1022.0, 19.0, 0.0}, {880.0, 10.0, 5.0}};
     if (filter < 0 || filter > 7) {
         throw std::invalid_argument("Mastcam-Z's filter wheels hold filters 0 to 7");
     }
@@ -325,8 +405,11 @@ void AuthorMastcamZ(Scene& scene, const Path& camera, const Path& product, Mastc
         prim.Set(kSensorType, std::string("rgb"))
             .Set(kSpectralRange, glm::dvec2(380.0, 780.0))
             .Set(kSpectralBands, 16);
-        steps = {{"Qe", "qe"},   {"Bayer", "bayer"},       {"Noise", "noise"},
-                 {"Adc", "adc"}, {"Demosaic", "demosaic"}};
+        steps = {{"Qe", "qe"},
+                 {"Bayer", "bayer"},
+                 {"Noise", "noise"},
+                 {"Adc", "adc"},
+                 {"Demosaic", "demosaic"}};
     } else {
         // The passband on the detector's response (Ernie's generic silicon curve scaled to the
         // ~40% peak), its edges ramped over 2 nm about the half maxima so its area is the FWHM's.
@@ -345,7 +428,8 @@ void AuthorMastcamZ(Scene& scene, const Path& camera, const Path& product, Mastc
                 static_cast<float>(inBand * transmission * Z::kPeakQe * silicon(w) / siliconPeak));
         };
         add(low - 1.0, 0.0);
-        for (double w = low + 1.0; w <= high - 1.0 + 1e-9; w += std::max(1.0, (high - low - 2.0) / 8.0)) {
+        for (double w = low + 1.0; w <= high - 1.0 + 1e-9;
+             w += std::max(1.0, (high - low - 2.0) / 8.0)) {
             add(w, 1.0);
         }
         add(high + 1.0, 0.0);
@@ -404,25 +488,11 @@ void AuthorMastcamZPair(Scene& scene, const Path& rig, const Path& leftProduct,
 }
 
 void AuthorMars2020NavcamPair(Scene& scene, const Path& rig, const Path& leftProduct,
-                              const Path& rightProduct, BayerPattern pattern,
-                              double jpegQuality) {
-    using namespace tokens;
-    if (!scene.Has(rig)) {
-        scene.Define(rig, kXform);
-    }
-    const double half = 0.5 * Mars2020Navcam::kBaselineM;
-    const std::pair<const char*, std::pair<double, const Path*>> eyes[] = {
-        {"Left", {-half, &leftProduct}}, {"Right", {half, &rightProduct}}};
-    for (const auto& [name, eye] : eyes) {
-        const Path camera = rig.Child(name);
-        if (!scene.Has(camera)) {
-            scene.Define(camera, kCamera);
-        }
-        glm::dmat4 offset(1.0);
-        offset[3] = glm::dvec4(eye.first, 0.0, 0.0, 1.0);
-        scene.GetPrim(camera).Set(kTransform, offset);
-        AuthorMars2020Navcam(scene, camera, *eye.second, pattern, jpegQuality);
-    }
+                              const Path& rightProduct, BayerPattern pattern, double jpegQuality) {
+    AuthorStereoPair(scene, rig, leftProduct, rightProduct, Mars2020Navcam::kBaselineM,
+                     [&](const Path& camera, const Path& product) {
+                         AuthorMars2020Navcam(scene, camera, product, pattern, jpegQuality);
+                     });
 }
 
 }  // namespace ernie
