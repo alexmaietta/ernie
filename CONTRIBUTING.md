@@ -7,22 +7,23 @@ Thanks for helping. This page covers building, testing and the conventions the c
 You need CMake 3.24 or later, a C++20 compiler, Ninja, and a Vulkan 1.3 driver. CMake fetches every other dependency (see [third_party/README.md](third_party/README.md)). On Linux the viewer also needs the X11 and Wayland development headers:
 
 ```sh
-sudo apt install ninja-build libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
-    libwayland-dev libxkbcommon-dev
+sudo apt install ninja-build libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libwayland-dev libxkbcommon-dev
 ```
 
 ```sh
-cmake -S . -B build -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
+cmake -S . -B build -DERNIE_BUILD_TESTS=ON -DERNIE_BUILD_DEMOS=ON -DERNIE_INSTALL=ON -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
 cmake --build build
 ```
 
+Every option is off by default, so a plain configure builds just the libraries.
+
 | Option | Default | What it does |
 | --- | --- | --- |
-| `ERNIE_BUILD_TESTS` | on, top level | GoogleTest suites and the Python tests |
-| `ERNIE_BUILD_DEMOS` | on, top level | C++ demos in `demos/cpp` |
+| `ERNIE_BUILD_TESTS` | off | GoogleTest suites and the Python tests |
+| `ERNIE_BUILD_DEMOS` | off | C++ demos in `demos/cpp` |
 | `ERNIE_BUILD_PYTHON` | off | The `ernie` Python module |
 | `ERNIE_BUILD_APP` | off | The viewer (`ernie` executable and `ernie::app`) |
-| `ERNIE_INSTALL` | on, top level | libernie, the install rules and packages |
+| `ERNIE_INSTALL` | off | libernie, the install rules and packages (not on Windows yet) |
 | `ERNIE_TRACY` | off | Tracy profiler zones |
 
 Python tooling uses [uv](https://docs.astral.sh/uv/): `uv venv && uv pip install numpy pytest nanobind`, then configure with `-DPython_EXECUTABLE=$PWD/.venv/bin/python`.

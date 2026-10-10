@@ -12,9 +12,9 @@ project(
         "Efficient Renderer for Natural and Interplanetary Environments: a spectral Vulkan renderer"
     LANGUAGES C CXX)
 
-option(ERNIE_BUILD_TESTS "Build Ernie's tests" ${PROJECT_IS_TOP_LEVEL})
+option(ERNIE_BUILD_TESTS "Build Ernie's tests" OFF)
 option(ERNIE_BUILD_PYTHON "Build Ernie's Python module" OFF)
-option(ERNIE_BUILD_DEMOS "Build Ernie's C++ demos" ${PROJECT_IS_TOP_LEVEL})
+option(ERNIE_BUILD_DEMOS "Build Ernie's C++ demos" OFF)
 option(ERNIE_BUILD_APP
        "Build Ernie's app, the GUI viewer (GLFW, Dear ImGui, ImPlot, ImGuizmo, fonts)" OFF)
 option(ERNIE_TRACY "Instrument Ernie for the Tracy profiler (CPU and Vulkan GPU zones, on demand)"
@@ -22,15 +22,8 @@ option(ERNIE_TRACY "Instrument Ernie for the Tracy profiler (CPU and Vulkan GPU 
 option(ERNIE_CCACHE "Compile through ccache when it is installed" ON)
 # libernie and the install rules need CMake 3.24's whole-archive linking; Windows needs export
 # annotations first.
-if(PROJECT_IS_TOP_LEVEL
-   AND NOT WIN32
-   AND CMAKE_VERSION VERSION_GREATER_EQUAL 3.24)
-    set(ernie_install_default ON)
-else()
-    set(ernie_install_default OFF)
-endif()
 option(ERNIE_INSTALL "Build libernie, the shared library, and Ernie's install rules and packages"
-       ${ernie_install_default})
+       OFF)
 if(ERNIE_INSTALL AND CMAKE_VERSION VERSION_LESS 3.24)
     message(FATAL_ERROR "ERNIE_INSTALL needs CMake 3.24 or later")
 endif()

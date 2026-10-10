@@ -198,7 +198,7 @@ Both need a Vulkan 1.3 driver: your GPU vendor's, or Mesa's (`mesa-vulkan-driver
 Ernie needs CMake 3.24+, a C++20 compiler and a Vulkan 1.3 driver; it fetches its other dependencies (see [third_party/README.md](third_party/README.md)).
 
 ```sh
-cmake -S . -B build -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
+cmake -S . -B build -DERNIE_BUILD_TESTS=ON -DERNIE_INSTALL=ON -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
 cmake --build build
 ctest --test-dir build -j4              # C++, GPU and Python tests
 build/bin/ernie                         # the viewer

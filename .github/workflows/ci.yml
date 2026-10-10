@@ -69,6 +69,7 @@ jobs:
           cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
           -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           "-DFETCHCONTENT_BASE_DIR=$PWD/.deps"
+          -DERNIE_BUILD_TESTS=ON -DERNIE_BUILD_DEMOS=ON -DERNIE_INSTALL=ON
           -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
           "-DPython_EXECUTABLE=$PWD/.venv/bin/python"
       - name: Build
