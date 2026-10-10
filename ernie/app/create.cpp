@@ -2,6 +2,7 @@
 #include "ernie/app/create.h"
 
 #include "ernie/app/session.h"
+#include "ernie/scene/light_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/util/astronomy.h"
@@ -73,9 +74,7 @@ StageLightUnits LightUnitsOf(const Scene& scene, const Path& created) {
             if (light == created || IsSessionPath(light)) {
                 continue;
             }
-            if (scene.Get(light, kPhotometricIlluminance) != nullptr ||
-                scene.Get(light, kPhotometricIlluminanceDistance) != nullptr ||
-                scene.Get(light, kPhotometricPower) != nullptr) {
+            if (Light(scene, light).IsPhotometric()) {
                 return StageLightUnits::Photometric;
             }
             units = StageLightUnits::Relative;
@@ -156,19 +155,21 @@ void AuthorDefaultPrim(Scene& scene, const Path& path, std::string_view type,
     } else if (type == kDistantLight) {
         // Next to photometric lights, a clear-day sun; otherwise a relative sun of 1, which
         // lights white to 1 without exposure.
-        scene.Set(path, kTransform, DistantLightTransform({0.4, -0.5, 0.75}));
+        DistantLight sun(scene, path);
+        sun.SetTransform(DistantLightTransform({0.4, -0.5, 0.75}));
         if (LightUnitsOf(scene, path) == StageLightUnits::Photometric) {
-            scene.Set(path, kPhotometricIlluminance, 100000.0);
+            sun.SetPhotometricIlluminance(100000.0);
         }
     } else if (type == kDomeLight) {
         // A clear sky gives about a tenth of the sun's light: 10000 lux next to photometric
         // lights, 0.1 next to relative ones, and 1 when it is the stage's only light.
+        DomeLight dome(scene, path);
         switch (LightUnitsOf(scene, path)) {
         case StageLightUnits::Photometric:
-            scene.Set(path, kPhotometricIlluminance, 10000.0);
+            dome.SetPhotometricIlluminance(10000.0);
             break;
         case StageLightUnits::Relative:
-            scene.Set(path, kIntensity, 0.1);
+            dome.SetIntensity(0.1);
             break;
         case StageLightUnits::None:
             break;
@@ -184,18 +185,27 @@ void AuthorDefaultPrim(Scene& scene, const Path& path, std::string_view type,
         write(kStarsDeclination, stars.declination);
         write(kStarsMagnitude, stars.magnitude);
         write(kStarsColorIndex, stars.colorIndex);
-    } else if (type == kSphereLight) {
-        PlaceAbove(scene, path, context, 3.0);
-        scene.Set(path, kRadius, 0.1 * s);
-        scene.Set(path, kPhotometricPower, 1600.0 * s * s);
-    } else if (type == kRectLight || type == kDiskLight) {
-        PlaceAbove(scene, path, context, 3.0);
-        scene.Set(path, kPhotometricPower, 1600.0 * s * s);
-        if (type == kRectLight) {
-            scene.Set(path, kWidth, s);
-            scene.Set(path, kHeight, s);
+    } else if (type == kSphereLight || type == kRectLight || type == kDiskLight) {
+        // Next to photometric lights, a 100 W bulb's 1600 lumens; otherwise a radiance lighting
+        // the target below it as a relative sun of 1 does: the distance squared over the area.
+        constexpr double kAbove = 3.0;
+        PlaceAbove(scene, path, context, kAbove);
+        BoundableLight light(scene, path);
+        double area = 0.0;
+        if (type == kSphereLight) {
+            SphereLight(scene, path).SetRadius(0.1 * s);
+            area = M_PI * 0.01 * s * s;
+        } else if (type == kRectLight) {
+            RectLight(scene, path).SetWidth(s).SetHeight(s);
+            area = s * s;
         } else {
-            scene.Set(path, kRadius, 0.5 * s);
+            DiskLight(scene, path).SetRadius(0.5 * s);
+            area = M_PI * 0.25 * s * s;
+        }
+        if (LightUnitsOf(scene, path) == StageLightUnits::Photometric) {
+            light.SetPhotometricPower(1600.0 * s * s);
+        } else {
+            light.SetIntensity(kAbove * kAbove * s * s / area);
         }
     } else if (type == kCamera) {
         CameraParams camera = context.camera;
