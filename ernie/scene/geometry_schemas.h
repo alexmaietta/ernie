@@ -60,19 +60,19 @@
 #define ERNIE_POINT_BASED_ATTRIBUTES(X)                                                            \
     X(::ernie::Tensor, Points, ::ernie::tokens::kPoints, nullptr,                                  \
       (::ernie::AttributeMeta{.doc = "float32 or float64 (n, 3) positions in the prim's frame.",   \
-                              .group = "Geometry"}))
+                              .group = "Geometry", .dirty = ::ernie::Dirty::Points}))
 
 #define ERNIE_MESH_ATTRIBUTES(X)                                                                   \
     X(::ernie::Tensor, FaceVertexCounts, ::ernie::tokens::kFaceVertexCounts, nullptr,              \
       (::ernie::AttributeMeta{.doc = "Integer number of vertices of each face.",                   \
-                              .group = "Geometry"}))                                               \
+                              .group = "Geometry", .dirty = ::ernie::Dirty::Topology}))            \
     X(::ernie::Tensor, FaceVertexIndices, ::ernie::tokens::kFaceVertexIndices, nullptr,            \
       (::ernie::AttributeMeta{.doc = "Integer point indices of the faces' vertices, in order.",    \
-                              .group = "Geometry"}))                                               \
+                              .group = "Geometry", .dirty = ::ernie::Dirty::Topology}))            \
     X(::ernie::Tensor, Normals, ::ernie::tokens::kNormals, nullptr,                                \
       (::ernie::AttributeMeta{.doc = "(n, 3) normals, one per point; ignored when of another "     \
                                      "count.",                                                     \
-                              .group = "Geometry"}))
+                              .group = "Geometry", .dirty = ::ernie::Dirty::Points}))
 
 #define ERNIE_POINTS_ATTRIBUTES(X)                                                                 \
     X(std::vector<float>, Widths, ::ernie::tokens::kWidths, std::vector<float>{1.0f},             \
@@ -84,20 +84,21 @@
     X(::ernie::Tensor, Positions, ::ernie::tokens::kPositions, nullptr,                            \
       (::ernie::AttributeMeta{.doc = "(n, 3) instance positions in the instancer's frame; the "    \
                                      "number of instances.",                                       \
-                              .group = "Instances"}))                                              \
+                              .group = "Instances", .dirty = ::ernie::Dirty::Points}))             \
     X(::ernie::Tensor, Orientations, ::ernie::tokens::kOrientations, nullptr,                      \
       (::ernie::AttributeMeta{.doc = "(n, 4) instance rotations as quaternions.",                  \
-                              .group = "Instances"}))                                              \
+                              .group = "Instances", .dirty = ::ernie::Dirty::Points}))             \
     X(::ernie::Tensor, Scales, ::ernie::tokens::kScales, nullptr,                                  \
-      (::ernie::AttributeMeta{.doc = "(n, 3) instance scales.", .group = "Instances"}))            \
+      (::ernie::AttributeMeta{.doc = "(n, 3) instance scales.", .group = "Instances",              \
+                              .dirty = ::ernie::Dirty::Points}))                                   \
     X(::ernie::Tensor, ProtoIndices, ::ernie::tokens::kProtoIndices, nullptr,                      \
       (::ernie::AttributeMeta{.doc = "Integer prototype of each instance, of the prototypes "      \
                                      "relationship's targets; the first for all when unset.",      \
-                              .group = "Instances"}))                                              \
+                              .group = "Instances", .dirty = ::ernie::Dirty::Topology}))           \
     X(std::vector<::ernie::Path>, Prototypes, ::ernie::tokens::kPrototypes,                        \
       std::vector<::ernie::Path>{},                                                                \
       (::ernie::AttributeMeta{.doc = "The prims instanced, indexed by the proto indices.",         \
-                              .group = "Instances"}))                                              \
+                              .group = "Instances", .dirty = ::ernie::Dirty::Topology}))           \
     X(::ernie::Tensor, Worlds, ::ernie::tokens::kWorlds, nullptr,                                  \
       (::ernie::AttributeMeta{.doc = "int (n,): each instance's world, in place of the "           \
                                      "instancer's world.",                                         \
@@ -121,7 +122,8 @@
                               .group = "Ground", .color = true}))                                  \
     X(::ernie::Path, MaterialBinding, ::ernie::tokens::kMaterialBinding, ::ernie::Path(),          \
       (::ernie::AttributeMeta{.label = "Material", .doc = "The Material prim it is drawn with.",   \
-                              .group = "Ground", .options = {::ernie::tokens::kMaterial}}))
+                              .group = "Ground", .options = {::ernie::tokens::kMaterial},          \
+                              .dirty = ::ernie::Dirty::Material}))
 
 // Every attribute of each type, its bases' first, for its accessors.
 #define ERNIE_CUBE_ALL(X) ERNIE_GPRIM_ALL(X) ERNIE_CUBE_ATTRIBUTES(X)

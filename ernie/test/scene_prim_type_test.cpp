@@ -10,6 +10,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
 
+#include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -301,4 +303,23 @@ TEST(PrimType, SettingChecksNamesAndTypesAgainstTheDeclaration) {
     // Untyped and unregistered prims are not checked.
     scene.Set("/Looks", "anything", 1.0);
     scene.Define("/Custom", "MyType").Set("anything", 1.0);
+}
+
+TEST(PrimType, DeclarationsSayWhatTheirChangesStamp) {
+    // One attribute declared on several types stamps the same bit on each, as `DirtyOf` reads it.
+    std::map<std::string_view, std::optional<ernie::Dirty>> bits;
+    for (const PrimTypeDef* type : ernie::PrimTypes()) {
+        for (const AttributeDef& def : type->attributes) {
+            const auto [it, added] = bits.emplace(def.name, def.meta.dirty);
+            EXPECT_EQ(it->second, def.meta.dirty) << def.name << " on " << type->name;
+            EXPECT_EQ(ernie::DirtyOf(def.name),
+                      def.meta.dirty.value_or(def.name.starts_with("primvars:")
+                                                  ? ernie::Dirty::Primvars
+                                                  : ernie::Dirty::Params))
+                << def.name;
+        }
+    }
+    EXPECT_EQ(ernie::DirtyOf(tokens::kPoints), ernie::Dirty::Points);
+    EXPECT_EQ(ernie::DirtyOf(tokens::kPrototypes), ernie::Dirty::Topology);
+    EXPECT_EQ(ernie::DirtyOf("user:speed"), ernie::Dirty::Params);
 }

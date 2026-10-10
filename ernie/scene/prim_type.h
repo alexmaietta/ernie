@@ -67,6 +67,9 @@ struct AttributeMeta {
     /// Its readers also take values of other types (a legacy form), so `Scene::Set` checks only
     /// its name, not its value's type.
     bool lenient = false;
+    /// What changing it stamps (`DirtyOf`): `Dirty::Points` for bulk positions, say. Unset, any
+    /// other edit (`Dirty::Params`).
+    std::optional<Dirty> dirty;
 };
 
 class AttributeDef;

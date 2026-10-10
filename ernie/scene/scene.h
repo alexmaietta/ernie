@@ -51,7 +51,9 @@ inline constexpr bool Any(Dirty bits, Dirty flags) {
     return (bits & flags) != Dirty::None;
 }
 
-/// The dirty bit that setting or writing `attribute` raises.
+/// The dirty bit that setting or writing `attribute` raises: `Transform` for xformOps, else what
+/// the registered types declare for it (`AttributeMeta::dirty`, such as `Points` for `points`),
+/// else `Primvars` for primvars and `Params` for anything else.
 Dirty DirtyOf(std::string_view attribute);
 
 /// A prim's changes since a consumer last looked.

@@ -19,7 +19,8 @@
       (::ernie::AttributeMeta{.doc = "\"invisible\" hides the prim and its descendants.",          \
                               .group = "Prim",                                                     \
                               .options = {::ernie::tokens::kInherited,                             \
-                                          ::ernie::tokens::kInvisible}}))                          \
+                                          ::ernie::tokens::kInvisible},                            \
+                              .dirty = ::ernie::Dirty::Visibility}))                               \
     X(int, World, ::ernie::tokens::kWorld, -1,                                                     \
       (::ernie::AttributeMeta{.doc = "The world the prim and its descendants are in, of a "        \
                                      "batch's environments; -1 shared by every world.",            \
@@ -45,7 +46,8 @@
                               .group = "Geometry", .color = true}))                                \
     X(::ernie::Path, MaterialBinding, ::ernie::tokens::kMaterialBinding, ::ernie::Path(),          \
       (::ernie::AttributeMeta{.label = "Material", .doc = "The Material prim it is drawn with.",   \
-                              .group = "Geometry", .options = {::ernie::tokens::kMaterial}}))
+                              .group = "Geometry", .options = {::ernie::tokens::kMaterial},        \
+                              .dirty = ::ernie::Dirty::Material}))
 
 #define ERNIE_BOUNDABLE_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_BOUNDABLE_ATTRIBUTES(X)
 #define ERNIE_GPRIM_ALL(X) ERNIE_BOUNDABLE_ALL(X) ERNIE_GPRIM_ATTRIBUTES(X)

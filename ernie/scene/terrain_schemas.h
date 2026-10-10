@@ -18,7 +18,7 @@
       (::ernie::AttributeMeta{.doc = "float32 (rows, cols) heights in world units, the first row " \
                                      "the northern; a planet's float32 (6, n + 1, n + 1) cube "    \
                                      "faces.",                                                     \
-                              .group = "Terrain"}))                                                \
+                              .group = "Terrain", .dirty = ::ernie::Dirty::Points}))               \
     X(glm::dvec2, Origin, ::ernie::tokens::kOrigin, glm::dvec2(0.0),                               \
       (::ernie::AttributeMeta{.doc = "World x and y of the north-west corner", .group = "Terrain"})) \
     X(double, CellSize, ::ernie::tokens::kCellSize, 1.0,                                           \

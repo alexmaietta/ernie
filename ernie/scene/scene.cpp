@@ -44,24 +44,24 @@ Path Below(Path path, std::string_view relative) {
 }  // namespace
 
 Dirty DirtyOf(std::string_view attribute) {
-    using namespace tokens;
     if (IsXformAttribute(attribute)) {
         return Dirty::Transform;
     }
-    if (attribute == kVisibility) {
-        return Dirty::Visibility;
-    }
-    if (attribute == kMaterialBinding) {
-        return Dirty::Material;
-    }
-    if (attribute == kFaceVertexCounts || attribute == kFaceVertexIndices ||
-        attribute == kProtoIndices || attribute == kPrototypes) {
-        return Dirty::Topology;
-    }
-    if (attribute == kPoints || attribute == kNormals || attribute == kHeights ||
-        attribute == kPositions || attribute == kOrientations || attribute == kScales ||
-        attribute == kVelocities) {
-        return Dirty::Points;
+    // What the registered types' declarations say a change to each attribute stamps
+    // (`AttributeMeta::dirty`).
+    static const std::map<std::string_view, Dirty, std::less<>> declared = [] {
+        std::map<std::string_view, Dirty, std::less<>> bits;
+        for (const PrimTypeDef* type : PrimTypes()) {
+            for (const AttributeDef& def : type->attributes) {
+                if (def.meta.dirty) {
+                    bits.emplace(def.name, *def.meta.dirty);
+                }
+            }
+        }
+        return bits;
+    }();
+    if (const auto it = declared.find(attribute); it != declared.end()) {
+        return it->second;
     }
     if (attribute.starts_with("primvars:")) {
         return Dirty::Primvars;
