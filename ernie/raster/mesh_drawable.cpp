@@ -2453,8 +2453,10 @@ std::size_t MeshDrawable::Record(VkCommandBuffer commands, const RasterFrame& fr
             bound = pipeline;
             vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, bound->Handle());
         }
-        if (item != pushed || culled != pushedCulled) {
-            pushed = item;
+        // The resources differ only by material (`Resources`): items sharing one keep them.
+        const std::uint32_t material = items_[item].material;
+        if (material != pushed || culled != pushedCulled) {
+            pushed = material;
             pushedCulled = culled;
             std::vector<DescriptorResource> resources = Resources(frame, item, culled);
             if (motion != nullptr) {
