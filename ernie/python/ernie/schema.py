@@ -37,9 +37,23 @@ from __future__ import annotations
 import builtins
 import difflib
 import functools
+import json
+import os
 from typing import Any, ClassVar
 
-from ._ernie import AttributeDef, Path, Prim, PrimType, Scene, find_prim_type, prim_types
+import numpy as np
+
+from ._ernie import (
+    AttributeDef,
+    AttributeKind,
+    Path,
+    Prim,
+    PrimType,
+    Scene,
+    find_prim_type,
+    prim_types,
+    tokens,
+)
 
 __all__ = ["Schema", "typed"]
 
@@ -250,6 +264,85 @@ def _define(self: Scene | Prim, path: str | Path, type: Any, /, **attributes: An
         cls(prim).set(**attributes)
     return prim
 
+
+def load_scene(description: Any, scene: Scene | None = None) -> Scene:
+    """Builds prims from a description, into ``scene`` or a new Scene, and returns the scene.
+
+    The description is a dict (or JSON text, or the path of a ``.json`` file) from prim paths to
+    prims; each prim is a dict whose ``"type"`` names its type (none for an untyped prim, or to
+    leave an existing prim's type alone), whose dict values are its children by name, and whose
+    other values are its attributes, by Python name (``radius``) or USD name
+    (``"inputs:radius"``), with ``translate``, ``rotate``, ``rotation_order``, ``orient`` and
+    ``scale`` setting its transform ops and ``transform`` a 4 x 4 matrix (rows of four)::
+
+        ernie.load_scene({
+            "/World": {"type": "Xform",
+                "Rock": {"type": "Sphere", "radius": 0.5, "translate": [0, 0, 1]},
+                "Sun": {"type": "DistantLight", "angle": 0.53}},
+            "/Render/Settings": {"type": "RenderSettings", "resolution": [640, 480]},
+        })
+
+    Values are checked as setting them is; lists for array attributes (``points``, ``heights``)
+    become arrays, float32 or, of whole numbers, int32."""
+    if isinstance(description, (str, os.PathLike)):
+        text = str(description)
+        if text.lstrip().startswith("{"):
+            description = json.loads(text)
+        else:
+            with open(description) as file:
+                description = json.load(file)
+    if not isinstance(description, dict):
+        raise TypeError(f"A scene description is a dict of prim paths, not {type(description).__name__}")
+    scene = scene if scene is not None else Scene()
+    for key, body in description.items():
+        _load_prim(scene, key if key.startswith("/") else "/" + key, body)
+    return scene
+
+
+def _load_prim(scene: Scene, path: str, body: Any) -> None:
+    if not isinstance(body, dict):
+        raise TypeError(f"'{path}' must be described by a dict of attributes and children")
+    type_name = body.get("type")
+    existing = scene.get_prim(path)
+    if type_name is not None or existing is None:
+        prim = _scene_define(scene, path, type_name or "")
+    else:
+        prim = existing
+    cls = classes.get(prim.type)
+    attributes = {k: v for k, v in body.items() if k != "type" and not isinstance(v, dict)}
+    transform = attributes.pop("transform", None)
+    xform = {key: attributes.pop(key) for key in _XFORM_KEYS if key in attributes}
+    keywords = {}
+    for name, value in attributes.items():
+        definition = cls._attributes.get(name) if cls is not None else None
+        if definition is None and ":" not in name and cls is not None:
+            definition = next((d for d in cls._attributes.values() if d.name == name), None)
+        if definition is not None and definition.kind == AttributeKind.TENSOR:
+            value = _array(value)
+        if definition is not None and name == definition.py_name:
+            keywords[name] = value
+        else:
+            prim.set(definition.name if definition is not None else name, _target(value))
+    if cls is not None:
+        cls(prim).set(**keywords)
+    if xform:
+        prim.set_xform(**xform)
+    if transform is not None:
+        prim.set(tokens.TRANSFORM, transform)
+    for name, child in body.items():
+        if isinstance(child, dict):
+            _load_prim(scene, f"{path.rstrip('/')}/{name}", child)
+
+
+def _array(value: Any) -> Any:
+    """A list from a description as an array: int32 of whole numbers, else float32."""
+    if not isinstance(value, (list, tuple)):
+        return value
+    array = np.asarray(value)
+    return array.astype(np.int32 if np.issubdtype(array.dtype, np.integer) else np.float32)
+
+
+__all__ += ["load_scene"]
 
 _define.__doc__ = (
     "Defines the prim at `path` with `type`, a type name or a typed prim class "

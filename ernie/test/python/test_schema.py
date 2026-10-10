@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
+import json
+
 import numpy as np
 import pytest
 
@@ -124,3 +126,40 @@ def test_tensor_attributes_write_and_read_arrays():
     texture = np.ones((4, 8, 3), np.float32)
     dome.texture = texture
     assert dome.texture.shape == (4, 8, 3)
+
+
+def test_scenes_load_from_descriptions(tmp_path):
+    description = {
+        "/World": {
+            "type": "Xform",
+            "Rock": {"type": "Sphere", "radius": 0.5, "translate": [0, 0, 1]},
+            "Sun": {"type": "DistantLight", "angle": 0.53, "inputs:intensity": 2.0},
+            "Ground": {"type": "Terrain", "heights": [[0, 1], [2, 3.5]], "cell_size": 2.0},
+            "Quad": {"type": "Mesh", "points": [[0, 0, 0], [1, 0, 0], [1, 1, 0]],
+                     "face_vertex_counts": [3], "face_vertex_indices": [0, 1, 2]},
+            "Group": {"Child": {"type": "Cube", "size": 2.0}},
+        },
+        "Render/Settings": {"type": "RenderSettings", "camera": "/World/Camera",
+                            "resolution": [640, 480]},
+    }
+    scene = ernie.load_scene(description)
+    assert ernie.Sphere.at(scene, "/World/Rock").radius == 0.5
+    assert scene.get("/World/Rock", tokens.TRANSLATE) == (0.0, 0.0, 1.0)
+    assert ernie.DistantLight.at(scene, "/World/Sun").intensity == 2.0
+    assert ernie.Terrain.at(scene, "/World/Ground").heights.dtype == np.float32
+    assert ernie.Mesh.at(scene, "/World/Quad").face_vertex_indices.dtype == np.int32
+    assert scene.type_of("/World/Group") == "" and ernie.Cube.at(scene, "/World/Group/Child")
+    assert ernie.RenderSettings.at(scene, "/Render/Settings").camera == [ernie.Path("/World/Camera")]
+
+    # JSON text and files load the same way, into an existing scene; no type leaves a prim's alone.
+    path = tmp_path / "scene.json"
+    path.write_text(json.dumps({"/World/Rock": {"radius": 0.75}}))
+    assert ernie.load_scene(path, scene) is scene
+    assert ernie.Sphere.at(scene, "/World/Rock").radius == 0.75
+    ernie.load_scene('{"/World/Sun": {"angle": 1.0}}', scene)
+    assert ernie.DistantLight.at(scene, "/World/Sun").angle == 1.0
+
+    with pytest.raises(ValueError, match="did you mean 'radius'"):
+        ernie.load_scene({"/X": {"type": "Sphere", "radus": 1.0}})
+    with pytest.raises(TypeError, match="dict of prim paths"):
+        ernie.load_scene([1, 2])

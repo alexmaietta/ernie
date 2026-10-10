@@ -75,12 +75,13 @@ def main(output):
     lines = [
         "# SPDX-License-Identifier: BSD-3-Clause",
         "# Generated from the prim type registry by ernie/python/stub_schema.py; do not edit.",
+        "import os",
         "from collections.abc import Sequence",
         "from typing import Any, ClassVar, Self",
         "",
         "from ._ernie import AttributeDef, Path, Prim, PrimType, Quat, Scene",
         "",
-        f"__all__ = {['Schema', 'typed', *[t.name for t in ernie.prim_types()]]!r}",
+        f"__all__ = {['Schema', 'typed', 'load_scene', *[t.name for t in ernie.prim_types()]]!r}",
         "",
         "classes: dict[str, type[Schema]]",
         "",
@@ -121,6 +122,10 @@ def main(output):
         lines.append(f"    def set(self, *attribute: Any, {keywords}) -> Self: ...")
         lines.append("")
     lines.append("def typed(prim: Prim | Schema) -> Schema | Prim: ...")
+    lines.append(
+        "def load_scene(description: dict[str, Any] | str | os.PathLike[str], "
+        "scene: Scene | None = None) -> Scene: ..."
+    )
     lines.append("")
     with open(output, "w") as stub:
         stub.write("\n".join(lines))
