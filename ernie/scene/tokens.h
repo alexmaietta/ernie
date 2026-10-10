@@ -218,10 +218,10 @@ inline constexpr std::string_view kEnableColorTemperature = "inputs:enableColorT
 inline constexpr std::string_view kLightIrradiance = "ernie:irradiance";
 inline constexpr std::string_view kLightSpectrum = "ernie:spectrum";
 /// Physical lamp (Ernie): radiant flux over 360 to 830 nm in W. A SphereLight emits it equally in
-/// every direction (a cone only masks it); a RectLight or DiskLight from its face as a Lambertian
-/// emitter. Its spectrum's shape is `ernie:spectrum`, else a black body at the enabled colour
-/// temperature, else flat; `ernie:spectrum` alone gives the radiant intensity in W sr^-1 nm^-1
-/// (sphere) or radiance in W m^-2 sr^-1 nm^-1 (rect, disk, dome).
+/// every direction of its cone (a narrower cone concentrates it); a RectLight or DiskLight from
+/// its face as a Lambertian emitter. Its spectrum's shape is `ernie:spectrum`, else a black body at
+/// the enabled colour temperature, else flat; `ernie:spectrum` alone gives the radiant intensity in
+/// W sr^-1 nm^-1 (sphere) or radiance in W m^-2 sr^-1 nm^-1 (rect, disk, dome).
 inline constexpr std::string_view kLightPower = "ernie:power";
 /// A DomeLight's map (Ernie): float32 (rows, cols, 3 or 4) linear RGB scaling its radiance, in
 /// latitude-longitude layout around the dome's +z axis: rows run from +z (top) to -z, columns
@@ -233,10 +233,11 @@ inline constexpr std::string_view kLightTexture = "ernie:texture";
 // puts the light in photometric units: its brightness then comes from them alone, not from
 // `inputs:intensity`, `inputs:exposure`, `ernie:power` or `ernie:irradiance`.
 //
-/// token: the shape of the light's spectrum: "white" (flat, Ernie's neutral; the default),
-/// "blackbody" or "illuminant D" (CIE daylight) at `inputs:colorTemperature`, or "custom"
-/// (`physical:customIlluminant`). `inputs:color` still tints it. Unset, the shape is a black body
-/// when `inputs:enableColorTemperature` is on, else flat.
+/// token: the shape of the light's spectrum: "white" (flat) or "blackbody" (at
+/// `inputs:colorTemperature`), both over 380 to 780 nm as Omniverse's, "illuminant D" (CIE
+/// daylight), or "custom" (`physical:customIlluminant`). `inputs:color` still tints it. Unset, the
+/// shape is a black body when `inputs:enableColorTemperature` is on, else flat, over the whole
+/// spectral range.
 inline constexpr std::string_view kPhysicalIlluminant = "physical:illuminant";
 inline constexpr std::string_view kWhite = "white";
 inline constexpr std::string_view kBlackbody = "blackbody";
@@ -246,13 +247,14 @@ inline constexpr std::string_view kCustom = "custom";
 /// outside them.
 inline constexpr std::string_view kPhysicalCustomIlluminant = "physical:customIlluminant";
 /// float, lux: for a DistantLight, on a surface facing it (default 10000); for a DomeLight, on an
-/// upward-facing surface (default 10000); for an area light, on a surface facing it at
-/// `photometric:illuminance:distance` metres, when that is not 0.
+/// upward-facing surface (default 10000); for an area light, on a surface facing it on its axis
+/// `photometric:illuminance:distance` metres away, in place of the power when both are above 0.
 inline constexpr std::string_view kPhotometricIlluminance = "photometric:illuminance";
 inline constexpr std::string_view kPhotometricIlluminanceDistance =
     "photometric:illuminance:distance";
 /// float, lumens: an area light's (SphereLight, RectLight, DiskLight) luminous flux, default
-/// 1600; a SphereLight emits it in every direction, a RectLight or DiskLight from its face.
+/// 1600, whatever its colour or cone; a SphereLight emits it over its cone, a RectLight or
+/// DiskLight from its face.
 inline constexpr std::string_view kPhotometricPower = "photometric:power";
 
 /// bool: whether a DomeLight shows behind the scene where camera rays hit no geometry (Omniverse's

@@ -10,6 +10,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <stdexcept>
@@ -229,6 +230,41 @@ glm::dvec2 Chromaticity(const std::vector<float>& spectrum, const ernie::Spectra
     return glm::dvec2(xyz.x, xyz.y) / (xyz.x + xyz.y + xyz.z);
 }
 
+/// Illuminance per unit luminance on a surface facing a flat Lambertian emitter on its axis
+/// `distance` away, by brute force: the integral of d^2 / r^4 over the points of a grid over
+/// (-half, half) that `inside` says are on the emitter.
+template <typename Inside>
+double OnAxisIlluminancePerLuminance(glm::dvec2 half, double distance, const Inside& inside) {
+    constexpr int kSteps = 1000;
+    const glm::dvec2 step = 2.0 * half / static_cast<double>(kSteps);
+    double sum = 0.0;
+    for (int i = 0; i < kSteps; ++i) {
+        for (int j = 0; j < kSteps; ++j) {
+            const glm::dvec2 p = -half + (glm::dvec2(i, j) + 0.5) * step;
+            if (inside(p)) {
+                const double r2 = glm::dot(p, p) + distance * distance;
+                sum += distance * distance / (r2 * r2);
+            }
+        }
+    }
+    return sum * step.x * step.y;
+}
+
+/// The solid angle under a cone's falloff, by brute force: its smoothstep in the cosine off the
+/// axis (as the shading's) integrated over the sphere.
+double ConeSolidAngleBySum(double angleDegrees, double softness) {
+    const double outer = std::cos(glm::radians(angleDegrees));
+    const double inner = std::cos(glm::radians(angleDegrees * (1.0 - softness)));
+    constexpr int kSteps = 100000;
+    double sum = 0.0;
+    for (int i = 0; i < kSteps; ++i) {
+        const double theta = (i + 0.5) * M_PI / kSteps;
+        const double t = std::clamp((std::cos(theta) - outer) / (inner - outer), 0.0, 1.0);
+        sum += t * t * (3.0 - 2.0 * t) * std::sin(theta);
+    }
+    return 2.0 * M_PI * sum * M_PI / kSteps;
+}
+
 }  // namespace
 
 TEST(LightParamsOf, PhotometricUnitsSetTheBrightnessInLuxAndLumens) {
@@ -250,7 +286,8 @@ TEST(LightParamsOf, PhotometricUnitsSetTheBrightnessInLuxAndLumens) {
     bulb.SetPhotometricIlluminance(100.0).SetPhotometricIlluminanceDistance(2.0);
     EXPECT_NEAR(Luminous(ernie::LightParamsOf(scene, "/Bulb", bands).spectrum, bands), 400.0, 4.0);
 
-    // A 2 m x 1 m panel of 1000 lumens: luminance 1000 / (pi 2) nits; or 50 lux at 3 m.
+    // A 2 m x 1 m panel of 1000 lumens: luminance 1000 / (pi 2) nits; or 50 lux at 3 m, a little
+    // more than 50 x 3^2 / 2 nits, since its edges light the axis at a slant.
     ernie::RectLight panel = ernie::RectLight::Define(scene, "/Panel")
                                  .SetWidth(2.0)
                                  .SetHeight(1.0)
@@ -258,12 +295,74 @@ TEST(LightParamsOf, PhotometricUnitsSetTheBrightnessInLuxAndLumens) {
     EXPECT_NEAR(Luminous(ernie::LightParamsOf(scene, "/Panel", bands).spectrum, bands),
                 1000.0 / (2.0 * M_PI), 1.6);
     panel.SetPhotometricIlluminance(50.0).SetPhotometricIlluminanceDistance(3.0);
-    EXPECT_NEAR(Luminous(ernie::LightParamsOf(scene, "/Panel", bands).spectrum, bands), 225.0, 2.3);
+    const double panelLuminance =
+        50.0 / OnAxisIlluminancePerLuminance({1.0, 0.5}, 3.0, [](glm::dvec2) { return true; });
+    EXPECT_GT(panelLuminance, 225.0);
+    EXPECT_NEAR(Luminous(ernie::LightParamsOf(scene, "/Panel", bands).spectrum, bands),
+                panelLuminance, 0.01 * panelLuminance);
 
     // A uniform dome giving 20000 lux on the ground: luminance 20000 / pi.
     ernie::DomeLight::Define(scene, "/Sky").SetPhotometricIlluminance(20000.0);
     EXPECT_NEAR(Luminous(ernie::DomeParamsOf(scene, "/Sky", bands).radiance, bands), 20000.0 / M_PI,
                 64.0);
+}
+
+TEST(LightParamsOf, PhotometricAreaLightsFollowOmniversesRules) {
+    const ernie::SpectralBands bands{380.0, 780.0, 40};
+    Scene scene;
+    const auto luminous = [&](std::string_view path) {
+        return Luminous(ernie::LightParamsOf(scene, path, bands).spectrum, bands);
+    };
+
+    // An illuminance counts only with a distance, both above 0; otherwise the power does.
+    ernie::RectLight panel = ernie::RectLight::Define(scene, "/Panel")
+                                 .SetWidth(2.0)
+                                 .SetHeight(1.0)
+                                 .SetPhotometricPower(1000.0)
+                                 .SetPhotometricIlluminanceDistance(3.0);
+    EXPECT_NEAR(luminous("/Panel"), 1000.0 / (2.0 * M_PI), 1.6) << "a distance alone";
+    panel.ClearPhotometricIlluminanceDistance().SetPhotometricIlluminance(50.0);
+    EXPECT_NEAR(luminous("/Panel"), 1000.0 / (2.0 * M_PI), 1.6) << "an illuminance alone";
+
+    // Close up, the illuminance is still exactly what a surface facing the light on its axis
+    // gets, far from the distance squared over the area.
+    panel.SetPhotometricIlluminanceDistance(0.5);
+    const double rect =
+        50.0 / OnAxisIlluminancePerLuminance({1.0, 0.5}, 0.5, [](glm::dvec2) { return true; });
+    EXPECT_GT(rect, 1.5 * 50.0 * 0.25 / 2.0);
+    EXPECT_NEAR(luminous("/Panel"), rect, 0.01 * rect);
+    ernie::DiskLight::Define(scene, "/Disk")
+        .SetRadius(1.0)
+        .SetPhotometricIlluminance(500.0)
+        .SetPhotometricIlluminanceDistance(0.5);
+    const double disk = 500.0 / OnAxisIlluminancePerLuminance({1.0, 1.0}, 0.5, [](glm::dvec2 p) {
+                            return glm::dot(p, p) <= 1.0;
+                        });
+    EXPECT_NEAR(luminous("/Disk"), disk, 0.01 * disk);
+
+    // A spotlight of 1600 lumens emits them all within its cone, so a narrower cone is brighter.
+    ernie::SphereLight spot = ernie::SphereLight::Define(scene, "/Spot")
+                                  .SetPhotometricPower(1600.0)
+                                  .SetShapingConeAngle(40.0)
+                                  .SetShapingConeSoftness(0.5);
+    const double cone = ConeSolidAngleBySum(40.0, 0.5);
+    EXPECT_NEAR(luminous("/Spot"), 1600.0 / cone, 0.015 * 1600.0 / cone);
+    spot.SetShapingConeSoftness(0.0);
+    const double hard = ConeSolidAngleBySum(40.0, 0.0);
+    EXPECT_NEAR(luminous("/Spot"), 1600.0 / hard, 0.015 * 1600.0 / hard);
+    spot.SetPhotometricIlluminance(100.0).SetPhotometricIlluminanceDistance(2.0);
+    EXPECT_NEAR(luminous("/Spot"), 400.0, 4.0) << "on its axis, the cone does not matter";
+
+    // So does a physical lamp its watts.
+    ernie::SphereLight lamp = ernie::SphereLight::Define(scene, "/Lamp")
+                                  .SetPower(470.0)
+                                  .SetShapingConeAngle(40.0)
+                                  .SetShapingConeSoftness(0.5);
+    for (const float value : ernie::LightParamsOf(scene, "/Lamp", {}).spectrum) {
+        EXPECT_NEAR(value, 1.0 / cone, 1e-3 / cone) << "470 W flat over 470 nm, over the cone";
+    }
+    lamp.SetShapingConeAngle(180.0);
+    EXPECT_NEAR(ernie::LightParamsOf(scene, "/Lamp", {}).spectrum[0], 1.0 / (4.0 * M_PI), 1e-6);
 }
 
 TEST(LightParamsOf, IlluminantsShapeTheSpectrum) {
@@ -292,6 +391,22 @@ TEST(LightParamsOf, IlluminantsShapeTheSpectrum) {
     EXPECT_GT(custom[17], 0.0f) << "the 550 nm band";
     EXPECT_NEAR(Luminous(custom, bands), 1000.0, 10.0) << "still 1000 lux";
     EXPECT_THROW(shape("candle"), std::invalid_argument);
+
+    // White and black body light spans 380 to 780 nm, as Omniverse's; unset, the whole range.
+    const ernie::SpectralBands wide{360.0, 840.0, 48};
+    for (const std::string_view illuminant : {tokens::kWhite, tokens::kBlackbody}) {
+        sun.SetPhysicalIlluminant(illuminant);
+        const std::vector<float> spectrum = ernie::LightParamsOf(scene, "/Sun", wide).spectrum;
+        EXPECT_EQ(spectrum[1], 0.0f) << illuminant << ": 370 to 380 nm";
+        EXPECT_GT(spectrum[2], 0.0f) << illuminant << ": 380 to 390 nm";
+        EXPECT_GT(spectrum[41], 0.0f) << illuminant << ": 770 to 780 nm";
+        EXPECT_EQ(spectrum[42], 0.0f) << illuminant << ": 780 to 790 nm";
+        EXPECT_NEAR(Luminous(spectrum, wide), 1000.0, 10.0) << illuminant;
+    }
+    sun.ClearPhysicalIlluminant();
+    const std::vector<float> flat = ernie::LightParamsOf(scene, "/Sun", wide).spectrum;
+    EXPECT_GT(flat.front(), 0.0f);
+    EXPECT_GT(flat.back(), 0.0f);
 
     // Without photometric units, an illuminant only shapes the spectrum.
     Scene relative;

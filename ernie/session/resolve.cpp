@@ -136,11 +136,23 @@ std::vector<float> BinShape(const Shape& shape, const SpectralBands& bands, doub
     return values;
 }
 
+/// Whether `nm` is within 380 to 780 nm, where Omniverse defines its "white" and "blackbody"
+/// illuminants (at 5 nm intervals); they emit nothing outside it.
+bool InIlluminantRange(double nm) {
+    return nm >= 380.0 && nm <= 780.0;
+}
+
 /// The relative shape of a light's spectrum over wavelength in nm (`tokens::kPhysicalIlluminant`):
 /// its illuminant, else a black body at the enabled colour temperature, else flat; times the
-/// shape of `inputs:color` (upsampled with `RgbToSigmoid`).
+/// shape of `inputs:color` (upsampled with `RgbToSigmoid`). The "white" and "blackbody"
+/// illuminants span 380 to 780 nm as Omniverse's do; unset, the flat or black body shape spans the
+/// whole spectral range, for sensors beyond the visible.
 /// @throws std::invalid_argument for an unknown illuminant, a "custom" one without pairs, or
 /// illuminant D outside 4000 to 25000 K.
+///
+/// References:
+/// - NVIDIA, Omniverse lighting, PhysicalLightIlluminantAPI,
+///   https://docs.omniverse.nvidia.com/materials-and-rendering/latest/lighting.html
 std::function<double(double)> IlluminantShape(const Light& light) {
     using namespace tokens;
     const std::string illuminant = light.GetPhysicalIlluminant();
@@ -152,13 +164,15 @@ std::function<double(double)> IlluminantShape(const Light& light) {
             return temperature > 0.0 ? PlanckRadiance(w, temperature) : 1.0;
         };
     } else if (illuminant == kWhite) {
-        base = [](double) { return 1.0; };
+        base = [](double w) { return InIlluminantRange(w) ? 1.0 : 0.0; };
     } else if (illuminant == kBlackbody) {
         if (!(kelvin > 0.0)) {
             throw std::invalid_argument("Light '" + light.GetPath().String() +
                                         "' needs a positive colour temperature");
         }
-        base = [kelvin](double w) { return PlanckRadiance(w, kelvin); };
+        base = [kelvin](double w) {
+            return InIlluminantRange(w) ? PlanckRadiance(w, kelvin) : 0.0;
+        };
     } else if (illuminant == kIlluminantD) {
         CieDaylight(560.0, kelvin);  // checks the temperature
         base = [kelvin](double w) { return CieDaylight(w, kelvin); };
@@ -187,15 +201,64 @@ std::function<double(double)> IlluminantShape(const Light& light) {
     return [base, tint](double w) { return base(w) * tint(w); };
 }
 
-/// A photometric area light's luminous value over `spread` (4 pi sr for a sphere's luminous
-/// intensity, pi times the area for a flat emitter's luminance): its power in lumens over the
-/// spread, or, with an illuminance distance d, the illuminance at d times d^2 (a luminous
-/// intensity), over the area for a flat emitter.
-double PhotometricAreaValue(const BoundableLight& light, double spread, double area) {
+/// The solid angle a light emitting into a cone around its axis spreads its power over: the
+/// integral of its falloff, which rises by a smoothstep in the cosine off the axis from
+/// `cosOuter` to `cosInner` (as the shading's), so 2 pi (1 - (cosOuter + cosInner) / 2); 4 pi
+/// for a cone of 180 degrees.
+double ConeSolidAngle(double angleDegrees, double softness) {
+    if (angleDegrees >= 180.0) {
+        return 4.0 * M_PI;
+    }
+    const double angle = glm::radians(std::max(angleDegrees, 0.0));
+    const double cosOuter = std::cos(angle);
+    const double cosInner = std::cos(angle * (1.0 - std::clamp(softness, 0.0, 1.0)));
+    return std::max(2.0 * M_PI * (1.0 - 0.5 * (cosOuter + cosInner)), 1e-9);
+}
+
+/// Luminance of a Lambertian disk of `radius` that gives 1 lux to a surface facing it on its
+/// axis `distance` away: the inverse of pi R^2 / (R^2 + d^2), the disk's configuration factor
+/// times pi.
+///
+/// References:
+/// - J. R. Howell, A Catalog of Radiation Heat Transfer Configuration Factors, differential
+///   area to a parallel coaxial disk, http://www.thermalradiation.net/indexCat.html
+double DiskLuminancePerLux(double radius, double distance) {
+    return (radius * radius + distance * distance) / (M_PI * radius * radius);
+}
+
+/// Luminance of a Lambertian `width` x `height` rectangle that gives 1 lux to a surface facing
+/// it on its axis `distance` away: the inverse of pi times four configuration factors to the
+/// quarter rectangles, 2 (x / sqrt(1 + x^2) atan(y / sqrt(1 + x^2)) + the same with x and y
+/// swapped) for x and y the half sizes over the distance.
+///
+/// References:
+/// - J. R. Howell, A Catalog of Radiation Heat Transfer Configuration Factors, differential
+///   area to a parallel rectangle with a corner above it,
+///   http://www.thermalradiation.net/indexCat.html
+double RectLuminancePerLux(double width, double height, double distance) {
+    const double x = 0.5 * width / distance;
+    const double y = 0.5 * height / distance;
+    const double sx = std::sqrt(1.0 + x * x);
+    const double sy = std::sqrt(1.0 + y * y);
+    return 1.0 / (2.0 * (x / sx * std::atan(y / sx) + y / sy * std::atan(x / sy)));
+}
+
+/// A photometric area light's luminous value (a luminous intensity for a sphere, a luminance
+/// for a flat emitter), as Omniverse's PhotometricAreaLightAPI gives it. With both an illuminance
+/// and its distance above 0, the value lighting a surface facing it on its axis that far away
+/// with that illuminance, `perLux(distance)` giving the value per lux; otherwise its power in
+/// lumens over `spread` (the cone's solid angle for a sphere, pi times the area for a flat
+/// emitter), so it emits that power whatever its colour or cone.
+///
+/// References:
+/// - NVIDIA, Omniverse lighting, PhotometricAreaLightAPI,
+///   https://docs.omniverse.nvidia.com/materials-and-rendering/latest/lighting.html
+template <typename PerLux>
+double PhotometricAreaValue(const BoundableLight& light, double spread, const PerLux& perLux) {
+    const double illuminance = light.GetPhotometricIlluminance();
     const double distance = light.GetPhotometricIlluminanceDistance();
-    if (distance > 0.0) {
-        const double intensity = light.GetPhotometricIlluminance() * distance * distance;
-        return area > 0.0 ? intensity / area : intensity;
+    if (illuminance > 0.0 && distance > 0.0) {
+        return illuminance * perLux(distance);
     }
     return light.GetPhotometricPower() / spread;
 }
@@ -905,8 +968,14 @@ LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBa
         }
         const std::optional<std::vector<float>> pairs = SpectrumPairs(emitter);
         if (emitter.IsPhotometric()) {
-            light.spectrum =
-                RelativeSpectrum(emitter, bands, PhotometricAreaValue(emitter, M_PI * area, area));
+            const glm::dvec2 size(light.size);
+            const double radius = light.radius;
+            const auto perLux = [&](double distance) {
+                return type == kRectLight ? RectLuminancePerLux(size.x, size.y, distance)
+                                          : DiskLuminancePerLux(radius, distance);
+            };
+            light.spectrum = RelativeSpectrum(emitter, bands,
+                                              PhotometricAreaValue(emitter, M_PI * area, perLux));
         } else {
             light.spectrum =
                 emitter.HasPower() || pairs
@@ -923,14 +992,17 @@ LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBa
     if (light.radius < 0.0f) {
         throw std::invalid_argument("SphereLight '" + path.String() + "' has a negative radius");
     }
+    // A power, photometric or radiant, spreads over the cone's solid angle, so narrowing the cone
+    // concentrates the light rather than dimming it.
+    const double cone = ConeSolidAngle(light.coneAngle, light.coneSoftness);
     if (sphere.IsPhotometric()) {
-        light.spectrum =
-            RelativeSpectrum(sphere, bands, PhotometricAreaValue(sphere, 4.0 * M_PI, 0.0));
+        const auto perLux = [](double distance) { return distance * distance; };
+        light.spectrum = RelativeSpectrum(sphere, bands, PhotometricAreaValue(sphere, cone, perLux));
         return light;
     }
     const std::optional<std::vector<float>> pairs = SpectrumPairs(sphere);
     if (sphere.HasPower() || pairs) {
-        light.spectrum = LampSpectrum(sphere, bands, pairs ? &*pairs : nullptr, 4.0 * M_PI);
+        light.spectrum = LampSpectrum(sphere, bands, pairs ? &*pairs : nullptr, cone);
         return light;
     }
     const double radius = light.radius;

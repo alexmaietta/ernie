@@ -43,9 +43,10 @@
     X(std::string, PhysicalIlluminant, ::ernie::tokens::kPhysicalIlluminant, "",                   \
       (::ernie::AttributeMeta{                                                                     \
           .label = "Illuminant",                                                                   \
-          .doc = "The spectrum's shape: \"white\" (flat), \"blackbody\" or \"illuminant D\" at "   \
-                 "the temperature, or \"custom\" (the custom illuminant's pairs). Unset: a black " \
-                 "body if the temperature is used, else flat.",                                    \
+          .doc = "The spectrum's shape: \"white\" (flat) or \"blackbody\", both over 380 to 780 "  \
+                 "nm as Omniverse's, \"illuminant D\" (black body and D at the temperature), or "  \
+                 "\"custom\" (the custom illuminant's pairs). Unset: a black body if the "         \
+                 "temperature is used, else flat, over the whole range.",                          \
           .group = "Spectrum",                                                                     \
           .options = {::ernie::tokens::kWhite, ::ernie::tokens::kBlackbody,                        \
                       ::ernie::tokens::kIlluminantD, ::ernie::tokens::kCustom}}))                  \
@@ -67,12 +68,13 @@
                               .group = "Shape", .max = 1e7}))                                      \
     X(double, PhotometricPower, ::ernie::tokens::kPhotometricPower, 1600.0,                        \
       (::ernie::AttributeMeta{.label = "Power",                                                    \
-                              .doc = "Luminous flux in lumens." ERNIE_PHOTOMETRIC_SWITCH,          \
+                              .doc = "Luminous flux in lumens, whatever the colour or cone."       \
+                                     ERNIE_PHOTOMETRIC_SWITCH,                                     \
                               .group = "Photometric", .max = 1e6}))                                \
     X(double, PhotometricIlluminance, ::ernie::tokens::kPhotometricIlluminance, 0.0,               \
       (::ernie::AttributeMeta{.label = "Illuminance",                                              \
-                              .doc = "Lux on a surface facing it at the distance below, in place " \
-                                     "of the power.",                                              \
+                              .doc = "Lux on a surface facing it on its axis at the distance "     \
+                                     "below, in place of the power when both are above 0.",        \
                               .group = "Photometric", .max = 200000.0}))                           \
     X(double, PhotometricIlluminanceDistance, ::ernie::tokens::kPhotometricIlluminanceDistance,    \
       0.0,                                                                                         \
