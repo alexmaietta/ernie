@@ -696,3 +696,67 @@ TEST_F(RasterDelegateTest, StarsKeepTheirIrradianceAtAnyResolutionBehindTheScene
                           glm::dvec3(0.0, 1.0, 0.0)));
     EXPECT_EQ(irradiance(32, 12), 0.0) << "behind the scene";
 }
+
+TEST_F(RasterDelegateTest, PushbroomRowsSeeStarsFromTheirOwnPoses) {
+    // A magnitude 0 star in the detector line's plane of view (declination 0, the camera looking
+    // along +x with +z up), a little across the line.
+    Scene scene = SkyScene({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
+    const auto one = [](float value) { return Tensor::Copy<float>(std::array{value}, {1}); };
+    ernie::StarField::Define(scene, "/World/Stars")
+        .SetRightAscension(one(0.05f))
+        .SetDeclination(one(0.0f))
+        .SetMagnitude(one(0.0f))
+        .SetTemperature(one(5772.0f));
+    ernie::Camera(scene, "/World/Camera").SetScan(tokens::kPushbroom);
+    constexpr std::size_t kSize = 32;
+    ernie::RenderSettings(scene, "/Render/Settings").SetResolution(glm::dvec2(kSize, kSize));
+    const ernie::CameraParams camera = ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize);
+    const double f = camera.FocalLengthPixels();
+    constexpr std::size_t kBand = 12;
+    const double expected = ernie::BlackbodySpectralIrradiance(
+        camera.bands.Lower(static_cast<int>(kBand)) + 0.5 * camera.bands.Width(), 5772.0, 2.54e-6);
+    // Each row's spectral irradiance: its pixels' radiance times their detector pixels' solid
+    // angles.
+    const auto rows = [&](double fromElevation, double toElevation) {
+        const auto at = [](double y, double elevation) {
+            return ernie::LookAtTransform(
+                {0.0, y, 0.0}, {std::cos(elevation), y, std::sin(elevation)}, {0.0, 0.0, 1.0});
+        };
+        RasterDelegate delegate(*context_);
+        scene.Set("/World/Camera", tokens::kTransform, at(-1.0, fromElevation));
+        delegate.Step(scene);  // the strip's start
+        scene.Set("/World/Camera", tokens::kTransform, at(1.0, toElevation));
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const Tensor spectral = outputs.at("/Render/Product")
+                                    .vars.at("SpectralRadiance")
+                                    .Map(ernie::MapDevice::Cpu)
+                                    .tensor;
+        std::vector<double> sums(kSize, 0.0);
+        for (std::size_t row = 0; row < kSize; ++row) {
+            for (std::size_t col = 0; col < kSize; ++col) {
+                const double x = (static_cast<double>(col) + 0.5 - camera.PrincipalPoint().x) / f;
+                const double cosine = 1.0 / std::sqrt(1.0 + x * x);
+                sums[row] += SpectralAt(spectral, kBand, row, col, kSize) * cosine * cosine *
+                             cosine / (f * f);
+            }
+        }
+        return sums;
+    };
+
+    // Held still, every row sees it: a streak down its column.
+    for (const double sum : rows(0.0, 0.0)) {
+        EXPECT_NEAR(sum, expected, 0.03 * expected);
+    }
+    // Turning a pixel's angle a row, the rows sweep past it as a frame camera's image holds it:
+    // all of it once, over a row or two.
+    const double sweep = static_cast<double>(kSize) / f;
+    const std::vector<double> swept = rows(0.5 * sweep, -0.5 * sweep);
+    double total = 0.0;
+    std::size_t lit = 0;
+    for (const double sum : swept) {
+        total += sum;
+        lit += sum > 0.0 ? 1 : 0;
+    }
+    EXPECT_NEAR(total, expected, 0.03 * expected);
+    EXPECT_LE(lit, 2u);
+}

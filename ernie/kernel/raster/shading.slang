@@ -24,6 +24,8 @@
 // each (a tent filter, which sums to one, so a star's irradiance is kept at any resolution): each
 // adds its spectral irradiance times its weight over the pixel's solid angle. Each pixel gathers
 // the stars in the grid cells around its direction, in a fixed order, so images repeat exactly.
+// A pushbroom's rows each see the stars from their own pose, through the detector line's pixels
+// (`starOffset`).
 //
 // Bindings: 0 every view's ShadingUniforms, 1 G-buffer normal, 2 G-buffer albedo, 3 G-buffer ids,
 // 4 depth (one layer per view each), 5 materials, 6 RGB-to-spectrum coefficient table, 7 its
@@ -877,11 +879,54 @@ int starRow(float declination, int rows) {
     return clamp(int(floor((declination + 0.5 * PI) / PI * float(rows))), 0, rows - 1);
 }
 
+// How a pixel's stars land on it. A frame camera's: `a`, `b` and `c` are `rayThrough`'s steps in
+// x and y and its value at the image centre, `pixel` the pixel's centre in pixels. A pushbroom's
+// row: its pose's camera axes `x`, `y` and `z` in the world, the pixel's normalised image point
+// `point` (x across the line, the line's y) and the focal length in pixels `focal`.
+struct StarFrame {
+    float3 a;
+    float3 b;
+    float3 c;
+    float2 pixel;
+    float3 x;
+    float3 y;
+    float3 z;
+    float2 point;
+    float focal;
+}
+
+// The offset in pixels of direction `w` from the pixel, or a negative one when it is behind.
+// A pushbroom's row sees stars from its own pose: how far, in its detector's pixels, a star is
+// from the pixel across and along the line, so a turning camera sweeps them across its rows as
+// a frame camera's image holds them, and one held still draws each down its column.
+float2 starOffset(StarFrame frame, float3 w) {
+    if (kPushbroomCamera) {
+        let local = float3(dot(frame.x, w), dot(frame.y, w), dot(frame.z, w));
+        if (local.z >= 0.0) {
+            return float2(-1.0);
+        }
+        return abs(local.xy / -local.z - frame.point) * frame.focal;
+    }
+    // Directions to image coordinates: w = alpha a + beta b + gamma c gives the point
+    // (alpha, beta) / gamma in normalised device coordinates.
+    let bc = cross(frame.b, frame.c);
+    let ca = cross(frame.c, frame.a);
+    let ab = cross(frame.a, frame.b);
+    let det = dot(frame.a, bc);
+    let gamma = dot(ab, w) / det;
+    if (gamma <= 0.0) {
+        return float2(-1.0);
+    }
+    let ndc = float2(dot(bc, w), dot(ca, w)) / det / gamma;
+    let size = float2(sh.size.xy);
+    let at = float2((ndc.x + 1.0) * 0.5 * size.x, (1.0 - ndc.y) * 0.5 * size.y);
+    return abs(at - frame.pixel);
+}
+
 // Adds the stars around world direction `d` to `radiance` (per band), as their tent-filtered
-// irradiance over the pixel's solid angle. `a`, `b` and `c` are `rayThrough`'s steps in x and y
-// and its value at the image centre; `pixel` the pixel's centre in pixels.
-void addStars(inout float radiance[kMaxBands], float3 d, float3 a, float3 b, float3 c,
-              float2 pixel, float pixelAngle, float solidAngle) {
+// irradiance over the pixel's solid angle, landing as `frame` puts them.
+void addStars(inout float radiance[kMaxBands], float3 d, StarFrame frame, float pixelAngle,
+              float solidAngle) {
     // Points within a pixel and a half: farther ones give this pixel no weight.
     let reach = 1.5 * pixelAngle;
     if (reach > 0.2) {
@@ -906,13 +951,6 @@ void addStars(inout float radiance[kMaxBands], float3 d, float3 a, float3 b, flo
             lastColumn = int(floor((ascension + span) / (2.0 * PI) * float(columns)));
         }
     }
-    // Directions to image coordinates: d = alpha a + beta b + gamma c gives the point
-    // (alpha, beta) / gamma in normalised device coordinates.
-    let bc = cross(b, c);
-    let ca = cross(c, a);
-    let ab = cross(a, b);
-    let det = dot(a, bc);
-    let size = float2(sh.size.xy);
     let bands = uint(sh.range.z);
     for (int r = firstRow; r <= lastRow; ++r) {
         for (int k = firstColumn; k <= lastColumn; ++k) {
@@ -924,13 +962,10 @@ void addStars(inout float radiance[kMaxBands], float3 d, float3 a, float3 b, flo
                 let local = float3(cosDec * cos(star.x), cosDec * sin(star.x), sin(star.y));
                 let w = sh.toCatalogue[0].xyz * local.x + sh.toCatalogue[1].xyz * local.y +
                         sh.toCatalogue[2].xyz * local.z;
-                let gamma = dot(ab, w) / det;
-                if (gamma <= 0.0) {
+                let offset = starOffset(frame, w);
+                if (offset.x < 0.0) {
                     continue;
                 }
-                let ndc = float2(dot(bc, w), dot(ca, w)) / det / gamma;
-                let at = float2((ndc.x + 1.0) * 0.5 * size.x, (1.0 - ndc.y) * 0.5 * size.y);
-                let offset = abs(at - pixel);
                 let weight = max(1.0 - offset.x, 0.0) * max(1.0 - offset.y, 0.0);
                 if (weight <= 0.0) {
                     continue;
@@ -966,11 +1001,54 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
     for (uint band = 0; band < kMaxBands; ++band) {
         radiance[band] = 0.0;
     }
-    if (kPushbroomCamera || sh.range.w != 0.0) {
+    if (kPushbroomCamera) {
+        // Its pixels look along their rows' rays, each row from its own pose: the row's camera
+        // axes from its rays, which run (x, line, -1) in them, x across the line.
+        let line = sh.strip.z;
+        let x = (ndc.x - sh.strip.y) / sh.strip.x;
+        float3 origin;
+        float3 ray;
+        cameraRayThrough(sh.invViewProj, sh.strip, ndc, origin, ray);
+        float3 next;
+        cameraRayThrough(sh.invViewProj, sh.strip, ndc + float2(1.0, 0.0), origin, next);
+        StarFrame frame;
+        frame.x = normalize((next - ray) * sh.strip.x);
+        // v = line y - z and x cross v = y + line z.
+        let v = ray - x * frame.x;
+        let w = cross(frame.x, v);
+        frame.y = normalize(line * v + w);
+        frame.z = normalize(line * w - v);
+        frame.point = float2(x, line);
+        frame.focal = 0.5 * sh.strip.x * size.x;
+        let d = normalize(ray);
+        if ((sh.sky.x & kSkyDome) != 0) {
+            let rgb = (sh.sky.x & kSkyMap) != 0 ? max(domeMapAt(d, 0.0), float3(0.0))
+                                                 : float3(1.0);
+            let scale = max(rgb.x, max(rgb.y, rgb.z));
+            let coefficients = scale > 0.0 ? sigmoidCoefficients(rgb / scale) : float3(0.0);
+            for (uint band = 0; band < bands; ++band) {
+                let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;
+                radiance[band] =
+                    bandValue(sh.dome, band) * modulationAt(coefficients, scale, wavelength);
+            }
+        }
+        if ((sh.sky.x & kSkyStars) != 0) {
+            // A detector pixel's solid angle: square, a focal length's pixel on a side, seen
+            // off the axis.
+            let pixelAngle = 1.0 / frame.focal;
+            let cosine = 1.0 / length(float3(x, line, 1.0));
+            addStars(radiance, d, frame, pixelAngle,
+                     pixelAngle * pixelAngle * cosine * cosine * cosine);
+        }
+        for (uint band = 0; band < bands; ++band) {
+            spectral[int3(id.xy, id.z * bands + band)] = radiance[band];
+        }
+        return;
+    }
+    if (sh.range.w != 0.0) {
         // Orthographic: every pixel sees the dome along the view direction, with no solid angle
-        // for stars to fill. A pushbroom's pixels look along their rows' rays; its stars are not
-        // drawn.
-        let d = kPushbroomCamera ? cameraRay(sh.invViewProj, sh.strip, ndc) : normalize(c);
+        // for stars to fill.
+        let d = normalize(c);
         if ((sh.sky.x & kSkyDome) != 0) {
             let rgb = (sh.sky.x & kSkyMap) != 0 ? max(domeMapAt(d, 0.0), float3(0.0))
                                                  : float3(1.0);
@@ -1011,7 +1089,12 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
         }
     }
     if ((sh.sky.x & kSkyStars) != 0) {
-        addStars(radiance, d, a, b, c, pixel, pixelAngle, solidAngle);
+        StarFrame frame;
+        frame.a = a;
+        frame.b = b;
+        frame.c = c;
+        frame.pixel = pixel;
+        addStars(radiance, d, frame, pixelAngle, solidAngle);
     }
     for (uint band = 0; band < bands; ++band) {
         spectral[int3(id.xy, id.z * bands + band)] = radiance[band];
