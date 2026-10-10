@@ -203,6 +203,13 @@ class Viewer {
     /// @throws std::invalid_argument naming the prim and attribute of data the backend cannot use.
     void Sync();
 
+    /// Starts over on the scene's present content, once an application has replaced it (as the
+    /// demo browser switching demos does): clears the selection and undo history, picks the
+    /// first RenderSettings, looks through `PerspectiveCamera()` framing the scene and chooses
+    /// the lighting as on opening.
+    /// @throws std::invalid_argument as `Sync`.
+    void ResetSession();
+
     /// The current backend itself, for what the viewer does not wrap, such as CUDA bindings.
     RenderDelegate& Delegate();
 

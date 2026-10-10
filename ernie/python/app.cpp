@@ -284,6 +284,11 @@ void BindApp(nb::module_& parent) {
                      "The render backend the viewport draws with; assign to switch.")
         .def("sync", &Viewer::Sync,
              "Syncs the scene into the renderer now; raises ValueError for data it cannot use.")
+        .def("reset_session", &Viewer::ResetSession,
+             "Starts over on the scene's present content once it has been replaced, as the demo "
+             "browser does: clears the selection and undo history, picks the first "
+             "RenderSettings, frames the scene through perspective_camera and chooses the "
+             "lighting as on opening.")
         .def_prop_ro_static("session_root", [](nb::handle) { return Viewer::SessionRoot(); })
         .def_prop_ro_static("perspective_camera",
                             [](nb::handle) { return Viewer::PerspectiveCamera(); })

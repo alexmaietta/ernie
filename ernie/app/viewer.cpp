@@ -721,6 +721,19 @@ struct Viewer::State {
         FrameBounds(SceneBounds());
     }
 
+    /// Starts over on the scene's present content, as on opening: no selection or undo steps,
+    /// the first RenderSettings, the perspective view framing the scene, lighting by its lights.
+    void ResetSession() {
+        SetSelection({});
+        history.Reset();
+        settingsSource = FirstUserSettings();
+        orthographicView = -1;
+        activeCamera = PerspectiveCamera();
+        lighting = HasStageLights(scene) ? Lighting::Stage : Lighting::Default;
+        delegate->Sync(scene);
+        FrameBounds(SceneBounds());
+    }
+
     Path FirstUserSettings() const {
         for (const Path& path : scene.Prims(tokens::kRenderSettings)) {
             if (!IsSessionPath(path)) {
@@ -2546,6 +2559,10 @@ RenderStats Viewer::Stats() const {
 
 void Viewer::Sync() {
     state_->delegate->Sync(state_->scene);
+}
+
+void Viewer::ResetSession() {
+    state_->ResetSession();
 }
 
 RenderDelegate& Viewer::Delegate() {
