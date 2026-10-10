@@ -239,8 +239,12 @@ camera = scene.define("/World/Camera", ernie.Camera)
 product = scene.define("/Render/Product", ernie.RenderProduct, camera=camera)
 settings = scene.define("/Render/Settings", ernie.RenderSettings, camera="/World/Camera",
                         products=[product], lights=[sun])
-settings.camera                   # [Path('/World/Camera')]
+settings.camera                   # Path('/World/Camera')
+settings.cameras                  # [Path('/World/Camera')]
+product.cameras = [camera, "/World/Camera2"]   # a batch, one view per camera
 ```
+
+A render product's or settings' `camera` reads its first target (None when unset), and `cameras` reads them all; set either to one camera or a list.
 
 In C++ a single relationship's setter takes a `Path` and a list's takes one target or a list (`.SetLights({Path("/World/Sun"), Path("/World/Lamp")})`); getters return a `Path` (empty when unset) or a `std::vector<Path>`.
 
@@ -267,7 +271,16 @@ with scene.map(mesh.path, tokens.POINTS) as p:
     p[:, 2] += 1.0                # written in place, seen after the block
 ```
 
-Simulations that update many prims each step from one GPU array (`scene.write` of many paths, `ernie.PrimSet`, CUDA streams) are covered in [GPU interop](gpu-interop.md). In C++ an array attribute's setter takes a `Tensor` (`Tensor::Copy<float>(values, {3, 3})`, or one from DLPack), and its getter returns the written `const Tensor*`, null when unset; arrays have no default.
+Simulations that update many prims each step from one GPU array (`scene.write` of many paths, `ernie.PrimSet`, CUDA streams) are covered in [GPU interop](gpu-interop.md). An attribute named on its class (`ernie.PointInstancer.positions`) is its USD name, so it can be passed wherever an attribute name goes, and a class's `write_rows` writes row i of each array, by Python name, to prim i, with `translate`, `orient` and `scale` for the transform ops:
+
+```python
+swarms = ernie.PrimSet([f"/World/Swarm{i}" for i in range(64)])
+scene.write(swarms, ernie.PointInstancer.positions, positions)    # (64, n, 3)
+ernie.PointInstancer.write_rows(scene, swarms, positions=positions, orientations=orientations,
+                                translate=centres)               # (64, 3)
+```
+
+A write to many prims checks the attribute once for each prim type among them, before writing any row. In C++ an array attribute's setter takes a `Tensor` (`Tensor::Copy<float>(values, {3, 3})`, or one from DLPack), and its getter returns the written `const Tensor*`, null when unset; arrays have no default.
 
 ## Validation
 

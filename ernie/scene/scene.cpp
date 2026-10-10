@@ -6,6 +6,7 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/xform.h"
 
+#include <algorithm>
 #include <atomic>
 #include <bit>
 #include <set>
@@ -343,8 +344,9 @@ void Scene::Write(const Path& path, std::string_view attribute, Tensor tensor,
 }
 
 void Scene::WriteTensor(const Path& path, PrimData& prim, std::string_view attribute, Tensor tensor,
-                        std::uintptr_t stream, std::optional<std::pair<Tensor, std::int64_t>> row) {
-    if (prim.schema != nullptr) {
+                        std::uintptr_t stream, std::optional<std::pair<Tensor, std::int64_t>> row,
+                        bool checked) {
+    if (prim.schema != nullptr && !checked) {
         Validate(*prim.schema, path, attribute, nullptr);
     }
     // Found before inserted, so rewriting an attribute every step allocates no keys.
@@ -438,10 +440,20 @@ void Scene::Write(const PrimSet& prims, std::string_view attribute, const Tensor
         prims.sceneId_ = Id();
         prims.removals_ = removals_;
     }
+    // The attribute is checked once per type among the prims (`Validate`), not once per prim,
+    // and all before any is written, so a rejected one writes nothing.
+    std::vector<const PrimTypeDef*> checked;
+    for (std::size_t i = 0; i < prims.Size(); ++i) {
+        const PrimTypeDef* schema = static_cast<PrimData*>(prims.prims_[i])->schema;
+        if (schema != nullptr && std::find(checked.begin(), checked.end(), schema) == checked.end()) {
+            Validate(*schema, prims.Paths()[i], attribute, nullptr);
+            checked.push_back(schema);
+        }
+    }
     for (std::size_t i = 0; i < prims.Size(); ++i) {
         const auto row = static_cast<std::int64_t>(i);
         WriteTensor(prims.Paths()[i], *static_cast<PrimData*>(prims.prims_[i]), attribute,
-                    rows.Row(row), stream, std::pair(rows, row));
+                    rows.Row(row), stream, std::pair(rows, row), true);
     }
 }
 

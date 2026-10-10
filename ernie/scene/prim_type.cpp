@@ -14,6 +14,7 @@
 #include <cctype>
 #include <stdexcept>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace ernie {
 
@@ -345,6 +346,47 @@ bool AlwaysAllowed(std::string_view attribute) {
            attribute.ends_with(".connect");
 }
 
+/// The namespace of `attribute`: all but its last component ("inputs:shaping:cone" of
+/// "inputs:shaping:cone:angle"), or empty.
+std::string_view NamespaceOf(std::string_view attribute) {
+    const std::size_t colon = attribute.rfind(':');
+    return colon == std::string_view::npos ? std::string_view() : attribute.substr(0, colon);
+}
+
+/// A registered type's attributes by name, for `Scene::Set`'s check on every edit: the type's
+/// own declarations before its bases' (as `Find` walks them), the namespaces they are in, and
+/// whether the type takes any name.
+struct TypeIndex {
+    std::unordered_map<std::string_view, const AttributeDef*> byName;
+    std::unordered_map<std::string_view, const AttributeDef*> byPyName;
+    std::unordered_set<std::string_view> spaces;
+    bool openAll = false;
+};
+
+/// The index of `type` when it is registered (`PrimTypes`), built for every registered type the
+/// first time any is asked for; null for others.
+const TypeIndex* IndexOf(const PrimTypeDef& type) {
+    static const std::unordered_map<const PrimTypeDef*, TypeIndex> indices = [] {
+        std::unordered_map<const PrimTypeDef*, TypeIndex> built;
+        for (const PrimTypeDef* registered : PrimTypes()) {
+            TypeIndex& index = built[registered];
+            for (const PrimTypeDef* level = registered; level != nullptr; level = level->base) {
+                for (const AttributeDef& def : level->attributes) {
+                    index.byName.emplace(def.name, &def);
+                    index.byPyName.emplace(def.pyName, &def);
+                    if (const std::string_view space = NamespaceOf(def.name); !space.empty()) {
+                        index.spaces.insert(space);
+                    }
+                }
+            }
+            index.openAll = registered->IsOpen("*");
+        }
+        return built;
+    }();
+    const auto it = indices.find(&type);
+    return it != indices.end() ? &it->second : nullptr;
+}
+
 }  // namespace
 
 void Validate(const PrimTypeDef& type, const Path& path, std::string_view attribute,
@@ -371,12 +413,11 @@ void Validate(const PrimTypeDef& type, const Path& path, std::string_view attrib
         }
         return;
     }
-    const std::size_t colon = attribute.rfind(':');
-    const std::string_view space =
-        colon == std::string_view::npos ? std::string_view() : attribute.substr(0, colon);
-    if (type.IsOpen("*")) {
+    const TypeIndex* index = IndexOf(type);
+    if (index != nullptr ? index->openAll : type.IsOpen("*")) {
         return;
     }
+    const std::string_view space = NamespaceOf(attribute);
     if (!space.empty()) {
         if (type.IsOpen(space)) {
             return;
@@ -384,10 +425,12 @@ void Validate(const PrimTypeDef& type, const Path& path, std::string_view attrib
         // Custom data in a namespace of its own is the author's; a typo in one of the type's
         // own namespaces is not.
         bool declared = false;
-        for (const AttributeDef* def : type.AllAttributes()) {
-            const std::size_t defColon = def->name.rfind(':');
-            declared = declared || (defColon != std::string_view::npos &&
-                                    def->name.substr(0, defColon) == space);
+        if (index != nullptr) {
+            declared = index->spaces.contains(space);
+        } else {
+            for (const AttributeDef* def : type.AllAttributes()) {
+                declared = declared || NamespaceOf(def->name) == space;
+            }
         }
         if (!declared) {
             return;
@@ -399,6 +442,10 @@ void Validate(const PrimTypeDef& type, const Path& path, std::string_view attrib
 }
 
 const AttributeDef* PrimTypeDef::Find(std::string_view attribute) const {
+    if (const TypeIndex* index = IndexOf(*this)) {
+        const auto it = index->byName.find(attribute);
+        return it != index->byName.end() ? it->second : nullptr;
+    }
     for (const PrimTypeDef* type = this; type != nullptr; type = type->base) {
         for (const AttributeDef& def : type->attributes) {
             if (def.name == attribute) {
@@ -410,6 +457,10 @@ const AttributeDef* PrimTypeDef::Find(std::string_view attribute) const {
 }
 
 const AttributeDef* PrimTypeDef::FindByPyName(std::string_view attribute) const {
+    if (const TypeIndex* index = IndexOf(*this)) {
+        const auto it = index->byPyName.find(attribute);
+        return it != index->byPyName.end() ? it->second : nullptr;
+    }
     for (const PrimTypeDef* type = this; type != nullptr; type = type->base) {
         for (const AttributeDef& def : type->attributes) {
             if (def.pyName == attribute) {

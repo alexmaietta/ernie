@@ -56,9 +56,15 @@ from ._ernie import (
     tokens,
 )
 
-__all__ = ["Schema", "typed"]
+__all__ = ["AttributeName", "Schema", "typed"]
 
 _XFORM_KEYS = ("translate", "rotate", "rotation_order", "orient", "scale")
+# The transform ops `Schema.write_rows` writes as rows.
+_ROW_XFORM_OPS = {
+    "translate": "xformOp:translate",
+    "orient": "xformOp:orient",
+    "scale": "xformOp:scale",
+}
 _scene_define = Scene.define
 _prim_define = Prim.define
 
@@ -83,18 +89,39 @@ def _target(value: Any) -> Any:
     return value
 
 
+class AttributeName(str):
+    """A declared attribute as a typed prim class gives it (``ernie.PointInstancer.positions``):
+    its USD name, a str, so any function taking an attribute takes it
+    (``scene.write(prims, ernie.PointInstancer.positions, rows)``), that also describes it with its
+    ``AttributeDef``'s members (``doc``, ``kind``, ``default``, ``py_name``...)."""
+
+    def __new__(cls, definition: AttributeDef) -> AttributeName:
+        name = super().__new__(cls, definition.name)
+        name.definition = definition
+        return name
+
+    def __getattr__(self, member: str) -> Any:
+        if member == "definition":
+            raise AttributeError(member)
+        return getattr(self.definition, member)
+
+    def __repr__(self) -> str:
+        return repr(self.definition)
+
+
 class _Attribute:
-    """One declared attribute as a property: its AttributeDef on the class, its value on an
+    """One declared attribute as a property: its `AttributeName` on the class, its value on an
     instance."""
 
-    __slots__ = ("definition",)
+    __slots__ = ("definition", "name")
 
-    def __init__(self, definition: AttributeDef) -> None:
-        self.definition = definition
+    def __init__(self, name: AttributeName) -> None:
+        self.definition = name.definition
+        self.name = name
 
     def __get__(self, instance: Schema | None, owner: type | None = None) -> Any:
         if instance is None:
-            return self.definition
+            return self.name
         return self.definition.read(instance.prim)
 
     def __set__(self, instance: Schema, value: Any) -> None:
@@ -109,7 +136,7 @@ class _FirstTarget(_Attribute):
 
     def __get__(self, instance: Schema | None, owner: type | None = None) -> Any:
         if instance is None:
-            return self.definition
+            return self.name
         targets = self.definition.read(instance.prim)
         return targets[0] if targets else None
 
@@ -179,6 +206,34 @@ class Schema:
         """Every attribute of the type, its root base's first."""
         return list({definition.name: definition for definition in cls._attributes.values()}.values())
 
+    @classmethod
+    def write_rows(
+        cls, scene: Scene, prims: Any, *, stream: Any = None, **arrays: Any
+    ) -> None:
+        """Writes row i of each array, by Python name, as that attribute of prim i of ``prims`` (a
+        PrimSet, or a list of paths), every step of a simulation:
+        ``ernie.PointInstancer.write_rows(scene, prims, positions=p, orientations=q)``.
+        ``translate``, ``orient`` (x, y, z, w) and ``scale`` write the transform ops, which from
+        CUDA arrays pose the prims on the GPU. The arrays are DLPack arrays written without
+        copying; ``stream`` is as for ``Scene.write``.
+
+        Raises:
+            TypeError: A name is not an array attribute of this class or a transform op.
+        """
+        names = dict(_ROW_XFORM_OPS)
+        names.update(
+            (name, definition.name)
+            for name, definition in cls._attributes.items()
+            if definition.kind == AttributeKind.TENSOR
+        )
+        for name in arrays:
+            if name not in names:
+                raise TypeError(
+                    f"{cls.__name__} has no array attribute {name!r}" + _closest(name, names)
+                )
+        for name, rows in arrays.items():
+            scene.write(prims, names[name], rows, stream=stream)
+
     def set(self, *attribute: Any, **attributes: Any) -> Any:
         """Sets attributes by Python name, and the transform from ``translate``, ``rotate``,
         ``rotation_order``, ``orient`` and ``scale``; ``set(token, value)`` sets one by USD name.
@@ -243,11 +298,12 @@ def _build() -> dict[str, type[Schema]]:
                 if name in reserved:
                     raise RuntimeError(f"{prim_type.name}.{name} hides a Prim member")
                 namespace["_attributes"][name] = definition
+            name = AttributeName(definition)
             if definition.plural:
-                namespace[definition.py_name] = _FirstTarget(definition)
-                namespace[definition.plural] = _Attribute(definition)
+                namespace[definition.py_name] = _FirstTarget(name)
+                namespace[definition.plural] = _Attribute(name)
             else:
-                namespace[definition.py_name] = _Attribute(definition)
+                namespace[definition.py_name] = _Attribute(name)
         classes[prim_type.name] = builtins.type(prim_type.name, (base,), namespace)
     return classes
 
@@ -342,7 +398,14 @@ def _load_prim(scene: Scene, path: str, body: Any) -> None:
         if definition is None and cls is not None:
             definition = next((d for d in cls._attributes.values() if d.name == name), None)
         if definition is None:
-            prim.set(name, _target(value))
+            # As the C++ loader reads what SaveScene writes: an orient op's [w, x, y, z] as a
+            # quaternion, and nested arrays other than 4 x 4 (per-vertex colours) as an array.
+            if name.split(":")[:2] == ["xformOp", "orient"] and _numbers(value, 4):
+                prim.set(name, Quat(*value))
+            elif _nested(value):
+                prim.write(name, np.asarray(value, dtype=np.float32))
+            else:
+                prim.set(name, _target(value))
             continue
         if definition.kind == AttributeKind.TENSOR:
             value = _array(value, definition.is_integer)
@@ -356,6 +419,21 @@ def _load_prim(scene: Scene, path: str, body: Any) -> None:
     for name, child in body.items():
         if isinstance(child, dict):
             _load_prim(scene, f"{path.rstrip('/')}/{name}", child)
+
+
+def _numbers(value: Any, count: int) -> bool:
+    """Whether ``value`` is a list of ``count`` numbers."""
+    return (isinstance(value, (list, tuple)) and len(value) == count
+            and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in value))
+
+
+def _nested(value: Any) -> bool:
+    """Whether ``value`` is a list of lists other than a 4 x 4 matrix."""
+    if not isinstance(value, (list, tuple)) or not value:
+        return False
+    if not all(isinstance(row, (list, tuple)) for row in value):
+        return False
+    return not (len(value) == 4 and all(_numbers(row, 4) for row in value))
 
 
 def _array(value: Any, integer: bool) -> Any:

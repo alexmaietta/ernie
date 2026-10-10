@@ -129,6 +129,40 @@ def test_tensor_attributes_write_and_read_arrays():
     assert dome.texture.shape == (4, 8, 3)
 
 
+def test_class_attributes_name_their_attribute_for_bulk_writes():
+    scene = ernie.Scene()
+    paths = [f"/Swarm{i}" for i in range(3)]
+    for path in paths:
+        ernie.PointInstancer.define(scene, path)
+    prims = ernie.PrimSet(paths)
+    # The class attribute is its USD name, and describes it.
+    positions = ernie.PointInstancer.positions
+    assert isinstance(positions, ernie.AttributeName) and positions == "positions"
+    assert positions.kind == ernie.AttributeKind.TENSOR and positions.py_name == "positions"
+    rows = np.arange(3 * 2 * 3, dtype=np.float32).reshape(3, 2, 3)
+    scene.write(prims, positions, rows)
+    assert np.array_equal(scene.read("/Swarm1", positions), rows[1])
+    # write_rows: arrays by Python name, and the transform ops.
+    orientations = np.tile(np.float32([1, 0, 0, 0]), (3, 2, 1))
+    translate = np.float32([[0, 0, i] for i in range(3)])
+    ernie.PointInstancer.write_rows(
+        scene, prims, positions=rows + 1, orientations=orientations, translate=translate
+    )
+    assert np.array_equal(ernie.PointInstancer.at(scene, "/Swarm2").positions, rows[2] + 1)
+    assert np.array_equal(scene.read("/Swarm2", "xformOp:translate"), translate[2])
+    with pytest.raises(TypeError, match="did you mean 'positions'"):
+        ernie.PointInstancer.write_rows(scene, prims, postions=rows)
+    with pytest.raises(TypeError, match="no array attribute 'prototypes'"):
+        ernie.PointInstancer.write_rows(scene, prims, prototypes=rows)
+    # A PrimSet write is checked against each prim's type before any row is written.
+    mixed = ernie.Scene()
+    ernie.PointInstancer.define(mixed, "/Swarm0")
+    ernie.Mesh.define(mixed, "/Swarm1")
+    with pytest.raises(ValueError, match="positions"):
+        mixed.write(ernie.PrimSet(["/Swarm0", "/Swarm1"]), positions, rows[:2])
+    assert mixed.read("/Swarm0", positions) is None
+
+
 def test_scene_functions_take_prims_for_paths():
     scene = ernie.Scene()
     lamp = scene.define("/Lamp", ernie.SphereLight, radius=0.3)

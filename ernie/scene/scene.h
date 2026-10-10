@@ -370,9 +370,11 @@ class Scene {
     PrimData& CreateIfMissing(const Path& path);
     /// Writes `tensor` as `attribute` of `prim`, replacing any value; `row` records the tensor
     /// and row it came from (`RowOf`), and without one any such record is forgotten.
+    /// `checked` skips checking the attribute against the prim's type, when a caller has.
     void WriteTensor(const Path& path, PrimData& prim, std::string_view attribute, Tensor tensor,
                      std::uintptr_t stream,
-                     std::optional<std::pair<Tensor, std::int64_t>> row = std::nullopt);
+                     std::optional<std::pair<Tensor, std::int64_t>> row = std::nullopt,
+                     bool checked = false);
 
     std::map<Path, PrimData> prims_;
     std::uint64_t removals_ = 0;  ///< Counts `Remove`s, which invalidate resolved `PrimSet`s.
