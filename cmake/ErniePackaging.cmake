@@ -11,6 +11,7 @@ include_guard(GLOBAL)
 set(CPACK_PACKAGE_NAME ernie)
 set(CPACK_PACKAGE_VENDOR "Ernie")
 set(CPACK_PACKAGE_CONTACT "Alex Maietta <maiettaalex@gmail.com>")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/alexmaietta/ernie")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
     "Spectral Vulkan renderer for natural and interplanetary environments")
 set(CPACK_PACKAGE_DESCRIPTION
@@ -18,7 +19,10 @@ set(CPACK_PACKAGE_DESCRIPTION
 fields, sunlight and camera sensors described in physical units, rendered in batches on any \
 Vulkan 1.3 GPU. This package has the library, the viewer, and the headers and CMake package for \
 building against it.")
-set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+# Between releases, "0.1.0~dev12": Debian and RPM sort "~" before the release, as PEP 440 does
+# ".dev12".
+string(REPLACE "." "~" ernie_package_suffix "${ERNIE_VERSION_SUFFIX}")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}${ernie_package_suffix}")
 set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE")
 set(CPACK_PACKAGE_CHECKSUM SHA256)
 set(CPACK_STRIP_FILES ON)
@@ -32,7 +36,7 @@ else()
     set(ernie_deb_architecture ${CMAKE_SYSTEM_PROCESSOR})
 endif()
 set(CPACK_PACKAGE_FILE_NAME
-    "ernie-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
+    "ernie-${PROJECT_VERSION}${ERNIE_VERSION_SUFFIX}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(CPACK_GENERATOR TGZ DEB RPM)

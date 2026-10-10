@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use Ernie in your research, please cite it as below."
+title: "Ernie: Efficient Renderer for Natural and Interplanetary Environments"
+abstract: "A physically accurate, real-time, spectral renderer for interplanetary environments, with C++ and Python APIs, built for camera and sensor simulation in planetary robotics and batched rendering for reinforcement learning."
+type: software
+authors:
+  - family-names: Maietta
+    given-names: Alex
+repository-code: "https://github.com/alexmaietta/ernie"
+url: "https://alexmaietta.github.io/ernie/"
+license: BSD-3-Clause
+version: 0.1.0
+keywords:
+  - rendering
+  - spectral rendering
+  - Vulkan
+  - planetary science
+  - sensor simulation
+  - reinforcement learning
+  - robotics

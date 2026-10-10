@@ -31,7 +31,7 @@ ernie_add_library(
 add_executable(ernie_viewer main.cpp)
 set_target_properties(ernie_viewer PROPERTIES OUTPUT_NAME ernie)
 target_link_libraries(ernie_viewer PRIVATE ernie_build_options)
-target_compile_definitions(ernie_viewer PRIVATE ERNIE_VERSION="${PROJECT_VERSION}")
+target_compile_definitions(ernie_viewer PRIVATE ERNIE_VERSION="${ERNIE_VERSION}")
 if(ERNIE_INSTALL)
     # Installed beside libernie, which holds the app: compiled against the app's headers and
     # linked to the shared library rather than a second copy of everything.

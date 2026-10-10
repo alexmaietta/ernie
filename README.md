@@ -1,12 +1,6 @@
 # Efficient Renderer for Natural and Interplanetary Environments (Ernie)
 
-Ernie is a physically accurate, real-time, spectral renderer for interplanetary environments.
-
-Ernie has C++ and Python APIs and a Hydra-like scene and render delegate API. It is a Vulkan 1.3 rasterizer, so it is cross-platform by design and runs on Linux today, with Windows and macOS (through MoltenVK) on the way.
-
-One of the key features of Ernie is that scenes are described in physical quantities rather than arbitrary parameters. A light has a blackbody temperature and a power in lumens, not an intensity. A camera has exposure, aperture and focal length, but also quantum efficiency curves, full well capacity, read noise and dark current, with sensor filter chains that model a real sensor's noise and effects. This seems like more work at first, but it makes scientific rendering and building scenes much simpler.
-
-Ernie is also built for high-throughput batched rendering in reinforcement learning. It shares data zero copy with any DLPack tensor (PyTorch, JAX, Warp, NumPy), and its fast mode trades the more complex rendering features for simple, quick shading.
+Ernie is a physically accurate, real-time, spectral renderer for interplanetary environments, with C++ and Python APIs and a Hydra-like scene API. It is a Vulkan 1.3 rasterizer that runs on Linux today, with Windows and macOS on the way. Ernie is designed around physical quantities rather than artistic parameters: lights, materials and cameras are described the way they are measured, so a render can be compared against a real instrument. For reinforcement learning, Ernie renders batches of cameras in one step, shares data zero copy with any DLPack tensor (PyTorch, JAX, Warp, NumPy), and has a fast mode with simpler shading.
 
 Ernie's key features related to planetary robotics and sensing:
 
@@ -47,7 +41,7 @@ Future work:
 ### Python
 
 ```sh
-pip install ernie
+pip install ernie-renderer
 ```
 
 ```python
@@ -174,7 +168,7 @@ Planned future examples.
 
 ### Precompiled binaries
 
-The Python wheel is on PyPI (`pip install ernie`, Python 3.12+). It bundles everything, the viewer included, but a Vulkan driver.
+The Python wheel is on PyPI as `ernie-renderer` (`pip install ernie-renderer`, then `import ernie`; Python 3.12+). It bundles everything, the viewer included, but a Vulkan driver.
 
 Each GitHub release also has an `ernie` package for Ubuntu 22.04+, Debian 12+ and RHEL 9+ (and a tarball for other distributions), with the library, the viewer, and the headers and CMake package for building against it.
 
@@ -201,7 +195,7 @@ A Python wheel bundles the module with the Slang runtime it loads:
 
 ```sh
 uv build --wheel --out-dir dist .
-uv pip install dist/ernie-*.whl
+uv pip install dist/ernie_renderer-*.whl
 ```
 
 Packages are built with `cmake --preset package-deb` (or `package-rpm`), `cmake --build --preset package-deb` and `cpack --preset package-deb`.

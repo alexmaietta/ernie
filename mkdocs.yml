@@ -1,6 +1,9 @@
 site_name: Ernie
 site_description: Efficient Renderer for Natural and Interplanetary Environments
-repo_name: ernie
+site_url: https://alexmaietta.github.io/ernie/
+repo_url: https://github.com/alexmaietta/ernie
+repo_name: alexmaietta/ernie
+edit_uri: blob/main/docs/
 docs_dir: docs
 site_dir: site
 strict: true
@@ -77,6 +80,10 @@ nav:
 
 plugins:
   - search
+  # Versions on GitHub Pages (CI deploys "latest" from main), with a selector between them.
+  - mike:
+      version_selector: true
+      canonical_version: latest
   - mkdoxy:
       projects:
         cpp:
