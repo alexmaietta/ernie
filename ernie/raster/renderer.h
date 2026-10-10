@@ -8,6 +8,7 @@
 #include "ernie/device/shader_compiler.h"
 #include "ernie/raster/drawable.h"
 #include "ernie/raster/material.h"
+#include "ernie/raster/minimal_targets.h"
 #include "ernie/raster/overlay_pass.h"
 #include "ernie/raster/render_targets.h"
 #include "ernie/raster/sensor_plan.h"
@@ -261,6 +262,15 @@ class RasterRenderer {
     void RecordViews(VkCommandBuffer commands, RenderTargets& targets,
                      std::span<const RasterDrawable* const> drawables, std::uint32_t firstView,
                      bool overlays = true) const;
+
+    /// Records every view of a frame with minimal shading (`FrameParams::minimal`) after
+    /// `RecordShadows`: a chunk of views at a time (`MinimalTargets::Chunk`), one layered pass in
+    /// which the drawables draw each view with their minimal pipelines, then the resolve pass
+    /// (minimal_resolve.slang) writing the held vars' linear buffers.
+    /// @throws std::invalid_argument if the last `Update` was not minimal, or `targets` do not
+    /// have the camera's extent or the frame's views.
+    void RecordMinimal(VkCommandBuffer commands, MinimalTargets& targets,
+                       std::span<const RasterDrawable* const> drawables) const;
 
     /// Byte offsets of a view's camera fields in a block of per-view data, for `PatchViews`;
     /// `kNone` leaves a field alone. Matrices are glm's column-major floats.
@@ -685,6 +695,13 @@ class RasterRenderer {
     /// log-luminance histogram into its buffer (`RecordMeter`), read by a later frame in the slot.
     PipelineLayout meterLayout_;
     std::unique_ptr<ComputePipeline> meterPipeline_;
+    /// The last `Update`'s minimal shading (`RecordMinimal`), its resolve pass (made the first
+    /// time a frame asks) and the buffer bound for vars a frame does not hold.
+    MinimalMode minimal_ = MinimalMode::Off;
+    glm::vec3 minimalClear_{0.0f};  ///< The background's linear colour (`FrameParams::clearColor`).
+    PipelineLayout resolveLayout_;
+    std::unique_ptr<ComputePipeline> resolvePipeline_;
+    GpuBuffer unheldVar_;
     std::array<std::unique_ptr<GpuBuffer>, FrameUploads::kSlots> meterBins_;
     std::array<bool, FrameUploads::kSlots> metered_{};
     std::optional<double> meteredLuminance_;

@@ -33,6 +33,8 @@ public struct Uniforms {
     public float4 motion;
     // A pushbroom's intrinsics (`PushbroomStrip::Intrinsics`); unused by frame cameras.
     public float4 strip;
+    // Minimal shading (`minimalShade`): rgb the constant colour, w the mode (kMinimal*).
+    public float4 minimal;
 }
 
 // Clip coordinates of world point `world` in the view.

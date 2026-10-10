@@ -6,6 +6,7 @@ ernie_add_library(
     ground_drawable.cpp
     material.cpp
     mesh_drawable.cpp
+    minimal_targets.cpp
     points_drawable.cpp
     overlay_pass.cpp
     planet_drawable.cpp

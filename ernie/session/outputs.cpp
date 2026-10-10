@@ -101,6 +101,21 @@ bool RenderVar::IsMapped() const {
 }
 
 std::vector<std::int64_t> RenderVar::Shape() const {
+    if (frame_ == nullptr) {
+        throw std::invalid_argument("Empty render var");
+    }
+    if (const FrameImages::LinearVar linear = frame_->images->Linear(name_); linear.buffer) {
+        const VkExtent2D extent = frame_->images->Extent();
+        const std::int64_t channels = LayoutOf(linear.format).channels;
+        std::vector<std::int64_t> shape{extent.height, extent.width};
+        if (channels > 1) {
+            shape.push_back(channels);
+        }
+        if (frame_->batched) {
+            shape.insert(shape.begin(), static_cast<std::int64_t>(frame_->images->Views()));
+        }
+        return shape;
+    }
     const std::vector<GpuImage*> images = Images();
     const FrameImages& first = *frame_->images;
     const auto* chunked = dynamic_cast<const ChunkedFrameImages*>(&first);
@@ -114,6 +129,11 @@ std::vector<std::int64_t> RenderVar::Shape() const {
 }
 
 DType RenderVar::Type() const {
+    if (frame_ != nullptr) {
+        if (const FrameImages::LinearVar linear = frame_->images->Linear(name_); linear.buffer) {
+            return LayoutOf(linear.format).type;
+        }
+    }
     return LayoutOf(Images().front()->Desc().format).type;
 }
 
@@ -143,6 +163,9 @@ MappedRenderVar RenderVar::Map(MapDevice device, std::uintptr_t syncStream) {
         throw std::invalid_argument("RenderVar::Map on an empty render var");
     }
     ProductFrame& frame = *frame_;
+    if (const FrameImages::LinearVar linear = frame.images->Linear(name_); linear.buffer) {
+        return MapLinear(linear, device, syncStream);
+    }
     const std::vector<GpuImage*> images = Images();
     const std::vector<std::int64_t> shape = Shape();
     const DType type = LayoutOf(images.front()->Desc().format).type;
@@ -213,6 +236,48 @@ MappedRenderVar RenderVar::Map(MapDevice device, std::uintptr_t syncStream) {
         buffer.get(), [buffer, compute, syncStream](const void*) mutable {
             compute->SignalVulkan(syncStream);
             buffer.reset();
+        });
+    mapped.tensor = Tensor(view.Data(), type, shape, {}, view.Location(), owner);
+    return mapped;
+}
+
+MappedRenderVar RenderVar::MapLinear(const FrameImages::LinearVar& linear, MapDevice device,
+                                     std::uintptr_t syncStream) {
+    ProductFrame& frame = *frame_;
+    const std::vector<std::int64_t> shape = Shape();
+    const DType type = LayoutOf(linear.format).type;
+    MappedRenderVar mapped;
+    mapped.device = device;
+    if (device == MapDevice::Cpu) {
+        frame.context->WaitForSubmission(frame.submission);
+        const VkDeviceSize bytes = linear.buffer->Size();
+        GpuBuffer readback(*frame.context, bytes, 0, BufferMemory::Readback);
+        frame.context->Submit([&](VkCommandBuffer commands) {
+            const VkBufferCopy region{0, 0, bytes};
+            vkCmdCopyBuffer(commands, linear.buffer->Handle(), readback.Handle(), 1, &region);
+        });
+        auto owner = std::make_shared<std::vector<std::byte>>(static_cast<std::size_t>(bytes));
+        readback.Read(*owner);
+        mapped.tensor = Tensor(owner->data(), type, shape, {}, {}, owner);
+        return mapped;
+    }
+    if (frame.compute == nullptr) {
+        throw std::invalid_argument("Mapping a render var to the GPU needs compute interop");
+    }
+    if (device == MapDevice::GpuArray) {
+        throw std::invalid_argument("Render var " + name_ +
+                                    " is a linear buffer; map it to a linear GPU tensor");
+    }
+    // The frame's own submission wrote it: nothing to copy, only the render to wait for.
+    frame.compute->WaitForVulkan(syncStream);
+    const Tensor view = frame.compute->View(linear.buffer, type, shape);
+    // The frame renders again only once every copy of the tensor is released, after the reads
+    // its consumer queued on `syncStream` by then.
+    ComputeInterop* compute = frame.compute;
+    const std::shared_ptr<const void> owner(
+        linear.buffer.get(), [held = frame_, compute, syncStream](const void*) mutable {
+            compute->SignalVulkan(syncStream);
+            held.reset();
         });
     mapped.tensor = Tensor(view.Data(), type, shape, {}, view.Location(), owner);
     return mapped;

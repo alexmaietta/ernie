@@ -63,6 +63,10 @@ class GroundDrawable : public RasterDrawable {
         origin_ = origin;
     }
 
+    bool DrawsMinimal() const override {
+        return true;
+    }
+
     std::optional<Bounds3> Bounds() const override {
         return std::nullopt;
     }
@@ -92,6 +96,10 @@ class GroundDrawable : public RasterDrawable {
     /// For frame cameras and, once one is seen, pushbrooms.
     std::array<std::unique_ptr<GraphicsPipeline>, 2> pipelines_;
     bool pushbroom_ = false;  ///< Whether the last `Prepare`'s camera is a pushbroom.
+    /// The last `Prepare`'s minimal shading, and its pipelines (`MinimalTargets`): shaded, then
+    /// without colour; made the first time a frame asks.
+    MinimalMode minimal_ = MinimalMode::Off;
+    std::array<std::unique_ptr<GraphicsPipeline>, 2> minimalPipelines_;
     GpuBuffer uniforms_;
     GroundParams params_;
     glm::dvec3 origin_{0.0};  ///< The frame's origin (`SetOrigin`).

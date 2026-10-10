@@ -87,6 +87,12 @@ class RasterDrawable {
     /// cascades; none if it has none.
     virtual std::optional<Bounds3> Bounds() const = 0;
 
+    /// Whether the drawable draws with minimal shading (`MinimalMode`) into `MinimalTargets`:
+    /// its colour passes then use pipelines of their formats. None by default.
+    virtual bool DrawsMinimal() const {
+        return false;
+    }
+
     /// World bounds of the drawable's geometry in world `world` (`tokens::kWorld`, not the
     /// shared -1), for fitting that world's shadow map; none if it has none there.
     virtual std::optional<Bounds3> WorldBounds(std::int32_t /*world*/) const {

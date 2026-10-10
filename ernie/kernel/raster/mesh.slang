@@ -410,6 +410,51 @@ GBuffer meshCutoutFragmentMain(VertexOutput in) {
     return out;
 }
 
+// Minimal shading without colour (kMinimalNone): the ids and the geometric normal, two-sided,
+// with no material evaluated or lighting; and its cutout variant.
+Minimal meshIds(VertexOutput in) {
+    let d = draws[in.item];
+    var normal = (d.offsets.w & kHasNormals) != 0 && dot(in.normal, in.normal) > 0.0
+                     ? normalize(in.normal)
+                     : normalize(cross(ddx(in.world), ddy(in.world)));
+    if (dot(normal, towardsViewer(in.world)) < 0.0) {
+        normal = -normal;
+    }
+    Minimal out;
+    out.color = float4(0.0, 0.0, 0.0, 1.0);
+    out.ids = uint4(d.points.z, in.instance, packOctahedral(normal), 0u);
+    return out;
+}
+
+[shader("fragment")]
+Minimal meshIdsFragmentMain(VertexOutput in) {
+    return meshIds(in);
+}
+
+[shader("fragment")]
+Minimal meshIdsCutoutFragmentMain(VertexOutput in) {
+    let out = meshIds(in);
+    if (surfaceOpacity(in.uv) < surface.opacity.y) {
+        discard;
+    }
+    return out;
+}
+
+// Minimal shading (`minimalShade`) of what `meshFragmentMain` writes, and of its cutout variant.
+[shader("fragment")]
+Minimal meshMinimalFragmentMain(VertexOutput in) {
+    return minimalShade(meshGBuffer(in));
+}
+
+[shader("fragment")]
+Minimal meshMinimalCutoutFragmentMain(VertexOutput in) {
+    let out = minimalShade(meshGBuffer(in));
+    if (surfaceOpacity(in.uv) < surface.opacity.y) {
+        discard;
+    }
+    return out;
+}
+
 // The shadow passes' cutout variant: the caster's texture coordinates, to test its opacity.
 struct ShadowCutoutOutput {
     float4 position : SV_Position;

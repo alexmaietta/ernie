@@ -247,3 +247,65 @@ public uint packSurfaceFlags(uint flags, float slopeVariance, float parameter = 
     let value = uint(round(saturate(parameter) * 255.0));
     return (flags & 0xFFu) | (value << 8) | (min(encoded, 65534u) << 16);
 }
+
+// Minimal shading (`Uniforms::minimal`), RTX Minimal's modes for throughput: the w mode's low
+// bits are no colour (black, for the other outputs alone), one constant colour, or the surface's
+// diffuse colour; kMinimalNoSun set means no sun lights the frame, only the ambient fraction.
+public static const uint kMinimalNone = 0;
+public static const uint kMinimalConstant = 1;
+public static const uint kMinimalTextured = 2;
+public static const uint kMinimalNoSun = 4;
+
+// What minimal passes write (`MinimalTargets`): sRGB colour, and the prim id, instance id, unit
+// normal (octahedral, two 16-bit snorm) and surface flags.
+public struct Minimal {
+    public float4 color : SV_Target0;
+    public uint4 ids : SV_Target1;
+}
+
+// Unit vector `n` as two 16-bit snorm octahedral coordinates.
+//
+// Reference: Z. H. Cigolle, S. Donow, D. Evangelakos, M. Mara, M. McGuire and Q. Meyer, "A Survey
+// of Efficient Representations for Independent Unit Vectors", JCGT 3(2), 2014.
+// http://jcgt.org/published/0003/02/01/
+public uint packOctahedral(float3 n) {
+    var p = n.xy / max(abs(n.x) + abs(n.y) + abs(n.z), 1e-12);
+    if (n.z < 0.0) {
+        p = (1.0 - abs(p.yx)) * select(p >= 0.0, float2(1.0), float2(-1.0));
+    }
+    let q = int2(round(clamp(p, -1.0, 1.0) * 32767.0));
+    return (uint(q.x) & 0xFFFFu) | (uint(q.y) << 16);
+}
+
+float srgbEncode(float c) {
+    return c <= 0.0031308 ? 12.92 * c : 1.055 * pow(c, 1.0 / 2.4) - 0.055;
+}
+
+// Minimal shading of what a G-buffer pass wrote: Lambert under the sun (its visibility in
+// `g.normal.w`) and the ambient fraction, of the constant colour or of the material's linear
+// colour scaled to the albedo (an albedo map's) and modulated (textures, vertex colours, tints);
+// unlit surfaces show that colour as it is. Exposed, clamped and encoded as sRGB.
+public Minimal minimalShade(GBuffer g) {
+    Minimal out;
+    out.ids = uint4(g.ids.y, g.ids.z, packOctahedral(normalize(g.normal.xyz)), g.ids.w);
+    let mode = uint(u.minimal.w);
+    float3 color = float3(0.0);
+    if ((mode & 3u) != kMinimalNone) {
+        var base = u.minimal.rgb;
+        if ((mode & 3u) == kMinimalTextured) {
+            base = surface.albedo.rgb / max(surface.albedo.a, 1e-6) * g.albedo.x * g.albedo.yzw;
+        }
+        if ((g.ids.w & kUnlit) != 0) {
+            color = base;
+        } else {
+            let ambient = u.sun.w;
+            let sun = (mode & kMinimalNoSun) != 0
+                          ? 0.0
+                          : max(dot(g.normal.xyz, u.sun.xyz), 0.0) * g.normal.w;
+            color = base * (ambient + (1.0 - ambient) * sun);
+        }
+        color = saturate(color * u.eye.w);
+    }
+    out.color = float4(srgbEncode(color.r), srgbEncode(color.g), srgbEncode(color.b), 1.0);
+    return out;
+}

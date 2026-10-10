@@ -452,6 +452,18 @@ inline constexpr std::string_view kHiddenLine = "hiddenLine";
 /// over its LdrColor, "*" for all, else names separated by commas or spaces; none by default, so
 /// observations stay free of debug drawing.
 inline constexpr std::string_view kOverlays = "ernie:overlays";
+/// token, on a RenderProduct or else its RenderSettings: minimal shading for throughput
+/// (`MinimalMode`), after RTX Minimal: "off" (the full pipeline, the default), "none" (black
+/// colour, for depth, normals and ids alone), "constantDiffuse" (`kMinimalConstantColor` lit by
+/// the sun and ambient) or "texturedDiffuse" (surfaces' diffuse colours so lit). Its products
+/// render LdrColor, DistanceToCamera, DistanceToImagePlane, Normal, PrimId and InstanceId.
+inline constexpr std::string_view kMinimalMode = "ernie:minimal:mode";
+inline constexpr std::string_view kNone = "none";
+inline constexpr std::string_view kConstantDiffuse = "constantDiffuse";
+inline constexpr std::string_view kTexturedDiffuse = "texturedDiffuse";
+/// vec3 linear, on a RenderProduct or else its RenderSettings: "constantDiffuse"'s colour, white
+/// by default.
+inline constexpr std::string_view kMinimalConstantColor = "ernie:minimal:constantColor";
 /// token: how the rasterizer culls what lies outside a view: "off", "cpu" (whole draws) or
 /// "gpu" (whole draws, then every instance on the GPU; the default).
 inline constexpr std::string_view kCulling = "ernie:culling";

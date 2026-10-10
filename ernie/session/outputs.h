@@ -53,6 +53,20 @@ class FrameImages {
     virtual std::uint32_t Views() const {
         return 1;
     }
+
+    /// A render var the frame holds as one linear buffer over every view rather than an image:
+    /// written by the frame's own submission, in memory a compute API views in place
+    /// (`BufferMemory::Shared`), texels of `format` view after view.
+    struct LinearVar {
+        std::shared_ptr<GpuBuffer> buffer;
+        VkFormat format = VK_FORMAT_UNDEFINED;
+    };
+
+    /// Render var `name` as a linear buffer, or an empty one when the frame holds it as an image
+    /// (`Var`) or not at all.
+    virtual LinearVar Linear(std::string_view /*name*/) const {
+        return {};
+    }
 };
 
 /// The images of a frame of a batch of views that do not fit one set of images (such as more
@@ -138,6 +152,10 @@ class RenderVar {
     /// The var's images in the frame: one, or one per chunk of a batch's views.
     /// @throws std::invalid_argument for an empty var or one the frame lacks.
     std::vector<GpuImage*> Images() const;
+    /// `Map` of a var the frame holds as a linear buffer (`FrameImages::Linear`): on the GPU the
+    /// buffer itself, which keeps the frame from rendering again until released.
+    MappedRenderVar MapLinear(const FrameImages::LinearVar& linear, MapDevice device,
+                              std::uintptr_t syncStream);
 
     std::shared_ptr<ProductFrame> frame_;
     Path path_;

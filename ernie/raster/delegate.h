@@ -314,7 +314,9 @@ class RasterDelegate : public RenderDelegate {
                      std::vector<std::string_view> vars = {},
                      std::optional<glm::dmat4> posesParent = std::nullopt,
                      const std::optional<std::string>& overlays = std::nullopt,
-                     std::vector<FrameParams::SensorChain> chains = {});
+                     std::vector<FrameParams::SensorChain> chains = {},
+                     MinimalMode minimal = MinimalMode::Off,
+                     std::optional<glm::vec3> minimalColor = std::nullopt);
     /// Hands the renderer the state images of `key` for the frame `Update` just prepared, made
     /// (and history dropped) when its size, views or chain change, and swaps them for the next.
     void PrepareSensorState(const Path& key, VkExtent2D extent, std::uint32_t views);
@@ -329,7 +331,7 @@ class RasterDelegate : public RenderDelegate {
                                                std::uint32_t views, bool batched,
                                                std::span<const std::string_view> vars,
                                                std::span<const std::string> aovs = {},
-                                               std::uint32_t faces = 1);
+                                               std::uint32_t faces = 1, bool minimal = false);
     std::uint32_t PrimIdOf(const Path& path) const;
     void SetMeshPoints(const Scene& scene, const Path& path, std::uint32_t handle);
     /// Hands the mesh its normals and colours written on the GPU.

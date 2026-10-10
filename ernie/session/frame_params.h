@@ -133,6 +133,19 @@ enum class Occlusion : std::uint32_t {
     TwoPass = 2,
 };
 
+/// Minimal shading (`ernie:minimal:mode`), after RTX Minimal: for throughput, a product draws
+/// in one forward pass straight into its outputs, without the spectral shading, sensor filters,
+/// sky or dome; lit by the sun (the first distant light) and the ambient fraction.
+///
+/// Reference: NVIDIA, "RTX - Minimal Mode", Omniverse Materials and Rendering documentation.
+/// https://docs.omniverse.nvidia.com/materials-and-rendering/latest/rtx-renderer_minimal.html
+enum class MinimalMode : std::uint32_t {
+    Off = 0,       ///< The full spectral pipeline.
+    None = 1,      ///< No colour (black): only depth, normals and ids; no material evaluated.
+    Constant = 2,  ///< Every surface lit in one colour (`FrameParams::minimalColor`).
+    Textured = 3,  ///< Surfaces lit in their diffuse colour: material, textures, vertex colours.
+};
+
 /// Kinds of `Light`.
 enum class LightType : std::uint32_t {
     Distant = 0,  ///< Parallel light from a direction, such as Earthshine (UsdLux DistantLight).
@@ -286,6 +299,9 @@ struct FrameParams {
     std::vector<SensorChain> chains;
     /// The overlays drawn over LdrColor (`tokens::kOverlays`): "*", names, or empty for none.
     std::string overlays;
+    /// Minimal shading (`MinimalMode`), and its constant colour (linear RGB).
+    MinimalMode minimal = MinimalMode::Off;
+    glm::vec3 minimalColor{1.0f};
     glm::vec3 clearColor{0.0f};  ///< Linear display colour of the background in LdrColor.
     /// The frame number temporal noise derives from (`FrameSeed`): rendering the same frame again
     /// gives the same image, and consecutive frames independent noise.

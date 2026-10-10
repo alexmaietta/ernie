@@ -2,6 +2,7 @@
 #include "ernie/raster/ground_drawable.h"
 
 #include "ernie/kernel/embedded_shaders.h"
+#include "ernie/raster/minimal_targets.h"
 #include "ernie/util/profile.h"
 
 #include <glm/gtc/type_ptr.hpp>
@@ -81,6 +82,20 @@ void GroundDrawable::CreatePipeline(bool pushbroom) {
     desc.depthFormat = RenderTargets::kDepthFormat;
     pipelines_[pushbroom ? 1 : 0] =
         std::make_unique<GraphicsPipeline>(renderer_.Context(), layout_, desc);
+    // Minimal shading's, for frame cameras only.
+    if (!pushbroom && minimalPipelines_[0] == nullptr) {
+        const char* const entries[] = {"minimalFragmentMain", "idsFragmentMain"};
+        for (std::size_t i = 0; i < minimalPipelines_.size(); ++i) {
+            GraphicsPipelineDesc minimal;
+            minimal.vertexSpirv = vertex;
+            minimal.fragmentSpirv = renderer_.Compiler().CompileSpirv(modules, entries[i]);
+            minimal.colorFormats.assign(MinimalTargets::kColorFormats.begin(),
+                                        MinimalTargets::kColorFormats.end());
+            minimal.depthFormat = MinimalTargets::kDepthFormat;
+            minimalPipelines_[i] =
+                std::make_unique<GraphicsPipeline>(renderer_.Context(), layout_, minimal);
+        }
+    }
 }
 
 GroundDrawable::~GroundDrawable() {
@@ -101,7 +116,9 @@ void GroundDrawable::Prepare(const FrameParams& params, std::span<const ShadowCa
         return;
     }
     pushbroom_ = params.camera.pushbroom;
-    if (pipelines_[pushbroom_ ? 1 : 0] == nullptr) {
+    minimal_ = params.minimal;
+    if (pipelines_[pushbroom_ ? 1 : 0] == nullptr ||
+        (minimal_ != MinimalMode::Off && minimalPipelines_[0] == nullptr)) {
         CreatePipeline(pushbroom_);
     }
     GroundUniforms uniforms{};
@@ -155,8 +172,11 @@ void GroundDrawable::RecordColor(VkCommandBuffer commands, const RasterFrame& fr
     renderer_.MaterialOrDefault(params_.material).AppendResources(resources);
     resources.push_back(
         DescriptorResource::Of(uniforms_, view * kUniformsStride, sizeof(GroundUniforms)));
-    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      pipelines_[pushbroom_ ? 1 : 0]->Handle());
+    const GraphicsPipeline& pipeline =
+        minimal_ != MinimalMode::Off
+            ? *minimalPipelines_[minimal_ == MinimalMode::None ? 1 : 0]
+            : *pipelines_[pushbroom_ ? 1 : 0];
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.Handle());
     layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, resources);
     vkCmdDraw(commands, 3, 1, 0, 0);
 }

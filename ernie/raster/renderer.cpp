@@ -36,8 +36,9 @@ struct Uniforms {
     float sunShadow[4];           ///< Its texel size and depth span in world units, and the flag.
     float motion[4];              ///< The sub-frame's share from the last frame's transforms.
     float strip[4];               ///< A pushbroom's intrinsics (`PushbroomStrip::Intrinsics`).
+    float minimal[4];             ///< Minimal shading's constant colour and mode.
 };
-static_assert(sizeof(Uniforms) == 240, "Uniforms must match frame.slang");
+static_assert(sizeof(Uniforms) == 256, "Uniforms must match frame.slang");
 
 struct ShadowUniforms {
     float lightViewProjection[4][16];
@@ -345,6 +346,21 @@ constexpr DescriptorBinding kLightsBindings[] = {
     {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
 };
 
+/// minimal_resolve.slang: the attachments, the views' uniforms, and the vars' linear buffers.
+constexpr DescriptorBinding kResolveBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+    {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+    {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+    {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+    {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+    {5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+    {6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+    {7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+    {8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+    {9, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+    {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+};
+
 /// depth_range.slang: the views' depth and the range it reduces to.
 constexpr DescriptorBinding kDepthRangeBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
@@ -584,7 +600,9 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
                          kViewUniformUsage, BufferMemory::Device),
       lightsLayout_(context, kLightsBindings, 48),
       depthRangeLayout_(context, kDepthRangeBindings, 32),
-      meterLayout_(context, kMeterBindings, 32) {
+      meterLayout_(context, kMeterBindings, 32),
+      resolveLayout_(context, kResolveBindings, 32),
+      unheldVar_(context, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device) {
     if (brdfs_.Models().empty()) {
         throw std::invalid_argument("RasterRenderer needs at least one BRDF");
     }
@@ -1175,8 +1193,32 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
         throw std::invalid_argument("The dome's radiance needs one value per camera band");
     }
     views_ = static_cast<std::uint32_t>(raster.Views());
+    // Minimal shading draws one layer per view (`MinimalTargets`).
+    minimal_ = params.minimal;
+    minimalClear_ = params.clearColor;
+    if (minimal_ != MinimalMode::Off && resolvePipeline_ == nullptr) {
+        const std::vector<ShaderModuleSource> resolve{
+            {"minimal_resolve", shaders::kMinimalResolveSlang}};
+        resolvePipeline_ = std::make_unique<ComputePipeline>(
+            context_, resolveLayout_, compiler_.CompileSpirv(resolve, "resolveMain"));
+    }
     const std::uint32_t viewsPerTargets =
-        RenderTargets::MaxViews(context_, params.camera.bands.count, faces_);
+        minimal_ != MinimalMode::Off
+            ? RenderTargets::MaxViews(context_, 1, 1)
+            : RenderTargets::MaxViews(context_, params.camera.bands.count, faces_);
+    if (minimal_ != MinimalMode::Off) {
+        if (subframes_ > 1 || faces_ > 1 || params.camera.pushbroom ||
+            !params.camera.lens.IsPinhole()) {
+            throw std::invalid_argument("Minimal shading draws pinhole frame cameras without "
+                                        "motion blur");
+        }
+        for (const RasterDrawable* drawable : drawables) {
+            if (!drawable->DrawsMinimal() && drawable->Bounds()) {
+                throw std::invalid_argument("Minimal shading draws meshes and the ground plane, "
+                                            "not yet terrain, planets or point clouds");
+            }
+        }
+    }
     EnsureViewBuffers(views_);
     posesOnGpu_ = params.posesOnGpu;
     posesQuaternions_ = params.posesOnGpu && params.posesQuaternions;
@@ -1343,6 +1385,14 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
                 uniforms.sunShadow[1] = OrthographicDepth(own.lightViewProjection);
                 uniforms.sunShadow[2] = 1.0f;
             }
+            // Minimal shading's colour and mode (surface.slang's kMinimal*).
+            uniforms.minimal[0] = params.minimalColor.r;
+            uniforms.minimal[1] = params.minimalColor.g;
+            uniforms.minimal[2] = params.minimalColor.b;
+            const std::uint32_t mode = params.minimal == MinimalMode::Constant   ? 1u
+                                       : params.minimal == MinimalMode::Textured ? 2u
+                                                                                 : 0u;
+            uniforms.minimal[3] = static_cast<float>(mode | (params.sun ? 0u : 4u));
             uploads_.Write(uniforms_, std::as_bytes(std::span(&uniforms, 1)), v * kUniformsStride);
         }
     }
@@ -2155,6 +2205,71 @@ void RasterRenderer::RecordViews(VkCommandBuffer commands, RenderTargets& target
     // Overlays draw through a pinhole view onto the sensor's image, which a cube camera's is not.
     if (overlays && faces_ == 1) {
         RecordOverlays(commands, targets, firstView);
+    }
+}
+
+void RasterRenderer::RecordMinimal(VkCommandBuffer commands, MinimalTargets& targets,
+                                   std::span<const RasterDrawable* const> drawables) const {
+    if (!updated_) {
+        return;
+    }
+    if (minimal_ == MinimalMode::Off) {
+        throw std::invalid_argument("The last update was not of a frame with minimal shading");
+    }
+    if (targets.Extent().width != extent_.width || targets.Extent().height != extent_.height ||
+        targets.Views() != outputViews_) {
+        throw std::invalid_argument("Minimal targets need the camera's extent and the frame's views");
+    }
+    ERNIE_ZONE("RecordMinimal");
+    const float clear[3] = {minimalClear_.r, minimalClear_.g, minimalClear_.b};
+    const auto sampled = [](const GpuImage& image) {
+        return DescriptorResource::Of(image.View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    };
+    for (std::uint32_t first = 0; first < targets.Views(); first += targets.Chunk()) {
+        const std::uint32_t views = std::min(targets.Chunk(), targets.Views() - first);
+        {
+            ERNIE_GPU_ZONE(context_, commands, "Minimal draw");
+            targets.PrepareDraw(commands);
+            BeginRendering(commands, targets.Target(views, clear));
+            for (std::uint32_t v = 0; v < views; ++v) {
+                const RasterFrame frame = Frame(first + v);
+                for (const RasterDrawable* drawable : drawables) {
+                    if (drawable->DrawsMinimal()) {
+                        drawable->RecordColor(commands, frame, first + v, DrawPhase::All);
+                    }
+                }
+            }
+            vkCmdEndRendering(commands);
+        }
+        ERNIE_GPU_ZONE(context_, commands, "Minimal resolve");
+        targets.PrepareResolve(commands);
+        std::uint32_t holds = 0;
+        std::vector<DescriptorResource> resources = {
+            sampled(targets.Color()), sampled(targets.Ids()), sampled(targets.Depth()),
+            DescriptorResource::Of(uniforms_), DescriptorResource::Of(shadingUniforms_)};
+        const std::string_view vars[] = {render_vars::kLdrColor, render_vars::kDistanceToImagePlane,
+                                         render_vars::kDistanceToCamera, render_vars::kNormal,
+                                         render_vars::kPrimId, render_vars::kInstanceId};
+        for (std::size_t i = 0; i < std::size(vars); ++i) {
+            const FrameImages::LinearVar linear = targets.Linear(vars[i]);
+            holds |= linear.buffer != nullptr ? 1u << i : 0u;
+            resources.push_back(DescriptorResource::Of(linear.buffer != nullptr ? *linear.buffer
+                                                                                : unheldVar_));
+        }
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resolvePipeline_->Handle());
+        resolveLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+        const std::uint32_t constants[8] = {extent_.width,
+                                            extent_.height,
+                                            views,
+                                            first,
+                                            holds,
+                                            static_cast<std::uint32_t>(kUniformsStride),
+                                            static_cast<std::uint32_t>(kShadingStride),
+                                            0u};
+        resolveLayout_.PushConstants(commands, constants, sizeof(constants));
+        vkCmdDispatch(commands, Groups(extent_.width), Groups(extent_.height), views);
+        // The next chunk draws into the same attachments once this one is read.
+        ShaderBarrier(commands);
     }
 }
 

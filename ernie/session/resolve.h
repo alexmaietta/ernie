@@ -82,7 +82,15 @@ struct RenderProductSpec {
     std::vector<std::optional<std::vector<SensorFilterStep>>> varFilters;
     /// The product's own `ernie:overlays` (`tokens::kOverlays`), in place of its settings'.
     std::optional<std::string> overlays;
+    /// The product's own minimal shading and colour (`tokens::kMinimalMode`,
+    /// `tokens::kMinimalConstantColor`), in place of its settings'.
+    std::optional<MinimalMode> minimal;
+    std::optional<glm::vec3> minimalColor;
 };
+
+/// The minimal shading `prim` asks for (`tokens::kMinimalMode`), or `fallback` without it.
+/// @throws std::invalid_argument for an unknown mode.
+MinimalMode MinimalModeOf(const Scene& scene, const Path& prim, MinimalMode fallback);
 
 /// The views a render product draws through `cameras` (`RenderProductSpec::cameras`), for
 /// images of `width` x `height`: none for a single camera without `ernie:poses`, which draws the

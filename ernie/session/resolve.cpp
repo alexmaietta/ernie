@@ -320,6 +320,28 @@ std::string_view WireframeToken(Wireframe mode) {
     return tokens::kOff;
 }
 
+MinimalMode MinimalModeOf(const Scene& scene, const Path& prim, MinimalMode fallback) {
+    if (prim.IsEmpty() || !scene.Has(prim) || scene.Get(prim, tokens::kMinimalMode) == nullptr) {
+        return fallback;
+    }
+    const std::string token = GetToken(scene, prim, tokens::kMinimalMode, "");
+    if (token == tokens::kOff) {
+        return MinimalMode::Off;
+    }
+    if (token == tokens::kNone) {
+        return MinimalMode::None;
+    }
+    if (token == tokens::kConstantDiffuse) {
+        return MinimalMode::Constant;
+    }
+    if (token == tokens::kTexturedDiffuse) {
+        return MinimalMode::Textured;
+    }
+    throw std::invalid_argument("'" + std::string(tokens::kMinimalMode) + "' of '" +
+                                prim.String() + "' is '" + token +
+                                "', not off, none, constantDiffuse or texturedDiffuse");
+}
+
 Wireframe WireframeOf(const Scene& scene, const Path& settings) {
     const Value* value = settings.IsEmpty() ? nullptr : scene.Get(settings, tokens::kWireframe);
     if (value == nullptr) {
@@ -742,6 +764,12 @@ ResolveRenderProducts(const Scene& scene, std::span<const Path> products, const 
         spec.resolution = extentOf(GetVec2(scene, path, kResolution, settingsResolution));
         if (scene.Get(path, kOverlays) != nullptr) {
             spec.overlays = GetToken(scene, path, kOverlays, "");
+        }
+        if (scene.Get(path, kMinimalMode) != nullptr) {
+            spec.minimal = MinimalModeOf(scene, path, MinimalMode::Off);
+        }
+        if (scene.Get(path, kMinimalConstantColor) != nullptr) {
+            spec.minimalColor = glm::vec3(GetVec3(scene, path, kMinimalConstantColor, {}));
         }
         bool ownChains = false;
         for (const Path& var : TargetsOf(scene, path, kOrderedVars)) {
@@ -1343,6 +1371,9 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
         std::max(Number(scene, settings, kDomeShadowRadius, params.domeShadowRadius), 1e-6f);
     params.wireframe = WireframeOf(scene, settings);
     params.overlays = GetToken(scene, settings, kOverlays, "");
+    params.minimal = MinimalModeOf(scene, settings, MinimalMode::Off);
+    params.minimalColor =
+        glm::vec3(GetVec3(scene, settings, kMinimalConstantColor, glm::dvec3(1.0)));
     params.exposure =
         static_cast<float>(std::exp2(GetNumber(scene, settings, kExposureCompensation, 0.0)));
     params.meter = GetBool(scene, settings, kMeter, false);

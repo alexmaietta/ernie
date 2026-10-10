@@ -4,6 +4,7 @@
 #include "ernie/device/gpu_profile.h"
 #include "ernie/geometry/frustum.h"
 #include "ernie/kernel/embedded_shaders.h"
+#include "ernie/raster/minimal_targets.h"
 #include "ernie/util/profile.h"
 
 #include <glm/gtc/type_ptr.hpp>
@@ -525,6 +526,26 @@ void MeshDrawable::CreateCutoutPipelines(bool pushbroom) {
         shadow.depthFormat = VK_FORMAT_D32_SFLOAT;
         shadow.depthBiasSlope = 1.5f;
         shadowCutoutPipeline_ = std::make_unique<GraphicsPipeline>(context_, layout_, shadow);
+    }
+}
+
+void MeshDrawable::CreateMinimalPipelines() {
+    if (minimalPipelines_[0] != nullptr) {
+        return;
+    }
+    const std::vector<ShaderModuleSource> modules = MeshModules(false);
+    const std::vector<std::uint32_t> vertex =
+        renderer_.Compiler().CompileSpirv(modules, "meshVertexMain");
+    const char* const entries[] = {"meshMinimalFragmentMain", "meshMinimalCutoutFragmentMain",
+                                   "meshIdsFragmentMain", "meshIdsCutoutFragmentMain"};
+    for (std::size_t i = 0; i < minimalPipelines_.size(); ++i) {
+        GraphicsPipelineDesc desc;
+        desc.vertexSpirv = vertex;
+        desc.fragmentSpirv = renderer_.Compiler().CompileSpirv(modules, entries[i]);
+        desc.colorFormats.assign(MinimalTargets::kColorFormats.begin(),
+                                 MinimalTargets::kColorFormats.end());
+        desc.depthFormat = MinimalTargets::kDepthFormat;
+        minimalPipelines_[i] = std::make_unique<GraphicsPipeline>(context_, layout_, desc);
     }
 }
 
@@ -1540,6 +1561,11 @@ void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCasc
         std::fill(itemPipelines_.begin(), itemPipelines_.end(),
                   gbufferPipelines_[pushbroom ? 1 : 0].get());
     }
+    // Minimal shading draws with its own pipelines, compiled the first time a frame asks.
+    minimal_ = params.minimal;
+    if (minimal_ != MinimalMode::Off) {
+        CreateMinimalPipelines();
+    }
     // Cutout materials draw with their own pipelines, compiled the first time one appears.
     bool cutout = false;
     for (std::size_t i = 0; i < items_.size() && !cutout; ++i) {
@@ -2407,8 +2433,10 @@ std::size_t MeshDrawable::Record(VkCommandBuffer commands, const RasterFrame& fr
         const GraphicsPipeline* pipeline =
             motion != nullptr ? motionPipeline_.get()
             : shadow          ? (cut ? shadowCutoutPipeline_.get() : shadowPipeline_.get())
-            : cut             ? cutoutPipelines_[pushbroom_ ? 1 : 0].get()
-                              : itemPipelines_[item];
+            : minimal_ != MinimalMode::Off
+                ? minimalPipelines_[(minimal_ == MinimalMode::None ? 2 : 0) + (cut ? 1 : 0)].get()
+            : cut ? cutoutPipelines_[pushbroom_ ? 1 : 0].get()
+                  : itemPipelines_[item];
         if (pipeline != bound) {
             bound = pipeline;
             vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, bound->Handle());

@@ -375,6 +375,10 @@ RenderStats RasterDelegate::Stats() const {
                      (viewTargets_ != nullptr ? viewTargets_->GpuBytes() : 0);
     for (const auto& [product, frames] : frames_) {
         for (const std::shared_ptr<ProductFrame>& frame : frames) {
+            if (const auto* minimal = dynamic_cast<const MinimalTargets*>(frame->images.get())) {
+                stats.gpuBytes += minimal->GpuBytes();
+                continue;
+            }
             for (const RenderTargets* targets : TargetsOf(*frame->images)) {
                 stats.gpuBytes += targets->GpuBytes();
             }
@@ -1812,7 +1816,8 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
                                  std::vector<std::string_view> vars,
                                  std::optional<glm::dmat4> posesParent,
                                  const std::optional<std::string>& overlays,
-                                 std::vector<FrameParams::SensorChain> chains) {
+                                 std::vector<FrameParams::SensorChain> chains,
+                                 MinimalMode minimal, std::optional<glm::vec3> minimalColor) {
     ERNIE_ZONE("UpdatePrims");
     Sync(scene);
     prims_ = prims;
@@ -1905,6 +1910,11 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
     if (overlays) {
         frame.overlays = *overlays;
     }
+    // Minimal shading as the step resolved it for the product; views draw the full pipeline.
+    frame.minimal = minimal;
+    if (minimalColor) {
+        frame.minimalColor = *minimalColor;
+    }
     std::vector<const Overlay*> drawn;
     if (!frame.overlays.empty()) {
         for (const std::string& name : SelectOverlays(frame.overlays, scene.OverlayNames())) {
@@ -1990,21 +2000,28 @@ std::shared_ptr<ProductFrame> RasterDelegate::AcquireFrame(const Path& product, 
                                                            bool batched,
                                                            std::span<const std::string_view> vars,
                                                            std::span<const std::string> aovs,
-                                                           std::uint32_t faces) {
+                                                           std::uint32_t faces, bool minimal) {
     ERNIE_ZONE("AcquireFrame");
-    const std::vector<std::string_view> held = RequiredVars(vars);
+    const std::vector<std::string_view> held = minimal ? std::vector<std::string_view>{}
+                                                       : RequiredVars(vars);
+    const std::vector<std::string> minimalHeld = minimal ? MinimalTargets::Held(vars)
+                                                         : std::vector<std::string>{};
     const std::vector<std::string> aovNames(aovs.begin(), aovs.end());
     std::vector<std::shared_ptr<ProductFrame>>& frames = frames_[product];
     const bool shared = compute_ != nullptr;
     std::erase_if(frames, [&](const std::shared_ptr<ProductFrame>& frame) {
-        const RenderTargets& targets = *TargetsOf(*frame->images).front();
-        const bool stale = frame.use_count() == 1 && frame->arrayMaps == 0 &&
-                           (targets.Extent().width != extent.width ||
-                            targets.Extent().height != extent.height || targets.Bands() != bands ||
-                            targets.Shared() != shared || frame->images->Views() != views ||
-                            targets.Faces() != faces ||
-                            frame->batched != batched || targets.Vars() != held ||
-                            targets.AovNames() != aovNames);
+        bool differs = frame->images->Views() != views || frame->batched != batched ||
+                       frame->images->Extent().width != extent.width ||
+                       frame->images->Extent().height != extent.height;
+        if (const auto* own = dynamic_cast<const MinimalTargets*>(frame->images.get())) {
+            differs = differs || !minimal || own->Shared() != shared || own->Vars() != minimalHeld;
+        } else {
+            const RenderTargets& targets = *TargetsOf(*frame->images).front();
+            differs = differs || minimal || targets.Bands() != bands ||
+                      targets.Shared() != shared || targets.Faces() != faces ||
+                      targets.Vars() != held || targets.AovNames() != aovNames;
+        }
+        const bool stale = frame.use_count() == 1 && frame->arrayMaps == 0 && differs;
         if (stale) {
             // Earlier steps may still render into it, and maps copy from it: rare, so wait for
             // everything.
@@ -2022,9 +2039,13 @@ std::shared_ptr<ProductFrame> RasterDelegate::AcquireFrame(const Path& product, 
     frame->compute = compute_.get();
     frame->linearPool = &linearPool_;
     frame->batched = batched;
-    // A batch of more views than one set of targets holds renders into consecutive chunks.
+    // A batch of more views than one set of targets holds renders into consecutive chunks; a
+    // minimal frame's attachments hold a chunk at a time and its outputs every view.
     const std::uint32_t chunk = RenderTargets::MaxViews(context_, bands, faces);
-    if (views <= chunk) {
+    if (minimal) {
+        frame->images = std::make_unique<MinimalTargets>(
+            context_, extent, views, RenderTargets::MaxViews(context_, 1, 1), vars, shared);
+    } else if (views <= chunk) {
         frame->images = std::make_unique<RenderTargets>(context_, extent, bands, shared, views,
                                                         held, aovNames, faces);
     } else {
@@ -2130,6 +2151,10 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         const bool batched = !poses.empty();
         const auto views = static_cast<std::uint32_t>(std::max<std::size_t>(poses.size(), 1));
         std::vector<std::int32_t> worlds = ViewWorldsOf(scene, cameras, views, HostArrays(scene));
+        // Minimal shading, the product's or else its settings' (`tokens::kMinimalMode`): its
+        // vars come straight from the raster pass, without sensor filters.
+        const MinimalMode minimal =
+            spec.minimal.value_or(MinimalModeOf(scene, base.settings, MinimalMode::Off));
         // Only the vars the product asks for, as the static names of `kRenderVarNames`, and its
         // AOVs ("aov:<output>") as the slots its chains lay them in (`kAovSlotNames`), each from
         // its chain: the product's, or a var's own (`RenderProductSpec::varFilters`).
@@ -2165,10 +2190,25 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
             chains.push_back(std::move(chain));
             return chains.size() - 1;
         };
-        chainOf(spec.filters);  // the product's chain first
+        if (minimal == MinimalMode::Off) {
+            chainOf(spec.filters);  // the product's chain first
+        }
         std::vector<std::string_view> vars;
         for (std::size_t v = 0; v < spec.vars.size(); ++v) {
             const auto& [path, name] = spec.vars[v];
+            if (minimal != MinimalMode::Off) {
+                if (!MinimalTargets::Holds(name)) {
+                    throw std::invalid_argument(
+                        "Render var '" + path.String() + "' asks for '" + name +
+                        "', which minimal shading does not render (only LdrColor, "
+                        "DistanceToImagePlane, DistanceToCamera, Normal, PrimId and InstanceId)");
+                }
+                const auto known = std::find(kRenderVarNames.begin(), kRenderVarNames.end(), name);
+                if (std::find(vars.begin(), vars.end(), *known) == vars.end()) {
+                    vars.push_back(*known);
+                }
+                continue;
+            }
             const std::optional<std::vector<SensorFilterStep>>& own =
                 v < spec.varFilters.size() ? spec.varFilters[v] : std::nullopt;
             const std::size_t c = chainOf(own ? *own : spec.filters);
@@ -2220,12 +2260,14 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         // A wide fisheye draws its views on cube faces, each a layer of the raster images. Its
         // lens alone decides, not its pose (which may be on the GPU).
         const std::uint32_t faces =
-            NeedsCubeFaces(CameraOf(scene, cameras.front(), spec.resolution.width,
-                                    spec.resolution.height, glm::dmat4(1.0)))
+            minimal == MinimalMode::Off &&
+                    NeedsCubeFaces(CameraOf(scene, cameras.front(), spec.resolution.width,
+                                            spec.resolution.height, glm::dmat4(1.0)))
                 ? static_cast<std::uint32_t>(kCubeFaces)
                 : 1u;
-        std::shared_ptr<ProductFrame> frame = AcquireFrame(spec.product, spec.resolution, bands,
-                                                           views, batched, vars, aovs, faces);
+        std::shared_ptr<ProductFrame> frame =
+            AcquireFrame(spec.product, spec.resolution, bands, views, batched, vars, aovs, faces,
+                         minimal != MinimalMode::Off);
         std::optional<glm::dmat4> posesParent;
         if (gpuPoses != nullptr) {
             posesParent = PosesParentOf(scene, cameras.front());
@@ -2236,7 +2278,8 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         gpuPosesQuaternions_ = gpuPoses != nullptr && PosesAreQuaternions(*gpuPoses);
         UpdatePrims(scene, prims, spec.resolution, NextFrame(scene, base.settings, spec.product),
                     spec.product, spec.filters, std::move(poses), std::move(worlds),
-                    std::move(vars), posesParent, spec.overlays, std::move(chains));
+                    std::move(vars), posesParent, spec.overlays, std::move(chains), minimal,
+                    spec.minimalColor);
         if (gpuPoses != nullptr) {
             // Once no submission reads the pose buffer (`UpdatePrims` waits), on the writer's
             // stream; the submission waits for it (`SubmitWaits`).
@@ -2260,13 +2303,19 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         if (compute != nullptr) {
             signals.push_back(compute->NextVulkanSignal());
         }
-        const std::vector<RenderTargets*> targets = TargetsOf(*frame->images);
+        auto* minimalTargets = dynamic_cast<MinimalTargets*>(frame->images.get());
+        const std::vector<RenderTargets*> targets =
+            minimalTargets != nullptr ? std::vector<RenderTargets*>{} : TargetsOf(*frame->images);
         const RasterDrawable* drawables[] = {&terrain_, &planet_, &meshes_, &ground_, &points_};
         // Every view of the product renders in this one submission, sharing the shadow passes.
         ERNIE_ZONE_TEXT(spec.product.String());
         submission = context_.SubmitAsync(
             [&](VkCommandBuffer commands) {
                 renderer_.RecordShadows(commands, drawables);
+                if (minimalTargets != nullptr) {
+                    renderer_.RecordMinimal(commands, *minimalTargets, drawables);
+                    return;
+                }
                 std::uint32_t first = 0;
                 for (RenderTargets* chunk : targets) {
                     renderer_.RecordViews(commands, *chunk, drawables, first);

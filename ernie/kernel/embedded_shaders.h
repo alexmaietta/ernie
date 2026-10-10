@@ -92,6 +92,8 @@ extern const char kInstanceComposeSlang[];
 extern const char kInstanceAnchorsSlang[];
 /// Lights posed on the GPU: their light table entries, shadow views and those views' cull views.
 extern const char kLightViewsSlang[];
+/// Minimal shading's outputs, from its attachments into linear buffers.
+extern const char kMinimalResolveSlang[];
 
 /// Terrain modules: shared resources and grid vertex, the surface material, and the passes.
 extern const char kTerrainSlang[];

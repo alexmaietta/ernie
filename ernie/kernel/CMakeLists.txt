@@ -42,6 +42,7 @@ set(ernie_shaders
     raster/instance_compose.slang=kInstanceComposeSlang
     raster/instance_anchors.slang=kInstanceAnchorsSlang
     raster/light_views.slang=kLightViewsSlang
+    raster/minimal_resolve.slang=kMinimalResolveSlang
     raster/frame.slang=kFrameSlang
     raster/ground.slang=kGroundSlang
     raster/mesh.slang=kMeshSlang

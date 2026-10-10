@@ -323,6 +323,10 @@ class MeshDrawable : public RasterDrawable {
     void SetOrigin(const glm::dvec3& origin) override;
     std::optional<Bounds3> Bounds() const override;
 
+    bool DrawsMinimal() const override {
+        return true;
+    }
+
     /// World bounds of the current draws (and runs of instances) in world `world`.
     std::optional<Bounds3> WorldBounds(std::int32_t world) const override;
 
@@ -482,6 +486,7 @@ class MeshDrawable : public RasterDrawable {
     /// The G-buffer pipeline for a frame camera's views, or a pushbroom's.
     void CreateGBufferPipeline(bool pushbroom);
     void CreateCutoutPipelines(bool pushbroom);
+    void CreateMinimalPipelines();
     /// Writes every draw's GPU record and instance ids, and their pipelines and id offsets.
     void WriteDraws();
     /// Rebuilds `transforms_` from the items and the origin.
@@ -570,6 +575,10 @@ class MeshDrawable : public RasterDrawable {
     std::array<std::unique_ptr<GraphicsPipeline>, 2> cutoutPipelines_;
     std::unique_ptr<GraphicsPipeline> shadowCutoutPipeline_;
     bool pushbroom_ = false;  ///< Whether the last `Prepare`'s camera is a pushbroom.
+    /// The last `Prepare`'s minimal shading, and its pipelines (`MinimalTargets`): shaded, its
+    /// cutout variant, then without colour and its cutout variant.
+    MinimalMode minimal_ = MinimalMode::Off;
+    std::array<std::unique_ptr<GraphicsPipeline>, 4> minimalPipelines_;
 
     /// Whether item `item`'s material cuts out part of it.
     bool Cutout(std::size_t item) const;

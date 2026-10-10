@@ -102,3 +102,47 @@ GroundOutput fragmentMain(VertexOutput in) {
     out.depth = min(clip.z / clip.w, 0.99999994);
     return out;
 }
+
+// Minimal shading (`minimalShade`) of what `fragmentMain` writes, at its depth.
+struct GroundMinimalOutput {
+    float4 color : SV_Target0;
+    uint4 ids : SV_Target1;
+    float depth : SV_Depth;
+}
+
+// Minimal shading without colour (kMinimalNone): the plane's ids and normal at its depth, with
+// no material evaluated.
+[shader("fragment")]
+GroundMinimalOutput idsFragmentMain(VertexOutput in) {
+    let uv = in.position.xy / g.viewport.xy;
+    let ndc = float2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+    float3 origin;
+    float3 direction;
+    cameraRayThrough(kPushbroomCamera ? u.viewProj : g.invViewProj, u.strip, ndc, origin,
+                     direction);
+    let t = abs(direction.z) > 1e-12 ? (g.plane.x - origin.z) / direction.z : -1.0;
+    if (!(t > 0.0)) {
+        discard;
+    }
+    let clip = projectWorld(origin + direction * t);
+    GroundMinimalOutput out;
+    out.color = float4(0.0, 0.0, 0.0, 1.0);
+    out.ids = uint4(g.ids.y, 0u, packOctahedral(float3(0.0, 0.0, 1.0)), 0u);
+    out.depth = min(clip.z / clip.w, 0.99999994);
+    return out;
+}
+
+[shader("fragment")]
+GroundMinimalOutput minimalFragmentMain(VertexOutput in) {
+    let ground = fragmentMain(in);
+    GBuffer g;
+    g.normal = ground.normal;
+    g.albedo = ground.albedo;
+    g.ids = ground.ids;
+    let shaded = minimalShade(g);
+    GroundMinimalOutput out;
+    out.color = shaded.color;
+    out.ids = shaded.ids;
+    out.depth = ground.depth;
+    return out;
+}
