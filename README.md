@@ -1,14 +1,15 @@
 # Efficient Renderer for Natural and Interplanetary Environments (Ernie)
 
-Ernie is a physically accurate, real-time, spectral renderer for interplanetary environments, with C++ and Python APIs. It runs on any Vulkan 1.3 GPU.
+Ernie is a physically accurate, real-time, spectral renderer for interplanetary environments.
 
-Scenes are described in physical quantities rather than arbitrary parameters. A light has a blackbody temperature and a power in lumens, not an intensity. A camera has exposure, aperture and focal length, but also quantum efficiency curves, full well capacity, read noise and dark current, with sensor filter chains that model a real sensor's noise and effects. This seems like more work at first, but it makes scenes much simpler to design.
+Ernie has C++ and Python APIs and a Hydra-like scene and render delegate API. It is a Vulkan 1.3 rasterizer, so it is cross-platform by design and runs on Linux today, with Windows and macOS (through MoltenVK) on the way.
 
-Ernie has a Hydra-like scene and render delegate API. It renders batches of cameras at once and exchanges data with any DLPack tensor (NumPy, PyTorch, JAX, Warp), so it fits into physics and reinforcement learning workflows. Today it is a Vulkan rasterizer, tested on Linux; macOS should work through MoltenVK but is untested.
+One of the key features of Ernie is that scenes are described in physical quantities rather than arbitrary parameters. A light has a blackbody temperature and a power in lumens, not an intensity. A camera has exposure, aperture and focal length, but also quantum efficiency curves, full well capacity, read noise and dark current, with sensor filter chains that model a real sensor's noise and effects. This seems like more work at first, but it makes scientific rendering and building scenes much simpler.
 
-Key features with Ernie, mostly for planetary robotics:
+Ernie is also built for high-throughput batched rendering in reinforcement learning. It shares data zero copy with any DLPack tensor (PyTorch, JAX, Warp, NumPy), and its fast mode trades the more complex rendering features for simple, quick shading.
 
-- **Batch rendering**: many environments ("worlds"), each with its own camera, rendered in one step for RL and Monte Carlo workloads.
+Ernie's key features related to planetary robotics and sensing:
+
 - **Camera effects and modeling**: exposure, aperture, motion blur, rolling shutter, lens distortion and vignetting, with perspective, fisheye and orthographic projections.
 - **Real camera specs**: from quantum efficiency curves to full well, read noise, dark current, PRNU, DSNU, gain and ADC bit depth, and line-scan pushbroom cameras like LROC's, enabling users to model the noise and effects of those instruments.
 - **Terrain**: a first-class citizen, with a built-in Terrain prim type with continuous level of detail through quadtrees, updated in place where its heights change. With a radius, a Terrain is a whole planet or moon, drawn from orbit down to the ground with cube-sphere level of detail.
@@ -17,28 +18,12 @@ Key features with Ernie, mostly for planetary robotics:
 - **Star fields**: a built-in StarField prim allowing users to plug in their own star catalogs, with brightness from magnitudes and color from B-V indices, so you can see how camera exposure affects the visible stars.
 - **Lighting**: distant lights have an angle parameter, giving smooth penumbrae based on the light's width in the sky. Lights also take illuminants (blackbody, CIE daylight) and custom spectral curves, for example to model Earthshine on the lunar surface.
 - **Customizable and extendable**: write your own sensor filters in Slang and build up your own chains (noise models, lens flare, vignetting), designed for efficiency and throughput, and plug in custom BRDFs for the planetary reflectances you encounter. Hapke, Lommel-Seeliger, lunar-Lambert, Oren-Nayar and Lambert come built in.
+- **Batch rendering**: many environments ("worlds"), each with its own camera, rendered in one step for RL and Monte Carlo workloads.
 - **Debug drawing**: an easy-to-use API to add custom labels, trajectories and overlays to the scene.
 - **Floating origin**: prevents precision issues in large-scale scenes.
 - **Viewer**: a viewer class to easily spin up a GUI with customizable panels to integrate with your own simulations or workflows.
 
-For a more detailed overview of the features, see our documentation, which covers:
-
-- Scene description
-- Spectral
-- Lighting
-- Cameras
-- Sensor filter graph
-- Materials and BRDFs
-- Shadows
-- Terrains and LOD
-- Star fields
-- Batched rendering
-- GPU interop
-- Debug draw
-- Misc rendering techniques (culling, etc)
-- USGS CSM
-- Profling
-- The life of a pixel
+For a more detailed overview of the features, see our documentation.
 
 Future work:
 
@@ -49,11 +34,13 @@ Future work:
 - USGS CSM camera models for advanced, non-standard cameras and their noise.
 - OpenXR, so users can easily connect headsets to an Ernie viewer.
 - A ray-tracing backend alongside the rasterizer.
+- A fast mode for RL training: a forward renderer with a smaller feature set and higher throughput.
 - Windows support, and tested macOS support.
 - Continued test assets and benchmark scenes.
+- Guassian splat and particle fields
 - More sensor support for Lidars and Radars.
-- Integrations into Newton Viewer, Chrono Sensor, IsaacLab.
-- Compare benchmarks with Newton Warp Raytrace, Madrona both in speed and image quality.
+- Integrations into Newton Viewer, Chrono Sensor, and IsaacLab.
+- Compare benchmarks with Newton Warp Raytrace, Madrona both in speed, throughput, and image quality.
 
 ## Getting Started
 
@@ -142,6 +129,7 @@ Planned future examples.
 
 - Vignetting
 - Lens flare
+- Bloom
 
 **Terrain**
 
@@ -155,7 +143,8 @@ Planned future examples.
 
 - Distant light
 - Custom radiance curves to model Earthshine
-- 
+- Dome light shadows
+- Illuminants across the same scene
 
 **Star Field**
 
@@ -184,7 +173,7 @@ Planned future examples.
 
 The Python wheel is on PyPI (`pip install ernie`, Python 3.12+). It bundles everything, the viewer included, but a Vulkan driver.
 
-Each GitHub release also has an `ernie` package for Ubuntu 22.04+, Debian 12+ and RHEL 9+ (and a tarball for other distributions), with the library, the viewer, and the headers and CMake package for building against it:
+Each GitHub release also has an `ernie` package for Ubuntu 22.04+, Debian 12+ and RHEL 9+ (and a tarball for other distributions), with the library, the viewer, and the headers and CMake package for building against it.
 
 ```sh
 sudo apt install ./ernie_*.deb    # Debian, Ubuntu

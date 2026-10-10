@@ -33,8 +33,14 @@ nav:
   - Guides:
       - Batched rendering for RL: guides/batched-rendering.md
       - GPU interop: guides/gpu-interop.md
-      - Debug drawing and overlays: guides/debug-draw.md
-      - Custom panels: guides/custom-panels.md
+      - Extending Ernie:
+          - Custom BRDFs: guides/extending/custom-brdfs.md
+          - Custom sensor filters: guides/extending/custom-sensor-filters.md
+          - Custom lenses: guides/extending/custom-lenses.md
+          - Custom spectra and star catalogs: guides/extending/custom-spectra.md
+          - Debug drawing and overlays: guides/extending/debug-draw.md
+          - Custom panels and menus: guides/extending/custom-panels.md
+          - Custom render delegates: guides/extending/custom-render-delegates.md
   - API reference:
       - Python:
           - ernie: api/python/ernie.md
