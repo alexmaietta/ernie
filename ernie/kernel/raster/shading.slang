@@ -27,7 +27,8 @@
 // Bindings: 0 every view's ShadingUniforms, 1 G-buffer normal, 2 G-buffer albedo, 3 G-buffer ids,
 // 4 depth (one layer per view each), 5 materials, 6 RGB-to-spectrum coefficient table, 7 its
 // sampler, 8 spectral radiance, 9 lights, 10 the lights' shadow maps, 11 their comparison sampler,
-// 12 their view-projections, 13 the dome's map, 14 the stars, 15 their grid cells.
+// 12 their view-projections, 13 the dome's map, 14 the stars, 15 their grid cells, 16 the map
+// that lights the scene (13's, without its sun when that is lit on its own).
 //
 // References:
 // - W. Jakob and J. Hanika, "A Low-Dimensional Function Space for Efficient Spectral Upsampling",
@@ -153,6 +154,9 @@ struct ShadingConstants {
 [[vk::binding(13, 0)]] Texture2D<float4> domeMap;
 [[vk::binding(14, 0)]] StructuredBuffer<float4> stars;
 [[vk::binding(15, 0)]] StructuredBuffer<uint2> starCells;
+// The map that lights the scene, of the same size: the dome map, or the dome map without its sun
+// when the sun lights the scene as a shadowed distant light of its own (`ExtractDomeSun`).
+[[vk::binding(16, 0)]] Texture2D<float4> domeLighting;
 
 // The uniforms of the view this thread shades (`shadeMain` sets it).
 static uint shadedView;
@@ -360,7 +364,7 @@ EnvironmentResponse environmentOf(float3 n, float3 v, float3 albedo, float slope
 // box-filtered mips stand in for a GGX convolution), as sigmoid coefficients (xyz) and scale (w).
 float4 domeLobe(float3 r, float roughness) {
     let alpha = roughness * roughness;
-    let rgb = max(domeMapAt(r, max(2.0 * alpha, 1e-4)), float3(0.0));
+    let rgb = max(domeMapAt(r, max(2.0 * alpha, 1e-4), true), float3(0.0));
     let scale = max(rgb.x, max(rgb.y, rgb.z));
     return float4(scale > 0.0 ? sigmoidCoefficients(rgb / scale) : float3(0.0), scale);
 }
@@ -395,7 +399,7 @@ static const uint kOcclusionSteps = 4;
 //
 // Reference: J. Jimenez, X. Wu, A. Pesce and A. Jarabo, "Practical Realtime Strategies for
 // Accurate Indirect Occlusion", SIGGRAPH 2016 course: Physically Based Shading.
-float domeOcclusion(int2 pixel, uint layer, float3 world, float depth, float3 n, float3 v) {
+float4 domeOcclusion(int2 pixel, uint layer, float3 world, float depth, float3 n, float3 v) {
     let size = float2(sh.size.xy);
     let radius = sh.domeLighting.z;
     let ndc = float2((float(pixel.x) + 0.5) / size.x * 2.0 - 1.0,
@@ -406,10 +410,11 @@ float domeOcclusion(int2 pixel, uint layer, float3 world, float depth, float3 n,
                world);
     let pixels = min(radius / max(pixelWorld, 1e-12), sh.domeLighting.w);
     if (pixels < 1.0) {
-        return 1.0;
+        return float4(n, 1.0);
     }
     let noise = interleavedGradientNoise(float2(pixel));
     var visibility = 0.0;
+    var bent = float3(0.0);
     for (uint k = 0; k < kOcclusionDirections; ++k) {
         let angle = (float(k) + noise) * PI / float(kOcclusionDirections);
         let direction = float2(cos(angle), sin(angle));
@@ -424,6 +429,7 @@ float domeOcclusion(int2 pixel, uint layer, float3 world, float depth, float3 n,
         let projectedLength = length(projected);
         if (projectedLength < 1e-4) {
             visibility += 1.0;
+            bent += n;
             continue;
         }
         let cosN = clamp(dot(projected / projectedLength, v), -1.0, 1.0);
@@ -454,14 +460,112 @@ float domeOcclusion(int2 pixel, uint layer, float3 world, float depth, float3 n,
         let arc = 0.25 * (-cos(2.0 * h0 - gamma) + cosN + 2.0 * h0 * sin(gamma)) +
                   0.25 * (-cos(2.0 * h1 - gamma) + cosN + 2.0 * h1 * sin(gamma));
         visibility += projectedLength * arc;
+        // The slice's bent normal: the cosine-weighted mean of the directions between the
+        // horizons, sin(h) along the tangent plus cos(h) along the view (Jimenez et al. 2016).
+        let t0 = (6.0 * sin(h0 - gamma) - sin(3.0 * h0 - gamma) + 6.0 * sin(h1 - gamma) -
+                  sin(3.0 * h1 - gamma) + 16.0 * sin(gamma) -
+                  3.0 * (sin(h0 + gamma) + sin(h1 + gamma))) /
+                 12.0;
+        let t1 = (-cos(3.0 * h0 - gamma) - cos(3.0 * h1 - gamma) + 8.0 * cos(gamma) -
+                  3.0 * (cos(h0 + gamma) + cos(h1 + gamma))) /
+                 12.0;
+        bent += projectedLength * (t0 * tangent + t1 * v);
     }
-    return saturate(visibility / float(kOcclusionDirections));
+    let length = sqrt(dot(bent, bent));
+    return float4(length > 1e-6 ? bent / length : n,
+                  saturate(visibility / float(kOcclusionDirections)));
 }
 
-// The visibility of a specular lobe of perceptual roughness `roughness` at cos(e) `mu` under
-// ambient occlusion `ao` (Lagarde and de Rousiers 2014).
-float specularOcclusion(float mu, float ao, float roughness) {
-    return saturate(pow(max(mu + ao, 0.0), exp2(-16.0 * roughness - 1.0)) - 1.0 + ao);
+// The view vector at world point `world` of a pixel at `ndc`: back along its ray, towards the eye,
+// along the view when orthographic, towards the row's pose for a pushbroom.
+float3 viewVector(float2 ndc, float3 world) {
+    return kPushbroomCamera ? -cameraRay(sh.invViewProj, sh.strip, ndc)
+           : sh.range.w != 0.0 ? -normalize(rayThrough(ndc))
+                               : normalize(sh.eye.xyz - world);
+}
+
+// Dome occlusion per pixel: bent normal (xyz) and visibility (w), as the occlusion pass computes
+// it (`occlusionMain`), then smoothed by `occlusionFilterMain`, which shading reads.
+[[vk::image_format("rgba16f")]] [[vk::binding(17, 0)]] RWTexture2DArray<float4> occlusionRaw;
+[[vk::image_format("rgba16f")]] [[vk::binding(18, 0)]] RWTexture2DArray<float4> occlusionFiltered;
+
+// The dome occlusion of each covered pixel, for the full dome lighting mode.
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void occlusionMain(uint3 id : SV_DispatchThreadID) {
+    shadedView = pass.model.y + id.z;
+    if (id.x >= sh.size.x || id.y >= sh.size.y) {
+        return;
+    }
+    let pixel = int4(id.xyz, 0);
+    if (gIds.Load(pixel).x == kBackground) {
+        occlusionRaw[id] = float4(0.0, 0.0, 1.0, 1.0);
+        return;
+    }
+    let ndc = float3((float(id.x) + 0.5) / float(sh.size.x) * 2.0 - 1.0,
+                     1.0 - (float(id.y) + 0.5) / float(sh.size.y) * 2.0, gDepth.Load(pixel));
+    let world = cameraPoint(sh.invViewProj, sh.strip, ndc.xy, ndc.z);
+    let v = viewVector(ndc.xy, world);
+    let n = facingNormal(normalize(gNormal.Load(pixel).xyz), v);
+    occlusionRaw[id] = domeOcclusion(int2(id.xy), id.z, world, ndc.z, n, v);
+}
+
+// `occlusionMain`'s results averaged over 5 x 5 pixels of the same surface, weighted by how far
+// each lies off the pixel's plane (relative to its distance) and how its normal turns, which
+// smooths the per-pixel rotation's noise without blurring across edges. Spatial only, so a batch
+// of views needs no history.
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void occlusionFilterMain(uint3 id : SV_DispatchThreadID) {
+    shadedView = pass.model.y + id.z;
+    if (id.x >= sh.size.x || id.y >= sh.size.y) {
+        return;
+    }
+    float3 world;
+    if (!gbufferPoint(int2(id.xy), id.z, world)) {
+        occlusionFiltered[id] = float4(0.0, 0.0, 1.0, 1.0);
+        return;
+    }
+    let n = normalize(gNormal.Load(int4(id.xyz, 0)).xyz);
+    let scale = max(0.01 * length(world - sh.eye.xyz), 1e-4);
+    var sum = float4(0.0);
+    var weights = 0.0;
+    for (int dy = -2; dy <= 2; ++dy) {
+        for (int dx = -2; dx <= 2; ++dx) {
+            let at = int2(id.xy) + int2(dx, dy);
+            float3 other;
+            if (!gbufferPoint(at, id.z, other)) {
+                continue;
+            }
+            let otherNormal = normalize(gNormal.Load(int4(at, id.z, 0)).xyz);
+            let offPlane = abs(dot(n, other - world)) / scale;
+            let weight = exp(-offPlane * offPlane) * pow(saturate(dot(n, otherNormal)), 8.0);
+            let value = occlusionRaw[uint3(at, id.z)];
+            sum += weight * float4(value.xyz * value.w, value.w);
+            weights += weight;
+        }
+    }
+    let average = weights > 0.0 ? sum / weights : occlusionRaw[id];
+    let length = sqrt(dot(average.xyz, average.xyz));
+    occlusionFiltered[id] = float4(length > 1e-6 ? average.xyz / length : n, average.w);
+}
+
+// How much of a specular lobe of perceptual roughness `roughness` around reflection `r` the sky
+// still feeds, from occlusion `occlusion` (bent normal, visibility): the overlap of the lobe's cone
+// with the visible cone around the bent normal, whose width the visibility sets (Unreal's distance
+// field AO specular occlusion), fading to none as the visible cone closes.
+//
+// Reference: Unreal Engine, SkyLightingShared.ush, `GetDistanceFieldAOSpecularOcclusion` and
+// `ApproximateConeConeIntersection`.
+float coneOcclusion(float4 occlusion, float3 r, float roughness) {
+    let reflectionCone = max(roughness, 0.1) * PI;
+    let visibleCone = occlusion.w * PI;
+    let between = acos(clamp(dot(occlusion.xyz, r), -1.0, 1.0));
+    let difference = abs(reflectionCone - visibleCone);
+    let overlap =
+        smoothstep(0.0, 1.0, 1.0 - saturate((between - difference) /
+                                            max(reflectionCone + visibleCone - difference, 1e-4)));
+    return overlap * saturate((visibleCone - 0.1) / 0.2);
 }
 
 [shader("compute")]
@@ -486,9 +590,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     let normalVisibility = gNormal.Load(pixel);
     // Back along the pixel's ray: towards the eye, along the view when orthographic, towards the
     // row's pose for a pushbroom.
-    let v = kPushbroomCamera ? -cameraRay(sh.invViewProj, sh.strip, ndc.xy)
-            : sh.range.w != 0.0 ? -normalize(rayThrough(ndc.xy))
-                                : normalize(sh.eye.xyz - world);
+    let v = viewVector(ndc.xy, world);
     let n = facingNormal(normalize(normalVisibility.xyz), v);
     let visibility = normalVisibility.w;
     let albedo = gAlbedo.Load(pixel);
@@ -510,13 +612,17 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         let index = material.info.y - 1;
         params.values[index / 4][index % 4] = float((ids.w >> 8) & 0xFFu) / 255.0;
     }
-    // The dome lighting mode: its shadowing (the full mode) and its diffuse light (none in the
-    // limited one). The occlusion darkens the ambient term too.
+    // The dome lighting mode: its shadowing (the full mode, from the occlusion passes) and its
+    // diffuse light (none in the limited one). The visibility darkens the ambient term too, and
+    // the diffuse dome is looked up towards the bent normal, as far as the sky is hidden
+    // (Unreal's sky lighting with distance field AO).
     let domeLit = !unlit && (sh.sky.x & kSkyLighting) != 0;
-    let occlusion = domeLit && sh.domeLighting.x > 0.0
-                        ? domeOcclusion(int2(id.xy), id.z, world, ndc.z, n, v)
-                        : 1.0;
-    let domeRgb = unlit ? float3(0.0) : domeIrradiance(n) * (occlusion * sh.domeLighting.y);
+    let shadowed = domeLit && sh.domeLighting.x > 0.0;
+    let occlusionState = shadowed ? occlusionFiltered[id] : float4(n, 1.0);
+    let occlusion = occlusionState.w;
+    let lookup = normalize(lerp(occlusionState.xyz, n, occlusion) + 1e-6 * n);
+    let domeRgb =
+        unlit ? float3(0.0) : domeIrradiance(lookup) * (occlusion * sh.domeLighting.y);
     let domeScale = max(domeRgb.x, max(domeRgb.y, domeRgb.z));
     let domeCoefficients = domeScale > 0.0 ? sigmoidCoefficients(domeRgb / domeScale) : float3(0.0);
     // The dome's specular lobes, around the mirror direction, where the model has any: their
@@ -525,14 +631,13 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     if (domeLit) {
         let probe = environmentOf(n, v, float3(1.0), slopeVariance, params);
         let mirror = 2.0 * dot(n, v) * n - v;
-        let mu = saturate(dot(n, v));
         if (any(probe.specular0 > 0.0)) {
             lobes[0] = domeLobe(mirror, probe.roughness0);
-            lobes[0].w *= specularOcclusion(mu, occlusion, probe.roughness0);
+            lobes[0].w *= shadowed ? coneOcclusion(occlusionState, mirror, probe.roughness0) : 1.0;
         }
         if (any(probe.specular1 > 0.0)) {
             lobes[1] = domeLobe(mirror, probe.roughness1);
-            lobes[1].w *= specularOcclusion(mu, occlusion, probe.roughness1);
+            lobes[1].w *= shadowed ? coneOcclusion(occlusionState, mirror, probe.roughness1) : 1.0;
         }
     }
 
@@ -654,28 +759,31 @@ float3 rayThrough(float2 ndc) {
     return far.xyz / far.w - near.xyz / near.w;
 }
 
-// Texel (`x`, `y`) of mip `level` of the dome map, wrapping around in longitude.
-float3 domeTexel(int x, int y, uint level, int2 size) {
+// Texel (`x`, `y`) of mip `level` of the dome map (the lighting map with `lighting`), wrapping
+// around in longitude.
+float3 domeTexel(int x, int y, uint level, int2 size, bool lighting) {
     let wrapped = int2((x % size.x + size.x) % size.x, clamp(y, 0, size.y - 1));
-    return domeMap.Load(int3(wrapped, int(level))).rgb;
+    let at = int3(wrapped, int(level));
+    return lighting ? domeLighting.Load(at).rgb : domeMap.Load(at).rgb;
 }
 
 // The dome map bilinearly at (`u`, `v`) in mip `level`.
-float3 domeBilinear(float2 uv, uint level) {
+float3 domeBilinear(float2 uv, uint level, bool lighting) {
     let size = int2(max(sh.sky.y >> level, 1u), max(sh.sky.z >> level, 1u));
     let p = uv * float2(size) - 0.5;
     let base = int2(floor(p));
     let f = p - float2(base);
-    let a = domeTexel(base.x, base.y, level, size);
-    let b = domeTexel(base.x + 1, base.y, level, size);
-    let c = domeTexel(base.x, base.y + 1, level, size);
-    let d = domeTexel(base.x + 1, base.y + 1, level, size);
+    let a = domeTexel(base.x, base.y, level, size, lighting);
+    let b = domeTexel(base.x + 1, base.y, level, size, lighting);
+    let c = domeTexel(base.x, base.y + 1, level, size, lighting);
+    let d = domeTexel(base.x + 1, base.y + 1, level, size, lighting);
     return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
 }
 
 // The dome map in world direction `d`, from the mips whose texels match `pixelAngle` (radians):
-// trilinear, with the manual filtering that float32 maps need on every device.
-float3 domeMapAt(float3 d, float pixelAngle) {
+// trilinear, with the manual filtering that float32 maps need on every device. With `lighting`,
+// the map that lights the scene (binding 16), else the one the sky shows.
+float3 domeMapAt(float3 d, float pixelAngle, bool lighting = false) {
     let local = float3(dot(sh.toDome[0].xyz, d), dot(sh.toDome[1].xyz, d),
                        dot(sh.toDome[2].xyz, d));
     var u = atan2(local.y, local.x) / (2.0 * PI);
@@ -685,8 +793,8 @@ float3 domeMapAt(float3 d, float pixelAngle) {
     let lod = clamp(log2(max(pixelAngle / texelAngle, 1e-6)), 0.0, float(sh.sky.w - 1));
     let lower = uint(floor(lod));
     let upper = min(lower + 1, sh.sky.w - 1);
-    return lerp(domeBilinear(float2(u, v), lower), domeBilinear(float2(u, v), upper),
-                lod - float(lower));
+    return lerp(domeBilinear(float2(u, v), lower, lighting),
+                domeBilinear(float2(u, v), upper, lighting), lod - float(lower));
 }
 
 // The star grid's row of declination `declination` (radians), of `rows` from the south pole.

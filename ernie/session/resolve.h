@@ -224,6 +224,36 @@ DomeLight DomeOf(const Scene& scene, const Path& path, const SpectralBands& band
 /// @throws std::invalid_argument for an invalid map.
 std::optional<Image> DomeMapOf(const Scene& scene, const Path& path);
 
+/// A sun found in a dome's map (`ExtractDomeSun`), in the map's frame.
+struct DomeSun {
+    glm::dvec3 direction{0.0, 0.0, 1.0};  ///< Unit vector towards it, in the dome's frame.
+    double angle = 0.53;                   ///< Angular diameter in degrees.
+    /// Its RGB irradiance at normal incidence above the sky around it: the map's values over
+    /// the sky's, times each texel's solid angle, summed (the map's units times steradians).
+    glm::dvec3 irradiance{0.0};
+};
+
+/// The sun of a latitude-longitude dome map (`tokens::kLightTexture` layout) and the map without
+/// it, for lighting the sun as a shadowed distant light while the dome keeps the rest of the sky.
+struct DomeSunExtraction {
+    DomeSun sun;
+    /// The map with the sun's texels replaced by the sky around it.
+    Image lighting;
+};
+
+/// The sun of dome map `map`, if it has one: the brightest texel's connected region of texels
+/// above `kDomeSunThreshold` of its luminance, when that region is compact (under 5 degrees
+/// across), much brighter than the sky (its peak over 20 times the map's median luminance) and
+/// carries at least 5% of the map's irradiance. HDR skies with a sun disc have one; overcast
+/// skies, interiors and low-dynamic-range maps do not.
+///
+/// References:
+/// - P. Debevec, "A Median Cut Algorithm for Light Probe Sampling", SIGGRAPH 2005 posters
+///   (lighting from the energy of an environment map's regions).
+///   https://vgl.ict.usc.edu/Research/MedianCut/MedianCutSampling.pdf
+std::optional<DomeSunExtraction> ExtractDomeSun(const Image& map);
+inline constexpr double kDomeSunThreshold = 0.1;
+
 /// The stars of the StarField at `path`: each one's place from `ernie:stars:rightAscension` and
 /// `ernie:stars:declination` (or `ernie:stars:direction`), and its black-body spectrum from its
 /// temperature (`ernie:stars:temperature`, else `ernie:stars:colorIndex` through

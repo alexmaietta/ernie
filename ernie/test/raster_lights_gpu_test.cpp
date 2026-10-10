@@ -341,6 +341,21 @@ TEST_F(RasterDelegateTest, DomeLightModesShadowLimitAndApproximate) {
     const auto [fullNear, fullFar] = floor();
     EXPECT_LT(fullNear, 0.9f * approximateNear) << "the cube hides some of the sky";
     EXPECT_NEAR(fullFar, approximateFar, 0.02f * approximateFar) << "open floor sees it all";
+    // Floor alongside the cube's face, at the same distance from it, is as occluded everywhere:
+    // the filter smooths the per-pixel rotations' noise away.
+    {
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const auto vars = MapVars(outputs);
+        float low = 1e9f;
+        float high = 0.0f;
+        for (const float y : {-1.0f, 0.0f, 1.0f}) {  // the face's middle, away from its corners
+            const auto [row, col] = PixelOf(scene, 4.5f, y);
+            const float value = At<float>(vars.at("HdrColor"), row, col, 1);
+            low = std::min(low, value);
+            high = std::max(high, value);
+        }
+        EXPECT_LT(high - low, 0.05f * high) << "smooth along the face";
+    }
 
     scene.Set("/World/Sky", tokens::kShadowEnable, false);
     EXPECT_NEAR(floor().first, approximateNear, 0.02f * approximateNear) << "shadows off";
@@ -350,6 +365,58 @@ TEST_F(RasterDelegateTest, DomeLightModesShadowLimitAndApproximate) {
 
     scene.Set("/Render/Settings", tokens::kDomeLightMode, std::string("bright"));
     EXPECT_THROW(delegate.Step(scene), std::invalid_argument);
+}
+
+TEST_F(RasterDelegateTest, TheFullDomeModeShadowsTheSunOfAnHdrSky) {
+    // A sky of 1 with a sun of 3000 in one 2-degree texel, 60 degrees up towards +x, over
+    // FlatScene's floor and a 6 m cube. The full mode lights the sun as a shadowed sun of its own:
+    // the cube shadows the floor on its -x side; the approximate mode leaves the sun in the map,
+    // lighting both sides alike. Open floor gets about the same light either way.
+    Scene scene = FlatScene();
+    scene.Remove("/World/Sun");
+    const std::int64_t rows = 90;
+    const std::int64_t cols = 180;
+    std::vector<float> map(static_cast<std::size_t>(rows * cols * 3), 1.0f);
+    const std::int64_t sunRow = 15;  // 30-32 degrees from the zenith
+    for (int c = 0; c < 3; ++c) {
+        map[static_cast<std::size_t>((sunRow * cols + 0) * 3 + c)] = 3000.0f;  // azimuth 0, +x
+    }
+    scene.Define("/World/Sky", tokens::kDomeLight)
+        .Set(tokens::kIntensity, 1.0)
+        .Write(tokens::kLightTexture, Tensor::Copy<float>(map, {rows, cols, 3}));
+    scene.Define("/World/Box", tokens::kCube)
+        .Set(tokens::kSize, 6.0)
+        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 3.0)))
+        .Set(tokens::kMaterialBinding, Path("/Looks/Grey"));
+    RasterDelegate delegate(*context_);
+    const auto [shadeRow, shadeCol] = PixelOf(scene, -4.5f, 0.0f);
+    const auto [sunnyRow, sunnyCol] = PixelOf(scene, 4.5f, 0.0f);
+    const auto [openRow, openCol] = PixelOf(scene, -12.0f, 12.0f);
+    struct Floor {
+        float shade;
+        float sunny;
+        float open;
+    };
+    const auto floor = [&] {
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const auto vars = MapVars(outputs);
+        const Tensor& hdr = vars.at("HdrColor");
+        return Floor{At<float>(hdr, shadeRow, shadeCol, 1), At<float>(hdr, sunnyRow, sunnyCol, 1),
+                     At<float>(hdr, openRow, openCol, 1)};
+    };
+    const Floor approximate = floor();
+    EXPECT_NEAR(approximate.shade, approximate.sunny, 0.05f * approximate.sunny)
+        << "the sun in the map casts no shadow";
+
+    scene.Define("/Render/Settings", tokens::kRenderSettings)
+        .Set(tokens::kDomeLightMode, std::string("full"));
+    const Floor full = floor();
+    // The sun gives about a third of the light here, so its shadow leaves about two thirds.
+    EXPECT_LT(full.shade, 0.75f * full.sunny) << "the cube shadows the sun";
+    EXPECT_GT(full.shade, 0.5f * full.sunny) << "the rest of the sky still lights the shadow";
+    EXPECT_NEAR(full.sunny, full.open, 0.02f * full.open) << "unshadowed beside the cube";
+    EXPECT_NEAR(full.open, approximate.open, 0.05f * approximate.open)
+        << "the sun's light moved out of the map, not added";
 }
 
 TEST_F(RasterDelegateTest, EmissiveSurfacesShowTheirLuminanceUnlit) {

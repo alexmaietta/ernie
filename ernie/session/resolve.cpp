@@ -1011,6 +1011,122 @@ DomeLight DomeOf(const Scene& scene, const Path& path, const SpectralBands& band
     return dome;
 }
 
+std::optional<DomeSunExtraction> ExtractDomeSun(const Image& map) {
+    const auto rows = static_cast<std::int64_t>(map.height);
+    const auto cols = static_cast<std::int64_t>(map.width);
+    if (rows < 2 || cols < 2) {
+        return std::nullopt;
+    }
+    const double dTheta = M_PI / static_cast<double>(rows);
+    const double dPhi = 2.0 * M_PI / static_cast<double>(cols);
+    const auto luminance = [&](std::int64_t r, std::int64_t c) {
+        const glm::vec4& t = map.At(static_cast<std::uint32_t>(c), static_cast<std::uint32_t>(r));
+        return 0.2126 * t.r + 0.7152 * t.g + 0.0722 * t.b;
+    };
+    const auto solidAngle = [&](std::int64_t r) {
+        return (std::cos(static_cast<double>(r) * dTheta) -
+                std::cos(static_cast<double>(r + 1) * dTheta)) *
+               dPhi;
+    };
+    // The peak, the median and the whole map's irradiance-like total.
+    std::vector<double> values;
+    values.reserve(static_cast<std::size_t>(rows * cols));
+    double total = 0.0;
+    std::int64_t peakRow = 0;
+    std::int64_t peakCol = 0;
+    double peak = -1.0;
+    for (std::int64_t r = 0; r < rows; ++r) {
+        for (std::int64_t c = 0; c < cols; ++c) {
+            const double y = luminance(r, c);
+            values.push_back(y);
+            total += std::max(y, 0.0) * solidAngle(r);
+            if (y > peak) {
+                peak = y;
+                peakRow = r;
+                peakCol = c;
+            }
+        }
+    }
+    std::nth_element(values.begin(), values.begin() + static_cast<std::ptrdiff_t>(values.size() / 2),
+                     values.end());
+    const double median = values[values.size() / 2];
+    if (!(peak > 0.0) || !(total > 0.0) || peak < 20.0 * std::max(median, 1e-12)) {
+        return std::nullopt;
+    }
+    // The region: texels above the threshold connected to the peak (wrapping around in azimuth).
+    const double threshold = kDomeSunThreshold * peak;
+    std::vector<std::uint8_t> inside(static_cast<std::size_t>(rows * cols), 0);
+    std::vector<std::pair<std::int64_t, std::int64_t>> stack{{peakRow, peakCol}};
+    std::vector<std::pair<std::int64_t, std::int64_t>> region;
+    inside[static_cast<std::size_t>(peakRow * cols + peakCol)] = 1;
+    double area = 0.0;
+    const double maxArea = 2.0 * M_PI * (1.0 - std::cos(glm::radians(2.5)));
+    while (!stack.empty()) {
+        const auto [r, c] = stack.back();
+        stack.pop_back();
+        region.emplace_back(r, c);
+        area += solidAngle(r);
+        if (area > maxArea) {
+            return std::nullopt;  // too wide for a sun
+        }
+        for (const auto [dr, dc] : {std::pair{-1, 0}, {1, 0}, {0, -1}, {0, 1}}) {
+            const std::int64_t nr = r + dr;
+            if (nr < 0 || nr >= rows) {
+                continue;
+            }
+            const std::int64_t nc = ((c + dc) % cols + cols) % cols;
+            const auto index = static_cast<std::size_t>(nr * cols + nc);
+            if (inside[index] == 0 && luminance(nr, nc) > threshold) {
+                inside[index] = 1;
+                stack.emplace_back(nr, nc);
+            }
+        }
+    }
+    // The sky around it: the mean of the texels bordering the region.
+    glm::dvec3 border(0.0);
+    double borderCount = 0.0;
+    for (const auto [r, c] : region) {
+        for (const auto [dr, dc] : {std::pair{-1, 0}, {1, 0}, {0, -1}, {0, 1}}) {
+            const std::int64_t nr = r + dr;
+            if (nr < 0 || nr >= rows) {
+                continue;
+            }
+            const std::int64_t nc = ((c + dc) % cols + cols) % cols;
+            if (inside[static_cast<std::size_t>(nr * cols + nc)] == 0) {
+                border += glm::dvec3(
+                    map.At(static_cast<std::uint32_t>(nc), static_cast<std::uint32_t>(nr)));
+                borderCount += 1.0;
+            }
+        }
+    }
+    const glm::dvec3 sky = borderCount > 0.0 ? border / borderCount : glm::dvec3(0.0);
+    DomeSunExtraction extraction;
+    extraction.lighting = map;
+    glm::dvec3 direction(0.0);
+    double energy = 0.0;
+    for (const auto [r, c] : region) {
+        glm::vec4& texel =
+            extraction.lighting.At(static_cast<std::uint32_t>(c), static_cast<std::uint32_t>(r));
+        const glm::dvec3 above = glm::max(glm::dvec3(texel) - sky, glm::dvec3(0.0));
+        const double omega = solidAngle(r);
+        extraction.sun.irradiance += above * omega;
+        const double theta = (static_cast<double>(r) + 0.5) * dTheta;
+        const double phi = (static_cast<double>(c) + 0.5) * dPhi;
+        const double weight = (0.2126 * above.r + 0.7152 * above.g + 0.0722 * above.b) * omega;
+        direction += weight * glm::dvec3(std::sin(theta) * std::cos(phi),
+                                         std::sin(theta) * std::sin(phi), std::cos(theta));
+        energy += weight;
+        texel = glm::vec4(glm::vec3(sky), texel.a);
+    }
+    if (energy < 0.05 * total || glm::length(direction) == 0.0) {
+        return std::nullopt;  // a highlight, not what lights the scene
+    }
+    extraction.sun.direction = glm::normalize(direction);
+    // The region's area as a disc's.
+    extraction.sun.angle = glm::degrees(2.0 * std::acos(std::max(1.0 - area / (2.0 * M_PI), -1.0)));
+    return extraction;
+}
+
 std::optional<Image> DomeMapOf(const Scene& scene, const Path& path) {
     const Tensor* texture = scene.Read(path, tokens::kLightTexture);
     if (texture == nullptr) {

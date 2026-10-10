@@ -277,6 +277,11 @@ class RasterDelegate : public RenderDelegate {
     void SyncHeightfield(const Scene& scene, const Path& terrain);
     /// Uploads the map of the frame's dome and the stars of its StarField when they change.
     void SyncSky(const Scene& scene, const RenderPrims& prims);
+    /// Lights `frame` with the sun found in its dome's map (`domeSun_`) in the full dome lighting
+    /// mode: as the frame's sun (with its cascades, and no ambient fraction, since the dome is the
+    /// sky) when it has none, else as a shadowed distant light; the dome then lights with its
+    /// map without the sun.
+    void ApplyDomeSun(FrameParams& frame) const;
     void SyncMeshes(const Scene& scene);
     void SyncInstancers(const Scene& scene);
     /// Hands the meshes' drawable the arrays of prims posed on the GPU that changed, one
@@ -371,6 +376,11 @@ class RasterDelegate : public RenderDelegate {
     RenderPrims prims_;
     std::optional<Key> heightfield_;
     std::optional<Key> domeMap_;  ///< The dome map last uploaded, and its dome.
+    /// Whether the last upload looked for a sun in the map (the full dome lighting mode, with the
+    /// dome's shadows on), the sun it found, and the map without it (`ExtractDomeSun`).
+    bool domeSunWanted_ = false;
+    std::optional<DomeSun> domeSun_;
+    Tensor domeLightingMap_;
     /// The temporal filters' state per product: two images, the last frame's and the next's.
     struct SensorState {
         std::array<std::unique_ptr<GpuImage>, 2> images;

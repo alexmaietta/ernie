@@ -165,6 +165,9 @@ constexpr DescriptorBinding kShadingBindings[] = {
     {13, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {14, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {16, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {17, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {18, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
 };
 
 constexpr DescriptorBinding kFilterBindings[] = {
@@ -587,6 +590,12 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
     SetDomeMap(nullptr);
     SetStars({});
     SkyPipeline(false);
+    noOcclusion_ = std::make_unique<GpuImage>(
+        context_, ImageDesc{1, 1, 1, 1, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT,
+                            false, true});
+    context_.Submit([this](VkCommandBuffer commands) {
+        noOcclusion_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    });
 
     const std::vector<ShaderModuleSource> hzbModules{{"hzb", shaders::kHzbSlang}};
     const std::vector<ShaderModuleSource> pyramidModules{{"pyramid", shaders::kPyramidSlang}};
@@ -729,6 +738,19 @@ const RasterMaterial& RasterRenderer::MaterialOrDefault(std::uint32_t id) const 
 }
 
 void RasterRenderer::SetDomeMap(const Image* map) {
+    SetDomeMap(map, nullptr);
+}
+
+void RasterRenderer::SetDomeMap(const Image* map, const Image* lighting) {
+    auto image = UploadDomeMap(map);
+    auto lit = lighting != nullptr ? UploadDomeMap(lighting) : nullptr;
+    vkDeviceWaitIdle(context_.Device());
+    domeMap_ = std::move(image);
+    domeLighting_ = std::move(lit);
+    hasDomeMap_ = map != nullptr;
+}
+
+std::unique_ptr<GpuImage> RasterRenderer::UploadDomeMap(const Image* map) const {
     if (map != nullptr) {
         if (map->width == 0 || map->height == 0 ||
             map->pixels.size() != static_cast<std::size_t>(map->width) * map->height) {
@@ -751,9 +773,7 @@ void RasterRenderer::SetDomeMap(const Image* map) {
         spans.push_back(std::as_bytes(std::span(mip.pixels)));
     }
     image->Upload(spans);
-    vkDeviceWaitIdle(context_.Device());
-    domeMap_ = std::move(image);
-    hasDomeMap_ = map != nullptr;
+    return image;
 }
 
 void RasterRenderer::SetStars(std::span<const Star> stars) {
@@ -1470,6 +1490,16 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
     const bool domeShadowed = params.dome && params.dome->shadow &&
                               params.domeMode == DomeLightMode::Full && !params.camera.pushbroom;
     shading.domeLighting[0] = domeShadowed ? 1.0f : 0.0f;
+    domeShadowed_ = domeShadowed;
+    if (domeShadowed && occlusionPipeline_ == nullptr) {
+        // The occlusion passes share shading's module, composed with the first model, which they
+        // ignore.
+        const auto modules = ShadingModules(brdfs_.Models().front(), false);
+        occlusionPipeline_ = std::make_unique<ComputePipeline>(
+            context_, shadingLayout_, compiler_.CompileSpirv(modules, "occlusionMain"));
+        occlusionFilterPipeline_ = std::make_unique<ComputePipeline>(
+            context_, shadingLayout_, compiler_.CompileSpirv(modules, "occlusionFilterMain"));
+    }
     shading.domeLighting[1] = params.domeMode == DomeLightMode::Limited ? 0.0f : 1.0f;
     shading.domeLighting[2] = params.domeShadowRadius;
     shading.domeLighting[3] = 32.0f;
@@ -2305,6 +2335,21 @@ void RasterRenderer::Shade(VkCommandBuffer commands, RenderTargets& targets,
     const std::uint32_t views = targets.RasterLayers();
     {
         ERNIE_GPU_ZONE(context_, commands, "Shading");
+        if (domeShadowed_) {
+            for (std::unique_ptr<GpuImage>& image : occlusion_) {
+                if (image == nullptr || image->Desc().width != extent_.width ||
+                    image->Desc().height != extent_.height || image->Desc().layers != views) {
+                    if (image != nullptr) {
+                        vkDeviceWaitIdle(context_.Device());
+                    }
+                    image = std::make_unique<GpuImage>(
+                        context_, ImageDesc{extent_.width, extent_.height, views, 1,
+                                            VK_FORMAT_R16G16B16A16_SFLOAT,
+                                            VK_IMAGE_USAGE_STORAGE_BIT, false, true});
+                }
+                image->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+            }
+        }
         const DescriptorResource shading[] = {DescriptorResource::Of(shadingUniforms_),
                                               sampled(targets.GBuffer(0)),
                                               sampled(targets.GBuffer(1)),
@@ -2320,7 +2365,27 @@ void RasterRenderer::Shade(VkCommandBuffer commands, RenderTargets& targets,
                                               DescriptorResource::Of(lightViewMatrices_),
                                               sampled(*domeMap_),
                                               DescriptorResource::Of(*stars_),
-                                              DescriptorResource::Of(*starCells_)};
+                                              DescriptorResource::Of(*starCells_),
+                                              sampled(domeLighting_ != nullptr ? *domeLighting_
+                                                                               : *domeMap_),
+                                              general(occlusion_[0] != nullptr ? *occlusion_[0]
+                                                                               : *noOcclusion_),
+                                              general(occlusion_[1] != nullptr ? *occlusion_[1]
+                                                                               : *noOcclusion_)};
+        // Dome occlusion for the full dome lighting mode: per pixel, then filtered, before
+        // shading reads it.
+        if (domeShadowed_ && occlusionPipeline_ != nullptr) {
+            ERNIE_GPU_ZONE(context_, commands, "Dome occlusion");
+            const std::uint32_t constants[4] = {0, firstView, 0, 0};
+            for (const ComputePipeline* pipeline :
+                 {occlusionPipeline_.get(), occlusionFilterPipeline_.get()}) {
+                vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->Handle());
+                shadingLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, shading);
+                shadingLayout_.PushConstants(commands, constants, sizeof(constants));
+                vkCmdDispatch(commands, groupsX, groupsY, views);
+                ShaderBarrier(commands);
+            }
+        }
         for (const std::size_t model : modelsInUse_) {
             vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                               shadingPipelines_.at({model, pushbroom_})->Handle());
@@ -2579,7 +2644,8 @@ std::uint64_t RasterRenderer::GpuBytes() const {
                           lightViewMatrices_.Size() + sigmoidTable_.Bytes() +
                           shadingUniforms_.Size() + sensorUniforms_.Size() +
                           (materialTable_ != nullptr ? materialTable_->Size() : 0) +
-                          overlays_->GpuBytes() + domeMap_->Bytes() + stars_->Size() +
+                          overlays_->GpuBytes() + domeMap_->Bytes() +
+                          (domeLighting_ != nullptr ? domeLighting_->Bytes() : 0) + stars_->Size() +
                           starCells_->Size();
     for (const auto& [id, material] : materials_) {
         bytes += material->GpuBytes();

@@ -174,6 +174,12 @@ class RasterRenderer {
     /// @throws std::invalid_argument for an empty map or one larger than the device allows.
     void SetDomeMap(const Image* map);
 
+    /// As `SetDomeMap(map)`, with `lighting` (when not nullptr) lighting the scene in its place:
+    /// the map without a sun lit as a distant light of its own (`ExtractDomeSun`), while the sky
+    /// still shows the sun.
+    /// @throws std::invalid_argument as `SetDomeMap`.
+    void SetDomeMap(const Image* map, const Image* lighting);
+
     /// Sets the stars (`StarsOf`) drawn behind the scene while frames have `FrameParams::stars`,
     /// binned into cells of a degree for each pixel to gather the stars around it.
     void SetStars(std::span<const Star> stars);
@@ -576,6 +582,20 @@ class RasterRenderer {
     static constexpr std::uint32_t kStarColumns = 360;
     static constexpr std::uint32_t kStarRows = 180;
     std::unique_ptr<GpuImage> domeMap_;
+    /// The map that lights the scene when it differs from `domeMap_` (shading.slang's binding 16).
+    std::unique_ptr<GpuImage> domeLighting_;
+    /// `map` (a white texel for nullptr) as a float image with its mips.
+    std::unique_ptr<GpuImage> UploadDomeMap(const Image* map) const;
+
+    /// Dome occlusion (the full dome lighting mode): whether this frame computes it, the passes
+    /// (shading.slang's `occlusionMain` and `occlusionFilterMain`, made the first time a frame
+    /// does), and their per-view images, raw then filtered, made at the frame's size when first
+    /// needed; a placeholder texel binds in their place otherwise.
+    bool domeShadowed_ = false;
+    std::unique_ptr<ComputePipeline> occlusionPipeline_;
+    std::unique_ptr<ComputePipeline> occlusionFilterPipeline_;
+    mutable std::array<std::unique_ptr<GpuImage>, 2> occlusion_;
+    std::unique_ptr<GpuImage> noOcclusion_;
     bool hasDomeMap_ = false;
     std::unique_ptr<GpuBuffer> stars_;
     std::unique_ptr<GpuBuffer> starCells_;

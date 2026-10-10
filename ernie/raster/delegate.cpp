@@ -616,18 +616,72 @@ void RasterDelegate::SyncHeightfield(const Scene& scene, const Path& terrain) {
     }
 }
 
+void RasterDelegate::ApplyDomeSun(FrameParams& frame) const {
+    if (!domeSun_ || !frame.dome || frame.domeMode != DomeLightMode::Full ||
+        !frame.dome->shadow || domeLightingMap_.Empty()) {
+        return;
+    }
+    // The dome's frame turned into the world, as `DomeOf` turned its map.
+    const glm::dmat3 rotation = glm::transpose(glm::dmat3(frame.dome->toDome));
+    frame.dome->sh = DomeIrradianceSh(domeLightingMap_, rotation);
+    // The sun's spectral irradiance: the dome's spectral radiance times the sun's colour,
+    // upsampled as the dome's map is, times its RGB irradiance.
+    const glm::dvec3 rgb = domeSun_->irradiance;
+    const double peak = std::max({rgb.r, rgb.g, rgb.b});
+    const std::vector<float> shape = RgbToSpectrum(rgb / peak).Bin(frame.camera.bands);
+    std::vector<float> spectrum(frame.dome->radiance.size(), 0.0f);
+    for (std::size_t b = 0; b < spectrum.size() && b < shape.size(); ++b) {
+        spectrum[b] = static_cast<float>(frame.dome->radiance[b] * shape[b] * peak);
+    }
+    const glm::vec3 towards(glm::normalize(rotation * domeSun_->direction));
+    if (!frame.sun) {
+        frame.sun = true;
+        frame.sunDirection = towards;
+        frame.sunAngle = static_cast<float>(domeSun_->angle);
+        frame.sunIrradiance = std::move(spectrum);
+        frame.shadows.enabled = true;
+        frame.ambient = 0.0f;
+        return;
+    }
+    Light sun;
+    sun.type = LightType::Distant;
+    sun.direction = towards;
+    sun.spectrum = std::move(spectrum);
+    sun.shadows = true;
+    frame.lights.push_back(std::move(sun));
+}
+
 void RasterDelegate::SyncSky(const Scene& scene, const RenderPrims& prims) {
     ERNIE_ZONE("Sync sky");
     using namespace tokens;
     const std::optional<Key> map =
         prims.dome.IsEmpty() ? std::nullopt
                              : std::optional(KeyOf(scene, prims.dome, {kLightTexture}));
-    if (map != domeMap_) {
+    // The full dome lighting mode, with the dome's shadows on, lights its map's sun on its own.
+    const bool wantSun = !prims.dome.IsEmpty() &&
+                         GetToken(scene, prims.settings, kDomeLightMode, "approximate") == "full" &&
+                         GetBool(scene, prims.dome, kShadowEnable, true);
+    if (map != domeMap_ || wantSun != domeSunWanted_) {
         domeMap_ = map;
+        domeSunWanted_ = wantSun;
+        domeSun_.reset();
+        domeLightingMap_ = Tensor();
         try {
             const std::optional<Image> image =
                 prims.dome.IsEmpty() ? std::nullopt : DomeMapOf(scene, prims.dome);
-            renderer_.SetDomeMap(image ? &*image : nullptr);
+            const std::optional<DomeSunExtraction> extraction =
+                wantSun && image ? ExtractDomeSun(*image) : std::nullopt;
+            if (extraction) {
+                domeSun_ = extraction->sun;
+                const Image& lit = extraction->lighting;
+                const auto* values = reinterpret_cast<const float*>(lit.pixels.data());
+                domeLightingMap_ = Tensor::Copy<float>(
+                    std::span(values, lit.pixels.size() * 4),
+                    {static_cast<std::int64_t>(lit.height), static_cast<std::int64_t>(lit.width),
+                     4});
+            }
+            renderer_.SetDomeMap(image ? &*image : nullptr,
+                                 extraction ? &extraction->lighting : nullptr);
         } catch (const std::invalid_argument& error) {
             renderer_.SetDomeMap(nullptr);
             throw UploadError(prims.dome, kLightTexture, error.what());
@@ -1788,6 +1842,7 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
         ERNIE_ZONE("FrameParamsOf");
         return FrameParamsOf(scene, prims_, extent.width, extent.height);
     }();
+    ApplyDomeSun(frame);
     frame.filters.assign(filters.begin(), filters.end());
     // One chain needs no chains of its own: `filters` and `vars` run as it (its filters, which
     // are a var's own when every var has the same).

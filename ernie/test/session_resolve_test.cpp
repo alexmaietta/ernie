@@ -572,3 +572,58 @@ TEST(FrameOf, ReadsTheAuthoredFrame) {
     scene.Set("/Render/Settings", tokens::kFrame, 2.5);
     EXPECT_THROW(ernie::FrameOf(scene, Path("/Render/Settings")), std::invalid_argument);
 }
+
+TEST(ExtractDomeSun, FindsACompactBrightSunAndLeavesTheSky) {
+    // A sky of 1 at a degree per texel, with a sun of 5000 a degree in radius, 40 degrees from
+    // the zenith at azimuth 60 degrees.
+    const std::uint32_t rows = 180;
+    const std::uint32_t cols = 360;
+    const auto direction = [&](std::uint32_t r, std::uint32_t c) {
+        const double theta = (r + 0.5) * M_PI / rows;
+        const double phi = (c + 0.5) * 2.0 * M_PI / cols;
+        return glm::dvec3(std::sin(theta) * std::cos(phi), std::sin(theta) * std::sin(phi),
+                          std::cos(theta));
+    };
+    const glm::dvec3 towards(std::sin(glm::radians(40.0)) * std::cos(glm::radians(60.0)),
+                             std::sin(glm::radians(40.0)) * std::sin(glm::radians(60.0)),
+                             std::cos(glm::radians(40.0)));
+    ernie::Image map(cols, rows, glm::vec4(1.0f));
+    double sunOmega = 0.0;
+    for (std::uint32_t r = 0; r < rows; ++r) {
+        for (std::uint32_t c = 0; c < cols; ++c) {
+            if (glm::dot(direction(r, c), towards) > std::cos(glm::radians(1.0))) {
+                map.At(c, r) = glm::vec4(5000.0f, 4000.0f, 3000.0f, 1.0f);
+                sunOmega += (std::cos(r * M_PI / rows) - std::cos((r + 1) * M_PI / rows)) *
+                            2.0 * M_PI / cols;
+            }
+        }
+    }
+    const std::optional<ernie::DomeSunExtraction> found = ernie::ExtractDomeSun(map);
+    ASSERT_TRUE(found.has_value());
+    EXPECT_GT(glm::dot(found->sun.direction, towards), std::cos(glm::radians(0.5)));
+    EXPECT_NEAR(found->sun.angle, 2.0, 0.5) << "a degree in radius";
+    EXPECT_NEAR(found->sun.irradiance.r, 4999.0 * sunOmega, 1e-3 * 4999.0 * sunOmega)
+        << "what the sun adds above the sky";
+    EXPECT_NEAR(found->sun.irradiance.b / found->sun.irradiance.r, 2999.0 / 4999.0, 1e-6);
+    for (const glm::vec4& texel : found->lighting.pixels) {
+        EXPECT_NEAR(texel.r, 1.0f, 1e-6f) << "the sky goes on where the sun was";
+    }
+
+    // No sun: a uniform sky, a broad bright patch, a low-dynamic-range highlight.
+    EXPECT_FALSE(ernie::ExtractDomeSun(ernie::Image(cols, rows, glm::vec4(1.0f))).has_value());
+    ernie::Image broad(cols, rows, glm::vec4(1.0f));
+    ernie::Image mild = broad;
+    for (std::uint32_t r = 0; r < rows; ++r) {
+        for (std::uint32_t c = 0; c < cols; ++c) {
+            const double cosine = glm::dot(direction(r, c), towards);
+            if (cosine > std::cos(glm::radians(10.0))) {
+                broad.At(c, r) = glm::vec4(5000.0f);
+            }
+            if (cosine > std::cos(glm::radians(1.0))) {
+                mild.At(c, r) = glm::vec4(4.0f);
+            }
+        }
+    }
+    EXPECT_FALSE(ernie::ExtractDomeSun(broad).has_value()) << "too wide for a sun";
+    EXPECT_FALSE(ernie::ExtractDomeSun(mild).has_value()) << "not bright enough over the sky";
+}
