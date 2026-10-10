@@ -68,4 +68,4 @@ Packages: `tools/packaging/` builds the DEB, RPM and TGZ packages in a manylinux
 - Write a one-line, imperative commit message describing what changed.
 - CI must pass: formatting, the build and tests on lavapipe, and the wheel.
 
-By contributing, you agree that your contributions are licensed under the [Apache License 2.0](LICENSE).
+By contributing, you agree that your contributions are licensed under the [BSD 3-Clause License](LICENSE).

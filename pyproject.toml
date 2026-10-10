@@ -8,8 +8,8 @@ name = "ernie"
 dynamic = ["version"]
 description = "Efficient Renderer for Natural and Interplanetary Environments: a spectral Vulkan renderer with a USD-style scene and batched cameras"
 readme = "README.md"
-license = "Apache-2.0"
-license-files = ["LICENSE", "NOTICE"]
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
 authors = [{ name = "Alex Maietta" }]
 requires-python = ">=3.12"
 dependencies = ["numpy>=1.26"]

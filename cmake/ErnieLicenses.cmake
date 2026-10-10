@@ -1,4 +1,4 @@
-# ernie_install_licenses(<destination> <component>): Ernie's LICENSE and NOTICE, and the license
+# ernie_install_licenses(<destination> <component>): Ernie's LICENSE, and the license
 # of every third-party library built into Ernie's binaries, as <destination>/third_party/<name>/.
 # For the packages (ErnieInstall.cmake) and the wheel (ernie/python).
 include_guard(GLOBAL)
@@ -7,7 +7,7 @@ include(FetchContent)
 
 function(ernie_install_licenses destination component)
     install(
-        FILES "${PROJECT_SOURCE_DIR}/LICENSE" "${PROJECT_SOURCE_DIR}/NOTICE"
+        FILES "${PROJECT_SOURCE_DIR}/LICENSE"
         DESTINATION "${destination}"
         COMPONENT ${component})
 

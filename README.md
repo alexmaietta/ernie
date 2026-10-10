@@ -218,4 +218,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the build options, testing without a 
 
 ## License
 
-Ernie is licensed under the [Apache License 2.0](LICENSE). The third-party libraries it bundles keep their own licenses, listed in [third_party/README.md](third_party/README.md).
+Ernie is licensed under the [BSD 3-Clause License](LICENSE). The third-party libraries it bundles keep their own licenses, listed in [third_party/README.md](third_party/README.md).

@@ -90,7 +90,7 @@ set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "mesa-vulkan-drivers | vulkan-icd, ${ernie_d
 
 set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
 set(CPACK_RPM_PACKAGE_NAME ernie)
-set(CPACK_RPM_PACKAGE_LICENSE "Apache-2.0")
+set(CPACK_RPM_PACKAGE_LICENSE "BSD-3-Clause")
 set(CPACK_RPM_PACKAGE_GROUP "Applications/Graphics")
 # CPack's RPMs have no weak "Recommends", so the X11 client libraries (small, and no X server) are
 # required; Wayland's and Mesa's drivers are suggested.
