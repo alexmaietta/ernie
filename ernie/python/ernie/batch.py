@@ -56,6 +56,11 @@ class BatchCamera:
     camera's parent (`tokens.POSES`) and sees one world (`tokens.WORLDS`) besides what every
     world shares, or every world for -1. A missing camera is defined with default settings. Until
     the first poses, every view takes the camera's own transform, and views see every world.
+
+    `minimal` draws the product with minimal shading (`tokens.MINIMAL_MODE`) for throughput:
+    "none" (black, for distances, normals and ids alone), "constantDiffuse" (`minimal_color` lit
+    by the sun and ambient) or "texturedDiffuse" (surfaces' diffuse colours so lit), in one
+    forward pass straight into the observations, which then map to CUDA without a copy.
     """
 
     def __init__(
@@ -68,6 +73,8 @@ class BatchCamera:
         resolution: tuple[int, int] = (64, 64),
         render_vars: Iterable[str] = ("LdrColor",),
         product: str | Path = "/Render/BatchCamera",
+        minimal: str | None = None,
+        minimal_color: tuple[float, float, float] | None = None,
     ) -> None:
         if views < 1:
             raise ValueError("A BatchCamera needs at least one view")
@@ -96,9 +103,23 @@ class BatchCamera:
             scene.define(path, tokens.RENDER_VAR).set(tokens.SOURCE_NAME, name)
             var_paths.append(path)
             self._paths[name] = str(path)
-        scene.define(self.product, tokens.RENDER_PRODUCT).set(tokens.CAMERA_REL, self.camera).set(
+        product_prim = scene.define(self.product, tokens.RENDER_PRODUCT)
+        product_prim.set(tokens.CAMERA_REL, self.camera).set(
             tokens.RESOLUTION, self.resolution
         ).set(tokens.ORDERED_VARS, var_paths)
+        if minimal is not None:
+            product_prim.set(tokens.MINIMAL_MODE, minimal)
+        if minimal_color is not None:
+            product_prim.set(tokens.MINIMAL_CONSTANT_COLOR, tuple(minimal_color))
+
+    def map_poses(self, stream: Any = None) -> Any:
+        """The views' poses as a writable CUDA array over the renderer's own memory, holding the
+        poses as they are: write the next step's poses into it on `stream` and call `step()`
+        without poses, and nothing is copied. Map again each step. Needs poses written on the GPU
+        first (a contiguous float32 CUDA array, as `set_poses` takes)."""
+        mapped = self.renderer.map(self.scene, self.camera, tokens.POSES, stream)
+        self.scene.unmap(self.camera, tokens.POSES, stream)
+        return mapped
 
     def set_poses(self, poses: Any, stream: Any = None) -> None:
         """Sets every view's camera-to-world pose under the camera's parent: a (views, 4, 4)

@@ -117,3 +117,30 @@ def test_cuda_observations_match_cpu_ones(renderer, terrain_scene):
         differing = np.mean(~(gap <= 8))
         assert differing < 0.005, name
     assert renderer.take_validation_messages() == []
+
+
+def test_minimal_batch_with_poses_mapped_in_place(renderer):
+    if not renderer.cuda_available:
+        pytest.skip("No CUDA interop on this machine")
+    from test_minimal import boxes_scene
+
+    scene = boxes_scene()
+    camera = BatchCamera(
+        renderer, scene, "/World/Camera", 3, resolution=(48, 32),
+        render_vars=("LdrColor", "PrimId"), minimal="texturedDiffuse",
+    )
+    eyes = [(-20.0, -16.0, 12.0), (0.0, -24.0, 14.0), (20.0, -16.0, 12.0)]
+    poses = np.stack(
+        [np.array(ernie.look_at_transform(e, (0, 0, 1), up=(0, 0, 1)), np.float32) for e in eyes]
+    )
+    first = camera.step(renderer.cuda_upload(poses), device="cpu")
+    assert first["LdrColor"].shape == (3, 32, 48, 4)
+    assert (first["PrimId"] != 0).mean() > 0.2
+    # The next poses written in place into the renderer's own pose buffer.
+    moved = poses[::-1].copy()
+    renderer.cuda_copy(renderer.cuda_upload(moved), camera.map_poses())
+    mapped = camera.step(device="cpu")
+    expected = camera.step(renderer.cuda_upload(moved), device="cpu")
+    for name in ("LdrColor", "PrimId"):
+        np.testing.assert_array_equal(mapped[name], expected[name], err_msg=name)
+    np.testing.assert_array_equal(mapped["PrimId"][0], first["PrimId"][2])
