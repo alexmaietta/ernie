@@ -67,8 +67,10 @@ float filteredChecker(float2 p) {
     return 0.5 - 0.5 * i.x * i.y;
 }
 
-[shader("fragment")]
-GroundOutput fragmentMain(VertexOutput in) {
+// The plane where a pixel's camera ray meets it, as the G-buffer's fragment writes it; shared by
+// `fragmentMain` and `minimalFragmentMain`, since an entry point calling another hangs Slang's
+// entry-point parameter lowering (translateEntryPointInParamToBorrow, Slang 2026.19).
+GroundOutput shadeGround(VertexOutput in) {
     let uv = in.position.xy / g.viewport.xy;
     let ndc = float2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
     // A pushbroom's strip is in the frame's uniforms (and its pixels' rays from different poses).
@@ -103,6 +105,11 @@ GroundOutput fragmentMain(VertexOutput in) {
     return out;
 }
 
+[shader("fragment")]
+GroundOutput fragmentMain(VertexOutput in) {
+    return shadeGround(in);
+}
+
 // Minimal shading (`minimalShade`) of what `fragmentMain` writes, at its depth.
 struct GroundMinimalOutput {
     float4 color : SV_Target0;
@@ -134,7 +141,7 @@ GroundMinimalOutput idsFragmentMain(VertexOutput in) {
 
 [shader("fragment")]
 GroundMinimalOutput minimalFragmentMain(VertexOutput in) {
-    let ground = fragmentMain(in);
+    let ground = shadeGround(in);
     GBuffer g;
     g.normal = ground.normal;
     g.albedo = ground.albedo;

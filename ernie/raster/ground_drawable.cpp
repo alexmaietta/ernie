@@ -86,9 +86,12 @@ void GroundDrawable::CreatePipeline(bool pushbroom) {
     if (!pushbroom && minimalPipelines_[0] == nullptr) {
         const char* const entries[] = {"minimalFragmentMain", "idsFragmentMain"};
         for (std::size_t i = 0; i < minimalPipelines_.size(); ++i) {
+            // Kept alive until the pipeline is made: the desc only spans it.
+            const std::vector<std::uint32_t> minimalFragment =
+                renderer_.Compiler().CompileSpirv(modules, entries[i]);
             GraphicsPipelineDesc minimal;
             minimal.vertexSpirv = vertex;
-            minimal.fragmentSpirv = renderer_.Compiler().CompileSpirv(modules, entries[i]);
+            minimal.fragmentSpirv = minimalFragment;
             minimal.colorFormats.assign(MinimalTargets::kColorFormats.begin(),
                                         MinimalTargets::kColorFormats.end());
             minimal.depthFormat = MinimalTargets::kDepthFormat;

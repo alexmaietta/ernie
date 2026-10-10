@@ -539,9 +539,12 @@ void MeshDrawable::CreateMinimalPipelines() {
     const char* const entries[] = {"meshMinimalFragmentMain", "meshMinimalCutoutFragmentMain",
                                    "meshIdsFragmentMain", "meshIdsCutoutFragmentMain"};
     for (std::size_t i = 0; i < minimalPipelines_.size(); ++i) {
+        // Kept alive until the pipeline is made: the desc only spans it.
+        const std::vector<std::uint32_t> fragment =
+            renderer_.Compiler().CompileSpirv(modules, entries[i]);
         GraphicsPipelineDesc desc;
         desc.vertexSpirv = vertex;
-        desc.fragmentSpirv = renderer_.Compiler().CompileSpirv(modules, entries[i]);
+        desc.fragmentSpirv = fragment;
         desc.colorFormats.assign(MinimalTargets::kColorFormats.begin(),
                                  MinimalTargets::kColorFormats.end());
         desc.depthFormat = MinimalTargets::kDepthFormat;
