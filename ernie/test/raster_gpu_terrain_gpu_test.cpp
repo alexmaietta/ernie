@@ -43,11 +43,13 @@ Scene FramedTerrain(const TestRaster& raster) {
     Scene scene = TerrainScene(raster);
     ernie::OrbitController orbit;
     orbit.pitch = 0.8f;
-    const glm::vec3 low(static_cast<float>(raster.originX),
-                        static_cast<float>(raster.originY - static_cast<double>(raster.height) * raster.cellSize),
-                        -60.0f);
-    const glm::vec3 high(static_cast<float>(raster.originX + static_cast<double>(raster.width) * raster.cellSize),
-                         static_cast<float>(raster.originY), 60.0f);
+    const glm::vec3 low(
+        static_cast<float>(raster.originX),
+        static_cast<float>(raster.originY - static_cast<double>(raster.height) * raster.cellSize),
+        -60.0f);
+    const glm::vec3 high(
+        static_cast<float>(raster.originX + static_cast<double>(raster.width) * raster.cellSize),
+        static_cast<float>(raster.originY), 60.0f);
     orbit.Frame(low, high);
     ernie::SetCamera(scene, "/World/Camera", orbit.MakeCamera(kSize, kSize));
     return scene;

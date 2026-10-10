@@ -28,8 +28,8 @@ class OverlayPass {
   public:
     /// Pipelines for LdrColor's format and `presentFormat`.
     /// @throws std::runtime_error if they cannot be created.
-    OverlayPass(const VulkanContext& context, const ShaderCompiler& compiler,
-                FrameUploads& uploads, VkFormat presentFormat);
+    OverlayPass(const VulkanContext& context, const ShaderCompiler& compiler, FrameUploads& uploads,
+                VkFormat presentFormat);
     ~OverlayPass();
     OverlayPass(const OverlayPass&) = delete;
     OverlayPass& operator=(const OverlayPass&) = delete;

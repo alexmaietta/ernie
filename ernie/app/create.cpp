@@ -51,8 +51,7 @@ constexpr CreatableType kTypes[] = {
 /// Places the prim at `path` at world `at`, scaled by `scale`, under its parent.
 void Place(Scene& scene, const Path& path, const CreateContext& context, const glm::dvec3& at,
            double scale) {
-    const glm::dmat4 world =
-        glm::scale(glm::translate(glm::dmat4(1.0), at), glm::dvec3(scale));
+    const glm::dmat4 world = glm::scale(glm::translate(glm::dmat4(1.0), at), glm::dvec3(scale));
     scene.Set(path, kTransform, glm::inverse(context.parentWorld) * world);
 }
 
@@ -132,8 +131,7 @@ void AuthorDefaultPrim(Scene& scene, const Path& path, std::string_view type,
             }
         }
         const Path prototype = path.Child("Prototype");
-        scene.Define(prototype, kSphere).Set(kGeomRadius, 0.3).Set(kDisplayColor,
-                                                                    glm::vec3(0.7f));
+        scene.Define(prototype, kSphere).Set(kGeomRadius, 0.3).Set(kDisplayColor, glm::vec3(0.7f));
         scene.Write(path, kPositions, Tensor::Copy<float>(positions, {25, 3}));
         scene.Set(path, kPrototypes, std::vector<Path>{prototype});
         Place(scene, path, context, context.target, s);
@@ -166,14 +164,14 @@ void AuthorDefaultPrim(Scene& scene, const Path& path, std::string_view type,
         // A clear sky gives about a tenth of the sun's light: 10000 lux next to photometric
         // lights, 0.1 next to relative ones, and 1 when it is the stage's only light.
         switch (LightUnitsOf(scene, path)) {
-            case StageLightUnits::Photometric:
-                scene.Set(path, kPhotometricIlluminance, 10000.0);
-                break;
-            case StageLightUnits::Relative:
-                scene.Set(path, kIntensity, 0.1);
-                break;
-            case StageLightUnits::None:
-                break;
+        case StageLightUnits::Photometric:
+            scene.Set(path, kPhotometricIlluminance, 10000.0);
+            break;
+        case StageLightUnits::Relative:
+            scene.Set(path, kIntensity, 0.1);
+            break;
+        case StageLightUnits::None:
+            break;
         }
     } else if (type == kStarField) {
         // A made-up naked-eye sky until a catalogue replaces it.

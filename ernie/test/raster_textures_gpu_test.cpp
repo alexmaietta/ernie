@@ -125,8 +125,7 @@ TEST_F(RasterDelegateTest, AlbedoTexturesFollowTextureCoordinatesWithTheImageUpr
         .SetTexture(Tensor::Copy<std::uint8_t>(texels, {2, 2, 4}))
         .SetWrapS("clamp")
         .SetWrapT("clamp");
-    ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor, "/Looks/M/Tex",
-                   "outputs:rgb");
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor, "/Looks/M/Tex", "outputs:rgb");
     RasterDelegate delegate(*context_);
     const Tensor ldr = Render(delegate, scene, "LdrColor");
     const auto colour = [&](float x, float y) {
@@ -138,7 +137,8 @@ TEST_F(RasterDelegateTest, AlbedoTexturesFollowTextureCoordinatesWithTheImageUpr
     const glm::ivec3 bottomLeft = colour(-4.0f, -4.0f);
     const glm::ivec3 bottomRight = colour(4.0f, -4.0f);
     const auto leads = [](glm::ivec3 rgb, int channel) {
-        return rgb[channel] > rgb[(channel + 1) % 3] + 80 && rgb[channel] > rgb[(channel + 2) % 3] + 80;
+        return rgb[channel] > rgb[(channel + 1) % 3] + 80 &&
+               rgb[channel] > rgb[(channel + 2) % 3] + 80;
     };
     EXPECT_TRUE(leads(topLeft, 0)) << "red " << topLeft.r << " " << topLeft.g << " " << topLeft.b;
     EXPECT_TRUE(leads(topRight, 1)) << "green";
@@ -172,8 +172,7 @@ TEST_F(RasterDelegateTest, NormalMapsTiltTheSurfaceAlongItsTextureCoordinates) {
     const float flat = CentreGreen(delegate, scene);
     ASSERT_GT(flat, 0.0f);
 
-    ernie::Connect(scene, "/Looks/M/Surface", tokens::kNormalInput, "/Looks/M/Tex",
-                   "outputs:rgb");
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kNormalInput, "/Looks/M/Tex", "outputs:rgb");
     const float towards = CentreGreen(delegate, scene);
     const auto cosine = [](double degrees) {
         return static_cast<float>(std::cos(glm::radians(degrees)));

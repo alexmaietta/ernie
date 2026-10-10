@@ -16,8 +16,8 @@ glm::dmat4 InterpolatePose(const glm::dmat4& from, const glm::dmat4& to, double 
     const auto split = [](const glm::dmat4& pose, glm::dquat& rotation, glm::dvec3& scale) {
         const glm::dmat3 linear(pose);
         scale = {glm::length(linear[0]), glm::length(linear[1]), glm::length(linear[2])};
-        rotation = glm::quat_cast(glm::dmat3(linear[0] / scale.x, linear[1] / scale.y,
-                                             linear[2] / scale.z));
+        rotation = glm::quat_cast(
+            glm::dmat3(linear[0] / scale.x, linear[1] / scale.y, linear[2] / scale.z));
     };
     glm::dquat a;
     glm::dquat b;
@@ -171,9 +171,8 @@ FrameParams FrameParams::Subframes() const {
         const double s = 1.0 + camera.SubframeTime(k);
         for (std::size_t v = 0; v < views; ++v) {
             const glm::dmat4& pose = poses.empty() ? camera.transform : poses[v];
-            result.poses.push_back(previousPoses.empty()
-                                       ? pose
-                                       : InterpolatePose(previousPoses[v], pose, s));
+            result.poses.push_back(
+                previousPoses.empty() ? pose : InterpolatePose(previousPoses[v], pose, s));
             result.worlds.push_back(ViewWorld(v));
         }
     }

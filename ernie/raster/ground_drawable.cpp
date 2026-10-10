@@ -176,9 +176,8 @@ void GroundDrawable::RecordColor(VkCommandBuffer commands, const RasterFrame& fr
     resources.push_back(
         DescriptorResource::Of(uniforms_, view * kUniformsStride, sizeof(GroundUniforms)));
     const GraphicsPipeline& pipeline =
-        minimal_ != MinimalMode::Off
-            ? *minimalPipelines_[minimal_ == MinimalMode::None ? 1 : 0]
-            : *pipelines_[pushbroom_ ? 1 : 0];
+        minimal_ != MinimalMode::Off ? *minimalPipelines_[minimal_ == MinimalMode::None ? 1 : 0]
+                                     : *pipelines_[pushbroom_ ? 1 : 0];
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.Handle());
     layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, resources);
     vkCmdDraw(commands, 3, 1, 0, 0);

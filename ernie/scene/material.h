@@ -37,10 +37,10 @@ enum class TextureColorSpace {
 /// UsdTransform2d feeding it, which is also glTF's textureInfo with KHR_texture_transform and
 /// MaterialX's image, texcoord and place2d nodes.
 struct TextureReader {
-    std::string file;  ///< Image file, empty when `image` names the texture's tensor instead.
+    std::string file;   ///< Image file, empty when `image` names the texture's tensor instead.
     std::string image;  ///< Path of the Shader prim holding `ernie:texture`, else empty.
     std::string uvSet = "st";  ///< Mesh primvar of the coordinates (without "primvars:").
-    int channel = -1;  ///< The output read: -1 rgb, else one channel (0 r to 3 a).
+    int channel = -1;          ///< The output read: -1 rgb, else one channel (0 r to 3 a).
     TextureWrap wrapS = TextureWrap::Repeat;
     TextureWrap wrapT = TextureWrap::Repeat;
     TextureColorSpace colorSpace = TextureColorSpace::Auto;

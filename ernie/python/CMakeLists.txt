@@ -33,12 +33,18 @@ endif()
 nanobind_add_stub(
     _ernie_stub
     RECURSIVE
-    MODULE ernie._ernie
-    OUTPUT_PATH "${ernie_package_dir}"
-    OUTPUT ${ernie_stubs}
-    MARKER_FILE "${ernie_package_dir}/py.typed"
-    PYTHON_PATH "${CMAKE_BINARY_DIR}/python"
-    DEPENDS _ernie)
+    MODULE
+    ernie._ernie
+    OUTPUT_PATH
+    "${ernie_package_dir}"
+    OUTPUT
+    ${ernie_stubs}
+    MARKER_FILE
+    "${ernie_package_dir}/py.typed"
+    PYTHON_PATH
+    "${CMAKE_BINARY_DIR}/python"
+    DEPENDS
+    _ernie)
 configure_file(ernie/__init__.py "${ernie_package_dir}/__init__.py" COPYONLY)
 configure_file(ernie/app.py "${ernie_package_dir}/app.py" COPYONLY)
 configure_file(ernie/batch.py "${ernie_package_dir}/batch.py" COPYONLY)
@@ -48,8 +54,8 @@ configure_file(ernie/schema.py "${ernie_package_dir}/schema.py" COPYONLY)
 # where nanobind's stubgen cannot see them; -P keeps this directory's ernie/ off the path.
 add_custom_command(
     OUTPUT "${ernie_package_dir}/schema.pyi"
-    COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${CMAKE_BINARY_DIR}/python" ${Python_EXECUTABLE}
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/stub_schema.py" "${ernie_package_dir}/schema.pyi"
+    COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${CMAKE_BINARY_DIR}/python" ${Python_EXECUTABLE} -P
+            "${CMAKE_CURRENT_SOURCE_DIR}/stub_schema.py" "${ernie_package_dir}/schema.pyi"
     DEPENDS _ernie stub_schema.py ernie/schema.py ernie/__init__.py
     COMMENT "Generating the typed prim classes' stubs"
     VERBATIM)
@@ -60,8 +66,13 @@ add_custom_target(_ernie_schema_stub ALL DEPENDS "${ernie_package_dir}/schema.py
 if(SKBUILD)
     install(TARGETS _ernie LIBRARY DESTINATION ernie COMPONENT python)
     install(
-        FILES ernie/__init__.py ernie/app.py ernie/batch.py ernie/demo.py ernie/schema.py
-              "${ernie_package_dir}/schema.pyi" "${ernie_package_dir}/py.typed"
+        FILES ernie/__init__.py
+              ernie/app.py
+              ernie/batch.py
+              ernie/demo.py
+              ernie/schema.py
+              "${ernie_package_dir}/schema.pyi"
+              "${ernie_package_dir}/py.typed"
         DESTINATION ernie
         COMPONENT python)
     install(

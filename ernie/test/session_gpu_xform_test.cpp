@@ -251,18 +251,17 @@ TEST(GpuXform, OtherOpsAndOrdersAreComposedOnTheGpu) {
     EXPECT_TRUE(pose(Order({tokens::kScale}), [](Scene& s, const std::vector<Path>& l) {
                     s.Write(l, tokens::kScale, Cuda({2, 1}));
                 }).composed);
-    EXPECT_TRUE(pose(Order({tokens::kScale, tokens::kTranslate}),
-                     [](Scene& s, const std::vector<Path>& l) {
-                         s.Write(l, tokens::kTranslate, Cuda({2, 3}));
-                         s.Write(l, tokens::kScale, Cuda({2, 3}));
-                     })
-                    .composed);
+    EXPECT_TRUE(
+        pose(Order({tokens::kScale, tokens::kTranslate}), [](Scene& s, const std::vector<Path>& l) {
+            s.Write(l, tokens::kTranslate, Cuda({2, 3}));
+            s.Write(l, tokens::kScale, Cuda({2, 3}));
+        }).composed);
     // Translate, orient and scale in that order stay instance arrays.
-    const GpuXform plain = pose(Order({tokens::kTranslate, tokens::kScale}),
-                                [](Scene& s, const std::vector<Path>& l) {
-                                    s.Write(l, tokens::kTranslate, Cuda({2, 3}));
-                                    s.Write(l, tokens::kScale, Cuda({2, 3}));
-                                });
+    const GpuXform plain =
+        pose(Order({tokens::kTranslate, tokens::kScale}), [](Scene& s, const std::vector<Path>& l) {
+            s.Write(l, tokens::kTranslate, Cuda({2, 3}));
+            s.Write(l, tokens::kScale, Cuda({2, 3}));
+        });
     EXPECT_FALSE(plain.composed);
     EXPECT_FALSE(plain.translate.Empty());
     EXPECT_FALSE(plain.scale.Empty());
@@ -311,8 +310,9 @@ TEST(CameraPoses, RowsOfPositionsAndQuaternionsMatchMatrices) {
     scene.Set(Path("/World/Rig"), tokens::kTranslate, glm::dvec3(100.0, 0.0, 0.0));
     scene.Set(Path("/World/Rig"), tokens::kXformOpOrder, Order({tokens::kTranslate}));
     const glm::dquat q = glm::angleAxis(glm::radians(30.0), glm::normalize(glm::dvec3(1, 2, 3)));
-    const std::array<float, 14> rows{1.0f, 2.0f, 3.0f, float(q.x), float(q.y), float(q.z), float(q.w),
-                                     -4.0f, 0.0f, 9.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+    const std::array<float, 14> rows{1.0f,       2.0f,       3.0f,  float(q.x), float(q.y),
+                                     float(q.z), float(q.w), -4.0f, 0.0f,       9.0f,
+                                     0.0f,       0.0f,       0.0f,  1.0f};
     scene.Write(Path("/World/Rig/Camera"), tokens::kPoses, Tensor::Copy<float>(rows, {2, 7}));
     const Path camera("/World/Rig/Camera");
     const std::vector<glm::dmat4> poses = ernie::ViewPosesOf(scene, std::span(&camera, 1), 64, 48);
@@ -396,8 +396,9 @@ TEST(PrimSets, RefuseRowsOfAnotherCountAndWriteNothingForAMissingPrim) {
                              Tensor::Zeros(DType::Float32, {3, 3})),
                  std::invalid_argument);
     const ernie::PrimSet withMissing({links[0], Path("/Missing")});
-    EXPECT_THROW(scene.Write(withMissing, tokens::kTranslate, Tensor::Zeros(DType::Float32, {2, 3})),
-                 std::invalid_argument);
+    EXPECT_THROW(
+        scene.Write(withMissing, tokens::kTranslate, Tensor::Zeros(DType::Float32, {2, 3})),
+        std::invalid_argument);
     EXPECT_EQ(scene.Read(links[0], tokens::kTranslate), nullptr) << "nothing was written";
 }
 

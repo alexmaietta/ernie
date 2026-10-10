@@ -20,7 +20,7 @@ namespace ernie {
 /// Where `RenderVarOutput::Map` delivers an output. The GPU kinds are on the delegate's compute
 /// device (CUDA or ROCm, see `ComputeInterop`); `Cuda` and `CudaArray` are their earlier names.
 enum class MapDevice {
-    Cpu,       ///< A host tensor; the texels are copied to the host.
+    Cpu,  ///< A host tensor; the texels are copied to the host.
     /// A linear tensor on the compute device; the GPU detiles the image into it. Its memory goes
     /// back to the renderer once every copy of the tensor is released, after the work queued by
     /// then on the map's sync stream: read it there, or synchronise before releasing it.

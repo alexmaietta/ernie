@@ -638,8 +638,8 @@ void RasterDelegate::ApplyDomeDirections(FrameParams& frame) const {
         !domeLightingImage_) {
         return;
     }
-    const std::size_t free = RasterRenderer::kMaxLights -
-                             std::min(frame.lights.size(), RasterRenderer::kMaxLights);
+    const std::size_t free =
+        RasterRenderer::kMaxLights - std::min(frame.lights.size(), RasterRenderer::kMaxLights);
     const std::size_t count = std::min<std::size_t>(frame.domeDirections, free);
     if (count == 0) {
         return;
@@ -711,9 +711,9 @@ void RasterDelegate::ApplyDomeSun(FrameParams& frame) const {
 void RasterDelegate::SyncSky(const Scene& scene, const RenderPrims& prims) {
     ERNIE_ZONE("Sync sky");
     using namespace tokens;
-    const std::optional<Key> map =
-        prims.dome.IsEmpty() ? std::nullopt
-                             : std::optional(KeyOf(scene, prims.dome, {kLightTexture}));
+    const std::optional<Key> map = prims.dome.IsEmpty()
+                                       ? std::nullopt
+                                       : std::optional(KeyOf(scene, prims.dome, {kLightTexture}));
     // The full and directions dome lighting modes, with the dome's shadows on, light its map's
     // sun on its own.
     const std::string mode = RenderSettings::OrFallbacks(scene, prims.settings).GetDomeLightMode();
@@ -742,10 +742,9 @@ void RasterDelegate::SyncSky(const Scene& scene, const RenderPrims& prims) {
                 domeSun_ = extraction->sun;
                 const Image& lit = extraction->lighting;
                 const auto* values = reinterpret_cast<const float*>(lit.pixels.data());
-                domeLightingMap_ = Tensor::Copy<float>(
-                    std::span(values, lit.pixels.size() * 4),
-                    {static_cast<std::int64_t>(lit.height), static_cast<std::int64_t>(lit.width),
-                     4});
+                domeLightingMap_ = Tensor::Copy<float>(std::span(values, lit.pixels.size() * 4),
+                                                       {static_cast<std::int64_t>(lit.height),
+                                                        static_cast<std::int64_t>(lit.width), 4});
             }
             renderer_.SetDomeMap(image ? &*image : nullptr,
                                  extraction ? &extraction->lighting : nullptr);
@@ -788,7 +787,8 @@ ComputeInterop& RasterDelegate::RequireCompute() {
     std::string why;
     ComputeInterop* compute = Compute(&why);
     if (compute == nullptr) {
-        throw std::invalid_argument("GPU arrays need compute interop, which is unavailable: " + why);
+        throw std::invalid_argument("GPU arrays need compute interop, which is unavailable: " +
+                                    why);
     }
     if (!meshesOnGpu_) {
         meshes_.SetComputeInterop(compute);
@@ -811,8 +811,7 @@ void RasterDelegate::SetMeshPoints(const Scene& scene, const Path& path, std::ui
     meshes_.SetPoints(handle, points.value_or(std::vector<float>()));
 }
 
-void RasterDelegate::SetMeshAttributes(const Scene& scene, const Path& path,
-                                       std::uint32_t handle) {
+void RasterDelegate::SetMeshAttributes(const Scene& scene, const Path& path, std::uint32_t handle) {
     const Tensor* normals = scene.Read(path, tokens::kNormals);
     if (normals != nullptr && IsGpu(normals->Location().kind)) {
         RequireCompute();
@@ -1055,9 +1054,10 @@ void RasterDelegate::SyncGpuXforms(const Scene& scene) {
     }
     std::map<GpuXformKey, std::vector<Member>> groups;
     for (auto& [arrays, members] : byArrays) {
-        const auto first = std::min_element(
-            members.begin(), members.end(),
-            [](const Member& a, const Member& b) { return a.pose.row < b.pose.row; });
+        const auto first =
+            std::min_element(members.begin(), members.end(), [](const Member& a, const Member& b) {
+                return a.pose.row < b.pose.row;
+            });
         const std::int64_t rows = first->pose.ops.front().second.Shape()[0];
         groups[{first->path, rows}] = std::move(members);
     }
@@ -1182,7 +1182,8 @@ void RasterDelegate::SyncGpuXforms(const Scene& scene) {
                 throw std::invalid_argument(
                     "prims whose poses are composed on the GPU (Euler rotations, matrices, scales "
                     "of one number, ops out of translate, orient, scale order, or GPU-posed prims "
-                    "under others) need '" + std::string(kXformExtent) + "' on each");
+                    "under others) need '" +
+                    std::string(kXformExtent) + "' on each");
             }
             group.members = members.size();
             group.rows = key.second;
@@ -1308,7 +1309,8 @@ std::vector<AnchoredView> RasterDelegate::AnchoredViewsOf(const Scene& scene,
         if (scene.Read(camera, tokens::kPoses) != nullptr) {
             throw std::invalid_argument("Camera '" + camera.String() +
                                         "' renders with cameras under GPU-posed prims, so it "
-                                        "takes no '" + std::string(tokens::kPoses) + "'");
+                                        "takes no '" +
+                                        std::string(tokens::kPoses) + "'");
         }
         AnchoredView view;
         if (!anchors[i]) {
@@ -1354,7 +1356,8 @@ bool RasterDelegate::RefreshGpuXforms(const Scene& scene, std::span<const Change
             }
             Touched& seen = touched[&group];
             for (std::size_t op = 0; op < group.ops.size(); ++op) {
-                const std::pair<Tensor, std::int64_t>* row = scene.RowOf(change.path, group.ops[op]);
+                const std::pair<Tensor, std::int64_t>* row =
+                    scene.RowOf(change.path, group.ops[op]);
                 if (row == nullptr || row->second != posed->second.row) {
                     return false;
                 }
@@ -1463,7 +1466,8 @@ Tensor RasterDelegate::MapArray(Scene& scene, const Path& path, std::string_view
         }
     } else {
         throw std::invalid_argument("Cannot map " + std::string(attribute) + " of '" +
-                                    path.String() + "': only a Mesh's points, a PointInstancer's "
+                                    path.String() +
+                                    "': only a Mesh's points, a PointInstancer's "
                                     "arrays, a Points prim's points, the Terrain's heights and a "
                                     "Camera's poses map");
     }
@@ -1477,9 +1481,9 @@ Tensor RasterDelegate::MapArray(Scene& scene, const PrimSet& prims, std::string_
     Sync(scene);
     const std::vector<Path>& paths = prims.Paths();
     const auto refuse = [&](const std::string& why) {
-        return std::invalid_argument("Cannot map " + std::string(attribute) + " of " +
-                                     (paths.empty() ? "no prims" : "'" + paths.front().String() +
-                                                                       "'...") + ": " + why);
+        return std::invalid_argument(
+            "Cannot map " + std::string(attribute) + " of " +
+            (paths.empty() ? "no prims" : "'" + paths.front().String() + "'...") + ": " + why);
     };
     if (paths.empty()) {
         throw refuse("give the prims of a group posed on the GPU");
@@ -1506,8 +1510,8 @@ Tensor RasterDelegate::MapArray(Scene& scene, const PrimSet& prims, std::string_
     }
     Tensor view;
     if (group.composed) {
-        view = meshes_.MapComposedOp(group.handle,
-                                     static_cast<std::size_t>(op - group.ops.begin()), stream);
+        view = meshes_.MapComposedOp(group.handle, static_cast<std::size_t>(op - group.ops.begin()),
+                                     stream);
     } else {
         const InstanceOpKind kind = InstanceOpKindOf(*op);
         if (kind == InstanceOpKind::Orient && group.wFirst) {
@@ -1559,10 +1563,9 @@ void RasterDelegate::SyncPoints(const Scene& scene) {
             if (points != nullptr && IsGpu(points->Location().kind)) {
                 ComputeInterop& compute = RequireCompute();
                 const auto onDevice = [&](const Tensor* tensor) {
-                    return tensor == nullptr ? Tensor()
-                           : IsGpu(tensor->Location().kind)
-                               ? *tensor
-                               : compute.Upload(*tensor);
+                    return tensor == nullptr                ? Tensor()
+                           : IsGpu(tensor->Location().kind) ? *tensor
+                                                            : compute.Upload(*tensor);
                 };
                 DevicePointsData data;
                 data.points = *points;
@@ -1584,7 +1587,8 @@ void RasterDelegate::SyncPoints(const Scene& scene) {
                 points_.Set(synced.handle, data);
             } else {
                 PointsData data;
-                data.points = FloatAttribute(scene, path, kPoints, 3).value_or(std::vector<float>());
+                data.points =
+                    FloatAttribute(scene, path, kPoints, 3).value_or(std::vector<float>());
                 if (const Tensor* widths = widthsOf(data.width, data.widths)) {
                     data.widths = FloatsOf(*widths, 1, kWidths);
                 }
@@ -1851,8 +1855,8 @@ void RasterDelegate::PrepareSensorState(const Path& key, std::size_t pass, VkExt
     const std::uint32_t layers = views * slots;
     if (layers > context_.Limits().maxImageArrayLayers) {
         throw std::invalid_argument("Temporal sensor filters keep " + std::to_string(slots) +
-                                    " state slots per view, too many for " +
-                                    std::to_string(views) + " views on this device");
+                                    " state slots per view, too many for " + std::to_string(views) +
+                                    " views on this device");
     }
     SensorState& state = sensorStates_[{key, pass}];
     const std::string chain = renderer_.Plan(pass).Key();
@@ -1867,10 +1871,9 @@ void RasterDelegate::PrepareSensorState(const Path& key, std::size_t pass, VkExt
         }
         for (std::unique_ptr<GpuImage>& image : state.images) {
             image = std::make_unique<GpuImage>(
-                context_, ImageDesc{extent.width, extent.height, layers, 1,
-                                    VK_FORMAT_R32G32B32A32_SFLOAT,
-                                    VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false,
-                                    true});
+                context_,
+                ImageDesc{extent.width, extent.height, layers, 1, VK_FORMAT_R32G32B32A32_SFLOAT,
+                          VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false, true});
         }
         state.next = 0;
         state.history = false;
@@ -1891,8 +1894,8 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
                                  std::vector<std::string_view> vars,
                                  std::optional<glm::dmat4> posesParent,
                                  const std::optional<std::string>& overlays,
-                                 std::vector<FrameParams::SensorChain> chains,
-                                 MinimalMode minimal, std::optional<glm::vec3> minimalColor) {
+                                 std::vector<FrameParams::SensorChain> chains, MinimalMode minimal,
+                                 std::optional<glm::vec3> minimalColor) {
     ERNIE_ZONE("UpdatePrims");
     Sync(scene);
     prims_ = prims;
@@ -2017,8 +2020,7 @@ Path RasterDelegate::PrimPath(std::uint32_t id) const {
 
 Path RasterDelegate::Pick(std::uint32_t x, std::uint32_t y) {
     GpuImage* ids = viewTargets_ != nullptr ? viewTargets_->Var(render_vars::kPrimId) : nullptr;
-    if (ids == nullptr || x >= viewTargets_->Extent().width ||
-        y >= viewTargets_->Extent().height) {
+    if (ids == nullptr || x >= viewTargets_->Extent().width || y >= viewTargets_->Extent().height) {
         return {};
     }
     // The caller's frames are submitted outside the context's tracking.
@@ -2063,25 +2065,23 @@ void RasterDelegate::Record(VkCommandBuffer commands, const RenderingTarget& tar
         }
         vkDeviceWaitIdle(context_.Device());
         const std::vector<std::string_view> vars = ViewHeldVars(viewAovs_.size(), viewMotion_);
-        viewTargets_ = std::make_unique<RenderTargets>(context_, extent, renderer_.Bands().count,
-                                                       false, 1, vars, viewAovs_,
-                                                       renderer_.Faces());
+        viewTargets_ =
+            std::make_unique<RenderTargets>(context_, extent, renderer_.Bands().count, false, 1,
+                                            vars, viewAovs_, renderer_.Faces());
     }
     const RasterDrawable* drawables[] = {&terrain_, &planet_, &meshes_, &ground_, &points_};
     renderer_.Record(commands, *viewTargets_, drawables, &target, var);
 }
 
-std::shared_ptr<ProductFrame> RasterDelegate::AcquireFrame(const Path& product, VkExtent2D extent,
-                                                           int bands, std::uint32_t views,
-                                                           bool batched,
-                                                           std::span<const std::string_view> vars,
-                                                           std::span<const std::string> aovs,
-                                                           std::uint32_t faces, bool minimal) {
+std::shared_ptr<ProductFrame>
+RasterDelegate::AcquireFrame(const Path& product, VkExtent2D extent, int bands, std::uint32_t views,
+                             bool batched, std::span<const std::string_view> vars,
+                             std::span<const std::string> aovs, std::uint32_t faces, bool minimal) {
     ERNIE_ZONE("AcquireFrame");
-    const std::vector<std::string_view> held = minimal ? std::vector<std::string_view>{}
-                                                       : RequiredVars(vars);
-    const std::vector<std::string> minimalHeld = minimal ? MinimalTargets::Held(vars)
-                                                         : std::vector<std::string>{};
+    const std::vector<std::string_view> held =
+        minimal ? std::vector<std::string_view>{} : RequiredVars(vars);
+    const std::vector<std::string> minimalHeld =
+        minimal ? MinimalTargets::Held(vars) : std::vector<std::string>{};
     const std::vector<std::string> aovNames(aovs.begin(), aovs.end());
     std::vector<std::shared_ptr<ProductFrame>>& frames = frames_[product];
     const bool shared = compute_ != nullptr;
@@ -2188,18 +2188,17 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         }
         anchoredViews_ = !anchored.empty();
         meshes_.SetAnchoredViews(std::move(anchored));
-        const int bands = (prims.cameraTransform
-                               ? CameraParamsOf(scene, prims.camera, spec.resolution.width,
-                                                spec.resolution.height, *prims.cameraTransform)
-                               : CameraParamsOf(scene, prims.camera, spec.resolution.width,
-                                                spec.resolution.height))
-                              .bands.count;
+        const int bands =
+            (prims.cameraTransform ? CameraParamsOf(scene, prims.camera, spec.resolution.width,
+                                                    spec.resolution.height, *prims.cameraTransform)
+                                   : CameraParamsOf(scene, prims.camera, spec.resolution.width,
+                                                    spec.resolution.height))
+                .bands.count;
         // Poses written as a GPU array stay on the GPU (`GpuPosesOf`), copied device to device
         // after the work writing them, with the last ones rendered as the CPU's estimates; or
         // come to the host for the views' uniforms.
-        const Tensor* gpuPoses = cameras.size() == 1 && !anchoredViews_
-                                     ? GpuPosesOf(scene, cameras.front())
-                                     : nullptr;
+        const Tensor* gpuPoses =
+            cameras.size() == 1 && !anchoredViews_ ? GpuPosesOf(scene, cameras.front()) : nullptr;
         std::optional<Tensor> hostPoses;
         std::vector<glm::dmat4> poses;
         if (anchoredViews_) {
@@ -2208,10 +2207,9 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
             const auto count = static_cast<std::uint32_t>(gpuPoses->Shape()[0]);
             poses = renderer_.LastGpuPoses(count);
             if (poses.empty()) {
-                const glm::dmat4 own =
-                    CameraParamsOf(scene, cameras.front(), spec.resolution.width,
-                                   spec.resolution.height)
-                        .transform;
+                const glm::dmat4 own = CameraParamsOf(scene, cameras.front(), spec.resolution.width,
+                                                      spec.resolution.height)
+                                           .transform;
                 poses.assign(count, own);
             }
         } else {
@@ -2291,8 +2289,7 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
             const std::size_t c = chainOf(own ? *own : spec.filters);
             const auto missing = [&] {
                 return std::invalid_argument("Render var '" + path.String() + "' asks for '" +
-                                             name +
-                                             "', which its sensor filters do not write");
+                                             name + "', which its sensor filters do not write");
             };
             std::string_view held;
             const auto known = std::find(kRenderVarNames.begin(), kRenderVarNames.end(), name);
@@ -2331,9 +2328,8 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
             chains[c].vars.push_back(held);
         }
         // Chains no var asks for do not run.
-        std::erase_if(chains, [](const FrameParams::SensorChain& chain) {
-            return chain.vars.empty();
-        });
+        std::erase_if(chains,
+                      [](const FrameParams::SensorChain& chain) { return chain.vars.empty(); });
         // A wide fisheye draws its views on cube faces, each a layer of the raster images. Its
         // lens alone decides, not its pose (which may be on the GPU).
         const std::uint32_t faces =
@@ -2369,8 +2365,8 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
             } else if (gpuPosesQuaternions_ && QuaternionsWFirst(scene, cameras.front())) {
                 // Position, w, x, y, z into position, x, y, z, w.
                 constexpr std::array<std::size_t, 7> kXyzwOfWxyz{0, 1, 2, 4, 5, 6, 3};
-                RequireCompute().CopyColumnsToBuffer(*gpuPoses, kXyzwOfWxyz,
-                                                     renderer_.PoseBuffer(), 0, stream);
+                RequireCompute().CopyColumnsToBuffer(*gpuPoses, kXyzwOfWxyz, renderer_.PoseBuffer(),
+                                                     0, stream);
             } else {
                 RequireCompute().CopyToBuffer(*gpuPoses, renderer_.PoseBuffer(), 0, stream);
             }

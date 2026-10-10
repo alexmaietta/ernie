@@ -29,24 +29,25 @@ function(ernie_install_licenses destination component)
         endif()
     endmacro()
 
-    foreach(dependency
-            slang
-            vulkan_headers
-            volk
-            vma
-            glm
-            openexr
-            imath
-            meshoptimizer
-            nlohmann_json
-            tracy
-            nanobind
-            dear_imgui
-            implot
-            imguizmo
-            glfw
-            ernie_font_inter_license
-            ernie_font_lucide_license)
+    foreach(
+        dependency
+        slang
+        vulkan_headers
+        volk
+        vma
+        glm
+        openexr
+        imath
+        meshoptimizer
+        nlohmann_json
+        tracy
+        nanobind
+        dear_imgui
+        implot
+        imguizmo
+        glfw
+        ernie_font_inter_license
+        ernie_font_lucide_license)
         FetchContent_GetProperties(${dependency})
     endforeach()
 

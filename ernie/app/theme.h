@@ -28,9 +28,9 @@ struct Theme {
     glm::vec4 error{0.886f, 0.341f, 0.318f, 1.0f};
     glm::vec4 overlay{0.141f, 0.157f, 0.169f, 0.88f};  ///< Viewport toolbar pills and HUD.
 
-    float fontSize = 14.0f;  ///< Text size in pixels at a content scale of 1.
-    float iconSize = 15.0f;  ///< Icon size in pixels at a content scale of 1.
-    float rounding = 3.0f;   ///< Corner radius of frames, tabs and popups.
+    float fontSize = 14.0f;     ///< Text size in pixels at a content scale of 1.
+    float iconSize = 15.0f;     ///< Icon size in pixels at a content scale of 1.
+    float rounding = 3.0f;      ///< Corner radius of frames, tabs and popups.
     float pillRounding = 6.0f;  ///< Corner radius of the viewport's toolbar pills.
     glm::vec2 framePadding{6.0f, 3.0f};
     glm::vec2 itemSpacing{6.0f, 4.0f};

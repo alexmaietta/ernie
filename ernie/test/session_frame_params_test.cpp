@@ -78,8 +78,7 @@ TEST(Shutter, SubframesExpandEachViewAtItsTimes) {
     ASSERT_EQ(subframes.Views(), 6u);
     EXPECT_EQ(subframes.worlds, (std::vector<std::int32_t>{3, 4, 3, 4, 3, 4}));
     ExpectNear(subframes.poses[0], glm::dmat4(1.0));
-    ExpectNear(subframes.poses[3],
-               glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 1.0, 0.0)));
+    ExpectNear(subframes.poses[3], glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 1.0, 0.0)));
     ExpectNear(subframes.poses[4], a);
     // Without a last frame the camera stands still.
     frame.previousPoses.clear();
@@ -176,8 +175,8 @@ TEST(FrameParams, CubeFacesTurnEachViewOntoItsFaces) {
             // The view's position, looking along its face's direction.
             EXPECT_EQ(glm::dvec3(pose[3]), glm::dvec3(frame.poses[v][3]));
             const glm::dvec3 look = -glm::dvec3(pose[2]);
-            const glm::dvec3 expected =
-                glm::dmat3(frame.poses[v]) * -ernie::CubeFaceAxes(static_cast<ernie::CubeFace>(f))[2];
+            const glm::dvec3 expected = glm::dmat3(frame.poses[v]) *
+                                        -ernie::CubeFaceAxes(static_cast<ernie::CubeFace>(f))[2];
             EXPECT_NEAR(glm::distance(look, expected), 0.0, 1e-12) << v << ", " << f;
             EXPECT_EQ(faces.ViewWorld(i), frame.worlds[v]);
         }

@@ -27,7 +27,8 @@ Tensor RenderDelegate::Render(const Scene& scene, const Path& settings, Device d
         }
         if (interop->Location() != device) {
             throw std::invalid_argument("The renderer's Vulkan device is compute device " +
-                                        std::to_string(interop->Device()) + " of another kind or ordinal");
+                                        std::to_string(interop->Device()) +
+                                        " of another kind or ordinal");
         }
     }
     StepOperation step = StepAsync(scene, {}, settings);

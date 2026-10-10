@@ -134,15 +134,14 @@ TEST_F(RasterDelegateTest, MappedHeightsDrawWhereDirtyWithoutCopies) {
     }
     const TestRaster raster = RollingTerrain(65, 65, 2.0);
     Scene scene = TerrainScene(raster);
-    ernie::SetCamera(scene, "/World/Camera",
-                     [] {
-                         ernie::CameraParams camera;
-                         camera.width = kSize;
-                         camera.height = kSize;
-                         camera.transform = ernie::LookAtTransform(
-                             {0.0, -150.0, 120.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
-                         return camera;
-                     }());
+    ernie::SetCamera(scene, "/World/Camera", [] {
+        ernie::CameraParams camera;
+        camera.width = kSize;
+        camera.height = kSize;
+        camera.transform =
+            ernie::LookAtTransform({0.0, -150.0, 120.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
+        return camera;
+    }());
     EXPECT_THROW(delegate.MapArray(scene, "/World/Terrain", tokens::kHeights),
                  std::invalid_argument)
         << "heights on the host";

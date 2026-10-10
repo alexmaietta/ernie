@@ -30,7 +30,7 @@ bool ContainsIgnoringCase(std::string_view text, std::string_view part) {
 
 /// The kinds of prim the filter button shows or hides.
 enum Kind { kGeometry, kLights, kCameras, kMaterials, kRender, kOther, kKinds };
-constexpr const char* kKindNames[kKinds] = {"Geometry", "Lights",  "Cameras",
+constexpr const char* kKindNames[kKinds] = {"Geometry",  "Lights", "Cameras",
                                             "Materials", "Render", "Other"};
 
 Kind KindOf(std::string_view type) {
@@ -40,8 +40,8 @@ Kind KindOf(std::string_view type) {
         type == kTerrain || type == kVolume) {
         return kGeometry;
     }
-    if (type == kDistantLight || type == kSphereLight || type == kRectLight ||
-        type == kDiskLight || type == kDomeLight || type == kStarField) {
+    if (type == kDistantLight || type == kSphereLight || type == kRectLight || type == kDiskLight ||
+        type == kDomeLight || type == kStarField) {
         return kLights;
     }
     if (type == kCamera) {
@@ -152,10 +152,9 @@ class StagePanel final : public Panel {
             const float eye = ImGui::GetFrameHeight();
             ImGui::TableSetupScrollFreeze(0, 1);
             ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
-            ImGui::TableSetupColumn("##visible",
-                                    ImGuiTableColumnFlags_WidthFixed |
-                                        ImGuiTableColumnFlags_NoResize,
-                                    eye);
+            ImGui::TableSetupColumn(
+                "##visible", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize,
+                eye);
             ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed,
                                     7.0f * ImGui::GetFontSize());
             DrawHeaderRow();
@@ -201,8 +200,8 @@ class StagePanel final : public Panel {
             ImGui::OpenPopup("##filters");
         }
         Funnel(draw, ImVec2(corner.x + 0.1f * button, corner.y + 0.1f * button), glyph,
-               Colour(filtering ? theme_.accent : (ImGui::IsItemHovered() ? theme_.text
-                                                                         : theme_.textMuted)));
+               Colour(filtering ? theme_.accent
+                                : (ImGui::IsItemHovered() ? theme_.text : theme_.textMuted)));
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Show prims by kind");
         }
@@ -281,7 +280,8 @@ class StagePanel final : public Panel {
         ImGui::TableSetColumnIndex(0);
         ImGui::PushID(path.String().c_str());
         const std::vector<Path>& selection = viewer.Selection();
-        const bool selected = std::find(selection.begin(), selection.end(), path) != selection.end();
+        const bool selected =
+            std::find(selection.begin(), selection.end(), path) != selection.end();
         const ImVec2 rowStart = ImGui::GetCursorScreenPos();
         if (ImGui::Selectable("##row", selected,
                               ImGuiSelectableFlags_SpanAllColumns |
@@ -345,8 +345,9 @@ class StagePanel final : public Panel {
                 scene.Get<std::string>(path, tokens::kVisibility, "") == tokens::kInvisible;
             const ImVec2 corner = ImGui::GetCursorScreenPos();
             if (ImGui::InvisibleButton("##visibility", ImVec2(height, height))) {
-                viewer.Edit(path, tokens::kVisibility,
-                            std::string(authoredInvisible ? tokens::kInherited : tokens::kInvisible));
+                viewer.Edit(
+                    path, tokens::kVisibility,
+                    std::string(authoredInvisible ? tokens::kInherited : tokens::kInvisible));
             }
             const bool hovered = ImGui::IsItemHovered();
             // Kit's eyes are small and grey, lighting up under the mouse.
@@ -355,8 +356,8 @@ class StagePanel final : public Panel {
                 Colour(hovered ? theme_.text : theme_.textMuted, visible ? 0.9f : 0.45f));
             if (hovered) {
                 ImGui::SetTooltip(authoredInvisible ? "Hidden; click to show"
-                                  : visible         ? "Visible; click to hide"
-                                                    : "Hidden by an ancestor; click to hide it too");
+                                  : visible ? "Visible; click to hide"
+                                            : "Hidden by an ancestor; click to hide it too");
             }
         }
         ImGui::TableSetColumnIndex(2);
@@ -458,9 +459,9 @@ class StagePanel final : public Panel {
             ImGui::SetKeyboardFocusHere();
             renameFocus_ = false;
         }
-        const bool entered = ImGui::InputText("##rename", renameBuffer_.data(), renameBuffer_.size(),
-                                              ImGuiInputTextFlags_EnterReturnsTrue |
-                                                  ImGuiInputTextFlags_AutoSelectAll);
+        const bool entered = ImGui::InputText(
+            "##rename", renameBuffer_.data(), renameBuffer_.size(),
+            ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
         if (entered) {
             try {
                 viewer.Rename(path, renameBuffer_.data());

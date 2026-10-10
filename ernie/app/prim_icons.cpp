@@ -35,9 +35,9 @@ struct Frame {
 void Tripod(ImDrawList* draw, const Frame& at) {
     const float width = std::max(1.2f, at(0.09f));
     const ImVec2 centre = at(0.5f, 0.58f);
-    draw->AddLine(centre, at(0.5f, 0.1f), Rgb(110, 200, 90), width);    // y, green
-    draw->AddLine(centre, at(0.1f, 0.86f), Rgb(225, 80, 70), width);    // x, red
-    draw->AddLine(centre, at(0.9f, 0.86f), Rgb(80, 140, 235), width);   // z, blue
+    draw->AddLine(centre, at(0.5f, 0.1f), Rgb(110, 200, 90), width);   // y, green
+    draw->AddLine(centre, at(0.1f, 0.86f), Rgb(225, 80, 70), width);   // x, red
+    draw->AddLine(centre, at(0.9f, 0.86f), Rgb(80, 140, 235), width);  // z, blue
 }
 
 void Folder(ImDrawList* draw, const Frame& at) {
@@ -164,7 +164,8 @@ void Mountain(ImDrawList* draw, const Frame& at) {
 
 void Film(ImDrawList* draw, const Frame& at) {
     const ImU32 colour = Rgb(127, 166, 194);
-    draw->AddRect(at(0.1f, 0.18f), at(0.9f, 0.82f), colour, at(0.06f), 0, std::max(1.2f, at(0.08f)));
+    draw->AddRect(at(0.1f, 0.18f), at(0.9f, 0.82f), colour, at(0.06f), 0,
+                  std::max(1.2f, at(0.08f)));
     for (const float u : {0.24f, 0.42f, 0.6f, 0.78f}) {
         draw->AddRectFilled(at(u - 0.05f, 0.25f), at(u + 0.05f, 0.32f), colour);
         draw->AddRectFilled(at(u - 0.05f, 0.68f), at(u + 0.05f, 0.75f), colour);

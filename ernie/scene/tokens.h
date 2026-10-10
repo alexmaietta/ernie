@@ -153,8 +153,8 @@ inline constexpr std::string_view kPushbroomLineOffset = "ernie:pushbroom:lineOf
 
 // Physical camera (Ernie): spectral sampling, lens and sensor. Spectra are float arrays of
 // interleaved (wavelength in nm, value) pairs.
-inline constexpr std::string_view kSpectralRange = "ernie:spectral:range";    ///< vec2 nm.
-inline constexpr std::string_view kSpectralBands = "ernie:spectral:bands";    ///< int, 1 to 64.
+inline constexpr std::string_view kSpectralRange = "ernie:spectral:range";  ///< vec2 nm.
+inline constexpr std::string_view kSpectralBands = "ernie:spectral:bands";  ///< int, 1 to 64.
 /// The lens's projection: "perspective" (the default) or "fisheye" (`LensProjection`).
 inline constexpr std::string_view kLensProjection = "ernie:lens:projection";
 inline constexpr std::string_view kFisheye = "fisheye";
@@ -171,7 +171,7 @@ inline constexpr std::string_view kLensRaysStep = "ernie:lens:raysStep";
 /// focal length's shift in millimetres (axial colour, which the `defocus` filter blurs by).
 inline constexpr std::string_view kLensChromaticScale = "ernie:lens:chromatic:scale";
 inline constexpr std::string_view kLensChromaticFocus = "ernie:lens:chromatic:focus";
-inline constexpr std::string_view kLensVignetting = "ernie:lens:vignetting";  ///< bool.
+inline constexpr std::string_view kLensVignetting = "ernie:lens:vignetting";      ///< bool.
 inline constexpr std::string_view kLensTransmission = "ernie:lens:transmission";  ///< fraction.
 inline constexpr std::string_view kSensorType = "ernie:sensor:type";  ///< "rgb" or "mono".
 /// Quantum efficiency spectrum of one channel: append the channel name ("r", "g", "b", "mono").
@@ -191,8 +191,8 @@ inline constexpr std::string_view kSensorBlackLevel = "ernie:sensor:blackLevel";
 /// An orthographic (telecentric) camera's pixel pitch on its sensor, in micrometres: its apertures
 /// span the scene, so they do not give it (`CameraParams::orthographicPixelPitchUm`).
 inline constexpr std::string_view kSensorPixelPitch = "ernie:sensor:pixelPitch";
-inline constexpr std::string_view kSensorNoise = "ernie:sensor:noise";            ///< bool.
-inline constexpr std::string_view kSensorSeed = "ernie:sensor:seed";              ///< int.
+inline constexpr std::string_view kSensorNoise = "ernie:sensor:noise";  ///< bool.
+inline constexpr std::string_view kSensorSeed = "ernie:sensor:seed";    ///< int.
 
 // Lights (UsdLux). A DistantLight shines along the -z axis of its transform, and a SphereLight's
 // cone (ShapingAPI) is around its -z axis.

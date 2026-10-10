@@ -129,9 +129,9 @@ void OverlayPass::Upload(std::unique_ptr<GpuBuffer>& buffer, std::span<const std
     if (buffer->Size() < data.size()) {
         // Earlier frames may still read the old buffer.
         vkDeviceWaitIdle(context_.Device());
-        buffer = std::make_unique<GpuBuffer>(context_, std::max<VkDeviceSize>(data.size(), 4096),
-                                             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                             BufferMemory::Device);
+        buffer =
+            std::make_unique<GpuBuffer>(context_, std::max<VkDeviceSize>(data.size(), 4096),
+                                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
     }
     uploads_.Write(*buffer, data);
 }
@@ -200,17 +200,16 @@ void OverlayPass::Record(VkCommandBuffer commands, const Target& target) const {
     rendering.loadColor = true;
     BeginRendering(commands, rendering);
     const DescriptorResource resources[] = {
-        target.uniforms, DescriptorResource::Of(target.depth),
-        DescriptorResource::Of(*buffers_[0]), DescriptorResource::Of(*buffers_[1]),
-        DescriptorResource::Of(*buffers_[2])};
+        target.uniforms, DescriptorResource::Of(target.depth), DescriptorResource::Of(*buffers_[0]),
+        DescriptorResource::Of(*buffers_[1]), DescriptorResource::Of(*buffers_[2])};
     layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, resources);
     const bool srgb =
         target.format == VK_FORMAT_R8G8B8A8_SRGB || target.format == VK_FORMAT_B8G8R8A8_SRGB;
-    const OverlayConstants constants{
-        {target.world, static_cast<std::int32_t>(target.depthLayer), srgb ? 1 : 0,
-         target.orthographic ? 1 : 0},
-        {static_cast<float>(target.extent.width), static_cast<float>(target.extent.height),
-         target.nearPlane, target.farPlane}};
+    const OverlayConstants constants{{target.world, static_cast<std::int32_t>(target.depthLayer),
+                                      srgb ? 1 : 0, target.orthographic ? 1 : 0},
+                                     {static_cast<float>(target.extent.width),
+                                      static_cast<float>(target.extent.height), target.nearPlane,
+                                      target.farPlane}};
     layout_.PushConstants(commands, &constants, sizeof(constants));
     // Triangles first, so lines and markers on them stay visible.
     constexpr std::array<std::size_t, 3> kOrder{1, 0, 2};

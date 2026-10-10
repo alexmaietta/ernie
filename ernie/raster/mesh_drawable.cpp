@@ -103,16 +103,21 @@ constexpr DescriptorBinding kNormalsBindings[] = {
 
 /// instance_compose.slang's bindings: raw arrays, ops, instance lists, parents, and the pools.
 constexpr DescriptorBinding kComposeBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute}, {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute}, {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute}, {5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
 /// instance_anchors.slang's bindings: records, the pools, and what is written.
 constexpr DescriptorBinding kAnchorBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute}, {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute}, {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
@@ -408,8 +413,8 @@ std::vector<float> LodUvs(const std::vector<std::vector<glm::vec2>>& pointUvs,
             }
         }
         if (weight == 0.0f) {
-            reference = pointUvs[lodIndices[t]].empty() ? glm::vec2(0.0f)
-                                                        : pointUvs[lodIndices[t]][0];
+            reference =
+                pointUvs[lodIndices[t]].empty() ? glm::vec2(0.0f) : pointUvs[lodIndices[t]][0];
         } else {
             reference /= weight;
         }
@@ -447,7 +452,8 @@ MeshDrawable::MeshDrawable(RasterRenderer& renderer)
         {"instance_compose", shaders::kInstanceComposeSlang}};
     composePipeline_ = std::make_unique<ComputePipeline>(
         context_, composeLayout_, renderer_.Compiler().CompileSpirv(compose, "composeMain"));
-    const std::vector<ShaderModuleSource> anchors{{"instance_anchors", shaders::kInstanceAnchorsSlang}};
+    const std::vector<ShaderModuleSource> anchors{
+        {"instance_anchors", shaders::kInstanceAnchorsSlang}};
     anchorPipeline_ = std::make_unique<ComputePipeline>(
         context_, anchorLayout_, renderer_.Compiler().CompileSpirv(anchors, "anchorsMain"));
     const std::vector<ShaderModuleSource> lightViews{{"light_views", shaders::kLightViewsSlang}};
@@ -583,8 +589,8 @@ std::uint32_t MeshDrawable::AddMesh(MeshData data) {
             locked.push_back(at.size() > 1 ? meshopt_SimplifyVertex_Lock : 0);
         }
     }
-    for (const MeshLevel& level : SimplifiedLevels<MeshLevel>(data, kMaxLevels, kMinLodTriangles,
-                                                              mesh.lodIndices, locked)) {
+    for (const MeshLevel& level :
+         SimplifiedLevels<MeshLevel>(data, kMaxLevels, kMinLodTriangles, mesh.lodIndices, locked)) {
         mesh.levels.push_back(level);
     }
     if (!data.uvs.empty()) {
@@ -772,8 +778,7 @@ Tensor MeshDrawable::MapInstances(std::uint32_t instancer, std::size_t array,
     const std::array<std::size_t, 3> components{3, 4, 3};
     const auto count = static_cast<std::int64_t>(target.count);
     const auto view = [&](std::size_t a) {
-        return PoolView(*pools[a],
-                        components[a] * std::size_t{InstanceBase(target) + target.first},
+        return PoolView(*pools[a], components[a] * std::size_t{InstanceBase(target) + target.first},
                         {count, static_cast<std::int64_t>(components[a])});
     };
     compute_->WaitForVulkan(stream);
@@ -789,8 +794,7 @@ Tensor MeshDrawable::MapInstances(std::uint32_t instancer, std::size_t array,
     return target.mapped[array];
 }
 
-Tensor MeshDrawable::MapComposedOp(std::uint32_t instancer, std::size_t op,
-                                   std::uintptr_t stream) {
+Tensor MeshDrawable::MapComposedOp(std::uint32_t instancer, std::size_t op, std::uintptr_t stream) {
     const auto it = instancers_.find(instancer);
     if (it == instancers_.end()) {
         throw std::invalid_argument("Unknown instancer " + std::to_string(instancer));
@@ -963,7 +967,8 @@ void MeshDrawable::SetInstances(std::uint32_t instancer, const ComposedInstanceD
     if (data.ops.empty()) {
         throw std::invalid_argument("Composed instances need at least one transform op");
     }
-    const std::int64_t rows = data.ops.front().rows.Rank() > 0 ? data.ops.front().rows.Shape()[0] : 0;
+    const std::int64_t rows =
+        data.ops.front().rows.Rank() > 0 ? data.ops.front().rows.Shape()[0] : 0;
     for (const DeviceInstanceOp& op : data.ops) {
         const auto [width, alternative] = OpWidths(op.kind);
         const std::int64_t given = op.rows.Rank() == 2 ? op.rows.Shape()[1] : -1;
@@ -1307,7 +1312,8 @@ void MeshDrawable::RebuildCompose() {
     for (int pass = 0; changed; ++pass) {
         if (pass > kMaxDepth) {
             throw std::invalid_argument("Composed instances' parents form a cycle or nest deeper "
-                                        "than " + std::to_string(kMaxDepth));
+                                        "than " +
+                                        std::to_string(kMaxDepth));
         }
         changed = false;
         for (auto& [handle, instancer] : instancers_) {
@@ -1353,9 +1359,8 @@ void MeshDrawable::RebuildCompose() {
     const VkDeviceSize rawBytes = std::max<VkDeviceSize>(VkDeviceSize{raw} * sizeof(float), 16);
     if (composeRaw_ == nullptr || composeRaw_->Size() < rawBytes) {
         vkDeviceWaitIdle(context_.Device());
-        composeRaw_ = std::make_shared<GpuBuffer>(context_, rawBytes,
-                                                  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                                  BufferMemory::Shared);
+        composeRaw_ = std::make_shared<GpuBuffer>(
+            context_, rawBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Shared);
     }
     const auto upload = [&](std::unique_ptr<GpuBuffer>& buffer, std::span<const std::byte> bytes) {
         Reserve(context_, buffer, bytes.size(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -1445,9 +1450,9 @@ void MeshDrawable::RecordCompose(VkCommandBuffer commands) const {
     };
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, composePipeline_->Handle());
     const DescriptorResource resources[] = {
-        DescriptorResource::Of(*composeRaw_),     DescriptorResource::Of(*composeOps_),
-        DescriptorResource::Of(*composeLists_),   DescriptorResource::Of(*composeParents_),
-        DescriptorResource::Of(*positions_),      DescriptorResource::Of(*orientations_),
+        DescriptorResource::Of(*composeRaw_),   DescriptorResource::Of(*composeOps_),
+        DescriptorResource::Of(*composeLists_), DescriptorResource::Of(*composeParents_),
+        DescriptorResource::Of(*positions_),    DescriptorResource::Of(*orientations_),
         DescriptorResource::Of(*scales_)};
     composeLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
     std::uint32_t level = pendingCompose_.front().level;
@@ -1495,13 +1500,12 @@ void MeshDrawable::WriteInstancer(Instancer& instancer, bool flip) {
         VkDeviceSize offset = instancer.rawFirst;
         bool inPlace = false;
         for (const DeviceInstanceOp& op : data.ops) {
-            const Tensor raw = compute_->View(composeRaw_, DType::Float32, {1},
-                                              offset * sizeof(float));
+            const Tensor raw =
+                compute_->View(composeRaw_, DType::Float32, {1}, offset * sizeof(float));
             if (op.rows.Data() == raw.Data()) {
                 inPlace = true;
             } else {
-                compute_->CopyToBuffer(op.rows, *composeRaw_, offset * sizeof(float),
-                                       data.stream);
+                compute_->CopyToBuffer(op.rows, *composeRaw_, offset * sizeof(float), data.stream);
             }
             offset += static_cast<VkDeviceSize>(op.rows.Elements());
         }
@@ -1608,9 +1612,9 @@ void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCasc
             } else if (!mesh.devicePoints.Empty()) {
                 CopyDevicePoints(mesh);
             } else {
-                renderer_.Uploads().Write(
-                    *points_, std::as_bytes(std::span(mesh.data.points)),
-                    VkDeviceSize{PointBase(mesh) + mesh.firstVertex} * 3 * sizeof(float));
+                renderer_.Uploads().Write(*points_, std::as_bytes(std::span(mesh.data.points)),
+                                          VkDeviceSize{PointBase(mesh) + mesh.firstVertex} * 3 *
+                                              sizeof(float));
             }
             if (mesh.recomputeNormals) {
                 pendingNormals_.push_back(handle);
@@ -1645,8 +1649,7 @@ void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCasc
         for (std::size_t v = 0; v < anchoredViews_.size(); ++v) {
             const AnchoredView& view = anchoredViews_[v];
             AppendAnchorRecord(records, glm::mat4(toOrigin * view.frame), glm::mat4(view.below),
-                               AnchorSlot(view.instancer, view.row),
-                               static_cast<std::uint32_t>(v));
+                               AnchorSlot(view.instancer, view.row), static_cast<std::uint32_t>(v));
         }
         Reserve(context_, anchorRecords_, records.size() * sizeof(glm::vec4),
                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
@@ -1709,12 +1712,12 @@ void MeshDrawable::WriteDraws() {
         if (item.instancer) {
             const Instancer& instancer = instancers_.at(*item.instancer);
             flags |= kInstanced;
-            const bool orientations = instancer.composed ||
-                                      (instancer.onDevice ? !instancer.device.orientations.Empty()
+            const bool orientations =
+                instancer.composed || (instancer.onDevice ? !instancer.device.orientations.Empty()
                                                           : !instancer.data.orientations.empty());
-            const bool scales = instancer.composed ||
-                                (instancer.onDevice ? !instancer.device.scales.Empty()
-                                                    : !instancer.data.scales.empty());
+            const bool scales =
+                instancer.composed || (instancer.onDevice ? !instancer.device.scales.Empty()
+                                                          : !instancer.data.scales.empty());
             flags |= orientations ? kHasOrientations : 0u;
             flags |= scales ? kHasScales : 0u;
             const std::uint32_t first = instancer.first;
@@ -2033,8 +2036,8 @@ void MeshDrawable::Cull(const FrameParams& params, std::span<const ShadowCascade
     for (const ShadowCascade& cascade : cascades) {
         // Views the GPU fits cull there only, their blocks patched (`RecordShadowViews`).
         if (cascade.gpuFitted) {
-            gpuShadowSlots_.emplace_back(cascade.gpuMatrix,
-                                         static_cast<std::uint32_t>(views.size() / kCullViewStride));
+            gpuShadowSlots_.emplace_back(
+                cascade.gpuMatrix, static_cast<std::uint32_t>(views.size() / kCullViewStride));
         }
         // Shadow maps: one texel spans `texelWorldSize` (at w = 1 for perspective views).
         shadowDraws_.push_back(list(cascade.lightViewProjection,
@@ -2315,8 +2318,14 @@ void MeshDrawable::RecordCull(VkCommandBuffer commands) const {
         for (const std::uint32_t handle : pendingNormals_) {
             const Mesh& mesh = meshes_.at(handle);
             const auto count = static_cast<std::uint32_t>(mesh.data.points.size() / 3);
-            const std::uint32_t constants[8] = {mesh.firstVertex, mesh.firstIndex, count,
-                                                mesh.firstAdjacency, PointBase(mesh), 0, 0, 0};
+            const std::uint32_t constants[8] = {mesh.firstVertex,
+                                                mesh.firstIndex,
+                                                count,
+                                                mesh.firstAdjacency,
+                                                PointBase(mesh),
+                                                0,
+                                                0,
+                                                0};
             normalsLayout_.PushConstants(commands, constants, sizeof(constants));
             vkCmdDispatch(commands, (count + 63) / 64, 1, 1);
         }
@@ -2515,10 +2524,9 @@ std::size_t MeshDrawable::Record(VkCommandBuffer commands, const RasterFrame& fr
             const std::uint32_t firstDraw = culledSet == 0 ? job.output[1] : job.output[3];
             // Shadow batches span materials, except cutout ones, which bind their own to test
             // their opacity.
-            const bool sameMaterial = materialOf(batch ? batch->item : visible.item) ==
-                                          materialOf(visible.item) &&
-                                      itemPipelines_[batch ? batch->item : visible.item] ==
-                                          itemPipelines_[visible.item];
+            const bool sameMaterial =
+                materialOf(batch ? batch->item : visible.item) == materialOf(visible.item) &&
+                itemPipelines_[batch ? batch->item : visible.item] == itemPipelines_[visible.item];
             const bool joins =
                 batch && batch->first + batch->count == firstDraw &&
                 ((shadow && !cutout(batch->item) && !cutout(visible.item)) || sameMaterial);

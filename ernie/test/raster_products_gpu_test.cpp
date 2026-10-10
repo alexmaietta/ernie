@@ -464,7 +464,8 @@ TEST_F(RasterDelegateTest, AnIsdStripSeesTheGroundWhereUsgscsmPutsIt) {
     delegate.Step(scene);  // the strip's start
     scene.Set("/World/Camera", tokens::kTransform, strip.to);
     ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
-    const Tensor ids = outputs.at("/Render/Product").vars.at("PrimId").Map(ernie::MapDevice::Cpu).tensor;
+    const Tensor ids =
+        outputs.at("/Render/Product").vars.at("PrimId").Map(ernie::MapDevice::Cpu).tensor;
     const auto at = [&](std::size_t row, std::size_t column) {
         return delegate.PrimPath(ids.As<std::uint32_t>()[row * 16 + column]);
     };
@@ -607,9 +608,11 @@ TEST_F(RasterDelegateTest, TheLrocNacPresetSendsEightBitNumbers) {
     ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
     const auto vars = MapVars(outputs);
     const auto table = [](double x) {
-        return x < 32 ? std::floor(x / 2) : x < 136 ? std::floor(x / 4 + 8)
-             : x < 543 ? std::floor(x / 8 + 25) : x < 2207 ? std::floor(x / 16 + 59)
-                       : std::floor(x / 32 + 128);
+        return x < 32     ? std::floor(x / 2)
+               : x < 136  ? std::floor(x / 4 + 8)
+               : x < 543  ? std::floor(x / 8 + 25)
+               : x < 2207 ? std::floor(x / 16 + 59)
+                          : std::floor(x / 32 + 128);
     };
     int checked = 0;
     for (std::size_t row = 0; row < kVarSize; ++row) {

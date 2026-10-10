@@ -35,9 +35,9 @@ inline constexpr std::string_view kMotionVector = "MotionVector";
 
 /// Every render var name, in the order the rasterizer binds their images.
 inline constexpr std::array<std::string_view, 11> kRenderVarNames{
-    render_vars::kSpectralRadiance, render_vars::kElectrons, render_vars::kRawDn,
-    render_vars::kHdrColor,         render_vars::kLdrColor,  render_vars::kDistanceToImagePlane,
-    render_vars::kDistanceToCamera, render_vars::kNormal,    render_vars::kPrimId,
+    render_vars::kSpectralRadiance, render_vars::kElectrons,   render_vars::kRawDn,
+    render_vars::kHdrColor,         render_vars::kLdrColor,    render_vars::kDistanceToImagePlane,
+    render_vars::kDistanceToCamera, render_vars::kNormal,      render_vars::kPrimId,
     render_vars::kInstanceId,       render_vars::kMotionVector};
 
 /// The built-in sensor filters a render product runs in order on its spectral radiance, as

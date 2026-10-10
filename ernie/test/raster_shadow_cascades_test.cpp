@@ -149,7 +149,8 @@ TEST(WithShadows, GrowsTheBoxToWhereItsShadowsLand) {
     EXPECT_NEAR(high.z, 2.0f, 1e-5f);
     // A grazing sun stretches it at most `maxLength` diagonals; one below the horizon not at all.
     const glm::vec3 grazing = glm::normalize(glm::vec3(0.0f, -1.0f, 1e-3f));
-    const auto [grazingLow, grazingHigh] = ernie::WithShadows({-1, -1, 0}, {1, 1, 2}, grazing, 2.0f);
+    const auto [grazingLow, grazingHigh] =
+        ernie::WithShadows({-1, -1, 0}, {1, 1, 2}, grazing, 2.0f);
     EXPECT_LE(grazingHigh.y, 1.0f + 2.0f * glm::length(glm::vec3(2, 2, 2)) + 1e-4f);
     const auto [belowLow, belowHigh] =
         ernie::WithShadows({-1, -1, 0}, {1, 1, 2}, glm::vec3(0.0f, 0.0f, -1.0f));

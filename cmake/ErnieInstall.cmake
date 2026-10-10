@@ -43,12 +43,8 @@ list(JOIN ernie_modules "," ernie_modules_joined)
 
 # A library needs a source of its own; the modules provide everything else.
 set(ernie_shared_source "${PROJECT_BINARY_DIR}/generated/ernie/ernie_shared.cpp")
-file(
-    CONFIGURE
-    OUTPUT
-    "${ernie_shared_source}"
-    CONTENT
-    "// libernie: Ernie's module libraries, whole, linked into one shared library.\n")
+file(CONFIGURE OUTPUT "${ernie_shared_source}" CONTENT
+     "// libernie: Ernie's module libraries, whole, linked into one shared library.\n")
 
 add_library(ernie_shared SHARED "${ernie_shared_source}")
 target_link_libraries(ernie_shared PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,${ernie_modules_joined}>")
@@ -92,7 +88,9 @@ target_compile_definitions(ernie_shared INTERFACE ${ernie_interface_definitions}
 install(
     TARGETS ernie_shared
     EXPORT ErnieTargets
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime NAMELINK_COMPONENT dev
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            COMPONENT runtime
+            NAMELINK_COMPONENT dev
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime)
 # Executable, as shared libraries are installed: RPM only lists what an executable library provides.
 install(
@@ -105,7 +103,8 @@ install(
 if(TARGET ernie_viewer)
     file(RELATIVE_PATH ernie_bin_to_lib "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}"
          "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
-    set_target_properties(ernie_viewer PROPERTIES INSTALL_RPATH "${ernie_origin}/${ernie_bin_to_lib}")
+    set_target_properties(ernie_viewer PROPERTIES INSTALL_RPATH
+                                                  "${ernie_origin}/${ernie_bin_to_lib}")
     install(TARGETS ernie_viewer RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT viewer)
 endif()
 
@@ -113,12 +112,7 @@ endif()
 
 # The public API: the scene, sessions and the app, with the device types they take (a Vulkan
 # context, compute interop, images and buffers). raster/ and kernel/ are internal.
-set(ernie_header_modules
-    util
-    geometry
-    scene
-    device
-    session)
+set(ernie_header_modules util geometry scene device session)
 if(TARGET ernie_app)
     list(APPEND ernie_header_modules app)
 endif()
@@ -143,7 +137,8 @@ install(
     PATTERN "*.hpp"
     PATTERN "*.inl")
 install(
-    DIRECTORY "${vulkan_headers_SOURCE_DIR}/include/vulkan" "${vulkan_headers_SOURCE_DIR}/include/vk_video"
+    DIRECTORY "${vulkan_headers_SOURCE_DIR}/include/vulkan"
+              "${vulkan_headers_SOURCE_DIR}/include/vk_video"
     DESTINATION ${ERNIE_INSTALL_EXTERNAL_INCLUDEDIR}
     COMPONENT dev
     FILES_MATCHING
@@ -176,9 +171,9 @@ install(
     NAMESPACE Ernie::
     DESTINATION ${ERNIE_INSTALL_CMAKEDIR}
     COMPONENT dev)
-configure_package_config_file("${PROJECT_SOURCE_DIR}/cmake/ErnieConfig.cmake.in"
-                              "${PROJECT_BINARY_DIR}/ErnieConfig.cmake"
-                              INSTALL_DESTINATION ${ERNIE_INSTALL_CMAKEDIR})
+configure_package_config_file(
+    "${PROJECT_SOURCE_DIR}/cmake/ErnieConfig.cmake.in" "${PROJECT_BINARY_DIR}/ErnieConfig.cmake"
+    INSTALL_DESTINATION ${ERNIE_INSTALL_CMAKEDIR})
 # Before 1.0 a minor version may break the API.
 write_basic_package_version_file("${PROJECT_BINARY_DIR}/ErnieConfigVersion.cmake"
                                  COMPATIBILITY SameMinorVersion)

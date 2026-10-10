@@ -79,8 +79,7 @@ TEST(Camera, FisheyeMapsFieldAnglesToRadii) {
     EXPECT_NEAR(back.x, pinhole.x, 1e-9);
     EXPECT_NEAR(back.y, pinhole.y, 1e-9);
     const double t2 = theta * theta;
-    const double radius =
-        theta * (1.0 + t2 * (-0.05 + t2 * (0.01 + t2 * (-0.002 + t2 * 0.0005))));
+    const double radius = theta * (1.0 + t2 * (-0.05 + t2 * (0.01 + t2 * (-0.002 + t2 * 0.0005))));
     EXPECT_NEAR(glm::length(lens.Distort(pinhole)), radius, 1e-12);
 }
 
@@ -149,7 +148,7 @@ TEST(Camera, OrthographicSpansItsAperturesInTheScene) {
     camera.width = 200;
     camera.height = 100;
     camera.orthographic = true;
-    camera.verticalApertureMm = 40.0;  // 4 scene units
+    camera.verticalApertureMm = 40.0;       // 4 scene units
     camera.verticalApertureOffsetMm = 4.0;  // the view up by 0.4 units
     camera.transform = ernie::LookAtTransform({1.0, 2.0, 10.0}, {1.0, 2.0, 0.0}, {0, 1, 0});
     EXPECT_DOUBLE_EQ(camera.OrthographicPixelSize(), 0.04);

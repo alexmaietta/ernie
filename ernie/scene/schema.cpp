@@ -138,8 +138,8 @@ std::optional<Connection> GetConnection(const Scene& scene, const Path& path,
     if (text.empty()) {
         return std::nullopt;
     }
-    const std::size_t dot = text.find('.', text.rfind('/') == std::string::npos ? 0
-                                                                                : text.rfind('/'));
+    const std::size_t dot =
+        text.find('.', text.rfind('/') == std::string::npos ? 0 : text.rfind('/'));
     if (dot == std::string::npos || dot + 1 == text.size()) {
         throw std::invalid_argument("'" + path.String() + "' " + attribute + " is '" + text +
                                     "', not a property path such as /Looks/M/Tex.outputs:rgb");

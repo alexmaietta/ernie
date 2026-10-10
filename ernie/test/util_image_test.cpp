@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/util/image.h"
 
+#include <ImfRgbaFile.h>
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
-#include <ImfRgbaFile.h>
 #include <stb_image_write.h>
 
 #include <array>

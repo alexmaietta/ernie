@@ -22,7 +22,7 @@ struct ComputeArrayView {
     std::uint32_t width = 0;
     std::uint32_t height = 0;
     std::uint32_t channels = 0;
-    DType type = DType::UInt8;          ///< Type of each channel.
+    DType type = DType::UInt8;           ///< Type of each channel.
     DeviceKind kind = DeviceKind::Cuda;  ///< The compute API the handle belongs to.
     int device = 0;                      ///< Device ordinal in that API.
 };
@@ -100,7 +100,8 @@ class ComputeInterop {
     /// `destination` of the same byte size on `stream`, without waiting.
     /// @throws std::invalid_argument if either is not a contiguous tensor on this device or their
     /// sizes differ.
-    virtual void Copy(const Tensor& source, const Tensor& destination, std::uintptr_t stream = 1) = 0;
+    virtual void Copy(const Tensor& source, const Tensor& destination,
+                      std::uintptr_t stream = 1) = 0;
 
     /// A contiguous copy of a CPU tensor in device memory that the tensor owns.
     /// @throws std::invalid_argument for a tensor that is not on the CPU.

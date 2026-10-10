@@ -237,7 +237,7 @@ std::optional<Image> DomeMapOf(const Scene& scene, const Path& path);
 /// A sun found in a dome's map (`ExtractDomeSun`), in the map's frame.
 struct DomeSun {
     glm::dvec3 direction{0.0, 0.0, 1.0};  ///< Unit vector towards it, in the dome's frame.
-    double angle = 0.53;                   ///< Angular diameter in degrees.
+    double angle = 0.53;                  ///< Angular diameter in degrees.
     /// Its RGB irradiance at normal incidence above the sky around it: the map's values over
     /// the sky's, times each texel's solid angle, summed (the map's units times steradians).
     glm::dvec3 irradiance{0.0};
@@ -405,9 +405,9 @@ struct GpuXform {
     Tensor orient;
     Tensor scale;
     bool composed = false;
-    std::int64_t row = 0;    ///< The prim's row of them.
+    std::int64_t row = 0;       ///< The prim's row of them.
     std::uintptr_t stream = 1;  ///< The CUDA stream they were written on.
-    bool wFirst = false;     ///< `orient` is w, x, y, z (`tokens::kQuaternionOrder`).
+    bool wFirst = false;        ///< `orient` is w, x, y, z (`tokens::kQuaternionOrder`).
 };
 
 /// The prim's GPU pose, or none when none of its transform ops is a GPU array.

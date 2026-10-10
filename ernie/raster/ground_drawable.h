@@ -73,8 +73,8 @@ class GroundDrawable : public RasterDrawable {
 
     /// The plane's height when enabled: the casters' shadows reach down to it.
     std::optional<float> ShadowFloor() const override {
-        return enabled_ ? std::optional<float>(static_cast<float>(
-                              static_cast<double>(params_.height) - origin_.z))
+        return enabled_ ? std::optional<float>(
+                              static_cast<float>(static_cast<double>(params_.height) - origin_.z))
                         : std::nullopt;
     }
 

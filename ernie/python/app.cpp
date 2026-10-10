@@ -306,8 +306,7 @@ void BindApp(nb::module_& parent) {
              "Creates a prim of `type` (any of `creatable_types`) with defaults that make it "
              "show, as one undo step; selects it and returns its path.")
         .def(
-            "delete",
-            [](Viewer& viewer, const std::vector<Path>& paths) { viewer.Delete(paths); },
+            "delete", [](Viewer& viewer, const std::vector<Path>& paths) { viewer.Delete(paths); },
             nb::arg("paths"), "Deletes prims and their descendants as one undo step.")
         .def(
             "duplicate",
@@ -330,13 +329,13 @@ void BindApp(nb::module_& parent) {
         .def(
             "log",
             [](Viewer& viewer, std::string text, std::string_view level) {
-                const LogLevel parsed = level == "error"     ? LogLevel::Error
-                                        : level == "warning" ? LogLevel::Warning
-                                        : level == "info"
-                                            ? LogLevel::Info
-                                            : throw nb::value_error(
-                                                  "level must be \"info\", \"warning\" or "
-                                                  "\"error\"");
+                const LogLevel parsed =
+                    level == "error"     ? LogLevel::Error
+                    : level == "warning" ? LogLevel::Warning
+                    : level == "info"
+                        ? LogLevel::Info
+                        : throw nb::value_error("level must be \"info\", \"warning\" or "
+                                                "\"error\"");
                 viewer.Log(parsed, std::move(text));
             },
             nb::arg("text"), nb::arg("level") = "info", "Adds a message to the Log panel.")
@@ -346,8 +345,8 @@ void BindApp(nb::module_& parent) {
                 const char* names[] = {"info", "warning", "error"};
                 std::vector<std::tuple<double, std::string, std::string>> entries;
                 for (const LogEntry& entry : viewer.LogEntries()) {
-                    entries.emplace_back(entry.time,
-                                         names[static_cast<std::size_t>(entry.level)], entry.text);
+                    entries.emplace_back(entry.time, names[static_cast<std::size_t>(entry.level)],
+                                         entry.text);
                 }
                 return entries;
             },
@@ -399,10 +398,11 @@ void BindApp(nb::module_& parent) {
             [](nb::pointer_and_handle<Viewer> self, const Path& path, std::string_view attribute,
                nb::handle stream) {
                 Viewer& viewer = *self.p;
-                return ArrayFromTensor(KeepingAlive(
-                    viewer.Delegate().MapArray(viewer.GetScene(), path, attribute,
-                                               StreamOf(stream)),
-                    self.h), true);
+                return ArrayFromTensor(
+                    KeepingAlive(viewer.Delegate().MapArray(viewer.GetScene(), path, attribute,
+                                                            StreamOf(stream)),
+                                 self.h),
+                    true);
             },
             nb::arg("path"), nb::arg("attribute"), nb::arg("stream").none() = nb::none(),
             "As Renderer.map, for the viewer's scene and renderer: a CUDA array over the "
@@ -444,8 +444,7 @@ void BindApp(nb::module_& parent) {
             },
             nb::arg("menu"), nb::arg("label"), nb::arg("action"),
             "Adds `label` to the menu bar's `menu`; calls action(viewer).")
-        .def_prop_rw("viewport_display", &Viewer::GetViewportDisplay,
-                     &Viewer::SetViewportDisplay,
+        .def_prop_rw("viewport_display", &Viewer::GetViewportDisplay, &Viewer::SetViewportDisplay,
                      "What the viewport draws over the scene and its heads-up display lists.")
         .def(
             "add_viewport_toggle",
@@ -472,8 +471,8 @@ void BindApp(nb::module_& parent) {
             [](Viewer& viewer, std::string label, nb::callable value, bool shown) {
                 const Callable call(std::move(value));
                 return viewer.AddHudItem(
-                    std::move(label),
-                    [call](Viewer& v) { return call.Call<std::string>(v); }, shown);
+                    std::move(label), [call](Viewer& v) { return call.Call<std::string>(v); },
+                    shown);
             },
             nb::arg("label"), nb::arg("value"), nb::arg("shown") = true,
             "Adds a line \"label: value(viewer)\" to the viewport's heads-up display, refreshed a "

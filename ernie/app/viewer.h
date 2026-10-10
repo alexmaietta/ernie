@@ -43,11 +43,11 @@ struct DockSizes {
 
 /// Options for opening a `Viewer`.
 struct ViewerOptions {
-    std::string title = "Ernie";      ///< Window title.
-    std::uint32_t width = 1600;       ///< Window width in screen coordinates.
-    std::uint32_t height = 900;       ///< Window height in screen coordinates.
-    bool hidden = false;              ///< Render without showing the window, for tests.
-    bool validation = false;          ///< Enable the Vulkan validation layer when installed.
+    std::string title = "Ernie";  ///< Window title.
+    std::uint32_t width = 1600;   ///< Window width in screen coordinates.
+    std::uint32_t height = 900;   ///< Window height in screen coordinates.
+    bool hidden = false;          ///< Render without showing the window, for tests.
+    bool validation = false;      ///< Enable the Vulkan validation layer when installed.
     /// Wait for the display's refresh; otherwise draw frames as fast as they render.
     bool vsync = false;
     std::string device;               ///< GPU name to prefer; empty picks the first discrete.
@@ -63,12 +63,12 @@ struct ViewerOptions {
 /// What the viewport draws over the scene, as Kit's viewport "show by type" menu (the eye) and
 /// heads-up display settings choose. None of it renders into the scene's own render products.
 struct ViewportDisplay {
-    bool lights = true;     ///< Every light's gizmo: its shape and the direction it shines.
-    bool cameras = true;    ///< Every scene camera's frustum.
-    bool grid = true;       ///< A grid on the ground (z = 0) with the x and y axes.
-    bool selection = true;  ///< The selection's outline.
-    bool overlays = true;   ///< The scene's overlays (`Scene::GetOverlay`).
-    bool hud = true;        ///< The heads-up display at the top left, with the items below.
+    bool lights = true;           ///< Every light's gizmo: its shape and the direction it shines.
+    bool cameras = true;          ///< Every scene camera's frustum.
+    bool grid = true;             ///< A grid on the ground (z = 0) with the x and y axes.
+    bool selection = true;        ///< The selection's outline.
+    bool overlays = true;         ///< The scene's overlays (`Scene::GetOverlay`).
+    bool hud = true;              ///< The heads-up display at the top left, with the items below.
     bool hudFps = true;           ///< Frames per second and frame time.
     bool hudDeviceMemory = true;  ///< GPU memory in use, the renderer's share and the total.
     bool hudHostMemory = false;   ///< The process's resident memory.

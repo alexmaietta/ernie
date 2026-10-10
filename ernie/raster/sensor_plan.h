@@ -46,7 +46,7 @@ struct SensorPlan {
     std::uint32_t aovs = 0;             ///< AOV slots written, a bit per `kAovSlotNames` index.
     /// State slots per pixel the temporal filters that run keep between frames, in their order.
     std::uint32_t states = 0;
-    std::uint32_t segments = 1;         ///< Kernels, run in order with a barrier between.
+    std::uint32_t segments = 1;   ///< Kernels, run in order with a barrier between.
     bool spectrumImages = false;  ///< Whether segments pass the spectrum on (spectral spatial).
     bool channelImages = false;   ///< Whether they pass other domains on.
     /// Segments whose spatial filters read their input's pyramid (`SensorFilterModel::pyramid`),

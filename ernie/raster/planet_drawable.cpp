@@ -116,10 +116,11 @@ std::vector<std::vector<std::uint32_t>> PackedFaceGradients(const CubeSphereLod&
     }
     std::vector<std::vector<std::uint32_t>> mips;
     while (true) {
-        std::vector<std::uint32_t>& packed = mips.emplace_back(level.size());
+        std::vector<std::uint32_t> packed(level.size());
         for (std::size_t i = 0; i < level.size(); ++i) {
             packed[i] = glm::packHalf2x16(level[i]);
         }
+        mips.push_back(std::move(packed));
         if (w == 1 && h == 1) {
             return mips;
         }
@@ -426,8 +427,8 @@ std::vector<DescriptorResource> PlanetDrawable::Resources(const RasterFrame& fra
     return resources;
 }
 
-void PlanetDrawable::DrawPatches(VkCommandBuffer commands, DrawRange range,
-                                 const glm::mat4& light, bool shadowFromFrame) const {
+void PlanetDrawable::DrawPatches(VkCommandBuffer commands, DrawRange range, const glm::mat4& light,
+                                 bool shadowFromFrame) const {
     if (range.count == 0) {
         return;
     }

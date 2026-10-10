@@ -338,10 +338,9 @@ TEST_F(RasterDelegateTest, DomeLightModesShadowLimitAndApproximate) {
     const auto [approximateNear, approximateFar] = floor();
     EXPECT_NEAR(approximateNear, approximateFar, 0.02f * approximateFar) << "unoccluded";
 
-    ernie::RenderSettings settings =
-        ernie::RenderSettings::Define(scene, "/Render/Settings")
-            .SetDomeLightMode("full")
-            .SetDomeShadowRadius(8.0);
+    ernie::RenderSettings settings = ernie::RenderSettings::Define(scene, "/Render/Settings")
+                                         .SetDomeLightMode("full")
+                                         .SetDomeShadowRadius(8.0);
     const auto [fullNear, fullFar] = floor();
     EXPECT_LT(fullNear, 0.9f * approximateNear) << "the cube hides some of the sky";
     EXPECT_NEAR(fullFar, approximateFar, 0.02f * approximateFar) << "open floor sees it all";
@@ -503,7 +502,8 @@ TEST_F(RasterDelegateTest, EmissiveSurfacesShowTheirLuminanceUnlit) {
     grey.SetEmissiveColor(glm::dvec3(1.0, 0.0, 0.0));
     ernie::RenderProductSetOutputs red = delegate.Step(scene);
     const auto reds = MapVars(red);
-    EXPECT_GT(At<float>(reds.at("HdrColor"), c, c, 0), 3.0f * At<float>(reds.at("HdrColor"), c, c, 1));
+    EXPECT_GT(At<float>(reds.at("HdrColor"), c, c, 0),
+              3.0f * At<float>(reds.at("HdrColor"), c, c, 1));
 }
 
 TEST_F(RasterDelegateTest, PhotometricLightsLightByTheirLuxAndLumens) {
@@ -569,7 +569,8 @@ TEST_F(RasterDelegateTest, MeteringMeasuresTheScenesLuminance) {
     // Exposure compensation brightens the photographic image by its stops.
     const auto centre = [&] {
         const Tensor image = delegate.Render(scene);
-        return static_cast<int>(image.As<std::uint8_t>()[4 * (kVarSize / 2 * kVarSize + kVarSize / 2)]);
+        return static_cast<int>(
+            image.As<std::uint8_t>()[4 * (kVarSize / 2 * kVarSize + kVarSize / 2)]);
     };
     ernie::Camera(scene, "/World/Camera").SetExposureTime(1.0 / 20000.0);
     const int base = centre();
@@ -659,8 +660,10 @@ TEST_F(RasterDelegateTest, StarsKeepTheirIrradianceAtAnyResolutionBehindTheScene
         ernie::RenderSettings(scene, "/Render/Settings")
             .SetResolution(glm::dvec2(static_cast<double>(size), static_cast<double>(size)));
         ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
-        const Tensor spectral =
-            outputs.at("/Render/Product").vars.at("SpectralRadiance").Map(ernie::MapDevice::Cpu).tensor;
+        const Tensor spectral = outputs.at("/Render/Product")
+                                    .vars.at("SpectralRadiance")
+                                    .Map(ernie::MapDevice::Cpu)
+                                    .tensor;
         const ernie::CameraParams camera =
             ernie::CameraParamsOf(scene, "/World/Camera", size, size);
         const double f = camera.FocalLengthPixels();
@@ -670,8 +673,8 @@ TEST_F(RasterDelegateTest, StarsKeepTheirIrradianceAtAnyResolutionBehindTheScene
                 const double x = (static_cast<double>(col) + 0.5 - 0.5 * size) / f;
                 const double y = (static_cast<double>(row) + 0.5 - 0.5 * size) / f;
                 const double cosine = 1.0 / std::sqrt(1.0 + x * x + y * y);
-                sum += SpectralAt(spectral, band, row, col, size) * cosine * cosine * cosine /
-                       (f * f);
+                sum +=
+                    SpectralAt(spectral, band, row, col, size) * cosine * cosine * cosine / (f * f);
             }
         }
         return sum;

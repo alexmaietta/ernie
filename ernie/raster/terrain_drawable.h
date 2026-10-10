@@ -274,10 +274,10 @@ class TerrainDrawable : public RasterDrawable {
 
     // Heightfields on the compute device.
     ComputeInterop* compute_ = nullptr;
-    DeviceHeightfield device_;               ///< The last field, its tensor dropped.
+    DeviceHeightfield device_;                  ///< The last field, its tensor dropped.
     std::shared_ptr<GpuBuffer> deviceHeights_;  ///< The heights, copied from the device.
-    Tensor mappedHeights_;  ///< The view of `deviceHeights_` `MapHeights` gives out.
-    std::unique_ptr<GpuBuffer> leaves_;      ///< Per LOD leaf, (min, max).
+    Tensor mappedHeights_;               ///< The view of `deviceHeights_` `MapHeights` gives out.
+    std::unique_ptr<GpuBuffer> leaves_;  ///< Per LOD leaf, (min, max).
     PipelineLayout updateLayout_;
     std::unique_ptr<ComputePipeline> gradientsPipeline_;
     std::unique_ptr<ComputePipeline> gradientMipPipeline_;

@@ -108,8 +108,8 @@ inline double HapkeReference(const Geometry& g, double w, const std::vector<floa
 /// view and half vectors (glTF 2.0 Appendix B), with unresolved slope variance `variance`:
 /// parameters roughness, metallic, ior, useSpecularWorkflow, specularColor (3), clearcoat,
 /// clearcoatRoughness.
-inline double PreviewSurfaceReference(const Geometry& g, double albedo,
-                                      const std::vector<float>& p, double variance = 0.0) {
+inline double PreviewSurfaceReference(const Geometry& g, double albedo, const std::vector<float>& p,
+                                      double variance = 0.0) {
     const double sinI = std::sqrt(std::max(0.0, 1.0 - g.mu0 * g.mu0));
     const double sinE = std::sqrt(std::max(0.0, 1.0 - g.mu * g.mu));
     const double sinPsi = std::sqrt(std::max(0.0, 1.0 - g.cosPsi * g.cosPsi));

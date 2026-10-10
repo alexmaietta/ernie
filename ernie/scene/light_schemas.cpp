@@ -32,10 +32,14 @@ bool Light::IsPhotometric() const {
 }
 
 std::vector<const PrimTypeDef*> LightSchemaTypes() {
-    return {&Light::Definition(),        &BoundableLight::Definition(),
-            &NonboundableLight::Definition(), &DistantLight::Definition(),
-            &DomeLight::Definition(),    &SphereLight::Definition(),
-            &RectLight::Definition(),    &DiskLight::Definition()};
+    return {&Light::Definition(),
+            &BoundableLight::Definition(),
+            &NonboundableLight::Definition(),
+            &DistantLight::Definition(),
+            &DomeLight::Definition(),
+            &SphereLight::Definition(),
+            &RectLight::Definition(),
+            &DiskLight::Definition()};
 }
 
 }  // namespace ernie

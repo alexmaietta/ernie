@@ -111,12 +111,12 @@ class EditHistory {
     struct Step {
         enum class Kind { Attribute, Define, Remove, Add } kind = Kind::Attribute;
         Path path;
-        std::string attribute;        ///< Attribute steps.
-        std::optional<Value> before;  ///< None when the attribute was not authored.
-        std::optional<Value> after;   ///< None for a clear.
-        std::string type;             ///< Define steps.
+        std::string attribute;            ///< Attribute steps.
+        std::optional<Value> before;      ///< None when the attribute was not authored.
+        std::optional<Value> after;       ///< None for a clear.
+        std::string type;                 ///< Define steps.
         std::vector<PrimSnapshot> prims;  ///< Remove and Add steps' subtree, parents first.
-        std::uint64_t group = 0;      ///< Steps sharing a non-zero group undo together.
+        std::uint64_t group = 0;          ///< Steps sharing a non-zero group undo together.
     };
 
     void Push(Step step, bool open);
@@ -135,7 +135,7 @@ class EditHistory {
     std::size_t next_ = 0;  ///< Steps before it are done; from it on, undone.
     bool open_ = false;
     int groupDepth_ = 0;
-    std::uint64_t group_ = 0;      ///< The open group's id, while `groupDepth_` > 0.
+    std::uint64_t group_ = 0;  ///< The open group's id, while `groupDepth_` > 0.
     std::uint64_t nextGroup_ = 1;
 };
 

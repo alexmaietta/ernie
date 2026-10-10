@@ -27,8 +27,8 @@ std::string S(std::string_view text) {
 PropertyField Field(std::string_view attribute, std::string label, Kind kind, Value fallback,
                     double min = 0.0, double max = 0.0, std::vector<std::string> options = {},
                     std::string tooltip = {}) {
-    return {S(attribute), std::move(label), kind,           std::move(fallback),
-            min,          max,              std::move(options), std::move(tooltip)};
+    return {S(attribute),       std::move(label),  kind, std::move(fallback), min, max,
+            std::move(options), std::move(tooltip)};
 }
 
 PropertySection Common() {
@@ -273,8 +273,7 @@ std::vector<PropertySection> RenderSettingsSchema() {
 
 bool HasTransform(std::string_view type) {
     return type != kMaterial && type != kRenderSettings && type != kRenderProduct &&
-           type != kRenderVar && type != kSensorFilter && type != kGroundPlane &&
-           type != kTerrain;
+           type != kRenderVar && type != kSensorFilter && type != kGroundPlane && type != kTerrain;
 }
 
 std::vector<PropertySection> SchemaOf(const Scene& scene, const Path& path,

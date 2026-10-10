@@ -134,10 +134,11 @@ std::vector<std::vector<std::uint32_t>> PackedGradientMips(const RasterView& ras
     }
     std::vector<std::vector<std::uint32_t>> mips;
     while (true) {
-        std::vector<std::uint32_t>& packed = mips.emplace_back(level.size());
+        std::vector<std::uint32_t> packed(level.size());
         for (std::size_t i = 0; i < level.size(); ++i) {
             packed[i] = glm::packHalf2x16(level[i]);
         }
+        mips.push_back(std::move(packed));
         if (w == 1 && h == 1) {
             return mips;
         }
@@ -170,8 +171,8 @@ TerrainDrawable::TerrainDrawable(RasterRenderer& renderer)
       horizonLayout_(renderer.Context(), kHorizonBindings, sizeof(HorizonConstants)) {
     const std::vector<ShaderModuleSource> update{{"terrain_update", shaders::kTerrainUpdateSlang}};
     const auto compile = [&](const char* entry) {
-        return std::make_unique<ComputePipeline>(
-            renderer_.Context(), updateLayout_, renderer_.Compiler().CompileSpirv(update, entry));
+        return std::make_unique<ComputePipeline>(renderer_.Context(), updateLayout_,
+                                                 renderer_.Compiler().CompileSpirv(update, entry));
     };
     gradientsPipeline_ = compile("gradientsMain");
     gradientMipPipeline_ = compile("gradientMipMain");
@@ -303,9 +304,8 @@ void TerrainDrawable::SetHeightfield(const RasterView& raster) {
     heights->Upload(heightMips);
     const std::vector<std::vector<std::uint32_t>> gradients = PackedGradientMips(raster);
     auto gradientImage = std::make_unique<GpuImage>(
-        renderer_.Context(),
-        ImageDesc{w, h, 1, static_cast<std::uint32_t>(gradients.size()), VK_FORMAT_R16G16_SFLOAT,
-                  VK_IMAGE_USAGE_SAMPLED_BIT});
+        renderer_.Context(), ImageDesc{w, h, 1, static_cast<std::uint32_t>(gradients.size()),
+                                       VK_FORMAT_R16G16_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT});
     std::vector<std::span<const std::byte>> gradientMips;
     for (const std::vector<std::uint32_t>& mip : gradients) {
         gradientMips.push_back(std::as_bytes(std::span(mip)));
@@ -341,9 +341,9 @@ void TerrainDrawable::AllocateHeightfield(std::uint32_t width, std::uint32_t hei
         context, ImageDesc{width, height, 1, mips, VK_FORMAT_R16G16_SFLOAT,
                            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT});
     mappedHeights_ = Tensor();
-    deviceHeights_ = std::make_shared<GpuBuffer>(
-        context, VkDeviceSize{width} * height * sizeof(float), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        BufferMemory::Shared);
+    deviceHeights_ =
+        std::make_shared<GpuBuffer>(context, VkDeviceSize{width} * height * sizeof(float),
+                                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Shared);
     tree_ = LodQuadtree(width, height, cellSize, kLodLeafCells);
     const VkDeviceSize leafBytes =
         VkDeviceSize{tree_.LeavesPerSide()} * tree_.LeavesPerSide() * sizeof(glm::vec2);
@@ -410,11 +410,12 @@ void TerrainDrawable::SetHeightfield(const DeviceHeightfield& field) {
         compute_->CopyToBuffer(tensor, *deviceHeights_, 0, field.stream);
     }
     if (rect[0] < rect[2] && rect[1] < rect[3]) {
-        pendingRect_ = pendingRect_ ? std::array<std::uint32_t, 4>{std::min((*pendingRect_)[0], rect[0]),
-                                                                    std::min((*pendingRect_)[1], rect[1]),
-                                                                    std::max((*pendingRect_)[2], rect[2]),
-                                                                    std::max((*pendingRect_)[3], rect[3])}
-                                    : rect;
+        pendingRect_ = pendingRect_
+                           ? std::array<std::uint32_t, 4>{std::min((*pendingRect_)[0], rect[0]),
+                                                          std::min((*pendingRect_)[1], rect[1]),
+                                                          std::max((*pendingRect_)[2], rect[2]),
+                                                          std::max((*pendingRect_)[3], rect[3])}
+                           : rect;
     }
     if (reshape) {
         // Bounded at once, so the first frame selects patches from the real heights.
@@ -436,9 +437,9 @@ Tensor TerrainDrawable::MapHeights(std::uintptr_t stream) {
     }
     // Nothing writes them while frames already submitted may still copy them.
     compute_->WaitForVulkan(stream);
-    mappedHeights_ = compute_->View(deviceHeights_, DType::Float32,
-                                    {static_cast<std::int64_t>(height_),
-                                     static_cast<std::int64_t>(width_)});
+    mappedHeights_ =
+        compute_->View(deviceHeights_, DType::Float32,
+                       {static_cast<std::int64_t>(height_), static_cast<std::int64_t>(width_)});
     return mappedHeights_;
 }
 
@@ -510,7 +511,8 @@ void TerrainDrawable::RecordHeightUpdate(VkCommandBuffer commands,
     const auto height = static_cast<std::uint32_t>(height_);
     const auto barrier = [&](VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess) {
         VkMemoryBarrier2 memory{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
-        memory.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+        memory.srcStageMask =
+            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_TRANSFER_BIT;
         memory.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT;
         memory.dstStageMask = dstStage;
         memory.dstAccessMask = dstAccess;
@@ -528,7 +530,8 @@ void TerrainDrawable::RecordHeightUpdate(VkCommandBuffer commands,
     region.bufferRowLength = width;
     region.bufferImageHeight = height;
     region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    region.imageOffset = {static_cast<std::int32_t>(rect[0]), static_cast<std::int32_t>(rect[1]), 0};
+    region.imageOffset = {static_cast<std::int32_t>(rect[0]), static_cast<std::int32_t>(rect[1]),
+                          0};
     region.imageExtent = {rect[2] - rect[0], rect[3] - rect[1], 1};
     vkCmdCopyBufferToImage(commands, deviceHeights_->Handle(), heights_->Handle(),
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
@@ -609,8 +612,8 @@ void TerrainDrawable::TakeLeaves(const GpuBuffer& readback) {
 std::uint64_t TerrainDrawable::GpuBytes() const {
     std::uint64_t bytes = uniforms_.Size() + patchBuffer_->Size();
     if (heights_ != nullptr) {
-        bytes += heights_->Bytes() + gradients_->Bytes() +
-                 (horizon_ != nullptr ? horizon_->Bytes() : 0);
+        bytes +=
+            heights_->Bytes() + gradients_->Bytes() + (horizon_ != nullptr ? horizon_->Bytes() : 0);
     }
     if (deviceHeights_ != nullptr) {
         bytes += deviceHeights_->Size() + leaves_->Size();
@@ -790,8 +793,8 @@ std::vector<DescriptorResource> TerrainDrawable::Resources(const RasterFrame& fr
     return resources;
 }
 
-void TerrainDrawable::DrawPatches(VkCommandBuffer commands, DrawRange range,
-                                  const glm::mat4& light, bool shadowFromFrame) const {
+void TerrainDrawable::DrawPatches(VkCommandBuffer commands, DrawRange range, const glm::mat4& light,
+                                  bool shadowFromFrame) const {
     if (range.count == 0) {
         return;
     }

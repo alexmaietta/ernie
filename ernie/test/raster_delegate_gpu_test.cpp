@@ -457,8 +457,8 @@ TEST_F(RasterDelegateTest, NormalMapsFinerThanAPixelShadeAsRoughness) {
         for (int col = 0; col < 8; ++col) {
             const float slope = (row + col) % 2 == 0 ? 0.5f : -0.5f;
             const glm::vec3 n = glm::normalize(glm::vec3(-slope, 0.0f, 1.0f));
-            normals.insert(normals.end(), {0.5f * n.x + 0.5f, 0.5f * n.y + 0.5f,
-                                           0.5f * n.z + 0.5f, 1.0f});
+            normals.insert(normals.end(),
+                           {0.5f * n.x + 0.5f, 0.5f * n.y + 0.5f, 0.5f * n.z + 0.5f, 1.0f});
         }
     }
     const auto meanGreen = [&](RasterDelegate& delegate) {

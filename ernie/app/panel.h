@@ -14,7 +14,7 @@ class Viewer;
 /// Where a panel docks in the viewer's default layout, around the viewport.
 enum class Dock {
     Left,
-    Right,       ///< The right column's upper part (the whole column if nothing docks below).
+    Right,  ///< The right column's upper part (the whole column if nothing docks below).
     Bottom,
     Floating,    ///< Not docked: a free window.
     RightLower,  ///< The right column's lower part, below `Right`.

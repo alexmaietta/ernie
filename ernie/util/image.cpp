@@ -167,8 +167,8 @@ std::vector<Image> MipChain(const Image& image, MipFilter filter) {
                 const std::uint32_t x0 = std::min(2 * x, above.width - 1);
                 const std::uint32_t x1 = std::min(2 * x + 1, above.width - 1);
                 if (filter == MipFilter::NormalSlopes) {
-                    level.At(x, y) = FilterSlopes({above.At(x0, y0), above.At(x1, y0),
-                                                   above.At(x0, y1), above.At(x1, y1)});
+                    level.At(x, y) = FilterSlopes(
+                        {above.At(x0, y0), above.At(x1, y0), above.At(x0, y1), above.At(x1, y1)});
                     continue;
                 }
                 glm::vec4 texel = 0.25f * (above.At(x0, y0) + above.At(x1, y0) + above.At(x0, y1) +

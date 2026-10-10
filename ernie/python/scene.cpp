@@ -84,7 +84,7 @@ bool IsNumber(nb::handle item) {
 
 /// `object` as a C-contiguous NumPy array of `dtype` and rows of `columns` (any leading shape).
 nb::ndarray<nb::numpy, nb::c_contig> RowsOf(nb::handle object, const char* dtype,
-                                             std::size_t columns) {
+                                            std::size_t columns) {
     nb::module_ numpy = nb::module_::import_("numpy");
     nb::object array = numpy.attr("ascontiguousarray")(object, "dtype"_a = dtype);
     if (nb::cast<std::size_t>(array.attr("size")) % columns != 0) {
@@ -256,13 +256,12 @@ void BindOverlay(nb::module_& m) {
             "arrow",
             [](Overlay& o, nb::handle start, nb::handle end, double head,
                const nb::kwargs& style) -> Overlay& {
-                return o.Arrow(Vec3FromPython(start), Vec3FromPython(end),
-                               StyleFromPython(style), head);
+                return o.Arrow(Vec3FromPython(start), Vec3FromPython(end), StyleFromPython(style),
+                               head);
             },
             nb::arg("start"), nb::arg("end"), nb::arg("head") = 0.0, nb::arg("style"),
             nb::rv_policy::reference_internal,
-            (std::string("A line with a cone head `head` long (a fifth of it when 0).") +
-             kStyleDoc)
+            (std::string("A line with a cone head `head` long (a fifth of it when 0).") + kStyleDoc)
                 .c_str())
         .def(
             "box",
@@ -273,8 +272,7 @@ void BindOverlay(nb::module_& m) {
             },
             nb::arg("low"), nb::arg("high"), nb::arg("transform") = nb::none(), nb::arg("style"),
             nb::rv_policy::reference_internal,
-            (std::string("The edges of a box, placed by a 4 x 4 `transform`.") + kStyleDoc)
-                .c_str())
+            (std::string("The edges of a box, placed by a 4 x 4 `transform`.") + kStyleDoc).c_str())
         .def(
             "circle",
             [](Overlay& o, nb::handle centre, nb::handle normal, double radius, int segments,
@@ -312,8 +310,7 @@ void BindOverlay(nb::module_& m) {
             },
             nb::arg("points"), nb::arg("indices"), nb::arg("transform") = nb::none(),
             nb::arg("style"), nb::rv_policy::reference_internal,
-            (std::string("The edges of triangles (`indices` in threes over `points`).") +
-             kStyleDoc)
+            (std::string("The edges of triangles (`indices` in threes over `points`).") + kStyleDoc)
                 .c_str())
         .def(
             "triangles",
@@ -357,10 +354,8 @@ void BindOverlay(nb::module_& m) {
                const nb::kwargs& style) -> Overlay& {
                 return o.Label(Vec3FromPython(point), text, StyleFromPython(style));
             },
-            nb::arg("point"), nb::arg("text"), nb::arg("style"),
-            nb::rv_policy::reference_internal,
-            (std::string("ASCII `text`, `size` pixels tall, beside `point`.") + kStyleDoc)
-                .c_str())
+            nb::arg("point"), nb::arg("text"), nb::arg("style"), nb::rv_policy::reference_internal,
+            (std::string("ASCII `text`, `size` pixels tall, beside `point`.") + kStyleDoc).c_str())
         .def("__repr__", [](const Overlay& o) {
             return "Overlay(" + std::to_string(o.Segments().size()) + " segments, " +
                    std::to_string(o.Fills().size()) + " triangles, " +
@@ -874,8 +869,8 @@ void BindScene(nb::module_& m) {
             "the poses are copied to the host to bound them). `stream` is as for `write`.")
         .def(
             "write",
-            [](Scene& scene, const PrimSet& prims, std::string_view attribute,
-               const AnyArray& rows, nb::handle stream) {
+            [](Scene& scene, const PrimSet& prims, std::string_view attribute, const AnyArray& rows,
+               nb::handle stream) {
                 scene.Write(prims, attribute, TensorFromArray(rows), StreamOf(stream));
             },
             nb::arg("prims"), nb::arg("attribute"), nb::arg("rows"),
@@ -939,8 +934,7 @@ void BindScene(nb::module_& m) {
         "usgscsm reads it): its timing, detector and trajectory in the body-fixed frame, metres. "
         "Image coordinates are CSM's (line, sample), the first pixel's centre at (0.5, 0.5).")
         .def_static(
-            "from_file",
-            [](const std::string& path) { return IsdLineScanner(ReadIsdFile(path)); },
+            "from_file", [](const std::string& path) { return IsdLineScanner(ReadIsdFile(path)); },
             nb::arg("path"), "The line scanner of the ISD file at `path`.")
         .def_static(
             "from_json", [](const std::string& json) { return IsdLineScanner(ReadIsd(json)); },
@@ -957,9 +951,7 @@ void BindScene(nb::module_& m) {
             nb::arg("time"), "The sensor's body-fixed position at `time`.")
         .def(
             "sun_position",
-            [triple](const IsdLineScanner& s, double time) {
-                return triple(s.SunPosition(time));
-            },
+            [triple](const IsdLineScanner& s, double time) { return triple(s.SunPosition(time)); },
             nb::arg("time"), "The sun's body-fixed position at `time`.")
         .def(
             "image_to_ground",
@@ -991,7 +983,7 @@ void BindScene(nb::module_& m) {
                std::uint32_t lines, bool atEnd) {
                 const Path path = pathArg;
                 const IsdLineScanner::Strip strip = s.StripOf(first, lines);
-                const CameraParams& camera =strip.camera;
+                const CameraParams& camera = strip.camera;
                 using namespace tokens;
                 // The camera's geometry and line time only: its f-number, ISO, lens
                 // transmission and sensor stay as authored (`author_lroc_nac`, say).
@@ -1017,7 +1009,8 @@ void BindScene(nb::module_& m) {
             nb::arg("scene"), nb::arg("path"), nb::arg("first_line"), nb::arg("lines"),
             nb::arg("at_end") = true,
             "Authors the Camera prim at `path` (a str, Path, Prim or typed prim) as the pushbroom "
-            "of the strip of `lines` lines from `first_line` (with the lens's distortion along the detector fitted as "
+            "of the strip of `lines` lines from `first_line` (with the lens's distortion along the "
+            "detector fitted as "
             "`ernie:lens:distortion`), posed at its end (or its start), and returns the render "
             "resolution it needs, (samples, lines). Render an image strip by strip: author the "
             "first strip at its start and step once, then author each strip at its end and "
@@ -1070,7 +1063,7 @@ void BindScene(nb::module_& m) {
             [](const IsdPushFrame& s, Scene& scene, const PrimPath& pathArg, std::uint32_t index) {
                 const Path path = pathArg;
                 const IsdPushFrame::Framelet framelet = s.FrameletOf(index);
-                const CameraParams& camera =framelet.camera;
+                const CameraParams& camera = framelet.camera;
                 using namespace tokens;
                 // The camera's geometry and exposure only, as `IsdLineScanner.author_strip`.
                 Prim prim = scene.Has(Path(path)) ? scene.GetPrim(Path(path))
@@ -1084,12 +1077,11 @@ void BindScene(nb::module_& m) {
                     .Set(kHorizontalApertureOffset, camera.horizontalApertureOffsetMm)
                     .Set(kVerticalApertureOffset, camera.verticalApertureOffsetMm)
                     .Set(kPushbroomLineOffset, 0.0)
-                    .Set(kLensDistortion,
-                         std::vector<float>{static_cast<float>(camera.lens.k1),
-                                            static_cast<float>(camera.lens.k2),
-                                            static_cast<float>(camera.lens.k3),
-                                            static_cast<float>(camera.lens.p1),
-                                            static_cast<float>(camera.lens.p2)})
+                    .Set(kLensDistortion, std::vector<float>{static_cast<float>(camera.lens.k1),
+                                                             static_cast<float>(camera.lens.k2),
+                                                             static_cast<float>(camera.lens.k3),
+                                                             static_cast<float>(camera.lens.p1),
+                                                             static_cast<float>(camera.lens.p2)})
                     .Set(kClippingRange, glm::dvec2(camera.nearPlane, camera.farPlane))
                     .Set(kExposureTime, camera.exposureTime);
                 return nb::make_tuple(camera.width, camera.height, framelet.firstLine,
@@ -1097,7 +1089,8 @@ void BindScene(nb::module_& m) {
             },
             nb::arg("scene"), nb::arg("path"), nb::arg("framelet"),
             "Authors the Camera prim at `path` (a str, Path, Prim or typed prim) as framelet "
-            "`framelet` (in image order, from the top): a frame camera posed when it is exposed, with the lens's distortion fitted as "
+            "`framelet` (in image order, from the top): a frame camera posed when it is exposed, "
+            "with the lens's distortion fitted as "
             "`ernie:lens:distortion`. Returns (samples, lines, first_line, rows_reversed, time): "
             "render at that resolution, flip the rows if `rows_reversed`, and place them at "
             "`first_line` of the image.");
@@ -1152,7 +1145,7 @@ void BindScene(nb::module_& m) {
                double pixelPitchUm, std::uint32_t raysStep) {
                 const Path path = pathArg;
                 const CahvoreModel::ErnieCamera fit = model.ToCamera(pixelPitchUm);
-                const CameraParams& camera =fit.camera;
+                const CameraParams& camera = fit.camera;
                 using namespace tokens;
                 // The camera's geometry only, as `IsdFrame.author_camera`; its pose in the
                 // model's frame (parent the prim to that frame's Xform).
@@ -1166,10 +1159,10 @@ void BindScene(nb::module_& m) {
                     for (const glm::vec3& ray : table.rays) {
                         values.insert(values.end(), {ray.x, ray.y, ray.z});
                     }
-                    scene.Write(Path(path), kLensRays,
-                                Tensor::Copy(std::span<const float>(values),
-                                             {std::int64_t(table.rows), std::int64_t(table.columns),
-                                              3}));
+                    scene.Write(
+                        Path(path), kLensRays,
+                        Tensor::Copy(std::span<const float>(values),
+                                     {std::int64_t(table.rows), std::int64_t(table.columns), 3}));
                     scene.Set(Path(path), kLensRaysStep, static_cast<int>(raysStep));
                 }
                 const bool fisheye = camera.lens.projection == LensProjection::Fisheye;
@@ -1182,12 +1175,11 @@ void BindScene(nb::module_& m) {
                          camera.verticalApertureMm * camera.width / camera.height)
                     .Set(kHorizontalApertureOffset, camera.horizontalApertureOffsetMm)
                     .Set(kVerticalApertureOffset, camera.verticalApertureOffsetMm)
-                    .Set(kLensDistortion,
-                         std::vector<float>{static_cast<float>(camera.lens.k1),
-                                            static_cast<float>(camera.lens.k2),
-                                            static_cast<float>(camera.lens.k3),
-                                            static_cast<float>(camera.lens.p1),
-                                            static_cast<float>(camera.lens.p2)})
+                    .Set(kLensDistortion, std::vector<float>{static_cast<float>(camera.lens.k1),
+                                                             static_cast<float>(camera.lens.k2),
+                                                             static_cast<float>(camera.lens.k3),
+                                                             static_cast<float>(camera.lens.p1),
+                                                             static_cast<float>(camera.lens.p2)})
                     .Set(kLensFisheye,
                          std::vector<float>{static_cast<float>(camera.lens.fisheye[0]),
                                             static_cast<float>(camera.lens.fisheye[1]),
@@ -1197,8 +1189,7 @@ void BindScene(nb::module_& m) {
                 return nb::make_tuple(camera.width, camera.height, fit.rowsReversed,
                                       fit.residualPixels);
             },
-            nb::arg("scene"), nb::arg("path"), nb::arg("pixel_pitch_um"),
-            nb::arg("rays_step") = 8,
+            nb::arg("scene"), nb::arg("path"), nb::arg("pixel_pitch_um"), nb::arg("rays_step") = 8,
             "Authors the Camera prim at `path` (a str, Path, Prim or typed prim) as the model in "
             "Ernie's camera (perspective with "
             "Brown-Conrady terms, or a Kannala-Brandt fisheye for CAHVORE), posed in the model's "
@@ -1265,7 +1256,7 @@ void BindScene(nb::module_& m) {
             [](const IsdFrame& s, Scene& scene, const PrimPath& pathArg) {
                 const Path path = pathArg;
                 const IsdFrame::FrameView view = s.View();
-                const CameraParams& camera =view.camera;
+                const CameraParams& camera = view.camera;
                 using namespace tokens;
                 // The camera's geometry only, as `IsdLineScanner.author_strip`.
                 Prim prim = scene.Has(Path(path)) ? scene.GetPrim(Path(path))
@@ -1279,12 +1270,11 @@ void BindScene(nb::module_& m) {
                     .Set(kHorizontalApertureOffset, camera.horizontalApertureOffsetMm)
                     .Set(kVerticalApertureOffset, camera.verticalApertureOffsetMm)
                     .Set(kPushbroomLineOffset, 0.0)
-                    .Set(kLensDistortion,
-                         std::vector<float>{static_cast<float>(camera.lens.k1),
-                                            static_cast<float>(camera.lens.k2),
-                                            static_cast<float>(camera.lens.k3),
-                                            static_cast<float>(camera.lens.p1),
-                                            static_cast<float>(camera.lens.p2)})
+                    .Set(kLensDistortion, std::vector<float>{static_cast<float>(camera.lens.k1),
+                                                             static_cast<float>(camera.lens.k2),
+                                                             static_cast<float>(camera.lens.k3),
+                                                             static_cast<float>(camera.lens.p1),
+                                                             static_cast<float>(camera.lens.p2)})
                     .Set(kClippingRange, glm::dvec2(camera.nearPlane, camera.farPlane));
                 return nb::make_tuple(camera.width, camera.height, view.rowsReversed);
             },
@@ -1297,8 +1287,7 @@ void BindScene(nb::module_& m) {
 
     m.def(
         "author_lroc_nac",
-        [](Scene& scene, const PrimPath& camera, const PrimPath& product,
-           const std::string& side) {
+        [](Scene& scene, const PrimPath& camera, const PrimPath& product, const std::string& side) {
             if (side != "left" && side != "right") {
                 throw nb::value_error("side must be 'left' or 'right'");
             }
@@ -1390,8 +1379,8 @@ void BindScene(nb::module_& m) {
     m.def(
         "author_mars2020_hazcam_pair",
         [bayerPattern](Scene& scene, const PrimPath& rig, const PrimPath& left,
-                       const PrimPath& right, const std::string& which,
-                       const std::string& pattern, double jpegQuality) {
+                       const PrimPath& right, const std::string& which, const std::string& pattern,
+                       double jpegQuality) {
             if (which != "front" && which != "rear") {
                 throw nb::value_error("which must be 'front' or 'rear'");
             }
@@ -1467,8 +1456,8 @@ void BindScene(nb::module_& m) {
     m.def(
         "author_mastcamz_pair",
         [bayerPattern](Scene& scene, const PrimPath& rig, const PrimPath& left,
-                       const PrimPath& right, int leftFilter, int rightFilter,
-                       double focalLength, const std::string& pattern) {
+                       const PrimPath& right, int leftFilter, int rightFilter, double focalLength,
+                       const std::string& pattern) {
             try {
                 AuthorMastcamZPair(scene, Path(rig), Path(left), Path(right), leftFilter,
                                    rightFilter, focalLength, bayerPattern(pattern));
@@ -1500,13 +1489,12 @@ void BindScene(nb::module_& m) {
     m.def(
         "load_image",
         [](const std::filesystem::path& path, bool srgb) {
-            const Image image =
-                LoadImage(path, srgb ? ImageEncoding::Srgb : ImageEncoding::Linear);
+            const Image image = LoadImage(path, srgb ? ImageEncoding::Srgb : ImageEncoding::Linear);
             const auto* values = reinterpret_cast<const float*>(image.pixels.data());
-            return ArrayFromTensor(Tensor::Copy<float>(
-                std::span(values, image.pixels.size() * 4),
-                {static_cast<std::int64_t>(image.height), static_cast<std::int64_t>(image.width),
-                 4}), true);
+            return ArrayFromTensor(Tensor::Copy<float>(std::span(values, image.pixels.size() * 4),
+                                                       {static_cast<std::int64_t>(image.height),
+                                                        static_cast<std::int64_t>(image.width), 4}),
+                                   true);
         },
         nb::arg("path"), nb::arg("srgb") = true,
         "A PNG, JPEG or OpenEXR image as a linear float32 (rows, cols, 4) array: PNG and JPEG "

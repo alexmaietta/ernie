@@ -30,8 +30,8 @@ const CreatableType* FindCreatable(std::string_view type);
 
 /// Where a new prim goes and what it starts from.
 struct CreateContext {
-    glm::dvec3 target{0.0};  ///< The world point the view looks at: geometry goes there.
-    double scale = 1.0;      ///< World units per default size, from the view's distance.
+    glm::dvec3 target{0.0};       ///< The world point the view looks at: geometry goes there.
+    double scale = 1.0;           ///< World units per default size, from the view's distance.
     glm::dmat4 parentWorld{1.0};  ///< The new prim's parent's world transform.
     CameraParams camera;          ///< The view, for new cameras.
     Path activeCamera;            ///< The camera new render products look through.

@@ -354,11 +354,9 @@ IsdCameraModel::IsdCameraModel(IsdSensor isd) : isd_(std::move(isd)) {
     // Each model's coefficient count, as usgscsm's `removeDistortion` checks them (CAHVOR's sixth,
     // which usgscsm's default carries, is unused).
     static const std::map<std::string, std::pair<std::size_t, std::size_t>, std::less<>>
-        kCoefficients = {{"radial", {0, 3}},          {"transverse", {20, 20}},
-                         {"radtan", {5, 5}},          {"lrolrocnac", {1, 1}},
-                         {"kaguyalism", {10, 10}},    {"dawnfc", {1, 1}},
-                         {"cahvor", {5, 6}},          {"kplo_shadowcam", {1, 1}},
-                         {"cassis", {36, 36}}};
+        kCoefficients = {{"radial", {0, 3}},     {"transverse", {20, 20}},   {"radtan", {5, 5}},
+                         {"lrolrocnac", {1, 1}}, {"kaguyalism", {10, 10}},   {"dawnfc", {1, 1}},
+                         {"cahvor", {5, 6}},     {"kplo_shadowcam", {1, 1}}, {"cassis", {36, 36}}};
     if (!isd_.distortion.empty()) {
         const auto model = kCoefficients.find(isd_.distortion);
         if (model == kCoefficients.end()) {

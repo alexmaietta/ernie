@@ -619,7 +619,8 @@ void CudaInterop::CopyColumnsToBuffer(const Tensor& source, std::span<const std:
     ERNIE_ZONE("CUDA copy columns to buffer");
     CheckOnDevice(source);
     if (source.Rank() != 2) {
-        throw std::invalid_argument("CudaInterop::CopyColumnsToBuffer needs a (rows, width) tensor");
+        throw std::invalid_argument(
+            "CudaInterop::CopyColumnsToBuffer needs a (rows, width) tensor");
     }
     const auto rows = static_cast<std::size_t>(source.Shape()[0]);
     const auto width = static_cast<std::size_t>(source.Shape()[1]);

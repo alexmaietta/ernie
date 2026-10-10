@@ -25,8 +25,8 @@ OverlayItem ItemOf(const OverlayStyle& style, const glm::vec4& color) {
 
 /// Two unit vectors perpendicular to unit `n` and to each other.
 std::pair<glm::dvec3, glm::dvec3> Basis(const glm::dvec3& n) {
-    const glm::dvec3 helper = std::abs(n.z) < 0.9 ? glm::dvec3(0.0, 0.0, 1.0)
-                                                  : glm::dvec3(1.0, 0.0, 0.0);
+    const glm::dvec3 helper =
+        std::abs(n.z) < 0.9 ? glm::dvec3(0.0, 0.0, 1.0) : glm::dvec3(1.0, 0.0, 0.0);
     const glm::dvec3 u = glm::normalize(glm::cross(helper, n));
     return {u, glm::cross(n, u)};
 }
@@ -149,8 +149,7 @@ Overlay& Overlay::Box(const glm::dvec3& low, const glm::dvec3& high, const Overl
                       const glm::dmat4& transform) {
     std::array<glm::dvec3, 8> corners;
     for (int i = 0; i < 8; ++i) {
-        corners[i] = Apply(transform, {(i & 1) != 0 ? high.x : low.x,
-                                       (i & 2) != 0 ? high.y : low.y,
+        corners[i] = Apply(transform, {(i & 1) != 0 ? high.x : low.x, (i & 2) != 0 ? high.y : low.y,
                                        (i & 4) != 0 ? high.z : low.z});
     }
     // Corners differing in one bit share an edge.
@@ -229,10 +228,10 @@ Overlay& Overlay::Triangles(std::span<const glm::dvec3> points,
                             const glm::dmat4& transform) {
     CheckIndices(points, indices);
     for (std::size_t t = 0; t < indices.size(); t += 3) {
-        triangles_.push_back({{Apply(transform, points[indices[t]]),
-                               Apply(transform, points[indices[t + 1]]),
-                               Apply(transform, points[indices[t + 2]])},
-                              ItemOf(style, style.color)});
+        triangles_.push_back(
+            {{Apply(transform, points[indices[t]]), Apply(transform, points[indices[t + 1]]),
+              Apply(transform, points[indices[t + 2]])},
+             ItemOf(style, style.color)});
     }
     Touch();
     return *this;

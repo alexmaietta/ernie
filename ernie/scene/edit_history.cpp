@@ -107,8 +107,7 @@ void EditHistory::Add(Scene& scene, const Scene& source, const Path& path) {
     Push(std::move(step), false);
 }
 
-std::vector<EditHistory::PrimSnapshot> EditHistory::Snapshot(const Scene& scene,
-                                                             const Path& path) {
+std::vector<EditHistory::PrimSnapshot> EditHistory::Snapshot(const Scene& scene, const Path& path) {
     std::vector<PrimSnapshot> prims;
     for (const Path& prim : scene.Prims()) {
         if (prim != path && !prim.HasPrefix(path)) {
@@ -201,11 +200,10 @@ bool EditHistory::Move(Scene& scene, bool forward) {
     }
     const std::uint64_t group = steps_[forward ? next_ : next_ - 1].group;
     do {
-        applied |= forward ? Apply(scene, steps_[next_++], true)
-                           : Apply(scene, steps_[--next_], false);
-    } while (group != 0 &&
-             (forward ? next_ < steps_.size() && steps_[next_].group == group
-                      : next_ > 0 && steps_[next_ - 1].group == group));
+        applied |=
+            forward ? Apply(scene, steps_[next_++], true) : Apply(scene, steps_[--next_], false);
+    } while (group != 0 && (forward ? next_ < steps_.size() && steps_[next_].group == group
+                                    : next_ > 0 && steps_[next_ - 1].group == group));
     return applied;
 }
 
@@ -249,7 +247,8 @@ std::string EditHistory::UndoLabel() const {
     }
     // A group reads as its first step, such as the prim it created.
     std::size_t first = next_ - 1;
-    while (steps_[first].group != 0 && first > 0 && steps_[first - 1].group == steps_[first].group) {
+    while (steps_[first].group != 0 && first > 0 &&
+           steps_[first - 1].group == steps_[first].group) {
         --first;
     }
     return Label(steps_[first]);

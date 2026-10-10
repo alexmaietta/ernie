@@ -592,8 +592,8 @@ TEST(ExtractDomeSun, FindsACompactBrightSunAndLeavesTheSky) {
         for (std::uint32_t c = 0; c < cols; ++c) {
             if (glm::dot(direction(r, c), towards) > std::cos(glm::radians(1.0))) {
                 map.At(c, r) = glm::vec4(5000.0f, 4000.0f, 3000.0f, 1.0f);
-                sunOmega += (std::cos(r * M_PI / rows) - std::cos((r + 1) * M_PI / rows)) *
-                            2.0 * M_PI / cols;
+                sunOmega += (std::cos(r * M_PI / rows) - std::cos((r + 1) * M_PI / rows)) * 2.0 *
+                            M_PI / cols;
             }
         }
     }

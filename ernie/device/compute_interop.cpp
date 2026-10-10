@@ -5,7 +5,8 @@
 
 namespace ernie {
 
-std::unique_ptr<ComputeInterop> ComputeInterop::Create(const VulkanContext& context, std::string* why) {
+std::unique_ptr<ComputeInterop> ComputeInterop::Create(const VulkanContext& context,
+                                                       std::string* why) {
     std::string cudaWhy;
     if (auto cuda = CudaInterop::Create(context, &cudaWhy)) {
         return cuda;

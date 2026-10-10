@@ -499,9 +499,10 @@ void BindRender(nb::module_& m) {
             "map",
             [](nb::pointer_and_handle<Renderer> self, Scene& scene, const Path& path,
                std::string_view attribute, nb::handle stream) {
-                return ArrayFromTensor(KeepingAlive(
-                    self.p->Delegate().MapArray(scene, path, attribute, StreamOf(stream)),
-                    self.h), true);
+                return ArrayFromTensor(KeepingAlive(self.p->Delegate().MapArray(
+                                                        scene, path, attribute, StreamOf(stream)),
+                                                    self.h),
+                                       true);
             },
             nb::arg("scene"), nb::arg("path"), nb::arg("attribute"),
             nb::arg("stream").none() = nb::none(),
@@ -517,9 +518,10 @@ void BindRender(nb::module_& m) {
             "map",
             [](nb::pointer_and_handle<Renderer> self, Scene& scene, const PrimSet& prims,
                std::string_view attribute, nb::handle stream) {
-                return ArrayFromTensor(KeepingAlive(
-                    self.p->Delegate().MapArray(scene, prims, attribute, StreamOf(stream)),
-                    self.h), true);
+                return ArrayFromTensor(KeepingAlive(self.p->Delegate().MapArray(
+                                                        scene, prims, attribute, StreamOf(stream)),
+                                                    self.h),
+                                       true);
             },
             nb::arg("scene"), nb::arg("prims"), nb::arg("attribute"),
             nb::arg("stream").none() = nb::none(),
@@ -556,8 +558,7 @@ void BindRender(nb::module_& m) {
             [](Renderer& r) { return r.Context().TakeValidationMessages(); },
             "Vulkan validation messages since the last call.")
         .def_prop_ro(
-            "validation_enabled",
-            [](const Renderer& r) { return r.Context().ValidationEnabled(); },
+            "validation_enabled", [](const Renderer& r) { return r.Context().ValidationEnabled(); },
             "Whether the Vulkan validation layer is on: asked for with `validation` and "
             "installed.");
 }

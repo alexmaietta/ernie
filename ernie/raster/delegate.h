@@ -231,12 +231,12 @@ class RasterDelegate : public RenderDelegate {
         std::uint32_t handle = 0;
         std::uint64_t version = 0;
         std::uint64_t scene = 0;  ///< `Scene::Id` of the scene `version` counts in.
-        Tensor zeros;  ///< Device positions for a group whose prims have no translate.
+        Tensor zeros;             ///< Device positions for a group whose prims have no translate.
         std::size_t members = 0;
         std::int64_t rows = 0;          ///< Rows of its arrays.
         std::optional<Bounds3> extent;  ///< The union of its prims' extents, if all have one.
-        std::vector<std::string> ops;  ///< Its prims' ops, in order (`xformOp:*`).
-        bool wFirst = false;           ///< Its orientations put w first.
+        std::vector<std::string> ops;   ///< Its prims' ops, in order (`xformOp:*`).
+        bool wFirst = false;            ///< Its orientations put w first.
         /// Composed on the GPU (`GpuXform::composed`, or posed under other GPU-posed prims): per
         /// row, the instance it is posed under and the CPU transforms between.
         bool composed = false;
@@ -399,7 +399,7 @@ class RasterDelegate : public RenderDelegate {
         std::string chain;       ///< The plan key it was made for.
     };
     std::map<std::pair<Path, std::size_t>, SensorState> sensorStates_;  ///< By product, pass.
-    std::optional<Key> stars_;    ///< The StarField last uploaded.
+    std::optional<Key> stars_;  ///< The StarField last uploaded.
     std::map<Path, SyncedMaterial> materials_;
     std::map<Path, SyncedMesh> syncedMeshes_;
     std::map<Path, SyncedInstancer> instancers_;

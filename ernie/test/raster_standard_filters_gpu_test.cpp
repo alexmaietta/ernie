@@ -79,8 +79,8 @@ std::map<std::string, std::vector<float>> VarsThrough(RasterDelegate& delegate, 
         std::vector<float>& out = values[var];
         out.resize(static_cast<std::size_t>(tensor.Elements()));
         for (std::size_t i = 0; i < out.size(); ++i) {
-            out[i] = tensor.Type() == ernie::DType::UInt16 ? static_cast<float>(
-                                                                 tensor.As<std::uint16_t>()[i])
+            out[i] = tensor.Type() == ernie::DType::UInt16
+                         ? static_cast<float>(tensor.As<std::uint16_t>()[i])
                      : tensor.Type() == ernie::DType::UInt8
                          ? static_cast<float>(tensor.As<std::uint8_t>()[i])
                          : tensor.As<float>()[i];
@@ -91,9 +91,9 @@ std::map<std::string, std::vector<float>> VarsThrough(RasterDelegate& delegate, 
 
 /// Render var `var` of MeshScene's camera (without noise) through SensorFilter prims of `types`,
 /// each step with its own inputs, as floats.
-std::vector<float> VarThrough(RasterDelegate& delegate, Scene& scene, std::string_view var,
-                              const std::vector<std::pair<std::string,
-                                                          std::map<std::string, float>>>& steps) {
+std::vector<float>
+VarThrough(RasterDelegate& delegate, Scene& scene, std::string_view var,
+           const std::vector<std::pair<std::string, std::map<std::string, float>>>& steps) {
     ernie::Camera(scene, "/World/Camera").SetSensorNoise(false);
     std::vector<Path> filters;
     for (std::size_t i = 0; i < steps.size(); ++i) {
@@ -153,10 +153,9 @@ const std::map<std::string, float> kNone;
 
 TEST_F(RasterDelegateTest, TheStandardSensorFiltersAreRegistered) {
     RasterDelegate delegate(*context_);
-    for (const char* id :
-         {"psf", "defocus", "bayer", "demosaic", "whiteBalance", "colorMatrix", "compand",
-          "detectorPattern", "readoutTaps", "tdi", "defectPixels", "smear", "darkCurrent",
-          "jpeg"}) {
+    for (const char* id : {"psf", "defocus", "bayer", "demosaic", "whiteBalance", "colorMatrix",
+                           "compand", "detectorPattern", "readoutTaps", "tdi", "defectPixels",
+                           "smear", "darkCurrent", "jpeg"}) {
         EXPECT_NE(delegate.SensorFilters().Find(id), nullptr) << id;
     }
 }
@@ -170,7 +169,8 @@ TEST_F(RasterDelegateTest, ThePointSpreadFunctionSpreadsLightAndKeepsIt) {
     EXPECT_NEAR(Sum(blurred, 0), Sum(base, 0), 0.01 * Sum(base, 0)) << "light is kept";
     EXPECT_LT(Variation(blurred, 0), 0.8 * Variation(base, 0)) << "edges soften";
     // Diffraction alone at f/1 spreads well under a pixel at these pixels: nearly untouched.
-    const auto diffraction = VarThrough(delegate, scene, "HdrColor", {{"psf", kNone}, {"cie", kNone}});
+    const auto diffraction =
+        VarThrough(delegate, scene, "HdrColor", {{"psf", kNone}, {"cie", kNone}});
     EXPECT_NEAR(Sum(diffraction, 0), Sum(base, 0), 0.01 * Sum(base, 0));
 }
 
@@ -195,11 +195,10 @@ TEST_F(RasterDelegateTest, WhiteBalanceAndColourMatricesScaleAndMixChannels) {
     const auto base = VarThrough(delegate, scene, "HdrColor", {{"cie", kNone}});
     const auto balanced = VarThrough(delegate, scene, "HdrColor",
                                      {{"cie", kNone}, {"whiteBalance", {{"red", 2.0f}}}});
-    const auto swapped = VarThrough(
-        delegate, scene, "HdrColor",
-        {{"cie", kNone},
-         {"colorMatrix",
-          {{"m00", 0.0f}, {"m02", 1.0f}, {"m20", 1.0f}, {"m22", 0.0f}}}});
+    const auto swapped =
+        VarThrough(delegate, scene, "HdrColor",
+                   {{"cie", kNone},
+                    {"colorMatrix", {{"m00", 0.0f}, {"m02", 1.0f}, {"m20", 1.0f}, {"m22", 0.0f}}}});
     for (std::size_t i = 0; i < base.size(); i += 4) {
         EXPECT_EQ(balanced[i], 2.0f * base[i]);
         EXPECT_EQ(balanced[i + 1], base[i + 1]);
@@ -214,8 +213,8 @@ TEST_F(RasterDelegateTest, BayerMosaicsDemosaicRestoresAndCompandingCompresses) 
     // Short enough not to saturate.
     ernie::Camera(scene, "/World/Camera").SetExposureTime(0.001);
     const auto raw = VarThrough(delegate, scene, "RawDN", {{"qe", kNone}, {"adc", kNone}});
-    const auto mosaic = VarThrough(delegate, scene, "RawDN",
-                                   {{"qe", kNone}, {"bayer", kNone}, {"adc", kNone}});
+    const auto mosaic =
+        VarThrough(delegate, scene, "RawDN", {{"qe", kNone}, {"bayer", kNone}, {"adc", kNone}});
     // RGGB: each pixel's other channels hold the black level alone, its own the full value.
     const ernie::CameraParams camera = ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize);
     const float black = static_cast<float>(camera.sensor.blackLevelDn);
@@ -255,9 +254,9 @@ TEST_F(RasterDelegateTest, BayerMosaicsDemosaicRestoresAndCompandingCompresses) 
         }
     }
     // Companding 12 bits to 8: full scale to 255, and the square root in between.
-    const auto companded = VarThrough(delegate, scene, "RawDN",
-                                      {{"qe", kNone}, {"adc", kNone},
-                                       {"compand", {{"inputBits", 12.0f}, {"outputBits", 8.0f}}}});
+    const auto companded = VarThrough(
+        delegate, scene, "RawDN",
+        {{"qe", kNone}, {"adc", kNone}, {"compand", {{"inputBits", 12.0f}, {"outputBits", 8.0f}}}});
     for (std::size_t i = 0; i < raw.size(); ++i) {
         if (i % 4 == 3) {
             continue;
@@ -287,10 +286,10 @@ TEST_F(RasterDelegateTest, CurveParametersTakeArraysOfAnyLength) {
     // 830 nm) dims white rocks' red and keeps their blue.
     ernie::Mesh(scene, "/World/Rocks/Rock").SetDisplayColor(glm::dvec3(1.0));
     const auto white = VarThrough(delegate, scene, "HdrColor", {{"cie", kNone}});
-    const auto cut =
-        VarsThrough(delegate, scene, {"HdrColor"}, {{"spectralTransmission", kNone}, {"cie", kNone}},
-                    {{0, {{"curve", {1, 1, 1, 1, 1, 0, 0, 0, 0, 0}}}}})
-            .at("HdrColor");
+    const auto cut = VarsThrough(delegate, scene, {"HdrColor"},
+                                 {{"spectralTransmission", kNone}, {"cie", kNone}},
+                                 {{0, {{"curve", {1, 1, 1, 1, 1, 0, 0, 0, 0, 0}}}}})
+                         .at("HdrColor");
     EXPECT_LT(Sum(cut, 0), 0.3 * Sum(white, 0)) << "red passes little";
     EXPECT_GT(Sum(cut, 2), 0.7 * Sum(white, 2)) << "blue mostly passes";
 
@@ -316,9 +315,8 @@ TEST_F(RasterDelegateTest, BloomingSpillsSaturatedChargeAlongColumns) {
     const float well = static_cast<float>(
         ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize).sensor.fullWellElectrons);
     const auto clipped = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
-    const auto bloomed =
-        VarsThrough(delegate, scene, {"Electrons", "aov:overflow"},
-                    {{"qe", kNone}, {"blooming", {{"maxLength", 64.0f}}}});
+    const auto bloomed = VarsThrough(delegate, scene, {"Electrons", "aov:overflow"},
+                                     {{"qe", kNone}, {"blooming", {{"maxLength", 64.0f}}}});
     const auto& electrons = bloomed.at("Electrons");
     const auto& overflow = bloomed.at("aov:overflow");
     const auto at = [](const std::vector<float>& image, std::size_t x, std::size_t y) {
@@ -347,8 +345,8 @@ TEST_F(RasterDelegateTest, BloomingSpillsSaturatedChargeAlongColumns) {
     EXPECT_EQ(at(overflow, column, 0), 0.0f) << "nothing overflowed above the quad";
 
     // An overflow drain takes it all: no streak.
-    const auto drained =
-        VarThrough(delegate, scene, "Electrons", {{"qe", kNone}, {"blooming", {{"antiBlooming", 1.0f}}}});
+    const auto drained = VarThrough(delegate, scene, "Electrons",
+                                    {{"qe", kNone}, {"blooming", {{"antiBlooming", 1.0f}}}});
     EXPECT_EQ(drained, clipped);
 }
 
@@ -429,8 +427,9 @@ TEST_F(RasterDelegateTest, CustomIntegratorsStandInForQe) {
     EXPECT_NEAR(Sum(electrons, 0), Sum(builtin, 0), 0.03 * Sum(builtin, 0));
     EXPECT_LT(Sum(electrons, 1), 1e-2) << "dark current alone";
     EXPECT_GT(Sum(measured.at("RawDN"), 0), 0.0) << "adc after a custom integrator";
-    EXPECT_THROW(VarsThrough(delegate, scene, {"Electrons"}, {{"qe", kNone}, {"measuredQe", kNone}}),
-                 std::invalid_argument)
+    EXPECT_THROW(
+        VarsThrough(delegate, scene, {"Electrons"}, {{"qe", kNone}, {"measuredQe", kNone}}),
+        std::invalid_argument)
         << "one integrator into electrons";
 }
 
@@ -467,7 +466,7 @@ TEST_F(RasterDelegateTest, RenderVarsCanNameTheirOwnChains) {
 
     // One product: HdrColor through a white-balanced chain, RawDN through a mosaicking one.
     const auto define = [&](const std::string& name, const std::string& type,
-                            std::map<std::string, float> inputs = {}) {
+                            const std::map<std::string, float>& inputs = {}) {
         const Path path("/Render/Chains/" + name);
         ernie::SensorFilterPrim::Define(scene, path).SetFilterType(type);
         for (const auto& [input, value] : inputs) {
@@ -490,7 +489,8 @@ TEST_F(RasterDelegateTest, RenderVarsCanNameTheirOwnChains) {
               std::vector<Path>{"/Render/Vars/Photo", "/Render/Vars/Raw"});
     const Path product[] = {"/Render/Both"};
     auto outputs = delegate.Step(scene, product);
-    const Tensor hdr = outputs.at("/Render/Both").vars.at("HdrColor").Map(ernie::MapDevice::Cpu).tensor;
+    const Tensor hdr =
+        outputs.at("/Render/Both").vars.at("HdrColor").Map(ernie::MapDevice::Cpu).tensor;
     const Tensor dn = outputs.at("/Render/Both").vars.at("RawDN").Map(ernie::MapDevice::Cpu).tensor;
     for (std::size_t i = 0; i < balancedAlone.size(); ++i) {
         ASSERT_EQ(hdr.As<float>()[i], balancedAlone[i]) << i;
@@ -562,14 +562,14 @@ TEST_F(RasterDelegateTest, TemporalFiltersKeepStateBetweenAProductsFrames) {
 
 TEST_F(RasterDelegateTest, DetectorPatternsStripeAlongTheTrack) {
     RasterDelegate delegate(*context_);
-    Scene scene = FlatScene();  // grey terrain filling the image
+    Scene scene = FlatScene();                                    // grey terrain filling the image
     ernie::Camera(scene, "/World/Camera").SetExposureTime(1e-6);  // unsaturated
     const auto at = [](std::size_t x, std::size_t y) { return (y * kSize + x) * 4 + 1; };
     const auto base = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
     // Gain alone: each column's electrons scale by its detector's gain, all down the column.
-    const auto gains = VarThrough(delegate, scene, "Electrons",
-                                  {{"qe", kNone},
-                                   {"detectorPattern", {{"gain", 0.05f}, {"offset", 0.0f}}}});
+    const auto gains =
+        VarThrough(delegate, scene, "Electrons",
+                   {{"qe", kNone}, {"detectorPattern", {{"gain", 0.05f}, {"offset", 0.0f}}}});
     std::vector<double> columnGain(kSize, 0.0);
     int lit = 0;
     for (std::size_t x = 0; x < kSize; ++x) {
@@ -619,10 +619,9 @@ TEST_F(RasterDelegateTest, ReadoutTapsOffsetInterleavedPixels) {
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();
     const auto raw = VarThrough(delegate, scene, "RawDN", {{"qe", kNone}, {"adc", kNone}});
-    const auto tapped = VarThrough(delegate, scene, "RawDN",
-                                   {{"qe", kNone},
-                                    {"adc", kNone},
-                                    {"readoutTaps", {{"offset0", 7.0f}, {"gain1", 2.0f}}}});
+    const auto tapped = VarThrough(
+        delegate, scene, "RawDN",
+        {{"qe", kNone}, {"adc", kNone}, {"readoutTaps", {{"offset0", 7.0f}, {"gain1", 2.0f}}}});
     int checked = 0;
     for (std::size_t y = 0; y < kSize; ++y) {
         for (std::size_t x = 0; x < kSize; ++x) {
@@ -646,14 +645,13 @@ TEST_F(RasterDelegateTest, TdiSumsItsStagesAndSmearsWhenOutOfStep) {
     ASSERT_LT(*std::max_element(line.begin(), line.end()), 2000.0f) << "four stages unsaturated";
     const auto inStep = VarThrough(delegate, scene, "Electrons",
                                    {{"qe", kNone}, {"tdi", {{"stages", 4.0f}, {"drift", 0.0f}}}});
-    const auto drifting =
-        VarThrough(delegate, scene, "Electrons",
-                   {{"qe", kNone}, {"tdi", {{"stages", 4.0f}, {"drift", 1.0f}}}});
+    const auto drifting = VarThrough(delegate, scene, "Electrons",
+                                     {{"qe", kNone}, {"tdi", {{"stages", 4.0f}, {"drift", 1.0f}}}});
     for (std::size_t y = 0; y + 3 < kSize; ++y) {
         for (std::size_t x = 0; x < kSize; ++x) {
             EXPECT_NEAR(inStep[at(x, y)], 4.0f * line[at(x, y)], 1e-3f * line[at(x, y)] + 1e-3f);
-            const float smeared = line[at(x, y)] + line[at(x, y + 1)] + line[at(x, y + 2)] +
-                                  line[at(x, y + 3)];
+            const float smeared =
+                line[at(x, y)] + line[at(x, y + 1)] + line[at(x, y + 2)] + line[at(x, y + 3)];
             EXPECT_NEAR(drifting[at(x, y)], smeared, 1e-3f * smeared + 1e-3f) << x << ", " << y;
         }
     }
@@ -665,8 +663,10 @@ TEST_F(RasterDelegateTest, DefectPixelsAreDeadOrHotAndStayPut) {
     ernie::Camera(scene, "/World/Camera").SetExposureTime(1e-6);  // unsaturated
     const auto base = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
     const std::map<std::string, float> defects{{"dead", 0.02f}, {"hot", 0.02f}, {"hotRate", 1e8f}};
-    const auto first = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}, {"defectPixels", defects}});
-    const auto second = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}, {"defectPixels", defects}});
+    const auto first =
+        VarThrough(delegate, scene, "Electrons", {{"qe", kNone}, {"defectPixels", defects}});
+    const auto second =
+        VarThrough(delegate, scene, "Electrons", {{"qe", kNone}, {"defectPixels", defects}});
     int dead = 0;
     int hot = 0;
     for (std::size_t i = 1; i < base.size(); i += 4) {
@@ -701,7 +701,8 @@ TEST_F(RasterDelegateTest, SmearAddsEachColumnsMeanForTheTransferTime) {
         }
         const double added = 0.5 * column / kSize;
         for (std::size_t y = 0; y < kSize; ++y) {
-            EXPECT_NEAR(smeared[at(x, y)], base[at(x, y)] + added, 1e-3 * (base[at(x, y)] + added) + 1e-3)
+            EXPECT_NEAR(smeared[at(x, y)], base[at(x, y)] + added,
+                        1e-3 * (base[at(x, y)] + added) + 1e-3)
                 << x << ", " << y;
         }
     }
@@ -715,11 +716,12 @@ TEST_F(RasterDelegateTest, DarkCurrentDoublesWithTemperature) {
     const auto darkAt = [&](float temperature) {
         return VarThrough(delegate, scene, "Electrons",
                           {{"qe", kNone},
-                           {"darkCurrent", {{"temperature", temperature},
-                                            {"referenceTemperature", 20.0f},
-                                            {"referenceRate", 1e7f},
-                                            {"doubling", 6.0f},
-                                            {"nonuniformity", 0.0f}}}});
+                           {"darkCurrent",
+                            {{"temperature", temperature},
+                             {"referenceTemperature", 20.0f},
+                             {"referenceRate", 1e7f},
+                             {"doubling", 6.0f},
+                             {"nonuniformity", 0.0f}}}});
     };
     const auto reference = darkAt(20.0f);
     const auto warm = darkAt(32.0f);  // two doublings
@@ -737,10 +739,10 @@ TEST_F(RasterDelegateTest, JpegKeepsQualityAndLosesDetailAsItFalls) {
         VarsThrough(delegate, scene, {"LdrColor"}, {{"cie", kNone}, {"exposure", kNone}})
             .at("LdrColor");
     const auto errorAt = [&](float quality) {
-        const auto jpeg = VarsThrough(delegate, scene, {"LdrColor"},
-                                      {{"cie", kNone}, {"exposure", kNone},
-                                       {"jpeg", {{"quality", quality}}}})
-                              .at("LdrColor");
+        const auto jpeg =
+            VarsThrough(delegate, scene, {"LdrColor"},
+                        {{"cie", kNone}, {"exposure", kNone}, {"jpeg", {{"quality", quality}}}})
+                .at("LdrColor");
         double total = 0.0;
         double largest = 0.0;
         for (std::size_t i = 0; i < plain.size(); ++i) {

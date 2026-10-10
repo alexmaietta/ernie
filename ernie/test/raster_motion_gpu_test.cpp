@@ -16,9 +16,9 @@
 
 #include <algorithm>
 #include <array>
-#include <functional>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -52,8 +52,11 @@ Scene MotionScene() {
 /// One step of /Render/Out: render var `var` as floats.
 std::vector<float> Step(RasterDelegate& delegate, const Scene& scene, const std::string& var) {
     const Path product[] = {"/Render/Out"};
-    const Tensor tensor =
-        delegate.Step(scene, product).at("/Render/Out").vars.at(var).Map(ernie::MapDevice::Cpu).tensor;
+    const Tensor tensor = delegate.Step(scene, product)
+                              .at("/Render/Out")
+                              .vars.at(var)
+                              .Map(ernie::MapDevice::Cpu)
+                              .tensor;
     std::vector<float> values(static_cast<std::size_t>(tensor.Elements()));
     for (std::size_t i = 0; i < values.size(); ++i) {
         values[i] = tensor.Type() == ernie::DType::UInt8
@@ -132,8 +135,8 @@ TEST_F(RasterDelegateTest, InstancesAndDeformingPointsBlurFromHostAndCudaArrays)
     Scene scene = MotionScene();
     // The rocks: the middle one slides 6 m towards -x.
     const auto rocks = [&](double s, bool device) {
-        const std::array<float, 9> positions{12, -10, 0, static_cast<float>(12.0 - 6.0 * s),
-                                             0,  0,   12, 10, 0};
+        const std::array<float, 9> positions{12, -10, 0, static_cast<float>(12.0 - 6.0 * s), 0, 0,
+                                             12, 10,  0};
         const Tensor host = Tensor::Copy<float>(positions, {3, 3});
         ernie::PointInstancer(scene, "/World/Rocks")
             .SetPositions(device ? cuda->Upload(host) : host);
@@ -203,8 +206,7 @@ TEST_F(RasterDelegateTest, MotionVectorsFollowTheCameraAndWhatMoves) {
     Scene scene = MotionScene();
     const Path var("/Render/Vars/MotionVector");
     ernie::RenderVar::Define(scene, var).SetSourceName("MotionVector");
-    scene.Set("/Render/Out", tokens::kOrderedVars,
-              std::vector<Path>{"/Render/Vars/HdrColor", var});
+    scene.Set("/Render/Out", tokens::kOrderedVars, std::vector<Path>{"/Render/Vars/HdrColor", var});
     const double focal =
         ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize).FocalLengthPixels();
     const auto at = [](const std::vector<float>& motion, std::size_t x, std::size_t y) {

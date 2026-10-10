@@ -99,8 +99,10 @@ TEST_F(RasterDelegateTest, MeshNormalsAndColoursFromCudaMatchTheHostPath) {
     const Tensor expected = reference.Render(host);
 
     Scene device = BallScene(ball);
-    for (const std::string_view attribute : {tokens::kPoints, tokens::kNormals, tokens::kDisplayColor}) {
-        device.Write("/World/Ball", attribute, cuda->Upload(*device.Read("/World/Ball", attribute)));
+    for (const std::string_view attribute :
+         {tokens::kPoints, tokens::kNormals, tokens::kDisplayColor}) {
+        device.Write("/World/Ball", attribute,
+                     cuda->Upload(*device.Read("/World/Ball", attribute)));
     }
     const Tensor image = delegate.Render(device);
     ASSERT_EQ(image.Elements(), expected.Elements());
@@ -112,13 +114,15 @@ TEST_F(RasterDelegateTest, MeshNormalsAndColoursFromCudaMatchTheHostPath) {
         flipped[i] = i % 3 == 2 ? ball.normals[i] : -ball.normals[i];
     }
     const auto n = static_cast<std::int64_t>(ball.points.size() / 3);
-    device.Write("/World/Ball", tokens::kNormals, cuda->Upload(Tensor::Copy<float>(flipped, {n, 3})));
+    device.Write("/World/Ball", tokens::kNormals,
+                 cuda->Upload(Tensor::Copy<float>(flipped, {n, 3})));
     host.Write("/World/Ball", tokens::kNormals, Tensor::Copy<float>(flipped, {n, 3}));
     std::vector<float> green(ball.points.size(), 0.0f);
     for (std::size_t i = 1; i < green.size(); i += 3) {
         green[i] = 1.0f;
     }
-    device.Write("/World/Ball", tokens::kDisplayColor, cuda->Upload(Tensor::Copy<float>(green, {n, 3})));
+    device.Write("/World/Ball", tokens::kDisplayColor,
+                 cuda->Upload(Tensor::Copy<float>(green, {n, 3})));
     host.Write("/World/Ball", tokens::kDisplayColor, Tensor::Copy<float>(green, {n, 3}));
     const Tensor updated = delegate.Render(device);
     EXPECT_GT(Differing(updated, image, 2), 100u);

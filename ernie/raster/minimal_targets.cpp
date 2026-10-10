@@ -52,9 +52,9 @@ std::vector<std::string> MinimalTargets::Held(std::span<const std::string_view> 
     return held;
 }
 
-MinimalTargets::MinimalTargets(const VulkanContext& context, VkExtent2D extent,
-                               std::uint32_t views, std::uint32_t chunk,
-                               std::span<const std::string_view> vars, bool shared)
+MinimalTargets::MinimalTargets(const VulkanContext& context, VkExtent2D extent, std::uint32_t views,
+                               std::uint32_t chunk, std::span<const std::string_view> vars,
+                               bool shared)
     : extent_(extent), views_(views), chunk_(std::min(chunk, views)), shared_(shared) {
     if (extent.width == 0 || extent.height == 0 || views == 0) {
         throw std::invalid_argument("Minimal targets need a non-zero extent and views");
@@ -81,8 +81,8 @@ MinimalTargets::MinimalTargets(const VulkanContext& context, VkExtent2D extent,
     depth_ = attachment(kDepthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     const VkDeviceSize pixels = VkDeviceSize{extent.width} * extent.height * views;
     for (const MinimalVar& var : kMinimalVars) {
-        const bool held = vars.empty() || std::find(vars.begin(), vars.end(), var.name) !=
-                                              vars.end();
+        const bool held =
+            vars.empty() || std::find(vars.begin(), vars.end(), var.name) != vars.end();
         LinearVar linear;
         if (held) {
             linear.buffer = std::make_shared<GpuBuffer>(

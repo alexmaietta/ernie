@@ -425,8 +425,8 @@ class MeshDrawable : public RasterDrawable {
         std::uint32_t firstVertex = 0;
         bool pointsDirty = false;
         Tensor devicePoints;  ///< CUDA points replacing `data.points` on the GPU, if any.
-        std::uintptr_t deviceStream = 1;        ///< The CUDA stream `devicePoints` are written on.
-        Tensor deviceNormals;  ///< Device normals replacing `data.normals`, if any.
+        std::uintptr_t deviceStream = 1;  ///< The CUDA stream `devicePoints` are written on.
+        Tensor deviceNormals;             ///< Device normals replacing `data.normals`, if any.
         std::uintptr_t normalsStream = 1;
         bool normalsDirty = false;
         Tensor deviceColors;  ///< Device colours replacing `data.colors`, if any.

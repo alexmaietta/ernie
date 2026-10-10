@@ -336,9 +336,8 @@ void Scene::Write(const Path& path, std::string_view attribute, Tensor tensor,
     WriteTensor(path, Find(path), attribute, std::move(tensor), stream);
 }
 
-void Scene::WriteTensor(const Path& path, PrimData& prim, std::string_view attribute,
-                        Tensor tensor, std::uintptr_t stream,
-                        std::optional<std::pair<Tensor, std::int64_t>> row) {
+void Scene::WriteTensor(const Path& path, PrimData& prim, std::string_view attribute, Tensor tensor,
+                        std::uintptr_t stream, std::optional<std::pair<Tensor, std::int64_t>> row) {
     // Found before inserted, so rewriting an attribute every step allocates no keys.
     if (const auto it = prim.streams.find(attribute); it != prim.streams.end()) {
         it->second = stream;

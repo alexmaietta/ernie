@@ -6,6 +6,7 @@
 #include "ernie/app/icons.h"
 #include "ernie/app/prim_icons.h"
 #include "ernie/app/session.h"
+#include "ernie/device/gpu_profile.h"
 #include "ernie/device/image.h"
 #include "ernie/device/offscreen_target.h"
 #include "ernie/device/pipeline.h"
@@ -21,7 +22,6 @@
 #include "ernie/scene/xform.h"
 #include "ernie/session/delegate.h"
 #include "ernie/session/resolve.h"
-#include "ernie/device/gpu_profile.h"
 #include "ernie/util/profile.h"
 
 #define GLFW_INCLUDE_NONE
@@ -398,9 +398,10 @@ struct Viewer::State {
                 CameraParamsOf(scene, activeCamera, ViewportWidth(), ViewportHeight())
                     .LinearExposureScale();
             const double target = std::log2(kMiddleGrey / (*luminance * scale));
-            autoStops = autoStops ? *autoStops + (target - *autoStops) *
-                                                     (1.0 - std::exp(-frameInfo.delta / kAdaptation))
-                                  : target;
+            autoStops = autoStops
+                            ? *autoStops + (target - *autoStops) *
+                                               (1.0 - std::exp(-frameInfo.delta / kAdaptation))
+                            : target;
         }
         return stops + autoStops.value_or(0.0);
     }
@@ -461,8 +462,8 @@ struct Viewer::State {
     std::set<std::string, std::less<>> drawnPanels;
     StatsPanel* stats = nullptr;
     Panel* profilerPanel = nullptr;
-    bool showControls = false;  ///< Help > Keyboard and Mouse.
-    bool showAbout = false;     ///< Help > About Ernie.
+    bool showControls = false;      ///< Help > Keyboard and Mouse.
+    bool showAbout = false;         ///< Help > About Ernie.
     std::size_t builtInPanels = 0;  ///< The first panels, which removing only hides.
     std::vector<MenuItem> menuItems;
     struct ViewportToggle {
@@ -795,10 +796,10 @@ struct Viewer::State {
                 CameraParamsOf(scene, camera, ViewportWidth(), ViewportHeight());
             // An orthographic view's aperture is its height: the controller keeps its own field
             // of view.
-            controller = ControllerFromTransform(
-                current.transform, controller.distance,
-                current.orthographic ? controller.verticalFov
-                                     : static_cast<float>(current.VerticalFov()));
+            controller = ControllerFromTransform(current.transform, controller.distance,
+                                                 current.orthographic
+                                                     ? controller.verticalFov
+                                                     : static_cast<float>(current.VerticalFov()));
         }
     }
 
@@ -881,8 +882,8 @@ struct Viewer::State {
         }
         // The right column: `Right` above `RightLower`, either taking all of it alone.
         if (wants(Dock::Right) || wants(Dock::RightLower)) {
-            ImGuiID column = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right,
-                                                         share(sizes.right), nullptr, &center);
+            ImGuiID column = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, share(sizes.right),
+                                                         nullptr, &center);
             if (wants(Dock::Right) && wants(Dock::RightLower)) {
                 dockNodes[Dock::RightLower] = ImGui::DockBuilderSplitNode(
                     column, ImGuiDir_Down, share(sizes.rightLower), nullptr, &column);
@@ -1044,11 +1045,10 @@ struct Viewer::State {
         bool active = false;
         if (!gizmoBusy) {
             ImGui::SetNextItemAllowOverlap();
-            ImGui::InvisibleButton("##viewport",
-                                   ImVec2(std::max(size.x, 1.0f), std::max(size.y, 1.0f)),
-                                   ImGuiButtonFlags_MouseButtonLeft |
-                                       ImGuiButtonFlags_MouseButtonRight |
-                                       ImGuiButtonFlags_MouseButtonMiddle);
+            ImGui::InvisibleButton(
+                "##viewport", ImVec2(std::max(size.x, 1.0f), std::max(size.y, 1.0f)),
+                ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight |
+                    ImGuiButtonFlags_MouseButtonMiddle);
             hovered = ImGui::IsItemHovered();
             active = ImGui::IsItemActive();
             const ImGuiIO& io = ImGui::GetIO();
@@ -1091,9 +1091,10 @@ struct Viewer::State {
             ImU32 colour;
             const char* label;
         };
-        std::array<Axis, 3> axes{{{toView * glm::dvec3(1, 0, 0), IM_COL32(222, 74, 64, 255), "X"},
-                                  {toView * glm::dvec3(0, 1, 0), IM_COL32(110, 190, 70, 255), "Y"},
-                                  {toView * glm::dvec3(0, 0, 1), IM_COL32(70, 130, 230, 255), "Z"}}};
+        std::array<Axis, 3> axes{
+            {{toView * glm::dvec3(1, 0, 0), IM_COL32(222, 74, 64, 255), "X"},
+             {toView * glm::dvec3(0, 1, 0), IM_COL32(110, 190, 70, 255), "Y"},
+             {toView * glm::dvec3(0, 0, 1), IM_COL32(70, 130, 230, 255), "Z"}}};
         std::sort(axes.begin(), axes.end(),
                   [](const Axis& a, const Axis& b) { return a.view.z < b.view.z; });
         ImDrawList* draw = ImGui::GetWindowDrawList();
@@ -1120,8 +1121,7 @@ struct Viewer::State {
         if (x < 0.0f || y < 0.0f) {
             return;
         }
-        const Path picked =
-            self.Pick(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+        const Path picked = self.Pick(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
         if (!toggle) {
             SetSelection(picked.IsEmpty() ? std::vector<Path>{} : std::vector<Path>{picked});
             return;
@@ -1147,8 +1147,7 @@ struct Viewer::State {
             return;
         }
         const Path& path = selection.front();
-        if (!scene.Has(path) || path.IsRoot() || IsSessionPath(path) ||
-            !scene.Has(activeCamera)) {
+        if (!scene.Has(path) || path.IsRoot() || IsSessionPath(path) || !scene.Has(activeCamera)) {
             return;
         }
         const CameraParams camera =
@@ -1164,10 +1163,9 @@ struct Viewer::State {
         ImGuizmo::SetOrthographic(camera.orthographic);
         ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
         ImGuizmo::SetRect(origin.x, origin.y, size.x, size.y);
-        const ImGuizmo::OPERATION operation = gizmo == Viewer::Gizmo::Rotate ? ImGuizmo::ROTATE
-                                              : gizmo == Viewer::Gizmo::Scale
-                                                  ? ImGuizmo::SCALE
-                                                  : ImGuizmo::TRANSLATE;
+        const ImGuizmo::OPERATION operation = gizmo == Viewer::Gizmo::Rotate  ? ImGuizmo::ROTATE
+                                              : gizmo == Viewer::Gizmo::Scale ? ImGuizmo::SCALE
+                                                                              : ImGuizmo::TRANSLATE;
         if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), operation,
                                  gizmoLocal ? ImGuizmo::LOCAL : ImGuizmo::WORLD,
                                  glm::value_ptr(model))) {
@@ -1235,8 +1233,8 @@ struct Viewer::State {
             const double h = 0.5 * light.GetHeight();
             overlay.Box({-w, -h, 0.0}, {w, h, 0.0}, style, world);
         } else {
-            const double radius =
-                DiskLight(std::as_const(scene), path).GetRadius() * glm::length(glm::dvec3(world[0]));
+            const double radius = DiskLight(std::as_const(scene), path).GetRadius() *
+                                  glm::length(glm::dvec3(world[0]));
             overlay.Circle(centre, down, radius, style);
         }
         overlay.Arrow(centre, centre + down * reach, style, 0.18 * reach);
@@ -1320,8 +1318,8 @@ struct Viewer::State {
     /// point the view orbits, with the x axis in red and the y axis in green through the origin.
     void DrawGrid(Overlay& overlay) {
         constexpr int kLines = 20;  // to each side of the centre
-        const double step = std::pow(
-            10.0, std::floor(std::log10(std::max(0.25 * controller.distance, 1e-3))));
+        const double step =
+            std::pow(10.0, std::floor(std::log10(std::max(0.25 * controller.distance, 1e-3))));
         const glm::dvec2 centre = glm::round(glm::dvec2(controller.target) / step) * step;
         const double half = kLines * step;
         std::vector<glm::dvec3> endpoints;
@@ -1374,13 +1372,12 @@ struct Viewer::State {
         const glm::dvec3 eye = at(0.0, 0.0, 0.0);
         const glm::dvec3 corners[] = {at(-side, -up, -depth), at(side, -up, -depth),
                                       at(side, up, -depth), at(-side, up, -depth)};
-        const glm::dvec3 endpoints[] = {
-            eye,        corners[0], eye,        corners[1], eye,        corners[2],
-            eye,        corners[3], corners[0], corners[1], corners[1], corners[2],
-            corners[2], corners[3], corners[3], corners[0]};
+        const glm::dvec3 endpoints[] = {eye,        corners[0], eye,        corners[1],
+                                        eye,        corners[2], eye,        corners[3],
+                                        corners[0], corners[1], corners[1], corners[2],
+                                        corners[2], corners[3], corners[3], corners[0]};
         overlay.Lines(endpoints, style);
-        const glm::dvec3 roof[] = {at(-0.5 * side, 1.15 * up, -depth),
-                                   at(0.0, 1.6 * up, -depth),
+        const glm::dvec3 roof[] = {at(-0.5 * side, 1.15 * up, -depth), at(0.0, 1.6 * up, -depth),
                                    at(0.5 * side, 1.15 * up, -depth),
                                    at(-0.5 * side, 1.15 * up, -depth)};
         overlay.Polyline(roof, style);
@@ -1760,15 +1757,13 @@ struct Viewer::State {
         char line[192];
         if (display.hudFps) {
             const double fps = std::max(static_cast<double>(ImGui::GetIO().Framerate), 1e-3);
-            std::snprintf(line, sizeof(line), "FPS: %.1f, Frame time: %.2f ms", fps,
-                          1000.0 / fps);
+            std::snprintf(line, sizeof(line), "FPS: %.1f, Frame time: %.2f ms", fps, 1000.0 / fps);
             hudLines.emplace_back(line);
         }
         if (display.hudDeviceMemory) {
             const auto [used, total] = DeviceMemory();
-            hudLines.push_back("Device Memory: " + FormatBytes(used) + " / " +
-                               FormatBytes(total) + " (renderer " +
-                               FormatBytes(delegate->Stats().gpuBytes) + ")");
+            hudLines.push_back("Device Memory: " + FormatBytes(used) + " / " + FormatBytes(total) +
+                               " (renderer " + FormatBytes(delegate->Stats().gpuBytes) + ")");
         }
         if (display.hudHostMemory) {
             const std::optional<std::uint64_t> bytes = HostResidentBytes();
@@ -1782,8 +1777,8 @@ struct Viewer::State {
         if (display.hudExposure) {
             if (const std::optional<double> ev = self.MeteredEv()) {
                 std::snprintf(line, sizeof(line), "Exposure: EV %.1f%s, %+.1f stops", *ev,
-                              AutoExposing() ? " (auto)" : "", autoStops.value_or(0.0) +
-                                                                   compensation);
+                              AutoExposing() ? " (auto)" : "",
+                              autoStops.value_or(0.0) + compensation);
             } else {
                 std::snprintf(line, sizeof(line), "Exposure: not metered");
             }
@@ -1990,8 +1985,7 @@ struct Viewer::State {
             }
             ImGui::SameLine();
         }
-        if (display.toolbarLighting &&
-            ImGui::BeginCombo("##lighting", lightLabel.c_str(), kPill)) {
+        if (display.toolbarLighting && ImGui::BeginCombo("##lighting", lightLabel.c_str(), kPill)) {
             for (const Lighting mode : {Lighting::Stage, Lighting::Camera, Lighting::Default}) {
                 if (ImGui::MenuItem(LightingName(mode), nullptr, mode == lighting)) {
                     lighting = mode;
@@ -2061,8 +2055,7 @@ struct Viewer::State {
             if (node != dockNodes.end()) {
                 ImGui::SetNextWindowDockID(node->second, ImGuiCond_FirstUseEver);
             }
-            const auto focus =
-                std::find(focusRequests.begin(), focusRequests.end(), panel.Title());
+            const auto focus = std::find(focusRequests.begin(), focusRequests.end(), panel.Title());
             if (focus != focusRequests.end() && drawnPanels.contains(panel.Title())) {
                 ImGui::SetNextWindowFocus();
                 focusRequests.erase(focus);
@@ -2102,7 +2095,8 @@ struct Viewer::State {
             ImGui::IsKeyPressed(ImGuiKey_D, false)) {
             self.Duplicate(std::vector<Path>(selection));
         }
-        if (!io.WantTextInput && !selection.empty() && ImGui::IsKeyPressed(ImGuiKey_Delete, false)) {
+        if (!io.WantTextInput && !selection.empty() &&
+            ImGui::IsKeyPressed(ImGuiKey_Delete, false)) {
             self.Delete(std::vector<Path>(selection));
         }
         ImGui::DockSpaceOverViewport(dockSpace, ImGui::GetMainViewport());
@@ -2136,8 +2130,7 @@ struct Viewer::State {
             // The viewport favours sharp shadows over images that repeat exactly, and shows
             // every overlay, unless the scene's settings choose.
             const auto authored = [&](std::string_view attribute) {
-                return !settingsSource.IsEmpty() &&
-                       scene.Get(settingsSource, attribute) != nullptr;
+                return !settingsSource.IsEmpty() && scene.Get(settingsSource, attribute) != nullptr;
             };
             if (!authored(tokens::kShadowFit)) {
                 overrides.emplace(tokens::kShadowFit, std::string(tokens::kVisible));
@@ -2150,8 +2143,7 @@ struct Viewer::State {
             UpdateSelectionOverlay();
             UpdateViewportOverlay();
             // Selected geometry outlined as Kit does, from the frame's prim ids.
-            const std::vector<Path> outlined =
-                display.selection ? selection : std::vector<Path>{};
+            const std::vector<Path> outlined = display.selection ? selection : std::vector<Path>{};
             delegate->SetHighlight(outlined, theme.outline);
             overrides.emplace(tokens::kOverlays, ShownOverlays(authored(tokens::kOverlays)));
             MirrorSettings(scene, settingsSource, SessionSettingsPath(), overrides, mirrored);
@@ -2709,8 +2701,7 @@ void Viewer::Edit(const Path& path, std::string_view attribute, Value value, boo
 }
 
 void Viewer::EditLocalTransform(const Path& path, const glm::dmat4& local, bool open) {
-    state_->history.Set(state_->scene, path, LocalTransformEdits(state_->scene, path, local),
-                        open);
+    state_->history.Set(state_->scene, path, LocalTransformEdits(state_->scene, path, local), open);
 }
 
 void Viewer::ClearAttribute(const Path& path, std::string_view attribute) {
@@ -2751,11 +2742,11 @@ Path Viewer::Create(std::string_view type) {
     CreateContext context;
     context.target = glm::dvec3(s.controller.target);
     // Default sizes at the view's scale: a power of ten near a tenth of its distance.
-    context.scale = std::pow(10.0, std::round(std::log10(std::max(
-                                       static_cast<double>(s.controller.distance) / 10.0, 1e-3))));
+    context.scale = std::pow(
+        10.0,
+        std::round(std::log10(std::max(static_cast<double>(s.controller.distance) / 10.0, 1e-3))));
     context.parentWorld = s.scene.Has(parent) ? s.scene.WorldTransform(parent) : glm::dmat4(1.0);
-    context.camera =
-        CameraParamsOf(s.scene, s.activeCamera, s.ViewportWidth(), s.ViewportHeight());
+    context.camera = CameraParamsOf(s.scene, s.activeCamera, s.ViewportWidth(), s.ViewportHeight());
     if (!IsSessionPath(s.activeCamera)) {
         context.activeCamera = s.activeCamera;
     }
@@ -3102,8 +3093,7 @@ std::uint64_t Viewer::AddViewportToggle(std::string label, bool shown, std::stri
 
 namespace {
 
-template <typename Items>
-auto& FindViewportItem(Items& items, std::uint64_t id, const char* kind) {
+template <typename Items> auto& FindViewportItem(Items& items, std::uint64_t id, const char* kind) {
     const auto found =
         std::find_if(items.begin(), items.end(), [id](const auto& item) { return item.id == id; });
     if (found == items.end()) {

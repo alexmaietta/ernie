@@ -114,8 +114,7 @@ std::invalid_argument BadOp(const Path& path, std::string_view attribute, std::s
 /// The numbers of an op's value or CPU tensor, or a GPU tensor `read` copies to the host, or none
 /// if it has neither.
 std::optional<std::vector<double>> NumbersOf(const Scene& scene, const Path& path,
-                                             std::string_view attribute,
-                                             const GpuOpReader* read) {
+                                             std::string_view attribute, const GpuOpReader* read) {
     if (const Value* value = scene.Get(path, attribute)) {
         return std::visit(
             [&](const auto& v) -> std::vector<double> {
@@ -222,8 +221,8 @@ glm::dmat4 OpMatrix(const Scene& scene, const Path& path, const OpEntry& op,
         // Arrays are x, y, z, w, or w first by the prim's `ernie:quaternionOrder`.
         const Value* order = scene.Get(path, tokens::kQuaternionOrder);
         const auto* token = order != nullptr ? order->Get<std::string>() : nullptr;
-        const bool wFirst = scene.Get(path, op.attribute) == nullptr && token != nullptr &&
-                            *token == tokens::kWxyz;
+        const bool wFirst =
+            scene.Get(path, op.attribute) == nullptr && token != nullptr && *token == tokens::kWxyz;
         const glm::dquat q =
             wFirst ? glm::dquat(n[0], n[1], n[2], n[3]) : glm::dquat(n[3], n[0], n[1], n[2]);
         m = glm::dmat4(glm::mat3_cast(glm::normalize(q)));

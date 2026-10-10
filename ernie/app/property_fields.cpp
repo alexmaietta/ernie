@@ -144,8 +144,10 @@ bool CurveEditor(std::vector<float>& values, double min, double max, float heigh
     float lo = static_cast<float>(min);
     float hi = static_cast<float>(max);
     if (!(max > min)) {
-        lo = std::min(0.0f, values.empty() ? 0.0f : *std::min_element(values.begin(), values.end()));
-        hi = std::max(1.0f, values.empty() ? 1.0f : *std::max_element(values.begin(), values.end()));
+        lo =
+            std::min(0.0f, values.empty() ? 0.0f : *std::min_element(values.begin(), values.end()));
+        hi =
+            std::max(1.0f, values.empty() ? 1.0f : *std::max_element(values.begin(), values.end()));
         if (active && ImGui::IsItemActivated()) {
             storage.SetFloat(rangeId, hi);
         } else if (active) {
@@ -183,9 +185,8 @@ bool CurveEditor(std::vector<float>& values, double min, double max, float heigh
     // Every sample between the pointer's last and current place, so a fast drag leaves no gaps.
     const ImGuiIO& io = ImGui::GetIO();
     const ImVec2 to = io.MousePos;
-    const ImVec2 from = ImGui::IsItemActivated()
-                            ? to
-                            : ImVec2(to.x - io.MouseDelta.x, to.y - io.MouseDelta.y);
+    const ImVec2 from =
+        ImGui::IsItemActivated() ? to : ImVec2(to.x - io.MouseDelta.x, to.y - io.MouseDelta.y);
     const auto indexOf = [&](float x) {
         const float t = std::clamp((x - low.x) / width, 0.0f, 1.0f);
         return static_cast<std::ptrdiff_t>(std::lround(t * float(values.size() - 1)));
@@ -227,8 +228,8 @@ std::optional<Value> Widget(Viewer& viewer, const PropertyField& field, const Va
     }
     case Kind::Float: {
         double value = NumberOf(shown);
-        const float speed = static_cast<float>(
-            limited ? (field.max - field.min) / 500.0 : std::max(std::abs(value), 1.0) / 200.0);
+        const float speed = static_cast<float>(limited ? (field.max - field.min) / 500.0
+                                                       : std::max(std::abs(value), 1.0) / 200.0);
         if (ImGui::DragScalar("##v", ImGuiDataType_Double, &value, speed,
                               limited ? &field.min : nullptr, limited ? &field.max : nullptr,
                               "%.4g")) {
@@ -411,9 +412,8 @@ std::string DrawPropertyFields(Viewer& viewer, const Path& path,
             ImGui::TextDisabled("%s", field.label.c_str());
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("%s%s%s%s", field.attribute.c_str(),
-                              authored ? "" : " (fallback)", field.tooltip.empty() ? "" : "\n",
-                              field.tooltip.c_str());
+            ImGui::SetTooltip("%s%s%s%s", field.attribute.c_str(), authored ? "" : " (fallback)",
+                              field.tooltip.empty() ? "" : "\n", field.tooltip.c_str());
         }
         if (authored && ImGui::BeginPopupContextItem("##reset")) {
             if (ImGui::MenuItem("Reset to Fallback")) {

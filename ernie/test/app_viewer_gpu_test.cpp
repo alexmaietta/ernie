@@ -372,7 +372,7 @@ TEST_F(ViewerTest, ToolbarMenusCanBeHidden) {
     ViewportDisplay display = viewer_->GetViewportDisplay();
     EXPECT_TRUE(display.toolbarRenderer && display.toolbarVar && display.toolbarCamera &&
                 display.toolbarLighting);
-    for (bool ViewportDisplay::*menu :
+    for (bool ViewportDisplay::* menu :
          {&ViewportDisplay::toolbarRenderer, &ViewportDisplay::toolbarVar,
           &ViewportDisplay::toolbarCamera, &ViewportDisplay::toolbarLighting}) {
         display.*menu = false;

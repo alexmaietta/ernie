@@ -193,9 +193,9 @@ class VulkanContext {
     }
 
     /// Records into `commands`, outside a rendering pass, the collection of finished GPU zones
-    /// for Tracy, and hands those Ernie's profiler timed to it; nothing without either. `Submit` and `SubmitAsync` collect at the start
-    /// of every command buffer, so only command buffers recorded elsewhere need it, such as an
-    /// app's frames.
+    /// for Tracy, and hands those Ernie's profiler timed to it; nothing without either. `Submit`
+    /// and `SubmitAsync` collect at the start of every command buffer, so only command buffers
+    /// recorded elsewhere need it, such as an app's frames.
     void CollectGpuProfile(VkCommandBuffer commands) const;
 
   private:

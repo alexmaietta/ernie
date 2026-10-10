@@ -232,11 +232,11 @@ MappedRenderVar RenderVarOutput::Map(MapDevice device, std::uintptr_t syncStream
     // Released, the tensor queues on `syncStream` a signal after the reads queued there, and
     // only then returns the buffer to the pool (`use_count`).
     ComputeInterop* compute = frame.compute;
-    const std::shared_ptr<const void> owner(
-        buffer.get(), [buffer, compute, syncStream](const void*) mutable {
-            compute->SignalVulkan(syncStream);
-            buffer.reset();
-        });
+    const std::shared_ptr<const void> owner(buffer.get(),
+                                            [buffer, compute, syncStream](const void*) mutable {
+                                                compute->SignalVulkan(syncStream);
+                                                buffer.reset();
+                                            });
     mapped.tensor = Tensor(view.Data(), type, shape, {}, view.Location(), owner);
     return mapped;
 }

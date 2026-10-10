@@ -471,8 +471,7 @@ class RasterRenderer {
     void Shade(VkCommandBuffer commands, RenderTargets& targets, std::uint32_t firstView) const;
     /// Adds sub-frame `subframe`'s raster radiance into `targets`' sum (motion.slang), each row
     /// weighted for its share of its exposure; the last leaves the sum in the raster radiance.
-    void Accumulate(VkCommandBuffer commands, RenderTargets& targets,
-                    std::uint32_t subframe) const;
+    void Accumulate(VkCommandBuffer commands, RenderTargets& targets, std::uint32_t subframe) const;
     /// Writes each internal view's MotionUniforms for a frame holding the MotionVector var: the
     /// last frame's view-projection from `frame`'s `PreviousPose`, and makes the camera pass.
     void WriteMotion(const FrameParams& params, const FrameParams& frame);
@@ -594,7 +593,7 @@ class RasterRenderer {
     std::unique_ptr<GraphicsPipeline> presentUint_;
     std::unique_ptr<GraphicsPipeline> presentSpectral_;
     std::unique_ptr<GraphicsPipeline> presentOutline_;
-    std::unique_ptr<GpuBuffer> highlight_;        ///< A bit per highlighted prim id.
+    std::unique_ptr<GpuBuffer> highlight_;  ///< A bit per highlighted prim id.
     /// One chain's sensor kernels: its plan, its custom filters' parameters and the temporal
     /// filters' state images (`SetSensorState`, or null).
     struct SensorPass {
@@ -612,7 +611,7 @@ class RasterRenderer {
     std::vector<SensorPass> sensorPasses_;
     std::unique_ptr<GpuImage> statePlaceholder_;  ///< Bound without state.
     std::vector<std::uint32_t> highlightBits_;
-    std::uint32_t highlightWords_ = 0;            ///< 0 draws no outline.
+    std::uint32_t highlightWords_ = 0;  ///< 0 draws no outline.
     std::uint32_t highlightWidth_ = 2;
     glm::vec4 highlightColour_{1.0f, 0.6f, 0.1f, 1.0f};
     int presentBand_ = -1;       ///< The SpectralRadiance band `Present` shows; -1 their mean.
@@ -705,7 +704,7 @@ class RasterRenderer {
     std::array<std::unique_ptr<GpuBuffer>, FrameUploads::kSlots> meterBins_;
     std::array<bool, FrameUploads::kSlots> metered_{};
     std::optional<double> meteredLuminance_;
-    bool meter_ = false;  ///< Whether the last `Update`'s frame meters.
+    bool meter_ = false;                    ///< Whether the last `Update`'s frame meters.
     std::vector<std::int32_t> viewWorlds_;  ///< Per view of the last `Update`, its world.
     std::array<float, 2> clipRange_{};      ///< The last `Update`'s near and far planes.
     bool orthographic_ = false;             ///< Whether the last `Update`'s camera is.

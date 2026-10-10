@@ -78,7 +78,8 @@ class CameraPanel final : public Panel {
             viewer.SetExposureCompensation(compensation);
         }
         if (const std::optional<double> ev = viewer.MeteredEv()) {
-            ImGui::Text("Scene EV100 %.1f%s", *ev, viewer.AutoExposing() ? ", exposing for it" : "");
+            ImGui::Text("Scene EV100 %.1f%s", *ev,
+                        viewer.AutoExposing() ? ", exposing for it" : "");
         } else {
             ImGui::TextDisabled("Scene EV100: not metered yet");
         }
@@ -87,8 +88,8 @@ class CameraPanel final : public Panel {
             const CameraParams settings = CameraParamsOf(scene, camera, 64, 64);
             const double ev = std::log2(settings.fStop * settings.fStop / settings.exposureTime) -
                               std::log2(settings.iso / 100.0) - settings.exposureStops;
-            ImGui::TextDisabled("Camera EV100 %.1f (f/%.1f, %.4g s, ISO %.0f)", ev,
-                                settings.fStop, settings.exposureTime, settings.iso);
+            ImGui::TextDisabled("Camera EV100 %.1f (f/%.1f, %.4g s, ISO %.0f)", ev, settings.fStop,
+                                settings.exposureTime, settings.iso);
         } catch (const std::exception&) {
         }
     }

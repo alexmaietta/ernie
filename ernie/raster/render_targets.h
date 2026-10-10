@@ -50,8 +50,7 @@ class RenderTargets : public FrameImages {
 
     /// The most views one set of targets with `bands` bands and `faces` raster layers per view
     /// can hold on `context`'s device: its `maxImageArrayLayers` over the bands and faces.
-    static std::uint32_t MaxViews(const VulkanContext& context, int bands,
-                                  std::uint32_t faces = 1);
+    static std::uint32_t MaxViews(const VulkanContext& context, int bands, std::uint32_t faces = 1);
 
     /// Raster layers per view: 1, or a cube camera's faces.
     std::uint32_t Faces() const {

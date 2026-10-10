@@ -31,7 +31,8 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
 else()
     set(ernie_deb_architecture ${CMAKE_SYSTEM_PROCESSOR})
 endif()
-set(CPACK_PACKAGE_FILE_NAME "ernie-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
+set(CPACK_PACKAGE_FILE_NAME
+    "ernie-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(CPACK_GENERATOR TGZ DEB RPM)
@@ -85,7 +86,8 @@ else()
 endif()
 # Recommended rather than required, so headless servers can leave the window libraries out
 # (`apt install --no-install-recommends`).
-set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "mesa-vulkan-drivers | vulkan-icd, ${ernie_deb_window_libraries}")
+set(CPACK_DEBIAN_PACKAGE_RECOMMENDS
+    "mesa-vulkan-drivers | vulkan-icd, ${ernie_deb_window_libraries}")
 
 # --- RPM --------------------------------------------------------------------------------------
 
@@ -95,11 +97,12 @@ set(CPACK_RPM_PACKAGE_LICENSE "BSD-3-Clause")
 set(CPACK_RPM_PACKAGE_GROUP "Applications/Graphics")
 # CPack's RPMs have no weak "Recommends", so the X11 client libraries (small, and no X server) are
 # required; Wayland's and Mesa's drivers are suggested.
-set(CPACK_RPM_PACKAGE_REQUIRES "vulkan-loader, libX11, libXcursor, libXrandr, libXinerama, libXi, libXext, libxkbcommon")
+set(CPACK_RPM_PACKAGE_REQUIRES
+    "vulkan-loader, libX11, libXcursor, libXrandr, libXinerama, libXi, libXext, libxkbcommon")
 set(CPACK_RPM_PACKAGE_SUGGESTS "mesa-vulkan-drivers, libwayland-client, libwayland-cursor")
 # Directories that the system's own packages own.
-set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/cmake"
-                                                  "${CMAKE_INSTALL_PREFIX}/share/doc")
+set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
+    "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/cmake" "${CMAKE_INSTALL_PREFIX}/share/doc")
 
 include(CPack)
 

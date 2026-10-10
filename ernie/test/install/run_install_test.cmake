@@ -28,8 +28,15 @@ function(run)
 endfunction()
 
 foreach(component runtime dev)
-    run("${CMAKE_COMMAND}" --install "${BUILD_DIR}" --prefix "${prefix}" --config "${CONFIG}"
-        --component ${component})
+    run("${CMAKE_COMMAND}"
+        --install
+        "${BUILD_DIR}"
+        --prefix
+        "${prefix}"
+        --config
+        "${CONFIG}"
+        --component
+        ${component})
 endforeach()
 
 # The README's C++ example: the first ```cpp block.
@@ -44,8 +51,15 @@ string(FIND "${readme}" "```" end)
 string(SUBSTRING "${readme}" 0 ${end} readme_cpp)
 file(WRITE "${WORK_DIR}/readme_example.cpp" "${readme_cpp}")
 
-run("${CMAKE_COMMAND}" -S "${CMAKE_CURRENT_LIST_DIR}" -B "${consumer_build}" -G "${GENERATOR}"
-    "-DCMAKE_BUILD_TYPE=${CONFIG}" "-DCMAKE_PREFIX_PATH=${prefix}"
+run("${CMAKE_COMMAND}"
+    -S
+    "${CMAKE_CURRENT_LIST_DIR}"
+    -B
+    "${consumer_build}"
+    -G
+    "${GENERATOR}"
+    "-DCMAKE_BUILD_TYPE=${CONFIG}"
+    "-DCMAKE_PREFIX_PATH=${prefix}"
     "-DREADME_CPP=${WORK_DIR}/readme_example.cpp")
 run("${CMAKE_COMMAND}" --build "${consumer_build}" --config "${CONFIG}")
 

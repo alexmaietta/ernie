@@ -71,13 +71,12 @@ void GpuTimer::Collect() {
     std::vector<Pending> waiting;
     for (const Pending& pending : pending_) {
         std::array<std::uint64_t, 4> values{};  // two (timestamp, availability) pairs
-        const VkResult result = pending.ended
-                                    ? vkGetQueryPoolResults(
-                                          device_, pool_, pending.query, 2, sizeof(values),
-                                          values.data(), 2 * sizeof(std::uint64_t),
-                                          VK_QUERY_RESULT_64_BIT |
-                                              VK_QUERY_RESULT_WITH_AVAILABILITY_BIT)
-                                    : VK_NOT_READY;
+        const VkResult result =
+            pending.ended ? vkGetQueryPoolResults(device_, pool_, pending.query, 2, sizeof(values),
+                                                  values.data(), 2 * sizeof(std::uint64_t),
+                                                  VK_QUERY_RESULT_64_BIT |
+                                                      VK_QUERY_RESULT_WITH_AVAILABILITY_BIT)
+                          : VK_NOT_READY;
         if (result != VK_SUCCESS || values[1] == 0 || values[3] == 0) {
             waiting.push_back(pending);
             continue;

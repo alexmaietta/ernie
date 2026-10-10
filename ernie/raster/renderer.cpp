@@ -596,12 +596,11 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
                   BufferMemory::Device),
       lightViewMatrices_(context, kMaxLightShadowViews * sizeof(glm::mat4),
                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device),
-      lightShadowBlocks_(context, kMaxLightShadowViews * kLightShadowBlockStride,
-                         kViewUniformUsage, BufferMemory::Device),
+      lightShadowBlocks_(context, kMaxLightShadowViews * kLightShadowBlockStride, kViewUniformUsage,
+                         BufferMemory::Device),
       lightsLayout_(context, kLightsBindings, 48),
       depthRangeLayout_(context, kDepthRangeBindings, 32),
-      meterLayout_(context, kMeterBindings, 32),
-      resolveLayout_(context, kResolveBindings, 32),
+      meterLayout_(context, kMeterBindings, 32), resolveLayout_(context, kResolveBindings, 32),
       unheldVar_(context, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device) {
     if (brdfs_.Models().empty()) {
         throw std::invalid_argument("RasterRenderer needs at least one BRDF");
@@ -639,19 +638,19 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
     SetDomeMap(nullptr);
     SetStars({});
     SkyPipeline(false);
-    noOcclusion_ = std::make_unique<GpuImage>(
-        context_, ImageDesc{1, 1, 1, 1, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT,
-                            false, true});
+    noOcclusion_ =
+        std::make_unique<GpuImage>(context_, ImageDesc{1, 1, 1, 1, VK_FORMAT_R16G16B16A16_SFLOAT,
+                                                       VK_IMAGE_USAGE_STORAGE_BIT, false, true});
     context_.Submit([this](VkCommandBuffer commands) {
         noOcclusion_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
     });
     // Two layers of horizons at the nadir: nothing occludes.
-    noHorizon_ = std::make_unique<GpuImage>(
-        context_, ImageDesc{1, 1, 2, 1, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT,
-                            false, true});
-    const std::array<std::uint16_t, 4> nadir{
-        glm::packHalf1x16(-100.0f), glm::packHalf1x16(-100.0f), glm::packHalf1x16(-100.0f),
-        glm::packHalf1x16(-100.0f)};
+    noHorizon_ =
+        std::make_unique<GpuImage>(context_, ImageDesc{1, 1, 2, 1, VK_FORMAT_R16G16B16A16_SFLOAT,
+                                                       VK_IMAGE_USAGE_SAMPLED_BIT, false, true});
+    const std::array<std::uint16_t, 4> nadir{glm::packHalf1x16(-100.0f), glm::packHalf1x16(-100.0f),
+                                             glm::packHalf1x16(-100.0f),
+                                             glm::packHalf1x16(-100.0f)};
     const std::span<const std::byte> layers[] = {std::as_bytes(std::span(nadir)),
                                                  std::as_bytes(std::span(nadir))};
     noHorizon_->Upload(layers);
@@ -699,19 +698,19 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
     depthRangePipeline_ = std::make_unique<ComputePipeline>(
         context_, depthRangeLayout_, compiler_.CompileSpirv(depthRangeModules, "depthRangeMain"));
     for (std::unique_ptr<GpuBuffer>& range : depthRanges_) {
-        range = std::make_unique<GpuBuffer>(
-            context_, 2 * sizeof(std::uint32_t),
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            BufferMemory::Readback);
+        range = std::make_unique<GpuBuffer>(context_, 2 * sizeof(std::uint32_t),
+                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                                                VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                            BufferMemory::Readback);
     }
     const std::vector<ShaderModuleSource> meterModules{{"meter", shaders::kMeterSlang}};
     meterPipeline_ = std::make_unique<ComputePipeline>(
         context_, meterLayout_, compiler_.CompileSpirv(meterModules, "meterMain"));
     for (std::unique_ptr<GpuBuffer>& bins : meterBins_) {
-        bins = std::make_unique<GpuBuffer>(
-            context_, kMeterBins * sizeof(std::uint32_t),
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            BufferMemory::Readback);
+        bins = std::make_unique<GpuBuffer>(context_, kMeterBins * sizeof(std::uint32_t),
+                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                                               VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                           BufferMemory::Readback);
     }
 }
 
@@ -828,8 +827,8 @@ std::unique_ptr<GpuImage> RasterRenderer::UploadDomeMap(const Image* map) const 
     // Float texels, filtered by the shader itself: linear filtering of float32 is optional.
     auto image = std::make_unique<GpuImage>(
         context_, ImageDesc{mips.front().width, mips.front().height, 1,
-                            static_cast<std::uint32_t>(mips.size()),
-                            VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT});
+                            static_cast<std::uint32_t>(mips.size()), VK_FORMAT_R32G32B32A32_SFLOAT,
+                            VK_IMAGE_USAGE_SAMPLED_BIT});
     std::vector<std::span<const std::byte>> spans;
     for (const Image& mip : mips) {
         spans.push_back(std::as_bytes(std::span(mip.pixels)));
@@ -842,8 +841,8 @@ void RasterRenderer::SetStars(std::span<const Star> stars) {
     // Each star's grid cell, by declination row from the south pole and right ascension column.
     const auto cellOf = [](const Star& star) {
         constexpr double kTwoPi = 2.0 * M_PI;
-        const double ascension = std::fmod(
-            std::fmod(static_cast<double>(star.rightAscension), kTwoPi) + kTwoPi, kTwoPi);
+        const double ascension =
+            std::fmod(std::fmod(static_cast<double>(star.rightAscension), kTwoPi) + kTwoPi, kTwoPi);
         const auto column = std::min<std::uint32_t>(
             static_cast<std::uint32_t>(ascension / kTwoPi * kStarColumns), kStarColumns - 1);
         const auto row = std::min<std::uint32_t>(
@@ -880,12 +879,12 @@ void RasterRenderer::SetStars(std::span<const Star> stars) {
     if (packed.empty()) {
         packed.emplace_back(0.0f);  // buffers cannot be empty
     }
-    auto starBuffer = std::make_unique<GpuBuffer>(
-        context_, packed.size() * sizeof(glm::vec4), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        BufferMemory::Device);
-    auto cellBuffer = std::make_unique<GpuBuffer>(
-        context_, ranges.size() * sizeof(glm::uvec2), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        BufferMemory::Device);
+    auto starBuffer =
+        std::make_unique<GpuBuffer>(context_, packed.size() * sizeof(glm::vec4),
+                                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+    auto cellBuffer =
+        std::make_unique<GpuBuffer>(context_, ranges.size() * sizeof(glm::uvec2),
+                                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
     starBuffer->Write(std::as_bytes(std::span(packed)));
     cellBuffer->Write(std::as_bytes(std::span(ranges)));
     vkDeviceWaitIdle(context_.Device());
@@ -974,9 +973,9 @@ void RasterRenderer::WriteLights(const FrameParams& params, const std::optional<
         std::copy(light.spectrum.begin(), light.spectrum.end(), entry.spectrum);
         if (light.posedOnGpu) {
             // The light pass poses it and fits its views as `FitLightShadowViews` would.
-            const auto kind = distant                                       ? 0u
+            const auto kind = distant                                               ? 0u
                               : light.coneAngle <= LightParams::kMaxSpotConeDegrees ? 1u
-                                                                              : 2u;
+                                                                                    : 2u;
             const std::uint32_t record[4] = {static_cast<std::uint32_t>(i),
                                              static_cast<std::uint32_t>(entry.cone[2]),
                                              static_cast<std::uint32_t>(entry.cone[3]), kind};
@@ -1311,8 +1310,8 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
         // within those the casters can shadow.
         if (shadows.fit == ShadowFit::Visible) {
             if (const std::optional<std::pair<float, float>> seen = VisibleDepths(params)) {
-                shadowDistance = std::max(std::min(shadowDistance, seen->second),
-                                          view.nearPlane * 1.01f);
+                shadowDistance =
+                    std::max(std::min(shadowDistance, seen->second), view.nearPlane * 1.01f);
                 splitNear = std::clamp(seen->first, view.nearPlane, 0.95f * shadowDistance);
             }
         }
@@ -1344,7 +1343,8 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
         for (std::uint32_t v = 0; v < views_; ++v) {
             const CameraView viewOf = raster.View(v);
             Uniforms uniforms{};
-            // A pushbroom projects through its strip in place of a view-projection (`projectWorld`).
+            // A pushbroom projects through its strip in place of a view-projection
+            // (`projectWorld`).
             if (params.camera.pushbroom) {
                 const PushbroomStrip strip = params.Strip(v);
                 CopyMatrix(uniforms.viewProjection, strip.Packed());
@@ -1442,16 +1442,16 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
         const FrameParams::SensorChain& chain = chains[c];
         const std::vector<std::string_view> held = RequiredVars(chain.vars);
         for (const std::string_view var : held) {
-            if (std::find(requiredVars_.begin(), requiredVars_.end(), var) !=
-                requiredVars_.end()) {
+            if (std::find(requiredVars_.begin(), requiredVars_.end(), var) != requiredVars_.end()) {
                 throw std::invalid_argument("Render var '" + std::string(var) +
                                             "' comes from two sensor filter chains");
             }
             requiredVars_.push_back(var);
         }
         SensorPass& pass = passes[c];
-        pass.plan = PlanSensor(chain.filters.empty() ? StepsOf(DefaultFilterChain()) : chain.filters,
-                               held, sensorFilters_, chain.aovOffset);
+        pass.plan =
+            PlanSensor(chain.filters.empty() ? StepsOf(DefaultFilterChain()) : chain.filters, held,
+                       sensorFilters_, chain.aovOffset);
         pass.plan.lens = LensKernelOf(params.camera.lens, params.camera.pushbroom);
         pass.plan.pushbroom = params.camera.pushbroom;
         pass.plan.cube = faces_ > 1;
@@ -1475,9 +1475,8 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
             pass.params = std::move(sensorPasses_[c].params);
         } else {
             vkDeviceWaitIdle(context_.Device());
-            pass.params = std::make_unique<GpuBuffer>(context_, bytes,
-                                                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                                      BufferMemory::Device);
+            pass.params = std::make_unique<GpuBuffer>(
+                context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
         }
         if (!uploaded.empty()) {
             uploads_.Write(*pass.params, std::as_bytes(std::span(uploaded)));
@@ -1534,8 +1533,7 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
 }
 
 const ComputePipeline& RasterRenderer::ShadingPipeline(std::size_t model, bool pushbroom) {
-    if (const auto it = shadingPipelines_.find({model, pushbroom});
-        it != shadingPipelines_.end()) {
+    if (const auto it = shadingPipelines_.find({model, pushbroom}); it != shadingPipelines_.end()) {
         return *it->second;
     }
     std::vector<std::uint32_t> spirv;
@@ -1557,8 +1555,7 @@ void RasterRenderer::SkyPipeline(bool pushbroom) {
         // The sky pass shares shading's module, composed with the first model, which it ignores.
         sky = std::make_unique<ComputePipeline>(
             context_, shadingLayout_,
-            compiler_.CompileSpirv(ShadingModules(brdfs_.Models().front(), pushbroom),
-                                   "skyMain"));
+            compiler_.CompileSpirv(ShadingModules(brdfs_.Models().front(), pushbroom), "skyMain"));
     }
 }
 
@@ -1593,7 +1590,8 @@ void RasterRenderer::WriteMaterialTable() {
         // Emission: its colour upsampled as a reflectance is (`RgbToSpectrum`, on its largest
         // component's scale) under the equal-energy illuminant of 1 cd/m^2 per unit.
         const glm::vec3 emission = settings.emission;
-        const float peak = std::max({emission.r, emission.g, emission.b});        if (peak > 0.0f) {
+        const float peak = std::max({emission.r, emission.g, emission.b});
+        if (peak > 0.0f) {
             entry.info[2] = 1;
             const std::vector<float> emitted =
                 RgbToSpectrum(glm::dvec3(emission / peak)).Bin(bands_);
@@ -1786,8 +1784,7 @@ void RasterRenderer::WriteSensor(const FrameParams& params, const FrameParams& r
     // (orthographic) optics do not have: they stay all in focus.
     sensor.range[2] = static_cast<float>(camera.orthographic ? 0.0 : camera.lensFStop);
     sensor.range[3] = camera.orthographic ? 1.0f : 0.0f;
-    sensor.optics[0] =
-        static_cast<float>(camera.lensFStop > 0.0 ? camera.lensFStop : camera.fStop);
+    sensor.optics[0] = static_cast<float>(camera.lensFStop > 0.0 ? camera.lensFStop : camera.fStop);
     sensor.optics[1] = static_cast<float>(camera.PixelPitchMetres() * 1e6);
     sensor.optics[2] = static_cast<float>(camera.focalLengthMm);
     sensor.optics[3] = static_cast<float>(camera.focusDistance);
@@ -1836,8 +1833,8 @@ void RasterRenderer::WriteSensor(const FrameParams& params, const FrameParams& r
     for (int i = 0; i < bands_.count; ++i) {
         const double low = bands_.Lower(i);
         const double high = low + bands_.Width();
-        const double scale = lens.chromaticScale.Empty() ? 1.0
-                                                         : lens.chromaticScale.Average(low, high);
+        const double scale =
+            lens.chromaticScale.Empty() ? 1.0 : lens.chromaticScale.Average(low, high);
         const double shift =
             lens.chromaticFocusMm.Empty() ? 0.0 : lens.chromaticFocusMm.Average(low, high);
         sensor.chromatic[i / 2][(i % 2) * 2] = static_cast<float>(scale);
@@ -1884,12 +1881,11 @@ void RasterRenderer::WriteMotion(const FrameParams& params, const FrameParams& f
     const VkDeviceSize bytes = VkDeviceSize{views_} * sizeof(MotionUniforms);
     if (motionUniforms_ == nullptr || motionUniforms_->Size() < bytes) {
         vkDeviceWaitIdle(context_.Device());
-        motionUniforms_ = std::make_unique<GpuBuffer>(context_, bytes, kViewUniformUsage,
-                                                      BufferMemory::Device);
+        motionUniforms_ =
+            std::make_unique<GpuBuffer>(context_, bytes, kViewUniformUsage, BufferMemory::Device);
     }
     if (cameraMotionPipeline_ == nullptr) {
-        cameraMotionLayout_ =
-            std::make_unique<PipelineLayout>(context_, kCameraMotionBindings, 16);
+        cameraMotionLayout_ = std::make_unique<PipelineLayout>(context_, kCameraMotionBindings, 16);
         const std::vector<ShaderModuleSource> modules{
             {"motion_vectors", shaders::kMotionVectorsSlang}};
         cameraMotionPipeline_ = std::make_unique<ComputePipeline>(
@@ -2224,7 +2220,8 @@ void RasterRenderer::RecordMinimal(VkCommandBuffer commands, MinimalTargets& tar
     }
     if (targets.Extent().width != extent_.width || targets.Extent().height != extent_.height ||
         targets.Views() != outputViews_) {
-        throw std::invalid_argument("Minimal targets need the camera's extent and the frame's views");
+        throw std::invalid_argument(
+            "Minimal targets need the camera's extent and the frame's views");
     }
     ERNIE_ZONE("RecordMinimal");
     const float clear[3] = {minimalClear_.r, minimalClear_.g, minimalClear_.b};
@@ -2253,14 +2250,15 @@ void RasterRenderer::RecordMinimal(VkCommandBuffer commands, MinimalTargets& tar
         std::vector<DescriptorResource> resources = {
             sampled(targets.Color()), sampled(targets.Ids()), sampled(targets.Depth()),
             DescriptorResource::Of(uniforms_), DescriptorResource::Of(shadingUniforms_)};
-        const std::string_view vars[] = {render_vars::kLdrColor, render_vars::kDistanceToImagePlane,
-                                         render_vars::kDistanceToCamera, render_vars::kNormal,
-                                         render_vars::kPrimId, render_vars::kInstanceId};
+        const std::string_view vars[] = {
+            render_vars::kLdrColor,         render_vars::kDistanceToImagePlane,
+            render_vars::kDistanceToCamera, render_vars::kNormal,
+            render_vars::kPrimId,           render_vars::kInstanceId};
         for (std::size_t i = 0; i < std::size(vars); ++i) {
             const FrameImages::LinearVar linear = targets.Linear(vars[i]);
             holds |= linear.buffer != nullptr ? 1u << i : 0u;
-            resources.push_back(DescriptorResource::Of(linear.buffer != nullptr ? *linear.buffer
-                                                                                : unheldVar_));
+            resources.push_back(
+                DescriptorResource::Of(linear.buffer != nullptr ? *linear.buffer : unheldVar_));
         }
         vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resolvePipeline_->Handle());
         resolveLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
@@ -2607,31 +2605,27 @@ void RasterRenderer::Shade(VkCommandBuffer commands, RenderTargets& targets,
                 image->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
             }
         }
-        const DescriptorResource shading[] = {DescriptorResource::Of(shadingUniforms_),
-                                              sampled(targets.GBuffer(0)),
-                                              sampled(targets.GBuffer(1)),
-                                              sampled(targets.GBuffer(2)),
-                                              sampled(targets.Depth()),
-                                              DescriptorResource::Of(*materialTable_),
-                                              DescriptorResource::Of(sigmoidTable_.View()),
-                                              DescriptorResource::Of(tableSampler_),
-                                              general(targets.RasterRadiance()),
-                                              DescriptorResource::Of(lightTable_),
-                                              DescriptorResource::Of(lightShadowMaps_->View()),
-                                              DescriptorResource::Of(shadowSampler_),
-                                              DescriptorResource::Of(lightViewMatrices_),
-                                              sampled(*domeMap_),
-                                              DescriptorResource::Of(*stars_),
-                                              DescriptorResource::Of(*starCells_),
-                                              sampled(domeLighting_ != nullptr ? *domeLighting_
-                                                                               : *domeMap_),
-                                              general(occlusion_[0] != nullptr ? *occlusion_[0]
-                                                                               : *noOcclusion_),
-                                              general(occlusion_[1] != nullptr ? *occlusion_[1]
-                                                                               : *noOcclusion_),
-                                              sampled(terrainHorizon_.image != nullptr
-                                                          ? *terrainHorizon_.image
-                                                          : *noHorizon_)};
+        const DescriptorResource shading[] = {
+            DescriptorResource::Of(shadingUniforms_),
+            sampled(targets.GBuffer(0)),
+            sampled(targets.GBuffer(1)),
+            sampled(targets.GBuffer(2)),
+            sampled(targets.Depth()),
+            DescriptorResource::Of(*materialTable_),
+            DescriptorResource::Of(sigmoidTable_.View()),
+            DescriptorResource::Of(tableSampler_),
+            general(targets.RasterRadiance()),
+            DescriptorResource::Of(lightTable_),
+            DescriptorResource::Of(lightShadowMaps_->View()),
+            DescriptorResource::Of(shadowSampler_),
+            DescriptorResource::Of(lightViewMatrices_),
+            sampled(*domeMap_),
+            DescriptorResource::Of(*stars_),
+            DescriptorResource::Of(*starCells_),
+            sampled(domeLighting_ != nullptr ? *domeLighting_ : *domeMap_),
+            general(occlusion_[0] != nullptr ? *occlusion_[0] : *noOcclusion_),
+            general(occlusion_[1] != nullptr ? *occlusion_[1] : *noOcclusion_),
+            sampled(terrainHorizon_.image != nullptr ? *terrainHorizon_.image : *noHorizon_)};
         // The dispatch's model and first view, and the terrain horizon (none without its image).
         const auto constantsFor = [&](std::uint32_t model) {
             ShadingConstants constants{};
@@ -2699,9 +2693,10 @@ void RasterRenderer::Accumulate(VkCommandBuffer commands, RenderTargets& targets
         std::uint32_t frame[4];
         float times[4];
         float rolling[4];
-    } constants{{subframe, subframes_, static_cast<std::uint32_t>(bands_.count), sky_ != 0 ? 1u : 0u},
-                {shutter_[0], shutter_[1], shutter_[2], shutter_[3]},
-                {shutter_[4], 0.0f, 0.0f, 0.0f}};
+    } constants{
+        {subframe, subframes_, static_cast<std::uint32_t>(bands_.count), sky_ != 0 ? 1u : 0u},
+        {shutter_[0], shutter_[1], shutter_[2], shutter_[3]},
+        {shutter_[4], 0.0f, 0.0f, 0.0f}};
     motionLayout_.PushConstants(commands, &constants, sizeof(constants));
     vkCmdDispatch(commands, Groups(extent_.width), Groups(extent_.height),
                   targets.RasterLayers() * static_cast<std::uint32_t>(bands_.count));
@@ -2739,16 +2734,16 @@ void RasterRenderer::Filter(VkCommandBuffer commands, RenderTargets& targets,
         // Each segment reads the images the one before stored and stores those the next reads,
         // the two sets alternating (placeholders for a plan that passes none on).
         const auto image = [&](bool spectrum, std::uint32_t set) -> GpuImage& {
-            GpuImage& sensorImage =
-                targets.SensorImage(spectrum, set, spectrum ? plan.spectrumImages : plan.channelImages,
-                                    plan.pyramids != 0);
+            GpuImage& sensorImage = targets.SensorImage(
+                spectrum, set, spectrum ? plan.spectrumImages : plan.channelImages,
+                plan.pyramids != 0);
             sensorImage.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
             return sensorImage;
         };
         // The temporal filters' state, from the last frame and for the next, or a placeholder.
         const bool state = plan.states > 0 && pass.stateNext != nullptr;
-        GpuImage& previous = state && pass.statePrevious != nullptr ? *pass.statePrevious
-                                                                    : *statePlaceholder_;
+        GpuImage& previous =
+            state && pass.statePrevious != nullptr ? *pass.statePrevious : *statePlaceholder_;
         GpuImage& next = state ? *pass.stateNext : *statePlaceholder_;
         previous.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
         next.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
@@ -2820,9 +2815,11 @@ void RasterRenderer::Present(VkCommandBuffer commands, RenderTargets& targets,
     target.depth = VK_NULL_HANDLE;
     BeginRendering(commands, target);
     const bool spectral = mode.show == kShowSpectral;
-    vkCmdBindPipeline(
-        commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        (spectral ? presentSpectral_ : mode.integer ? presentUint_ : presentFloat_)->Handle());
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      (spectral       ? presentSpectral_
+                       : mode.integer ? presentUint_
+                                      : presentFloat_)
+                          ->Handle());
     // Every binding takes the var, SpectralRadiance's view 0 bands at 2; the pipeline reads the
     // one of its type.
     const DescriptorResource view =
@@ -2863,9 +2860,9 @@ void RasterRenderer::Present(VkCommandBuffer commands, RenderTargets& targets,
         struct {
             std::uint32_t flags[4];
             float colour[4];
-        } outlineConstants{{srgb ? 1u : 0u, highlightWidth_, highlightWords_, 0},
-                           {highlightColour_.r, highlightColour_.g, highlightColour_.b,
-                            highlightColour_.a}};
+        } outlineConstants{
+            {srgb ? 1u : 0u, highlightWidth_, highlightWords_, 0},
+            {highlightColour_.r, highlightColour_.g, highlightColour_.b, highlightColour_.a}};
         presentLayout_.PushConstants(commands, &outlineConstants, sizeof(outlineConstants));
         vkCmdDraw(commands, 3, 1, 0, 0);
         vkCmdEndRendering(commands);
@@ -2903,23 +2900,22 @@ void RasterRenderer::SetHighlight(std::span<const std::uint32_t> primIds, glm::v
     const VkDeviceSize bytes = words.size() * sizeof(std::uint32_t);
     if (highlight_->Size() < bytes) {
         vkDeviceWaitIdle(context_.Device());
-        highlight_ = std::make_unique<GpuBuffer>(context_, std::max<VkDeviceSize>(bytes, 256),
-                                                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                                 BufferMemory::Device);
+        highlight_ =
+            std::make_unique<GpuBuffer>(context_, std::max<VkDeviceSize>(bytes, 256),
+                                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
     }
     // Through the frame's uploads, ordered with the frames still reading the buffer.
     uploads_.Write(*highlight_, std::as_bytes(std::span(highlightBits_)));
 }
 
 std::uint64_t RasterRenderer::GpuBytes() const {
-    std::uint64_t bytes = uniforms_.Size() + shadowUniforms_.Size() + shadowMaps_->Bytes() +
-                          lightShadowMaps_->Bytes() + lightTable_.Size() +
-                          lightViewMatrices_.Size() + sigmoidTable_.Bytes() +
-                          shadingUniforms_.Size() + sensorUniforms_.Size() +
-                          (materialTable_ != nullptr ? materialTable_->Size() : 0) +
-                          overlays_->GpuBytes() + domeMap_->Bytes() +
-                          (domeLighting_ != nullptr ? domeLighting_->Bytes() : 0) + stars_->Size() +
-                          starCells_->Size();
+    std::uint64_t bytes =
+        uniforms_.Size() + shadowUniforms_.Size() + shadowMaps_->Bytes() +
+        lightShadowMaps_->Bytes() + lightTable_.Size() + lightViewMatrices_.Size() +
+        sigmoidTable_.Bytes() + shadingUniforms_.Size() + sensorUniforms_.Size() +
+        (materialTable_ != nullptr ? materialTable_->Size() : 0) + overlays_->GpuBytes() +
+        domeMap_->Bytes() + (domeLighting_ != nullptr ? domeLighting_->Bytes() : 0) +
+        stars_->Size() + starCells_->Size();
     for (const auto& [id, material] : materials_) {
         bytes += material->GpuBytes();
     }

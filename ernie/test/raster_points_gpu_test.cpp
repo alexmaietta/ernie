@@ -158,6 +158,7 @@ TEST_F(RasterDelegateTest, PointsFromCudaMatchTheHostsAndBlurAsTheyMove) {
     const auto blurred = Step(delegate, device).at("LdrColor");
     const std::size_t middle = 4 * PixelOf(0.0, 3.0) + 1;
     EXPECT_GT(blurred[middle], 20.0f) << "green between where it was and is";
-    EXPECT_LT(blurred[4 * PixelOf(0.0, 0.0) + 1], expected.at("LdrColor")[4 * PixelOf(0.0, 0.0) + 1])
+    EXPECT_LT(blurred[4 * PixelOf(0.0, 0.0) + 1],
+              expected.at("LdrColor")[4 * PixelOf(0.0, 0.0) + 1])
         << "dimmer where it started";
 }

@@ -125,8 +125,8 @@ std::string_view ChannelOf(FilterDomain domain) {
 }  // namespace
 
 SensorPlan PlanSensor(std::span<const SensorFilterStep> chain,
-                      std::span<const std::string_view> held,
-                      const SensorFilterRegistry& registry, std::uint32_t aovOffset) {
+                      std::span<const std::string_view> held, const SensorFilterRegistry& registry,
+                      std::uint32_t aovOffset) {
     SensorPlan plan;
     for (const std::string_view var : held) {
         plan.holds |= BitOf(var);
@@ -157,15 +157,12 @@ SensorPlan PlanSensor(std::span<const SensorFilterStep> chain,
             }
         }
     }
-    const auto forcedDomain = [&](FilterDomain domain) {
-        return forcedDomains[IndexOf(domain)];
-    };
+    const auto forcedDomain = [&](FilterDomain domain) { return forcedDomains[IndexOf(domain)]; };
     const bool digital = holds(render_vars::kRawDn) || forcedDomain(FilterDomain::Digital);
     const bool electrons =
         holds(render_vars::kElectrons) || digital || forcedDomain(FilterDomain::Electrons);
     const bool display = holds(render_vars::kLdrColor) || forcedDomain(FilterDomain::Display);
-    const bool colour =
-        holds(render_vars::kHdrColor) || display || forcedDomain(FilterDomain::Rgb);
+    const bool colour = holds(render_vars::kHdrColor) || display || forcedDomain(FilterDomain::Rgb);
     const bool bands = electrons || colour || holds(render_vars::kSpectralRadiance) ||
                        forcedDomain(FilterDomain::Spectrum);
     for (std::size_t i = 0; i < steps.size(); ++i) {
@@ -226,11 +223,10 @@ SensorPlan PlanSensor(std::span<const SensorFilterStep> chain,
                     // resampled to the parameter's size.
                     const auto array = step.arrays.find(param.name);
                     std::vector<float> values =
-                        array != step.arrays.end() ? array->second
-                        : input != step.inputs.end()
-                            ? std::vector<float>{input->second}
-                        : !param.defaults.empty() ? param.defaults
-                                                  : std::vector<float>{param.defaultValue};
+                        array != step.arrays.end()   ? array->second
+                        : input != step.inputs.end() ? std::vector<float>{input->second}
+                        : !param.defaults.empty()    ? param.defaults
+                                                     : std::vector<float>{param.defaultValue};
                     const std::vector<float> resampled = ResampleCurve(values, param.size);
                     plan.params.insert(plan.params.end(), resampled.begin(), resampled.end());
                 }
@@ -440,8 +436,8 @@ std::string SensorPlan::Source(std::uint32_t segment) const {
             } else {
                 params += "    SpatialImage input" + std::to_string(s) + " = {" +
                           std::string(ChannelOf(stage.custom->domain)) + "};\n";
-                pixels += "    " + base + type + ".apply(value, pixel, input" +
-                          std::to_string(s) + args + ");\n";
+                pixels += "    " + base + type + ".apply(value, pixel, input" + std::to_string(s) +
+                          args + ");\n";
             }
             break;
         case FilterKind::Band:

@@ -108,8 +108,8 @@ class SettingsPanel final : public Panel {
                 viewer.SetWireframe(std::nullopt);
             }
             for (std::uint32_t mode = 0; mode < 3; ++mode) {
-                if (ImGui::Selectable(wireNames[mode],
-                                      wireframe && static_cast<std::uint32_t>(*wireframe) == mode)) {
+                if (ImGui::Selectable(wireNames[mode], wireframe && static_cast<std::uint32_t>(
+                                                                        *wireframe) == mode)) {
                     viewer.SetWireframe(static_cast<Wireframe>(mode));
                 }
             }

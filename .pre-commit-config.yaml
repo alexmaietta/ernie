@@ -32,6 +32,9 @@ repos:
           - "--enable=warning,performance,portability"
           - "--suppress=missingInclude"
           - "--suppress=normalCheckLevelMaxBranches"
+          # GoogleTest's macros, and Ernie's schema and nanobind macros (cmake/cppcheck/ernie.cfg).
+          - "--library=googletest"
+          - "--library=cmake/cppcheck/ernie.cfg"
           - "--error-exitcode=1"
 
   # Every source file of Ernie's own starts with its license: `// SPDX-License-Identifier:

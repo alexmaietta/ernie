@@ -169,8 +169,7 @@ class PropertiesPanel final : public Panel {
                 others.push_back(attribute);
             }
         }
-        if (!others.empty() &&
-            SectionHeader(viewer, "Other attributes")) {
+        if (!others.empty() && SectionHeader(viewer, "Other attributes")) {
             DrawAttributes(viewer, scene, path, others);
         }
     }
@@ -289,8 +288,8 @@ class PropertiesPanel final : public Panel {
                     changed = ImGui::DragFloat("##v", &edit, Speed(edit), 0.0f, 0.0f, "%.4g");
                 } else if constexpr (std::is_same_v<T, double>) {
                     changed = ImGui::DragScalar("##v", ImGuiDataType_Double, &edit,
-                                                Speed(static_cast<float>(edit)), nullptr,
-                                                nullptr, "%.6g");
+                                                Speed(static_cast<float>(edit)), nullptr, nullptr,
+                                                "%.6g");
                 } else if constexpr (std::is_same_v<T, glm::ivec2>) {
                     changed = ImGui::DragInt2("##v", &edit[0]);
                 } else if constexpr (std::is_same_v<T, glm::vec2>) {
@@ -392,7 +391,8 @@ class PropertiesPanel final : public Panel {
                                               ImGuiInputTextFlags_EnterReturnsTrue);
         editing_ = ImGui::IsItemActive() ? key : (editing_ == key ? std::string() : editing_);
         if (entered || ImGui::IsItemDeactivatedAfterEdit()) {
-            std::string text(buffer.c_str());
+            // The text up to the NUL padding of the edit buffer.
+            std::string text = buffer.substr(0, buffer.find('\0'));
             buffer = text;
             if (text != current) {
                 return text;

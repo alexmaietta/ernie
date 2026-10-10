@@ -268,8 +268,7 @@ void PointsDrawable::Set(std::uint32_t points, const DevicePointsData& data) {
         cloud.onDevice ? !cloud.device.widths.Empty() : !cloud.data.widths.empty();
     const bool hadColors =
         cloud.onDevice ? !cloud.device.colors.Empty() : !cloud.data.colors.empty();
-    const bool layout = count != cloud.count ||
-                        (!cloud.onDevice && cloud.mapped.Empty()) ||
+    const bool layout = count != cloud.count || (!cloud.onDevice && cloud.mapped.Empty()) ||
                         data.widths.Empty() == hadWidths || data.colors.Empty() == hadColors;
     // The view `MapPositions` gave out, handed back: the positions are in place already.
     cloud.inPlace = !layout && !cloud.mapped.Empty() && data.points.Data() == cloud.mapped.Data();
@@ -536,16 +535,14 @@ void PointsDrawable::Prepare(const FrameParams& params, std::span<const ShadowCa
         const Cloud& cloud = clouds_.at(item.points);
         GpuPointsDraw& draw = draws[i];
         const bool anchored = item.anchorInstancer != 0;
-        const glm::mat4 model = Relative(anchored ? item.transform * item.below : item.transform,
-                                         origin_);
-        const glm::mat4 previous =
-            anchored ? model : glm::mat4(Relative(previous_[i], origin_));
+        const glm::mat4 model =
+            Relative(anchored ? item.transform * item.below : item.transform, origin_);
+        const glm::mat4 previous = anchored ? model : glm::mat4(Relative(previous_[i], origin_));
         if (anchored) {
-            MeshDrawable::AppendAnchorRecord(records, Relative(item.transform, origin_),
-                                             glm::mat4(item.below),
-                                             anchors_->AnchorSlot(item.anchorInstancer,
-                                                                  item.anchorRow),
-                                             static_cast<std::uint32_t>(i));
+            MeshDrawable::AppendAnchorRecord(
+                records, Relative(item.transform, origin_), glm::mat4(item.below),
+                anchors_->AnchorSlot(item.anchorInstancer, item.anchorRow),
+                static_cast<std::uint32_t>(i));
         }
         std::memcpy(draw.model, glm::value_ptr(model), sizeof(draw.model));
         std::memcpy(draw.previous, glm::value_ptr(previous), sizeof(draw.previous));
@@ -556,8 +553,10 @@ void PointsDrawable::Prepare(const FrameParams& params, std::span<const ShadowCa
         const auto count = static_cast<std::uint32_t>(cloud.count);
         draw.info[0] = cloud.set * count;
         draw.info[1] = (cloud.moving ? 1u - cloud.set : cloud.set) * count;
-        const bool widths = cloud.onDevice ? !cloud.device.widths.Empty() : !cloud.data.widths.empty();
-        const bool colors = cloud.onDevice ? !cloud.device.colors.Empty() : !cloud.data.colors.empty();
+        const bool widths =
+            cloud.onDevice ? !cloud.device.widths.Empty() : !cloud.data.widths.empty();
+        const bool colors =
+            cloud.onDevice ? !cloud.device.colors.Empty() : !cloud.data.colors.empty();
         draw.info[2] = (widths ? kHasWidths : 0u) | (colors ? kHasColors : 0u);
         const float scale = MaxScale(model);
         std::memcpy(&draw.info[3], &scale, sizeof(scale));
@@ -666,8 +665,8 @@ void PointsDrawable::RecordMotion(VkCommandBuffer commands, const RasterFrame& f
     }
 }
 
-void PointsDrawable::RecordShadow(VkCommandBuffer commands, const RasterFrame& frame,
-                                  std::size_t, const glm::mat4& lightViewProjection,
+void PointsDrawable::RecordShadow(VkCommandBuffer commands, const RasterFrame& frame, std::size_t,
+                                  const glm::mat4& lightViewProjection,
                                   const ShadowCasters& casters) const {
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowPipeline_->Handle());
     for (std::size_t i = 0; i < items_.size(); ++i) {

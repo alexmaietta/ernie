@@ -28,9 +28,9 @@ using ernie::ShaderModuleSource;
 using ernie::testing::Geometry;
 using ernie::testing::GeometryGrid;
 using ernie::testing::HapkeReference;
-using ernie::testing::PreviewSurfaceReference;
 using ernie::testing::HenyeyGreenstein;
 using ernie::testing::kPi;
+using ernie::testing::PreviewSurfaceReference;
 
 namespace {
 
@@ -90,9 +90,8 @@ class BrdfVulkanTest : public ernie::testing::VulkanTest {
 
         std::vector<float> packedCases;
         for (const Geometry& g : cases) {
-            for (const double v :
-                 {g.mu0, g.mu, g.cosG, g.cosPsi, g.albedo.r, g.albedo.g, g.albedo.b,
-                  slopeVariance}) {
+            for (const double v : {g.mu0, g.mu, g.cosG, g.cosPsi, g.albedo.r, g.albedo.g,
+                                   g.albedo.b, slopeVariance}) {
                 packedCases.push_back(static_cast<float>(v));
             }
         }
@@ -199,8 +198,8 @@ TEST_F(BrdfVulkanTest, UnresolvedSlopesWidenTheModelsRoughness) {
     std::vector<float> hapke = BrdfRegistry::WithBuiltins().Find("hapke")->Defaults();
     const std::vector<glm::dvec3> rough = Evaluate("hapke", hapke, cases, variance);
     const double tanT = std::tan(hapke[4] * kPi / 180.0);
-    hapke[4] = static_cast<float>(std::atan(std::sqrt(tanT * tanT + 2.0 * variance / kPi)) *
-                                  180.0 / kPi);
+    hapke[4] =
+        static_cast<float>(std::atan(std::sqrt(tanT * tanT + 2.0 * variance / kPi)) * 180.0 / kPi);
     const std::vector<glm::dvec3> widened = Evaluate("hapke", hapke, cases);
     const std::vector<glm::dvec3> smooth =
         Evaluate("hapke", BrdfRegistry::WithBuiltins().Find("hapke")->Defaults(), cases);
@@ -238,7 +237,9 @@ TEST_F(BrdfVulkanTest, PreviewSurfaceMatchesTheGltfReferenceBrdf) {
     for (const auto& params : parameterSets) {
         ExpectMatches(
             "preview_surface", params,
-            [&params](const Geometry& g, double a) { return PreviewSurfaceReference(g, a, params); },
+            [&params](const Geometry& g, double a) {
+                return PreviewSurfaceReference(g, a, params);
+            },
             1e-3);
     }
     // Unresolved slopes widen the lobe as alpha^2 + 2 variance.

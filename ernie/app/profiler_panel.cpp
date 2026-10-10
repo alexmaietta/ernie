@@ -145,17 +145,16 @@ class ProfilerPanel final : public Panel {
             const float top =
                 origin.y + height - static_cast<float>(std::min(ms / longest, 1.0)) * height;
             const bool chosen = inspected != nullptr && frame.index == inspected->index;
-            const bool under = hovered && ImGui::GetIO().MousePos.x >= x &&
-                               ImGui::GetIO().MousePos.x < x + bar;
-            const ImU32 colour =
-                chosen ? ImGui::GetColorU32(ImGuiCol_PlotHistogramHovered)
-                       : ImGui::GetColorU32(under ? ImGuiCol_ButtonHovered : ImGuiCol_PlotHistogram);
-            draw->AddRectFilled(ImVec2(x, top), ImVec2(x + std::max(bar - 1.0f, 1.0f),
-                                                       origin.y + height),
-                                colour);
+            const bool under =
+                hovered && ImGui::GetIO().MousePos.x >= x && ImGui::GetIO().MousePos.x < x + bar;
+            const ImU32 colour = chosen ? ImGui::GetColorU32(ImGuiCol_PlotHistogramHovered)
+                                        : ImGui::GetColorU32(under ? ImGuiCol_ButtonHovered
+                                                                   : ImGuiCol_PlotHistogram);
+            draw->AddRectFilled(ImVec2(x, top),
+                                ImVec2(x + std::max(bar - 1.0f, 1.0f), origin.y + height), colour);
             if (under) {
-                ImGui::SetTooltip("Frame %llu: %.2f ms", static_cast<unsigned long long>(frame.index),
-                                  ms);
+                ImGui::SetTooltip("Frame %llu: %.2f ms",
+                                  static_cast<unsigned long long>(frame.index), ms);
                 if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
                     selected_ = frame.index;
                     paused_ = true;  // keep it while inspecting
@@ -236,11 +235,12 @@ class ProfilerPanel final : public Panel {
         if (ImGui::IsWindowHovered() && right > left) {
             const double span = view_->second - view_->first;
             const double at =
-                view_->first + std::clamp((io.MousePos.x - left) / (right - left), 0.0f, 1.0f) * span;
+                view_->first +
+                std::clamp((io.MousePos.x - left) / (right - left), 0.0f, 1.0f) * span;
             if (io.MouseWheel != 0.0f) {
                 const double scale = std::pow(0.85, static_cast<double>(io.MouseWheel));
-                view_ = std::pair(at - (at - view_->first) * scale,
-                                  at + (view_->second - at) * scale);
+                view_ =
+                    std::pair(at - (at - view_->first) * scale, at + (view_->second - at) * scale);
             }
             if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f)) {
                 const double shift = -io.MouseDelta.x / (right - left) * span;
@@ -359,7 +359,8 @@ class ProfilerPanel final : public Panel {
             ImGui::PushID(&row);
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            ImGui::ColorButton("##colour", ImGui::ColorConvertU32ToFloat4(ZoneColour(row.name.c_str())),
+            ImGui::ColorButton("##colour",
+                               ImGui::ColorConvertU32ToFloat4(ZoneColour(row.name.c_str())),
                                ImGuiColorEditFlags_NoTooltip,
                                ImVec2(ImGui::GetTextLineHeight(), ImGui::GetTextLineHeight()));
             ImGui::SameLine();

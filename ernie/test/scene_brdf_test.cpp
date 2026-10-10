@@ -31,8 +31,8 @@ BrdfModel Custom(std::string id) {
 
 TEST(BrdfRegistry, BuiltinsAreDocumentedAndValid) {
     const BrdfRegistry registry = BrdfRegistry::WithBuiltins();
-    const std::vector<std::string> ids = {"lambert", "lommel_seeliger", "lunar_lambert",
-                                          "oren_nayar", "hapke", "preview_surface"};
+    const std::vector<std::string> ids = {"lambert",    "lommel_seeliger", "lunar_lambert",
+                                          "oren_nayar", "hapke",           "preview_surface"};
     ASSERT_EQ(registry.Models().size(), ids.size());
     for (const std::string& id : ids) {
         const BrdfModel* model = registry.Find(id);

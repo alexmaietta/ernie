@@ -47,9 +47,10 @@ struct PointsItem {
     std::uint32_t points = 0;   ///< The cloud's handle.
     glm::dmat4 transform{1.0};  ///< World transform, in double; drawn relative to the origin.
     std::uint32_t material = RasterRenderer::kDefaultMaterial;
-    glm::vec3 tint{0.5f};      ///< Every point's colour without colours of their own.
-    std::uint32_t primId = 1;  ///< Written to the PrimId render var; the point's index to InstanceId.
-    std::int32_t world = -1;   ///< The world it belongs to (`tokens::kWorld`), -1 for every one.
+    glm::vec3 tint{0.5f};  ///< Every point's colour without colours of their own.
+    std::uint32_t primId =
+        1;  ///< Written to the PrimId render var; the point's index to InstanceId.
+    std::int32_t world = -1;  ///< The world it belongs to (`tokens::kWorld`), -1 for every one.
     /// Under an instance posed on the GPU (a cloud on a robot's link): its instancer in the
     /// meshes' drawable (`PointsDrawable::SetAnchors`), 0 for none, and row. The cloud's transform
     /// is then `transform`, the instance's pose, then `below`, composed on the GPU each frame.

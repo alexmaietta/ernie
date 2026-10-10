@@ -67,8 +67,8 @@ StarCatalogue SyntheticStars(std::size_t count, std::uint64_t seed, double faint
         stars.magnitude.push_back(
             static_cast<float>(std::log10(low + (high - low) * uniform()) / kGrowth));
         // A normal spread of B-V about 0.6 (Box-Muller), within the stars' range.
-        const double normal = std::sqrt(-2.0 * std::log(uniform())) *
-                              std::cos(2.0 * glm::pi<double>() * uniform());
+        const double normal =
+            std::sqrt(-2.0 * std::log(uniform())) * std::cos(2.0 * glm::pi<double>() * uniform());
         stars.colorIndex.push_back(static_cast<float>(std::clamp(0.6 + 0.45 * normal, -0.3, 2.0)));
     }
     return stars;
@@ -116,8 +116,7 @@ double GreenwichMeanSiderealTime(double julianDate) {
 }
 
 glm::dmat4 CelestialToLocal(double latitude, double longitude, double julianDate) {
-    const double localSidereal =
-        glm::radians(GreenwichMeanSiderealTime(julianDate) + longitude);
+    const double localSidereal = glm::radians(GreenwichMeanSiderealTime(julianDate) + longitude);
     const double phi = glm::radians(latitude);
     // To hour-angle axes: x the equator's point on the meridian, y east, z the pole.
     const double c = std::cos(localSidereal);
@@ -126,8 +125,7 @@ glm::dmat4 CelestialToLocal(double latitude, double longitude, double julianDate
                                glm::dvec3(0.0, 0.0, 1.0));
     // Those axes in east, north, up: the meridian's equator point due south at altitude
     // 90 - latitude, and the pole due north at altitude latitude.
-    const glm::dmat3 site(glm::dvec3(0.0, -std::sin(phi), std::cos(phi)),
-                          glm::dvec3(1.0, 0.0, 0.0),
+    const glm::dmat3 site(glm::dvec3(0.0, -std::sin(phi), std::cos(phi)), glm::dvec3(1.0, 0.0, 0.0),
                           glm::dvec3(0.0, std::cos(phi), std::sin(phi)));
     return glm::dmat4(site * hourAngle);
 }

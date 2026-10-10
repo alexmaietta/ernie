@@ -263,9 +263,8 @@ void CameraParams::Check() const {
                                     "rolling readout and 1 to " +
                                     std::to_string(kMaxShutterSamples) + " samples");
     }
-    if (pushbroom &&
-        (orthographic || lens.projection != LensProjection::Perspective || lens.p1 != 0.0 ||
-         lens.p2 != 0.0 || Subframes() != 1)) {
+    if (pushbroom && (orthographic || lens.projection != LensProjection::Perspective ||
+                      lens.p1 != 0.0 || lens.p2 != 0.0 || Subframes() != 1)) {
         throw std::invalid_argument(
             "A pushbroom camera needs a perspective projection, a lens with radial distortion "
             "at most, and no shutter interval or rolling readout: its rows are its readout");
@@ -320,10 +319,9 @@ void CameraParams::Check() const {
         // field angle up to it.
         const double f = FocalLengthPixels();
         const glm::dvec2 centre = PrincipalPoint();
-        const double corner =
-            glm::length(glm::dvec2(std::max(centre.x, width - centre.x),
-                                   std::max(centre.y, height - centre.y))) /
-            f;
+        const double corner = glm::length(glm::dvec2(std::max(centre.x, width - centre.x),
+                                                     std::max(centre.y, height - centre.y))) /
+                              f;
         double theta = 0.0;
         double reached = 0.0;
         constexpr int kSteps = 256;
@@ -403,8 +401,8 @@ CameraParams CameraParamsOf(const Scene& scene, const Path& path, std::uint32_t 
     const Camera prim(scene, path);
     const std::string projection = prim.GetProjection();
     if (projection != kPerspective && projection != kOrthographic) {
-        throw std::invalid_argument("Camera '" + path.String() + "' has projection '" +
-                                    projection + "'; use perspective or orthographic");
+        throw std::invalid_argument("Camera '" + path.String() + "' has projection '" + projection +
+                                    "'; use perspective or orthographic");
     }
     CameraParams camera;
     camera.orthographic = projection == kOrthographic;
@@ -471,8 +469,7 @@ CameraParams CameraParamsOf(const Scene& scene, const Path& path, std::uint32_t 
         const Tensor rays = written->Contiguous();
         if (rays.Type() != DType::Float32 || rays.Rank() != 3 || rays.Shape()[2] != 3 ||
             rays.Location().kind != DeviceKind::Cpu) {
-            throw std::invalid_argument("Camera '" + path.String() + "' " +
-                                        std::string(kLensRays) +
+            throw std::invalid_argument("Camera '" + path.String() + "' " + std::string(kLensRays) +
                                         " must be a float32 (rows, columns, 3) CPU tensor");
         }
         auto table = std::make_shared<LensRayTable>();

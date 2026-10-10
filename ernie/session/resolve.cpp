@@ -298,8 +298,8 @@ MinimalMode MinimalModeOf(const Scene& scene, const Path& prim, MinimalMode fall
     if (token == tokens::kTexturedDiffuse) {
         return MinimalMode::Textured;
     }
-    throw std::invalid_argument("'" + std::string(tokens::kMinimalMode) + "' of '" +
-                                prim.String() + "' is '" + token +
+    throw std::invalid_argument("'" + std::string(tokens::kMinimalMode) + "' of '" + prim.String() +
+                                "' is '" + token +
                                 "', not off, none, constantDiffuse or texturedDiffuse");
 }
 
@@ -365,7 +365,7 @@ std::optional<std::uint64_t> FrameOf(const Scene& scene, const Path& settings) {
     // As a double, not the view's int (`RenderSettings::GetFrame`), to reject fractions and
     // frames past an int's range; not a number reads as -1, rejected below.
     const double frame = AttributeTraits<double>::From(*value).value_or(-1.0);
-    if (!(frame >= 0.0)|| frame != std::floor(frame) || frame >= 0x1p64) {
+    if (!(frame >= 0.0) || frame != std::floor(frame) || frame >= 0x1p64) {
         throw std::invalid_argument("'" + std::string(tokens::kFrame) + "' of '" +
                                     settings.String() + "' must be a non-negative integer");
     }
@@ -472,9 +472,7 @@ bool PosesAreQuaternions(const Tensor& poses) {
     return poses.Rank() == 2 && poses.Shape()[1] == 7;
 }
 
-namespace {
-
-}  // namespace
+namespace {}  // namespace
 
 void CheckBatchCameras(const Scene& scene, std::span<const Path> cameras, std::uint32_t width,
                        std::uint32_t height) {
@@ -498,10 +496,9 @@ void CheckBatchCameras(const Scene& scene, std::span<const Path> cameras, std::u
             }
         }
         if (!same) {
-            throw std::invalid_argument("Camera '" + path.String() +
-                                        "' differs in projection or bands from '" +
-                                        cameras.front().String() +
-                                        "', so they cannot render as one batch");
+            throw std::invalid_argument(
+                "Camera '" + path.String() + "' differs in projection or bands from '" +
+                cameras.front().String() + "', so they cannot render as one batch");
         }
     }
 }
@@ -681,10 +678,10 @@ std::vector<SensorFilterStep> FilterStepsOf(const Scene& scene, const std::vecto
             }
             const std::string name = attribute.substr(kInputs.size());
             const Value* value = scene.Get(filter, attribute);
-            const bool scalar = value != nullptr && (value->Get<double>() != nullptr ||
-                                                     value->Get<float>() != nullptr ||
-                                                     value->Get<int>() != nullptr ||
-                                                     value->Get<bool>() != nullptr);
+            const bool scalar =
+                value != nullptr &&
+                (value->Get<double>() != nullptr || value->Get<float>() != nullptr ||
+                 value->Get<int>() != nullptr || value->Get<bool>() != nullptr);
             // Arrays, also from the vectors short lists arrive as (`GetFloats`).
             if (std::optional<std::vector<float>> list =
                     scalar ? std::nullopt : GetFloats(scene, filter, attribute)) {
@@ -742,8 +739,8 @@ ResolveRenderProducts(const Scene& scene, std::span<const Path> products, const 
         spec.cameras = product.GetCamera();
         spec.camera = spec.cameras.empty() ? Path() : spec.cameras.front();
         // What the product leaves unset comes from its settings.
-        spec.resolution = extentOf(product.HasResolution() ? product.GetResolution()
-                                                           : settingsResolution);
+        spec.resolution =
+            extentOf(product.HasResolution() ? product.GetResolution() : settingsResolution);
         if (product.HasOverlays()) {
             spec.overlays = product.GetOverlays();
         }
@@ -920,8 +917,7 @@ LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBa
     }
     const SphereLight sphere(scene, path);
     light.radius = sphere.GetTreatAsPoint() ? 0.0f : static_cast<float>(sphere.GetRadius());
-    light.coneAngle =
-        std::clamp(static_cast<float>(sphere.GetShapingConeAngle()), 0.0f, 180.0f);
+    light.coneAngle = std::clamp(static_cast<float>(sphere.GetShapingConeAngle()), 0.0f, 180.0f);
     light.coneSoftness =
         std::clamp(static_cast<float>(sphere.GetShapingConeSoftness()), 0.0f, 1.0f);
     if (light.radius < 0.0f) {
@@ -1017,8 +1013,8 @@ DomeParams DomeParamsOf(const Scene& scene, const Path& path, const SpectralBand
             throw std::invalid_argument("DomeLight '" + path.String() +
                                         "' lights no upward surface to give an illuminance");
         }
-        dome.radiance = RelativeSpectrum(
-            prim, bands, prim.GetPhotometricIlluminance() / (M_PI * luminance));
+        dome.radiance =
+            RelativeSpectrum(prim, bands, prim.GetPhotometricIlluminance() / (M_PI * luminance));
         return dome;
     }
     const std::optional<std::vector<float>> pairs = SpectrumPairs(prim);
@@ -1063,8 +1059,8 @@ std::optional<DomeSunExtraction> ExtractDomeSun(const Image& map) {
             }
         }
     }
-    std::nth_element(values.begin(), values.begin() + static_cast<std::ptrdiff_t>(values.size() / 2),
-                     values.end());
+    std::nth_element(values.begin(),
+                     values.begin() + static_cast<std::ptrdiff_t>(values.size() / 2), values.end());
     const double median = values[values.size() / 2];
     if (!(peak > 0.0) || !(total > 0.0) || peak < 20.0 * std::max(median, 1e-12)) {
         return std::nullopt;
@@ -1196,8 +1192,7 @@ std::vector<DomeDirection> DomeDirectionsOf(const Image& map, std::size_t count)
             break;
         }
         const Region region = regions[best];
-        const double middle =
-            std::sin(0.5 * static_cast<double>(region.r0 + region.r1) * dTheta);
+        const double middle = std::sin(0.5 * static_cast<double>(region.r0 + region.r1) * dTheta);
         const double width = static_cast<double>(region.c1 - region.c0) * dPhi * middle;
         const double height = static_cast<double>(region.r1 - region.r0) * dTheta;
         const bool acrossColumns =
@@ -1266,8 +1261,7 @@ namespace {
 /// The prim's float array `attribute`, `components` per element, from a tensor or a float array
 /// value.
 std::optional<std::vector<float>> FloatArray(const Scene& scene, const Path& path,
-                                             std::string_view attribute,
-                                             std::size_t components) {
+                                             std::string_view attribute, std::size_t components) {
     if (std::optional<std::vector<float>> values =
             FloatAttribute(scene, path, attribute, components)) {
         return values;
@@ -1312,8 +1306,8 @@ std::vector<Star> StarsOf(const Scene& scene, const Path& path) {
         if (values && values->size() != count * components) {
             throw std::invalid_argument("'" + std::string(attribute) + "' of '" + path.String() +
                                         "' has " + std::to_string(values->size() / components) +
-                                        " stars where '" + std::string(kStarsMagnitude) +
-                                        "' has " + std::to_string(count));
+                                        " stars where '" + std::string(kStarsMagnitude) + "' has " +
+                                        std::to_string(count));
         }
     };
     const std::optional<std::vector<float>> ra = array(kStarsRightAscension, 1);
@@ -1347,9 +1341,8 @@ std::vector<Star> StarsOf(const Scene& scene, const Path& path) {
             star.rightAscension = static_cast<float>(glm::radians(static_cast<double>((*ra)[i])));
             star.declination = static_cast<float>(glm::radians(static_cast<double>((*dec)[i])));
         } else {
-            const glm::dvec3 d = glm::normalize(glm::dvec3((*direction)[3 * i],
-                                                           (*direction)[3 * i + 1],
-                                                           (*direction)[3 * i + 2]));
+            const glm::dvec3 d = glm::normalize(
+                glm::dvec3((*direction)[3 * i], (*direction)[3 * i + 1], (*direction)[3 * i + 2]));
             star.rightAscension = static_cast<float>(std::atan2(d.y, d.x));
             star.declination = static_cast<float>(std::asin(std::clamp(d.z, -1.0, 1.0)));
         }
@@ -1455,8 +1448,8 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
     } else if (domeMode == "directions") {
         params.domeMode = DomeLightMode::Directions;
     } else {
-        throw std::invalid_argument("'" + settings.String() + "' " +
-                                    std::string(kDomeLightMode) + " is '" + domeMode +
+        throw std::invalid_argument("'" + settings.String() + "' " + std::string(kDomeLightMode) +
+                                    " is '" + domeMode +
                                     "', not approximate, full, directions or limited");
     }
     params.domeShadowRadius = std::max(static_cast<float>(options.GetDomeShadowRadius()), 1e-6f);
@@ -1526,9 +1519,10 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
     }
     for (const Path& light : prims.lights) {
         const auto posed = prims.lightTransforms.find(light);
-        params.lights.push_back(posed != prims.lightTransforms.end()
-                                    ? LightParamsOf(scene, light, params.camera.bands, posed->second)
-                                    : LightParamsOf(scene, light, params.camera.bands));
+        params.lights.push_back(
+            posed != prims.lightTransforms.end()
+                ? LightParamsOf(scene, light, params.camera.bands, posed->second)
+                : LightParamsOf(scene, light, params.camera.bands));
         params.lights.back().world = WorldOf(scene, light);
     }
     return params;
@@ -1610,9 +1604,8 @@ TextureReader TextureReaderOf(const Scene& scene, const Connection& connection,
         reader.file = shader.GetFile();
     }
     if (reader.Source().empty()) {
-        throw std::invalid_argument("'" + texture.String() + "' has neither " +
-                                    std::string(kFile) + " nor " +
-                                    std::string(kShaderTexture));
+        throw std::invalid_argument("'" + texture.String() + "' has neither " + std::string(kFile) +
+                                    " nor " + std::string(kShaderTexture));
     }
     reader.wrapS = WrapOf(shader.GetWrapS(), texture, kWrapS);
     reader.wrapT = WrapOf(shader.GetWrapT(), texture, kWrapT);
@@ -1624,9 +1617,8 @@ TextureReader TextureReaderOf(const Scene& scene, const Connection& connection,
     } else if (space == "sRGB") {
         reader.colorSpace = TextureColorSpace::Srgb;
     } else {
-        throw std::invalid_argument("'" + texture.String() + "' " +
-                                    std::string(kSourceColorSpace) + " is '" + space +
-                                    "', not auto, raw or sRGB");
+        throw std::invalid_argument("'" + texture.String() + "' " + std::string(kSourceColorSpace) +
+                                    " is '" + space + "', not auto, raw or sRGB");
     }
     // UsdUVTexture's 4-vector scale, undeclared as it shares its name with UsdTransform2d's.
     reader.scale = Vec4Of(scene, texture, kShaderScale, reader.scale);
@@ -1642,8 +1634,8 @@ TextureReader TextureReaderOf(const Scene& scene, const Connection& connection,
             reader.uvTranslation = glm::vec2(transform.GetTranslation());
             const std::optional<Connection> in = GetConnection(scene, source, kIn);
             if (!in) {
-                throw std::invalid_argument("'" + source.String() + "' has no " +
-                                            std::string(kIn) + " connection");
+                throw std::invalid_argument("'" + source.String() + "' has no " + std::string(kIn) +
+                                            " connection");
             }
             source = in->prim;
         }
@@ -1684,9 +1676,9 @@ std::string UvSetOf(const Scene& scene, const Path& material) {
         if (surface.IsEmpty()) {
             return "st";
         }
-        for (const std::string_view input : {tokens::kDiffuseColor, tokens::kNormalInput,
-                                             tokens::kRoughness, tokens::kMetallic,
-                                             tokens::kOpacity}) {
+        for (const std::string_view input :
+             {tokens::kDiffuseColor, tokens::kNormalInput, tokens::kRoughness, tokens::kMetallic,
+              tokens::kOpacity}) {
             if (const std::optional<Connection> texture = GetConnection(scene, surface, input)) {
                 const bool scalar = input != tokens::kDiffuseColor && input != tokens::kNormalInput;
                 return TextureReaderOf(scene, *texture, input, surface, scalar).uvSet;
@@ -1726,11 +1718,11 @@ std::vector<float> TexCoordsOf(const Scene& scene, const Path& mesh, const std::
     std::string interpolation =
         GetToken(scene, mesh, attribute + std::string(kInterpolationSuffix), "");
     if (interpolation.empty()) {
-        interpolation = elements == faceVertexCount   ? "faceVarying"
-                        : elements == points          ? "vertex"
+        interpolation = elements == faceVertexCount     ? "faceVarying"
+                        : elements == points            ? "vertex"
                         : elements == faceCounts.size() ? "uniform"
-                        : elements == 1               ? "constant"
-                                                      : "";
+                        : elements == 1                 ? "constant"
+                                                        : "";
     }
     const std::size_t expected = interpolation == "faceVarying" ? faceVertexCount
                                  : interpolation == "vertex"    ? points
@@ -1750,9 +1742,8 @@ std::vector<float> TexCoordsOf(const Scene& scene, const Path& mesh, const std::
                                     : interpolation == "vertex"    ? data.indices[c]
                                     : interpolation == "uniform"   ? corners.faces[c]
                                                                    : 0;
-        const auto value =
-            static_cast<std::size_t>(indices != nullptr ? lookup[element]
-                                                        : static_cast<std::int64_t>(element));
+        const auto value = static_cast<std::size_t>(
+            indices != nullptr ? lookup[element] : static_cast<std::int64_t>(element));
         uvs[2 * c] = (*values)[2 * value];
         uvs[2 * c + 1] = (*values)[2 * value + 1];
     }
@@ -1830,7 +1821,8 @@ MaterialSettings MaterialSettingsOf(const Scene& scene, const Path& material,
     // normal map, whichever model shades it.
     if (!surface.IsEmpty()) {
         const Shader shader(scene, surface);
-        if (const std::optional<Connection> diffuse = GetConnection(scene, surface, kDiffuseColor)) {
+        if (const std::optional<Connection> diffuse =
+                GetConnection(scene, surface, kDiffuseColor)) {
             settings.albedoTexture = TextureReaderOf(scene, *diffuse, kDiffuseColor, surface);
             settings.albedo = glm::vec3(1.0f);
         } else {
@@ -1852,8 +1844,8 @@ MaterialSettings MaterialSettingsOf(const Scene& scene, const Path& material,
         throw std::invalid_argument("'" + emitter.String() + "' " + std::string(kEmissiveColor) +
                                     " is connected; only a constant emissiveColor is supported");
     }
-    const glm::dvec3 emission = surface.IsEmpty() ? view.GetEmissiveColor()
-                                                  : Shader(scene, surface).GetEmissiveColor();
+    const glm::dvec3 emission =
+        surface.IsEmpty() ? view.GetEmissiveColor() : Shader(scene, surface).GetEmissiveColor();
     settings.emission = glm::max(glm::vec3(emission), glm::vec3(0.0f));
     return settings;
 }
@@ -1946,12 +1938,13 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh) {
     }
     if (const Tensor* colors = scene.Read(mesh, kDisplayColor)) {
         if (static_cast<std::size_t>(colors->Elements()) == data.points.size() && count > 1) {
-            data.colors = IsGpu(colors->Location().kind) ? std::vector<float>(data.points.size(), 0.0f)
-                                                         : FloatsOf(*colors, 3, kDisplayColor);
+            data.colors = IsGpu(colors->Location().kind)
+                              ? std::vector<float>(data.points.size(), 0.0f)
+                              : FloatsOf(*colors, 3, kDisplayColor);
         }
     }
-    data.uvs = TexCoordsOf(scene, mesh, UvSetOf(scene, view.GetMaterialBinding()), data,
-                           faceCounts, faceVertexCount);
+    data.uvs = TexCoordsOf(scene, mesh, UvSetOf(scene, view.GetMaterialBinding()), data, faceCounts,
+                           faceVertexCount);
     return data;
 }
 
@@ -2097,7 +2090,8 @@ std::optional<GpuXform> GpuXformOf(const Scene& scene, const Path& path) {
     // The order, or `xformOp:transform` alone without one.
     static const std::vector<std::string> kTransformAlone{std::string(kTransform)};
     const Value* orderValue = scene.Get(path, kXformOpOrder);
-    const auto* order = orderValue != nullptr ? orderValue->Get<std::vector<std::string>>() : nullptr;
+    const auto* order =
+        orderValue != nullptr ? orderValue->Get<std::vector<std::string>>() : nullptr;
     if (order == nullptr) {
         if (!onGpu(kTransform)) {
             return std::nullopt;
@@ -2143,7 +2137,8 @@ std::optional<GpuXform> GpuXformOf(const Scene& scene, const Path& path) {
         const std::string& op = (*order)[n];
         const auto [width, alternative] = widths(op);
         if (width == 0) {
-            throw fail("its xformOpOrder lists " + op + ": suffixed and inverted ops are "
+            throw fail("its xformOpOrder lists " + op +
+                       ": suffixed and inverted ops are "
                        "composed on the CPU only");
         }
         const std::pair<Tensor, std::int64_t>* source = scene.RowOf(path, op);
@@ -2155,8 +2150,8 @@ std::optional<GpuXform> GpuXformOf(const Scene& scene, const Path& path) {
         if (op == kTransform && whole.Rank() == 3 && whole.Shape()[1] == 4 &&
             whole.Shape()[2] == 4 && whole.IsContiguous()) {
             // (n, 4, 4) matrices as (n, 16) rows, the view keeping the array alive.
-            whole = Tensor(whole.Data(), whole.Type(), {whole.Shape()[0], 16}, {},
-                           whole.Location(), std::make_shared<const Tensor>(whole));
+            whole = Tensor(whole.Data(), whole.Type(), {whole.Shape()[0], 16}, {}, whole.Location(),
+                           std::make_shared<const Tensor>(whole));
         }
         if (whole.Type() != DType::Float32 || whole.Rank() != 2 || !whole.IsContiguous() ||
             (whole.Shape()[1] != width && whole.Shape()[1] != alternative)) {

@@ -47,10 +47,9 @@ RenderTargets::RenderTargets(const VulkanContext& context, VkExtent2D extent, in
     }
     if (views == 0 || views > MaxViews(context, bands, faces)) {
         throw std::invalid_argument("Render targets hold 1 to " +
-                                    std::to_string(MaxViews(context, bands, faces)) +
-                                    " views of " + std::to_string(bands) + " bands and " +
-                                    std::to_string(faces) + " faces, not " +
-                                    std::to_string(views));
+                                    std::to_string(MaxViews(context, bands, faces)) + " views of " +
+                                    std::to_string(bands) + " bands and " + std::to_string(faces) +
+                                    " faces, not " + std::to_string(views));
     }
     const std::uint32_t layers = views * faces;
     for (std::size_t i = 0; i < gbuffer_.size(); ++i) {
@@ -80,10 +79,9 @@ RenderTargets::RenderTargets(const VulkanContext& context, VkExtent2D extent, in
         const std::uint32_t width = held ? extent.width : 1;
         const std::uint32_t height = held ? extent.height : 1;
         // LdrColor is also drawn into, by the overlays.
-        const VkImageUsageFlags usage =
-            kVarNames[i] == render_vars::kLdrColor
-                ? kStorage | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
-                : kStorage;
+        const VkImageUsageFlags usage = kVarNames[i] == render_vars::kLdrColor
+                                            ? kStorage | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+                                            : kStorage;
         vars_.push_back(std::make_unique<GpuImage>(
             context, ImageDesc{width, height, spectral ? views * bandLayers : views, 1,
                                kVarFormats[i], usage, held && shared && !spectral && views == 1,
@@ -91,13 +89,12 @@ RenderTargets::RenderTargets(const VulkanContext& context, VkExtent2D extent, in
     }
     // The AOV slots, float RGBA, held or one-texel placeholders as the vars.
     for (std::size_t slot = 0; slot < kMaxAovs; ++slot) {
-        const bool held =
-            std::find(held_.begin(), held_.end(), kAovSlotNames[slot]) != held_.end();
+        const bool held = std::find(held_.begin(), held_.end(), kAovSlotNames[slot]) != held_.end();
         holdsAov_[slot] = held;
         aovImages_[slot] = std::make_unique<GpuImage>(
-            context, ImageDesc{held ? extent.width : 1, held ? extent.height : 1, views, 1,
-                               VK_FORMAT_R32G32B32A32_SFLOAT, kStorage,
-                               held && shared && views == 1, true});
+            context,
+            ImageDesc{held ? extent.width : 1, held ? extent.height : 1, views, 1,
+                      VK_FORMAT_R32G32B32A32_SFLOAT, kStorage, held && shared && views == 1, true});
     }
 }
 
@@ -115,10 +112,9 @@ GpuImage& RenderTargets::Hzb() {
         const std::uint32_t width = std::bit_floor(extent_.width);
         const std::uint32_t height = std::bit_floor(extent_.height);
         const auto mips = static_cast<std::uint32_t>(std::bit_width(std::max(width, height)));
-        hzb_ = std::make_unique<GpuImage>(
-            context_,
-            ImageDesc{width, height, RasterLayers(), mips, VK_FORMAT_R32_SFLOAT, kStorage, false,
-                      true});
+        hzb_ = std::make_unique<GpuImage>(context_,
+                                          ImageDesc{width, height, RasterLayers(), mips,
+                                                    VK_FORMAT_R32_SFLOAT, kStorage, false, true});
     }
     return *hzb_;
 }
@@ -140,8 +136,7 @@ GpuImage& RenderTargets::Raster(bool full) {
         image = std::make_unique<GpuImage>(
             context_,
             ImageDesc{full ? extent_.width : 1, full ? extent_.height : 1,
-                      full ? RasterLayers() : 1, 1,
-                      VK_FORMAT_R32G32B32A32_SFLOAT,
+                      full ? RasterLayers() : 1, 1, VK_FORMAT_R32G32B32A32_SFLOAT,
                       kStorage | (full ? VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT : 0u), false, true});
     }
     return *image;
@@ -236,10 +231,10 @@ std::span<const std::string_view> RenderTargets::VarNames() {
 }
 
 std::uint64_t RenderTargets::GpuBytes() const {
-    std::uint64_t bytes =
-        depth_->Bytes() + rasterRadiance_->Bytes() + (hzb_ != nullptr ? hzb_->Bytes() : 0) +
-        (radianceSum_ != nullptr ? radianceSum_->Bytes() : 0) +
-        (raster_ != nullptr ? raster_->Bytes() : 0);
+    std::uint64_t bytes = depth_->Bytes() + rasterRadiance_->Bytes() +
+                          (hzb_ != nullptr ? hzb_->Bytes() : 0) +
+                          (radianceSum_ != nullptr ? radianceSum_->Bytes() : 0) +
+                          (raster_ != nullptr ? raster_->Bytes() : 0);
     for (const std::unique_ptr<GpuImage>& image : gbuffer_) {
         bytes += image->Bytes();
     }
