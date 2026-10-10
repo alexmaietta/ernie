@@ -269,6 +269,17 @@ class MeshDrawable : public RasterDrawable {
     /// @throws std::invalid_argument for an unknown instancer or a row out of range.
     void SetAnchoredViews(std::vector<AnchoredView> views);
 
+    /// Sets the lights the next frames pose on the GPU under instances, one per light with
+    /// `Light::posedOnGpu` in the frame's order: their poses, relative to the frame's origin, are
+    /// written into the renderer's light poses (`RasterRenderer::LightPoseBuffer`) in
+    /// `RecordPrepass`, after the instances are composed.
+    /// @throws std::invalid_argument for an unknown instancer or a row out of range.
+    void SetAnchoredLights(std::vector<AnchoredView> lights);
+
+    /// Patches the cull views of the shadow views the GPU fitted (`ShadowCascade::gpuFitted`)
+    /// from their matrices (`RasterRenderer::LightViewMatrices`), after the renderer's light pass.
+    void RecordShadowViews(VkCommandBuffer commands) const override;
+
     /// The slot of instance `row` of `instancer` in this frame's half of the instance pools, for
     /// records of `RecordAnchors`: valid from this frame's `Prepare` to the next. ~0 for an
     /// unknown instance.
@@ -618,6 +629,16 @@ class MeshDrawable : public RasterDrawable {
     std::uint32_t anchorViews_ = 0;
     PipelineLayout anchorLayout_;
     std::unique_ptr<ComputePipeline> anchorPipeline_;
+    /// Lights posed under instances (`SetAnchoredLights`) and their records for this frame.
+    std::vector<AnchoredView> anchoredLights_;
+    std::unique_ptr<GpuBuffer> anchorLightRecords_;
+    std::uint32_t anchorLights_ = 0;
+    /// The shadow views the GPU fits, as their matrix (`ShadowCascade::gpuMatrix`) and cull view
+    /// slot, and the pass patching those cull views (light_views.slang).
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> gpuShadowSlots_;
+    std::unique_ptr<GpuBuffer> gpuShadowSlotBuffer_;
+    PipelineLayout lightCullLayout_;
+    std::unique_ptr<ComputePipeline> lightCullPipeline_;
     /// The meshes whose normals the next frame recomputes, as their handles.
     std::vector<std::uint32_t> pendingNormals_;
     std::shared_ptr<GpuBuffer> positions_;

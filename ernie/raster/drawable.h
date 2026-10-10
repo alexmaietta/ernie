@@ -36,6 +36,10 @@ struct RasterFrame {
     DescriptorResource shadowMap;
     DescriptorResource shadowSampler;
     DescriptorResource clampSampler;
+    /// Shadow passes: `shadows` is the light view's own block, whose first view-projection the
+    /// pass draws with (`DrawConstants::shadowFromFrame`), as the GPU may have fitted it; the
+    /// matrix `RecordShadow` gets is then only the CPU's estimate.
+    bool shadowFromFrame = false;
 };
 
 /// The shadow casters a shadow pass draws: what every world shares (`tokens::kWorld` -1), and
@@ -117,6 +121,11 @@ class RasterDrawable {
     /// the GPU poses (`RasterRenderer::PatchViews`) when the frame's poses are on the GPU
     /// (`FrameParams::posesOnGpu`), before `RecordCull`. Nothing by default.
     virtual void RecordViewPoses(VkCommandBuffer /*commands*/) const {}
+
+    /// Records the patching of the drawable's per-view buffers for the shadow views the GPU fits
+    /// (`ShadowCascade::gpuFitted`) from their matrices (`RasterRenderer::LightViewMatrices`),
+    /// after the renderer's light pass and before `RecordCull`. Nothing by default.
+    virtual void RecordShadowViews(VkCommandBuffer /*commands*/) const {}
 
     /// Records depth-only draws of `casters` for shadow view `cascade` (an index into the views
     /// given to `Prepare`) into the open rendering pass. Drawables without worlds draw only when

@@ -38,8 +38,10 @@ struct DrawConstants {
     std::uint32_t instanceOffset;
     std::uint32_t indexOffset;
     std::uint32_t records;
+    std::uint32_t shadowFromFrame;
+    std::uint32_t padding[3];
 };
-static_assert(sizeof(DrawConstants) == 80, "DrawConstants must match frame.slang");
+static_assert(sizeof(DrawConstants) == 96, "DrawConstants must match frame.slang");
 
 constexpr VkShaderStageFlags kGraphics = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
@@ -396,8 +398,9 @@ void PlanetDrawable::Prepare(const FrameParams& frame, std::span<const ShadowCas
         }
         const auto first = static_cast<std::uint32_t>(patches_.size());
         const glm::vec3 eye(lodEyes_.front() - origin_);
+        // A view the GPU fits draws every patch: its matrix here is only an estimate.
         const Frustum light = Shifted(Frustum::FromMatrix(cascades[c].lightViewProjection), -eye);
-        Select(lodEyes_.front(), ranges, &light);
+        Select(lodEyes_.front(), ranges, cascades[c].gpuFitted ? nullptr : &light);
         cascadeRanges_[c] = {first, static_cast<std::uint32_t>(patches_.size()) - first};
     }
     if (!patches_.empty()) {
@@ -423,13 +426,14 @@ std::vector<DescriptorResource> PlanetDrawable::Resources(const RasterFrame& fra
 }
 
 void PlanetDrawable::DrawPatches(VkCommandBuffer commands, DrawRange range,
-                                 const glm::mat4& light) const {
+                                 const glm::mat4& light, bool shadowFromFrame) const {
     if (range.count == 0) {
         return;
     }
     DrawConstants constants{};
     std::memcpy(constants.lightViewProj, glm::value_ptr(light), sizeof(constants.lightViewProj));
     constants.first = range.first;
+    constants.shadowFromFrame = shadowFromFrame ? 1u : 0u;
     layout_.PushConstants(commands, &constants, sizeof(constants));
     const std::uint32_t cells = lod_.PatchCells();
     vkCmdDraw(commands, 6 * cells * cells, range.count, 0, 0);
@@ -443,7 +447,7 @@ void PlanetDrawable::RecordShadow(VkCommandBuffer commands, const RasterFrame& f
     }
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowPipeline_->Handle());
     layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, Resources(frame, 0));
-    DrawPatches(commands, cascadeRanges_[cascade], lightViewProjection);
+    DrawPatches(commands, cascadeRanges_[cascade], lightViewProjection, frame.shadowFromFrame);
 }
 
 void PlanetDrawable::RecordColor(VkCommandBuffer commands, const RasterFrame& frame,

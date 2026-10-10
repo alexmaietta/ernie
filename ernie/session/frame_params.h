@@ -176,6 +176,11 @@ struct Light {
     /// The world the light shines in (`tokens::kWorld`): views of a batch see their world's
     /// lights and the shared ones (-1).
     std::int32_t world = -1;
+    /// Posed on the GPU under a prim posed there (a lamp on a robot's link): `position`,
+    /// `direction` and `tangent` are the CPU's estimate, and the renderer takes the pose the GPU
+    /// composes for the light and its shadow views (`RasterRenderer::LightPoseBuffer`). Its size,
+    /// radius and spectrum keep the estimate's scale.
+    bool posedOnGpu = false;
 
     /// Cones up to this half angle (degrees) get one perspective shadow map, wider ones a cube.
     static constexpr float kMaxSpotConeDegrees = 75.0f;

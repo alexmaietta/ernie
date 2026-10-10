@@ -179,7 +179,7 @@ struct ShadowVertexOutput {
 // The light's view direction away from it, and two directions across it, from its
 // view-projection: the gradients of clip z, x and y (exact for orthographic maps).
 float3 lightAxis(uint row) {
-    let m = draw.lightViewProj;
+    let m = shadowViewProj();
     return normalize(float3(m[row][0], m[row][1], m[row][2]));
 }
 
@@ -191,7 +191,7 @@ ShadowVertexOutput shadowVertex(uint vertexIndex : SV_VertexID, uint point : SV_
     let corner = cornerOf(vertexIndex);
     let world = sphere.xyz + (corner.x * lightAxis(0) + corner.y * lightAxis(1)) * sphere.w;
     ShadowVertexOutput out;
-    out.position = mul(draw.lightViewProj, float4(world, 1.0));
+    out.position = mul(shadowViewProj(), float4(world, 1.0));
     out.corner = corner;
     out.sphere = sphere;
     return out;
@@ -206,6 +206,6 @@ float shadowFragment(ShadowVertexOutput in) : SV_Depth {
     // The sphere's surface facing the light over this texel.
     let across = in.corner.x * lightAxis(0) + in.corner.y * lightAxis(1);
     let front = in.sphere.xyz + in.sphere.w * (across - sqrt(1.0 - rho2) * lightAxis(2));
-    let clip = mul(draw.lightViewProj, float4(front, 1.0));
+    let clip = mul(shadowViewProj(), float4(front, 1.0));
     return clip.z / clip.w;
 }

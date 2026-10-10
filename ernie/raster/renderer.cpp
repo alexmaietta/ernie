@@ -143,6 +143,8 @@ constexpr VkDeviceSize Aligned(VkDeviceSize bytes) {
 constexpr VkDeviceSize kUniformsStride = Aligned(sizeof(Uniforms));
 constexpr VkDeviceSize kShadingStride = Aligned(sizeof(ShadingUniforms));
 constexpr VkDeviceSize kSensorStride = Aligned(sizeof(SensorUniforms));
+/// Light shadow views' Shadows blocks (`lightShadowBlocks_`), bound one at a time.
+constexpr VkDeviceSize kLightShadowBlockStride = Aligned(sizeof(ShadowUniforms));
 static_assert(kShadingStride == sizeof(ShadingUniforms) && kSensorStride == sizeof(SensorUniforms),
               "Shading and the filters index the views' uniforms as arrays");
 
@@ -319,6 +321,16 @@ constexpr DescriptorBinding kViewsBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
     {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
     {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+};
+
+/// light_views.slang's `lightsMain`: records, poses, the light table, the shadow views' matrices
+/// and their Shadows blocks.
+constexpr DescriptorBinding kLightsBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+    {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+    {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+    {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
 };
 
 /// depth_range.slang: the views' depth and the range it reduces to.
@@ -555,6 +567,9 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
                   BufferMemory::Device),
       lightViewMatrices_(context, kMaxLightShadowViews * sizeof(glm::mat4),
                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device),
+      lightShadowBlocks_(context, kMaxLightShadowViews * kLightShadowBlockStride,
+                         kViewUniformUsage, BufferMemory::Device),
+      lightsLayout_(context, kLightsBindings, 48),
       depthRangeLayout_(context, kDepthRangeBindings, 32),
       meterLayout_(context, kMeterBindings, 32) {
     if (brdfs_.Models().empty()) {
@@ -612,6 +627,9 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
     const std::vector<ShaderModuleSource> viewsModules{{"views", shaders::kViewsSlang}};
     viewsPipeline_ = std::make_unique<ComputePipeline>(
         context_, viewsLayout_, compiler_.CompileSpirv(viewsModules, "viewsMain"));
+    const std::vector<ShaderModuleSource> lightModules{{"light_views", shaders::kLightViewsSlang}};
+    lightsPipeline_ = std::make_unique<ComputePipeline>(
+        context_, lightsLayout_, compiler_.CompileSpirv(lightModules, "lightsMain"));
     const std::vector<ShaderModuleSource> presentModules{{"present", shaders::kPresentSlang}};
     const std::vector<std::uint32_t> vertex =
         compiler_.CompileSpirv(presentModules, "presentVertex");
@@ -867,6 +885,7 @@ void RasterRenderer::WriteLights(const FrameParams& params, const std::optional<
     const std::uint32_t resolution = std::max(params.shadows.lightResolution, 1u);
     lightViews_.clear();
     std::vector<LightGpu> table(params.lights.size());
+    std::vector<glm::vec4> lightRecords;  ///< The light pass's, for lights posed on the GPU.
     for (std::size_t i = 0; i < params.lights.size(); ++i) {
         const Light& light = params.lights[i];
         LightGpu& entry = table[i];
@@ -894,31 +913,102 @@ void RasterRenderer::WriteLights(const FrameParams& params, const std::optional<
         entry.cone[0] = cone ? std::cos(glm::radians(light.coneAngle)) : -2.0f;
         entry.cone[1] = cone ? std::cos(glm::radians(light.coneAngle * (1.0f - softness))) : -1.0f;
         if (bounds) {
-            const std::vector<ShadowCascade> views = FitLightShadowViews(
+            std::vector<ShadowCascade> views = FitLightShadowViews(
                 light, params.Relative(light.position), bounds->first, bounds->second, resolution);
             if (!views.empty() && lightViews_.size() + views.size() <= kMaxLightShadowViews) {
                 entry.cone[2] = static_cast<float>(lightViews_.size());
                 entry.cone[3] = static_cast<float>(views.size());
                 entry.shadow[0] = views.front().texelWorldSize;
+                if (light.posedOnGpu) {
+                    for (std::size_t v = 0; v < views.size(); ++v) {
+                        views[v].gpuFitted = true;
+                        views[v].gpuMatrix = static_cast<std::uint32_t>(lightViews_.size() + v);
+                    }
+                }
                 lightViews_.insert(lightViews_.end(), views.begin(), views.end());
             }
         }
         std::copy(light.spectrum.begin(), light.spectrum.end(), entry.spectrum);
+        if (light.posedOnGpu) {
+            // The light pass poses it and fits its views as `FitLightShadowViews` would.
+            const auto kind = distant                                       ? 0u
+                              : light.coneAngle <= Light::kMaxSpotConeDegrees ? 1u
+                                                                              : 2u;
+            const std::uint32_t record[4] = {static_cast<std::uint32_t>(i),
+                                             static_cast<std::uint32_t>(entry.cone[2]),
+                                             static_cast<std::uint32_t>(entry.cone[3]), kind};
+            glm::vec4 bits;
+            std::memcpy(&bits, record, sizeof(bits));
+            lightRecords.push_back(bits);
+            lightRecords.emplace_back(2.0f * glm::radians(std::max(light.coneAngle, 0.5f)),
+                                      light.radius, 0.0f, 0.0f);
+        }
     }
     if (!table.empty()) {
         uploads_.Write(lightTable_, std::as_bytes(std::span(table)));
     }
     std::vector<glm::mat4> matrices;
-    for (const ShadowCascade& view : lightViews_) {
-        matrices.push_back(view.lightViewProjection);
+    std::vector<std::byte> blocks(lightViews_.size() * kLightShadowBlockStride);
+    for (std::size_t v = 0; v < lightViews_.size(); ++v) {
+        matrices.push_back(lightViews_[v].lightViewProjection);
+        std::memcpy(blocks.data() + v * kLightShadowBlockStride,
+                    glm::value_ptr(lightViews_[v].lightViewProjection), sizeof(glm::mat4));
     }
     if (!matrices.empty()) {
         uploads_.Write(lightViewMatrices_, std::as_bytes(std::span(matrices)));
+        uploads_.Write(lightShadowBlocks_, blocks);
         const auto layers = static_cast<std::uint32_t>(lightViews_.size());
         if (resolution != lightResolution_ || layers > lightShadowMaps_->Desc().layers) {
             CreateLightShadowMaps(resolution, layers);
         }
     }
+    gpuLights_ = static_cast<std::uint32_t>(lightRecords.size() / 2);
+    if (gpuLights_ > 0) {
+        // Grown only once no frame still reads them.
+        const VkDeviceSize recordBytes = lightRecords.size() * sizeof(glm::vec4);
+        const VkDeviceSize poseBytes = VkDeviceSize{gpuLights_} * sizeof(glm::mat4);
+        if (lightRecords_ == nullptr || lightRecords_->Size() < recordBytes ||
+            lightPoses_ == nullptr || lightPoses_->Size() < poseBytes) {
+            vkDeviceWaitIdle(context_.Device());
+            lightRecords_ = std::make_unique<GpuBuffer>(
+                context_, recordBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+            lightPoses_ = std::make_unique<GpuBuffer>(
+                context_, poseBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+        }
+        uploads_.Write(*lightRecords_, std::as_bytes(std::span(lightRecords)));
+        lightBoundsLow_ = bounds ? glm::vec4(bounds->first, 0.0f) : glm::vec4(0.0f);
+        lightBoundsHigh_ = bounds ? glm::vec4(bounds->second, 0.0f) : glm::vec4(0.0f);
+    }
+}
+
+void RasterRenderer::RecordLights(VkCommandBuffer commands,
+                                  std::span<const RasterDrawable* const> drawables) const {
+    if (gpuLights_ == 0) {
+        return;
+    }
+    ERNIE_GPU_ZONE(context_, commands, "Lights posed on the GPU");
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, lightsPipeline_->Handle());
+    const DescriptorResource resources[] = {
+        DescriptorResource::Of(*lightRecords_), DescriptorResource::Of(*lightPoses_),
+        DescriptorResource::Of(lightTable_), DescriptorResource::Of(lightViewMatrices_),
+        DescriptorResource::Of(lightShadowBlocks_)};
+    lightsLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+    struct {
+        std::uint32_t layout[4];
+        glm::vec4 low;
+        glm::vec4 high;
+    } constants{{gpuLights_, static_cast<std::uint32_t>(sizeof(LightGpu) / sizeof(glm::vec4)),
+                 static_cast<std::uint32_t>(kLightShadowBlockStride / sizeof(glm::vec4)), 0u},
+                lightBoundsLow_,
+                lightBoundsHigh_};
+    lightsLayout_.PushConstants(commands, &constants, sizeof(constants));
+    vkCmdDispatch(commands, (gpuLights_ + 63) / 64, 1, 1);
+    ShaderBarrier(commands);
+    // The views' cull views follow their fitted matrices.
+    for (const RasterDrawable* drawable : drawables) {
+        drawable->RecordShadowViews(commands);
+    }
+    ShaderBarrier(commands);
 }
 
 void RasterRenderer::PlanBatchShadows(const FrameParams& params, const Bounds3& scene,
@@ -1859,6 +1949,7 @@ void RasterRenderer::RecordShadows(VkCommandBuffer commands,
         }
         ShaderBarrier(commands);
     }
+    RecordLights(commands, drawables);
     if (posesOnGpu_) {
         ERNIE_GPU_ZONE(context_, commands, "View poses");
         RecordViewPoses(commands, drawables);
@@ -1931,8 +2022,14 @@ void RasterRenderer::RecordShadowMaps(VkCommandBuffer commands,
             shadow.depth = lightShadowMaps_->LayerView(static_cast<std::uint32_t>(v));
             shadow.extent = {lightResolution_, lightResolution_};
             BeginRendering(commands, shadow);
+            // Each view draws with its own Shadows block's matrix, which the light pass fits for
+            // lights posed on the GPU.
+            RasterFrame own = frame;
+            own.shadows = DescriptorResource::Of(lightShadowBlocks_, v * kLightShadowBlockStride,
+                                                 sizeof(ShadowUniforms));
+            own.shadowFromFrame = true;
             for (const RasterDrawable* drawable : drawables) {
-                drawable->RecordShadow(commands, frame, cascades_.size() + v,
+                drawable->RecordShadow(commands, own, cascades_.size() + v,
                                        lightViews_[v].lightViewProjection, lightCasters_);
             }
             vkCmdEndRendering(commands);

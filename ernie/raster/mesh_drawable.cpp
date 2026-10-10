@@ -51,8 +51,10 @@ struct DrawConstants {
     std::uint32_t instanceOffset;
     std::uint32_t indexOffset;
     std::uint32_t records;
+    std::uint32_t shadowFromFrame;
+    std::uint32_t padding[3];
 };
-static_assert(sizeof(DrawConstants) == 80, "DrawConstants must match frame.slang");
+static_assert(sizeof(DrawConstants) == 96, "DrawConstants must match frame.slang");
 
 constexpr VkShaderStageFlags kGraphics = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
@@ -110,6 +112,14 @@ constexpr DescriptorBinding kAnchorBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute}, {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute}, {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+};
+
+/// light_views.slang's `cullViewsMain` bindings: the fitted matrices, the cull views' matrices
+/// and slots, and the cull views.
+constexpr DescriptorBinding kLightCullBindings[] = {
+    {5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
 /// The row width an instance op of `kind` takes, or both widths it accepts (scale: 3 or 1).
@@ -426,6 +436,7 @@ MeshDrawable::MeshDrawable(RasterRenderer& renderer)
       normalsLayout_(renderer.Context(), kNormalsBindings, 32),
       composeLayout_(renderer.Context(), kComposeBindings, 32),
       anchorLayout_(renderer.Context(), kAnchorBindings, 16),
+      lightCullLayout_(renderer.Context(), kLightCullBindings, 48),
       cullLayout_(renderer.Context(), kCullBindings, 32) {
     const std::vector<ShaderModuleSource> normals{{"mesh_normals", shaders::kMeshNormalsSlang}};
     normalsPipeline_ = std::make_unique<ComputePipeline>(
@@ -437,6 +448,9 @@ MeshDrawable::MeshDrawable(RasterRenderer& renderer)
     const std::vector<ShaderModuleSource> anchors{{"instance_anchors", shaders::kInstanceAnchorsSlang}};
     anchorPipeline_ = std::make_unique<ComputePipeline>(
         context_, anchorLayout_, renderer_.Compiler().CompileSpirv(anchors, "anchorsMain"));
+    const std::vector<ShaderModuleSource> lightViews{{"light_views", shaders::kLightViewsSlang}};
+    lightCullPipeline_ = std::make_unique<ComputePipeline>(
+        context_, lightCullLayout_, renderer_.Compiler().CompileSpirv(lightViews, "cullViewsMain"));
     // Stands in for a depth pyramid in culling without one.
     noHzb_ =
         std::make_unique<GpuImage>(context_, ImageDesc{1, 1, 1, 1, VK_FORMAT_R32_SFLOAT,
@@ -1609,6 +1623,23 @@ void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCasc
         renderer_.Uploads().Write(*anchorRecords_, std::as_bytes(std::span(records)));
         anchorViews_ = static_cast<std::uint32_t>(anchoredViews_.size());
     }
+    // Lights posed under instances, as the views.
+    anchorLights_ = 0;
+    if (!anchoredLights_.empty()) {
+        const glm::dmat4 toOrigin = glm::translate(glm::dmat4(1.0), -params.origin);
+        std::vector<glm::vec4> records;
+        records.reserve(anchoredLights_.size() * 9);
+        for (std::size_t l = 0; l < anchoredLights_.size(); ++l) {
+            const AnchoredView& light = anchoredLights_[l];
+            AppendAnchorRecord(records, glm::mat4(toOrigin * light.frame), glm::mat4(light.below),
+                               AnchorSlot(light.instancer, light.row),
+                               static_cast<std::uint32_t>(l));
+        }
+        Reserve(context_, anchorLightRecords_, records.size() * sizeof(glm::vec4),
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+        renderer_.Uploads().Write(*anchorLightRecords_, std::as_bytes(std::span(records)));
+        anchorLights_ = static_cast<std::uint32_t>(anchoredLights_.size());
+    }
 
     // Flipped halves move the draws' offsets.
     if (drawsChanged || drawsDirty_) {
@@ -1968,11 +1999,27 @@ void MeshDrawable::Cull(const FrameParams& params, std::span<const ShadowCascade
         }
     }
     shadowDraws_.clear();
+    gpuShadowSlots_.clear();
     for (const ShadowCascade& cascade : cascades) {
+        // Views the GPU fits cull there only, their blocks patched (`RecordShadowViews`).
+        if (cascade.gpuFitted) {
+            gpuShadowSlots_.emplace_back(cascade.gpuMatrix,
+                                         static_cast<std::uint32_t>(views.size() / kCullViewStride));
+        }
         // Shadow maps: one texel spans `texelWorldSize` (at w = 1 for perspective views).
         shadowDraws_.push_back(list(cascade.lightViewProjection,
                                     1.0f / std::max(cascade.texelWorldSize, 1e-30f), false, nullptr,
-                                    true));
+                                    !cascade.gpuFitted));
+    }
+    if (!gpuShadowSlots_.empty()) {
+        Reserve(context_, gpuShadowSlotBuffer_,
+                gpuShadowSlots_.size() * sizeof(std::pair<std::uint32_t, std::uint32_t>),
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+        std::vector<glm::uvec2> slots;
+        for (const auto& [matrix, slot] : gpuShadowSlots_) {
+            slots.emplace_back(matrix, slot);
+        }
+        renderer_.Uploads().Write(*gpuShadowSlotBuffer_, std::as_bytes(std::span(slots)));
     }
     // A world's shadow pass draws its world's casters and the shared ones, not every world's.
     shadowWorldDraws_.assign(shadowDraws_.size(), {});
@@ -2136,6 +2183,36 @@ void MeshDrawable::SetAnchoredViews(std::vector<AnchoredView> views) {
     anchoredViews_ = std::move(views);
 }
 
+void MeshDrawable::SetAnchoredLights(std::vector<AnchoredView> lights) {
+    for (const AnchoredView& light : lights) {
+        if (light.instancer == 0) {
+            continue;
+        }
+        const auto it = instancers_.find(light.instancer);
+        if (it == instancers_.end() || light.row >= it->second.count) {
+            throw std::invalid_argument("Anchored light under unknown instance " +
+                                        std::to_string(light.instancer) + ", row " +
+                                        std::to_string(light.row));
+        }
+    }
+    anchoredLights_ = std::move(lights);
+}
+
+void MeshDrawable::RecordShadowViews(VkCommandBuffer commands) const {
+    if (gpuShadowSlots_.empty() || cullJobs_.empty()) {
+        return;  // without cull jobs, no cull views either
+    }
+    ERNIE_GPU_ZONE(context_, commands, "Shadow cull views");
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, lightCullPipeline_->Handle());
+    const DescriptorResource resources[] = {DescriptorResource::Of(renderer_.LightViewMatrices()),
+                                            DescriptorResource::Of(*gpuShadowSlotBuffer_),
+                                            DescriptorResource::Of(*cullViewBuffer_)};
+    lightCullLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+    const std::uint32_t constants[12] = {static_cast<std::uint32_t>(gpuShadowSlots_.size())};
+    lightCullLayout_.PushConstants(commands, constants, sizeof(constants));
+    vkCmdDispatch(commands, (static_cast<std::uint32_t>(gpuShadowSlots_.size()) + 63) / 64, 1, 1);
+}
+
 std::uint32_t MeshDrawable::AnchorSlot(std::uint32_t instancer, std::uint32_t row) const {
     const auto it = instancers_.find(instancer);
     if (it == instancers_.end() || row >= it->second.count) {
@@ -2157,12 +2234,16 @@ void MeshDrawable::AppendAnchorRecord(std::vector<glm::vec4>& records, const glm
 
 void MeshDrawable::RecordPrepass(VkCommandBuffer commands) const {
     RecordCompose(commands);
-    if (anchorViews_ == 0) {
-        return;
+    if (anchorViews_ != 0) {
+        ERNIE_GPU_ZONE(context_, commands, "Anchored views");
+        RecordAnchors(commands, *anchorRecords_, anchorViews_, renderer_.PoseBuffer(),
+                      AnchorOutput::ViewPoses);
     }
-    ERNIE_GPU_ZONE(context_, commands, "Anchored views");
-    RecordAnchors(commands, *anchorRecords_, anchorViews_, renderer_.PoseBuffer(),
-                  AnchorOutput::ViewPoses);
+    if (anchorLights_ != 0) {
+        ERNIE_GPU_ZONE(context_, commands, "Anchored lights");
+        RecordAnchors(commands, *anchorLightRecords_, anchorLights_, renderer_.LightPoseBuffer(),
+                      AnchorOutput::ViewPoses);
+    }
 }
 
 void MeshDrawable::RecordAnchors(VkCommandBuffer commands, const GpuBuffer& records,
@@ -2343,6 +2424,7 @@ std::size_t MeshDrawable::Record(VkCommandBuffer commands, const RasterFrame& fr
     };
     DrawConstants constants{};
     std::memcpy(constants.lightViewProj, glm::value_ptr(light), sizeof(constants.lightViewProj));
+    constants.shadowFromFrame = shadow && frame.shadowFromFrame ? 1u : 0u;
 
     // GPU-culled ranges draw indirectly, each level a command with a per-draw record (mesh.slang
     // reads it by draw index). Consecutive commands that bind the same resources, which shadow

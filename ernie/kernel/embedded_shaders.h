@@ -89,6 +89,8 @@ extern const char kMeshNormalsSlang[];
 extern const char kInstanceComposeSlang[];
 /// Views and point clouds posed under prims posed on the GPU.
 extern const char kInstanceAnchorsSlang[];
+/// Lights posed on the GPU: their light table entries, shadow views and those views' cull views.
+extern const char kLightViewsSlang[];
 
 /// Terrain modules: shared resources and grid vertex, the surface material, and the passes.
 extern const char kTerrainSlang[];

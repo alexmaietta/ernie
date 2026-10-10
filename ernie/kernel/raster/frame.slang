@@ -78,6 +78,14 @@ public struct DrawConstants {
     // replace `first`, `instanceOffset` and `indexOffset`, one per draw by its draw index; 0 to
     // use those three.
     public uint records;
+    // Shadow passes: 1 to take the light's view-projection from the frame's Shadows block
+    // (`s.lightViewProj[0]`, which the GPU may have fitted: a light posed on the GPU) instead of
+    // `lightViewProj`.
+    public uint shadowFromFrame;
+    // To 96 bytes, as uints: a uint3 would align to 16 and end at 108.
+    uint padding0;
+    uint padding1;
+    uint padding2;
 }
 
 public struct Shadows {
@@ -104,6 +112,11 @@ public struct Shadows {
 [[vk::binding(3, 0)]] public SamplerComparisonState shadowSampler;
 [[vk::binding(4, 0)]] public SamplerState clampSampler;
 [[vk::push_constant]] public ConstantBuffer<DrawConstants> draw;
+
+// The view-projection of the shadow pass drawing (`DrawConstants::shadowFromFrame`).
+public float4x4 shadowViewProj() {
+    return draw.shadowFromFrame != 0 ? s.lightViewProj[0] : draw.lightViewProj;
+}
 
 // Jimenez 2014, "Next Generation Post Processing in Call of Duty: Advanced Warfare".
 float interleavedGradientNoise(float2 pixel) {

@@ -4,5 +4,5 @@ import terrain;
 [shader("vertex")]
 float4 shadowVertex(uint vertexIndex : SV_VertexID, uint instanceIndex : SV_InstanceID)
     : SV_Position {
-    return mul(draw.lightViewProj, float4(gridVertex(vertexIndex, instanceIndex).world, 1.0));
+    return mul(shadowViewProj(), float4(gridVertex(vertexIndex, instanceIndex).world, 1.0));
 }

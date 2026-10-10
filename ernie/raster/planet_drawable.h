@@ -125,7 +125,8 @@ class PlanetDrawable : public RasterDrawable {
     /// Appends the patches `lod_` selects and their anchors.
     void Select(const glm::dvec3& eye, std::span<const LodRange> ranges, const Frustum* frustum);
     std::vector<DescriptorResource> Resources(const RasterFrame& frame, std::size_t view) const;
-    void DrawPatches(VkCommandBuffer commands, DrawRange range, const glm::mat4& light) const;
+    void DrawPatches(VkCommandBuffer commands, DrawRange range, const glm::mat4& light,
+                     bool shadowFromFrame = false) const;
 
     RasterRenderer& renderer_;
     PipelineLayout layout_;

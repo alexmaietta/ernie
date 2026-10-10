@@ -229,7 +229,8 @@ class TerrainDrawable : public RasterDrawable {
     /// range.
     void TakeLeaves(const GpuBuffer& readback);
     std::vector<DescriptorResource> Resources(const RasterFrame& frame, std::size_t view) const;
-    void DrawPatches(VkCommandBuffer commands, DrawRange range, const glm::mat4& light) const;
+    void DrawPatches(VkCommandBuffer commands, DrawRange range, const glm::mat4& light,
+                     bool shadowFromFrame = false) const;
 
     /// What maps a point relative to the origin into the tree's coordinates (the terrain's
     /// north-west corner at x = y = 0, heights as they are): add it.

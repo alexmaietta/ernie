@@ -35,7 +35,7 @@ constexpr VkBufferUsageFlags kUniformsUsage =
     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 
 /// frame.slang's per-draw push constants, which the pass declares but leaves unused.
-constexpr std::uint32_t kDrawConstantsSize = 80;
+constexpr std::uint32_t kDrawConstantsSize = 96;
 
 constexpr VkShaderStageFlags kGraphics = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 

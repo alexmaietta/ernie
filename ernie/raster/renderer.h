@@ -282,6 +282,19 @@ class RasterRenderer {
     /// previous buffer keeps that buffer alive, so its values can still be copied.
     const std::shared_ptr<GpuBuffer>& EnsurePoseBuffer(std::uint32_t views);
 
+    /// The poses of the last `Update`'s lights posed on the GPU (`Light::posedOnGpu`), row-major
+    /// 4x4 float32 per light in their order, relative to the frame's origin: written in the
+    /// prepass (`MeshDrawable::SetAnchoredLights`), read by the light pass.
+    const GpuBuffer& LightPoseBuffer() const {
+        return *lightPoses_;
+    }
+
+    /// The light shadow views' world-to-clip matrices (`LightShadowViews`, glm columns): the CPU's,
+    /// and for views of lights posed on the GPU, the light pass's (`ShadowCascade::gpuFitted`).
+    const GpuBuffer& LightViewMatrices() const {
+        return lightViewMatrices_;
+    }
+
     /// The camera-to-world poses the last frame with poses on the GPU in this `BeginFrame`'s slot
     /// rendered (a finished frame), if it had `views` views; otherwise empty. Estimates of the
     /// next frame's poses.
@@ -402,6 +415,11 @@ class RasterRenderer {
     void EnsureViewBuffers(std::uint32_t views);
     /// Writes views.slang's camera and sizes the pose buffers for a frame posed on the GPU.
     void WritePoseCamera(const FrameParams& params);
+    /// Records the light pass (light_views.slang) for the lights posed on the GPU, after the
+    /// prepass wrote their poses: their light table entries and shadow views, then every
+    /// drawable's `RecordShadowViews`, each followed by a barrier. Nothing without such lights.
+    void RecordLights(VkCommandBuffer commands,
+                      std::span<const RasterDrawable* const> drawables) const;
     /// Records `PatchViews` of the renderer's own per-view uniforms and every drawable's.
     void RecordViewPoses(VkCommandBuffer commands,
                          std::span<const RasterDrawable* const> drawables) const;
@@ -575,6 +593,18 @@ class RasterRenderer {
     GpuBuffer sensorUniforms_;
     GpuBuffer lightTable_;
     GpuBuffer lightViewMatrices_;
+    /// Per light shadow view, a Shadows block (frame.slang) whose first matrix its shadow pass
+    /// draws with (`RasterFrame::shadowFromFrame`), `kLightShadowBlockStride` apart.
+    GpuBuffer lightShadowBlocks_;
+    /// Lights posed on the GPU: their poses (`LightPoseBuffer`), the light pass's records (two
+    /// float4 each, light_views.slang) and count, and the pass.
+    std::unique_ptr<GpuBuffer> lightPoses_;
+    std::unique_ptr<GpuBuffer> lightRecords_;
+    std::uint32_t gpuLights_ = 0;
+    glm::vec4 lightBoundsLow_{0.0f};
+    glm::vec4 lightBoundsHigh_{0.0f};
+    PipelineLayout lightsLayout_;
+    std::unique_ptr<ComputePipeline> lightsPipeline_;
     std::unique_ptr<GpuBuffer> materialTable_;
     /// What shows behind the scene: the dome's map (a white texel without one), the stars sorted
     /// by grid cell (`kStarColumns` by `kStarRows`), each cell's first star and count, and the

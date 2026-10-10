@@ -17,6 +17,11 @@ struct ShadowCascade {
     float splitNear = 0.0f;               ///< View-space depth where this cascade starts.
     float splitFar = 0.0f;                ///< View-space depth where this cascade ends.
     float texelWorldSize = 0.0f;          ///< World size of one shadow map texel.
+    /// Fitted on the GPU (a light posed there): `lightViewProjection` is only the CPU's estimate,
+    /// so passes neither cull nor select what they draw by it on the CPU; the fitted matrix is
+    /// `gpuMatrix` of `RasterRenderer::LightViewMatrices`.
+    bool gpuFitted = false;
+    std::uint32_t gpuMatrix = 0;
 };
 
 /// View-space split depths from `nearPlane` to `farPlane` with the practical split scheme, which

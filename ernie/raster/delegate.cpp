@@ -1208,21 +1208,6 @@ std::optional<RasterDelegate::GpuAnchor> RasterDelegate::GpuAnchorOf(const Scene
     return std::nullopt;
 }
 
-glm::dmat4 RasterDelegate::HostWorldTransform(const Scene& scene, const Path& path) {
-    Path at;
-    const GpuOpReader read = [&](std::string_view attribute, const Tensor& device) {
-        return RequireCompute().Download(device, scene.WriteStream(at, attribute));
-    };
-    glm::dmat4 world(1.0);
-    for (at = path; !at.IsEmpty(); at = at.Parent()) {
-        world = ComposeXformOps(scene, at, &read) * world;
-        if (ResetsXformStack(scene, at)) {
-            break;
-        }
-    }
-    return world;
-}
-
 HostArrayReader RasterDelegate::HostArrays(const Scene& scene) const {
     return [this, &scene](const Path& path, std::string_view attribute, const Tensor& device) {
         HostArray& kept = hostArrays_[{path, std::string(attribute)}];
@@ -1830,18 +1815,27 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
     ERNIE_ZONE("UpdatePrims");
     Sync(scene);
     prims_ = prims;
-    // Lights under prims posed on the GPU (a lamp on a robot's link): planned on the CPU, so their
-    // links' rows come to the host.
-    for (const Path& light : prims_.lights) {
-        if (GpuAnchorOf(scene, light)) {
-            prims_.lightTransforms[light] = HostWorldTransform(scene, light);
+    // Lights under prims posed on the GPU (a lamp on a robot's link): posed there under their
+    // instances, the renderer fitting their shadow views from those poses. The CPU plans them at
+    // their frames without the instances' poses, an estimate for what does not move with them.
+    std::vector<AnchoredView> lightAnchors;
+    std::vector<bool> anchoredLights(prims_.lights.size(), false);
+    for (std::size_t i = 0; i < prims_.lights.size(); ++i) {
+        if (const std::optional<GpuAnchor> anchor = GpuAnchorOf(scene, prims_.lights[i])) {
+            prims_.lightTransforms[prims_.lights[i]] = anchor->frame * anchor->below;
+            lightAnchors.push_back({anchor->instancer, anchor->row, anchor->frame, anchor->below});
+            anchoredLights[i] = true;
         }
     }
+    meshes_.SetAnchoredLights(std::move(lightAnchors));
     SyncSky(scene, prims_);
     FrameParams frame = [&] {
         ERNIE_ZONE("FrameParamsOf");
         return FrameParamsOf(scene, prims_, extent.width, extent.height);
     }();
+    for (std::size_t i = 0; i < frame.lights.size() && i < anchoredLights.size(); ++i) {
+        frame.lights[i].posedOnGpu = anchoredLights[i];
+    }
     ApplyDomeSun(frame);
     frame.filters.assign(filters.begin(), filters.end());
     // One chain needs no chains of its own: `filters` and `vars` run as it (its filters, which

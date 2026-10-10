@@ -39,8 +39,10 @@ struct DrawConstants {
     std::uint32_t instanceOffset;
     std::uint32_t indexOffset;
     std::uint32_t records;
+    std::uint32_t shadowFromFrame;
+    std::uint32_t padding[3];
 };
-static_assert(sizeof(DrawConstants) == 80, "DrawConstants must match frame.slang");
+static_assert(sizeof(DrawConstants) == 96, "DrawConstants must match frame.slang");
 
 constexpr VkShaderStageFlags kGraphics = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
@@ -677,6 +679,7 @@ void PointsDrawable::RecordShadow(VkCommandBuffer commands, const RasterFrame& f
         std::memcpy(constants.lightViewProj, glm::value_ptr(lightViewProjection),
                     sizeof(constants.lightViewProj));
         constants.first = static_cast<std::uint32_t>(i);
+        constants.shadowFromFrame = frame.shadowFromFrame ? 1u : 0u;
         layout_.PushConstants(commands, &constants, sizeof(constants));
         vkCmdDraw(commands, 6, static_cast<std::uint32_t>(count), 0, 0);
     }

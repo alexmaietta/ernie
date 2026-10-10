@@ -263,9 +263,6 @@ class RasterDelegate : public RenderDelegate {
     /// The nearest prim from `path` up posed on the GPU whose transform reaches it (none past a
     /// prim resetting the transform stack), as `GpuAnchor`.
     std::optional<GpuAnchor> GpuAnchorOf(const Scene& scene, const Path& path) const;
-    /// The world transform of `path` under prims posed on the GPU, their rows copied to the host
-    /// (waiting for their streams): for the lights the CPU plans each frame.
-    glm::dmat4 HostWorldTransform(const Scene& scene, const Path& path);
     /// `HostArrayReader` of `scene`: GPU arrays the CPU plans with (worlds), copied to the host
     /// once per write (waiting for their streams) and kept until written again.
     HostArrayReader HostArrays(const Scene& scene) const;

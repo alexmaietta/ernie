@@ -282,7 +282,7 @@ float4 meshShadowVertex(uint vertexIndex : SV_VertexID, uint instanceIndex : SV_
     : SV_Position {
     // Where the caster is at the pass's sub-frame (Uniforms.motion, 1 without motion blur).
     let v = meshVertex(vertexIndex, instanceIndex, drawCall(drawIndex), u.motion.x);
-    return mul(draw.lightViewProj, float4(v.world, 1.0));
+    return mul(shadowViewProj(), float4(v.world, 1.0));
 }
 
 // Detail textures projected along the three world axes and blended by the normal (triplanar
@@ -421,7 +421,7 @@ ShadowCutoutOutput meshShadowCutoutVertex(uint vertexIndex : SV_VertexID,
                                           uint drawIndex : SV_DrawIndex) {
     let v = meshVertex(vertexIndex, instanceIndex, drawCall(drawIndex), u.motion.x);
     ShadowCutoutOutput out;
-    out.position = mul(draw.lightViewProj, float4(v.world, 1.0));
+    out.position = mul(shadowViewProj(), float4(v.world, 1.0));
     out.uv = v.uv;
     return out;
 }
