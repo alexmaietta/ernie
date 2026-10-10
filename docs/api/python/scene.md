@@ -10,6 +10,8 @@ Prims, paths and attributes, transforms, and change tracking.
 
 ::: ernie.PrimSet
 
+::: ernie.AttributeMapping
+
 ::: ernie.Quat
 
 ::: ernie.ChangeCursor

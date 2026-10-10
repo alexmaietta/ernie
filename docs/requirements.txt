@@ -3,5 +3,7 @@ mkdocs==1.6.1
 mkdocstrings==1.0.6
 mkdocstrings-python==2.0.9
 mkdoxy==1.2.8
+# mkdocstrings' highlighting breaks with pymdown-extensions 11 and later.
+pymdown-extensions==10.21.3
 # Formats the Python API's signatures (mkdocstrings' separate_signature).
 ruff==0.17.0

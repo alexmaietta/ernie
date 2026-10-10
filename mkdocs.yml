@@ -60,7 +60,7 @@ nav:
   - API reference:
       - Python:
           - Scene: api/python/scene.md
-          - Schemas and lights: api/python/schemas.md
+          - Prim types: api/python/schemas.md
           - Rendering: api/python/rendering.md
           - Cameras and sensor models: api/python/cameras.md
           - Astronomy: api/python/astronomy.md

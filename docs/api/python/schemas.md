@@ -1,8 +1,14 @@
-# Schemas and lights
+# Prim types
 
-Typed prims: the registered prim types, their attributes, and the light schemas.
+The typed prim classes and the registry they are built from: one class per registered prim type, with a property per attribute (see [Describing scenes](../../guides/scenes.md)). The classes are also exported from `ernie` itself (`ernie.SphereLight`).
 
-::: ernie.Schema
+## Registry and loading
+
+::: ernie.schema.Schema
+
+::: ernie.schema.typed
+
+::: ernie.schema.load_scene
 
 ::: ernie.PrimType
 
@@ -10,24 +16,88 @@ Typed prims: the registered prim types, their attributes, and the light schemas.
 
 ::: ernie.AttributeKind
 
-::: ernie.AttributeMapping
-
 ::: ernie.find_prim_type
 
 ::: ernie.prim_types
 
-::: ernie.Light
+## Bases
 
-::: ernie.BoundableLightBase
+::: ernie.schema.Imageable
 
-::: ernie.NonboundableLightBase
+::: ernie.schema.Xform
 
-::: ernie.DistantLight
+::: ernie.schema.Scope
 
-::: ernie.DomeLight
+::: ernie.schema.Boundable
 
-::: ernie.SphereLight
+::: ernie.schema.Gprim
 
-::: ernie.RectLight
+## Geometry
 
-::: ernie.DiskLight
+::: ernie.schema.Cube
+
+::: ernie.schema.Sphere
+
+::: ernie.schema.AxisShape
+
+::: ernie.schema.Cylinder
+
+::: ernie.schema.Cone
+
+::: ernie.schema.Capsule
+
+::: ernie.schema.Plane
+
+::: ernie.schema.PointBased
+
+::: ernie.schema.Mesh
+
+::: ernie.schema.Points
+
+::: ernie.schema.PointInstancer
+
+::: ernie.schema.Volume
+
+::: ernie.schema.GroundPlane
+
+::: ernie.schema.Terrain
+
+## Lights
+
+::: ernie.schema.Light
+
+::: ernie.schema.BoundableLightBase
+
+::: ernie.schema.NonboundableLightBase
+
+::: ernie.schema.DistantLight
+
+::: ernie.schema.DomeLight
+
+::: ernie.schema.SphereLight
+
+::: ernie.schema.RectLight
+
+::: ernie.schema.DiskLight
+
+::: ernie.schema.StarField
+
+## Cameras and materials
+
+::: ernie.schema.Camera
+
+::: ernie.schema.Material
+
+::: ernie.schema.Shader
+
+## Rendering
+
+::: ernie.schema.RenderSettingsBase
+
+::: ernie.schema.RenderSettings
+
+::: ernie.schema.RenderProduct
+
+::: ernie.schema.RenderVar
+
+::: ernie.schema.SensorFilter
