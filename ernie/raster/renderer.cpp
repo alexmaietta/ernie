@@ -126,8 +126,11 @@ struct SensorUniforms {
     /// Faces (1 without), the faces' focal length in raster pixels, their principal point.
     float faces[4];
     float facesPadding[44];
+    /// Per band, two to a float4: the lens's image scale (lateral colour) and focal length shift
+    /// in millimetres (axial colour); 1 and 0 without chromatic aberration.
+    float chromatic[SpectralBands::kMaxBands / 2][4];
 };
-static_assert(sizeof(SensorUniforms) == 2816, "SensorUniforms must match sensor.slang");
+static_assert(sizeof(SensorUniforms) == 3328, "SensorUniforms must match sensor.slang");
 
 /// Per-view uniforms sit in one buffer at multiples of this, the largest
 /// `minUniformBufferOffsetAlignment` Vulkan allows.
@@ -1291,6 +1294,7 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
         // are all taken).
         const std::shared_ptr<const LensRayTable>& table = params.camera.lens.rays;
         pass.plan.table = table != nullptr;
+        pass.plan.chromatic = !params.camera.lens.chromaticScale.Empty();
         std::vector<float> uploaded = pass.plan.params;
         pass.tableOffset = static_cast<std::uint32_t>(uploaded.size());
         if (table != nullptr) {
@@ -1658,6 +1662,18 @@ void RasterRenderer::WriteSensor(const FrameParams& params, const FrameParams& r
     }
     // A cube camera's faces: where their image planes land in the raster, and their depth back
     // to their camera frames (every face shares the projection).
+    // Chromatic aberration per band, its mean over the band: the image's scale and the focal
+    // length's shift.
+    for (int i = 0; i < bands_.count; ++i) {
+        const double low = bands_.Lower(i);
+        const double high = low + bands_.Width();
+        const double scale = lens.chromaticScale.Empty() ? 1.0
+                                                         : lens.chromaticScale.Average(low, high);
+        const double shift =
+            lens.chromaticFocusMm.Empty() ? 0.0 : lens.chromaticFocusMm.Average(low, high);
+        sensor.chromatic[i / 2][(i % 2) * 2] = static_cast<float>(scale);
+        sensor.chromatic[i / 2][(i % 2) * 2 + 1] = static_cast<float>(shift);
+    }
     sensor.faces[0] = static_cast<float>(faces_);
     if (faces_ > 1) {
         const glm::dvec3 face = FrameParams::FaceIntrinsics(extent_.width, extent_.height);

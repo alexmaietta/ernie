@@ -279,6 +279,17 @@ void Camera::Check() const {
             "An orthographic camera needs a perspective lens without distortion and a positive "
             "pixel pitch");
     }
+    if (!lens.chromaticScale.Empty()) {
+        for (int i = 0; i < bands.count; ++i) {
+            if (!(lens.chromaticScale.Average(bands.Lower(i), bands.Lower(i) + bands.Width()) >
+                  0.0)) {
+                throw std::invalid_argument("A lens's chromatic scale must be positive");
+            }
+        }
+        if (pushbroom) {
+            throw std::invalid_argument("A pushbroom camera has no lateral colour yet");
+        }
+    }
     if (lens.rays != nullptr) {
         const LensRayTable& table = *lens.rays;
         if (table.width != width || table.height != height || table.step == 0 ||
@@ -348,6 +359,35 @@ double Camera::SubframeTime(int subframe) const {
     const double start = shutterOpen - rollingShutter;
     return count == 1 ? shutterClose
                       : start + (shutterClose - start) * subframe / static_cast<double>(count - 1);
+}
+
+void SetSingletChromatic(LensModel& lens, double focalLengthMm, double nd, double abbe,
+                         double lateral) {
+    if (!(nd > 1.0) || !(abbe > 0.0) || !(focalLengthMm > 0.0) || !(lateral >= 0.0) ||
+        !(lateral <= 1.0)) {
+        throw std::invalid_argument("A singlet's chromatic aberration needs an index above 1, a "
+                                    "positive Abbe number and focal length, and a lateral "
+                                    "fraction from 0 to 1");
+    }
+    // The d, F and C lines (micrometres); Cauchy's n = A + B / lambda^2 through them.
+    constexpr double kD = 0.5875618;
+    constexpr double kF = 0.4861327;
+    constexpr double kC = 0.6562725;
+    const double b = (nd - 1.0) / abbe / (1.0 / (kF * kF) - 1.0 / (kC * kC));
+    const double a = nd - b / (kD * kD);
+    std::vector<double> wavelengths;
+    std::vector<double> scale;
+    std::vector<double> focus;
+    for (double nm = 300.0; nm <= 1100.0 + 1e-9; nm += 10.0) {
+        const double um = nm * 1e-3;
+        const double n = a + b / (um * um);
+        const double ratio = (nd - 1.0) / (n - 1.0);  // f(lambda) / f_d
+        wavelengths.push_back(nm);
+        scale.push_back(1.0 + lateral * (ratio - 1.0));
+        focus.push_back(focalLengthMm * (ratio - 1.0));
+    }
+    lens.chromaticScale = Spectrum(wavelengths, scale);
+    lens.chromaticFocusMm = Spectrum(wavelengths, focus);
 }
 
 Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::uint32_t height) {
@@ -430,6 +470,21 @@ Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::
     }
     lens.vignetting = GetBool(scene, path, kLensVignetting, lens.vignetting);
     lens.transmission = number(kLensTransmission, lens.transmission);
+    // Curves of (wavelength, value) pairs; two pairs may come as a 4-vector (Python's lists of
+    // four numbers do).
+    const auto curve = [&](std::string_view attribute) -> Spectrum {
+        if (const std::vector<float>* pairs = FloatArray(scene, path, attribute)) {
+            return Spectrum::FromPairs(*pairs);
+        }
+        if (const Value* value = scene.Get(path, attribute)) {
+            if (const auto* v = value->Get<glm::vec4>()) {
+                return Spectrum::FromPairs(std::vector<float>{v->x, v->y, v->z, v->w});
+            }
+        }
+        return {};
+    };
+    lens.chromaticScale = curve(kLensChromaticScale);
+    lens.chromaticFocusMm = curve(kLensChromaticFocus);
     if (const Tensor* written = scene.Read(path, kLensRays)) {
         const Tensor rays = written->Contiguous();
         if (rays.Type() != DType::Float32 || rays.Rank() != 3 || rays.Shape()[2] != 3 ||

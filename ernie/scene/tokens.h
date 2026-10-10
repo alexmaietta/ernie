@@ -165,6 +165,11 @@ inline constexpr std::string_view kLensFisheye = "ernie:lens:fisheye";
 /// `ernie:lens:raysStep` (int) pixels across the image, corners included.
 inline constexpr std::string_view kLensRays = "ernie:lens:rays";
 inline constexpr std::string_view kLensRaysStep = "ernie:lens:raysStep";
+/// Chromatic aberration (`LensModel::chromaticScale`, `chromaticFocusMm`), float arrays of
+/// (wavelength nm, value) pairs: the image's scale per wavelength (lateral colour), and the
+/// focal length's shift in millimetres (axial colour, which the `defocus` filter blurs by).
+inline constexpr std::string_view kLensChromaticScale = "ernie:lens:chromatic:scale";
+inline constexpr std::string_view kLensChromaticFocus = "ernie:lens:chromatic:focus";
 inline constexpr std::string_view kLensVignetting = "ernie:lens:vignetting";  ///< bool.
 inline constexpr std::string_view kLensTransmission = "ernie:lens:transmission";  ///< fraction.
 inline constexpr std::string_view kSensorType = "ernie:sensor:type";  ///< "rgb" or "mono".

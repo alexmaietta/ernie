@@ -64,6 +64,9 @@ struct SensorPlan {
     /// Whether the lens is a table of rays (`LensModel::rays`), which the kernel interpolates in
     /// place of its projection and distortion.
     bool table = false;
+    /// Whether the lens has lateral colour (`LensModel::chromaticScale`): the lens resamples each
+    /// band at its own scale.
+    bool chromatic = false;
 
     /// Identifies the kernels: plans with the same key share them (parameter values aside, which
     /// the kernels read from a buffer).

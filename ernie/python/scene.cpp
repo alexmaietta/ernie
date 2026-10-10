@@ -1348,6 +1348,41 @@ void BindScene(nb::module_& m) {
         "A Hazcam stereo pair on Xform `rig`: Cameras `rig`/Left and `rig`/Right 24.8 cm apart "
         "(front) or 93.4 cm (rear) along x, each as `author_mars2020_hazcam` with its product.");
     m.def(
+        "author_singlet_chromatic",
+        [](Scene& scene, const std::string& camera, double nd, double abbe, double lateral) {
+            using namespace tokens;
+            const Path path(camera);
+            if (!scene.Has(path) || scene.TypeOf(path) != kCamera) {
+                throw nb::value_error(("'" + camera + "' is not a Camera").c_str());
+            }
+            LensModel lens;
+            try {
+                SetSingletChromatic(lens, GetNumber(scene, path, kFocalLength, 50.0), nd, abbe,
+                                    lateral);
+            } catch (const std::invalid_argument& error) {
+                throw nb::value_error(error.what());
+            }
+            const auto pairs = [](const Spectrum& spectrum) {
+                std::vector<float> out;
+                for (double nm = 300.0; nm <= 1100.0 + 1e-9; nm += 10.0) {
+                    out.push_back(static_cast<float>(nm));
+                    out.push_back(static_cast<float>(spectrum(nm)));
+                }
+                return out;
+            };
+            scene.GetPrim(path)
+                .Set(kLensChromaticScale, pairs(lens.chromaticScale))
+                .Set(kLensChromaticFocus, pairs(lens.chromaticFocusMm));
+        },
+        nb::arg("scene"), nb::arg("camera"), nb::arg("nd") = 1.5168, nb::arg("abbe") = 64.17,
+        nb::arg("lateral") = 0.0,
+        "Authors Camera `camera`'s chromatic aberration (`ernie:lens:chromatic:scale` and "
+        "`:focus`) as a thin singlet of its focal length in a glass of index `nd` and Abbe number "
+        "`abbe` (by default SCHOTT N-BK7) would have: axial colour from the glass's dispersion "
+        "(Cauchy, f_C - f_F = f / V), lateral colour `lateral` times its relative focal change "
+        "(0 with the stop at the lens, up to 1 for a distant stop). The `defocus` filter blurs "
+        "by the axial colour; the lens resamples each band by the lateral.");
+    m.def(
         "author_mastcamz",
         [bayerPattern](Scene& scene, const std::string& camera, const std::string& product,
                        const std::string& eye, int filter, double focalLength,
@@ -1574,6 +1609,8 @@ void BindScene(nb::module_& m) {
         {"LENS_FISHEYE", tokens::kLensFisheye},
         {"LENS_RAYS", tokens::kLensRays},
         {"LENS_RAYS_STEP", tokens::kLensRaysStep},
+        {"LENS_CHROMATIC_SCALE", tokens::kLensChromaticScale},
+        {"LENS_CHROMATIC_FOCUS", tokens::kLensChromaticFocus},
         {"LENS_DISTORTION", tokens::kLensDistortion},
         {"LENS_VIGNETTING", tokens::kLensVignetting},
         {"LENS_TRANSMISSION", tokens::kLensTransmission},

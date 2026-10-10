@@ -52,3 +52,16 @@ def test_mastcamz_pair_reaches_the_near_infrared():
     assert math.isclose(right_range[0], 1002.0) and math.isclose(right_range[1], 1042.0)
     with pytest.raises(ValueError):
         ernie.author_mastcamz(scene, "/Rover/MastcamZ/Left", "/Render/Left", filter=9)
+
+
+def test_singlet_chromatic_follows_its_glass():
+    scene = ernie.Scene()
+    scene.define("/Camera", tokens.CAMERA).set(tokens.FOCAL_LENGTH, 50.0)
+    # SCHOTT N-BK7 by default: the C line focuses about f / V = 0.78 mm further than the F line.
+    ernie.author_singlet_chromatic(scene, "/Camera", lateral=0.5)
+    focus = dict(zip(*[iter(scene.get("/Camera", tokens.LENS_CHROMATIC_FOCUS))] * 2))
+    scale = dict(zip(*[iter(scene.get("/Camera", tokens.LENS_CHROMATIC_SCALE))] * 2))
+    assert 0.6 < focus[660.0] - focus[490.0] < 0.8
+    assert scale[700.0] > 1.0 > scale[400.0]
+    with pytest.raises(ValueError):
+        ernie.author_singlet_chromatic(scene, "/Camera", nd=0.5)

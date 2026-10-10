@@ -886,6 +886,113 @@ TEST_F(RasterDelegateTest, CahvoreCamerasSeeThroughTheirRayTablesExactly) {
     }
 }
 
+TEST_F(RasterDelegateTest, LateralColourScalesEachBandsImageAboutThePrincipalPoint) {
+    // A lens whose image is 10% smaller at 400 nm and 10% larger at 700 than its reference: a
+    // cube off the axis lands, in each band's spectral radiance, its offset from the principal
+    // point times the band's mean scale.
+    const auto centroids = [&](bool fringed) {
+        Scene scene = FlatScene();
+        scene.Remove("/World/Terrain");
+        scene.Set("/Render/Settings", tokens::kResolution, glm::ivec2(96, 96));
+        scene.Set("/Render/Product", tokens::kOrderedVars,
+                  std::vector<Path>{"/Render/Vars/SpectralRadiance"});
+        scene.Define("/World/Cube", tokens::kCube)
+            .Set(tokens::kSize, 4.0)
+            .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(9.0, 5.0, 2.0)));
+        if (fringed) {
+            scene.Set("/World/Camera", tokens::kLensChromaticScale,
+                      std::vector<float>{400.0f, 0.9f, 700.0f, 1.1f});
+        }
+        RasterDelegate delegate(*context_);
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const Tensor spectral = outputs.at("/Render/Product")
+                                    .vars.at("SpectralRadiance")
+                                    .Map(ernie::MapDevice::Cpu)
+                                    .tensor;
+        const auto bands = static_cast<std::size_t>(spectral.Shape()[0]);
+        const ernie::Camera camera = ernie::CameraOf(scene, "/World/Camera", 96, 96);
+        std::vector<std::pair<glm::dvec2, double>> result;  // offset, the band's scale
+        for (std::size_t b = 0; b < bands; ++b) {
+            glm::dvec2 sum(0.0);
+            double total = 0.0;
+            for (std::size_t row = 0; row < 96; ++row) {
+                for (std::size_t col = 0; col < 96; ++col) {
+                    const double value = spectral.As<float>()[(b * 96 + row) * 96 + col];
+                    sum += value * glm::dvec2(col + 0.5, row + 0.5);
+                    total += value;
+                }
+            }
+            const double low = camera.bands.Lower(static_cast<int>(b));
+            const double scale =
+                fringed ? camera.lens.chromaticScale.Average(low, low + camera.bands.Width()) : 1.0;
+            result.emplace_back(sum / total - camera.PrincipalPoint(), scale);
+        }
+        return result;
+    };
+    const auto plain = centroids(false);
+    const auto fringed = centroids(true);
+    ASSERT_EQ(plain.size(), fringed.size());
+    EXPECT_GT(glm::length(plain.front().first), 10.0) << "well off the axis";
+    for (std::size_t b = 0; b < plain.size(); ++b) {
+        EXPECT_NEAR(glm::distance(plain[b].first, plain.front().first), 0.0, 1e-3)
+            << "every band alike without it";
+        EXPECT_NEAR(glm::distance(fringed[b].first, fringed[b].second * plain[b].first), 0.0, 0.15)
+            << "band " << b << ", scale " << fringed[b].second;
+    }
+    EXPECT_LT(fringed.front().second, 0.95);
+    EXPECT_GT(fringed.back().second, 1.05);
+}
+
+TEST_F(RasterDelegateTest, AxialColourDefocusesTheBandsAwayFromTheReference) {
+    // A fast lens (f/1.4) focused on the ground 100 m below, its focal length 4 mm longer at 400
+    // and 700 nm than through the greens: blurred by the defocus filter into discs about six
+    // pixels across, red and blue lose the cubes' sharp edges and green keeps them.
+    const auto edges = [&](bool coloured) {
+        Scene scene = FlatScene();
+        scene.Set("/Render/Product", tokens::kOrderedVars,
+                  std::vector<Path>{"/Render/Vars/HdrColor"});
+        for (int i = 0; i < 3; ++i) {
+            scene.Define(Path("/World/Cube" + std::to_string(i)), tokens::kCube)
+                .Set(tokens::kSize, 6.0)
+                .Set(tokens::kTransform,
+                     glm::translate(glm::dmat4(1.0), glm::dvec3(10.0 * i - 10.0, 2.0, 0.0)));
+        }
+        scene.Set("/World/Camera", tokens::kFStop, 1.4);
+        scene.Set("/World/Camera", tokens::kFocusDistance, 100.0);
+        if (coloured) {
+            scene.Set("/World/Camera", tokens::kLensChromaticFocus,
+                      std::vector<float>{400.0f, 4.0f, 480.0f, 0.0f, 580.0f, 0.0f, 700.0f, 4.0f});
+        }
+        const Path defocus("/Render/Filters/Defocus");
+        scene.Define(defocus, tokens::kSensorFilter)
+            .Set(tokens::kFilterType, std::string("defocus"))
+            .Set("inputs:maxRadius", 4.0);
+        const Path cie("/Render/Filters/Cie");
+        scene.Define(cie, tokens::kSensorFilter).Set(tokens::kFilterType, std::string("cie"));
+        scene.Set("/Render/Product", tokens::kFilters, std::vector<Path>{defocus, cie});
+        RasterDelegate delegate(*context_);
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const Tensor hdr =
+            outputs.at("/Render/Product").vars.at("HdrColor").Map(ernie::MapDevice::Cpu).tensor;
+        // Each channel's total variation along the rows.
+        std::array<double, 3> variation{};
+        for (std::size_t row = 0; row < kVarSize; ++row) {
+            for (std::size_t col = 1; col < kVarSize; ++col) {
+                for (std::size_t c = 0; c < 3; ++c) {
+                    variation[c] +=
+                        std::abs(At<float>(hdr, row, col, c) - At<float>(hdr, row, col - 1, c));
+                }
+            }
+        }
+        return variation;
+    };
+    const std::array<double, 3> sharp = edges(false);
+    const std::array<double, 3> coloured = edges(true);
+    EXPECT_LT(coloured[0], 0.8 * sharp[0]) << "red blurs";
+    EXPECT_LT(coloured[2], 0.8 * sharp[2]) << "blue blurs";
+    EXPECT_GT(coloured[1], 0.85 * sharp[1]) << "green stays sharp";
+}
+
 TEST_F(RasterDelegateTest, FisheyeSeesFieldAnglesInProportionToRadius) {
     // 50 above flat ground looking straight down: a ray at field angle theta meets it
     // 50 / cos(theta) away. Equidistant, a pixel's theta is its radius over the focal length.

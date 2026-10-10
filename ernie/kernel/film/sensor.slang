@@ -84,7 +84,7 @@ public struct SensorUniforms {
     // distance (scene units; 0 is infinity).
     public float4 optics;
     // Per band: photons a pixel collects over the exposure per unit radiance, before quantum
-    // efficiency, four per float4. The views' stride in the buffer is 2816 bytes.
+    // efficiency, four per float4.
     public float4 photons[16];
     // A camera rendered on cube faces (`kLensCube`): their shared projection's inverse, clip
     // space to the face's camera frame; and x the faces per view, y their focal length in raster
@@ -92,6 +92,15 @@ public struct SensorUniforms {
     public float4x4 faceInvProj;
     public float4 faces;
     float4 facesPadding[11];
+    // Per band, two to a float4 (`chromaticOf`): the lens's image scale (lateral colour) and focal
+    // length shift in millimetres (axial colour). The views' stride in the buffer is 3328 bytes.
+    public float4 chromatic[32];
+}
+
+// Band `band`'s image scale (x) and focal length shift in millimetres (y) through `cam`'s lens.
+public float2 chromaticOf(SensorUniforms cam, uint band) {
+    let pair = cam.chromatic[band / 2];
+    return (band & 1u) == 0u ? pair.xy : pair.zw;
 }
 
 public struct SensorConstants {
@@ -446,12 +455,17 @@ float3 tableRayAt(float2 pixel) {
 // faces (`kLensCube`), along the lens's ray onto the face it leaves through, which the view's
 // faces' consecutive layers hold. A lens of rays (`kLensTable`) gives the ray from its table.
 RasterTap rasterTapOf(SensorUniforms cam, int2 at, int view) {
+    return rasterTapAt(cam, float2(at) + 0.5, view);
+}
+
+// As `rasterTapOf`, at sensor position `position` (pixels from the top left corner).
+RasterTap rasterTapAt(SensorUniforms cam, float2 position, int view) {
     let f = cam.intrinsics.x;
     RasterTap tap;
-    tap.distorted = float2((float(at.x) + 0.5 - cam.intrinsics.y) / f,
-                           (cam.intrinsics.z - (float(at.y) + 0.5)) / f);
+    tap.distorted = float2((position.x - cam.intrinsics.y) / f,
+                           (cam.intrinsics.z - position.y) / f);
     if (kLensTable) {
-        tap.ray = tableRayAt(float2(at) + 0.5);
+        tap.ray = tableRayAt(position);
     } else if (kLensCube) {
         tap.ray = lensRayOf(tap.distorted, cam.distortion, cam.lens.x);
     }
@@ -627,6 +641,9 @@ public struct Lens : ISpatialSource {
     }
 
     public float band(uint band, PixelContext pixel) {
+        if (kLensChromatic) {
+            return chromaticBand(band, pixel);
+        }
         if (dark) {
             return 0.0;
         }
@@ -638,6 +655,39 @@ public struct Lens : ISpatialSource {
         let d = lit.w ? rasterRadiance.Load(int4(next.x, next.y, slice, 0)) : 0.0;
         let value = lerp(lerp(a, b, weight.x), lerp(c, d, weight.x), weight.y);
         return value * falloff;
+    }
+
+    // Lateral colour (`kLensChromatic`): band `band`'s image is scaled by s about the principal
+    // point, so this pixel sees what the reference wavelength's image holds at its position over
+    // s; that tap, resampled as `at` does, with its own coverage, so a band can reach an object
+    // the reference misses (the fringes).
+    float chromaticBand(uint band, PixelContext pixel) {
+        let cam = pixel.uniforms();
+        let scale = chromaticOf(cam, band).x;
+        let principal = cam.intrinsics.yz;
+        let position = principal + (float2(pixel.id.xy) + 0.5 - principal) / scale;
+        let tap = rasterTapAt(cam, position, int(pixel.id.z));
+        let size = float2(cam.size.xy);
+        if (any(tap.raster < float2(-0.5)) || any(tap.raster > size - 0.5)) {
+            return 0.0;
+        }
+        let first = int2(floor(clamp(tap.raster, float2(0.0), size - 1.0)));
+        let last = min(first + 1, int2(size) - 1);
+        let w = clamp(tap.raster - float2(first), float2(0.0), float2(1.0));
+        let sky = cam.clear.w > 0.5;
+        let slice = int(uint(tap.layer) * pixel.bands() + band);
+        let a = heldRadiance(first, tap.layer, slice, sky);
+        let b = heldRadiance(int2(last.x, first.y), tap.layer, slice, sky);
+        let c = heldRadiance(int2(first.x, last.y), tap.layer, slice, sky);
+        let d = heldRadiance(last, tap.layer, slice, sky);
+        return lerp(lerp(a, b, w.x), lerp(c, d, w.x), w.y) * falloff;
+    }
+
+    // The raster radiance of texel `texel` in layer `layer`'s band slice `slice`: zero for a
+    // background without a sky, which shading leaves unwritten.
+    static float heldRadiance(int2 texel, int layer, int slice, bool sky) {
+        let held = sky || gIds.Load(int4(texel, layer, 0)).x != kBackground;
+        return held ? rasterRadiance.Load(int4(texel, slice, 0)) : 0.0;
     }
 
     // Writes the geometry vars of `holds` (kHolds* bits) and marks the background.

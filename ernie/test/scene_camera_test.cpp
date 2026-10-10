@@ -92,6 +92,38 @@ TEST(Camera, NaturalVignettingFollowsTheProjection) {
     EXPECT_DOUBLE_EQ(lens.NaturalVignetting({0.0, 0.0}), 1.0);
 }
 
+TEST(Camera, SingletChromaticAberrationFollowsItsGlass) {
+    // SCHOTT N-BK7 (n_d 1.5168, V_d 64.17) at 50 mm: the C line focuses about f / V = 0.78 mm
+    // further than the F line, blue nearer the lens than red.
+    ernie::LensModel lens;
+    ernie::SetSingletChromatic(lens, 50.0, 1.5168, 64.17);
+    const double fc = lens.chromaticFocusMm(656.27);
+    const double ff = lens.chromaticFocusMm(486.13);
+    EXPECT_NEAR(fc - ff, 50.0 / 64.17, 0.01);
+    EXPECT_NEAR(lens.chromaticFocusMm(587.56), 0.0, 1e-3) << "the d line is the reference";
+    EXPECT_LT(lens.chromaticFocusMm(400.0), 0.0);
+    EXPECT_GT(lens.chromaticFocusMm(800.0), 0.0);
+    EXPECT_DOUBLE_EQ(lens.chromaticScale(450.0), 1.0) << "no lateral colour with the stop at it";
+    ernie::SetSingletChromatic(lens, 50.0, 1.5168, 64.17, 0.5);
+    EXPECT_GT(lens.chromaticScale(656.27), 1.0);
+    EXPECT_LT(lens.chromaticScale(486.13), 1.0);
+    EXPECT_NEAR(lens.chromaticScale(656.27) - lens.chromaticScale(486.13), 0.5 * (fc - ff) / 50.0,
+                1e-5);
+    EXPECT_THROW(ernie::SetSingletChromatic(lens, 50.0, 0.9, 64.17), std::invalid_argument);
+    EXPECT_THROW(ernie::SetSingletChromatic(lens, 50.0, 1.5, 64.17, 2.0), std::invalid_argument);
+
+    // Read from the prim's attributes, and checked.
+    ernie::Scene scene;
+    scene.Define("/Camera", ernie::tokens::kCamera)
+        .Set(ernie::tokens::kLensChromaticScale, std::vector<float>{400.0f, 0.99f, 700.0f, 1.01f})
+        .Set(ernie::tokens::kLensChromaticFocus, std::vector<float>{400.0f, -0.2f, 700.0f, 0.3f});
+    Camera camera = ernie::CameraOf(scene, "/Camera", 64, 48);
+    EXPECT_NEAR(camera.lens.chromaticScale(550.0), 1.0, 1e-6);
+    EXPECT_NEAR(camera.lens.chromaticFocusMm(700.0), 0.3, 1e-6);
+    camera.lens.chromaticScale = ernie::Spectrum::FromPairs(std::vector<float>{400.0f, -1.0f});
+    EXPECT_THROW(camera.Check(), std::invalid_argument);
+}
+
 TEST(Camera, FisheyeFieldIsLimited) {
     Camera camera;
     camera.width = 100;

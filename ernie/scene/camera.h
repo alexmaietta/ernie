@@ -100,6 +100,14 @@ struct LensModel {
     /// Its natural vignetting follows the rays: the pixel's solid angle and the aperture's
     /// foreshortening.
     std::shared_ptr<const LensRayTable> rays;
+    /// Lateral colour (`ernie:lens:chromatic:scale`): the image's scale per wavelength relative
+    /// to the reference's, about the principal point, which the sensor resamples each band at.
+    /// Empty for none.
+    Spectrum chromaticScale;
+    /// Axial colour (`ernie:lens:chromatic:focus`): the lens's focal length shift per wavelength
+    /// in millimetres, the sensor staying at the reference's focus, which the `defocus` filter
+    /// blurs each band by. Empty for none.
+    Spectrum chromaticFocusMm;
 
     /// The largest field angle a fisheye may see, in radians (125 degrees off axis, a 250 degree
     /// field): one fisheye reaching past 60 degrees renders on cube faces (wide_view.h), which
@@ -341,6 +349,26 @@ struct Camera {
 /// @throws std::invalid_argument if the prim is not a Camera, its projection is not perspective,
 /// or the result fails `Check`.
 Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::uint32_t height);
+
+/// Sets `lens`'s chromatic aberration (`LensModel::chromaticScale`, `chromaticFocusMm`) for a thin
+/// singlet of focal length `focalLengthMm` at the d line (587.56 nm) in a glass of refractive
+/// index `nd` and Abbe number `abbe`: the index by Cauchy's dispersion n = A + B / lambda^2
+/// through n_d and n_F - n_C = (n_d - 1) / V_d (the F and C lines at 486.13 and 656.27 nm), the
+/// focal length by the lensmaker's equation, f(lambda) = f_d (n_d - 1) / (n(lambda) - 1), whose
+/// shift f(lambda) - f_d is the axial colour (f_C - f_F = f_d / V_d, about). The lateral colour
+/// is `lateral` times the relative change, the image's scale 1 + lateral (f / f_d - 1): 0 for a
+/// stop at the lens, where the chief ray passes undeviated, up to 1 for a distant stop. Tabulated
+/// every 10 nm from 300 to 1100 nm.
+///
+/// References:
+/// - A.-L. Cauchy, "Mémoire sur la dispersion de la lumière", 1836.
+/// - E. Hecht, "Optics", 5th ed., Pearson, 2017, sections 6.3.2 (chromatic aberrations) and 6.2
+///   (thick lenses).
+/// - SCHOTT, "Optical Glass Datasheets" (n_d and V_d at the d, F and C lines).
+/// @throws std::invalid_argument for an index at or below 1, a non-positive Abbe number or focal
+/// length, or a lateral fraction outside 0 to 1.
+void SetSingletChromatic(LensModel& lens, double focalLengthMm, double nd, double abbe,
+                         double lateral = 0.0);
 
 /// As `CameraOf`, with `transform` in place of the prim's world transform, such as an estimate for
 /// a camera posed on the GPU, whose transform the CPU cannot read.

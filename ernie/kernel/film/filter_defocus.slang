@@ -4,7 +4,9 @@
 // discs cover it, each weighted by one over its disc's area: the scatter of every pixel's light
 // over its disc, as a gather, so light is conserved. It ignores occlusion within the blur (an
 // out-of-focus background can bleed over a sharp foreground edge). Pinhole cameras (USD fStop 0)
-// are untouched.
+// are untouched. With axial colour (the lens's `chromaticFocusMm`) each band's focal length
+// shifts, and with it where it images each point: stars and edges in focus for one wavelength
+// blur in the others (`cocRadius`).
 //
 // References:
 // - M. Potmesil and I. Chakravarty, "A lens and aperture camera model for synthetic image
@@ -18,21 +20,21 @@ struct Defocus : ISpatialBandFilter {
         float maxRadius;  // the widest disc radius in pixels, bounding the cost
     }
 
-    // The blur disc's radius in pixels for what pixel `at` sees.
-    static float cocRadius(PixelContext pixel, int2 at, float maxRadius) {
+    // The blur disc's radius in pixels for what pixel `at` sees in band `band`. The sensor sits
+    // where the reference wavelength's lens (focal length f) images the focus distance s, at
+    // v_s = f s / (s - f) (f at infinity); band `band`'s lens, f_b = f + its axial colour's
+    // shift, images a point at distance d at v = f_b d / (d - f_b) (f_b at infinity), and the
+    // aperture's cone of diameter f / N meets the sensor in a disc c = (f / N) |v - v_s| / v.
+    static float cocRadius(PixelContext pixel, int2 at, uint band, float maxRadius) {
         let distance = sceneDistance(pixel, at);
         let f = pixel.focalLengthMm() * 1e-3;  // metres, as scene units
+        let fb = f + chromaticOf(pixel.uniforms(), band).y * 1e-3;
         let n = pixel.lensFNumber();
         let s = pixel.focusDistance();
         let aperture = f / n;
-        float diameter;
-        if (isinf(distance)) {
-            diameter = s > 0.0 ? aperture * f / max(s - f, 1e-6) : 0.0;
-        } else if (s > 0.0) {
-            diameter = aperture * abs(distance - s) / distance * f / max(s - f, 1e-6);
-        } else {
-            diameter = aperture * f / max(distance, 1e-6);
-        }
+        let sensor = s > 0.0 ? f * s / max(s - f, 1e-6) : f;
+        let image = isinf(distance) ? fb : fb * distance / max(distance - fb, 1e-6);
+        let diameter = aperture * abs(image - sensor) / max(image, 1e-9);
         let pixels = diameter / (pixel.pixelPitchMicrons() * 1e-6);
         return min(0.5 * pixels, maxRadius);
     }
@@ -48,7 +50,7 @@ struct Defocus : ISpatialBandFilter {
             for (int x = -reach; x <= reach; ++x) {
                 let at = centre + int2(x, y);
                 // Discs under a pixel keep their light in their own pixel: the area is at least 1.
-                let radius = max(cocRadius(pixel, at, params.maxRadius), 0.5);
+                let radius = max(cocRadius(pixel, at, band, params.maxRadius), 0.5);
                 if (float(x * x + y * y) <= radius * radius) {
                     sum += input.band(pixel, at, band) /
                            max(3.14159265 * radius * radius, 1.0);

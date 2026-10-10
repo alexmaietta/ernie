@@ -297,7 +297,7 @@ std::string SensorPlan::Key() const {
         key += "^" + std::to_string(pyramids);
     }
     return key + "~" + lens + (pushbroom ? "~pushbroom" : "") + (cube ? "~cube" : "") +
-           (table ? "~table" : "");
+           (table ? "~table" : "") + (chromatic ? "~chromatic" : "");
 }
 
 std::string LensKernelOf(const LensModel& lens, bool pushbroom) {
@@ -317,12 +317,17 @@ std::string SensorPlan::LensSource() const {
            "public static const bool kLensCube = " +
            (cube ? "true" : "false") +
            ";\n"
+           "public static const bool kLensChromatic = " +
+           (chromatic ? "true" : "false") +
+           ";\n"
            "public static const bool kLensTable = " +
            (table ? "true" : "false") +
            ";\n"
            "public float2 lensPinholeOf(float2 sensor, float4 k, float p2, float overscan) {\n"
            "    return " +
-           lens + (lens == "Pushbroom" ? ".pinholeOf(sensor, k, overscan);\n" : ".pinholeOf(sensor, k, p2);\n") +
+           lens +
+           (lens == "Pushbroom" ? ".pinholeOf(sensor, k, overscan);\n"
+                                : ".pinholeOf(sensor, k, p2);\n") +
            "}\n"
            "public float3 lensRayOf(float2 sensor, float4 k, float p2) {\n"
            "    return " +
