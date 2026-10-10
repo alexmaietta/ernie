@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/app/create.h"
 
+#include "ernie/app/session.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/util/astronomy.h"
@@ -60,6 +61,28 @@ void PlaceAbove(Scene& scene, const Path& path, const CreateContext& context, do
     const glm::dvec3 eye = context.target + glm::dvec3(0.0, 0.0, height * context.scale);
     const glm::dmat4 world = LookAtTransform(eye, context.target, {0.0, 1.0, 0.0});
     scene.Set(path, kTransform, glm::inverse(context.parentWorld) * world);
+}
+
+/// The units the stage's own lights (not the viewer's session lights) come in.
+enum class StageLightUnits { None, Relative, Photometric };
+
+StageLightUnits LightUnitsOf(const Scene& scene, const Path& created) {
+    StageLightUnits units = StageLightUnits::None;
+    for (const std::string_view type :
+         {kDistantLight, kSphereLight, kRectLight, kDiskLight, kDomeLight}) {
+        for (const Path& light : scene.Prims(type)) {
+            if (light == created || IsSessionPath(light)) {
+                continue;
+            }
+            if (scene.Get(light, kPhotometricIlluminance) != nullptr ||
+                scene.Get(light, kPhotometricIlluminanceDistance) != nullptr ||
+                scene.Get(light, kPhotometricPower) != nullptr) {
+                return StageLightUnits::Photometric;
+            }
+            units = StageLightUnits::Relative;
+        }
+    }
+    return units;
 }
 
 }  // namespace
@@ -133,11 +156,25 @@ void AuthorDefaultPrim(Scene& scene, const Path& path, std::string_view type,
                              context.target.y + 0.5 * kCells * cell));
         scene.Set(path, kCellSize, cell);
     } else if (type == kDistantLight) {
-        // Lights come in photometric units: a clear-day sun, a 100 W bulb's 1600 lumens.
+        // Next to photometric lights, a clear-day sun; otherwise a relative sun of 1, which
+        // lights white to 1 without exposure.
         scene.Set(path, kTransform, DistantLightTransform({0.4, -0.5, 0.75}));
-        scene.Set(path, kPhotometricIlluminance, 100000.0);
+        if (LightUnitsOf(scene, path) == StageLightUnits::Photometric) {
+            scene.Set(path, kPhotometricIlluminance, 100000.0);
+        }
     } else if (type == kDomeLight) {
-        scene.Set(path, kPhotometricIlluminance, 10000.0);
+        // A clear sky gives about a tenth of the sun's light: 10000 lux next to photometric
+        // lights, 0.1 next to relative ones, and 1 when it is the stage's only light.
+        switch (LightUnitsOf(scene, path)) {
+            case StageLightUnits::Photometric:
+                scene.Set(path, kPhotometricIlluminance, 10000.0);
+                break;
+            case StageLightUnits::Relative:
+                scene.Set(path, kIntensity, 0.1);
+                break;
+            case StageLightUnits::None:
+                break;
+        }
     } else if (type == kStarField) {
         // A made-up naked-eye sky until a catalogue replaces it.
         const StarCatalogue stars = SyntheticStars(5000);
