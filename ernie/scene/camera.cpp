@@ -96,7 +96,7 @@ double LensModel::NaturalVignetting(glm::dvec2 distorted) const {
             return 1.0;
         }
         const double theta = FisheyeFieldAngle(fisheye, rd);
-        return std::cos(theta) * std::sin(theta) / (rd * FisheyeSlope(fisheye, theta));
+        return std::abs(std::cos(theta)) * std::sin(theta) / (rd * FisheyeSlope(fisheye, theta));
     }
     const glm::dvec2 p = Undistort(distorted);
     const double cosine2 = 1.0 / (1.0 + glm::dot(p, p));
@@ -279,6 +279,30 @@ void Camera::Check() const {
             "An orthographic camera needs a perspective lens without distortion and a positive "
             "pixel pitch");
     }
+    if (lens.rays != nullptr) {
+        const LensRayTable& table = *lens.rays;
+        if (table.width != width || table.height != height || table.step == 0 ||
+            table.columns != (width + table.step - 1) / table.step + 1 ||
+            table.rows != (height + table.step - 1) / table.step + 1 ||
+            table.rays.size() != std::size_t(table.columns) * table.rows) {
+            throw std::invalid_argument(
+                "A lens's ray table needs the camera's image size and a ray every step pixels "
+                "across it, corners included");
+        }
+        if (pushbroom) {
+            throw std::invalid_argument("A pushbroom camera's lens cannot be a ray table");
+        }
+        for (const glm::vec3& ray : table.rays) {
+            if (!(std::acos(std::clamp(-double(ray.z) / glm::length(glm::dvec3(ray)), -1.0, 1.0)) <=
+                  LensModel::kMaxFisheyeFieldAngle)) {
+                throw std::invalid_argument(
+                    "A lens's ray table reaches past " +
+                    std::to_string(LensModel::kMaxFisheyeFieldAngle * 180.0 / M_PI) +
+                    " degrees off axis");
+            }
+        }
+        return;
+    }
     if (lens.projection == LensProjection::Fisheye) {
         if (lens.HasDistortion()) {
             throw std::invalid_argument(
@@ -406,6 +430,27 @@ Camera CameraOf(const Scene& scene, const Path& path, std::uint32_t width, std::
     }
     lens.vignetting = GetBool(scene, path, kLensVignetting, lens.vignetting);
     lens.transmission = number(kLensTransmission, lens.transmission);
+    if (const Tensor* written = scene.Read(path, kLensRays)) {
+        const Tensor rays = written->Contiguous();
+        if (rays.Type() != DType::Float32 || rays.Rank() != 3 || rays.Shape()[2] != 3 ||
+            rays.Location().kind != DeviceKind::Cpu) {
+            throw std::invalid_argument("Camera '" + path.String() + "' " +
+                                        std::string(kLensRays) +
+                                        " must be a float32 (rows, columns, 3) CPU tensor");
+        }
+        auto table = std::make_shared<LensRayTable>();
+        table->width = width;
+        table->height = height;
+        table->step = static_cast<std::uint32_t>(number(kLensRaysStep, 8.0));
+        table->rows = static_cast<std::uint32_t>(rays.Shape()[0]);
+        table->columns = static_cast<std::uint32_t>(rays.Shape()[1]);
+        const float* values = rays.As<float>();
+        table->rays.resize(std::size_t(table->rows) * table->columns);
+        for (std::size_t i = 0; i < table->rays.size(); ++i) {
+            table->rays[i] = glm::vec3(values[3 * i], values[3 * i + 1], values[3 * i + 2]);
+        }
+        lens.rays = std::move(table);
+    }
 
     const std::string type = GetToken(scene, path, kSensorType, "rgb");
     if (type == "rgb") {

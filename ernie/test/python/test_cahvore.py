@@ -25,5 +25,8 @@ def test_mars2020_models_round_trip_and_author_cameras():
     assert residual < 5.0
     assert scene.get("/Rover/RSM/NAVL", tokens.LENS_PROJECTION) == tokens.FISHEYE
     assert math.isclose(scene.get("/Rover/RSM/NAVL", tokens.FOCAL_LENGTH), 19.1, abs_tol=0.5)
+    # The model's own rays every 8 pixels, corners included.
+    assert scene.get("/Rover/RSM/NAVL", tokens.LENS_RAYS_STEP) == 8
+    assert np.asarray(scene.read("/Rover/RSM/NAVL", tokens.LENS_RAYS)).shape == (481, 641, 3)
     with pytest.raises(ValueError):
         models["SuperCam"][1].fit(6.4)

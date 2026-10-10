@@ -160,6 +160,11 @@ inline constexpr std::string_view kFisheye = "fisheye";
 inline constexpr std::string_view kLensDistortion = "ernie:lens:distortion";  ///< k1 k2 k3 p1 p2.
 /// A fisheye's Kannala-Brandt coefficients k1 k2 k3 k4 (float array; none is equidistant).
 inline constexpr std::string_view kLensFisheye = "ernie:lens:fisheye";
+/// The lens as its rays (`LensRayTable`), in place of its projection and distortion: a float32
+/// (rows, columns, 3) CPU tensor of unit directions in the camera's frame at every
+/// `ernie:lens:raysStep` (int) pixels across the image, corners included.
+inline constexpr std::string_view kLensRays = "ernie:lens:rays";
+inline constexpr std::string_view kLensRaysStep = "ernie:lens:raysStep";
 inline constexpr std::string_view kLensVignetting = "ernie:lens:vignetting";  ///< bool.
 inline constexpr std::string_view kLensTransmission = "ernie:lens:transmission";  ///< fraction.
 inline constexpr std::string_view kSensorType = "ernie:sensor:type";  ///< "rgb" or "mono".

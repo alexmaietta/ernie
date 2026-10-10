@@ -1,6 +1,7 @@
 #include "ernie/device/offscreen_target.h"
 #include "ernie/geometry/primitives.h"
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/cahvore.h"
 #include "ernie/scene/instruments.h"
 #include "ernie/scene/isd.h"
 #include "ernie/scene/orbit_controller.h"
@@ -775,6 +776,95 @@ TEST_F(RasterDelegateTest, AFisheyeWiderThan180DegreesSeesPastItsHorizonOnCubeFa
     // Where the lens puts its centre: radius theta f along the diagonal (up and right).
     const glm::dvec2 expected = centre + theta * f * glm::dvec2(1.0, -1.0) / std::sqrt(2.0);
     EXPECT_LT(glm::distance(cubeSum / double(cubeHits), expected), 1.5);
+}
+
+TEST_F(RasterDelegateTest, CahvoreCamerasSeeThroughTheirRayTablesExactly) {
+    // Perseverance's Navcam (58 degrees off axis, one pinhole raster) and Hazcam (79, cube
+    // faces), scaled to a quarter of their 5120 x 3840 (H and V scaled, image coordinates with
+    // them), each rendered through its CAHVORE model's ray table: spheres along chosen pixels'
+    // model rays land on those pixels, where the fitted lens alone is off by a pixel.
+    const auto models = ernie::ReadCahvoreModelsFile(
+        (std::filesystem::path(ERNIE_TEST_FIXTURES) / "cahvore" / "m2020_camera_models.json")
+            .string());
+    for (const char* name : {"NAVL", "HAZFLA"}) {
+        ernie::CahvoreModel model;
+        for (const ernie::NamedCahvore& named : models) {
+            model = named.name == name ? named.model : model;
+        }
+        constexpr double kScale = 0.25;
+        model.h *= kScale;
+        model.v *= kScale;
+        model.width = static_cast<std::uint32_t>(model.width * kScale);
+        model.height = static_cast<std::uint32_t>(model.height * kScale);
+        const ernie::CahvoreModel::ErnieCamera fit = model.ToCamera(6.4 / kScale);
+        const ernie::LensRayTable table = model.RayTable(4);
+
+        Scene scene = FlatScene();
+        scene.Remove("/World/Terrain");
+        scene.Set("/Render/Settings", tokens::kResolution,
+                  glm::ivec2(static_cast<int>(model.width), static_cast<int>(model.height)));
+        scene.Set("/Render/Product", tokens::kOrderedVars, std::vector<Path>{"/Render/Vars/PrimId"});
+        ernie::Camera camera = fit.camera;
+        camera.bands.count = 3;
+        ernie::SetCamera(scene, "/World/Camera", camera);
+        scene.Set("/World/Camera", tokens::kLensProjection, std::string(tokens::kFisheye));
+        scene.Set("/World/Camera", tokens::kLensFisheye,
+                  std::vector<float>{float(camera.lens.fisheye[0]), float(camera.lens.fisheye[1]),
+                                     float(camera.lens.fisheye[2]), float(camera.lens.fisheye[3])});
+        std::vector<float> rays;
+        for (const glm::vec3& ray : table.rays) {
+            rays.insert(rays.end(), {ray.x, ray.y, ray.z});
+        }
+        scene.Write("/World/Camera", tokens::kLensRays,
+                    Tensor::Copy(std::span<const float>(rays),
+                                 {std::int64_t(table.rows), std::int64_t(table.columns), 3}));
+        scene.Set("/World/Camera", tokens::kLensRaysStep, 4);
+        // Spheres 30 m along the model's rays of pixels across the image, 1.5 pixels in radius:
+        // far enough that the CAHVORE entrance pupil's movement (up to 12.5 mm, which Ernie's
+        // central camera leaves out) moves them by under a fifth of a pixel.
+        constexpr double kDistance = 30.0;
+        // At pixel centres, so the nearest raster texels the ids come from fall evenly about them.
+        const std::vector<glm::dvec2> pixels = {{0.5 * model.width + 0.5, 0.5 * model.height + 0.5},
+                                                {40.5, 30.5},
+                                                {model.width - 40.5, 50.5},
+                                                {60.5, model.height - 40.5},
+                                                {model.width - 30.5, model.height - 30.5},
+                                                {0.5 * model.width + 0.5, 25.5}};
+        const double pixelAngle = 1.0 / fit.camera.FocalLengthPixels();
+        for (std::size_t i = 0; i < pixels.size(); ++i) {
+            const ernie::CahvoreModel::Ray ray = model.ImageToRay(pixels[i] - 0.5);
+            scene.Define(Path("/World/Ball" + std::to_string(i)), tokens::kSphere)
+                .Set(tokens::kGeomRadius, kDistance * 1.5 * pixelAngle)
+                .Set(tokens::kTransform,
+                     glm::translate(glm::dmat4(1.0), ray.origin + kDistance * ray.direction));
+        }
+        const ernie::Camera rendered =
+            ernie::CameraOf(scene, "/World/Camera", model.width, model.height);
+        ASSERT_NE(rendered.lens.rays, nullptr);
+        EXPECT_EQ(ernie::NeedsCubeFaces(rendered), std::string(name) == "HAZFLA");
+        RasterDelegate delegate(*context_);
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const Tensor ids =
+            outputs.at("/Render/Product").vars.at("PrimId").Map(ernie::MapDevice::Cpu).tensor;
+        for (std::size_t i = 0; i < pixels.size(); ++i) {
+            const Path ball("/World/Ball" + std::to_string(i));
+            glm::dvec2 sum(0.0);
+            int hits = 0;
+            for (std::uint32_t row = 0; row < model.height; ++row) {
+                for (std::uint32_t col = 0; col < model.width; ++col) {
+                    if (delegate.PrimPath(ids.As<std::uint32_t>()[row * model.width + col]) == ball) {
+                        sum += glm::dvec2(col + 0.5, row + 0.5);
+                        ++hits;
+                    }
+                }
+            }
+            ASSERT_GT(hits, 0) << name << " " << ball.String();
+            // PrimId comes from the nearest raster texel (within half a pixel); the fitted lens
+            // alone is off by a pixel at the edges here.
+            EXPECT_LT(glm::distance(sum / double(hits), pixels[i]), 0.6)
+                << name << " " << ball.String() << " at " << pixels[i].x << ", " << pixels[i].y;
+        }
+    }
 }
 
 TEST_F(RasterDelegateTest, FisheyeSeesFieldAnglesInProportionToRadius) {

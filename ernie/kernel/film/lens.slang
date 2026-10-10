@@ -146,6 +146,7 @@ public struct Fisheye {
             return 1.0;
         }
         let theta = fieldAngle(rd, k);
-        return cos(theta) * sin(theta) / (rd * slope(theta, k));
+        // |cos|: past 90 degrees the aperture is foreshortened as much again.
+        return abs(cos(theta)) * sin(theta) / (rd * slope(theta, k));
     }
 }

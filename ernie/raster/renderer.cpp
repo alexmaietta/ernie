@@ -534,7 +534,7 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
       shadowSampler_(context, SamplerDesc{VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST,
                                           VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 1.0f, true}),
       poisson_(PoissonDisk(16)), shadingLayout_(context, kShadingBindings, 16),
-      filterLayout_(context, kFilterBindings, 16), presentLayout_(context, kPresentBindings, 32),
+      filterLayout_(context, kFilterBindings, 32), presentLayout_(context, kPresentBindings, 32),
       hzbLayout_(context, kHzbBindings, 16), motionLayout_(context, kMotionBindings, 48),
       viewsLayout_(context, kViewsBindings, 48),
       poseCamera_(context, kPoseCameraBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -1267,10 +1267,20 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
         pass.plan.lens = LensKernelOf(params.camera.lens, params.camera.pushbroom);
         pass.plan.pushbroom = params.camera.pushbroom;
         pass.plan.cube = faces_ > 1;
+        // A lens of rays reads its table after the filters' parameters (the kernel's bindings
+        // are all taken).
+        const std::shared_ptr<const LensRayTable>& table = params.camera.lens.rays;
+        pass.plan.table = table != nullptr;
+        std::vector<float> uploaded = pass.plan.params;
+        pass.tableOffset = static_cast<std::uint32_t>(uploaded.size());
+        if (table != nullptr) {
+            for (const glm::vec3& ray : table->rays) {
+                uploaded.insert(uploaded.end(), {ray.x, ray.y, ray.z});
+            }
+        }
         // Each pass's parameters in a buffer of its own; kept from the last frame's pass at the
         // same place in the order when large enough, which only ever waits when one grows.
-        const VkDeviceSize bytes = std::max<VkDeviceSize>(pass.plan.params.size(), 1) *
-                                   sizeof(float);
+        const VkDeviceSize bytes = std::max<VkDeviceSize>(uploaded.size(), 1) * sizeof(float);
         if (c < sensorPasses_.size() && sensorPasses_[c].params != nullptr &&
             sensorPasses_[c].params->Size() >= bytes) {
             pass.params = std::move(sensorPasses_[c].params);
@@ -1280,12 +1290,16 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
                                                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                                       BufferMemory::Device);
         }
-        if (!pass.plan.params.empty()) {
-            uploads_.Write(*pass.params, std::as_bytes(std::span(pass.plan.params)));
+        if (!uploaded.empty()) {
+            uploads_.Write(*pass.params, std::as_bytes(std::span(uploaded)));
         }
         SensorPipelines(pass.plan);
     }
     sensorPasses_ = std::move(passes);
+    lensTable_ = {};
+    if (const auto& table = params.camera.lens.rays) {
+        lensTable_ = {0u, table->step, table->columns, table->rows};
+    }
     filters_ = sensorPasses_.front().plan.filters;
     bands_ = params.camera.bands;
     extent_ = {params.camera.width, params.camera.height};
@@ -2402,8 +2416,15 @@ void RasterRenderer::Filter(VkCommandBuffer commands, RenderTargets& targets,
         next.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
         // The AOV slots the frame holds, which filters' `writeOutput` writes; whether the state
         // holds history, and its slots per view.
-        const std::uint32_t constants[4] = {firstView, plan.aovs, state && pass.history ? 1u : 0u,
-                                            state ? plan.states : 0u};
+        // And a lens of rays' table, at its place in this pass's parameters.
+        const std::uint32_t constants[8] = {firstView,
+                                            plan.aovs,
+                                            state && pass.history ? 1u : 0u,
+                                            state ? plan.states : 0u,
+                                            pass.tableOffset,
+                                            lensTable_[1],
+                                            lensTable_[2],
+                                            lensTable_[3]};
         for (std::uint32_t segment = 0; segment < plan.segments; ++segment) {
             std::vector<DescriptorResource> resources = bound;
             resources.push_back(general(image(true, segment + 1)));

@@ -55,9 +55,9 @@ glm::dvec3 CubeFaceRay(CubeFace face, glm::dvec2 plane);
 /// face `facePixels` across, so bilinear taps at a seam stay inside the face they sample.
 double CubeFaceExtent(double facePixels, double marginPixels = 2.0);
 
-/// Whether `camera` needs its views on cube faces: a fisheye whose field reaches past
-/// `kMaxSingleViewAngle` off axis somewhere in its image, where one pinhole raster image would
-/// spread its pixels too thin at the centre.
+/// Whether `camera` needs its views on cube faces: a fisheye or a lens of rays whose field
+/// reaches past `kMaxSingleViewAngle` off axis somewhere in its image, where one pinhole raster
+/// image would spread its pixels too thin at the centre.
 bool NeedsCubeFaces(const Camera& camera);
 
 /// The field angle (radians) past which a fisheye renders on cube faces: 60 degrees, where a
@@ -68,21 +68,9 @@ inline constexpr double kMaxSingleViewAngle = 1.0471975511965976;
 /// point (its edges' midpoints for a fisheye whose field folds no earlier).
 double MaxFieldAngle(const Camera& camera);
 
-/// A lens given as its rays: unit directions in the camera's frame at every `step`th sensor
-/// pixel corner, (`width` / `step` + 1) by (`height` / `step` + 1) of them row by row from the top
-/// left, interpolated between. For calibrations no parametric lens takes exactly, such as a
-/// CAHVORE model's distortion about an axis off its image plane's normal.
-struct LensRayTable {
-    std::uint32_t width = 0;   ///< The sensor's pixels.
-    std::uint32_t height = 0;
-    std::uint32_t step = 8;
-    std::uint32_t columns = 0;
-    std::uint32_t rows = 0;
-    std::vector<glm::vec3> rays;
-
-    /// The ray at sensor position `pixel` (pixels from the top left corner, centres at + 0.5),
-    /// interpolated bilinearly between the table's rays and normalised.
-    glm::dvec3 RayAt(glm::dvec2 pixel) const;
-};
+/// The unit ray, in the camera's frame, of sensor position `pixel` of `camera` (pixels from the
+/// top left corner, centres at + 0.5): its lens's ray table's, or `LensRay` of its normalised
+/// image coordinates.
+glm::dvec3 CameraRay(const Camera& camera, glm::dvec2 pixel);
 
 }  // namespace ernie

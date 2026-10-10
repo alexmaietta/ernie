@@ -1100,7 +1100,7 @@ void BindScene(nb::module_& m) {
         .def(
             "author_camera",
             [](const CahvoreModel& model, Scene& scene, const std::string& path,
-               double pixelPitchUm) {
+               double pixelPitchUm, std::uint32_t raysStep) {
                 const CahvoreModel::ErnieCamera fit = model.ToCamera(pixelPitchUm);
                 const Camera& camera = fit.camera;
                 using namespace tokens;
@@ -1108,6 +1108,20 @@ void BindScene(nb::module_& m) {
                 // model's frame (parent the prim to that frame's Xform).
                 Prim prim = scene.Has(Path(path)) ? scene.GetPrim(Path(path))
                                                   : scene.Define(Path(path), kCamera);
+                if (raysStep > 0) {
+                    // The model's own rays, which the sensor interpolates in place of the fit.
+                    const LensRayTable table = model.RayTable(raysStep);
+                    std::vector<float> values;
+                    values.reserve(table.rays.size() * 3);
+                    for (const glm::vec3& ray : table.rays) {
+                        values.insert(values.end(), {ray.x, ray.y, ray.z});
+                    }
+                    scene.Write(Path(path), kLensRays,
+                                Tensor::Copy(std::span<const float>(values),
+                                             {std::int64_t(table.rows), std::int64_t(table.columns),
+                                              3}));
+                    scene.Set(Path(path), kLensRaysStep, static_cast<int>(raysStep));
+                }
                 const bool fisheye = camera.lens.projection == LensProjection::Fisheye;
                 prim.Set(kTransform, camera.transform)
                     .Set(kCameraScan, std::string(kFrameScan))
@@ -1134,10 +1148,14 @@ void BindScene(nb::module_& m) {
                                       fit.residualPixels);
             },
             nb::arg("scene"), nb::arg("path"), nb::arg("pixel_pitch_um"),
+            nb::arg("rays_step") = 8,
             "Authors the Camera prim at `path` as the model in Ernie's camera (perspective with "
             "Brown-Conrady terms, or a Kannala-Brandt fisheye for CAHVORE), posed in the model's "
-            "frame, and returns (width, height, rows_reversed, residual_pixels): render at that "
-            "resolution and flip the rows if `rows_reversed`.");
+            "frame, and with `rays_step` above 0 the model's own rays every that many pixels "
+            "(`ernie:lens:rays`), which the sensor follows in place of the fit: exact but for "
+            "CAHVORE's moving entrance pupil. Returns (width, height, rows_reversed, "
+            "residual_pixels), the residual the fit's alone: render at that resolution and flip "
+            "the rows if `rows_reversed`.");
     m.def(
         "read_cahvore_models",
         [](const std::string& path) {
@@ -1525,6 +1543,8 @@ void BindScene(nb::module_& m) {
         {"LENS_PROJECTION", tokens::kLensProjection},
         {"FISHEYE", tokens::kFisheye},
         {"LENS_FISHEYE", tokens::kLensFisheye},
+        {"LENS_RAYS", tokens::kLensRays},
+        {"LENS_RAYS_STEP", tokens::kLensRaysStep},
         {"LENS_DISTORTION", tokens::kLensDistortion},
         {"LENS_VIGNETTING", tokens::kLensVignetting},
         {"LENS_TRANSMISSION", tokens::kLensTransmission},

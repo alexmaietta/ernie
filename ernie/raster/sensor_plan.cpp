@@ -296,7 +296,8 @@ std::string SensorPlan::Key() const {
     if (pyramids != 0) {
         key += "^" + std::to_string(pyramids);
     }
-    return key + "~" + lens + (pushbroom ? "~pushbroom" : "") + (cube ? "~cube" : "");
+    return key + "~" + lens + (pushbroom ? "~pushbroom" : "") + (cube ? "~cube" : "") +
+           (table ? "~table" : "");
 }
 
 std::string LensKernelOf(const LensModel& lens, bool pushbroom) {
@@ -315,6 +316,9 @@ std::string SensorPlan::LensSource() const {
            "import lens;\n"
            "public static const bool kLensCube = " +
            (cube ? "true" : "false") +
+           ";\n"
+           "public static const bool kLensTable = " +
+           (table ? "true" : "false") +
            ";\n"
            "public float2 lensPinholeOf(float2 sensor, float4 k, float p2, float overscan) {\n"
            "    return " +

@@ -61,6 +61,9 @@ struct SensorPlan {
     /// Whether the camera is rendered on cube faces (`NeedsCubeFaces`): the lens follows each
     /// pixel's ray (`lensRayOf`) onto its face's layer rather than through one pinhole image.
     bool cube = false;
+    /// Whether the lens is a table of rays (`LensModel::rays`), which the kernel interpolates in
+    /// place of its projection and distortion.
+    bool table = false;
 
     /// Identifies the kernels: plans with the same key share them (parameter values aside, which
     /// the kernels read from a buffer).

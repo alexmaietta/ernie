@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <string>
 #include <vector>
@@ -47,6 +48,23 @@ enum class LensProjection : std::uint8_t {
     Fisheye,
 };
 
+/// A lens given as its rays: unit directions in the camera's frame at every `step`th sensor
+/// pixel corner, (`width` / `step` + 1) by (`height` / `step` + 1) of them row by row from the top
+/// left, interpolated between. For calibrations no parametric lens takes exactly, such as a
+/// CAHVORE model's distortion about an axis off its image plane's normal (`CahvoreModel`).
+struct LensRayTable {
+    std::uint32_t width = 0;  ///< The sensor's pixels.
+    std::uint32_t height = 0;
+    std::uint32_t step = 8;
+    std::uint32_t columns = 0;
+    std::uint32_t rows = 0;
+    std::vector<glm::vec3> rays;
+
+    /// The ray at sensor position `pixel` (pixels from the top left corner, centres at + 0.5),
+    /// interpolated bilinearly between the table's rays and normalised.
+    glm::dvec3 RayAt(glm::dvec2 pixel) const;
+};
+
 /// A lens: its projection, natural vignetting and transmission. A perspective lens has radial and
 /// tangential distortion (Brown-Conrady, in OpenCV's convention), which maps undistorted
 /// normalised image coordinates (x, y) = (X/Z, Y/Z) to distorted ones:
@@ -77,6 +95,11 @@ struct LensModel {
     std::array<double, 4> fisheye{};  ///< Kannala-Brandt k1 to k4.
     bool vignetting = false;    ///< Natural falloff of irradiance off axis (cos^4 for pinholes).
     double transmission = 1.0;  ///< Fraction of light the optics pass.
+    /// The lens's rays, in place of its projection and distortion when set (`ernie:lens:rays`):
+    /// each sensor pixel sees along its interpolated ray, on cube faces past 60 degrees off axis.
+    /// Its natural vignetting follows the rays: the pixel's solid angle and the aperture's
+    /// foreshortening.
+    std::shared_ptr<const LensRayTable> rays;
 
     /// The largest field angle a fisheye may see, in radians (125 degrees off axis, a 250 degree
     /// field): one fisheye reaching past 60 degrees renders on cube faces (wide_view.h), which
@@ -85,7 +108,7 @@ struct LensModel {
 
     /// Whether the lens is a pinhole: perspective without distortion.
     bool IsPinhole() const {
-        return projection == LensProjection::Perspective && !HasDistortion();
+        return projection == LensProjection::Perspective && !HasDistortion() && rays == nullptr;
     }
 
     /// Whether Brown-Conrady distortion is set.

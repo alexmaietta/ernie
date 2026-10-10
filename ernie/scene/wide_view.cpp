@@ -62,10 +62,17 @@ double CubeFaceExtent(double facePixels, double marginPixels) {
     return facePixels / (facePixels - 2.0 * marginPixels);
 }
 
-double MaxFieldAngle(const Camera& camera) {
-    // The image's border, where the field is widest.
+glm::dvec3 CameraRay(const Camera& camera, glm::dvec2 pixel) {
+    if (camera.lens.rays != nullptr) {
+        return camera.lens.rays->RayAt(pixel);
+    }
     const double f = camera.FocalLengthPixels();
     const glm::dvec2 centre = camera.PrincipalPoint();
+    return LensRay(camera.lens, glm::dvec2(pixel.x - centre.x, centre.y - pixel.y) / f);
+}
+
+double MaxFieldAngle(const Camera& camera) {
+    // The image's border, where the field is widest.
     const double w = camera.width;
     const double h = camera.height;
     double largest = 0.0;
@@ -74,8 +81,7 @@ double MaxFieldAngle(const Camera& camera) {
         const double t = double(i) / kSteps;
         for (const glm::dvec2 pixel : {glm::dvec2(t * w, 0.0), glm::dvec2(t * w, h),
                                        glm::dvec2(0.0, t * h), glm::dvec2(w, t * h)}) {
-            const glm::dvec2 distorted((pixel.x - centre.x) / f, (centre.y - pixel.y) / f);
-            const glm::dvec3 ray = LensRay(camera.lens, distorted);
+            const glm::dvec3 ray = CameraRay(camera, pixel);
             largest = std::max(largest, std::acos(std::clamp(-ray.z, -1.0, 1.0)));
         }
     }
@@ -97,8 +103,10 @@ glm::dvec3 LensRayTable::RayAt(glm::dvec2 pixel) const {
 }
 
 bool NeedsCubeFaces(const Camera& camera) {
-    return camera.lens.projection == LensProjection::Fisheye && !camera.orthographic &&
-           !camera.pushbroom && MaxFieldAngle(camera) > kMaxSingleViewAngle;
+    const bool wideLens =
+        camera.lens.projection == LensProjection::Fisheye || camera.lens.rays != nullptr;
+    return wideLens && !camera.orthographic && !camera.pushbroom &&
+           MaxFieldAngle(camera) > kMaxSingleViewAngle;
 }
 
 }  // namespace ernie

@@ -543,11 +543,16 @@ class RasterRenderer {
     /// filters' state images (`SetSensorState`, or null).
     struct SensorPass {
         SensorPlan plan;
+        /// The plan's parameters, then a lens of rays' table (`tableOffset` on).
         std::unique_ptr<GpuBuffer> params;
+        std::uint32_t tableOffset = 0;
         GpuImage* statePrevious = nullptr;
         GpuImage* stateNext = nullptr;
         bool history = false;
     };
+    /// A lens of rays' table, as sensor.slang's `SensorConstants::table` takes it: (0, step,
+    /// columns, rows); all zero without one.
+    std::array<std::uint32_t, 4> lensTable_{};
     std::vector<SensorPass> sensorPasses_;
     std::unique_ptr<GpuImage> statePlaceholder_;  ///< Bound without state.
     std::vector<std::uint32_t> highlightBits_;

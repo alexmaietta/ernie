@@ -1160,7 +1160,14 @@ double OverscanOf(const Camera& camera) {
     }
     double overscan = 1.0;
     const auto include = [&](double x, double y) {
-        const glm::dvec2 u = camera.lens.Undistort({(x - centre.x) / f, (centre.y - y) / f});
+        // A lens of rays: their pinhole points (`CameraRay`).
+        glm::dvec2 u;
+        if (camera.lens.rays != nullptr) {
+            const glm::dvec3 ray = CameraRay(camera, {x, y});
+            u = glm::dvec2(ray) / std::max(-ray.z, 1e-6);
+        } else {
+            u = camera.lens.Undistort({(x - centre.x) / f, (centre.y - y) / f});
+        }
         const double right = w - centre.x;
         const double up = centre.y;
         const double down = h - centre.y;

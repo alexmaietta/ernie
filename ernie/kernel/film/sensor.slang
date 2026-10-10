@@ -98,6 +98,9 @@ public struct SensorConstants {
     // x: the first view's uniforms, y: the AOV slots held (a bit each), z: 1 when the state holds
     // the product's previous frame, w: state slots per view.
     public uint4 view;
+    // A lens of rays (`kLensTable`): x their first float in `filterParams`, y the pixels between
+    // them, z and w their columns and rows.
+    public uint4 table;
 }
 
 [[vk::binding(0, 0)]] StructuredBuffer<SensorUniforms> sensorViews;
@@ -421,16 +424,38 @@ struct RasterTap {
     float3 ray;        // its lens ray in the camera's frame (a cube camera's)
 }
 
+// A lens of rays' ray at sensor position `pixel` (pixels from the top left corner): the table's
+// rays (`pass.table`, in `filterParams`) interpolated bilinearly, normalised.
+float3 tableRayAt(float2 pixel) {
+    let columns = pass.table.z;
+    let rows = pass.table.w;
+    let at = clamp(pixel / float(pass.table.y), float2(0.0), float2(columns - 1, rows - 1));
+    let x0 = min(uint(at.x), columns - 2);
+    let y0 = min(uint(at.y), rows - 2);
+    let t = at - float2(x0, y0);
+    float3 corner[4];
+    [unroll]
+    for (uint i = 0; i < 4; ++i) {
+        let index = pass.table.x + 3 * ((y0 + i / 2) * columns + x0 + i % 2);
+        corner[i] = float3(filterParams[index], filterParams[index + 1], filterParams[index + 2]);
+    }
+    return normalize(lerp(lerp(corner[0], corner[1], t.x), lerp(corner[2], corner[3], t.x), t.y));
+}
+
 // Through the lens's projection onto the pinhole raster image; for a camera rendered on cube
 // faces (`kLensCube`), along the lens's ray onto the face it leaves through, which the view's
-// faces' consecutive layers hold.
+// faces' consecutive layers hold. A lens of rays (`kLensTable`) gives the ray from its table.
 RasterTap rasterTapOf(SensorUniforms cam, int2 at, int view) {
     let f = cam.intrinsics.x;
     RasterTap tap;
     tap.distorted = float2((float(at.x) + 0.5 - cam.intrinsics.y) / f,
                            (cam.intrinsics.z - (float(at.y) + 0.5)) / f);
-    if (kLensCube) {
+    if (kLensTable) {
+        tap.ray = tableRayAt(float2(at) + 0.5);
+    } else if (kLensCube) {
         tap.ray = lensRayOf(tap.distorted, cam.distortion, cam.lens.x);
+    }
+    if (kLensCube) {
         let face = cubeFaceOf(tap.ray);
         let plane = cubeFacePlane(face, tap.ray);
         tap.raster = float2(cam.faces.z + plane.x * cam.faces.y,
@@ -439,7 +464,9 @@ RasterTap rasterTapOf(SensorUniforms cam, int2 at, int view) {
         tap.pinhole = float2(0.0);
         return tap;
     }
-    tap.pinhole = lensPinholeOf(tap.distorted, cam.distortion, cam.lens.x, cam.intrinsics.w);
+    tap.pinhole = kLensTable
+                      ? tap.ray.xy / max(-tap.ray.z, 1e-6)
+                      : lensPinholeOf(tap.distorted, cam.distortion, cam.lens.x, cam.intrinsics.w);
     let rasterF = f / cam.intrinsics.w;
     tap.raster = float2(cam.intrinsics.y + tap.pinhole.x * rasterF,
                         cam.intrinsics.z - tap.pinhole.y * rasterF) - 0.5;
@@ -572,7 +599,17 @@ public struct Lens : ISpatialSource {
         lens.next = next;
         lens.weight = clamp(raster - float2(base), float2(0.0), float2(1.0));
         if (cam.lens.y > 0.5) {
-            lens.falloff = lensFalloff(distorted, p, cam.distortion);
+            if (kLensTable) {
+                // From the rays: the aperture's foreshortening |cos theta| times the pixel's
+                // solid angle over the axis's 1 / f^2, cos^4 for a pinhole's.
+                let at = float2(id.xy) + 0.5;
+                let dx = tableRayAt(at + float2(0.5, 0.0)) - tableRayAt(at - float2(0.5, 0.0));
+                let dy = tableRayAt(at + float2(0.0, 0.5)) - tableRayAt(at - float2(0.0, 0.5));
+                let f = cam.intrinsics.x;
+                lens.falloff = abs(tap.ray.z) * length(cross(dx, dy)) * f * f;
+            } else {
+                lens.falloff = lensFalloff(distorted, p, cam.distortion);
+            }
         }
         lens.lit = sky ? bool4(true)
                        : bool4(gIds.Load(int4(base.x, base.y, layer, 0)).x != kBackground,
