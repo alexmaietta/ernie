@@ -93,7 +93,7 @@ TEST(PrimType, RegistryListsTypesWithBasesAndAttributes) {
     // Bases' attributes first, each once.
     const std::vector<const AttributeDef*> all = sphere.AllAttributes();
     EXPECT_EQ(all.front()->name, tokens::kVisibility);
-    EXPECT_EQ(all[2]->name, tokens::kIntensity);
+    EXPECT_EQ(all[3]->name, tokens::kIntensity);
     EXPECT_EQ(all.back()->name, tokens::kShapingConeSoftness);
     std::set<std::string_view> names;
     for (const AttributeDef* def : all) {
@@ -162,15 +162,15 @@ TEST(PrimType, ViewsClearAndPassThroughInTheirChains) {
     ernie::SphereLight lamp =
         ernie::SphereLight::Define(scene, "/Lamp")
             .SetRadius(0.2)
-            .Set("ernie:custom", Value(3))
-            .Write("ernie:samples", ernie::Tensor::Copy<float>(std::vector<float>{1, 2}, {2}))
+            .Set("user:custom", Value(3))
+            .Write("user:samples", ernie::Tensor::Copy<float>(std::vector<float>{1, 2}, {2}))
             .ClearRadius()
             .SetIntensity(2.0);
     EXPECT_FALSE(lamp.HasRadius());
     EXPECT_EQ(lamp.GetRadius(), 0.5) << "the fallback again";
     EXPECT_EQ(scene.Get("/Lamp", tokens::kRadius), nullptr);
-    EXPECT_EQ(*scene.Get("/Lamp", "ernie:custom"), Value(3));
-    EXPECT_EQ(scene.Read("/Lamp", "ernie:samples")->Elements(), 2);
+    EXPECT_EQ(*scene.Get("/Lamp", "user:custom"), Value(3));
+    EXPECT_EQ(scene.Read("/Lamp", "user:samples")->Elements(), 2);
     EXPECT_EQ(lamp.GetIntensity(), 2.0);
     lamp.ClearRadius();  // Clearing what is unset changes nothing.
 
@@ -203,8 +203,8 @@ TEST(PrimType, Vec4AttributesReadFourVectors) {
     ernie::Shader(scene, "/Tex").SetBias(glm::dvec4(0.5));
     EXPECT_EQ(*scene.Get("/Tex", tokens::kShaderBias), Value(glm::dvec4(0.5)));
     EXPECT_EQ(bias.Read(scene, "/Tex"), Value(glm::dvec4(0.5)));
-    scene.Set("/Tex", tokens::kShaderBias, glm::dvec3(1.0));
-    EXPECT_EQ(texture.GetBias(), glm::dvec4(0.0));
+    // Another type is refused (`Validate`).
+    EXPECT_THROW(scene.Set("/Tex", tokens::kShaderBias, glm::dvec3(1.0)), std::invalid_argument);
 
     EXPECT_EQ(bias.Coerce(Value(glm::vec4(1.0f))), Value(glm::dvec4(1.0)));
     try {
@@ -254,9 +254,8 @@ TEST(PrimType, RelationshipListsTakeOneTargetOrSeveral) {
     EXPECT_THROW(camera.Coerce(Value(2.0)), std::invalid_argument);
     EXPECT_THROW(camera.Coerce(Value(std::vector<std::string>{"not a path"})),
                  std::invalid_argument);
-    // Another type authored reads as the fallback.
-    scene.Set("/Render/Product", tokens::kCameraRel, 3);
-    EXPECT_TRUE(product.GetCamera().empty());
+    // Another type is refused (`Validate`).
+    EXPECT_THROW(scene.Set("/Render/Product", tokens::kCameraRel, 3), std::invalid_argument);
 }
 
 TEST(PrimType, FloatArraysTakeOneNumber) {
@@ -265,4 +264,41 @@ TEST(PrimType, FloatArraysTakeOneNumber) {
     EXPECT_EQ(widths.Coerce(Value(0.5)), Value(std::vector<float>{0.5f}));
     EXPECT_EQ(widths.Coerce(Value(2)), Value(std::vector<float>{2.0f}));
     EXPECT_EQ(widths.Coerce(Value(glm::dvec4(1.0))), Value(std::vector<float>(4, 1.0f)));
+}
+
+TEST(PrimType, SettingChecksNamesAndTypesAgainstTheDeclaration) {
+    Scene scene;
+    scene.Define("/Lamp", tokens::kSphereLight);
+    const auto message = [&](std::string_view attribute, Value value) {
+        try {
+            scene.Set("/Lamp", attribute, std::move(value));
+        } catch (const std::invalid_argument& error) {
+            return std::string(error.what());
+        }
+        return std::string();
+    };
+    // A misspelt name, plain or in one of the type's own namespaces, and a value of another type.
+    EXPECT_NE(message("radus", 1.0).find("did you mean 'inputs:radius'"), std::string::npos);
+    EXPECT_NE(message("inputs:radus", 1.0).find("did you mean 'inputs:radius'"), std::string::npos);
+    EXPECT_NE(message(tokens::kRadius, "big").find("must be a number"), std::string::npos);
+    EXPECT_NE(message(tokens::kTreatAsPoint, glm::dvec3(1.0)).find("'/Lamp'"), std::string::npos);
+    // Numbers of any type for numbers, ints for bools, as the readers take them.
+    EXPECT_EQ(message(tokens::kRadius, 2), "");
+    EXPECT_EQ(message(tokens::kShadowEnable, 0), "");
+    // Custom data in a namespace of its own, primvars, transform ops and connections are free.
+    EXPECT_EQ(message("user:speed", 3.0), "");
+    EXPECT_EQ(message("primvars:st", std::vector<float>{0.0f, 1.0f}), "");
+    EXPECT_EQ(message("xformOp:translate:pivot", glm::dvec3(1.0)), "");
+    EXPECT_EQ(message("inputs:color.connect", "/Looks/Tex.outputs:rgb"), "");
+    // Writing arrays checks names only.
+    EXPECT_THROW(
+        scene.Write("/Lamp", "radus", ernie::Tensor::Copy<float>(std::vector<float>{1}, {1})),
+        std::invalid_argument);
+
+    // A shader's inputs depend on its info:id, and grouping prims hold any custom data.
+    scene.Define("/Looks/Tex", tokens::kShader).Set("inputs:anything", 1.0);
+    scene.Define("/World", tokens::kXform).Set("speed", 3.0);
+    // Untyped and unregistered prims are not checked.
+    scene.Set("/Looks", "anything", 1.0);
+    scene.Define("/Custom", "MyType").Set("anything", 1.0);
 }

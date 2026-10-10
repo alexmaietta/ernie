@@ -9,10 +9,14 @@ namespace ernie {
 ERNIE_DEFINE_SCHEMA(Imageable, "Imageable", nullptr, true,
                     "What every prim has: visibility and the world it is in.",
                     ERNIE_IMAGEABLE_ATTRIBUTES)
-ERNIE_DEFINE_SCHEMA(Xform, tokens::kXform, &Imageable::Definition(), false,
-                    "A transform grouping its children.", ERNIE_NO_ATTRIBUTES)
-ERNIE_DEFINE_SCHEMA(Scope, tokens::kScope, &Imageable::Definition(), false,
-                    "A grouping without a transform of its own.", ERNIE_NO_ATTRIBUTES)
+// Grouping prims are where custom data lives, so they take attributes of any name.
+ERNIE_DEFINE_OPEN_SCHEMA(Xform, tokens::kXform, &Imageable::Definition(), false,
+                         "A transform grouping its children; takes custom attributes of any name.",
+                         ERNIE_NO_ATTRIBUTES, "*")
+ERNIE_DEFINE_OPEN_SCHEMA(Scope, tokens::kScope, &Imageable::Definition(), false,
+                         "A grouping without a transform of its own; takes custom attributes of "
+                         "any name.",
+                         ERNIE_NO_ATTRIBUTES, "*")
 ERNIE_DEFINE_SCHEMA(Boundable, "Boundable", &Imageable::Definition(), true,
                     "What has local bounds: geometry and instancers, with an optional authored "
                     "extent.",

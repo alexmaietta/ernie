@@ -19,9 +19,10 @@ ERNIE_DEFINE_SCHEMA(RenderProduct, tokens::kRenderProduct, &RenderSettingsBase::
 ERNIE_DEFINE_SCHEMA(RenderVar, tokens::kRenderVar, &Imageable::Definition(), false,
                     "An output of a render product, named by its source.",
                     ERNIE_RENDER_VAR_ATTRIBUTES)
-ERNIE_DEFINE_SCHEMA(SensorFilterPrim, tokens::kSensorFilter, &Imageable::Definition(), false,
-                    "One step of a sensor filter chain: a filter type and its inputs.",
-                    ERNIE_SENSOR_FILTER_ATTRIBUTES)
+// Its inputs are its filter type's parameters (`SensorFilterRegistry`).
+ERNIE_DEFINE_OPEN_SCHEMA(SensorFilterPrim, tokens::kSensorFilter, &Imageable::Definition(), false,
+                         "One step of a sensor filter chain: a filter type and its inputs.",
+                         ERNIE_SENSOR_FILTER_ATTRIBUTES, "inputs")
 
 RenderSettings RenderSettings::OrFallbacks(const Scene& scene, const Path& path) {
     if (!path.IsEmpty() && scene.Has(path)) {

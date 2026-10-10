@@ -23,7 +23,12 @@
     X(int, World, ::ernie::tokens::kWorld, -1,                                                     \
       (::ernie::AttributeMeta{.doc = "The world the prim and its descendants are in, of a "        \
                                      "batch's environments; -1 shared by every world.",            \
-                              .group = "Prim", .min = -1.0, .max = 1048576.0}))
+                              .group = "Prim", .min = -1.0, .max = 1048576.0}))                    \
+    X(std::string, QuaternionOrder, ::ernie::tokens::kQuaternionOrder, ::ernie::tokens::kXyzw,     \
+      (::ernie::AttributeMeta{.doc = "Component order of the quaternions in the prim's arrays: "   \
+                                     "xyzw (USD, Warp, PhysX) or wxyz (Isaac Lab, MuJoCo).",       \
+                              .group = "Prim",                                                     \
+                              .options = {::ernie::tokens::kXyzw, ::ernie::tokens::kWxyz}}))
 
 #define ERNIE_BOUNDABLE_ATTRIBUTES(X)                                                              \
     X(std::vector<float>, Extent, ::ernie::tokens::kExtent, std::vector<float>{},                  \

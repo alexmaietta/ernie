@@ -174,8 +174,8 @@ TEST(RenderPrims, LightsRelationshipChoosesTheLights) {
     EXPECT_EQ(prims.lights, std::vector<Path>{Path("/World/Lamp")});
     EXPECT_EQ(prims.dome, Path("/World/Sky"));
 
-    scene.Set("/Render/Settings", tokens::kLightsRel, 3.0f);
-    EXPECT_THROW(ernie::ResolveRenderPrims(scene, {}), std::invalid_argument);
+    // Another type is refused when set (`Validate`).
+    EXPECT_THROW(scene.Set("/Render/Settings", tokens::kLightsRel, 3.0f), std::invalid_argument);
 }
 
 TEST(MeshDataOf, ReadsPointsTopologyNormalsAndVertexColours) {

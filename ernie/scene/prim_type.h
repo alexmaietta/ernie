@@ -64,6 +64,9 @@ struct AttributeMeta {
     std::vector<std::string_view> options;  ///< A token's choices, or a relationship's target type.
     bool color = false;                     ///< A `Vec3` (`Vec4`) that is linear RGB (RGBA).
     bool asset = false;                     ///< A `Token` that is a file path.
+    /// Its readers also take values of other types (a legacy form), so `Scene::Set` checks only
+    /// its name, not its value's type.
+    bool lenient = false;
 };
 
 class AttributeDef;
@@ -265,9 +268,16 @@ struct PrimTypeDef {
     bool abstract = false;
     std::string_view doc;
     std::vector<AttributeDef> attributes;
+    /// Namespaces whose attributes are data-driven, so any name in them is allowed (`Validate`):
+    /// "inputs" on a Shader, whose inputs depend on its `info:id`, say.
+    std::vector<std::string_view> openNamespaces;
 
     /// Whether this is `other` or derives from it.
     bool IsA(const PrimTypeDef& other) const;
+
+    /// Whether attributes in `space` (such as "inputs" or "ernie:sensor") may have any name here
+    /// or on a base.
+    bool IsOpen(std::string_view space) const;
 
     /// The attribute named `name` (its USD name), here or on a base; null when it has none.
     const AttributeDef* Find(std::string_view name) const;
@@ -278,6 +288,20 @@ struct PrimTypeDef {
     /// Every attribute, the root base's first.
     std::vector<const AttributeDef*> AllAttributes() const;
 };
+
+/// Checks that `attribute` may be set on a prim of `type` (at `path`, for messages), and that
+/// `value`, when given, is of its declared type, as `Scene::Set` and `Scene::Write` do:
+/// - a declared attribute takes what its readers take (`AttributeDef::Coerce`; anything for
+///   tensors, whose readers also take small arrays, and for `AttributeMeta::lenient` ones);
+/// - an undeclared one is an error when its name has no namespace (`radus`), or is in a
+///   namespace the type declares attributes in and does not open (`inputs:radus` on a light,
+///   `ernie:sensor:noize` on a camera), with the closest declared names suggested;
+/// - everything else is allowed: other namespaces (custom data such as `user:speed`), the type's
+///   open namespaces (`PrimTypeDef::openNamespaces`), `primvars:*`, xformOps and
+///   `xformOpOrder`, and UsdShade connections (`<input>.connect`).
+/// @throws std::invalid_argument naming the prim and the attribute.
+void Validate(const PrimTypeDef& type, const Path& path, std::string_view attribute,
+              const Value* value);
 
 /// Every registered prim type, bases before the types derived from them.
 std::span<const PrimTypeDef* const> PrimTypes();
@@ -420,9 +444,15 @@ class SchemaView {
 /// Defines `Class::Definition()`: the type `typeName`, deriving from `base` (a `PrimTypeDef*`, or
 /// nullptr), declaring the attributes of `OWN_ATTRIBUTES`.
 #define ERNIE_DEFINE_SCHEMA(Class, typeName, base, isAbstract, typeDoc, OWN_ATTRIBUTES)            \
+    ERNIE_DEFINE_OPEN_SCHEMA(Class, typeName, base, isAbstract, typeDoc, OWN_ATTRIBUTES)
+
+/// `ERNIE_DEFINE_SCHEMA` for a type whose attributes in the namespaces listed after
+/// `OWN_ATTRIBUTES` (such as "inputs") are data-driven (`PrimTypeDef::openNamespaces`).
+#define ERNIE_DEFINE_OPEN_SCHEMA(Class, typeName, base, isAbstract, typeDoc, OWN_ATTRIBUTES, ...)  \
     const ::ernie::PrimTypeDef& Class::Definition() {                                              \
         static const ::ernie::PrimTypeDef definition{                                              \
-            typeName, base, isAbstract, typeDoc, {OWN_ATTRIBUTES(ERNIE_ATTRIBUTE_DEF)}};           \
+            typeName,     base, isAbstract, typeDoc, {OWN_ATTRIBUTES(ERNIE_ATTRIBUTE_DEF)},        \
+            {__VA_ARGS__}};                                                                        \
         return definition;                                                                         \
     }
 

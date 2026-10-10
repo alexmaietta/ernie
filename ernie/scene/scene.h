@@ -66,6 +66,7 @@ struct ChangeCursor {
 };
 
 class Scene;
+struct PrimTypeDef;
 
 /// Handle to a prim in a `Scene`: its path plus the scene, for chained edits. Copyable and cheap;
 /// valid while the scene lives, though the prim it names may be removed.
@@ -149,8 +150,10 @@ class PrimSet {
 ///
 /// Small values (`Value`: scalars, vectors, matrices, tokens, relationships) are set one at a time;
 /// bulk data (`Tensor`: heights, points, instance transforms) is written as tensors, either to one
-/// prim or as rows of one tensor spread over many prims without copying. Attributes are not checked
-/// against schemas; `tokens.h` names the ones Ernie reads.
+/// prim or as rows of one tensor spread over many prims without copying. On a prim of a registered
+/// type (`prim_type.h`), setting and writing check the attribute against its declaration
+/// (`Validate`): a misspelt name or a value of the wrong type throws, while custom attributes in
+/// namespaces of their own are free.
 ///
 /// Every edit advances `Version()` and stamps the prim's dirty bit for that attribute (`DirtyOf`);
 /// transform and visibility edits stamp the prim's descendants too. Each consumer keeps a
@@ -346,6 +349,8 @@ class Scene {
 
     struct PrimData {
         std::string type;
+        /// The registered type (`FindPrimType`) its attributes are checked against, if any.
+        const PrimTypeDef* schema = nullptr;
         std::map<std::string, Value, std::less<>> values;
         std::map<std::string, Tensor, std::less<>> tensors;
         std::map<std::string, std::uintptr_t, std::less<>> streams;  ///< CUDA tensors' streams.

@@ -82,7 +82,8 @@
                                      "may override it.",                                           \
                               .group = "Image",                                                    \
                               .options = {::ernie::tokens::kOff, ::ernie::tokens::kOverlay,        \
-                                          ::ernie::tokens::kHiddenLine}}))                         \
+                                          ::ernie::tokens::kHiddenLine},                           \
+                              .lenient = true}))                                                   \
     X(int, Frame, ::ernie::tokens::kFrame, 0,                                                      \
       (::ernie::AttributeMeta{.doc = "The frame noise derives from; counts up by itself unless "   \
                                      "set.",                                                       \

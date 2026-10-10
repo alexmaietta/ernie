@@ -9,6 +9,7 @@
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/terrain_schemas.h"
 
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <stdexcept>
@@ -278,6 +279,123 @@ bool PrimTypeDef::IsA(const PrimTypeDef& other) const {
         }
     }
     return false;
+}
+
+bool PrimTypeDef::IsOpen(std::string_view space) const {
+    for (const PrimTypeDef* type = this; type != nullptr; type = type->base) {
+        for (const std::string_view open : type->openNamespaces) {
+            if (open == "*" || space == open ||
+                (space.size() > open.size() && space.starts_with(open) &&
+                 space[open.size()] == ':')) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+namespace {
+
+/// Edit distance between `a` and `b`, for suggesting the declared name an author meant.
+std::size_t Distance(std::string_view a, std::string_view b) {
+    std::vector<std::size_t> row(b.size() + 1);
+    for (std::size_t j = 0; j <= b.size(); ++j) {
+        row[j] = j;
+    }
+    for (std::size_t i = 1; i <= a.size(); ++i) {
+        std::size_t diagonal = row[0];
+        row[0] = i;
+        for (std::size_t j = 1; j <= b.size(); ++j) {
+            const std::size_t above = row[j];
+            row[j] =
+                std::min({row[j] + 1, row[j - 1] + 1, diagonal + (a[i - 1] == b[j - 1] ? 0u : 1u)});
+            diagonal = above;
+        }
+    }
+    return row[b.size()];
+}
+
+/// "; did you mean 'radius'?" for the declared names closest to `name`, or nothing.
+std::string Suggestion(const PrimTypeDef& type, std::string_view name) {
+    // Names compare whole and by their last component, so "radus" finds "inputs:radius".
+    const auto last = [](std::string_view text) { return text.substr(text.rfind(':') + 1); };
+    std::vector<std::pair<std::size_t, std::string_view>> close;
+    for (const AttributeDef* def : type.AllAttributes()) {
+        const std::size_t distance =
+            std::min(Distance(name, def->name), Distance(last(name), last(def->name)));
+        if (distance <= std::max<std::size_t>(2, name.size() / 4)) {
+            close.emplace_back(distance, def->name);
+        }
+    }
+    if (close.empty()) {
+        return {};
+    }
+    std::sort(close.begin(), close.end());
+    std::string text = "; did you mean ";
+    for (std::size_t i = 0; i < std::min<std::size_t>(close.size(), 3); ++i) {
+        text += (i > 0 ? ", '" : "'") + std::string(close[i].second) + "'";
+    }
+    return text + "?";
+}
+
+/// Attributes any prim may carry, whatever its type: primvars, transform ops and their order,
+/// and UsdShade connections.
+bool AlwaysAllowed(std::string_view attribute) {
+    return attribute.starts_with("xformOp") || attribute.starts_with("primvars:") ||
+           attribute.ends_with(".connect");
+}
+
+}  // namespace
+
+void Validate(const PrimTypeDef& type, const Path& path, std::string_view attribute,
+              const Value* value) {
+    if (AlwaysAllowed(attribute)) {
+        return;
+    }
+    if (const AttributeDef* def = type.Find(attribute)) {
+        if (value == nullptr || def->kind == AttributeKind::Tensor || def->meta.lenient) {
+            return;
+        }
+        // Numbers of any type, as `GetNumber` reads them (an int attribute's reader rounds, or
+        // checks, them itself), and ints for bools, as `GetBool` reads them.
+        const bool number = value->Is<double>() || value->Is<float>() || value->Is<int>();
+        if (((def->kind == AttributeKind::Int || def->kind == AttributeKind::Double) && number) ||
+            (def->kind == AttributeKind::Bool && (value->Is<bool>() || value->Is<int>()))) {
+            return;
+        }
+        try {
+            def->Coerce(*value);
+        } catch (const std::invalid_argument& error) {
+            throw std::invalid_argument("'" + path.String() + "' (" + std::string(type.name) +
+                                        "): " + error.what());
+        }
+        return;
+    }
+    const std::size_t colon = attribute.rfind(':');
+    const std::string_view space =
+        colon == std::string_view::npos ? std::string_view() : attribute.substr(0, colon);
+    if (type.IsOpen("*")) {
+        return;
+    }
+    if (!space.empty()) {
+        if (type.IsOpen(space)) {
+            return;
+        }
+        // Custom data in a namespace of its own is the author's; a typo in one of the type's
+        // own namespaces is not.
+        bool declared = false;
+        for (const AttributeDef* def : type.AllAttributes()) {
+            const std::size_t defColon = def->name.rfind(':');
+            declared = declared || (defColon != std::string_view::npos &&
+                                    def->name.substr(0, defColon) == space);
+        }
+        if (!declared) {
+            return;
+        }
+    }
+    throw std::invalid_argument("'" + path.String() + "' is a " + std::string(type.name) +
+                                ", which has no attribute '" + std::string(attribute) + "'" +
+                                Suggestion(type, attribute));
 }
 
 const AttributeDef* PrimTypeDef::Find(std::string_view attribute) const {

@@ -137,7 +137,8 @@ def test_writes_share_memory_and_reads_are_read_only_views():
 
 def test_strided_and_typed_arrays_keep_their_layout():
     scene = ernie.Scene()
-    scene.define("/T", tokens.TERRAIN)
+    # An Xform takes custom attributes of any name; a Terrain checks them against its schema.
+    scene.define("/T", tokens.XFORM)
     base = np.arange(12, dtype=np.float32).reshape(3, 4)
     scene.write("/T", "transposed", base.T)
     np.testing.assert_array_equal(scene.read("/T", "transposed"), base.T)
