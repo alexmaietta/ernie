@@ -64,6 +64,9 @@ struct AttributeMeta {
     std::vector<std::string_view> options;  ///< A token's choices, or a relationship's target type.
     bool color = false;                     ///< A `Vec3` (`Vec4`) that is linear RGB (RGBA).
     bool asset = false;                     ///< A `Token` that is a file path.
+    /// A `Tensor` of whole numbers, such as indices: scene loaders make int32 arrays of it, and
+    /// float32 arrays of other tensors, whatever the numbers look like.
+    bool integer = false;
     /// Its readers also take values of other types (a legacy form), so `Scene::Set` checks only
     /// its name, not its value's type.
     bool lenient = false;

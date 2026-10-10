@@ -344,13 +344,10 @@ The format:
 | `"translate"`, `"rotate"`, `"rotation_order"`, `"scale"` | Transform ops, as the keywords: 3 numbers, Euler angles in degrees, an order such as `"ZYX"`, one number or 3. |
 | `"orient"` | A quaternion as `[w, x, y, z]`, the real part first as in `ernie.Quat(w, x, y, z)` (in a Python dict, a `Quat` too). |
 | `"transform"` | A 4 x 4 matrix as rows of four (column vectors, translation in the last column). |
-| Lists for array attributes | Become arrays: int32 when every number is whole, else float32. |
+| Lists for array attributes | Become arrays: int32 for attributes of whole numbers (`face_vertex_counts`, `face_vertex_indices`, `proto_indices`; `AttributeDef.is_integer`), float32 for the rest (`points`, `heights`), whatever the numbers look like. |
 | Strings for relationships | Target paths; lists of them for list relationships. |
 
-Every value is checked as setting it is, so a misspelt name or a wrong value raises as above. Two things to watch in a description:
-
-- Arrays become int32 when every number in them is whole, so write float data with a decimal point (`[0.0, 1.0, 0.0]`), as `points` above is: `[[0, 0, 0], ...]` would load as int32 points.
-- Give array attributes by their Python names (`"points"`, `"heights"`): a list given under a USD name with a namespace is set as a value rather than converted to an array.
+Every value is checked as setting it is, so a misspelt name or a wrong value raises as above. Attributes may be given by Python name or USD name alike; either way they are converted to their declared types, arrays included.
 
 ## The C++ API
 

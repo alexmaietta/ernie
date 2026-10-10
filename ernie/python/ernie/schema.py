@@ -284,8 +284,9 @@ def load_scene(description: Any, scene: Scene | None = None) -> Scene:
             "/Render/Settings": {"type": "RenderSettings", "resolution": [640, 480]},
         })
 
-    Values are checked as setting them is; lists for array attributes (``points``, ``heights``)
-    become arrays, float32 or, of whole numbers, int32."""
+    Values are checked as setting them is; lists for array attributes become arrays: int32 for
+    those of whole numbers (``face_vertex_indices``, ``proto_indices``; ``AttributeDef.is_integer``),
+    float32 for the rest (``points``, ``heights``), whatever the numbers look like."""
     if isinstance(description, (str, os.PathLike)):
         text = str(description)
         if text.lstrip().startswith("{"):
@@ -319,14 +320,14 @@ def _load_prim(scene: Scene, path: str, body: Any) -> None:
     keywords = {}
     for name, value in attributes.items():
         definition = cls._attributes.get(name) if cls is not None else None
-        if definition is None and ":" not in name and cls is not None:
+        if definition is None and cls is not None:
             definition = next((d for d in cls._attributes.values() if d.name == name), None)
-        if definition is not None and definition.kind == AttributeKind.TENSOR:
-            value = _array(value)
-        if definition is not None and name == definition.py_name:
-            keywords[name] = value
-        else:
-            prim.set(definition.name if definition is not None else name, _target(value))
+        if definition is None:
+            prim.set(name, _target(value))
+            continue
+        if definition.kind == AttributeKind.TENSOR:
+            value = _array(value, definition.is_integer)
+        keywords[definition.py_name] = value
     if cls is not None:
         cls(prim).set(**keywords)
     if xform:
@@ -338,12 +339,15 @@ def _load_prim(scene: Scene, path: str, body: Any) -> None:
             _load_prim(scene, f"{path.rstrip('/')}/{name}", child)
 
 
-def _array(value: Any) -> Any:
-    """A list from a description as an array: int32 of whole numbers, else float32."""
+def _array(value: Any, integer: bool) -> Any:
+    """A list from a description as an array: int32 for an attribute of whole numbers (indices,
+    counts), float32 for any other, whatever the numbers look like."""
     if not isinstance(value, (list, tuple)):
         return value
     array = np.asarray(value)
-    return array.astype(np.int32 if np.issubdtype(array.dtype, np.integer) else np.float32)
+    if integer and not np.issubdtype(array.dtype, np.integer):
+        raise ValueError("An array of whole numbers takes no fractions")
+    return array.astype(np.int32 if integer else np.float32)
 
 
 __all__ += ["load_scene"]

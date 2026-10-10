@@ -59,6 +59,9 @@ void BindSchema(nb::module_& m) {
                      })
         .def_prop_ro("is_color", [](const AttributeDef& def) { return def.meta.color; })
         .def_prop_ro("is_asset", [](const AttributeDef& def) { return def.meta.asset; })
+        .def_prop_ro(
+            "is_integer", [](const AttributeDef& def) { return def.meta.integer; },
+            "Whether it is an array of whole numbers (indices, counts), loaded as int32.")
         .def(
             "read",
             [](const AttributeDef& def, const Prim& prim) -> nb::object {

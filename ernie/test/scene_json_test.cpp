@@ -83,6 +83,8 @@ TEST(LoadScene, LoadsTheDescriptionPythonLoads) {
     const ernie::Mesh quad(scene, "/World/Quad");
     ASSERT_NE(quad.GetFaceVertexIndices(), nullptr);
     EXPECT_EQ(quad.GetFaceVertexIndices()->Type(), DType::Int32);
+    // Points are float32 though written as whole numbers: the declaration picks the type.
+    EXPECT_EQ(quad.GetPoints()->Type(), DType::Float32);
     EXPECT_EQ(quad.GetFaceVertexCounts()->Shape(), (std::vector<std::int64_t>{1}));
     EXPECT_EQ(quad.GetPoints()->Shape(), (std::vector<std::int64_t>{3, 3}));
 

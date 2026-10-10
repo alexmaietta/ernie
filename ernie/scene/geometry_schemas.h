@@ -65,10 +65,12 @@
 #define ERNIE_MESH_ATTRIBUTES(X)                                                                   \
     X(::ernie::Tensor, FaceVertexCounts, ::ernie::tokens::kFaceVertexCounts, nullptr,              \
       (::ernie::AttributeMeta{.doc = "Integer number of vertices of each face.",                   \
-                              .group = "Geometry", .dirty = ::ernie::Dirty::Topology}))            \
+                              .group = "Geometry", .integer = true,                                \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
     X(::ernie::Tensor, FaceVertexIndices, ::ernie::tokens::kFaceVertexIndices, nullptr,            \
       (::ernie::AttributeMeta{.doc = "Integer point indices of the faces' vertices, in order.",    \
-                              .group = "Geometry", .dirty = ::ernie::Dirty::Topology}))            \
+                              .group = "Geometry", .integer = true,                                \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
     X(::ernie::Tensor, Normals, ::ernie::tokens::kNormals, nullptr,                                \
       (::ernie::AttributeMeta{.doc = "(n, 3) normals, one per point; ignored when of another "     \
                                      "count.",                                                     \
@@ -94,7 +96,8 @@
     X(::ernie::Tensor, ProtoIndices, ::ernie::tokens::kProtoIndices, nullptr,                      \
       (::ernie::AttributeMeta{.doc = "Integer prototype of each instance, of the prototypes "      \
                                      "relationship's targets; the first for all when unset.",      \
-                              .group = "Instances", .dirty = ::ernie::Dirty::Topology}))           \
+                              .group = "Instances", .integer = true,                               \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
     X(std::vector<::ernie::Path>, Prototypes, ::ernie::tokens::kPrototypes,                        \
       std::vector<::ernie::Path>{},                                                                \
       (::ernie::AttributeMeta{.doc = "The prims instanced, indexed by the proto indices.",         \

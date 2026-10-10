@@ -156,20 +156,21 @@ void Flatten(const Json& json, std::size_t depth, std::vector<std::int64_t>& sha
     numbers.push_back(&json);
 }
 
-/// A (possibly nested) array as a CPU tensor shaped as it nests: int32 when every number is an
-/// integer, float32 otherwise.
-Tensor TensorOf(const Json& json) {
+/// A (possibly nested) array as a CPU tensor shaped as it nests: int32 for an attribute of whole
+/// numbers (`AttributeMeta::integer`), float32 otherwise, whatever the numbers look like.
+Tensor TensorOf(const Json& json, bool integer) {
     if (!json.is_array()) {
         throw std::invalid_argument("an array attribute takes an array of numbers");
     }
     std::vector<std::int64_t> shape;
     std::vector<const Json*> numbers;
     Flatten(json, 0, shape, numbers);
-    bool integers = true;
-    for (const Json* number : numbers) {
-        integers = integers && number->is_number_integer();
-    }
-    if (integers) {
+    if (integer) {
+        for (const Json* number : numbers) {
+            if (!number->is_number_integer()) {
+                throw std::invalid_argument("an array of whole numbers takes no fractions");
+            }
+        }
         std::vector<std::int32_t> values;
         for (const Json* number : numbers) {
             values.push_back(IntOf(*number));
@@ -235,7 +236,7 @@ void SetKey(Scene& scene, const Path& path, const PrimTypeDef* type, const std::
         }
         const std::string_view name = def != nullptr ? def->name : std::string_view(key);
         if (def != nullptr && def->kind == AttributeKind::Tensor) {
-            scene.Write(path, name, TensorOf(json));
+            scene.Write(path, name, TensorOf(json, def->meta.integer));
         } else if (def != nullptr) {
             scene.Set(path, name, def->Coerce(ValueOf(json)));
         } else {

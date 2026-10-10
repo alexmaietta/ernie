@@ -30,8 +30,9 @@
 ///   vectors, other lengths as float arrays, and 4 x 4 nested arrays as matrices. A declared
 ///   attribute's value is then converted to its type (`AttributeDef::Coerce`: a string to a
 ///   relationship target, say); one declared as a tensor (`points`, `heights`) takes a possibly
-///   nested array as a CPU tensor, int32 when every number is an integer and float32 otherwise,
-///   written with `Scene::Write`. Values are checked as `Scene::Set` checks them (`Validate`).
+///   nested array as a CPU tensor, int32 for one of whole numbers (`AttributeMeta::integer`:
+///   indices, counts) and float32 for any other, whatever the numbers look like, written with
+///   `Scene::Write`. Values are checked as `Scene::Set` checks them (`Validate`).
 namespace ernie {
 
 class Scene;

@@ -160,6 +160,8 @@ def test_scenes_load_from_descriptions(tmp_path):
     assert ernie.DistantLight.at(scene, "/World/Sun").intensity == 2.0
     assert ernie.Terrain.at(scene, "/World/Ground").heights.dtype == np.float32
     assert ernie.Mesh.at(scene, "/World/Quad").face_vertex_indices.dtype == np.int32
+    # Float attributes stay float32 however their numbers are written.
+    assert ernie.Mesh.at(scene, "/World/Quad").points.dtype == np.float32
     assert scene.type_of("/World/Group") == "" and ernie.Cube.at(scene, "/World/Group/Child")
     assert ernie.RenderSettings.at(scene, "/Render/Settings").camera == [ernie.Path("/World/Camera")]
 
