@@ -70,7 +70,7 @@ TEST(PrimType, RegistryListsTypesWithBasesAndAttributes) {
     EXPECT_TRUE(sphere.base->abstract);
     EXPECT_TRUE(sphere.IsA(ernie::GetPrimType("Light")));
     EXPECT_FALSE(sphere.IsA(ernie::GetPrimType("NonboundableLightBase")));
-    EXPECT_EQ(ernie::FindPrimType("Sphere"), nullptr);
+    EXPECT_EQ(ernie::FindPrimType("Nope"), nullptr);
     EXPECT_THROW(ernie::GetPrimType("Nope"), std::invalid_argument);
 
     const AttributeDef* radius = sphere.Find(tokens::kRadius);

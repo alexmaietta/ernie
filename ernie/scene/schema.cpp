@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/scene/schema.h"
 
+#include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/tokens.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -194,30 +195,30 @@ glm::dvec3 TowardsLight(const Scene& scene, const Path& light) {
 void SetCamera(Scene& scene, const Path& path, const CameraParams& camera) {
     using namespace tokens;
     const double aspect = static_cast<double>(camera.width) / static_cast<double>(camera.height);
-    scene.Define(path, kCamera)
-        .Set(kTransform, camera.transform)
-        .Set(kProjection, camera.orthographic ? kOrthographic : kPerspective)
-        .Set(kCameraScan, camera.pushbroom ? kPushbroom : kFrameScan)
-        .Set(kPushbroomLineOffset, camera.lineOffsetMm)
-        .Set(kFocalLength, camera.focalLengthMm)
-        .Set(kVerticalAperture, camera.verticalApertureMm)
-        .Set(kHorizontalAperture, camera.verticalApertureMm * aspect)
-        .Set(kHorizontalApertureOffset, camera.horizontalApertureOffsetMm)
-        .Set(kVerticalApertureOffset, camera.verticalApertureOffsetMm)
-        .Set(kClippingRange, glm::dvec2(camera.nearPlane, camera.farPlane))
-        .Set(kCameraExposure, camera.exposureStops)
-        .Set(kExposureTime, camera.exposureTime)
-        .Set(kExposureIso, camera.iso)
-        .Set(kExposureFStop, camera.fStop)
-        .Set(kExposureResponsivity, camera.responsivity)
-        .Set(kFStop, camera.lensFStop)
-        .Set(kFocusDistance, camera.focusDistance)
-        .Set(kShutterOpen, camera.shutterOpen)
-        .Set(kShutterClose, camera.shutterClose)
-        .Set(kShutterSamples, camera.shutterSamples)
-        .Set(kShutterRolling, camera.rollingShutter)
-        .Set(kSpectralRange, glm::dvec2(camera.bands.minNm, camera.bands.maxNm))
-        .Set(kSpectralBands, camera.bands.count);
+    scene.Define(path, kCamera).Set(kTransform, camera.transform);
+    Camera(scene, path)
+        .SetProjection(camera.orthographic ? kOrthographic : kPerspective)
+        .SetScan(camera.pushbroom ? kPushbroom : kFrameScan)
+        .SetPushbroomLineOffset(camera.lineOffsetMm)
+        .SetFocalLength(camera.focalLengthMm)
+        .SetVerticalAperture(camera.verticalApertureMm)
+        .SetHorizontalAperture(camera.verticalApertureMm * aspect)
+        .SetHorizontalApertureOffset(camera.horizontalApertureOffsetMm)
+        .SetVerticalApertureOffset(camera.verticalApertureOffsetMm)
+        .SetClippingRange(glm::dvec2(camera.nearPlane, camera.farPlane))
+        .SetExposure(camera.exposureStops)
+        .SetExposureTime(camera.exposureTime)
+        .SetExposureIso(camera.iso)
+        .SetExposureFStop(camera.fStop)
+        .SetExposureResponsivity(camera.responsivity)
+        .SetFStop(camera.lensFStop)
+        .SetFocusDistance(camera.focusDistance)
+        .SetShutterOpen(camera.shutterOpen)
+        .SetShutterClose(camera.shutterClose)
+        .SetShutterSamples(camera.shutterSamples)
+        .SetShutterRolling(camera.rollingShutter)
+        .SetSpectralRange(glm::dvec2(camera.bands.minNm, camera.bands.maxNm))
+        .SetSpectralBands(camera.bands.count);
 }
 
 }  // namespace ernie

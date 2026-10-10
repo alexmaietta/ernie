@@ -57,7 +57,7 @@ def test_unknown_attributes_raise_with_suggestions():
     with pytest.raises(TypeError, match="did you mean 'radius'"):
         scene.define("/Other", ernie.SphereLight, radus=1.0)
     with pytest.raises(TypeError, match="not a registered prim type"):
-        scene.define("/Rock", tokens.SPHERE, radius=1.0)
+        scene.define("/Rock", "Boulder", radius=1.0)
 
 
 def test_define_takes_names_classes_and_relative_paths():
@@ -67,6 +67,10 @@ def test_define_takes_names_classes_and_relative_paths():
     sun = plain.define("Sun", ernie.DistantLight, angle=1.0, rotate=(30, 0, 0))
     assert sun.path == ernie.Path("/World/Sun") and sun.angle == 1.0
     assert sun.photometric_illuminance == 10000.0
+    # On a typed prim, define makes a child; on its class, a prim of that type.
+    world = ernie.Xform.define(scene, "/Typed")
+    lamp = world.define("Lamp", ernie.SphereLight, radius=0.25)
+    assert lamp.path == ernie.Path("/Typed/Lamp") and lamp.radius == 0.25
     assert scene.get("/World/Sun", "xformOp:rotateXYZ") == (30.0, 0.0, 0.0)
     # A registered type by name still returns the Prim, with keyword attributes set.
     disk = scene.define("/World/Disk", tokens.DISK_LIGHT, radius=0.25)

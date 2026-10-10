@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/delegate.h"
 
+#include "ernie/scene/geometry_schemas.h"
+#include "ernie/scene/material_schemas.h"
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
+#include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/wide_view.h"
 #include "ernie/session/product_frame.h"
@@ -70,7 +74,7 @@ std::string TextureKey(const Scene& scene, const TextureReader& reader) {
 /// cannot be read.
 Image TextureImageOf(const Scene& scene, const TextureReader& reader) {
     if (!reader.image.empty()) {
-        const Tensor* tensor = scene.Read(Path(reader.image), tokens::kShaderTexture);
+        const Tensor* tensor = Shader(scene, Path(reader.image)).GetTexture();
         if (tensor == nullptr) {
             throw std::invalid_argument("'" + reader.image + "' has no " +
                                         std::string(tokens::kShaderTexture));
@@ -86,23 +90,41 @@ std::invalid_argument UploadError(const Path& path, std::string_view attribute,
                                  path.String() + "': " + why);
 }
 
-/// `tensor` as a float32 raster with the grid in the prim's attributes.
-RasterView RasterOf(const Scene& scene, const Path& path, const Tensor& tensor,
-                    std::string_view origin, std::string_view cellSize, std::string_view noData) {
-    if (tensor.Type() != DType::Float32 || tensor.Rank() != 2 ||
-        tensor.Location().kind != DeviceKind::Cpu) {
+/// The Material's albedo map `map` as a float32 raster with its grid.
+RasterView RasterOf(const ernie::Material& material, const Tensor& map) {
+    if (map.Type() != DType::Float32 || map.Rank() != 2 || map.Location().kind != DeviceKind::Cpu) {
         throw std::invalid_argument("expected a float32 (rows, cols) CPU tensor");
     }
     RasterView view;
-    view.data = tensor.As<float>();
-    view.height = static_cast<std::size_t>(tensor.Shape()[0]);
-    view.width = static_cast<std::size_t>(tensor.Shape()[1]);
-    const glm::dvec2 corner = GetVec2(scene, path, origin, {0.0, 0.0});
+    view.data = map.As<float>();
+    view.height = static_cast<std::size_t>(map.Shape()[0]);
+    view.width = static_cast<std::size_t>(map.Shape()[1]);
+    const glm::dvec2 corner = material.GetAlbedoMapOrigin();
     view.originX = corner.x;
     view.originY = corner.y;
-    view.cellSize = GetNumber(scene, path, cellSize, 1.0);
-    if (scene.Get(path, noData) != nullptr) {
-        view.noData = static_cast<float>(GetNumber(scene, path, noData, 0.0));
+    view.cellSize = material.GetAlbedoMapCellSize();
+    if (material.HasAlbedoMapNoData()) {
+        view.noData = static_cast<float>(material.GetAlbedoMapNoData());
+    }
+    return view;
+}
+
+/// The Terrain's heights as a float32 raster with its grid.
+RasterView RasterOf(const Terrain& terrain, const Tensor& heights) {
+    if (heights.Type() != DType::Float32 || heights.Rank() != 2 ||
+        heights.Location().kind != DeviceKind::Cpu) {
+        throw std::invalid_argument("expected a float32 (rows, cols) CPU tensor");
+    }
+    RasterView view;
+    view.data = heights.As<float>();
+    view.height = static_cast<std::size_t>(heights.Shape()[0]);
+    view.width = static_cast<std::size_t>(heights.Shape()[1]);
+    const glm::dvec2 corner = terrain.GetOrigin();
+    view.originX = corner.x;
+    view.originY = corner.y;
+    view.cellSize = terrain.GetCellSize();
+    if (terrain.HasNoData()) {
+        view.noData = static_cast<float>(terrain.GetNoData());
     }
     return view;
 }
@@ -162,18 +184,19 @@ std::vector<Path> TargetsOf(const Scene& scene, const Path& path, std::string_vi
     return {};
 }
 
-/// The constant colour of `primvars:displayColor`: a colour value or a one-row array.
-std::optional<glm::vec3> ConstantDisplayColor(const Scene& scene, const Path& mesh) {
-    if (scene.Get(mesh, tokens::kDisplayColor) != nullptr) {
-        return glm::vec3(GetVec3(scene, mesh, tokens::kDisplayColor, glm::dvec3(0.5)));
-    }
-    if (const Tensor* tensor = scene.Read(mesh, tokens::kDisplayColor)) {
-        if (tensor->Elements() == 3 && tensor->Location().kind == DeviceKind::Cpu) {
+/// The constant colour of a Gprim's `primvars:displayColor`: a colour value or a one-row array,
+/// else the declared fallback (colours per vertex are read as arrays, by name).
+glm::vec3 ConstantDisplayColor(const Gprim& gprim) {
+    const Scene& scene = gprim.GetScene();
+    if (scene.Get(gprim.GetPath(), tokens::kDisplayColor) == nullptr) {
+        if (const Tensor* tensor = scene.Read(gprim.GetPath(), tokens::kDisplayColor);
+            tensor != nullptr && tensor->Elements() == 3 &&
+            tensor->Location().kind == DeviceKind::Cpu) {
             const std::vector<float> color = FloatsOf(*tensor, 3, tokens::kDisplayColor);
             return glm::vec3(color[0], color[1], color[2]);
         }
     }
-    return std::nullopt;
+    return glm::vec3(gprim.GetDisplayColor());
 }
 
 /// The instance op of transform op `op` (`xformOp:translate`...), composed on the GPU.
@@ -270,34 +293,34 @@ std::vector<float> BinShape(const Shape& shape, const SpectralBands& bands, doub
 }  // namespace
 
 GroundParams GroundParamsOf(const Scene& scene, const Path& ground) {
-    using namespace tokens;
+    const GroundPlane plane(scene, ground);
     GroundParams params;
-    params.height = Number(scene, ground, kGroundHeight, params.height);
-    params.checker = GetBool(scene, ground, kChecker, params.checker);
-    params.checkerSize = Number(scene, ground, kCheckerSize, params.checkerSize);
+    params.height = static_cast<float>(plane.GetHeight());
+    params.checker = plane.GetChecker();
+    params.checkerSize = static_cast<float>(plane.GetCheckerSize());
     if (!(params.checkerSize > 0.0f) || !std::isfinite(params.checkerSize)) {
         throw std::invalid_argument("GroundPlane '" + ground.String() +
                                     "' needs a positive checker size");
     }
-    params.checkerColors[0] =
-        glm::vec3(GetVec3(scene, ground, kCheckerColor0, glm::dvec3(params.checkerColors[0])));
-    params.checkerColors[1] =
-        glm::vec3(GetVec3(scene, ground, kCheckerColor1, glm::dvec3(params.checkerColors[1])));
+    params.checkerColors[0] = glm::vec3(plane.GetCheckerColor0());
+    params.checkerColors[1] = glm::vec3(plane.GetCheckerColor1());
     return params;
 }
 
 TerrainParams TerrainParamsOf(const Scene& scene, const RenderPrims& prims) {
     using namespace tokens;
     TerrainParams params;
-    params.exaggeration = Number(scene, prims.terrain, kExaggeration, 1.0f);
-    const Path& settings = prims.settings;
-    params.colorMode = ColorModeOf(GetToken(scene, settings, kColorMode, kShadedColormap));
+    if (!prims.terrain.IsEmpty()) {
+        params.exaggeration = static_cast<float>(Terrain(scene, prims.terrain).GetExaggeration());
+    }
+    const RenderSettings settings = RenderSettings::OrFallbacks(scene, prims.settings);
+    params.colorMode = ColorModeOf(settings.GetColorMode());
     LodSettings& lod = params.lod;
-    lod.enabled = GetBool(scene, settings, kLodEnable, lod.enabled);
-    lod.detail = Number(scene, settings, kLodDetail, lod.detail);
-    lod.morphStart = Number(scene, settings, kLodMorphStart, lod.morphStart);
-    lod.freeze = GetBool(scene, settings, kLodFreeze, lod.freeze);
-    lod.showLevels = GetBool(scene, settings, kLodShowLevels, lod.showLevels);
+    lod.enabled = settings.GetLodEnable();
+    lod.detail = static_cast<float>(settings.GetLodDetail());
+    lod.morphStart = static_cast<float>(settings.GetLodMorphStart());
+    lod.freeze = settings.GetLodFreeze();
+    lod.showLevels = settings.GetLodShowLevels();
     return params;
 }
 
@@ -483,13 +506,13 @@ void RasterDelegate::SyncMaterial(const Scene& scene, const Path& path, SyncedMa
 
     const Key albedoKey =
         KeyOf(scene, path, {kAlbedoMap, kAlbedoMapOrigin, kAlbedoMapCellSize, kAlbedoMapNoData});
+    const ernie::Material prim(scene, path);
     if (material.albedoMap != albedoKey) {
         material.albedoMap = albedoKey;
         try {
-            if (const Tensor* tensor = scene.Read(path, kAlbedoMap)) {
+            if (const Tensor* tensor = prim.GetAlbedoMap()) {
                 const Tensor albedo = tensor->Contiguous();
-                gpu.SetAlbedoMap(RasterOf(scene, path, albedo, kAlbedoMapOrigin, kAlbedoMapCellSize,
-                                          kAlbedoMapNoData));
+                gpu.SetAlbedoMap(RasterOf(prim, albedo));
             } else if (gpu.HasAlbedoMap()) {
                 gpu.ClearAlbedoMap();
             }
@@ -507,7 +530,7 @@ void RasterDelegate::SyncMaterial(const Scene& scene, const Path& path, SyncedMa
         cached = key;
         try {
             std::optional<Image> image;
-            if (const Tensor* tensor = scene.Read(path, attribute)) {
+            if (const Tensor* tensor = normal ? prim.GetDetailNormal() : prim.GetDetailAlbedo()) {
                 image =
                     ImageOfTensor(*tensor, normal ? ImageEncoding::Linear : ImageEncoding::Srgb);
             }
@@ -525,7 +548,12 @@ void RasterDelegate::SyncMaterial(const Scene& scene, const Path& path, SyncedMa
 void RasterDelegate::SyncHeightfield(const Scene& scene, const Path& terrain) {
     ERNIE_ZONE("Sync heightfield");
     using namespace tokens;
-    if (terrain.IsEmpty() || scene.Read(terrain, kHeights) == nullptr) {
+    // `::ernie::Terrain`, not this class's `Terrain()`.
+    using TerrainView = ::ernie::Terrain;
+    const std::optional<TerrainView> prim =
+        terrain.IsEmpty() ? std::nullopt : std::optional<TerrainView>(TerrainView(scene, terrain));
+    const Tensor* written = prim ? prim->GetHeights() : nullptr;
+    if (written == nullptr) {
         if (heightfield_) {
             terrain_.ClearHeightfield();
             planet_.ClearHeights();
@@ -538,12 +566,12 @@ void RasterDelegate::SyncHeightfield(const Scene& scene, const Path& terrain) {
         return;
     }
     heightfield_ = key;
-    if (scene.Get(terrain, kPlanetRadius) != nullptr) {
+    if (prim->HasPlanetRadius()) {
         try {
             if (terrain_.HasHeightfield()) {
                 terrain_.ClearHeightfield();
             }
-            const Tensor heights = scene.Read(terrain, kHeights)->Contiguous();
+            const Tensor heights = written->Contiguous();
             if (heights.Type() != DType::Float32 || heights.Rank() != 3 ||
                 heights.Shape()[0] != CubeSphereLod::kFaces ||
                 heights.Location().kind != DeviceKind::Cpu) {
@@ -557,12 +585,11 @@ void RasterDelegate::SyncHeightfield(const Scene& scene, const Path& terrain) {
                 faces[face].data = heights.As<float>() + face * rows * cols;
                 faces[face].width = cols;
                 faces[face].height = rows;
-                if (scene.Get(terrain, kNoData) != nullptr) {
-                    faces[face].noData =
-                        static_cast<float>(GetNumber(scene, terrain, kNoData, 0.0));
+                if (prim->HasNoData()) {
+                    faces[face].noData = static_cast<float>(prim->GetNoData());
                 }
             }
-            planet_.SetHeights(GetNumber(scene, terrain, kPlanetRadius, 0.0), faces);
+            planet_.SetHeights(prim->GetPlanetRadius(), faces);
         } catch (const std::invalid_argument& error) {
             throw UploadError(terrain, kHeights, error.what());
         }
@@ -573,7 +600,6 @@ void RasterDelegate::SyncHeightfield(const Scene& scene, const Path& terrain) {
     }
     // Heights written on a GPU stay there: the terrain copies them device to device and rebuilds
     // what depends on the cells that changed on the GPU.
-    const Tensor* written = scene.Read(terrain, kHeights);
     if (IsGpu(written->Location().kind)) {
         try {
             if (!terrainOnGpu_) {
@@ -582,13 +608,14 @@ void RasterDelegate::SyncHeightfield(const Scene& scene, const Path& terrain) {
             }
             DeviceHeightfield field;
             field.heights = *written;
-            const glm::dvec2 corner = GetVec2(scene, terrain, kOrigin, {0.0, 0.0});
+            const glm::dvec2 corner = prim->GetOrigin();
             field.originX = corner.x;
             field.originY = corner.y;
-            field.cellSize = GetNumber(scene, terrain, kCellSize, 1.0);
-            if (scene.Get(terrain, kNoData) != nullptr) {
-                field.noData = static_cast<float>(GetNumber(scene, terrain, kNoData, 0.0));
+            field.cellSize = prim->GetCellSize();
+            if (prim->HasNoData()) {
+                field.noData = static_cast<float>(prim->GetNoData());
             }
+            // Four numbers, which the registry has no type for.
             if (const Value* value = scene.Get(terrain, kHeightsDirty)) {
                 // A vec4, or four numbers.
                 glm::vec4 dirty(-1.0f);
@@ -614,8 +641,8 @@ void RasterDelegate::SyncHeightfield(const Scene& scene, const Path& terrain) {
         return;
     }
     try {
-        const Tensor heights = scene.Read(terrain, kHeights)->Contiguous();
-        terrain_.SetHeightfield(RasterOf(scene, terrain, heights, kOrigin, kCellSize, kNoData));
+        const Tensor heights = written->Contiguous();
+        terrain_.SetHeightfield(RasterOf(*prim, heights));
     } catch (const std::invalid_argument& error) {
         throw UploadError(terrain, kHeights, error.what());
     }
@@ -704,7 +731,7 @@ void RasterDelegate::SyncSky(const Scene& scene, const RenderPrims& prims) {
                              : std::optional(KeyOf(scene, prims.dome, {kLightTexture}));
     // The full and directions dome lighting modes, with the dome's shadows on, light its map's
     // sun on its own.
-    const std::string mode = GetToken(scene, prims.settings, kDomeLightMode, "approximate");
+    const std::string mode = RenderSettings::OrFallbacks(scene, prims.settings).GetDomeLightMode();
     const bool wantSun = !prims.dome.IsEmpty() && (mode == "full" || mode == "directions") &&
                          GetBool(scene, prims.dome, kShadowEnable, true);
     if (map != domeMap_ || wantSun != domeSunWanted_) {
@@ -872,7 +899,7 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
         try {
             MeshData data = MeshDataOf(scene, path);
             synced.hasColors = !data.colors.empty();
-            synced.tint = ConstantDisplayColor(scene, path).value_or(glm::vec3(0.5f));
+            synced.tint = ConstantDisplayColor(Gprim(scene, path));
             synced.handle = meshes_.AddMesh(std::move(data));
             if (onGpu(kPoints)) {
                 SetMeshPoints(scene, path, synced.handle);
@@ -927,7 +954,8 @@ void RasterDelegate::SyncInstancers(const Scene& scene) {
         synced.anchorRow = anchorRow;
         synced.anchorBelow = anchorBelow;
         try {
-            const Tensor* positions = scene.Read(path, kPositions);
+            const PointInstancer instancer(scene, path);
+            const Tensor* positions = instancer.GetPositions();
             if (anchor && positions != nullptr) {
                 // Under a GPU-posed prim: its instances composed on the GPU under that prim's
                 // instance, then the transforms from it down to the instancer.
@@ -968,8 +996,7 @@ void RasterDelegate::SyncInstancers(const Scene& scene) {
                 meshes_.SetInstances(synced.handle, data);
             } else if (positions != nullptr && IsGpu(positions->Location().kind)) {
                 ComputeInterop& compute = RequireCompute();
-                const auto onDevice = [&](std::string_view attribute) {
-                    const Tensor* tensor = scene.Read(path, attribute);
+                const auto onDevice = [&](const Tensor* tensor) {
                     if (tensor == nullptr) {
                         return Tensor();
                     }
@@ -977,8 +1004,8 @@ void RasterDelegate::SyncInstancers(const Scene& scene) {
                 };
                 DeviceInstanceData data;
                 data.positions = *positions;
-                data.orientations = onDevice(kOrientations);
-                data.scales = onDevice(kScales);
+                data.orientations = onDevice(instancer.GetOrientations());
+                data.scales = onDevice(instancer.GetScales());
                 data.extent = ExtentOf(scene, path);
                 data.stream = scene.WriteStream(path, kPositions);
                 if (synced.handle == 0) {
@@ -1525,9 +1552,11 @@ void RasterDelegate::SyncPoints(const Scene& scene) {
         }
         synced.key = key;
         try {
-            // A width for all from a value or a one-element array, else one per point.
+            const ernie::Points cloud(scene, path);
+            // A width for all from a value or a one-element array, else one per point (an array
+            // the declared width does not cover, read by name).
             const auto widthsOf = [&](float& width) -> const Tensor* {
-                width = static_cast<float>(GetNumber(scene, path, kWidths, 1.0));
+                width = static_cast<float>(cloud.GetWidths());
                 const Tensor* tensor = scene.Read(path, kWidths);
                 if (tensor != nullptr && tensor->Elements() == 1 &&
                     tensor->Location().kind == DeviceKind::Cpu) {
@@ -1536,7 +1565,7 @@ void RasterDelegate::SyncPoints(const Scene& scene) {
                 }
                 return tensor;
             };
-            const Tensor* points = scene.Read(path, kPoints);
+            const Tensor* points = cloud.GetPoints();
             if (points != nullptr && IsGpu(points->Location().kind)) {
                 ComputeInterop& compute = RequireCompute();
                 const auto onDevice = [&](const Tensor* tensor) {
@@ -1626,7 +1655,7 @@ std::vector<PointsItem> RasterDelegate::PointsItems(const Scene& scene) const {
             item.transform = scene.WorldTransform(path);
         }
         item.material = MaterialOf(scene, path);
-        item.tint = ConstantDisplayColor(scene, path).value_or(glm::vec3(0.5f));
+        item.tint = ConstantDisplayColor(Gprim(scene, path));
         item.primId = PrimIdOf(path);
         item.world = WorldOf(scene, path);
         items.push_back(item);
@@ -1731,7 +1760,7 @@ std::vector<MeshItem> RasterDelegate::Items(const Scene& scene) const {
         const std::vector<Path> targets = TargetsOf(scene, path, tokens::kPrototypes);
         std::vector<std::vector<std::uint32_t>> lists =
             InstancesByPrototype(scene, path, targets.size());
-        const Tensor* positions = scene.Read(path, tokens::kPositions);
+        const Tensor* positions = PointInstancer(scene, path).GetPositions();
         const std::vector<std::int32_t> worlds = InstanceWorldsOf(
             scene, path,
             positions != nullptr ? static_cast<std::size_t>(positions->Elements()) / 3 : 0,

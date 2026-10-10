@@ -67,5 +67,66 @@ TEST(PrimSchemasTest, LightPanelsComeFromTheRegistry) {
     EXPECT_EQ(FieldOf(sky, tokens::kLightTexture), nullptr);
 }
 
+TEST(PrimSchemasTest, MaterialPanelsComeFromTheRegistryAndTheBrdf) {
+    Scene scene;
+    scene.Define("/Looks/Rock", tokens::kMaterial).Set(tokens::kBrdf, std::string("hapke"));
+    scene.Define("/Looks/Rock/Tex", tokens::kShader)
+        .Set(tokens::kInfoId, std::string(tokens::kUsdUVTexture));
+    scene.Define("/Looks/Rock/Node", tokens::kShader);
+    const BrdfRegistry brdfs = BrdfRegistry::WithBuiltins();
+    const SensorFilterRegistry filters = SensorFilterRegistry::WithStandard();
+
+    const std::vector<PropertySection> rock = SchemaOf(scene, "/Looks/Rock", brdfs, filters);
+    EXPECT_EQ(Titles(rock), (std::vector<std::string>{"Surface", "Reflectance model",
+                                                      "Detail textures", "Prim"}));
+    const PropertyField* brdf = FieldOf(rock, tokens::kBrdf);
+    ASSERT_NE(brdf, nullptr);
+    EXPECT_EQ(brdf->kind, PropertyField::Kind::Token);
+    EXPECT_EQ(brdf->options.size(), brdfs.Models().size());
+    EXPECT_EQ(rock[1].fields.size(), brdfs.Find("hapke")->params.size());
+    EXPECT_EQ(rock[1].fields.front().attribute, "inputs:" + brdfs.Find("hapke")->params[0].name);
+    EXPECT_EQ(FieldOf(rock, tokens::kAlbedoMapEnable)->label, "Use albedo map");
+    EXPECT_EQ(FieldOf(rock, tokens::kDetailHexSharpness)->max, 32.0);
+    EXPECT_EQ(FieldOf(rock, tokens::kAlbedoMap), nullptr);
+
+    // A shader shows the inputs of its info:id; all of them without one.
+    EXPECT_EQ(Titles(SchemaOf(scene, "/Looks/Rock/Tex", brdfs, filters)),
+              (std::vector<std::string>{"Shader", "Texture", "Prim"}));
+    EXPECT_EQ(Titles(SchemaOf(scene, "/Looks/Rock/Node", brdfs, filters)),
+              (std::vector<std::string>{"Shader", "Preview surface", "Texture", "Transform 2D",
+                                        "Primvar reader", "Prim"}));
+}
+
+TEST(PrimSchemasTest, GeometryPanelsComeFromTheRegistry) {
+    Scene scene;
+    scene.Define("/Capsule", tokens::kCapsule);
+    scene.Define("/Mesh", tokens::kMesh);
+    scene.Define("/Ground", tokens::kGroundPlane);
+    const BrdfRegistry brdfs = BrdfRegistry::WithBuiltins();
+    const SensorFilterRegistry filters = SensorFilterRegistry::WithStandard();
+
+    // Radius, height, then the axis its base declares.
+    const std::vector<PropertySection> capsule = SchemaOf(scene, "/Capsule", brdfs, filters);
+    EXPECT_EQ(Titles(capsule), (std::vector<std::string>{"Shape", "Geometry", "Prim"}));
+    ASSERT_EQ(capsule[0].fields.size(), 3u);
+    EXPECT_EQ(capsule[0].fields[0].fallback, Value(0.5));
+    EXPECT_EQ(capsule[0].fields[1].label, "Height");
+    EXPECT_EQ(capsule[0].fields[1].max, 1000.0);
+    EXPECT_EQ(capsule[0].fields[2].options, (std::vector<std::string>{"X", "Y", "Z"}));
+    EXPECT_EQ(FieldOf(capsule, tokens::kDisplayColor)->kind, PropertyField::Kind::Color);
+
+    // A mesh's arrays are not edited.
+    EXPECT_EQ(Titles(SchemaOf(scene, "/Mesh", brdfs, filters)),
+              (std::vector<std::string>{"Geometry", "Prim"}));
+
+    const std::vector<PropertySection> ground = SchemaOf(scene, "/Ground", brdfs, filters);
+    EXPECT_EQ(Titles(ground), (std::vector<std::string>{"Ground", "Prim"}));
+    EXPECT_EQ(FieldOf(ground, tokens::kChecker)->label, "Checkerboard");
+    EXPECT_EQ(FieldOf(ground, tokens::kCheckerSize)->min, 0.001);
+    EXPECT_EQ(FieldOf(ground, tokens::kCheckerColor1)->label, "Checker colour 1");
+    EXPECT_EQ(FieldOf(ground, tokens::kMaterialBinding)->kind, PropertyField::Kind::Target);
+    EXPECT_EQ(FieldOf(ground, tokens::kDisplayColor), nullptr);
+}
+
 }  // namespace
 }  // namespace ernie::app

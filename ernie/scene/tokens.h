@@ -176,6 +176,10 @@ inline constexpr std::string_view kLensTransmission = "ernie:lens:transmission";
 inline constexpr std::string_view kSensorType = "ernie:sensor:type";  ///< "rgb" or "mono".
 /// Quantum efficiency spectrum of one channel: append the channel name ("r", "g", "b", "mono").
 inline constexpr std::string_view kSensorQePrefix = "ernie:sensor:qe:";
+inline constexpr std::string_view kSensorQeR = "ernie:sensor:qe:r";
+inline constexpr std::string_view kSensorQeG = "ernie:sensor:qe:g";
+inline constexpr std::string_view kSensorQeB = "ernie:sensor:qe:b";
+inline constexpr std::string_view kSensorQeMono = "ernie:sensor:qe:mono";
 inline constexpr std::string_view kSensorFullWell = "ernie:sensor:fullWell";        ///< electrons.
 inline constexpr std::string_view kSensorReadNoise = "ernie:sensor:readNoise";      ///< electrons.
 inline constexpr std::string_view kSensorDarkCurrent = "ernie:sensor:darkCurrent";  ///< e-/s.

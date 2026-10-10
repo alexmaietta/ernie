@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/scene/camera.h"
 
+#include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 
@@ -26,12 +27,6 @@ Spectrum Bump(double centre, double width, double peak) {
         values.push_back(peak * std::exp(-0.5 * t * t));
     }
     return Spectrum(std::move(wavelengths), std::move(values));
-}
-
-// A float array attribute, also from the vectors short lists arrive as (`GetFloats`).
-std::optional<std::vector<float>> FloatArray(const Scene& scene, const Path& path,
-                                             std::string_view attribute) {
-    return GetFloats(scene, path, attribute);
 }
 
 }  // namespace
@@ -405,7 +400,8 @@ CameraParams CameraParamsOf(const Scene& scene, const Path& path, std::uint32_t 
     if (!scene.Has(path) || scene.TypeOf(path) != kCamera) {
         throw std::invalid_argument("'" + path.String() + "' is not a Camera");
     }
-    const std::string projection = GetToken(scene, path, kProjection, kPerspective);
+    const Camera prim(scene, path);
+    const std::string projection = prim.GetProjection();
     if (projection != kPerspective && projection != kOrthographic) {
         throw std::invalid_argument("Camera '" + path.String() + "' has projection '" +
                                     projection + "'; use perspective or orthographic");
@@ -415,71 +411,63 @@ CameraParams CameraParamsOf(const Scene& scene, const Path& path, std::uint32_t 
     camera.transform = transform;
     camera.width = width;
     camera.height = height;
-    const auto number = [&](std::string_view attribute, double fallback) {
-        return GetNumber(scene, path, attribute, fallback);
-    };
-    camera.focalLengthMm = number(kFocalLength, camera.focalLengthMm);
-    camera.verticalApertureMm = number(kVerticalAperture, camera.verticalApertureMm);
-    camera.horizontalApertureOffsetMm = number(kHorizontalApertureOffset, 0.0);
-    camera.verticalApertureOffsetMm = number(kVerticalApertureOffset, 0.0);
-    const glm::dvec2 clipping =
-        GetVec2(scene, path, kClippingRange, {camera.nearPlane, camera.farPlane});
+    camera.focalLengthMm = prim.GetFocalLength();
+    camera.verticalApertureMm = prim.GetVerticalAperture();
+    camera.horizontalApertureOffsetMm = prim.GetHorizontalApertureOffset();
+    camera.verticalApertureOffsetMm = prim.GetVerticalApertureOffset();
+    const glm::dvec2 clipping = prim.GetClippingRange();
     camera.nearPlane = clipping.x;
     camera.farPlane = clipping.y;
-    camera.exposureStops = number(kCameraExposure, 0.0);
-    camera.exposureTime = number(kExposureTime, camera.exposureTime);
-    camera.iso = number(kExposureIso, camera.iso);
-    camera.fStop = number(kExposureFStop, camera.fStop);
-    camera.responsivity = number(kExposureResponsivity, camera.responsivity);
-    camera.lensFStop = std::max(number(kFStop, 0.0), 0.0);
-    camera.focusDistance = std::max(number(kFocusDistance, 0.0), 0.0);
-    camera.shutterOpen = number(kShutterOpen, camera.shutterOpen);
-    camera.shutterClose = number(kShutterClose, camera.shutterClose);
-    camera.shutterSamples = static_cast<int>(number(kShutterSamples, camera.shutterSamples));
-    camera.rollingShutter = number(kShutterRolling, camera.rollingShutter);
-    const std::string scan = GetToken(scene, path, kCameraScan, kFrameScan);
+    camera.exposureStops = prim.GetExposure();
+    camera.exposureTime = prim.GetExposureTime();
+    camera.iso = prim.GetExposureIso();
+    camera.fStop = prim.GetExposureFStop();
+    camera.responsivity = prim.GetExposureResponsivity();
+    camera.lensFStop = std::max(prim.GetFStop(), 0.0);
+    camera.focusDistance = std::max(prim.GetFocusDistance(), 0.0);
+    camera.shutterOpen = prim.GetShutterOpen();
+    camera.shutterClose = prim.GetShutterClose();
+    camera.shutterSamples = prim.GetShutterSamples();
+    camera.rollingShutter = prim.GetShutterRolling();
+    const std::string scan = prim.GetScan();
     if (scan != kFrameScan && scan != kPushbroom) {
         throw std::invalid_argument("Camera '" + path.String() + "' has scan '" + scan +
                                     "'; use frame or pushbroom");
     }
     camera.pushbroom = scan == kPushbroom;
-    camera.lineOffsetMm = number(kPushbroomLineOffset, camera.lineOffsetMm);
+    camera.lineOffsetMm = prim.GetPushbroomLineOffset();
 
-    const glm::dvec2 range =
-        GetVec2(scene, path, kSpectralRange, {camera.bands.minNm, camera.bands.maxNm});
-    camera.bands = {range.x, range.y, static_cast<int>(number(kSpectralBands, camera.bands.count))};
+    const glm::dvec2 range = prim.GetSpectralRange();
+    camera.bands = {range.x, range.y, prim.GetSpectralBands()};
 
     LensModel& lens = camera.lens;
-    if (const std::optional<std::vector<float>> k = FloatArray(scene, path, kLensDistortion)) {
-        const auto at = [&k](std::size_t i) { return i < k->size() ? double((*k)[i]) : 0.0; };
-        lens.k1 = at(0);
-        lens.k2 = at(1);
-        lens.k3 = at(2);
-        lens.p1 = at(3);
-        lens.p2 = at(4);
-    }
-    const std::string lensProjection = GetToken(scene, path, kLensProjection, kPerspective);
+    // Missing coefficients are 0.
+    const std::vector<float> distortion = prim.GetLensDistortion();
+    const auto at = [&distortion](std::size_t i) {
+        return i < distortion.size() ? double(distortion[i]) : 0.0;
+    };
+    lens.k1 = at(0);
+    lens.k2 = at(1);
+    lens.k3 = at(2);
+    lens.p1 = at(3);
+    lens.p2 = at(4);
+    const std::string lensProjection = prim.GetLensProjection();
     if (lensProjection == kFisheye) {
         lens.projection = LensProjection::Fisheye;
     } else if (lensProjection != kPerspective) {
         throw std::invalid_argument("Camera '" + path.String() + "' has lens projection '" +
                                     lensProjection + "'; use perspective or fisheye");
     }
-    if (const std::optional<std::vector<float>> k = FloatArray(scene, path, kLensFisheye)) {
-        for (std::size_t i = 0; i < lens.fisheye.size(); ++i) {
-            lens.fisheye[i] = i < k->size() ? double((*k)[i]) : 0.0;
-        }
+    const std::vector<float> fisheye = prim.GetLensFisheye();
+    for (std::size_t i = 0; i < lens.fisheye.size(); ++i) {
+        lens.fisheye[i] = i < fisheye.size() ? double(fisheye[i]) : 0.0;
     }
-    lens.vignetting = GetBool(scene, path, kLensVignetting, lens.vignetting);
-    lens.transmission = number(kLensTransmission, lens.transmission);
-    // Curves of (wavelength, value) pairs.
-    const auto curve = [&](std::string_view attribute) -> Spectrum {
-        const std::optional<std::vector<float>> pairs = FloatArray(scene, path, attribute);
-        return pairs ? Spectrum::FromPairs(*pairs) : Spectrum();
-    };
-    lens.chromaticScale = curve(kLensChromaticScale);
-    lens.chromaticFocusMm = curve(kLensChromaticFocus);
-    if (const Tensor* written = scene.Read(path, kLensRays)) {
+    lens.vignetting = prim.GetLensVignetting();
+    lens.transmission = prim.GetLensTransmission();
+    // Curves of (wavelength, value) pairs; none when unset.
+    lens.chromaticScale = Spectrum::FromPairs(prim.GetLensChromaticScale());
+    lens.chromaticFocusMm = Spectrum::FromPairs(prim.GetLensChromaticFocus());
+    if (const Tensor* written = prim.GetLensRays()) {
         const Tensor rays = written->Contiguous();
         if (rays.Type() != DType::Float32 || rays.Rank() != 3 || rays.Shape()[2] != 3 ||
             rays.Location().kind != DeviceKind::Cpu) {
@@ -490,7 +478,7 @@ CameraParams CameraParamsOf(const Scene& scene, const Path& path, std::uint32_t 
         auto table = std::make_shared<LensRayTable>();
         table->width = width;
         table->height = height;
-        table->step = static_cast<std::uint32_t>(number(kLensRaysStep, 8.0));
+        table->step = static_cast<std::uint32_t>(prim.GetLensRaysStep());
         table->rows = static_cast<std::uint32_t>(rays.Shape()[0]);
         table->columns = static_cast<std::uint32_t>(rays.Shape()[1]);
         const float* values = rays.As<float>();
@@ -501,7 +489,7 @@ CameraParams CameraParamsOf(const Scene& scene, const Path& path, std::uint32_t 
         lens.rays = std::move(table);
     }
 
-    const std::string type = GetToken(scene, path, kSensorType, "rgb");
+    const std::string type = prim.GetSensorType();
     if (type == "rgb") {
         camera.sensor = SensorModel::Rgb();
     } else if (type == "mono") {
@@ -512,22 +500,21 @@ CameraParams CameraParamsOf(const Scene& scene, const Path& path, std::uint32_t 
     }
     SensorModel& sensor = camera.sensor;
     for (SensorChannel& channel : sensor.channels) {
-        const std::string attribute = std::string(kSensorQePrefix) + channel.name;
-        if (const std::optional<std::vector<float>> pairs = FloatArray(scene, path, attribute)) {
+        if (const std::optional<std::vector<float>> pairs = prim.GetSensorQe(channel.name)) {
             channel.quantumEfficiency = Spectrum::FromPairs(*pairs);
         }
     }
-    sensor.fullWellElectrons = number(kSensorFullWell, sensor.fullWellElectrons);
-    sensor.readNoiseElectrons = number(kSensorReadNoise, sensor.readNoiseElectrons);
-    sensor.darkCurrentElectrons = number(kSensorDarkCurrent, sensor.darkCurrentElectrons);
-    sensor.prnu = number(kSensorPrnu, sensor.prnu);
-    sensor.dsnuElectrons = number(kSensorDsnu, sensor.dsnuElectrons);
-    sensor.electronsPerDnAtIso100 = number(kSensorGain, sensor.electronsPerDnAtIso100);
-    sensor.adcBits = static_cast<int>(number(kSensorAdcBits, sensor.adcBits));
-    sensor.blackLevelDn = number(kSensorBlackLevel, sensor.blackLevelDn);
-    camera.orthographicPixelPitchUm = number(kSensorPixelPitch, camera.orthographicPixelPitchUm);
-    sensor.noise = GetBool(scene, path, kSensorNoise, sensor.noise);
-    sensor.seed = static_cast<std::uint32_t>(number(kSensorSeed, sensor.seed));
+    sensor.fullWellElectrons = prim.GetSensorFullWell();
+    sensor.readNoiseElectrons = prim.GetSensorReadNoise();
+    sensor.darkCurrentElectrons = prim.GetSensorDarkCurrent();
+    sensor.prnu = prim.GetSensorPrnu();
+    sensor.dsnuElectrons = prim.GetSensorDsnu();
+    sensor.electronsPerDnAtIso100 = prim.GetSensorElectronsPerDn();
+    sensor.adcBits = prim.GetSensorAdcBits();
+    sensor.blackLevelDn = prim.GetSensorBlackLevel();
+    camera.orthographicPixelPitchUm = prim.GetSensorPixelPitch();
+    sensor.noise = prim.GetSensorNoise();
+    sensor.seed = static_cast<std::uint32_t>(prim.GetSensorSeed());
     camera.Check();
     return camera;
 }

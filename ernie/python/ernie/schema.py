@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import builtins
 import difflib
+import functools
 from typing import Any, ClassVar
 
 from ._ernie import AttributeDef, Path, Prim, PrimType, Scene, find_prim_type, prim_types
@@ -70,6 +71,28 @@ class _Attribute:
         self.definition.write(instance.prim, _target(value))
 
 
+def _define_type(cls: type, parent: Any, path: str | Path, **attributes: Any) -> Any:
+    """Defines a prim of `cls`'s type at ``path`` in a Scene, or relative to a prim, and sets
+    ``attributes``."""
+    if cls.prim_type.abstract:
+        raise TypeError(f"{cls.__name__} is abstract; define one of the types derived from it")
+    if isinstance(parent, Schema):
+        parent = parent.prim
+    define = _scene_define if isinstance(parent, Scene) else _prim_define
+    return cls(define(parent, path, cls.prim_type.name)).set(**attributes)
+
+
+class _Define:
+    """``define`` on a typed prim class defines a prim of its type
+    (``ernie.Sphere.define(scene, "/World/Rock")``); on a typed prim, a child of it, as
+    ``Prim.define`` does (``material.define("Surface", ernie.Shader)``)."""
+
+    def __get__(self, instance: Any, owner: type) -> Any:
+        if instance is None:
+            return functools.partial(_define_type, owner)
+        return functools.partial(_define, instance.prim)
+
+
 class Schema:
     """Base of the typed prim classes: a ``Prim`` of the class's registered type or one derived
     from it."""
@@ -87,16 +110,7 @@ class Schema:
             raise TypeError(f"'{prim.path}' is {what}, not a {self.prim_type.name}")
         object.__setattr__(self, "prim", prim)
 
-    @classmethod
-    def define(cls, parent: Scene | Prim | Schema, path: str | Path, **attributes: Any) -> Any:
-        """Defines a prim of this type at ``path`` in a Scene, or relative to a prim, and sets
-        ``attributes``."""
-        if cls.prim_type.abstract:
-            raise TypeError(f"{cls.__name__} is abstract; define one of the types derived from it")
-        if isinstance(parent, Schema):
-            parent = parent.prim
-        define = _scene_define if isinstance(parent, Scene) else _prim_define
-        return cls(define(parent, path, cls.prim_type.name)).set(**attributes)
+    define = _Define()
 
     @classmethod
     def attributes(cls) -> list[AttributeDef]:

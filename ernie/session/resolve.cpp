@@ -2,8 +2,13 @@
 #include "ernie/session/resolve.h"
 
 #include "ernie/geometry/primitives.h"
+#include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/light_schemas.h"
+#include "ernie/scene/material_schemas.h"
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
+#include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/wide_view.h"
 #include "ernie/scene/xform.h"
@@ -312,7 +317,7 @@ MinimalMode MinimalModeOf(const Scene& scene, const Path& prim, MinimalMode fall
     if (prim.IsEmpty() || !scene.Has(prim) || scene.Get(prim, tokens::kMinimalMode) == nullptr) {
         return fallback;
     }
-    const std::string token = GetToken(scene, prim, tokens::kMinimalMode, "");
+    const std::string token = RenderSettingsBase(scene, prim).GetMinimalMode();
     if (token == tokens::kOff) {
         return MinimalMode::Off;
     }
@@ -335,11 +340,14 @@ Wireframe WireframeOf(const Scene& scene, const Path& settings) {
     if (value == nullptr) {
         return Wireframe::Off;
     }
-    if (value->Is<bool>() || value->Is<int>()) {
-        return GetBool(scene, settings, tokens::kWireframe, false) ? Wireframe::Overlay
-                                                                   : Wireframe::Off;
+    // A bool, as the viewport's toggle once wrote it: on is "overlay".
+    if (const bool* on = value->Get<bool>()) {
+        return *on ? Wireframe::Overlay : Wireframe::Off;
     }
-    const std::string token = GetToken(scene, settings, tokens::kWireframe, "");
+    if (const int* on = value->Get<int>()) {
+        return *on != 0 ? Wireframe::Overlay : Wireframe::Off;
+    }
+    const std::string token = RenderSettings(scene, settings).GetWireframe();
     for (const Wireframe mode : {Wireframe::Off, Wireframe::Overlay, Wireframe::HiddenLine}) {
         if (token == WireframeToken(mode)) {
             return mode;
@@ -351,9 +359,7 @@ Wireframe WireframeOf(const Scene& scene, const Path& settings) {
 }
 
 Occlusion OcclusionOf(const Scene& scene, const Path& settings) {
-    const std::string token = settings.IsEmpty()
-                                  ? std::string(tokens::kOff)
-                                  : GetToken(scene, settings, tokens::kOcclusion, tokens::kOff);
+    const std::string token = RenderSettings::OrFallbacks(scene, settings).GetOcclusion();
     if (token == tokens::kOff) {
         return Occlusion::Off;
     }
@@ -369,9 +375,7 @@ Occlusion OcclusionOf(const Scene& scene, const Path& settings) {
 }
 
 Culling CullingOf(const Scene& scene, const Path& settings) {
-    const std::string token = settings.IsEmpty()
-                                  ? std::string(tokens::kGpu)
-                                  : GetToken(scene, settings, tokens::kCulling, tokens::kGpu);
+    const std::string token = RenderSettings::OrFallbacks(scene, settings).GetCulling();
     if (token == tokens::kOff) {
         return Culling::Off;
     }
@@ -386,11 +390,14 @@ Culling CullingOf(const Scene& scene, const Path& settings) {
 }
 
 std::optional<std::uint64_t> FrameOf(const Scene& scene, const Path& settings) {
-    if (settings.IsEmpty() || scene.Get(settings, tokens::kFrame) == nullptr) {
+    const Value* value = settings.IsEmpty() ? nullptr : scene.Get(settings, tokens::kFrame);
+    if (value == nullptr) {
         return std::nullopt;
     }
-    const double frame = GetNumber(scene, settings, tokens::kFrame, -1.0);
-    if (!(frame >= 0.0) || frame != std::floor(frame) || frame >= 0x1p64) {
+    // As a double, not the view's int (`RenderSettings::GetFrame`), to reject fractions and
+    // frames past an int's range; not a number reads as -1, rejected below.
+    const double frame = AttributeTraits<double>::From(*value).value_or(-1.0);
+    if (!(frame >= 0.0)|| frame != std::floor(frame) || frame >= 0x1p64) {
         throw std::invalid_argument("'" + std::string(tokens::kFrame) + "' of '" +
                                     settings.String() + "' must be a non-negative integer");
     }
@@ -416,7 +423,7 @@ RenderPrims ResolveRenderPrims(const Scene& scene, const Path& settings) {
         prims.settings = FirstOutsideSession(scene, tokens::kRenderSettings);
     }
     if (!prims.settings.IsEmpty()) {
-        prims.camera = GetTarget(scene, prims.settings, tokens::kCameraRel);
+        prims.camera = RenderSettings(scene, prims.settings).GetCamera();
     }
     if (prims.camera.IsEmpty()) {
         prims.camera = FirstOutsideSession(scene, tokens::kCamera);
@@ -530,7 +537,7 @@ const Tensor* GpuPosesOf(const Scene& scene, const Path& camera) {
         return nullptr;
     }
     CheckPosesShape(*tensor, camera);
-    const std::string device = GetToken(scene, camera, tokens::kPosesDevice, tokens::kGpu);
+    const std::string device = Camera(scene, camera).GetPosesDevice();
     if (device == tokens::kHost) {
         return nullptr;
     }
@@ -562,7 +569,7 @@ std::vector<glm::dmat4> ViewPosesOf(const Scene& scene, std::span<const Path> ca
         return poses;
     }
     const Path& camera = cameras.front();
-    const Tensor* tensor = hostPoses != nullptr ? hostPoses : scene.Read(camera, kPoses);
+    const Tensor* tensor = hostPoses != nullptr ? hostPoses : Camera(scene, camera).GetPoses();
     if (tensor == nullptr) {
         return poses;
     }
@@ -680,7 +687,7 @@ std::vector<SensorFilterStep> FilterStepsOf(const Scene& scene, const Path& prim
             throw std::invalid_argument("'" + filter.String() + "' is not a SensorFilter prim");
         }
         SensorFilterStep step;
-        step.type = GetToken(scene, filter, kFilterType, "");
+        step.type = SensorFilterPrim(scene, filter).GetFilterType();
         if (step.type.empty()) {
             throw std::invalid_argument("Sensor filter '" + filter.String() + "' has no '" +
                                         std::string(kFilterType) + "'");
@@ -717,7 +724,8 @@ std::vector<RenderProductSpec>
 ResolveRenderProducts(const Scene& scene, std::span<const Path> products, const Path& settings) {
     using namespace tokens;
     const Path resolved = ResolveRenderPrims(scene, settings).settings;
-    const glm::dvec2 settingsResolution = GetVec2(scene, resolved, kResolution, {2048.0, 1080.0});
+    const glm::dvec2 settingsResolution =
+        RenderSettings::OrFallbacks(scene, resolved).GetResolution();
     std::vector<Path> paths(products.begin(), products.end());
     if (paths.empty() && !resolved.IsEmpty()) {
         paths = TargetsOf(scene, resolved, kProducts);
@@ -745,26 +753,30 @@ ResolveRenderProducts(const Scene& scene, std::span<const Path> products, const 
         if (!scene.Has(path) || scene.TypeOf(path) != kRenderProduct) {
             throw std::invalid_argument("'" + path.String() + "' is not a RenderProduct prim");
         }
+        const RenderProduct product(scene, path);
         RenderProductSpec spec;
         spec.product = path;
+        // One camera, or a batch of them: a list, which the view's single target cannot hold.
         spec.cameras = TargetsOf(scene, path, kCameraRel);
         spec.camera = spec.cameras.empty() ? Path() : spec.cameras.front();
-        spec.resolution = extentOf(GetVec2(scene, path, kResolution, settingsResolution));
-        if (scene.Get(path, kOverlays) != nullptr) {
-            spec.overlays = GetToken(scene, path, kOverlays, "");
+        // What the product leaves unset comes from its settings.
+        spec.resolution = extentOf(product.HasResolution() ? product.GetResolution()
+                                                           : settingsResolution);
+        if (product.HasOverlays()) {
+            spec.overlays = product.GetOverlays();
         }
-        if (scene.Get(path, kMinimalMode) != nullptr) {
+        if (product.HasMinimalMode()) {
             spec.minimal = MinimalModeOf(scene, path, MinimalMode::Off);
         }
-        if (scene.Get(path, kMinimalConstantColor) != nullptr) {
-            spec.minimalColor = glm::vec3(GetVec3(scene, path, kMinimalConstantColor, {}));
+        if (product.HasMinimalConstantColor()) {
+            spec.minimalColor = glm::vec3(product.GetMinimalConstantColor());
         }
         bool ownChains = false;
         for (const Path& var : TargetsOf(scene, path, kOrderedVars)) {
             if (!scene.Has(var) || scene.TypeOf(var) != kRenderVar) {
                 throw std::invalid_argument("'" + var.String() + "' is not a RenderVar prim");
             }
-            const std::string name = GetToken(scene, var, kSourceName, kLdrColor);
+            const std::string name = RenderVar(scene, var).GetSourceName();
             spec.vars.emplace_back(var, name);
             // A var with its own `ernie:filters` comes from that chain, not the product's.
             if (scene.Get(var, kFilters) != nullptr) {
@@ -1303,6 +1315,8 @@ std::vector<Star> StarsOf(const Scene& scene, const Path& path) {
     if (scene.TypeOf(path) != kStarField) {
         throw std::invalid_argument("'" + path.String() + "' is not a StarField");
     }
+    // The star arrays are tensors or float array values, read by name: `StarField`'s tensor
+    // accessors read tensors only. They have no fallback.
     const auto array = [&](std::string_view attribute, std::size_t components) {
         return FloatArray(scene, path, attribute, components);
     };
@@ -1336,9 +1350,9 @@ std::vector<Star> StarsOf(const Scene& scene, const Path& path) {
                                     std::string(kStarsDeclination) + "', or '" +
                                     std::string(kStarsDirection) + "'");
     }
-    const double zeroPoint = GetNumber(scene, path, kStarsZeroPoint, kMagnitudeZeroLux) *
-                             std::exp2(GetNumber(scene, path, kExposure, 0.0));
-    const double limit = GetNumber(scene, path, kStarsMagnitudeLimit, 99.0);
+    const StarField field(scene, path);
+    const double zeroPoint = field.GetZeroPoint() * std::exp2(field.GetExposure());
+    const double limit = field.GetMagnitudeLimit();
     std::vector<Star> stars;
     stars.reserve(count);
     for (std::size_t i = 0; i < count; ++i) {
@@ -1446,8 +1460,10 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
                         : CameraParamsOf(scene, prims.camera, width, height);
     params.overscan = OverscanOf(params.camera);
     const Path& settings = prims.settings;
-    params.ambient = Number(scene, settings, kAmbient, params.ambient);
-    const std::string domeMode = GetToken(scene, settings, kDomeLightMode, "approximate");
+    // Without a RenderSettings prim, every option is its declared fallback.
+    const RenderSettings options = RenderSettings::OrFallbacks(scene, settings);
+    params.ambient = static_cast<float>(options.GetAmbient());
+    const std::string domeMode = options.GetDomeLightMode();
     if (domeMode == "approximate") {
         params.domeMode = DomeLightMode::Approximate;
     } else if (domeMode == "full") {
@@ -1461,18 +1477,15 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
                                     std::string(kDomeLightMode) + " is '" + domeMode +
                                     "', not approximate, full, directions or limited");
     }
-    params.domeShadowRadius =
-        std::max(Number(scene, settings, kDomeShadowRadius, params.domeShadowRadius), 1e-6f);
-    params.domeDirections = static_cast<std::uint32_t>(std::clamp(
-        GetNumber(scene, settings, kDomeDirections, params.domeDirections), 1.0, 1024.0));
+    params.domeShadowRadius = std::max(static_cast<float>(options.GetDomeShadowRadius()), 1e-6f);
+    params.domeDirections =
+        static_cast<std::uint32_t>(std::clamp(options.GetDomeDirections(), 1, 1024));
     params.wireframe = WireframeOf(scene, settings);
-    params.overlays = GetToken(scene, settings, kOverlays, "");
+    params.overlays = options.GetOverlays();
     params.minimal = MinimalModeOf(scene, settings, MinimalMode::Off);
-    params.minimalColor =
-        glm::vec3(GetVec3(scene, settings, kMinimalConstantColor, glm::dvec3(1.0)));
-    params.exposure =
-        static_cast<float>(std::exp2(GetNumber(scene, settings, kExposureCompensation, 0.0)));
-    params.meter = GetBool(scene, settings, kMeter, false);
+    params.minimalColor = glm::vec3(options.GetMinimalConstantColor());
+    params.exposure = static_cast<float>(std::exp2(options.GetExposureCompensation()));
+    params.meter = options.GetMeter();
     params.culling = CullingOf(scene, settings);
     params.occlusion = OcclusionOf(scene, settings);
     // A pushbroom's depth pyramid holds its strip's depths, which no one view-projection tests
@@ -1480,17 +1493,13 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
     if (params.camera.pushbroom) {
         params.occlusion = Occlusion::Off;
     }
-    params.meshLodError =
-        std::max(Number(scene, settings, kLodMeshError, params.meshLodError), 0.0f);
-    params.clearColor = glm::vec3(GetVec3(scene, settings, kClearColor, {0.0, 0.0, 0.0}));
+    params.meshLodError = std::max(static_cast<float>(options.GetLodMeshError()), 0.0f);
+    params.clearColor = glm::vec3(options.GetClearColor());
     ShadowSettings& shadows = params.shadows;
-    shadows.cascades =
-        static_cast<int>(GetNumber(scene, settings, kShadowCascades, shadows.cascades));
-    shadows.resolution = static_cast<std::uint32_t>(
-        GetNumber(scene, settings, kShadowResolution, shadows.resolution));
-    shadows.worldResolution = static_cast<std::uint32_t>(
-        GetNumber(scene, settings, kShadowWorldResolution, shadows.worldResolution));
-    const std::string worlds = GetToken(scene, settings, kShadowWorlds, kSeparate);
+    shadows.cascades = options.GetShadowCascades();
+    shadows.resolution = static_cast<std::uint32_t>(options.GetShadowResolution());
+    shadows.worldResolution = static_cast<std::uint32_t>(options.GetShadowWorldResolution());
+    const std::string worlds = options.GetShadowWorlds();
     if (worlds == kSeparate) {
         shadows.worlds = WorldShadows::Separate;
     } else if (worlds == kShared) {
@@ -1502,24 +1511,23 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
                                     settings.String() +
                                     "' must be \"separate\", \"shared\" or \"merged\"");
     }
-    const std::string fit = GetToken(scene, settings, kShadowWorldFit, kScene);
+    const std::string fit = options.GetShadowWorldFit();
     if (fit != kScene && fit != kWorldFit) {
         throw std::invalid_argument("'" + std::string(kShadowWorldFit) + "' of '" +
                                     settings.String() + "' must be \"scene\" or \"world\"");
     }
     shadows.worldFit = fit == kWorldFit ? WorldShadowFit::World : WorldShadowFit::Scene;
-    const std::string viewFit = GetToken(scene, settings, kShadowFit, kScene);
+    const std::string viewFit = options.GetShadowFit();
     if (viewFit != kScene && viewFit != kVisible) {
         throw std::invalid_argument("'" + std::string(kShadowFit) + "' of '" + settings.String() +
                                     "' must be \"scene\" or \"visible\"");
     }
     shadows.fit = viewFit == kVisible ? ShadowFit::Visible : ShadowFit::Scene;
-    shadows.worldMargin =
-        std::max(Number(scene, settings, kShadowWorldMargin, shadows.worldMargin), 0.0f);
-    shadows.softness = Number(scene, settings, kShadowSoftness, shadows.softness);
-    shadows.normalOffset = Number(scene, settings, kShadowNormalOffset, shadows.normalOffset);
-    shadows.splitLambda = Number(scene, settings, kShadowSplitLambda, shadows.splitLambda);
-    shadows.showCascades = GetBool(scene, settings, kShadowShowCascades, shadows.showCascades);
+    shadows.worldMargin = std::max(static_cast<float>(options.GetShadowWorldMargin()), 0.0f);
+    shadows.softness = static_cast<float>(options.GetShadowSoftness());
+    shadows.normalOffset = static_cast<float>(options.GetShadowNormalOffset());
+    shadows.splitLambda = static_cast<float>(options.GetShadowSplitLambda());
+    shadows.showCascades = options.GetShadowShowCascades();
     if (!prims.light.IsEmpty()) {
         params.sunDirection = glm::vec3(TowardsLight(scene, prims.light));
         params.sunIrradiance = SunIrradianceOf(scene, prims.light, params.camera.bands);
@@ -1546,8 +1554,15 @@ FrameParams FrameParamsOf(const Scene& scene, const RenderPrims& prims, std::uin
 
 namespace {
 
-TextureWrap WrapOf(const Scene& scene, const Path& texture, std::string_view attribute) {
-    const std::string wrap = GetToken(scene, texture, attribute, "useMetadata");
+/// The shader type `info:id` of the Shader at `path`, or "" when there is none.
+std::string ShaderIdOf(const Scene& scene, const Path& path) {
+    if (!scene.Has(path) || scene.TypeOf(path) != tokens::kShader) {
+        return {};
+    }
+    return Shader(scene, path).GetInfoId();
+}
+
+TextureWrap WrapOf(const std::string& wrap, const Path& texture, std::string_view attribute) {
     if (wrap == "repeat" || wrap == "useMetadata") {
         return TextureWrap::Repeat;
     }
@@ -1585,10 +1600,11 @@ TextureReader TextureReaderOf(const Scene& scene, const Connection& connection,
     using namespace tokens;
     const Path& texture = connection.prim;
     const std::string where = "'" + surface.String() + "' " + std::string(input);
-    if (GetToken(scene, texture, kInfoId, "") != kUsdUVTexture) {
+    if (ShaderIdOf(scene, texture) != kUsdUVTexture) {
         throw std::invalid_argument(where + " connects to '" + texture.String() +
                                     "', which is not a UsdUVTexture");
     }
+    const Shader shader(scene, texture);
     TextureReader reader;
     if (scalar) {
         constexpr std::array<std::string_view, 4> kChannels{"outputs:r", "outputs:g", "outputs:b",
@@ -1603,19 +1619,19 @@ TextureReader TextureReaderOf(const Scene& scene, const Connection& connection,
         throw std::invalid_argument(where + " reads " + connection.output +
                                     "; a colour or normal reads outputs:rgb");
     }
-    if (scene.Read(texture, kShaderTexture) != nullptr) {
+    if (shader.GetTexture() != nullptr) {
         reader.image = texture.String();
     } else {
-        reader.file = GetToken(scene, texture, kFile, "");
+        reader.file = shader.GetFile();
     }
     if (reader.Source().empty()) {
         throw std::invalid_argument("'" + texture.String() + "' has neither " +
                                     std::string(kFile) + " nor " +
                                     std::string(kShaderTexture));
     }
-    reader.wrapS = WrapOf(scene, texture, kWrapS);
-    reader.wrapT = WrapOf(scene, texture, kWrapT);
-    const std::string space = GetToken(scene, texture, kSourceColorSpace, "auto");
+    reader.wrapS = WrapOf(shader.GetWrapS(), texture, kWrapS);
+    reader.wrapT = WrapOf(shader.GetWrapT(), texture, kWrapT);
+    const std::string space = shader.GetSourceColorSpace();
     if (space == "auto") {
         reader.colorSpace = TextureColorSpace::Auto;
     } else if (space == "raw") {
@@ -1631,11 +1647,13 @@ TextureReader TextureReaderOf(const Scene& scene, const Connection& connection,
     reader.bias = Vec4Of(scene, texture, kShaderBias, reader.bias);
     if (const std::optional<Connection> st = GetConnection(scene, texture, kSt)) {
         Path source = st->prim;
-        if (GetToken(scene, source, kInfoId, "") == kUsdTransform2d) {
+        if (ShaderIdOf(scene, source) == kUsdTransform2d) {
+            // UsdTransform2d's 2-vector inputs:scale shares its name with UsdUVTexture's 4-vector
+            // one, so the Shader type does not declare it.
+            const Shader transform(scene, source);
             reader.uvScale = glm::vec2(GetVec2(scene, source, kShaderScale, glm::dvec2(1.0)));
-            reader.uvRotation = Number(scene, source, kRotation, 0.0f);
-            reader.uvTranslation =
-                glm::vec2(GetVec2(scene, source, kTranslation, glm::dvec2(0.0)));
+            reader.uvRotation = static_cast<float>(transform.GetRotation());
+            reader.uvTranslation = glm::vec2(transform.GetTranslation());
             const std::optional<Connection> in = GetConnection(scene, source, kIn);
             if (!in) {
                 throw std::invalid_argument("'" + source.String() + "' has no " +
@@ -1643,12 +1661,12 @@ TextureReader TextureReaderOf(const Scene& scene, const Connection& connection,
             }
             source = in->prim;
         }
-        if (GetToken(scene, source, kInfoId, "") != kUsdPrimvarReaderFloat2) {
+        if (ShaderIdOf(scene, source) != kUsdPrimvarReaderFloat2) {
             throw std::invalid_argument("'" + texture.String() + "' " + std::string(kSt) +
                                         " comes from '" + source.String() +
                                         "', not a UsdPrimvarReader_float2");
         }
-        reader.uvSet = GetToken(scene, source, kVarname, reader.uvSet);
+        reader.uvSet = Shader(scene, source).GetVarname();
     }
     return reader;
 }
@@ -1661,7 +1679,7 @@ Path PreviewSurfaceOf(const Scene& scene, const Path& material) {
     if (!surface) {
         return {};
     }
-    if (GetToken(scene, surface->prim, kInfoId, "") != kUsdPreviewSurface) {
+    if (ShaderIdOf(scene, surface->prim) != kUsdPreviewSurface) {
         throw std::invalid_argument("'" + material.String() + "' " + std::string(kSurfaceOutput) +
                                     " connects to '" + surface->prim.String() +
                                     "', which is not a UsdPreviewSurface");
@@ -1761,11 +1779,15 @@ MaterialSettings MaterialSettingsOf(const Scene& scene, const Path& material,
                                     const BrdfRegistry& brdfs) {
     using namespace tokens;
     MaterialSettings settings;
+    // No material (an unbound prim's empty path) shades with the defaults.
+    if (material.IsEmpty() || !scene.Has(material)) {
+        return settings;
+    }
+    const Material view(scene, material);
     // A UsdPreviewSurface network shades with the preview surface's model, reading its inputs from
     // the shader, unless the Material names another model.
     const Path surface = PreviewSurfaceOf(scene, material);
-    settings.brdf = GetToken(scene, material, kBrdf,
-                             surface.IsEmpty() ? settings.brdf : std::string("preview_surface"));
+    settings.brdf = surface.IsEmpty() || view.HasBrdf() ? view.GetBrdf() : "preview_surface";
     const BrdfModel* model = brdfs.Find(settings.brdf);
     if (model == nullptr) {
         throw std::invalid_argument("Material '" + material.String() + "' names unknown BRDF '" +
@@ -1778,6 +1800,7 @@ MaterialSettings MaterialSettingsOf(const Scene& scene, const Path& material,
             Number(scene, inputs, "inputs:" + param.name, param.defaultValue));
     }
     if (preview) {
+        const Shader shader(scene, surface);
         const auto index = [&](std::string_view name) {
             for (std::size_t i = 0; i < model->params.size(); ++i) {
                 if (model->params[i].name == name) {
@@ -1789,8 +1812,8 @@ MaterialSettings MaterialSettingsOf(const Scene& scene, const Path& material,
         // useSpecularWorkflow is USD's int, or a bool; specularColor is one colour input over
         // three parameters.
         settings.brdfParams[static_cast<std::size_t>(index("useSpecularWorkflow"))] =
-            GetBool(scene, surface, kUseSpecularWorkflow, false) ? 1.0f : 0.0f;
-        const glm::dvec3 specular = GetVec3(scene, surface, kSpecularColor, glm::dvec3(0.0));
+            shader.GetUseSpecularWorkflow() ? 1.0f : 0.0f;
+        const glm::dvec3 specular = shader.GetSpecularColor();
         for (int c = 0; c < 3; ++c) {
             settings.brdfParams[static_cast<std::size_t>(index("specularColorR") + c)] =
                 static_cast<float>(specular[c]);
@@ -1805,26 +1828,27 @@ MaterialSettings MaterialSettingsOf(const Scene& scene, const Path& material,
             settings.metallicParam = index("metallic");
         }
     }
-    settings.albedo = glm::vec3(GetVec3(scene, material, kAlbedo, glm::dvec3(settings.albedo)));
-    settings.useAlbedoMap = GetBool(scene, material, kAlbedoMapEnable, true);
+    settings.albedo = glm::vec3(view.GetAlbedo());
+    settings.useAlbedoMap = view.GetAlbedoMapEnable();
     DetailSettings& detail = settings.detail;
-    detail.tileSize = Number(scene, material, kDetailTileSize, detail.tileSize);
-    detail.albedoStrength = Number(scene, material, kDetailAlbedoStrength, detail.albedoStrength);
-    detail.normalStrength = Number(scene, material, kDetailNormalStrength, detail.normalStrength);
-    detail.directXNormals = GetBool(scene, material, kDetailDirectXNormals, detail.directXNormals);
-    detail.hexTiling = GetBool(scene, material, kDetailHexTiling, detail.hexTiling);
-    detail.hexRotation = Number(scene, material, kDetailHexRotation, detail.hexRotation);
-    detail.hexContrast = Number(scene, material, kDetailHexContrast, detail.hexContrast);
-    detail.hexSharpness = Number(scene, material, kDetailHexSharpness, detail.hexSharpness);
+    detail.tileSize = static_cast<float>(view.GetDetailTileSize());
+    detail.albedoStrength = static_cast<float>(view.GetDetailAlbedoStrength());
+    detail.normalStrength = static_cast<float>(view.GetDetailNormalStrength());
+    detail.directXNormals = view.GetDetailDirectxNormals();
+    detail.hexTiling = view.GetDetailHexTiling();
+    detail.hexRotation = static_cast<float>(view.GetDetailHexRotation());
+    detail.hexContrast = static_cast<float>(view.GetDetailHexContrast());
+    detail.hexSharpness = static_cast<float>(view.GetDetailHexSharpness());
 
     // The network's diffuse colour (a constant or a texture) is the albedo, and its normal a
     // normal map, whichever model shades it.
     if (!surface.IsEmpty()) {
+        const Shader shader(scene, surface);
         if (const std::optional<Connection> diffuse = GetConnection(scene, surface, kDiffuseColor)) {
             settings.albedoTexture = TextureReaderOf(scene, *diffuse, kDiffuseColor, surface);
             settings.albedo = glm::vec3(1.0f);
         } else {
-            settings.albedo = glm::vec3(GetVec3(scene, surface, kDiffuseColor, glm::dvec3(0.18)));
+            settings.albedo = glm::vec3(shader.GetDiffuseColor());
         }
         if (const std::optional<Connection> normal = GetConnection(scene, surface, kNormalInput)) {
             settings.normalTexture = TextureReaderOf(scene, *normal, kNormalInput, surface);
@@ -1832,9 +1856,9 @@ MaterialSettings MaterialSettingsOf(const Scene& scene, const Path& material,
         if (const std::optional<Connection> opacity = GetConnection(scene, surface, kOpacity)) {
             settings.opacityTexture = TextureReaderOf(scene, *opacity, kOpacity, surface, true);
         }
-        settings.opacity = std::clamp(Number(scene, surface, kOpacity, 1.0f), 0.0f, 1.0f);
+        settings.opacity = std::clamp(static_cast<float>(shader.GetOpacity()), 0.0f, 1.0f);
         settings.opacityThreshold =
-            std::clamp(Number(scene, surface, kOpacityThreshold, 0.0f), 0.0f, 1.0f);
+            std::clamp(static_cast<float>(shader.GetOpacityThreshold()), 0.0f, 1.0f);
     }
     // Emission, from the preview surface or else the Material itself, whatever the model.
     const Path& emitter = surface.IsEmpty() ? material : surface;
@@ -1842,8 +1866,10 @@ MaterialSettings MaterialSettingsOf(const Scene& scene, const Path& material,
         throw std::invalid_argument("'" + emitter.String() + "' " + std::string(kEmissiveColor) +
                                     " is connected; only a constant emissiveColor is supported");
     }
-    settings.emission = glm::max(
-        glm::vec3(GetVec3(scene, emitter, kEmissiveColor, glm::dvec3(0.0))), glm::vec3(0.0f));    return settings;
+    const glm::dvec3 emission = surface.IsEmpty() ? view.GetEmissiveColor()
+                                                  : Shader(scene, surface).GetEmissiveColor();
+    settings.emission = glm::max(glm::vec3(emission), glm::vec3(0.0f));
+    return settings;
 }
 
 bool IsMeshType(std::string_view type) {
@@ -1855,31 +1881,36 @@ bool IsMeshType(std::string_view type) {
 MeshData PrimitiveMeshOf(const Scene& scene, const Path& path) {
     using namespace tokens;
     const std::string_view type = scene.TypeOf(path);
-    const auto number = [&](std::string_view attribute, double fallback) {
-        return static_cast<float>(GetNumber(scene, path, attribute, fallback));
+    const auto f = [](double value) { return static_cast<float>(value); };
+    const auto axisOf = [&path](const AxisShape& shape) {
+        const std::string name = shape.GetAxis();
+        const std::optional<Axis> axis = AxisNamed(name);
+        if (!axis) {
+            throw std::invalid_argument("'" + path.String() + "' has unknown axis '" + name + "'");
+        }
+        return *axis;
     };
-    const std::string axisName = GetToken(scene, path, kAxis, "Z");
-    const std::optional<Axis> axis = AxisNamed(axisName);
-    if (!axis) {
-        throw std::invalid_argument("'" + path.String() + "' has unknown axis '" + axisName + "'");
-    }
     if (type == kCube) {
-        return BoxMesh(glm::vec3(number(kSize, 2.0)));
+        return BoxMesh(glm::vec3(f(Cube(scene, path).GetSize())));
     }
     if (type == kSphere) {
-        return SphereMesh(number(kGeomRadius, 1.0));
+        return SphereMesh(f(Sphere(scene, path).GetRadius()));
     }
     if (type == kCylinder) {
-        return CylinderMesh(number(kGeomRadius, 1.0), number(kGeomHeight, 2.0), *axis);
+        const Cylinder cylinder(scene, path);
+        return CylinderMesh(f(cylinder.GetRadius()), f(cylinder.GetHeight()), axisOf(cylinder));
     }
     if (type == kCone) {
-        return ConeMesh(number(kGeomRadius, 1.0), number(kGeomHeight, 2.0), *axis);
+        const Cone cone(scene, path);
+        return ConeMesh(f(cone.GetRadius()), f(cone.GetHeight()), axisOf(cone));
     }
     if (type == kCapsule) {
-        return CapsuleMesh(number(kGeomRadius, 0.5), number(kGeomHeight, 1.0), *axis);
+        const Capsule capsule(scene, path);
+        return CapsuleMesh(f(capsule.GetRadius()), f(capsule.GetHeight()), axisOf(capsule));
     }
     if (type == kPlane) {
-        return PlaneMesh(number(kGeomWidth, 2.0), number(kGeomLength, 2.0), *axis);
+        const Plane plane(scene, path);
+        return PlaneMesh(f(plane.GetWidth()), f(plane.GetLength()), axisOf(plane));
     }
     throw std::invalid_argument("'" + path.String() + "' is not a UsdGeom primitive");
 }
@@ -1889,8 +1920,9 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh) {
     if (scene.TypeOf(mesh) != kMesh && IsMeshType(scene.TypeOf(mesh))) {
         return PrimitiveMeshOf(scene, mesh);
     }
+    const Mesh view(scene, mesh);
     MeshData data;
-    const Tensor* pointsTensor = scene.Read(mesh, kPoints);
+    const Tensor* pointsTensor = view.GetPoints();
     if (pointsTensor != nullptr && IsGpu(pointsTensor->Location().kind)) {
         if (pointsTensor->Elements() % 3 != 0) {
             throw std::invalid_argument("points must be 3-vectors");
@@ -1900,8 +1932,8 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh) {
         data.points = FloatAttribute(scene, mesh, kPoints, 3).value_or(std::vector<float>());
     }
     const std::size_t count = data.points.size() / 3;
-    const Tensor* counts = scene.Read(mesh, kFaceVertexCounts);
-    const Tensor* indices = scene.Read(mesh, kFaceVertexIndices);
+    const Tensor* counts = view.GetFaceVertexCounts();
+    const Tensor* indices = view.GetFaceVertexIndices();
     if ((counts == nullptr) != (indices == nullptr)) {
         throw std::invalid_argument("needs both faceVertexCounts and faceVertexIndices");
     }
@@ -1915,7 +1947,7 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh) {
     }
     // Normals and colours written on the GPU are zeros here, holding their place until the
     // renderer copies them in (as points).
-    const Tensor* normalsTensor = scene.Read(mesh, kNormals);
+    const Tensor* normalsTensor = view.GetNormals();
     if (normalsTensor != nullptr && IsGpu(normalsTensor->Location().kind)) {
         if (static_cast<std::size_t>(normalsTensor->Elements()) == data.points.size()) {
             data.normals.assign(data.points.size(), 0.0f);
@@ -1932,8 +1964,8 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh) {
                                                          : FloatsOf(*colors, 3, kDisplayColor);
         }
     }
-    data.uvs = TexCoordsOf(scene, mesh, UvSetOf(scene, GetTarget(scene, mesh, kMaterialBinding)),
-                           data, faceCounts, faceVertexCount);
+    data.uvs = TexCoordsOf(scene, mesh, UvSetOf(scene, view.GetMaterialBinding()), data,
+                           faceCounts, faceVertexCount);
     return data;
 }
 
@@ -1976,7 +2008,7 @@ std::optional<Bounds3> LocalBoundsOf(const Scene& scene, const Path& prim) {
     MeshData mesh;
     try {
         if (scene.TypeOf(prim) == tokens::kMesh) {
-            const Tensor* points = scene.Read(prim, tokens::kPoints);
+            const Tensor* points = Mesh(scene, prim).GetPoints();
             if (points == nullptr || points->Location().kind != DeviceKind::Cpu) {
                 return std::nullopt;
             }
@@ -2003,13 +2035,14 @@ std::optional<Bounds3> LocalBoundsOf(const Scene& scene, const Path& prim) {
 std::vector<std::vector<std::uint32_t>>
 InstancesByPrototype(const Scene& scene, const Path& instancer, std::size_t prototypes) {
     std::vector<std::vector<std::uint32_t>> lists(prototypes);
-    const Tensor* positions = scene.Read(instancer, tokens::kPositions);
+    const PointInstancer view(scene, instancer);
+    const Tensor* positions = view.GetPositions();
     const std::size_t count =
         positions != nullptr ? static_cast<std::size_t>(positions->Elements()) / 3 : 0;
     if (prototypes == 0) {
         return lists;
     }
-    const Tensor* protoIndices = scene.Read(instancer, tokens::kProtoIndices);
+    const Tensor* protoIndices = view.GetProtoIndices();
     if (protoIndices == nullptr) {
         for (std::uint32_t i = 0; i < count; ++i) {
             lists[0].push_back(i);

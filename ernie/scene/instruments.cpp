@@ -2,6 +2,7 @@
 #include "ernie/scene/instruments.h"
 
 #include "ernie/scene/camera.h"
+#include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/tokens.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -31,17 +32,17 @@ void AuthorLrocNac(Scene& scene, const Path& camera, const Path& product, LrocNa
     const double fullWell = left ? 334000.0 : 352000.0;
     // Section 3.1.2: the KLI-5001G's average QE through the 400-760 nm response is > 60%.
     const std::vector<float> qe{390.0f, 0.0f, 400.0f, 0.6f, 760.0f, 0.6f, 770.0f, 0.0f};
-    scene.GetPrim(camera)
-        .Set(kSensorType, std::string("mono"))
-        .Set(std::string(kSensorQePrefix) + "mono", qe)
-        .Set(kExposureFStop, fNumber)
-        .Set(kExposureIso, 100.0)  // the gain is the ADC's, at ISO 100
-        .Set(kSensorGain, electronsPerDn)
-        .Set(kSensorReadNoise, detectorNoise)
-        .Set(kSensorFullWell, fullWell)
-        .Set(kSensorAdcBits, 12)  // 12-bit, encoded to 8-bit
-        .Set(kSensorBlackLevel, 0.0)
-        .Set(kSensorNoise, true);
+    Camera(scene, camera)
+        .SetSensorType("mono")
+        .SetSensorQeMono(qe)
+        .SetExposureFStop(fNumber)
+        .SetExposureIso(100.0)  // the gain is the ADC's, at ISO 100
+        .SetSensorElectronsPerDn(electronsPerDn)
+        .SetSensorReadNoise(detectorNoise)
+        .SetSensorFullWell(fullWell)
+        .SetSensorAdcBits(12)  // 12-bit, encoded to 8-bit
+        .SetSensorBlackLevel(0.0)
+        .SetSensorNoise(true);
 
     // The readout: electrons, their noise, the 12-bit ADC, the even and odd channels (sections
     // 3.1.2 and 4.1.1) and the nominal 12- to 8-bit table (Appendix A, code 0); and the
@@ -144,20 +145,20 @@ void AuthorLrocWac(Scene& scene, const Path& camera, const Path& product, LrocWa
     const std::vector<float> curve{
         static_cast<float>(low - 1.0),  0.0f,      static_cast<float>(low + 1.0),  float(qe),
         static_cast<float>(high - 1.0), float(qe), static_cast<float>(high + 1.0), 0.0f};
-    scene.GetPrim(camera)
-        .Set(kSensorType, std::string("mono"))
-        .Set(std::string(kSensorQePrefix) + "mono", curve)
-        .Set(kSpectralRange, glm::dvec2(low - 1.0, high + 1.0))
-        .Set(kSpectralBands, 4)
-        .Set(kLensTransmission, 1.0)  // in the effective QE
-        .Set(kExposureFStop, spec.fNumber)
-        .Set(kExposureIso, 100.0)  // the gain is the ADC's, at ISO 100
-        .Set(kSensorGain, kWacElectronsPerDn)
-        .Set(kSensorReadNoise, kWacReadNoise)
-        .Set(kSensorFullWell, kWacFullWell)
-        .Set(kSensorAdcBits, 11)  // 11-bit, encoded to 8-bit
-        .Set(kSensorBlackLevel, 0.0)
-        .Set(kSensorNoise, true);
+    Camera(scene, camera)
+        .SetSensorType("mono")
+        .SetSensorQeMono(curve)
+        .SetSpectralRange(glm::dvec2(low - 1.0, high + 1.0))
+        .SetSpectralBands(4)
+        .SetLensTransmission(1.0)  // in the effective QE
+        .SetExposureFStop(spec.fNumber)
+        .SetExposureIso(100.0)  // the gain is the ADC's, at ISO 100
+        .SetSensorElectronsPerDn(kWacElectronsPerDn)
+        .SetSensorReadNoise(kWacReadNoise)
+        .SetSensorFullWell(kWacFullWell)
+        .SetSensorAdcBits(11)  // 11-bit, encoded to 8-bit
+        .SetSensorBlackLevel(0.0)
+        .SetSensorNoise(true);
 
     const std::pair<const char*, const char*> steps[] = {
         {"Qe", "qe"}, {"Noise", "noise"}, {"Adc", "adc"}};
@@ -211,25 +212,25 @@ void AuthorEngineeringCamera(Scene& scene, const Path& camera, const Path& produ
     }
     using N = Mars2020Navcam;
     // Maki et al. 2020, Table 2: the optics and the CMV-20000.
-    scene.GetPrim(camera)
-        .Set(kProjection, std::string(kPerspective))
-        .Set(kLensProjection, std::string(kFisheye))
-        .Set(kLensFisheye, std::vector<float>{static_cast<float>(k1), 0.0f, 0.0f, 0.0f})
-        .Set(kLensDistortion, std::vector<float>{0.0f, 0.0f, 0.0f, 0.0f, 0.0f})
-        .Set(kFocalLength, focal)
-        .Set(kVerticalAperture, 1e-3 * N::kPixelPitchUm * N::kHeight)
-        .Set(kHorizontalAperture, 1e-3 * N::kPixelPitchUm * N::kWidth)
-        .Set(kFStop, fNumber)
-        .Set(kFocusDistance, focus)
-        .Set(kExposureFStop, fNumber)
-        .Set(kSensorType, std::string("rgb"))
-        .Set(kExposureIso, 100.0)  // the gain is the ADC's, at ISO 100
-        .Set(kSensorGain, N::kElectronsPerDn)
-        .Set(kSensorReadNoise, N::kDarkNoiseElectrons)
-        .Set(kSensorFullWell, N::kFullWellElectrons)
-        .Set(kSensorAdcBits, N::kAdcBits)
-        .Set(kSensorBlackLevel, 0.0)
-        .Set(kSensorNoise, true);
+    Camera(scene, camera)
+        .SetProjection(kPerspective)
+        .SetLensProjection(kFisheye)
+        .SetLensFisheye(std::vector<float>{static_cast<float>(k1), 0.0f, 0.0f, 0.0f})
+        .SetLensDistortion(std::vector<float>{0.0f, 0.0f, 0.0f, 0.0f, 0.0f})
+        .SetFocalLength(focal)
+        .SetVerticalAperture(1e-3 * N::kPixelPitchUm * N::kHeight)
+        .SetHorizontalAperture(1e-3 * N::kPixelPitchUm * N::kWidth)
+        .SetFStop(fNumber)
+        .SetFocusDistance(focus)
+        .SetExposureFStop(fNumber)
+        .SetSensorType("rgb")
+        .SetExposureIso(100.0)  // the gain is the ADC's, at ISO 100
+        .SetSensorElectronsPerDn(N::kElectronsPerDn)
+        .SetSensorReadNoise(N::kDarkNoiseElectrons)
+        .SetSensorFullWell(N::kFullWellElectrons)
+        .SetSensorAdcBits(N::kAdcBits)
+        .SetSensorBlackLevel(0.0)
+        .SetSensorNoise(true);
 
     struct Step {
         const char* name;
@@ -371,41 +372,42 @@ void AuthorMastcamZ(Scene& scene, const Path& camera, const Path& product, Mastc
     const MastcamZ::Filter passband = MastcamZ::FilterOf(eye, filter);
     using Z = MastcamZ;
     // Bell et al. 2021, Table 5.
-    Prim prim = scene.GetPrim(camera);
-    prim.Set(kProjection, std::string(kPerspective))
-        .Set(kLensProjection, std::string(kPerspective))
-        .Set(kLensDistortion, std::vector<float>{0.0f, 0.0f, 0.0f, 0.0f, 0.0f})
-        .Set(kFocalLength, focalLengthMm)
-        .Set(kVerticalAperture, 1e-3 * Z::kPixelPitchUm * Z::kHeight)
-        .Set(kHorizontalAperture, 1e-3 * Z::kPixelPitchUm * Z::kWidth)
-        .Set(kExposureFStop, Z::FNumberAt(focalLengthMm))
-        .Set(kExposureIso, 100.0)  // the gain is the ADC's, at ISO 100
-        .Set(kSensorGain, Z::kElectronsPerDn)
-        .Set(kSensorReadNoise, Z::ReadNoiseElectrons(eye))
-        .Set(kSensorFullWell, Z::FullWellElectrons(eye))
-        .Set(kSensorAdcBits, Z::kAdcBits)
-        .Set(kSensorBlackLevel, 0.0)
-        .Set(kSensorNoise, true);
+    Camera prim(scene, camera);
+    prim.SetProjection(kPerspective)
+        .SetLensProjection(kPerspective)
+        .SetLensDistortion(std::vector<float>{0.0f, 0.0f, 0.0f, 0.0f, 0.0f})
+        .SetFocalLength(focalLengthMm)
+        .SetVerticalAperture(1e-3 * Z::kPixelPitchUm * Z::kHeight)
+        .SetHorizontalAperture(1e-3 * Z::kPixelPitchUm * Z::kWidth)
+        .SetExposureFStop(Z::FNumberAt(focalLengthMm))
+        .SetExposureIso(100.0)  // the gain is the ADC's, at ISO 100
+        .SetSensorElectronsPerDn(Z::kElectronsPerDn)
+        .SetSensorReadNoise(Z::ReadNoiseElectrons(eye))
+        .SetSensorFullWell(Z::FullWellElectrons(eye))
+        .SetSensorAdcBits(Z::kAdcBits)
+        .SetSensorBlackLevel(0.0)
+        .SetSensorNoise(true);
 
     std::vector<std::pair<const char*, const char*>> steps;
     if (filter == 0) {
         // The Bayer channels as Gaussians of Table 3's half widths at the ~40% peak, every
         // 5 nm over the visible.
         const std::array<MastcamZ::Filter, 3> bayer = MastcamZ::BayerOf(eye);
-        const char* names[3] = {"r", "g", "b"};
+        std::array<std::vector<float>, 3> curves;
         for (int c = 0; c < 3; ++c) {
             const double sigma = bayer[c].hwhmNm / std::sqrt(2.0 * std::log(2.0));
-            std::vector<float> curve;
             for (double w = 380.0; w <= 780.0; w += 5.0) {
                 const double x = (w - bayer[c].effectiveNm) / sigma;
-                curve.push_back(static_cast<float>(w));
-                curve.push_back(static_cast<float>(Z::kPeakQe * std::exp(-0.5 * x * x)));
+                curves[c].push_back(static_cast<float>(w));
+                curves[c].push_back(static_cast<float>(Z::kPeakQe * std::exp(-0.5 * x * x)));
             }
-            prim.Set(std::string(kSensorQePrefix) + names[c], curve);
         }
-        prim.Set(kSensorType, std::string("rgb"))
-            .Set(kSpectralRange, glm::dvec2(380.0, 780.0))
-            .Set(kSpectralBands, 16);
+        prim.SetSensorQeR(curves[0])
+            .SetSensorQeG(curves[1])
+            .SetSensorQeB(curves[2])
+            .SetSensorType("rgb")
+            .SetSpectralRange(glm::dvec2(380.0, 780.0))
+            .SetSpectralBands(16);
         steps = {{"Qe", "qe"},
                  {"Bayer", "bayer"},
                  {"Noise", "noise"},
@@ -434,10 +436,10 @@ void AuthorMastcamZ(Scene& scene, const Path& camera, const Path& product, Mastc
             add(w, 1.0);
         }
         add(high + 1.0, 0.0);
-        prim.Set(kSensorType, std::string("mono"))
-            .Set(std::string(kSensorQePrefix) + "mono", curve)
-            .Set(kSpectralRange, glm::dvec2(low - 1.0, high + 1.0))
-            .Set(kSpectralBands, 4);
+        prim.SetSensorType("mono")
+            .SetSensorQeMono(curve)
+            .SetSpectralRange(glm::dvec2(low - 1.0, high + 1.0))
+            .SetSpectralBands(4);
         steps = {{"Qe", "qe"}, {"Noise", "noise"}, {"Adc", "adc"}};
     }
 

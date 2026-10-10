@@ -2,6 +2,7 @@
 #include "bindings.h"
 
 #include "ernie/scene/cahvore.h"
+#include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/instruments.h"
 #include "ernie/scene/isd.h"
 #include "ernie/scene/scene.h"
@@ -1361,8 +1362,7 @@ void BindScene(nb::module_& m) {
             }
             LensModel lens;
             try {
-                SetSingletChromatic(lens, GetNumber(scene, path, kFocalLength, 50.0), nd, abbe,
-                                    lateral);
+                SetSingletChromatic(lens, Camera(scene, path).GetFocalLength(), nd, abbe, lateral);
             } catch (const std::invalid_argument& error) {
                 throw nb::value_error(error.what());
             }

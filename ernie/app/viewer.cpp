@@ -14,6 +14,7 @@
 #include "ernie/scene/camera.h"
 #include "ernie/scene/light_schemas.h"
 #include "ernie/scene/orbit_controller.h"
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/sensor_filters.h"
 #include "ernie/scene/tokens.h"
@@ -385,10 +386,8 @@ struct Viewer::State {
         constexpr double kMiddleGrey = 0.18;
         // Seconds the automatic exposure takes to cover most (63%) of a change.
         constexpr double kAdaptation = 0.25;
-        double stops = compensation;
-        if (!settingsSource.IsEmpty()) {
-            stops += GetNumber(scene, settingsSource, tokens::kExposureCompensation, 0.0);
-        }
+        double stops = compensation +
+                       RenderSettings::OrFallbacks(scene, settingsSource).GetExposureCompensation();
         if (!AutoExposing()) {
             autoStops.reset();
             return stops;
@@ -510,7 +509,7 @@ struct Viewer::State {
         std::vector<std::string> names = scene.OverlayNames();
         if (authored) {
             // The settings' names, separated by commas or spaces, with "*" for all.
-            std::string list = GetToken(scene, settingsSource, tokens::kOverlays, "");
+            std::string list = RenderSettings::OrFallbacks(scene, settingsSource).GetOverlays();
             std::replace(list.begin(), list.end(), ',', ' ');
             std::istringstream words(list);
             std::vector<std::string> named(std::istream_iterator<std::string>(words), {});

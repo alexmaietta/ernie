@@ -21,7 +21,8 @@ std::vector<PropertySection> SchemaOf(const Scene& scene, const Path& path,
                                       const BrdfRegistry& brdfs,
                                       const SensorFilterRegistry& filters);
 
-/// A Camera prim's sections: lens, exposure and sensor.
+/// A Camera prim's sections from its declaration (`Camera`): lens, exposure, shutter, sensor and
+/// views, without the "Prim" section every prim has.
 std::vector<PropertySection> CameraSchema();
 
 /// A RenderSettings prim's sections: image, culling and level of detail, and shadows.
