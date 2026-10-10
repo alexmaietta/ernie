@@ -8,6 +8,7 @@ nanobind_add_module(
     module.cpp
     render.cpp
     scene.cpp
+    schema.cpp
     tensor.cpp)
 target_link_libraries(_ernie PRIVATE ernie ernie_build_options)
 if(TARGET ernie_app)
@@ -42,13 +43,14 @@ configure_file(ernie/__init__.py "${ernie_package_dir}/__init__.py" COPYONLY)
 configure_file(ernie/app.py "${ernie_package_dir}/app.py" COPYONLY)
 configure_file(ernie/batch.py "${ernie_package_dir}/batch.py" COPYONLY)
 configure_file(ernie/demo.py "${ernie_package_dir}/demo.py" COPYONLY)
+configure_file(ernie/schema.py "${ernie_package_dir}/schema.py" COPYONLY)
 # A wheel (pyproject.toml, scikit-build-core): the package, with Slang's compiler and the glslang
 # library it loads at run time beside the module, found through $ORIGIN; the `python` component
 # only, not dependencies' own install rules.
 if(SKBUILD)
     install(TARGETS _ernie LIBRARY DESTINATION ernie COMPONENT python)
     install(
-        FILES ernie/__init__.py ernie/app.py ernie/batch.py ernie/demo.py
+        FILES ernie/__init__.py ernie/app.py ernie/batch.py ernie/demo.py ernie/schema.py
               "${ernie_package_dir}/py.typed"
         DESTINATION ernie
         COMPONENT python)

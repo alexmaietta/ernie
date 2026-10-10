@@ -12,6 +12,7 @@
 #include "ernie/device/swapchain.h"
 #include "ernie/device/vulkan_context.h"
 #include "ernie/scene/camera.h"
+#include "ernie/scene/light_schemas.h"
 #include "ernie/scene/orbit_controller.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/sensor_filters.h"
@@ -1194,9 +1195,6 @@ struct Viewer::State {
         const glm::dvec3 y = glm::normalize(glm::dvec3(world[1]));
         // Lights shine along their -z axis.
         const glm::dvec3 down = -glm::normalize(glm::dvec3(world[2]));
-        const auto number = [&](std::string_view attribute, double fallback) {
-            return GetNumber(scene, path, attribute, fallback);
-        };
         if (distant) {
             // Parallel rays through a disc facing the light.
             overlay.Circle(centre, down, 0.35 * reach, style);
@@ -1209,11 +1207,10 @@ struct Viewer::State {
             return true;
         }
         if (sphere) {
-            const double radius = GetBool(scene, path, tokens::kTreatAsPoint, false)
-                                      ? 0.0
-                                      : number(tokens::kRadius, 0.5);
+            const schema::SphereLight light(std::as_const(scene), path);
+            const double radius = light.GetTreatAsPoint() ? 0.0 : light.GetRadius();
             overlay.Sphere(centre, std::max(radius, 0.05 * reach), style);
-            const double cone = number(tokens::kShapingConeAngle, 180.0);
+            const double cone = light.GetShapingConeAngle();
             if (cone < 90.0) {
                 // The cone's edge as rays and a ring at the gizmo's reach.
                 const double spread = reach * std::tan(glm::radians(cone));
@@ -1231,11 +1228,13 @@ struct Viewer::State {
         }
         // Rect and disk lights: their outline, scaled with the prim, and their normal.
         if (rect) {
-            const double w = 0.5 * number(tokens::kWidth, 1.0);
-            const double h = 0.5 * number(tokens::kHeight, 1.0);
+            const schema::RectLight light(std::as_const(scene), path);
+            const double w = 0.5 * light.GetWidth();
+            const double h = 0.5 * light.GetHeight();
             overlay.Box({-w, -h, 0.0}, {w, h, 0.0}, style, world);
         } else {
-            const double radius = number(tokens::kRadius, 0.5) * glm::length(glm::dvec3(world[0]));
+            const double radius = schema::DiskLight(std::as_const(scene), path).GetRadius() *
+                                  glm::length(glm::dvec3(world[0]));
             overlay.Circle(centre, down, radius, style);
         }
         overlay.Arrow(centre, centre + down * reach, style, 0.18 * reach);

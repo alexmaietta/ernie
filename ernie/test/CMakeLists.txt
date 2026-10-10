@@ -22,6 +22,7 @@ ernie_add_test_suite(
     scene_orbit_controller_test.cpp
     scene_overlay_test.cpp
     scene_path_test.cpp
+    scene_prim_type_test.cpp
     scene_scene_test.cpp
     scene_schema_test.cpp
     scene_sensor_filters_test.cpp
@@ -114,6 +115,7 @@ if(TARGET ernie_app)
         SOURCES
         app_file_dialog_test.cpp
         app_panel_test.cpp
+        app_prim_schemas_test.cpp
         app_session_test.cpp
         app_theme_test.cpp
         LIBRARIES

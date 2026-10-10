@@ -3,9 +3,13 @@
 
 #include "ernie/scene/camera.h"
 #include "ernie/scene/material.h"
+#include "ernie/scene/prim_type.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 
+#include <algorithm>
+#include <array>
+#include <optional>
 #include <string>
 
 namespace ernie::app {
@@ -73,79 +77,71 @@ std::vector<PropertySection> ShapeOf(std::string_view type) {
     return {};
 }
 
-/// UsdLux inputs every light reads.
-PropertySection LightCommon() {
-    return {"Light",
-            {Field(kIntensity, "Intensity", Kind::Float, 1.0, 0.0, 1e6),
-             Field(kExposure, "Exposure", Kind::Float, 0.0, -16.0, 16.0, {},
-                   "Stops; scales the intensity by 2^exposure"),
-             Field(kColor, "Colour", Kind::Color, glm::vec3(1.0f)),
-             Field(kEnableColorTemperature, "Use temperature", Kind::Bool, false),
-             Field(kColorTemperature, "Temperature", Kind::Float, 6500.0, 1000.0, 20000.0, {},
-                   "Kelvin"),
-             Field(kShadowEnable, "Shadows", Kind::Bool, true)}};
+/// The field a panel edits a registered attribute with; none for arrays and tensors.
+std::optional<PropertyField> FieldOf(const AttributeDef& def) {
+    std::optional<Kind> kind;
+    switch (def.kind) {
+    case AttributeKind::Bool:
+        kind = Kind::Bool;
+        break;
+    case AttributeKind::Int:
+        kind = Kind::Int;
+        break;
+    case AttributeKind::Double:
+        kind = Kind::Float;
+        break;
+    case AttributeKind::Vec2:
+        kind = Kind::Vec2;
+        break;
+    case AttributeKind::Vec3:
+        if (def.meta.color) {
+            kind = Kind::Color;
+        }
+        break;
+    case AttributeKind::Token:
+        kind = def.meta.options.empty() ? Kind::Text : Kind::Token;
+        break;
+    case AttributeKind::Relationship:
+        kind = Kind::Target;
+        break;
+    case AttributeKind::FloatArray:
+    case AttributeKind::Tensor:
+        break;
+    }
+    if (!kind) {
+        return std::nullopt;
+    }
+    std::vector<std::string> options;
+    for (const std::string_view option : def.meta.options) {
+        options.push_back(S(option));
+    }
+    return Field(def.name, def.label, *kind, def.fallback, def.meta.min, def.meta.max,
+                 std::move(options), S(def.meta.doc));
 }
 
-std::vector<PropertySection> LightOf(std::string_view type) {
-    std::vector<PropertySection> sections{LightCommon()};
-    PropertySection shape{"Shape", {}};
-    if (type == kDistantLight) {
-        shape.fields = {Field(kAngle, "Angle", Kind::Float, 0.53, 0.0, 30.0, {},
-                              "Degrees the light subtends; widens penumbrae"),
-                        Field(kLightIrradiance, "Irradiance", Kind::Float, 1361.0, 0.0, 1e5, {},
-                              "W/m^2 at normal incidence; the Sun's by default")};
-    } else if (type == kSphereLight) {
-        shape.fields = {Field(kRadius, "Radius", Kind::Float, 0.5, 0.0, 1000.0),
-                        Field(kTreatAsPoint, "Point", Kind::Bool, false),
-                        Field(kShapingConeAngle, "Cone angle", Kind::Float, 180.0, 0.0, 180.0, {},
-                              "Degrees; 180 unshaped"),
-                        Field(kShapingConeSoftness, "Cone softness", Kind::Float, 0.0, 0.0, 1.0),
-                        Field(kLightPower, "Power", Kind::Float, 0.0, 0.0, 1e7, {},
-                              "Radiant flux in W, in place of the intensity when set")};
-    } else if (type == kRectLight) {
-        shape.fields = {Field(kWidth, "Width", Kind::Float, 1.0, 0.0, 1000.0),
-                        Field(kHeight, "Height", Kind::Float, 1.0, 0.0, 1000.0),
-                        Field(kLightPower, "Power", Kind::Float, 0.0, 0.0, 1e7, {},
-                              "Radiant flux in W, in place of the intensity when set")};
-    } else if (type == kDiskLight) {
-        shape.fields = {Field(kRadius, "Radius", Kind::Float, 0.5, 0.0, 1000.0),
-                        Field(kLightPower, "Power", Kind::Float, 0.0, 0.0, 1e7, {},
-                              "Radiant flux in W, in place of the intensity when set")};
-    } else if (type == kDomeLight) {
-        shape.fields = {Field(kTextureFile, "Texture file", Kind::Text, S("")),
-                        Field(kVisibleInPrimaryRay, "Visible in primary ray", Kind::Bool, true,
-                              0, 0, {}, "Show behind the scene where camera rays meet nothing")};
+/// A registered type's sections, one per `AttributeMeta::group` in `kGroups`' order (others after,
+/// as they come); within one, the type's own attributes before its bases'.
+std::vector<PropertySection> SectionsOf(const PrimTypeDef& type) {
+    static constexpr std::array<std::string_view, 4> kGroups{"Light", "Shape", "Spectrum",
+                                                             "Photometric"};
+    std::vector<PropertySection> sections;
+    for (const PrimTypeDef* level = &type; level != nullptr; level = level->base) {
+        for (const AttributeDef& def : level->attributes) {
+            std::optional<PropertyField> field = FieldOf(def);
+            if (!field) {
+                continue;
+            }
+            auto section = std::ranges::find(sections, def.meta.group, &PropertySection::title);
+            if (section == sections.end()) {
+                section = sections.insert(sections.end(), PropertySection{S(def.meta.group), {}});
+            }
+            section->fields.push_back(std::move(*field));
+        }
     }
-    if (!shape.fields.empty()) {
-        sections.push_back(std::move(shape));
-    }
-    sections.push_back(
-        {"Spectrum",
-         {Field(kPhysicalIlluminant, "Illuminant", Kind::Token, S(kWhite), 0, 0,
-                {S(kWhite), S(kBlackbody), S(kIlluminantD), S(kCustom)},
-                "The spectrum's shape; blackbody and illuminant D take the temperature above. "
-                "Unset: a black body if the temperature is used, else flat")}});
-    const std::string switches =
-        "Setting any photometric value puts the light in photometric units: they alone then set "
-        "its brightness";
-    PropertySection photometric{"Photometric", {}};
-    if (type == kDistantLight) {
-        photometric.fields = {Field(kPhotometricIlluminance, "Illuminance", Kind::Float, 10000.0,
-                                    0.0, 200000.0, {}, "Lux on a surface facing it. " + switches)};
-    } else if (type == kDomeLight) {
-        photometric.fields = {Field(kPhotometricIlluminance, "Illuminance", Kind::Float, 10000.0,
-                                    0.0, 200000.0, {},
-                                    "Lux on an upward-facing surface. " + switches)};
-    } else {
-        photometric.fields = {
-            Field(kPhotometricPower, "Power", Kind::Float, 1600.0, 0.0, 1e6, {},
-                  "Luminous flux in lumens. " + switches),
-            Field(kPhotometricIlluminance, "Illuminance", Kind::Float, 0.0, 0.0, 200000.0, {},
-                  "Lux on a surface facing it at the distance below, in place of the power"),
-            Field(kPhotometricIlluminanceDistance, "At distance", Kind::Float, 0.0, 0.0, 1000.0,
-                  {}, "Metres; 0 uses the power")};
-    }
-    sections.push_back(std::move(photometric));
+    const auto rank = [](const PropertySection& section) {
+        return std::ranges::find(kGroups, section.title) - kGroups.begin();
+    };
+    std::ranges::stable_sort(sections, {}, rank);
     return sections;
 }
 
@@ -354,9 +350,8 @@ std::vector<PropertySection> SchemaOf(const Scene& scene, const Path& path,
               Field(kExaggeration, "Exaggeration", Kind::Float, 1.0, 0.0, 100.0),
               Field(kNoData, "No data", Kind::Float, 0.0, 0, 0, {}, "Height marking missing cells"),
               Field(kMaterialBinding, "Material", Kind::Target, Value(), 0, 0, {S(kMaterial)})}});
-    } else if (type == kDistantLight || type == kSphereLight || type == kRectLight ||
-               type == kDiskLight || type == kDomeLight) {
-        sections = LightOf(type);
+    } else if (const PrimTypeDef* registered = FindPrimType(type)) {
+        sections = SectionsOf(*registered);
     } else if (type == kStarField) {
         sections.push_back(
             {"Stars",

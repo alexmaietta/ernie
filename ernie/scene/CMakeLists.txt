@@ -8,9 +8,11 @@ ernie_add_library(
     edit_history.cpp
     instruments.cpp
     isd.cpp
+    light_schemas.cpp
     orbit_controller.cpp
     overlay.cpp
     path.cpp
+    prim_type.cpp
     scene.cpp
     schema.cpp
     sensor_filters.cpp

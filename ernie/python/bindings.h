@@ -47,6 +47,8 @@ nb::object ValueToPython(const Value& value);
 
 void BindTensor(nb::module_& m);
 void BindScene(nb::module_& m);
+/// The prim type registry (`PrimType`, `AttributeDef`), which `ernie.schema` builds classes from.
+void BindSchema(nb::module_& m);
 void BindRender(nb::module_& m);
 
 /// The `app` submodule; built only with Ernie's app (`ERNIE_HAS_APP`).

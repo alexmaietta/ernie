@@ -52,6 +52,8 @@ stream wait for the render on the GPU, so the host never blocks.
 """
 
 from ._ernie import (
+    AttributeDef,
+    AttributeKind,
     AttributeMapping,
     CahvoreModel,
     ChangeCursor,
@@ -67,6 +69,7 @@ from ._ernie import (
     Path,
     Prim,
     PrimSet,
+    PrimType,
     Quat,
     Renderer,
     RenderProductOutput,
@@ -86,17 +89,23 @@ from ._ernie import (
     color_index_to_temperature,
     dirty_of,
     distant_light_transform,
+    find_prim_type,
     greenwich_sidereal_time,
     julian_date,
     load_image,
     look_at_transform,
+    prim_types,
     read_cahvore_models,
     star_illuminance,
     synthetic_stars,
     tokens,
 )
+from . import schema
+from .schema import *  # noqa: F403  the typed prim classes, such as SphereLight
 
 __all__ = [
+    "AttributeDef",
+    "AttributeKind",
     "AttributeMapping",
     "CahvoreModel",
     "ChangeCursor",
@@ -112,6 +121,7 @@ __all__ = [
     "Path",
     "Prim",
     "PrimSet",
+    "PrimType",
     "Quat",
     "Renderer",
     "RenderProductOutput",
@@ -131,12 +141,15 @@ __all__ = [
     "color_index_to_temperature",
     "dirty_of",
     "distant_light_transform",
+    "find_prim_type",
     "greenwich_sidereal_time",
     "julian_date",
     "load_image",
     "look_at_transform",
+    "prim_types",
     "read_cahvore_models",
     "star_illuminance",
     "synthetic_stars",
     "tokens",
+    *schema.__all__,
 ]
