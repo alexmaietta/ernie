@@ -128,6 +128,17 @@ def test_tensor_attributes_write_and_read_arrays():
     assert dome.texture.shape == (4, 8, 3)
 
 
+def test_scene_functions_take_prims_for_paths():
+    scene = ernie.Scene()
+    lamp = scene.define("/Lamp", ernie.SphereLight, radius=0.3)
+    assert scene.get(lamp, tokens.RADIUS) == 0.3
+    assert scene.get(lamp.prim, tokens.RADIUS) == 0.3
+    assert scene.type_of(lamp) == "SphereLight"
+    assert ernie.Path(lamp) == ernie.Path("/Lamp")
+    with pytest.raises(TypeError):
+        scene.get(3, tokens.RADIUS)
+
+
 def test_scenes_load_from_descriptions(tmp_path):
     description = {
         "/World": {

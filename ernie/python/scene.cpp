@@ -569,9 +569,11 @@ void BindScene(nb::module_& m) {
     BindOverlay(m);
     nb::class_<Path>(m, "Path",
                      "Absolute path of a prim, as in USD: `/` is the root and `/World/Sun` the "
-                     "child `Sun` of `/World`. Functions taking a path also accept a str.")
+                     "child `Sun` of `/World`. Functions taking a path also accept a str, a "
+                     "Prim or a typed prim (its path).")
         .def(nb::init<>())
         .def(nb::init_implicit<std::string>(), nb::arg("text"))
+        .def(nb::init_implicit<PrimPath>(), nb::arg("prim"))
         .def_static("root", &Path::Root)
         .def_static("is_valid_name", &Path::IsValidName, nb::arg("name"))
         .def_prop_ro("name", [](const Path& p) { return std::string(p.Name()); })
