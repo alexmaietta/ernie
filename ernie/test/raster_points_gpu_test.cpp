@@ -124,6 +124,33 @@ TEST_F(RasterDelegateTest, PointsDrawAsSpheresWithTheirIdsColoursAndDepth) {
     EXPECT_NEAR(Step(delegate, scene).at("DistanceToCamera")[PixelOf(0.0, 0.0)], 37.0f, 0.05f);
 }
 
+TEST_F(RasterDelegateTest, PointsTakeAWidthEachAsAValueListOrAnArray) {
+    RasterDelegate delegate(*context_);
+    Scene scene = PointsScene();
+    // The distance to each sphere along the ray through its centre: its centre's less its radius.
+    const auto nearest = [&] {
+        const std::vector<float> distance = Step(delegate, scene).at("DistanceToCamera");
+        return std::array<float, 3>{distance[PixelOf(-8.0, 0.0)], distance[PixelOf(0.0, 0.0)],
+                                    distance[PixelOf(8.0, 0.0)]};
+    };
+    const float offAxis = std::sqrt(8.0f * 8.0f + 40.0f * 40.0f);
+
+    // One width per point as a value: 2, 4 and 6 m across.
+    ernie::Points(scene, "/World/Grains").SetWidths({2.0f, 4.0f, 6.0f});
+    const std::array<float, 3> byValue = nearest();
+    EXPECT_NEAR(byValue[0], offAxis - 1.0f, 0.3f);
+    EXPECT_NEAR(byValue[1], 38.0f, 0.05f);
+    EXPECT_NEAR(byValue[2], offAxis - 3.0f, 0.3f);
+
+    // The same widths written as an array draw the same.
+    scene.Write("/World/Grains", tokens::kWidths,
+                Tensor::Copy<float>(std::array<float, 3>{2.0f, 4.0f, 6.0f}, {3}));
+    const std::array<float, 3> byArray = nearest();
+    for (std::size_t i = 0; i < byArray.size(); ++i) {
+        EXPECT_NEAR(byArray[i], byValue[i], 1e-3f) << "point " << i;
+    }
+}
+
 TEST_F(RasterDelegateTest, PointsFromCudaMatchTheHostsAndBlurAsTheyMove) {
     RasterDelegate delegate(*context_);
     std::string why;
