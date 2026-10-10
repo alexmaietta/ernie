@@ -44,7 +44,12 @@ struct IsdRotation {
 /// - USGS Astrogeology, "ALE: Abstraction Layer for Ephemerides",
 ///   https://github.com/DOI-USGS/ale
 /// - USGS Astrogeology, "usgscsm: Community Sensor Model plugin",
-///   https://github.com/DOI-USGS/usgscsm (the sensor models that read these ISDs).
+///   https://github.com/DOI-USGS/usgscsm (the sensor models that read these ISDs; its
+///   src/Distortion.cpp the lens models).
+/// - USGS Astrogeology, ISIS's distortion maps (LroNarrowAngleDistortionMap,
+///   ShadowCamDistortionMap, TgoCassisDistortionMap), https://github.com/DOI-USGS/ISIS3
+/// - S. Tulyakov et al., "Geometric calibration of Colour and Stereo Surface Imaging System of
+///   ESA's Trace Gas Orbiter", Advances in Space Research 61(1), 2018 (CaSSIS's rational model).
 /// - NGA, "Community Sensor Model (CSM) Technical Requirements Document", version 3.0.4.
 struct IsdSensor {
     std::string model;  ///< `name_model`, such as USGS_ASTRO_LINE_SCANNER_SENSOR_MODEL.
@@ -65,7 +70,9 @@ struct IsdSensor {
     double sampleSumming = 1.0;
     /// `optical_distortion`'s model name (such as "radial", "transverse", "lrolrocnac") and
     /// coefficients; for "transverse" the x coefficients then the y (ten each: the cubic
-    /// polynomial's terms 1, x, y, x^2, xy, y^2, x^3, x^2 y, x y^2, y^3).
+    /// polynomial's terms 1, x, y, x^2, xy, y^2, x^3, x^2 y, x y^2, y^3), for "kaguyalism"
+    /// boresight x, the four x coefficients, boresight y, the four y (as usgscsm's
+    /// `getDistortionCoeffs` packs them).
     std::string distortion;
     std::vector<double> distortionCoefficients;
 
@@ -137,6 +144,10 @@ class IsdCameraModel {
     /// rotated into the body's.
     glm::dvec3 SunPosition(double time) const;
 
+    /// Undistorted focal plane coordinates (mm) of distorted `distorted`, and the inverse.
+    glm::dvec2 Undistort(glm::dvec2 distorted) const;
+    glm::dvec2 Distort(glm::dvec2 undistorted) const;
+
     /// A frame of the detector as Ernie renders it: a frame camera of the image's samples by its
     /// rows, posed (`camera.transform`, camera to body-fixed world) when the frame is exposed,
     /// the lens's distortion fitted as Brown-Conrady terms (and scale).
@@ -152,16 +163,15 @@ class IsdCameraModel {
 
   protected:
     /// @throws std::invalid_argument if `isd` has no states or rotations, a singular focal plane
-    /// map, or a distortion model other than none, "radial", "transverse", "radtan" (OpenCV's
-    /// radial-tangential, coefficients k1, k2, p1, p2, k3 on coordinates over the focal length)
-    /// and "lrolrocnac".
+    /// map, or a distortion model other than none and usgscsm's: "radial", "transverse",
+    /// "radtan" (OpenCV's radial-tangential, coefficients k1, k2, p1, p2, k3 on coordinates over
+    /// the focal length), "lrolrocnac", "kaguyalism", "dawnfc", "cahvor", "kplo_shadowcam" and
+    /// "cassis" (TGO CaSSIS's rational model, its 18 correcting coefficients then 18
+    /// distorting); or with the wrong number of coefficients for its model.
     explicit IsdCameraModel(IsdSensor isd);
 
     /// The rotation `rotation` describes at `time`: its constant after its time-dependent part.
     static glm::dquat RotationAt(const IsdRotation& rotation, double time);
-    /// Undistorted focal plane coordinates of distorted `distorted`, and the inverse.
-    glm::dvec2 Undistort(glm::dvec2 distorted) const;
-    glm::dvec2 Distort(glm::dvec2 undistorted) const;
     /// Focal plane coordinates (distorted, mm) of detector line `line` and image sample `sample`.
     glm::dvec2 FocalPlaneOf(double line, double sample) const;
     /// Image (line on the detector, sample) of distorted focal plane point `focal`.
@@ -240,8 +250,8 @@ class IsdLineScanner : public IsdCameraModel {
     /// A strip of `lines` image lines from `firstLine` as Ernie renders it: a pushbroom camera
     /// (`CameraParams::pushbroom`) whose rows are those lines, posed `from` at the strip's first
     /// line's start and `to` at its end (camera to body-fixed world). Consecutive strips chain:
-    /// each's `from` is the last one's `to`, so stepping the camera's transform through the strips'
-    /// `to`s (after a first step at the first `from`) renders the image strip by strip.
+    /// each's `from` is the last one's `to`, so stepping the camera's transform through the
+    /// strips' `to`s (after a first step at the first `from`) renders the image strip by strip.
     ///
     /// The pose between `from` and `to` is a straight line and a great-arc turn, which departs
     /// from the orbit's curve by about a T^2 / 8 for its acceleration a over the strip's time T:

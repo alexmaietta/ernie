@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include <map>
 #include <sstream>
 #include <stdexcept>
 
@@ -280,8 +281,18 @@ IsdSensor ReadIsd(std::string_view json) {
             if (model.contains("coefficients")) {
                 sensor.distortionCoefficients = Numbers(model["coefficients"], "coefficients");
             } else if (model.contains("x") && model.contains("y")) {
-                sensor.distortionCoefficients = Numbers(model["x"], "x");
-                const std::vector<double> y = Numbers(model["y"], "y");
+                // As usgscsm's `getDistortionCoeffs`: the x then the y, padded with zeros to
+                // ten each for "transverse", four each after their boresights for "kaguyalism".
+                const bool kaguya = name == "kaguyalism";
+                std::vector<double> x = Numbers(model["x"], "x");
+                std::vector<double> y = Numbers(model["y"], "y");
+                x.resize(kaguya ? 4 : 10, 0.0);
+                y.resize(kaguya ? 4 : 10, 0.0);
+                if (kaguya) {
+                    x.insert(x.begin(), Number(model, "boresight_x"));
+                    y.insert(y.begin(), Number(model, "boresight_y"));
+                }
+                sensor.distortionCoefficients = std::move(x);
                 sensor.distortionCoefficients.insert(sensor.distortionCoefficients.end(), y.begin(),
                                                      y.end());
             }
@@ -340,22 +351,31 @@ IsdCameraModel::IsdCameraModel(IsdSensor isd) : isd_(std::move(isd)) {
     if (determinant == 0.0) {
         throw std::invalid_argument("The ISD's focal plane map to pixels is singular");
     }
-    if (!isd_.distortion.empty() && isd_.distortion != "radial" &&
-        isd_.distortion != "transverse" && isd_.distortion != "radtan" &&
-        isd_.distortion != "lrolrocnac") {
-        throw std::invalid_argument(
-            "The ISD's distortion model '" + isd_.distortion +
-            "' is not supported; use radial, transverse, radtan or lrolrocnac");
-    }
-    if (isd_.distortion == "radtan" && isd_.distortionCoefficients.size() != 5) {
-        throw std::invalid_argument(
-            "Radtan distortion takes five coefficients: k1, k2, p1, p2, k3");
-    }
-    if (isd_.distortion == "lrolrocnac" && isd_.distortionCoefficients.size() != 1) {
-        throw std::invalid_argument("LRO NAC distortion takes one coefficient");
-    }
-    if (isd_.distortion == "transverse" && isd_.distortionCoefficients.size() != 20) {
-        throw std::invalid_argument("Transverse distortion takes ten x and ten y coefficients");
+    // Each model's coefficient count, as usgscsm's `removeDistortion` checks them (CAHVOR's sixth,
+    // which usgscsm's default carries, is unused).
+    static const std::map<std::string, std::pair<std::size_t, std::size_t>, std::less<>>
+        kCoefficients = {{"radial", {0, 3}},          {"transverse", {20, 20}},
+                         {"radtan", {5, 5}},          {"lrolrocnac", {1, 1}},
+                         {"kaguyalism", {10, 10}},    {"dawnfc", {1, 1}},
+                         {"cahvor", {5, 6}},          {"kplo_shadowcam", {1, 1}},
+                         {"cassis", {36, 36}}};
+    if (!isd_.distortion.empty()) {
+        const auto model = kCoefficients.find(isd_.distortion);
+        if (model == kCoefficients.end()) {
+            throw std::invalid_argument("The ISD's distortion model '" + isd_.distortion +
+                                        "' is not supported; use radial, transverse, radtan, "
+                                        "lrolrocnac, kaguyalism, dawnfc, cahvor, kplo_shadowcam "
+                                        "or cassis");
+        }
+        const auto [least, most] = model->second;
+        const std::size_t count = isd_.distortionCoefficients.size();
+        if (count < least || count > most) {
+            throw std::invalid_argument(
+                "The ISD's " + isd_.distortion + " distortion takes " +
+                (least == most ? std::to_string(least)
+                               : std::to_string(least) + " to " + std::to_string(most)) +
+                " coefficients, not " + std::to_string(count));
+        }
     }
     if (isd_.distortion == "radial") {
         isd_.distortionCoefficients.resize(3, 0.0);
@@ -505,6 +525,22 @@ glm::dmat2 RadTanJacobian(const std::vector<double>& k, glm::dvec2 u) {
     return glm::dmat2(glm::dvec2(xx, yx), glm::dvec2(xy, yy));
 }
 
+// TGO CaSSIS's rational model (usgscsm's `cassisChiDotA`, from ISIS's `TgoCassisDistortionMap`):
+// a point's (A1 . chi, A2 . chi) / (A3 . chi), chi = (x^2, xy, y^2, x, y, 1), `a` the three
+// six-vectors. Valid on the 2048-pixel, 10 um detector and 0.2 mm beyond, the point unchanged
+// outside.
+glm::dvec2 CassisMap(const double* a, glm::dvec2 p) {
+    constexpr double kBound = 0.5 * 0.01 * 2048.0 + 0.2;
+    if (std::abs(p.x) > kBound || std::abs(p.y) > kBound) {
+        return p;
+    }
+    const auto dot = [&](const double* c) {
+        return c[0] * p.x * p.x + c[1] * p.x * p.y + c[2] * p.y * p.y + c[3] * p.x + c[4] * p.y +
+               c[5];
+    };
+    return glm::dvec2(dot(a), dot(a + 6)) / dot(a + 12);
+}
+
 // usgscsm's `newtonRaphson`, as its `removeDistortion` calls it: the undistorted point whose
 // `distort` is `d`, from `d`, to a tolerance of 1e-6 in 20 tries, stopping where the Jacobian's
 // determinant falls under 1e-6 (so a singular polynomial, as usgscsm's simple framer has, leaves
@@ -549,6 +585,33 @@ glm::dvec2 IsdCameraModel::Undistort(glm::dvec2 d) const {
                        d / f, [&](glm::dvec2 u) { return RadTanDistort(k, u); },
                        [&](glm::dvec2 u) { return RadTanJacobian(k, u); });
     }
+    if (isd_.distortion == "kaguyalism") {
+        // Kaguya TC and MI (SELENE's SEL_TC_V01.TI and SEL_MI_V01.TI): each axis offset by its
+        // boresight and a cubic in the distorted point's radius.
+        const double r = glm::length(d);
+        const auto cubic = [r](const double* c) {
+            return c[0] + r * (c[1] + r * (c[2] + r * c[3]));
+        };
+        return d + glm::dvec2(k[0] + cubic(&k[1]), k[5] + cubic(&k[6]));
+    }
+    if (isd_.distortion == "dawnfc") {
+        // Dawn FC's model distorts in closed form (see `Distort`); undone by Newton's method.
+        return NewtonInverse([&](glm::dvec2 u) { return Distort(u); }, d);
+    }
+    if (isd_.distortion == "cahvor") {
+        // The radial model about the optical centre (k[3], k[4]).
+        const glm::dvec2 centre(k[3], k[4]);
+        const glm::dvec2 shifted = d - centre;
+        const double rr = glm::dot(shifted, shifted);
+        return centre + shifted * (1.0 - (k[0] + rr * (k[1] + rr * k[2])));
+    }
+    if (isd_.distortion == "kplo_shadowcam") {
+        // KPLO ShadowCam (ISIS's `ShadowCamDistortionMap`): a cubic across the line only.
+        return {d.x, d.y * (1.0 + k[0] * d.y * d.y)};
+    }
+    if (isd_.distortion == "cassis") {
+        return CassisMap(k.data(), d);
+    }
     return d;
 }
 
@@ -562,6 +625,15 @@ glm::dvec2 IsdCameraModel::Distort(glm::dvec2 undistorted) const {
     if (isd_.distortion == "radtan") {
         const double f = isd_.focalLengthMm;
         return f * RadTanDistort(isd_.distortionCoefficients, undistorted / f);
+    }
+    if (isd_.distortion == "dawnfc") {
+        // usgscsm's `applyDistortion`: Dawn FC's radial term on the undistorted radius.
+        return undistorted *
+               (1.0 + isd_.distortionCoefficients[0] * glm::dot(undistorted, undistorted));
+    }
+    if (isd_.distortion == "cassis") {
+        // CaSSIS's own distorting fit, not the correcting one's inverse.
+        return CassisMap(isd_.distortionCoefficients.data() + 18, undistorted);
     }
     return NewtonInverse([&](glm::dvec2 d) { return Undistort(d); }, undistorted);
 }

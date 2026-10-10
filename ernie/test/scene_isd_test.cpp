@@ -8,6 +8,8 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -291,6 +293,95 @@ TEST(IsdFrame, DawnsFramingCameraSeesVestaThroughItsRadTanLens) {
     }
     isd.distortionCoefficients = {1.0};
     EXPECT_THROW(ernie::IsdFrame{isd}, std::invalid_argument);
+}
+
+// usgscsm's other lens models, against its own expectations (tests/DistortionTests.cpp), on
+// Dawn's framing camera.
+TEST(IsdFrame, ReadsUsgscsmsOtherDistortionModels) {
+    std::ifstream file(Fixture("dawnfc_radtan.json"));
+    std::string json((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    const std::string radtan = R"("radtan": {
+      "coefficients": [
+        8.4e-06, 0, 0, 0, 0
+      ]
+    })";
+    const std::size_t at = json.find(radtan);
+    ASSERT_NE(at, std::string::npos);
+    const auto with = [&](const std::string& model) {
+        std::string changed = json;
+        return ernie::ReadIsd(changed.replace(at, radtan.size(), model));
+    };
+    const auto lens = [&](const std::string& name, std::vector<double> k) {
+        ernie::IsdSensor isd = ernie::ReadIsdFile(Fixture("dawnfc_radtan.json"));
+        isd.distortion = name;
+        isd.distortionCoefficients = std::move(k);
+        return ernie::IsdFrame(isd);
+    };
+    const auto roundTrips = [](const ernie::IsdFrame& frame, glm::dvec2 d, double tolerance) {
+        const glm::dvec2 back = frame.Distort(frame.Undistort(d));
+        EXPECT_NEAR(back.x, d.x, tolerance) << frame.Isd().distortion;
+        EXPECT_NEAR(back.y, d.y, tolerance) << frame.Isd().distortion;
+    };
+
+    // Kaguya TC: boresights and cubics, read as usgscsm packs them.
+    const ernie::IsdFrame kaguya(with(R"("kaguyalism": {
+      "x": [-0.00096499, 0.00098441, 8.5773e-06, -3.7438e-06],
+      "y": [-0.0013796, 1.3502e-05, 2.7251e-06, -6.1938e-06],
+      "boresight_x": -0.0725, "boresight_y": 0.0214
+    })"));
+    EXPECT_EQ(kaguya.Isd().distortionCoefficients.size(), 10u);
+    const glm::dvec2 u = kaguya.Undistort({1.0, 1.0});
+    EXPECT_NEAR(u.x, 0.9279337415074662, 1e-6);
+    EXPECT_NEAR(u.y, 1.0200274261995939, 1e-5);
+    roundTrips(kaguya, {1.0, 1.0}, 1e-8);
+    const glm::dvec2 ones =
+        lens("kaguyalism", {0.5, 1, 2, 3, 4, 0.5, 1, 2, 3, 4}).Undistort({1.0, 1.0});
+    EXPECT_NEAR(ones.x, 1 + 1 + 2.828427125 + 6 + 11.313708499 + 0.5, 1e-8);
+
+    // Dawn FC's radial model, distorting in closed form.
+    const ernie::IsdFrame dawn = lens("dawnfc", {8.4e-6});
+    EXPECT_DOUBLE_EQ(dawn.Distort({10.0, 10.0}).x, 10.0168);
+    EXPECT_NEAR(dawn.Undistort({10.0168, 10.0168}).y, 10.0, 1e-8);
+
+    // CAHVOR's radial model about its offset centre.
+    EXPECT_NEAR(lens("cahvor", {0, 0, 0, 1, 1}).Undistort({4.0, 0.0}).x, 4.0, 1e-12);
+    const ernie::IsdFrame cahvor = lens("cahvor", {1e-3, 2e-5, 0, 0.5, -0.3, 0});
+    const glm::dvec2 c = cahvor.Undistort({4.5, -0.3});
+    EXPECT_NEAR(c.x, 0.5 + 4.0 * (1.0 - (1e-3 + 16.0 * 2e-5)), 1e-12);
+    roundTrips(cahvor, {3.0, -2.0}, 1e-9);
+
+    // KPLO ShadowCam: across the line only.
+    const ernie::IsdFrame shadow = lens("kplo_shadowcam", {-1.741e-05});
+    const glm::dvec2 s = shadow.Undistort({0.0, -18.69});
+    EXPECT_EQ(s.x, 0.0);
+    EXPECT_NEAR(s.y, -18.69 * (1.0 + (-1.741e-05) * 18.69 * 18.69), 1e-10);
+    roundTrips(shadow, {2.0, 18.0}, 1e-9);
+
+    // TGO CaSSIS's rational fits (ISIS's tgoCassisAddendum007.ti), each way.
+    const ernie::IsdFrame cassis = lens(
+        "cassis", {0.00376130530948266,  -0.0134154156065812,   -1.86749521007237e-05,
+                   1.00021352681836,     -0.000432362371703953, -0.000948065735350123,
+                   9.9842559363676e-05,  0.00373543707958162,   -0.0133299918873929,
+                   -0.000215311328389359, 0.995296015537294,    -0.0183542717710778,
+                   -3.13320167004204e-05, -7.35655125749807e-06, -1.57664245066771e-05,
+                   0.00373549465439151,  -0.0141671946930935,   1.0,
+                   0.00213658795560622,  -0.00711785765064197,  1.10355974742147e-05,
+                   0.573607182625377,    0.000250884350194894,  0.000550623913037132,
+                   -5.69725741015406e-05, 0.00215155905679149,  -0.00716392991767185,
+                   0.000124152787728634, 0.576459544392426,     0.010576940564854,
+                   1.78250771483506e-05, 4.24592743471094e-06,  9.51220699036653e-06,
+                   0.00215158425420738,  -0.0066835595774833,   0.573741540971609});
+    EXPECT_NEAR(cassis.Undistort({2.0, -8.0}).x, 1.9927225905155812, 1e-9);
+    EXPECT_NEAR(cassis.Undistort({2.0, -8.0}).y, -7.942225998826645, 1e-9);
+    EXPECT_NEAR(cassis.Distort({2.0, -8.0}).x, 2.007349177383467, 1e-9);
+    EXPECT_NEAR(cassis.Distort({2.0, -8.0}).y, -8.058521300253895, 1e-9);
+    roundTrips(cassis, {-3.0, -9.0}, 1e-4);  // Independent fits, inverse to their residual.
+    EXPECT_EQ(cassis.Undistort({20.0, 0.0}), glm::dvec2(20.0, 0.0));  // Off the detector.
+
+    // Each model's coefficients are counted; lunarorbiter is unimplemented even in usgscsm.
+    EXPECT_THROW(lens("cassis", std::vector<double>(18, 0.0)), std::invalid_argument);
+    EXPECT_THROW(lens("kaguyalism", {1.0}), std::invalid_argument);
+    EXPECT_THROW(lens("lunarorbiter", {}), std::invalid_argument);
 }
 
 // The frame ISD's view as Ernie renders it: the ISD's ground points land on its pixels.
