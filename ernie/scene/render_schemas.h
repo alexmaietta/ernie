@@ -32,7 +32,8 @@
       (::ernie::AttributeMeta{.doc = "The camera rendered, or a product's batch of cameras (one "  \
                                      "view each); unset, the settings' camera, else the scene's "  \
                                      "first.",                                                     \
-                              .group = "Image", .options = {::ernie::tokens::kCamera}}))           \
+                              .group = "Image", .options = {::ernie::tokens::kCamera},             \
+                              .plural = "cameras"}))                                               \
     X(glm::dvec2, Resolution, ::ernie::tokens::kResolution, glm::dvec2(2048.0, 1080.0),            \
       (::ernie::AttributeMeta{.doc = "Pixels, width and height; a product's, unset, its "          \
                                      "settings'.",                                                 \

@@ -163,7 +163,7 @@ def test_scenes_load_from_descriptions(tmp_path):
     # Float attributes stay float32 however their numbers are written.
     assert ernie.Mesh.at(scene, "/World/Quad").points.dtype == np.float32
     assert scene.type_of("/World/Group") == "" and ernie.Cube.at(scene, "/World/Group/Child")
-    assert ernie.RenderSettings.at(scene, "/Render/Settings").camera == [ernie.Path("/World/Camera")]
+    assert ernie.RenderSettings.at(scene, "/Render/Settings").camera == ernie.Path("/World/Camera")
 
     # JSON text and files load the same way, into an existing scene; no type leaves a prim's alone.
     path = tmp_path / "scene.json"

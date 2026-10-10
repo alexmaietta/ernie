@@ -101,6 +101,19 @@ class _Attribute:
         self.definition.write(instance.prim, _target(value))
 
 
+class _FirstTarget(_Attribute):
+    """A list of targets that usually holds one, by its singular name (``camera``): its first
+    target, or None; set to one target or a list. Its ``plural`` reads the whole list."""
+
+    __slots__ = ()
+
+    def __get__(self, instance: Schema | None, owner: type | None = None) -> Any:
+        if instance is None:
+            return self.definition
+        targets = self.definition.read(instance.prim)
+        return targets[0] if targets else None
+
+
 def _define_type(cls: type, parent: Any, path: str | Path, **attributes: Any) -> Any:
     """Defines a prim of `cls`'s type at ``path`` in a Scene, or relative to a prim, and sets
     ``attributes``."""
@@ -164,7 +177,7 @@ class Schema:
     @classmethod
     def attributes(cls) -> list[AttributeDef]:
         """Every attribute of the type, its root base's first."""
-        return list(cls._attributes.values())
+        return list({definition.name: definition for definition in cls._attributes.values()}.values())
 
     def set(self, *attribute: Any, **attributes: Any) -> Any:
         """Sets attributes by Python name, and the transform from ``translate``, ``rotate``,
@@ -225,10 +238,16 @@ def _build() -> dict[str, type[Schema]]:
             "_attributes": dict(base._attributes),
         }
         for definition in prim_type.attributes:
-            if definition.py_name in reserved:
-                raise RuntimeError(f"{prim_type.name}.{definition.py_name} hides a Prim member")
-            namespace[definition.py_name] = _Attribute(definition)
-            namespace["_attributes"][definition.py_name] = definition
+            names = [definition.py_name] + ([definition.plural] if definition.plural else [])
+            for name in names:
+                if name in reserved:
+                    raise RuntimeError(f"{prim_type.name}.{name} hides a Prim member")
+                namespace["_attributes"][name] = definition
+            if definition.plural:
+                namespace[definition.py_name] = _FirstTarget(definition)
+                namespace[definition.plural] = _Attribute(definition)
+            else:
+                namespace[definition.py_name] = _Attribute(definition)
         classes[prim_type.name] = builtins.type(prim_type.name, (base,), namespace)
     return classes
 

@@ -73,6 +73,9 @@ struct AttributeMeta {
     /// What changing it stamps (`DirtyOf`): `Dirty::Points` for bulk positions, say. Unset, any
     /// other edit (`Dirty::Params`).
     std::optional<Dirty> dirty;
+    /// For a list of targets usually holding one (a product's camera, or a batch's cameras): the
+    /// plural name Python reads the list by, its own name then reading the first target alone.
+    std::string_view plural;
 };
 
 class AttributeDef;

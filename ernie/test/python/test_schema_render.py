@@ -25,7 +25,7 @@ def test_render_settings_read_fallbacks_and_define_with_keywords():
         "/Render/Settings", ernie.RenderSettings, camera="/Cam", resolution=(640, 480),
         shadow_cascades=2, culling="cpu")
     assert isinstance(settings, ernie.RenderSettings)
-    assert settings.camera == [ernie.Path("/Cam")]
+    assert settings.camera == ernie.Path("/Cam") and settings.cameras == [ernie.Path("/Cam")]
     assert scene.get("/Render/Settings", tokens.CAMERA_REL) == ernie.Path("/Cam")
     assert settings.resolution == (640.0, 480.0)
     assert settings.shadow_cascades == 2 and scene.get("/Render/Settings", tokens.SHADOW_CASCADES) == 2
@@ -63,13 +63,21 @@ def test_relationship_lists_take_one_target_or_several():
     var = scene.define("/Render/Product/Color", ernie.RenderVar)
     assert ernie.RenderProduct.camera.kind == ernie.AttributeKind.RELATIONSHIPS
     assert ernie.RenderProduct.ordered_vars.default == []
-    # One target, as a str, Path, Prim or typed prim, is stored as a Path and reads as a list.
+    # One target, as a str, Path, Prim or typed prim, is stored as a Path: `camera` reads it, and
+    # `cameras` the list of one.
     product = scene.define("/Render/Product", ernie.RenderProduct, camera=cams[0])
     assert scene.get("/Render/Product", tokens.CAMERA_REL) == ernie.Path("/Cams/A")
-    assert product.camera == [ernie.Path("/Cams/A")]
-    # A batch of cameras: a list of any of them, mixed.
-    product.camera = [cams[0], "/Cams/B"]
-    assert product.camera == [ernie.Path("/Cams/A"), ernie.Path("/Cams/B")]
+    assert product.camera == ernie.Path("/Cams/A")
+    assert product.cameras == [ernie.Path("/Cams/A")]
+    # A batch of cameras: a list of any of them, mixed; `camera` reads the first.
+    product.cameras = [cams[0], "/Cams/B"]
+    assert product.cameras == [ernie.Path("/Cams/A"), ernie.Path("/Cams/B")]
+    assert product.camera == ernie.Path("/Cams/A")
+    assert scene.define("/Render/Batch", ernie.RenderProduct, cameras=cams).cameras == [
+        cam.path for cam in cams]
+    assert ernie.RenderProduct.cameras is ernie.RenderProduct.camera
+    unset = scene.define("/Render/Unset", ernie.RenderProduct)
+    assert unset.camera is None and unset.cameras == []
     assert scene.get("/Render/Product", tokens.CAMERA_REL) == [
         ernie.Path("/Cams/A"), ernie.Path("/Cams/B")]
     product.set(ordered_vars=[var], filters=["/Render/Qe"])

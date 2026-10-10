@@ -60,6 +60,10 @@ void BindSchema(nb::module_& m) {
         .def_prop_ro("is_color", [](const AttributeDef& def) { return def.meta.color; })
         .def_prop_ro("is_asset", [](const AttributeDef& def) { return def.meta.asset; })
         .def_prop_ro(
+            "plural", [](const AttributeDef& def) { return std::string(def.meta.plural); },
+            "For a list of targets usually holding one: the Python name of the whole list, its "
+            "own name reading the first target; else empty.")
+        .def_prop_ro(
             "is_integer", [](const AttributeDef& def) { return def.meta.integer; },
             "Whether it is an array of whole numbers (indices, counts), loaded as int32.")
         .def(

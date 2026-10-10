@@ -65,9 +65,12 @@ def _attribute_doc(attribute):
 
 
 def _keywords(prim_type):
-    keywords = [
-        f"{a.py_name}: {_ARGUMENTS.get(a.kind, _TYPES[a.kind])} = ..." for a in prim_type.all_attributes()
-    ]
+    keywords = []
+    for a in prim_type.all_attributes():
+        argument = _ARGUMENTS.get(a.kind, _TYPES[a.kind])
+        keywords.append(f"{a.py_name}: {argument} = ...")
+        if a.plural:
+            keywords.append(f"{a.plural}: {argument} = ...")
     return keywords + list(_XFORM)
 
 
@@ -111,6 +114,12 @@ def main(output):
         lines.append(f"class {prim_type.name}({base}):")
         lines += _doc(prim_type.doc, "    ")
         for attribute in prim_type.attributes:
+            if attribute.plural:
+                lines.append(f"    {attribute.py_name}: Path | None")
+                lines += _doc("The first target. " + _attribute_doc(attribute), "    ")
+                lines.append(f"    {attribute.plural}: {_TYPES[attribute.kind]}")
+                lines += _doc("Every target. " + _attribute_doc(attribute), "    ")
+                continue
             lines.append(f"    {attribute.py_name}: {_TYPES[attribute.kind]}")
             lines += _doc(_attribute_doc(attribute), "    ")
         keywords = ", ".join(_keywords(prim_type))
