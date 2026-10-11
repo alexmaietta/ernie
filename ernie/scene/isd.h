@@ -105,6 +105,15 @@ struct IsdSensor {
     bool frameletsFlipped = false;
     bool frameletOrderReversed = false;
 
+    /// Frame cameras' rolling-shutter jitter, usgscsm's `jitter`: each image line's exposure time
+    /// (`lineExposureTimes`, line l's at index round(l) - 1, clamped to the list), and the line
+    /// and sample jitter, pixels, as polynomials in that time with no constant term, highest power
+    /// first (`lineJitterCoefficients` and `sampleJitterCoefficients`: c0 t^n + ... + c(n-1) t).
+    /// Empty when the ISD has none.
+    std::vector<double> jitterLineTimes;
+    std::vector<double> lineJitter;
+    std::vector<double> sampleJitter;
+
     /// Whether the ISD is a line scanner's (`model` USGS_ASTRO_LINE_SCANNER_SENSOR_MODEL).
     bool IsLineScanner() const;
 
@@ -343,10 +352,14 @@ class IsdPushFrame : public IsdCameraModel {
 /// (`UsgsAstroFrameSensorModel`) computes it (`IsdCameraModel`): the whole image is exposed at
 /// once, at the ISD's centre time, from one position and orientation. Unlike the line scanner,
 /// the camera looks along (x, y, f) in the sensor's frame, and a ray meets the ellipsoid at its
-/// first intersection along it. Rolling-shutter jitter (`jitter`) is not read.
+/// first intersection along it. A rolling shutter's jitter (`jitter`), as usgscsm models it,
+/// moves each image line's pixels by an offset polynomial in the line's exposure time, the pose
+/// left at the centre time: image coordinates less the jitter are the unjittered camera's.
 ///
-/// Reference: usgscsm's `UsgsAstroFrameSensorModel` (`imageToGround`, `groundToImage`,
-/// `losEllipsoidIntersect`, `constructStateFromIsd`).
+/// References:
+/// - usgscsm's `UsgsAstroFrameSensorModel` (`imageToGround`, `groundToImage`,
+///   `losEllipsoidIntersect`, `constructStateFromIsd`), and its src/Utilities.cpp
+///   (`removeJitter`, `addJitter`).
 class IsdFrame : public IsdCameraModel {
   public:
     /// @throws std::invalid_argument if `isd` is not a frame camera's, or as `IsdCameraModel`.
@@ -357,18 +370,28 @@ class IsdFrame : public IsdCameraModel {
         return isd_.centerTime;
     }
 
-    /// The unit body-fixed direction of pixel (`line`, `sample`)'s ray.
+    /// The rolling shutter's jitter (line, sample) at image line `line`, pixels, as usgscsm's
+    /// `removeJitter` takes it: the polynomials at the exposure time of line round(`line`)
+    /// (clamped to the ISD's lines); zero without jitter.
+    glm::dvec2 Jitter(double line) const;
+
+    /// The unit body-fixed direction of pixel (`line`, `sample`)'s ray, its jitter removed.
     glm::dvec3 Look(double line, double sample) const;
 
     /// Where pixel (`line`, `sample`)'s ray first meets the body's ellipsoid raised by `height`
     /// metres, or the ray's point nearest the ellipsoid when it misses.
     glm::dvec3 ImageToGround(double line, double sample, double height = 0.0) const;
 
-    /// The image coordinates (line, sample) of body-fixed point `ground`.
+    /// The image coordinates (line, sample) of body-fixed point `ground`, the jitter added by
+    /// fixed-point iteration as usgscsm's `addJitter` (to 1e-10 pixels).
     glm::dvec2 GroundToImage(const glm::dvec3& ground) const;
 
     /// The image as Ernie renders it: a frame camera of the image's samples by its lines, its
-    /// exposure left as authored (frame ISDs carry none).
+    /// exposure left as authored (frame ISDs carry none). The jitter is a shift of each line's
+    /// pixels, which Ernie's camera cannot take exactly: a rolling shutter (`rollingShutter`)
+    /// moves the pose linearly across the rows, while usgscsm keeps the pose and moves the
+    /// pixels by a polynomial in time. So its midrange over the lines moves the principal point
+    /// and the rest, half its range, is added to `distortionResidualPixels`.
     FrameView View() const;
 };
 

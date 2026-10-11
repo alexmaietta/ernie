@@ -66,3 +66,17 @@ def test_frame_camera_matches_usgscsm_and_authors_its_view():
     samples, lines, _ = frame.author_camera(scene, ernie.Path("/World/Camera"))
     assert (samples, lines) == (16, 16)
     assert scene.get("/World/Camera", tokens.CAMERA_SCAN) == tokens.FRAME_SCAN
+
+
+def test_frame_camera_reads_usgscsms_rolling_shutter_jitter():
+    plain = ernie.IsdFrame.from_file(str(FIXTURES / "orbitalFramer.json"))
+    jittered = ernie.IsdFrame.from_file(str(FIXTURES / "jitterFramer.json"))
+    assert plain.jitter(8.0) == (0.0, 0.0)
+    # usgscsm's JitterFrameSensorModel: -t^2 / 256 + t / 16 is 0.25 at line 8's time.
+    assert jittered.jitter(8.0) == (0.25, -0.25)
+    ground = jittered.image_to_ground(8.0, 8.0)
+    expected = plain.image_to_ground(7.75, 8.25)
+    assert all(math.isclose(a, b, abs_tol=1e-6) for a, b in zip(ground, expected))
+    line, sample = jittered.ground_to_image(ground)
+    assert math.isclose(line, 8.0, abs_tol=1e-9)
+    assert math.isclose(sample, 8.0, abs_tol=1e-9)

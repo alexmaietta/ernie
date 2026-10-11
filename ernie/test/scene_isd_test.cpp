@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -421,6 +422,71 @@ TEST(IsdFrame, ViewsAreFrameCamerasOnTheIsdsPixels) {
             }
         }
     }
+}
+
+// usgscsm's expectations for its rolling-shutter jitter (tests/FrameCameraTests.cpp's
+// JitterFrameSensorModel, and tests/UtilitiesTests.cpp's removeJitter).
+TEST(IsdFrame, MatchesUsgscsmsRollingShutterJitter) {
+    const ernie::IsdFrame plain(ernie::ReadIsdFile(Fixture("orbitalFramer.json")));
+    const ernie::IsdFrame jittered(ernie::ReadIsdFile(Fixture("jitterFramer.json")));
+    ASSERT_EQ(jittered.Isd().jitterLineTimes.size(), 16u);
+    EXPECT_EQ(plain.Jitter(8.0), glm::dvec2(0.0));
+    // The jitter is -t^2 / 256 + t / 16 (line) and its negative (sample), 0.25 at t = 8.
+    const glm::dvec3 ground = jittered.ImageToGround(8.0, 8.0);
+    const glm::dvec3 expected = plain.ImageToGround(7.75, 8.25);
+    EXPECT_DOUBLE_EQ(ground.x, expected.x);
+    EXPECT_DOUBLE_EQ(ground.y, expected.y);
+    EXPECT_DOUBLE_EQ(ground.z, expected.z);
+    for (int line = 0; line <= 16; ++line) {
+        for (int sample = 0; sample <= 16; ++sample) {
+            const glm::dvec2 back =
+                jittered.GroundToImage(jittered.ImageToGround(line, sample, 1e-3));
+            EXPECT_NEAR(back.x, line, 1e-6) << line << " " << sample;
+            EXPECT_NEAR(back.y, sample, 1e-6) << line << " " << sample;
+        }
+    }
+
+    ernie::IsdSensor isd = jittered.Isd();
+    isd.lineJitter = {2.0, 3.0, 4.0};
+    isd.sampleJitter = {-10.0, -20.0, -30.0};
+    isd.jitterLineTimes = {0.0, 1.0, 2.0, 3.0, 4.0};
+    const ernie::IsdFrame cubic(isd);
+    EXPECT_EQ(cubic.Jitter(1.0), glm::dvec2(0.0));
+    EXPECT_EQ(cubic.Jitter(2.0), glm::dvec2(9.0, -60.0));
+    EXPECT_EQ(cubic.Jitter(3.0),
+              glm::dvec2(8 * 2.0 + 4 * 3.0 + 2 * 4.0, -(8 * 10.0 + 4 * 20.0 + 2 * 30.0)));
+    // Lines round to their times, clamped to the list.
+    EXPECT_EQ(cubic.Jitter(-100.0), cubic.Jitter(1.0));
+    EXPECT_EQ(cubic.Jitter(100.0), cubic.Jitter(5.0));
+    EXPECT_EQ(cubic.Jitter(0.75), cubic.Jitter(1.0));
+    EXPECT_EQ(cubic.Jitter(1.35), cubic.Jitter(1.0));
+    isd.sampleJitter.pop_back();
+    EXPECT_THROW(ernie::IsdFrame{isd}, std::invalid_argument);
+}
+
+// The jittered frame as Ernie renders it: the jitter's midrange moves the principal point, and
+// its pixels land within the reported residual (half the jitter's 0.25 pixel range).
+TEST(IsdFrame, ViewsOfJitteredFramesCarryTheJittersMidrange) {
+    const ernie::IsdFrame frame(ernie::ReadIsdFile(Fixture("jitterFramer.json")));
+    const ernie::IsdFrame::FrameView view = frame.View();
+    const ernie::CameraParams& c = view.camera;
+    EXPECT_NEAR(view.distortionResidualPixels, 0.125, 1e-6);
+    const glm::dmat4 toCamera = glm::inverse(c.transform);
+    double worst = 0.0;
+    for (double line = 0.5; line < 16.0; line += 1.0) {
+        for (const double sample : {4.5, 8.5, 12.5}) {
+            const glm::dvec3 local(toCamera * glm::dvec4(frame.ImageToGround(line, sample), 1.0));
+            ASSERT_LT(local.z, 0.0);
+            const glm::dvec2 d = c.lens.Distort(glm::dvec2(local) / -local.z);
+            glm::dvec2 pixel = c.PrincipalPoint() + glm::dvec2(d.x, -d.y) * c.FocalLengthPixels();
+            if (view.rowsReversed) {
+                pixel.y = 16.0 - pixel.y;
+            }
+            worst = std::max({worst, std::abs(pixel.x - sample), std::abs(pixel.y - line)});
+        }
+    }
+    EXPECT_LE(worst, view.distortionResidualPixels + 1e-6);
+    EXPECT_GT(worst, 0.12);
 }
 
 TEST(LrocNac, AuthorsThePublishedSensorAndReadout) {

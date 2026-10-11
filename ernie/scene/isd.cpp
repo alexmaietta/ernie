@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include <limits>
 #include <map>
 #include <sstream>
 #include <stdexcept>
@@ -319,6 +320,15 @@ IsdSensor ReadIsd(std::string_view json) {
             static_cast<std::uint32_t>(NumberOr(isd, "num_lines_overlap", 0.0));
         sensor.frameletsFlipped = isd.value("framelets_flipped", false);
         sensor.frameletOrderReversed = isd.value("framelet_order_reversed", false);
+        if (isd.contains("jitter")) {
+            const Json& jitter = isd["jitter"];
+            sensor.lineJitter =
+                Numbers(Field(jitter, "lineJitterCoefficients"), "lineJitterCoefficients");
+            sensor.sampleJitter =
+                Numbers(Field(jitter, "sampleJitterCoefficients"), "sampleJitterCoefficients");
+            sensor.jitterLineTimes =
+                Numbers(Field(jitter, "lineExposureTimes"), "lineExposureTimes");
+        }
 
         const Json& radii = Field(isd, "radii");
         sensor.semiMajorAxis = Number(radii, "semimajor") * MetresPer(radii);
@@ -1074,11 +1084,32 @@ IsdFrame::IsdFrame(IsdSensor isd) : IsdCameraModel(std::move(isd)) {
     if (!isd_.IsFrame()) {
         throw std::invalid_argument("The ISD's model '" + isd_.model + "' is not a frame camera's");
     }
+    if (!isd_.jitterLineTimes.empty() && isd_.lineJitter.size() != isd_.sampleJitter.size()) {
+        throw std::invalid_argument("The ISD's line and sample jitter need as many coefficients");
+    }
+}
+
+glm::dvec2 IsdFrame::Jitter(double line) const {
+    const std::vector<double>& times = isd_.jitterLineTimes;
+    if (times.empty()) {
+        return glm::dvec2(0.0);
+    }
+    // As usgscsm's `removeJitter`: line l's time at index round(l) - 1, within the list.
+    const double index = std::clamp(std::round(line), 1.0, static_cast<double>(times.size())) - 1.0;
+    const double time = times[static_cast<std::size_t>(index)];
+    glm::dvec2 jitter(0.0);
+    const std::size_t terms = isd_.lineJitter.size();
+    for (std::size_t n = 0; n < terms; ++n) {
+        const double power = std::pow(time, static_cast<double>(terms - n));
+        jitter += glm::dvec2(isd_.lineJitter[n], isd_.sampleJitter[n]) * power;
+    }
+    return jitter;
 }
 
 glm::dvec3 IsdFrame::Look(double line, double sample) const {
+    const glm::dvec2 unjittered = glm::dvec2(line, sample) - Jitter(line);
     // usgscsm's frame camera looks along (x, y, f), against the line scanner's (-x, -y, -f).
-    return -LookAt(ImageTime(), line, sample);
+    return -LookAt(ImageTime(), unjittered.x, unjittered.y);
 }
 
 glm::dvec3 IsdFrame::ImageToGround(double line, double sample, double height) const {
@@ -1086,7 +1117,17 @@ glm::dvec3 IsdFrame::ImageToGround(double line, double sample, double height) co
 }
 
 glm::dvec2 IsdFrame::GroundToImage(const glm::dvec3& ground) const {
-    return PixelOf(Distort(FocalPlaneView(ground, ImageTime())));
+    const glm::dvec2 unjittered = PixelOf(Distort(FocalPlaneView(ground, ImageTime())));
+    // usgscsm's `addJitter`: the image point whose jitter removed gives the unjittered one.
+    glm::dvec2 image = unjittered;
+    for (int iteration = 0; iteration < 50 && !isd_.jitterLineTimes.empty(); ++iteration) {
+        const glm::dvec2 error = image - Jitter(image.x) - unjittered;
+        if (std::abs(error.x) < 1e-10 && std::abs(error.y) < 1e-10) {
+            break;
+        }
+        image -= error;
+    }
+    return image;
 }
 
 IsdCameraModel::FrameView IsdFrame::View() const {
@@ -1097,7 +1138,27 @@ IsdCameraModel::FrameView IsdFrame::View() const {
     const double facing =
         glm::dot(centre - Position(time), LookAt(time, middle, 0.5 * isd_.samples)) < 0.0 ? -1.0
                                                                                           : 1.0;
-    return FrameViewOf([](double row) { return row; }, isd_.lines, time, facing);
+    FrameView view = FrameViewOf([](double row) { return row; }, isd_.lines, time, facing);
+    if (isd_.jitterLineTimes.empty()) {
+        return view;
+    }
+    // The jitter's range over the image's lines (each line's pixels round to it).
+    glm::dvec2 least(std::numeric_limits<double>::max());
+    glm::dvec2 most(std::numeric_limits<double>::lowest());
+    for (std::uint32_t line = 1; line <= isd_.lines; ++line) {
+        least = glm::min(least, Jitter(line));
+        most = glm::max(most, Jitter(line));
+    }
+    // Pixel (line, sample) sees the unjittered camera's (line, sample) - jitter: moving the
+    // principal point by the midrange shifts the whole image by it, along the samples (Ernie's x)
+    // and the lines (Ernie's rows, down or, reversed, up).
+    const glm::dvec2 midrange = 0.5 * (least + most);
+    const double pitch = view.camera.verticalApertureMm / view.camera.height;
+    view.camera.horizontalApertureOffsetMm += midrange.y * pitch;
+    view.camera.verticalApertureOffsetMm += (view.rowsReversed ? midrange.x : -midrange.x) * pitch;
+    const glm::dvec2 half = 0.5 * (most - least);
+    view.distortionResidualPixels += std::max(half.x, half.y);
+    return view;
 }
 
 IsdSensor ReadIsdFile(const std::string& path) {

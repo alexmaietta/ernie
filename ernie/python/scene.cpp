@@ -1254,6 +1254,15 @@ void BindScene(nb::module_& m) {
             },
             nb::arg("ground"), "The (line, sample) that sees body-fixed point `ground`.")
         .def(
+            "jitter",
+            [](const IsdFrame& s, double line) {
+                const glm::dvec2 jitter = s.Jitter(line);
+                return nb::make_tuple(jitter.x, jitter.y);
+            },
+            nb::arg("line"),
+            "The rolling shutter's jitter (line, sample) in pixels at image line `line`, as "
+            "usgscsm's `removeJitter` takes it; (0, 0) when the ISD has no `jitter`.")
+        .def(
             "author_camera",
             [](const IsdFrame& s, Scene& scene, const PrimPath& pathArg) {
                 const Path path = pathArg;
