@@ -131,6 +131,17 @@ TEST(Pushbroom, StripRunsFromTheLastPoseToThisOne) {
     EXPECT_FLOAT_EQ(packed[2][3], 1.0f)
         << "the identity rotation's w";
 
+    params.camera.lens.k1 = -0.1;
+    params.camera.lens.p1 = 0.002;
+    params.camera.lens.p2 = -0.001;
+    EXPECT_NO_THROW(params.camera.Check())
+        << "radial and tangential distortion";
+    params.camera.lens = ernie::LensModel{};
+    params.camera.lens.projection = ernie::LensProjection::Fisheye;
+    EXPECT_THROW(params.camera.Check(), std::invalid_argument)
+        << "perspective only";
+    params.camera.lens = ernie::LensModel{};
+
     params.camera.shutterOpen = -0.5;
     EXPECT_THROW(params.camera.Check(), std::invalid_argument)
         << "rows are its readout";

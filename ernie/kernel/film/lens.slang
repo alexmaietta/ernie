@@ -67,33 +67,44 @@ public struct BrownConrady {
     }
 }
 
-// A pushbroom's detector line, with Brown-Conrady radial distortion across it: its rows are its
-// readout over time, not space, so only x moves. `k` is (k1, k2, k3, the line's normalised y);
-// the row's coordinate is scaled by `overscan` so the raster row is the sensor's row (the raster
-// image is drawn with the focal length over `overscan`, wide enough for the undistorted line).
+// A pushbroom's detector line, with Brown-Conrady radial and tangential distortion: its rows are
+// its readout over time, not space, so a sensor pixel is a point of the line, whose pinhole
+// point (`undistort`) lies along the line and, for a line off the axis or tangential terms, off
+// it. sensor.slang's `pushbroomTapAt` takes it there, onto the raster row of the pixel's own
+// time, and `retimed` onto the row whose pose sees the point on the line. `k` is (k1, k2, k3,
+// the line's normalised y), `tangential` (p1, p2).
 public struct Pushbroom {
-    static float2 distort(float2 p, float4 k) {
+    static float2 distort(float2 p, float3 k, float2 tangential) {
         let r2 = dot(p, p);
-        return p * (1.0 + r2 * (k.x + r2 * (k.y + r2 * k.z)));
+        let radial = 1.0 + r2 * (k.x + r2 * (k.y + r2 * k.z));
+        return float2(p.x * radial + 2.0 * tangential.x * p.x * p.y +
+                          tangential.y * (r2 + 2.0 * p.x * p.x),
+                      p.y * radial + tangential.x * (r2 + 2.0 * p.y * p.y) +
+                          2.0 * tangential.y * p.x * p.y);
     }
 
-    public static float2 pinholeOf(float2 sensor, float4 k, float overscan) {
-        let distorted = float2(sensor.x, k.w);
+    // The pinhole image point of normalised image point `distorted`, by fixed-point iteration.
+    public static float2 undistort(float2 distorted, float4 k, float2 tangential) {
         var p = distorted;
         for (int i = 0; i < 12; ++i) {
-            p += distorted - distort(p, k);
+            p += distorted - distort(p, k.xyz, tangential);
         }
-        return float2(p.x, sensor.y * overscan);
+        return p;
     }
 
-    // The ray through the detector line (a pushbroom is never rendered on cube faces).
+    // The lens projection interface, unused: sensor.slang maps a pushbroom's pixels itself.
+    public static float2 pinholeOf(float2 sensor, float4 k, float p2) {
+        return sensor;
+    }
+
+    // A pushbroom is never rendered on cube faces.
     public static float3 rayOf(float2 sensor, float4 k, float p2) {
-        return normalize(float3(pinholeOf(sensor, k, 1.0), -1.0));
+        return normalize(float3(sensor, -1.0));
     }
 
-    // cos^4 of the field angle along the line, where the row's ray lies.
+    // cos^4 of the field angle of the pixel's ray, its pinhole point on (or off) the line.
     public static float falloff(float2 sensor, float2 pinhole, float4 k) {
-        return cosine4(float2(pinhole.x, k.w));
+        return cosine4(pinhole);
     }
 }
 

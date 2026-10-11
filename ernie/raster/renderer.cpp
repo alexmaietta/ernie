@@ -250,7 +250,10 @@ struct SensorUniforms {
     /// The unit direction towards the sun in the view's camera frame;
     /// 1 when the sun lights the frame.
     float sun[4];
-    float facesPadding[40];
+    /// A pushbroom's lens: Brown-Conrady p1 and p2 (its k1 to k3 and
+    /// line in `distortion`).
+    float pushbroom[4];
+    float facesPadding[36];
     /// Per band, two to a float4: the lens's image scale (lateral
     /// colour) and focal length shift in millimetres (axial colour);
     /// 1 and 0 without chromatic aberration.
@@ -2951,14 +2954,16 @@ void RasterRenderer::WriteSensor(const FrameParams& params,
             (subframes_ - 1) * outputViews_ + v;
         const CameraView view = params.View(last);
         if (params.camera.pushbroom) {
-            // Its strip; its distortion across the line and the line
-            // (lens.slang's Pushbroom).
+            // Its strip; its distortion, the line and its tangential
+            // terms (lens.slang's Pushbroom).
             const PushbroomStrip strip = params.Strip(last);
             CopyMatrix(sensor.invViewProj, strip.Packed());
             sensor.distortion[0] = static_cast<float>(lens.k1);
             sensor.distortion[1] = static_cast<float>(lens.k2);
             sensor.distortion[2] = static_cast<float>(lens.k3);
             sensor.distortion[3] = strip.line;
+            sensor.pushbroom[0] = static_cast<float>(lens.p1);
+            sensor.pushbroom[1] = static_cast<float>(lens.p2);
         } else {
             CopyMatrix(sensor.invViewProj,
                        glm::inverse(view.ViewProjection()));

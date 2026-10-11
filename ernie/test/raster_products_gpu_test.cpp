@@ -573,6 +573,82 @@ TEST_F(RasterDelegateTest, PushbroomScansItsRowsAlongItsMotion) {
 }
 
 TEST_F(RasterDelegateTest,
+       PushbroomDecentringMovesPointsOffTheLineToOtherRows) {
+    // The scan of PushbroomScansItsRowsAlongItsMotion through a lens
+    // with tangential distortion: p1 bends the detector line's
+    // pinhole points off it towards its ends (by about p1 x^2), which
+    // are seen one unit along the track per 1/50 of the pinhole's y,
+    // so by rows later or earlier. Squares where each pixel's own
+    // pinhole ray from its row's pose meets the ground show on that
+    // pixel.
+    Scene scene = FlatScene();
+    const auto at = [](double y) {
+        return ernie::LookAtTransform({0.0, y, 50.0}, {0.0, y, 0.0},
+                                      {0.0, 1.0, 0.0});
+    };
+    ernie::Camera(scene, "/World/Camera")
+        .SetScan(tokens::kPushbroom)
+        .SetFocalLength(18.0)
+        .SetLensDistortion({0.0f, 0.0f, 0.0f, 0.4f, 0.01f});
+    const ernie::CameraParams camera = ernie::CameraParamsOf(
+        scene, "/World/Camera", kVarSize, kVarSize);
+    const double f = camera.FocalLengthPixels();
+    const double line = camera.lineOffsetMm / camera.focalLengthMm;
+    const std::pair<std::size_t, std::size_t> pixels[] = {
+        {16, 2}, {12, 29}, {20, 5}, {14, 16}};
+    for (std::size_t i = 0; i < std::size(pixels); ++i) {
+        const auto [row, column] = pixels[i];
+        const glm::dvec2 pinhole = camera.lens.Undistort(
+            {(column + 0.5 - camera.PrincipalPoint().x) / f, line});
+        if (column != 16) {
+            ASSERT_GT(std::abs(pinhole.y - line) * 50.0, 1.5)
+                << "rows off the line's";
+        }
+        // Row r's pose is (r + 0.5) / 32 of the way from y = -16 to
+        // 16; the camera's x and y are the world's.
+        const double z = 0.05;
+        const glm::dvec2 ground =
+            glm::dvec2(0.0, row + 0.5 - 16.0) + (50.0 - z) * pinhole;
+        const Path square("/World/Square" + std::to_string(i));
+        DefineQuad(scene, square, 0.9f);
+        scene.Set(
+            square, tokens::kTransform,
+            glm::translate(glm::dmat4(1.0), glm::dvec3(ground, z)));
+    }
+    scene.Set("/World/Camera", tokens::kTransform, at(-16.0));
+    RasterDelegate delegate(*context_);
+    delegate.Step(scene);  // the strip's start
+    scene.Set("/World/Camera", tokens::kTransform, at(16.0));
+    ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+    const auto vars = MapVars(outputs);
+    for (std::size_t i = 0; i < std::size(pixels); ++i) {
+        const auto [row, column] = pixels[i];
+        const Path square("/World/Square" + std::to_string(i));
+        EXPECT_EQ(delegate.PrimPath(At<std::uint32_t>(
+                      vars.at("PrimId"), row, column)),
+                  square)
+            << "row " << row << ", column " << column;
+        glm::dvec2 sum(0.0);
+        int hits = 0;
+        for (std::size_t r = 0; r < kVarSize; ++r) {
+            for (std::size_t c = 0; c < kVarSize; ++c) {
+                if (delegate.PrimPath(At<std::uint32_t>(
+                        vars.at("PrimId"), r, c)) == square) {
+                    sum += glm::dvec2(r, c);
+                    ++hits;
+                }
+            }
+        }
+        ASSERT_GT(hits, 0) << square.String();
+        EXPECT_LT(glm::distance(sum / double(hits),
+                                glm::dvec2(row, column)),
+                  0.75)
+            << square.String() << " at row " << row << ", column "
+            << column;
+    }
+}
+
+TEST_F(RasterDelegateTest,
        AnIsdStripSeesTheGroundWhereUsgscsmPutsIt) {
     // usgscsm's synthetic orbital line scanner (16 x 16 pixels of
     // about 100 m, 50 km above a 1000 km body) rendered as one strip:
@@ -1297,6 +1373,112 @@ TEST_F(RasterDelegateTest,
     }
     EXPECT_LT(fringed.front().second, 0.95);
     EXPECT_GT(fringed.back().second, 1.05);
+}
+
+TEST_F(RasterDelegateTest,
+       PushbroomLateralColourScalesAlongAndAcrossItsLine) {
+    // A pushbroom whose line lies 0.3 off the axis, scanning 32 units
+    // over 32 rows from 50 up, through a lens whose image is 20%
+    // smaller at 400 nm and 20% larger at 700: a band of scale s sees
+    // a square off the axis at its column offset from the principal
+    // point times s, and, its line's point at y 0.3 / s, at the time
+    // the camera is 50 (0.3 / s - 0.3) earlier: rows earlier for s <
+    // 1, later for s > 1. Each row is one instant, so the square's
+    // edges, and its centroid, move by rows: checked to half a row,
+    // against shifts of up to four. The square lies on flat ground,
+    // whose depth leads each row's search for what it sees, and is
+    // measured as the image less one without it.
+    constexpr double kLine = 0.3;
+    const auto render = [&](bool fringed, bool square) {
+        Scene scene = FlatScene();
+        scene.Set("/Render/Product", tokens::kOrderedVars,
+                  std::vector<Path>{"/Render/Vars/SpectralRadiance"});
+        if (square) {
+            DefineQuad(scene, "/World/Square", 2.0f);
+            scene.Set("/World/Square", tokens::kTransform,
+                      glm::translate(glm::dmat4(1.0),
+                                     glm::dvec3(15.0, 15.0, 0.05)));
+            ernie::Material::Define(scene, "/Looks/White")
+                .SetAlbedo(glm::dvec3(1.0));
+            ernie::Mesh(scene, "/World/Square")
+                .SetMaterialBinding("/Looks/White");
+        }
+        const auto at = [](double y) {
+            return ernie::LookAtTransform(
+                {0.0, y, 50.0}, {0.0, y, 0.0}, {0.0, 1.0, 0.0});
+        };
+        ernie::Camera camera(scene, "/World/Camera");
+        camera.SetScan(tokens::kPushbroom)
+            .SetFocalLength(18.0)
+            .SetPushbroomLineOffset(18.0 * kLine);
+        if (fringed) {
+            camera.SetLensChromaticScale(
+                {400.0f, 0.8f, 700.0f, 1.2f});
+        }
+        scene.Set("/World/Camera", tokens::kTransform, at(-16.0));
+        RasterDelegate delegate(*context_);
+        delegate.Step(scene);  // the strip's start
+        scene.Set("/World/Camera", tokens::kTransform, at(16.0));
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const Tensor spectral = outputs.at("/Render/Product")
+                                    .vars.at("SpectralRadiance")
+                                    .Map(ernie::MapDevice::Cpu)
+                                    .tensor;
+        const float* values = spectral.As<float>();
+        return std::pair(
+            std::vector<float>(values, values + spectral.Elements()),
+            ernie::CameraParamsOf(scene, "/World/Camera", kVarSize,
+                                  kVarSize));
+    };
+    const auto centroids = [&](bool fringed) {
+        const auto [image, params] = render(fringed, true);
+        const auto [ground, unused] = render(fringed, false);
+        const std::size_t bands =
+            image.size() / (kVarSize * kVarSize);
+        std::vector<std::pair<glm::dvec2, double>>
+            result;  // (column, row) centroid, scale
+        for (std::size_t b = 0; b < bands; ++b) {
+            glm::dvec2 sum(0.0);
+            double total = 0.0;
+            for (std::size_t row = 0; row < kVarSize; ++row) {
+                for (std::size_t col = 0; col < kVarSize; ++col) {
+                    const std::size_t i =
+                        (b * kVarSize + row) * kVarSize + col;
+                    const double value =
+                        std::abs(static_cast<double>(image[i]) -
+                                 static_cast<double>(ground[i]));
+                    sum += value * glm::dvec2(col + 0.5, row + 0.5);
+                    total += value;
+                }
+            }
+            const double low =
+                params.bands.Lower(static_cast<int>(b));
+            const double scale =
+                fringed ? params.lens.chromaticScale.Average(
+                              low, low + params.bands.Width())
+                        : 1.0;
+            result.emplace_back(
+                sum / total -
+                    glm::dvec2(params.PrincipalPoint().x, 0.0),
+                scale);
+        }
+        return result;
+    };
+    const auto plain = centroids(false);
+    const auto fringed = centroids(true);
+    ASSERT_EQ(plain.size(), fringed.size());
+    EXPECT_GT(plain.front().first.x, 8.0) << "well off the axis";
+    for (std::size_t b = 0; b < plain.size(); ++b) {
+        const double s = fringed[b].second;
+        EXPECT_NEAR(fringed[b].first.x, s * plain[b].first.x, 0.3)
+            << "band " << b << ", " << s;
+        EXPECT_NEAR(fringed[b].first.y,
+                    plain[b].first.y - 50.0 * kLine * (1.0 / s - 1.0),
+                    0.5)
+            << "band " << b << ", scale " << s;
+    }
+    EXPECT_LT(fringed.front().second, 0.85);
+    EXPECT_GT(fringed.back().second, 1.15);
 }
 
 TEST_F(RasterDelegateTest,

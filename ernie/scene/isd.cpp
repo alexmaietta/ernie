@@ -921,10 +921,10 @@ double IsdCameraModel::FitDistortion(CameraParams& camera,
     if (isd_.distortion.empty()) {
         return 0.0;
     }
-    // The lens's distortion as Brown-Conrady radial terms: distorted
-    // = undistorted (1 + k1 r^2 + k2 r^4 + k3 r^6), fitted by least
-    // squares to the ISD's model at samples along the lines, in
-    // Ernie's normalised image coordinates.
+    // The lens's distortion as Brown-Conrady terms: distorted =
+    // undistorted (1 + k1 r^2 + k2 r^4 + k3 r^6) + decentring of p1
+    // and p2, fitted by least squares to the ISD's model at samples
+    // along the lines, in Ernie's normalised image coordinates.
     const double f = isd_.focalLengthMm;
     const double pitch =
         glm::length(FocalPlaneOf(lines.front(), 1.0) -
@@ -953,10 +953,7 @@ double IsdCameraModel::FitDistortion(CameraParams& camera,
     // tangential terms of t1 and t2: a scale too, as radial models
     // with a constant term have, which the camera's focal length
     // takes (f a), leaving Brown-Conrady's k = b / a and p = t / a on
-    // its sensor's coordinates (distorted / a). The tangential terms
-    // only across a frame: a pushbroom's lens resamples along the
-    // line, radially.
-    const std::size_t unknowns = across ? 6 : 4;
+    // its sensor's coordinates (distorted / a).
     const auto basis = [](glm::dvec2 u, int axis) {
         const double r2 = glm::dot(u, u);
         const double v = u[axis];
@@ -969,21 +966,48 @@ double IsdCameraModel::FitDistortion(CameraParams& camera,
                                      axis == 0 ? cross : own,
                                      axis == 0 ? own : cross};
     };
-    std::array<std::array<double, 6>, 6> normal{};
-    std::array<double, 6> right{};
-    for (const auto& [u, d] : samples) {
-        for (int axis = 0; axis < (across ? 2 : 1); ++axis) {
-            const std::array<double, 6> row = basis(u, axis);
-            for (std::size_t i = 0; i < unknowns; ++i) {
-                for (std::size_t j = 0; j < unknowns; ++j) {
-                    normal[i][j] += row[i] * row[j];
-                }
-                right[i] += row[i] * d[axis];
+    std::array<double, 6> b{};
+    if (across) {
+        NormalEquations<6> fit;
+        for (const auto& [u, d] : samples) {
+            for (int axis = 0; axis < 2; ++axis) {
+                fit.Add(basis(u, axis), d[axis]);
             }
         }
+        b = fit.Solve(largest > 0.0 ? 6 : 0);
+    } else {
+        // One line, a pushbroom's: along it (x) the scale, the radial
+        // terms and t2; t1 moves points along it only as the scale
+        // does (2 t1 x y, y about the line's), so it comes from their
+        // displacement off it (y), which changes the time that sees
+        // them. Alternately, until they settle.
+        double t1 = 0.0;
+        for (int round = 0; round < 4; ++round) {
+            NormalEquations<6> along;
+            for (const auto& [u, d] : samples) {
+                const std::array<double, 6> row = basis(u, 0);
+                along.Add(
+                    {row[0], row[1], row[2], row[3], row[5], 0.0},
+                    d.x - t1 * row[4], 5);
+            }
+            const std::array<double, 6> x =
+                along.Solve(largest > 0.0 ? 5 : 0);
+            b = {x[0], x[1], x[2], x[3], t1, x[4]};
+            double moved = 0.0;
+            double weight = 0.0;
+            for (const auto& [u, d] : samples) {
+                const std::array<double, 6> row = basis(u, 1);
+                double fitted = 0.0;
+                for (std::size_t i = 0; i < 6; ++i) {
+                    fitted += i == 4 ? 0.0 : row[i] * b[i];
+                }
+                moved += row[4] * (d.y - fitted);
+                weight += row[4] * row[4];
+            }
+            t1 = weight > 0.0 ? moved / weight : 0.0;
+        }
+        b[4] = t1;
     }
-    std::array<double, 6> b =
-        SolveNormal(normal, right, largest > 0.0 ? unknowns : 0);
     if (b[0] == 0.0) {
         b = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     }
@@ -999,7 +1023,7 @@ double IsdCameraModel::FitDistortion(CameraParams& camera,
         for (int axis = 0; axis < (across ? 2 : 1); ++axis) {
             const std::array<double, 6> row = basis(u, axis);
             double fitted = 0.0;
-            for (std::size_t i = 0; i < unknowns; ++i) {
+            for (std::size_t i = 0; i < 6; ++i) {
                 fitted += row[i] * b[i];
             }
             residual = std::max(residual, std::abs(fitted - d[axis]) *

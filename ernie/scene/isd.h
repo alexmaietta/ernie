@@ -259,10 +259,15 @@ class IsdCameraModel {
     /// the samples as Brown-Conrady terms on `camera` (and a scale
     /// into its focal length, from a radial model's constant term),
     /// with `facing` and `axes` as `ErnieAxes`; returns the fit's
-    /// largest departure from the ISD's, in pixels. One line fits
-    /// along it only (x) and radially, as a pushbroom's lens
-    /// resamples; more fit both of the image's directions with the
-    /// tangential terms too, which a radtan model's map onto exactly.
+    /// largest departure from the ISD's, in pixels. More lines fit
+    /// both of the image's directions at once, which a radtan model's
+    /// map onto exactly. One line, a pushbroom's, fits the scale,
+    /// radial terms and p2 along it (x), the departure reported along
+    /// it only, and p1 from its points' displacement off it (y),
+    /// which p1 moves them along the line by only as the scale does.
+    ///
+    /// Reference: D. C. Brown, "Decentering Distortion of Lenses",
+    /// Photogrammetric Engineering 32(3):444-462, 1966.
     double FitDistortion(CameraParams& camera,
                          std::span<const double> lines,
                          const glm::dmat3& axes, double facing) const;
@@ -336,9 +341,10 @@ class IsdLineScanner : public IsdCameraModel {
     /// great-arc turn, which departs from the orbit's curve by about
     /// a T^2 / 8 for its acceleration a over the strip's time T: keep
     /// strips short (for LRO's NAC, 64 lines are 0.8 s and 0.1 m).
-    /// The lens's distortion along the detector is fitted as the
-    /// camera's Brown-Conrady k1 to k3, which the pushbroom's lens
-    /// resamples through.
+    /// The lens's distortion along the detector and off it is fitted
+    /// as the camera's Brown-Conrady k1 to k3, p1 and p2, which the
+    /// pushbroom's lens resamples through (rows of points off the
+    /// line from the time that sees them).
     struct Strip {
         CameraParams camera;
         glm::dmat4 from{1.0};

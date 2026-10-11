@@ -132,7 +132,7 @@ SensorPlan PlanSensor(std::span<const SensorFilterStep> chain,
 /// The lens projection of lens.slang that `lens` compiles into the
 /// sensor kernel (`SensorPlan::lens`): "Pinhole" without distortion,
 /// "BrownConrady" with it, or "Fisheye"; for a `pushbroom` camera,
-/// "Pushbroom" (its distortion across the line only).
+/// "Pushbroom" (its line's points, which sensor.slang maps itself).
 std::string LensKernelOf(const LensModel& lens,
                          bool pushbroom = false);
 

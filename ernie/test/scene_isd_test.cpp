@@ -178,6 +178,47 @@ TEST(IsdLineScanner, StripsFitTheLensDistortionAlongTheLine) {
     }
 }
 
+TEST(IsdLineScanner, StripsFitDecentringOnAndOffTheLine) {
+    // The Context Camera through a radtan lens with decentring: the
+    // strip's pushbroom sees each sample of the line along the ISD's
+    // ray, along the line and off it (which changes the time that
+    // sees a point), its pinhole points leaving the line by pixels.
+    ernie::IsdSensor isd =
+        ernie::ReadIsdFile(Fixture("ctxLineScan.json"));
+    isd.distortion = "radtan";
+    isd.distortionCoefficients = {0.5, 0.0, 0.01, -0.005,
+                                  0.0};  // k1, k2, p1, p2, k3
+    const ernie::IsdLineScanner scanner(isd);
+    const ernie::IsdLineScanner::Strip strip =
+        scanner.StripOf(1000, 64);
+    const ernie::CameraParams& camera = strip.camera;
+    EXPECT_NO_THROW(camera.Check());
+    EXPECT_NE(camera.lens.p1, 0.0);
+    EXPECT_NE(camera.lens.p2, 0.0);
+    EXPECT_LT(strip.distortionResidualPixels, 0.01);
+    const double f = camera.FocalLengthPixels();
+    const double line = camera.lineOffsetMm / camera.focalLengthMm;
+    const glm::dmat3 toCamera =
+        glm::transpose(glm::dmat3(strip.from));
+    double off = 0.0;
+    for (int i = 0; i <= 16; ++i) {
+        const double sample = scanner.Isd().samples * i / 16.0;
+        // The ISD's ray at the strip's first pose, in the camera's
+        // frame, facing the scene.
+        glm::dvec3 ray = toCamera * scanner.Look(1000.0, sample);
+        ray = ray.z > 0.0 ? -ray : ray;
+        const glm::dvec2 expected = glm::dvec2(ray) / -ray.z;
+        const glm::dvec2 pinhole = camera.lens.Undistort(
+            {(sample - camera.PrincipalPoint().x) / f, line});
+        EXPECT_NEAR(pinhole.x * f, expected.x * f, 0.02)
+            << "along the line at " << sample;
+        EXPECT_NEAR(pinhole.y * f, expected.y * f, 0.02)
+            << "off the line at " << sample;
+        off = std::max(off, std::abs(pinhole.y - line) * f);
+    }
+    EXPECT_GT(off, 0.5) << "pixels off the line";
+}
+
 TEST(Isd, ReadsTheLroWideAngleCamerasFramelets) {
     const ernie::IsdSensor wac =
         ernie::ReadIsdFile(Fixture("lroWacPushFrame.json"));

@@ -41,6 +41,7 @@
 module sensor;
 
 import cube_faces;
+import lens;
 import lensProjection;
 import projection;
 
@@ -95,7 +96,10 @@ public struct SensorUniforms {
     // xyz: the unit direction towards the sun in the camera's frame (x right, y up, the camera
     // looking down -z); w: 1 when the sun lights the frame, else 0 (`PixelContext.sunInCamera`).
     public float4 sun;
-    float4 facesPadding[10];
+    // A pushbroom's (`kPushbroomCamera`) lens: Brown-Conrady p1 and p2 (its k1 to k3 and line's
+    // normalised y are `distortion`'s); zw unused.
+    public float4 pushbroom;
+    float4 facesPadding[9];
     // Per band, two to a float4 (`chromaticOf`): the lens's image scale (lateral colour) and focal
     // length shift in millimetres (axial colour).
     public float4 chromatic[32];
@@ -478,8 +482,81 @@ RasterTap rasterTapOf(SensorUniforms cam, int2 at, int view) {
     return rasterTapAt(cam, float2(at) + 0.5, view);
 }
 
+// A pushbroom's tap (`kPushbroomCamera`): sensor position `position`'s point of the detector line,
+// normalised (x, the line's y), through the lens (lens.slang's `Pushbroom`) to its pinhole point,
+// at the raster row of the position's own time, the raster x of the pinhole point's along the
+// line. A pinhole point off the line (`pinhole.y` not the line's) is seen at another time, which
+// `retimed` finds from the raster's depth. With lateral colour, the band's image is `scale`
+// times the reference's about the principal point, so the point is the line's over `scale`.
+RasterTap pushbroomTapAt(SensorUniforms cam, float2 position, int view, float scale) {
+    let f = cam.intrinsics.x;
+    RasterTap tap;
+    tap.distorted = float2((position.x - cam.intrinsics.y) / f, cam.distortion.w) / scale;
+    tap.pinhole = Pushbroom.undistort(tap.distorted, cam.distortion, cam.pushbroom.xy);
+    tap.raster = float2(cam.intrinsics.y + tap.pinhole.x * f / cam.intrinsics.w, position.y) - 0.5;
+    tap.layer = view;
+    tap.ray = normalize(float3(tap.pinhole, -1.0));
+    return tap;
+}
+
+// The intrinsics of a pushbroom's raster strip (`PushbroomStrip::Intrinsics`): its raster focal
+// length and principal point in NDC x, and its detector line.
+float4 stripIntrinsics(SensorUniforms cam) {
+    let width = float(cam.size.x);
+    return float4(2.0 * cam.intrinsics.x / cam.intrinsics.w / width,
+                  2.0 * cam.intrinsics.y / width - 1.0, cam.distortion.w, 0.0);
+}
+
+// A pushbroom's tap `tap` of sensor row position `row` (pixels from the top), moved onto the raster
+// row that sees what it sees when its pinhole point lies off the detector line (radial distortion
+// of a line off the axis, tangential terms, lateral colour): the raster images the line's plane
+// of view, row by row, and the pixel's ray from its row's pose leaves that plane. The point along
+// the ray as far as what the raster shows about the tap (its depth, from the texel nearest it,
+// three times so it settles onto the surface there) is projected through the strip
+// (`cameraProject`); rows past the strip's ends hold the nearest end's. Over the background
+// (no depth) the ray reaches the far plane.
+RasterTap retimed(SensorUniforms cam, RasterTap tap, float row) {
+    if (!(abs(tap.pinhole.y - cam.distortion.w) * cam.intrinsics.x > 1e-3)) {
+        return tap;
+    }
+    let size = float2(cam.size.xy);
+    let strip = stripIntrinsics(cam);
+    // The pixel's ray: its row's pose, through its pinhole point (the strip's line moved to it).
+    float3 origin;
+    float3 direction;
+    cameraRayThrough(cam.invViewProj, float4(strip.xy, tap.pinhole.y, 0.0),
+                     float2(tap.pinhole.x * strip.x + strip.y, 1.0 - 2.0 * row / size.y), origin,
+                     direction);
+    var raster = tap.raster;
+    for (int i = 0; i < 3; ++i) {
+        let texel = int2(clamp(floor(raster + 0.5), float2(0.0), size - 1.0));
+        let depth = gIds.Load(int4(texel, tap.layer, 0)).x == kBackground
+                        ? 1.0
+                        : gDepth.Load(int4(texel, tap.layer, 0));
+        let ndc = float2((float(texel.x) + 0.5) / size.x * 2.0 - 1.0,
+                         1.0 - (float(texel.y) + 0.5) / size.y * 2.0);
+        let seen = cameraPoint(cam.invViewProj, strip, ndc, depth);
+        let along = dot(seen - origin, direction) / dot(direction, direction);
+        let clip = cameraProject(cam.invViewProj, strip, origin + direction * along);
+        raster = float2((clip.x / clip.w + 1.0) * 0.5 * size.x,
+                        (1.0 - clip.y / clip.w) * 0.5 * size.y) - 0.5;
+    }
+    tap.raster = float2(raster.x, clamp(raster.y, 0.0, size.y - 1.0));
+    return tap;
+}
+
+// The tap of what sensor position `position` sees: `rasterTapAt`'s, a pushbroom's `retimed`.
+// Reads the G-buffer, which the overlay passes do not bind.
+RasterTap sceneTapAt(SensorUniforms cam, float2 position, int view) {
+    let tap = rasterTapAt(cam, position, view);
+    return kPushbroomCamera ? retimed(cam, tap, position.y) : tap;
+}
+
 // As `rasterTapOf`, at sensor position `position` (pixels from the top left corner).
 RasterTap rasterTapAt(SensorUniforms cam, float2 position, int view) {
+    if (kPushbroomCamera) {
+        return pushbroomTapAt(cam, position, view, 1.0);
+    }
     let f = cam.intrinsics.x;
     RasterTap tap;
     tap.distorted = float2((position.x - cam.intrinsics.y) / f,
@@ -500,7 +577,7 @@ RasterTap rasterTapAt(SensorUniforms cam, float2 position, int view) {
     }
     tap.pinhole = kLensTable
                       ? tap.ray.xy / max(-tap.ray.z, 1e-6)
-                      : lensPinholeOf(tap.distorted, cam.distortion, cam.lens.x, cam.intrinsics.w);
+                      : lensPinholeOf(tap.distorted, cam.distortion, cam.lens.x);
     let rasterF = f / cam.intrinsics.w;
     tap.raster = float2(cam.intrinsics.y + tap.pinhole.x * rasterF,
                         cam.intrinsics.z - tap.pinhole.y * rasterF) - 0.5;
@@ -562,7 +639,8 @@ void distancesOf(SensorUniforms cam, RasterTap tap, int2 nearest, out float imag
 public float sceneDistance(PixelContext pixel, int2 at) {
     let cam = pixel.uniforms();
     let size = float2(cam.size.xy);
-    let tap = rasterTapOf(cam, clamp(at, int2(0), int2(cam.size.xy) - 1), int(pixel.id.z));
+    let tap = sceneTapAt(cam, float2(clamp(at, int2(0), int2(cam.size.xy) - 1)) + 0.5,
+                         int(pixel.id.z));
     let nearest = int2(clamp(floor(tap.raster + 0.5), float2(0.0), size - 1.0));
     if (gIds.Load(int4(nearest, tap.layer, 0)).x == kBackground) {
         return asfloat(0x7f800000u);
@@ -579,9 +657,7 @@ public float sceneDistance(PixelContext pixel, int2 at) {
 // length, principal point and detector line make its intrinsics, `PushbroomStrip::Intrinsics`).
 void distancesAt(SensorUniforms cam, float3 ndc, out float imagePlane, out float camera) {
     if (kPushbroomCamera) {
-        let width = float(cam.size.x);
-        let strip = float4(2.0 * cam.intrinsics.x / cam.intrinsics.w / width,
-                           2.0 * cam.intrinsics.y / width - 1.0, cam.distortion.w, 0.0);
+        let strip = stripIntrinsics(cam);
         float3 origin;
         float3 direction;  // one unit of view depth long
         cameraRayThrough(cam.invViewProj, strip, ndc.xy, origin, direction);
@@ -622,7 +698,7 @@ public struct Lens : ISpatialSource {
     public static Lens at(PixelContext pixel) {
         let cam = pixel.uniforms();
         let id = pixel.id;
-        let tap = rasterTapOf(cam, int2(id.xy), int(id.z));
+        let tap = sceneTapAt(cam, float2(id.xy) + 0.5, int(id.z));
         let distorted = tap.distorted;
         let p = tap.pinhole;
         let raster = tap.raster;
@@ -710,13 +786,17 @@ public struct Lens : ISpatialSource {
     // Lateral colour (`kLensChromatic`): band `band`'s image is scaled by s about the principal
     // point, so this pixel sees what the reference wavelength's image holds at its position over
     // s; that tap, resampled as `at` does, with its own coverage, so a band can reach an object
-    // the reference misses (the fringes).
+    // the reference misses (the fringes). A pushbroom's pixel sees the reference's at its point
+    // of the line over s (`pushbroomTapAt`): along the line, and for a line off the axis off it,
+    // at another time (`retimed`).
     float chromaticBand(uint band, PixelContext pixel) {
         let cam = pixel.uniforms();
         let scale = chromaticOf(cam, band).x;
         let principal = cam.intrinsics.yz;
-        let position = principal + (float2(pixel.id.xy) + 0.5 - principal) / scale;
-        let tap = rasterTapAt(cam, position, int(pixel.id.z));
+        let at = float2(pixel.id.xy) + 0.5;
+        let tap = kPushbroomCamera
+                      ? retimed(cam, pushbroomTapAt(cam, at, int(pixel.id.z), scale), at.y)
+                      : rasterTapAt(cam, principal + (at - principal) / scale, int(pixel.id.z));
         let size = float2(cam.size.xy);
         if (any(tap.raster < float2(-0.5)) || any(tap.raster > size - 0.5)) {
             return 0.0;

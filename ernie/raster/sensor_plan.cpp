@@ -363,11 +363,10 @@ std::string SensorPlan::LensSource() const {
            (table ? "true" : "false") +
            ";\n"
            "public float2 lensPinholeOf(float2 sensor, float4 k, "
-           "float p2, float overscan) {\n"
+           "float p2) {\n"
            "    return " +
            lens +
-           (lens == "Pushbroom" ? ".pinholeOf(sensor, k, overscan);\n"
-                                : ".pinholeOf(sensor, k, p2);\n") +
+           ".pinholeOf(sensor, k, p2);\n"
            "}\n"
            "public float3 lensRayOf(float2 sensor, float4 k, float "
            "p2) {\n"

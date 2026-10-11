@@ -317,12 +317,11 @@ void CameraParams::Check() const {
     if (pushbroom &&
         (orthographic ||
          lens.projection != LensProjection::Perspective ||
-         lens.p1 != 0.0 || lens.p2 != 0.0 || Subframes() != 1)) {
+         Subframes() != 1)) {
         throw std::invalid_argument(
-            "A pushbroom camera needs a perspective projection, a "
-            "lens with radial distortion "
-            "at most, and no shutter interval or rolling readout: "
-            "its rows are its readout");
+            "A pushbroom camera needs a perspective projection and "
+            "no shutter interval or "
+            "rolling readout: its rows are its readout");
     }
     if (orthographic &&
         (!lens.IsPinhole() || !(orthographicPixelPitchUm > 0.0))) {
@@ -339,10 +338,6 @@ void CameraParams::Check() const {
                 throw std::invalid_argument(
                     "A lens's chromatic scale must be positive");
             }
-        }
-        if (pushbroom) {
-            throw std::invalid_argument(
-                "A pushbroom camera has no lateral colour yet");
         }
     }
     if (lens.rays != nullptr) {

@@ -116,8 +116,11 @@ struct LensModel {
     std::shared_ptr<const LensRayTable> rays;
     /// Lateral colour (`ernie:lens:chromatic:scale`): the image's
     /// scale per wavelength relative to the reference's, about the
-    /// principal point, which the sensor resamples each band at.
-    /// Empty for none.
+    /// principal point, which the sensor resamples each band at. A
+    /// pushbroom's band sees the reference's at its point of the line
+    /// over the scale: along the line, and for a line off the axis
+    /// off it, at another time (as its distortion's points off the
+    /// line). Empty for none.
     Spectrum chromaticScale;
     /// Axial colour (`ernie:lens:chromatic:focus`): the lens's focal
     /// length shift per wavelength in millimetres, the sensor staying
@@ -303,10 +306,15 @@ struct CameraParams {
     /// plane, read out once per image row as the camera moves. Row r
     /// (from the top) is exposed at the pose (r + 0.5) / height of
     /// the way from the last frame's pose to this frame's, so a frame
-    /// is one strip of the scan. Its lens may distort radially (k1 to
-    /// k3, with r^2 from the line's distance off the axis too),
-    /// moving pixels along the line only; it has no tangential
-    /// distortion, shutter interval or rolling readout of its own.
+    /// is one strip of the scan. Its lens distorts as a frame
+    /// camera's (Brown-Conrady k1 to k3, p1 and p2, with r^2 from the
+    /// line's distance off the axis too): a pixel sees along the
+    /// undistorted direction of its point of the line, which may lie
+    /// off the line (a line off the axis, decentring), and is then
+    /// seen at another time; the sensor finds that row from the
+    /// raster's depth (sensor.slang's `retimed`), rows past the
+    /// strip's ends taking the nearest end's. It has no shutter
+    /// interval or rolling readout of its own.
     ///
     /// Reference: R. Gupta and R. I. Hartley, "Linear Pushbroom
     /// Cameras", IEEE TPAMI 19(9):963-975, 1997.
@@ -397,9 +405,9 @@ struct CameraParams {
     /// negative rolling readout or shutter samples outside 1 to
     /// `kMaxShutterSamples`, an orthographic camera with lens
     /// distortion or a fisheye or a non-positive pixel pitch, a
-    /// pushbroom that is orthographic, has a fisheye or tangential
-    /// distortion or more than one sub-frame, or a fisheye with
-    /// Brown-Conrady distortion or a field reaching past
+    /// pushbroom that is orthographic, has a fisheye or a ray table
+    /// or more than one sub-frame, or a fisheye with Brown-Conrady
+    /// distortion or a field reaching past
     /// `LensModel::kMaxFisheyeFieldAngle`.
     void Check() const;
 
