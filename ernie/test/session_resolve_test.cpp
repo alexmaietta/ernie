@@ -558,8 +558,8 @@ TEST(MaterialSettingsOf, AMeasuredReflectanceReplacesTheAlbedo) {
     ernie::Material material =
         ernie::Material::Define(scene, "/Looks/Red")
             .SetAlbedo({0.5, 0.5, 0.5})
-            .SetReflectance({400.0f, 0.04f, 550.0f, 0.06f, 700.0f,
-                             0.64f});
+            .SetReflectance(
+                {400.0f, 0.04f, 550.0f, 0.06f, 700.0f, 0.64f});
     ernie::MaterialSettings settings =
         ernie::MaterialSettingsOf(scene, "/Looks/Red", brdfs);
     EXPECT_EQ(settings.reflectance.Wavelengths(),
