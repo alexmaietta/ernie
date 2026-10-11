@@ -309,17 +309,18 @@ TEST_F(RasterDelegateTest, TheScenesAmbientLightComesFromAllAround) {
         << "as bright";
 }
 
-TEST_F(RasterDelegateTest, TheSunAndAnotherDistantLightBothCastShadows) {
+TEST_F(RasterDelegateTest,
+       TheSunAndAnotherDistantLightBothCastShadows) {
     // A blocker 10 up over the origin, under the sun 30 degrees from
-    // the zenith towards +x and Earthshine from 45 degrees towards -x:
-    // the sun's shadow lies 5.8 towards -x, Earthshine's 10 towards
-    // +x, both where the camera above sees past the blocker, each
-    // dimming only its own light there.
+    // the zenith towards +x and Earthshine from 45 degrees towards
+    // -x: the sun's shadow lies 5.8 towards -x, Earthshine's 10
+    // towards +x, both where the camera above sees past the blocker,
+    // each dimming only its own light there.
     Scene scene = FlatScene();
     ernie::DistantLight(scene, "/World/Sun").SetShadowEnable(true);
-    scene.Set("/World/Sun", tokens::kTransform,
-              ernie::DistantLightTransform(
-                  {0.5, 0.0, std::sqrt(0.75)}));
+    scene.Set(
+        "/World/Sun", tokens::kTransform,
+        ernie::DistantLightTransform({0.5, 0.0, std::sqrt(0.75)}));
     ernie::DistantLight::Define(scene, "/World/Earthshine")
         .SetIntensity(0.5)
         .SetShadowEnable(true);
@@ -675,11 +676,11 @@ TEST_F(RasterDelegateTest, LaserPatternsReadTheirDataAndImage) {
     // Dots where the laser's data put them, sharing its power: a
     // pattern of beamlets, normalized.
     ernie::LightPatternModel dots;
-    dots.id = "dots";
-    dots.typeName = "Dots";
+    dots.id = "listed";
+    dots.typeName = "ListedDots";
     dots.normalized = true;
     dots.slang = R"(import light_pattern;
-public struct Dots : ILightPattern {
+public struct ListedDots : ILightPattern {
     public float emission(LightPatternInput input,
                           LightPatternParams p) {
         let count = p.dataCount() / 2;
@@ -694,7 +695,7 @@ public struct Dots : ILightPattern {
 )";
     delegate.AddLightPattern(dots);
     ernie::LaserLight laser(scene, "/World/Laser");
-    laser.SetPattern("dots")
+    laser.SetPattern("listed")
         .SetPatternData({0.4f, 0.0f, -0.3f, 0.3f})
         .SetEfficiency(0.9)
         .SetZeroOrder(0.1);
@@ -738,6 +739,50 @@ public struct Dots : ILightPattern {
     const auto [row, col] = PixelOf(scene, 0.0f, 2.0f);
     EXPECT_EQ(band[row * kVarSize + col], 0.0f) << "past its edge";
     std::filesystem::remove(file);
+}
+
+TEST_F(RasterDelegateTest, LaserDotsAreSeededAndKeepTheirPower) {
+    RasterDelegate delegate(*context_);
+    double bandWidth = 0.0;
+    Scene scene = LaserScene(0.001, &bandWidth);
+    const auto [r0, left] = PixelOf(scene, -10.0f, 0.0f);
+    const auto [r1, right] = PixelOf(scene, 10.0f, 0.0f);
+    const double pixel = (PixelCentre(scene, 10.0f, 0.0f).x -
+                          PixelCentre(scene, -10.0f, 0.0f).x) /
+                         static_cast<double>(right - left);
+    const double unit = 0.5 / M_PI / bandWidth;
+    // 2 x 2 tiles of 4 x 3 dots over 8 m x 6 m of floor 10 m down:
+    // cells of a metre, wider than a pixel.
+    ernie::LaserLight laser(scene, "/World/Laser");
+    laser.SetPattern("dots")
+        .SetDotColumns(4)
+        .SetDotRows(3)
+        .SetDotTileColumns(2)
+        .SetDotTileRows(2)
+        .SetPatternFieldOfView(
+            glm::degrees(2.0 * glm::atan(glm::dvec2(0.4, 0.3))))
+        .SetEfficiency(0.9);
+    const auto total = [&](const std::vector<float>& band) {
+        double power = 0.0;
+        for (const float value : band) {
+            power += value * pixel * pixel;
+        }
+        return power / unit;
+    };
+    const std::vector<float> first = Band8(delegate, scene);
+    EXPECT_NEAR(total(first), 0.9, 0.03) << "every dot's share";
+    // Dots light a few pixels each, not the field evenly.
+    const auto lit = [&](const std::vector<float>& band) {
+        return std::count_if(
+            band.begin(), band.end(),
+            [](float value) { return value > 0.0f; });
+    };
+    EXPECT_LT(lit(first), 4 * 48) << "48 dots, a few pixels each";
+    EXPECT_EQ(Band8(delegate, scene), first) << "the same seed";
+    laser.SetDotSeed(2);
+    const std::vector<float> second = Band8(delegate, scene);
+    EXPECT_NE(second, first) << "another seed";
+    EXPECT_NEAR(total(second), 0.9, 0.03);
 }
 
 TEST_F(RasterDelegateTest, LasersLightAGaussianSpot) {

@@ -789,6 +789,31 @@ TEST(LightParamsOf, LaserPatternsAndTheirShadowCones) {
     EXPECT_EQ(rings.beam.patternImage, nullptr);
     EXPECT_FLOAT_EQ(rings.beam.wavelength, 532.0f);
 
+    // Dots: per tile, tiles, jitter, the field's half tangents and
+    // the seed; unbounded, as each dot's beam carries its share.
+    laser.SetPattern("dots")
+        .SetDotColumns(8)
+        .SetDotRows(6)
+        .SetDotTileColumns(3)
+        .SetDotTileRows(3)
+        .SetDotSeed(7);
+    const LightParams dots =
+        ernie::LightParamsOf(scene, "/Laser", bands);
+    ASSERT_EQ(dots.beam.patternParams.size(), 8u);
+    EXPECT_EQ(dots.beam.patternParams[0], 8.0f);
+    EXPECT_EQ(dots.beam.patternParams[3], 3.0f);
+    EXPECT_FLOAT_EQ(dots.beam.patternParams[4], 0.9f);
+    EXPECT_NEAR(dots.beam.patternParams[5],
+                std::tan(glm::radians(20.0)), 1e-6);
+    EXPECT_EQ(dots.beam.patternParams[7], 7.0f);
+    EXPECT_EQ(dots.beam.extent, glm::vec2(0.0f));
+    EXPECT_GT(dots.coneAngle, 24.0f)
+        << "reaching the field's corners";
+    laser.SetDotJitter(1.5);
+    EXPECT_THROW(ernie::LightParamsOf(scene, "/Laser", bands),
+                 std::invalid_argument);
+    laser.SetDotJitter(0.9);
+
     // An image needs its file; over 40 x 30 degrees it reaches
     // tan 20 and tan 15 across the tangent plane.
     laser.SetPattern("image");

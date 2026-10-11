@@ -359,7 +359,10 @@ inline constexpr std::string_view kLaserApertureRadius =
 /// "flat" as a Powell lens gives or "gaussian" as a cylindrical lens
 /// does, the beam's across it), "grid" (`gridColumns` x `gridRows`
 /// beamlets `gridPitch` degrees apart along x and y, as a diffractive
-/// element splits it), "image" (`pattern:image` over
+/// element splits it), "dots" (a seeded field of `dotColumns` x
+/// `dotRows` dots per tile, `dotTileColumns` x `dotTileRows` tiles of
+/// the same dots over `pattern:fieldOfView`, as a depth camera's
+/// projector makes), "image" (`pattern:image` over
 /// `pattern:fieldOfView`, as a projector shows it) or a registered
 /// custom pattern (`LightPatternModel`). `efficiency` of the power
 /// goes into the pattern and `zeroOrder` stays in an undiffracted
@@ -376,6 +379,21 @@ inline constexpr std::string_view kLaserGridRows =
     "ernie:laser:gridRows";
 inline constexpr std::string_view kLaserGridPitch =
     "ernie:laser:gridPitch";
+/// "dots": dots per tile along x and y, one in each cell of a grid,
+/// jittered by up to `dotJitter` of a cell from its centre; tiles of
+/// the same dots along x and y; the seed the dots derive from.
+inline constexpr std::string_view kLaserDotColumns =
+    "ernie:laser:dotColumns";
+inline constexpr std::string_view kLaserDotRows =
+    "ernie:laser:dotRows";
+inline constexpr std::string_view kLaserDotTileColumns =
+    "ernie:laser:dotTileColumns";
+inline constexpr std::string_view kLaserDotTileRows =
+    "ernie:laser:dotTileRows";
+inline constexpr std::string_view kLaserDotJitter =
+    "ernie:laser:dotJitter";
+inline constexpr std::string_view kLaserDotSeed =
+    "ernie:laser:dotSeed";
 inline constexpr std::string_view kLaserEfficiency =
     "ernie:laser:efficiency";
 inline constexpr std::string_view kLaserZeroOrder =
@@ -401,6 +419,7 @@ inline constexpr std::string_view kSpot = "spot";
 inline constexpr std::string_view kLine = "line";
 inline constexpr std::string_view kGrid = "grid";
 inline constexpr std::string_view kImage = "image";
+inline constexpr std::string_view kDots = "dots";
 inline constexpr std::string_view kFlat = "flat";
 inline constexpr std::string_view kGaussian = "gaussian";
 /// Degrees off the axis that a light reaches, and the fraction of

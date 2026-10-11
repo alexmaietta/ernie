@@ -60,7 +60,7 @@ TEST(LightPatternRegistry, BuiltinsComeFirst) {
     ernie::LightPatternRegistry registry =
         ernie::LightPatternRegistry::WithBuiltins();
     const std::vector<std::string> ids = {"spot", "line", "grid",
-                                          "image"};
+                                          "image", "dots"};
     ASSERT_EQ(registry.Models().size(), ids.size());
     for (std::size_t i = 0; i < ids.size(); ++i) {
         EXPECT_EQ(registry.IndexOf(ids[i]), static_cast<int>(i));
@@ -72,7 +72,7 @@ TEST(LightPatternRegistry, BuiltinsComeFirst) {
     EXPECT_THROW(registry.Add(registry.Models()[0]),
                  std::invalid_argument);
     registry.Add(Stripes());
-    EXPECT_EQ(registry.IndexOf("stripes"), 4);
+    EXPECT_EQ(registry.IndexOf("stripes"), 5);
 }
 
 TEST(LightPatternModules, DispatchEveryPatternByIndex) {

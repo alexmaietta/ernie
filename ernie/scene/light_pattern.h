@@ -93,17 +93,20 @@ class LightPatternRegistry {
     /// - "grid": parameters columns, rows and pitch along x and y
     ///   (radians), a beamlet at each;
     /// - "image": parameters tan of half the field of view along x
-    ///   and y, the laser's image over it.
+    ///   and y, the laser's image over it;
+    /// - "dots": parameters dots per tile along x and y, tiles along
+    ///   x and y, the jitter (cells), tan of half the field of view
+    ///   along x and y, and the seed; a beamlet at each dot.
     static LightPatternRegistry WithBuiltins();
 
     /// Adds `model`; its Slang is compiled when the renderer next
     /// builds its shading (`RasterRenderer::AddLightPattern` compiles
     /// eagerly).
     /// @throws std::invalid_argument if the id is not an identifier,
-    /// names a built-in pattern ("spot", "line", "grid", "image") or
-    /// is taken; there are more than `kMaxParams` parameters; the
-    /// extent is not positive; or the type name is not an identifier
-    /// or the source does not mention it.
+    /// names a built-in pattern ("spot", "line", "grid", "image",
+    /// "dots") or is taken; there are more than `kMaxParams`
+    /// parameters; the extent is not positive; or the type name is
+    /// not an identifier or the source does not mention it.
     void Add(LightPatternModel model);
 
     /// The pattern with id `id`, or null.

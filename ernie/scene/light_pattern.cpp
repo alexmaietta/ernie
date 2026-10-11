@@ -216,6 +216,66 @@ public struct LaserGrid : ILightPattern {
 }
 )";
 
+constexpr const char* kDotsSlang = R"(
+import light_pattern;
+
+// A 32-bit integer hash, Wellons' lowbias32.
+//
+// References:
+// - C. Wellons, "Prospecting for Hash Functions", 2018,
+//   https://nullprogram.com/blog/2018/07/31/
+uint dotHash(uint x) {
+    x ^= x >> 16;
+    x *= 0x7feb352du;
+    x ^= x >> 15;
+    x *= 0x846ca68bu;
+    x ^= x >> 16;
+    return x;
+}
+
+// Where in its cell, from 0 to 1 along each axis, the dot of cell `cell` of a tile lies.
+float2 dotPlace(uint2 cell, uint seed) {
+    let h = dotHash(cell.x + dotHash(cell.y + dotHash(seed)));
+    return float2(h & 0xffffu, h >> 16) / 65536.0;
+}
+
+// A seeded field of dots, as a depth camera's diffractive projector makes (the original Kinect
+// repeats one pattern over 3 x 3 tiles): p0 x p1 dots per tile, one in each cell of a grid,
+// strayed from its centre by up to p4 of a cell; p2 x p3 tiles of the same dots over
+// |t.x| < p5, |t.y| < p6; seed p7. Each dot is a beamlet with its share of the power.
+public struct LaserDots : ILightPattern {
+    public float emission(LightPatternInput input, LightPatternParams p) {
+        let count = float2(p.get(0), p.get(1));
+        let cells = count * float2(p.get(2), p.get(3));
+        let jitter = p.get(4);
+        let half = float2(p.get(5), p.get(6));
+        let seed = uint(p.get(7));
+        let cell = 2.0 * half / cells;
+        let share = 1.0 / (cells.x * cells.y);
+        // A pixel or beam wider than a cell sees the dots' mean over the field.
+        if (any(input.footprint + 2.0 * input.beam > cell)) {
+            let cover = saturate((half - abs(input.t)) / max(input.footprint, 1e-9) + 0.5);
+            return cover.x * cover.y / (4.0 * half.x * half.y);
+        }
+        // The dots of the cell holding t and of its neighbours, which a dot can stray into.
+        let nearest = floor((input.t + half) / cell);
+        var sum = 0.0;
+        for (int i = -1; i <= 1; ++i) {
+            for (int j = -1; j <= 1; ++j) {
+                let at = nearest + float2(i, j);
+                if (any(at < 0.0) || any(at > cells - 1.0)) {
+                    continue;
+                }
+                let local = uint2(at - count * floor(at / count));
+                let offset = (dotPlace(local, seed) - 0.5) * jitter;
+                sum += beamlet((at + 0.5 + offset) * cell - half, input);
+            }
+        }
+        return sum * share;
+    }
+}
+)";
+
 constexpr const char* kImageSlang = R"(
 import light_pattern;
 
@@ -234,7 +294,8 @@ public struct LaserImage : ILightPattern {
 /// The ids built-in patterns hold, which `Add` refuses.
 bool IsBuiltinId(std::string_view id) {
     return id == tokens::kSpot || id == tokens::kLine ||
-           id == tokens::kGrid || id == tokens::kImage;
+           id == tokens::kGrid || id == tokens::kImage ||
+           id == tokens::kDots;
 }
 
 }  // namespace
@@ -277,6 +338,16 @@ LightPatternRegistry LightPatternRegistry::WithBuiltins() {
         {{"halfX", 0.364f, "tan of half the field of view along x"},
          {"halfY", 0.268f, "tan of half the field of view along y"}},
         false);
+    add(tokens::kDots, "Dots", "LaserDots", kDotsSlang,
+        {{"columns", 64.0f, "Dots per tile along x"},
+         {"rows", 48.0f, "Dots per tile along y"},
+         {"tileColumns", 1.0f, "Tiles along x"},
+         {"tileRows", 1.0f, "Tiles along y"},
+         {"jitter", 0.9f, "How far a dot strays, in cells"},
+         {"halfX", 0.364f, "tan of half the field of view along x"},
+         {"halfY", 0.268f, "tan of half the field of view along y"},
+         {"seed", 1.0f, "The seed the dots derive from"}},
+        true);
     return registry;
 }
 

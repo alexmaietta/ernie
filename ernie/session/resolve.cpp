@@ -1516,6 +1516,37 @@ LightParams LaserParamsOf(const Scene& scene, const Path& path,
         const glm::dvec2 half =
             0.5 * glm::dvec2(columns - 1, rows - 1) * pitch + spread;
         extent = std::atan(glm::length(glm::tan(half)));
+    } else if (beam.pattern == tokens::kDots) {
+        const glm::dvec2 fov =
+            glm::radians(laser.GetPatternFieldOfView());
+        const int columns = laser.GetDotColumns();
+        const int rows = laser.GetDotRows();
+        const int tileColumns = laser.GetDotTileColumns();
+        const int tileRows = laser.GetDotTileRows();
+        const double jitter = laser.GetDotJitter();
+        const int seed = laser.GetDotSeed();
+        if (columns < 1 || rows < 1 || tileColumns < 1 ||
+            tileRows < 1 || !(jitter >= 0.0) || !(jitter <= 1.0) ||
+            seed < 0 || !(fov.x > 0.0) || !(fov.y > 0.0) ||
+            !(fov.x < glm::radians(170.0)) ||
+            !(fov.y < glm::radians(170.0))) {
+            throw std::invalid_argument(
+                "LaserLight '" + path.String() +
+                "' needs one or more dots and tiles along each "
+                "axis, a jitter from 0 to 1, a seed of 0 or more and "
+                "a field of view above 0 and below 170 degrees");
+        }
+        const glm::dvec2 half = glm::tan(0.5 * fov);
+        beam.patternParams = {static_cast<float>(columns),
+                              static_cast<float>(rows),
+                              static_cast<float>(tileColumns),
+                              static_cast<float>(tileRows),
+                              static_cast<float>(jitter),
+                              static_cast<float>(half.x),
+                              static_cast<float>(half.y),
+                              static_cast<float>(seed)};
+        extent = std::atan(glm::length(half)) +
+                 std::max(spread.x, spread.y);
     } else if (beam.pattern == tokens::kImage) {
         const glm::dvec2 fov =
             glm::radians(laser.GetPatternFieldOfView());
@@ -2445,8 +2476,8 @@ FrameParams FrameParamsOf(const Scene& scene,
         RenderSettings::OrFallbacks(scene, settings);
     params.ambient =
         std::max(static_cast<float>(options.GetAmbient()), 0.0f);
-    params.ambientColor =
-        glm::max(glm::vec3(options.GetAmbientColor()), glm::vec3(0.0f));
+    params.ambientColor = glm::max(
+        glm::vec3(options.GetAmbientColor()), glm::vec3(0.0f));
     const std::string domeMode = options.GetDomeLightMode();
     if (domeMode == "approximate") {
         params.domeMode = DomeLightMode::Approximate;

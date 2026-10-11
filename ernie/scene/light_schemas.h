@@ -207,10 +207,12 @@
                               .group = "Beam", .max = 100.0}))                                     \
     X(std::string, Pattern, ::ernie::tokens::kLaserPattern, "spot",                                \
       (::ernie::AttributeMeta{.doc = "The beam itself, a line fanned along x, a grid of "          \
-                                     "beamlets, an image, or a registered custom pattern.",        \
+                                     "beamlets, a field of dots, an image, or a registered "       \
+                                     "custom pattern.",                                            \
                               .group = "Pattern",                                                  \
                               .options = {::ernie::tokens::kSpot, ::ernie::tokens::kLine,          \
-                                          ::ernie::tokens::kGrid, ::ernie::tokens::kImage}}))      \
+                                          ::ernie::tokens::kGrid, ::ernie::tokens::kDots,          \
+                                          ::ernie::tokens::kImage}}))                              \
     X(double, FanAngle, ::ernie::tokens::kLaserFanAngle, 60.0,                                     \
       (::ernie::AttributeMeta{.label = "Fan angle",                                                \
                               .doc = "A line's full angle along x, degrees.", .group = "Pattern",  \
@@ -231,6 +233,27 @@
       (::ernie::AttributeMeta{.label = "Pitch",                                                    \
                               .doc = "Degrees between a grid's beamlets along x and y.",           \
                               .group = "Pattern", .min = 0.001, .max = 60.0}))                     \
+    X(int, DotColumns, ::ernie::tokens::kLaserDotColumns, 64,                                      \
+      (::ernie::AttributeMeta{.label = "Dot columns", .doc = "Dots per tile along x.",             \
+                              .group = "Pattern", .min = 1.0, .max = 10000.0}))                    \
+    X(int, DotRows, ::ernie::tokens::kLaserDotRows, 48,                                            \
+      (::ernie::AttributeMeta{.label = "Dot rows", .doc = "Dots per tile along y.",                \
+                              .group = "Pattern", .min = 1.0, .max = 10000.0}))                    \
+    X(int, DotTileColumns, ::ernie::tokens::kLaserDotTileColumns, 1,                               \
+      (::ernie::AttributeMeta{.label = "Tile columns",                                             \
+                              .doc = "Tiles of the same dots along x.", .group = "Pattern",        \
+                              .min = 1.0, .max = 100.0}))                                          \
+    X(int, DotTileRows, ::ernie::tokens::kLaserDotTileRows, 1,                                     \
+      (::ernie::AttributeMeta{.label = "Tile rows", .doc = "Tiles of the same dots along y.",      \
+                              .group = "Pattern", .min = 1.0, .max = 100.0}))                      \
+    X(double, DotJitter, ::ernie::tokens::kLaserDotJitter, 0.9,                                    \
+      (::ernie::AttributeMeta{.label = "Dot jitter",                                               \
+                              .doc = "How far a dot strays from its cell's centre, in cells: 0 "   \
+                                     "a regular grid, 1 anywhere in the cell.",                    \
+                              .group = "Pattern", .max = 1.0}))                                    \
+    X(int, DotSeed, ::ernie::tokens::kLaserDotSeed, 1,                                             \
+      (::ernie::AttributeMeta{.label = "Dot seed", .doc = "The seed the dots derive from.",        \
+                              .group = "Pattern", .max = 1000000.0}))                              \
     X(double, Efficiency, ::ernie::tokens::kLaserEfficiency, 1.0,                                  \
       (::ernie::AttributeMeta{.doc = "Fraction of the power that goes into the line or the "       \
                                      "grid's beamlets.",                                           \
@@ -247,7 +270,7 @@
     X(glm::dvec2, PatternFieldOfView, ::ernie::tokens::kLaserPatternFieldOfView,                   \
       glm::dvec2(40.0, 30.0),                                                                      \
       (::ernie::AttributeMeta{.label = "Field of view",                                            \
-                              .doc = "Full angles the image spans along x and y, degrees.",        \
+                              .doc = "Full angles an image or dots span along x and y, degrees.",  \
                               .group = "Pattern", .min = 0.01, .max = 170.0}))                     \
     X(std::vector<float>, PatternParams, ::ernie::tokens::kLaserPatternParams,                     \
       std::vector<float>{},                                                                        \
