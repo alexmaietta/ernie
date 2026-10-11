@@ -221,6 +221,11 @@ class SensorFilterRegistry {
 ///   `exposure`.
 /// - `spectralTransmission` (band): each band times `curve` (48 samples, 360 to 830 nm), a
 ///   measured filter's transmission; before `qe` and `cie`.
+/// - `glare` (spatial, rgb; pyramid): a wide power-law halo of scattered light around bright
+///   sources in the image; after `cie`.
+/// - `flare` (spatial, electrons; pyramid): lens flare ghosts, the image's bright sources as
+///   defocused aperture shapes on the line through the principal point, each at its own scale,
+///   size and coating tint; after `qe`, before `noise`.
 /// - `lag` (pixel, electrons; temporal): a `fraction` of each frame's charge read out with the
 ///   next.
 /// - `temporalAverage` (pixel, rgb; temporal): an exponential moving average, `alpha` the new

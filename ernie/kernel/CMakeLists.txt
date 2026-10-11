@@ -21,6 +21,7 @@ set(ernie_shaders
     film/filter_defect_pixels.slang=kFilterDefectPixelsSlang
     film/filter_demosaic.slang=kFilterDemosaicSlang
     film/filter_detector_pattern.slang=kFilterDetectorPatternSlang
+    film/filter_flare.slang=kFilterFlareSlang
     film/filter_glare.slang=kFilterGlareSlang
     film/filter_jpeg.slang=kFilterJpegSlang
     film/filter_lag.slang=kFilterLagSlang

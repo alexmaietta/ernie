@@ -455,6 +455,65 @@ TEST_F(RasterDelegateTest, GlareSpreadsAHaloFromItsPyramidAndKeepsTheLight) {
         << "fading with distance";
 }
 
+TEST_F(RasterDelegateTest, FlareGhostsMirrorBrightSourcesThroughTheCentreAndKeepTheLight) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    ernie::Camera(scene, "/World/Camera").SetExposureTime(1e-6);  // unsaturated
+    const auto base = VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
+    EXPECT_EQ(
+        VarThrough(delegate, scene, "Electrons", {{"qe", kNone}, {"flare", {{"strength", 0.0f}}}}),
+        base)
+        << "untouched at zero strength";
+    const auto at = [](const std::vector<float>& image, std::size_t x, std::size_t y) {
+        return static_cast<double>(image[(y * kSize + x) * 4]);  // red
+    };
+    // The red quad, left of the centre: its light and centroid in red.
+    double source = 0.0;
+    glm::dvec2 quad(0.0);
+    for (std::size_t y = 0; y < kSize; ++y) {
+        for (std::size_t x = 0; x < kSize / 2; ++x) {
+            source += at(base, x, y);
+            quad += at(base, x, y) * (glm::dvec2(x, y) + 0.5);
+        }
+    }
+    ASSERT_GT(source, 0.0);
+    quad /= source;
+    const ernie::CameraParams camera = ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize);
+    const glm::dvec2 centre = camera.PrincipalPoint();
+    const float strength = 0.1f;
+    for (const float scale : {-0.5f, -1.0f}) {
+        // One small grey ghost at `scale`: (1 - strength) of the image plus the ghosts.
+        const auto flared =
+            VarsThrough(delegate, scene, {"Electrons"},
+                        {{"qe", kNone}, {"flare", {{"strength", strength}, {"ghosts", 1.0f}}}},
+                        {{1,
+                          {{"scales", {scale}},
+                           {"radii", {0.02f}},
+                           {"weights", {1.0f}},
+                           {"tintRed", {1.0f}},
+                           {"tintGreen", {1.0f}},
+                           {"tintBlue", {1.0f}}}}})
+                .at("Electrons");
+        EXPECT_NEAR(Sum(flared, 0), Sum(base, 0), 0.01 * Sum(base, 0)) << "light is kept";
+        // The quad's ghost, mirrored to the right of the centre.
+        double ghost = 0.0;
+        glm::dvec2 where(0.0);
+        for (std::size_t y = 0; y < kSize; ++y) {
+            for (std::size_t x = kSize / 2; x < kSize; ++x) {
+                const double gained = at(flared, x, y) - (1.0 - strength) * at(base, x, y);
+                ghost += gained;
+                where += gained * (glm::dvec2(x, y) + 0.5);
+            }
+        }
+        ASSERT_GT(ghost, 0.0) << scale;
+        where /= ghost;
+        EXPECT_NEAR(ghost, strength * source, 0.03 * strength * source) << scale;
+        const glm::dvec2 expected = centre + static_cast<double>(scale) * (quad - centre);
+        EXPECT_NEAR(where.x, expected.x, 0.3) << scale;
+        EXPECT_NEAR(where.y, expected.y, 0.3) << scale;
+    }
+}
+
 TEST_F(RasterDelegateTest, RenderVarsCanNameTheirOwnChains) {
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();

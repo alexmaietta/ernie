@@ -44,6 +44,7 @@ extern const char kFilterDemosaicSlang[];
 extern const char kFilterJpegSlang[];
 extern const char kFilterSmearSlang[];
 extern const char kFilterDetectorPatternSlang[];
+extern const char kFilterFlareSlang[];
 extern const char kFilterGlareSlang[];
 extern const char kFilterLagSlang[];
 extern const char kFilterMeasuredQeSlang[];
