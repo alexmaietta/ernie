@@ -463,15 +463,17 @@ const AttributeDef* FindXformOp(std::string_view attribute) {
     static const std::vector<AttributeDef> kOps = [] {
         const auto make = [](std::string_view name, std::string_view member, const auto& fallback,
                              std::string_view doc) {
-            return AttributeDef::Make(name, member, fallback,
-                                      AttributeMeta{.doc = doc, .group = "Transform", .array = true});
+            return AttributeDef::Make(
+                name, member, fallback,
+                AttributeMeta{.doc = doc, .group = "Transform", .array = true});
         };
         std::vector<AttributeDef> ops;
         ops.push_back(make(tokens::kTranslate, "Translate", glm::dvec3(0.0), "Metres."));
         AttributeDef scale =
             make(tokens::kScale, "Scale", glm::dvec3(1.0), "Factors along x, y and z, or one.");
         scale.from_ = [](const Value& value) -> std::optional<Value> {
-            if (const std::optional<glm::dvec3> factors = AttributeTraits<glm::dvec3>::From(value)) {
+            if (const std::optional<glm::dvec3> factors =
+                    AttributeTraits<glm::dvec3>::From(value)) {
                 return Value(*factors);
             }
             if (const std::optional<double> factor = NumberOf(value)) {
@@ -485,11 +487,12 @@ const AttributeDef* FindXformOp(std::string_view attribute) {
               std::pair{tokens::kRotateZ, "RotateZ"}}) {
             ops.push_back(make(name, member, 0.0, "Degrees."));
         }
-        for (const auto& [name, member] :
-             {std::pair{tokens::kRotateXYZ, "RotateXYZ"}, std::pair{tokens::kRotateXZY, "RotateXZY"},
-              std::pair{tokens::kRotateYXZ, "RotateYXZ"}, std::pair{tokens::kRotateYZX, "RotateYZX"},
-              std::pair{tokens::kRotateZXY, "RotateZXY"},
-              std::pair{tokens::kRotateZYX, "RotateZYX"}}) {
+        for (const auto& [name, member] : {std::pair{tokens::kRotateXYZ, "RotateXYZ"},
+                                           std::pair{tokens::kRotateXZY, "RotateXZY"},
+                                           std::pair{tokens::kRotateYXZ, "RotateYXZ"},
+                                           std::pair{tokens::kRotateYZX, "RotateYZX"},
+                                           std::pair{tokens::kRotateZXY, "RotateZXY"},
+                                           std::pair{tokens::kRotateZYX, "RotateZYX"}}) {
             ops.push_back(make(name, member, glm::dvec3(0.0), "Euler angles in degrees."));
         }
         ops.push_back(make(tokens::kOrient, "Orient", glm::dquat(1.0, 0.0, 0.0, 0.0),

@@ -173,7 +173,8 @@ std::optional<std::vector<float>> FloatAttribute(const Scene& scene, const Path&
 /// else the declared fallback (colours per vertex are its array, `ReadDisplayColor`).
 glm::vec3 ConstantDisplayColor(const Gprim& gprim) {
     if (const Tensor* tensor = gprim.ReadDisplayColor();
-        tensor != nullptr && tensor->Elements() == 3 && tensor->Location().kind == DeviceKind::Cpu) {
+        tensor != nullptr && tensor->Elements() == 3 &&
+        tensor->Location().kind == DeviceKind::Cpu) {
         const std::vector<float> color = FloatsOf(*tensor, 3, tokens::kDisplayColor);
         return glm::vec3(color[0], color[1], color[2]);
     }
@@ -1587,7 +1588,8 @@ void RasterDelegate::SyncPoints(const Scene& scene) {
                 if (const Tensor* widths = widthsOf(data.width, data.widths)) {
                     data.widths = FloatsOf(*widths, 1, kWidths);
                 }
-                if (const Tensor* colors = cloud.ReadDisplayColor(); colors != nullptr &&
+                if (const Tensor* colors = cloud.ReadDisplayColor();
+                    colors != nullptr &&
                     static_cast<std::size_t>(colors->Elements()) == data.points.size() &&
                     data.points.size() > 3) {
                     data.colors = FloatsOf(*colors, 3, kDisplayColor);

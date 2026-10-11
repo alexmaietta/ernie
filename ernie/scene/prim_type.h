@@ -448,13 +448,13 @@ class SchemaView {
         Edit().Clear(GetPath(), token);                                                            \
         return static_cast<Self&>(*this);                                                          \
     }                                                                                              \
-    /** For an `OrArray` attribute: the array written in place of its value, or null. */          \
+    /** For an `OrArray` attribute: the array written in place of its value, or null. */           \
     template <typename T = Type>                                                                   \
         requires ::ernie::kIsOrArray<T>                                                            \
     const ::ernie::Tensor* Read##Name() const {                                                    \
         return GetScene().Read(GetPath(), token);                                                  \
     }                                                                                              \
-    /** For an `OrArray` attribute: writes an array in place of its value (`Scene::Write`). */    \
+    /** For an `OrArray` attribute: writes an array in place of its value (`Scene::Write`). */     \
     template <typename T = Type>                                                                   \
         requires ::ernie::kIsOrArray<T>                                                            \
     Self& Write##Name(::ernie::Tensor array) {                                                     \
