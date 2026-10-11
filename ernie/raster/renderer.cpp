@@ -2932,14 +2932,14 @@ void RasterRenderer::SetHighlight(std::span<const std::uint32_t> primIds, glm::v
 }
 
 std::uint64_t RasterRenderer::GpuBytes() const {
-    std::uint64_t bytes =
-        uniforms_.Size() + shadowUniforms_.Size() + shadowMaps_->Bytes() +
-        lightShadowMaps_->Bytes() + lightTable_.Size() + lightProfiles_.Size() +
-        lightViewMatrices_.Size() +
-        sigmoidTable_.Bytes() + shadingUniforms_.Size() + sensorUniforms_.Size() +
-        (materialTable_ != nullptr ? materialTable_->Size() : 0) + overlays_->GpuBytes() +
-        domeMap_->Bytes() + (domeLighting_ != nullptr ? domeLighting_->Bytes() : 0) +
-        stars_->Size() + starCells_->Size();
+    std::uint64_t bytes = uniforms_.Size() + shadowUniforms_.Size() + shadowMaps_->Bytes() +
+                          lightShadowMaps_->Bytes() + lightTable_.Size() + lightProfiles_.Size() +
+                          lightViewMatrices_.Size() + sigmoidTable_.Bytes() +
+                          shadingUniforms_.Size() + sensorUniforms_.Size() +
+                          (materialTable_ != nullptr ? materialTable_->Size() : 0) +
+                          overlays_->GpuBytes() + domeMap_->Bytes() +
+                          (domeLighting_ != nullptr ? domeLighting_->Bytes() : 0) + stars_->Size() +
+                          starCells_->Size();
     for (const auto& [id, material] : materials_) {
         bytes += material->GpuBytes();
     }
