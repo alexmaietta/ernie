@@ -236,6 +236,7 @@
 <li><strong>class</strong> <a href="../classernie_1_1GroundPlane/"><strong>ernie::GroundPlane</strong></a> <em>Ernie: an infinite horizontal floor facing +z at a world height, drawn with its material, optionally as a checkerboard.</em> </li>
 <li><strong>class</strong> <a href="../classernie_1_1Light/"><strong>ernie::Light</strong></a> <em>Any light: UsdLux's LightAPI inputs, its spectrum's shape and Ernie's physical spectrum.</em>     <ul>
 <li><strong>class</strong> <a href="../classernie_1_1BoundableLight/"><strong>ernie::BoundableLight</strong></a> <em>An area light (sphere, rect, disk): a radiant power, or a photometric power or illuminance.</em>     <ul>
+<li><strong>class</strong> <a href="../classernie_1_1CylinderLight/"><strong>ernie::CylinderLight</strong></a> <em>A cylinder along its x axis emitting from its side as a Lambertian emitter, not its caps.</em> </li>
 <li><strong>class</strong> <a href="../classernie_1_1DiskLight/"><strong>ernie::DiskLight</strong></a> <em>A disk in its xy plane emitting along -z.</em> </li>
 <li><strong>class</strong> <a href="../classernie_1_1RectLight/"><strong>ernie::RectLight</strong></a> <em>A rectangle in its xy plane emitting along -z.</em> </li>
 <li><strong>class</strong> <a href="../classernie_1_1SphereLight/"><strong>ernie::SphereLight</strong></a> <em>A sphere (or point) light, optionally shaped to a cone around its -z axis.</em> </li>
@@ -321,11 +322,16 @@
 <li><strong>class</strong> <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a> <em>An interactive window onto an Ernie</em> <code>Scene</code> <em>: a docked viewport rendering the scene with a</em><code>RenderDelegate</code> <em>(the rasterizer), plus Stage, Property, Render Settings, Sensor, Stats and Log panels.</em></li>
 <li><strong>class</strong> <a href="../classernie_1_1profiler_1_1ScopedZone/"><strong>ernie::profiler::ScopedZone</strong></a> <em>Times the rest of the enclosing scope as a CPU zone named</em> <code>name</code> <em>while recording.</em></li>
 <li><strong>struct</strong> <a href="../structernie_1_1AttributeMeta/"><strong>ernie::AttributeMeta</strong></a> <em>How an attribute is described and edited. Declared with designated initializers in this order.</em> </li>
-<li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits/"><strong>ernie::AttributeTraits</strong></a> <em>How the declared C++ type</em> <code>T</code> <em>reads, writes and converts:</em><code>Read</code> <em>with the fallback (accepting any numeric or vector type an author used, as</em><code>GetNumber</code> <em>does),</em><code>Write</code> <em>, and</em><code>From</code> <em>, a value as</em><code>T</code> <em>or nullopt when it cannot be one.</em></li>
+<li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits/"><strong>ernie::AttributeTraits</strong></a> <em>How the declared C++ type</em> <code>T</code> <em>reads, writes and converts:</em><code>Read</code> <em>with the fallback (accepting any numeric or vector type an author used, as</em><code>GetNumber</code> <em>does),</em><code>Write</code> <em>, and</em><code>From</code> <em>, a value as</em><code>T</code> <em>or nullopt when it cannot be one.</em>    <ul>
+<li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01OrArray_3_01T_01_4_01_4/"><strong>ernie::AttributeTraits&lt; OrArray&lt; T &gt; &gt;</strong></a> </li>
+</ul>
+</li>
 <li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01Path_01_4/"><strong>ernie::AttributeTraits&lt; Path &gt;</strong></a> </li>
 <li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01Tensor_01_4/"><strong>ernie::AttributeTraits&lt; Tensor &gt;</strong></a> <em>Bulk data: reads the written tensor or null (there is no fallback), writes with</em> <code>Scene::Write</code> <em>.</em></li>
 <li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01bool_01_4/"><strong>ernie::AttributeTraits&lt; bool &gt;</strong></a> </li>
 <li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01double_01_4/"><strong>ernie::AttributeTraits&lt; double &gt;</strong></a> </li>
+<li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01glm_1_1dmat4_01_4/"><strong>ernie::AttributeTraits&lt; glm::dmat4 &gt;</strong></a> </li>
+<li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01glm_1_1dquat_01_4/"><strong>ernie::AttributeTraits&lt; glm::dquat &gt;</strong></a> </li>
 <li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01glm_1_1dvec2_01_4/"><strong>ernie::AttributeTraits&lt; glm::dvec2 &gt;</strong></a> </li>
 <li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01glm_1_1dvec3_01_4/"><strong>ernie::AttributeTraits&lt; glm::dvec3 &gt;</strong></a> </li>
 <li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01glm_1_1dvec4_01_4/"><strong>ernie::AttributeTraits&lt; glm::dvec4 &gt;</strong></a> </li>
@@ -385,6 +391,7 @@
 <li><strong>struct</strong> <a href="../structernie_1_1MeshData/"><strong>ernie::MeshData</strong></a> <em>Triangle mesh geometry in a mesh's own frame.</em> </li>
 <li><strong>struct</strong> <a href="../structernie_1_1NamedCahvore/"><strong>ernie::NamedCahvore</strong></a> <em>A named camera model in a frame, as camera model files list them.</em> </li>
 <li><strong>struct</strong> <a href="../structernie_1_1NormalEquations/"><strong>ernie::NormalEquations</strong></a> <em>Accumulates the normal equations of a linear least-squares fit, row by row.</em> </li>
+<li><strong>struct</strong> <a href="../structernie_1_1OrArray/"><strong>ernie::OrArray</strong></a> <em>An attribute declared as</em> <code>T</code> <em>that also takes an array written in place of its value: colours per vertex for one</em><code>displayColor</code> <em>, a width per point.</em></li>
 <li><strong>struct</strong> <a href="../structernie_1_1OverlayItem/"><strong>ernie::OverlayItem</strong></a> <em>What every overlay item carries besides its geometry.</em> </li>
 <li><strong>struct</strong> <a href="../structernie_1_1OverlaySegment/"><strong>ernie::OverlaySegment</strong></a> <em>A line segment of</em> <code>width</code> <em>pixels.</em></li>
 <li><strong>struct</strong> <a href="../structernie_1_1OverlaySprite/"><strong>ernie::OverlaySprite</strong></a> <em>A rectangle facing the image at a fixed size in pixels, placed by a world point:</em> <code>rect</code> <em>spans (x0, y0) to (x1, y1) pixels from where</em><code>anchor</code> <em>projects, y down.</em></li>
@@ -425,6 +432,7 @@
 <li><strong>struct</strong> <a href="../structernie_1_1app_1_1CreateContext/"><strong>ernie::app::CreateContext</strong></a> <em>Where a new prim goes and what it starts from.</em> </li>
 <li><strong>struct</strong> <a href="../structernie_1_1app_1_1DemoInfo/"><strong>ernie::app::DemoInfo</strong></a> <em>A demo the runner can build, for the Demos panel and</em> <code>DemoMain</code> <em>.</em></li>
 <li><strong>struct</strong> <a href="../structernie_1_1app_1_1DemoOptions/"><strong>ernie::app::DemoOptions</strong></a> <em>The options every demo takes (</em> <code>ParseDemoOptions</code> <em>), as Newton's examples share theirs.</em></li>
+<li><strong>struct</strong> <a href="../structernie_1_1app_1_1DemoRegistration/"><strong>ernie::app::DemoRegistration</strong></a> <em>Registers a demo at static initialization, for</em> <code>RegisteredDemos</code> <em>.</em></li>
 <li><strong>struct</strong> <a href="../structernie_1_1app_1_1DirectoryEntry/"><strong>ernie::app::DirectoryEntry</strong></a> <em>One row of a folder listing.</em> </li>
 <li><strong>struct</strong> <a href="../structernie_1_1app_1_1DockSizes/"><strong>ernie::app::DockSizes</strong></a> <em>The default layout's docks as fractions of the window: what each takes of the space left once the docks before it are placed (left, then the right column, then the bottom).</em> </li>
 <li><strong>struct</strong> <a href="../structernie_1_1app_1_1FileDialogOptions/"><strong>ernie::app::FileDialogOptions</strong></a> <em>What a file dialog asks for (</em> <code>Viewer::OpenFileDialog</code> <em>).</em></li>

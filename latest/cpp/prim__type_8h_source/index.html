@@ -238,6 +238,8 @@ enum class AttributeKind {
     Relationships,  
     FloatArray,     
     Tensor,         
+    Quat,           
+    Matrix,         
 };
 
 struct AttributeMeta {
@@ -253,6 +255,7 @@ struct AttributeMeta {
     bool lenient = false;
     std::optional&lt;Dirty&gt; dirty;
     std::string_view plural;
+    bool array = false;
 };
 
 class AttributeDef;
@@ -319,6 +322,24 @@ template &lt;&gt; struct AttributeTraits&lt;glm::dvec4&gt; {
     static glm::dvec4 Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
                            glm::dvec4 fallback);
     static std::optional&lt;glm::dvec4&gt; From(const Value&amp; value);
+};
+
+template &lt;&gt; struct AttributeTraits&lt;glm::dquat&gt; {
+    static constexpr AttributeKind kKind = AttributeKind::Quat;
+    using Result = glm::dquat;
+    using Arg = glm::dquat;
+    static glm::dquat Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
+                           glm::dquat fallback);
+    static std::optional&lt;glm::dquat&gt; From(const Value&amp; value);
+};
+
+template &lt;&gt; struct AttributeTraits&lt;glm::dmat4&gt; {
+    static constexpr AttributeKind kKind = AttributeKind::Matrix;
+    using Result = glm::dmat4;
+    using Arg = const glm::dmat4&amp;;
+    static glm::dmat4 Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
+                           const glm::dmat4&amp; fallback);
+    static std::optional&lt;glm::dmat4&gt; From(const Value&amp; value);
 };
 
 template &lt;&gt; struct AttributeTraits&lt;std::string&gt; {
@@ -393,6 +414,15 @@ template &lt;&gt; struct AttributeTraits&lt;Tensor&gt; {
     }
 };
 
+template &lt;typename T&gt; struct OrArray {
+    using Value = T;
+};
+
+template &lt;typename T&gt; inline constexpr bool kIsOrArray = false;
+template &lt;typename T&gt; inline constexpr bool kIsOrArray&lt;OrArray&lt;T&gt;&gt; = true;
+
+template &lt;typename T&gt; struct AttributeTraits&lt;OrArray&lt;T&gt;&gt; : AttributeTraits&lt;T&gt; {};
+
 class AttributeDef {
   public:
     std::string_view name;  
@@ -419,9 +449,13 @@ class AttributeDef {
     static AttributeDef Describe(std::string_view name, std::string_view member, AttributeKind kind,
                                  AttributeMeta meta);
 
+    friend const AttributeDef* FindXformOp(std::string_view attribute);
+
     Value (*read_)(const AttributeDef&amp;, const Scene&amp;, const Path&amp;) = nullptr;
     std::optional&lt;Value&gt; (*from_)(const Value&amp;) = nullptr;
 };
+
+const AttributeDef* FindXformOp(std::string_view attribute);
 
 struct PrimTypeDef {
     std::string_view name;
@@ -442,7 +476,7 @@ struct PrimTypeDef {
     std::vector&lt;const AttributeDef*&gt; AllAttributes() const;
 };
 
-void Validate(const PrimTypeDef&amp; type, const Path&amp; path, std::string_view attribute,
+void Validate(const PrimTypeDef* type, const Path&amp; path, std::string_view attribute,
               const Value* value);
 
 std::span&lt;const PrimTypeDef* const&gt; PrimTypes();
@@ -505,6 +539,19 @@ class SchemaView {
     }                                                                                              \
     Self&amp; Clear##Name() {                                                                          \
         Edit().Clear(GetPath(), token);                                                            \
+        return static_cast&lt;Self&amp;&gt;(*this);                                                          \
+    }                                                                                              \
+           \
+    template &lt;typename T = Type&gt;                                                                   \
+        requires ::ernie::kIsOrArray&lt;T&gt;                                                            \
+    const ::ernie::Tensor* Read##Name() const {                                                    \
+        return GetScene().Read(GetPath(), token);                                                  \
+    }                                                                                              \
+     \
+    template &lt;typename T = Type&gt;                                                                   \
+        requires ::ernie::kIsOrArray&lt;T&gt;                                                            \
+    Self&amp; Write##Name(::ernie::Tensor array) {                                                     \
+        Edit().Write(GetPath(), token, std::move(array));                                          \
         return static_cast&lt;Self&amp;&gt;(*this);                                                          \
     }
 
@@ -577,7 +624,9 @@ namespace ernie::detail {
 template &lt;typename T&gt;
 void WriteAttribute(Scene&amp; scene, const Path&amp; path, std::string_view name,
                     typename AttributeTraits&lt;T&gt;::Arg value) {
-    if constexpr (std::is_same_v&lt;T, Tensor&gt;) {
+    if constexpr (kIsOrArray&lt;T&gt;) {
+        WriteAttribute&lt;typename T::Value&gt;(scene, path, name, value);
+    } else if constexpr (std::is_same_v&lt;T, Tensor&gt;) {
         scene.Write(path, name, std::move(value));
     } else if constexpr (std::is_same_v&lt;T, std::string&gt;) {
         scene.Set(path, name, Value(std::string(value)));
@@ -591,7 +640,10 @@ void WriteAttribute(Scene&amp; scene, const Path&amp; path, std::string_view nam
 template &lt;typename T, typename Fallback&gt;
 AttributeDef MakeAttribute(std::string_view name, std::string_view member, const Fallback&amp; fallback,
                            AttributeMeta meta) {
-    if constexpr (std::is_same_v&lt;T, Tensor&gt;) {
+    if constexpr (kIsOrArray&lt;T&gt;) {
+        meta.array = true;
+        return MakeAttribute&lt;typename T::Value&gt;(name, member, fallback, std::move(meta));
+    } else if constexpr (std::is_same_v&lt;T, Tensor&gt;) {
         return AttributeDef::MakeTensor(name, member, std::move(meta));
     } else {
         return AttributeDef::Make&lt;T&gt;(name, member, T(fallback), std::move(meta));

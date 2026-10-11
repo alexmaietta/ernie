@@ -258,11 +258,43 @@
 <td style="text-align: left;"><a href="../structernie_1_1app_1_1DemoOptions/"><strong>DemoOptions</strong></a> <br><em>The options every demo takes (</em> <code>ParseDemoOptions</code> <em>), as Newton's examples share theirs.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1DemoRegistration/"><strong>DemoRegistration</strong></a> <br><em>Registers a demo at static initialization, for</em> <code>RegisteredDemos</code> <em>.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1app_1_1DemoRunner/"><strong>DemoRunner</strong></a> <br><em>Runs demos as Newton's examples run: opens the viewer the options ask for (or none), runs a demo until its window closes or it has run its frames, then writes</em> <code>--output</code> <em>, runs its final test and reports the benchmark.</em></td>
 </tr>
 </tbody>
 </table>
+<h2 id="macros">Macros</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_register_demo"><strong>ERNIE_REGISTER_DEMO</strong></a> (Class, category, name, description) <code>/* multi line expression */</code><br><em>Registers the demo class</em> <code>Class</code> <em>as</em><code>category</code> <em>/</em><code>name</code> <em>, such as "lighting"/"illuminants", with a one-line description, in a source file of its own.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="macro-definition-documentation">Macro Definition Documentation</h2>
+<h3 id="define-ernie_register_demo">define ERNIE_REGISTER_DEMO</h3>
+<p><em>Registers the demo class</em> <code>Class</code> <em>as</em><code>category</code> <em>/</em><code>name</code> <em>, such as "lighting"/"illuminants", with a one-line description, in a source file of its own.</em></p>
+<pre><code class="language-C++">#define ERNIE_REGISTER_DEMO (
+    Class,
+    category,
+    name,
+    description
+) `static const ::ernie::app::DemoRegistration ernie_demo_registration_##Class(                   \ ::ernie::app::MakeDemoInfo &lt;Class&gt;(category, name, description))`
+</code></pre>
+<p>Link the object file itself (an object library), not through a static archive, which would drop it as unreferenced. </p>
+<hr>
+
 <hr />
 <p>The documentation for this class was generated from the following file <code>ernie/app/demo.h</code></p>
               

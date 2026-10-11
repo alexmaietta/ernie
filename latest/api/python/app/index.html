@@ -184,7 +184,11 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie._ernie.app.light_theme"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;light_theme</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie._ernie.app.main"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;main</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie._ernie.app.parse_demo_options"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;parse_demo_options</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie._ernie.app.registered_demos"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;registered_demos</a>
     </li>
     </ul>
                 </li>
@@ -404,10 +408,26 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            main (ernie._ernie.app.main)" href="#ernie._ernie.app.main">main</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The <code>ernie</code> program (ernie.cli): the viewer on a scene file or the default scene with a Demos panel of Ernie's C++ demos, or a render without a window; args without the program name. Returns the exit status.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            parse_demo_options (ernie._ernie.app.parse_demo_options)" href="#ernie._ernie.app.parse_demo_options">parse_demo_options</a></code></td>
               <td>
                 <div class="doc-md-description">
                   <p>Parses the shared demo options from a command line without the program name, leaving the others in extra; raises ValueError for a bad value.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            registered_demos (ernie._ernie.app.registered_demos)" href="#ernie._ernie.app.registered_demos">registered_demos</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The C++ demos compiled in (ERNIE_REGISTER_DEMO), by category and name.</p>
                 </div>
               </td>
             </tr>
@@ -949,6 +969,14 @@
               </div>
             </li>
             <li>
+              <b><code>id</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>"category/name", as <code>ernie --demo</code> and <code>--list</code> name it.</p>
+              </div>
+            </li>
+            <li>
               <b><code>label</code></b>
                   (<code><span title="str">str</span></code>)
               –
@@ -1017,6 +1045,29 @@
 <pre class="highlight"><code class="language-python doc-signature">description: str</code></pre>
 
     <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.DemoInfo.id" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">id</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">id: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>"category/name", as <code>ernie --demo</code> and <code>--list</code> name it.</p>
 
     </div>
 
@@ -6678,6 +6729,25 @@
 <div class="doc doc-object doc-function">
 
 
+<h2 id="ernie._ernie.app.main" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">main</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">main(args: Sequence[str], version: str) -&gt; int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The <code>ernie</code> program (ernie.cli): the viewer on a scene file or the default scene with a Demos panel of Ernie's C++ demos, or a render without a window; args without the program name. Returns the exit status.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h2 id="ernie._ernie.app.parse_demo_options" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">parse_demo_options</span>
 
@@ -6688,6 +6758,25 @@
     <div class="doc doc-contents ">
 
         <p>Parses the shared demo options from a command line without the program name, leaving the others in extra; raises ValueError for a bad value.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie._ernie.app.registered_demos" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">registered_demos</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">registered_demos() -&gt; list[DemoInfo]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The C++ demos compiled in (ERNIE_REGISTER_DEMO), by category and name.</p>
 
 
     </div>

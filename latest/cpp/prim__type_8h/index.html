@@ -258,6 +258,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1AttributeTraits_3_01OrArray_3_01T_01_4_01_4/"><strong>AttributeTraits&lt; OrArray&lt; T &gt; &gt;</strong></a> &lt;typename T&gt;<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1AttributeTraits_3_01Path_01_4/"><strong>AttributeTraits&lt; Path &gt;</strong></a> &lt;&gt;<br></td>
 </tr>
 <tr>
@@ -271,6 +275,14 @@
 <tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1AttributeTraits_3_01double_01_4/"><strong>AttributeTraits&lt; double &gt;</strong></a> &lt;&gt;<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1AttributeTraits_3_01glm_1_1dmat4_01_4/"><strong>AttributeTraits&lt; glm::dmat4 &gt;</strong></a> &lt;&gt;<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1AttributeTraits_3_01glm_1_1dquat_01_4/"><strong>AttributeTraits&lt; glm::dquat &gt;</strong></a> &lt;&gt;<br></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -302,6 +314,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1OrArray/"><strong>OrArray</strong></a> &lt;typename T&gt;<br><em>An attribute declared as</em> <code>T</code> <em>that also takes an array written in place of its value: colours per vertex for one</em><code>displayColor</code> <em>, a width per point.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1PrimTypeDef/"><strong>PrimTypeDef</strong></a> <br><em>A registered prim type: its name (</em> <code>Scene::Define</code> <em>'s type), its base, and the attributes it declares itself; abstract ones, such as "Light", are bases only.</em></td>
 </tr>
 <tr>
@@ -325,7 +341,7 @@
 <tbody>
 <tr>
 <td style="text-align: right;">define</td>
-<td style="text-align: left;"><a href="./#define-ernie_attribute_accessors"><strong>ERNIE_ATTRIBUTE_ACCESSORS</strong></a> (Type, Name, token, fallback, meta) <code>/* multi line expression */</code><br><em>One attribute's accessors in a view class:</em> <code>Get&lt;Name&gt;</code> <em>(the fallback when unset),</em><code>Has&lt;Name&gt;</code> <em>(whether it is authored), and</em><code>Set&lt;Name&gt;</code> <em>and</em><code>Clear&lt;Name&gt;</code> <em>(removing it,</em><code>Scene::Clear</code> <em>), which return the view for chaining.</em></td>
+<td style="text-align: left;"><a href="./#define-ernie_attribute_accessors"><strong>ERNIE_ATTRIBUTE_ACCESSORS</strong></a> (Type, Name, token, fallback, meta) <code>/* multi line expression */</code><br><em>One attribute's accessors in a view class:</em> <code>Get&lt;Name&gt;</code> <em>(the fallback when unset),</em><code>Has&lt;Name&gt;</code> <em>(whether it is authored), and</em><code>Set&lt;Name&gt;</code> <em>and</em><code>Clear&lt;Name&gt;</code> <em>(removing it,</em><code>Scene::Clear</code> <em>), which return the view for chaining; for an</em><code>OrArray</code> <em>attribute,</em><code>Read&lt;Name&gt;</code> <em>and</em><code>Write&lt;Name&gt;</code> <em>too, its array.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">define</td>
@@ -351,7 +367,7 @@
 </table>
 <h2 id="macro-definition-documentation">Macro Definition Documentation</h2>
 <h3 id="define-ernie_attribute_accessors">define ERNIE_ATTRIBUTE_ACCESSORS</h3>
-<p><em>One attribute's accessors in a view class:</em> <code>Get&lt;Name&gt;</code> <em>(the fallback when unset),</em><code>Has&lt;Name&gt;</code> <em>(whether it is authored), and</em><code>Set&lt;Name&gt;</code> <em>and</em><code>Clear&lt;Name&gt;</code> <em>(removing it,</em><code>Scene::Clear</code> <em>), which return the view for chaining.</em></p>
+<p><em>One attribute's accessors in a view class:</em> <code>Get&lt;Name&gt;</code> <em>(the fallback when unset),</em><code>Has&lt;Name&gt;</code> <em>(whether it is authored), and</em><code>Set&lt;Name&gt;</code> <em>and</em><code>Clear&lt;Name&gt;</code> <em>(removing it,</em><code>Scene::Clear</code> <em>), which return the view for chaining; for an</em><code>OrArray</code> <em>attribute,</em><code>Read&lt;Name&gt;</code> <em>and</em><code>Write&lt;Name&gt;</code> <em>too, its array.</em></p>
 <pre><code class="language-C++">#define ERNIE_ATTRIBUTE_ACCESSORS (
     Type,
     Name,

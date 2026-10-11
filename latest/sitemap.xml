@@ -181,6 +181,10 @@
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1AttributeTraits_3_01OrArray_3_01T_01_4_01_4/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1AttributeTraits_3_01Path_01_4/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
@@ -194,6 +198,14 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1AttributeTraits_3_01double_01_4/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1AttributeTraits_3_01glm_1_1dmat4_01_4/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1AttributeTraits_3_01glm_1_1dquat_01_4/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
@@ -326,6 +338,10 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1Cylinder/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1CylinderLight/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
@@ -578,6 +594,10 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1OffscreenTarget/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1OrArray/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
@@ -909,6 +929,10 @@
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1app_1_1DemoRegistration/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1app_1_1DemoRunner/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
@@ -1066,6 +1090,14 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/builtin__panels_8h_source/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/cli_8h/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/cli_8h_source/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>

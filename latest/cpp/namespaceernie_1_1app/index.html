@@ -246,6 +246,10 @@
 <td style="text-align: left;"><a href="../structernie_1_1app_1_1DemoOptions/"><strong>DemoOptions</strong></a> <br><em>The options every demo takes (</em> <code>ParseDemoOptions</code> <em>), as Newton's examples share theirs.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1DemoRegistration/"><strong>DemoRegistration</strong></a> <br><em>Registers a demo at static initialization, for</em> <code>RegisteredDemos</code> <em>.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1app_1_1DemoRunner/"><strong>DemoRunner</strong></a> <br><em>Runs demos as Newton's examples run: opens the viewer the options ask for (or none), runs a demo until its window closes or it has run its frames, then writes</em> <code>--output</code> <em>, runs its final test and reports the benchmark.</em></td>
 </tr>
@@ -392,6 +396,10 @@
 <td style="text-align: left;"><a href="#function-defaultlightpath"><strong>DefaultLightPath</strong></a> () <br><em>The session's default light,</em> <code>/__session/Lights/Default</code> <em>: a white sun from above with shadows.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-definedefaultscene"><strong>DefineDefaultScene</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene) <br><em>Defines in</em> <code>scene</code> <em>what the</em><code>ernie</code> <em>program opens on without a scene file or demo: a ground plane with a cube, a sphere and a cylinder on it, lit by a sun, and a camera for renders without a viewer.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">int</td>
 <td style="text-align: left;"><a href="#function-demomain"><strong>DemoMain</strong></a> (int argc, char ** argv, std::vector&lt; <a href="../structernie_1_1app_1_1DemoInfo/"><strong>DemoInfo</strong></a> &gt; demos, std::size_t start=0) <br><em>A demo program's</em> <code>main</code> <em>: parses the command line (</em><code>ParseDemoOptions</code> <em>), then prints the help (</em><code>--help</code> <em>) or the demos (</em><code>--list</code> <em>), or runs</em><code>demos[start]</code> <em>(or the one</em><code>--demo NAME</code> <em>names) with all of</em><code>demos</code> <em>in the Demos panel.</em></td>
 </tr>
@@ -416,8 +424,16 @@
 <td style="text-align: left;"><a href="#function-drawrenderericon"><strong>DrawRendererIcon</strong></a> (ImDrawList * draw, const ImVec2 &amp; corner, float size) <br><em>Draws the viewport's renderer icon, a lit ball on the ground, into the square of</em> <code>size</code> <em>pixels at</em><code>corner</code> <em>.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">int</td>
+<td style="text-align: left;"><a href="#function-erniemain"><strong>ErnieMain</strong></a> (std::span&lt; const std::string &gt; args, std::string_view version) <br><em>The</em> <code>ernie</code> <em>program, also the</em><code>ernie</code> <em>command a pip install puts on the path:</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">const <a href="../structernie_1_1app_1_1CreatableType/"><strong>CreatableType</strong></a> *</td>
 <td style="text-align: left;"><a href="#function-findcreatable"><strong>FindCreatable</strong></a> (std::string_view type) <br><em>The type the Create menu offers as</em> <code>type</code> <em>; null if it offers none.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::optional&lt; std::size_t &gt;</td>
+<td style="text-align: left;"><a href="#function-finddemo"><strong>FindDemo</strong></a> (std::span&lt; const <a href="../structernie_1_1app_1_1DemoInfo/"><strong>DemoInfo</strong></a> &gt; demos, std::string_view id) <br><em>Finds the demo</em> <code>id</code> <em>among</em><code>demos</code> <em>: "category/name" (such as "lighting/illuminants"), or the panel's label "category: name"; underscores and spaces match each other.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -492,6 +508,10 @@
 <td style="text-align: left;"><a href="#function-propertylabelwidth"><strong>PropertyLabelWidth</strong></a> (const <a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> &amp; viewer) <br><em>The label column's width in pixels for the viewer's theme and font.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1app_1_1DemoInfo/"><strong>DemoInfo</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-registereddemos"><strong>RegisteredDemos</strong></a> () <br><em>The demos registered with</em> <code>ERNIE_REGISTER_DEMO</code> <em>, sorted by category then name: Ernie's own (the ernie_demos library, in the</em><code>ernie</code> <em>program and the Python module) and any an application links in.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1app_1_1PropertySection/"><strong>PropertySection</strong></a> &gt;</td>
 <td style="text-align: left;"><a href="#function-rendersettingsschema"><strong>RenderSettingsSchema</strong></a> () <br><em>A</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim's sections: image, culling and level of detail, and shadows.</em></td>
 </tr>
@@ -522,6 +542,10 @@
 <tr>
 <td style="text-align: right;">std::vector&lt; <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt;</td>
 <td style="text-align: left;"><a href="#function-viewablecameras"><strong>ViewableCameras</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene) <br><em>The</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prims of</em><code>scene</code> <em>the viewport can look through: those under the session root first, then the scene's own, each in path order.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-writepng"><strong>WritePng</strong></a> (const std::filesystem::path &amp; path, const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp; image) <br><em>Writes</em> <code>image</code> <em>, uint8 (rows, cols, 3 or 4) on the CPU, as PNG.</em></td>
 </tr>
 </tbody>
 </table>
@@ -660,6 +684,14 @@
 </code></pre>
 <hr>
 
+<h3 id="function-definedefaultscene">function DefineDefaultScene</h3>
+<p><em>Defines in</em> <code>scene</code> <em>what the</em><code>ernie</code> <em>program opens on without a scene file or demo: a ground plane with a cube, a sphere and a cylinder on it, lit by a sun, and a camera for renders without a viewer.</em></p>
+<pre><code class="language-C++">void ernie::app::DefineDefaultScene (
+    Scene &amp; scene
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-demomain">function DemoMain</h3>
 <p><em>A demo program's</em> <code>main</code> <em>: parses the command line (</em><code>ParseDemoOptions</code> <em>), then prints the help (</em><code>--help</code> <em>) or the demos (</em><code>--list</code> <em>), or runs</em><code>demos[start]</code> <em>(or the one</em><code>--demo NAME</code> <em>names) with all of</em><code>demos</code> <em>in the Demos panel.</em></p>
 <pre><code class="language-C++">int ernie::app::DemoMain (
@@ -724,12 +756,32 @@
 </code></pre>
 <hr>
 
+<h3 id="function-erniemain">function ErnieMain</h3>
+<p><em>The</em> <code>ernie</code> <em>program, also the</em><code>ernie</code> <em>command a pip install puts on the path:</em></p>
+<pre><code class="language-C++">int ernie::app::ErnieMain (
+    std::span&lt; const std::string &gt; args,
+    std::string_view version
+) 
+</code></pre>
+<p>It takes the options every demo takes (<code>ParseDemoOptions</code>), so a scene file renders headless or without a viewer as a demo does, and <code>--version</code>. The Demos panel lists the scene (the default or the file's) and every registered demo (<code>RegisteredDemos</code>). <code>args</code> is the command line without the program name; returns the exit status, printing any error. </p>
+<hr>
+
 <h3 id="function-findcreatable">function FindCreatable</h3>
 <p><em>The type the Create menu offers as</em> <code>type</code> <em>; null if it offers none.</em></p>
 <pre><code class="language-C++">const CreatableType * ernie::app::FindCreatable (
     std::string_view type
 ) 
 </code></pre>
+<hr>
+
+<h3 id="function-finddemo">function FindDemo</h3>
+<p><em>Finds the demo</em> <code>id</code> <em>among</em><code>demos</code> <em>: "category/name" (such as "lighting/illuminants"), or the panel's label "category: name"; underscores and spaces match each other.</em></p>
+<pre><code class="language-C++">std::optional&lt; std::size_t &gt; ernie::app::FindDemo (
+    std::span&lt; const DemoInfo &gt; demos,
+    std::string_view id
+) 
+</code></pre>
+<p>Returns its index. </p>
 <hr>
 
 <h3 id="function-hasstagelights">function HasStageLights</h3>
@@ -888,6 +940,12 @@ DemoInfo ernie::app::MakeDemoInfo (
 </code></pre>
 <hr>
 
+<h3 id="function-registereddemos">function RegisteredDemos</h3>
+<p><em>The demos registered with</em> <code>ERNIE_REGISTER_DEMO</code> <em>, sorted by category then name: Ernie's own (the ernie_demos library, in the</em><code>ernie</code> <em>program and the Python module) and any an application links in.</em></p>
+<pre><code class="language-C++">std::vector&lt; DemoInfo &gt; ernie::app::RegisteredDemos () 
+</code></pre>
+<hr>
+
 <h3 id="function-rendersettingsschema">function RenderSettingsSchema</h3>
 <p><em>A</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim's sections: image, culling and level of detail, and shadows.</em></p>
 <pre><code class="language-C++">std::vector&lt; PropertySection &gt; ernie::app::RenderSettingsSchema () 
@@ -954,6 +1012,19 @@ DemoInfo ernie::app::MakeDemoInfo (
     const Scene &amp; scene
 ) 
 </code></pre>
+<hr>
+
+<h3 id="function-writepng">function WritePng</h3>
+<p><em>Writes</em> <code>image</code> <em>, uint8 (rows, cols, 3 or 4) on the CPU, as PNG.</em></p>
+<pre><code class="language-C++">void ernie::app::WritePng (
+    const std::filesystem::path &amp; path,
+    const Tensor &amp; image
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for another shape or type, or std::runtime_error if the file cannot be written. </li>
+</ul>
 <hr>
 
 <hr />

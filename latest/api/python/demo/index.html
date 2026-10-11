@@ -172,15 +172,23 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.discover_demos"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;discover_demos</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.heatmap"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;heatmap</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.init"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;init</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.load_demo_class"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;load_demo_class</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.main"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;main</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.mean_linear_rgb"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mean_linear_rgb</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.options_from_args"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;options_from_args</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.run"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;run</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.side_by_side"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;side_by_side</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.srgb_to_linear"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;srgb_to_linear</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.write_png"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;write_png</a>
     </li>
@@ -326,7 +334,7 @@ panel switches away.</p>
             <td><code><a class="autorefs autorefs-internal" title="            DemoEntry (ernie.demo.DemoEntry)" href="#ernie.demo.DemoEntry">DemoEntry</a></code></td>
             <td>
               <div class="doc-md-description">
-                <p>A demo file: its path, category and name from <code>demo_&lt;category&gt;_&lt;name&gt;.py</code>.</p>
+                <p>A demo file, <code>&lt;category&gt;/&lt;name&gt;.py</code>: its path, category and name.</p>
               </div>
             </td>
           </tr>
@@ -349,7 +357,7 @@ panel switches away.</p>
               <td><code><a class="autorefs autorefs-internal" title="            catalog (ernie.demo.catalog)" href="#ernie.demo.catalog">catalog</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>The Demos panel's entries for a run of <code>demo_class</code>, <code>(infos, current)</code>: the demo files</p>
+                  <p>The Demos panel's entries for a run of <code>demo_class</code>, <code>(infos, current)</code>: the demos of every</p>
                 </div>
               </td>
             </tr>
@@ -373,7 +381,15 @@ panel switches away.</p>
               <td><code><a class="autorefs autorefs-internal" title="            discover_demos (ernie.demo.discover_demos)" href="#ernie.demo.discover_demos">discover_demos</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>The <code>demo_*.py</code> files in <code>directory</code> that define a Demo class, by category and name.</p>
+                  <p>The demos under <code>root</code>, <code>&lt;category&gt;/&lt;name&gt;.py</code> files that define a Demo class, by category</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            heatmap (ernie.demo.heatmap)" href="#ernie.demo.heatmap">heatmap</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p><code>values</code> from <code>low</code> (blue) through cyan, green and yellow to <code>high</code> (red), as RGB uint8.</p>
                 </div>
               </td>
             </tr>
@@ -402,6 +418,14 @@ panel switches away.</p>
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            mean_linear_rgb (ernie.demo.mean_linear_rgb)" href="#ernie.demo.mean_linear_rgb">mean_linear_rgb</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The mean colour of a uint8 (rows, cols, 3 or 4) image, decoded from sRGB to linear.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            options_from_args (ernie.demo.options_from_args)" href="#ernie.demo.options_from_args">options_from_args</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -414,6 +438,22 @@ panel switches away.</p>
               <td>
                 <div class="doc-md-description">
                   <p>Steps and renders <code>demo</code> until its window closes or it has run <code>--num-frames</code>, then writes</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            side_by_side (ernie.demo.side_by_side)" href="#ernie.demo.side_by_side">side_by_side</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>uint8 (rows, cols, channels) images of one height next to each other with black gaps.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            srgb_to_linear (ernie.demo.srgb_to_linear)" href="#ernie.demo.srgb_to_linear">srgb_to_linear</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>An sRGB-encoded colour in [0, 1] to linear.</p>
                 </div>
               </td>
             </tr>
@@ -514,11 +554,15 @@ panel switches away.</p>
     "create_parser",
     "default_args",
     "discover_demos",
+    "heatmap",
     "init",
     "load_demo_class",
     "main",
+    "mean_linear_rgb",
     "options_from_args",
     "run",
+    "side_by_side",
+    "srgb_to_linear",
     "write_png",
 ]
 </code></pre>
@@ -1040,7 +1084,7 @@ tests. Not the viewport: the viewer's own camera is not the scene's.</p>
 
 
 
-        <p>A demo file: its path, category and name from <code>demo_&lt;category&gt;_&lt;name&gt;.py</code>.</p>
+        <p>A demo file, <code>&lt;category&gt;/&lt;name&gt;.py</code>: its path, category and name.</p>
 
 
 
@@ -1066,6 +1110,13 @@ tests. Not the viewport: the viewer's own camera is not the scene's.</p>
         <ul class="first simple">
             <li>
               <b><code>category</code></b>
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>id</code></b>
               –
               <div class="doc-md-description">
                 
@@ -1121,7 +1172,28 @@ tests. Not the viewport: the viewer's own camera is not the scene's.</p>
   </span>
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">category = parts[1] if len(parts) &gt; 1 else 'other'</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">category = os.path.basename(os.path.dirname(os.path.abspath(path)))</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.DemoEntry.id" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">id</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">id = f'{self.category}/{stem}'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -1163,7 +1235,7 @@ tests. Not the viewport: the viewer's own camera is not the scene's.</p>
   </span>
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">name = parts[2].replace('_', ' ') if len(parts) &gt; 2 else stem</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">name = stem.replace('_', ' ')</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -1217,8 +1289,9 @@ tests. Not the viewport: the viewer's own camera is not the scene's.</p>
 
     <div class="doc doc-contents ">
 
-        <p>The Demos panel's entries for a run of <code>demo_class</code>, <code>(infos, current)</code>: the demo files
-beside its module, or the class alone when it is not among them.</p>
+        <p>The Demos panel's entries for a run of <code>demo_class</code>, <code>(infos, current)</code>: the demos of every
+category beside its own (<code>demos/&lt;category&gt;/&lt;name&gt;.py</code>), or the class alone when it is not
+among them.</p>
 
 
     </div>
@@ -1271,11 +1344,31 @@ beside its module, or the class alone when it is not among them.</p>
 
 
 </h2>
-<pre class="highlight"><code class="language-python doc-signature">discover_demos(directory)</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">discover_demos(root)</code></pre>
 
     <div class="doc doc-contents ">
 
-        <p>The <code>demo_*.py</code> files in <code>directory</code> that define a Demo class, by category and name.</p>
+        <p>The demos under <code>root</code>, <code>&lt;category&gt;/&lt;name&gt;.py</code> files that define a Demo class, by category
+and name.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.demo.heatmap" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">heatmap</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">heatmap(values, low, high)</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p><code>values</code> from <code>low</code> (blue) through cyan, green and yellow to <code>high</code> (red), as RGB uint8.</p>
 
 
     </div>
@@ -1345,6 +1438,25 @@ beside it) and returns its Demo class.</p>
 <div class="doc doc-object doc-function">
 
 
+<h2 id="ernie.demo.mean_linear_rgb" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">mean_linear_rgb</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">mean_linear_rgb(image)</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The mean colour of a uint8 (rows, cols, 3 or 4) image, decoded from sRGB to linear.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h2 id="ernie.demo.options_from_args" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">options_from_args</span>
 
@@ -1376,6 +1488,44 @@ beside it) and returns its Demo class.</p>
         <p>Steps and renders <code>demo</code> until its window closes or it has run <code>--num-frames</code>, then writes
 <code>--output</code>, runs its final test and reports the benchmark. In a window the Demos panel lists
 the demo files beside this one. Returns the demo running at the end.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.demo.side_by_side" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">side_by_side</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">side_by_side(images, gap=4)</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>uint8 (rows, cols, channels) images of one height next to each other with black gaps.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.demo.srgb_to_linear" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">srgb_to_linear</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">srgb_to_linear(rgb)</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>An sRGB-encoded colour in [0, 1] to linear.</p>
 
 
     </div>

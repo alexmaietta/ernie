@@ -278,6 +278,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1AttributeTraits_3_01OrArray_3_01T_01_4_01_4/"><strong>AttributeTraits&lt; OrArray&lt; T &gt; &gt;</strong></a> &lt;typename T&gt;<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1AttributeTraits_3_01Path_01_4/"><strong>AttributeTraits&lt; Path &gt;</strong></a> &lt;&gt;<br></td>
 </tr>
 <tr>
@@ -291,6 +295,14 @@
 <tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1AttributeTraits_3_01double_01_4/"><strong>AttributeTraits&lt; double &gt;</strong></a> &lt;&gt;<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1AttributeTraits_3_01glm_1_1dmat4_01_4/"><strong>AttributeTraits&lt; glm::dmat4 &gt;</strong></a> &lt;&gt;<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1AttributeTraits_3_01glm_1_1dquat_01_4/"><strong>AttributeTraits&lt; glm::dquat &gt;</strong></a> &lt;&gt;<br></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -415,6 +427,10 @@
 <tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1Cylinder/"><strong>Cylinder</strong></a> <br><em>A capped cylinder along its axis.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1CylinderLight/"><strong>CylinderLight</strong></a> <br><em>A cylinder along its x axis emitting from its side as a Lambertian emitter, not its caps.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -643,6 +659,10 @@
 <tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1OffscreenTarget/"><strong>OffscreenTarget</strong></a> <br><em>A colour and depth target for headless rendering, with readback of the colour image.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1OrArray/"><strong>OrArray</strong></a> &lt;typename T&gt;<br><em>An attribute declared as</em> <code>T</code> <em>that also takes an array written in place of its value: colours per vertex for one</em><code>displayColor</code> <em>, a width per point.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
@@ -1159,6 +1179,14 @@
 <td style="text-align: left;"><a href="#variable-kfivefacesangle"><strong>kFiveFacesAngle</strong></a>   = <code>2.1862760354652844</code><br><em>The field angle (radians) the first five faces cover in every direction: 90 degrees plus atan(1 / sqrt 2), where the back face's pyramid reaches nearest the axis, along the side faces' diagonals.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">constexpr bool</td>
+<td style="text-align: left;"><a href="#variable-kisorarray"><strong>kIsOrArray</strong></a>   = <code>false</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr bool</td>
+<td style="text-align: left;"><a href="#variable-kisorarray-orarray-t"><strong>kIsOrArray&lt; OrArray&lt; T &gt; &gt;</strong></a>   = <code>true</code><br></td>
+</tr>
+<tr>
 <td style="text-align: right;">constexpr double</td>
 <td style="text-align: left;"><a href="#variable-kluminousefficacy"><strong>kLuminousEfficacy</strong></a>   = <code>683.002</code><br></td>
 </tr>
@@ -1506,6 +1534,10 @@
 <td style="text-align: left;"><a href="#function-findprimtype"><strong>FindPrimType</strong></a> (std::string_view name) <br><em>The registered prim type named</em> <code>name</code> <em>, or null.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">const <a href="../classernie_1_1AttributeDef/"><strong>AttributeDef</strong></a> *</td>
+<td style="text-align: left;"><a href="#function-findxformop"><strong>FindXformOp</strong></a> (std::string_view attribute) <br><em>The transform op</em> <code>attribute</code> <em>names ("xformOp:orient", "xformOp:translate:pivot") as a declared attribute, any prim's:</em><code>xformOp:translate</code> <em>and the Euler rotations a</em><code>Vec3</code> <em>,</em><code>xformOp:scale</code> <em>a</em><code>Vec3</code> <em>or one number,</em><code>rotateX</code> <em>(Y, Z) a</em><code>Double</code> <em>in degrees,</em><code>xformOp:orient</code> <em>a</em><code>Quat</code> <em>and</em><code>xformOp:transform</code> <em>a</em><code>Matrix</code> <em>, each also taking an array of them, a pose per prim (</em><code>AttributeMeta::array</code> <em>); null for other names and ops Ernie does not know.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::optional&lt; std::uint64_t &gt;</td>
 <td style="text-align: left;"><a href="#function-frameof"><strong>FrameOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; settings) <br><em>The frame number the</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim</em><code>settings</code> <em>authors in</em><code>ernie:frame</code> <em>, if it does: the frame an image's noise and samples derive from (</em><code>FrameSeed</code> <em>), so a simulation can render any frame again without the ones before it.</em></td>
 </tr>
@@ -1639,7 +1671,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-loadscene"><strong>LoadScene</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, std::string_view json) <br><em>Builds the prims</em> <code>json</code> <em>describes into</em><code>scene</code> <em>(see above).</em></td>
+<td style="text-align: left;"><a href="#function-loadscene"><strong>LoadScene</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, std::string_view json, std::span&lt; const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &gt; arrays={}) <br><em>Builds the prims</em> <code>json</code> <em>describes into</em><code>scene</code> <em>(see above).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
@@ -1931,7 +1963,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-validate"><strong>Validate</strong></a> (const <a href="../structernie_1_1PrimTypeDef/"><strong>PrimTypeDef</strong></a> &amp; type, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute, const <a href="../classernie_1_1Value/"><strong>Value</strong></a> * value) <br><em>Checks that</em> <code>attribute</code> <em>may be set on a prim of</em><code>type</code> <em>(at</em><code>path</code> <em>, for messages), and that</em><code>value</code> <em>, when given, is of its declared type, as</em><code>Scene::Set</code> <em>and</em><code>Scene::Write</code> <em>do:</em></td>
+<td style="text-align: left;"><a href="#function-validate"><strong>Validate</strong></a> (const <a href="../structernie_1_1PrimTypeDef/"><strong>PrimTypeDef</strong></a> * type, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute, const <a href="../classernie_1_1Value/"><strong>Value</strong></a> * value) <br><em>Checks that</em> <code>attribute</code> <em>may be set on a prim of</em><code>type</code> <em>(at</em><code>path</code> <em>, for messages), and that</em><code>value</code> <em>is of its declared type, or, when null (</em><code>Scene::Write</code> <em>), that it takes an array, as</em><code>Scene::Set</code> <em>and</em><code>Scene::Write</code> <em>do:</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; std::string_view &gt;</td>
@@ -1995,7 +2027,8 @@
 <li>The top level maps prim paths (absolute, or relative to the root) to prims.</li>
 <li>A prim is an object: <code>"type"</code> names its type (<code>Scene::Define</code>; registered or not). Without one, a new prim is untyped and an existing prim keeps its type and attributes. Keys whose values are objects are its children, by name; the other keys are its attributes, by the Python name of one its type declares (<code>AttributeDef::pyName</code>, "cell_size") or by USD name ("inputs:intensity").</li>
 <li><code>translate</code> (3 numbers), <code>rotate</code> (3 Euler angles in degrees), <code>rotation_order</code> ("XYZ", ..., "ZYX"), <code>orient</code> (a quaternion as [w, x, y, z], the real part first as USD writes one and as Python's <code>Quat(w, x, y, z)</code> takes it) and <code>scale</code> (one number or 3) set its transform ops (<code>SetXform</code>); <code>transform</code> sets <code>xformOp:transform</code> to a 4 x 4 matrix given as 4 rows of 4 numbers (math convention: column vectors, translation in the last column).</li>
-<li>Values convert as Python's do: booleans, integers (32-bit), other numbers as doubles, strings, arrays of strings, arrays of 2 numbers (<code>ivec2</code> when both are integers), 3 or 4 as vectors, other lengths as float arrays, and 4 x 4 nested arrays as matrices. A declared attribute's value is then converted to its type (<code>AttributeDef::Coerce</code>: a string to a relationship target, say); one declared as a tensor (<code>points</code>, <code>heights</code>) takes a possibly nested array as a CPU tensor, int32 for one of whole numbers (<code>AttributeMeta::integer</code>: indices, counts) and float32 for any other, whatever the numbers look like, written with <code>Scene::Write</code>. A declared 4-vector takes its 4 numbers as doubles, and a declared <code>AttributeMeta::lenient</code> attribute keeps a value its type cannot convert. On any other attribute, nested arrays other than 4 x 4 (such as a per-vertex <code>primvars:displayColor</code>, N rows of 3) are a float32 tensor; on an undeclared one, 4 numbers for an <code>xformOp:orient</code> (or <code>xformOp:orient:&lt;suffix&gt;</code>) are a quaternion as [w, x, y, z]. Values are checked as <code>Scene::Set</code> checks them (<code>Validate</code>).</li>
+<li>Values convert as Python's do: booleans, integers (32-bit), other numbers as doubles, strings, arrays of strings, arrays of 2 numbers (<code>ivec2</code> when both are integers), 3 or 4 as vectors, other lengths as float arrays, and 4 x 4 nested arrays as matrices; nested arrays other than 4 x 4 are a float32 tensor.</li>
+<li>Those are the rules for undeclared attributes only. A declared one, or a transform op (<code>FindXformOp</code>: <code>xformOp:orient:&lt;suffix&gt;</code> too), is read as its kind: a tensor (<code>points</code>, <code>heights</code>) as a CPU tensor, int32 for one of whole numbers (<code>AttributeMeta::integer</code>: indices, counts) and float32 for any other, whatever the numbers look like, written with <code>Scene::Write</code>; an <code>AttributeMeta::array</code> attribute's array of values, nested deeper than one value (a per-vertex <code>primvars:displayColor</code>, N rows of 3), as a float32 tensor; a <code>Vec4</code>'s 4 numbers as doubles, a <code>Quat</code>'s as [w, x, y, z] and a <code>Matrix</code> as 4 rows; then converted to its type (<code>AttributeDef::Coerce</code>: a string to a relationship target, say), a <code>AttributeMeta::lenient</code> attribute keeping a value its type cannot convert. Values are checked as <code>Scene::Set</code> checks them (<code>Validate</code>).</li>
 </ul>
 <p><code>SaveScene</code> writes the format back, so that <code>LoadScene</code> of its text into an empty scene rebuilds the scene: every prim but the viewer's (under <code>tokens::kSessionRoot</code>), roots by path at the top level and the others nested as children by name, <code>"type"</code> first when typed, then the attributes by USD name in name order (transform ops as <code>xformOp:*</code> and <code>xformOpOrder</code> attributes, not the <code>translate</code>-style keys), then the children in path order. Values are written as <code>LoadScene</code> reads them back: <code>Path</code>s and lists of them as strings, matrices as 4 rows, quaternions as [w, x, y, z], floats in their shortest form that reads back as the same float, and tensors as arrays nested by their shape. Limits:
 * large tensors make large files (a number per element, a line per row), and NaN or infinite numbers cannot be written (JSON has none);
@@ -2025,7 +2058,9 @@
     Relationship,
     Relationships,
     FloatArray,
-    Tensor
+    Tensor,
+    Quat,
+    Matrix
 };
 </code></pre>
 <hr>
@@ -2223,7 +2258,8 @@
     Distant = 0,
     Sphere = 1,
     Rect = 2,
-    Disk = 3
+    Disk = 3,
+    Cylinder = 4
 };
 </code></pre>
 <hr>
@@ -2485,6 +2521,16 @@
 <h3 id="variable-kfivefacesangle">variable kFiveFacesAngle</h3>
 <p><em>The field angle (radians) the first five faces cover in every direction: 90 degrees plus atan(1 / sqrt 2), where the back face's pyramid reaches nearest the axis, along the side faces' diagonals.</em> </p>
 <pre><code class="language-C++">constexpr double ernie::kFiveFacesAngle;
+</code></pre>
+<hr>
+
+<h3 id="variable-kisorarray">variable kIsOrArray</h3>
+<pre><code class="language-C++">constexpr bool ernie::kIsOrArray;
+</code></pre>
+<hr>
+
+<h3 id="variable-kisorarray-orarray-t">variable kIsOrArray&lt; OrArray&lt; T &gt; &gt;</h3>
+<pre><code class="language-C++">constexpr bool ernie::kIsOrArray&lt; OrArray&lt; T &gt; &gt;;
 </code></pre>
 <hr>
 
@@ -3333,6 +3379,14 @@ constexpr DType ernie::DTypeOf&lt; std::uint8_t &gt; ()
 </code></pre>
 <hr>
 
+<h3 id="function-findxformop">function FindXformOp</h3>
+<p><em>The transform op</em> <code>attribute</code> <em>names ("xformOp:orient", "xformOp:translate:pivot") as a declared attribute, any prim's:</em><code>xformOp:translate</code> <em>and the Euler rotations a</em><code>Vec3</code> <em>,</em><code>xformOp:scale</code> <em>a</em><code>Vec3</code> <em>or one number,</em><code>rotateX</code> <em>(Y, Z) a</em><code>Double</code> <em>in degrees,</em><code>xformOp:orient</code> <em>a</em><code>Quat</code> <em>and</em><code>xformOp:transform</code> <em>a</em><code>Matrix</code> <em>, each also taking an array of them, a pose per prim (</em><code>AttributeMeta::array</code> <em>); null for other names and ops Ernie does not know.</em></p>
+<pre><code class="language-C++">const AttributeDef * ernie::FindXformOp (
+    std::string_view attribute
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-frameof">function FrameOf</h3>
 <p><em>The frame number the</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim</em><code>settings</code> <em>authors in</em><code>ernie:frame</code> <em>, if it does: the frame an image's noise and samples derive from (</em><code>FrameSeed</code> <em>), so a simulation can render any frame again without the ones before it.</em></p>
 <pre><code class="language-C++">std::optional&lt; std::uint64_t &gt; ernie::FrameOf (
@@ -3714,12 +3768,14 @@ constexpr DType ernie::DTypeOf&lt; std::uint8_t &gt; ()
 <p><em>Builds the prims</em> <code>json</code> <em>describes into</em><code>scene</code> <em>(see above).</em></p>
 <pre><code class="language-C++">void ernie::LoadScene (
     Scene &amp; scene,
-    std::string_view json
+    std::string_view json,
+    std::span&lt; const Tensor &gt; arrays={}
 ) 
 </code></pre>
+<p>An attribute's value may be <code>{"$array": i}</code>, <code>arrays[i]</code> in its place: written as it is, shared and not copied (<code>Scene::Write</code>, keeping its element type), where an array goes (a tensor attribute, an <code>AttributeMeta::array</code> attribute's array of values, nested arrays on an undeclared one), and else, as for transform keys, read as the numbers it holds, as if written in the JSON. Python's <code>ernie.load_scene</code> hands a dict's arrays over so, without copying them through the text. </p>
 <p><strong>Exception:</strong></p>
 <ul>
-<li><code>std::invalid_argument</code> for text that is not JSON (with its line and column), a description of the wrong shape, or a value <code>scene</code> rejects, naming the prim and the key. </li>
+<li><code>std::invalid_argument</code> for text that is not JSON (with its line and column), a description of the wrong shape, an <code>"$array"</code> index out of range, or a value <code>scene</code> rejects, naming the prim and the key. </li>
 </ul>
 <hr>
 
@@ -4499,18 +4555,18 @@ std::array&lt; double, N &gt; ernie::SolveNormal (
 <hr>
 
 <h3 id="function-validate">function Validate</h3>
-<p><em>Checks that</em> <code>attribute</code> <em>may be set on a prim of</em><code>type</code> <em>(at</em><code>path</code> <em>, for messages), and that</em><code>value</code> <em>, when given, is of its declared type, as</em><code>Scene::Set</code> <em>and</em><code>Scene::Write</code> <em>do:</em></p>
+<p><em>Checks that</em> <code>attribute</code> <em>may be set on a prim of</em><code>type</code> <em>(at</em><code>path</code> <em>, for messages), and that</em><code>value</code> <em>is of its declared type, or, when null (</em><code>Scene::Write</code> <em>), that it takes an array, as</em><code>Scene::Set</code> <em>and</em><code>Scene::Write</code> <em>do:</em></p>
 <pre><code class="language-C++">void ernie::Validate (
-    const PrimTypeDef &amp; type,
+    const PrimTypeDef * type,
     const Path &amp; path,
     std::string_view attribute,
     const Value * value
 ) 
 </code></pre>
 <ul>
-<li>a declared attribute takes what its readers take (<code>AttributeDef::Coerce</code>; anything for tensors, whose readers also take small arrays, and for <code>AttributeMeta::lenient</code> ones);</li>
+<li>a declared attribute, or a transform op (<code>FindXformOp</code>), takes what its readers take (<code>AttributeDef::Coerce</code>; anything for <code>AttributeMeta::lenient</code> ones), and an array only when it is a tensor or <code>AttributeMeta::array</code> (a tensor also takes small arrays as values);</li>
 <li>an undeclared one is an error when its name has no namespace (<code>radus</code>), or is in a namespace the type declares attributes in and does not open (<code>inputs:radus</code> on a light, <code>ernie:sensor:noize</code> on a camera), with the closest declared names suggested;</li>
-<li>everything else is allowed: other namespaces (custom data such as <code>user:speed</code>), the type's open namespaces (<code>PrimTypeDef::openNamespaces</code>), <code>primvars:*</code>, xformOps and <code>xformOpOrder</code>, and UsdShade connections (<code>&lt;input&gt;.connect</code>). </li>
+<li>everything else is allowed: other namespaces (custom data such as <code>user:speed</code>), the type's open namespaces (<code>PrimTypeDef::openNamespaces</code>), undeclared <code>primvars:*</code>, <code>xformOpOrder</code> and ops Ernie does not know, and UsdShade connections (<code>&lt;input&gt;.connect</code>). A null <code>type</code> (an untyped prim, or one of a type not registered) checks only what Ernie reads on every prim: transform ops and <a href="../classernie_1_1Imageable/"><strong>Imageable</strong></a>'s attributes (<code>visibility</code>, <code>ernie:world</code>, <code>ernie:quaternionOrder</code>), any other name being allowed. </li>
 </ul>
 <p><strong>Exception:</strong></p>
 <ul>

@@ -232,7 +232,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">float</td>
-<td style="text-align: left;"><a href="#variable-focus"><strong>focus</strong></a>   = <code>0.0f</code><br><a href="../classernie_1_1Sphere/"><em><strong>Sphere</strong></em></a> <em>, rect and disk (UsdLux's shaping focus):</em><code>spectrum</code> <em>is the emission along the axis, and off it the emission per band is spectrum x lerp(focusTint, 1, |cos|^focus), cos of the angle between the axis and the direction from the light.</em></td>
+<td style="text-align: left;"><a href="#variable-focus"><strong>focus</strong></a>   = <code>0.0f</code><br><em>Not distant (UsdLux's shaping focus):</em> <code>spectrum</code> <em>is the emission along the axis, and off it the emission per band is spectrum x lerp(focusTint, 1, |cos|^focus), cos of the angle between the axis and the direction from the light.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; float &gt;</td>
@@ -248,7 +248,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; float &gt;</td>
-<td style="text-align: left;"><a href="#variable-profile"><strong>profile</strong></a>  <br><a href="../classernie_1_1Sphere/"><em><strong>Sphere</strong></em></a> <em>, rect and disk with an IES profile: its candela,</em><code>kProfileRows</code> <em>rows of</em><code>kProfileColumns</code> <em>, row i at i x 180 / (kProfileRows - 1) degrees off the axis (its angle scale applied) and column j at j x 360 / kProfileColumns degrees around it from the light's +x towards +y; the emission per band is spectrum x the profile, interpolated, besides cone and focus.</em></td>
+<td style="text-align: left;"><a href="#variable-profile"><strong>profile</strong></a>  <br><em>Not distant, with an IES profile: its candela,</em> <code>kProfileRows</code> <em>rows of</em><code>kProfileColumns</code> <em>, row i at i x 180 / (kProfileRows - 1) degrees off the axis (its angle scale applied) and column j at j x 360 / kProfileColumns degrees around it from the light's +x towards +y; the emission per band is spectrum x the profile, interpolated, besides cone and focus.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">float</td>
@@ -334,7 +334,7 @@
 <hr>
 
 <h3 id="variable-focus">variable focus</h3>
-<p><a href="../classernie_1_1Sphere/"><em><strong>Sphere</strong></em></a> <em>, rect and disk (UsdLux's shaping focus):</em><code>spectrum</code> <em>is the emission along the axis, and off it the emission per band is spectrum x lerp(focusTint, 1, |cos|^focus), cos of the angle between the axis and the direction from the light.</em></p>
+<p><em>Not distant (UsdLux's shaping focus):</em> <code>spectrum</code> <em>is the emission along the axis, and off it the emission per band is spectrum x lerp(focusTint, 1, |cos|^focus), cos of the angle between the axis and the direction from the light.</em></p>
 <pre><code class="language-C++">float ernie::LightParams::focus;
 </code></pre>
 <p>An empty tint is black. </p>
@@ -359,7 +359,7 @@
 <hr>
 
 <h3 id="variable-profile">variable profile</h3>
-<p><a href="../classernie_1_1Sphere/"><em><strong>Sphere</strong></em></a> <em>, rect and disk with an IES profile: its candela,</em><code>kProfileRows</code> <em>rows of</em><code>kProfileColumns</code> <em>, row i at i x 180 / (kProfileRows - 1) degrees off the axis (its angle scale applied) and column j at j x 360 / kProfileColumns degrees around it from the light's +x towards +y; the emission per band is spectrum x the profile, interpolated, besides cone and focus.</em></p>
+<p><em>Not distant, with an IES profile: its candela,</em> <code>kProfileRows</code> <em>rows of</em><code>kProfileColumns</code> <em>, row i at i x 180 / (kProfileRows - 1) degrees off the axis (its angle scale applied) and column j at j x 360 / kProfileColumns degrees around it from the light's +x towards +y; the emission per band is spectrum x the profile, interpolated, besides cone and focus.</em></p>
 <pre><code class="language-C++">std::vector&lt;float&gt; ernie::LightParams::profile;
 </code></pre>
 <p>Empty without one. </p>

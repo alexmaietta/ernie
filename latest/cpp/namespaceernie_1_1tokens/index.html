@@ -361,6 +361,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kcylinderlight"><strong>kCylinderLight</strong></a>   = <code>"CylinderLight"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kdetailalbedo"><strong>kDetailAlbedo</strong></a>   = <code>"inputs:detailAlbedo"</code><br><em>Detail textures: float32 (rows, cols, channels) linear, or uint8 with sRGB albedo and linear normals; 1, 3 or 4 channels.</em></td>
 </tr>
 <tr>
@@ -618,6 +622,10 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kldrcolor"><strong>kLdrColor</strong></a>   = <code>"LdrColor"</code><br><a href="../classernie_1_1RenderVar/"><em><strong>RenderVar</strong></em></a> <em>source names.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klength"><strong>kLength</strong></a>   = <code>"inputs:length"</code><br><em>A</em> <a href="../classernie_1_1CylinderLight/"><em><strong>CylinderLight</strong></em></a> <em>'s length along its x axis, and whether it may be drawn as a line (a hint).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -1129,7 +1137,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
-<td style="text-align: left;"><a href="#variable-kshapingfocus"><strong>kShapingFocus</strong></a>   = <code>"inputs:shaping:focus"</code><br><em>float: a sphere, rect or disk light's emission falls off as |cos|^focus of the angle off its axis; color3f: the tint its falloff fades to instead of black (white undoes the focus).</em></td>
+<td style="text-align: left;"><a href="#variable-kshapingfocus"><strong>kShapingFocus</strong></a>   = <code>"inputs:shaping:focus"</code><br><em>float: a sphere, rect, disk or cylinder light's emission falls off as |cos|^focus of the angle off its -z axis; color3f: the tint its falloff fades to instead of black (white undoes it).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -1141,7 +1149,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
-<td style="text-align: left;"><a href="#variable-kshapingiesfile"><strong>kShapingIesFile</strong></a>   = <code>"inputs:shaping:ies:file"</code><br><em>asset: an IES LM-63 profile (</em> <code>IesProfile</code> <em>) shaping a sphere, rect or disk light, its nadir along the light's -z axis and its 0 degree plane through +x.</em></td>
+<td style="text-align: left;"><a href="#variable-kshapingiesfile"><strong>kShapingIesFile</strong></a>   = <code>"inputs:shaping:ies:file"</code><br><em>asset: an IES LM-63 profile (</em> <code>IesProfile</code> <em>) shaping a sphere, rect, disk or cylinder light, its nadir along the light's -z axis and its 0 degree plane through +x.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -1266,6 +1274,10 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-ktranslation"><strong>kTranslation</strong></a>   = <code>"inputs:translation"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-ktreatasline"><strong>kTreatAsLine</strong></a>   = <code>"treatAsLine"</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -1590,6 +1602,11 @@
 
 <h3 id="variable-kcylinder">variable kCylinder</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kCylinder;
+</code></pre>
+<hr>
+
+<h3 id="variable-kcylinderlight">variable kCylinderLight</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kCylinderLight;
 </code></pre>
 <hr>
 
@@ -1939,6 +1956,12 @@
 <h3 id="variable-kldrcolor">variable kLdrColor</h3>
 <p><a href="../classernie_1_1RenderVar/"><em><strong>RenderVar</strong></em></a> <em>source names.</em></p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLdrColor;
+</code></pre>
+<hr>
+
+<h3 id="variable-klength">variable kLength</h3>
+<p><em>A</em> <a href="../classernie_1_1CylinderLight/"><em><strong>CylinderLight</strong></em></a> <em>'s length along its x axis, and whether it may be drawn as a line (a hint).</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLength;
 </code></pre>
 <hr>
 
@@ -2652,7 +2675,7 @@
 <hr>
 
 <h3 id="variable-kshapingfocus">variable kShapingFocus</h3>
-<p><em>float: a sphere, rect or disk light's emission falls off as |cos|^focus of the angle off its axis; color3f: the tint its falloff fades to instead of black (white undoes the focus).</em> </p>
+<p><em>float: a sphere, rect, disk or cylinder light's emission falls off as |cos|^focus of the angle off its -z axis; color3f: the tint its falloff fades to instead of black (white undoes it).</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kShapingFocus;
 </code></pre>
 <hr>
@@ -2668,7 +2691,7 @@
 <hr>
 
 <h3 id="variable-kshapingiesfile">variable kShapingIesFile</h3>
-<p><em>asset: an IES LM-63 profile (</em> <code>IesProfile</code> <em>) shaping a sphere, rect or disk light, its nadir along the light's -z axis and its 0 degree plane through +x.</em></p>
+<p><em>asset: an IES LM-63 profile (</em> <code>IesProfile</code> <em>) shaping a sphere, rect, disk or cylinder light, its nadir along the light's -z axis and its 0 degree plane through +x.</em></p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kShapingIesFile;
 </code></pre>
 <p>float: scales its vertical angle about the nadir (above 0) or the zenith (below 0); 0 leaves it. bool: normalize keeps the light's power as without the profile; otherwise its candela multiply the intensity. </p>
@@ -2846,6 +2869,11 @@
 
 <h3 id="variable-ktranslation">variable kTranslation</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kTranslation;
+</code></pre>
+<hr>
+
+<h3 id="variable-ktreatasline">variable kTreatAsLine</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kTreatAsLine;
 </code></pre>
 <hr>
 

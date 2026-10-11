@@ -205,14 +205,17 @@
 <pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include &quot;ernie/util/tensor.h&quot;
+
 #include &lt;filesystem&gt;
+#include &lt;span&gt;
 #include &lt;string_view&gt;
 
 namespace ernie {
 
 class Scene;
 
-void LoadScene(Scene&amp; scene, std::string_view json);
+void LoadScene(Scene&amp; scene, std::string_view json, std::span&lt;const Tensor&gt; arrays = {});
 
 void LoadSceneFile(Scene&amp; scene, const std::filesystem::path&amp; path);
 

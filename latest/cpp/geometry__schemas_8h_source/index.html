@@ -271,7 +271,8 @@
                               .group = &quot;Geometry&quot;, .dirty = ::ernie::Dirty::Points}))
 
 #define ERNIE_POINTS_ATTRIBUTES(X)                                                                 \
-    X(std::vector&lt;float&gt;, Widths, ::ernie::tokens::kWidths, std::vector&lt;float&gt;{1.0f},             \
+    X(::ernie::OrArray&lt;std::vector&lt;float&gt;&gt;, Widths, ::ernie::tokens::kWidths,                      \
+      std::vector&lt;float&gt;{1.0f},                                                                    \
       (::ernie::AttributeMeta{.doc = &quot;Diameters: one for every point, or one per point. Many &quot;     \
                                      &quot;points' widths may be written as an array instead.&quot;,         \
                               .group = &quot;Geometry&quot;, .min = 0.0, .max = 1000.0}))

@@ -1014,10 +1014,48 @@ a 4 x 4 matrix (rows of four); C++ reads the same format (<code>ernie/scene/scen
     "/Render/Settings": {"type": "RenderSettings", "resolution": [640, 480]},
 })
 </code></pre>
-<p>Values are checked as setting them is; lists for array attributes become arrays: int32 for
-those of whole numbers (<code>face_vertex_indices</code>, <code>proto_indices</code>; <code>AttributeDef.is_integer</code>),
-float32 for the rest (<code>points</code>, <code>heights</code>), whatever the numbers look like.</p>
+<p>C++ loads it (<code>LoadScene</code>), so both read a description the same way: each value is read as
+its attribute's declared kind, checked as setting it is. Lists for array attributes become
+arrays: int32 for those of whole numbers (<code>face_vertex_indices</code>, <code>proto_indices</code>;
+<code>AttributeDef.is_integer</code>), float32 for the rest (<code>points</code>, <code>heights</code>), whatever the
+numbers look like; nested lists for one that takes an array in place of its value
+(<code>AttributeDef.takes_array</code>: per-vertex <code>display_color</code>) are a float32 array. A dict may
+hold <code>Quat</code>s, <code>Path</code>s and prims too, and arrays (NumPy, or any DLPack array, a CUDA one
+included): where an array goes, written as it is, shared and not copied, its dtype kept, as
+<code>Scene.write</code> writes one; elsewhere (<code>translate</code>, a <code>radius</code>) read as the numbers it
+holds, which needs a CPU array.</p>
 
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Raises:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><span title="ValueError">ValueError</span></code>
+              –
+              <div class="doc-md-description">
+                <p>A value its attribute does not take, or JSON that does not parse, naming
+the prim and key (or the line and column).</p>
+              </div>
+            </li>
+            <li>
+                  <code><span title="TypeError">TypeError</span></code>
+              –
+              <div class="doc-md-description">
+                <p>The description is not a dict, JSON text or a file path.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
 
     </div>
 
@@ -1404,7 +1442,7 @@ float32 for the rest (<code>points</code>, <code>heights</code>), whatever the n
               <td><code><a class="autorefs autorefs-internal" title="            read (ernie.AttributeDef.read)" href="#ernie.AttributeDef.read">read</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>The attribute of <code>prim</code> as its declared type, or its default while unset; a list of paths for a relationship to several prims; an array (or None) for tensors.</p>
+                  <p>The attribute of <code>prim</code> as its declared type, or its default while unset; a list of paths for a relationship to several prims; an array (or None) for tensors, and the array written in place of the value of one that takes one (takes_array).</p>
                 </div>
               </td>
             </tr>
@@ -1412,7 +1450,7 @@ float32 for the rest (<code>points</code>, <code>heights</code>), whatever the n
               <td><code><a class="autorefs autorefs-internal" title="            write (ernie.AttributeDef.write)" href="#ernie.AttributeDef.write">write</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Sets the attribute of <code>prim</code>, converted to its declared type (an int to a float, a str to a Path; a relationship to several prims takes one target or a list); writes an array for tensors.</p>
+                  <p>Sets the attribute of <code>prim</code>, converted to its declared type (an int to a float, a str to a Path; a relationship to several prims takes one target or a list); writes an array for tensors, and for one that takes an array in place of its value (takes_array: colours per vertex for display_color).</p>
                 </div>
               </td>
             </tr>
@@ -1542,6 +1580,14 @@ float32 for the rest (<code>points</code>, <code>heights</code>), whatever the n
               –
               <div class="doc-md-description">
                 <p>Its Python name, such as 'radius'.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>takes_array</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Whether it also takes an array in place of its value: colours per vertex for display_color, a width per point, a pose per prim for a transform op.</p>
               </div>
             </li>
         </ul>
@@ -1864,6 +1910,29 @@ float32 for the rest (<code>points</code>, <code>heights</code>), whatever the n
 
 </div>
 
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.AttributeDef.takes_array" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">takes_array</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">takes_array: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Whether it also takes an array in place of its value: colours per vertex for display_color, a width per point, a pose per prim for a transform op.</p>
+
+    </div>
+
+</div>
+
 
 
 
@@ -1896,7 +1965,7 @@ float32 for the rest (<code>points</code>, <code>heights</code>), whatever the n
 
     <div class="doc doc-contents ">
 
-        <p>The attribute of <code>prim</code> as its declared type, or its default while unset; a list of paths for a relationship to several prims; an array (or None) for tensors.</p>
+        <p>The attribute of <code>prim</code> as its declared type, or its default while unset; a list of paths for a relationship to several prims; an array (or None) for tensors, and the array written in place of the value of one that takes one (takes_array).</p>
 
 
     </div>
@@ -1915,7 +1984,7 @@ float32 for the rest (<code>points</code>, <code>heights</code>), whatever the n
 
     <div class="doc doc-contents ">
 
-        <p>Sets the attribute of <code>prim</code>, converted to its declared type (an int to a float, a str to a Path; a relationship to several prims takes one target or a list); writes an array for tensors.</p>
+        <p>Sets the attribute of <code>prim</code>, converted to its declared type (an int to a float, a str to a Path; a relationship to several prims takes one target or a list); writes an array for tensors, and for one that takes an array in place of its value (takes_array: colours per vertex for display_color).</p>
 
 
     </div>
@@ -1995,6 +2064,20 @@ float32 for the rest (<code>points</code>, <code>heights</code>), whatever the n
             </li>
             <li>
               <b><code>INT</code></b>
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>MATRIX</code></b>
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>QUAT</code></b>
               –
               <div class="doc-md-description">
                 
@@ -2146,6 +2229,50 @@ float32 for the rest (<code>points</code>, <code>heights</code>), whatever the n
 
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">INT = 1</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.AttributeKind.MATRIX" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">MATRIX</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">MATRIX = 12</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.AttributeKind.QUAT" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">QUAT</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">QUAT = 11</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -2928,7 +3055,7 @@ world. Default -1. USD name <code>ernie:world</code>.</p>
         <ul class="first simple">
             <li>
               <b><code>extent</code></b>
-                  (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
+                  (<code><span title="list">list</span>[<span title="float">float</span>] | <span title="typing.Any">Any</span></code>)
               –
               <div class="doc-md-description">
                 <p>The prim's local bounds as six numbers, (min x, y, z, max x, y, z); unset, computed from its</p>
@@ -2963,7 +3090,7 @@ world. Default -1. USD name <code>ernie:world</code>.</p>
   </span>
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">extent: list[float]</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">extent: list[float] | Any</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -2990,7 +3117,7 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
     rotation_order: str = "XYZ",
@@ -3078,7 +3205,7 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
         <ul class="first simple">
             <li>
               <b><code>display_color</code></b>
-                  (<code><span title="tuple">tuple</span>[<span title="float">float</span>, <span title="float">float</span>, <span title="float">float</span>]</code>)
+                  (<code><span title="tuple">tuple</span>[<span title="float">float</span>, <span title="float">float</span>, <span title="float">float</span>] | <span title="typing.Any">Any</span></code>)
               –
               <div class="doc-md-description">
                 <p>Linear RGB of the whole prim; colours per vertex are written as an array instead. Default</p>
@@ -3121,7 +3248,7 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
   </span>
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">display_color: tuple[float, float, float]</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">display_color: tuple[float, float, float] | Any</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -3171,8 +3298,8 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
@@ -3342,8 +3469,8 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     size: float = ...,
     translate: Sequence[float] = ...,
@@ -3373,8 +3500,8 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     size: float = ...,
     translate: Sequence[float] = ...,
@@ -3544,8 +3671,8 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     radius: float = ...,
     translate: Sequence[float] = ...,
@@ -3575,8 +3702,8 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     radius: float = ...,
     translate: Sequence[float] = ...,
@@ -3727,8 +3854,8 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     axis: str = ...,
     translate: Sequence[float] = ...,
@@ -3929,8 +4056,8 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     axis: str = ...,
     radius: float = ...,
@@ -3962,8 +4089,8 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     axis: str = ...,
     radius: float = ...,
@@ -4166,8 +4293,8 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     axis: str = ...,
     radius: float = ...,
@@ -4199,8 +4326,8 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     axis: str = ...,
     radius: float = ...,
@@ -4403,8 +4530,8 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     axis: str = ...,
     radius: float = ...,
@@ -4436,8 +4563,8 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     axis: str = ...,
     radius: float = ...,
@@ -4640,8 +4767,8 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     axis: str = ...,
     width: float = ...,
@@ -4673,8 +4800,8 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     axis: str = ...,
     width: float = ...,
@@ -4827,8 +4954,8 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     points: Any = ...,
     translate: Sequence[float] = ...,
@@ -5060,8 +5187,8 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     points: Any = ...,
     face_vertex_counts: Any = ...,
@@ -5094,8 +5221,8 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     points: Any = ...,
     face_vertex_counts: Any = ...,
@@ -5201,7 +5328,7 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
         <ul class="first simple">
             <li>
               <b><code>widths</code></b>
-                  (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
+                  (<code><span title="list">list</span>[<span title="float">float</span>] | <span title="typing.Any">Any</span></code>)
               –
               <div class="doc-md-description">
                 <p>Diameters: one for every point, or one per point. Many points' widths may be written as an</p>
@@ -5236,7 +5363,7 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
   </span>
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">widths: list[float]</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">widths: list[float] | Any</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -5269,11 +5396,11 @@ array instead. Default [1.0]. USD name <code>widths</code>.</p>
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     points: Any = ...,
-    widths: float | Sequence[float] = ...,
+    widths: float | Sequence[float] | Any = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
     rotation_order: str = "XYZ",
@@ -5301,11 +5428,11 @@ array instead. Default [1.0]. USD name <code>widths</code>.</p>
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     points: Any = ...,
-    widths: float | Sequence[float] = ...,
+    widths: float | Sequence[float] | Any = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
     rotation_order: str = "XYZ",
@@ -5631,7 +5758,7 @@ all when unset. USD name <code>protoIndices</code>.</p>
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
     positions: Any = ...,
     orientations: Any = ...,
     scales: Any = ...,
@@ -5665,7 +5792,7 @@ all when unset. USD name <code>protoIndices</code>.</p>
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
     positions: Any = ...,
     orientations: Any = ...,
     scales: Any = ...,
@@ -5792,8 +5919,8 @@ all when unset. USD name <code>protoIndices</code>.</p>
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
@@ -5822,8 +5949,8 @@ all when unset. USD name <code>protoIndices</code>.</p>
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
@@ -6515,8 +6642,8 @@ name <code>ernie:radius</code>.</p>
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     heights: Any = ...,
     origin: Sequence[float] = ...,
@@ -6551,8 +6678,8 @@ name <code>ernie:radius</code>.</p>
     visibility: str = ...,
     world: int = ...,
     quaternion_order: str = ...,
-    extent: float | Sequence[float] = ...,
-    display_color: Sequence[float] = ...,
+    extent: float | Sequence[float] | Any = ...,
+    display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     heights: Any = ...,
     origin: Sequence[float] = ...,

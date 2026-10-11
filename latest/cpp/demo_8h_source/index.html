@@ -314,6 +314,8 @@ struct DemoInfo {
     std::function&lt;std::shared_ptr&lt;Demo&gt;(Viewer*, const DemoOptions&amp;)&gt; create;
 
     std::string Label() const;
+
+    std::string Id() const;
 };
 
 template &lt;typename T&gt;
@@ -323,6 +325,20 @@ DemoInfo MakeDemoInfo(std::string category, std::string name, std::string descri
                 return std::make_shared&lt;T&gt;(viewer, options);
             }};
 }
+
+void WritePng(const std::filesystem::path&amp; path, const Tensor&amp; image);
+
+std::vector&lt;DemoInfo&gt; RegisteredDemos();
+
+struct DemoRegistration {
+    explicit DemoRegistration(DemoInfo info);
+};
+
+#define ERNIE_REGISTER_DEMO(Class, category, name, description)                                    \
+    static const ::ernie::app::DemoRegistration ernie_demo_registration_##Class(                   \
+        ::ernie::app::MakeDemoInfo&lt;Class&gt;(category, name, description))
+
+std::optional&lt;std::size_t&gt; FindDemo(std::span&lt;const DemoInfo&gt; demos, std::string_view id);
 
 class DemoRunner {
   public:

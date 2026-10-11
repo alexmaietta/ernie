@@ -442,7 +442,7 @@ scene.write(swarms, ernie.PointInstancer.positions, positions)    # (64, n, 3)
 ernie.PointInstancer.write_rows(scene, swarms, positions=positions, orientations=orientations,
                                 translate=centres)               # (64, 3)
 </code></pre>
-<p>A write to many prims checks the attribute once for each prim type among them, before writing any row. In C++ an array attribute's setter takes a <code>Tensor</code> (<code>Tensor::Copy&lt;float&gt;(values, {3, 3})</code>, or one from DLPack), and its getter returns the written <code>const Tensor*</code>, null when unset; arrays have no default.</p>
+<p>A write to many prims checks the attribute once for each prim type among them, before writing any row. In C++ an array attribute's setter takes a <code>Tensor</code> (<code>Tensor::Copy&lt;float&gt;(values, {3, 3})</code>, or one from DLPack), and its getter returns the written <code>const Tensor*</code>, null when unset; arrays have no default. An attribute that takes an array in place of its value has both: <code>mesh.GetDisplayColor()</code> for the one colour, and <code>mesh.ReadDisplayColor()</code> and <code>mesh.WriteDisplayColor(tensor)</code> for colours per vertex.</p>
 <h2 id="validation">Validation</h2>
 <p>Every attribute you set on a prim of a registered type is checked against its declaration, whether by a property, a keyword, <code>prim.set</code>, <code>scene.set</code>, a loader, or C++'s <code>Scene::Set</code> and <code>Scene::Write</code>. A misspelt name is an error, with the closest declared names suggested; so is a value that cannot be the declared type.</p>
 <pre><code class="language-python">lamp.radus = 1.0
@@ -454,7 +454,12 @@ lamp.set(&quot;inputs:radus&quot;, 1.0)
 lamp.radius = &quot;big&quot;
 # ValueError: 'inputs:radius' must be a number
 </code></pre>
-<p>C++ throws <code>std::invalid_argument</code> with the same messages, such as <code>'/World/Lamp' (SphereLight): 'inputs:radius' must be a number</code>. Values convert as their readers would read them: any number for a number, an int for a bool, a tuple or list for a vector, a string for a relationship. A keyword <code>define</code> defines the prim before it sets the attributes, so after a failed one the prim is there, with the attributes set before the bad one.</p>
+<p>C++ throws <code>std::invalid_argument</code> with the same messages, such as <code>'/World/Lamp' (SphereLight): 'inputs:radius' must be a number</code>. Values convert as their readers would read them: any number for a number, an int for a bool, a tuple or list for a vector, a string for a relationship.</p>
+<p>An array written in place of a value (<code>scene.write</code>, <code>Scene::Write</code>) is taken only by array attributes and by those declared to take one (<code>AttributeDef.takes_array</code>, C++'s <code>AttributeMeta::array</code>): <code>display_color</code> with a colour per vertex, <code>widths</code> with one per point, <code>extent</code> as (2, 3), and transform ops with a pose per prim. Setting such an attribute to nested lists writes them as a float32 array:</p>
+<pre><code class="language-python">mesh.display_color = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]   # a (3, 3) float32 array
+mesh.display_color.shape                                  # (3, 3)
+</code></pre>
+<p>Transform ops are declared too, for every prim, untyped ones included (C++'s <code>FindXformOp</code>): <code>xformOp:translate</code> and the Euler rotations take 3 numbers, <code>xformOp:scale</code> 3 or one, <code>xformOp:rotateX</code> (Y, Z) one angle, <code>xformOp:orient</code> a <code>Quat</code> (four plain numbers are refused, since w may come first or last) and <code>xformOp:transform</code> a 4 x 4 matrix, suffixed ops (<code>xformOp:orient:pivot</code>) as their op. A keyword <code>define</code> defines the prim before it sets the attributes, so after a failed one the prim is there, with the attributes set before the bad one.</p>
 <p>Some names stay open, for data Ernie does not declare:</p>
 <table>
 <thead>
@@ -473,7 +478,7 @@ lamp.radius = &quot;big&quot;
 <td><code>primvars:temperature</code></td>
 </tr>
 <tr>
-<td>Transform ops and their order</td>
+<td>Transform ops (checked by their kind, above) and their order</td>
 <td><code>xformOp:translate:pivot</code>, <code>xformOpOrder</code></td>
 </tr>
 <tr>
@@ -490,7 +495,7 @@ lamp.radius = &quot;big&quot;
 </tr>
 </tbody>
 </table>
-<p>What is caught is a name without a namespace (<code>radus</code>), and a name in a namespace the type uses but does not open (<code>inputs:radus</code> on a light, <code>ernie:sensor:noize</code> on a camera). So put your own data in a namespace of your own, not in <code>inputs:</code> or <code>ernie:</code>. Untyped prims, and prims of types that are not registered, take anything.</p>
+<p>What is caught is a name without a namespace (<code>radus</code>), and a name in a namespace the type uses but does not open (<code>inputs:radus</code> on a light, <code>ernie:sensor:noize</code> on a camera). So put your own data in a namespace of your own, not in <code>inputs:</code> or <code>ernie:</code>. Untyped prims, and prims of types that are not registered, take anything but transform op values of the wrong kind.</p>
 <h2 id="loading-scenes-from-a-dict-or-json">Loading scenes from a dict or JSON</h2>
 <p><code>ernie.load_scene(description, scene=None)</code> builds prims from a description: a dict, JSON text, or the path of a <code>.json</code> file. It adds them to <code>scene</code>, or to a new Scene, and returns the scene. Its C++ counterpart is <code>LoadScene(scene, json)</code>, with <code>LoadSceneFile(scene, path)</code> for a file, in <code>ernie/scene/scene_json.h</code>; it reads the same format and throws <code>std::invalid_argument</code> naming the prim and key (or the line and column of malformed JSON).</p>
 <pre><code class="language-cpp">#include &lt;ernie/scene/scene_json.h&gt;
@@ -561,12 +566,16 @@ ernie::LoadScene(scene, R&quot;({&quot;/World/Rock&quot;: {&quot;type&quot;: &qu
 <td>Become arrays: int32 for attributes of whole numbers (<code>face_vertex_counts</code>, <code>face_vertex_indices</code>, <code>proto_indices</code>; <code>AttributeDef.is_integer</code>), float32 for the rest (<code>points</code>, <code>heights</code>), whatever the numbers look like.</td>
 </tr>
 <tr>
+<td>Nested lists for an attribute that takes an array</td>
+<td>Become a float32 array: a <code>display_color</code> per vertex as rows of 3.</td>
+</tr>
+<tr>
 <td>Strings for relationships</td>
 <td>Target paths; lists of them for list relationships.</td>
 </tr>
 </tbody>
 </table>
-<p>Every value is checked as setting it is, so a misspelt name or a wrong value raises as above. Attributes may be given by Python name or USD name alike; either way they are converted to their declared types, arrays included.</p>
+<p>Each value is read as its attribute's declared kind (a transform op's too, <code>xformOp:orient:pivot</code> as a quaternion), not by how it looks, and checked as setting it is, so a misspelt name or a wrong value raises as above. Attributes may be given by Python name or USD name alike. Only undeclared attributes are read by their look: 2 to 4 numbers as a vector, other lists as float arrays, nested lists as a float32 array. Python's <code>load_scene</code> hands the description to C++'s <code>LoadScene</code> (a dict written as JSON first, its <code>Quat</code>s, <code>Path</code>s and prims included), so the two read every description the same way. Arrays in a dict (NumPy, or any DLPack array, CUDA ones included) go over beside the JSON rather than through it, each as <code>{"$array": i}</code> in the text and the array itself in <code>LoadScene</code>'s <code>arrays</code>: where an array goes (<code>points</code>, <code>heights</code>, per-vertex <code>display_color</code>) it is written as it is, shared and not copied, its dtype kept, as <code>scene.write</code> writes it; elsewhere (<code>translate</code>, a radius) it is read as the numbers it holds. So a dict of large arrays loads without the arrays being turned into lists.</p>
 <h2 id="the-c-api">The C++ API</h2>
 <p>Each concrete type's view class has a static <code>Define(scene, path)</code> that defines the prim and returns its view, and a constructor <code>X(scene, path)</code> that views an existing one (and checks its type). A view is a cheap handle: a scene pointer, the path and the type, and copies name the same prim. Setters return the view, so they chain:</p>
 <pre><code class="language-cpp">#include &lt;ernie/scene/geometry_schemas.h&gt;
@@ -602,7 +611,7 @@ Sphere rock = Sphere::Define(scene, &quot;/World/Rock&quot;)
 <p><code>ernie.tokens</code> holds the names Ernie reads (<code>tokens.TRANSFORM</code>, <code>tokens.POINTS</code>, <code>tokens.MATERIAL_BINDING</code>), as <code>ernie::tokens</code> does in C++ (<code>tokens::kTransform</code>), and <code>ernie.X.attr.name</code> gives an attribute's USD name. A typed instance's <code>set(token, value)</code> returns the instance, so it chains with keyword sets: <code>lamp.set("user:id", 7).set(intensity=2.0)</code>.</p>
 <h2 id="declaring-a-new-prim-type">Declaring a new prim type</h2>
 <p>A prim type is declared in C++, and everything else follows from that declaration. Say you want a fiducial marker for a pose-estimation pipeline.</p>
-<p><strong>1. List its attributes</strong> in a header, as an X-macro: one <code>X(C++ type, Name, USD name, default, (AttributeMeta{...}))</code> entry per attribute. The C++ types are <code>bool</code>, <code>int</code>, <code>double</code>, <code>glm::dvec2</code>, <code>glm::dvec3</code>, <code>glm::dvec4</code>, <code>std::string</code> (a token or file path), <code>ernie::Path</code> (a relationship), <code>std::vector&lt;ernie::Path&gt;</code> (a list of targets), <code>std::vector&lt;float&gt;</code> (a small array such as (nm, value) pairs) and <code>ernie::Tensor</code> (an array, default <code>nullptr</code>). Then a second macro with the base's attributes first, for the accessors:</p>
+<p><strong>1. List its attributes</strong> in a header, as an X-macro: one <code>X(C++ type, Name, USD name, default, (AttributeMeta{...}))</code> entry per attribute. The C++ types are <code>bool</code>, <code>int</code>, <code>double</code>, <code>glm::dvec2</code>, <code>glm::dvec3</code>, <code>glm::dvec4</code>, <code>std::string</code> (a token or file path), <code>ernie::Path</code> (a relationship), <code>std::vector&lt;ernie::Path&gt;</code> (a list of targets), <code>std::vector&lt;float&gt;</code> (a small array such as (nm, value) pairs) and <code>ernie::Tensor</code> (an array, default <code>nullptr</code>). Wrap a type as <code>ernie::OrArray&lt;T&gt;</code> for an attribute that also takes an array written in place of its value, as <code>display_color</code> does with a colour per vertex: its view then has <code>Read&lt;Name&gt;()</code> (the array, or null) and <code>Write&lt;Name&gt;(tensor)</code> beside <code>Get&lt;Name&gt;()</code>, loaders read nested lists for it as such an array, and Python's <code>AttributeDef.takes_array</code> is true. Then a second macro with the base's attributes first, for the accessors:</p>
 <pre><code class="language-cpp">// ernie/scene/fiducial_schemas.h
 #include &quot;ernie/scene/base_schemas.h&quot;
 #include &quot;ernie/scene/prim_type.h&quot;

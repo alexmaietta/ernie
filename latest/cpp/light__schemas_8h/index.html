@@ -239,6 +239,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1CylinderLight/"><strong>CylinderLight</strong></a> <br><em>A cylinder along its x axis emitting from its side as a Lambertian emitter, not its caps.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1DiskLight/"><strong>DiskLight</strong></a> <br><em>A disk in its xy plane emitting along -z.</em></td>
 </tr>
 <tr>
@@ -283,6 +287,14 @@
 <tr>
 <td style="text-align: right;">define</td>
 <td style="text-align: left;"><a href="./#define-ernie_boundable_light_attributes"><strong>ERNIE_BOUNDABLE_LIGHT_ATTRIBUTES</strong></a> (X) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_cylinder_light_all"><strong>ERNIE_CYLINDER_LIGHT_ALL</strong></a> (X) <code>[**ERNIE\_BOUNDABLE\_LIGHT\_ALL**](light__schemas_8h.md#define-ernie_boundable_light_all)(X) [**ERNIE\_CYLINDER\_LIGHT\_ATTRIBUTES**](light__schemas_8h.md#define-ernie_cylinder_light_attributes)(X)</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_cylinder_light_attributes"><strong>ERNIE_CYLINDER_LIGHT_ATTRIBUTES</strong></a> (X) <code>/* multi line expression */</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">define</td>
@@ -358,6 +370,20 @@
 <pre><code class="language-C++">#define ERNIE_BOUNDABLE_LIGHT_ATTRIBUTES (
     X
 ) 
+</code></pre>
+<hr>
+
+<h3 id="define-ernie_cylinder_light_all">define ERNIE_CYLINDER_LIGHT_ALL</h3>
+<pre><code class="language-C++">#define ERNIE_CYLINDER_LIGHT_ALL (
+    X
+) `ERNIE_BOUNDABLE_LIGHT_ALL (X) ERNIE_CYLINDER_LIGHT_ATTRIBUTES (X)`
+</code></pre>
+<hr>
+
+<h3 id="define-ernie_cylinder_light_attributes">define ERNIE_CYLINDER_LIGHT_ATTRIBUTES</h3>
+<pre><code class="language-C++">#define ERNIE_CYLINDER_LIGHT_ATTRIBUTES (
+    X
+) `/* multi line expression */`
 </code></pre>
 <hr>
 

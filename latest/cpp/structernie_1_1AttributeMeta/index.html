@@ -216,6 +216,10 @@
 <tbody>
 <tr>
 <td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-array"><strong>array</strong></a>   = <code>false</code><br><em>It also takes an array written in place of its value (</em> <code>Scene::Write</code> <em>): colours per vertex for one</em><code>displayColor</code> <em>, a width per point, a pose per prim for a transform op.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#variable-asset"><strong>asset</strong></a>   = <code>false</code><br><em>A</em> <code>Token</code> <em>that is a file path.</em></td>
 </tr>
 <tr>
@@ -265,6 +269,13 @@
 </tbody>
 </table>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-array">variable array</h3>
+<p><em>It also takes an array written in place of its value (</em> <code>Scene::Write</code> <em>): colours per vertex for one</em><code>displayColor</code> <em>, a width per point, a pose per prim for a transform op.</em></p>
+<pre><code class="language-C++">bool ernie::AttributeMeta::array;
+</code></pre>
+<p><a href="../classernie_1_1Scene/"><strong>Scene</strong></a> loaders make float32 arrays of nested arrays for it; others take no array. Declare such an attribute as <code>OrArray &lt;T&gt;</code>, which sets it and gives its view <code>Read&lt;Name&gt;</code>. </p>
+<hr>
+
 <h3 id="variable-asset">variable asset</h3>
 <p><em>A</em> <code>Token</code> <em>that is a file path.</em></p>
 <pre><code class="language-C++">bool ernie::AttributeMeta::asset;
