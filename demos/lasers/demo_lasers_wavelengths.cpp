@@ -166,20 +166,20 @@ class WavelengthsDemo : public app::Demo {
             .SetResolution(kResolution)
             .SetAmbient(0.0);
 
-        // The demo's option: which camera the viewport looks through.
-        std::vector<std::string> names;
+        // The demo's option: which camera the viewport looks through,
+        // the viewer's own perspective camera first.
+        std::vector<std::string> names = {"perspective"};
         for (const Band& band : kBands) {
             names.emplace_back(band.name);
         }
         Widgets().Combo(
             "Camera", std::move(names), 0, [this](std::size_t index) {
                 if (GetViewer() != nullptr) {
-                    GetViewer()->SetActiveCamera(CameraPath(index));
+                    GetViewer()->SetActiveCamera(
+                        index == 0 ? app::Viewer::PerspectiveCamera()
+                                   : CameraPath(index - 1));
                 }
             });
-        if (viewer != nullptr) {
-            viewer->SetActiveCamera(CameraPath(0));
-        }
     }
 
     /// The four cameras' images side by side.

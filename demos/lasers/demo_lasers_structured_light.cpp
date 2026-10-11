@@ -91,10 +91,10 @@ class StructuredLightDemo : public app::Demo {
             .SetDisplayColor(glm::dvec3(0.7));
         SetXform(scene, "/World/Ball",
                  {.translate = glm::dvec3(0.4, 0.3, 0.25)});
-        // The projector: 40 mW at 450 nm, a DLP scanner's blue, its
-        // six planes in turn, each shown for 1/15 s.
+        // The projector: 40 mW at 850 nm, its six planes in turn,
+        // each shown for 1/15 s.
         LaserLight::Define(scene, "/World/Projector")
-            .SetWavelength(450.0)
+            .SetWavelength(850.0)
             .SetPower(0.04)
             .SetWaistRadius(glm::dvec2(0.001))
             .SetPattern("image")
@@ -104,14 +104,20 @@ class StructuredLightDemo : public app::Demo {
             .SetSequencePeriod(kPeriod)
             .SetTransform(LookAtTransform(
                 {0.3, -1.8, 1.2}, {0.0, 0.6, 0.4}, {0.0, 0.0, 1.0}));
-        // A mono camera 30 cm to the projector's left, exposing 1/60
-        // s within each plane.
+        // A near-infrared camera (a visible-blocking filter on
+        // silicon) 30 cm to the projector's left, exposing 1/60 s
+        // within each plane.
         Camera::Define(scene, "/World/Camera")
             .SetFocalLength(20.0)
             .SetSensorNoise(false)
             .SetSensorType("mono")
+            .SetSensorQeMono(std::vector<float>{
+                760.0f, 0.0f, 779.0f, 0.0f, 781.0f, 0.35f, 900.0f,
+                0.25f, 1000.0f, 0.05f})
+            .SetSpectralRange({760.0, 1000.0})
+            .SetSpectralBands(12)
             .SetExposureTime(kExposure)
-            .SetExposureIso(3200.0)
+            .SetExposureIso(1600.0)
             .SetExposureFStop(2.0)
             .SetTransform(LookAtTransform(
                 {0.0, -1.8, 1.2}, {0.0, 0.6, 0.4}, {0.0, 0.0, 1.0}));

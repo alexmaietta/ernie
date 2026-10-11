@@ -103,12 +103,12 @@ class Demo(ernie.demo.Demo):
             display_color=(0.7,) * 3,
             translate=(0.4, 0.3, 0.25),
         )
-        # The projector: 40 mW at 450 nm, a DLP scanner's blue, its six
-        # planes in turn, each shown for 1/15 s.
+        # The projector: 40 mW at 850 nm, its six planes in turn, each
+        # shown for 1/15 s.
         world.define(
             "Projector",
             ernie.LaserLight,
-            wavelength=450.0,
+            wavelength=850.0,
             power=0.04,
             waist_radius=(0.001, 0.001),
             pattern="image",
@@ -122,16 +122,31 @@ class Demo(ernie.demo.Demo):
                 (0.3, -1.8, 1.2), (0.0, 0.6, 0.4)
             ),
         )
-        # A mono camera 30 cm to the projector's left, exposing 1/60 s
-        # within each plane.
+        # A near-infrared camera (a visible-blocking filter on silicon)
+        # 30 cm to the projector's left, exposing 1/60 s within each
+        # plane.
         camera = world.define(
             "Camera",
             ernie.Camera,
             focal_length=20.0,
             sensor_noise=False,
             sensor_type="mono",
+            sensor_qe_mono=[
+                760,
+                0,
+                779,
+                0,
+                781,
+                0.35,
+                900,
+                0.25,
+                1000,
+                0.05,
+            ],
+            spectral_range=(760.0, 1000.0),
+            spectral_bands=12,
             exposure_time=EXPOSURE,
-            exposure_iso=3200.0,
+            exposure_iso=1600.0,
             exposure_f_stop=2.0,
         ).set(
             tokens.TRANSFORM,
