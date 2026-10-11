@@ -242,6 +242,10 @@
 <td style="text-align: left;"><a href="#variable-atmosphere"><strong>atmosphere</strong></a>  <br><em>The planet's atmosphere.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1BodyParams/"><strong>BodyParams</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#variable-bodies"><strong>bodies</strong></a>  <br><em>Bodies such as moons, at most</em> <code>kMaxBodies</code> <em>.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../structernie_1_1CameraParams/"><strong>CameraParams</strong></a></td>
 <td style="text-align: left;"><a href="#variable-camera"><strong>camera</strong></a>  <br><em>The camera: pose, projection, spectral bands, exposure, lens and sensor.</em></td>
 </tr>
@@ -403,6 +407,21 @@
 </tr>
 </tbody>
 </table>
+<h2 id="public-static-attributes">Public Static Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">constexpr std::size_t</td>
+<td style="text-align: left;"><a href="#variable-kmaxbodies"><strong>kMaxBodies</strong></a>   = <code>4</code><br></td>
+</tr>
+</tbody>
+</table>
 <h2 id="public-functions">Public Functions</h2>
 <table>
 <thead>
@@ -491,6 +510,12 @@
 <h3 id="variable-atmosphere">variable atmosphere</h3>
 <p><em>The planet's atmosphere.</em> </p>
 <pre><code class="language-C++">std::optional&lt;AtmosphereParams&gt; ernie::FrameParams::atmosphere;
+</code></pre>
+<hr>
+
+<h3 id="variable-bodies">variable bodies</h3>
+<p><em>Bodies such as moons, at most</em> <code>kMaxBodies</code> <em>.</em></p>
+<pre><code class="language-C++">std::vector&lt;BodyParams&gt; ernie::FrameParams::bodies;
 </code></pre>
 <hr>
 
@@ -730,6 +755,11 @@
 <h3 id="variable-worlds">variable worlds</h3>
 <p><em>The world each view sees (</em> <code>tokens::kWorld</code> <em>): its own and the shared one, or every world for -1; empty for every view seeing every world.</em></p>
 <pre><code class="language-C++">std::vector&lt;std::int32_t&gt; ernie::FrameParams::worlds;
+</code></pre>
+<hr>
+<h2 id="public-static-attributes-documentation">Public Static Attributes Documentation</h2>
+<h3 id="variable-kmaxbodies">variable kMaxBodies</h3>
+<pre><code class="language-C++">constexpr std::size_t ernie::FrameParams::kMaxBodies;
 </code></pre>
 <hr>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>

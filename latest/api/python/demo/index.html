@@ -260,73 +260,6 @@
 <a id="ernie.demo"></a>
     <div class="doc doc-contents first">
 
-        <p>Demos: a base class for Ernie's demos and the loop that runs them,
-in a window, headless or through a bare renderer, with a Demos panel
-to switch between them.</p>
-<p>A demo subclasses Demo, builds its scene into <code>self.scene</code> in
-<code>__init__</code>, advances it in <code>step</code> and checks itself in <code>test_final</code>.
-Its scene has a Camera of its own, even when the demo is meant for the
-viewer (which frames the scene with its own camera): without a viewer
-(<code>--viewer null</code>, <code>--benchmark</code>) and in tests (<code>render_image</code>) the
-scene renders through it::</p>
-<pre><code>import ernie
-import ernie.demo
-from ernie import tokens
-
-class Demo(ernie.demo.Demo):
-    def __init__(self, viewer, args):
-        super().__init__(viewer, args)
-        self.ball = self.scene.define(
-            "/World/Ball", ernie.Sphere, radius=0.5
-        )
-        self.scene.define("/World/Sun", ernie.DistantLight)
-        self.scene.define("/World/Camera", ernie.Camera).set(
-            tokens.TRANSFORM,
-            ernie.look_at_transform((0, -5, 2), (0, 0, 0)),
-        )
-
-    def step(self):
-        # moved by self.frame_dt each step
-        self.ball.set(translate=(0, 0, self.time))
-
-    def test_final(self):
-        assert self.render_image()[..., :3].any()
-
-if __name__ == "__main__":
-    ernie.demo.main(Demo)
-</code></pre>
-<p><code>main(Demo)</code> is <code>init(Demo.create_parser())</code> then <code>run(Demo(viewer,
-args), args)</code>, as Newton's examples run. The common options:</p>
-<ul>
-<li><code>--viewer window</code> (the default) opens the viewer, with a Demos panel
-  listing the demos beside this one to switch to, pause, step and
-  reset; <code>--headless</code> renders the viewer without a window (no display
-  needed); <code>--viewer null</code> has no viewer and renders the scene's
-  RenderSettings through an <code>ernie.Renderer</code> each frame.</li>
-<li><code>--num-frames N</code> stops after N frames (in a window, runs until it
-  closes without it).</li>
-<li><code>--benchmark [SECONDS]</code> forces <code>--viewer null</code>, and reports frames
-  per second after a few frames' warm-up, stopping after SECONDS or
-  <code>--num-frames</code>, whichever comes first.</li>
-<li><code>--test</code> calls the demo's <code>test_post_step</code> after every step and
-  <code>test_final</code> at the end; one of them must exist.</li>
-<li><code>--output PATH</code> writes the last frame (or what <code>save_output</code> makes)
-  as PNG.</li>
-<li><code>--paused</code>, <code>--device</code>, <code>--renderer</code>, <code>--validation</code> and <code>--vsync</code>.</li>
-</ul>
-<p>The base class and the loop are C++'s (<code>ernie.app.Demo</code>,
-<code>ernie.app.DemoRunner</code>; ernie/app/demo.h), which C++ demos derive from
-and run the same way; this module adds argparse options, NumPy images
-and the demos found beside a Python one. In the viewer, a demo uses it
-as any application does (<code>add_panel</code>, <code>on_frame</code>, <code>active_camera</code>
-...); what it adds is removed (it registers in a scope of its own,
-<code>Viewer.scope</code>), and the viewport's display settings are restored,
-when the Demos panel switches away.</p>
-<p>References:
-- Newton's examples (<code>newton.examples</code>: <code>Example</code>, <code>create_parser</code>,
-  <code>init</code>, <code>run</code> and the example browser),
-  https://github.com/newton-physics/newton</p>
-
 
 
 
@@ -357,7 +290,7 @@ when the Demos panel switches away.</p>
             <td><code><a class="autorefs autorefs-internal" title="            DemoEntry (ernie.demo.DemoEntry)" href="#ernie.demo.DemoEntry">DemoEntry</a></code></td>
             <td>
               <div class="doc-md-description">
-                <p>A demo file, <code>&lt;category&gt;/&lt;name&gt;.py</code>: its path, category and</p>
+                <p>A demo file, <code>&lt;category&gt;/demo_&lt;category&gt;_&lt;name&gt;.py</code>: its path,</p>
               </div>
             </td>
           </tr>
@@ -420,7 +353,7 @@ when the Demos panel switches away.</p>
               <td><code><a class="autorefs autorefs-internal" title="            discover_demos (ernie.demo.discover_demos)" href="#ernie.demo.discover_demos">discover_demos</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>The demos under <code>root</code>, <code>&lt;category&gt;/&lt;name&gt;.py</code> files that</p>
+                  <p>The demos under <code>root</code>, <code>&lt;category&gt;/demo_&lt;category&gt;_&lt;name&gt;.py</code></p>
                 </div>
               </td>
             </tr>
@@ -1156,8 +1089,10 @@ else the last frame.</p>
 
 
 
-        <p>A demo file, <code>&lt;category&gt;/&lt;name&gt;.py</code>: its path, category and
-name.</p>
+        <p>A demo file, <code>&lt;category&gt;/demo_&lt;category&gt;_&lt;name&gt;.py</code>: its path,
+category, name and id (its file's stem, <code>demo_&lt;category&gt;_&lt;name&gt;</code>,
+as <code>--demo</code> and <code>python -m ernie.demos</code> take it). A file of the
+former <code>&lt;category&gt;/&lt;name&gt;.py</code> form gets the same id.</p>
 
 
 
@@ -1216,6 +1151,13 @@ name.</p>
                 
               </div>
             </li>
+            <li>
+              <b><code>path_id</code></b>
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
         </ul>
       </td>
     </tr>
@@ -1266,7 +1208,7 @@ name.</p>
   </span>
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">id = f'{self.category}/{stem}'</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">id = f'{prefix}{short}'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -1308,7 +1250,7 @@ name.</p>
   </span>
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">name = stem.replace('_', ' ')</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">name = short.replace('_', ' ')</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -1330,6 +1272,27 @@ name.</p>
 
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">path = path</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.DemoEntry.path_id" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">path_id</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">path_id = f'{self.category}/{short}'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -1404,8 +1367,8 @@ $XDG_CACHE_HOME/ernie, else ~/.cache/ernie (C++
 
         <p>The Demos panel's entries for a run of <code>demo_class</code>, <code>(infos,
 current)</code>: the demos of every category beside its own
-(<code>demos/&lt;category&gt;/&lt;name&gt;.py</code>), or the class alone when it is not
-among them.</p>
+(<code>demos/&lt;category&gt;/demo_&lt;category&gt;_&lt;name&gt;.py</code>), or the class alone
+when it is not among them.</p>
 
 
     </div>
@@ -1463,8 +1426,8 @@ among them.</p>
 
     <div class="doc doc-contents ">
 
-        <p>The demos under <code>root</code>, <code>&lt;category&gt;/&lt;name&gt;.py</code> files that
-define a Demo class, by category and name.</p>
+        <p>The demos under <code>root</code>, <code>&lt;category&gt;/demo_&lt;category&gt;_&lt;name&gt;.py</code>
+files that define a Demo class, by category and name.</p>
 
 
     </div>

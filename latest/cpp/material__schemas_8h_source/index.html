@@ -227,6 +227,17 @@
                                      &quot;reflectance spectrum in [0, 1], replacing the albedo; the &quot;  \
                                      &quot;nearest value outside them.&quot;,                                \
                               .group = &quot;Surface&quot;}))                                                \
+    X(std::string, ReflectanceLibrary, ::ernie::tokens::kReflectanceLibrary, &quot;&quot;,                   \
+      (::ernie::AttributeMeta{.label = &quot;Measured reflectance&quot;,                                     \
+                              .doc = &quot;A measured spectrum Ernie embeds (ECOSTRESS), 0.35 to 2.5 &quot;  \
+                                     &quot;um and on into the thermal infrared, replacing the albedo &quot;  \
+                                     &quot;unless a reflectance is given.&quot;,                             \
+                              .group = &quot;Surface&quot;,                                                  \
+                              .options = {&quot;&quot;, &quot;grass&quot;, &quot;chaparral&quot;, &quot;dry_grass&quot;, &quot;loam&quot;, &quot;sand&quot;,   \
+                                          &quot;concrete&quot;, &quot;asphalt&quot;, &quot;brick&quot;, &quot;pine_wood&quot;,             \
+                                          &quot;black_paint&quot;, &quot;olive_paint&quot;, &quot;white_coating&quot;,           \
+                                          &quot;aluminium&quot;, &quot;galvanized_steel&quot;, &quot;copper&quot;, &quot;fine_snow&quot;,  \
+                                          &quot;granular_snow&quot;, &quot;ice&quot;, &quot;water&quot;}}))                      \
     X(bool, AlbedoMapEnable, ::ernie::tokens::kAlbedoMapEnable, true,                              \
       (::ernie::AttributeMeta{.label = &quot;Use albedo map&quot;, .group = &quot;Surface&quot;}))                     \
     X(::ernie::Tensor, AlbedoMap, ::ernie::tokens::kAlbedoMap, nullptr,                            \

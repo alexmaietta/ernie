@@ -265,6 +265,10 @@
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1BodyParams/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1Boundable/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
@@ -310,6 +314,10 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1Capsule/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1CelestialBody/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
@@ -585,6 +593,10 @@
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1LightParams_1_1Beam_1_1Lit/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1LightPatternImage/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
@@ -634,6 +646,10 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1MaterialSettings/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1MeasuredReflectance/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
@@ -726,6 +742,10 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1Points/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1PolarStereographicDem/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
@@ -1114,6 +1134,14 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1profiler_1_1Zone/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/namespaceernie_1_1reflectance__table/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1reflectance__table_1_1Entry/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
@@ -1806,6 +1834,22 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/raster__view_8h_source/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/reflectance__library_8h/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/reflectance__library_8h_source/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/reflectance__table_8h/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/reflectance__table_8h_source/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>

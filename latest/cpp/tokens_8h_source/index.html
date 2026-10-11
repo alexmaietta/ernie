@@ -260,6 +260,8 @@ inline constexpr std::string_view kStarField =
     &quot;StarField&quot;;  
 inline constexpr std::string_view kAtmosphere =
     &quot;Atmosphere&quot;;  
+inline constexpr std::string_view kCelestialBody =
+    &quot;CelestialBody&quot;;  
 inline constexpr std::string_view kRenderSettings = &quot;RenderSettings&quot;;
 inline constexpr std::string_view kRenderProduct = &quot;RenderProduct&quot;;
 inline constexpr std::string_view kRenderVar = &quot;RenderVar&quot;;
@@ -485,6 +487,18 @@ inline constexpr std::string_view kLaserDotJitter =
     &quot;ernie:laser:dotJitter&quot;;
 inline constexpr std::string_view kLaserDotSeed =
     &quot;ernie:laser:dotSeed&quot;;
+inline constexpr std::string_view kLaserPulseRate =
+    &quot;ernie:laser:pulse:rate&quot;;
+inline constexpr std::string_view kLaserPulseWidth =
+    &quot;ernie:laser:pulse:width&quot;;
+inline constexpr std::string_view kLaserPulseDelay =
+    &quot;ernie:laser:pulse:delay&quot;;
+inline constexpr std::string_view kLaserSequenceCount =
+    &quot;ernie:laser:sequence:count&quot;;
+inline constexpr std::string_view kLaserSequencePeriod =
+    &quot;ernie:laser:sequence:period&quot;;
+inline constexpr std::string_view kLaserSequenceDelay =
+    &quot;ernie:laser:sequence:delay&quot;;
 inline constexpr std::string_view kLaserEfficiency =
     &quot;ernie:laser:efficiency&quot;;
 inline constexpr std::string_view kLaserZeroOrder =
@@ -495,6 +509,8 @@ inline constexpr std::string_view kLaserPatternData =
     &quot;ernie:laser:pattern:data&quot;;
 inline constexpr std::string_view kLaserPatternImage =
     &quot;ernie:laser:pattern:image&quot;;
+inline constexpr std::string_view kLaserPatternImageArray =
+    &quot;ernie:laser:pattern:imageArray&quot;;
 inline constexpr std::string_view kLaserPatternFieldOfView =
     &quot;ernie:laser:pattern:fieldOfView&quot;;
 inline constexpr std::string_view kSpot = &quot;spot&quot;;
@@ -605,6 +621,17 @@ inline constexpr std::string_view kAtmosphereOzoneColumn =
     &quot;ernie:atmosphere:ozoneColumn&quot;;
 inline constexpr std::string_view kAtmosphereDustOpticalDepth =
     &quot;ernie:atmosphere:dustOpticalDepth&quot;;
+inline constexpr std::string_view kAtmosphereCloudTop =
+    &quot;ernie:atmosphere:cloudTop&quot;;
+inline constexpr std::string_view kAtmosphereCloudCover =
+    &quot;ernie:atmosphere:cloudCover&quot;;
+
+// CelestialBody (Ernie): a sphere far beyond the scene, such as a
+// moon, at its transform's origin, drawn in the sky and casting
+// eclipse shadows.
+//
+inline constexpr std::string_view kBodyRadius = &quot;ernie:body:radius&quot;;
+inline constexpr std::string_view kBodyAlbedo = &quot;ernie:body:albedo&quot;;
 
 // Terrain (Ernie): a north-up heightfield, x east, y north, z up.
 inline constexpr std::string_view kHeights =
@@ -641,6 +668,8 @@ inline constexpr std::string_view kBrdf =
 inline constexpr std::string_view kAlbedo =
     &quot;inputs:albedo&quot;;  
 inline constexpr std::string_view kReflectance = &quot;inputs:reflectance&quot;;
+inline constexpr std::string_view kReflectanceLibrary =
+    &quot;inputs:reflectanceLibrary&quot;;
 inline constexpr std::string_view kAlbedoMap =
     &quot;inputs:albedoMap&quot;;  
 inline constexpr std::string_view kAlbedoMapOrigin =

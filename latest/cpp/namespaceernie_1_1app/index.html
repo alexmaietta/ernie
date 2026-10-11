@@ -441,7 +441,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">std::optional&lt; std::size_t &gt;</td>
-<td style="text-align: left;"><a href="#function-finddemo"><strong>FindDemo</strong></a> (std::span&lt; const <a href="../structernie_1_1app_1_1DemoInfo/"><strong>DemoInfo</strong></a> &gt; demos, std::string_view id) <br><em>Finds the demo</em> <code>id</code> <em>among</em><code>demos</code> <em>: "category/name" (such as "lighting/illuminants"), or the panel's label "category: name"; underscores and spaces match each other.</em></td>
+<td style="text-align: left;"><a href="#function-finddemo"><strong>FindDemo</strong></a> (std::span&lt; const <a href="../structernie_1_1app_1_1DemoInfo/"><strong>DemoInfo</strong></a> &gt; demos, std::string_view id) <br><em>Finds the demo</em> <code>id</code> <em>among</em><code>demos</code> <em>: its id (such as "demo_lighting_illuminants"), the former "category/name", or the panel's label "category: name"; underscores and spaces match each other.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -787,7 +787,7 @@
 <hr>
 
 <h3 id="function-finddemo">function FindDemo</h3>
-<p><em>Finds the demo</em> <code>id</code> <em>among</em><code>demos</code> <em>: "category/name" (such as "lighting/illuminants"), or the panel's label "category: name"; underscores and spaces match each other.</em></p>
+<p><em>Finds the demo</em> <code>id</code> <em>among</em><code>demos</code> <em>: its id (such as "demo_lighting_illuminants"), the former "category/name", or the panel's label "category: name"; underscores and spaces match each other.</em></p>
 <pre><code class="language-C++">std::optional&lt; std::size_t &gt; ernie::app::FindDemo (
     std::span&lt; const DemoInfo &gt; demos,
     std::string_view id

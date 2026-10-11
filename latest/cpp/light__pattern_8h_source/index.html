@@ -206,6 +206,7 @@
 #pragma once
 
 #include &quot;ernie/util/shader_source.h&quot;
+#include &quot;ernie/util/tensor.h&quot;
 
 #include &lt;cstddef&gt;
 #include &lt;cstdint&gt;
@@ -271,6 +272,8 @@ struct LightPatternImage {
 
 LightPatternImage
 LoadLightPatternImage(const std::filesystem::path&amp; path);
+
+LightPatternImage LightPatternImageOf(const Tensor&amp; array);
 
 }  // namespace ernie
 </code></pre>

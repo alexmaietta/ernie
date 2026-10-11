@@ -233,6 +233,7 @@
 </ul>
 </li>
 <li><strong>struct</strong> <a href="../structernie_1_1BandedConstituent/"><strong>BandedConstituent</strong></a> <em>A constituent averaged over a camera's spectral bands.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1BodyParams/"><strong>BodyParams</strong></a> <em>A</em> <a href="../classernie_1_1CelestialBody/"><em><strong>CelestialBody</strong></em></a> <em>far beyond the scene (</em><code>BodyParamsOf</code> <em>): drawn in the sky and eclipsing the sun.</em>    </li>
 <li><strong>class</strong> <a href="../classernie_1_1Boundable/"><strong>Boundable</strong></a> <em>What has local bounds: geometry and instancers, with an optional authored extent.</em> </li>
 <li><strong>class</strong> <a href="../classernie_1_1BoundableLight/"><strong>BoundableLight</strong></a> <em>An area light (sphere, rect, disk): a radiant power, or a photometric power or illuminance.</em> </li>
 <li><strong>struct</strong> <a href="../structernie_1_1BrdfModel/"><strong>BrdfModel</strong></a> <em>A reflectance model: shader source plus parameter metadata.</em>     </li>
@@ -247,6 +248,7 @@
 <li><strong>struct</strong> <a href="../structernie_1_1CameraParams/"><strong>CameraParams</strong></a> <em>A camera's parameters resolved from its</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim (</em><code>CameraParamsOf</code> <em>): a physically based pinhole camera for one image, with UsdGeomCamera's pose, projection and exposure attributes, a spectral range, a lens and a sensor.</em>    </li>
 <li><strong>struct</strong> <a href="../structernie_1_1CameraView/"><strong>CameraView</strong></a> <em>The raster view of a camera for one frame, derived from a</em> <code>CameraParams</code> <em>by</em><code>CameraParams::RasterView</code> <em>: what the rasterizer's passes need.</em>    </li>
 <li><strong>class</strong> <a href="../classernie_1_1Capsule/"><strong>Capsule</strong></a> <em>A cylinder with hemispherical caps along its axis.</em> </li>
+<li><strong>class</strong> <a href="../classernie_1_1CelestialBody/"><strong>CelestialBody</strong></a> <em>A sphere far beyond the scene, such as a moon, centred at its transform's origin: drawn in the sky behind the scene, lit by the sun with Lommel-Seeliger reflectance, and casting eclipse shadows on everything the sun lights, the air included, as it covers part of the sun's limb-darkened disc.</em> </li>
 <li><strong>struct</strong> <a href="../structernie_1_1Change/"><strong>Change</strong></a> <em>A prim's changes since a consumer last looked.</em>     </li>
 <li><strong>struct</strong> <a href="../structernie_1_1ChangeCursor/"><strong>ChangeCursor</strong></a> <em>A consumer's position in a scene's history; see</em> <code>Scene::Changes</code> <em>.</em>    </li>
 <li><strong>class</strong> <a href="../classernie_1_1ChunkedFrameImages/"><strong>ChunkedFrameImages</strong></a> <em>The images of a frame of a batch of views that do not fit one set of images (such as more views than an image has layers): consecutive chunks of the views, each its own</em> <code>FrameImages</code> <em>.</em>    </li>
@@ -324,7 +326,10 @@
 <li><strong>struct</strong> <a href="../structernie_1_1LensRayTable/"><strong>LensRayTable</strong></a> <em>A lens given as its rays: unit directions in the camera's frame at every</em> <code>step</code> <em>th sensor pixel corner, (</em><code>width</code> <em>/</em><code>step</code> <em>+ 1) by (</em><code>height</code> <em>/</em><code>step</code> <em>+ 1) of them row by row from the top left, interpolated between.</em>    </li>
 <li><strong>class</strong> <a href="../classernie_1_1Light/"><strong>Light</strong></a> <em>Any light: UsdLux's LightAPI inputs, its spectrum's shape and Ernie's physical spectrum.</em>     </li>
 <li><strong>struct</strong> <a href="../structernie_1_1LightParams/"><strong>LightParams</strong></a> <em>A light besides the sun, resolved for a frame from its prim (</em> <code>LightParamsOf</code> <em>).</em>    <ul>
-<li><strong>struct</strong> <a href="../structernie_1_1LightParams_1_1Beam/"><strong>Beam</strong></a> <em>A laser's Gaussian beam (Siegman 1986): its 1/e^2 radius at the waist along the light's x and y, its Rayleigh range along each, and the waist's distance along the beam from</em> <code>position</code> <em>, m.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1LightParams_1_1Beam/"><strong>Beam</strong></a> <em>A laser's Gaussian beam (Siegman 1986): its 1/e^2 radius at the waist along the light's x and y, its Rayleigh range along each, and the waist's distance along the beam from</em> <code>position</code> <em>, m.</em>    <ul>
+<li><strong>struct</strong> <a href="../structernie_1_1LightParams_1_1Beam_1_1Lit/"><strong>Lit</strong></a> <em>One frame of its sequence lit during a span of time, and how much: the light's mean over the span relative to its average power.</em>     </li>
+</ul>
+</li>
 </ul>
 </li>
 <li><strong>struct</strong> <a href="../structernie_1_1LightPatternImage/"><strong>LightPatternImage</strong></a> <em>A laser's pattern image (</em> <code>ernie:laser:pattern:image</code> <em>) as patterns read it: one linear channel, the mean of its colour channels, its rows top to bottom, and its mip levels after it down to 1 x 1, each</em><code>max(1, size &gt;&gt; n)</code> <em>on a side and averaging the texels above.</em>    </li>
@@ -340,6 +345,7 @@
 <li><strong>struct</strong> <a href="../structernie_1_1MarsAtmosphereOptions/"><strong>MarsAtmosphereOptions</strong></a> <em>Mars's atmosphere: an isothermal CO2 column and suspended dust.</em>     </li>
 <li><strong>class</strong> <a href="../classernie_1_1Material/"><strong>Material</strong></a> <em>How a surface reflects light: Ernie's own inputs, or a UsdPreviewSurface its</em> <code>outputs:surface</code> <em>connects to.</em></li>
 <li><strong>struct</strong> <a href="../structernie_1_1MaterialSettings/"><strong>MaterialSettings</strong></a> <em>How a surface reflects light: a material's settings.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1MeasuredReflectance/"><strong>MeasuredReflectance</strong></a> <em>A measured reflectance spectrum Ernie embeds: its id (as a material names it in</em> <code>ernie:reflectance:library</code> <em>), what was measured, the ECOSTRESS file it comes from, and the spectrum, a fraction from 350 nm (or where its measurement starts) to 2.5 um and for most on into the thermal infrared, 12.5 to 15 um.</em>    </li>
 <li><strong>class</strong> <a href="../classernie_1_1Mesh/"><strong>Mesh</strong></a> <em>A polygon mesh: points and the faces over them.</em> </li>
 <li><strong>struct</strong> <a href="../structernie_1_1MeshData/"><strong>MeshData</strong></a> <em>Triangle mesh geometry in a mesh's own frame.</em>     </li>
 <li><strong>struct</strong> <a href="../structernie_1_1MieEfficiencies/"><strong>MieEfficiencies</strong></a> <em>Mie efficiencies of a homogeneous sphere: cross sections over the geometric cross section pi r^2, and the asymmetry parameter g (the mean cosine of the scattering angle).</em>     </li>
@@ -363,6 +369,7 @@
 <li><strong>class</strong> <a href="../classernie_1_1PointBased/"><strong>PointBased</strong></a> <em>Geometry from an array of points: a mesh or a point cloud.</em> </li>
 <li><strong>class</strong> <a href="../classernie_1_1PointInstancer/"><strong>PointInstancer</strong></a> <em>Instances of its prototypes (the</em> <code>prototypes</code> <em>relationship's targets) at rows of positions, orientations and scales.</em></li>
 <li><strong>class</strong> <a href="../classernie_1_1Points/"><strong>Points</strong></a> <a href="../classernie_1_1Points/"><em><strong>Points</strong></em></a> <em>drawn as spheres</em><code>widths</code> <em>across, coloured by their display colour.</em></li>
+<li><strong>struct</strong> <a href="../structernie_1_1PolarStereographicDem/"><strong>PolarStereographicDem</strong></a> <em>A planet's radius on a polar stereographic grid (spherical, true at the pole), as LOLA's polar LDEM products hold it:</em> <code>heights</code> <em>(metres above</em><code>referenceRadius</code> <em>) row by row,</em><code>mapScale</code> <em>metres a pixel at the pole.</em>    </li>
 <li><strong>class</strong> <a href="../classernie_1_1Prim/"><strong>Prim</strong></a> <em>Handle to a prim in a</em> <code>Scene</code> <em>: its path plus the scene, for chained edits.</em>    </li>
 <li><strong>class</strong> <a href="../classernie_1_1PrimSet/"><strong>PrimSet</strong></a> <em>A fixed list of prims to write rows of one tensor to at once (</em> <code>Scene::Write</code> <em>), such as a simulation's bodies every step: the scene looks the prims up the first time and keeps them, looking them up again only after prims are removed or for another scene.</em>    </li>
 <li><strong>struct</strong> <a href="../structernie_1_1PrimTypeDef/"><strong>PrimTypeDef</strong></a> <em>A registered prim type: its name (</em> <code>Scene::Define</code> <em>'s type), its base, and the attributes it declares itself; abstract ones, such as "Light", are bases only.</em>    </li>
@@ -467,6 +474,10 @@ type" menu (the eye) and heads-up display settings choose.</em>     </li>
 <li><strong>struct</strong> <a href="../structernie_1_1profiler_1_1Frame/"><strong>Frame</strong></a> <em>One frame's zones.</em>     </li>
 <li><strong>class</strong> <a href="../classernie_1_1profiler_1_1ScopedZone/"><strong>ScopedZone</strong></a> <em>Times the rest of the enclosing scope as a CPU zone named</em> <code>name</code> <em>while recording.</em>    </li>
 <li><strong>struct</strong> <a href="../structernie_1_1profiler_1_1Zone/"><strong>Zone</strong></a> <em>A timed span: a CPU zone of thread</em> <code>thread</code> <em>, or a GPU zone (</em><code>thread</code> <em>unused) on the device's own clock.</em>    </li>
+</ul>
+</li>
+<li><strong>namespace</strong> <a href="../namespaceernie_1_1reflectance__table/"><strong>reflectance_table</strong></a>     <ul>
+<li><strong>struct</strong> <a href="../structernie_1_1reflectance__table_1_1Entry/"><strong>Entry</strong></a>     </li>
 </ul>
 </li>
 <li><strong>namespace</strong> <a href="../namespaceernie_1_1render__vars/"><strong>render_vars</strong></a> <em>Render var names, after Omniverse's where it has the quantity.</em>     </li>

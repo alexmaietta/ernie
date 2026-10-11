@@ -3697,6 +3697,14 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            add_light_pattern (ernie._ernie.app.Viewer.add_light_pattern)" href="#ernie._ernie.app.Viewer.add_light_pattern">add_light_pattern</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Registers a laser pattern with the viewport's renderer, as Renderer.add_light_pattern does.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            add_menu_item (ernie._ernie.app.Viewer.add_menu_item)" href="#ernie._ernie.app.Viewer.add_menu_item">add_menu_item</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -3842,6 +3850,14 @@
               <td>
                 <div class="doc-md-description">
                   <p>Frames <code>paths</code> (the whole scene when empty) with the active camera.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            has_light_pattern (ernie._ernie.app.Viewer.has_light_pattern)" href="#ernie._ernie.app.Viewer.has_light_pattern">has_light_pattern</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Whether the viewport's renderer has light pattern <code>id</code>.</p>
                 </div>
               </td>
             </tr>
@@ -5022,6 +5038,34 @@
 <div class="doc doc-object doc-function">
 
 
+<h3 id="ernie._ernie.app.Viewer.add_light_pattern" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">add_light_pattern</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">add_light_pattern(
+    id: str,
+    type_name: str,
+    slang: str,
+    params: object | None = None,
+    extent: float = 1.0,
+    normalized: bool = False,
+    name: str = "",
+    description: str = "",
+) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Registers a laser pattern with the viewport's renderer, as Renderer.add_light_pattern does.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="ernie._ernie.app.Viewer.add_menu_item" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">add_menu_item</span>
 
@@ -5359,6 +5403,25 @@
     <div class="doc doc-contents ">
 
         <p>Frames <code>paths</code> (the whole scene when empty) with the active camera.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Viewer.has_light_pattern" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">has_light_pattern</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">has_light_pattern(id: str) -&gt; bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Whether the viewport's renderer has light pattern <code>id</code>.</p>
 
 
     </div>

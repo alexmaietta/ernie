@@ -205,6 +205,21 @@
 <ul>
 <li><code>#include &lt;ernie/session/frame_params.h&gt;</code></li>
 </ul>
+<h2 id="classes">Classes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1LightParams_1_1Beam_1_1Lit/"><strong>Lit</strong></a> <br><em>One frame of its sequence lit during a span of time, and how much: the light's mean over the span relative to its average power.</em></td>
+</tr>
+</tbody>
+</table>
 <h2 id="public-attributes">Public Attributes</h2>
 <table>
 <thead>
@@ -227,6 +242,18 @@
 <td style="text-align: left;"><a href="#variable-pattern"><strong>pattern</strong></a>   = <code>{"spot"}</code><br><em>The pattern it makes (</em> <code>tokens::kLaserPattern</code> <em>), a</em><code>LightPatternModel</code> <em>the renderer finds by id: a built-in one ("spot", "line", "grid", "image") with its parameters in</em><code>patternParams</code> <em>and its tangent-plane half extents in</em><code>extent</code> <em>(0 unbounded), or a custom one with its parameters as given (the renderer fills in defaults and its extent).</em></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-patternarray"><strong>patternArray</strong></a>  <br><em>The image as a float32 (rows, cols) array on the GPU (</em> <code>ernie:laser:pattern:imageArray</code> <em>), which the renderer reads in place when it is its own memory (</em><code>RenderDelegate::MapArray</code> <em>), the stream it was written on, and the laser's path, which keys its memory; empty for an image on the host (</em><code>patternImage</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#variable-patternarraykey"><strong>patternArrayKey</strong></a>  <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uintptr_t</td>
+<td style="text-align: left;"><a href="#variable-patternarraystream"><strong>patternArrayStream</strong></a>   = <code>1</code><br></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::vector&lt; float &gt;</td>
 <td style="text-align: left;"><a href="#variable-patterndata"><strong>patternData</strong></a>  <br><em>What patterns read besides their parameters:</em> <code>ernie:laser:pattern:data</code> <em>and the image</em><code>ernie:laser:pattern:image</code> <em>(null without one).</em></td>
 </tr>
@@ -239,8 +266,32 @@
 <td style="text-align: left;"><a href="#variable-patternparams"><strong>patternParams</strong></a>  <br></td>
 </tr>
 <tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-pulsedelay"><strong>pulseDelay</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-pulserate"><strong>pulseRate</strong></a>   = <code>0.0</code><br><em>Its timing on the sensor clock, seconds: pulses</em> <code>pulseWidth</code> <em>long at</em><code>pulseRate</code> <em>per second from</em><code>pulseDelay</code> <em>(a rate of 0, continuous), and a sequence of</em><code>sequenceCount</code> <em>pattern frames, each</em><code>sequencePeriod</code> <em>long, from</em><code>sequenceDelay</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-pulsewidth"><strong>pulseWidth</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
 <td style="text-align: right;">glm::vec2</td>
 <td style="text-align: left;"><a href="#variable-rayleigh"><strong>rayleigh</strong></a>   = <code>{0.0f}</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">int</td>
+<td style="text-align: left;"><a href="#variable-sequencecount"><strong>sequenceCount</strong></a>   = <code>1</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-sequencedelay"><strong>sequenceDelay</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-sequenceperiod"><strong>sequencePeriod</strong></a>   = <code>1.0</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::vec2</td>
@@ -260,6 +311,21 @@
 </tr>
 </tbody>
 </table>
+<h2 id="public-static-attributes">Public Static Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">constexpr std::size_t</td>
+<td style="text-align: left;"><a href="#variable-kmaxlit"><strong>kMaxLit</strong></a>   = <code>4</code><br></td>
+</tr>
+</tbody>
+</table>
 <h2 id="public-functions">Public Functions</h2>
 <table>
 <thead>
@@ -272,6 +338,10 @@
 <tr>
 <td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#function-isspot"><strong>IsSpot</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1LightParams_1_1Beam_1_1Lit/"><strong>Lit</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-litbetween"><strong>LitBetween</strong></a> (double start, double end) const<br><em>What the beam shows over [</em> <code>start</code> <em>,</em><code>end</code> <em>] seconds of the sensor clock: each sequence frame shown then, weighted by its share of the span times its pulses' energy then over their average (1 / duty cycle while a pulse is on, 0 between them), exactly.</em></td>
 </tr>
 </tbody>
 </table>
@@ -295,6 +365,22 @@
 <p><code>efficiency</code> of the power goes into the pattern, <code>zeroOrder</code> into a spot along the axis. </p>
 <hr>
 
+<h3 id="variable-patternarray">variable patternArray</h3>
+<p><em>The image as a float32 (rows, cols) array on the GPU (</em> <code>ernie:laser:pattern:imageArray</code> <em>), which the renderer reads in place when it is its own memory (</em><code>RenderDelegate::MapArray</code> <em>), the stream it was written on, and the laser's path, which keys its memory; empty for an image on the host (</em><code>patternImage</code> <em>).</em></p>
+<pre><code class="language-C++">Tensor ernie::LightParams::Beam::patternArray;
+</code></pre>
+<hr>
+
+<h3 id="variable-patternarraykey">variable patternArrayKey</h3>
+<pre><code class="language-C++">std::string ernie::LightParams::Beam::patternArrayKey;
+</code></pre>
+<hr>
+
+<h3 id="variable-patternarraystream">variable patternArrayStream</h3>
+<pre><code class="language-C++">std::uintptr_t ernie::LightParams::Beam::patternArrayStream;
+</code></pre>
+<hr>
+
 <h3 id="variable-patterndata">variable patternData</h3>
 <p><em>What patterns read besides their parameters:</em> <code>ernie:laser:pattern:data</code> <em>and the image</em><code>ernie:laser:pattern:image</code> <em>(null without one).</em></p>
 <pre><code class="language-C++">std::vector&lt;float&gt; ernie::LightParams::Beam::patternData;
@@ -311,8 +397,39 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-pulsedelay">variable pulseDelay</h3>
+<pre><code class="language-C++">double ernie::LightParams::Beam::pulseDelay;
+</code></pre>
+<hr>
+
+<h3 id="variable-pulserate">variable pulseRate</h3>
+<p><em>Its timing on the sensor clock, seconds: pulses</em> <code>pulseWidth</code> <em>long at</em><code>pulseRate</code> <em>per second from</em><code>pulseDelay</code> <em>(a rate of 0, continuous), and a sequence of</em><code>sequenceCount</code> <em>pattern frames, each</em><code>sequencePeriod</code> <em>long, from</em><code>sequenceDelay</code> <em>.</em></p>
+<pre><code class="language-C++">double ernie::LightParams::Beam::pulseRate;
+</code></pre>
+<hr>
+
+<h3 id="variable-pulsewidth">variable pulseWidth</h3>
+<pre><code class="language-C++">double ernie::LightParams::Beam::pulseWidth;
+</code></pre>
+<hr>
+
 <h3 id="variable-rayleigh">variable rayleigh</h3>
 <pre><code class="language-C++">glm::vec2 ernie::LightParams::Beam::rayleigh;
+</code></pre>
+<hr>
+
+<h3 id="variable-sequencecount">variable sequenceCount</h3>
+<pre><code class="language-C++">int ernie::LightParams::Beam::sequenceCount;
+</code></pre>
+<hr>
+
+<h3 id="variable-sequencedelay">variable sequenceDelay</h3>
+<pre><code class="language-C++">double ernie::LightParams::Beam::sequenceDelay;
+</code></pre>
+<hr>
+
+<h3 id="variable-sequenceperiod">variable sequencePeriod</h3>
+<pre><code class="language-C++">double ernie::LightParams::Beam::sequencePeriod;
 </code></pre>
 <hr>
 
@@ -336,10 +453,25 @@
 <pre><code class="language-C++">float ernie::LightParams::Beam::zeroOrder;
 </code></pre>
 <hr>
+<h2 id="public-static-attributes-documentation">Public Static Attributes Documentation</h2>
+<h3 id="variable-kmaxlit">variable kMaxLit</h3>
+<pre><code class="language-C++">constexpr std::size_t ernie::LightParams::Beam::kMaxLit;
+</code></pre>
+<hr>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
 <h3 id="function-isspot">function IsSpot</h3>
 <pre><code class="language-C++">inline bool ernie::LightParams::Beam::IsSpot () const
 </code></pre>
+<hr>
+
+<h3 id="function-litbetween">function LitBetween</h3>
+<p><em>What the beam shows over [</em> <code>start</code> <em>,</em><code>end</code> <em>] seconds of the sensor clock: each sequence frame shown then, weighted by its share of the span times its pulses' energy then over their average (1 / duty cycle while a pulse is on, 0 between them), exactly.</em></p>
+<pre><code class="language-C++">std::vector&lt; Lit &gt; ernie::LightParams::Beam::LitBetween (
+    double start,
+    double end
+) const
+</code></pre>
+<p>A span of no length is its instant's. Over more than <code>kMaxLit</code> frames, <code>kMaxLit</code> of them spread evenly carry the weight of all. </p>
 <hr>
 
 <hr />

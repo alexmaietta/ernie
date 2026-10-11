@@ -209,6 +209,7 @@
 <li><strong>AovOutputsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>AspectOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>AtmosphereParamsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>AtmospherePresetRadius</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>AttributeKind</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>AuthorIsdCamera</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>Axis</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
@@ -226,6 +227,7 @@
 <li><strong>BlackbodyIrradiance</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>BlackbodySpectralIrradiance</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>BodyDirection</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>BodyParamsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>BoundMaterial</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>Bounds3</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>BoxMesh</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
@@ -328,6 +330,7 @@
 <li><strong>FilterDomain</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>FilterKind</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>FindPrimType</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>FindReflectance</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>FindXformOp</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>FrameOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>FrameParamsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
@@ -416,6 +419,8 @@
 <li><strong>kSlidersHorizontal</strong> (<a href="../namespaceernie_1_1app_1_1icons/"><strong>ernie::app::icons</strong></a>)</li>
 <li><strong>kSun</strong> (<a href="../namespaceernie_1_1app_1_1icons/"><strong>ernie::app::icons</strong></a>, <a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kX</strong> (<a href="../namespaceernie_1_1app_1_1icons/"><strong>ernie::app::icons</strong></a>)</li>
+<li><strong>kEntries</strong> (<a href="../namespaceernie_1_1reflectance__table/"><strong>ernie::reflectance_table</strong></a>)</li>
+<li><strong>kPairs</strong> (<a href="../namespaceernie_1_1reflectance__table/"><strong>ernie::reflectance_table</strong></a>, <a href="../namespaceernie_1_1solar__table/"><strong>ernie::solar_table</strong></a>)</li>
 <li><strong>kDistanceToCamera</strong> (<a href="../namespaceernie_1_1render__vars/"><strong>ernie::render_vars</strong></a>)</li>
 <li><strong>kDistanceToImagePlane</strong> (<a href="../namespaceernie_1_1render__vars/"><strong>ernie::render_vars</strong></a>)</li>
 <li><strong>kElectrons</strong> (<a href="../namespaceernie_1_1render__vars/"><strong>ernie::render_vars</strong></a>)</li>
@@ -428,7 +433,6 @@
 <li><strong>kRawDn</strong> (<a href="../namespaceernie_1_1render__vars/"><strong>ernie::render_vars</strong></a>)</li>
 <li><strong>kSpectralRadiance</strong> (<a href="../namespaceernie_1_1render__vars/"><strong>ernie::render_vars</strong></a>)</li>
 <li><strong>kCount</strong> (<a href="../namespaceernie_1_1solar__table/"><strong>ernie::solar_table</strong></a>)</li>
-<li><strong>kPairs</strong> (<a href="../namespaceernie_1_1solar__table/"><strong>ernie::solar_table</strong></a>)</li>
 <li><strong>kAlbedo</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kAlbedoMap</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kAlbedoMapCellSize</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
@@ -439,6 +443,8 @@
 <li><strong>kAmbientColor</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kAngle</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kAtmosphere</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
+<li><strong>kAtmosphereCloudCover</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
+<li><strong>kAtmosphereCloudTop</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kAtmosphereDustOpticalDepth</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kAtmosphereGroundAlbedo</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kAtmosphereHazeOpticalDepth</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
@@ -448,11 +454,14 @@
 <li><strong>kAuto</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kAxis</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kBlackbody</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
+<li><strong>kBodyAlbedo</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
+<li><strong>kBodyRadius</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kBrdf</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kCameraExposure</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kCameraRel</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kCameraScan</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kCapsule</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
+<li><strong>kCelestialBody</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kCellSize</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kChecker</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kCheckerColor0</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
@@ -571,8 +580,15 @@
 <li><strong>kLaserPatternData</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kLaserPatternFieldOfView</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kLaserPatternImage</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
+<li><strong>kLaserPatternImageArray</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kLaserPatternParams</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kLaserPower</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
+<li><strong>kLaserPulseDelay</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
+<li><strong>kLaserPulseRate</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
+<li><strong>kLaserPulseWidth</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
+<li><strong>kLaserSequenceCount</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
+<li><strong>kLaserSequenceDelay</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
+<li><strong>kLaserSequencePeriod</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kLaserWaistDistance</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kLaserWaistRadius</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kLaserWavelength</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
@@ -651,6 +667,7 @@
 <li><strong>kRadius</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kRectLight</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kReflectance</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
+<li><strong>kReflectanceLibrary</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kRenderProduct</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kRenderSettings</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
 <li><strong>kRenderVar</strong> (<a href="../namespaceernie_1_1tokens/"><strong>ernie::tokens</strong></a>)</li>
@@ -813,6 +830,7 @@
 <li><strong>LensProjection</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>LensRay</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>LightParamsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>LightPatternImageOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>LightPatternModules</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>LightPatternSlang</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>LightSchemaTypes</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
@@ -912,6 +930,8 @@
 <li><strong>ReadIes</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>ReadIsd</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>ReadIsdFile</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ReadPolarStereographicDem</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ReflectanceLibrary</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>ReflectanceToLinearSrgb</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>RenderBackends</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>RenderProductSetOutputs</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>

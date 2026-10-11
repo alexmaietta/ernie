@@ -242,6 +242,24 @@ struct CylindricalDem {
 
 CylindricalDem ReadCylindricalDem(const std::string&amp; labelPath);
 
+struct PolarStereographicDem {
+    std::uint32_t lines = 0;
+    std::uint32_t samples = 0;
+    double mapScale = 1.0;  
+    double lineProjectionOffset = 0.0;
+    double sampleProjectionOffset = 0.0;
+    double centerLatitudeDeg = -90.0;  
+    double centerLongitudeDeg = 0.0;
+    double referenceRadius = 0.0;  
+    std::vector&lt;float&gt; heights;
+
+    glm::dvec2 ToGrid(double latitudeDeg, double longitudeDeg) const;
+    double HeightAt(double latitudeDeg, double longitudeDeg) const;
+};
+
+PolarStereographicDem
+ReadPolarStereographicDem(const std::string&amp; labelPath);
+
 struct LocalTerrain {
     Tensor heights;     
     glm::dvec2 origin;  
@@ -250,6 +268,9 @@ struct LocalTerrain {
 };
 
 LocalTerrain LocalTerrainOf(const CylindricalDem&amp; dem,
+                            double latitudeDeg, double longitudeDeg,
+                            std::uint32_t cells, double cellSize);
+LocalTerrain LocalTerrainOf(const PolarStereographicDem&amp; dem,
                             double latitudeDeg, double longitudeDeg,
                             std::uint32_t cells, double cellSize);
 

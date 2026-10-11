@@ -311,9 +311,28 @@
     X(double, DustOpticalDepth, ::ernie::tokens::kAtmosphereDustOpticalDepth, 0.5,                 \
       (::ernie::AttributeMeta{.doc = &quot;Mars: the dust's vertical optical depth at 880 nm (about &quot;   \
                                      &quot;0.3 to 0.9 in clear seasons, above 1 in dust storms).&quot;,      \
-                              .group = &quot;Atmosphere&quot;, .max = 10.0}))
+                              .group = &quot;Atmosphere&quot;, .max = 10.0}))                                \
+    X(double, CloudTop, ::ernie::tokens::kAtmosphereCloudTop, 0.0,                                 \
+      (::ernie::AttributeMeta{.doc = &quot;Metres: clouds block light grazing the planet below this, &quot;  \
+                                     &quot;darkening its shadow, as in a lunar eclipse's umbra; 0 &quot;     \
+                                     &quot;for clear air.&quot;,                                             \
+                              .group = &quot;Atmosphere&quot;, .max = 20e3}))                                \
+    X(double, CloudCover, ::ernie::tokens::kAtmosphereCloudCover, 0.5,                             \
+      (::ernie::AttributeMeta{.doc = &quot;The fraction of the planet's limb the clouds cover.&quot;,        \
+                              .group = &quot;Atmosphere&quot;, .max = 1.0}))
+
+#define ERNIE_CELESTIAL_BODY_ATTRIBUTES(X)                                                         \
+    X(double, Radius, ::ernie::tokens::kBodyRadius, 1737.4e3,                                      \
+      (::ernie::AttributeMeta{.doc = &quot;Metres; the Moon's mean radius by default.&quot;,                 \
+                              .group = &quot;Body&quot;, .max = 1e9}))                                       \
+    X(glm::dvec3, Albedo, ::ernie::tokens::kBodyAlbedo, glm::dvec3(0.12),                          \
+      (::ernie::AttributeMeta{.doc = &quot;Normal albedo, linear RGB: its brightness lit and seen &quot;     \
+                                     &quot;head on over a white Lambertian surface's (the Moon's &quot;      \
+                                     &quot;about 0.12).&quot;,                                               \
+                              .group = &quot;Body&quot;, .color = true}))
 
 #define ERNIE_TERRAIN_ALL(X) ERNIE_GPRIM_ALL(X) ERNIE_TERRAIN_ATTRIBUTES(X)
+#define ERNIE_CELESTIAL_BODY_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_CELESTIAL_BODY_ATTRIBUTES(X)
 #define ERNIE_STAR_FIELD_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_STAR_FIELD_ATTRIBUTES(X)
 #define ERNIE_ATMOSPHERE_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_ATMOSPHERE_ATTRIBUTES(X)
 // clang-format on
@@ -333,6 +352,12 @@ class StarField : public Imageable {
 class Atmosphere : public Imageable {
     ERNIE_SCHEMA_BODY(Atmosphere, Imageable, ERNIE_ATMOSPHERE_ALL)
     ERNIE_SCHEMA_DEFINE(Atmosphere)
+};
+
+class CelestialBody : public Imageable {
+    ERNIE_SCHEMA_BODY(CelestialBody, Imageable,
+                      ERNIE_CELESTIAL_BODY_ALL)
+    ERNIE_SCHEMA_DEFINE(CelestialBody)
 };
 
 std::vector&lt;const PrimTypeDef*&gt; TerrainSchemaTypes();

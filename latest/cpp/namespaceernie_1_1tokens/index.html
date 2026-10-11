@@ -253,6 +253,14 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-katmospherecloudcover"><strong>kAtmosphereCloudCover</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-katmospherecloudtop"><strong>kAtmosphereCloudTop</strong></a>   = <code>/* multi line expression */</code><br><em>float, metres: the clouds' tops, below which they block light grazing the planet, which reddens the Moon in a lunar eclipse; and the fraction of the planet's limb they cover.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-katmospheredustopticaldepth"><strong>kAtmosphereDustOpticalDepth</strong></a>   = <code>/* multi line expression */</code><br><em>float: Mars's vertical dust optical depth at 880 nm.</em></td>
 </tr>
 <tr>
@@ -289,6 +297,14 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kbodyalbedo"><strong>kBodyAlbedo</strong></a>   = <code>"ernie:body:albedo"</code><br><em>color3f: its normal albedo, linear RGB.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kbodyradius"><strong>kBodyRadius</strong></a>   = <code>"ernie:body:radius"</code><br><em>float, metres.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kbrdf"><strong>kBrdf</strong></a>   = <code>/* multi line expression */</code><br><em>BRDF model id.</em></td>
 </tr>
 <tr>
@@ -310,6 +326,10 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kcapsule"><strong>kCapsule</strong></a>   = <code>"Capsule"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kcelestialbody"><strong>kCelestialBody</strong></a>   = <code>/* multi line expression */</code><br><em>Ernie: a moon or planet far off.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -793,11 +813,39 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klaserpatternimagearray"><strong>kLaserPatternImageArray</strong></a>   = <code>/* multi line expression */</code><br><a href="../classernie_1_1Tensor/"><em><strong>Tensor</strong></em></a> <em>float32 (rows, cols): the pattern image as an array, rows top to bottom, in place of</em><code>pattern:image</code> <em>'s file: on the host, or on the GPU, where the renderer reads it in place when mapped (</em><code>RenderDelegate::MapArray</code> <em>), so procedural patterns need no copy.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-klaserpatternparams"><strong>kLaserPatternParams</strong></a>   = <code>/* multi line expression */</code><br><em>float[]: a custom pattern's parameters (</em> <code>LightPatternModel</code> <em>), in its order; missing ones take its defaults.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-klaserpower"><strong>kLaserPower</strong></a>   = <code>"ernie:laser:power"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klaserpulsedelay"><strong>kLaserPulseDelay</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klaserpulserate"><strong>kLaserPulseRate</strong></a>   = <code>/* multi line expression */</code><br><em>A pulsed laser (0 rate: continuous): pulses</em> <code>pulse:width</code> <em>seconds long at</em><code>pulse:rate</code> <em>per second, the first starting</em><code>pulse:delay</code> <em>seconds into the sensor clock (</em><code>RenderDelegate::Time</code> <em>); its</em><code>power</code> <em>is their average.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klaserpulsewidth"><strong>kLaserPulseWidth</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klasersequencecount"><strong>kLaserSequenceCount</strong></a>   = <code>/* multi line expression */</code><br><em>A sequence of</em> <code>sequence:count</code> <em>patterns (1: one), each shown for</em><code>sequence:period</code> <em>seconds in turn from</em><code>sequence:delay</code> <em>seconds into the sensor clock, as structured light's Gray codes and phase shifts are: the pattern's frames (</em><code>LightPatternInput::frame</code> <em>), an image's stacked top to bottom.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klasersequencedelay"><strong>kLaserSequenceDelay</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klasersequenceperiod"><strong>kLaserSequencePeriod</strong></a>   = <code>/* multi line expression */</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -1114,6 +1162,10 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kreflectance"><strong>kReflectance</strong></a>   = <code>"inputs:reflectance"</code><br><em>float[] (nm, value) pairs of a reflectance spectrum, replacing the albedo.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kreflectancelibrary"><strong>kReflectanceLibrary</strong></a>   = <code>/* multi line expression */</code><br><em>token: a measured reflectance spectrum Ernie embeds, by id (</em> <code>ReflectanceLibrary</code> <em>), replacing the albedo unless</em><code>inputs:reflectance</code> <em>is given.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -1711,6 +1763,17 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-katmospherecloudcover">variable kAtmosphereCloudCover</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kAtmosphereCloudCover;
+</code></pre>
+<hr>
+
+<h3 id="variable-katmospherecloudtop">variable kAtmosphereCloudTop</h3>
+<p><em>float, metres: the clouds' tops, below which they block light grazing the planet, which reddens the Moon in a lunar eclipse; and the fraction of the planet's limb they cover.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kAtmosphereCloudTop;
+</code></pre>
+<hr>
+
 <h3 id="variable-katmospheredustopticaldepth">variable kAtmosphereDustOpticalDepth</h3>
 <p><em>float: Mars's vertical dust optical depth at 880 nm.</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kAtmosphereDustOpticalDepth;
@@ -1763,6 +1826,18 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-kbodyalbedo">variable kBodyAlbedo</h3>
+<p><em>color3f: its normal albedo, linear RGB.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kBodyAlbedo;
+</code></pre>
+<hr>
+
+<h3 id="variable-kbodyradius">variable kBodyRadius</h3>
+<p><em>float, metres.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kBodyRadius;
+</code></pre>
+<hr>
+
 <h3 id="variable-kbrdf">variable kBrdf</h3>
 <p><em>BRDF model id.</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kBrdf;
@@ -1794,6 +1869,12 @@
 
 <h3 id="variable-kcapsule">variable kCapsule</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kCapsule;
+</code></pre>
+<hr>
+
+<h3 id="variable-kcelestialbody">variable kCelestialBody</h3>
+<p><em>Ernie: a moon or planet far off.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kCelestialBody;
 </code></pre>
 <hr>
 
@@ -2437,6 +2518,12 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-klaserpatternimagearray">variable kLaserPatternImageArray</h3>
+<p><a href="../classernie_1_1Tensor/"><em><strong>Tensor</strong></em></a> <em>float32 (rows, cols): the pattern image as an array, rows top to bottom, in place of</em><code>pattern:image</code> <em>'s file: on the host, or on the GPU, where the renderer reads it in place when mapped (</em><code>RenderDelegate::MapArray</code> <em>), so procedural patterns need no copy.</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserPatternImageArray;
+</code></pre>
+<hr>
+
 <h3 id="variable-klaserpatternparams">variable kLaserPatternParams</h3>
 <p><em>float[]: a custom pattern's parameters (</em> <code>LightPatternModel</code> <em>), in its order; missing ones take its defaults.</em></p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserPatternParams;
@@ -2445,6 +2532,38 @@
 
 <h3 id="variable-klaserpower">variable kLaserPower</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserPower;
+</code></pre>
+<hr>
+
+<h3 id="variable-klaserpulsedelay">variable kLaserPulseDelay</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserPulseDelay;
+</code></pre>
+<hr>
+
+<h3 id="variable-klaserpulserate">variable kLaserPulseRate</h3>
+<p><em>A pulsed laser (0 rate: continuous): pulses</em> <code>pulse:width</code> <em>seconds long at</em><code>pulse:rate</code> <em>per second, the first starting</em><code>pulse:delay</code> <em>seconds into the sensor clock (</em><code>RenderDelegate::Time</code> <em>); its</em><code>power</code> <em>is their average.</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserPulseRate;
+</code></pre>
+<hr>
+
+<h3 id="variable-klaserpulsewidth">variable kLaserPulseWidth</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserPulseWidth;
+</code></pre>
+<hr>
+
+<h3 id="variable-klasersequencecount">variable kLaserSequenceCount</h3>
+<p><em>A sequence of</em> <code>sequence:count</code> <em>patterns (1: one), each shown for</em><code>sequence:period</code> <em>seconds in turn from</em><code>sequence:delay</code> <em>seconds into the sensor clock, as structured light's Gray codes and phase shifts are: the pattern's frames (</em><code>LightPatternInput::frame</code> <em>), an image's stacked top to bottom.</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserSequenceCount;
+</code></pre>
+<hr>
+
+<h3 id="variable-klasersequencedelay">variable kLaserSequenceDelay</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserSequenceDelay;
+</code></pre>
+<hr>
+
+<h3 id="variable-klasersequenceperiod">variable kLaserSequencePeriod</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserSequencePeriod;
 </code></pre>
 <hr>
 
@@ -2890,6 +3009,12 @@
 <h3 id="variable-kreflectance">variable kReflectance</h3>
 <p><em>float[] (nm, value) pairs of a reflectance spectrum, replacing the albedo.</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kReflectance;
+</code></pre>
+<hr>
+
+<h3 id="variable-kreflectancelibrary">variable kReflectanceLibrary</h3>
+<p><em>token: a measured reflectance spectrum Ernie embeds, by id (</em> <code>ReflectanceLibrary</code> <em>), replacing the albedo unless</em><code>inputs:reflectance</code> <em>is given.</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kReflectanceLibrary;
 </code></pre>
 <hr>
 

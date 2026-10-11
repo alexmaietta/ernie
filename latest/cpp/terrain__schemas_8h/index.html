@@ -239,6 +239,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1CelestialBody/"><strong>CelestialBody</strong></a> <br><em>A sphere far beyond the scene, such as a moon, centred at its transform's origin: drawn in the sky behind the scene, lit by the sun with Lommel-Seeliger reflectance, and casting eclipse shadows on everything the sun lights, the air included, as it covers part of the sun's limb-darkened disc.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1StarField/"><strong>StarField</strong></a> <br><em>Stars from a catalogue as points of light at infinity, behind everything else, each with a black-body spectrum.</em></td>
 </tr>
 <tr>
@@ -263,6 +267,14 @@
 <tr>
 <td style="text-align: right;">define</td>
 <td style="text-align: left;"><a href="./#define-ernie_atmosphere_attributes"><strong>ERNIE_ATMOSPHERE_ATTRIBUTES</strong></a> (X) <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_celestial_body_all"><strong>ERNIE_CELESTIAL_BODY_ALL</strong></a> (X) <code>[**ERNIE\_IMAGEABLE\_ATTRIBUTES**](base__schemas_8h.md#define-ernie_imageable_attributes)(X) [**ERNIE\_CELESTIAL\_BODY\_ATTRIBUTES**](terrain__schemas_8h.md#define-ernie_celestial_body_attributes)(X)</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_celestial_body_attributes"><strong>ERNIE_CELESTIAL_BODY_ATTRIBUTES</strong></a> (X) <code>/* multi line expression */</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">define</td>
@@ -292,6 +304,20 @@
 
 <h3 id="define-ernie_atmosphere_attributes">define ERNIE_ATMOSPHERE_ATTRIBUTES</h3>
 <pre><code class="language-C++">#define ERNIE_ATMOSPHERE_ATTRIBUTES (
+    X
+) `/* multi line expression */`
+</code></pre>
+<hr>
+
+<h3 id="define-ernie_celestial_body_all">define ERNIE_CELESTIAL_BODY_ALL</h3>
+<pre><code class="language-C++">#define ERNIE_CELESTIAL_BODY_ALL (
+    X
+) `ERNIE_IMAGEABLE_ATTRIBUTES (X) ERNIE_CELESTIAL_BODY_ATTRIBUTES (X)`
+</code></pre>
+<hr>
+
+<h3 id="define-ernie_celestial_body_attributes">define ERNIE_CELESTIAL_BODY_ATTRIBUTES</h3>
+<pre><code class="language-C++">#define ERNIE_CELESTIAL_BODY_ATTRIBUTES (
     X
 ) `/* multi line expression */`
 </code></pre>

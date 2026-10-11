@@ -216,6 +216,14 @@
 <tbody>
 <tr>
 <td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-cloudcover"><strong>cloudCover</strong></a>   = <code>0.5</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-cloudtop"><strong>cloudTop</strong></a>   = <code>0.0</code><br><em>Metres: clouds' tops, below which they block light grazing the planet into its shadow, over the fraction</em> <code>cloudCover</code> <em>of its limb.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
 <td style="text-align: left;"><a href="#variable-dustopticaldepth"><strong>dustOpticalDepth</strong></a>   = <code>0.5</code><br><em>Mars, at 880 nm.</em></td>
 </tr>
 <tr>
@@ -266,6 +274,17 @@
 <h2 id="detailed-description">Detailed Description</h2>
 <p>Renderers rebuild their tables of it only when the settings or the spectral bands change. </p>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-cloudcover">variable cloudCover</h3>
+<pre><code class="language-C++">double ernie::AtmosphereParams::cloudCover;
+</code></pre>
+<hr>
+
+<h3 id="variable-cloudtop">variable cloudTop</h3>
+<p><em>Metres: clouds' tops, below which they block light grazing the planet into its shadow, over the fraction</em> <code>cloudCover</code> <em>of its limb.</em></p>
+<pre><code class="language-C++">double ernie::AtmosphereParams::cloudTop;
+</code></pre>
+<hr>
+
 <h3 id="variable-dustopticaldepth">variable dustOpticalDepth</h3>
 <p><em>Mars, at 880 nm.</em> </p>
 <pre><code class="language-C++">double ernie::AtmosphereParams::dustOpticalDepth;

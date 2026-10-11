@@ -266,6 +266,10 @@ class RenderDelegate {
             model.id);
     }
 
+    virtual bool HasLightPattern(std::string_view id) const {
+        return false;
+    }
+
     virtual const SensorFilterRegistry&amp; SensorFilters() const = 0;
 
     virtual void Sync(const Scene&amp; scene) = 0;

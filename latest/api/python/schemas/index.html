@@ -436,6 +436,14 @@ registered type or one derived from it.</p>
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            set_xform (ernie.schema.Schema.set_xform)" href="#ernie.schema.Schema.set_xform">set_xform</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            write (ernie.schema.Schema.write)" href="#ernie.schema.Schema.write">write</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -879,6 +887,30 @@ derived from it.</p>
 <code>translate</code>, <code>rotate</code>, <code>rotation_order</code>, <code>orient</code> and
 <code>scale</code>; <code>set(token, value)</code> sets one by USD name. Returns
 this prim.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.schema.Schema.set_xform" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">set_xform</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">set_xform(
+    *,
+    translate: Any = None,
+    rotate: Any = None,
+    rotation_order: str = "XYZ",
+    orient: Any = None,
+    scale: Any = None,
+) -&gt; Prim</code></pre>
+
+    <div class="doc doc-contents ">
 
 
     </div>
@@ -11289,6 +11321,14 @@ connects to.</p>
                 <p>(nm, value) pairs, wavelengths increasing, of a measured reflectance spectrum in [0, 1],</p>
               </div>
             </li>
+            <li>
+              <b><code>reflectance_library</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>A measured spectrum Ernie embeds (ECOSTRESS), 0.35 to 2.5 um and on into the thermal</p>
+              </div>
+            </li>
         </ul>
       </td>
     </tr>
@@ -11778,6 +11818,31 @@ replacing the albedo; the nearest value outside them. USD name <code>inputs:refl
 
 </div>
 
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.reflectance_library" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">reflectance_library</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">reflectance_library: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>A measured spectrum Ernie embeds (ECOSTRESS), 0.35 to 2.5 um and on into the thermal
+infrared, replacing the albedo unless a reflectance is given. USD name
+<code>inputs:reflectanceLibrary</code>.</p>
+
+    </div>
+
+</div>
+
 
 
 
@@ -11797,6 +11862,7 @@ replacing the albedo; the nearest value outside them. USD name <code>inputs:refl
     brdf: str = ...,
     albedo: Sequence[float] = ...,
     reflectance: float | Sequence[float] = ...,
+    reflectance_library: str = ...,
     albedo_map_enable: bool = ...,
     albedo_map: Any = ...,
     albedo_map_origin: Sequence[float] = ...,

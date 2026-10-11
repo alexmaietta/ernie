@@ -458,6 +458,11 @@
                               .doc = &quot;The image pattern's relative power (linear), top towards &quot;   \
                                      &quot;+y; custom patterns read it too.&quot;,                           \
                               .group = &quot;Pattern&quot;, .asset = true}))                                 \
+    X(::ernie::Tensor, PatternImageArray, ::ernie::tokens::kLaserPatternImageArray, nullptr,       \
+      (::ernie::AttributeMeta{.label = &quot;Pattern image array&quot;,                                      \
+                              .doc = &quot;float32 (rows, cols) pattern image in place of the file, &quot;   \
+                                     &quot;on the host or the GPU (mapped, read in place).&quot;,            \
+                              .group = &quot;Pattern&quot;}))                                                \
     X(glm::dvec2, PatternFieldOfView, ::ernie::tokens::kLaserPatternFieldOfView,                   \
       glm::dvec2(40.0, 30.0),                                                                      \
       (::ernie::AttributeMeta{.label = &quot;Field of view&quot;,                                            \
@@ -472,6 +477,29 @@
       (::ernie::AttributeMeta{.label = &quot;Pattern data&quot;,                                             \
                               .doc = &quot;Data a custom pattern reads, p.data(i).&quot;,                    \
                               .group = &quot;Pattern&quot;}))                                                \
+    X(double, PulseRate, ::ernie::tokens::kLaserPulseRate, 0.0,                                    \
+      (::ernie::AttributeMeta{.label = &quot;Pulse rate&quot;,                                               \
+                              .doc = &quot;Pulses per second; 0 a continuous beam.&quot;, .group = &quot;Time&quot;,   \
+                              .max = 1e9}))                                                        \
+    X(double, PulseWidth, ::ernie::tokens::kLaserPulseWidth, 0.0,                                  \
+      (::ernie::AttributeMeta{.label = &quot;Pulse width&quot;, .doc = &quot;Each pulse's length, seconds.&quot;,      \
+                              .group = &quot;Time&quot;, .max = 1.0}))                                       \
+    X(double, PulseDelay, ::ernie::tokens::kLaserPulseDelay, 0.0,                                  \
+      (::ernie::AttributeMeta{.label = &quot;Pulse delay&quot;,                                              \
+                              .doc = &quot;When a pulse starts on the sensor clock, seconds.&quot;,          \
+                              .group = &quot;Time&quot;, .min = -1.0, .max = 1.0}))                          \
+    X(int, SequenceCount, ::ernie::tokens::kLaserSequenceCount, 1,                                 \
+      (::ernie::AttributeMeta{.label = &quot;Sequence count&quot;,                                           \
+                              .doc = &quot;Patterns shown in turn; 1 one pattern.&quot;, .group = &quot;Time&quot;,    \
+                              .min = 1.0, .max = 1024.0}))                                         \
+    X(double, SequencePeriod, ::ernie::tokens::kLaserSequencePeriod, 1.0 / 30.0,                   \
+      (::ernie::AttributeMeta{.label = &quot;Sequence period&quot;,                                          \
+                              .doc = &quot;How long each pattern of a sequence shows, seconds.&quot;,        \
+                              .group = &quot;Time&quot;, .max = 10.0}))                                      \
+    X(double, SequenceDelay, ::ernie::tokens::kLaserSequenceDelay, 0.0,                            \
+      (::ernie::AttributeMeta{.label = &quot;Sequence delay&quot;,                                           \
+                              .doc = &quot;When the first pattern shows on the sensor clock, seconds.&quot;, \
+                              .group = &quot;Time&quot;, .min = -10.0, .max = 10.0}))                        \
     X(bool, ShadowEnable, ::ernie::tokens::kShadowEnable, true,                                    \
       (::ernie::AttributeMeta{.label = &quot;Shadows&quot;, .group = &quot;Laser&quot;}))
 

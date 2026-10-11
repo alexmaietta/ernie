@@ -209,22 +209,22 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="demos">Demos</h1>
-<p>Ernie's demos show its features one at a time: lighting in physical units, real orbital cameras, terrain and planets, GPU interop, batched rendering for reinforcement learning. They live in <code>demos/&lt;category&gt;/</code>, each a pair, <code>&lt;name&gt;.cpp</code> and <code>&lt;name&gt;.py</code>: the same scene and checks in each language, rendering the same image. Only <code>demos/interop/</code>, which shows Python's GPU interop (Warp, DLPack, CUDA streams), is Python alone. A demo is named <code>&lt;category&gt;/&lt;name&gt;</code>, such as <code>lighting/illuminants</code>. They run the same way, after Newton's examples.</p>
+<p>Ernie's demos show its features one at a time: lighting in physical units, real orbital cameras, terrain and planets, GPU interop, batched rendering for reinforcement learning. They live in <code>demos/&lt;category&gt;/</code>, each a pair, <code>demo_&lt;category&gt;_&lt;name&gt;.cpp</code> and <code>demo_&lt;category&gt;_&lt;name&gt;.py</code>: the same scene and checks in each language, rendering the same image. Only <code>demos/interop/</code>, which shows Python's GPU interop (Warp, DLPack, CUDA streams), is Python alone. A demo is named as its files, <code>demo_&lt;category&gt;_&lt;name&gt;</code>, such as <code>demo_lighting_illuminants</code>, wherever it runs: <code>--demo</code>, <code>python -m ernie.demos</code> and its own program. They run the same way, after Newton's examples.</p>
 <h2 id="running-a-demo">Running a demo</h2>
 <p>The <code>ernie</code> program, which <code>pip install ernie-renderer</code> puts on the path, runs the C++ demos:</p>
 <pre><code class="language-sh">ernie                                  # the viewer on the default scene, with the Demos panel
-ernie --demo lighting/illuminants      # the viewer with a demo running
+ernie --demo demo_lighting_illuminants # the viewer with a demo running
 ernie --list                           # every demo's name
 ernie scene.json                       # the viewer on a scene file (ernie.save_scene's JSON)
 ernie scene.json --output scene.png    # renders a scene file without a window
 </code></pre>
 <p><code>python -m ernie.demos</code> runs the Python demos, which the package ships as <code>ernie.demos</code>:</p>
-<pre><code class="language-sh">python -m ernie.demos                         # viewer/custom_panel
+<pre><code class="language-sh">python -m ernie.demos                            # demo_viewer_custom_panel
 python -m ernie.demos --list
-python -m ernie.demos lighting/illuminants    # one by name, with its options after it
+python -m ernie.demos demo_lighting_illuminants  # one by name, with its options after it
 </code></pre>
-<p>From a checkout, run the files themselves (<code>PYTHONPATH=build/python python demos/lighting/illuminants.py</code>), or a C++ demo's own program, which <code>-DERNIE_BUILD_DEMOS=ON</code> builds as <code>demo_&lt;category&gt;_&lt;name&gt;</code> (<code>build/bin/demo_lighting_illuminants</code>).</p>
-<p>Each opens the viewer with a Demos panel at the bottom, a tab beside the Log and Stats. It lists the demos in the same language under a collapsing header per category; choosing one clears the scene and builds that demo in the same window. Below the list it pauses, single-steps and resets the running demo, describes it, and shows its options. A demo builds its options from widgets (<code>widgets</code> in Python, <code>Widgets()</code> in C++): text, text fields, buttons, checkboxes, sliders, drop-downs (combos), colour pickers and live plots; <code>viewer/custom_panel</code> uses each. C++ demos can also draw Dear ImGui directly in <code>Gui()</code>.</p>
+<p>From a checkout, run the files themselves (<code>PYTHONPATH=build/python python demos/lighting/demo_lighting_illuminants.py</code>), or a C++ demo's own program, which <code>-DERNIE_BUILD_DEMOS=ON</code> builds under the same name (<code>build/bin/demo_lighting_illuminants</code>).</p>
+<p>Each opens the viewer with a Demos panel in the upper right, a tab beside the Stage. It lists the demos in the same language under a collapsing header per category; choosing one clears the scene and builds that demo in the same window. Below the list it pauses, single-steps and resets the running demo, describes it, and shows its options. A demo builds its options from widgets (<code>widgets</code> in Python, <code>Widgets()</code> in C++): text, text fields, buttons, checkboxes, sliders, drop-downs (combos), colour pickers and live plots; <code>demo_viewer_custom_panel</code> uses each. C++ demos can also draw Dear ImGui directly in <code>Gui()</code>.</p>
 <p>Every demo takes these options:</p>
 <table>
 <thead>
@@ -285,10 +285,10 @@ python -m ernie.demos lighting/illuminants    # one by name, with its options af
 </tbody>
 </table>
 <p>A demo's own options follow these; <code>--help</code> lists them all. For example:</p>
-<pre><code class="language-sh">ernie --demo lighting/illuminants --viewer null --output illuminants.png
-python -m ernie.demos lighting/illuminants --viewer null --output illuminants.png
-python -m ernie.demos viewer/custom_panel --headless --test
-ernie --demo viewer/custom_panel --benchmark --num-frames 300
+<pre><code class="language-sh">ernie --demo demo_lighting_illuminants --viewer null --output illuminants.png
+python -m ernie.demos demo_lighting_illuminants --viewer null --output illuminants.png
+python -m ernie.demos demo_viewer_custom_panel --headless --test
+ernie --demo demo_viewer_custom_panel --benchmark --num-frames 300
 </code></pre>
 <p>The Python tests (<code>ernie/test/python/test_demos.py</code>) run every demo in both languages with <code>--viewer null --test</code>, check that each has its twin, and check that the twins' <code>--output</code> images match.</p>
 <h2 id="writing-a-demo">Writing a demo</h2>

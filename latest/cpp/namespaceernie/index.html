@@ -247,6 +247,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">namespace</td>
+<td style="text-align: left;"><a href="../namespaceernie_1_1reflectance__table/"><strong>reflectance_table</strong></a> <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">namespace</td>
 <td style="text-align: left;"><a href="../namespaceernie_1_1render__vars/"><strong>render_vars</strong></a> <br><em>Render var names, after Omniverse's where it has the quantity.</em></td>
 </tr>
 <tr>
@@ -361,6 +365,10 @@
 <td style="text-align: left;"><a href="../structernie_1_1BandedConstituent/"><strong>BandedConstituent</strong></a> <br><em>A constituent averaged over a camera's spectral bands.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1BodyParams/"><strong>BodyParams</strong></a> <br><em>A</em> <a href="../classernie_1_1CelestialBody/"><em><strong>CelestialBody</strong></em></a> <em>far beyond the scene (</em><code>BodyParamsOf</code> <em>): drawn in the sky and eclipsing the sun.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1Boundable/"><strong>Boundable</strong></a> <br><em>What has local bounds: geometry and instancers, with an optional authored extent.</em></td>
 </tr>
@@ -399,6 +407,10 @@
 <tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1Capsule/"><strong>Capsule</strong></a> <br><em>A cylinder with hemispherical caps along its axis.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1CelestialBody/"><strong>CelestialBody</strong></a> <br><em>A sphere far beyond the scene, such as a moon, centred at its transform's origin: drawn in the sky behind the scene, lit by the sun with Lommel-Seeliger reflectance, and casting eclipse shadows on everything the sun lights, the air included, as it covers part of the sun's limb-darkened disc.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -701,6 +713,10 @@
 <td style="text-align: left;"><a href="../structernie_1_1MaterialSettings/"><strong>MaterialSettings</strong></a> <br><em>How a surface reflects light: a material's settings.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1MeasuredReflectance/"><strong>MeasuredReflectance</strong></a> <br><em>A measured reflectance spectrum Ernie embeds: its id (as a material names it in</em> <code>ernie:reflectance:library</code> <em>), what was measured, the ECOSTRESS file it comes from, and the spectrum, a fraction from 350 nm (or where its measurement starts) to 2.5 um and for most on into the thermal infrared, 12.5 to 15 um.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1Mesh/"><strong>Mesh</strong></a> <br><em>A polygon mesh: points and the faces over them.</em></td>
 </tr>
@@ -791,6 +807,10 @@
 <tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1Points/"><strong>Points</strong></a> <br><a href="../classernie_1_1Points/"><em><strong>Points</strong></em></a> <em>drawn as spheres</em><code>widths</code> <em>across, coloured by their display colour.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1PolarStereographicDem/"><strong>PolarStereographicDem</strong></a> <br><em>A planet's radius on a polar stereographic grid (spherical, true at the pole), as LOLA's polar LDEM products hold it:</em> <code>heights</code> <em>(metres above</em><code>referenceRadius</code> <em>) row by row,</em><code>mapScale</code> <em>metres a pixel at the pole.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
@@ -1350,6 +1370,10 @@
 <td style="text-align: left;"><a href="#function-atmosphereparamsof"><strong>AtmosphereParamsOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; terrain) <br><em>The</em> <a href="../classernie_1_1Atmosphere/"><em><strong>Atmosphere</strong></em></a> <em>at</em><code>path</code> <em>around the planet</em><a href="../classernie_1_1Terrain/"><em><strong>Terrain</strong></em></a> __<code>terrain</code> <em>(empty for none): with a planet</em><a href="../classernie_1_1Terrain/"><em><strong>Terrain</strong></em></a> <em>the planet is at the world's origin and has its radius unless</em><code>ernie:atmosphere:planetRadius</code> <em>sets one; without, it is that radius, else the preset planet's mean radius, centred that far below the origin.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-atmospherepresetradius"><strong>AtmospherePresetRadius</strong></a> (std::string_view preset) <br><em>The mean radius (metres) of an</em> <a href="../classernie_1_1Atmosphere/"><em><strong>Atmosphere</strong></em></a> <em>preset's planet, as</em><code>AtmosphereParamsOf</code> <em>takes it; 0 for an unknown preset.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">void</td>
 <td style="text-align: left;"><a href="#function-authorisdcamera"><strong>AuthorIsdCamera</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, const <a href="../structernie_1_1CameraParams/"><strong>CameraParams</strong></a> &amp; camera) <br><em>Authors the</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim at</em><code>path</code> <em>(defined if missing) with an ISD camera's geometry and exposure time only, as Python's</em><code>author_framelet</code> <em>does:</em><code>camera</code> <em>'s transform, scan (frame or pushbroom), focal length, apertures (the horizontal from the image's aspect) and their offsets, pushbroom line offset, Brown-Conrady distortion, clipping range and exposure time.</em></td>
 </tr>
@@ -1380,6 +1404,10 @@
 <tr>
 <td style="text-align: right;">glm::dvec3</td>
 <td style="text-align: left;"><a href="#function-bodydirection"><strong>BodyDirection</strong></a> (double latitudeDeg, double longitudeDeg) <br><em>The body-fixed unit vector of planetocentric latitude</em> <code>latitudeDeg</code> <em>and east longitude</em><code>longitudeDeg</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1BodyParams/"><strong>BodyParams</strong></a></td>
+<td style="text-align: left;"><a href="#function-bodyparamsof"><strong>BodyParamsOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) <br><em>A</em> <a href="../classernie_1_1CelestialBody/"><em><strong>CelestialBody</strong></em></a> <em>'s centre (its transform's origin), radius and albedo.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../classernie_1_1Path/"><strong>Path</strong></a></td>
@@ -1622,6 +1650,10 @@
 <td style="text-align: left;"><a href="#function-findprimtype"><strong>FindPrimType</strong></a> (std::string_view name) <br><em>The registered prim type named</em> <code>name</code> <em>, or null.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">const <a href="../structernie_1_1MeasuredReflectance/"><strong>MeasuredReflectance</strong></a> *</td>
+<td style="text-align: left;"><a href="#function-findreflectance"><strong>FindReflectance</strong></a> (std::string_view id) <br><em>The measured reflectance with id</em> <code>id</code> <em>, or null.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">const <a href="../classernie_1_1AttributeDef/"><strong>AttributeDef</strong></a> *</td>
 <td style="text-align: left;"><a href="#function-findxformop"><strong>FindXformOp</strong></a> (std::string_view attribute) <br><em>The transform op</em> <code>attribute</code> <em>names ("xformOp:orient", "xformOp:translate:pivot") as a declared attribute, any prim's:</em><code>xformOp:translate</code> <em>and the Euler rotations a</em><code>Vec3</code> <em>,</em><code>xformOp:scale</code> <em>a</em><code>Vec3</code> <em>or one number,</em><code>rotateX</code> <em>(Y, Z) a</em><code>Double</code> <em>in degrees,</em><code>xformOp:orient</code> <em>a</em><code>Quat</code> <em>and</em><code>xformOp:transform</code> <em>a</em><code>Matrix</code> <em>, each also taking an array of them, a pose per prim (</em><code>AttributeMeta::array</code> <em>); null for other names and ops Ernie does not know.</em></td>
 </tr>
@@ -1750,6 +1782,10 @@
 <td style="text-align: left;"><a href="#function-lightparamsof"><strong>LightParamsOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, const <a href="../structernie_1_1SpectralBands/"><strong>SpectralBands</strong></a> &amp; bands, const glm::dmat4 &amp; world) <br><code>LightParamsOf</code> <em>with</em><code>world</code> <em>standing in for the light's world transform, for a light posed on the GPU (</em><code>RenderPrims::lightTransforms</code> <em>).</em></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="../structernie_1_1LightPatternImage/"><strong>LightPatternImage</strong></a></td>
+<td style="text-align: left;"><a href="#function-lightpatternimageof"><strong>LightPatternImageOf</strong></a> (const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp; array) <br><em>A float32 (rows, cols) host array of a pattern's relative power, rows top to bottom, as a</em> <code>LightPatternImage</code> <em>with its mip levels.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1ShaderModuleSource/"><strong>ShaderModuleSource</strong></a> &gt;</td>
 <td style="text-align: left;"><a href="#function-lightpatternmodules"><strong>LightPatternModules</strong></a> (const <a href="../classernie_1_1LightPatternRegistry/"><strong>LightPatternRegistry</strong></a> &amp; registry) <br><em>The Slang modules a shader drawing</em> <code>registry</code> <em>'s patterns compiles with:</em><code>light_pattern</code> <em>, each pattern's module, and</em><code>light_patterns</code> <em>, whose</em><code>lightPattern(index, input, p)</code> <em>calls pattern</em><code>index</code> <em>'s</em><code>emission</code> <em>(0 for none).</em></td>
 </tr>
@@ -1792,6 +1828,10 @@
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1LocalTerrain/"><strong>LocalTerrain</strong></a></td>
 <td style="text-align: left;"><a href="#function-localterrainof"><strong>LocalTerrainOf</strong></a> (const <a href="../structernie_1_1CylindricalDem/"><strong>CylindricalDem</strong></a> &amp; dem, double latitudeDeg, double longitudeDeg, std::uint32_t cells, double cellSize) <br><em>The</em> <code>cells</code> <em>x</em><code>cells</code> <em>heightfield of</em><code>dem</code> <em>,</em><code>cellSize</code> <em>metres apart, about latitude</em><code>latitudeDeg</code> <em>and east longitude</em><code>longitudeDeg</code> <em>(</em><code>LocalTerrain</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1LocalTerrain/"><strong>LocalTerrain</strong></a></td>
+<td style="text-align: left;"><a href="#function-localterrainof"><strong>LocalTerrainOf</strong></a> (const <a href="../structernie_1_1PolarStereographicDem/"><strong>PolarStereographicDem</strong></a> &amp; dem, double latitudeDeg, double longitudeDeg, std::uint32_t cells, double cellSize) <br></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; std::pair&lt; std::string, <a href="../classernie_1_1Value/"><strong>Value</strong></a> &gt; &gt;</td>
@@ -1952,6 +1992,14 @@
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1IsdSensor/"><strong>IsdSensor</strong></a></td>
 <td style="text-align: left;"><a href="#function-readisdfile"><strong>ReadIsdFile</strong></a> (const std::string &amp; path) <br><code>ReadIsd</code> <em>of the file at</em><code>path</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1PolarStereographicDem/"><strong>PolarStereographicDem</strong></a></td>
+<td style="text-align: left;"><a href="#function-readpolarstereographicdem"><strong>ReadPolarStereographicDem</strong></a> (const std::string &amp; labelPath) <br><em>Reads the DEM a PDS3 label at</em> <code>labelPath</code> <em>describes, as</em><code>ReadCylindricalDem</code> <em>but on a polar stereographic grid.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::span&lt; const <a href="../structernie_1_1MeasuredReflectance/"><strong>MeasuredReflectance</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-reflectancelibrary"><strong>ReflectanceLibrary</strong></a> () <br><em>The measured reflectances, from the ECOSTRESS Spectral Library (tools/reflectance_library.py): green rye grass ("grass"), chamise leaves ("chaparral"), wild oat litter ("dry_grass"), a sandy loam and a sand ("loam", "sand"), weathered concrete, asphalt, red brick and pine ("concrete", "asphalt", "brick", "pine_wood"), black and olive alkyd paints ("black_paint", "olive_paint"), a white roof coating ("white_coating"), weathered aluminium, galvanized steel and copper ("aluminium", "galvanized_steel", "copper"), fine and granular snow, ice and tap water ("fine_snow", "granular_snow", "ice", "water").</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::dvec3</td>
@@ -2184,7 +2232,7 @@
 * G. A. Neumann, "Lunar Reconnaissance Orbiter Lunar Orbiter Laser
   Altimeter Reduced Data Record and Derived Products Software
   Interface Specification", version 2.42, 2010 (the LDEM products, their labels and simple cylindrical grids).
-* J. P. Snyder, "Map Projections: A Working Manual", USGS Professional Paper 1395, 1987 (the equirectangular projection).The view reads and writes the scene's attributes by their USD names, so it changes nothing about storage or change tracking; unset attributes read as the declared fallback, the one place Ernie keeps it.</p>
+* J. P. Snyder, "Map Projections: A Working Manual", USGS Professional Paper 1395, 1987 (the equirectangular projection; the polar stereographic, eq. 21-33 and 21-34).The view reads and writes the scene's attributes by their USD names, so it changes nothing about storage or change tracking; unset attributes read as the declared fallback, the one place Ernie keeps it.</p>
 <p>A schema's header declares its attributes with an X-macro list and its class with <code>ERNIE_SCHEMA_BODY</code>; its source defines the registry entry with <code>ERNIE_DEFINE_SCHEMA</code>, and <code>prim_type.cpp</code> lists it in the registry. See <code>light_schemas.h</code>.</p>
 <p>References:
 * Blender, Cycles' node types and sockets (<code>NODE_DEFINE</code>, <code>SOCKET_*</code>, <code>NODE_SOCKET_API</code>), <a href="https://projects.blender.org/blender/cycles/src/branch/main/src/graph/node_type.h">https://projects.blender.org/blender/cycles/src/branch/main/src/graph/node_type.h</a>
@@ -2828,6 +2876,14 @@ Rendering", Journal of Computer Graphics Techniques 9(3):21-38, 2020 (pcg3d).</p
 </ul>
 <hr>
 
+<h3 id="function-atmospherepresetradius">function AtmospherePresetRadius</h3>
+<p><em>The mean radius (metres) of an</em> <a href="../classernie_1_1Atmosphere/"><em><strong>Atmosphere</strong></em></a> <em>preset's planet, as</em><code>AtmosphereParamsOf</code> <em>takes it; 0 for an unknown preset.</em></p>
+<pre><code class="language-C++">double ernie::AtmospherePresetRadius (
+    std::string_view preset
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-authorisdcamera">function AuthorIsdCamera</h3>
 <p><em>Authors the</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim at</em><code>path</code> <em>(defined if missing) with an ISD camera's geometry and exposure time only, as Python's</em><code>author_framelet</code> <em>does:</em><code>camera</code> <em>'s transform, scan (frame or pushbroom), focal length, apertures (the horizontal from the image's aspect) and their offsets, pushbroom line offset, Brown-Conrady distortion, clipping range and exposure time.</em></p>
 <pre><code class="language-C++">void ernie::AuthorIsdCamera (
@@ -2901,6 +2957,19 @@ Rendering", Journal of Computer Graphics Techniques 9(3):21-38, 2020 (pcg3d).</p
     double longitudeDeg
 ) 
 </code></pre>
+<hr>
+
+<h3 id="function-bodyparamsof">function BodyParamsOf</h3>
+<p><em>A</em> <a href="../classernie_1_1CelestialBody/"><em><strong>CelestialBody</strong></em></a> <em>'s centre (its transform's origin), radius and albedo.</em></p>
+<pre><code class="language-C++">BodyParams ernie::BodyParamsOf (
+    const Scene &amp; scene,
+    const Path &amp; path
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for another prim type. </li>
+</ul>
 <hr>
 
 <h3 id="function-boundmaterial">function BoundMaterial</h3>
@@ -3501,6 +3570,14 @@ Sampling", SIGGRAPH 2005 posters. <a href="https://vgl.ict.usc.edu/Research/Medi
 </code></pre>
 <hr>
 
+<h3 id="function-findreflectance">function FindReflectance</h3>
+<p><em>The measured reflectance with id</em> <code>id</code> <em>, or null.</em></p>
+<pre><code class="language-C++">const MeasuredReflectance * ernie::FindReflectance (
+    std::string_view id
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-findxformop">function FindXformOp</h3>
 <p><em>The transform op</em> <code>attribute</code> <em>names ("xformOp:orient", "xformOp:translate:pivot") as a declared attribute, any prim's:</em><code>xformOp:translate</code> <em>and the Euler rotations a</em><code>Vec3</code> <em>,</em><code>xformOp:scale</code> <em>a</em><code>Vec3</code> <em>or one number,</em><code>rotateX</code> <em>(Y, Z) a</em><code>Double</code> <em>in degrees,</em><code>xformOp:orient</code> <em>a</em><code>Quat</code> <em>and</em><code>xformOp:transform</code> <em>a</em><code>Matrix</code> <em>, each also taking an array of them, a pose per prim (</em><code>AttributeMeta::array</code> <em>); null for other names and ops Ernie does not know.</em></p>
 <pre><code class="language-C++">const AttributeDef * ernie::FindXformOp (
@@ -3872,6 +3949,18 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 </code></pre>
 <hr>
 
+<h3 id="function-lightpatternimageof">function LightPatternImageOf</h3>
+<p><em>A float32 (rows, cols) host array of a pattern's relative power, rows top to bottom, as a</em> <code>LightPatternImage</code> <em>with its mip levels.</em></p>
+<pre><code class="language-C++">LightPatternImage ernie::LightPatternImageOf (
+    const Tensor &amp; array
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for another type, rank or device, or more than 65535 on a side. </li>
+</ul>
+<hr>
+
 <h3 id="function-lightpatternmodules">function LightPatternModules</h3>
 <p><em>The Slang modules a shader drawing</em> <code>registry</code> <em>'s patterns compiles with:</em><code>light_pattern</code> <em>, each pattern's module, and</em><code>light_patterns</code> <em>, whose</em><code>lightPattern(index, input, p)</code> <em>calls pattern</em><code>index</code> <em>'s</em><code>emission</code> <em>(0 for none).</em></p>
 <pre><code class="language-C++">std::vector&lt; ShaderModuleSource &gt; ernie::LightPatternModules (
@@ -3987,6 +4076,17 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 <ul>
 <li><code>std::invalid_argument</code> for fewer than 2 cells or a non-positive cell size. </li>
 </ul>
+<hr>
+
+<h3 id="function-localterrainof_1">function LocalTerrainOf</h3>
+<pre><code class="language-C++">LocalTerrain ernie::LocalTerrainOf (
+    const PolarStereographicDem &amp; dem,
+    double latitudeDeg,
+    double longitudeDeg,
+    std::uint32_t cells,
+    double cellSize
+) 
+</code></pre>
 <hr>
 
 <h3 id="function-localtransformedits">function LocalTransformEdits</h3>
@@ -4455,6 +4555,30 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 <ul>
 <li><code>std::runtime_error</code> if the file cannot be read, or as <code>ReadIsd</code>. </li>
 </ul>
+<hr>
+
+<h3 id="function-readpolarstereographicdem">function ReadPolarStereographicDem</h3>
+<p><em>Reads the DEM a PDS3 label at</em> <code>labelPath</code> <em>describes, as</em><code>ReadCylindricalDem</code> <em>but on a polar stereographic grid.</em></p>
+<pre><code class="language-C++">PolarStereographicDem ernie::ReadPolarStereographicDem (
+    const std::string &amp; labelPath
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>as</code> <code>ReadCylindricalDem</code>, and std::invalid_argument for a projection not centred on a pole. </li>
+</ul>
+<hr>
+
+<h3 id="function-reflectancelibrary">function ReflectanceLibrary</h3>
+<p><em>The measured reflectances, from the ECOSTRESS Spectral Library (tools/reflectance_library.py): green rye grass ("grass"), chamise leaves ("chaparral"), wild oat litter ("dry_grass"), a sandy loam and a sand ("loam", "sand"), weathered concrete, asphalt, red brick and pine ("concrete", "asphalt", "brick", "pine_wood"), black and olive alkyd paints ("black_paint", "olive_paint"), a white roof coating ("white_coating"), weathered aluminium, galvanized steel and copper ("aluminium", "galvanized_steel", "copper"), fine and granular snow, ice and tap water ("fine_snow", "granular_snow", "ice", "water").</em> </p>
+<pre><code class="language-C++">std::span&lt; const MeasuredReflectance &gt; ernie::ReflectanceLibrary () 
+</code></pre>
+<p>Beyond the visible they reflect as the materials do, which colours cannot say: green leaves bright in the near infrared (the red edge), snow dark past 1.4 um, metals bright in the thermal infrared.</p>
+<p>References:
+* S. K. Meerdink, S. J. Hook, D. A. Roberts and E. A. Abbott, "The
+  ECOSTRESS spectral library version 1.0", Remote Sensing of Environment 230:111196, 2019.
+* A. M. Baldridge, S. J. Hook, C. I. Grove and G. Rivera, "The
+  ASTER spectral library version 2.0", Remote Sensing of Environment 113(4):711-715, 2009. </p>
 <hr>
 
 <h3 id="function-reflectancetolinearsrgb">function ReflectanceToLinearSrgb</h3>

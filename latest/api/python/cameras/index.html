@@ -160,6 +160,10 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.read_cylindrical_dem"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;read_cylindrical_dem</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.PolarStereographicDem"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;PolarStereographicDem</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.read_polar_stereographic_dem"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;read_polar_stereographic_dem</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.local_terrain_of"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;local_terrain_of</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.author_singlet_chromatic"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;author_singlet_chromatic</a>
@@ -2236,6 +2240,333 @@
 
 </div>
 
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="ernie.PolarStereographicDem" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">PolarStereographicDem</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">PolarStereographicDem(reference_radius: float)</code></pre>
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>A planet's radius on a polar stereographic grid (spherical, true at the pole), as LOLA's polar LDEM products hold it: heights in metres above reference_radius, map_scale metres a pixel. Made empty, it is the bare reference sphere of <code>reference_radius</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            height_at (ernie.PolarStereographicDem.height_at)" href="#ernie.PolarStereographicDem.height_at">height_at</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The height (m) at planetocentric latitude and east longitude (degrees), bilinear between cell centres.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            to_grid (ernie.PolarStereographicDem.to_grid)" href="#ernie.PolarStereographicDem.to_grid">to_grid</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The fractional (line, sample) of a latitude and east longitude (degrees), cell centres at whole numbers.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>center_latitude</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>center_longitude</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>lines</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>map_scale</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>reference_radius</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>samples</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.PolarStereographicDem.center_latitude" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">center_latitude</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">center_latitude: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.PolarStereographicDem.center_longitude" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">center_longitude</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">center_longitude: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.PolarStereographicDem.lines" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">lines</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">lines: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.PolarStereographicDem.map_scale" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">map_scale</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">map_scale: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.PolarStereographicDem.reference_radius" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">reference_radius</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">reference_radius: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.PolarStereographicDem.samples" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">samples</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">samples: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.PolarStereographicDem.height_at" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">height_at</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">height_at(latitude: float, longitude: float) -&gt; float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The height (m) at planetocentric latitude and east longitude (degrees), bilinear between cell centres.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.PolarStereographicDem.to_grid" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">to_grid</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">to_grid(latitude: float, longitude: float) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The fractional (line, sample) of a latitude and east longitude (degrees), cell centres at whole numbers.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.read_polar_stereographic_dem" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">read_polar_stereographic_dem</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">read_polar_stereographic_dem(label_path: str) -&gt; PolarStereographicDem</code></pre>
+
+    <div class="doc doc-contents first">
+
+        <p>Reads the DEM a PDS3 label describes on a polar stereographic grid (LOLA's polar LDEM products).</p>
+
+
+    </div>
+
+</div>
+
 <div class="doc doc-object doc-function">
 
 
@@ -2245,7 +2576,11 @@
 
 </h2>
 <pre class="highlight"><code class="language-python doc-signature">local_terrain_of(
-    dem: CylindricalDem, latitude: float, longitude: float, cells: int, cell_size: float
+    dem: PolarStereographicDem | CylindricalDem,
+    latitude: float,
+    longitude: float,
+    cells: int,
+    cell_size: float,
 ) -&gt; dict</code></pre>
 
     <div class="doc doc-contents first">

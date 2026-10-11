@@ -235,6 +235,10 @@
 <td style="text-align: left;"><a href="#function-compute"><strong>Compute</strong></a> (std::string * why=nullptr) = 0<br><em>The compute interop (CUDA or HIP) of the delegate's device, connected on first use; null if unavailable, with the reason in</em> <code>why</code> <em>if given.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">virtual bool</td>
+<td style="text-align: left;"><a href="#function-haslightpattern"><strong>HasLightPattern</strong></a> (std::string_view id) const<br><em>Whether light pattern</em> <code>id</code> <em>is registered, built in or added.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">virtual const <a href="../structernie_1_1RendererInfo/"><strong>RendererInfo</strong></a> &amp;</td>
 <td style="text-align: left;"><a href="#function-info"><strong>Info</strong></a> () const = 0<br></td>
 </tr>
@@ -413,6 +417,14 @@
 <pre><code class="language-C++">virtual ComputeInterop * ernie::RenderDelegate::Compute (
     std::string * why=nullptr
 ) = 0
+</code></pre>
+<hr>
+
+<h3 id="function-haslightpattern">function HasLightPattern</h3>
+<p><em>Whether light pattern</em> <code>id</code> <em>is registered, built in or added.</em></p>
+<pre><code class="language-C++">inline virtual bool ernie::RenderDelegate::HasLightPattern (
+    std::string_view id
+) const
 </code></pre>
 <hr>
 

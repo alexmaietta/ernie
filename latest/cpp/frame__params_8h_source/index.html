@@ -364,11 +364,28 @@ struct LightParams {
         float zeroOrder = 0.0f;
         std::vector&lt;float&gt; patternData;
         std::shared_ptr&lt;const LightPatternImage&gt; patternImage;
+        Tensor patternArray;
+        std::uintptr_t patternArrayStream = 1;
+        std::string patternArrayKey;
         float wavelength = 0.0f;  
+        double pulseRate = 0.0;
+        double pulseWidth = 0.0;
+        double pulseDelay = 0.0;
+        int sequenceCount = 1;
+        double sequencePeriod = 1.0;
+        double sequenceDelay = 0.0;
 
         bool IsSpot() const {
             return pattern == &quot;spot&quot;;
         }
+
+        struct Lit {
+            std::uint32_t frame = 0;
+            float weight = 0.0f;
+        };
+        static constexpr std::size_t kMaxLit = 4;
+
+        std::vector&lt;Lit&gt; LitBetween(double start, double end) const;
     };
     Beam beam;
     bool shadows = true;
@@ -414,6 +431,8 @@ struct AtmosphereParams {
     double hazeOpticalDepth = 0.1;  
     double ozoneColumn = 300.0;     
     double dustOpticalDepth = 0.5;  
+    double cloudTop = 0.0;
+    double cloudCover = 0.5;
 
     bool operator==(const AtmosphereParams&amp;) const = default;
 
@@ -422,6 +441,14 @@ struct AtmosphereParams {
         placed.planetCentre = planetCentre;
         return placed == *this;
     }
+};
+
+struct BodyParams {
+    glm::dvec3 centre{0.0};   
+    double radius = 0.0;      
+    glm::vec3 albedo{0.12f};  
+
+    bool operator==(const BodyParams&amp;) const = default;
 };
 
 struct FrameParams {
@@ -444,6 +471,8 @@ struct FrameParams {
         stars;  
     std::optional&lt;AtmosphereParams&gt;
         atmosphere;  
+    std::vector&lt;BodyParams&gt; bodies;
+    static constexpr std::size_t kMaxBodies = 4;
     float exposure =
         1.0f;  
     bool meter =
