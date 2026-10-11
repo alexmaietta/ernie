@@ -445,7 +445,8 @@ void Scene::Write(const PrimSet& prims, std::string_view attribute, const Tensor
     std::vector<const PrimTypeDef*> checked;
     for (std::size_t i = 0; i < prims.Size(); ++i) {
         const PrimTypeDef* schema = static_cast<PrimData*>(prims.prims_[i])->schema;
-        if (schema != nullptr && std::find(checked.begin(), checked.end(), schema) == checked.end()) {
+        if (schema != nullptr &&
+            std::find(checked.begin(), checked.end(), schema) == checked.end()) {
             Validate(*schema, prims.Paths()[i], attribute, nullptr);
             checked.push_back(schema);
         }

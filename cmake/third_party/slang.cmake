@@ -39,6 +39,8 @@ find_package(
     REQUIRED
     PATHS
     "${slang_SOURCE_DIR}/lib/cmake/slang"
+    # The Windows release keeps its CMake package at the top.
+    "${slang_SOURCE_DIR}/cmake"
     NO_DEFAULT_PATH)
 
 # Visible to applications that install Slang's runtime library beside their binaries.
@@ -57,5 +59,7 @@ file(
     "${slang_library_dir}/libslang-compiler.so.*"
     "${slang_library_dir}/libslang-glslang-*.so"
     "${slang_library_dir}/libslang-compiler*.dylib"
-    "${slang_library_dir}/libslang-glslang-*.dylib")
+    "${slang_library_dir}/libslang-glslang-*.dylib"
+    "${slang_library_dir}/slang-compiler.dll"
+    "${slang_library_dir}/slang-glslang.dll")
 set(ERNIE_SLANG_RUNTIME_DIR "${slang_library_dir}")

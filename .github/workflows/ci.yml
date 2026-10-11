@@ -229,6 +229,35 @@ jobs:
           name: wheel-linux-${{ matrix.arch }}
           path: wheelhouse/*.whl
 
+  # The aarch64 wheel installed and tested on Ubuntu's arm64 runner, on its lavapipe: AlmaLinux 9
+  # (the wheel's build image) has no lavapipe for aarch64, so cibuildwheel skips testing it there.
+  wheel-test:
+    name: wheel-test (aarch64)
+    needs: wheel
+    runs-on: ubuntu-24.04-arm
+    env:
+      ERNIE_TEST_REQUIRE_VALIDATION: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: wheel-linux-aarch64
+          path: wheelhouse
+      - name: Install Vulkan (lavapipe, validation layers)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mesa-vulkan-drivers vulkan-validationlayers libvulkan1 xvfb
+      - uses: astral-sh/setup-uv@v6
+      - name: Install the wheel
+        run: |
+          uv venv --python 3.12
+          uv pip install wheelhouse/*.whl pytest pillow
+      - name: Test on lavapipe
+        run: |
+          VK_DRIVER_FILES=$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' | head -n1)
+          export VK_DRIVER_FILES
+          xvfb-run -a .venv/bin/python -m pytest -q -p no:cacheprovider ernie/test/python
+
   sdist:
     needs: version
     runs-on: ubuntu-24.04

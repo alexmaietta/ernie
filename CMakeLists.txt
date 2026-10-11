@@ -15,7 +15,10 @@ project(
 # A pre-release suffix for builds between releases, such as ".dev12" (PEP 440): CI sets it to the
 # commits since the last tag on pushes to main; releases, tagged vX.Y.Z, leave it empty. The wheel
 # reads it here too (pyproject.toml), and the packages turn it into "~dev12".
+# One line, as CI rewrites it and the wheel's version regex reads it.
+# cmake-format: off
 set(ERNIE_VERSION_SUFFIX "" CACHE STRING "Pre-release suffix of Ernie's version, such as .dev12")
+# cmake-format: on
 set(ERNIE_VERSION "${PROJECT_VERSION}${ERNIE_VERSION_SUFFIX}")
 
 option(ERNIE_BUILD_TESTS "Build Ernie's tests" OFF)

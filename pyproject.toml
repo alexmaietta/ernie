@@ -89,10 +89,14 @@ manylinux-aarch64-image = "manylinux_2_34"
 build-verbosity = 1
 test-extras = ["test"]
 test-command = "VK_DRIVER_FILES=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n 1) python -m pytest -q -p no:cacheprovider {project}/ernie/test/python"
+# AlmaLinux 9 has no lavapipe for aarch64: CI tests that wheel on Ubuntu's arm64 runner instead
+# (the wheel-test job).
+test-skip = "*-manylinux_aarch64"
 
 [tool.cibuildwheel.linux]
-# The viewer's window system headers to build; Mesa's lavapipe to test.
-before-all = "dnf install -y -q --enablerepo=crb libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel libXext-devel wayland-devel wayland-protocols-devel libxkbcommon-devel mesa-vulkan-drivers vulkan-loader"
+# The viewer's window system headers to build; Mesa's lavapipe to test (x86_64 only, see
+# test-skip).
+before-all = "dnf install -y -q --enablerepo=crb libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel libXext-devel wayland-devel wayland-protocols-devel libxkbcommon-devel && dnf install -y -q --setopt=strict=0 mesa-vulkan-drivers vulkan-loader"
 # Slang's runtime is already in the wheel beside the module, found through $ORIGIN.
 repair-wheel-command = "auditwheel repair --exclude 'libslang-*' -w {dest_dir} {wheel}"
 # Builds in the container's own directory: a local run copies the checkout in, and a build/wheel
