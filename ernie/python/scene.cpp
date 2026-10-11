@@ -1449,20 +1449,66 @@ void BindScene(nb::module_& m) {
           "Reads the DEM a PDS3 label describes (LOLA's LDEM "
           "products: 16- or 32-bit integers or 32-bit reals on a "
           "simple cylindrical grid).");
+    nb::class_<PolarStereographicDem>(
+        m, "PolarStereographicDem",
+        "A planet's radius on a polar stereographic grid (spherical, "
+        "true at the pole), as LOLA's polar LDEM products hold it: "
+        "heights in metres above reference_radius, map_scale metres "
+        "a "
+        "pixel.")
+        .def_ro("lines", &PolarStereographicDem::lines)
+        .def_ro("samples", &PolarStereographicDem::samples)
+        .def_ro("map_scale", &PolarStereographicDem::mapScale)
+        .def_ro("center_latitude",
+                &PolarStereographicDem::centerLatitudeDeg)
+        .def_ro("center_longitude",
+                &PolarStereographicDem::centerLongitudeDeg)
+        .def_ro("reference_radius",
+                &PolarStereographicDem::referenceRadius)
+        .def(
+            "to_grid",
+            [](const PolarStereographicDem& dem, double latitude,
+               double longitude) {
+                const glm::dvec2 at = dem.ToGrid(latitude, longitude);
+                return nb::make_tuple(at.x, at.y);
+            },
+            nb::arg("latitude"), nb::arg("longitude"),
+            "The fractional (line, sample) of a latitude and east "
+            "longitude (degrees), cell centres at whole numbers.")
+        .def("height_at", &PolarStereographicDem::HeightAt,
+             nb::arg("latitude"), nb::arg("longitude"),
+             "The height (m) at planetocentric latitude and east "
+             "longitude (degrees), bilinear between cell centres.");
+    m.def("read_polar_stereographic_dem", &ReadPolarStereographicDem,
+          nb::arg("label_path"),
+          "Reads the DEM a PDS3 label describes on a polar "
+          "stereographic grid (LOLA's polar LDEM products).");
+    const auto localTerrain = [](const LocalTerrain& terrain) {
+        nb::dict result;
+        result["heights"] = ArrayFromTensor(terrain.heights);
+        result["origin"] =
+            nb::make_tuple(terrain.origin.x, terrain.origin.y);
+        result["cell_size"] = terrain.cellSize;
+        result["body_to_local"] = MatrixToPython(terrain.bodyToLocal);
+        return result;
+    };
     m.def(
         "local_terrain_of",
-        [](const CylindricalDem& dem, double latitude,
-           double longitude, std::uint32_t cells, double cellSize) {
-            const LocalTerrain terrain = LocalTerrainOf(
-                dem, latitude, longitude, cells, cellSize);
-            nb::dict result;
-            result["heights"] = ArrayFromTensor(terrain.heights);
-            result["origin"] =
-                nb::make_tuple(terrain.origin.x, terrain.origin.y);
-            result["cell_size"] = terrain.cellSize;
-            result["body_to_local"] =
-                MatrixToPython(terrain.bodyToLocal);
-            return result;
+        [localTerrain](const PolarStereographicDem& dem,
+                       double latitude, double longitude,
+                       std::uint32_t cells, double cellSize) {
+            return localTerrain(LocalTerrainOf(
+                dem, latitude, longitude, cells, cellSize));
+        },
+        nb::arg("dem"), nb::arg("latitude"), nb::arg("longitude"),
+        nb::arg("cells"), nb::arg("cell_size"));
+    m.def(
+        "local_terrain_of",
+        [localTerrain](const CylindricalDem& dem, double latitude,
+                       double longitude, std::uint32_t cells,
+                       double cellSize) {
+            return localTerrain(LocalTerrainOf(
+                dem, latitude, longitude, cells, cellSize));
         },
         nb::arg("dem"), nb::arg("latitude"), nb::arg("longitude"),
         nb::arg("cells"), nb::arg("cell_size"),

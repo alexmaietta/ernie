@@ -16,7 +16,8 @@ namespace ernie {
 
 namespace {
 
-constexpr double kDegree = std::numbers::pi / 180.0;
+constexpr double kPi = std::numbers::pi;
+constexpr double kDegree = kPi / 180.0;
 
 std::string Trim(std::string_view text) {
     std::size_t begin = 0;
@@ -143,17 +144,17 @@ Pds3Label ParsePds3Label(std::string_view text) {
     return label;
 }
 
-double CylindricalDem::HeightAt(double latitudeDeg,
-                                double longitudeDeg) const {
+namespace {
+
+/// `heights` (`lines` rows of `samples`) at fractional line `line`
+/// and sample `sample` (cell centres at whole numbers), bilinear,
+/// clamped to the grid's edges; 0 for an empty grid.
+double Bilinear(const std::vector<float>& heights,
+                std::uint32_t lines, std::uint32_t samples,
+                double line, double sample) {
     if (lines == 0 || samples == 0) {
         return 0.0;
     }
-    double east =
-        std::fmod(longitudeDeg - westLongitudeDeg, 360.0) + 360.0;
-    east = std::fmod(east, 360.0);
-    const double line =
-        (maxLatitudeDeg - latitudeDeg) * pixelsPerDegree - 0.5;
-    const double sample = east * pixelsPerDegree - 0.5;
     const double y = std::clamp(line, 0.0, double(lines - 1));
     const double x = std::clamp(sample, 0.0, double(samples - 1));
     const auto l0 = std::min<std::uint32_t>(
@@ -173,7 +174,8 @@ double CylindricalDem::HeightAt(double latitudeDeg,
     return top + ty * (bottom - top);
 }
 
-CylindricalDem ReadCylindricalDem(const std::string& labelPath) {
+/// The label at `labelPath`, parsed.
+Pds3Label ReadLabel(const std::string& labelPath) {
     std::ifstream labelFile(labelPath);
     if (!labelFile) {
         throw std::runtime_error("Cannot read the PDS3 label '" +
@@ -181,27 +183,29 @@ CylindricalDem ReadCylindricalDem(const std::string& labelPath) {
     }
     std::stringstream text;
     text << labelFile.rdbuf();
-    const Pds3Label label = ParsePds3Label(text.str());
+    return ParsePds3Label(text.str());
+}
 
-    const std::string projection =
-        label.Text("IMAGE_MAP_PROJECTION.MAP_PROJECTION_TYPE");
-    if (projection != "SIMPLE CYLINDRICAL" &&
-        projection != "EQUIRECTANGULAR") {
-        throw std::invalid_argument("The DEM's projection '" +
-                                    projection +
-                                    "' is not simple cylindrical");
-    }
-    CylindricalDem dem;
+/// A DEM's grid as its label describes it: its size, its heights
+/// (metres above the reference sphere) and that sphere's radius.
+struct DemGrid {
+    std::uint32_t lines = 0;
+    std::uint32_t samples = 0;
+    double referenceRadius = 0.0;
+    std::vector<float> heights;
+};
+
+/// Reads the IMAGE object of `label` (at `labelPath`): 16- or 32-bit
+/// LSB integers, or 32-bit LSB reals, each times SCALING_FACTOR, plus
+/// the label's OFFSET where the label says the heights are radii, in
+/// the file its ^IMAGE pointer names beside the label.
+DemGrid ReadGrid(const Pds3Label& label,
+                 const std::string& labelPath) {
+    DemGrid dem;
     dem.lines =
         static_cast<std::uint32_t>(label.Number("IMAGE.LINES"));
     dem.samples = static_cast<std::uint32_t>(
         label.Number("IMAGE.LINE_SAMPLES"));
-    dem.pixelsPerDegree =
-        label.Number("IMAGE_MAP_PROJECTION.MAP_RESOLUTION");
-    dem.maxLatitudeDeg =
-        label.Number("IMAGE_MAP_PROJECTION.MAXIMUM_LATITUDE");
-    dem.westLongitudeDeg =
-        label.Number("IMAGE_MAP_PROJECTION.WESTERNMOST_LONGITUDE");
     const double scale = label.Get("IMAGE.SCALING_FACTOR")
                              ? label.Number("IMAGE.SCALING_FACTOR")
                              : 1.0;
@@ -304,6 +308,112 @@ CylindricalDem ReadCylindricalDem(const std::string& labelPath) {
     return dem;
 }
 
+/// Local terrain about a point of a sphere of `radius`, its surface
+/// `heightAt(latitude, longitude)` above it (`LocalTerrainOf`).
+template <typename HeightAt>
+LocalTerrain LocalTerrainOn(double radius, const HeightAt& heightAt,
+                            double latitudeDeg, double longitudeDeg,
+                            std::uint32_t cells, double cellSize);
+
+}  // namespace
+
+double CylindricalDem::HeightAt(double latitudeDeg,
+                                double longitudeDeg) const {
+    double east =
+        std::fmod(longitudeDeg - westLongitudeDeg, 360.0) + 360.0;
+    east = std::fmod(east, 360.0);
+    return Bilinear(heights, lines, samples,
+                    (maxLatitudeDeg - latitudeDeg) * pixelsPerDegree -
+                        0.5,
+                    east * pixelsPerDegree - 0.5);
+}
+
+CylindricalDem ReadCylindricalDem(const std::string& labelPath) {
+    const Pds3Label label = ReadLabel(labelPath);
+    const std::string projection =
+        label.Text("IMAGE_MAP_PROJECTION.MAP_PROJECTION_TYPE");
+    if (projection != "SIMPLE CYLINDRICAL" &&
+        projection != "EQUIRECTANGULAR") {
+        throw std::invalid_argument("The DEM's projection '" +
+                                    projection +
+                                    "' is not simple cylindrical");
+    }
+    DemGrid grid = ReadGrid(label, labelPath);
+    CylindricalDem dem;
+    dem.lines = grid.lines;
+    dem.samples = grid.samples;
+    dem.referenceRadius = grid.referenceRadius;
+    dem.heights = std::move(grid.heights);
+    dem.pixelsPerDegree =
+        label.Number("IMAGE_MAP_PROJECTION.MAP_RESOLUTION");
+    dem.maxLatitudeDeg =
+        label.Number("IMAGE_MAP_PROJECTION.MAXIMUM_LATITUDE");
+    dem.westLongitudeDeg =
+        label.Number("IMAGE_MAP_PROJECTION.WESTERNMOST_LONGITUDE");
+    return dem;
+}
+
+glm::dvec2 PolarStereographicDem::ToGrid(double latitudeDeg,
+                                         double longitudeDeg) const {
+    const double lat = latitudeDeg * kDegree;
+    const double lon = (longitudeDeg - centerLongitudeDeg) * kDegree;
+    const bool south = centerLatitudeDeg < 0.0;
+    // Snyder 1987, eq. 21-33 and 21-34 for the sphere (k0 = 1, true
+    // at the pole): rho = 2 R tan(pi/4 -+ phi/2).
+    const double rho =
+        2.0 * referenceRadius *
+        std::tan(0.25 * kPi + (south ? 0.5 : -0.5) * lat);
+    const double x = rho * std::sin(lon);
+    const double y = (south ? 1.0 : -1.0) * rho * std::cos(lon);
+    return {lineProjectionOffset - y / mapScale,
+            sampleProjectionOffset + x / mapScale};
+}
+
+double PolarStereographicDem::HeightAt(double latitudeDeg,
+                                       double longitudeDeg) const {
+    const glm::dvec2 at = ToGrid(latitudeDeg, longitudeDeg);
+    return Bilinear(heights, lines, samples, at.x, at.y);
+}
+
+PolarStereographicDem
+ReadPolarStereographicDem(const std::string& labelPath) {
+    const Pds3Label label = ReadLabel(labelPath);
+    const std::string projection =
+        label.Text("IMAGE_MAP_PROJECTION.MAP_PROJECTION_TYPE");
+    if (projection != "POLAR STEREOGRAPHIC") {
+        throw std::invalid_argument("The DEM's projection '" +
+                                    projection +
+                                    "' is not polar stereographic");
+    }
+    DemGrid grid = ReadGrid(label, labelPath);
+    PolarStereographicDem dem;
+    dem.lines = grid.lines;
+    dem.samples = grid.samples;
+    dem.referenceRadius = grid.referenceRadius;
+    dem.heights = std::move(grid.heights);
+    dem.centerLatitudeDeg =
+        label.Number("IMAGE_MAP_PROJECTION.CENTER_LATITUDE");
+    if (std::abs(std::abs(dem.centerLatitudeDeg) - 90.0) > 1e-9) {
+        throw std::invalid_argument(
+            "The DEM's polar stereographic projection is not centred "
+            "on a pole");
+    }
+    dem.centerLongitudeDeg =
+        label.Get("IMAGE_MAP_PROJECTION.CENTER_LONGITUDE")
+            ? label.Number("IMAGE_MAP_PROJECTION.CENTER_LONGITUDE")
+            : 0.0;
+    dem.mapScale = label.Number("IMAGE_MAP_PROJECTION.MAP_SCALE");
+    if (label.Text("IMAGE_MAP_PROJECTION.MAP_SCALE").find("KM") !=
+        std::string::npos) {
+        dem.mapScale *= 1e3;
+    }
+    dem.lineProjectionOffset =
+        label.Number("IMAGE_MAP_PROJECTION.LINE_PROJECTION_OFFSET");
+    dem.sampleProjectionOffset =
+        label.Number("IMAGE_MAP_PROJECTION.SAMPLE_PROJECTION_OFFSET");
+    return dem;
+}
+
 glm::dvec3 BodyDirection(double latitudeDeg, double longitudeDeg) {
     const double lat = latitudeDeg * kDegree;
     const double lon = longitudeDeg * kDegree;
@@ -314,12 +424,36 @@ glm::dvec3 BodyDirection(double latitudeDeg, double longitudeDeg) {
 LocalTerrain LocalTerrainOf(const CylindricalDem& dem,
                             double latitudeDeg, double longitudeDeg,
                             std::uint32_t cells, double cellSize) {
+    return LocalTerrainOn(
+        dem.referenceRadius,
+        [&dem](double lat, double lon) {
+            return dem.HeightAt(lat, lon);
+        },
+        latitudeDeg, longitudeDeg, cells, cellSize);
+}
+
+LocalTerrain LocalTerrainOf(const PolarStereographicDem& dem,
+                            double latitudeDeg, double longitudeDeg,
+                            std::uint32_t cells, double cellSize) {
+    return LocalTerrainOn(
+        dem.referenceRadius,
+        [&dem](double lat, double lon) {
+            return dem.HeightAt(lat, lon);
+        },
+        latitudeDeg, longitudeDeg, cells, cellSize);
+}
+
+namespace {
+
+template <typename HeightAt>
+LocalTerrain LocalTerrainOn(double radius, const HeightAt& heightAt,
+                            double latitudeDeg, double longitudeDeg,
+                            std::uint32_t cells, double cellSize) {
     if (cells < 2 || !(cellSize > 0.0)) {
         throw std::invalid_argument(
             "A local terrain needs at least 2 cells a positive size "
             "apart");
     }
-    const double radius = dem.referenceRadius;
     // The local frame: up along the point's direction, east and north
     // along its parallel and meridian.
     const glm::dvec3 up = BodyDirection(latitudeDeg, longitudeDeg);
@@ -358,7 +492,7 @@ LocalTerrain LocalTerrainOf(const CylindricalDem& dem,
                 const double lat =
                     std::asin(std::clamp(d.z, -1.0, 1.0)) / kDegree;
                 const double along = std::atan2(d.y, d.x) / kDegree;
-                h = dem.HeightAt(lat, along);
+                h = heightAt(lat, along);
             }
             const double r = radius + h;
             z = std::sqrt(std::max(r * r - x * x - y * y, 0.0)) -
@@ -371,5 +505,7 @@ LocalTerrain LocalTerrainOf(const CylindricalDem& dem,
         heights, {std::int64_t(cells), std::int64_t(cells)});
     return terrain;
 }
+
+}  // namespace
 
 }  // namespace ernie

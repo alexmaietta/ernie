@@ -12,13 +12,24 @@
 
 namespace {
 
+/// The map projection of `WriteDem`'s labels by default: 4 samples a
+/// degree from 40 S and 340 E.
+constexpr const char* kCylindrical =
+    "  MAP_PROJECTION_TYPE = \"SIMPLE CYLINDRICAL\"\n"
+    "  MAP_RESOLUTION = 4 <pix/deg>\n"
+    "  A_AXIS_RADIUS = 1737.4 <km>\n"
+    "  MAXIMUM_LATITUDE = -40 <deg>\n"
+    "  WESTERNMOST_LONGITUDE = 340 <deg>\n";
+
 /// A LOLA LDEM-style label and 16-bit image of `heights` (metres,
 /// `lines` rows from the northern) in a directory of its own, half-
-/// metre steps above a 1737.4 km sphere, 4 samples a degree from 40 S
-/// and 340 E. Returns the label's path.
+/// metre steps above a 1737.4 km sphere, on map projection
+/// `projection` (the IMAGE_MAP_PROJECTION object's lines). Returns
+/// the label's path.
 std::string WriteDem(const std::string& name,
                      const std::vector<double>& heights, int lines,
-                     int samples) {
+                     int samples,
+                     const char* projection = kCylindrical) {
     const std::filesystem::path directory =
         std::filesystem::temp_directory_path() /
         ("ernie_scene_dem_test_" + name);
@@ -42,12 +53,7 @@ std::string WriteDem(const std::string& name,
           << "  OFFSET = 1737400.\n"
           << "END_OBJECT = IMAGE\n"
           << "OBJECT = IMAGE_MAP_PROJECTION\n"
-          << "  MAP_PROJECTION_TYPE = \"SIMPLE CYLINDRICAL\"\n"
-          << "  MAP_RESOLUTION = 4 <pix/deg>\n"
-          << "  A_AXIS_RADIUS = 1737.4 <km>\n"
-          << "  MAXIMUM_LATITUDE = -40 <deg>\n"
-          << "  WESTERNMOST_LONGITUDE = 340 <deg>\n"
-          << "END_OBJECT = IMAGE_MAP_PROJECTION\n"
+          << projection << "END_OBJECT = IMAGE_MAP_PROJECTION\n"
           << "END\n";
     return (directory / "TEST_DEM.LBL").string();
 }
@@ -125,4 +131,51 @@ TEST(LocalTerrain, HoldsThePlanetsCurvatureAndFramesThePoint) {
     EXPECT_NEAR(local.z, 0.001 * kRadius, 1e-6);
     EXPECT_THROW(ernie::LocalTerrainOf(dem, 0.0, 0.0, 1, 1.0),
                  std::invalid_argument);
+}
+
+TEST(PolarStereographicDem, ReadsLolasPolarLabelsAndProjectsThePole) {
+    // A south polar grid of 10 m pixels, the pole at the centre of 21
+    // x 21; heights rising 10 m a line and 1 m a sample.
+    constexpr int kSize = 21;
+    std::vector<double> heights;
+    for (int l = 0; l < kSize; ++l) {
+        for (int s = 0; s < kSize; ++s) {
+            heights.push_back(10.0 * l + s);
+        }
+    }
+    const std::string label =
+        WriteDem("polar", heights, kSize, kSize,
+                 "  MAP_PROJECTION_TYPE = \"POLAR STEREOGRAPHIC\"\n"
+                 "  A_AXIS_RADIUS = 1737.4 <km>\n"
+                 "  CENTER_LATITUDE = -90 <deg>\n"
+                 "  CENTER_LONGITUDE = 0 <deg>\n"
+                 "  MAP_SCALE = 10 <m/pix>\n"
+                 "  LINE_PROJECTION_OFFSET = 10.0 <pix>\n"
+                 "  SAMPLE_PROJECTION_OFFSET = 10.0 <pix>\n");
+    const ernie::PolarStereographicDem dem =
+        ernie::ReadPolarStereographicDem(label);
+    EXPECT_EQ(dem.lines, 21u);
+    EXPECT_EQ(dem.mapScale, 10.0);
+    EXPECT_EQ(dem.referenceRadius, 1737400.0);
+    const glm::dvec2 pole = dem.ToGrid(-90.0, 123.0);
+    EXPECT_NEAR(pole.x, 10.0, 1e-9);
+    EXPECT_NEAR(pole.y, 10.0, 1e-9);
+    // 20 m from the pole: along 90 E two samples right (x), along the
+    // prime meridian two lines up (y), as LOLA's grids lie.
+    constexpr double kRadius = 1737400.0;
+    const double latitude =
+        (2.0 * std::atan(20.0 / (2.0 * kRadius)) - 0.5 * M_PI) *
+        180.0 / M_PI;
+    EXPECT_NEAR(dem.HeightAt(latitude, 90.0), 10.0 * 10 + 12, 1e-6);
+    EXPECT_NEAR(dem.HeightAt(latitude, 0.0), 10.0 * 8 + 10, 1e-6);
+    EXPECT_NEAR(dem.HeightAt(latitude, 180.0), 10.0 * 12 + 10, 1e-6);
+    EXPECT_THROW(ernie::ReadCylindricalDem(label),
+                 std::invalid_argument);
+    EXPECT_THROW(ernie::ReadPolarStereographicDem(WriteDem(
+                     "notpolar", std::vector<double>(4, 0.0), 2, 2)),
+                 std::invalid_argument);
+    // A local terrain near the pole: flat ground about the point.
+    const ernie::LocalTerrain terrain =
+        ernie::LocalTerrainOf(dem, -89.9999, 0.0, 3, 1.0);
+    EXPECT_EQ(terrain.heights.Shape()[0], 3);
 }

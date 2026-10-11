@@ -16,6 +16,10 @@ Camera models read from mission files, planetary elevation models, and lens help
 
 ::: ernie.read_cylindrical_dem
 
+::: ernie.PolarStereographicDem
+
+::: ernie.read_polar_stereographic_dem
+
 ::: ernie.local_terrain_of
 
 ::: ernie.author_singlet_chromatic

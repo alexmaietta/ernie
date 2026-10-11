@@ -24,7 +24,8 @@
 ///   Interface Specification", version 2.42, 2010 (the LDEM products,
 ///   their labels and simple cylindrical grids).
 /// - J. P. Snyder, "Map Projections: A Working Manual", USGS
-///   Professional Paper 1395, 1987 (the equirectangular projection).
+///   Professional Paper 1395, 1987 (the equirectangular projection;
+///   the polar stereographic, eq. 21-33 and 21-34).
 namespace ernie {
 
 /// A PDS3 label's keywords, by name; a keyword inside an OBJECT
@@ -79,6 +80,41 @@ struct CylindricalDem {
 /// label it cannot follow.
 CylindricalDem ReadCylindricalDem(const std::string& labelPath);
 
+/// A planet's radius on a polar stereographic grid (spherical, true
+/// at the pole), as LOLA's polar LDEM products hold it: `heights`
+/// (metres above `referenceRadius`) row by row, `mapScale` metres a
+/// pixel at the pole. A point at polar distance rho = 2 R tan(45 +
+/// lat / 2) (south) or 2 R tan(45 - lat / 2) (north) and longitude
+/// lon from the centre longitude lies at x = rho sin(lon) and y = rho
+/// cos(lon) (south) or -rho cos(lon) (north), the cell centre at line
+/// lineProjectionOffset - y / mapScale and sample
+/// sampleProjectionOffset + x / mapScale (zero-based).
+struct PolarStereographicDem {
+    std::uint32_t lines = 0;
+    std::uint32_t samples = 0;
+    double mapScale = 1.0;  ///< Metres a pixel.
+    double lineProjectionOffset = 0.0;
+    double sampleProjectionOffset = 0.0;
+    double centerLatitudeDeg = -90.0;  ///< -90 or 90.
+    double centerLongitudeDeg = 0.0;
+    double referenceRadius = 0.0;  ///< Metres.
+    std::vector<float> heights;
+
+    /// Fractional (line, sample) of latitude `latitudeDeg` and east
+    /// longitude `longitudeDeg`.
+    glm::dvec2 ToGrid(double latitudeDeg, double longitudeDeg) const;
+    /// The height there, bilinear between the cells' centres, clamped
+    /// to the grid's edges.
+    double HeightAt(double latitudeDeg, double longitudeDeg) const;
+};
+
+/// Reads the DEM a PDS3 label at `labelPath` describes, as
+/// `ReadCylindricalDem` but on a polar stereographic grid.
+/// @throws as `ReadCylindricalDem`, and std::invalid_argument for a
+/// projection not centred on a pole.
+PolarStereographicDem
+ReadPolarStereographicDem(const std::string& labelPath);
+
 /// A heightfield of a DEM about one point, in a local frame there:
 /// x east, y north and z up, its origin on the reference sphere at
 /// the point. Each cell holds the height above that tangent plane of
@@ -99,6 +135,9 @@ struct LocalTerrain {
 /// @throws std::invalid_argument for fewer than 2 cells or a
 /// non-positive cell size.
 LocalTerrain LocalTerrainOf(const CylindricalDem& dem,
+                            double latitudeDeg, double longitudeDeg,
+                            std::uint32_t cells, double cellSize);
+LocalTerrain LocalTerrainOf(const PolarStereographicDem& dem,
                             double latitudeDeg, double longitudeDeg,
                             std::uint32_t cells, double cellSize);
 

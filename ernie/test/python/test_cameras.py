@@ -146,3 +146,50 @@ def test_local_terrains_hold_the_planets_curvature(tmp_path):
         point * (1.0 + 1000.0 / radius), 1.0
     )
     assert np.allclose(above[:3], (0.0, 0.0, 1000.0), atol=1e-6)
+
+
+def test_polar_dems_read_as_lolas_polar_labels_say(tmp_path):
+    # A south polar grid of 10 m pixels, the pole at the centre of 21 x
+    # 21, heights rising 10 m a line and 1 m a sample: 20 m from the
+    # pole along 90 E lies two samples right of it, along the prime
+    # meridian two lines up.
+    heights = 10.0 * np.arange(21)[:, None] + np.arange(21)[None, :]
+    (tmp_path / "POLAR.IMG").write_bytes(
+        np.round(heights / 0.5).astype("<i2").tobytes()
+    )
+    (tmp_path / "POLAR.LBL").write_text(
+        """PDS_VERSION_ID = PDS3
+^IMAGE = "POLAR.IMG"
+OBJECT = IMAGE
+  LINES = 21
+  LINE_SAMPLES = 21
+  SAMPLE_TYPE = LSB_INTEGER
+  SAMPLE_BITS = 16
+  SCALING_FACTOR = 0.5
+  OFFSET = 1737400.
+END_OBJECT = IMAGE
+OBJECT = IMAGE_MAP_PROJECTION
+  MAP_PROJECTION_TYPE = "POLAR STEREOGRAPHIC"
+  A_AXIS_RADIUS = 1737.4 <km>
+  CENTER_LATITUDE = -90 <deg>
+  CENTER_LONGITUDE = 0 <deg>
+  MAP_SCALE = 10 <m/pix>
+  LINE_PROJECTION_OFFSET = 10.0 <pix>
+  SAMPLE_PROJECTION_OFFSET = 10.0 <pix>
+END_OBJECT = IMAGE_MAP_PROJECTION
+END
+"""
+    )
+    dem = ernie.read_polar_stereographic_dem(
+        str(tmp_path / "POLAR.LBL")
+    )
+    assert (dem.lines, dem.map_scale) == (21, 10.0)
+    assert np.allclose(dem.to_grid(-90.0, 45.0), (10.0, 10.0))
+    radius = 1737400.0
+    latitude = math.degrees(
+        2.0 * math.atan(20.0 / (2.0 * radius)) - 0.5 * math.pi
+    )
+    assert math.isclose(dem.height_at(latitude, 90.0), 112.0)
+    assert math.isclose(dem.height_at(latitude, 0.0), 90.0)
+    terrain = ernie.local_terrain_of(dem, -89.9999, 0.0, 3, 1.0)
+    assert np.asarray(terrain["heights"]).shape == (3, 3)
