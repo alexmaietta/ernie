@@ -409,6 +409,9 @@ def _load_prim(scene: Scene, path: str, body: Any) -> None:
             continue
         if definition.kind == AttributeKind.TENSOR:
             value = _array(value, definition.is_integer)
+        elif _nested(value):  # a value per element (per-vertex display colours) as an array
+            prim.write(definition.name, np.asarray(value, dtype=np.float32))
+            continue
         keywords[definition.py_name] = value
     if cls is not None:
         cls(prim).set(**keywords)

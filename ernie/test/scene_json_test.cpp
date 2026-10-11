@@ -4,6 +4,7 @@
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/light_schemas.h"
+#include "ernie/scene/prim_type.h"
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/terrain_schemas.h"
@@ -14,7 +15,10 @@
 #include <glm/gtc/quaternion.hpp>
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <filesystem>
+#include <limits>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -181,4 +185,245 @@ TEST(LoadScene, ErrorsNameThePrimAndTheKey) {
     EXPECT_THROW(ernie::LoadSceneFile(scene, std::filesystem::path(ERNIE_TEST_FIXTURES) /
                                                  "no_such_scene.json"),
                  std::invalid_argument);
+}
+
+namespace {
+
+/// The elements of a CPU tensor as doubles, in row-major order.
+std::vector<double> NumbersOf(const ernie::Tensor& tensor) {
+    const ernie::Tensor contiguous = tensor.Contiguous();
+    std::vector<double> numbers;
+    for (std::int64_t i = 0; i < contiguous.Elements(); ++i) {
+        const auto index = static_cast<std::size_t>(i);
+        switch (contiguous.Type()) {
+        case DType::Int32:
+            numbers.push_back(contiguous.As<std::int32_t>()[index]);
+            break;
+        case DType::Float32:
+            numbers.push_back(contiguous.As<float>()[index]);
+            break;
+        case DType::Float64:
+            numbers.push_back(contiguous.As<double>()[index]);
+            break;
+        default:
+            ADD_FAILURE() << "unexpected element type";
+        }
+    }
+    return numbers;
+}
+
+bool IsSession(const Path& path) {
+    return path.String().starts_with(tokens::kSessionRoot);
+}
+
+/// Expects `copy` to hold the prims of `scene` outside the session, of the same types, with the
+/// same attributes: declared values equal as their declared types, others equal, and tensors of
+/// the same shape and numbers.
+void ExpectEquivalent(const Scene& scene, const Scene& copy) {
+    std::vector<Path> prims;
+    for (const Path& path : scene.Prims()) {
+        if (!IsSession(path)) {
+            prims.push_back(path);
+        }
+    }
+    ASSERT_EQ(copy.Prims(), prims);
+    for (const Path& path : prims) {
+        SCOPED_TRACE(path.String());
+        EXPECT_EQ(copy.TypeOf(path), scene.TypeOf(path));
+        ASSERT_EQ(copy.Attributes(path), scene.Attributes(path));
+        const ernie::PrimTypeDef* type = ernie::FindPrimType(scene.TypeOf(path));
+        for (const std::string& name : scene.Attributes(path)) {
+            SCOPED_TRACE(name);
+            if (const ernie::Tensor* tensor = scene.Read(path, name)) {
+                const ernie::Tensor* loaded = copy.Read(path, name);
+                ASSERT_NE(loaded, nullptr);
+                EXPECT_EQ(loaded->Shape(), tensor->Shape());
+                EXPECT_EQ(NumbersOf(*loaded), NumbersOf(*tensor));
+                continue;
+            }
+            const ernie::Value* value = scene.Get(path, name);
+            const ernie::Value* loaded = copy.Get(path, name);
+            ASSERT_NE(value, nullptr);
+            ASSERT_NE(loaded, nullptr);
+            const ernie::AttributeDef* def = type != nullptr ? type->Find(name) : nullptr;
+            if (def != nullptr && !def->meta.lenient) {
+                EXPECT_EQ(def->Coerce(*loaded), def->Coerce(*value));
+            } else {
+                EXPECT_EQ(*loaded, *value);
+            }
+        }
+    }
+}
+
+/// A scene with prims of every family, transforms, relationships, tensors and the viewer's
+/// session prims.
+Scene RichScene() {
+    Scene scene;
+    scene.Define("/World", "Xform");
+    ernie::XformOps ops;
+    ops.translate = glm::dvec3(1.0, 2.0, 3.0);
+    ops.orient = glm::angleAxis(glm::radians(30.0), glm::normalize(glm::dvec3(1.0, 2.0, 3.0)));
+    ops.scale = glm::dvec3(0.5, 2.0, 1.25);
+    ernie::SetXform(scene, "/World", ops);
+
+    // Geometry: shapes, a mesh with per-vertex colours, an instancer with a list of prototypes.
+    ernie::Sphere::Define(scene, "/World/Rock").SetRadius(0.1).SetMaterialBinding("/Looks/Stone");
+    const float points[] = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.1f};
+    const int counts[] = {3};
+    const int indices[] = {0, 1, 2};
+    const float colors[] = {1.0f, 0.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f, 0.0f, 0.25f};
+    ernie::Mesh::Define(scene, "/World/Quad")
+        .SetPoints(ernie::Tensor::Copy(std::span<const float>(points), {3, 3}))
+        .SetFaceVertexCounts(ernie::Tensor::Copy(std::span<const int>(counts), {1}))
+        .SetFaceVertexIndices(ernie::Tensor::Copy(std::span<const int>(indices), {3}));
+    scene.Write("/World/Quad", tokens::kDisplayColor,
+                ernie::Tensor::Copy(std::span<const float>(colors), {3, 3}));
+    ernie::Cube::Define(scene, "/World/Instancer/Box").SetSize(0.25);
+    ernie::Sphere::Define(scene, "/World/Instancer/Ball");
+    const float positions[] = {0.0f, 0.0f, 0.0f, 2.0f, 0.0f, 0.0f};
+    const int proto[] = {0, 1};
+    ernie::PointInstancer::Define(scene, "/World/Instancer")
+        .SetPrototypes({Path("/World/Instancer/Box"), Path("/World/Instancer/Ball")})
+        .SetPositions(ernie::Tensor::Copy(std::span<const float>(positions), {2, 3}))
+        .SetProtoIndices(ernie::Tensor::Copy(std::span<const int>(proto), {2}));
+
+    // A matrix transform, lights, a camera, a terrain.
+    scene.Define("/World/Pivot", "Xform");
+    glm::dmat4 matrix(1.0);
+    matrix[3] = glm::dvec4(4.0, 5.0, 6.0, 1.0);
+    matrix[0][1] = 0.3;
+    scene.Set("/World/Pivot", tokens::kTransform, matrix);
+    scene.Set("/World/Pivot", tokens::kXformOpOrder,
+              std::vector<std::string>{std::string(tokens::kTransform)});
+    ernie::DistantLight::Define(scene, "/World/Sun")
+        .SetAngle(0.53)
+        .SetIntensity(2.0)
+        .SetColor(glm::dvec3(1.0, 0.9, 0.8));
+    ernie::SphereLight::Define(scene, "/World/Lamp").SetRadius(0.2);
+    ernie::Camera::Define(scene, "/World/Camera")
+        .SetFocalLength(35.0)
+        .SetClippingRange(glm::dvec2(0.1, 1000.0));
+    const float heights[] = {0.0f, 1.0f, 2.0f, 3.5f, 4.0f, 5.0f};
+    ernie::Terrain::Define(scene, "/World/Ground")
+        .SetHeights(ernie::Tensor::Copy(std::span<const float>(heights), {2, 3}))
+        .SetCellSize(2.0);
+
+    // Render settings: one camera, a list of products, a lenient bool wireframe.
+    ernie::RenderProduct::Define(scene, "/Render/Product");
+    ernie::RenderSettings::Define(scene, "/Render/Settings")
+        .SetCamera("/World/Camera")
+        .SetProducts({Path("/Render/Product")})
+        .SetResolution(glm::dvec2(640.0, 480.0));
+    scene.Set("/Render/Settings", tokens::kWireframe, true);
+
+    // An unregistered material and an untyped prim of undeclared values and an undeclared tensor.
+    scene.Define("/Looks/Stone", "Material");
+    scene.Define("/Custom", "");
+    scene.Set("/Custom", "user:count", 3);
+    scene.Set("/Custom", "user:speed", 2.5);
+    scene.Set("/Custom", "user:flag", true);
+    scene.Set("/Custom", "user:size", glm::ivec2(4, 5));
+    scene.Set("/Custom", "user:dir", glm::dvec3(0.1, 0.2, 0.3));
+    scene.Set("/Custom", "user:tint", glm::vec4(0.25f, 0.5f, 0.75f, 1.0f));
+    scene.Set("/Custom", "user:name", std::string("rock \"one\""));
+    scene.Set("/Custom", "user:tags", std::vector<std::string>{"a", "b"});
+    scene.Set("/Custom", "user:frame", matrix);
+    const float samples[] = {0.5f, 1.5f, 2.5f, 3.5f, 4.5f, 5.5f};
+    scene.Write("/Custom", "user:samples",
+                ernie::Tensor::Copy(std::span<const float>(samples), {3, 2}));
+    scene.Define("/Custom/Empty", "");
+
+    // The viewer's own prims.
+    ernie::Camera::Define(scene, Path(std::string(tokens::kSessionRoot) + "/Perspective"));
+    return scene;
+}
+
+}  // namespace
+
+TEST(SaveScene, RoundTripsThroughLoadScene) {
+    const Scene scene = RichScene();
+    const std::string text = ernie::SaveScene(scene);
+    Scene loaded;
+    LoadScene(loaded, text);
+    ExpectEquivalent(scene, loaded);
+    EXPECT_EQ(ernie::SaveScene(loaded), text) << "saving what loads gives the same text";
+
+    EXPECT_FALSE(loaded.Has(Path(tokens::kSessionRoot)));
+    EXPECT_EQ(text.find("__session"), std::string::npos);
+    ExpectNear(loaded.LocalTransform("/World"), scene.LocalTransform("/World"));
+    ExpectNear(loaded.LocalTransform("/World/Pivot"), scene.LocalTransform("/World/Pivot"));
+    EXPECT_TRUE(loaded.Get("/World", tokens::kOrient)->Is<glm::dquat>());
+    EXPECT_EQ(loaded.Read("/World/Quad", tokens::kDisplayColor)->Type(), DType::Float32);
+    EXPECT_EQ(loaded.Read("/World/Quad", "faceVertexIndices")->Type(), DType::Int32);
+    EXPECT_EQ(ernie::PointInstancer(loaded, "/World/Instancer").GetPrototypes(),
+              (std::vector<Path>{"/World/Instancer/Box", "/World/Instancer/Ball"}));
+    EXPECT_EQ(ernie::Sphere(loaded, "/World/Rock").GetMaterialBinding(), Path("/Looks/Stone"));
+    EXPECT_TRUE(loaded.Get("/Render/Settings", tokens::kWireframe)->Is<bool>());
+}
+
+TEST(SaveScene, WritesStablePrettyJson) {
+    Scene scene;
+    ernie::Sphere::Define(scene, "/B").SetRadius(0.1);
+    scene.Define("/A/Child", "");
+    scene.Set("/A", "user:z", 1);
+    scene.Set("/A", "user:a", glm::vec3(0.1f, 0.2f, 0.3f));
+    EXPECT_EQ(ernie::SaveScene(scene), R"({
+  "/A": {
+    "user:a": [0.1, 0.2, 0.3],
+    "user:z": 1,
+    "Child": {}
+  },
+  "/B": {
+    "type": "Sphere",
+    "radius": 0.1
+  }
+}
+)");
+    EXPECT_EQ(ernie::SaveScene(Scene()), "{}\n");
+}
+
+TEST(SaveScene, FilesRoundTripAndErrorsNameThePrimAndAttribute) {
+    const Scene scene = RichScene();
+    const std::filesystem::path file =
+        std::filesystem::path(::testing::TempDir()) / "ernie_save_scene.json";
+    ernie::SaveSceneFile(scene, file);
+    Scene loaded;
+    ernie::LoadSceneFile(loaded, file);
+    ExpectEquivalent(scene, loaded);
+    std::filesystem::remove(file);
+    EXPECT_THROW(ernie::SaveSceneFile(scene, std::filesystem::path(::testing::TempDir()) /
+                                                 "no_such_dir" / "scene.json"),
+                 std::invalid_argument);
+
+    const auto errorOf = [](const Scene& broken) -> std::string {
+        try {
+            ernie::SaveScene(broken);
+        } catch (const std::invalid_argument& error) {
+            return error.what();
+        }
+        return {};
+    };
+
+    Scene gpu;
+    float dummy = 0.0f;
+    ernie::Mesh::Define(gpu, "/G").SetPoints(ernie::Tensor(
+        &dummy, DType::Float32, {1, 3}, {}, ernie::Device{ernie::DeviceKind::Cuda, 0}));
+    const std::string gpuError = errorOf(gpu);
+    EXPECT_NE(gpuError.find("'/G', \"points\""), std::string::npos) << gpuError;
+    EXPECT_NE(gpuError.find("GPU"), std::string::npos) << gpuError;
+
+    Scene nan;
+    nan.Define("/N", "");
+    nan.Set("/N", "user:x", std::numeric_limits<double>::quiet_NaN());
+    EXPECT_NE(errorOf(nan).find("'/N', \"user:x\""), std::string::npos);
+
+    Scene misread;
+    misread.Define("/M", "");
+    misread.Set("/M", "Child", 1);
+    misread.Define("/M/Child", "");
+    EXPECT_NE(errorOf(misread).find("'/M/Child'"), std::string::npos) << errorOf(misread);
+    Scene transformKey;
+    transformKey.Define("/T", "");
+    transformKey.Set("/T", "scale", 2.0);
+    EXPECT_NE(errorOf(transformKey).find("'/T', \"scale\""), std::string::npos);
 }

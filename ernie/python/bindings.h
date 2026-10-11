@@ -66,6 +66,8 @@ struct PrimPath {
 
 void BindTensor(nb::module_& m);
 void BindScene(nb::module_& m);
+/// `save_scene`, the JSON description of a scene (ernie/scene/scene_json.h).
+void BindSceneJson(nb::module_& m);
 /// The prim type registry (`PrimType`, `AttributeDef`), which `ernie.schema` builds classes from.
 void BindSchema(nb::module_& m);
 void BindRender(nb::module_& m);

@@ -289,6 +289,15 @@ void BindApp(nb::module_& parent) {
              "browser does: clears the selection and undo history, picks the first "
              "RenderSettings, frames the scene through perspective_camera and chooses the "
              "lighting as on opening.")
+        .def("open_scene", &Viewer::OpenScene, nb::arg("path"),
+             "Replaces the stage with the scene a JSON file describes (the format of "
+             "ernie.load_scene and ernie.save_scene), as File > Open Scene does: removes every "
+             "prim but the viewer's own and every overlay but its own, loads the file and starts "
+             "the session over (reset_session). A file that does not load raises ValueError and "
+             "leaves the stage as it was.")
+        .def("save_scene", &Viewer::SaveScene, nb::arg("path"),
+             "Writes the stage, every prim but the viewer's own, to path as JSON "
+             "(ernie.save_scene), as File > Save Scene As does.")
         .def_prop_ro_static("session_root", [](nb::handle) { return Viewer::SessionRoot(); })
         .def_prop_ro_static("perspective_camera",
                             [](nb::handle) { return Viewer::PerspectiveCamera(); })

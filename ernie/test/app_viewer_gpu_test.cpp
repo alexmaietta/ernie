@@ -490,6 +490,54 @@ TEST_F(ViewerTest, FileDialogsDrawModallyAndCallBackOnTheViewer) {
     EXPECT_FALSE(viewer_->GetFileDialog().IsOpen());
 }
 
+TEST_F(ViewerTest, OpensAndSavesScenesAsJson) {
+    const std::filesystem::path saved = TempFile("saved_scene.json");
+    viewer_->SaveScene(saved);
+    std::ifstream savedFile(saved);
+    const std::string text((std::istreambuf_iterator<char>(savedFile)),
+                           std::istreambuf_iterator<char>());
+    EXPECT_NE(text.find("\"/World\""), std::string::npos) << text;
+    EXPECT_EQ(text.find(Viewer::SessionRoot().String()), std::string::npos)
+        << "the viewer's own prims are not saved";
+
+    const std::filesystem::path other = TempFile("other_scene.json");
+    std::ofstream(other) << R"({"/Stage": {"type": "Xform",
+        "Ball": {"type": "Sphere", "radius": 0.5, "translate": [0, 0, 1]},
+        "Lamp": {"type": "SphereLight", "radius": 0.1}},
+      "/Render/Other": {"type": "RenderSettings"}})";
+    viewer_->SetSelection({Path("/World/Cube")});
+    scene_.GetOverlay("user_marks");
+    viewer_->OpenScene(other);
+    EXPECT_FALSE(scene_.Has(Path("/World"))) << "the stage's prims are replaced";
+    EXPECT_EQ(Sphere(scene_, "/Stage/Ball").GetRadius(), 0.5);
+    EXPECT_TRUE(scene_.Has(Viewer::PerspectiveCamera())) << "the viewer's prims stay";
+    EXPECT_EQ(scene_.FindOverlay("user_marks"), nullptr);
+    EXPECT_TRUE(viewer_->Selection().empty());
+    EXPECT_EQ(viewer_->Settings(), Path("/Render/Other"));
+    EXPECT_EQ(viewer_->ActiveCamera(), Viewer::PerspectiveCamera());
+    EXPECT_TRUE(viewer_->Step());
+
+    // A file that does not load leaves the stage alone.
+    const std::filesystem::path broken = TempFile("broken_scene.json");
+    std::ofstream(broken) << R"({"/Bad": {"type": "Sphere", "radus": 1}})";
+    EXPECT_THROW(viewer_->OpenScene(broken), std::invalid_argument);
+    EXPECT_THROW(viewer_->OpenScene(TempFile("no_such_scene.json")), std::invalid_argument);
+    EXPECT_TRUE(scene_.Has(Path("/Stage/Ball")));
+    EXPECT_FALSE(scene_.Has(Path("/Bad")));
+
+    // Back to the saved scene, through File > Open Scene's dialog.
+    viewer_->OpenFileDialog(
+        {"Open Scene", false, {{"Scenes", {".json"}}}, saved},
+        [](Viewer& viewer, const std::filesystem::path& path) { viewer.OpenScene(path); });
+    EXPECT_TRUE(viewer_->GetFileDialog().Accept(saved.filename().string()));
+    EXPECT_EQ(Cube(scene_, "/World/Cube").GetSize(), 2.0);
+    EXPECT_FALSE(scene_.Has(Path("/Stage")));
+    EXPECT_TRUE(viewer_->Step());
+    for (const std::filesystem::path& path : {saved, other, broken}) {
+        std::filesystem::remove(path);
+    }
+}
+
 TEST_F(ViewerTest, RendererIsAViewerOptionAndSwitchable) {
     const std::vector<std::string> renderers = Viewer::Renderers();
     ASSERT_FALSE(renderers.empty());

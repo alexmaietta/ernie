@@ -16,6 +16,7 @@
 #include "ernie/scene/light_schemas.h"
 #include "ernie/scene/orbit_controller.h"
 #include "ernie/scene/render_schemas.h"
+#include "ernie/scene/scene_json.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/sensor_filters.h"
 #include "ernie/scene/tokens.h"
@@ -457,6 +458,8 @@ struct Viewer::State {
     std::uint64_t nextCallback = 1;
     std::vector<std::unique_ptr<Panel>> panels;
     FileDialog fileDialog;
+    /// The scene file last opened or saved, where File > Save Scene As starts.
+    std::filesystem::path scenePath;
     /// Panels to bring to the front (`FocusPanel`), and those drawn at least once.
     std::vector<std::string> focusRequests;
     std::set<std::string, std::less<>> drawnPanels;
@@ -736,6 +739,23 @@ struct Viewer::State {
         FrameBounds(SceneBounds());
     }
 
+    /// File > Open Scene or Save Scene As, once a file is chosen: logs what it did, or the error
+    /// and brings the Log panel to the front.
+    void SceneFileAction(const std::filesystem::path& path, bool save) {
+        try {
+            if (save) {
+                self.SaveScene(path);
+            } else {
+                self.OpenScene(path);
+            }
+            self.Log(LogLevel::Info,
+                     (save ? "Saved the scene to " : "Opened the scene ") + path.string());
+        } catch (const std::exception& error) {
+            self.Log(LogLevel::Error, error.what());
+            self.FocusPanel("Log");
+        }
+    }
+
     Path FirstUserSettings() const {
         for (const Path& path : scene.Prims(tokens::kRenderSettings)) {
             if (!IsSessionPath(path)) {
@@ -954,6 +974,21 @@ struct Viewer::State {
                 if (ImGui::MenuItem("Frame Selection", "F", false, !selection.empty())) {
                     self.Frame(selection);
                 }
+            }
+            if (menu == "File") {
+                for (const bool save : {false, true}) {
+                    if (ImGui::MenuItem(save ? "Save Scene As..." : "Open Scene...")) {
+                        self.OpenFileDialog(
+                            {save ? "Save Scene As" : "Open Scene",
+                             save,
+                             {{"Scenes", {".json"}}},
+                             scenePath},
+                            [this, save](Viewer&, const std::filesystem::path& path) {
+                                SceneFileAction(path, save);
+                            });
+                    }
+                }
+                ImGui::Separator();
             }
             if (menu == "Help") {
                 ImGui::MenuItem("Keyboard and Mouse", nullptr, &showControls);
@@ -2557,6 +2592,38 @@ void Viewer::Sync() {
 
 void Viewer::ResetSession() {
     state_->ResetSession();
+}
+
+void Viewer::OpenScene(const std::filesystem::path& path) {
+    {
+        Scene check;
+        LoadSceneFile(check, path);
+        if (check.Has(SessionRoot())) {
+            throw std::invalid_argument(
+                path.string() + ": a scene file cannot describe the viewer's own prims, under " +
+                SessionRoot().String());
+        }
+    }
+    Scene& scene = state_->scene;
+    SetSelection({});
+    for (const Path& root : scene.Children(Path::Root())) {
+        if (root != SessionRoot()) {
+            scene.Remove(root);
+        }
+    }
+    for (const std::string& name : scene.OverlayNames()) {
+        if (!name.starts_with("__")) {
+            scene.RemoveOverlay(name);
+        }
+    }
+    LoadSceneFile(scene, path);
+    state_->scenePath = path;
+    ResetSession();
+}
+
+void Viewer::SaveScene(const std::filesystem::path& path) {
+    SaveSceneFile(state_->scene, path);
+    state_->scenePath = path;
 }
 
 RenderDelegate& Viewer::Delegate() {

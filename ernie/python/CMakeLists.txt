@@ -8,6 +8,7 @@ nanobind_add_module(
     module.cpp
     render.cpp
     scene.cpp
+    scene_json.cpp
     schema.cpp
     tensor.cpp)
 target_link_libraries(_ernie PRIVATE ernie ernie_build_options)

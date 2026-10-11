@@ -210,6 +210,20 @@ class Viewer {
     /// @throws std::invalid_argument as `Sync`.
     void ResetSession();
 
+    /// Replaces the stage with the scene the JSON file at `path` describes (`LoadSceneFile`,
+    /// ernie/scene/scene_json.h), as File > Open Scene does: removes every prim but the viewer's
+    /// own and every overlay but the viewer's (named with a leading "__"), loads the file and
+    /// starts the session over (`ResetSession`). The file is checked first, by loading it into a
+    /// scene of its own, so a file that does not load leaves the stage as it was.
+    /// @throws std::invalid_argument for a file that cannot be read or does not load, or that
+    /// describes prims under `SessionRoot()`; or as `ResetSession`.
+    void OpenScene(const std::filesystem::path& path);
+
+    /// Writes the stage, every prim but the viewer's own, to `path` as JSON (`SaveSceneFile`), as
+    /// File > Save Scene As does.
+    /// @throws std::invalid_argument as `SaveSceneFile`.
+    void SaveScene(const std::filesystem::path& path);
+
     /// The current backend itself, for what the viewer does not wrap, such as CUDA bindings.
     RenderDelegate& Delegate();
 

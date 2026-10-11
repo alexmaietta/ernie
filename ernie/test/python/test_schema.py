@@ -227,3 +227,42 @@ def test_scene_files_load_as_cpp_loads_them():
     scene = ernie.load_scene({"/A": {"orient": [0.5**0.5, 0, 0, 0.5**0.5]}})
     scene.define("/B", "").set_xform(orient=ernie.Quat.from_axis_angle((0, 0, 1), 90.0))
     assert np.allclose(scene.local_transform("/A"), scene.local_transform("/B"))
+
+
+def test_saved_scenes_load_back_equal(tmp_path):
+    scene = ernie.Scene()
+    world = scene.define("/World", ernie.Xform)
+    world.set_xform(translate=(1, 2, 3), orient=ernie.Quat.from_axis_angle((0, 0, 1), 30.0), scale=2.0)
+    world.define("Rock", ernie.Sphere, radius=0.25)
+    world.define("Sun", ernie.DistantLight, angle=0.53, intensity=2.0, color=(1.0, 0.9, 0.8))
+    world.define("Camera", ernie.Camera, focal_length=35.0)
+    quad = ernie.Mesh.define(scene, "/World/Quad")
+    quad.points = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0.5]], dtype=np.float32)
+    quad.face_vertex_counts = np.array([3], dtype=np.int32)
+    quad.face_vertex_indices = np.array([0, 1, 2], dtype=np.int32)
+    scene.write("/World/Quad", tokens.DISPLAY_COLOR, np.eye(3, dtype=np.float32))
+    scene.define("/Render/Settings", ernie.RenderSettings, camera="/World/Camera", resolution=(640, 480))
+    scene.define("/Custom", "")
+    scene.set("/Custom", "user:tags", ["a", "b"])
+    scene.set("/Custom", "user:count", 3)
+    scene.define("/__session/Perspective", ernie.Camera)
+
+    path = tmp_path / "saved.json"
+    text = ernie.save_scene(scene, path)
+    assert path.read_text() == text and json.loads(text)["/World"]["type"] == "Xform"
+    assert "/__session" not in json.loads(text)
+
+    loaded = ernie.load_scene(path)
+    assert loaded.prims() == [p for p in scene.prims() if not str(p).startswith("/__session")]
+    for prim in loaded.prims():
+        assert loaded.type_of(prim) == scene.type_of(prim)
+        assert loaded.attributes(prim) == scene.attributes(prim), prim
+        for name in scene.attributes(prim):
+            array = scene.read(prim, name)
+            if array is not None:
+                assert np.array_equal(np.asarray(loaded.read(prim, name)), np.asarray(array)), name
+                assert np.asarray(loaded.read(prim, name)).dtype == np.asarray(array).dtype, name
+            else:
+                assert loaded.get(prim, name) == scene.get(prim, name), (prim, name)
+    assert np.allclose(loaded.local_transform("/World"), scene.local_transform("/World"))
+    assert ernie.save_scene(loaded) == text

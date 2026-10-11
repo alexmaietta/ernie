@@ -997,7 +997,8 @@ LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBa
     const double cone = ConeSolidAngle(light.coneAngle, light.coneSoftness);
     if (sphere.IsPhotometric()) {
         const auto perLux = [](double distance) { return distance * distance; };
-        light.spectrum = RelativeSpectrum(sphere, bands, PhotometricAreaValue(sphere, cone, perLux));
+        light.spectrum =
+            RelativeSpectrum(sphere, bands, PhotometricAreaValue(sphere, cone, perLux));
         return light;
     }
     const std::optional<std::vector<float>> pairs = SpectrumPairs(sphere);
