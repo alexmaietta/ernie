@@ -28,8 +28,8 @@ struct RendererOptions {
 ///
 ///     ernie::Renderer renderer;
 ///     ernie::RenderProductSetOutputs outputs = renderer.Step(scene);
-///     ernie::Tensor image =
-///     outputs.at("/Render/Product").vars.at("LdrColor")
+///     ernie::Tensor image = outputs.at("/Render/Product")
+///                               .vars.at("LdrColor")
 ///                               .Map(ernie::MapDevice::Cpu).tensor;
 ///
 /// Applications that draw into their own windows or command buffers

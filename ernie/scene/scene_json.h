@@ -12,11 +12,12 @@
 ///
 ///     {
 ///       "/World": {"type": "Xform",
-///         "Rock": {"type": "Sphere", "radius": 0.5, "translate": [0,
-///         0, 1]}, "Sun": {"type": "DistantLight", "angle": 0.53,
-///         "inputs:intensity": 2.0}},
-///       "Render/Settings": {"type": "RenderSettings", "camera":
-///       "/World/Camera",
+///         "Rock": {"type": "Sphere", "radius": 0.5,
+///                  "translate": [0, 0, 1]},
+///         "Sun": {"type": "DistantLight", "angle": 0.53,
+///                 "inputs:intensity": 2.0}},
+///       "Render/Settings": {"type": "RenderSettings",
+///                           "camera": "/World/Camera",
 ///                           "resolution": [640, 480]}
 ///     }
 ///

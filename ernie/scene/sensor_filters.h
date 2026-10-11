@@ -210,8 +210,8 @@ std::vector<float> ResampleCurve(std::span<const float> values,
 ///     import sensor;
 ///     struct HotPixels : IPixelFilter {
 ///         struct Params { float fraction; float electrons; }
-///         static void apply(inout SensorPixel value, PixelContext
-///         pixel, Params params) {
+///         static void apply(inout SensorPixel value,
+///                           PixelContext pixel, Params params) {
 ///             if (pixel.fixedRandom(0x407) < params.fraction) {
 ///                 value.electrons += params.electrons;
 ///             }

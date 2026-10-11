@@ -19,8 +19,11 @@
 ///     ernie::Scene scene;
 ///     ernie::app::Viewer viewer(scene);
 ///     viewer.AddPanel<SimPanel>();
-///     viewer.OnPreRender([](ernie::app::Viewer& v, const
-///     ernie::app::FrameInfo& frame) { ... }); viewer.Run();
+///     viewer.OnPreRender([](ernie::app::Viewer& v,
+///                           const ernie::app::FrameInfo& frame) {
+///         ...
+///     });
+///     viewer.Run();
 
 #include "ernie/app/demo.h"
 #include "ernie/app/icons.h"

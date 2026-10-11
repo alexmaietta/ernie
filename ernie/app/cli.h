@@ -19,12 +19,11 @@ void DefineDefaultScene(Scene& scene);
 /// The `ernie` program, also the `ernie` command a pip install puts
 /// on the path:
 ///
-///     ernie                          the viewer on the default
-///     scene, with the Demos panel ernie scene.json               the
-///     viewer on a scene file (LoadSceneFile) ernie scene.json
-///     --output x.png    renders the scene file without a window
-///     ernie --demo lighting/illuminants  the viewer with that demo
-///     running ernie --list                   the demos' names
+///     ernie                       the default scene, Demos panel
+///     ernie scene.json            a scene file (LoadSceneFile)
+///     ernie scene.json --output x.png     renders it, no window
+///     ernie --demo lighting/illuminants   that demo running
+///     ernie --list                the demos' names
 ///
 /// It takes the options every demo takes (`ParseDemoOptions`), so a
 /// scene file renders headless or without a viewer as a demo does,

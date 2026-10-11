@@ -8,8 +8,8 @@
 // (ERNIE_TRACY) also sent to Tracy on the same timeline as the CPU
 // zones of ernie/util/profile.h.
 //
-//     ERNIE_GPU_ZONE(context, commands, "Shadow passes");  // until
-//     the end of the scope
+//     // Until the end of the scope.
+//     ERNIE_GPU_ZONE(context, commands, "Shadow passes");
 //
 // Finished zones reach the profilers when later command buffers
 // collect them

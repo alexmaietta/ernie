@@ -7,12 +7,14 @@
 // Tracy profiler once it connects. GPU zones are in
 // ernie/device/gpu_profile.h.
 //
-//     ERNIE_ZONE("Sync");               // the rest of the scope, one
-//     per scope; a string literal ERNIE_ZONE_TEXT(path.String()); //
-//     text attached to the scope's zone (Tracy only)
-//     ERNIE_PLOT("views", 256);         // a value plotted over time
-//     (Tracy only) ERNIE_FRAME_MARK("Step");         // the end of a
-//     frame of a named frame set (Tracy only)
+//     // The rest of the scope, one per scope; a string literal.
+//     ERNIE_ZONE("Sync");
+//     // Text attached to the scope's zone (Tracy only).
+//     ERNIE_ZONE_TEXT(path.String());
+//     // A value plotted over time (Tracy only).
+//     ERNIE_PLOT("views", 256);
+//     // The end of a frame of a named frame set (Tracy only).
+//     ERNIE_FRAME_MARK("Step");
 //
 // References:
 // - B. Taudul, "Tracy Profiler". https://github.com/wolfpld/tracy
