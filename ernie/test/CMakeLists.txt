@@ -43,6 +43,8 @@ ernie_add_test_suite(
     util_image_test.cpp
     util_ies_test.cpp
     util_astronomy_test.cpp
+    util_atmosphere_test.cpp
+    util_scattering_test.cpp
     util_spectrum_test.cpp
     util_tensor_test.cpp
     LIBRARIES

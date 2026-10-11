@@ -3,9 +3,11 @@ ernie_add_library(
     ernie_util
     SOURCES
     astronomy.cpp
+    atmosphere.cpp
     ies.cpp
     image.cpp
     profiler.cpp
+    scattering.cpp
     spectrum.cpp
     tensor.cpp
     PUBLIC
