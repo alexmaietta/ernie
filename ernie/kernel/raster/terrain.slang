@@ -21,6 +21,8 @@ public struct TerrainUniforms {
     public float4 morph[8];
     // Material, prim id.
     public uint4 ids;
+    // xyz: towards the hillshade's light (x east, y north, z up).
+    public float4 hillshade;
 }
 
 [[vk::binding(10, 0)]] public ConstantBuffer<TerrainUniforms> t;

@@ -65,6 +65,9 @@ GBuffer fragmentMain(VertexOutput in) {
         flags = kUnlit;
     } else if (t.dims.z == 2) {
         modulation = modulation * colormap(fraction);
+    } else if (t.dims.z == 3) {
+        modulation = float3(max(dot(normal, t.hillshade.xyz), 0.0));
+        flags = kUnlit;
     }
     if (hiddenLine()) {
         flags = kUnlit;

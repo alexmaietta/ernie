@@ -41,8 +41,9 @@ struct TerrainUniforms {
     std::uint32_t lodInfo[4];
     float morph[LodQuadtree::kMaxLevels * 2];
     std::uint32_t ids[4];
+    float hillshade[4];
 };
-static_assert(sizeof(TerrainUniforms) == 224,
+static_assert(sizeof(TerrainUniforms) == 240,
               "TerrainUniforms must match terrain.slang");
 static_assert(sizeof(LodPatch) == 16,
               "LodPatch must match the shaders' uint4");
@@ -908,6 +909,10 @@ void TerrainDrawable::Prepare(
     uniforms.dims[1] = static_cast<std::uint32_t>(height_);
     uniforms.dims[2] = static_cast<std::uint32_t>(params_.colorMode);
     uniforms.dims[3] = params_.lod.showLevels ? 1u : 0u;
+    const glm::vec3 towards = HillshadeDirection(params_);
+    uniforms.hillshade[0] = towards.x;
+    uniforms.hillshade[1] = towards.y;
+    uniforms.hillshade[2] = towards.z;
 
     const LodSettings& lod = params_.lod;
     const std::size_t views = frame.Views();

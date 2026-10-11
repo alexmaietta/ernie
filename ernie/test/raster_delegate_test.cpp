@@ -96,7 +96,6 @@ TEST(FrameParamsOf, ReadsLightMaterialTerrainAndSettings) {
         .SetExaggeration(3.0);
     ernie::RenderSettings::Define(scene, "/Render/Settings")
         .SetAmbient(0.3)
-        .SetColorMode(tokens::kHillshade)
         .SetWireframe(tokens::kOverlay)
         .SetShadowCascades(2)
         .SetShadowResolution(1024)
@@ -148,14 +147,25 @@ TEST(FrameParamsOf, ReadsLightMaterialTerrainAndSettings) {
     ernie::TerrainParams terrain =
         ernie::TerrainParamsOf(scene, prims);
     EXPECT_EQ(terrain.exaggeration, 3.0f);
-    EXPECT_EQ(terrain.colorMode, TerrainColorMode::Hillshade);
+    EXPECT_EQ(terrain.colorMode, TerrainColorMode::Shaded);
     EXPECT_FALSE(terrain.lod.enabled);
     EXPECT_EQ(terrain.lod.detail, 6.0f);
 
-    ernie::RenderSettings(scene, "/Render/Settings")
+    ernie::Terrain(scene, "/World/Terrain")
         .SetColorMode(tokens::kColormap);
     EXPECT_EQ(ernie::TerrainParamsOf(scene, prims).colorMode,
               TerrainColorMode::Colormap);
+    ernie::Terrain(scene, "/World/Terrain")
+        .SetColorMode(tokens::kHillshade)
+        .SetHillshadeAzimuth(270.0)
+        .SetHillshadeAltitude(30.0);
+    terrain = ernie::TerrainParamsOf(scene, prims);
+    EXPECT_EQ(terrain.colorMode, TerrainColorMode::Hillshade);
+    EXPECT_EQ(terrain.hillshadeAzimuth, 270.0f);
+    const glm::vec3 towards = ernie::HillshadeDirection(terrain);
+    EXPECT_NEAR(towards.x, -std::cos(glm::radians(30.0f)), 1e-6f);
+    EXPECT_NEAR(towards.y, 0.0f, 1e-6f);
+    EXPECT_NEAR(towards.z, 0.5f, 1e-6f);
     ernie::Material(scene, "/Looks/Rock").SetBrdf("nope");
     EXPECT_THROW(
         ernie::MaterialSettingsOf(scene, prims.material, brdfs),

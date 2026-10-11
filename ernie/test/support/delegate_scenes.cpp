@@ -148,7 +148,6 @@ Scene FlatScene() {
     RenderSettings::Define(scene, "/Render/Settings")
         .SetCamera("/World/Camera")
         .SetResolution(glm::dvec2(kVarSize, kVarSize))
-        .SetColorMode(tokens::kHillshade)
         .SetAmbient(0.0);
     RenderProduct::Define(scene, "/Render/Product");
     scene.Set("/Render/Product", tokens::kOrderedVars, vars);

@@ -163,7 +163,7 @@ TEST_F(TerrainRendererTest, SlopesFacingTheSunAreBrighter) {
     TerrainRenderer renderer(*context_, kColorFormat);
     renderer.SetHeightfield(Plane(0.5f));
     TerrainDrawParams params = FramedView(renderer);
-    params.colorMode = TerrainColorMode::Hillshade;
+    params.colorMode = TerrainColorMode::Shaded;
     params.ambient = 0.0f;
 
     params.sunDirection =
@@ -174,6 +174,29 @@ TEST_F(TerrainRendererTest, SlopesFacingTheSunAreBrighter) {
     const Pixel away =
         Render(renderer, params)[kSize / 2 * kSize + kSize / 2];
     EXPECT_GT(facing.Luminance(), away.Luminance() + 100);
+}
+
+// The hillshade's fixed light, not the sun, shades it: a slope rising
+// east is bright with the light in the west and dark with it in the
+// east, wherever the sun is.
+TEST_F(TerrainRendererTest, HillshadeShadesFromItsOwnLight) {
+    TerrainRenderer renderer(*context_, kColorFormat);
+    renderer.SetHeightfield(Plane(0.5f));
+    TerrainDrawParams params = FramedView(renderer);
+    params.colorMode = TerrainColorMode::Hillshade;
+    params.hillshadeAltitude = 45.0f;
+    const auto centre = [&] {
+        return Render(renderer, params)[kSize / 2 * kSize + kSize / 2]
+            .Luminance();
+    };
+    params.hillshadeAzimuth = 270.0f;
+    const int facing = centre();
+    params.sunDirection = glm::normalize(glm::vec3(1.0f, 0.0f, 1.0f));
+    EXPECT_EQ(centre(), facing) << "the sun should not shade it";
+    params.hillshadeAzimuth = 90.0f;
+    const int away = centre();
+    EXPECT_GT(facing, away + 100);
+    EXPECT_GT(away, 0) << "0.32 of the light still reaches it";
 }
 
 TEST_F(TerrainRendererTest, RejectsUnsupportedHeightfields) {
@@ -244,7 +267,7 @@ TEST_F(TerrainRendererTest, FlatGroundUnderALowSunHasNoShadowAcne) {
     renderer.SetHeightfield(
         Grid(65, [](double, double) { return 0.0f; }));
     TerrainDrawParams params = FramedView(renderer);
-    params.colorMode = TerrainColorMode::Hillshade;
+    params.colorMode = TerrainColorMode::Shaded;
     params.ambient = 0.0f;
     params.sunDirection =
         glm::normalize(glm::vec3(0.8f, 0.3f, 0.35f));
@@ -272,7 +295,7 @@ TEST_F(TerrainRendererTest, RidgeShadowsTheGroundAwayFromTheSun) {
         return std::fabs(x) < 2.0 ? 20.0f : 0.0f;
     }));
     TerrainDrawParams params = FramedView(renderer);
-    params.colorMode = TerrainColorMode::Hillshade;
+    params.colorMode = TerrainColorMode::Shaded;
     params.ambient = 0.0f;
     params.sunDirection =
         glm::normalize(glm::vec3(1.0f, 0.0f, 0.36f));
@@ -331,7 +354,7 @@ TEST_F(TerrainRendererTest, LodImageMatchesFullResolution) {
                                   0.05 * x);
     }));
     TerrainDrawParams params = FramedView(renderer);
-    params.colorMode = TerrainColorMode::Hillshade;
+    params.colorMode = TerrainColorMode::Shaded;
     // Shadow PCF noise depends on exact caster depths; LOD shadows
     // are checked separately.
     params.shadows.enabled = false;
@@ -365,7 +388,7 @@ TEST_F(TerrainRendererTest,
         return std::fabs(x) < 8.0 ? 40.0f : 0.0f;
     }));
     TerrainDrawParams params = FramedView(renderer);
-    params.colorMode = TerrainColorMode::Hillshade;
+    params.colorMode = TerrainColorMode::Shaded;
     params.ambient = 0.0f;
     params.sunDirection =
         glm::normalize(glm::vec3(1.0f, 0.0f, 0.36f));
@@ -417,7 +440,7 @@ TEST_F(TerrainRendererTest, ShowLevelsTintsTheTerrain) {
     TerrainRenderer renderer(*context_, kColorFormat);
     renderer.SetHeightfield(Plane(0.0f));
     TerrainDrawParams params = FramedView(renderer);
-    params.colorMode = TerrainColorMode::Hillshade;
+    params.colorMode = TerrainColorMode::Shaded;
     const Pixel grey =
         Render(renderer, params)[kSize / 2 * kSize + kSize / 2];
     EXPECT_EQ(grey.r, grey.b);
@@ -487,7 +510,7 @@ TerrainDrawParams LitFromEast(const TerrainRenderer& renderer) {
     camera.Frame(low, high);
     TerrainDrawParams params;
     params.camera = camera.MakeCamera(kSize, kSize);
-    params.colorMode = TerrainColorMode::Hillshade;
+    params.colorMode = TerrainColorMode::Shaded;
     params.ambient = 0.0f;
     params.shadows.enabled = false;
     params.sunDirection = glm::normalize(glm::vec3(1.0f, 0.0f, 0.5f));
@@ -501,7 +524,7 @@ TEST_F(TerrainRendererTest,
     TerrainRenderer renderer(*context_, kColorFormat);
     renderer.SetHeightfield(RollingTerrain(65, 65, 1.0));
     TerrainDrawParams params = FramedView(renderer);
-    params.colorMode = TerrainColorMode::Hillshade;
+    params.colorMode = TerrainColorMode::Shaded;
     params.sunDirection =
         glm::normalize(glm::vec3(0.3f, -0.2f, 1.0f));
     params.surface.albedo = glm::vec3(0.3f);
@@ -520,7 +543,7 @@ TEST_F(TerrainRendererTest,
     TerrainRenderer renderer(*context_, kColorFormat);
     renderer.SetHeightfield(Plane(0.0f));
     TerrainDrawParams params = FramedView(renderer);
-    params.colorMode = TerrainColorMode::Hillshade;
+    params.colorMode = TerrainColorMode::Shaded;
     params.ambient = 0.0f;
     const double lambert = CentreLinear(Render(renderer, params));
 
@@ -569,7 +592,7 @@ TEST_F(TerrainRendererTest, AlbedoAndExposureScaleTheShading) {
     TerrainRenderer renderer(*context_, kColorFormat);
     renderer.SetHeightfield(Plane(0.0f));
     TerrainDrawParams params = FramedView(renderer);
-    params.colorMode = TerrainColorMode::Hillshade;
+    params.colorMode = TerrainColorMode::Shaded;
     params.ambient = 0.0f;
     params.sunDirection = glm::normalize(glm::vec3(0.0f, 0.0f, 1.0f));
     const double full = CentreLinear(Render(renderer, params));
@@ -601,7 +624,7 @@ TEST_F(TerrainRendererTest,
     EXPECT_TRUE(renderer.Material().HasAlbedoMap());
 
     TerrainDrawParams params = FramedView(renderer);
-    params.colorMode = TerrainColorMode::Hillshade;
+    params.colorMode = TerrainColorMode::Shaded;
     params.ambient = 0.0f;
     params.sunDirection = glm::vec3(0.0f, 0.0f, 1.0f);
     params.surface.albedo = glm::vec3(0.0f);
@@ -646,7 +669,7 @@ TEST_F(TerrainRendererTest,
     TerrainRenderer renderer(*context_, kColorFormat);
     renderer.SetHeightfield(Plane(0.0f));
     TerrainDrawParams params = FramedView(renderer);
-    params.colorMode = TerrainColorMode::Hillshade;
+    params.colorMode = TerrainColorMode::Shaded;
     params.ambient = 0.0f;
     params.sunDirection = glm::vec3(0.0f, 0.0f, 1.0f);
     params.surface.albedo = glm::vec3(0.5f);
@@ -760,7 +783,7 @@ TEST_F(TerrainRendererTest,
     TerrainRenderer renderer(*context_, kColorFormat);
     renderer.SetHeightfield(Plane(0.0f));
     TerrainDrawParams params = FramedView(renderer);
-    params.colorMode = TerrainColorMode::Hillshade;
+    params.colorMode = TerrainColorMode::Shaded;
     params.ambient = 0.0f;
     params.sunDirection = glm::vec3(0.0f, 0.0f, 1.0f);
     params.shadows.enabled = false;

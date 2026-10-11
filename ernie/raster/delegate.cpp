@@ -157,13 +157,16 @@ RasterView RasterOf(const Terrain& terrain, const Tensor& heights) {
 }
 
 TerrainColorMode ColorModeOf(const std::string& token) {
-    if (token == tokens::kHillshade) {
-        return TerrainColorMode::Hillshade;
-    }
     if (token == tokens::kColormap) {
         return TerrainColorMode::Colormap;
     }
-    return TerrainColorMode::ShadedColormap;
+    if (token == tokens::kShadedColormap) {
+        return TerrainColorMode::ShadedColormap;
+    }
+    if (token == tokens::kHillshade) {
+        return TerrainColorMode::Hillshade;
+    }
+    return TerrainColorMode::Shaded;
 }
 
 /// A CPU array of `components`-vectors as floats, shaped (n,
@@ -364,12 +367,17 @@ TerrainParams TerrainParamsOf(const Scene& scene,
     using namespace tokens;
     TerrainParams params;
     if (!prims.terrain.IsEmpty()) {
-        params.exaggeration = static_cast<float>(
-            Terrain(scene, prims.terrain).GetExaggeration());
+        const Terrain terrain(scene, prims.terrain);
+        params.exaggeration =
+            static_cast<float>(terrain.GetExaggeration());
+        params.colorMode = ColorModeOf(terrain.GetColorMode());
+        params.hillshadeAzimuth =
+            static_cast<float>(terrain.GetHillshadeAzimuth());
+        params.hillshadeAltitude =
+            static_cast<float>(terrain.GetHillshadeAltitude());
     }
     const RenderSettings settings =
         RenderSettings::OrFallbacks(scene, prims.settings);
-    params.colorMode = ColorModeOf(settings.GetColorMode());
     LodSettings& lod = params.lod;
     lod.enabled = settings.GetLodEnable();
     lod.detail = static_cast<float>(settings.GetLodDetail());

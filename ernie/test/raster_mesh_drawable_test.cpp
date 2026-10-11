@@ -88,7 +88,7 @@ struct Frame {
         : renderer(context, kColorFormat), terrain(renderer),
           meshes(renderer) {
         ernie::TerrainParams params;
-        params.colorMode = ernie::TerrainColorMode::Hillshade;
+        params.colorMode = ernie::TerrainColorMode::Shaded;
         terrain.SetParams(params);
     }
 };

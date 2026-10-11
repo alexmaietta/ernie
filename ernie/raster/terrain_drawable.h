@@ -15,6 +15,7 @@
 #include <glm/glm.hpp>
 
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <map>
@@ -28,11 +29,14 @@ namespace ernie {
 
 /// How terrain fragments are coloured.
 enum class TerrainColorMode : std::uint32_t {
-    Hillshade = 0,  ///< Material albedo lit by the material's
-                    ///< reflectance model.
-    Colormap = 1,   ///< Height colormap without shading.
+    Shaded = 0,    ///< Material albedo lit by the material's
+                   ///< reflectance model.
+    Colormap = 1,  ///< Height colormap without shading.
     ShadedColormap =
-        2,  ///< Height colormap modulated by the lit surface.
+        2,          ///< Height colormap modulated by the lit surface.
+    Hillshade = 3,  ///< GIS hillshade: grey, unlit, the cosine of
+                    ///< the angle to a fixed light
+                    ///< (`TerrainParams::hillshadeAzimuth`).
 };
 
 /// Continuous level-of-detail options; see `LodQuadtree`.
@@ -55,14 +59,34 @@ struct LodSettings {
 /// Terrain options for the next frames.
 struct TerrainParams {
     float exaggeration = 1.0f;  ///< Vertical exaggeration of heights.
-    TerrainColorMode colorMode = TerrainColorMode::ShadedColormap;
+    TerrainColorMode colorMode = TerrainColorMode::Shaded;
     LodSettings lod;
     std::uint32_t material =
         RasterRenderer::kDefaultMaterial;  ///< Id in the renderer's
                                            ///< table.
     std::uint32_t primId =
         1;  ///< Written to the PrimId render var; 0 means background.
+    float hillshadeAzimuth =
+        315.0f;  ///< Hillshade's light, degrees clockwise from north.
+    float hillshadeAltitude =
+        45.0f;  ///< Hillshade's light, degrees above the horizon.
 };
+
+/// The unit direction towards `params`' hillshade light in a frame of
+/// x east, y north and z up.
+///
+/// References:
+/// - P. A. Burrough and R. A. McDonnell, "Principles of Geographical
+///   Information Systems", Oxford University Press, 1998, section
+///   8.2 (the hillshade: the cosine of the angle between the surface
+///   normal and a light at an azimuth and altitude).
+inline glm::vec3 HillshadeDirection(const TerrainParams& params) {
+    const float azimuth = glm::radians(params.hillshadeAzimuth);
+    const float altitude = glm::radians(params.hillshadeAltitude);
+    return {std::sin(azimuth) * std::cos(altitude),
+            std::cos(azimuth) * std::cos(altitude),
+            std::sin(altitude)};
+}
 
 /// A heightfield written on the compute device (CUDA or HIP), which
 /// stays there: a contiguous float32 (rows, cols) tensor and how it

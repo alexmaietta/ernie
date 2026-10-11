@@ -850,10 +850,23 @@ inline constexpr std::string_view kDomeShadowRadius =
     "ernie:domeLight:shadowRadius";
 inline constexpr std::string_view kDomeDirections =
     "ernie:domeLight:directions";
+/// token, on a Terrain: how it is coloured, "shaded" (its
+/// material, lit; the default), "colormap" (a height ramp, unlit),
+/// "shadedColormap" (the ramp times the material, lit) or
+/// "hillshade".
 inline constexpr std::string_view kColorMode = "ernie:colorMode";
-inline constexpr std::string_view kHillshade = "hillshade";
+inline constexpr std::string_view kShaded = "shaded";
 inline constexpr std::string_view kColormap = "colormap";
 inline constexpr std::string_view kShadedColormap = "shadedColormap";
+/// A GIS hillshade, grey and unlit: the cosine of the angle between
+/// the terrain's normal and a fixed light at
+/// `ernie:hillshade:azimuth` (degrees clockwise from north) and
+/// `ernie:hillshade:altitude` (degrees above the horizon).
+inline constexpr std::string_view kHillshade = "hillshade";
+inline constexpr std::string_view kHillshadeAzimuth =
+    "ernie:hillshade:azimuth";
+inline constexpr std::string_view kHillshadeAltitude =
+    "ernie:hillshade:altitude";
 /// token: "off", "overlay" (edges over shaded surfaces) or
 /// "hiddenLine" (edges on flat, unlit surfaces); a bool means
 /// "overlay" when true and "off" when false.

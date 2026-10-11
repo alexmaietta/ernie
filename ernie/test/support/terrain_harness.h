@@ -24,7 +24,9 @@ struct TerrainDrawParams {
     glm::vec3 sunDirection{0.0f, 0.0f, 1.0f};
     float ambient = 0.15f;
     float exaggeration = 1.0f;
-    TerrainColorMode colorMode = TerrainColorMode::ShadedColormap;
+    TerrainColorMode colorMode = TerrainColorMode::Shaded;
+    float hillshadeAzimuth = 315.0f;
+    float hillshadeAltitude = 45.0f;
     Wireframe wireframe = Wireframe::Off;
     ShadowSettings shadows;
     LodSettings lod;
@@ -65,9 +67,12 @@ class TerrainRenderer {
     void Update(const TerrainDrawParams& params) {
         renderer_.SetMaterial(RasterRenderer::kDefaultMaterial,
                               params.surface);
-        terrain_.SetParams({params.exaggeration, params.colorMode,
-                            params.lod,
-                            RasterRenderer::kDefaultMaterial});
+        TerrainParams terrain{params.exaggeration, params.colorMode,
+                              params.lod,
+                              RasterRenderer::kDefaultMaterial};
+        terrain.hillshadeAzimuth = params.hillshadeAzimuth;
+        terrain.hillshadeAltitude = params.hillshadeAltitude;
+        terrain_.SetParams(terrain);
         FrameParams frame;
         frame.camera = params.camera;
         frame.camera.width = params.extent.width;

@@ -52,7 +52,7 @@ Scene CullingScene();
 const std::uint8_t* TexelAt(const Scene& scene, const Tensor& image,
                             glm::vec3 p);
 
-/// A flat grey (albedo 0.5) Hillshade terrain 100 m below a camera
+/// A flat grey (albedo 0.5) shaded terrain 100 m below a camera
 /// looking straight down, lit by a relative white sun overhead
 /// without shadows, rendering every var at 32 x 32.
 Scene FlatScene();

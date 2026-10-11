@@ -4,6 +4,7 @@
 #include "ernie/raster/terrain_drawable.h"
 #include "ernie/scene/prim_type.h"
 #include "ernie/scene/scene.h"
+#include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/session/frame_params.h"
 #include "ernie/session/resolve.h"
@@ -89,9 +90,10 @@ TEST(RenderSchemas, FallbacksAreTheRenderDefaults) {
     // The terrain's.
     const ernie::TerrainParams terrain;
     const ernie::LodSettings& lod = terrain.lod;
-    EXPECT_EQ(settings.GetColorMode(), tokens::kShadedColormap);
-    EXPECT_EQ(terrain.colorMode,
-              ernie::TerrainColorMode::ShadedColormap);
+    EXPECT_EQ(ernie::Terrain::Define(scene, "/World/Terrain")
+                  .GetColorMode(),
+              tokens::kShaded);
+    EXPECT_EQ(terrain.colorMode, ernie::TerrainColorMode::Shaded);
     EXPECT_EQ(settings.GetLodEnable(), lod.enabled);
     EXPECT_FLOAT_EQ(static_cast<float>(settings.GetLodDetail()),
                     lod.detail);

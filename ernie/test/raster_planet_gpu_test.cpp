@@ -69,8 +69,7 @@ Scene PlanetScene(std::uint32_t n) {
     ernie::RenderSettings::Define(scene, "/Render/Settings")
         .SetCamera("/World/Camera")
         .SetResolution(glm::dvec2(kSize, kSize))
-        .SetClearColor(glm::dvec3(0.0, 0.0, 1.0))
-        .SetColorMode(tokens::kHillshade);
+        .SetClearColor(glm::dvec3(0.0, 0.0, 1.0));
     return scene;
 }
 

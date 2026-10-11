@@ -88,6 +88,14 @@ GBuffer fragmentMain(VertexOutput in) {
         flags = kUnlit;
     } else if (p.dims.y == 2) {
         modulation = modulation * colormap(fraction);
+    } else if (p.dims.y == 3) {
+        // East and north at the point, north towards +z (at the poles, +y stands in for it).
+        let axis = abs(up.z) < 0.9999 ? float3(0.0, 0.0, 1.0) : float3(0.0, 1.0, 0.0);
+        let east = normalize(cross(axis, up));
+        let north = cross(up, east);
+        let towards = p.hillshade.x * east + p.hillshade.y * north + p.hillshade.z * up;
+        modulation = float3(max(dot(normal, towards), 0.0));
+        flags = kUnlit;
     }
     if (hiddenLine()) {
         flags = kUnlit;

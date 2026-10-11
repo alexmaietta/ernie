@@ -73,10 +73,6 @@
       (::ernie::AttributeMeta{.doc = "The lights rendered, when set (empty: none); unset, every "  \
                                      "visible light.",                                             \
                               .group = "Image"}))                                                  \
-    X(std::string, ColorMode, ::ernie::tokens::kColorMode, ::ernie::tokens::kShadedColormap,       \
-      (::ernie::AttributeMeta{.label = "Terrain colour", .group = "Image",                         \
-                              .options = {::ernie::tokens::kHillshade, ::ernie::tokens::kColormap, \
-                                          ::ernie::tokens::kShadedColormap}}))                     \
     X(double, Ambient, ::ernie::tokens::kAmbient, 0.0,                                             \
       (::ernie::AttributeMeta{.doc = "Luminance (cd/m^2) of light reaching every surface "        \
                                      "uniformly from all around, besides the lights; 0 none. "     \

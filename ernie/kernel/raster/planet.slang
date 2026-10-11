@@ -17,6 +17,8 @@ public struct PlanetUniforms {
     public float4 morph[8];
     // Material, prim id.
     public uint4 ids;
+    // xyz: towards the hillshade's light in each point's frame (east, north, up), north towards +z.
+    public float4 hillshade;
 }
 
 [[vk::binding(10, 0)]] public ConstantBuffer<PlanetUniforms> p;

@@ -28,8 +28,9 @@ struct PlanetUniforms {
     float lodEye[4];
     float morph[LodQuadtree::kMaxLevels * 2];
     std::uint32_t ids[4];
+    float hillshade[4];
 };
-static_assert(sizeof(PlanetUniforms) == 192,
+static_assert(sizeof(PlanetUniforms) == 208,
               "PlanetUniforms must match planet.slang");
 
 constexpr VkDeviceSize kUniformsStride = 256;
@@ -359,6 +360,11 @@ void PlanetDrawable::Prepare(
     uniforms.dims[1] = static_cast<std::uint32_t>(params_.colorMode);
     uniforms.dims[2] = params_.lod.showLevels ? 1u : 0u;
     uniforms.dims[3] = lod_.PatchCells();
+    // The hillshade's light in each point's frame (east, north, up).
+    const glm::vec3 towards = HillshadeDirection(params_);
+    uniforms.hillshade[0] = towards.x;
+    uniforms.hillshade[1] = towards.y;
+    uniforms.hillshade[2] = towards.z;
 
     const LodSettings& lod = params_.lod;
     const std::size_t views = frame.Views();
