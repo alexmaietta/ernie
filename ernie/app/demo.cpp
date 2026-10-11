@@ -3,6 +3,7 @@
 
 #include "ernie/app/panel.h"
 
+#include <imgui.h>
 #include <stb_image_write.h>
 
 #include <algorithm>
@@ -199,6 +200,19 @@ void Demo::TestFinal() {
 
 void Demo::Close() {}
 
+void Demo::Gui() {}
+
+WidgetPanel& Demo::Widgets() {
+    return *SharedWidgets();
+}
+
+std::shared_ptr<WidgetPanel> Demo::SharedWidgets() {
+    if (!widgets_) {
+        widgets_ = std::make_shared<WidgetPanel>("Options", Dock::Floating);
+    }
+    return widgets_;
+}
+
 std::uint64_t Demo::NumFrames() const {
     return numFrames;
 }
@@ -320,12 +334,12 @@ struct DemoRunner::State {
     Viewer::Gizmo gizmo = Viewer::Gizmo::None;
     bool gizmoLocal = false;
 
-    // The Demos panel and what it asked for during the last frame.
-    WidgetPanel* panel = nullptr;
-    WidgetPanel::Id status = 0;
-    WidgetPanel::Id about = 0;
+    // The Demos panel, the demo it shows, and what it asked for during the last frame.
+    Panel* panel = nullptr;
+    Demo* running = nullptr;
+    std::string about;  ///< The running demo's description.
+    bool paused = false;
     std::optional<std::size_t> switchTo;
-    std::optional<bool> pausedRequest;
     bool resetRequested = false;
     bool singleStep = false;
 
@@ -340,11 +354,9 @@ struct DemoRunner::State {
     }
 
     void Announce(Demo& demo) {
-        const std::string description = DescriptionOf(demo);
-        viewer->Log(LogLevel::Info, "Demo: " + (description.empty() ? "untitled" : description));
-        if (panel != nullptr) {
-            panel->Set(about, description);
-        }
+        running = &demo;
+        about = DescriptionOf(demo);
+        viewer->Log(LogLevel::Info, "Demo: " + (about.empty() ? "untitled" : about));
     }
 
     std::string DescriptionOf(Demo& demo) const {
@@ -355,35 +367,77 @@ struct DemoRunner::State {
         return description;
     }
 
-    void AddPanel(Demo& demo) {
+    void AddPanel() {
         const std::uint64_t previous = viewer->Scope();
         viewer->SetScope(0);
-        panel = &viewer->AddWidgetPanel("Demos", Dock::Left);
-        if (catalog.empty()) {
-            panel->Text("No other demos");
-        } else {
-            std::vector<std::string> labels;
-            for (const DemoInfo& info : catalog) {
-                labels.push_back(info.Label());
-            }
-            panel->Combo("Demo", std::move(labels), current,
-                         [this](std::size_t index) { switchTo = index; });
+        // In the bottom dock with the Log and Stats, the Log staying in front.
+        panel = &viewer->AddPanel("Demos", Dock::Bottom, [this](Viewer& v) { DrawPanel(v); });
+        if (viewer->FindPanel("Log") != nullptr) {
+            viewer->FocusPanel("Log");
         }
-        panel->Separator();
-        panel->Checkbox("Paused", options.paused, [this](bool on) { pausedRequest = on; });
-        panel->Button("Step", [this] { singleStep = true; });
-        panel->Button("Reset", [this] { resetRequested = true; });
-        status = panel->Text("");
-        panel->Separator();
-        about = panel->Text(DescriptionOf(demo));
         viewer->SetScope(previous);
+    }
+
+    /// The Demos panel, after Newton's example browser: a menu of the demos with a node per
+    /// category, the running demo's controls and description, and its own options.
+    void DrawPanel(Viewer& v) {
+        // A collapsing header per category, the catalogue listing each category's demos
+        // together; the running demo's opens first.
+        for (std::size_t first = 0; first < catalog.size();) {
+            const std::string& category = catalog[first].category;
+            std::size_t end = first;
+            while (end < catalog.size() && catalog[end].category == category) {
+                ++end;
+            }
+            ImGui::SetNextItemOpen(current >= first && current < end, ImGuiCond_Appearing);
+            if (ImGui::CollapsingHeader(category.c_str())) {
+                ImGui::Indent();
+                for (std::size_t i = first; i < end; ++i) {
+                    if (ImGui::Selectable(catalog[i].name.c_str(),
+                                          i == current && running != nullptr)) {
+                        switchTo = i;
+                    }
+                }
+                ImGui::Unindent();
+            }
+            first = end;
+        }
+        ImGui::SeparatorText(running != nullptr && current < catalog.size()
+                                 ? catalog[current].Label().c_str()
+                                 : "No demo");
+        ImGui::Checkbox("Paused", &paused);
+        ImGui::SameLine();
+        if (ImGui::Button("Step")) {
+            singleStep = true;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Reset")) {
+            resetRequested = true;
+        }
+        if (running == nullptr) {
+            return;
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("frame %llu, %.2f s", static_cast<unsigned long long>(running->frame),
+                            running->time);
+        if (!about.empty()) {
+            ImGui::TextWrapped("%s", about.c_str());
+        }
+        ImGui::SeparatorText("Options");
+        ImGui::PushID("options");
+        running->Widgets().Draw(v);
+        running->Gui();
+        ImGui::PopID();
     }
 
     /// Replaces `old` with a new build of the catalogue's demo `index`; null, with the error in
     /// the log, if it cannot be built.
     std::shared_ptr<Demo> Load(std::shared_ptr<Demo> old, std::size_t index) {
+        running = nullptr;
         if (old) {
             old->Close();
+            // Its widgets' callbacks may hold it (in Python, a cycle through C++).
+            old->Widgets().Clear();
         }
         viewer->RemoveScope(scope);
         RestoreDisplay();
@@ -407,9 +461,7 @@ struct DemoRunner::State {
             viewer->RemoveScope(scope);
             viewer->ClearScene();
             viewer->ResetSession();
-            if (panel != nullptr) {
-                panel->Set(about, std::string());
-            }
+            about.clear();
             return nullptr;
         }
     }
@@ -417,6 +469,7 @@ struct DemoRunner::State {
     /// Removes the running demo's registrations and the panel, which hold the demo (and in
     /// Python, through it the viewer).
     void Release() {
+        running = nullptr;
         if (!viewer) {
             return;
         }
@@ -519,20 +572,18 @@ std::shared_ptr<Demo> DemoRunner::Run(std::shared_ptr<Demo> demo) {
     try {
         if (viewer != nullptr) {
             viewer->ResetSession();
-            if (o.Windowed() && !o.test) {
-                s.AddPanel(*demo);
+            // The Demos panel, also in a hidden viewer, whose window captures show it; not in
+            // test runs, which check one demo.
+            if (!o.test) {
+                s.AddPanel();
             }
             s.Announce(*demo);
         }
-        bool paused = o.paused && o.Windowed();
+        s.paused = o.paused && o.Windowed();
         std::optional<Clock::time_point> timerStart;
         std::uint64_t timedFrames = 0;
         Clock::time_point last = Clock::now();
         while (viewer == nullptr || viewer->IsOpen()) {
-            if (s.pausedRequest) {
-                paused = *s.pausedRequest;
-                s.pausedRequest.reset();
-            }
             if (s.switchTo || s.resetRequested) {
                 const std::size_t index = s.switchTo.value_or(s.current);
                 s.switchTo.reset();
@@ -542,13 +593,6 @@ std::shared_ptr<Demo> DemoRunner::Run(std::shared_ptr<Demo> demo) {
             if (!demo) {
                 viewer->Step();
                 continue;
-            }
-            if (s.panel != nullptr) {
-                char status[96];
-                std::snprintf(status, sizeof(status), "frame %llu, %.2f s%s",
-                              static_cast<unsigned long long>(demo->frame), demo->time,
-                              paused ? "  (paused)" : "");
-                s.panel->Set(s.status, std::string(status));
             }
             const std::optional<std::uint64_t> limit =
                 o.numFrames ? o.numFrames
@@ -563,8 +607,8 @@ std::shared_ptr<Demo> DemoRunner::Run(std::shared_ptr<Demo> demo) {
                                            demo->MaxFrameDt())
                                 : demo->FixedDt();
             last = now;
-            bool stepping = !paused;
-            if (paused && s.singleStep) {
+            bool stepping = !s.paused;
+            if (s.paused && s.singleStep) {
                 stepping = true;
                 s.singleStep = false;
             }
@@ -621,8 +665,13 @@ std::shared_ptr<Demo> DemoRunner::Run(std::shared_ptr<Demo> demo) {
         std::fflush(stdout);
         if (demo) {
             demo->Close();
+            // Its widgets' callbacks may hold it (in Python, a cycle through C++).
+            demo->Widgets().Clear();
         }
     } catch (...) {
+        if (demo) {
+            demo->Widgets().Clear();
+        }
         s.Release();
         throw;
     }

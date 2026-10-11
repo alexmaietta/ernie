@@ -102,14 +102,11 @@ class Demo(ernie.demo.Demo):
                           resolution=(448, 300), ambient=0.0)
         self.light_with(0)
 
+        # The demo's option, in the Demos panel: the illuminant.
+        self.widgets.combo("Illuminant", [name for name, _, _ in ILLUMINANTS], 0,
+                           on_change=self.light_with)
         if viewer is not None:
-            # In the viewer, a panel switches the illuminant.
-            from ernie.app import Dock
-
             viewer.active_camera = camera.path
-            panel = viewer.add_panel("Illuminant", Dock.RIGHT)
-            panel.combo("Illuminant", [name for name, _, _ in ILLUMINANTS], 0,
-                        on_change=self.light_with)
 
     def light_with(self, index):
         _, illuminant, kelvin = ILLUMINANTS[index]

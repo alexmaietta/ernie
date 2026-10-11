@@ -28,8 +28,6 @@
 #include "ernie/scene/xform.h"
 #include "util.h"
 
-#include <imgui.h>
-
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -146,20 +144,15 @@ class IlluminantsDemo : public app::Demo {
             .SetAmbient(0.0);
         LightWith(0);
 
+        // The demo's option, in the Demos panel: the illuminant.
+        std::vector<std::string> names;
+        for (const Illuminant& illuminant : kIlluminants) {
+            names.emplace_back(illuminant.name);
+        }
+        Widgets().Combo("Illuminant", std::move(names), 0,
+                        [this](std::size_t index) { LightWith(static_cast<int>(index)); });
         if (viewer != nullptr) {
-            // In the viewer, a panel switches the illuminant.
             viewer->SetActiveCamera("/World/Camera");
-            viewer->AddPanel("Illuminant", app::Dock::Right, [this](app::Viewer&) {
-                int index = illuminant_;
-                for (int i = 0; i < static_cast<int>(kIlluminants.size()); ++i) {
-                    if (ImGui::RadioButton(kIlluminants[i].name, i == index)) {
-                        index = i;
-                    }
-                }
-                if (index != illuminant_) {
-                    LightWith(index);
-                }
-            });
         }
     }
 

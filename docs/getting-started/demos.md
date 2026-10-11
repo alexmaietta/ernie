@@ -24,7 +24,7 @@ python -m ernie.demos lighting/illuminants    # one by name, with its options af
 
 From a checkout, run the files themselves (`PYTHONPATH=build/python python demos/lighting/illuminants.py`), or a C++ demo's own program, which `-DERNIE_BUILD_DEMOS=ON` builds as `demo_<category>_<name>` (`build/bin/demo_lighting_illuminants`).
 
-Each opens the viewer with a Demos panel on the left. Its menu lists the demos in the same language, by category; choosing one clears the scene and builds that demo in the same window. The panel also pauses, single-steps and resets the demo.
+Each opens the viewer with a Demos panel at the bottom, a tab beside the Log and Stats. It lists the demos in the same language under a collapsing header per category; choosing one clears the scene and builds that demo in the same window. Below the list it pauses, single-steps and resets the running demo, describes it, and shows its options.
 
 Every demo takes these options:
 
@@ -76,10 +76,9 @@ class Demo(ernie.demo.Demo):
             tokens.TRANSFORM, ernie.distant_light_transform((0.4, -0.6, 0.7)))
         world.define("Camera", ernie.Camera).set(
             tokens.TRANSFORM, ernie.look_at_transform((0, -8, 3), (0, 0, 0.5)))
-        if viewer is not None:
-            panel = viewer.add_panel("Ball")
-            panel.slider("Radius", 0.1, 2.0, 0.5,
-                         on_change=lambda value: self.ball.set(radius=value))
+        # The demo's options, shown in the Demos panel.
+        self.widgets.slider("Radius", 0.1, 2.0, 0.5,
+                            on_change=lambda value: self.ball.set(radius=value))
 
     def step(self):
         self.ball.set(translate=(2.0 * self.time, 0, 0.5))
@@ -94,7 +93,8 @@ if __name__ == "__main__":
 
 What to know:
 
-- `viewer` is `None` under `--viewer null`, so put panels and other viewer calls under `if viewer is not None`. Give the scene a camera of its own: without a viewer, and in tests, the scene renders through it.
+- A demo's own controls go in the Demos panel's Options section: add widgets to `self.widgets` (sliders, checkboxes, combos, buttons, plots), which works with or without a viewer. C++ demos can also override `Gui()` and draw there with Dear ImGui, as Newton's examples' `gui(ui)` does.
+- `viewer` is `None` under `--viewer null`, so put other viewer calls (such as `active_camera`) under `if viewer is not None`. Give the scene a camera of its own: without a viewer, and in tests, the scene renders through it.
 - In a window `frame_dt` is the real time since the last frame (at most `max_frame_dt`). Without one it is `fixed_dt`, so runs repeat exactly. `self.time` is the demo's clock at the start of the step.
 - A demo uses the viewer as any application does: `add_panel`, `on_frame`, `add_hud_item`, `active_camera`, `viewport_display`. A demo registers in a scope of its own (`Viewer.scope`), so when the Demos panel switches away, what it added is removed, and the viewport's display settings are restored. A camera, lighting or RenderSettings it chooses is kept over the viewer's reset of its session.
 - Add your own options by overriding the class method `create_parser`, adding to what `super().create_parser()` returns. Give every option a default: the Demos panel opens demos with their defaults.
@@ -119,7 +119,7 @@ class BallDemo : public ernie::app::Demo {
         : Demo(viewer, options) {
         numFrames = 120;
         ernie::Sphere::Define(GetScene(), "/World/Ball").SetRadius(0.5);
-        // ... a sun and a camera, and a panel when GetViewer() is not null
+        // ... a sun, a camera, and options: Widgets().Slider(...), or override Gui()
     }
 
     void Step() override {

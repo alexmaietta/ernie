@@ -163,6 +163,9 @@ void BindDemo(nb::module_& m) {
         .def_prop_ro("renderer", &Demo::SharedRenderer,
                      "A Renderer of the demo's own, opened on first use with the run's device, "
                      "backend and validation.")
+        .def_prop_ro("widgets", &Demo::SharedWidgets,
+                     "The demo's controls in the Demos panel's Options section: a WidgetPanel "
+                     "to add sliders, checkboxes and combos to, with or without a viewer.")
         .def_prop_ro("options", &Demo::Options, "The run's shared options.")
         .def_rw("frame", &Demo::frame, "Steps taken so far.")
         .def_rw("time", &Demo::time, "Demo seconds at the start of this step.")

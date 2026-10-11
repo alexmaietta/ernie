@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Opens the viewer on a scene built in code, with a panel of its own that moves the sun. The
-Python twin of sun_panel.cpp.
+"""Opens the viewer on a scene built in code, with options in the Demos panel that move the sun.
+The Python twin of sun_panel.cpp.
 
     python -m ernie.demos viewer/sun_panel [--viewer null --output sun.png]
 """
@@ -31,14 +31,11 @@ class Demo(ernie.demo.Demo):
         self.elevation = 45.0
         self.azimuth = 30.0
         self.aim_sun()
-        if viewer is not None:
-            from ernie.app import Dock
-
-            panel = viewer.add_panel("Sun", Dock.LEFT)
-            panel.slider("Elevation", 1.0, 90.0, self.elevation,
-                         on_change=lambda value: self.aim_sun(elevation=value))
-            panel.slider("Azimuth", 0.0, 360.0, self.azimuth,
-                         on_change=lambda value: self.aim_sun(azimuth=value))
+        # The demo's options, in the Demos panel: sliders that move the sun.
+        self.widgets.slider("Elevation", 1.0, 90.0, self.elevation,
+                            on_change=lambda value: self.aim_sun(elevation=value))
+        self.widgets.slider("Azimuth", 0.0, 360.0, self.azimuth,
+                            on_change=lambda value: self.aim_sun(azimuth=value))
 
     def aim_sun(self, elevation=None, azimuth=None):
         self.elevation = self.elevation if elevation is None else elevation

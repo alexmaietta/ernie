@@ -106,6 +106,20 @@ class Demo {
     /// replaces it; for timing reports and the like.
     virtual void Close();
 
+    /// Draws the demo's own controls with Dear ImGui (`#include <imgui.h>`) in the Demos panel's
+    /// Options section each frame, after its `Widgets`, as Newton's examples' `gui(ui)` does;
+    /// nothing by default. Runs only in a viewer.
+    virtual void Gui();
+
+    /// The demo's controls in the Demos panel's Options section, as widgets (sliders, checkboxes,
+    /// combos) rather than ImGui calls, as Python demos add theirs (`widgets`). Add them in the
+    /// constructor, with or without a viewer; the runner drops them, with their callbacks, when
+    /// the demo ends or is replaced.
+    WidgetPanel& Widgets();
+
+    /// `Widgets` shared, for holders that may outlive the demo, such as its Python wrapper.
+    std::shared_ptr<WidgetPanel> SharedWidgets();
+
     /// Frames to run without a window when `--num-frames` is not given: `numFrames`.
     virtual std::uint64_t NumFrames() const;
     /// Seconds a step advances without a window, for runs that repeat: `fixedDt`.
@@ -160,6 +174,7 @@ class Demo {
     DemoOptions options_;
     std::shared_ptr<Scene> ownScene_;
     std::shared_ptr<Renderer> renderer_;
+    std::shared_ptr<WidgetPanel> widgets_;
     Tensor image_;
     bool untestedSteps_ = false;
     bool untestedFinal_ = false;

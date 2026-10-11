@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// Opens the viewer on a scene built in code, with a panel of its own that moves the sun. The C++
-// twin of sun_panel.py.
+// Opens the viewer on a scene built in code, with options in the Demos panel that move the sun.
+// The C++ twin of sun_panel.py.
 //
 //     ernie --demo viewer/sun_panel [--viewer null --output sun.png]
 
@@ -43,15 +43,15 @@ class SunPanelDemo : public app::Demo {
             .SetFocalLength(24.0)
             .SetTransform(LookAtTransform({0.0, -14.0, 6.0}, {0.0, 0.0, 0.5}, {0.0, 0.0, 1.0}));
         AimSun();
-        if (viewer != nullptr) {
-            // Panels draw with Dear ImGui and edit the scene, which the next frame renders.
-            viewer->AddPanel("Sun", app::Dock::Left, [this](app::Viewer&) {
-                bool changed = ImGui::SliderFloat("Elevation", &elevation_, 1.0f, 90.0f);
-                changed |= ImGui::SliderFloat("Azimuth", &azimuth_, 0.0f, 360.0f);
-                if (changed) {
-                    AimSun();
-                }
-            });
+    }
+
+    // The demo's options, in the Demos panel: sliders drawn with Dear ImGui that move the sun,
+    // which the next frame renders.
+    void Gui() override {
+        bool changed = ImGui::SliderFloat("Elevation", &elevation_, 1.0f, 90.0f);
+        changed |= ImGui::SliderFloat("Azimuth", &azimuth_, 0.0f, 360.0f);
+        if (changed) {
+            AimSun();
         }
     }
 
@@ -76,4 +76,4 @@ class SunPanelDemo : public app::Demo {
 }  // namespace
 
 ERNIE_REGISTER_DEMO(SunPanelDemo, "viewer", "sun panel",
-                    "A scene built in code, with a panel of its own that moves the sun.");
+                    "A scene built in code, with options that move the sun.");
