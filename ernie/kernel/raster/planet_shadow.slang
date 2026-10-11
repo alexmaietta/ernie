@@ -3,7 +3,6 @@
 import planet;
 
 [shader("vertex")]
-float4 shadowVertex(uint vertexIndex : SV_VertexID, uint instanceIndex : SV_InstanceID)
-    : SV_Position {
-    return mul(shadowViewProj(), float4(planetVertex(vertexIndex, instanceIndex).world, 1.0));
+ShadowPosition shadowVertex(uint vertexIndex : SV_VertexID, uint instanceIndex : SV_InstanceID) {
+    return shadowPosition(planetVertex(vertexIndex, instanceIndex).world);
 }

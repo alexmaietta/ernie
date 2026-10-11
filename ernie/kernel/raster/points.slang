@@ -177,6 +177,14 @@ struct ShadowVertexOutput {
     nointerpolation float4 sphere : SPHERE;
 }
 
+// The shadow vertex stage's outputs: the fragment stage's inputs and the shadow map's layer.
+struct ShadowVertexLayered {
+    float4 position : SV_Position;
+    float2 corner : CORNER;
+    nointerpolation float4 sphere : SPHERE;
+    uint layer : SV_RenderTargetArrayIndex;
+}
+
 // The light's view direction away from it, and two directions across it, from its
 // view-projection: the gradients of clip z, x and y (exact for orthographic maps).
 float3 lightAxis(uint row) {
@@ -185,16 +193,18 @@ float3 lightAxis(uint row) {
 }
 
 [shader("vertex")]
-ShadowVertexOutput shadowVertex(uint vertexIndex : SV_VertexID, uint point : SV_InstanceID) {
+ShadowVertexLayered shadowVertex(uint vertexIndex : SV_VertexID, uint point : SV_InstanceID) {
     let d = draws[draw.first];
     // Where the point is at the pass's sub-frame (Uniforms.motion, 1 without motion blur).
     let sphere = sphereOf(d, point, u.motion.x);
     let corner = cornerOf(vertexIndex);
     let world = sphere.xyz + (corner.x * lightAxis(0) + corner.y * lightAxis(1)) * sphere.w;
-    ShadowVertexOutput out;
-    out.position = mul(shadowViewProj(), float4(world, 1.0));
+    let at = shadowPosition(world);
+    ShadowVertexLayered out;
+    out.position = at.position;
     out.corner = corner;
     out.sphere = sphere;
+    out.layer = at.layer;
     return out;
 }
 

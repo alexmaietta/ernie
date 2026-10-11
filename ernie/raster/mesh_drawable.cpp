@@ -58,7 +58,8 @@ struct DrawConstants {
     std::uint32_t records;
     std::uint32_t shadowFromFrame;
     std::uint32_t view;
-    std::uint32_t padding[2];
+    std::uint32_t shadowLayer;
+    std::uint32_t padding;
 };
 static_assert(sizeof(DrawConstants) == 96,
               "DrawConstants must match frame.slang");
@@ -3106,6 +3107,7 @@ std::size_t MeshDrawable::Record(
     constants.shadowFromFrame =
         shadow && frame.shadowFromFrame ? 1u : 0u;
     constants.view = frame.view;
+    constants.shadowLayer = shadow ? frame.shadowLayer : 0u;
 
     // GPU-culled ranges draw indirectly, each level a command with a
     // per-draw record (mesh.slang reads it by draw index).

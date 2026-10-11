@@ -43,7 +43,8 @@ struct DrawConstants {
     std::uint32_t records;
     std::uint32_t shadowFromFrame;
     std::uint32_t view;
-    std::uint32_t padding[2];
+    std::uint32_t shadowLayer;
+    std::uint32_t padding;
 };
 static_assert(sizeof(DrawConstants) == 96,
               "DrawConstants must match frame.slang");
@@ -821,6 +822,7 @@ void PointsDrawable::RecordShadow(
         constants.first = static_cast<std::uint32_t>(i);
         constants.shadowFromFrame = frame.shadowFromFrame ? 1u : 0u;
         constants.view = frame.view;
+        constants.shadowLayer = frame.shadowLayer;
         layout_.PushConstants(commands, &constants,
                               sizeof(constants));
         vkCmdDraw(commands, 6, static_cast<std::uint32_t>(count), 0,

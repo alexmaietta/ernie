@@ -2794,25 +2794,32 @@ void RasterRenderer::RecordShadowMaps(
         ERNIE_GPU_ZONE(context_, commands, "Sun shadows");
         shadowMaps_->Transition(
             commands, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-        const auto record = [&](const ShadowPass& pass) {
+        // One layered pass for the passes of a kind, each drawing
+        // into its layer (`RasterFrame::shadowLayer`), rather than a
+        // pass per layer: a batch has a layer per world.
+        const auto record = [&](bool fromBase) {
             RenderingTarget shadow;
-            shadow.depth = shadowMaps_->LayerView(pass.layer);
+            shadow.depth = shadowMaps_->View();
             shadow.extent = {shadowResolution_, shadowResolution_};
-            shadow.loadDepth = pass.fromBase;
+            shadow.layers = shadowMaps_->Desc().layers;
+            shadow.loadDepth = fromBase;
             BeginRendering(commands, shadow);
-            for (const RasterDrawable* drawable : drawables) {
-                drawable->RecordShadow(
-                    commands, frame, pass.cascade,
-                    cascades_[pass.cascade].lightViewProjection,
-                    pass.casters);
+            for (const ShadowPass& pass : shadowPasses_) {
+                if (pass.fromBase != fromBase) {
+                    continue;
+                }
+                RasterFrame layered = frame;
+                layered.shadowLayer = pass.layer;
+                for (const RasterDrawable* drawable : drawables) {
+                    drawable->RecordShadow(
+                        commands, layered, pass.cascade,
+                        cascades_[pass.cascade].lightViewProjection,
+                        pass.casters);
+                }
             }
             vkCmdEndRendering(commands);
         };
-        for (const ShadowPass& pass : shadowPasses_) {
-            if (!pass.fromBase) {
-                record(pass);
-            }
-        }
+        record(false);
         // Each world's layer starts as a copy of the shared casters'
         // layer 0.
         std::vector<VkImageCopy> copies;
@@ -2839,11 +2846,7 @@ void RasterRenderer::RecordShadowMaps(
                            copies.data());
             shadowMaps_->Transition(
                 commands, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-            for (const ShadowPass& pass : shadowPasses_) {
-                if (pass.fromBase) {
-                    record(pass);
-                }
-            }
+            record(true);
         }
         shadowMaps_->Transition(
             commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);

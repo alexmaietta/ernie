@@ -51,6 +51,11 @@ struct RasterFrame {
     /// it; the matrix `RecordShadow` gets is then only the CPU's
     /// estimate.
     bool shadowFromFrame = false;
+    /// Shadow passes: the layer of the layered shadow map their draws
+    /// go to
+    /// (`DrawConstants::shadowLayer`), so one pass draws every
+    /// world's map.
+    std::uint32_t shadowLayer = 0;
 };
 
 /// The shadow casters a shadow pass draws: what every world shares

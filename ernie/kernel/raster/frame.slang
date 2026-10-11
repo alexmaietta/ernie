@@ -87,9 +87,11 @@ public struct DrawConstants {
     public uint shadowFromFrame;
     // The view drawn: its Uniforms in `views` (`u`).
     public uint view;
-    // To 96 bytes, as uints: a uint2 would align to 8 and a uint3 to 16.
+    // Shadow passes: the layer of the layered shadow map drawn into (SV_RenderTargetArrayIndex),
+    // so one pass draws every world's map.
+    public uint shadowLayer;
+    // To 96 bytes, as uints: a uint2 would align to 8.
     uint padding0;
-    uint padding1;
 }
 
 public struct Shadows {
@@ -129,6 +131,20 @@ public property Uniforms u {
 // The view-projection of the shadow pass drawing (`DrawConstants::shadowFromFrame`).
 public float4x4 shadowViewProj() {
     return draw.shadowFromFrame != 0 ? s.lightViewProj[0] : draw.lightViewProj;
+}
+
+// A shadow pass's vertex: in the light's clip space, in the layer the draw names
+// (`DrawConstants::shadowLayer`), so one layered pass draws every world's map.
+public struct ShadowPosition {
+    public float4 position : SV_Position;
+    public uint layer : SV_RenderTargetArrayIndex;
+}
+
+public ShadowPosition shadowPosition(float3 world) {
+    ShadowPosition out;
+    out.position = mul(shadowViewProj(), float4(world, 1.0));
+    out.layer = draw.shadowLayer;
+    return out;
 }
 
 // Jimenez 2014, "Next Generation Post Processing in Call of Duty: Advanced Warfare".

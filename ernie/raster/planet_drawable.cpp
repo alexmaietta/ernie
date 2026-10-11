@@ -42,7 +42,8 @@ struct DrawConstants {
     std::uint32_t records;
     std::uint32_t shadowFromFrame;
     std::uint32_t view;
-    std::uint32_t padding[2];
+    std::uint32_t shadowLayer;
+    std::uint32_t padding;
 };
 static_assert(sizeof(DrawConstants) == 96,
               "DrawConstants must match frame.slang");
@@ -513,6 +514,7 @@ void PlanetDrawable::DrawPatches(VkCommandBuffer commands,
     constants.shadowFromFrame =
         shadow && frame.shadowFromFrame ? 1u : 0u;
     constants.view = frame.view;
+    constants.shadowLayer = shadow ? frame.shadowLayer : 0u;
     layout_.PushConstants(commands, &constants, sizeof(constants));
     const std::uint32_t cells = lod_.PatchCells();
     vkCmdDraw(commands, 6 * cells * cells, range.count, 0, 0);

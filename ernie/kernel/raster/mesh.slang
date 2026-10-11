@@ -278,12 +278,12 @@ float4 meshMotionFragment(MotionFragmentInput in) : SV_Target0 {
 }
 
 [shader("vertex")]
-float4 meshShadowVertex(uint vertexIndex : SV_VertexID, uint instanceIndex : SV_InstanceID,
-                        uint drawIndex : SV_DrawIndex)
-    : SV_Position {
+ShadowPosition meshShadowVertex(uint vertexIndex : SV_VertexID,
+                                uint instanceIndex : SV_InstanceID,
+                                uint drawIndex : SV_DrawIndex) {
     // Where the caster is at the pass's sub-frame (Uniforms.motion, 1 without motion blur).
     let v = meshVertex(vertexIndex, instanceIndex, drawCall(drawIndex), u.motion.x);
-    return mul(shadowViewProj(), float4(v.world, 1.0));
+    return shadowPosition(v.world);
 }
 
 // Detail textures projected along the three world axes and blended by the normal (triplanar
@@ -461,14 +461,23 @@ struct ShadowCutoutOutput {
     float2 uv : TEXCOORD;
 }
 
+// Its vertex stage's outputs: the fragment stage's inputs and the shadow map's layer.
+struct ShadowCutoutLayered {
+    float4 position : SV_Position;
+    float2 uv : TEXCOORD;
+    uint layer : SV_RenderTargetArrayIndex;
+}
+
 [shader("vertex")]
-ShadowCutoutOutput meshShadowCutoutVertex(uint vertexIndex : SV_VertexID,
-                                          uint instanceIndex : SV_InstanceID,
-                                          uint drawIndex : SV_DrawIndex) {
+ShadowCutoutLayered meshShadowCutoutVertex(uint vertexIndex : SV_VertexID,
+                                           uint instanceIndex : SV_InstanceID,
+                                           uint drawIndex : SV_DrawIndex) {
     let v = meshVertex(vertexIndex, instanceIndex, drawCall(drawIndex), u.motion.x);
-    ShadowCutoutOutput out;
-    out.position = mul(shadowViewProj(), float4(v.world, 1.0));
+    let at = shadowPosition(v.world);
+    ShadowCutoutLayered out;
+    out.position = at.position;
     out.uv = v.uv;
+    out.layer = at.layer;
     return out;
 }
 
