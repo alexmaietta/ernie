@@ -213,7 +213,7 @@ def test_demos_package_lists_the_shipped_demos():
     result = run([sys.executable, "-m", "ernie.demos", "--list"])
     names = result.stdout.split()
     assert (
-        "viewer/sun_panel" in names
+        "viewer/custom_panel" in names
         and "lighting/illuminants" in names
     )
 

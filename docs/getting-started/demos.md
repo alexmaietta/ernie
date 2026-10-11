@@ -17,14 +17,14 @@ ernie scene.json --output scene.png    # renders a scene file without a window
 `python -m ernie.demos` runs the Python demos, which the package ships as `ernie.demos`:
 
 ```sh
-python -m ernie.demos                         # viewer/sun_panel
+python -m ernie.demos                         # viewer/custom_panel
 python -m ernie.demos --list
 python -m ernie.demos lighting/illuminants    # one by name, with its options after it
 ```
 
 From a checkout, run the files themselves (`PYTHONPATH=build/python python demos/lighting/illuminants.py`), or a C++ demo's own program, which `-DERNIE_BUILD_DEMOS=ON` builds as `demo_<category>_<name>` (`build/bin/demo_lighting_illuminants`).
 
-Each opens the viewer with a Demos panel at the bottom, a tab beside the Log and Stats. It lists the demos in the same language under a collapsing header per category; choosing one clears the scene and builds that demo in the same window. Below the list it pauses, single-steps and resets the running demo, describes it, and shows its options.
+Each opens the viewer with a Demos panel at the bottom, a tab beside the Log and Stats. It lists the demos in the same language under a collapsing header per category; choosing one clears the scene and builds that demo in the same window. Below the list it pauses, single-steps and resets the running demo, describes it, and shows its options. A demo builds its options from widgets (`widgets` in Python, `Widgets()` in C++): text, text fields, buttons, checkboxes, sliders, drop-downs (combos), colour pickers and live plots; `viewer/custom_panel` uses each. C++ demos can also draw Dear ImGui directly in `Gui()`.
 
 Every demo takes these options:
 
@@ -48,8 +48,8 @@ A demo's own options follow these; `--help` lists them all. For example:
 ```sh
 ernie --demo lighting/illuminants --viewer null --output illuminants.png
 python -m ernie.demos lighting/illuminants --viewer null --output illuminants.png
-python -m ernie.demos viewer/sun_panel --headless --test
-ernie --demo viewer/sun_panel --benchmark --num-frames 300
+python -m ernie.demos viewer/custom_panel --headless --test
+ernie --demo viewer/custom_panel --benchmark --num-frames 300
 ```
 
 The Python tests (`ernie/test/python/test_demos.py`) run every demo in both languages with `--viewer null --test`, check that each has its twin, and check that the twins' `--output` images match.

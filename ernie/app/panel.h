@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -100,16 +101,24 @@ class WidgetPanel final : public Panel {
              std::size_t selected,
              std::function<void(std::size_t)> onChange);
 
+    /// A field of editable text; `onChange` gets it after each edit.
+    Id InputText(std::string label, std::string value,
+                 std::function<void(const std::string&)> onChange);
+    /// An RGB colour swatch with a picker, components in [0, 1].
+    Id Color(std::string label, std::array<double, 3> value,
+             std::function<void(std::array<double, 3>)> onChange);
+
     /// A line plot of the values `source` returns, read each frame.
     Id Plot(std::string label,
             std::function<std::vector<float>()> source);
 
-    /// Sets the value of a checkbox (`bool`), slider (`double`) or
-    /// combo (index), or a text's text.
+    /// Sets the value of a checkbox (`bool`), slider (`double`),
+    /// combo (index) or colour, or the text of a text or text field.
     void Set(Id widget, bool value);
     void Set(Id widget, double value);
     void Set(Id widget, std::size_t value);
     void Set(Id widget, std::string value);
+    void Set(Id widget, std::array<double, 3> value);
 
     void Remove(Id widget);
     void Clear();
@@ -121,5 +130,9 @@ class WidgetPanel final : public Panel {
     std::vector<std::unique_ptr<Widget>> widgets_;
     Id next_ = 1;
 };
+
+/// ImGui::InputText on a std::string, which grows as the user types;
+/// `flags` are ImGuiInputTextFlags.
+bool InputString(const char* label, std::string& text, int flags = 0);
 
 }  // namespace ernie::app

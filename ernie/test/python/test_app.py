@@ -113,13 +113,20 @@ def test_widget_panels_and_menus(viewer):
     check = panel.checkbox("Shadows", True)
     combo = panel.combo("Mode", ["a", "b"], 1)
     text = panel.text("ready")
+    field = panel.input_text("Name", "rock")
+    colour = panel.color("Tint", (0.2, 0.4, 0.6))
     panel.plot("History", lambda: [1.0, 2.0, 3.0])
     panel.set(slider, 45.0)
     panel.set(check, False)
     panel.set(combo, 0)
     panel.set(text, "running")
+    panel.set(field, "boulder")
+    # Colours clamp to [0, 1].
+    panel.set(colour, (1.5, 0.5, -1.0))
     with pytest.raises(ValueError):
         panel.set(slider, True)
+    with pytest.raises(ValueError):
+        panel.set(colour, "red")
     viewer.add_menu_item("Tools", "Reset", lambda v: None)
     assert viewer.step()
 

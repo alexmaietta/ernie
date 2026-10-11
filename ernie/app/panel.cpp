@@ -5,6 +5,7 @@
 #include <implot.h>
 
 #include <algorithm>
+#include <array>
 #include <stdexcept>
 #include <variant>
 
@@ -44,18 +45,54 @@ struct ComboWidget {
     std::function<void(std::size_t)> onChange;
 };
 
+struct InputTextWidget {
+    std::string label;
+    std::string value;
+    std::function<void(const std::string&)> onChange;
+};
+
+struct ColorWidget {
+    std::string label;
+    std::array<float, 3> value{};
+    std::function<void(std::array<double, 3>)> onChange;
+};
+
 struct PlotWidget {
     std::string label;
     std::function<std::vector<float>()> source;
 };
 
+int ResizeString(ImGuiInputTextCallbackData* data) {
+    if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
+        auto* text = static_cast<std::string*>(data->UserData);
+        text->resize(static_cast<std::size_t>(data->BufTextLen));
+        data->Buf = text->data();
+    }
+    return 0;
+}
+
+std::array<float, 3> Clamped(const std::array<double, 3>& rgb) {
+    std::array<float, 3> out{};
+    for (std::size_t i = 0; i < 3; ++i) {
+        out[i] = static_cast<float>(std::clamp(rgb[i], 0.0, 1.0));
+    }
+    return out;
+}
+
 }  // namespace
+
+bool InputString(const char* label, std::string& text, int flags) {
+    return ImGui::InputText(label, text.data(), text.capacity() + 1,
+                            flags |
+                                ImGuiInputTextFlags_CallbackResize,
+                            ResizeString, &text);
+}
 
 struct WidgetPanel::Widget {
     Id id = 0;
     std::variant<TextWidget, SeparatorWidget, ButtonWidget,
                  CheckboxWidget, SliderWidget, ComboWidget,
-                 PlotWidget>
+                 InputTextWidget, ColorWidget, PlotWidget>
         data;
 };
 
@@ -148,6 +185,24 @@ WidgetPanel::Combo(std::string label, std::vector<std::string> items,
     return next_++;
 }
 
+WidgetPanel::Id WidgetPanel::InputText(
+    std::string label, std::string value,
+    std::function<void(const std::string&)> onChange) {
+    widgets_.push_back(std::make_unique<Widget>(Widget{
+        next_, InputTextWidget{std::move(label), std::move(value),
+                               std::move(onChange)}}));
+    return next_++;
+}
+
+WidgetPanel::Id WidgetPanel::Color(
+    std::string label, std::array<double, 3> value,
+    std::function<void(std::array<double, 3>)> onChange) {
+    widgets_.push_back(std::make_unique<Widget>(
+        Widget{next_, ColorWidget{std::move(label), Clamped(value),
+                                  std::move(onChange)}}));
+    return next_++;
+}
+
 WidgetPanel::Id
 WidgetPanel::Plot(std::string label,
                   std::function<std::vector<float>()> source) {
@@ -176,7 +231,21 @@ void WidgetPanel::Set(Id widget, std::size_t value) {
 }
 
 void WidgetPanel::Set(Id widget, std::string value) {
+    for (auto& w : widgets_) {
+        if (w->id != widget) {
+            continue;
+        }
+        if (auto* field = std::get_if<InputTextWidget>(&w->data)) {
+            field->value = std::move(value);
+            return;
+        }
+        break;
+    }
     Find<TextWidget>(widgets_, widget).text = std::move(value);
+}
+
+void WidgetPanel::Set(Id widget, std::array<double, 3> value) {
+    Find<ColorWidget>(widgets_, widget).value = Clamped(value);
 }
 
 void WidgetPanel::Remove(Id widget) {
@@ -247,6 +316,20 @@ void WidgetPanel::Draw(Viewer& /*viewer*/) {
                             }
                         }
                         ImGui::EndCombo();
+                    }
+                } else if constexpr (std::is_same_v<
+                                         T, InputTextWidget>) {
+                    if (InputString(w.label.c_str(), w.value) &&
+                        w.onChange) {
+                        Call(w.onChange, w.value);
+                    }
+                } else if constexpr (std::is_same_v<T, ColorWidget>) {
+                    if (ImGui::ColorEdit3(w.label.c_str(),
+                                          w.value.data()) &&
+                        w.onChange) {
+                        Call(w.onChange,
+                             std::array<double, 3>{
+                                 w.value[0], w.value[1], w.value[2]});
                     }
                 } else if constexpr (std::is_same_v<T, PlotWidget>) {
                     const std::vector<float> values =

@@ -3,9 +3,12 @@
 [name] [options]` runs one, as `python -m newton.examples` runs
 Newton's examples.
 
-    python -m ernie.demos                     # the sun panel demo, with the Demos panel
-    python -m ernie.demos --list              # every demo's name
-    python -m ernie.demos lighting/illuminants --viewer null --output illuminants.png
+    # The custom panel demo, with the Demos panel.
+    python -m ernie.demos
+    # Every demo's name.
+    python -m ernie.demos --list
+    python -m ernie.demos lighting/illuminants --viewer null \\
+        --output illuminants.png
     python -m ernie.demos lighting/illuminants --help
 
 The demos are `<category>/<name>.py` files, each the twin of a C++
@@ -31,14 +34,15 @@ from ..demo import discover_demos
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 
 #: The demo `python -m ernie.demos` runs without a name.
-DEFAULT = "viewer/sun_panel"
+DEFAULT = "viewer/custom_panel"
 
 USAGE = """Usage: python -m ernie.demos [category/name] [options]
        python -m ernie.demos --list
        python -m ernie.demos category/name --help
 
-Runs one of Ernie's Python demos (viewer/sun_panel without a name), with a Demos panel to switch
-to the others; --list lists them, and NAME --help shows a demo's options."""
+Runs one of Ernie's Python demos (viewer/custom_panel without a
+name), with a Demos panel to switch to the others; --list lists them,
+and NAME --help shows a demo's options."""
 
 
 def demos():

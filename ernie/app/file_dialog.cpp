@@ -2,6 +2,7 @@
 #include "ernie/app/file_dialog.h"
 
 #include "ernie/app/icons.h"
+#include "ernie/app/panel.h"
 
 #include <imgui.h>
 
@@ -83,23 +84,6 @@ std::string TimeText(fs::file_time_type time) {
     char text[32];
     std::strftime(text, sizeof(text), "%Y-%m-%d %H:%M", &local);
     return text;
-}
-
-int ResizeString(ImGuiInputTextCallbackData* data) {
-    if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
-        auto* text = static_cast<std::string*>(data->UserData);
-        text->resize(static_cast<std::size_t>(data->BufTextLen));
-        data->Buf = text->data();
-    }
-    return 0;
-}
-
-bool InputString(const char* label, std::string& text,
-                 ImGuiInputTextFlags flags = 0) {
-    return ImGui::InputText(label, text.data(), text.capacity() + 1,
-                            flags |
-                                ImGuiInputTextFlags_CallbackResize,
-                            ResizeString, &text);
 }
 
 }  // namespace

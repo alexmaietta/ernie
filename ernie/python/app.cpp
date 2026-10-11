@@ -245,6 +245,16 @@ void BindApp(nb::module_& parent) {
         .def("combo", &WidgetPanel::Combo, nb::arg("label"),
              nb::arg("items"), nb::arg("selected") = 0,
              nb::arg("on_change").none() = nb::none())
+        .def("input_text", &WidgetPanel::InputText, nb::arg("label"),
+             nb::arg("value") = "",
+             nb::arg("on_change").none() = nb::none(),
+             "A field of editable text; on_change gets the text "
+             "after each edit.")
+        .def("color", &WidgetPanel::Color, nb::arg("label"),
+             nb::arg("value"),
+             nb::arg("on_change").none() = nb::none(),
+             "An RGB colour swatch with a picker; on_change gets "
+             "(r, g, b) in [0, 1].")
         .def("plot", &WidgetPanel::Plot, nb::arg("label"),
              nb::arg("source"),
              "A line plot of the floats `source()` returns, read "
@@ -259,14 +269,20 @@ void BindApp(nb::module_& parent) {
                     panel.Set(widget, nb::cast<std::size_t>(value));
                 } else if (nb::isinstance<nb::float_>(value)) {
                     panel.Set(widget, nb::cast<double>(value));
-                } else {
+                } else if (nb::isinstance<nb::str>(value)) {
                     panel.Set(widget, nb::cast<std::string>(value));
+                } else {
+                    panel.Set(widget,
+                              nb::cast<std::array<double, 3>>(value));
                 }
             },
             nb::arg("widget"), nb::arg("value"),
+            nb::sig("def set(self, widget: int, value: bool | int | "
+                    "float | str | tuple[float, float, float]) -> "
+                    "None"),
             "Sets a checkbox (bool), combo (int index), slider "
-            "(float) or text (str) without "
-            "calling its callback.")
+            "(float), text or text field (str) or colour (r, g, b) "
+            "without calling its callback.")
         .def("remove", &WidgetPanel::Remove, nb::arg("widget"))
         .def("clear", &WidgetPanel::Clear);
 
