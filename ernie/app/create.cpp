@@ -47,6 +47,7 @@ constexpr CreatableType kTypes[] = {
     {kDomeLight, "Dome Light", "Lights", "Dome", "/World"},
     {kStarField, "Star Field", "Lights", "Stars", "/World"},
     {kAtmosphere, "Atmosphere", "Lights", "Atmosphere", "/World"},
+    {kCelestialBody, "Celestial Body", "Lights", "Moon", "/World"},
     {kCamera, "Camera from View", "Cameras", "Camera", "/World"},
     {kMaterial, "Material", "Shading", "Material", "/Looks"},
     {kRenderSettings, "Render Settings", "Render", "Settings",

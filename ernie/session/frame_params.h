@@ -445,6 +445,16 @@ struct AtmosphereParams {
     }
 };
 
+/// A CelestialBody far beyond the scene (`BodyParamsOf`): drawn in
+/// the sky and eclipsing the sun.
+struct BodyParams {
+    glm::dvec3 centre{0.0};   ///< World, metres.
+    double radius = 0.0;      ///< Metres.
+    glm::vec3 albedo{0.12f};  ///< Normal albedo, linear RGB.
+
+    bool operator==(const BodyParams&) const = default;
+};
+
 /// Per-frame parameters of a render, whatever the backend: the
 /// camera, the sun, the other lights, the sensor filters and the
 /// frame's place in the random streams. `shadows` tunes the
@@ -496,6 +506,9 @@ struct FrameParams {
         stars;  ///< Stars behind everything, as last uploaded.
     std::optional<AtmosphereParams>
         atmosphere;  ///< The planet's atmosphere.
+    /// Bodies such as moons, at most `kMaxBodies`.
+    std::vector<BodyParams> bodies;
+    static constexpr std::size_t kMaxBodies = 4;
     float exposure =
         1.0f;  ///< Extra scale on the photographic output.
     bool meter =

@@ -22,9 +22,16 @@ ERNIE_DEFINE_SCHEMA(
     "Terrain or a planet under the world's origin.",
     ERNIE_ATMOSPHERE_ATTRIBUTES)
 
+ERNIE_DEFINE_SCHEMA(
+    CelestialBody, tokens::kCelestialBody, &Imageable::Definition(),
+    false,
+    "A sphere far beyond the scene, such as a moon, drawn in the sky "
+    "and casting eclipse shadows.",
+    ERNIE_CELESTIAL_BODY_ATTRIBUTES)
+
 std::vector<const PrimTypeDef*> TerrainSchemaTypes() {
     return {&Terrain::Definition(), &StarField::Definition(),
-            &Atmosphere::Definition()};
+            &Atmosphere::Definition(), &CelestialBody::Definition()};
 }
 
 }  // namespace ernie

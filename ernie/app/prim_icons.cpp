@@ -262,7 +262,7 @@ void DrawPrimIcon(ImDrawList* draw, const ImVec2& corner, float size,
         Panel(draw, at, type == kDiskLight);
     } else if (type == kDomeLight || type == kAtmosphere) {
         Dome(draw, at);
-    } else if (type == kStarField) {
+    } else if (type == kStarField || type == kCelestialBody) {
         Stars(draw, at);
     } else if (type == kCamera) {
         CameraIcon(draw, at);

@@ -90,8 +90,12 @@ struct ShadingUniforms {
     /// The scene's ambient light's colour, linear RGB over its
     /// luminance (its luminance is `sun[3]`'s); w unused.
     float ambient[4];
-    float padding[32];  ///< To the views' stride, so shading reads
-                        ///< them as one array.
+    /// Celestial bodies (km): each centre relative to the frame's
+    /// origin and radius, 0 for none; and its normal albedo, linear
+    /// RGB. They fill the views' stride, so shading reads them as one
+    /// array.
+    float bodies[4][4];
+    float bodyAlbedo[4][4];
 };
 static_assert(sizeof(ShadingUniforms) == 1280,
               "ShadingUniforms must match shading.slang");
@@ -104,6 +108,7 @@ constexpr std::uint32_t kSkyMap = 2;
 constexpr std::uint32_t kSkyStars = 4;
 constexpr std::uint32_t kSkyLighting = 8;
 constexpr std::uint32_t kSkyAtmosphere = 16;
+constexpr std::uint32_t kSkyBodies = 32;
 
 struct LightGpu {
     float position[4];
@@ -2580,6 +2585,9 @@ void RasterRenderer::Update(
     if (params.stars && starCount_ > 0) {
         sky_ |= kSkyStars;
     }
+    if (!params.bodies.empty()) {
+        sky_ |= kSkyBodies;
+    }
     atmosphere_->Set(params.atmosphere, bands_);
     // The lights first: shading reads the size of the light shadow
     // maps they make.
@@ -2841,8 +2849,22 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
         shading.atmosphere[1][0] = static_cast<float>(
             (banded.bottomRadius + banded.topAltitude) * 1e-3);
         shading.atmosphere[1][1] = 1.0f;
-        shading.atmosphere[1][2] = std::max(
-            std::sin(glm::radians(0.5f * params.sunAngle)), 1e-5f);
+    }
+    shading.atmosphere[1][2] = std::max(
+        std::sin(glm::radians(0.5f * params.sunAngle)), 1e-5f);
+    // Bodies in kilometres likewise, the Moon's 384,000 km away.
+    for (std::size_t i = 0;
+         i < std::min(params.bodies.size(), FrameParams::kMaxBodies);
+         ++i) {
+        const BodyParams& body = params.bodies[i];
+        const glm::dvec3 centre = (body.centre - params.origin) * 1e-3;
+        shading.bodies[i][0] = static_cast<float>(centre.x);
+        shading.bodies[i][1] = static_cast<float>(centre.y);
+        shading.bodies[i][2] = static_cast<float>(centre.z);
+        shading.bodies[i][3] = static_cast<float>(body.radius * 1e-3);
+        shading.bodyAlbedo[i][0] = body.albedo.x;
+        shading.bodyAlbedo[i][1] = body.albedo.y;
+        shading.bodyAlbedo[i][2] = body.albedo.z;
     }
     shading.sky[1] = map.width;
     shading.sky[2] = map.height;

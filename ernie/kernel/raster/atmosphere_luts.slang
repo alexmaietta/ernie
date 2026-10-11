@@ -152,7 +152,8 @@ void skyIrradianceMain(uint3 id: SV_DispatchThreadID) {
         float4 light;
         float4 through;
         scatterAlong(medium, densities, phases, transmittance, multiple, linear, origin, direction,
-                     start, end, sun, kSunSine, id.z, kIrradianceSteps, light, through);
+                     start, end, sun, kSunSine, noEclipse(), id.z, kIrradianceSteps, light,
+                     through);
         irradiance += light;
     }
     irradianceOut[id] = PI * irradiance / float(kDirections);

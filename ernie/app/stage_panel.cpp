@@ -57,7 +57,7 @@ Kind KindOf(std::string_view type) {
         type == kRectLight || type == kDiskLight ||
         type == kCylinderLight || type == kLaserLight ||
         type == kDomeLight || type == kStarField ||
-        type == kAtmosphere) {
+        type == kAtmosphere || type == kCelestialBody) {
         return kLights;
     }
     if (type == kCamera) {

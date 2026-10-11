@@ -74,6 +74,8 @@ inline constexpr std::string_view kStarField =
     "StarField";  ///< Ernie: stars behind everything.
 inline constexpr std::string_view kAtmosphere =
     "Atmosphere";  ///< Ernie: a planet's air and aerosols.
+inline constexpr std::string_view kCelestialBody =
+    "CelestialBody";  ///< Ernie: a moon or planet far off.
 inline constexpr std::string_view kRenderSettings = "RenderSettings";
 inline constexpr std::string_view kRenderProduct = "RenderProduct";
 inline constexpr std::string_view kRenderVar = "RenderVar";
@@ -618,6 +620,15 @@ inline constexpr std::string_view kAtmosphereOzoneColumn =
 /// float: Mars's vertical dust optical depth at 880 nm.
 inline constexpr std::string_view kAtmosphereDustOpticalDepth =
     "ernie:atmosphere:dustOpticalDepth";
+
+// CelestialBody (Ernie): a sphere far beyond the scene, such as a
+// moon, at its transform's origin, drawn in the sky and casting
+// eclipse shadows.
+//
+/// float, metres.
+inline constexpr std::string_view kBodyRadius = "ernie:body:radius";
+/// color3f: its normal albedo, linear RGB.
+inline constexpr std::string_view kBodyAlbedo = "ernie:body:albedo";
 
 // Terrain (Ernie): a north-up heightfield, x east, y north, z up.
 inline constexpr std::string_view kHeights =

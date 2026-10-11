@@ -378,11 +378,17 @@ public bool clipSegment(float3 p, float3 d, float span, float top, out float sta
 // in-scattering is integrated exactly for constant coefficients. Steps crowd towards the start
 // when it is inside the atmosphere, where the air is densest along rays from the ground, and are
 // even across rays from space.
+//
+// `eclipse`'s bodies (planet-centred) dim the sun at each step (`eclipseVisibility`), both its
+// single and its multiple scattering: Psi_ms assumes the sun lights all the air around a point
+// alike, so inside a moon's umbra, about a hundred kilometres across, the light scattered in
+// from the sunlit air beyond is left out, and the sky there is darker than it should be.
 public void scatterAlong(StructuredBuffer<float4> medium, StructuredBuffer<float> densities,
                          StructuredBuffer<float> phases, Texture2DArray<float4> transmittanceTable,
                          Texture2DArray<float4> multipleTable, SamplerState linear, float3 p,
                          float3 d, float start, float end, float3 sun, float sunSine,
-                         uint group, uint steps, out float4 radiance, out float4 transmittance) {
+                         Eclipse eclipse, uint group, uint steps, out float4 radiance,
+                         out float4 transmittance) {
     let bottom = atmosphereBottom(medium);
     let top = atmosphereTop(medium);
     let constituents = uint(medium[0].z);
@@ -421,7 +427,9 @@ public void scatterAlong(StructuredBuffer<float4> medium, StructuredBuffer<float
         let toSun = sunTransmittance(transmittanceTable, linear, point, sun, sunSine, group, bottom,
                                      top);
         let multiple = multipleScattering(multipleTable, linear, r, muSun, group, bottom, top);
-        let source = phased * toSun + scattering * multiple;
+        let source =
+            (phased * toSun + scattering * multiple) * eclipseVisibility(eclipse, point, sun,
+                                                                         sunSine);
         let sample = exp(-extinction * step);
         let fraction = select(extinction > 0.0, (1.0 - sample) / max(extinction, 1e-20),
                               float4(step));
@@ -447,8 +455,98 @@ public float sunDisc(float3 d, float3 sun, float sunSine, float wavelength, floa
     if (cosine <= 0.0 || sine >= sunSine) {
         return 0.0;
     }
-    let alpha = max(-0.023 + 292.0 / wavelength, 0.0);
+    let alpha = limbDarkening(wavelength);
     let ratio = sine / sunSine;
     let mu = sqrt(max(1.0 - ratio * ratio, 0.0));
     return pow(mu, alpha) * (alpha + 2.0) / (2.0 * solidAngle);
+}
+
+// Hestroffer and Magnan's limb darkening exponent at `wavelength` nm (`sunDisc`).
+public float limbDarkening(float wavelength) {
+    return max(-0.023 + 292.0 / wavelength, 0.0);
+}
+
+// Bodies that may eclipse the sun, such as moons: xyz each centre and w its radius, in km in the
+// frame of the points it is asked about (0 radius for none); and the wavelengths (nm) of the band
+// group's bands, whose limb darkening differs.
+public struct Eclipse {
+    public float4 bodies[4];
+    public float4 wavelengths;
+}
+
+// No bodies.
+public Eclipse noEclipse() {
+    Eclipse eclipse;
+    for (uint i = 0; i < 4; ++i) {
+        eclipse.bodies[i] = float4(0.0);
+    }
+    eclipse.wavelengths = float4(550.0);
+    return eclipse;
+}
+
+// Rings across the sun's disc over which an eclipse is integrated.
+static const uint kEclipseRings = 16;
+
+// The fraction of the sun's light that reaches `p` (km, in the bodies' frame) past `eclipse`'s
+// bodies, per band: the part of the sun's disc, of angular radius sine `sunSine` towards `sun`,
+// that no body covers, weighted by its limb-darkened brightness (`sunDisc`). Each body covers a
+// disc of angular radius asin(radius / distance). Across rings of the sun's disc, a body covers
+// the fraction acos((s^2 + rho^2 - R^2) / (2 s rho)) / pi of the ring at angular radius rho, for a
+// body of angular radius R whose centre is s from the sun's (the discs taken as flat, as both are
+// small); the power law's brightness inside radius rho is 1 - (1 - (rho / rho_sun)^2)^(alpha/2 + 1)
+// of the whole, exactly, which weights the rings. Several bodies dim the light in turn. 0 inside a
+// body.
+//
+// References:
+// - S. Schneegans, J. Gilg, V. Ahlers and A. Gerndt, "Real-Time Rendering of Eclipses without
+//   Incorporation of Atmospheric Effects", Computer Graphics Forum 41(7):279-289, 2022, sections
+//   3 and 4 (the eclipse geometry, and the occluded fraction with limb darkening).
+//   https://doi.org/10.1111/cgf.14676
+// - Hestroffer and Magnan 1998 (the limb darkening, `sunDisc`).
+public float4 eclipseVisibility(Eclipse eclipse, float3 p, float3 sun, float sunSine) {
+    var visible = float4(1.0);
+    let sunRadius = asin(sunSine);
+    var exponent = float4(0.0);
+    for (uint k = 0; k < 4; ++k) {
+        exponent[k] = 0.5 * limbDarkening(eclipse.wavelengths[k]) + 1.0;
+    }
+    for (uint i = 0; i < 4; ++i) {
+        let body = eclipse.bodies[i];
+        if (body.w <= 0.0) {
+            continue;
+        }
+        let toBody = body.xyz - p;
+        let distance = length(toBody);
+        if (distance <= body.w) {
+            return float4(0.0);
+        }
+        let direction = toBody / distance;
+        if (dot(direction, sun) <= 0.0) {
+            continue;
+        }
+        // Angles: the body's radius, and its centre's separation from the sun's, which the
+        // chord's arc sine keeps accurate for small angles.
+        let bodyRadius = asin(body.w / distance);
+        let separation = 2.0 * asin(min(0.5 * length(direction - sun), 1.0));
+        if (separation >= sunRadius + bodyRadius) {
+            continue;
+        }
+        if (separation + sunRadius <= bodyRadius) {
+            return float4(0.0);
+        }
+        var covered = float4(0.0);
+        var inside = float4(0.0);
+        for (uint ring = 0; ring < kEclipseRings; ++ring) {
+            let outer = float(ring + 1) / float(kEclipseRings);
+            let rho = (float(ring) + 0.5) / float(kEclipseRings) * sunRadius;
+            let cosine = (separation * separation + rho * rho - bodyRadius * bodyRadius) /
+                         max(2.0 * separation * rho, 1e-20);
+            let arc = acos(clamp(cosine, -1.0, 1.0)) / kPi;
+            let within = 1.0 - pow(float4(max(1.0 - outer * outer, 0.0)), exponent);
+            covered += arc * (within - inside);
+            inside = within;
+        }
+        visible *= saturate(1.0 - covered);
+    }
+    return visible;
 }

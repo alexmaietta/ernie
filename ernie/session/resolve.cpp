@@ -856,6 +856,12 @@ RenderPrims ResolveRenderPrims(const Scene& scene,
     prims.ground = FirstVisible(scene, tokens::kGroundPlane);
     prims.stars = FirstVisible(scene, tokens::kStarField);
     prims.atmosphere = FirstVisible(scene, tokens::kAtmosphere);
+    for (const Path& path : scene.Prims(tokens::kCelestialBody)) {
+        if (prims.bodies.size() < FrameParams::kMaxBodies &&
+            scene.IsVisible(path)) {
+            prims.bodies.push_back(path);
+        }
+    }
     return prims;
 }
 
@@ -2430,6 +2436,20 @@ AtmosphereParams AtmosphereParamsOf(const Scene& scene,
     return params;
 }
 
+BodyParams BodyParamsOf(const Scene& scene, const Path& path) {
+    if (scene.TypeOf(path) != tokens::kCelestialBody) {
+        throw std::invalid_argument("'" + path.String() +
+                                    "' is not a CelestialBody");
+    }
+    const CelestialBody prim(scene, path);
+    BodyParams params;
+    params.centre = glm::dvec3(scene.WorldTransform(path)[3]);
+    params.radius = std::max(prim.GetRadius(), 0.0);
+    params.albedo = glm::clamp(glm::vec3(prim.GetAlbedo()),
+                               glm::vec3(0.0f), glm::vec3(1.0f));
+    return params;
+}
+
 double OverscanOf(const CameraParams& camera) {
     // A camera rendered on cube faces resamples their own projection,
     // not one pinhole image.
@@ -2613,6 +2633,9 @@ FrameParams FrameParamsOf(const Scene& scene,
     if (!prims.atmosphere.IsEmpty()) {
         params.atmosphere = AtmosphereParamsOf(
             scene, prims.atmosphere, prims.terrain);
+    }
+    for (const Path& body : prims.bodies) {
+        params.bodies.push_back(BodyParamsOf(scene, body));
     }
     for (const Path& light : prims.lights) {
         const auto posed = prims.lightTransforms.find(light);

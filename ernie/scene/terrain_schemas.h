@@ -113,7 +113,18 @@
                                      "0.3 to 0.9 in clear seasons, above 1 in dust storms).",      \
                               .group = "Atmosphere", .max = 10.0}))
 
+#define ERNIE_CELESTIAL_BODY_ATTRIBUTES(X)                                                         \
+    X(double, Radius, ::ernie::tokens::kBodyRadius, 1737.4e3,                                      \
+      (::ernie::AttributeMeta{.doc = "Metres; the Moon's mean radius by default.",                 \
+                              .group = "Body", .max = 1e9}))                                       \
+    X(glm::dvec3, Albedo, ::ernie::tokens::kBodyAlbedo, glm::dvec3(0.12),                          \
+      (::ernie::AttributeMeta{.doc = "Normal albedo, linear RGB: its brightness lit and seen "     \
+                                     "head on over a white Lambertian surface's (the Moon's "      \
+                                     "about 0.12).",                                               \
+                              .group = "Body", .color = true}))
+
 #define ERNIE_TERRAIN_ALL(X) ERNIE_GPRIM_ALL(X) ERNIE_TERRAIN_ATTRIBUTES(X)
+#define ERNIE_CELESTIAL_BODY_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_CELESTIAL_BODY_ATTRIBUTES(X)
 #define ERNIE_STAR_FIELD_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_STAR_FIELD_ATTRIBUTES(X)
 #define ERNIE_ATMOSPHERE_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_ATMOSPHERE_ATTRIBUTES(X)
 // clang-format on
@@ -156,6 +167,18 @@ class StarField : public Imageable {
 class Atmosphere : public Imageable {
     ERNIE_SCHEMA_BODY(Atmosphere, Imageable, ERNIE_ATMOSPHERE_ALL)
     ERNIE_SCHEMA_DEFINE(Atmosphere)
+};
+
+/// A sphere far beyond the scene, such as a moon, centred at its
+/// transform's origin: drawn in the sky behind the scene, lit by the
+/// sun with Lommel-Seeliger reflectance, and casting eclipse shadows
+/// on everything the sun lights, the air included, as it covers part
+/// of the sun's limb-darkened disc. Renders use the first four
+/// visible ones.
+class CelestialBody : public Imageable {
+    ERNIE_SCHEMA_BODY(CelestialBody, Imageable,
+                      ERNIE_CELESTIAL_BODY_ALL)
+    ERNIE_SCHEMA_DEFINE(CelestialBody)
 };
 
 /// This file's types' registry entries, bases first (`PrimTypes`).
