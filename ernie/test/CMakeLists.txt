@@ -21,6 +21,7 @@ ernie_add_test_suite(
     scene_edit_history_test.cpp
     scene_geometry_schemas_test.cpp
     scene_isd_test.cpp
+    scene_light_pattern_test.cpp
     scene_material_schemas_test.cpp
     scene_orbit_controller_test.cpp
     scene_overlay_test.cpp

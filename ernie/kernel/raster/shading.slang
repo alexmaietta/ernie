@@ -46,6 +46,8 @@
 import brdf;
 // The planet's atmosphere: the sun's transmittance through it (atmosphere.slang).
 import atmosphere;
+import light_pattern;
+import light_patterns;
 // The camera's projection: a frame camera's matrices, or a pushbroom's strip
 // (projection_pinhole.slang, projection_pushbroom.slang).
 import projection;
@@ -138,10 +140,12 @@ struct LightGpu {
     // ranges along each; x: the waist's distance along the beam.
     float4 beam;
     float4 beamExtra;
-    // beamExtra yzw: its pattern (0 spot, 1 line, 2 grid), the efficiency into it and its zero
-    // order. pattern: a line's half fan angle (radians) and profile (1 Gaussian), or a grid's
-    // columns, rows and pitch along x and y (radians).
+    // beamExtra yzw: its pattern (0 spot, 1 line, 2 grid, 3 custom), the efficiency into it and
+    // its zero order. pattern: a line's half fan angle (radians) and profile (1 Gaussian); a grid's
+    // columns, rows and pitch along x and y (radians); or a custom pattern's index
+    // (`customPattern`), extent, wavelength (nm) and time (s), its parameters `patternParams`.
     float4 pattern;
+    float4 patternParams[4];
 }
 
 struct MaterialGpu {
@@ -193,6 +197,9 @@ struct ShadingConstants {
 // Lights' IES profiles (`LightParams::profile`): per slot kProfileRows rows from the light's axis
 // (0) to opposite it (180 degrees), of kProfileColumns columns around it from its +x towards +y.
 [[vk::binding(20, 0)]] StructuredBuffer<float> lightProfiles;
+// Per light slot, its custom pattern's integral over its extent (the renderer's
+// `patternNormMain`), which its emission is divided by so the laser emits its power.
+[[vk::binding(27, 0)]] StructuredBuffer<float> patternNorms;
 static const uint kProfileRows = 129;
 static const uint kProfileColumns = 64;
 
@@ -668,11 +675,13 @@ float normalBelow(float x) {
 //   the beam is wide, or Gaussian with 1/e^2 at the fan's edges), so per metre along the line
 //   g(a) cos^2 a / z at angle a = atan(x / z), the beam's Gaussian across it;
 // - grid: beamlets at the pitch's angles, each a Gaussian beam centred z tan(angle) off the axis
-//   with its share of the power, the zero order on the axis; the pixel sums those around it.
+//   with its share of the power, the zero order on the axis; the pixel sums those around it;
+// - custom: a registered `ILightPattern`'s emission over its integral (`patternNorms`, light
+//   slot `slot`).
 //
 // References:
 // - A. E. Siegman, Lasers, University Science Books, 1986, ch. 17.
-float laserIrradiance(LightGpu light, float3 world, float3x2 footprint) {
+float laserIrradiance(LightGpu light, uint slot, float3 world, float3x2 footprint) {
     let offset = world - light.position.xyz;
     let along = dot(offset, light.axis.xyz);
     if (along <= 0.0) {
@@ -694,6 +703,26 @@ float laserIrradiance(LightGpu light, float3 world, float3x2 footprint) {
     // from the aperture it is that over the cosine between the ray and the axis (shading then
     // applies the surface's own cosine).
     let oblique = length(offset) / along;
+    if (kind == 3) {
+        // A custom pattern (`ILightPattern`): its relative power per unit area of the tangent
+        // plane over its integral there, so per square metre of the plane across the axis z on
+        // over z^2; nothing beyond its extent, the pixel's footprint covering it in part at
+        // its edge.
+        let tangent = float2(rx, ry) / along;
+        let footprint = width / along;
+        let extent = light.pattern.y;
+        let norm = patternNorms[slot];
+        let cover = saturate((extent - abs(tangent)) / max(footprint, 1e-9) + 0.5);
+        if (cover.x * cover.y <= 0.0 || !(norm > 0.0)) {
+            return 0.0;
+        }
+        LightPatternParams p;
+        p.values = light.patternParams;
+        let emission = customPattern(uint(light.pattern.x), clamp(tangent, -extent, extent),
+                                     footprint, light.pattern.z, light.pattern.w, p);
+        return oblique * efficiency * cover.x * cover.y * max(emission, 0.0) /
+               (norm * along * along);
+    }
     if (kind == 1) {
         // Along the line, in angle: the pixel spans width cos^2 a / z of it, and the beam's own
         // width w / z softens the fan's edges (Gaussian, as w is the 1/e^2 radius, sigma w / 2).
@@ -1271,7 +1300,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                 footprint = pixelFootprint(int2(id.xy), id.z, world);
                 footprinted = true;
             }
-            scale = laserIrradiance(light, world, footprint);
+            scale = laserIrradiance(light, k, world, footprint);
             let reach = max(length(float3(footprint[0].x, footprint[1].x, footprint[2].x)),
                             length(float3(footprint[0].y, footprint[1].y, footprint[2].y)));
             if (light.beamExtra.y > 0.5) {

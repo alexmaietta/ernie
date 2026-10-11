@@ -239,6 +239,11 @@
       (::ernie::AttributeMeta{.label = "Zero order",                                               \
                               .doc = "Fraction of a grid's power left in a beam along the axis.",  \
                               .group = "Pattern", .max = 1.0}))                                    \
+    X(std::vector<float>, PatternParams, ::ernie::tokens::kLaserPatternParams,                     \
+      std::vector<float>{},                                                                        \
+      (::ernie::AttributeMeta{.label = "Pattern parameters",                                       \
+                              .doc = "A custom pattern's parameters, in its order.",               \
+                              .group = "Pattern"}))                                                \
     X(bool, ShadowEnable, ::ernie::tokens::kShadowEnable, true,                                    \
       (::ernie::AttributeMeta{.label = "Shadows", .group = "Laser"}))
 

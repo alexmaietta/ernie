@@ -346,6 +346,10 @@ inline constexpr std::string_view kLaserEfficiency =
     "ernie:laser:efficiency";
 inline constexpr std::string_view kLaserZeroOrder =
     "ernie:laser:zeroOrder";
+/// float[]: a custom pattern's parameters (`LightPatternModel`), in
+/// its order; missing ones take its defaults.
+inline constexpr std::string_view kLaserPatternParams =
+    "ernie:laser:pattern:params";
 inline constexpr std::string_view kSpot = "spot";
 inline constexpr std::string_view kLine = "line";
 inline constexpr std::string_view kGrid = "grid";

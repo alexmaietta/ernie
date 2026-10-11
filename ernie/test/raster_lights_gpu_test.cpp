@@ -508,6 +508,59 @@ TEST_F(RasterDelegateTest, LaserLinesAndGridsSpreadTheirPower) {
     }
 }
 
+TEST_F(RasterDelegateTest, CustomLaserPatternsKeepTheirPower) {
+    RasterDelegate delegate(*context_);
+    double bandWidth = 0.0;
+    Scene scene = LaserScene(0.001, &bandWidth);
+    ernie::LaserLight laser(scene, "/World/Laser");
+    laser.SetPattern("square").SetEfficiency(0.8);
+    EXPECT_THROW(delegate.Step(scene), std::invalid_argument)
+        << "not registered yet";
+
+    // A uniform square 0.2 across the beam on each side of its axis,
+    // a 4 m square on the floor 10 m down; its level any scale.
+    ernie::LightPatternModel square;
+    square.id = "square";
+    square.typeName = "Square";
+    square.slang = R"(import light_pattern;
+public struct Square : ILightPattern {
+    public float emission(float2 t, float2 footprint,
+                          float wavelength, float time,
+                          LightPatternParams p) {
+        return p.get(0);
+    }
+};
+)";
+    square.params = {{"level", 1.0f, "Its emission"}};
+    square.extent = 0.2;
+    delegate.AddLightPattern(square);
+    laser.SetPatternParams({3.0f});
+
+    const auto [r0, left] = PixelOf(scene, -10.0f, 0.0f);
+    const auto [r1, right] = PixelOf(scene, 10.0f, 0.0f);
+    const double pixel = (PixelCentre(scene, 10.0f, 0.0f).x -
+                          PixelCentre(scene, -10.0f, 0.0f).x) /
+                         static_cast<double>(right - left);
+    const double unit = 0.5 / M_PI / bandWidth;
+    const std::vector<float> band = Band8(delegate, scene);
+    double total = 0.0;
+    for (const float value : band) {
+        total += value * pixel * pixel;
+    }
+    EXPECT_NEAR(total / unit, 0.8, 0.04) << "all of its power";
+    // 0.8 W over 16 m^2, inside; nothing outside.
+    for (const glm::dvec2 at :
+         {glm::dvec2(0.0, 0.0), glm::dvec2(1.5, -1.0)}) {
+        const auto [row, col] =
+            PixelOf(scene, static_cast<float>(at.x),
+                    static_cast<float>(at.y));
+        EXPECT_NEAR(band[row * kVarSize + col] / unit, 0.05, 0.0015)
+            << "at " << at.x << ", " << at.y;
+    }
+    const auto [row, col] = PixelOf(scene, 3.0f, 0.0f);
+    EXPECT_EQ(band[row * kVarSize + col], 0.0f) << "past its edge";
+}
+
 TEST_F(RasterDelegateTest, LasersLightAGaussianSpot) {
     RasterDelegate delegate(*context_);
     double bandWidth = 0.0;

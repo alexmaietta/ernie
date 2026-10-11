@@ -114,9 +114,73 @@ struct LightGpu {
     float beam[4];
     float beamExtra[4];
     float pattern[4];
+    float patternParams[16];
 };
-static_assert(sizeof(LightGpu) == 656,
+static_assert(sizeof(LightGpu) == 720,
               "LightGpu must match shading.slang");
+
+/// A custom light pattern's integration (`patternNormMain`): its
+/// index in the registry and light slot, its extent, wavelength and
+/// time, and its parameters.
+struct PatternJob {
+    std::uint32_t info[4];
+    float values[4];
+    float params[16];
+};
+
+constexpr DescriptorBinding kPatternBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+};
+
+/// Integrates each job's pattern over |t| < its extent on a grid of
+/// 256 x 256 cells, a workgroup per job, into `norms` at its slot.
+constexpr const char* kPatternNormSlang = R"(
+import light_pattern;
+import light_patterns;
+
+struct PatternJob {
+    uint4 info;
+    float4 values;
+    float4 params[4];
+}
+[[vk::binding(0, 0)]] StructuredBuffer<PatternJob> jobs;
+[[vk::binding(1, 0)]] RWStructuredBuffer<float> norms;
+
+static const uint kCells = 256;
+groupshared float partial[kCells];
+
+[shader("compute")]
+[numthreads(256, 1, 1)]
+void patternNormMain(uint3 group : SV_GroupID,
+                     uint3 thread : SV_GroupThreadID) {
+    let job = jobs[group.x];
+    let extent = job.values.x;
+    let cell = 2.0 * extent / float(kCells);
+    LightPatternParams p;
+    p.values = job.params;
+    let ty = -extent + (float(thread.x) + 0.5) * cell;
+    var sum = 0.0;
+    for (uint i = 0; i < kCells; ++i) {
+        let tx = -extent + (float(i) + 0.5) * cell;
+        sum += customPattern(job.info.x, float2(tx, ty), float2(cell),
+                             job.values.y, job.values.z, p);
+    }
+    partial[thread.x] = sum * cell * cell;
+    GroupMemoryBarrierWithGroupSync();
+    for (uint stride = kCells / 2; stride > 0; stride /= 2) {
+        if (thread.x < stride) {
+            partial[thread.x] += partial[thread.x + stride];
+        }
+        GroupMemoryBarrierWithGroupSync();
+    }
+    if (thread.x == 0) {
+        norms[job.info.y] = partial[0];
+    }
+}
+)";
 
 /// One light's IES profile on the GPU (shading.slang's kProfileRows x
 /// kProfileColumns floats).
@@ -239,6 +303,7 @@ constexpr DescriptorBinding kShadingBindings[] = {
     {24, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {25, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {26, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {27, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
 /// shading.slang's ShadingConstants: the dispatch's model and first
@@ -343,17 +408,23 @@ SensorPlan ProbePlan(const SensorFilterModel& model,
 }
 
 /// The modules of the shading and sky passes with `brdf` as the
-/// active model, for a frame camera's views or a pushbroom's.
-std::vector<ShaderModuleSource> ShadingModules(const BrdfModel& brdf,
-                                               bool pushbroom) {
-    return {
-        {"brdf", std::string(BrdfSlang())},
-        {BrdfModuleName(brdf), brdf.slang},
-        ProjectionModule(pushbroom),
-        {"atmosphere", shaders::kAtmosphereSlang},
-        {"shading", "import " + BrdfModuleName(brdf) +
-                        ";\ntypealias ActiveBrdf = " + brdf.typeName +
-                        ";\n" + shaders::kShadingSlang}};
+/// active model and `patterns`' light patterns, for a frame camera's
+/// views or a pushbroom's.
+std::vector<ShaderModuleSource>
+ShadingModules(const BrdfModel& brdf,
+               const LightPatternRegistry& patterns, bool pushbroom) {
+    std::vector<ShaderModuleSource> modules =
+        LightPatternModules(patterns);
+    modules.insert(modules.end(),
+                   {{"brdf", std::string(BrdfSlang())},
+                    {BrdfModuleName(brdf), brdf.slang},
+                    ProjectionModule(pushbroom),
+                    {"atmosphere", shaders::kAtmosphereSlang},
+                    {"shading", "import " + BrdfModuleName(brdf) +
+                                    ";\ntypealias ActiveBrdf = " +
+                                    brdf.typeName + ";\n" +
+                                    shaders::kShadingSlang}});
+    return modules;
 }
 
 /// The modules of `plan`'s kernel: the sensor, its custom filters'
@@ -845,6 +916,13 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
       lightProfiles_(context, kMaxLights * kProfileBytes,
                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                      BufferMemory::Device),
+      patternNorms_(context, kMaxLights * sizeof(float),
+                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                    BufferMemory::Device),
+      patternJobs_(context, kMaxLights * sizeof(PatternJob),
+                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                   BufferMemory::Device),
+      patternLayout_(context, kPatternBindings, 0),
       lightViewMatrices_(
           context, kMaxLightShadowViews * sizeof(glm::mat4),
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device),
@@ -1042,6 +1120,47 @@ void RasterRenderer::AddSensorFilter(SensorFilterModel model) {
             " failed to compile: " + error.what());
     }
     sensorFilters_ = std::move(candidate);
+}
+
+void RasterRenderer::AddLightPattern(LightPatternModel model) {
+    LightPatternRegistry candidate = lightPatterns_;
+    candidate.Add(model);
+    std::vector<ShaderModuleSource> modules =
+        LightPatternModules(candidate);
+    modules.push_back({"pattern_norms", kPatternNormSlang});
+    std::vector<std::uint32_t> spirv;
+    try {
+        spirv = compiler_.CompileSpirv(modules, "patternNormMain");
+    } catch (const std::invalid_argument& error) {
+        throw std::invalid_argument(
+            "Light pattern " + model.id +
+            " failed to compile: " + error.what());
+    }
+    // The passes that draw patterns compile again with it.
+    vkDeviceWaitIdle(context_.Device());
+    lightPatterns_ = std::move(candidate);
+    patternPipeline_ = std::make_unique<ComputePipeline>(
+        context_, patternLayout_, spirv);
+    shadingPipelines_.clear();
+    skyPipelines_ = {};
+    occlusionPipeline_.reset();
+    occlusionFilterPipeline_.reset();
+}
+
+void RasterRenderer::RecordPatternNorms(
+    VkCommandBuffer commands) const {
+    if (patternJobCount_ == 0) {
+        return;
+    }
+    ERNIE_GPU_ZONE(context_, commands, "Light patterns");
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                      patternPipeline_->Handle());
+    const DescriptorResource resources[] = {
+        DescriptorResource::Of(patternJobs_),
+        DescriptorResource::Of(patternNorms_)};
+    patternLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                        resources);
+    vkCmdDispatch(commands, patternJobCount_, 1, 1);
 }
 
 void RasterRenderer::AddBrdf(BrdfModel model) {
@@ -1285,8 +1404,32 @@ void RasterRenderer::WriteLights(
     std::vector<glm::vec4>
         lightRecords;  ///< The light pass's, for lights posed on the
                        ///< GPU.
+    std::vector<PatternJob> patternJobs;
     for (std::size_t i = 0; i < params.lights.size(); ++i) {
-        const LightParams& light = params.lights[i];
+        const LightParams& given = params.lights[i];
+        // A laser's custom pattern, by name: its shadow view covers
+        // its extent.
+        const LightPatternModel* custom = nullptr;
+        LightParams patterned;
+        if (given.type == LightType::Laser &&
+            given.beam.pattern ==
+                LightParams::Beam::Pattern::Custom) {
+            custom = lightPatterns_.Find(given.beam.customPattern);
+            if (custom == nullptr) {
+                throw std::invalid_argument(
+                    "Unknown light pattern '" +
+                    given.beam.customPattern +
+                    "': register it with AddLightPattern");
+            }
+            patterned = given;
+            patterned.coneAngle = static_cast<float>(
+                std::min(glm::degrees(std::atan(custom->extent *
+                                                std::sqrt(2.0))) +
+                             1.0,
+                         180.0));
+        }
+        const LightParams& light =
+            custom != nullptr ? patterned : given;
         LightGpu& entry = table[i];
         const glm::vec3 axis = glm::normalize(light.direction);
         const bool distant = light.type == LightType::Distant;
@@ -1312,10 +1455,10 @@ void RasterRenderer::WriteLights(
             entry.extentX[k] = x[k] * half.x;
             entry.extentY[k] = y[k] * half.y;
         }
-        // The light's size for its shadows' penumbrae (shading.slang):
-        // a local light's radius, a rect's or cylinder's the mean of
-        // its half extents; a distant light's tangent of its angular
-        // radius.
+        // The light's size for its shadows' penumbrae
+        // (shading.slang): a local light's radius, a rect's or
+        // cylinder's the mean of its half extents; a distant light's
+        // tangent of its angular radius.
         float shadowRadius = 0.0f;
         switch (light.type) {
         case LightType::Sphere:
@@ -1333,7 +1476,8 @@ void RasterRenderer::WriteLights(
         }
         entry.extentX[3] = shadowRadius;
         entry.extentY[3] =
-            distant ? std::tan(0.5f * glm::radians(light.angle)) : 0.0f;
+            distant ? std::tan(0.5f * glm::radians(light.angle))
+                    : 0.0f;
         const bool cone = !distant && light.coneAngle < 180.0f;
         const float softness =
             std::clamp(light.coneSoftness, 0.0f, 1.0f);
@@ -1415,6 +1559,32 @@ void RasterRenderer::WriteLights(
                 entry.pattern[1] = static_cast<float>(beam.cells.y);
                 entry.pattern[2] = beam.pitch.x;
                 entry.pattern[3] = beam.pitch.y;
+            } else if (custom != nullptr) {
+                // A custom pattern: its index, extent, the laser's
+                // wavelength and the frame's time (none yet), its
+                // parameters (defaults for those not given), and its
+                // integral to compute (`patternNormMain`).
+                const auto index = static_cast<std::uint32_t>(
+                    lightPatterns_.IndexOf(custom->id));
+                entry.pattern[0] = static_cast<float>(index);
+                entry.pattern[1] = static_cast<float>(custom->extent);
+                entry.pattern[2] = beam.wavelength;
+                entry.pattern[3] = 0.0f;
+                std::vector<float> values = custom->Defaults();
+                for (std::size_t p = 0; p < values.size() &&
+                                        p < beam.patternParams.size();
+                     ++p) {
+                    values[p] = beam.patternParams[p];
+                }
+                PatternJob job{};
+                job.info[0] = index;
+                job.info[1] = static_cast<std::uint32_t>(i);
+                std::copy(entry.pattern + 1, entry.pattern + 4,
+                          job.values);
+                std::copy(values.begin(), values.end(),
+                          entry.patternParams);
+                std::copy(values.begin(), values.end(), job.params);
+                patternJobs.push_back(job);
             }
         }
         if (light.posedOnGpu) {
@@ -1435,6 +1605,19 @@ void RasterRenderer::WriteLights(
             lightRecords.emplace_back(
                 2.0f * glm::radians(std::max(light.coneAngle, 0.5f)),
                 light.radius, 0.0f, 0.0f);
+        }
+    }
+    patternJobCount_ = static_cast<std::uint32_t>(patternJobs.size());
+    if (!patternJobs.empty()) {
+        uploads_.Write(patternJobs_,
+                       std::as_bytes(std::span(patternJobs)));
+        if (patternPipeline_ == nullptr) {
+            std::vector<ShaderModuleSource> modules =
+                LightPatternModules(lightPatterns_);
+            modules.push_back({"pattern_norms", kPatternNormSlang});
+            patternPipeline_ = std::make_unique<ComputePipeline>(
+                context_, patternLayout_,
+                compiler_.CompileSpirv(modules, "patternNormMain"));
         }
     }
     if (!table.empty()) {
@@ -2260,7 +2443,8 @@ RasterRenderer::ShadingPipeline(std::size_t model, bool pushbroom) {
     const BrdfModel& brdf = brdfs_.Models()[model];
     try {
         spirv = compiler_.CompileSpirv(
-            ShadingModules(brdf, pushbroom), "shadeMain");
+            ShadingModules(brdf, lightPatterns_, pushbroom),
+            "shadeMain");
     } catch (const std::invalid_argument& error) {
         throw std::invalid_argument(
             "BRDF " + brdf.id +
@@ -2283,7 +2467,8 @@ void RasterRenderer::SkyPipeline(bool pushbroom) {
         sky = std::make_unique<ComputePipeline>(
             context_, shadingLayout_,
             compiler_.CompileSpirv(
-                ShadingModules(brdfs_.Models().front(), pushbroom),
+                ShadingModules(brdfs_.Models().front(),
+                               lightPatterns_, pushbroom),
                 "skyMain"));
     }
 }
@@ -2413,8 +2598,8 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
     if (domeShadowed && occlusionPipeline_ == nullptr) {
         // The occlusion passes share shading's module, composed with
         // the first model, which they ignore.
-        const auto modules =
-            ShadingModules(brdfs_.Models().front(), false);
+        const auto modules = ShadingModules(brdfs_.Models().front(),
+                                            lightPatterns_, false);
         occlusionPipeline_ = std::make_unique<ComputePipeline>(
             context_, shadingLayout_,
             compiler_.CompileSpirv(modules, "occlusionMain"));
@@ -2933,6 +3118,8 @@ void RasterRenderer::RecordShadows(
         for (const RasterDrawable* drawable : drawables) {
             drawable->RecordPrepass(commands);
         }
+        // The custom light patterns' integrals, which shading reads.
+        RecordPatternNorms(commands);
         ShaderBarrier(commands);
     }
     RecordLights(commands, drawables);
@@ -3867,7 +4054,8 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
             sampled(atmosphere_->MultipleScattering()),
             DescriptorResource::Of(atmosphere_->Medium()),
             DescriptorResource::Of(atmosphere_->Densities()),
-            DescriptorResource::Of(atmosphere_->Phases())};
+            DescriptorResource::Of(atmosphere_->Phases()),
+            DescriptorResource::Of(patternNorms_)};
         // The dispatch's model and first view, and the terrain
         // horizon (none without its image).
         const auto constantsFor = [&](std::uint32_t model) {

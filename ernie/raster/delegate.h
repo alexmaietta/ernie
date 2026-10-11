@@ -90,6 +90,7 @@ class RasterDelegate : public RenderDelegate {
     const RendererInfo& Info() const override;
     const BrdfRegistry& Brdfs() const override;
     void AddSensorFilter(SensorFilterModel model) override;
+    void AddLightPattern(LightPatternModel model) override;
     const SensorFilterRegistry& SensorFilters() const override {
         return renderer_.SensorFilters();
     }

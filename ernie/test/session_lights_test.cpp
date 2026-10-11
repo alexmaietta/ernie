@@ -765,9 +765,16 @@ TEST(LightParamsOf, LaserPatternsAndTheirShadowCones) {
     EXPECT_THROW(ernie::LightParamsOf(scene, "/Laser", bands),
                  std::invalid_argument)
         << "more than its power";
-    laser.SetZeroOrder(0.0).SetPattern("rings");
-    EXPECT_THROW(ernie::LightParamsOf(scene, "/Laser", bands),
-                 std::invalid_argument);
+    // Any other name is a custom pattern, for the renderer to find.
+    laser.SetZeroOrder(0.0).SetPattern("rings").SetPatternParams(
+        {0.5f, 2.0f});
+    const LightParams rings =
+        ernie::LightParamsOf(scene, "/Laser", bands);
+    EXPECT_EQ(rings.beam.pattern, Pattern::Custom);
+    EXPECT_EQ(rings.beam.customPattern, "rings");
+    EXPECT_EQ(rings.beam.patternParams,
+              (std::vector<float>{0.5f, 2.0f}));
+    EXPECT_FLOAT_EQ(rings.beam.wavelength, 532.0f);
 }
 
 TEST(LightParamsOf, LasersCarryTheirBeamAndLine) {

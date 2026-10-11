@@ -431,6 +431,10 @@ void RasterDelegate::AddSensorFilter(SensorFilterModel model) {
     renderer_.AddSensorFilter(std::move(model));
 }
 
+void RasterDelegate::AddLightPattern(LightPatternModel model) {
+    renderer_.AddLightPattern(std::move(model));
+}
+
 const BrdfRegistry& RasterDelegate::Brdfs() const {
     return renderer_.Brdfs();
 }

@@ -5,6 +5,7 @@
 #include "ernie/device/pipeline.h"
 #include "ernie/device/vulkan_context.h"
 #include "ernie/scene/brdf.h"
+#include "ernie/scene/light_pattern.h"
 #include "ernie/scene/scene.h"
 #include "ernie/session/frame_params.h"
 #include "ernie/session/outputs.h"
@@ -15,6 +16,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -94,6 +96,17 @@ class RenderDelegate {
     /// @throws std::invalid_argument if the model is invalid or fails
     /// to compile, or the backend runs no custom filters.
     virtual void AddSensorFilter(SensorFilterModel model) = 0;
+
+    /// Registers custom light pattern `model` for LaserLights to name
+    /// in `ernie:laser:pattern`.
+    /// @throws std::invalid_argument if the model is invalid or fails
+    /// to compile, or the backend draws no custom patterns (the
+    /// default).
+    virtual void AddLightPattern(LightPatternModel model) {
+        throw std::invalid_argument(
+            "This renderer draws no custom light patterns: " +
+            model.id);
+    }
 
     /// The custom sensor filters registered so far.
     virtual const SensorFilterRegistry& SensorFilters() const = 0;

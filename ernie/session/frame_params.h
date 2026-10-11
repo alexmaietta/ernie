@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -288,8 +289,16 @@ struct LightParams {
         /// profile along the line flat or Gaussian; or a grid of
         /// `cells` beamlets `pitch` radians apart. `efficiency` of
         /// the power goes into the line or the beamlets, `zeroOrder`
-        /// into a beam along the axis (grids).
-        enum class Pattern : std::uint32_t { Spot, Line, Grid };
+        /// into a beam along the axis (grids). A custom pattern
+        /// (`LightPatternModel`) is named by `customPattern`, its
+        /// parameters `patternParams` as given (the renderer fills in
+        /// defaults).
+        enum class Pattern : std::uint32_t {
+            Spot,
+            Line,
+            Grid,
+            Custom
+        };
         Pattern pattern = Pattern::Spot;
         float fan = 0.0f;
         bool gaussianLine = false;
@@ -297,6 +306,9 @@ struct LightParams {
         glm::vec2 pitch{0.0f};
         float efficiency = 1.0f;
         float zeroOrder = 0.0f;
+        std::string customPattern;
+        std::vector<float> patternParams;
+        float wavelength = 0.0f;  ///< nm, the line's centre.
     };
     Beam beam;
     bool shadows = true;

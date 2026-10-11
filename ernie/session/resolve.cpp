@@ -1428,6 +1428,7 @@ LightParams LaserParamsOf(const Scene& scene, const Path& path,
             "more, and no negative power or linewidth");
     }
     light.beam.waist = glm::vec2(waist);
+    light.beam.wavelength = static_cast<float>(wavelength);
     light.beam.rayleigh = glm::vec2(laser.RayleighRange());
     light.beam.waistDistance =
         static_cast<float>(laser.GetWaistDistance());
@@ -1490,9 +1491,11 @@ LightParams LaserParamsOf(const Scene& scene, const Path& path,
             0.5 * glm::dvec2(columns - 1, rows - 1) * pitch + spread;
         extent = std::atan(glm::length(glm::tan(half)));
     } else if (pattern != tokens::kSpot) {
-        throw std::invalid_argument("LaserLight '" + path.String() +
-                                    "' has unknown pattern '" +
-                                    pattern + "'");
+        // A custom pattern, which the renderer looks up (and sizes
+        // the shadow view for) by name.
+        beam.pattern = Pattern::Custom;
+        beam.customPattern = pattern;
+        beam.patternParams = laser.GetPatternParams();
     }
     if (beam.efficiency < 0.0f || beam.zeroOrder < 0.0f ||
         beam.efficiency + beam.zeroOrder > 1.0f + 1e-6f) {

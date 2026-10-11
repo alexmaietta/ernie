@@ -11,6 +11,7 @@ ernie_add_library(
     geometry_schemas.cpp
     instruments.cpp
     isd.cpp
+    light_pattern.cpp
     light_schemas.cpp
     material_schemas.cpp
     orbit_controller.cpp
