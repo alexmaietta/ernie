@@ -1242,12 +1242,28 @@ void atmosphereSky(inout float radiance[kMaxBands], float3 origin, float3 d,
                                           bottom, top);
             escapes = escapesAtmosphere(atmosphereMedium, atmosphereDensities, r, mu, group);
             // A ray towards the ground that the air bends clear of it passes through the
-            // air low along the horizon, not just to the ground: its transmittance is the
-            // grazing ray's to the top.
-            if (ground) {
-                let grazing = transmittanceToTop(atmosphereTransmittance, tableSampler, r,
-                                                 horizonCosine(r, bottom), group, bottom, top);
-                transmittance = select(escapes, grazing, transmittance);
+            // air low along the horizon, not just to the ground: its light and transmittance are
+            // those of the ray grazing the horizon, out to the top.
+            if (ground && any(escapes)) {
+                let level = d - mu * vertical;
+                let grazing = horizonCosine(r, bottom) + 1e-4;
+                let along = normalize(level) * sqrt(max(1.0 - grazing * grazing, 0.0)) +
+                            grazing * vertical;
+                float grazingStart;
+                float grazingEnd;
+                bool grazingGround;
+                if (clipToAtmosphere(p, along, bottom, top, grazingStart, grazingEnd,
+                                     grazingGround) &&
+                    !grazingGround) {
+                    float4 light;
+                    float4 through;
+                    scatterAlong(atmosphereMedium, atmosphereDensities, atmospherePhases,
+                                 atmosphereTransmittance, atmosphereMultiple, tableSampler, p,
+                                 along, grazingStart, grazingEnd, sun, sunSine, eclipse, group,
+                                 kSkySteps, light, through);
+                    scattered = select(escapes, light, scattered);
+                    transmittance = select(escapes, through, transmittance);
+                }
             }
         }
         // A sun disc smaller than the pixel shows dimmed by the bodies as a whole, from the eye;
