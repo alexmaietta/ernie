@@ -209,6 +209,7 @@
 #include &quot;ernie/device/pipeline.h&quot;
 #include &quot;ernie/device/vulkan_context.h&quot;
 #include &quot;ernie/scene/brdf.h&quot;
+#include &quot;ernie/scene/light_pattern.h&quot;
 #include &quot;ernie/scene/scene.h&quot;
 #include &quot;ernie/session/frame_params.h&quot;
 #include &quot;ernie/session/outputs.h&quot;
@@ -219,6 +220,7 @@
 #include &lt;memory&gt;
 #include &lt;optional&gt;
 #include &lt;span&gt;
+#include &lt;stdexcept&gt;
 #include &lt;string&gt;
 #include &lt;string_view&gt;
 #include &lt;utility&gt;
@@ -257,6 +259,12 @@ class RenderDelegate {
     virtual const BrdfRegistry&amp; Brdfs() const = 0;
 
     virtual void AddSensorFilter(SensorFilterModel model) = 0;
+
+    virtual void AddLightPattern(LightPatternModel model) {
+        throw std::invalid_argument(
+            &quot;This renderer draws no custom light patterns: &quot; +
+            model.id);
+    }
 
     virtual const SensorFilterRegistry&amp; SensorFilters() const = 0;
 

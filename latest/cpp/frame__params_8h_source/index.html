@@ -216,6 +216,7 @@
 #include &lt;cstddef&gt;
 #include &lt;cstdint&gt;
 #include &lt;optional&gt;
+#include &lt;string&gt;
 #include &lt;string_view&gt;
 #include &lt;utility&gt;
 #include &lt;vector&gt;
@@ -342,6 +343,7 @@ struct LightParams {
     glm::vec2 size{1.0f, 1.0f};  
     std::vector&lt;float&gt; spectrum;
     float radius = 0.0f;
+    float angle = 0.0f;
     float coneAngle = 180.0f;  
     float coneSoftness = 0.0f;  
     float focus = 0.0f;
@@ -353,7 +355,12 @@ struct LightParams {
         glm::vec2 waist{0.0f};
         glm::vec2 rayleigh{0.0f};
         float waistDistance = 0.0f;
-        enum class Pattern : std::uint32_t { Spot, Line, Grid };
+        enum class Pattern : std::uint32_t {
+            Spot,
+            Line,
+            Grid,
+            Custom
+        };
         Pattern pattern = Pattern::Spot;
         float fan = 0.0f;
         bool gaussianLine = false;
@@ -361,6 +368,9 @@ struct LightParams {
         glm::vec2 pitch{0.0f};
         float efficiency = 1.0f;
         float zeroOrder = 0.0f;
+        std::string customPattern;
+        std::vector&lt;float&gt; patternParams;
+        float wavelength = 0.0f;  
     };
     Beam beam;
     bool shadows = true;

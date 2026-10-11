@@ -323,6 +323,9 @@
 <li><strong>struct</strong> <a href="../structernie_1_1LightParams_1_1Beam/"><strong>Beam</strong></a> <em>A laser's Gaussian beam (Siegman 1986): its 1/e^2 radius at the waist along the light's x and y, its Rayleigh range along each, and the waist's distance along the beam from</em> <code>position</code> <em>, m.</em>    </li>
 </ul>
 </li>
+<li><strong>struct</strong> <a href="../structernie_1_1LightPatternModel/"><strong>LightPatternModel</strong></a> <em>A laser's pattern written in Slang: the relative power a laser sends towards each direction, its watts, beam and shadows staying Ernie's.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1LightPatternParam/"><strong>LightPatternParam</strong></a> <em>One parameter of a light pattern, which a</em> <a href="../classernie_1_1LaserLight/"><em><strong>LaserLight</strong></em></a> <em>gives in</em><code>ernie:laser:pattern:params</code> <em>in this order.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1LightPatternRegistry/"><strong>LightPatternRegistry</strong></a> <a href="../classernie_1_1Light/"><em><strong>Light</strong></em></a> <em>patterns a renderer can draw, by</em><code>LightPatternModel::id</code> <em>.</em>    </li>
 <li><strong>struct</strong> <a href="../structernie_1_1LodPatch/"><strong>LodPatch</strong></a> <em>One square patch of</em> <code>PatchCells()</code> <em>x</em><code>PatchCells()</code> <em>grid quads whose vertices are</em><code>2^level</code> <em>raster cells apart.</em>    </li>
 <li><strong>class</strong> <a href="../classernie_1_1LodQuadtree/"><strong>LodQuadtree</strong></a> <em>Quadtree over a heightfield for continuous distance-dependent level of detail (CDLOD).</em>     </li>
 <li><strong>struct</strong> <a href="../structernie_1_1LodRange/"><strong>LodRange</strong></a> <em>Distances from the LOD eye, in world units, over which one level's vertices morph towards the next coarser level's.</em>     </li>
