@@ -2251,7 +2251,7 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh) {
             data.normals = std::move(*normals);
         }
     }
-    if (const Tensor* colors = scene.Read(mesh, kDisplayColor)) {
+    if (const Tensor* colors = view.ReadDisplayColor()) {
         if (static_cast<std::size_t>(colors->Elements()) == data.points.size() && count > 1) {
             data.colors = IsGpu(colors->Location().kind)
                               ? std::vector<float>(data.points.size(), 0.0f)
@@ -2274,15 +2274,33 @@ InstanceData InstanceDataOf(const Scene& scene, const Path& instancer) {
 }
 
 std::optional<Bounds3> ExtentOf(const Scene& scene, const Path& prim) {
-    std::vector<float> values;
-    if (const Tensor* tensor = scene.Read(prim, tokens::kExtent)) {
-        if (tensor->Location().kind != DeviceKind::Cpu || tensor->Elements() != 6) {
+    // A (2, 3) array written in place of the six numbers, on the CPU.
+    const auto fromArray = [](const Tensor& tensor) -> std::optional<std::vector<float>> {
+        if (tensor.Location().kind != DeviceKind::Cpu || tensor.Elements() != 6) {
             return std::nullopt;
         }
-        values = FloatsOf(*tensor, 3, tokens::kExtent);
-    } else if (const PrimTypeDef* type = scene.Has(prim) ? PrimTypeOf(scene, prim) : nullptr;
-               type != nullptr && type->IsA(Boundable::Definition())) {
-        values = Boundable(scene, prim).GetExtent();
+        return FloatsOf(tensor, 3, tokens::kExtent);
+    };
+    std::vector<float> values;
+    if (const PrimTypeDef* type = scene.Has(prim) ? PrimTypeOf(scene, prim) : nullptr;
+        type != nullptr && type->IsA(Boundable::Definition())) {
+        const Boundable boundable(scene, prim);
+        if (const Tensor* tensor = boundable.ReadExtent()) {
+            std::optional<std::vector<float>> read = fromArray(*tensor);
+            if (!read) {
+                return std::nullopt;
+            }
+            values = std::move(*read);
+        } else {
+            values = boundable.GetExtent();
+        }
+    } else if (const Tensor* tensor = scene.Read(prim, tokens::kExtent)) {
+        // A prim of a type without bounds of its own, such as an untyped one, by name.
+        std::optional<std::vector<float>> read = fromArray(*tensor);
+        if (!read) {
+            return std::nullopt;
+        }
+        values = std::move(*read);
     } else if (const Value* value = scene.Get(prim, tokens::kExtent)) {
         // A prim of a type without bounds of its own, such as an untyped one.
         if (const auto* floats = value->Get<std::vector<float>>()) {
