@@ -1276,34 +1276,12 @@ void BindScene(nb::module_& m) {
                 const Path path = pathArg;
                 const IsdLineScanner::Strip strip =
                     s.StripOf(first, lines);
-                const CameraParams& camera = strip.camera;
-                using namespace tokens;
+                CameraParams camera = strip.camera;
                 // The camera's geometry and line time only: its
                 // f-number, ISO, lens transmission and sensor stay as
                 // authored (by a demo's instrument, say).
-                Prim prim = scene.Has(Path(path))
-                                ? scene.GetPrim(Path(path))
-                                : scene.Define(Path(path), kCamera);
-                prim.Set(kTransform, atEnd ? strip.to : strip.from)
-                    .Set(kCameraScan, std::string(kPushbroom))
-                    .Set(kFocalLength, camera.focalLengthMm)
-                    .Set(kVerticalAperture, camera.verticalApertureMm)
-                    .Set(kHorizontalAperture,
-                         camera.verticalApertureMm * camera.width /
-                             camera.height)
-                    .Set(kHorizontalApertureOffset,
-                         camera.horizontalApertureOffsetMm)
-                    .Set(kVerticalApertureOffset, 0.0)
-                    .Set(kPushbroomLineOffset, camera.lineOffsetMm)
-                    .Set(kLensDistortion,
-                         std::vector<float>{
-                             static_cast<float>(camera.lens.k1),
-                             static_cast<float>(camera.lens.k2),
-                             static_cast<float>(camera.lens.k3), 0.0f,
-                             0.0f})
-                    .Set(kClippingRange, glm::dvec2(camera.nearPlane,
-                                                    camera.farPlane))
-                    .Set(kExposureTime, camera.exposureTime);
+                camera.transform = atEnd ? strip.to : strip.from;
+                AuthorIsdCamera(scene, path, camera);
                 return nb::make_tuple(camera.width, camera.height);
             },
             nb::arg("scene"), nb::arg("path"), nb::arg("first_line"),
@@ -1455,7 +1433,15 @@ void BindScene(nb::module_& m) {
         "true at the pole), as LOLA's polar LDEM products hold it: "
         "heights in metres above reference_radius, map_scale metres "
         "a "
-        "pixel.")
+        "pixel. Made empty, it is the bare reference sphere of "
+        "`reference_radius`.")
+        .def(
+            "__init__",
+            [](PolarStereographicDem* dem, double referenceRadius) {
+                new (dem) PolarStereographicDem();
+                dem->referenceRadius = referenceRadius;
+            },
+            nb::arg("reference_radius"))
         .def_ro("lines", &PolarStereographicDem::lines)
         .def_ro("samples", &PolarStereographicDem::samples)
         .def_ro("map_scale", &PolarStereographicDem::mapScale)
