@@ -26,6 +26,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace ernie {
@@ -749,7 +750,8 @@ class RasterRenderer {
     VkFormat presentFormat_;
     ShaderCompiler compiler_;
     BrdfRegistry brdfs_;
-    LightPatternRegistry lightPatterns_;
+    LightPatternRegistry lightPatterns_ =
+        LightPatternRegistry::WithBuiltins();
     /// Recorded by the const `Record*` calls, so mutable.
     mutable FrameUploads uploads_;
     std::map<std::uint32_t, std::unique_ptr<RasterMaterial>>
@@ -911,16 +913,23 @@ class RasterRenderer {
     /// Per light slot, its IES profile's candela
     /// (`LightParams::profile`), where `LightGpu`'s shadow.w points.
     GpuBuffer lightProfiles_;
-    /// Per light slot, the integral of its custom pattern
+    /// Per light slot, the integral of its laser's pattern
     /// (`LightPatternModel`), which shading divides it by so the
-    /// laser emits its power; computed each frame from
-    /// `patternJobs_` by `patternPipeline_`.
+    /// laser emits its power: 1 for a normalized pattern, else
+    /// computed each frame from `patternJobs_` by `patternPipeline_`.
     GpuBuffer patternNorms_;
     GpuBuffer patternJobs_;
     std::uint32_t patternJobCount_ = 0;
     PipelineLayout patternLayout_;
     std::unique_ptr<ComputePipeline> patternPipeline_;
-    /// Records the integration of the frame's custom patterns.
+    /// The lasers' pattern data and images (shading.slang's
+    /// lightPatternData), grown as they need, and what it holds:
+    /// per laser its data and image, so unchanged ones upload once.
+    std::unique_ptr<GpuBuffer> patternData_;
+    std::vector<std::pair<std::vector<float>,
+                          std::shared_ptr<const LightPatternImage>>>
+        patternDataHeld_;
+    /// Records the integration of the frame's light patterns.
     void RecordPatternNorms(VkCommandBuffer commands) const;
     GpuBuffer lightViewMatrices_;
     /// Per light shadow view, a Shadows block (frame.slang) whose

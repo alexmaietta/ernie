@@ -113,18 +113,26 @@ struct LightGpu {
     float tinted[SpectralBands::kMaxBands];
     float beam[4];
     float beamExtra[4];
+    /// x: its pattern's index in the registry, y: the laser's
+    /// wavelength (nm), z: the frame's time (s); `patternExtent` xy
+    /// its tangent-plane half extents (0 unbounded); `patternLayout`
+    /// its data and image in `patternData_` (shading.slang's
+    /// LightPatternParams); its parameters.
     float pattern[4];
+    float patternExtent[4];
+    std::uint32_t patternLayout[4];
     float patternParams[16];
 };
-static_assert(sizeof(LightGpu) == 720,
+static_assert(sizeof(LightGpu) == 752,
               "LightGpu must match shading.slang");
 
-/// A custom light pattern's integration (`patternNormMain`): its
-/// index in the registry and light slot, its extent, wavelength and
-/// time, and its parameters.
+/// A light pattern's integration (`patternNormMain`): its index in
+/// the registry and light slot, its half extents, wavelength and
+/// time, its data and image, and its parameters.
 struct PatternJob {
     std::uint32_t info[4];
     float values[4];
+    std::uint32_t layout[4];
     float params[16];
 };
 
@@ -133,10 +141,12 @@ constexpr DescriptorBinding kPatternBindings[] = {
      VK_SHADER_STAGE_COMPUTE_BIT},
     {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
      VK_SHADER_STAGE_COMPUTE_BIT},
+    {29, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+     VK_SHADER_STAGE_COMPUTE_BIT},
 };
 
-/// Integrates each job's pattern over |t| < its extent on a grid of
-/// 256 x 256 cells, a workgroup per job, into `norms` at its slot.
+/// Integrates each job's pattern over its extent on a grid of 256 x
+/// 256 cells, a workgroup per job, into `norms` at its slot.
 constexpr const char* kPatternNormSlang = R"(
 import light_pattern;
 import light_patterns;
@@ -144,6 +154,7 @@ import light_patterns;
 struct PatternJob {
     uint4 info;
     float4 values;
+    uint4 layout;
     float4 params[4];
 }
 [[vk::binding(0, 0)]] StructuredBuffer<PatternJob> jobs;
@@ -157,18 +168,23 @@ groupshared float partial[kCells];
 void patternNormMain(uint3 group : SV_GroupID,
                      uint3 thread : SV_GroupThreadID) {
     let job = jobs[group.x];
-    let extent = job.values.x;
+    let extent = job.values.xy;
     let cell = 2.0 * extent / float(kCells);
     LightPatternParams p;
     p.values = job.params;
-    let ty = -extent + (float(thread.x) + 0.5) * cell;
+    p.layout = job.layout;
+    LightPatternInput input;
+    input.footprint = cell;
+    input.beam = float2(0.0);
+    input.wavelength = job.values.z;
+    input.time = job.values.w;
+    input.t.y = -extent.y + (float(thread.x) + 0.5) * cell.y;
     var sum = 0.0;
     for (uint i = 0; i < kCells; ++i) {
-        let tx = -extent + (float(i) + 0.5) * cell;
-        sum += customPattern(job.info.x, float2(tx, ty), float2(cell),
-                             job.values.y, job.values.z, p);
+        input.t.x = -extent.x + (float(i) + 0.5) * cell.x;
+        sum += max(lightPattern(job.info.x, input, p), 0.0);
     }
-    partial[thread.x] = sum * cell * cell;
+    partial[thread.x] = sum * cell.x * cell.y;
     GroupMemoryBarrierWithGroupSync();
     for (uint stride = kCells / 2; stride > 0; stride /= 2) {
         if (thread.x < stride) {
@@ -305,6 +321,7 @@ constexpr DescriptorBinding kShadingBindings[] = {
     {26, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {27, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {28, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {29, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
 /// shading.slang's ShadingConstants: the dispatch's model and first
@@ -823,8 +840,7 @@ std::vector<ShadowCascade> FitLightShadowViews(
     // A laser's spot: orthographic along the beam (a patterned laser
     // spreads from its aperture, so a spot light's perspective view
     // over the pattern below).
-    if (light.type == LightType::Laser &&
-        light.beam.pattern == LightParams::Beam::Pattern::Spot) {
+    if (light.type == LightType::Laser && light.beam.IsSpot()) {
         // Orthographic along the beam, as wide as the beam's widest
         // (at the aperture or the scene's far side) out to 2.5 1/e^2
         // radii, where it carries e^-12.5 of its peak.
@@ -924,6 +940,9 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                    BufferMemory::Device),
       patternLayout_(context, kPatternBindings, 0),
+      patternData_(std::make_unique<GpuBuffer>(
+          context, sizeof(float), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+          BufferMemory::Device)),
       lightViewMatrices_(
           context, kMaxLightShadowViews * sizeof(glm::mat4),
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device),
@@ -1158,7 +1177,8 @@ void RasterRenderer::RecordPatternNorms(
                       patternPipeline_->Handle());
     const DescriptorResource resources[] = {
         DescriptorResource::Of(patternJobs_),
-        DescriptorResource::Of(patternNorms_)};
+        DescriptorResource::Of(patternNorms_),
+        DescriptorResource::Of(*patternData_)};
     patternLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                         resources);
     vkCmdDispatch(commands, patternJobCount_, 1, 1);
@@ -1406,31 +1426,40 @@ void RasterRenderer::WriteLights(
         lightRecords;  ///< The light pass's, for lights posed on the
                        ///< GPU.
     std::vector<PatternJob> patternJobs;
+    // Per light slot, its pattern's integral where known (1 for a
+    // normalized pattern); the pattern pass writes the others.
+    std::vector<float> patternNorms(params.lights.size(), 1.0f);
+    // The lasers' pattern data and images, as uploaded to
+    // `patternData_`.
+    std::vector<float> patternData;
+    decltype(patternDataHeld_) patternDataHeld;
     for (std::size_t i = 0; i < params.lights.size(); ++i) {
         const LightParams& given = params.lights[i];
-        // A laser's custom pattern, by name: its shadow view covers
-        // its extent.
-        const LightPatternModel* custom = nullptr;
+        // A laser's pattern, by name; a custom one sizes its own
+        // extent, which its shadow view covers.
+        const LightPatternModel* model = nullptr;
         LightParams patterned;
-        if (given.type == LightType::Laser &&
-            given.beam.pattern ==
-                LightParams::Beam::Pattern::Custom) {
-            custom = lightPatterns_.Find(given.beam.customPattern);
-            if (custom == nullptr) {
+        if (given.type == LightType::Laser) {
+            model = lightPatterns_.Find(given.beam.pattern);
+            if (model == nullptr) {
                 throw std::invalid_argument(
-                    "Unknown light pattern '" +
-                    given.beam.customPattern +
+                    "Unknown light pattern '" + given.beam.pattern +
                     "': register it with AddLightPattern");
             }
-            patterned = given;
-            patterned.coneAngle = static_cast<float>(
-                std::min(glm::degrees(std::atan(custom->extent *
-                                                std::sqrt(2.0))) +
-                             1.0,
-                         180.0));
+            if (given.beam.extent == glm::vec2(0.0f) &&
+                !model->normalized) {
+                patterned = given;
+                patterned.beam.extent =
+                    glm::vec2(static_cast<float>(model->extent));
+                patterned.coneAngle = static_cast<float>(
+                    std::min(glm::degrees(std::atan(model->extent *
+                                                    std::sqrt(2.0))) +
+                                 1.0,
+                             180.0));
+            }
         }
         const LightParams& light =
-            custom != nullptr ? patterned : given;
+            patterned.type == LightType::Laser ? patterned : given;
         LightGpu& entry = table[i];
         const glm::vec3 axis = glm::normalize(light.direction);
         const bool distant = light.type == LightType::Distant;
@@ -1491,9 +1520,8 @@ void RasterRenderer::WriteLights(
         const bool laser = light.type == LightType::Laser;
         // A laser's spot posed on the GPU has no shadows yet: the
         // light pass fits perspective views only.
-        if (bounds && !(laser && light.posedOnGpu &&
-                        light.beam.pattern ==
-                            LightParams::Beam::Pattern::Spot)) {
+        if (bounds &&
+            !(laser && light.posedOnGpu && light.beam.IsSpot())) {
             std::vector<ShadowCascade> views = FitLightShadowViews(
                 light, params.Relative(light.position), bounds->first,
                 bounds->second, resolution);
@@ -1544,46 +1572,62 @@ void RasterRenderer::WriteLights(
             entry.beam[2] = light.beam.rayleigh.x;
             entry.beam[3] = light.beam.rayleigh.y;
             entry.beamExtra[0] = light.beam.waistDistance;
-            // Its pattern: kind (0 spot, 1 line, 2 grid), efficiency,
-            // zero order; a line's half fan angle and profile (1
-            // Gaussian), or a grid's columns, rows and pitch.
+            // Its pattern: whether it is the beam itself (0, a spot)
+            // or spreads from the aperture (1), its efficiency and
+            // zero order; the pattern's index, the laser's wavelength
+            // and the frame's time (none yet), its extent, its data
+            // and image, and its parameters (defaults for those not
+            // given).
             const LightParams::Beam& beam = light.beam;
-            entry.beamExtra[1] = static_cast<float>(beam.pattern);
+            entry.beamExtra[1] = beam.IsSpot() ? 0.0f : 1.0f;
             entry.beamExtra[2] = beam.efficiency;
             entry.beamExtra[3] = beam.zeroOrder;
-            if (beam.pattern == LightParams::Beam::Pattern::Line) {
-                entry.pattern[0] = 0.5f * beam.fan;
-                entry.pattern[1] = beam.gaussianLine ? 1.0f : 0.0f;
-            } else if (beam.pattern ==
-                       LightParams::Beam::Pattern::Grid) {
-                entry.pattern[0] = static_cast<float>(beam.cells.x);
-                entry.pattern[1] = static_cast<float>(beam.cells.y);
-                entry.pattern[2] = beam.pitch.x;
-                entry.pattern[3] = beam.pitch.y;
-            } else if (custom != nullptr) {
-                // A custom pattern: its index, extent, the laser's
-                // wavelength and the frame's time (none yet), its
-                // parameters (defaults for those not given), and its
-                // integral to compute (`patternNormMain`).
-                const auto index = static_cast<std::uint32_t>(
-                    lightPatterns_.IndexOf(custom->id));
-                entry.pattern[0] = static_cast<float>(index);
-                entry.pattern[1] = static_cast<float>(custom->extent);
-                entry.pattern[2] = beam.wavelength;
-                entry.pattern[3] = 0.0f;
-                std::vector<float> values = custom->Defaults();
-                for (std::size_t p = 0; p < values.size() &&
-                                        p < beam.patternParams.size();
-                     ++p) {
-                    values[p] = beam.patternParams[p];
-                }
+            const auto index = static_cast<std::uint32_t>(
+                lightPatterns_.IndexOf(model->id));
+            entry.pattern[0] = static_cast<float>(index);
+            entry.pattern[1] = beam.wavelength;
+            entry.pattern[2] = 0.0f;
+            entry.patternExtent[0] = beam.extent.x;
+            entry.patternExtent[1] = beam.extent.y;
+            entry.patternLayout[0] =
+                static_cast<std::uint32_t>(patternData.size());
+            entry.patternLayout[1] =
+                static_cast<std::uint32_t>(beam.patternData.size());
+            patternData.insert(patternData.end(),
+                               beam.patternData.begin(),
+                               beam.patternData.end());
+            if (const LightPatternImage* image =
+                    beam.patternImage.get()) {
+                entry.patternLayout[2] =
+                    static_cast<std::uint32_t>(patternData.size());
+                entry.patternLayout[3] =
+                    image->width | (image->height << 16);
+                patternData.insert(patternData.end(),
+                                   image->texels.begin(),
+                                   image->texels.end());
+            }
+            patternDataHeld.emplace_back(beam.patternData,
+                                         beam.patternImage);
+            std::vector<float> values = model->Defaults();
+            for (std::size_t p = 0;
+                 p < values.size() && p < beam.patternParams.size();
+                 ++p) {
+                values[p] = beam.patternParams[p];
+            }
+            std::copy(values.begin(), values.end(),
+                      entry.patternParams);
+            // Its integral to compute (`patternNormMain`), unless
+            // it is 1.
+            if (!model->normalized) {
                 PatternJob job{};
                 job.info[0] = index;
                 job.info[1] = static_cast<std::uint32_t>(i);
-                std::copy(entry.pattern + 1, entry.pattern + 4,
-                          job.values);
-                std::copy(values.begin(), values.end(),
-                          entry.patternParams);
+                job.values[0] = beam.extent.x;
+                job.values[1] = beam.extent.y;
+                job.values[2] = entry.pattern[1];
+                job.values[3] = entry.pattern[2];
+                std::copy(entry.patternLayout,
+                          entry.patternLayout + 4, job.layout);
                 std::copy(values.begin(), values.end(), job.params);
                 patternJobs.push_back(job);
             }
@@ -1608,6 +1652,23 @@ void RasterRenderer::WriteLights(
                 light.radius, 0.0f, 0.0f);
         }
     }
+    if (!patternNorms.empty()) {
+        uploads_.Write(patternNorms_,
+                       std::as_bytes(std::span(patternNorms)));
+    }
+    // The pattern data and images, when they change.
+    if (patternDataHeld != patternDataHeld_ && !patternData.empty()) {
+        const VkDeviceSize bytes = patternData.size() * sizeof(float);
+        if (patternData_->Size() < bytes) {
+            vkDeviceWaitIdle(context_.Device());
+            patternData_ = std::make_unique<GpuBuffer>(
+                context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                BufferMemory::Device);
+        }
+        uploads_.Write(*patternData_,
+                       std::as_bytes(std::span(patternData)));
+    }
+    patternDataHeld_ = std::move(patternDataHeld);
     patternJobCount_ = static_cast<std::uint32_t>(patternJobs.size());
     if (!patternJobs.empty()) {
         uploads_.Write(patternJobs_,
@@ -4057,7 +4118,8 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
             DescriptorResource::Of(atmosphere_->Densities()),
             DescriptorResource::Of(atmosphere_->Phases()),
             DescriptorResource::Of(patternNorms_),
-            sampled(atmosphere_->SkyIrradiance())};
+            sampled(atmosphere_->SkyIrradiance()),
+            DescriptorResource::Of(*patternData_)};
         // The dispatch's model and first view, and the terrain
         // horizon (none without its image).
         const auto constantsFor = [&](std::uint32_t model) {

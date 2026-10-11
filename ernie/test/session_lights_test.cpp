@@ -11,10 +11,12 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
+#include <stb_image_write.h>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
@@ -725,19 +727,21 @@ TEST(LightParamsOf, LaserPatternsAndTheirShadowCones) {
     Scene scene;
     ernie::LaserLight laser =
         ernie::LaserLight::Define(scene, "/Laser");
-    using Pattern = LightParams::Beam::Pattern;
-    EXPECT_EQ(
-        ernie::LightParamsOf(scene, "/Laser", bands).beam.pattern,
-        Pattern::Spot);
+    EXPECT_TRUE(
+        ernie::LightParamsOf(scene, "/Laser", bands).beam.IsSpot());
 
-    // A 60 degree line: its half fan, and a shadow cone over it.
+    // A 60 degree line: its half fan and profile, unbounded, and a
+    // shadow cone over it.
     laser.SetPattern("line").SetFanAngle(60.0).SetLineProfile(
         "gaussian");
     const LightParams line =
         ernie::LightParamsOf(scene, "/Laser", bands);
-    EXPECT_EQ(line.beam.pattern, Pattern::Line);
-    EXPECT_NEAR(line.beam.fan, glm::radians(60.0f), 1e-6f);
-    EXPECT_TRUE(line.beam.gaussianLine);
+    EXPECT_EQ(line.beam.pattern, "line");
+    ASSERT_EQ(line.beam.patternParams.size(), 2u);
+    EXPECT_NEAR(line.beam.patternParams[0], glm::radians(30.0f),
+                1e-6f);
+    EXPECT_EQ(line.beam.patternParams[1], 1.0f);
+    EXPECT_EQ(line.beam.extent, glm::vec2(0.0f));
     EXPECT_GT(line.coneAngle, 30.0f);
     EXPECT_LT(line.coneAngle, 32.0f);
 
@@ -751,8 +755,12 @@ TEST(LightParamsOf, LaserPatternsAndTheirShadowCones) {
         .SetZeroOrder(0.1);
     const LightParams grid =
         ernie::LightParamsOf(scene, "/Laser", bands);
-    EXPECT_EQ(grid.beam.pattern, Pattern::Grid);
-    EXPECT_EQ(grid.beam.cells, glm::uvec2(5u, 3u));
+    EXPECT_EQ(grid.beam.pattern, "grid");
+    ASSERT_EQ(grid.beam.patternParams.size(), 4u);
+    EXPECT_EQ(grid.beam.patternParams[0], 5.0f);
+    EXPECT_EQ(grid.beam.patternParams[1], 3.0f);
+    EXPECT_NEAR(grid.beam.patternParams[3], glm::radians(4.0f),
+                1e-6f);
     EXPECT_FLOAT_EQ(grid.beam.efficiency, 0.8f);
     EXPECT_FLOAT_EQ(grid.beam.zeroOrder, 0.1f);
     const double corner = glm::degrees(std::atan(
@@ -765,16 +773,61 @@ TEST(LightParamsOf, LaserPatternsAndTheirShadowCones) {
     EXPECT_THROW(ernie::LightParamsOf(scene, "/Laser", bands),
                  std::invalid_argument)
         << "more than its power";
-    // Any other name is a custom pattern, for the renderer to find.
-    laser.SetZeroOrder(0.0).SetPattern("rings").SetPatternParams(
-        {0.5f, 2.0f});
+    // Any other name is a custom pattern, for the renderer to find,
+    // with its parameters and data as given.
+    laser.SetZeroOrder(0.0)
+        .SetPattern("rings")
+        .SetPatternParams({0.5f, 2.0f})
+        .SetPatternData({1.0f, 2.0f, 3.0f});
     const LightParams rings =
         ernie::LightParamsOf(scene, "/Laser", bands);
-    EXPECT_EQ(rings.beam.pattern, Pattern::Custom);
-    EXPECT_EQ(rings.beam.customPattern, "rings");
+    EXPECT_EQ(rings.beam.pattern, "rings");
     EXPECT_EQ(rings.beam.patternParams,
               (std::vector<float>{0.5f, 2.0f}));
+    EXPECT_EQ(rings.beam.patternData,
+              (std::vector<float>{1.0f, 2.0f, 3.0f}));
+    EXPECT_EQ(rings.beam.patternImage, nullptr);
     EXPECT_FLOAT_EQ(rings.beam.wavelength, 532.0f);
+
+    // An image needs its file; over 40 x 30 degrees it reaches
+    // tan 20 and tan 15 across the tangent plane.
+    laser.SetPattern("image");
+    EXPECT_THROW(ernie::LightParamsOf(scene, "/Laser", bands),
+                 std::invalid_argument)
+        << "no image";
+    const std::filesystem::path file =
+        std::filesystem::temp_directory_path() /
+        "ernie_light_pattern_test.png";
+    const std::array<std::uint8_t, 8> grey = {51,  51,  51,  51,
+                                              153, 153, 153, 153};
+    ASSERT_NE(stbi_write_png(file.string().c_str(), 4, 2, 1,
+                             grey.data(), 4),
+              0);
+    laser.SetPatternImage(file.string());
+    const LightParams image =
+        ernie::LightParamsOf(scene, "/Laser", bands);
+    ASSERT_NE(image.beam.patternImage, nullptr);
+    EXPECT_EQ(image.beam.patternImage->width, 4u);
+    EXPECT_EQ(image.beam.patternImage->height, 2u);
+    // Linear, 0.2 above 0.6; then 2 x 1 and 1 x 1 levels of 0.4.
+    const std::vector<float> texels = {0.2f, 0.2f, 0.2f, 0.2f,
+                                       0.6f, 0.6f, 0.6f, 0.6f,
+                                       0.4f, 0.4f, 0.4f};
+    ASSERT_EQ(image.beam.patternImage->texels.size(), texels.size());
+    for (std::size_t i = 0; i < texels.size(); ++i) {
+        EXPECT_NEAR(image.beam.patternImage->texels[i], texels[i],
+                    1e-6f)
+            << "texel " << i;
+    }
+    EXPECT_NEAR(image.beam.extent.x, std::tan(glm::radians(20.0)),
+                1e-6);
+    EXPECT_NEAR(image.beam.extent.y, std::tan(glm::radians(15.0)),
+                1e-6);
+    EXPECT_EQ(image.beam.patternImage,
+              ernie::LightParamsOf(scene, "/Laser", bands)
+                  .beam.patternImage)
+        << "read once";
+    std::filesystem::remove(file);
 }
 
 TEST(LightParamsOf, LasersCarryTheirBeamAndLine) {

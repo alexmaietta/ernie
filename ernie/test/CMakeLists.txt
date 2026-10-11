@@ -86,6 +86,7 @@ ernie_add_test_suite(
     support/delegate_scenes.cpp
     LIBRARIES
     ernie
+    ernie_stb
     LABELS
     gpu
     DEFINITIONS

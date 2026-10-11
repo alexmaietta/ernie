@@ -140,11 +140,14 @@ struct LightGpu {
     // ranges along each; x: the waist's distance along the beam.
     float4 beam;
     float4 beamExtra;
-    // beamExtra yzw: its pattern (0 spot, 1 line, 2 grid, 3 custom), the efficiency into it and
-    // its zero order. pattern: a line's half fan angle (radians) and profile (1 Gaussian); a grid's
-    // columns, rows and pitch along x and y (radians); or a custom pattern's index
-    // (`customPattern`), extent, wavelength (nm) and time (s), its parameters `patternParams`.
+    // beamExtra yzw: whether its pattern is the beam itself (0, a spot) or spreads from the
+    // aperture (1), the efficiency into it and its zero order. pattern: its pattern's index
+    // (`lightPattern`), the laser's wavelength (nm) and the time (s); patternExtent xy: its
+    // tangent-plane half extents (0 unbounded); patternLayout: its data and image
+    // (LightPatternParams); its parameters.
     float4 pattern;
+    float4 patternExtent;
+    uint4 patternLayout;
     float4 patternParams[4];
 }
 
@@ -197,8 +200,9 @@ struct ShadingConstants {
 // Lights' IES profiles (`LightParams::profile`): per slot kProfileRows rows from the light's axis
 // (0) to opposite it (180 degrees), of kProfileColumns columns around it from its +x towards +y.
 [[vk::binding(20, 0)]] StructuredBuffer<float> lightProfiles;
-// Per light slot, its custom pattern's integral over its extent (the renderer's
-// `patternNormMain`), which its emission is divided by so the laser emits its power.
+// Per light slot, its laser's pattern's integral over its extent (1 for a normalized pattern, else
+// the renderer's `patternNormMain`), which its emission is divided by so the laser emits its
+// power.
 [[vk::binding(27, 0)]] StructuredBuffer<float> patternNorms;
 static const uint kProfileRows = 129;
 static const uint kProfileColumns = 64;
@@ -637,47 +641,22 @@ float3x2 pixelFootprint(int2 pixel, uint layer, float3 world) {
     return float3x2(steps[0].x, steps[1].x, steps[0].y, steps[1].y, steps[0].z, steps[1].z);
 }
 
-// The error function, to 1.5e-7 (Abramowitz and Stegun 7.1.26).
+// A laser's irradiance at `world` per watt of its power, across the light's ray, m^-2: its pattern
+// (`LightParams::Beam`, an `ILightPattern` in light slot `slot`), averaged over the pixel's
+// `footprint` (`pixelFootprint`) as it spans the beam's x and y, so a feature smaller than a pixel
+// spreads over it and the pixels it falls on carry its whole power, however obliquely; 0 behind
+// the laser.
 //
-// References:
-// - M. Abramowitz and I. A. Stegun, Handbook of Mathematical Functions, 1964, 7.1.26.
-float erfApprox(float x) {
-    let t = 1.0 / (1.0 + 0.3275911 * abs(x));
-    let poly =
-        t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
-    let y = 1.0 - poly * exp(-x * x);
-    return x < 0.0 ? -y : y;
-}
-
-// A Gaussian beam's 1D profile across one axis, 1/e^2 radius `w`, normalised to 1 over the line,
-// averaged over `width` centred at `u`: exactly, from erf, so a beam narrower than the width
-// keeps its power; the profile itself at `u` for a width of 0.
-float beamAverage(float u, float w, float width) {
-    if (width < 1e-4 * w) {
-        return sqrt(2.0 / PI) / w * exp(-2.0 * u * u / (w * w));
-    }
-    let k = sqrt(2.0) / w;
-    return 0.5 * (erfApprox(k * (u + 0.5 * width)) - erfApprox(k * (u - 0.5 * width))) / width;
-}
-
-// The standard normal distribution's cumulative probability at `x`.
-float normalBelow(float x) {
-    return 0.5 * (1.0 + erfApprox(x * 0.70710678));
-}
-
-// A laser's irradiance at `world` per watt of its power, normal to its beam, m^-2, by its pattern
-// (`LightParams::Beam`), each averaged over the pixel's `footprint` (`pixelFootprint`) as it spans
-// the beam's x and y, so a feature smaller than a pixel spreads over it and the pixels it falls on
-// carry its whole power, however obliquely; 0 behind the laser.
-// - spot: its Gaussian beam, 2 / (pi w_x w_y) exp(-2 (x^2 / w_x^2 + y^2 / w_y^2)) at the point's
-//   distance z along it, w = w0 sqrt(1 + (z / z_R)^2) along each axis;
-// - line: fanned along x, its power per radian of fan g(a) (flat over the fan, its edges as soft as
-//   the beam is wide, or Gaussian with 1/e^2 at the fan's edges), so per metre along the line
-//   g(a) cos^2 a / z at angle a = atan(x / z), the beam's Gaussian across it;
-// - grid: beamlets at the pitch's angles, each a Gaussian beam centred z tan(angle) off the axis
-//   with its share of the power, the zero order on the axis; the pixel sums those around it;
-// - custom: a registered `ILightPattern`'s emission over its integral (`patternNorms`, light
-//   slot `slot`).
+// A pattern gives its relative power per unit area of the tangent plane, t = (x / z, y / z) at the
+// point's distance z along the axis; over its integral there (`patternNorms`), per square metre of
+// the plane across the axis that is its emission over z^2. It is given the beam's own 1/e^2
+// radius there, w(z) / z with w = w0 sqrt(1 + (z / z_R)^2) along each axis, so the spot (the beam
+// itself) is 2 / (pi w_x w_y) exp(-2 (x^2 / w_x^2 + y^2 / w_y^2)) near its waist and far from it
+// alike. `efficiency` of the power goes into the pattern, the zero order into a spot.
+//
+// Across the ray, that irradiance is over the cosine between the ray and the axis: a pattern's
+// rays leave the aperture, while the beam's own follow its wavefronts, of radius
+// R = z (1 + (z_R / z)^2) from its waist, so parallel to the axis near the waist.
 //
 // References:
 // - A. E. Siegman, Lasers, University Science Books, 1986, ch. 17.
@@ -689,87 +668,47 @@ float laserIrradiance(LightGpu light, uint slot, float3 world, float3x2 footprin
     }
     let x = normalize(light.extentX.xyz);
     let y = cross(x, light.axis.xyz);
-    let t = (along - light.beamExtra.x) / max(light.beam.zw, float2(1e-12));
-    let w = light.beam.xy * sqrt(1.0 + t * t);
+    let z = along - light.beamExtra.x;
+    let zr = max(light.beam.zw, float2(1e-12));
+    let w = light.beam.xy * sqrt(1.0 + (z / zr) * (z / zr));
     // The pixel's extent across the beam along each of its axes.
     let spanX = abs(mul(x, footprint));
     let spanY = abs(mul(y, footprint));
     let width = float2(spanX.x + spanX.y, spanY.x + spanY.y);
-    let rx = dot(offset, x);
-    let ry = dot(offset, y);
-    let kind = uint(light.beamExtra.y);
+    let across = float2(dot(offset, x), dot(offset, y));
+    LightPatternInput input;
+    input.t = across / along;
+    input.footprint = width / along;
+    input.beam = w / along;
+    input.wavelength = light.pattern.y;
+    input.time = light.pattern.z;
+    // The beam's rays' slope r / R and a pattern's from the aperture.
+    let slope = across * z / (z * z + zr * zr);
+    let beamOblique = sqrt(1.0 + dot(slope, slope));
+    let patternOblique = length(offset) / along;
+    // What the element leaves undiffracted, along the axis.
+    var irradiance = light.beamExtra.w * beamOblique * beamlet(float2(0.0), input);
     let efficiency = light.beamExtra.z;
-    // A pattern's light is reckoned on the plane across the axis at its distance; across the ray
-    // from the aperture it is that over the cosine between the ray and the axis (shading then
-    // applies the surface's own cosine).
-    let oblique = length(offset) / along;
-    if (kind == 3) {
-        // A custom pattern (`ILightPattern`): its relative power per unit area of the tangent
-        // plane over its integral there, so per square metre of the plane across the axis z on
-        // over z^2; nothing beyond its extent, the pixel's footprint covering it in part at
+    let norm = patternNorms[slot];
+    if (efficiency > 0.0 && norm > 0.0) {
+        // Nothing beyond a bounded pattern's extent, the pixel's footprint covering it in part at
         // its edge.
-        let tangent = float2(rx, ry) / along;
-        let footprint = width / along;
-        let extent = light.pattern.y;
-        let norm = patternNorms[slot];
-        let cover = saturate((extent - abs(tangent)) / max(footprint, 1e-9) + 0.5);
-        if (cover.x * cover.y <= 0.0 || !(norm > 0.0)) {
-            return 0.0;
+        let extent = light.patternExtent.xy;
+        let bounded = extent > 0.0;
+        let cover = select(bounded,
+                           saturate((extent - abs(input.t)) / max(input.footprint, 1e-9) + 0.5),
+                           float2(1.0));
+        if (cover.x * cover.y > 0.0) {
+            input.t = select(bounded, clamp(input.t, -extent, extent), input.t);
+            LightPatternParams p;
+            p.values = light.patternParams;
+            p.layout = light.patternLayout;
+            let emission = max(lightPattern(uint(light.pattern.x), input, p), 0.0);
+            let oblique = light.beamExtra.y > 0.5 ? patternOblique : beamOblique;
+            irradiance += oblique * efficiency * cover.x * cover.y * emission / norm;
         }
-        LightPatternParams p;
-        p.values = light.patternParams;
-        let emission = customPattern(uint(light.pattern.x), clamp(tangent, -extent, extent),
-                                     footprint, light.pattern.z, light.pattern.w, p);
-        return oblique * efficiency * cover.x * cover.y * max(emission, 0.0) /
-               (norm * along * along);
     }
-    if (kind == 1) {
-        // Along the line, in angle: the pixel spans width cos^2 a / z of it, and the beam's own
-        // width w / z softens the fan's edges (Gaussian, as w is the 1/e^2 radius, sigma w / 2).
-        let a = atan(rx / along);
-        let c2 = along * along / (along * along + rx * rx);
-        let pixel = width.x * c2 / along;
-        let sigma2 = 0.25 * w.x * w.x / (along * along) + pixel * pixel / 12.0;
-        let halfFan = light.pattern.x;
-        var density = 0.0;
-        if (light.pattern.y > 0.5) {
-            let s = sqrt(0.25 * halfFan * halfFan + sigma2);
-            density = exp(-0.5 * a * a / (s * s)) / (sqrt(2.0 * PI) * s);
-        } else {
-            let s = sqrt(max(sigma2, 1e-20));
-            density = (normalBelow((a + halfFan) / s) - normalBelow((a - halfFan) / s)) /
-                      (2.0 * halfFan);
-        }
-        return oblique * efficiency * density * c2 / along * beamAverage(ry, w.y, width.y);
-    }
-    if (kind == 2) {
-        // The nearest beamlet along each axis and its neighbours, which a pixel can straddle.
-        let cells = light.pattern.xy;
-        let pitch = light.pattern.zw;
-        let nearest = round(atan(float2(rx, ry) / along) / pitch + 0.5 * (cells - 1.0));
-        let share = efficiency / (cells.x * cells.y);
-        var sum = 0.0;
-        for (int i = -1; i <= 1; ++i) {
-            let column = nearest.x + float(i);
-            if (column < 0.0 || column > cells.x - 1.0) {
-                continue;
-            }
-            let cx = along * tan((column - 0.5 * (cells.x - 1.0)) * pitch.x);
-            let across = beamAverage(rx - cx, w.x, width.x);
-            for (int j = -1; j <= 1; ++j) {
-                let row = nearest.y + float(j);
-                if (row < 0.0 || row > cells.y - 1.0) {
-                    continue;
-                }
-                let cy = along * tan((row - 0.5 * (cells.y - 1.0)) * pitch.y);
-                sum += share * across * beamAverage(ry - cy, w.y, width.y);
-            }
-        }
-        // What the element leaves undiffracted, along the axis.
-        return oblique * (sum + light.beamExtra.w * beamAverage(rx, w.x, width.x) *
-                                    beamAverage(ry, w.y, width.y));
-    }
-    return beamAverage(rx, w.x, width.x) * beamAverage(ry, w.y, width.y);
+    return irradiance / (along * along);
 }
 
 static const uint kOcclusionDirections = 4;

@@ -2,6 +2,7 @@
 #pragma once
 
 #include "ernie/scene/camera.h"
+#include "ernie/scene/light_pattern.h"
 #include "ernie/scene/sensor_filters.h"
 
 #include <glm/glm.hpp>
@@ -11,6 +12,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -284,31 +286,29 @@ struct LightParams {
         glm::vec2 waist{0.0f};
         glm::vec2 rayleigh{0.0f};
         float waistDistance = 0.0f;
-        /// The pattern it makes (`tokens::kLaserPattern`): the beam
-        /// itself; a line fanned over `fan` radians along x, its
-        /// profile along the line flat or Gaussian; or a grid of
-        /// `cells` beamlets `pitch` radians apart. `efficiency` of
-        /// the power goes into the line or the beamlets, `zeroOrder`
-        /// into a beam along the axis (grids). A custom pattern
-        /// (`LightPatternModel`) is named by `customPattern`, its
-        /// parameters `patternParams` as given (the renderer fills in
-        /// defaults).
-        enum class Pattern : std::uint32_t {
-            Spot,
-            Line,
-            Grid,
-            Custom
-        };
-        Pattern pattern = Pattern::Spot;
-        float fan = 0.0f;
-        bool gaussianLine = false;
-        glm::uvec2 cells{1u};
-        glm::vec2 pitch{0.0f};
+        /// The pattern it makes (`tokens::kLaserPattern`), a
+        /// `LightPatternModel` the renderer finds by id: a built-in
+        /// one ("spot", "line", "grid", "image") with its parameters
+        /// in `patternParams` and its tangent-plane half extents in
+        /// `extent` (0 unbounded), or a custom one with its
+        /// parameters as given (the renderer fills in defaults and
+        /// its extent). `efficiency` of the power goes into the
+        /// pattern, `zeroOrder` into a spot along the axis.
+        std::string pattern{"spot"};
+        std::vector<float> patternParams;
+        glm::vec2 extent{0.0f};
         float efficiency = 1.0f;
         float zeroOrder = 0.0f;
-        std::string customPattern;
-        std::vector<float> patternParams;
+        /// What patterns read besides their parameters:
+        /// `ernie:laser:pattern:data` and the image
+        /// `ernie:laser:pattern:image` (null without one).
+        std::vector<float> patternData;
+        std::shared_ptr<const LightPatternImage> patternImage;
         float wavelength = 0.0f;  ///< nm, the line's centre.
+
+        bool IsSpot() const {
+            return pattern == "spot";
+        }
     };
     Beam beam;
     bool shadows = true;

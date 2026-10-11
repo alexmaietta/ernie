@@ -2,6 +2,7 @@
 #include "ernie/scene/light_pattern.h"
 
 #include "ernie/scene/tokens.h"
+#include "ernie/util/image.h"
 
 #include <algorithm>
 #include <cctype>
@@ -23,24 +24,218 @@ bool IsIdentifier(std::string_view text) {
 }
 
 constexpr const char* kLightPatternSlang = R"(
-// A laser's pattern (ernie/scene/light_pattern.h): sixteen parameters
-// and the interface a pattern implements.
+// A laser's pattern (ernie/scene/light_pattern.h): what a pattern is evaluated at, its parameters
+// with the laser's data and image, the interface it implements, and helpers for patterns.
+
+// Every laser's pattern data and image texels, at the offsets its LightPatternParams hold.
+[[vk::binding(29, 0)]] StructuredBuffer<float> lightPatternData;
+
+// Where a pattern is evaluated: t = (x / z, y / z) on the tangent plane, a pixel's footprint
+// there, the beam's own 1/e^2 radius there (w(z) / z), the laser's wavelength (nm) and the time
+// (s).
+public struct LightPatternInput {
+    public float2 t;
+    public float2 footprint;
+    public float2 beam;
+    public float wavelength;
+    public float time;
+}
+
 public struct LightPatternParams {
     public float4 values[4];
+    // x: the offset of the laser's data in lightPatternData, y: their count, z: the offset of its
+    // image, w: the image's width | height << 16 (0 without one).
+    public uint4 layout;
 
     public float get(uint i) {
         return values[i / 4][i % 4];
     }
+
+    public uint dataCount() {
+        return layout.y;
+    }
+
+    // The laser's datum i (ernie:laser:pattern:data), 0 past its end.
+    public float data(uint i) {
+        return i < layout.y ? lightPatternData[layout.x + i] : 0.0;
+    }
+
+    public uint2 imageSize() {
+        return uint2(layout.w & 0xffffu, layout.w >> 16);
+    }
+
+    // The laser's image (ernie:laser:pattern:image) at uv, (0, 0) its top left corner and (1, 1)
+    // its bottom right, averaged over `footprint` of uv: bilinear in the mip level whose texels
+    // are that wide, linear between levels; 0 outside it or without one.
+    public float image(float2 uv, float2 footprint) {
+        let size = imageSize();
+        if (size.x == 0 || any(uv < 0.0) || any(uv > 1.0)) {
+            return 0.0;
+        }
+        let levels = uint(firstbithigh(max(size.x, size.y))) + 1;
+        let texels = max(footprint * float2(size), float2(1.0));
+        let level = clamp(log2(max(texels.x, texels.y)), 0.0, float(levels - 1));
+        let below = uint(level);
+        let above = min(below + 1, levels - 1);
+        return lerp(imageLevel(below, uv), imageLevel(above, uv), level - float(below));
+    }
+
+    float imageLevel(uint level, float2 uv) {
+        var offset = layout.z;
+        var size = imageSize();
+        for (uint i = 0; i < level; ++i) {
+            offset += size.x * size.y;
+            size = max(size / 2, uint2(1));
+        }
+        let at = uv * float2(size) - 0.5;
+        let corner = floor(at);
+        let f = at - corner;
+        let last = int2(size) - 1;
+        let low = uint2(clamp(int2(corner), int2(0), last));
+        let high = uint2(clamp(int2(corner) + 1, int2(0), last));
+        let top = lerp(lightPatternData[offset + low.y * size.x + low.x],
+                       lightPatternData[offset + low.y * size.x + high.x], f.x);
+        let bottom = lerp(lightPatternData[offset + high.y * size.x + low.x],
+                          lightPatternData[offset + high.y * size.x + high.x], f.x);
+        return lerp(top, bottom, f.y);
+    }
 }
 
 public interface ILightPattern {
-    // Relative power per unit area of the tangent plane at t (x / z,
-    // y / z), averaged over `footprint` of it, at `wavelength` nm and
-    // `time` s; any scale.
-    float emission(float2 t, float2 footprint, float wavelength,
-                   float time, LightPatternParams p);
+    // Relative power per unit area of the tangent plane at input.t, averaged over
+    // input.footprint of it; any scale.
+    float emission(LightPatternInput input, LightPatternParams p);
+}
+
+// The error function, to 1.5e-7 (Abramowitz and Stegun 7.1.26).
+//
+// References:
+// - M. Abramowitz and I. A. Stegun, Handbook of Mathematical Functions, 1964, 7.1.26.
+public float erfApprox(float x) {
+    let t = 1.0 / (1.0 + 0.3275911 * abs(x));
+    let poly =
+        t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+    let y = 1.0 - poly * exp(-x * x);
+    return x < 0.0 ? -y : y;
+}
+
+// The standard normal distribution below x.
+public float normalBelow(float x) {
+    return 0.5 * (1.0 + erfApprox(x * 0.70710678));
+}
+
+// A Gaussian beam's 1D profile across one axis, 1/e^2 radius `w`, normalised to 1 over the line,
+// averaged over `width` centred at `u`: exactly, from erf, so a beam narrower than the width
+// keeps its power; the profile itself at `u` for a width of 0, a box for a radius of 0.
+public float beamAverage(float u, float w, float width) {
+    let radius = max(w, 1e-12);
+    if (width < 1e-4 * radius) {
+        return sqrt(2.0 / 3.14159265358979) / radius * exp(-2.0 * u * u / (radius * radius));
+    }
+    let k = sqrt(2.0) / radius;
+    return 0.5 * (erfApprox(k * (u + 0.5 * width)) - erfApprox(k * (u - 0.5 * width))) / width;
+}
+
+// A beamlet of power 1 centred at `centre` on the tangent plane: the beam's Gaussian, averaged
+// over the pixel's footprint.
+public float beamlet(float2 centre, LightPatternInput input) {
+    return beamAverage(input.t.x - centre.x, input.beam.x, input.footprint.x) *
+           beamAverage(input.t.y - centre.y, input.beam.y, input.footprint.y);
 }
 )";
+
+constexpr const char* kSpotSlang = R"(
+import light_pattern;
+
+// The beam itself.
+public struct LaserSpot : ILightPattern {
+    public float emission(LightPatternInput input, LightPatternParams p) {
+        return beamlet(float2(0.0), input);
+    }
+}
+)";
+
+constexpr const char* kLineSlang = R"(
+import light_pattern;
+
+// A line fanned along x, half fan angle p0 (radians): flat in angle, or Gaussian with 1/e^2 at
+// the fan's edges for p1 = 1; across it the beam's Gaussian.
+public struct LaserLine : ILightPattern {
+    public float emission(LightPatternInput input, LightPatternParams p) {
+        // Along the line, in angle a: the pixel spans footprint cos^2 a of it, and the beam's own
+        // width softens the fan's edges (Gaussian, as it is the 1/e^2 radius, sigma half that).
+        let a = atan(input.t.x);
+        let c2 = 1.0 / (1.0 + input.t.x * input.t.x);
+        let pixel = input.footprint.x * c2;
+        let sigma2 = 0.25 * input.beam.x * input.beam.x + pixel * pixel / 12.0;
+        let halfFan = p.get(0);
+        var density = 0.0;
+        if (p.get(1) > 0.5) {
+            let s = sqrt(0.25 * halfFan * halfFan + sigma2);
+            density = exp(-0.5 * a * a / (s * s)) / (sqrt(2.0 * 3.14159265358979) * s);
+        } else {
+            let s = sqrt(max(sigma2, 1e-20));
+            density = (normalBelow((a + halfFan) / s) - normalBelow((a - halfFan) / s)) /
+                      (2.0 * halfFan);
+        }
+        // Per unit of t.x, da / dt = cos^2 a.
+        return density * c2 * beamAverage(input.t.y, input.beam.y, input.footprint.y);
+    }
+}
+)";
+
+constexpr const char* kGridSlang = R"(
+import light_pattern;
+
+// p0 x p1 beamlets p2 and p3 radians apart along x and y, sharing the power.
+public struct LaserGrid : ILightPattern {
+    public float emission(LightPatternInput input, LightPatternParams p) {
+        // The nearest beamlet along each axis and its neighbours, which a pixel can straddle.
+        let cells = float2(p.get(0), p.get(1));
+        let pitch = float2(p.get(2), p.get(3));
+        let nearest = round(atan(input.t) / pitch + 0.5 * (cells - 1.0));
+        var sum = 0.0;
+        for (int i = -1; i <= 1; ++i) {
+            let column = nearest.x + float(i);
+            if (column < 0.0 || column > cells.x - 1.0) {
+                continue;
+            }
+            let cx = tan((column - 0.5 * (cells.x - 1.0)) * pitch.x);
+            let across = beamAverage(input.t.x - cx, input.beam.x, input.footprint.x);
+            for (int j = -1; j <= 1; ++j) {
+                let row = nearest.y + float(j);
+                if (row < 0.0 || row > cells.y - 1.0) {
+                    continue;
+                }
+                let cy = tan((row - 0.5 * (cells.y - 1.0)) * pitch.y);
+                sum += across * beamAverage(input.t.y - cy, input.beam.y, input.footprint.y);
+            }
+        }
+        return sum / (cells.x * cells.y);
+    }
+}
+)";
+
+constexpr const char* kImageSlang = R"(
+import light_pattern;
+
+// The laser's image over |t.x| < p0 and |t.y| < p1 (tangents of half its field of view), its top
+// towards +y, averaged over the pixel's footprint and the beam's width.
+public struct LaserImage : ILightPattern {
+    public float emission(LightPatternInput input, LightPatternParams p) {
+        let half = float2(p.get(0), p.get(1));
+        let uv = float2(0.5 + 0.5 * input.t.x / half.x, 0.5 - 0.5 * input.t.y / half.y);
+        let blur = sqrt(input.footprint * input.footprint + input.beam * input.beam);
+        return p.image(uv, 0.5 * blur / half);
+    }
+}
+)";
+
+/// The ids built-in patterns hold, which `Add` refuses.
+bool IsBuiltinId(std::string_view id) {
+    return id == tokens::kSpot || id == tokens::kLine ||
+           id == tokens::kGrid || id == tokens::kImage;
+}
 
 }  // namespace
 
@@ -52,14 +247,46 @@ std::vector<float> LightPatternModel::Defaults() const {
     return values;
 }
 
+LightPatternRegistry LightPatternRegistry::WithBuiltins() {
+    LightPatternRegistry registry;
+    const auto add = [&](std::string_view id, std::string name,
+                         std::string typeName, const char* slang,
+                         std::vector<LightPatternParam> params,
+                         bool normalized) {
+        LightPatternModel model;
+        model.id = std::string(id);
+        model.name = std::move(name);
+        model.typeName = std::move(typeName);
+        model.slang = slang;
+        model.params = std::move(params);
+        model.normalized = normalized;
+        registry.models_.push_back(std::move(model));
+    };
+    add(tokens::kSpot, "Spot", "LaserSpot", kSpotSlang, {}, true);
+    add(tokens::kLine, "Line", "LaserLine", kLineSlang,
+        {{"halfFan", 0.5f, "Half the fan angle, radians"},
+         {"gaussian", 0.0f, "1 Gaussian along the line, else flat"}},
+        true);
+    add(tokens::kGrid, "Grid", "LaserGrid", kGridSlang,
+        {{"columns", 1.0f, "Beamlets along x"},
+         {"rows", 1.0f, "Beamlets along y"},
+         {"pitchX", 0.0349f, "Radians between columns"},
+         {"pitchY", 0.0349f, "Radians between rows"}},
+        true);
+    add(tokens::kImage, "Image", "LaserImage", kImageSlang,
+        {{"halfX", 0.364f, "tan of half the field of view along x"},
+         {"halfY", 0.268f, "tan of half the field of view along y"}},
+        false);
+    return registry;
+}
+
 void LightPatternRegistry::Add(LightPatternModel model) {
     if (!IsIdentifier(model.id)) {
         throw std::invalid_argument(
             "Light pattern id must be an identifier: '" + model.id +
             "'");
     }
-    if (model.id == tokens::kSpot || model.id == tokens::kLine ||
-        model.id == tokens::kGrid) {
+    if (IsBuiltinId(model.id)) {
         throw std::invalid_argument("Light pattern id '" + model.id +
                                     "' is a built-in pattern's");
     }
@@ -117,16 +344,36 @@ LightPatternModules(const LightPatternRegistry& registry) {
         dispatch += "import " + module + ";\n";
         cases += "    case " + std::to_string(i) + ": {\n        " +
                  model.typeName +
-                 " pattern;\n        return pattern.emission(t, "
-                 "footprint, wavelength, time, p);\n    }\n";
+                 " pattern;\n        return pattern.emission(input, "
+                 "p);\n    }\n";
     }
-    dispatch +=
-        "public float customPattern(uint index, float2 t, float2 "
-        "footprint, float wavelength, float time, LightPatternParams "
-        "p) {\n    switch (index) {\n" +
-        cases + "    default:\n        return 0.0;\n    }\n}\n";
+    dispatch += "public float lightPattern(uint index, "
+                "LightPatternInput input, LightPatternParams p) {\n"
+                "    switch (index) {\n" +
+                cases +
+                "    default:\n        return 0.0;\n    }\n}\n";
     modules.push_back({"light_patterns", dispatch});
     return modules;
+}
+
+LightPatternImage
+LoadLightPatternImage(const std::filesystem::path& path) {
+    const Image image = LoadImageFile(path, ImageEncoding::Linear);
+    if (image.width > 0xffffu || image.height > 0xffffu) {
+        throw std::invalid_argument(
+            "Light pattern image is over 65535 texels on a side: " +
+            path.string());
+    }
+    LightPatternImage pattern;
+    pattern.width = image.width;
+    pattern.height = image.height;
+    for (const Image& level : MipChain(image, MipFilter::Average)) {
+        for (const glm::vec4& texel : level.pixels) {
+            pattern.texels.push_back((texel.r + texel.g + texel.b) /
+                                     3.0f);
+        }
+    }
+    return pattern;
 }
 
 }  // namespace ernie

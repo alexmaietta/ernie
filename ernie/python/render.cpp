@@ -507,7 +507,7 @@ void BindRender(nb::module_& m) {
             "add_light_pattern",
             [](Renderer& r, const std::string& id,
                const std::string& typeName, const std::string& slang,
-               nb::object params, double extent,
+               nb::object params, double extent, bool normalized,
                const std::string& name,
                const std::string& description) {
                 LightPatternModel model;
@@ -515,6 +515,7 @@ void BindRender(nb::module_& m) {
                 model.typeName = typeName;
                 model.slang = slang;
                 model.extent = extent;
+                model.normalized = normalized;
                 model.name = name.empty() ? id : name;
                 model.description = description;
                 // Parameters as {name: default} in order, or
@@ -547,23 +548,28 @@ void BindRender(nb::module_& m) {
             },
             nb::arg("id"), nb::arg("type_name"), nb::arg("slang"),
             nb::arg("params").none() = nb::none(),
-            nb::arg("extent") = 1.0, nb::arg("name") = "",
-            nb::arg("description") = "",
+            nb::arg("extent") = 1.0, nb::arg("normalized") = false,
+            nb::arg("name") = "", nb::arg("description") = "",
             "Registers a laser pattern written in Slang, for "
             "LaserLights to name in ernie:laser:pattern: struct "
             "`type_name` in module `slang` (which may `import "
             "light_pattern;`) implementing ILightPattern, whose "
-            "`float emission(float2 t, float2 footprint, float "
-            "wavelength, float time, LightPatternParams p)` gives "
-            "the relative power per unit area of the tangent plane "
-            "at t = (x / z, y / z) averaged over `footprint` of it; "
-            "any scale, as Ernie integrates it over |t| < `extent` "
-            "so the laser emits its power. `params` is {name: "
-            "default} in order, or a list of {\"name\", \"default\", "
-            "\"description\"}; LaserLights set them in "
-            "ernie:laser:pattern:params, read with p.get(i). Raises "
-            "ValueError for an invalid pattern or one that fails to "
-            "compile, with the compiler's diagnostics.")
+            "`float emission(LightPatternInput input, "
+            "LightPatternParams p)` gives the relative power per "
+            "unit area of the tangent plane at input.t = (x / z, y / "
+            "z), averaged over input.footprint of it (input.beam "
+            "being the beam's own radius there, for `beamlet`); any "
+            "scale, as Ernie integrates it over |t| < `extent` so "
+            "the laser emits its power, unless `normalized` says it "
+            "integrates to 1. `params` is {name: default} in order, "
+            "or a list of "
+            "{\"name\", \"default\", \"description\"}; LaserLights "
+            "set them in ernie:laser:pattern:params, read with "
+            "p.get(i), and their ernie:laser:pattern:data and "
+            "ernie:laser:pattern:image are p.data(i) and p.image(uv, "
+            "footprint). Raises ValueError for an invalid pattern or "
+            "one that fails to compile, with the compiler's "
+            "diagnostics.")
         .def_prop_ro(
             "sensor_filters",
             [](const Renderer& r) {

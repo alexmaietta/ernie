@@ -325,11 +325,13 @@ inline constexpr std::string_view kLaserApertureRadius =
 /// A laser's pattern: "spot" (its beam), "line" (fanned over
 /// `fanAngle` degrees along its x axis, its profile along the line
 /// "flat" as a Powell lens gives or "gaussian" as a cylindrical lens
-/// does, the beam's across it) or "grid" (`gridColumns` x `gridRows`
+/// does, the beam's across it), "grid" (`gridColumns` x `gridRows`
 /// beamlets `gridPitch` degrees apart along x and y, as a diffractive
-/// element splits it). `efficiency` of the power goes into the
-/// pattern and `zeroOrder` stays in an undiffracted beam along the
-/// axis (grids); the rest is lost.
+/// element splits it), "image" (`pattern:image` over
+/// `pattern:fieldOfView`, as a projector shows it) or a registered
+/// custom pattern (`LightPatternModel`). `efficiency` of the power
+/// goes into the pattern and `zeroOrder` stays in an undiffracted
+/// beam along the axis; the rest is lost.
 inline constexpr std::string_view kLaserPattern =
     "ernie:laser:pattern";
 inline constexpr std::string_view kLaserFanAngle =
@@ -350,9 +352,23 @@ inline constexpr std::string_view kLaserZeroOrder =
 /// its order; missing ones take its defaults.
 inline constexpr std::string_view kLaserPatternParams =
     "ernie:laser:pattern:params";
+/// float[]: data a custom pattern reads (`p.data(i)`), such as a
+/// diffractive element's beamlet angles.
+inline constexpr std::string_view kLaserPatternData =
+    "ernie:laser:pattern:data";
+/// asset: an image of the pattern's relative power (linear, colour
+/// channels averaged), drawn by "image" and read by custom patterns
+/// (`p.image(uv, footprint)`).
+inline constexpr std::string_view kLaserPatternImage =
+    "ernie:laser:pattern:image";
+/// double2: the full angles, degrees, that "image" spreads its image
+/// over along x and y.
+inline constexpr std::string_view kLaserPatternFieldOfView =
+    "ernie:laser:pattern:fieldOfView";
 inline constexpr std::string_view kSpot = "spot";
 inline constexpr std::string_view kLine = "line";
 inline constexpr std::string_view kGrid = "grid";
+inline constexpr std::string_view kImage = "image";
 inline constexpr std::string_view kFlat = "flat";
 inline constexpr std::string_view kGaussian = "gaussian";
 /// Degrees off the axis that a light reaches, and the fraction of

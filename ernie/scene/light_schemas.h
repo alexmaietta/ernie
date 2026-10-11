@@ -206,11 +206,11 @@
                               .doc = "Clips the beam's tails at the aperture, m; 0 none.",         \
                               .group = "Beam", .max = 100.0}))                                     \
     X(std::string, Pattern, ::ernie::tokens::kLaserPattern, "spot",                                \
-      (::ernie::AttributeMeta{.doc = "The beam itself, a line fanned along x, or a grid of "       \
-                                     "beamlets.",                                                  \
+      (::ernie::AttributeMeta{.doc = "The beam itself, a line fanned along x, a grid of "          \
+                                     "beamlets, an image, or a registered custom pattern.",        \
                               .group = "Pattern",                                                  \
                               .options = {::ernie::tokens::kSpot, ::ernie::tokens::kLine,          \
-                                          ::ernie::tokens::kGrid}}))                               \
+                                          ::ernie::tokens::kGrid, ::ernie::tokens::kImage}}))      \
     X(double, FanAngle, ::ernie::tokens::kLaserFanAngle, 60.0,                                     \
       (::ernie::AttributeMeta{.label = "Fan angle",                                                \
                               .doc = "A line's full angle along x, degrees.", .group = "Pattern",  \
@@ -237,12 +237,26 @@
                               .group = "Pattern", .max = 1.0}))                                    \
     X(double, ZeroOrder, ::ernie::tokens::kLaserZeroOrder, 0.0,                                    \
       (::ernie::AttributeMeta{.label = "Zero order",                                               \
-                              .doc = "Fraction of a grid's power left in a beam along the axis.",  \
+                              .doc = "Fraction of the power left in a beam along the axis.",       \
                               .group = "Pattern", .max = 1.0}))                                    \
+    X(std::string, PatternImage, ::ernie::tokens::kLaserPatternImage, "",                          \
+      (::ernie::AttributeMeta{.label = "Pattern image",                                            \
+                              .doc = "The image pattern's relative power (linear), top towards "   \
+                                     "+y; custom patterns read it too.",                           \
+                              .group = "Pattern", .asset = true}))                                 \
+    X(glm::dvec2, PatternFieldOfView, ::ernie::tokens::kLaserPatternFieldOfView,                   \
+      glm::dvec2(40.0, 30.0),                                                                      \
+      (::ernie::AttributeMeta{.label = "Field of view",                                            \
+                              .doc = "Full angles the image spans along x and y, degrees.",        \
+                              .group = "Pattern", .min = 0.01, .max = 170.0}))                     \
     X(std::vector<float>, PatternParams, ::ernie::tokens::kLaserPatternParams,                     \
       std::vector<float>{},                                                                        \
       (::ernie::AttributeMeta{.label = "Pattern parameters",                                       \
                               .doc = "A custom pattern's parameters, in its order.",               \
+                              .group = "Pattern"}))                                                \
+    X(std::vector<float>, PatternData, ::ernie::tokens::kLaserPatternData, std::vector<float>{},   \
+      (::ernie::AttributeMeta{.label = "Pattern data",                                             \
+                              .doc = "Data a custom pattern reads, p.data(i).",                    \
                               .group = "Pattern"}))                                                \
     X(bool, ShadowEnable, ::ernie::tokens::kShadowEnable, true,                                    \
       (::ernie::AttributeMeta{.label = "Shadows", .group = "Laser"}))

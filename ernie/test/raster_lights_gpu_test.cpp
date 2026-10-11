@@ -23,10 +23,12 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
+#include <stb_image_write.h>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -34,6 +36,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 using ernie::DeviceKind;
@@ -524,8 +527,7 @@ TEST_F(RasterDelegateTest, CustomLaserPatternsKeepTheirPower) {
     square.typeName = "Square";
     square.slang = R"(import light_pattern;
 public struct Square : ILightPattern {
-    public float emission(float2 t, float2 footprint,
-                          float wavelength, float time,
+    public float emission(LightPatternInput input,
                           LightPatternParams p) {
         return p.get(0);
     }
@@ -559,6 +561,98 @@ public struct Square : ILightPattern {
     }
     const auto [row, col] = PixelOf(scene, 3.0f, 0.0f);
     EXPECT_EQ(band[row * kVarSize + col], 0.0f) << "past its edge";
+}
+
+TEST_F(RasterDelegateTest, LaserPatternsReadTheirDataAndImage) {
+    RasterDelegate delegate(*context_);
+    double bandWidth = 0.0;
+    Scene scene = LaserScene(0.001, &bandWidth);
+    const auto [r0, left] = PixelOf(scene, -10.0f, 0.0f);
+    const auto [r1, right] = PixelOf(scene, 10.0f, 0.0f);
+    const double pixel = (PixelCentre(scene, 10.0f, 0.0f).x -
+                          PixelCentre(scene, -10.0f, 0.0f).x) /
+                         static_cast<double>(right - left);
+    const double unit = 0.5 / M_PI / bandWidth;
+    // The power (per watt) on the floor within a pixel of (x, y).
+    const auto around = [&](const std::vector<float>& band, double x,
+                            double y) {
+        const auto [row, col] = PixelOf(scene, static_cast<float>(x),
+                                        static_cast<float>(y));
+        double power = 0.0;
+        for (std::size_t r = row - 1; r <= row + 1; ++r) {
+            for (std::size_t c = col - 1; c <= col + 1; ++c) {
+                power += band[r * kVarSize + c] * pixel * pixel;
+            }
+        }
+        return power / unit;
+    };
+
+    // Dots where the laser's data put them, sharing its power: a
+    // pattern of beamlets, normalized.
+    ernie::LightPatternModel dots;
+    dots.id = "dots";
+    dots.typeName = "Dots";
+    dots.normalized = true;
+    dots.slang = R"(import light_pattern;
+public struct Dots : ILightPattern {
+    public float emission(LightPatternInput input,
+                          LightPatternParams p) {
+        let count = p.dataCount() / 2;
+        var sum = 0.0;
+        for (uint i = 0; i < count; ++i) {
+            let centre = float2(p.data(2 * i), p.data(2 * i + 1));
+            sum += beamlet(centre, input);
+        }
+        return sum / float(count);
+    }
+};
+)";
+    delegate.AddLightPattern(dots);
+    ernie::LaserLight laser(scene, "/World/Laser");
+    laser.SetPattern("dots")
+        .SetPatternData({0.4f, 0.0f, -0.3f, 0.3f})
+        .SetEfficiency(0.9)
+        .SetZeroOrder(0.1);
+    std::vector<float> band = Band8(delegate, scene);
+    EXPECT_NEAR(around(band, 4.0, 0.0), 0.45, 0.015);
+    EXPECT_NEAR(around(band, -3.0, 3.0), 0.45, 0.015);
+    EXPECT_NEAR(around(band, 0.0, 0.0), 0.1, 0.005)
+        << "the zero order";
+
+    // An image 4 m x 2 m across the floor 10 m down, a quarter of its
+    // power in its left half and the rest in its right.
+    const std::filesystem::path file =
+        std::filesystem::temp_directory_path() /
+        "ernie_laser_image_test.png";
+    std::array<std::uint8_t, 32> texels{};
+    for (std::size_t i = 0; i < texels.size(); ++i) {
+        texels[i] = i % 8 < 4 ? 51 : 153;
+    }
+    ASSERT_NE(stbi_write_png(file.string().c_str(), 8, 4, 1,
+                             texels.data(), 8),
+              0);
+    laser.SetPattern("image")
+        .SetPatternImage(file.string())
+        .SetPatternFieldOfView(
+            glm::degrees(2.0 * glm::atan(glm::dvec2(0.2, 0.1))))
+        .SetEfficiency(0.8)
+        .SetZeroOrder(0.0);
+    band = Band8(delegate, scene);
+    double total = 0.0;
+    for (const float value : band) {
+        total += value * pixel * pixel;
+    }
+    EXPECT_NEAR(total / unit, 0.8, 0.04) << "all of its power";
+    for (const auto& [x, want] :
+         {std::pair{-1.0f, 0.05}, std::pair{1.0f, 0.15}}) {
+        const auto [row, col] = PixelOf(scene, x, 0.0f);
+        EXPECT_NEAR(band[row * kVarSize + col] / unit, want,
+                    0.03 * want)
+            << "at x = " << x;
+    }
+    const auto [row, col] = PixelOf(scene, 0.0f, 2.0f);
+    EXPECT_EQ(band[row * kVarSize + col], 0.0f) << "past its edge";
+    std::filesystem::remove(file);
 }
 
 TEST_F(RasterDelegateTest, LasersLightAGaussianSpot) {

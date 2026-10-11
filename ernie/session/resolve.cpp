@@ -1390,6 +1390,33 @@ std::vector<float> LaserLine(const SpectralBands& bands,
     return values;
 }
 
+/// A laser's pattern image `file` (`LoadLightPatternImage`), or null
+/// without one. Files are read once each, and again when they
+/// change, so lasers sharing one share its texels.
+/// @throws std::runtime_error or std::invalid_argument for a file
+/// that cannot be read.
+std::shared_ptr<const LightPatternImage>
+PatternImageOf(const std::string& file) {
+    if (file.empty()) {
+        return nullptr;
+    }
+    struct Cached {
+        std::filesystem::file_time_type written;
+        std::shared_ptr<const LightPatternImage> image;
+    };
+    static std::mutex mutex;
+    static std::map<std::string, Cached> cache;
+    const std::filesystem::file_time_type written =
+        std::filesystem::last_write_time(file);
+    const std::lock_guard lock(mutex);
+    Cached& entry = cache[file];
+    if (entry.image == nullptr || entry.written != written) {
+        entry = {written, std::make_shared<const LightPatternImage>(
+                              LoadLightPatternImage(file))};
+    }
+    return entry.image;
+}
+
 /// The LaserLight at `path` under transform `world` as a light: its
 /// beam from the waist, divergence and power it gives (`LaserLight`),
 /// its power through its aperture, and a shadow view along its beam.
@@ -1444,36 +1471,35 @@ LightParams LaserParamsOf(const Scene& scene, const Path& path,
     }
     light.spectrum =
         LaserLine(bands, wavelength, laser.GetLinewidth(), through);
-    // Its pattern. Patterns spread from the aperture, so their shadow
+    // Its pattern (`LightPatternRegistry::WithBuiltins`), its data
+    // and image. Patterns spread from the aperture, so their shadow
     // view is a perspective one over the pattern's angular extent
     // (`coneAngle`), its beamlets' spread added; a spot's looks along
     // its beam.
-    using Pattern = LightParams::Beam::Pattern;
     LightParams::Beam& beam = light.beam;
-    const std::string pattern = laser.GetPattern();
+    beam.pattern = laser.GetPattern();
     beam.efficiency = static_cast<float>(laser.GetEfficiency());
     beam.zeroOrder = static_cast<float>(laser.GetZeroOrder());
+    beam.patternData = laser.GetPatternData();
+    beam.patternImage = PatternImageOf(laser.GetPatternImage());
     const glm::dvec2 spread = 2.0 * laser.Divergence();
     double extent = 0.0;  // half-angle, radians
-    if (pattern == tokens::kLine) {
-        beam.pattern = Pattern::Line;
-        beam.fan =
-            static_cast<float>(glm::radians(laser.GetFanAngle()));
-        beam.gaussianLine =
+    if (beam.pattern == tokens::kLine) {
+        const double fan = glm::radians(laser.GetFanAngle());
+        const bool gaussian =
             laser.GetLineProfile() == tokens::kGaussian;
-        if (!(beam.fan > 0.0f) ||
-            !(beam.fan < glm::radians(170.0f)) ||
-            (!beam.gaussianLine &&
-             laser.GetLineProfile() != tokens::kFlat)) {
+        if (!(fan > 0.0) || !(fan < glm::radians(170.0)) ||
+            (!gaussian && laser.GetLineProfile() != tokens::kFlat)) {
             throw std::invalid_argument(
                 "LaserLight '" + path.String() +
                 "' needs a fan angle above 0 and below 170 degrees "
                 "and a "
                 "line profile of \"flat\" or \"gaussian\"");
         }
-        extent = 0.5 * beam.fan + spread.x;
-    } else if (pattern == tokens::kGrid) {
-        beam.pattern = Pattern::Grid;
+        beam.patternParams = {static_cast<float>(0.5 * fan),
+                              gaussian ? 1.0f : 0.0f};
+        extent = 0.5 * fan + spread.x;
+    } else if (beam.pattern == tokens::kGrid) {
         const int columns = laser.GetGridColumns();
         const int rows = laser.GetGridRows();
         const glm::dvec2 pitch = glm::radians(laser.GetGridPitch());
@@ -1484,17 +1510,33 @@ LightParams LaserParamsOf(const Scene& scene, const Path& path,
                 "' needs one or more grid columns and rows and a "
                 "positive pitch");
         }
-        beam.cells = glm::uvec2(static_cast<unsigned>(columns),
-                                static_cast<unsigned>(rows));
-        beam.pitch = glm::vec2(pitch);
+        beam.patternParams = {
+            static_cast<float>(columns), static_cast<float>(rows),
+            static_cast<float>(pitch.x), static_cast<float>(pitch.y)};
         const glm::dvec2 half =
             0.5 * glm::dvec2(columns - 1, rows - 1) * pitch + spread;
         extent = std::atan(glm::length(glm::tan(half)));
-    } else if (pattern != tokens::kSpot) {
+    } else if (beam.pattern == tokens::kImage) {
+        const glm::dvec2 fov =
+            glm::radians(laser.GetPatternFieldOfView());
+        if (!(fov.x > 0.0) || !(fov.y > 0.0) ||
+            !(fov.x < glm::radians(170.0)) ||
+            !(fov.y < glm::radians(170.0)) ||
+            beam.patternImage == nullptr) {
+            throw std::invalid_argument(
+                "LaserLight '" + path.String() +
+                "' needs a pattern image and a field of view above 0 "
+                "and below 170 degrees");
+        }
+        const glm::dvec2 half = glm::tan(0.5 * fov);
+        beam.patternParams = {static_cast<float>(half.x),
+                              static_cast<float>(half.y)};
+        beam.extent = glm::vec2(half);
+        extent = std::atan(glm::length(half)) +
+                 std::max(spread.x, spread.y);
+    } else if (beam.pattern != tokens::kSpot) {
         // A custom pattern, which the renderer looks up (and sizes
         // the shadow view for) by name.
-        beam.pattern = Pattern::Custom;
-        beam.customPattern = pattern;
         beam.patternParams = laser.GetPatternParams();
     }
     if (beam.efficiency < 0.0f || beam.zeroOrder < 0.0f ||
@@ -1505,7 +1547,7 @@ LightParams LaserParamsOf(const Scene& scene, const Path& path,
             "efficiency "
             "and zero order add to at most 1");
     }
-    if (beam.pattern != Pattern::Spot) {
+    if (!beam.IsSpot()) {
         light.coneAngle = static_cast<float>(
             std::min(glm::degrees(extent) + 1.0, 180.0));
     }

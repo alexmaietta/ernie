@@ -12,7 +12,7 @@ ernie::LightPatternModel Stripes() {
     ernie::LightPatternModel model;
     model.id = "stripes";
     model.typeName = "Stripes";
-    model.slang = "import light_pattern;\nstruct Stripes : "
+    model.slang = "import light_pattern;\npublic struct Stripes : "
                   "ILightPattern { ... }";
     model.params = {{"period", 0.1f, ""}, {"duty", 0.5f, ""}};
     model.extent = 0.5;
@@ -36,6 +36,9 @@ TEST(LightPatternRegistry, RegistersPatternsByIdAndChecksThem) {
     model.id = "line";
     EXPECT_THROW(registry.Add(model), std::invalid_argument)
         << "a built-in's";
+    model.id = "image";
+    EXPECT_THROW(registry.Add(model), std::invalid_argument)
+        << "a built-in's, though this registry has none";
     model = Stripes();
     model.id = "2stripes";
     EXPECT_THROW(registry.Add(model), std::invalid_argument);
@@ -51,6 +54,25 @@ TEST(LightPatternRegistry, RegistersPatternsByIdAndChecksThem) {
     model.id = "many";
     model.params.resize(17);
     EXPECT_THROW(registry.Add(model), std::invalid_argument);
+}
+
+TEST(LightPatternRegistry, BuiltinsComeFirst) {
+    ernie::LightPatternRegistry registry =
+        ernie::LightPatternRegistry::WithBuiltins();
+    const std::vector<std::string> ids = {"spot", "line", "grid",
+                                          "image"};
+    ASSERT_EQ(registry.Models().size(), ids.size());
+    for (std::size_t i = 0; i < ids.size(); ++i) {
+        EXPECT_EQ(registry.IndexOf(ids[i]), static_cast<int>(i));
+        // Only the image needs integrating.
+        EXPECT_EQ(registry.Models()[i].normalized, ids[i] != "image")
+            << ids[i];
+    }
+    EXPECT_EQ(registry.Find("grid")->params.size(), 4u);
+    EXPECT_THROW(registry.Add(registry.Models()[0]),
+                 std::invalid_argument);
+    registry.Add(Stripes());
+    EXPECT_EQ(registry.IndexOf("stripes"), 4);
 }
 
 TEST(LightPatternModules, DispatchEveryPatternByIndex) {
