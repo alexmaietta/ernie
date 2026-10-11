@@ -45,11 +45,12 @@ void OrbitController::Pan(float dx, float dy, float viewportHeight) {
     const double worldPerPixel =
         2.0 * distance * std::tan(0.5 * double(verticalFov)) /
         std::max(double(viewportHeight), 1.0);
-    const glm::dvec3 right(std::cos(double(yaw)), std::sin(double(yaw)),
-                           0.0);
+    const glm::dvec3 right(std::cos(double(yaw)),
+                           std::sin(double(yaw)), 0.0);
     const glm::dvec3 forward(-std::sin(double(yaw)),
                              std::cos(double(yaw)), 0.0);
-    target += (-double(dx) * right + double(dy) * forward) * worldPerPixel;
+    target +=
+        (-double(dx) * right + double(dy) * forward) * worldPerPixel;
 }
 
 void OrbitController::PanVertical(float dx, float dy,
@@ -57,8 +58,8 @@ void OrbitController::PanVertical(float dx, float dy,
     const double worldPerPixel =
         2.0 * distance * std::tan(0.5 * double(verticalFov)) /
         std::max(double(viewportHeight), 1.0);
-    const glm::dvec3 right(std::cos(double(yaw)), std::sin(double(yaw)),
-                           0.0);
+    const glm::dvec3 right(std::cos(double(yaw)),
+                           std::sin(double(yaw)), 0.0);
     target += (-double(dx) * right +
                double(dy) * glm::dvec3(0.0, 0.0, 1.0)) *
               worldPerPixel;

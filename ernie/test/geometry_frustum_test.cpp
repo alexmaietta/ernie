@@ -40,16 +40,11 @@ TEST(Frustum,
         << "before the near plane";
     EXPECT_FALSE(Contains(frustum, eye + 20000.0f * forward, 1.0f))
         << "past the far plane";
-    EXPECT_FALSE(
-        Contains(frustum, target + 500.0f * right, 1.0f));
-    EXPECT_FALSE(
-        Contains(frustum, target - 500.0f * right, 1.0f));
-    EXPECT_FALSE(
-        Contains(frustum, target + 500.0f * up, 1.0f));
-    EXPECT_FALSE(
-        Contains(frustum, target - 500.0f * up, 1.0f));
-    EXPECT_TRUE(
-        Contains(frustum, target + 500.0f * right, 480.0f))
+    EXPECT_FALSE(Contains(frustum, target + 500.0f * right, 1.0f));
+    EXPECT_FALSE(Contains(frustum, target - 500.0f * right, 1.0f));
+    EXPECT_FALSE(Contains(frustum, target + 500.0f * up, 1.0f));
+    EXPECT_FALSE(Contains(frustum, target - 500.0f * up, 1.0f));
+    EXPECT_TRUE(Contains(frustum, target + 500.0f * right, 480.0f))
         << "straddles a plane";
 }
 

@@ -926,8 +926,8 @@ TEST_F(
 
 TEST_F(RasterDelegateTest, StrayLightComesFromEveryDistantLight) {
     // The sun straight behind the camera gives none; another distant
-    // light as bright, 60 degrees off the axis to the right, gives the
-    // veil the sun would there (as below).
+    // light as bright, 60 degrees off the axis to the right, gives
+    // the veil the sun would there (as below).
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();
     const ernie::DistantLight sun(scene, "/World/Sun");

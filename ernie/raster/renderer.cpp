@@ -788,11 +788,13 @@ glm::vec3 MinimalAmbient(const FrameParams& params,
     if (params.sun && params.sunIrradiance.empty()) {
         white = 1.0;  // relative units: 1 cd/m^2 on white
     } else if (params.sun) {
-        for (int b = 0; b < bands.count &&
-                        b < static_cast<int>(params.sunIrradiance.size());
+        for (int b = 0;
+             b < bands.count &&
+             b < static_cast<int>(params.sunIrradiance.size());
              ++b) {
-            white += params.sunIrradiance[static_cast<std::size_t>(b)] *
-                     CieXyz(bands.Centre(b)).y * bands.Width();
+            white +=
+                params.sunIrradiance[static_cast<std::size_t>(b)] *
+                CieXyz(bands.Centre(b)).y * bands.Width();
         }
         white *= kLuminousEfficacy / M_PI;
     }
@@ -2188,12 +2190,11 @@ void RasterRenderer::Update(
     }
     // What a single view's cascades fit to, the sun's and other
     // distant lights' alike (`FitViewCascades`).
-    const bool distantCascades =
-        std::any_of(params.lights.begin(), params.lights.end(),
-                    [](const LightParams& light) {
-                        return light.type == LightType::Distant &&
-                               light.shadows;
-                    });
+    const bool distantCascades = std::any_of(
+        params.lights.begin(), params.lights.end(),
+        [](const LightParams& light) {
+            return light.type == LightType::Distant && light.shadows;
+        });
     cascadeFit_.reset();
     if (!batch && bounds && (shadowsEnabled_ || distantCascades)) {
         CascadeFit fit;
@@ -2677,11 +2678,11 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
     // luminance shapes.
     const glm::vec3 ambientColour =
         UnitLuminanceColor(params.ambientColor);
-    shading.sun[3] =
-        glm::length(ambientColour) > 0.0f
-            ? static_cast<float>(params.ambient /
-                                 (kLuminousEfficacy * LuminanceIntegral()))
-            : 0.0f;
+    shading.sun[3] = glm::length(ambientColour) > 0.0f
+                         ? static_cast<float>(params.ambient /
+                                              (kLuminousEfficacy *
+                                               LuminanceIntegral()))
+                         : 0.0f;
     shading.ambient[0] = ambientColour.r;
     shading.ambient[1] = ambientColour.g;
     shading.ambient[2] = ambientColour.b;
@@ -3020,7 +3021,8 @@ void RasterRenderer::WriteSensor(const FrameParams& params,
                         focal > 0.0 && std::isfinite(focal);
              ++i) {
             sensor.sourceRadiance[s][i] = static_cast<float>(
-                static_cast<double>(spectrum[static_cast<std::size_t>(i)]) /
+                static_cast<double>(
+                    spectrum[static_cast<std::size_t>(i)]) /
                 focal);
         }
         sensor.sources[s][3] = 1.0f;
@@ -3769,10 +3771,11 @@ RasterRenderer::FitViewCascades(const glm::vec3& towards,
         const glm::vec3 corner((i & 1) ? high.x : low.x,
                                (i & 2) ? high.y : low.y,
                                (i & 4) ? high.z : low.z);
-        farthest = std::max(
-            farthest, fit.around > 0.0f
-                          ? glm::length(corner - view.eye)
-                          : glm::dot(corner - view.eye, view.forward));
+        farthest =
+            std::max(farthest,
+                     fit.around > 0.0f
+                         ? glm::length(corner - view.eye)
+                         : glm::dot(corner - view.eye, view.forward));
     }
     // A margin keeps surfaces at exactly the farthest depth, such as
     // flat ground under a nadir camera, inside the last cascade.

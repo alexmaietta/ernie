@@ -56,15 +56,14 @@ TEST(OrbitController, ProjectionUsesZeroToOneDepth) {
         camera.MakeCamera(1, 1).RasterView().ViewProjection();
     const glm::vec3 forward =
         glm::normalize(camera.target - camera.Eye());
-    EXPECT_NEAR(
-        Project(viewProjection, glm::vec3(camera.Eye()) + forward * 0.1f)
-            .z,
-        0.0f, 1e-4f);
-    EXPECT_NEAR(
-        Project(viewProjection,
-                glm::vec3(camera.Eye()) + forward * 1000.0f)
-            .z,
-        1.0f, 1e-4f);
+    EXPECT_NEAR(Project(viewProjection,
+                        glm::vec3(camera.Eye()) + forward * 0.1f)
+                    .z,
+                0.0f, 1e-4f);
+    EXPECT_NEAR(Project(viewProjection,
+                        glm::vec3(camera.Eye()) + forward * 1000.0f)
+                    .z,
+                1.0f, 1e-4f);
 }
 
 TEST(OrbitController, OrbitClampsPitch) {
