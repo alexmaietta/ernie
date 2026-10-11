@@ -42,8 +42,8 @@ class SunPanelDemo : public app::Demo {
         }
         DistantLight::Define(scene, "/World/Sun");
         // The viewer frames the scene with its own camera; this one
-        // renders it without a viewer
-        // (--viewer null, --benchmark) and for --test.
+        // renders it without a viewer (--viewer null, --benchmark)
+        // and for --test.
         Camera::Define(scene, "/World/Camera")
             .SetFocalLength(24.0)
             .SetTransform(LookAtTransform(

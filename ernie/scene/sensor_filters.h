@@ -66,19 +66,16 @@ inline constexpr std::array<std::string_view, 11> kRenderVarNames{
 /// rasterizer fuses a chain into one kernel (`PlanSensor`), so the
 /// vars below are written only when held:
 /// - `Lens`: resamples the radiance into sensor pixels through the
-/// inverse lens distortion, with
-///   cos^4 vignetting; writes SpectralRadiance and the geometry vars.
-///   Always runs first.
+///   inverse lens distortion, with cos^4 vignetting; writes
+///   SpectralRadiance and the geometry vars. Always runs first.
 /// - `Qe`: mean electrons per channel (camera equation, quantum
-/// efficiency, dark current); writes
-///   Electrons.
+///   efficiency, dark current); writes Electrons.
 /// - `Noise`: shot, read, PRNU and DSNU noise on Electrons.
 /// - `Adc`: digital numbers from Electrons; writes RawDN.
 /// - `Cie`: linear sRGB in cd/m^2 through the CIE observer; writes
-/// HdrColor.
+///   HdrColor.
 /// - `Exposure`: the photographic output, HDR colour times the
-/// exposure scale, sRGB-encoded;
-///   writes LdrColor.
+///   exposure scale, sRGB-encoded; writes LdrColor.
 enum class SensorFilter : std::uint8_t {
     Lens,
     Qe,
@@ -117,15 +114,13 @@ VarsWrittenBy(std::span<const SensorFilter> chain);
 /// How a sensor filter runs in the fused sensor kernel
 /// (sensor.slang):
 /// - `Spatial`: reads whole images and produces each band of its
-/// pixel (`ISpatialSource`); it heads
-///   a kernel. The lens.
+///   pixel (`ISpatialSource`); it heads a kernel. The lens.
 /// - `Band`: on each band's radiance, before integration
-/// (`IBandFilter`).
+///   (`IBandFilter`).
 /// - `Integrator`: folds the bands into channels (`IIntegrator`): QE
-/// into electrons, CIE into
-///   linear colour.
+///   into electrons, CIE into linear colour.
 /// - `Pixel`: on one pixel's values of one domain, in chain order
-/// (`IPixelFilter`).
+///   (`IPixelFilter`).
 enum class FilterKind : std::uint8_t {
     Spatial,
     Band,
@@ -155,9 +150,8 @@ FilterKind KindOf(SensorFilter filter);
 /// `writeOutput`; a RenderVar asks for one with `sourceName`
 /// "aov:<output>" and maps it as float32 (rows, cols, 4). A product's
 /// chain lays its filters' outputs into `kMaxAovs` slots in chain
-/// order
-/// (`AovOutputsOf`); a requested output's filter runs whatever else
-/// the product holds.
+/// order (`AovOutputsOf`); a requested output's filter runs whatever
+/// else the product holds.
 inline constexpr std::string_view kAovPrefix = "aov:";
 inline constexpr std::size_t kMaxAovs = 8;
 /// The slots' names inside a frame (its held vars and images).
@@ -240,10 +234,9 @@ struct SensorFilterModel {
     /// image lag or a moving average.
     std::uint32_t states = 0;
     /// Whether a spatial filter on a domain after the spectrum reads
-    /// its input's pyramid
-    /// (`SpatialImage.valuesAt` at coarser levels), for kernels too
-    /// wide to sum pixel by pixel, such as glare; the renderer builds
-    /// it before the filter's kernel.
+    /// its input's pyramid (`SpatialImage.valuesAt` at coarser
+    /// levels), for kernels too wide to sum pixel by pixel, such as
+    /// glare; the renderer builds it before the filter's kernel.
     bool pyramid = false;
 };
 
@@ -289,56 +282,45 @@ class SensorFilterRegistry {
 /// custom ones and registered with every renderer, for a SensorFilter
 /// prim's `ernie:filter:type`:
 /// - `psf` (spatial, spectrum): the lens's point-spread, diffraction
-/// for the camera's f-number
-///   per band (a Gaussian fit to the Airy disc) and a Gaussian `blur`
-///   in pixels; before `qe`.
+///   for the camera's f-number per band (a Gaussian fit to the Airy
+///   disc) and a Gaussian `blur` in pixels; before `qe`.
 /// - `defocus` (spatial, spectrum): thin-lens depth of field from the
-/// camera's `fStop` and
-///   `focusDistance`; before `qe`.
+///   camera's `fStop` and `focusDistance`; before `qe`.
 /// - `bayer` (pixel, electrons): a Bayer colour filter mosaic,
-/// `pattern` 0 RGGB, 1 BGGR, 2 GRBG,
-///   3 GBRG; best between `noise` and `adc`.
+///   `pattern` 0 RGGB, 1 BGGR, 2 GRBG, 3 GBRG; best between `noise`
+///   and `adc`.
 /// - `demosaic` (spatial, digital): interpolates the mosaic back,
-/// `method` 0 bilinear or
-///   1 Malvar-He-Cutler; after `adc`. AOV `mosaic`: the mosaic it
-///   read.
+///   `method` 0 bilinear or 1 Malvar-He-Cutler; after `adc`. AOV
+///   `mosaic`: the mosaic it read.
 /// - `blooming` (spatial, electrons): charge beyond the full well
-/// spilling along columns,
-///   `antiBlooming` the fraction drained; after `qe`. AOV `overflow`:
-///   the charge beyond the well.
+///   spilling along columns, `antiBlooming` the fraction drained;
+///   after `qe`. AOV `overflow`: the charge beyond the well.
 /// - `whiteBalance` (pixel, rgb): `red`, `green` and `blue` gains;
-/// after `cie`.
+///   after `cie`.
 /// - `colorMatrix` (pixel, rgb): a 3 x 3 colour correction matrix
-/// `m00`..`m22`; after `cie`.
+///   `m00`..`m22`; after `cie`.
 /// - `compand` (pixel, digital): square-root companding from
-/// `inputBits` to `outputBits`;
-///   after `adc`.
+///   `inputBits` to `outputBits`; after `adc`.
 /// - `toneCurve` (pixel, display): each channel through `curve` (33
-/// samples over 0 to 1); after
-///   `exposure`.
+///   samples over 0 to 1); after `exposure`.
 /// - `spectralTransmission` (band): each band times `curve` (48
-/// samples, 360 to 830 nm), a
-///   measured filter's transmission; before `qe` and `cie`.
+///   samples, 360 to 830 nm), a measured filter's transmission;
+///   before `qe` and `cie`.
 /// - `glare` (spatial, rgb; pyramid): a wide power-law halo of
-/// scattered light around bright
-///   sources in the image; after `cie`.
+///   scattered light around bright sources in the image; after `cie`.
 /// - `flare` (spatial, electrons; pyramid): lens flare ghosts, the
-/// image's bright sources as
-///   defocused aperture shapes on the line through the principal
-///   point, each at its own scale, size and coating tint; after `qe`,
-///   before `noise`.
+///   image's bright sources as defocused aperture shapes on the line
+///   through the principal point, each at its own scale, size and
+///   coating tint; after `qe`, before `noise`.
 /// - `strayLight` (band): the sun's light from outside the field as a
-/// veil over the image, its
-///   irradiance times the optics' point source transmittance at its
-///   angle off the axis (from the frame's sun, which the image
-///   lacks); before `qe` and `cie`.
+///   veil over the image, its irradiance times the optics' point
+///   source transmittance at its angle off the axis (from the frame's
+///   sun, which the image lacks); before `qe` and `cie`.
 /// - `lag` (pixel, electrons; temporal): a `fraction` of each frame's
-/// charge read out with the
-///   next.
+///   charge read out with the next.
 /// - `temporalAverage` (pixel, rgb; temporal): an exponential moving
-/// average, `alpha` the new
-///   frame's weight.
-/// Each file's header cites its references.
+///   average, `alpha` the new frame's weight. Each file's header
+///   cites its references.
 std::vector<SensorFilterModel> StandardSensorFilters();
 
 /// One filter of a product's chain: a SensorFilter prim's

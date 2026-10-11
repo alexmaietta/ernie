@@ -9,7 +9,7 @@
 ///
 /// References:
 /// - Pixar, OpenUSD schema domains,
-/// https://openusd.org/release/api/index.html
+///   https://openusd.org/release/api/index.html
 /// - NVIDIA, Omniverse lighting, photometric units,
 ///   https://docs.omniverse.nvidia.com/materials-and-rendering/latest/lighting.html
 namespace ernie::tokens {
@@ -98,7 +98,7 @@ inline constexpr std::string_view kXformExtent = "ernie:xform:extent";
 /// them) or "wxyz" (w first, as Isaac Lab and MuJoCo do). It applies
 /// to `xformOp:orient` written as an array and to a Camera's (views,
 /// 7) `ernie:poses`; single `xformOp:orient` values are quaternions
-/// either way.
+///    either way.
 inline constexpr std::string_view kQuaternionOrder =
     "ernie:quaternionOrder";
 inline constexpr std::string_view kXyzw = "xyzw";
@@ -131,8 +131,8 @@ inline constexpr std::string_view kProtoIndices = "protoIndices";
 inline constexpr std::string_view kPrototypes = "prototypes";
 
 // Implicit primitives (UsdGeom Cube, Sphere, Cylinder, Cone, Capsule,
-// Plane), drawn as meshes
-// (`ernie::BoxMesh` and the other generators).
+// Plane), drawn as meshes (`ernie::BoxMesh` and the other
+// generators).
 inline constexpr std::string_view kSize =
     "size";  ///< Cube edge length, default 2.
 inline constexpr std::string_view kGeomRadius = "radius";
@@ -409,11 +409,10 @@ inline constexpr std::string_view kVisibleInPrimaryRay =
 // infinity, behind everything else, each with a black-body spectrum.
 // The prim's transform takes the catalogue's frame, J2000 equatorial
 // with x towards right ascension 0 and z the north celestial pole,
-// into the world
-// (`CelestialToLocal` places it over a site at a time). A star's
-// illuminance is `ernie:stars:zeroPoint` times 10^(-0.4 magnitude)
-// times 2^`inputs:exposure`. Renders draw the first visible
-// StarField.
+// into the world (`CelestialToLocal` places it over a site at a
+// time). A star's illuminance is `ernie:stars:zeroPoint` times
+// 10^(-0.4 magnitude) times 2^`inputs:exposure`. Renders draw the
+// first visible StarField.
 //
 /// float arrays, degrees, one per star: right ascension and
 /// declination in the catalogue's frame.
@@ -441,9 +440,9 @@ inline constexpr std::string_view kStarsTemperature =
 /// none).
 inline constexpr std::string_view kStarsMagnitudeLimit =
     "ernie:stars:magnitudeLimit";
-/// float, lux: the illuminance of a magnitude 0 star
-/// (default 2.54e-6, Allen's Astrophysical Quantities), so 10^(-0.4
-/// m) of it for a star of magnitude m.
+/// float, lux: the illuminance of a magnitude 0 star (default
+/// 2.54e-6, Allen's Astrophysical Quantities), so 10^(-0.4 m) of it
+/// for a star of magnitude m.
 inline constexpr std::string_view kStarsZeroPoint =
     "ernie:stars:zeroPoint";
 
@@ -528,15 +527,14 @@ inline constexpr std::string_view kDetailHexSharpness =
 // UsdPreviewSurface Shader, whose inputs are constants or connections
 // to other Shaders' outputs: a connection is the attribute
 // `<input>.connect` holding the source's property path as text, e.g.
-// "/Looks/M/Tex.outputs:rgb"
-// (`GetConnection`). Ernie reads UsdPreviewSurface's diffuseColor,
-// normal, roughness, metallic, ior, useSpecularWorkflow,
-// specularColor, clearcoat and clearcoatRoughness, UsdUVTexture,
-// UsdPrimvarReader_float2 and UsdTransform2d; a Material without a
-// surface keeps Ernie's own inputs above. A Material with one shades
-// with the `preview_surface` model unless it names another in
-// `ernie:brdf`, which then reads its parameters from the Material as
-// before.
+// "/Looks/M/Tex.outputs:rgb" (`GetConnection`). Ernie reads
+// UsdPreviewSurface's diffuseColor, normal, roughness, metallic, ior,
+// useSpecularWorkflow, specularColor, clearcoat and
+// clearcoatRoughness, UsdUVTexture, UsdPrimvarReader_float2 and
+// UsdTransform2d; a Material without a surface keeps Ernie's own
+// inputs above. A Material with one shades with the `preview_surface`
+// model unless it names another in `ernie:brdf`, which then reads its
+// parameters from the Material as before.
 //
 // Reference: Pixar, "UsdPreviewSurface Specification",
 // https://openusd.org/release/spec_usdpreviewsurface.html
@@ -709,13 +707,13 @@ inline constexpr std::string_view kHiddenLine = "hiddenLine";
 /// observations stay free of debug drawing.
 inline constexpr std::string_view kOverlays = "ernie:overlays";
 /// token, on a RenderProduct or else its RenderSettings: minimal
-/// shading for throughput
-/// (`MinimalMode`), after RTX Minimal: "off" (the full pipeline, the
-/// default), "none" (black colour, for depth, normals and ids alone),
-/// "constantDiffuse" (`kMinimalConstantColor` lit by the sun and
-/// ambient) or "texturedDiffuse" (surfaces' diffuse colours so lit).
-/// Its products render LdrColor, DistanceToCamera,
-/// DistanceToImagePlane, Normal, PrimId and InstanceId.
+/// shading for throughput (`MinimalMode`), after RTX Minimal: "off"
+/// (the full pipeline, the default), "none" (black colour, for depth,
+/// normals and ids alone), "constantDiffuse" (`kMinimalConstantColor`
+/// lit by the sun and ambient) or "texturedDiffuse" (surfaces'
+/// diffuse colours so lit). Its products render LdrColor,
+/// DistanceToCamera, DistanceToImagePlane, Normal, PrimId and
+/// InstanceId.
 inline constexpr std::string_view kMinimalMode = "ernie:minimal:mode";
 inline constexpr std::string_view kNone = "none";
 inline constexpr std::string_view kConstantDiffuse =

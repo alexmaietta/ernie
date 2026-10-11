@@ -261,9 +261,8 @@ std::size_t ValueDepth(const AttributeDef& def) {
 }
 
 /// Whether `json` is an array of `def`'s values written in place of
-/// one value
-/// (`AttributeMeta::array`): nested deeper than one value of its
-/// kind.
+/// one value (`AttributeMeta::array`): nested deeper than one value
+/// of its kind.
 bool IsArrayOf(const AttributeDef& def, const Json& json) {
     return def.meta.array && DepthOf(json) > ValueDepth(def);
 }

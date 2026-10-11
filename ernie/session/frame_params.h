@@ -70,8 +70,7 @@ enum class WorldShadows : std::uint32_t {
     /// no shadows. The cheapest.
     Shared = 1,
     /// One map of every world's casters: right when worlds do not
-    /// overlap in space, such as a grid
-    /// of environments.
+    /// overlap in space, such as a grid of environments.
     Merged = 2,
 };
 
@@ -197,11 +196,11 @@ enum class LightType : std::uint32_t {
     Distant = 0,  ///< Parallel light from a direction, such as
                   ///< Earthshine (UsdLux DistantLight).
     Sphere = 1,   ///< A point or sphere, optionally limited to a cone
-                 ///< (UsdLux SphereLight with ShapingAPI): lamps and
-                 ///< spot lights.
-    Rect = 2,  ///< A one-sided Lambertian rectangle (UsdLux
-               ///< RectLight): panels, windows.
-    Disk = 3,  ///< A one-sided Lambertian disk (UsdLux DiskLight).
+                  ///< (UsdLux SphereLight with ShapingAPI): lamps and
+                  ///< spot lights.
+    Rect = 2,     ///< A one-sided Lambertian rectangle (UsdLux
+                  ///< RectLight): panels, windows.
+    Disk = 3,     ///< A one-sided Lambertian disk (UsdLux DiskLight).
     /// A Lambertian cylinder's side (UsdLux CylinderLight): tubes,
     /// `size.x` long along `tangent` and `radius` wide, shaded
     /// through its outline from the shaded point.
@@ -260,10 +259,10 @@ struct LightParams {
     /// Not distant, with an IES profile: its candela, `kProfileRows`
     /// rows of `kProfileColumns`, row i at i x 180 / (kProfileRows -
     /// 1) degrees off the axis (its angle scale applied) and column j
-    /// at j x 360 / kProfileColumns degrees around it from the
-    /// light's +x towards +y; the emission per band is spectrum x the
-    /// profile, interpolated, besides cone and focus. Empty without
-    /// one.
+    ///    at j x 360 / kProfileColumns degrees around it from the
+    ///    light's +x towards +y; the emission per band is spectrum x
+    ///    the profile, interpolated, besides cone and focus. Empty
+    ///    without one.
     std::vector<float> profile;
     static constexpr int kProfileRows = 129;
     static constexpr int kProfileColumns = 64;
@@ -302,9 +301,8 @@ struct LightParams {
 struct DomeParams {
     std::vector<float> radiance;
     /// Irradiance over pi of the RGB map as order-2 spherical
-    /// harmonics in world space
-    /// (`DomeIrradianceSh`): a uniform map of 1 has sh[0] = sqrt(4
-    /// pi) and zeros elsewhere.
+    /// harmonics in world space (`DomeIrradianceSh`): a uniform map
+    /// of 1 has sh[0] = sqrt(4 pi) and zeros elsewhere.
     std::array<glm::vec3, 9> sh{};
     /// Whether camera rays that hit nothing see the dome
     /// (`tokens::kVisibleInPrimaryRay`): its radiance times its map
@@ -387,9 +385,9 @@ struct FrameParams {
     /// `DomeLightMode::Full`.
     float domeShadowRadius = 1.0f;
     /// How many shadowed directions light the dome's diffuse light in
-    /// `DomeLightMode::Directions`
-    /// (`tokens::kDomeDirections`), and whether `lights` holds them
-    /// this frame, so the dome's own diffuse light stays off.
+    /// `DomeLightMode::Directions` (`tokens::kDomeDirections`), and
+    /// whether `lights` holds them this frame, so the dome's own
+    /// diffuse light stays off.
     std::uint32_t domeDirections = 16;
     bool domeDirectionsLit = false;
     std::optional<StarFieldParams>
@@ -504,12 +502,11 @@ struct FrameParams {
     ///
     /// References:
     /// - C. Thorne, "Using a Floating Origin to Improve Fidelity and
-    /// Performance of Large,
-    ///   Distributed Virtual Worlds", CW 2005.
+    ///   Performance of Large, Distributed Virtual Worlds", CW 2005.
     ///   https://doi.org/10.1109/CW.2005.94
     /// - P. Cozzi and K. Ring, "3D Engine Design for Virtual Globes",
-    /// CRC Press, 2011, chapter 5
-    ///   (rendering relative to center and to eye).
+    ///   CRC Press, 2011, chapter 5 (rendering relative to center and
+    ///   to eye).
     glm::dvec3 origin{0.0};
 
     /// World transform `world` relative to `origin`, in float for the
@@ -564,12 +561,12 @@ struct FrameParams {
     /// at `v * faces + f`, posed at the view's pose turned onto the
     /// face (`CubeFaceAxes`, its previous pose too) and seeing the
     /// view's world, and `camera` a centred pinhole of the same image
-    /// whose square of 90 degrees plus a margin
-    /// (`CubeFaceExtent`) spans the image's shorter side. The raster
-    /// passes draw these; the sensor follows the original camera's
-    /// lens rays onto them. A copy for one face. With the poses on
-    /// the GPU, `poses` are their estimates, and the GPU turns the
-    /// poses themselves (views.slang).
+    /// whose square of 90 degrees plus a margin (`CubeFaceExtent`)
+    /// spans the image's shorter side. The raster passes draw these;
+    /// the sensor follows the original camera's lens rays onto them.
+    /// A copy for one face. With the poses on the GPU, `poses` are
+    /// their estimates, and the GPU turns the poses themselves
+    /// (views.slang).
     /// @throws std::invalid_argument for faces other than 1,
     /// `kCubeFaces` and `kAllCubeFaces`.
     FrameParams Faces(int faces) const;

@@ -64,8 +64,7 @@ class GpuBuffer {
 
     /// For `Shared` buffers, a new handle to the buffer's memory (a
     /// file descriptor, or a Win32 handle on Windows), owned by the
-    /// caller until it imports it elsewhere
-    /// (`CloseExternalHandle`).
+    /// caller until it imports it elsewhere (`CloseExternalHandle`).
     /// @throws std::logic_error for other buffers, or
     /// std::runtime_error if export fails.
     ExternalHandle ExportHandle() const;

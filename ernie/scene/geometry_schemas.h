@@ -19,9 +19,9 @@
 ///
 /// References:
 /// - Pixar, UsdGeom,
-/// https://openusd.org/release/api/usd_geom_page_front.html
+///   https://openusd.org/release/api/usd_geom_page_front.html
 /// - Pixar, UsdVol,
-/// https://openusd.org/release/api/usd_vol_page_front.html
+///   https://openusd.org/release/api/usd_vol_page_front.html
 
 // clang-format off
 #define ERNIE_GEOM_SHAPE_RANGE .group = "Shape", .min = 0.0, .max = 1000.0

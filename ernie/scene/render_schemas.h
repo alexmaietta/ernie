@@ -27,9 +27,9 @@
 ///
 /// References:
 /// - Pixar, UsdRender,
-/// https://openusd.org/release/api/usd_render_page_front.html
+///   https://openusd.org/release/api/usd_render_page_front.html
 /// - NVIDIA, "RTX - Minimal Mode", Omniverse Materials and Rendering
-/// documentation,
+///   documentation,
 ///   https://docs.omniverse.nvidia.com/materials-and-rendering/latest/rtx-renderer_minimal.html
 
 // clang-format off

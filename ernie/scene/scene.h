@@ -104,8 +104,7 @@ class Prim {
     const std::string& Type() const;
 
     /// As `Scene::Define` at `relative` below this prim: a name such
-    /// as "Rock", or names joined by
-    /// '/' such as "Rig/Arm".
+    /// as "Rock", or names joined by '/' such as "Rig/Arm".
     /// @throws std::invalid_argument if the handle is empty or a name
     /// is not valid.
     Prim Define(std::string_view relative,
@@ -192,9 +191,9 @@ class PrimSet {
 ///
 /// References:
 /// - Pixar, "UsdStage",
-/// https://openusd.org/release/api/class_usd_stage.html
+///   https://openusd.org/release/api/class_usd_stage.html
 /// - Pixar, "HdChangeTracker" (dirty bits),
-/// https://openusd.org/release/api/class_hd_change_tracker.html
+///   https://openusd.org/release/api/class_hd_change_tracker.html
 class Scene {
   public:
     Scene();
@@ -299,9 +298,8 @@ class Scene {
     /// `paths[i]`, so one tensor from a simulation updates many prims
     /// at once without copying. For a CUDA tensor, `stream` is the
     /// stream its contents are written on, as `Write`. Consumers may
-    /// use the tensor whole
-    /// (`RowOf`), such as a renderer posing many prims from one GPU
-    /// array.
+    /// use the tensor whole (`RowOf`), such as a renderer posing many
+    /// prims from one GPU array.
     /// @throws std::invalid_argument if a prim does not exist or the
     /// first dimension of `rows` is not `paths.size()`; nothing is
     /// written then.

@@ -15,10 +15,9 @@ namespace ernie {
 /// the colour image.
 class OffscreenTarget {
   public:
-    /// @throws std::runtime_error if the images cannot be created.
-    /// A `shared` target allocates its colour image exportable, for
-    /// CUDA or HIP to read in place
-    /// (`ComputeInterop::MapImage`).
+    /// @throws std::runtime_error if the images cannot be created. A
+    /// `shared` target allocates its colour image exportable, for
+    /// CUDA or HIP to read in place (`ComputeInterop::MapImage`).
     OffscreenTarget(const VulkanContext& context, std::uint32_t width,
                     std::uint32_t height,
                     VkFormat colorFormat = VK_FORMAT_R8G8B8A8_UNORM,

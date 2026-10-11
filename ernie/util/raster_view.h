@@ -12,10 +12,10 @@ namespace ernie {
 ///
 /// Row 0 is the northern edge. `originX` and `originY` are the world
 /// coordinates of the north-west corner of the first cell, so cell
-/// (`col`, `row`) is centred at
-/// (`originX + (col + 0.5) cellSize`, `originY - (row + 0.5)
-/// cellSize`). The world frame is x east, y north, z up, in the same
-/// units as the camera; heights are in those units too.
+/// (`col`, `row`) is centred at (`originX + (col + 0.5) cellSize`,
+/// `originY - (row + 0.5) cellSize`). The world frame is x east, y
+/// north, z up, in the same units as the camera; heights are in those
+/// units too.
 struct RasterView {
     const float* data = nullptr;
     std::size_t width = 0;

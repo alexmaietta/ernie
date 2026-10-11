@@ -20,48 +20,44 @@ namespace ernie {
 /// fish-eye term and an entrance pupil that moves along the optical
 /// axis with the field angle, so its rays do not meet at one point.
 /// - C: the projection centre (for CAHVORE, the entrance pupil at
-/// zero field angle), in the
-///   model's frame and units (metres for rovers).
+///   zero field angle), in the model's frame and units (metres for
+///   rovers).
 /// - A: the unit axis perpendicular to the image plane, pointing into
-/// the scene.
+///   the scene.
 /// - H, V: image x (right) and y (down) of point P are (P - C) . H /
-/// (P - C) . A and
-///   (P - C) . V / (P - C) . A for a CAHV model: H and V hold the
-///   focal lengths in pixels and the image centre.
+///   (P - C) . A and (P - C) . V / (P - C) . A for a CAHV model: H
+///   and V hold the focal lengths in pixels and the image centre.
 /// - O: the unit optical axis about which the distortion is radial.
 /// - R: radial distortion coefficients (rho0, rho1, rho2).
 /// - E: the entrance pupil's movement coefficients (epsilon0 to
-/// epsilon2).
+///   epsilon2).
 /// - The CAHVORE type: 1 perspective (linearity 1), 2 fish-eye
-/// (linearity 0), 3 general, with
-///   its linearity between them.
-/// Image coordinates are the models': (0, 0) is the centre of the
-/// upper-left pixel, x to the right, y down.
+///   (linearity 0), 3 general, with its linearity between them. Image
+///   coordinates are the models': (0, 0) is the centre of the
+///   upper-left pixel, x to the right, y down.
 ///
 /// References:
 /// - Y. Yakimovsky and R. Cunningham, "A System for Extracting
-/// Three-Dimensional Measurements
-///   from a Stereo Pair of TV Cameras", Computer Graphics and Image
-///   Processing 7(2):195-210, 1978 (CAHV).
+///   Three-Dimensional Measurements from a Stereo Pair of TV
+///   Cameras", Computer Graphics and Image Processing 7(2):195-210,
+///   1978 (CAHV).
 /// - D. B. Gennery, "Least-Squares Camera Calibration Including Lens
-/// Distortion and Automatic
-///   Editing of Calibration Points", in A. Gruen and T. Huang (eds.),
-///   Calibration and Orientation of Cameras in Computer Vision,
-///   Springer, 2001, 123-136 (CAHVOR).
+///   Distortion and Automatic Editing of Calibration Points", in A.
+///   Gruen and T. Huang (eds.), Calibration and Orientation of
+///   Cameras in Computer Vision, Springer, 2001, 123-136 (CAHVOR).
 /// - D. B. Gennery, "Generalized Camera Calibration Including
-/// Fish-Eye Lenses", International
-///   Journal of Computer Vision 68(3):239-266, 2006 (CAHVORE).
+///   Fish-Eye Lenses", International Journal of Computer Vision
+///   68(3):239-266, 2006 (CAHVORE).
 /// - T. Litwin's cmod library (cmod_cahv.c, cmod_cahvor.c,
-/// cmod_cahvore.c), as ported by
-///   NASA-AMMOS, "CameraModelUtilsJS",
+///   cmod_cahvore.c), as ported by NASA-AMMOS, "CameraModelUtilsJS",
 ///   https://github.com/NASA-AMMOS/CameraModelUtilsJS (Apache-2.0):
 ///   `ImageToRay` follows its cahvore-utilities/cahvore.js.
 /// - PDS Imaging Node, "Geometric Camera Models" (MSL
-/// GEOMETRIC_CM.TXT), for the conventions.
+///   GEOMETRIC_CM.TXT), for the conventions.
 /// - S. Aiazzi et al., "IRIS: High-fidelity Perception Sensor
-/// Modeling for Closed-Loop
-///   Planetary Simulations", AIAA SciTech 2022, AIAA 2022-1433
-///   (CAHVORE camera rays in a planetary simulator).
+///   Modeling for Closed-Loop Planetary Simulations", AIAA SciTech
+///   2022, AIAA 2022-1433 (CAHVORE camera rays in a planetary
+///   simulator).
 struct CahvoreModel {
     enum class Kind { Cahv, Cahvor, Cahvore };
     Kind kind = Kind::Cahv;

@@ -61,11 +61,11 @@ struct PropertySection {
 /// Omniverse's property widgets do: a label (`labelWidth` pixels;
 /// muted while the attribute is unset), the value's widget, and a
 /// reset square, blue once the attribute is authored, which resets it
-/// to its fallback when clicked
-/// (`Viewer::ClearAttribute`; so does a right-click on the label).
-/// Edits go through the viewer's undo history (`Viewer::Edit`). Only
-/// fields whose label or attribute contains `filter` (case aside)
-/// show. Returns the first error an edit raised, or an empty string.
+/// to its fallback when clicked (`Viewer::ClearAttribute`; so does a
+/// right-click on the label). Edits go through the viewer's undo
+/// history (`Viewer::Edit`). Only fields whose label or attribute
+/// contains `filter` (case aside) show. Returns the first error an
+/// edit raised, or an empty string.
 std::string DrawPropertyFields(Viewer& viewer, const Path& path,
                                std::span<const PropertyField> fields,
                                float labelWidth,

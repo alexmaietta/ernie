@@ -39,7 +39,7 @@ inline constexpr float kMinNormalZ = 0.05f;
 
 /// A slope standard deviation `sigma` (0 or more) as a value in [0,
 /// 1) for 8-bit storage, sigma / (1 + sigma), finest near 0;
-/// `DecodeSlopeDeviation` inverts it.
+///    `DecodeSlopeDeviation` inverts it.
 float EncodeSlopeDeviation(float sigma);
 float DecodeSlopeDeviation(float encoded);
 
@@ -92,7 +92,7 @@ float LinearToSrgb(float value);
 ///
 /// References:
 /// - M. Toksvig, "Mipmapping Normal Maps", Journal of Graphics Tools
-/// 10(3), 2005.
+///   10(3), 2005.
 /// - M. Olano and D. Baker, "LEAN Mapping", I3D 2010.
 std::vector<Image> MipChain(const Image& image, MipFilter filter);
 

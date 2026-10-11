@@ -43,14 +43,11 @@ struct CameraView {
 /// image.
 enum class LensProjection : std::uint8_t {
     /// Rectilinear: a ray at field angle theta lands at radius
-    /// tan(theta), with Brown-Conrady
-    /// distortion on top.
+    /// tan(theta), with Brown-Conrady distortion on top.
     Perspective,
     /// Kannala-Brandt fisheye: at radius theta_d = theta (1 + k1
-    /// theta^2 + k2 theta^4 +
-    /// k3 theta^6 + k4 theta^8), with `fisheye` as k1 to k4; all zero
-    /// is the equidistant
-    /// projection.
+    /// theta^2 + k2 theta^4 + k3 theta^6 + k4 theta^8), with
+    /// `fisheye` as k1 to k4; all zero is the equidistant projection.
     Fisheye,
 };
 
@@ -78,12 +75,10 @@ struct LensRayTable {
 /// perspective lens has radial and tangential distortion
 /// (Brown-Conrady, in OpenCV's convention), which maps undistorted
 /// normalised image coordinates (x, y) = (X/Z, Y/Z) to distorted
-/// ones:
-///   x' = x (1 + k1 r^2 + k2 r^4 + k3 r^6) + 2 p1 x y + p2 (r^2 + 2
-///   x^2) y' = y (1 + k1 r^2 + k2 r^4 + k3 r^6) + p1 (r^2 + 2 y^2) +
-///   2 p2 x y
-/// A fisheye lens maps them to theta_d / r (x, y), with theta =
-/// atan(r) (OpenCV's fisheye model).
+/// ones: x' = x (1 + k1 r^2 + k2 r^4 + k3 r^6) + 2 p1 x y + p2 (r^2 +
+/// 2 x^2) y' = y (1 + k1 r^2 + k2 r^4 + k3 r^6) + p1 (r^2 + 2 y^2) +
+/// 2 p2 x y A fisheye lens maps them to theta_d / r (x, y), with
+/// theta = atan(r) (OpenCV's fisheye model).
 ///
 /// The rasterizer draws a pinhole image and the sensor resamples it
 /// through the lens; a fisheye reaching past 60 degrees off axis is
@@ -92,12 +87,11 @@ struct LensRayTable {
 ///
 /// References:
 /// - D. C. Brown, "Decentering Distortion of Lenses", Photogrammetric
-/// Engineering 32(3):444-462,
-///   1966.
+///   Engineering 32(3):444-462, 1966.
 /// - J. Kannala and S. S. Brandt, "A Generic Camera Model and
-/// Calibration Method for
-///   Conventional, Wide-Angle, and Fish-Eye Lenses", IEEE TPAMI
-///   28(8):1335-1340, 2006. https://doi.org/10.1109/TPAMI.2006.153
+///   Calibration Method for Conventional, Wide-Angle, and Fish-Eye
+///   Lenses", IEEE TPAMI 28(8):1335-1340, 2006.
+///   https://doi.org/10.1109/TPAMI.2006.153
 /// - OpenCV, "Camera Calibration and 3D Reconstruction",
 ///   https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html, and
 ///   "Fisheye camera model",
@@ -258,10 +252,10 @@ struct SensorModel {
 ///
 /// References:
 /// - B. K. P. Horn, "Robot Vision", MIT Press, 1986 (the image
-/// irradiance equation
-///   E = L (pi / 4) (d / f)^2 cos^4(alpha), with N = f / d).
+///   irradiance equation E = L (pi / 4) (d / f)^2 cos^4(alpha), with
+///   N = f / d).
 /// - Pixar, "UsdGeomCamera",
-/// https://openusd.org/release/api/class_usd_geom_camera.html
+///   https://openusd.org/release/api/class_usd_geom_camera.html
 struct CameraParams {
     glm::dmat4 transform{1.0};  ///< Camera to world.
     std::uint32_t width = 1;
@@ -371,10 +365,9 @@ struct CameraParams {
     double VerticalFov() const;
 
     /// Irradiance at the sensor per unit scene radiance at normalised
-    /// image coordinates
-    /// (`x`, `y`) on the sensor: pi t cos^4(theta) / (4 N^2) for a
-    /// pinhole, the lens's `NaturalVignetting` in place of cos^4,
-    /// which is left out when vignetting is off.
+    /// image coordinates (`x`, `y`) on the sensor: pi t cos^4(theta)
+    /// / (4 N^2) for a pinhole, the lens's `NaturalVignetting` in
+    /// place of cos^4, which is left out when vignetting is off.
     double IrradiancePerRadiance(glm::dvec2 normalised) const;
 
     /// Mean electrons a pixel at normalised coordinates `normalised`
@@ -443,21 +436,21 @@ CameraParams CameraParamsOf(const Scene& scene, const Path& path,
 /// index `nd` and Abbe number `abbe`: the index by Cauchy's
 /// dispersion n = A + B / lambda^2 through n_d and n_F - n_C = (n_d -
 /// 1) / V_d (the F and C lines at 486.13 and 656.27 nm), the focal
-/// length by the lensmaker's equation, f(lambda) = f_d (n_d - 1) /
-/// (n(lambda) - 1), whose shift f(lambda) - f_d is the axial colour
-/// (f_C - f_F = f_d / V_d, about). The lateral colour is `lateral`
-/// times the relative change, the image's scale 1 + lateral (f / f_d
+///    length by the lensmaker's equation, f(lambda) = f_d (n_d - 1) /
+///    (n(lambda) - 1), whose shift f(lambda) - f_d is the axial
+///    colour (f_C - f_F = f_d / V_d, about). The lateral colour is
+///    `lateral` times the relative change, the image's scale 1 +
+///    lateral (f / f_d
 /// - 1): 0 for a stop at the lens, where the chief ray passes
-/// undeviated, up to 1 for a distant stop. Tabulated every 10 nm from
-/// 300 to 1100 nm.
+///   undeviated, up to 1 for a distant stop. Tabulated every 10 nm
+///   from 300 to 1100 nm.
 ///
 /// References:
 /// - A.-L. Cauchy, "Mémoire sur la dispersion de la lumière", 1836.
 /// - E. Hecht, "Optics", 5th ed., Pearson, 2017, sections 6.3.2
-/// (chromatic aberrations) and 6.2
-///   (thick lenses).
+///   (chromatic aberrations) and 6.2 (thick lenses).
 /// - SCHOTT, "Optical Glass Datasheets" (n_d and V_d at the d, F and
-/// C lines).
+///   C lines).
 /// @throws std::invalid_argument for an index at or below 1, a
 /// non-positive Abbe number or focal length, or a lateral fraction
 /// outside 0 to 1.

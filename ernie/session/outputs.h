@@ -71,8 +71,7 @@ class FrameImages {
     };
 
     /// Render var `name` as a linear buffer, or an empty one when the
-    /// frame holds it as an image
-    /// (`Var`) or not at all.
+    /// frame holds it as an image (`Var`) or not at all.
     virtual LinearVar Linear(std::string_view /*name*/) const {
         return {};
     }

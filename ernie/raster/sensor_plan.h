@@ -29,10 +29,10 @@ namespace ernie {
 ///
 /// References:
 /// - J. Ragan-Kelley et al., "Halide: A Language and Compiler for
-/// Optimizing Parallelism,
-///   Locality, and Recomputation in Image Processing Pipelines", PLDI
-///   2013 (fusing pointwise stages and materialising only at
-///   stencils). https://doi.org/10.1145/2491956.2462176
+///   Optimizing Parallelism, Locality, and Recomputation in Image
+///   Processing Pipelines", PLDI 2013 (fusing pointwise stages and
+///   materialising only at stencils).
+///   https://doi.org/10.1145/2491956.2462176
 struct SensorPlan {
     /// A filter that runs: a built-in, or a custom one with its
     /// parameters at `firstParam`, in kernel `segment`.
@@ -130,10 +130,9 @@ SensorPlan PlanSensor(std::span<const SensorFilterStep> chain,
                       std::uint32_t aovOffset = 0);
 
 /// The lens projection of lens.slang that `lens` compiles into the
-/// sensor kernel
-/// (`SensorPlan::lens`): "Pinhole" without distortion, "BrownConrady"
-/// with it, or "Fisheye"; for a `pushbroom` camera, "Pushbroom" (its
-/// distortion across the line only).
+/// sensor kernel (`SensorPlan::lens`): "Pinhole" without distortion,
+/// "BrownConrady" with it, or "Fisheye"; for a `pushbroom` camera,
+/// "Pushbroom" (its distortion across the line only).
 std::string LensKernelOf(const LensModel& lens,
                          bool pushbroom = false);
 

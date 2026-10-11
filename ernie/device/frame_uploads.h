@@ -28,10 +28,10 @@ class VulkanContext;
 ///
 /// References:
 /// - Khronos, "Synchronization Examples", transfer then use in a
-/// later submission.
+///   later submission.
 ///   https://github.com/KhronosGroup/Vulkan-Docs/wiki/Synchronization-Examples
 /// - A. Kapoulkine, "niagara", per-frame staging of uploads.
-/// https://github.com/zeux/niagara
+///   https://github.com/zeux/niagara
 class FrameUploads {
   public:
     /// Frames that may be in flight at once.

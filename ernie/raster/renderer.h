@@ -31,20 +31,19 @@ namespace ernie {
 /// The shadow views of `light` over a scene within `sceneMin` to
 /// `sceneMax`, for square maps of `resolution` texels:
 /// - a distant light: one orthographic view along the light enclosing
-/// the scene's bounding sphere;
-///   `texelWorldSize` is the world size of a texel;
+///   the scene's bounding sphere; `texelWorldSize` is the world size
+///   of a texel;
 /// - a sphere light whose cone is at most
-/// `Light::kMaxSpotConeDegrees`: one perspective view along
-///   its axis covering the cone;
+///   `Light::kMaxSpotConeDegrees`: one perspective view along its
+///   axis covering the cone;
 /// - any other sphere light: six 90-degree perspective views, the
-/// faces of a cube in the order
-///   +x, -x, +y, -y, +z, -z.
-/// Perspective views reach from the light (its radius, at least
-/// 1/10000 of the far plane) to the scene's farthest corner, and
-/// their `texelWorldSize` is the size of a texel one unit away. None
-/// for a light without shadows. `position` is the light's position in
-/// the coordinates of the bounds, relative to the frame's origin
-/// (`FrameParams::Relative`); distant lights ignore it.
+///   faces of a cube in the order +x, -x, +y, -y, +z, -z. Perspective
+///   views reach from the light (its radius, at least 1/10000 of the
+///   far plane) to the scene's farthest corner, and their
+///   `texelWorldSize` is the size of a texel one unit away. None for
+///   a light without shadows. `position` is the light's position in
+///   the coordinates of the bounds, relative to the frame's origin
+///   (`FrameParams::Relative`); distant lights ignore it.
 std::vector<ShadowCascade> FitLightShadowViews(
     const LightParams& light, const glm::vec3& position,
     const glm::vec3& sceneMin, const glm::vec3& sceneMax,
@@ -73,14 +72,13 @@ std::vector<ShadowCascade> FitLightShadowViews(
 /// poses (`FrameParams::poses`), such as one per environment in
 /// reinforcement learning, into layered targets in one command
 /// buffer: every view has uniforms of its own, and drawables prepare
-/// and draw each view
-/// (`RasterDrawable::RecordColor`). A batch's sun shadows use one map
-/// fitted to the whole scene rather than cascades fitted to each
-/// view: a base layer of what every world shares, copied into one
-/// layer per world of the batch's views (`FrameParams::worlds`) on
-/// which that world's casters draw, so worlds overlapping in space
-/// shadow only themselves. Other lights' maps hold what every world
-/// shares.
+/// and draw each view (`RasterDrawable::RecordColor`). A batch's sun
+/// shadows use one map fitted to the whole scene rather than cascades
+/// fitted to each view: a base layer of what every world shares,
+/// copied into one layer per world of the batch's views
+/// (`FrameParams::worlds`) on which that world's casters draw, so
+/// worlds overlapping in space shadow only themselves. Other lights'
+/// maps hold what every world shares.
 ///
 /// The sun's shadows use cascaded shadow maps (`FitCascades`)
 /// filtered with rotated Poisson-disk PCF, with slope-scaled depth
@@ -92,28 +90,25 @@ std::vector<ShadowCascade> FitLightShadowViews(
 ///
 /// References:
 /// - L. Williams, "Casting Curved Shadows on Curved Surfaces",
-/// SIGGRAPH '78, 270-274, 1978.
+///   SIGGRAPH '78, 270-274, 1978.
 ///   https://doi.org/10.1145/965139.807402
 /// - W. T. Reeves, D. H. Salesin and R. L. Cook, "Rendering
-/// Antialiased Shadows with Depth Maps",
-///   SIGGRAPH '87, 283-291, 1987. https://doi.org/10.1145/37402.37435
+///   Antialiased Shadows with Depth Maps", SIGGRAPH '87, 283-291,
+///   1987. https://doi.org/10.1145/37402.37435
 /// - D. Holbert, "Saying 'Goodbye' to Shadow Acne", GDC 2011 poster
-/// (normal offset shadows).
+///   (normal offset shadows).
 /// - J. Jimenez, "Next Generation Post Processing in Call of Duty:
-/// Advanced Warfare", SIGGRAPH 2014
-///   Advances in Real-Time Rendering course (interleaved gradient
-///   noise).
+///   Advanced Warfare", SIGGRAPH 2014 Advances in Real-Time Rendering
+///   course (interleaved gradient noise).
 /// - R. Fernando, "Percentage-Closer Soft Shadows", SIGGRAPH 2005
-/// Sketches, 2005.
-///   https://doi.org/10.1145/1187112.1187153
+///   Sketches, 2005. https://doi.org/10.1145/1187112.1187153
 /// - T. Saito and T. Takahashi, "Comprehensible Rendering of 3-D
-/// Shapes", SIGGRAPH '90, 197-206,
-///   1990. https://doi.org/10.1145/97880.97901 (G-buffers and
-///   deferred shading).
+///   Shapes", SIGGRAPH '90, 197-206, 1990.
+///   https://doi.org/10.1145/97880.97901 (G-buffers and deferred
+///   shading).
 /// - W. Jakob and J. Hanika, "A Low-Dimensional Function Space for
-/// Efficient Spectral
-///   Upsampling", Computer Graphics Forum 38(2):147-155, 2019 (RGB
-///   modulation to spectra).
+///   Efficient Spectral Upsampling", Computer Graphics Forum
+///   38(2):147-155, 2019 (RGB modulation to spectra).
 class RasterRenderer {
   public:
     static constexpr int kMaxCascades = 4;
@@ -200,8 +195,7 @@ class RasterRenderer {
     void RemoveMaterial(std::uint32_t id);
 
     /// Counts additions and removals of materials, so drawables that
-    /// resolve material ids
-    /// (`HasMaterial`) know when to again.
+    /// resolve material ids (`HasMaterial`) know when to again.
     std::uint64_t MaterialSetVersion() const {
         return materialSetVersion_;
     }
@@ -406,10 +400,9 @@ class RasterRenderer {
     }
 
     /// `PoseBuffer` to hold up to `views` views, which a compute API
-    /// may view in place
-    /// (`ComputeInterop::View`); a larger one waits for the device to
-    /// idle. A view of the previous buffer keeps that buffer alive,
-    /// so its values can still be copied.
+    /// may view in place (`ComputeInterop::View`); a larger one waits
+    /// for the device to idle. A view of the previous buffer keeps
+    /// that buffer alive, so its values can still be copied.
     const std::shared_ptr<GpuBuffer>&
     EnsurePoseBuffer(std::uint32_t views);
 
@@ -449,9 +442,8 @@ class RasterRenderer {
     }
 
     /// The raster layers each view of the last `Update` draws: its
-    /// camera's cube faces
-    /// (`NeedsCubeFaces`), else 1. Render targets must hold as many
-    /// (`RenderTargets::Faces`).
+    /// camera's cube faces (`NeedsCubeFaces`), else 1. Render targets
+    /// must hold as many (`RenderTargets::Faces`).
     std::uint32_t Faces() const {
         return faces_;
     }
@@ -560,9 +552,8 @@ class RasterRenderer {
     const ComputePipeline& ShadingPipeline(std::size_t model,
                                            bool pushbroom = false);
     /// Sensor.slang's entry point `entry`, which reads only its lens,
-    /// for lens kernel source `lens`
-    /// (`SensorPlan::LensSource`) in `layout`, compiled when first
-    /// wanted.
+    /// for lens kernel source `lens` (`SensorPlan::LensSource`) in
+    /// `layout`, compiled when first wanted.
     const ComputePipeline& LensPipeline(const std::string& lens,
                                         const std::string& entry,
                                         const PipelineLayout& layout);
@@ -716,9 +707,9 @@ class RasterRenderer {
     bool updated_ = false;
     /// Internal views: a view per sub-frame, output view and face
     /// (`FrameParams::Subframes`, then `FrameParams::Faces`),
-    /// sub-frame `k`'s output view `v`'s face `f` at
-    /// `(k * outputViews_ + v) * faces_ + f`, which uniforms, culling
-    /// and drawables index.
+    /// sub-frame `k`'s output view `v`'s face `f` at `(k *
+    /// outputViews_ + v) * faces_ + f`, which uniforms, culling and
+    /// drawables index.
     std::uint32_t views_ = 1;
     std::uint32_t outputViews_ =
         1;  ///< The frame's own views (`FrameParams::Views`).

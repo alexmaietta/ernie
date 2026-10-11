@@ -54,15 +54,13 @@ struct IsdRotation {
 ///   https://github.com/DOI-USGS/usgscsm (the sensor models that read
 ///   these ISDs; its src/Distortion.cpp the lens models).
 /// - USGS Astrogeology, ISIS's distortion maps
-/// (LroNarrowAngleDistortionMap,
-///   ShadowCamDistortionMap, TgoCassisDistortionMap),
-///   https://github.com/DOI-USGS/ISIS3
+///   (LroNarrowAngleDistortionMap, ShadowCamDistortionMap,
+///   TgoCassisDistortionMap), https://github.com/DOI-USGS/ISIS3
 /// - S. Tulyakov et al., "Geometric calibration of Colour and Stereo
-/// Surface Imaging System of
-///   ESA's Trace Gas Orbiter", Advances in Space Research 61(1), 2018
-///   (CaSSIS's rational model).
+///   Surface Imaging System of ESA's Trace Gas Orbiter", Advances in
+///   Space Research 61(1), 2018 (CaSSIS's rational model).
 /// - NGA, "Community Sensor Model (CSM) Technical Requirements
-/// Document", version 3.0.4.
+///   Document", version 3.0.4.
 struct IsdSensor {
     std::string model;  ///< `name_model`, such as
                         ///< USGS_ASTRO_LINE_SCANNER_SENSOR_MODEL.
@@ -128,13 +126,12 @@ struct IsdSensor {
     bool frameletOrderReversed = false;
 
     /// Frame cameras' rolling-shutter jitter, usgscsm's `jitter`:
-    /// each image line's exposure time
-    /// (`lineExposureTimes`, line l's at index round(l) - 1, clamped
-    /// to the list), and the line and sample jitter, pixels, as
-    /// polynomials in that time with no constant term, highest power
-    /// first (`lineJitterCoefficients` and
-    /// `sampleJitterCoefficients`: c0 t^n + ... + c(n-1) t). Empty
-    /// when the ISD has none.
+    /// each image line's exposure time (`lineExposureTimes`, line l's
+    /// at index round(l) - 1, clamped to the list), and the line and
+    /// sample jitter, pixels, as polynomials in that time with no
+    /// constant term, highest power first (`lineJitterCoefficients`
+    /// and `sampleJitterCoefficients`: c0 t^n + ... + c(n-1) t).
+    /// Empty when the ISD has none.
     std::vector<double> jitterLineTimes;
     std::vector<double> lineJitter;
     std::vector<double> sampleJitter;
@@ -155,21 +152,21 @@ struct IsdSensor {
 /// What usgscsm's camera models of image support data share, in the
 /// body-fixed frame in metres:
 /// - Image coordinates are CSM's: (line, sample) with the first
-/// pixel's centre at (0.5, 0.5).
+///   pixel's centre at (0.5, 0.5).
 /// - The sensor's position is sampled as usgscsm samples it: at least
-/// 25 even times over the
-///   states, each a cubic Hermite of the states around it (ALE's
-///   spline) rotated into the body's frame, then interpolated
-///   eighth-order Lagrange (fewer points near the ends). Its
-///   orientation, sensor to body = body rotation x inverse pointing,
-///   is taken at the union of their times (each interpolated along
-///   the great arc), resampled evenly and interpolated the same way.
+///   25 even times over the states, each a cubic Hermite of the
+///   states around it (ALE's spline) rotated into the body's frame,
+///   then interpolated eighth-order Lagrange (fewer points near the
+///   ends). Its orientation, sensor to body = body rotation x inverse
+///   pointing, is taken at the union of their times (each
+///   interpolated along the great arc), resampled evenly and
+///   interpolated the same way.
 /// - Detector line d and sample s lie on the focal plane at the
-/// inverse of `focal2pixel` of
-///   (d x line summing + starting detector line - detector centre
-///   line, s x sample summing + starting detector sample - detector
-///   centre sample), in mm; the lens's distortion moves it; the
-///   camera looks along (-x, -y, -f) in the sensor's frame.
+///   inverse of `focal2pixel` of (d x line summing + starting
+///   detector line - detector centre line, s x sample summing +
+///   starting detector sample - detector centre sample), in mm; the
+///   lens's distortion moves it; the camera looks along (-x, -y, -f)
+///   in the sensor's frame.
 ///
 /// Light-time and aberration corrections are left out, as usgscsm
 /// leaves them out.
@@ -308,11 +305,10 @@ class IsdLineScanner : public IsdCameraModel {
     double ImageTime(double line) const;
 
     /// The unit body-fixed direction of pixel (`line`, `sample`)'s
-    /// ray as usgscsm takes it,
-    /// (-x, -y, -f) in the sensor's frame: towards the scene, or away
-    /// from it for ISDs whose boresight is the sensor's +z (ALE's
-    /// real cameras), which usgscsm images the same, the ray meeting
-    /// the ground on either side of the sensor.
+    /// ray as usgscsm takes it, (-x, -y, -f) in the sensor's frame:
+    /// towards the scene, or away from it for ISDs whose boresight is
+    /// the sensor's +z (ALE's real cameras), which usgscsm images the
+    /// same, the ray meeting the ground on either side of the sensor.
     glm::dvec3 Look(double line, double sample) const;
 
     /// Where pixel (`line`, `sample`)'s ray meets the body's
@@ -328,13 +324,13 @@ class IsdLineScanner : public IsdCameraModel {
     glm::dvec2 GroundToImage(const glm::dvec3& ground) const;
 
     /// A strip of `lines` image lines from `firstLine` as Ernie
-    /// renders it: a pushbroom camera
-    /// (`CameraParams::pushbroom`) whose rows are those lines, posed
-    /// `from` at the strip's first line's start and `to` at its end
-    /// (camera to body-fixed world). Consecutive strips chain: each's
-    /// `from` is the last one's `to`, so stepping the camera's
-    /// transform through the strips' `to`s (after a first step at the
-    /// first `from`) renders the image strip by strip.
+    /// renders it: a pushbroom camera (`CameraParams::pushbroom`)
+    /// whose rows are those lines, posed `from` at the strip's first
+    /// line's start and `to` at its end (camera to body-fixed world).
+    /// Consecutive strips chain: each's `from` is the last one's
+    /// `to`, so stepping the camera's transform through the strips'
+    /// `to`s (after a first step at the first `from`) renders the
+    /// image strip by strip.
     ///
     /// The pose between `from` and `to` is a straight line and a
     /// great-arc turn, which departs from the orbit's curve by about
@@ -443,22 +439,20 @@ class IsdPushFrame : public IsdCameraModel {
 };
 
 /// A frame camera from its image support data, its geometry as
-/// usgscsm's frame model
-/// (`UsgsAstroFrameSensorModel`) computes it (`IsdCameraModel`): the
-/// whole image is exposed at once, at the ISD's centre time, from one
-/// position and orientation. Unlike the line scanner, the camera
-/// looks along (x, y, f) in the sensor's frame, and a ray meets the
-/// ellipsoid at its first intersection along it. A rolling shutter's
-/// jitter (`jitter`), as usgscsm models it, moves each image line's
-/// pixels by an offset polynomial in the line's exposure time, the
-/// pose left at the centre time: image coordinates less the jitter
-/// are the unjittered camera's.
+/// usgscsm's frame model (`UsgsAstroFrameSensorModel`) computes it
+/// (`IsdCameraModel`): the whole image is exposed at once, at the
+/// ISD's centre time, from one position and orientation. Unlike the
+/// line scanner, the camera looks along (x, y, f) in the sensor's
+/// frame, and a ray meets the ellipsoid at its first intersection
+/// along it. A rolling shutter's jitter (`jitter`), as usgscsm models
+/// it, moves each image line's pixels by an offset polynomial in the
+/// line's exposure time, the pose left at the centre time: image
+/// coordinates less the jitter are the unjittered camera's.
 ///
 /// References:
 /// - usgscsm's `UsgsAstroFrameSensorModel` (`imageToGround`,
-/// `groundToImage`,
-///   `losEllipsoidIntersect`, `constructStateFromIsd`), and its
-///   src/Utilities.cpp
+///   `groundToImage`, `losEllipsoidIntersect`,
+///   `constructStateFromIsd`), and its src/Utilities.cpp
 ///   (`removeJitter`, `addJitter`).
 class IsdFrame : public IsdCameraModel {
   public:

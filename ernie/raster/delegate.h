@@ -66,10 +66,9 @@ TerrainParams TerrainParamsOf(const Scene& scene,
 /// the scene's camera, light and render settings.
 ///
 /// `Sync` re-uploads GPU data only when the attributes behind it
-/// changed
-/// (`Scene::AttributeVersion`): a deforming mesh rewrites only its
-/// points, and moving instances rewrites only the instance arrays.
-/// Arrays on a GPU compute device (mesh `points`, instance
+/// changed (`Scene::AttributeVersion`): a deforming mesh rewrites
+/// only its points, and moving instances rewrites only the instance
+/// arrays. Arrays on a GPU compute device (mesh `points`, instance
 /// `positions`, `orientations` and `scales`, contiguous float32) are
 /// copied device to device through `ComputeInterop`, connected on
 /// first use; author `extent` on such prims to spare a copy to the
@@ -331,10 +330,9 @@ class RasterDelegate : public RenderDelegate {
     /// light; the dome then lights with its map without the sun.
     void ApplyDomeSun(FrameParams& frame) const;
     /// In the directions mode, lights `frame` with its dome's
-    /// shadowed directions
-    /// (`DomeDirectionsOf`) as distant lights of the dome's diffuse
-    /// light, as many as light slots remain, so the dome lights
-    /// without its own diffuse light.
+    /// shadowed directions (`DomeDirectionsOf`) as distant lights of
+    /// the dome's diffuse light, as many as light slots remain, so
+    /// the dome lights without its own diffuse light.
     void ApplyDomeDirections(FrameParams& frame) const;
     void SyncMeshes(const Scene& scene);
     void SyncInstancers(const Scene& scene);
@@ -494,13 +492,12 @@ class RasterDelegate : public RenderDelegate {
     std::map<Path, SyncedPoints> syncedPoints_;
     std::map<GpuXformKey, GpuXformGroup> gpuXformGroups_;
     /// Whether the GPU poses of the product being updated are
-    /// positions and quaternions
-    /// (`PosesAreQuaternions`), for `UpdatePrims`.
+    /// positions and quaternions (`PosesAreQuaternions`), for
+    /// `UpdatePrims`.
     bool gpuPosesQuaternions_ = false;
     /// Whether the product being updated has views posed under
-    /// GPU-posed prims
-    /// (`AnchoredViewsOf`), whose poses the drawable writes relative
-    /// to the frame's origin.
+    /// GPU-posed prims (`AnchoredViewsOf`), whose poses the drawable
+    /// writes relative to the frame's origin.
     bool anchoredViews_ = false;
     std::unordered_map<Path, GpuPosed> gpuPosed_;
     /// The scene's version at the last full `Sync`: prims below

@@ -42,12 +42,11 @@ struct ComputeArrayView {
 /// two timeline semaphores created in Vulkan and imported into the
 /// compute API, one per direction so each side signals only its own:
 /// - compute to Vulkan: `CopyToBuffer` queues its copy and signals
-/// the next value; Vulkan
-///   submissions that read the buffer wait for `VulkanWait`.
+///   the next value; Vulkan submissions that read the buffer wait for
+///   `VulkanWait`.
 /// - Vulkan to compute: a Vulkan submission whose writes the compute
-/// side reads signals
-///   `NextVulkanSignal`; compute streams wait for it with
-///   `WaitForVulkan`, and `Download` waits for it itself.
+///   side reads signals `NextVulkanSignal`; compute streams wait for
+///   it with `WaitForVulkan`, and `Download` waits for it itself.
 ///
 /// Streams are numbered as in DLPack for the backend's device kind
 /// (for CUDA: 1 the legacy default stream, 2 the per-thread default

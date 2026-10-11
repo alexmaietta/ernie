@@ -220,9 +220,8 @@ class PointsDrawable : public RasterDrawable {
     /// Writes a cloud's arrays into its buffers, the positions into
     /// the other half on the first write of a frame.
     void Write(Cloud& cloud);
-    /// Draw `item`'s bounds relative to the origin.
-    /// The G-buffer pipeline for a frame camera's views, or a
-    /// pushbroom's.
+    /// Draw `item`'s bounds relative to the origin. The G-buffer
+    /// pipeline for a frame camera's views, or a pushbroom's.
     void CreateGBufferPipeline(bool pushbroom);
     Bounds3 ItemBounds(std::size_t item) const;
     std::vector<DescriptorResource>

@@ -51,8 +51,7 @@ Dirty DirtyOf(std::string_view attribute) {
         return Dirty::Transform;
     }
     // What the registered types' declarations say a change to each
-    // attribute stamps
-    // (`AttributeMeta::dirty`).
+    // attribute stamps (`AttributeMeta::dirty`).
     static const std::map<std::string_view, Dirty, std::less<>>
         declared = [] {
             std::map<std::string_view, Dirty, std::less<>> bits;

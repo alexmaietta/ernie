@@ -19,7 +19,7 @@ namespace ernie {
 ///
 /// References:
 /// - Khronos, Vulkan 1.3 specification, section 18.5 "Timestamp
-/// Queries".
+///   Queries".
 class GpuTimer {
   public:
     /// Timing on `device`'s queue family with `timestampBits` valid

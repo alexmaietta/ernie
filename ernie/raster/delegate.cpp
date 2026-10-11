@@ -2108,8 +2108,8 @@ RasterDelegate::Items(const Scene& scene) const {
                 : 0,
             HostArrays(scene));
         // Under a GPU-posed prim, its instances are composed under
-        // that prim's instance
-        // (`SyncInstancers`), drawn in the frame above it.
+        // that prim's instance (`SyncInstancers`), drawn in the frame
+        // above it.
         const glm::dmat4 world =
             synced.anchorInstancer != 0
                 ? GpuAnchorOf(scene, path).value_or(GpuAnchor{}).frame

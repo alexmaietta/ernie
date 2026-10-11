@@ -52,8 +52,7 @@ struct RasterFrame {
     /// estimate.
     bool shadowFromFrame = false;
     /// Shadow passes: the layer of the layered shadow map their draws
-    /// go to
-    /// (`DrawConstants::shadowLayer`), so one pass draws every
+    /// go to (`DrawConstants::shadowLayer`), so one pass draws every
     /// world's map.
     std::uint32_t shadowLayer = 0;
 };
@@ -165,17 +164,16 @@ class RasterDrawable {
     /// Records the patching of the views' camera fields in the
     /// drawable's per-view buffers from the GPU poses
     /// (`RasterRenderer::PatchViews`) when the frame's poses are on
-    /// the GPU
-    /// (`FrameParams::posesOnGpu`), before `RecordCull`. Nothing by
-    /// default.
+    /// the GPU (`FrameParams::posesOnGpu`), before `RecordCull`.
+    /// Nothing by default.
     virtual void RecordViewPoses(VkCommandBuffer /*commands*/) const {
     }
 
     /// Records the patching of the drawable's per-view buffers for
-    /// the shadow views the GPU fits
-    /// (`ShadowCascade::gpuFitted`) from their matrices
-    /// (`RasterRenderer::LightViewMatrices`), after the renderer's
-    /// light pass and before `RecordCull`. Nothing by default.
+    /// the shadow views the GPU fits (`ShadowCascade::gpuFitted`)
+    /// from their matrices (`RasterRenderer::LightViewMatrices`),
+    /// after the renderer's light pass and before `RecordCull`.
+    /// Nothing by default.
     virtual void
     RecordShadowViews(VkCommandBuffer /*commands*/) const {}
 

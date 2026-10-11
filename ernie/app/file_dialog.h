@@ -11,9 +11,8 @@
 namespace ernie::app {
 
 /// A choice of the file dialog's file type menu: a label and the
-/// extensions it shows, such as
-/// {"Terrain configurations", {".json"}}; no extensions shows every
-/// file.
+/// extensions it shows, such as {"Terrain configurations",
+/// {".json"}}; no extensions shows every file.
 struct FileFilter {
     std::string label;
     std::vector<std::string> extensions;  ///< With the dot, matched

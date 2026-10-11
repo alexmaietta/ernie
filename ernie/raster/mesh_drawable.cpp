@@ -385,11 +385,10 @@ TransformBox(const glm::mat4& transform, const glm::vec3& low,
 ///
 /// References:
 /// - M. Garland and P. S. Heckbert, "Surface Simplification Using
-/// Quadric Error Metrics",
-///   SIGGRAPH '97, 209-216, 1997.
+///   Quadric Error Metrics", SIGGRAPH '97, 209-216, 1997.
 ///   https://doi.org/10.1145/258734.258849
 /// - A. Kapoulkine, "meshoptimizer", `meshopt_simplify`.
-/// https://github.com/zeux/meshoptimizer
+///   https://github.com/zeux/meshoptimizer
 ///
 /// `locked` holds a `meshopt_SimplifyVertex_*` flag per point (or is
 /// empty): points on texture coordinate seams stay, so the seams do.

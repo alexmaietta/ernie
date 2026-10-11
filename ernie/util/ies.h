@@ -14,19 +14,17 @@ namespace ernie {
 /// width, z up; it shines down -z).
 enum class IesType {
     /// Type C: about the vertical axis z. The vertical angle runs
-    /// from the nadir (0) to the zenith
-    /// (180); the horizontal angle turns around z from x towards y.
-    /// Most luminaires.
+    /// from the nadir (0) to the zenith (180); the horizontal angle
+    /// turns around z from x towards y. Most luminaires.
     C = 1,
     /// Type B: about the width y (floodlights). The vertical angle
-    /// turns the plane through y, from
-    /// the nadir towards x; the horizontal angle leaves that plane,
-    /// towards -y; both -90 to 90.
+    /// turns the plane through y, from the nadir towards x; the
+    /// horizontal angle leaves that plane, towards -y; both -90 to
+    /// 90.
     B = 2,
     /// Type A: about the length x (automotive lamps). The vertical
-    /// angle turns the plane through
-    /// x, from the nadir towards y; the horizontal angle leaves that
-    /// plane, towards x.
+    /// angle turns the plane through x, from the nadir towards y; the
+    /// horizontal angle leaves that plane, towards x.
     A = 3,
 };
 
@@ -62,14 +60,12 @@ struct IesTilt {
 ///
 /// References:
 /// - IES LM-63-19, Approved Method: IES Standard File Format for the
-/// Electronic Transfer of
-///   Photometric Data and Related Information, Illuminating
-///   Engineering Society, 2019.
+///   Electronic Transfer of Photometric Data and Related Information,
+///   Illuminating Engineering Society, 2019.
 /// - I. Ashdown, "Parsing the IESNA LM-63 Photometric Data File",
-/// 1998,
-///   http://lumen.iee.put.poznan.pl/kw/iesna.txt
+///   1998, http://lumen.iee.put.poznan.pl/kw/iesna.txt
 /// - G. Ward, Radiance ies2rad, source.cal and tilt.cal (type B
-/// coordinates and tilt angles),
+///   coordinates and tilt angles),
 ///   https://github.com/NREL/Radiance/tree/master/src/cv
 struct IesProfile {
     IesType type = IesType::C;

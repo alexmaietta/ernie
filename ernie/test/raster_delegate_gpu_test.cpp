@@ -538,8 +538,8 @@ TEST_F(RasterDelegateTest,
     // centimetre and seen from 90 m: each pixel covers thousands of
     // tiles, flat on average, with slopes deviating by sqrt(0.125)
     // per axis. Under a low sun the plane shades as Hapke's theta-bar
-    // widened by that variance
-    // (`widenedMeanSlope`), not as the flat average normal.
+    // widened by that variance (`widenedMeanSlope`), not as the flat
+    // average normal.
     Scene scene = GroundScene(10.0);
     scene.Set("/World/Sun", tokens::kTransform,
               ernie::DistantLightTransform({1.0, 0.0, 0.35}));

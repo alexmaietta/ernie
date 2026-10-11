@@ -1416,8 +1416,7 @@ ElectronsOf(ernie::RenderProductSetOutputs& outputs,
 }
 
 /// FlatScene with sensor noise, exposed well below the full well, and
-/// a second product
-/// `/Render/Other` of the same camera.
+/// a second product `/Render/Other` of the same camera.
 Scene NoisyScene() {
     Scene scene = FlatScene();
     ernie::Camera(scene, "/World/Camera")

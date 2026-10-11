@@ -19,7 +19,7 @@
 ///
 /// References:
 /// - Pixar, "UsdGeomCamera",
-/// https://openusd.org/release/api/class_usd_geom_camera.html
+///   https://openusd.org/release/api/class_usd_geom_camera.html
 
 // clang-format off
 #define ERNIE_CAMERA_ATTRIBUTES(X)                                                                 \

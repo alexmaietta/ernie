@@ -22,16 +22,15 @@ enum class LrocNac {
 /// (`IsdLineScanner::StripOf`, Python's
 /// `IsdLineScanner.author_strip`); this sets the rest:
 /// - The sensor: one panchromatic channel over the 400-760 nm
-/// spectral response with the
-///   detector's average quantum efficiency through it (> 60%: 0.6,
-///   its edges ramped over 10 nm; the paper gives no curve), the
-///   gain, detector noise and full well of NAC-L or NAC-R, a 12-bit
-///   ADC and the telescope's f-number.
+///   spectral response with the detector's average quantum efficiency
+///   through it (> 60%: 0.6, its edges ramped over 10 nm; the paper
+///   gives no curve), the gain, detector noise and full well of NAC-L
+///   or NAC-R, a 12-bit ADC and the telescope's f-number.
 /// - The readout chain, SensorFilter prims under `product`: qe,
-/// noise, adc, readoutTaps (the
-///   even and odd pixels' two analog chains, offsets 0 until
-///   calibrated) and compandTable (the nominal 12- to 8-bit table,
-///   code 0), so RawDN holds the 8-bit numbers the NAC sends.
+///   noise, adc, readoutTaps (the even and odd pixels' two analog
+///   chains, offsets 0 until calibrated) and compandTable (the
+///   nominal 12- to 8-bit table, code 0), so RawDN holds the 8-bit
+///   numbers the NAC sends.
 ///
 /// Reference: M. S. Robinson et al., "Lunar Reconnaissance Orbiter
 /// Camera (LROC) Instrument Overview", Space Science Reviews
@@ -64,9 +63,9 @@ struct LrocWacBandSpec {
     double fwhmNm;        ///< Table 4's full width at half maximum.
     double responsivity;  ///< Table 4's responsivity coefficient,
                           ///< (W/m^3/sr) / (DN/s).
-    /// Table 3: the visible optics' or the UV optics'
-    /// (section 3.2.1's text gives 5.5 and 5.1 for the lens designs;
-    /// the table's are the system's).
+    /// Table 3: the visible optics' or the UV optics' (section
+    /// 3.2.1's text gives 5.5 and 5.1 for the lens designs; the
+    /// table's are the system's).
     double fNumber;
     double pixelPitchUm;  ///< The 9 um pixels, 4 x 4 summed in the UV
                           ///< (section 3.2).
@@ -92,18 +91,17 @@ LrocWacBand LrocWacBandNamed(int nanometres);
 /// (`IsdPushFrame::FrameletOf`, Python's
 /// `IsdPushFrame.author_framelet`); this sets the rest:
 /// - The sensor: one channel through the band, its passband Table 4's
-/// FWHM wide about the
-///   effective wavelength (edges ramped over 2 nm about the half
-///   maxima, so its area is the FWHM's) at the band's effective
-///   quantum efficiency (`LrocWacBandSpec::EffectiveQe`), the lens's
-///   transmission 1 (in that efficiency); the KAI-1001's gain, read
-///   noise and full well; an 11-bit ADC; the band's optics' f-number.
-///   The camera's spectral range is narrowed to the passband, four
-///   bands across it.
+///   FWHM wide about the effective wavelength (edges ramped over 2 nm
+///   about the half maxima, so its area is the FWHM's) at the band's
+///   effective quantum efficiency (`LrocWacBandSpec::EffectiveQe`),
+///   the lens's transmission 1 (in that efficiency); the KAI-1001's
+///   gain, read noise and full well; an 11-bit ADC; the band's
+///   optics' f-number. The camera's spectral range is narrowed to the
+///   passband, four bands across it.
 /// - The readout chain, SensorFilter prims under `product`: qe, noise
-/// and adc, so RawDN holds
-///   the 11-bit numbers before the WAC's companding to 8 bits, which
-///   the paper gives only as a figure (Fig. 25).
+///   and adc, so RawDN holds the 11-bit numbers before the WAC's
+///   companding to 8 bits, which the paper gives only as a figure
+///   (Fig. 25).
 ///
 /// Reference: M. S. Robinson et al., "Lunar Reconnaissance Orbiter
 /// Camera (LROC) Instrument Overview", Space Science Reviews
@@ -127,8 +125,8 @@ struct Mars2020Navcam {
     static constexpr double kFNumber = 12.0;
     static constexpr double kBestFocusM = 3.5;
     static constexpr double kBaselineM = 0.424;
-    /// The CMV-20000's 5120 x 3840 pixels of 6.4 um: a full frame
-    /// of 32.77 x 24.58 mm.
+    /// The CMV-20000's 5120 x 3840 pixels of 6.4 um: a full frame of
+    /// 32.77 x 24.58 mm.
     static constexpr std::uint32_t kWidth = 5120;
     static constexpr std::uint32_t kHeight = 3840;
     static constexpr double kPixelPitchUm = 6.4;
@@ -152,20 +150,19 @@ struct Mars2020Navcam {
 /// Authors one of the Mars 2020 Navcams as published, onto Camera
 /// `camera` and the readout chain of RenderProduct `product`:
 /// - The camera: the f-theta lens (`Mars2020Navcam::FisheyeK1`,
-/// Ernie's fisheye) of 19.1 mm
-///   over the full 32.77 x 24.58 mm frame, f/12, focused at 3.5 m.
-///   Render it at 5120 x 3840 for the detector's own 6.4 um pixels; a
-///   smaller resolution bins them (as the cameras can downsample),
-///   each pixel then wider and collecting more light.
+///   Ernie's fisheye) of 19.1 mm over the full 32.77 x 24.58 mm
+///   frame, f/12, focused at 3.5 m. Render it at 5120 x 3840 for the
+///   detector's own 6.4 um pixels; a smaller resolution bins them (as
+///   the cameras can downsample), each pixel then wider and
+///   collecting more light.
 /// - The sensor: RGB, the CMV-20000's gain, dark noise and full well,
-/// a 12-bit ADC. The paper
-///   gives the detector's QE only as 64.5% at 550 nm (monochrome,
-///   with microlenses; its table prints "55 nm"), with no colour
-///   responses, so the channels keep Ernie's generic RGB curves.
+///   a 12-bit ADC. The paper gives the detector's QE only as 64.5% at
+///   550 nm (monochrome, with microlenses; its table prints "55 nm"),
+///   with no colour responses, so the channels keep Ernie's generic
+///   RGB curves.
 /// - The readout chain, SensorFilter prims under `product`: qe, bayer
-/// (`pattern`; the paper
-///   does not give the layout), noise, adc and demosaic
-///   (Malvar-He-Cutler), so RawDN holds the 12-bit numbers
+///   (`pattern`; the paper does not give the layout), noise, adc and
+///   demosaic (Malvar-He-Cutler), so RawDN holds the 12-bit numbers
 ///   demosaiced; then cie, exposure and jpeg at `jpegQuality` for the
 ///   8-bit colour images the rover sends JPEG-compressed (the paper
 ///   gives the quality as selectable). Fixed-pattern noise and dark
@@ -201,8 +198,7 @@ void AuthorMars2020NavcamPair(
 enum class Mars2020Hazcams { Front, Rear };
 
 /// The Hazcams' optics (Maki et al. 2020, Table 2), on the Navcams'
-/// camera body and detector
-/// (`Mars2020Navcam`'s sensor values).
+/// camera body and detector (`Mars2020Navcam`'s sensor values).
 struct Mars2020Hazcam {
     static constexpr double kFocalLengthMm = 14.0;
     static constexpr double kFNumber = 12.0;
@@ -300,27 +296,26 @@ struct MastcamZ {
 /// Authors one Mastcam-Z camera through filter `filter` as published,
 /// onto Camera `camera` and the readout chain of RenderProduct
 /// `product`:
-/// - The camera: a pinhole of `focalLengthMm` (26 to 110) over
-/// the 11.84 x 8.88 mm detector at
-///   its f-number (`MastcamZ::FNumberAt`).
+/// - The camera: a pinhole of `focalLengthMm` (26 to 110) over the
+///   11.84 x 8.88 mm detector at its f-number
+///   (`MastcamZ::FNumberAt`).
 /// - Filter 0: an RGB sensor whose channels are Gaussians at Table
-/// 3's Bayer effective
-///   wavelengths and half widths, peaking at the detector's ~40%; the
-///   chain qe, bayer
-///   (`pattern`; the paper does not give the layout), noise, adc,
-///   demosaic.
+///   3's Bayer effective wavelengths and half widths, peaking at the
+///   detector's ~40%; the chain qe, bayer (`pattern`; the paper does
+///   not give the layout), noise, adc, demosaic.
 /// - Filters 1 to 7: one channel, the filter's passband (Table 3's 2
-/// x HWHM wide about its
-///   effective wavelength, ramped over 2 nm about the half maxima,
-///   times 10^-ND for filter 7) on the detector's response, Ernie's
-///   generic silicon curve scaled to the ~40% peak (the paper
-///   publishes no curve, and the Bayer microfilters' differences in a
-///   narrow band are left out); the camera's spectral range narrowed
-///   to the passband, four bands across it; the chain qe, noise, adc.
+///   x HWHM wide about its effective wavelength, ramped over 2 nm
+///   about the half maxima, times 10^-ND for filter 7) on the
+///   detector's response, Ernie's generic silicon curve scaled to the
+///   ~40% peak (the paper publishes no curve, and the Bayer
+///   microfilters' differences in a narrow band are left out); the
+///   camera's spectral range narrowed to the passband, four bands
+///   across it; the chain qe, noise, adc.
 /// - The sensor: the KAI-2020CM's gain, read noise and full well for
-/// `eye`, an 11-bit ADC. Scene radiance past 830 nm follows what the
-/// scene gives there: materials' RGB albedo holds its 830 nm value,
-/// so give materials reflectance spectra for the near-IR bands.
+///   `eye`, an 11-bit ADC. Scene radiance past 830 nm follows what
+///   the scene gives there: materials' RGB albedo holds its 830 nm
+///   value, so give materials reflectance spectra for the near-IR
+///   bands.
 ///
 /// Reference: J. F. Bell III et al., "The Mars 2020 Perseverance
 /// Rover Mast Camera Zoom (Mastcam-Z) Multispectral, Stereoscopic

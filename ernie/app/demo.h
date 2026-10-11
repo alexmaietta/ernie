@@ -95,8 +95,8 @@ std::string_view DemoOptionsHelp();
 ///
 /// References:
 /// - Newton's examples (`newton.examples`: `Example`,
-/// `create_parser`, `init`, `run` and the
-///   example browser), https://github.com/newton-physics/newton
+///   `create_parser`, `init`, `run` and the example browser),
+///   https://github.com/newton-physics/newton
 class Demo {
   public:
     /// `viewer` is null without one.
@@ -114,8 +114,7 @@ class Demo {
     virtual void Render();
 
     /// Writes `--output`: the viewport's next frame in a viewer, else
-    /// the scene's LdrColor
-    /// (`RenderImage`) as PNG.
+    /// the scene's LdrColor (`RenderImage`) as PNG.
     /// @throws std::runtime_error if the file cannot be written.
     virtual void SaveOutput(const std::filesystem::path& path);
 
@@ -344,10 +343,10 @@ class DemoRunner {
 };
 
 /// A demo program's `main`: parses the command line
-/// (`ParseDemoOptions`), then prints the help
-/// (`--help`) or the demos (`--list`), or runs `demos[start]` (or the
-/// one `--demo NAME` names) with all of `demos` in the Demos panel.
-/// Returns the exit status, printing any error.
+/// (`ParseDemoOptions`), then prints the help (`--help`) or the demos
+/// (`--list`), or runs `demos[start]` (or the one `--demo NAME`
+/// names) with all of `demos` in the Demos panel. Returns the exit
+/// status, printing any error.
 int DemoMain(int argc, char** argv, std::vector<DemoInfo> demos,
              std::size_t start = 0);
 

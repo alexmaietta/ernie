@@ -71,10 +71,9 @@ std::pair<glm::vec3, glm::vec3> WithShadows(const glm::vec3& low,
 ///
 /// References:
 /// - W. Engel, "Cascaded Shadow Maps", in ShaderX5, Charles River
-/// Media, 2006.
+///   Media, 2006.
 /// - M. Valient, "Stable Rendering of Cascaded Shadow Maps", in
-/// ShaderX6, Charles River Media,
-///   2008.
+///   ShaderX6, Charles River Media, 2008.
 ///
 /// @param toSun Unit vector pointing towards the light.
 /// @param splitNear Where the first cascade starts, such as the

@@ -59,13 +59,13 @@ struct LodRange {
 ///
 /// References:
 /// - F. Strugar, "Continuous Distance-Dependent Level of Detail for
-/// Rendering Heightmaps", Journal
-///   of Graphics, GPU, and Game Tools 14(4):57-74, 2009.
+///   Rendering Heightmaps", Journal of Graphics, GPU, and Game Tools
+///   14(4):57-74, 2009.
 ///   https://doi.org/10.1080/2151237X.2009.10129287
 /// - P. Lindstrom, D. Koller, W. Ribarsky, L. F. Hodges, N. Faust and
-/// G. A. Turner, "Real-Time,
-///   Continuous Level of Detail Rendering of Height Fields", SIGGRAPH
-///   '96, 109-118, 1996. https://doi.org/10.1145/237170.237217
+///   G. A. Turner, "Real-Time, Continuous Level of Detail Rendering
+///   of Height Fields", SIGGRAPH '96, 109-118, 1996.
+///   https://doi.org/10.1145/237170.237217
 class LodQuadtree {
   public:
     /// Most levels a tree may have; the shaders size their per-level

@@ -69,11 +69,10 @@ struct FrameId {
 ///
 /// There are two ways to render:
 /// - headless and in simulation: `StepAsync` (or `Step` and `Render`)
-/// renders the
-///   UsdRender products of a scene and returns their render vars;
+///   renders the UsdRender products of a scene and returns their
+///   render vars;
 /// - interactively: `Update` then `Record` into the application's own
-/// command buffer each frame,
-///   submitted after `SubmitWaits`.
+///   command buffer each frame, submitted after `SubmitWaits`.
 ///
 /// Rendering is deterministic: an image's noise and samples derive
 /// from the camera's `ernie:sensor:seed`, its render product's path
@@ -212,9 +211,9 @@ class RenderDelegate {
     virtual Path PrimPath(std::uint32_t id) const = 0;
 
     /// The scene's average luminance in cd/m^2 a recent frame
-    /// measured with metering on
-    /// (`tokens::kMeter`), for automatic exposure and meters; none
-    /// before one has, or from backends that do not meter.
+    /// measured with metering on (`tokens::kMeter`), for automatic
+    /// exposure and meters; none before one has, or from backends
+    /// that do not meter.
     virtual std::optional<double> MeteredLuminance() const {
         return std::nullopt;
     }

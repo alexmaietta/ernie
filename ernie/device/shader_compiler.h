@@ -16,9 +16,9 @@ namespace ernie {
 /// user-supplied modules (such as custom reflectance models).
 ///
 /// Modules are loaded from source in the order given, so a module
-/// must come after the modules it imports. Compilation targets
-/// SPIR-V 1.6 for Vulkan; `CompileWgsl` emits the same program as
-/// WGSL, which keeps shaders usable by a future WebGPU backend.
+/// must come after the modules it imports. Compilation targets SPIR-V
+/// 1.6 for Vulkan; `CompileWgsl` emits the same program as WGSL,
+/// which keeps shaders usable by a future WebGPU backend.
 ///
 /// Reference: Y. He, K. Fatahalian and T. Foley, "Slang: language
 /// mechanisms for extensible real-time shading systems", ACM

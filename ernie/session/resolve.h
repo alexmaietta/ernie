@@ -36,22 +36,21 @@ namespace ernie {
 /// The prims a render of `scene` uses, as every render delegate
 /// resolves them:
 /// - `settings`: the given RenderSettings prim, or the first one
-/// outside `tokens::kSessionRoot`
-///   when the given path is empty; empty if there is none, which
-///   leaves every option at its default.
+///   outside `tokens::kSessionRoot` when the given path is empty;
+///   empty if there is none, which leaves every option at its
+///   default.
 /// - `camera`: the settings' `camera` relationship, or else the first
-/// Camera outside the session
-///   root.
+///   Camera outside the session root.
 /// - `terrain`: the first visible Terrain.
 /// - `material`: the terrain's `material:binding` when it names a
-/// Material.
+///   Material.
 /// - the lights, from the settings' `ernie:lights` relationship when
-/// it is set (its visible light
-///   prims), or else from every visible light outside the session
-///   root: `light` is the first DistantLight by path, the sun, with
-///   cascaded shadows; `lights` every other DistantLight,
-///   SphereLight, RectLight and DiskLight, sorted by path; `dome` the
-///   first DomeLight. A scene without lights renders black.
+///   it is set (its visible light prims), or else from every visible
+///   light outside the session root: `light` is the first
+///   DistantLight by path, the sun, with cascaded shadows; `lights`
+///   every other DistantLight, SphereLight, RectLight and DiskLight,
+///   sorted by path; `dome` the first DomeLight. A scene without
+///   lights renders black.
 /// - `ground`: the first visible GroundPlane.
 struct RenderPrims {
     Path settings;
@@ -64,8 +63,7 @@ struct RenderPrims {
     Path ground;
     Path stars;  ///< The first visible StarField.
     /// A stand-in for the camera's world transform, for a camera
-    /// posed on the GPU
-    /// (`CameraParamsOf`).
+    /// posed on the GPU (`CameraParamsOf`).
     std::optional<glm::dmat4> cameraTransform;
     /// Stand-ins for the world transforms of `lights` posed on the
     /// GPU (`LightParamsOf`).
@@ -118,8 +116,7 @@ MinimalMode MinimalModeOf(const Scene& scene, const Path& prim,
 /// sensor, one image each:
 /// - several cameras: each camera's world transform;
 /// - one camera with `ernie:poses` (`tokens::kPoses`): each pose in
-/// place of the camera's own
-///   transform, under its parent's.
+///   place of the camera's own transform, under its parent's.
 /// @throws std::invalid_argument if a camera is not a Camera prim,
 /// cameras of a batch differ in projection or spectral bands, or the
 /// poses are not a CPU (views, 4, 4) float array. `hostPoses`, when
@@ -230,16 +227,16 @@ Path BoundMaterial(const Scene& scene, const Path& prim);
 /// The sun's spectral irradiance at normal incidence per band of
 /// `bands`, in W m^-2 nm^-1, from the DistantLight at `light`:
 /// - physical, when it has `ernie:irradiance` or `ernie:spectrum`:
-/// the spectrum binned (scaled to
-///   the irradiance when both are set), or else a black body at the
-///   enabled colour temperature or the Sun's 5772 K carrying the
-///   irradiance (default 1361 W/m^2, the solar constant);
+///   the spectrum binned (scaled to the irradiance when both are
+///   set), or else a black body at the enabled colour temperature or
+///   the Sun's 5772 K carrying the irradiance (default 1361 W/m^2,
+///   the solar constant);
 /// - otherwise relative, following UsdLux: `inputs:intensity` times
-/// 2^`inputs:exposure` is the
-///   luminance (cd/m^2) of a white Lambertian surface facing the
-///   light, with the spectrum's shape from `inputs:color` (upsampled
-///   with `RgbToSigmoid`) times a black body at the colour
-///   temperature when `inputs:enableColorTemperature` is set.
+///   2^`inputs:exposure` is the luminance (cd/m^2) of a white
+///   Lambertian surface facing the light, with the spectrum's shape
+///   from `inputs:color` (upsampled with `RgbToSigmoid`) times a
+///   black body at the colour temperature when
+///   `inputs:enableColorTemperature` is set.
 /// @throws std::invalid_argument for invalid bands or spectrum pairs.
 std::vector<float> SunIrradianceOf(const Scene& scene,
                                    const Path& light,
@@ -248,25 +245,24 @@ std::vector<float> SunIrradianceOf(const Scene& scene,
 /// The DistantLight or SphereLight at `path` as a `Light` for
 /// `bands`:
 /// - distant: towards the light along its +z axis, its spectrum as
-/// `SunIrradianceOf`;
+///   `SunIrradianceOf`;
 /// - sphere: at its world position with its cone
-/// (`inputs:shaping:cone:angle` and `:softness`,
-///   default 180 degrees: unshaped) around its -z axis, radius
-///   `inputs:radius` (default 0.5; 0 with `treatAsPoint`). Physical
-///   with `ernie:power` or `ernie:spectrum` (`tokens::kLightPower`);
+///   (`inputs:shaping:cone:angle` and `:softness`, default 180
+///   degrees: unshaped) around its -z axis, radius `inputs:radius`
+///   (default 0.5; 0 with `treatAsPoint`). Physical with
+///   `ernie:power` or `ernie:spectrum` (`tokens::kLightPower`);
 ///   otherwise relative, following UsdLux: `inputs:intensity` times
 ///   2^`inputs:exposure` is the luminance (cd/m^2) of its surface, so
 ///   its luminous intensity is that times pi r^2 (times 1 for a
 ///   point), with the shape of `inputs:color` and the enabled colour
 ///   temperature.
 /// - rect and disk: centred at its world position, emitting along its
-/// -z axis from a face of
-///   `inputs:width` x `inputs:height` (default 1 x 1) or radius
-///   `inputs:radius` (default 0.5), scaled by its transform. Physical
-///   with `ernie:power` or `ernie:spectrum` as a sphere; otherwise
-///   relative: `inputs:intensity` times 2^`inputs:exposure` is its
-///   luminance (cd/m^2).
-/// Shadows follow `inputs:shadow:enable`.
+///   -z axis from a face of `inputs:width` x `inputs:height` (default
+///   1 x 1) or radius `inputs:radius` (default 0.5), scaled by its
+///   transform. Physical with `ernie:power` or `ernie:spectrum` as a
+///   sphere; otherwise relative: `inputs:intensity` times
+///   2^`inputs:exposure` is its luminance (cd/m^2). Shadows follow
+///   `inputs:shadow:enable`.
 /// @throws std::invalid_argument for another prim type, a negative
 /// radius or power, an area light without area, a degenerate
 /// transform, invalid bands or spectrum pairs.
@@ -337,8 +333,8 @@ struct DomeSunExtraction {
 ///
 /// References:
 /// - P. Debevec, "A Median Cut Algorithm for Light Probe Sampling",
-/// SIGGRAPH 2005 posters
-///   (lighting from the energy of an environment map's regions).
+///   SIGGRAPH 2005 posters (lighting from the energy of an
+///   environment map's regions).
 ///   https://vgl.ict.usc.edu/Research/MedianCut/MedianCutSampling.pdf
 std::optional<DomeSunExtraction> ExtractDomeSun(const Image& map);
 inline constexpr double kDomeSunThreshold = 0.1;
@@ -378,15 +374,12 @@ std::vector<DomeDirection> DomeDirectionsOf(const Image& map,
 ///
 /// References:
 /// - A. N. Cox (ed.), "Allen's Astrophysical Quantities", 4th
-/// edition, Springer, 2000 (the
-///   illuminance of a magnitude 0 star).
+///   edition, Springer, 2000 (the illuminance of a magnitude 0 star).
 /// - F. J. Ballesteros, "New insights into black bodies", EPL
-/// 97(3):34008, 2012 (B-V to
-///   temperature).
+///   97(3):34008, 2012 (B-V to temperature).
 /// - H. W. Jensen, F. Durand, J. Dorsey, M. M. Stark, P. Shirley and
-/// S. Premoze, "A
-///   Physically-Based Night Sky Model", SIGGRAPH 2001, 399-408 (stars
-///   as black bodies by magnitude and colour index).
+///   S. Premoze, "A Physically-Based Night Sky Model", SIGGRAPH 2001,
+///   399-408 (stars as black bodies by magnitude and colour index).
 ///   https://doi.org/10.1145/383259.383306
 /// @throws std::invalid_argument for another prim type, or arrays of
 /// mismatched lengths.
@@ -430,19 +423,18 @@ Culling CullingOf(const Scene& scene, const Path& settings);
 /// The frame parameters for `prims` of `scene`, for an image of
 /// `width` x `height`:
 /// - the camera from the Camera prim (`CameraParamsOf`) and the
-/// overscan its lens distortion
-///   needs (`OverscanOf`);
+///   overscan its lens distortion needs (`OverscanOf`);
 /// - sun direction from the light's transform (`TowardsLight`), its
-/// spectral irradiance
-///   (`SunIrradianceOf`), angular diameter (`inputs:angle`, default
-///   0.53 degrees) and shadows from its `inputs:shadow:enable`;
-///   without a sun, no sunlight and no ambient;
+///   spectral irradiance (`SunIrradianceOf`), angular diameter
+///   (`inputs:angle`, default 0.53 degrees) and shadows from its
+///   `inputs:shadow:enable`; without a sun, no sunlight and no
+///   ambient;
 /// - the other lights (`LightParamsOf`, each in its world, `WorldOf`)
-/// and the dome
-///   (`DomeParamsOf`); the sun and the dome shine in every world;
+///   and the dome (`DomeParamsOf`); the sun and the dome shine in
+///   every world;
 /// - ambient, wireframe (`WireframeOf`), culling (`CullingOf`,
-/// `OcclusionOf`), mesh level-of-detail error, clear colour (linear)
-/// and shadow options from the render settings.
+///   `OcclusionOf`), mesh level-of-detail error, clear colour
+///   (linear) and shadow options from the render settings.
 /// @throws std::invalid_argument if there is no camera, it is not
 /// perspective, or it or the light are invalid.
 FrameParams FrameParamsOf(const Scene& scene,
@@ -485,9 +477,9 @@ bool IsMeshType(std::string_view type);
 
 /// The mesh of the UsdGeom primitive at `path` from its attributes
 /// and their UsdGeom defaults: Cube `size` (2); Sphere `radius` (1);
-/// Cylinder and Cone `radius` (1), `height` (2) and `axis`
-/// ("Z"); Capsule `radius` (0.5), `height` (1) and `axis`; Plane
-/// `width` (2), `length` (2) and `axis`. See `BoxMesh` and the other
+/// Cylinder and Cone `radius` (1), `height` (2) and `axis` ("Z");
+/// Capsule `radius` (0.5), `height` (1) and `axis`; Plane `width`
+/// (2), `length` (2) and `axis`. See `BoxMesh` and the other
 /// generators.
 /// @throws std::invalid_argument for another prim type, an unknown
 /// axis or invalid sizes.
@@ -576,8 +568,8 @@ std::optional<Bounds3> LocalBoundsOf(const Scene& scene,
 
 /// A detail texture tensor as an `Image`: float32 values are linear;
 /// uint8 values are sRGB-encoded when `encoding` is `Srgb` and linear
-/// otherwise. Grey replicates into rgb and a missing alpha reads
-/// as 1.
+/// otherwise. Grey replicates into rgb and a missing alpha reads as
+/// 1.
 /// @throws std::invalid_argument for a tensor that is not (rows,
 /// cols) or (rows, cols, 1, 3 or 4) float32 or uint8 on the CPU.
 Image ImageOfTensor(const Tensor& tensor, ImageEncoding encoding);

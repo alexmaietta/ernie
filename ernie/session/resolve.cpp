@@ -343,7 +343,7 @@ double EmittedSolidAngle(const EmissionShape& shape, bool flat,
 ///
 /// References:
 /// - Pixar, UsdLux ShapingAPI,
-/// https://openusd.org/dev/user_guides/schemas/usdLux/ShapingAPI.html
+///   https://openusd.org/dev/user_guides/schemas/usdLux/ShapingAPI.html
 std::vector<float> ProfileOf(const BoundableLight& light,
                              const glm::dmat4& world) {
     const std::string file = light.GetShapingIesFile();
@@ -489,8 +489,7 @@ void SetFocus(LightParams& light, const BoundableLight& emitter,
 ///
 /// References:
 /// - J. R. Howell, A Catalog of Radiation Heat Transfer Configuration
-/// Factors, differential
-///   area to a parallel coaxial disk,
+///   Factors, differential area to a parallel coaxial disk,
 ///   http://www.thermalradiation.net/indexCat.html
 double DiskLuminancePerLux(double radius, double distance) {
     return (radius * radius + distance * distance) /
@@ -506,9 +505,8 @@ double DiskLuminancePerLux(double radius, double distance) {
 ///
 /// References:
 /// - J. R. Howell, A Catalog of Radiation Heat Transfer Configuration
-/// Factors, differential
-///   area to a parallel rectangle with a corner above it,
-///   http://www.thermalradiation.net/indexCat.html
+///   Factors, differential area to a parallel rectangle with a corner
+///   above it, http://www.thermalradiation.net/indexCat.html
 double RectLuminancePerLux(double width, double height,
                            double distance) {
     const double x = 0.5 * width / distance;
@@ -2484,8 +2482,8 @@ std::string UvSetOf(const Scene& scene, const Path& material) {
 }
 
 /// Texture coordinates `primvars:<name>` of the Mesh at `mesh` per
-/// corner of `data`'s triangles
-/// (`MeshData::uvs`), or empty without them.
+/// corner of `data`'s triangles (`MeshData::uvs`), or empty without
+/// them.
 std::vector<float>
 TexCoordsOf(const Scene& scene, const Path& mesh,
             const std::string& name, const MeshData& data,

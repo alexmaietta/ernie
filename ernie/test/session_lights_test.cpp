@@ -303,8 +303,8 @@ glm::dvec2 Chromaticity(const std::vector<float>& spectrum,
 
 /// Illuminance per unit luminance on a surface facing a flat
 /// Lambertian emitter on its axis `distance` away, by brute force:
-/// the integral of d^2 / r^4 over the points of a grid over
-/// (-half, half) that `inside` says are on the emitter.
+/// the integral of d^2 / r^4 over the points of a grid over (-half,
+/// half) that `inside` says are on the emitter.
 template <typename Inside>
 double OnAxisIlluminancePerLuminance(glm::dvec2 half, double distance,
                                      const Inside& inside) {
@@ -630,9 +630,8 @@ TEST(LightParamsOf, IesProfilesShapeLightsInEveryUnit) {
         .SetPhotometricIlluminanceDistance(2.0);
     EXPECT_NEAR(luminous("/Lamp"), 50.0 * 4.0 / 100.0, 0.02);
 
-    // An angle scale of 0.5 squeezes the profile into half the
-    // angle: 22.5 degrees (row 16) reads its 45, and 45 degrees
-    // its 90.
+    // An angle scale of 0.5 squeezes the profile into half the angle:
+    // 22.5 degrees (row 16) reads its 45, and 45 degrees its 90.
     lamp.SetShapingIesAngleScale(0.5);
     const std::vector<float> squeezed =
         ernie::LightParamsOf(scene, "/Lamp", bands).profile;

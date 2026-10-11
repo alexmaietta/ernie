@@ -28,9 +28,8 @@ struct ImageDesc {
     /// that declare an array.
     bool array = false;
     /// With several layers, also view them in consecutive groups of
-    /// this many as 2D arrays
-    /// (`GroupView`), such as one view's spectral bands in a batch of
-    /// views; 0 for none.
+    /// this many as 2D arrays (`GroupView`), such as one view's
+    /// spectral bands in a batch of views; 0 for none.
     std::uint32_t groupLayers = 0;
 };
 

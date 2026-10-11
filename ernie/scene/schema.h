@@ -62,9 +62,9 @@ struct Connection {
 };
 
 /// The connection of input `input` (e.g. "inputs:diffuseColor") of
-/// the prim at `path`: its
-/// `<input>.connect` attribute, the source's property path as text
-/// ("/Looks/M/Tex.outputs:rgb"), or nullopt when it has none.
+/// the prim at `path`: its `<input>.connect` attribute, the source's
+/// property path as text ("/Looks/M/Tex.outputs:rgb"), or nullopt
+/// when it has none.
 /// @throws std::invalid_argument if the text is not a prim path, a
 /// dot and a property name.
 std::optional<Connection> GetConnection(const Scene& scene,

@@ -14,10 +14,9 @@
 namespace ernie::testing {
 
 /// Whether the environment requires a Vulkan device with the
-/// validation layer
-/// (`ERNIE_TEST_REQUIRE_VALIDATION=1`, as CI sets): without one a
-/// test fails rather than skipping or running unvalidated, so a
-/// missing driver or layer cannot pass as green.
+/// validation layer (`ERNIE_TEST_REQUIRE_VALIDATION=1`, as CI sets):
+/// without one a test fails rather than skipping or running
+/// unvalidated, so a missing driver or layer cannot pass as green.
 inline bool RequireValidation() {
     const char* value = std::getenv("ERNIE_TEST_REQUIRE_VALIDATION");
     return value != nullptr && std::string(value) == "1";

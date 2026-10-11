@@ -38,7 +38,7 @@
 ///
 /// References:
 /// - Blender, Cycles' node types and sockets (`NODE_DEFINE`,
-/// `SOCKET_*`, `NODE_SOCKET_API`),
+///   `SOCKET_*`, `NODE_SOCKET_API`),
 ///   https://projects.blender.org/blender/cycles/src/branch/main/src/graph/node_type.h
 /// - Pixar, UsdLux and generated schema classes,
 ///   https://openusd.org/release/api/usd_lux_page_front.html
@@ -377,9 +377,8 @@ class AttributeDef {
 /// `xformOp:scale` a `Vec3` or one number, `rotateX` (Y, Z) a
 /// `Double` in degrees, `xformOp:orient` a `Quat` and
 /// `xformOp:transform` a `Matrix`, each also taking an array of them,
-/// a pose per prim
-/// (`AttributeMeta::array`); null for other names and ops Ernie does
-/// not know.
+/// a pose per prim (`AttributeMeta::array`); null for other names and
+/// ops Ernie does not know.
 const AttributeDef* FindXformOp(std::string_view attribute);
 
 /// A registered prim type: its name (`Scene::Define`'s type), its
@@ -420,25 +419,24 @@ struct PrimTypeDef {
 /// null (`Scene::Write`), that it takes an array, as `Scene::Set` and
 /// `Scene::Write` do:
 /// - a declared attribute, or a transform op (`FindXformOp`), takes
-/// what its readers take
-///   (`AttributeDef::Coerce`; anything for `AttributeMeta::lenient`
-///   ones), and an array only when it is a tensor or
-///   `AttributeMeta::array` (a tensor also takes small arrays as
-///   values);
+///   what its readers take (`AttributeDef::Coerce`; anything for
+///   `AttributeMeta::lenient` ones), and an array only when it is a
+///   tensor or `AttributeMeta::array` (a tensor also takes small
+///   arrays as values);
 /// - an undeclared one is an error when its name has no namespace
-/// (`radus`), or is in a
-///   namespace the type declares attributes in and does not open
-///   (`inputs:radus` on a light, `ernie:sensor:noize` on a camera),
-///   with the closest declared names suggested;
+///   (`radus`), or is in a namespace the type declares attributes in
+///   and does not open (`inputs:radus` on a light,
+///   `ernie:sensor:noize` on a camera), with the closest declared
+///   names suggested;
 /// - everything else is allowed: other namespaces (custom data such
-/// as `user:speed`), the type's
-///   open namespaces (`PrimTypeDef::openNamespaces`), undeclared
-///   `primvars:*`, `xformOpOrder` and ops Ernie does not know, and
-///   UsdShade connections (`<input>.connect`).
-/// A null `type` (an untyped prim, or one of a type not registered)
-/// checks only what Ernie reads on every prim: transform ops and
-/// Imageable's attributes (`visibility`, `ernie:world`,
-/// `ernie:quaternionOrder`), any other name being allowed.
+///   as `user:speed`), the type's open namespaces
+///   (`PrimTypeDef::openNamespaces`), undeclared `primvars:*`,
+///   `xformOpOrder` and ops Ernie does not know, and UsdShade
+///   connections (`<input>.connect`). A null `type` (an untyped prim,
+///   or one of a type not registered) checks only what Ernie reads on
+///   every prim: transform ops and Imageable's attributes
+///   (`visibility`, `ernie:world`, `ernie:quaternionOrder`), any
+///   other name being allowed.
 /// @throws std::invalid_argument naming the prim and the attribute.
 void Validate(const PrimTypeDef* type, const Path& path,
               std::string_view attribute, const Value* value);

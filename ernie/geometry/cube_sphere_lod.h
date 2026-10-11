@@ -87,13 +87,12 @@ struct CubeSphereRegion {
 ///
 /// References:
 /// - C. Ronchi, R. Iacono and P. S. Paolucci, "The 'Cubed Sphere': A
-/// New Method for the Solution of
-///   Partial Differential Equations in Spherical Geometry", Journal
-///   of Computational Physics 124(1):93-114, 1996.
-///   https://doi.org/10.1006/jcph.1996.0047
+///   New Method for the Solution of Partial Differential Equations in
+///   Spherical Geometry", Journal of Computational Physics
+///   124(1):93-114, 1996. https://doi.org/10.1006/jcph.1996.0047
 /// - F. Strugar, "Continuous Distance-Dependent Level of Detail for
-/// Rendering Heightmaps", Journal
-///   of Graphics, GPU, and Game Tools 14(4):57-74, 2009.
+///   Rendering Heightmaps", Journal of Graphics, GPU, and Game Tools
+///   14(4):57-74, 2009.
 ///   https://doi.org/10.1080/2151237X.2009.10129287
 class CubeSphereLod {
   public:
@@ -103,10 +102,10 @@ class CubeSphereLod {
 
     /// Builds the height pyramids of six face rasters of `FaceCells()
     /// + 1` squared samples, in face order. Samples that are not
-    /// finite or equal a raster's nodata value are ignored, and nodes
-    /// without valid samples are never selected. The tree keeps no
-    /// reference to the rasters; their origins and cell sizes are not
-    /// used.
+    ///   finite or equal a raster's nodata value are ignored, and
+    ///   nodes without valid samples are never selected. The tree
+    ///   keeps no reference to the rasters; their origins and cell
+    ///   sizes are not used.
     /// @param leafCells Grid quads along a level-0 node; a power of
     /// two of at least 4.
     /// @throws std::invalid_argument if the radius is not positive

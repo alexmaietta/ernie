@@ -177,34 +177,31 @@ struct MeshItem {
 /// for shadow views, the light's:
 /// - `Culling::Off` draws every draw of the worlds a view sees;
 /// - `Culling::Cpu` skips draws (a mesh, or one world's run of an
-/// instancer's instances) whose
-///   world bounds miss the frustum, once per frame on the CPU;
+///   instancer's instances) whose world bounds miss the frustum, once
+///   per frame on the CPU;
 /// - `Culling::Gpu`, the default, also tests every instance of the
-/// instanced draws left on the GPU
-///   (cull.slang, `RecordCull`), one workgroup per draw and view,
-///   compacting the visible instances in order into an indirect draw;
-///   instance arrays written by CUDA are culled without coming to the
-///   host. It also picks each instance's level of detail
-///   (`LevelCount`), and consecutive indirect draws that bind the
-///   same resources go out as one multi-draw call, each draw finding
-///   its parameters by draw index (`DrawCalls`).
+///   instanced draws left on the GPU (cull.slang, `RecordCull`), one
+///   workgroup per draw and view, compacting the visible instances in
+///   order into an indirect draw; instance arrays written by CUDA are
+///   culled without coming to the host. It also picks each instance's
+///   level of detail (`LevelCount`), and consecutive indirect draws
+///   that bind the same resources go out as one multi-draw call, each
+///   draw finding its parameters by draw index (`DrawCalls`).
 ///
 /// References:
 /// - Pixar, "UsdGeomPointInstancer",
 ///   https://openusd.org/release/api/class_usd_geom_point_instancer.html
 /// - U. Haar and S. Aaltonen, "GPU-Driven Rendering Pipelines",
-/// SIGGRAPH 2015 Advances in
-///   Real-Time Rendering in Games course.
+///   SIGGRAPH 2015 Advances in Real-Time Rendering in Games course.
 ///   https://advances.realtimerendering.com/s2015/aaltonenhaar_siggraph2015_combined_final_footer_220dpi.pdf
 /// - B. Shacklett et al., "An Extensible, Data-Oriented Architecture
-/// for High-Performance,
-///   Many-World Simulation", ACM Transactions on Graphics 42(4), 2023
-///   (Madrona's batch renderer).
+///   for High-Performance, Many-World Simulation", ACM Transactions
+///   on Graphics 42(4), 2023 (Madrona's batch renderer).
 /// - V. Blanco, "Compute Shader Culling", Vulkan Guide.
 ///   https://vkguide.dev/docs/gpudriven/compute_culling/
 /// - Khronos, Vulkan specification, `vkCmdDrawIndirect` with the
-/// `multiDrawIndirect` feature, and
-///   `DrawIndex` (`gl_DrawID`, `shaderDrawParameters`).
+///   `multiDrawIndirect` feature, and `DrawIndex` (`gl_DrawID`,
+///   `shaderDrawParameters`).
 ///   https://registry.khronos.org/vulkan/specs/latest/man/html/vkCmdDrawIndirect.html
 class MeshDrawable : public RasterDrawable {
   public:

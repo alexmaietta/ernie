@@ -66,8 +66,8 @@ std::size_t History();
 void Clear();
 
 /// The calling thread's index in `Zone::thread`, and the names
-/// threads gave themselves
-/// (`SetThreadName`, else "Thread <index>"), by index.
+/// threads gave themselves (`SetThreadName`, else "Thread <index>"),
+/// by index.
 std::uint32_t ThreadIndex();
 void SetThreadName(std::string name);
 std::vector<std::string> ThreadNames();

@@ -20,8 +20,7 @@
 // - NVIDIA, "Omniverse RTX Renderer: Lighting, Physical Lighting",
 //   https://docs.omniverse.nvidia.com/materials-and-rendering/latest/lighting.html
 // - D. Pascale, "RGB coordinates of the Macbeth ColorChecker",
-// BabelColor, 2006 (the patches'
-//   sRGB values).
+//   BabelColor, 2006 (the patches' sRGB values).
 
 #include "ernie/app/demo.h"
 #include "ernie/scene/base_schemas.h"

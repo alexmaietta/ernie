@@ -1813,8 +1813,7 @@ void RasterRenderer::Update(
             const CameraView viewOf = raster.View(v);
             Uniforms& uniforms = viewUniforms[v];
             // A pushbroom projects through its strip in place of a
-            // view-projection
-            // (`projectWorld`).
+            // view-projection (`projectWorld`).
             if (params.camera.pushbroom) {
                 const PushbroomStrip strip = params.Strip(v);
                 CopyMatrix(uniforms.viewProjection, strip.Packed());
@@ -2943,8 +2942,7 @@ void RasterRenderer::RecordViews(
                              Frame(subframe * outputViews_ * faces_));
         }
         // One layered pass for all the views: each view's draws go to
-        // its layer
-        // (`Uniforms::flags`).
+        // its layer (`Uniforms::flags`).
         const auto draw = [&](DrawPhase phase, bool load) {
             targets.PrepareGBuffer(commands);
             BeginRendering(commands, targets.GBufferTarget(load));

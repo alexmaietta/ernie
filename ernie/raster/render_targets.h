@@ -41,18 +41,17 @@ class RenderTargets : public FrameImages {
     /// @throws std::runtime_error if allocation fails, or
     /// std::invalid_argument for a zero extent, a band count outside
     /// 1 to 64, no views, or more layers than the device allows
-    /// (`MaxViews`).
-    /// Holds the render vars `vars` (`RequiredVars`; empty for every
-    /// var); the others get placeholders of one texel per view that
-    /// passes bind but do not write. `aovs` names the AOV slots in
-    /// order (`AovOutputsOf` of the frame's chain); `vars` may hold
-    /// slots by their `kAovSlotNames`, which `Var` also finds as
-    /// "aov:<name>". A camera rendered on cube faces (wide_view.h)
-    /// draws `faces` raster layers per view: the G-buffer, depth,
-    /// raster radiance and the raster images below hold view `v`'s
-    /// face `f` at layer `v * faces + f` (`RasterLayers` of them),
-    /// while the render vars, AOVs and sensor images keep a layer per
-    /// view.
+    /// (`MaxViews`). Holds the render vars `vars` (`RequiredVars`;
+    /// empty for every var); the others get placeholders of one texel
+    /// per view that passes bind but do not write. `aovs` names the
+    /// AOV slots in order (`AovOutputsOf` of the frame's chain);
+    /// `vars` may hold slots by their `kAovSlotNames`, which `Var`
+    /// also finds as "aov:<name>". A camera rendered on cube faces
+    /// (wide_view.h) draws `faces` raster layers per view: the
+    /// G-buffer, depth, raster radiance and the raster images below
+    /// hold view `v`'s face `f` at layer `v * faces + f`
+    /// (`RasterLayers` of them), while the render vars, AOVs and
+    /// sensor images keep a layer per view.
     RenderTargets(const VulkanContext& context, VkExtent2D extent,
                   int bands, bool shared, std::uint32_t views = 1,
                   std::span<const std::string_view> vars = {},

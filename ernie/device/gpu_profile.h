@@ -12,14 +12,12 @@
 //     ERNIE_GPU_ZONE(context, commands, "Shadow passes");
 //
 // Finished zones reach the profilers when later command buffers
-// collect them
-// (`VulkanContext::CollectGpuProfile`, which `Submit` and
-// `SubmitAsync` do).
+// collect them (`VulkanContext::CollectGpuProfile`, which `Submit`
+// and `SubmitAsync` do).
 //
 // References:
 // - B. Taudul, "Tracy Profiler", the Vulkan GPU zones
-// (TracyVulkan.hpp).
-//   https://github.com/wolfpld/tracy
+//   (TracyVulkan.hpp). https://github.com/wolfpld/tracy
 
 #include "ernie/device/vulkan_context.h"
 #include "ernie/util/profile.h"

@@ -37,12 +37,10 @@ namespace ernie {
 ///
 /// References:
 /// - M. S. Mikkelsen, "Practical Real-Time Hex-Tiling", Journal of
-/// Computer Graphics Techniques
-///   11(3), 2022.
+///   Computer Graphics Techniques 11(3), 2022.
 /// - M. Jarzynski and M. Olano, "Hash Functions for GPU Rendering",
-/// Journal of Computer Graphics
-///   Techniques 9(3), 2020 (pcg2d, for per-tile rotations and
-///   offsets).
+///   Journal of Computer Graphics Techniques 9(3), 2020 (pcg2d, for
+///   per-tile rotations and offsets).
 class RasterMaterial {
   public:
     /// Its uniforms reach the device through `uploads`, which must

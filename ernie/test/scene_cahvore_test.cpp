@@ -154,8 +154,8 @@ TEST(Cahvore, Mars2020ModelsSeeThePublishedFieldsOfView) {
 TEST(Cahvore, ConvertsToErnieCameras) {
     const auto models = ernie::ReadCahvoreModelsFile(
         Fixture("m2020_camera_models.json"));
-    // Mastcam-Z's left camera at 26 mm (Bell et al. 2021, Table
-    // 5: 7.4 um pixels): CAHVOR as a perspective lens.
+    // Mastcam-Z's left camera at 26 mm (Bell et al. 2021, Table 5:
+    // 7.4 um pixels): CAHVOR as a perspective lens.
     const ernie::CahvoreModel::ErnieCamera mastcam =
         Named(models, "MCAM_Z_LEFT-Z026").ToCamera(7.4);
     EXPECT_EQ(mastcam.camera.lens.projection,

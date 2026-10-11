@@ -222,8 +222,7 @@ class TerrainDrawable : public RasterDrawable {
     std::uint64_t GpuBytes() const;
 
     /// Bounds of the drawn mesh at the given vertical exaggeration,
-    /// relative to the origin
-    /// (`SetOrigin`).
+    /// relative to the origin (`SetOrigin`).
     std::pair<glm::vec3, glm::vec3> Bounds(float exaggeration) const;
 
     void SetOrigin(const glm::dvec3& origin) override {

@@ -23,11 +23,10 @@
 ///
 /// References:
 /// - N. Greene, "Environment Mapping and Other Applications of World
-/// Projections", IEEE Computer
-///   Graphics and Applications 6(11):21-29, 1986 (cube maps).
+///   Projections", IEEE Computer Graphics and Applications
+///   6(11):21-29, 1986 (cube maps).
 /// - Khronos, "Vulkan Specification", 16.5.4 "Cube Map Face
-/// Selection" (selection by the
-///   largest-magnitude component).
+///   Selection" (selection by the largest-magnitude component).
 namespace ernie {
 
 /// The unit ray, in the camera's frame, that lands at distorted

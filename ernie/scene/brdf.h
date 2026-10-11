@@ -97,18 +97,16 @@ class BrdfRegistry {
 /// The shared Slang module `brdf`: `BrdfInput`, `BrdfParams`,
 /// `IBrdf`, `PI`, phase functions, and the backend-neutral helpers:
 /// - `brdfInputOf(n, l, v, albedo)`: the `BrdfInput` of unit light
-/// and view directions about a
-///   normal, in any frame;
+///   and view directions about a normal, in any frame;
 /// - `evaluateBrdf(model, n, l, v, albedo, p)`: f_r cos(i),
-/// `radianceFactor / pi`, the radiance
-///   reflected towards v per unit radiance from l per steradian;
+///   `radianceFactor / pi`, the radiance reflected towards v per unit
+///   radiance from l per steradian;
 /// - `sampleBrdf(model, n, v, albedo, p, u)`: a cosine-weighted
-/// incident direction with its
-///   density and weight (evaluation over density) from uniform `u` in
-///   [0, 1)^2;
+///   incident direction with its density and weight (evaluation over
+///   density) from uniform `u` in [0, 1)^2;
 /// - `brdfPdf(n, l)`: that density, for multiple importance sampling;
 /// - `cosineHemisphere` and `orthonormalBasis`, the sampling building
-/// blocks.
+///   blocks.
 std::string_view BrdfSlang();
 
 /// Slang modules to compile before a shader that uses `model`:

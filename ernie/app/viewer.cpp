@@ -1979,8 +1979,8 @@ struct Viewer::State {
     }
 
     /// Kit's eye menu: what the viewport draws over the scene,
-    /// applications' toggles
-    /// (`AddViewportToggle`), and the heads-up display's items.
+    /// applications' toggles (`AddViewportToggle`), and the heads-up
+    /// display's items.
     void DrawShowMenu() {
         // Toggles stay open, so several switch at once.
         ImGui::PushItemFlag(ImGuiItemFlags_AutoClosePopups, false);

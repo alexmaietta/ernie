@@ -16,12 +16,10 @@ namespace ernie {
 ///
 /// References:
 /// - G. Gribb and K. Hartmann, "Fast Extraction of Viewing Frustum
-/// Planes from the
-///   World-View-Projection Matrix", 2001.
+///   Planes from the World-View-Projection Matrix", 2001.
 /// - T. Akenine-Moller, E. Haines, N. Hoffman et al., "Real-Time
-/// Rendering", 4th ed., CRC Press,
-///   2018, section 22.10.1 (plane/box test with the box's positive
-///   vertex).
+///   Rendering", 4th ed., CRC Press, 2018, section 22.10.1 (plane/box
+///   test with the box's positive vertex).
 struct Frustum {
     std::array<glm::vec4, 6>
         planes{};  ///< Left, right, bottom, top, near, far.

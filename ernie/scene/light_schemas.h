@@ -18,7 +18,7 @@
 ///
 /// References:
 /// - Pixar, UsdLux,
-/// https://openusd.org/release/api/usd_lux_page_front.html
+///   https://openusd.org/release/api/usd_lux_page_front.html
 /// - NVIDIA, Omniverse lighting, photometric units,
 ///   https://docs.omniverse.nvidia.com/materials-and-rendering/latest/lighting.html
 

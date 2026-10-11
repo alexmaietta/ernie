@@ -14,8 +14,7 @@
 /// of a UsdShade network (UsdPreviewSurface, UsdUVTexture,
 /// UsdPrimvarReader_float2, UsdTransform2d) by `info:id`. Each
 /// declaration's fallback is the value Ernie shades an unset input
-/// with
-/// (`MaterialSettings`, `DetailSettings`, `TextureReader`, the
+/// with (`MaterialSettings`, `DetailSettings`, `TextureReader`, the
 /// `preview_surface` model's defaults).
 ///
 /// Not declared, and read generically: a BRDF's own parameters
@@ -28,7 +27,7 @@
 ///
 /// References:
 /// - Pixar, UsdShade,
-/// https://openusd.org/release/api/usd_shade_page_front.html
+///   https://openusd.org/release/api/usd_shade_page_front.html
 /// - Pixar, "UsdPreviewSurface Specification",
 ///   https://openusd.org/release/spec_usdpreviewsurface.html
 

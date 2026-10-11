@@ -143,16 +143,15 @@ struct FrameInfo {
 /// hide unless asked to show it.
 ///
 /// The viewer defines its own perspective camera on opening, framing
-/// the scene
-/// (`PerspectiveCamera()`, the default view). The viewport looks
-/// through it or any Camera prim of the scene; navigating moves
+/// the scene (`PerspectiveCamera()`, the default view). The viewport
+/// looks through it or any Camera prim of the scene; navigating moves
 /// whichever camera it looks through.
 ///
 /// Drive it in one of two ways, both on the thread that created it
 /// (GLFW needs the main thread on macOS):
 /// - `Run()` loops until the window closes;
 /// - `Step()` draws one frame and returns, for callers that own the
-/// loop, such as a simulation.
+///   loop, such as a simulation.
 ///
 /// Each frame runs, in order: `OnFrame` callbacks; the UI, whose
 /// panels may edit the scene, then `OnUi` callbacks; `OnPreRender`
@@ -324,10 +323,9 @@ class Viewer {
     void SetSelection(std::vector<Path> paths);
 
     /// Sets `attribute` of the prim at `path` as a GUI edit, through
-    /// the viewer's undo history
-    /// (`History`). With `open`, a continuing edit (a drag) merges
-    /// into one undo step, which ends once no widget or gizmo is in
-    /// use.
+    /// the viewer's undo history (`History`). With `open`, a
+    /// continuing edit (a drag) merges into one undo step, which ends
+    /// once no widget or gizmo is in use.
     /// @throws std::invalid_argument as `Scene::Set`.
     void Edit(const Path& path, std::string_view attribute,
               Value value, bool open = false);
@@ -477,10 +475,9 @@ class Viewer {
     void SetVsync(bool vsync);
 
     /// How the viewport draws triangle edges: a mode overriding the
-    /// render settings' own
-    /// (`ernie:wireframe`) in the viewport only, or none (the
-    /// default) to follow them. The Z key cycles through off, overlay
-    /// and hidden line.
+    /// render settings' own (`ernie:wireframe`) in the viewport only,
+    /// or none (the default) to follow them. The Z key cycles through
+    /// off, overlay and hidden line.
     std::optional<Wireframe> GetWireframe() const;
     void SetWireframe(std::optional<Wireframe> mode);
 
