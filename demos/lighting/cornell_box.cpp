@@ -201,12 +201,13 @@ void DefineQuads(Scene& scene, const Path& path,
         }
     }
     const std::vector<std::int64_t> counts(quads.size(), 4);
+    const auto vertices = static_cast<std::int64_t>(indices.size());
     Mesh::Define(scene, path)
-        .SetPoints(Tensor::Copy<double>(points, {indices.size(), 3}))
-        .SetFaceVertexCounts(
-            Tensor::Copy<std::int64_t>(counts, {counts.size()}))
+        .SetPoints(Tensor::Copy<double>(points, {vertices, 3}))
+        .SetFaceVertexCounts(Tensor::Copy<std::int64_t>(
+            counts, {static_cast<std::int64_t>(counts.size())}))
         .SetFaceVertexIndices(
-            Tensor::Copy<std::int64_t>(indices, {indices.size()}))
+            Tensor::Copy<std::int64_t>(indices, {vertices}))
         .SetMaterialBinding(material);
 }
 
