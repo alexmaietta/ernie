@@ -47,6 +47,17 @@ OrbitController ControllerFromTransform(const glm::dmat4& world,
                                         double distance,
                                         float verticalFov);
 
+/// `controller` orbited by `deltaYaw` and `deltaPitch` (as
+/// `OrbitController::Orbit`) about a planet's centre rather than its
+/// target, as globe viewers turn the view, when its eye is more than
+/// `top` (the top of the planet's air) from `centre`; none nearer.
+/// The view keeps its altitude and where it looks on the planet, so a
+/// drag never swings the eye into the ground.
+std::optional<OrbitController>
+OrbitAboutPlanet(const OrbitController& controller,
+                 const glm::dvec3& centre, double top, float deltaYaw,
+                 float deltaPitch);
+
 /// The local transform that places the prim at `path` at the world
 /// transform `world`, given its ancestors' transforms.
 glm::dmat4 LocalFromWorld(const Scene& scene, const Path& path,

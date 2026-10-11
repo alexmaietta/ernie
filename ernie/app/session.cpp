@@ -83,6 +83,34 @@ OrbitController ControllerFromTransform(const glm::dmat4& world,
     return controller;
 }
 
+std::optional<OrbitController>
+OrbitAboutPlanet(const OrbitController& controller,
+                 const glm::dvec3& centre, double top, float deltaYaw,
+                 float deltaPitch) {
+    const glm::dmat4 pose = controller.Transform();
+    const glm::dvec3 eye(pose[3]);
+    const double altitude = glm::length(eye - centre);
+    if (!(altitude > top)) {
+        return std::nullopt;
+    }
+    // An orbit of the eye about the centre, whose turn (a rotation
+    // about the centre) carries the view as it is.
+    const glm::dvec3 forward = (centre - eye) / altitude;
+    OrbitController pivot;
+    pivot.target = centre;
+    pivot.distance = altitude;
+    pivot.yaw = static_cast<float>(std::atan2(-forward.x, forward.y));
+    pivot.pitch = std::clamp(static_cast<float>(std::asin(
+                                 std::clamp(-forward.z, -1.0, 1.0))),
+                             OrbitController::kMinPitch,
+                             OrbitController::kMaxPitch);
+    const glm::dmat4 before = pivot.Transform();
+    pivot.Orbit(deltaYaw, deltaPitch);
+    return ControllerFromTransform(
+        pivot.Transform() * glm::inverse(before) * pose,
+        controller.distance, controller.verticalFov);
+}
+
 glm::dmat4 LocalFromWorld(const Scene& scene, const Path& path,
                           const glm::dmat4& world) {
     const Path parent = path.Parent();

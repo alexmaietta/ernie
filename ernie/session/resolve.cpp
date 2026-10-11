@@ -13,6 +13,7 @@
 #include "ernie/scene/wide_view.h"
 #include "ernie/scene/xform.h"
 #include "ernie/util/astronomy.h"
+#include "ernie/util/atmosphere.h"
 #include "ernie/util/ies.h"
 #include "ernie/util/reflectance_library.h"
 #include "ernie/util/solar.h"
@@ -2497,6 +2498,32 @@ AtmosphereParams AtmosphereParamsOf(const Scene& scene,
     return params;
 }
 
+std::optional<PlanetSphere> PlanetOf(const Scene& scene,
+                                     const Path& path) {
+    if (scene.TypeOf(path) != tokens::kAtmosphere) {
+        return std::nullopt;
+    }
+    AtmosphereParams params;
+    try {
+        params = AtmosphereParamsOf(
+            scene, path, FirstVisible(scene, tokens::kTerrain));
+    } catch (const std::invalid_argument&) {
+        return std::nullopt;
+    }
+    // Both presets' air reaches the model's top altitude.
+    return PlanetSphere{params.planetCentre, params.planetRadius,
+                        params.planetRadius +
+                            AtmosphereModel{}.topAltitude};
+}
+
+std::optional<PlanetSphere> PlanetOf(const Scene& scene) {
+    const Path atmosphere = FirstVisible(scene, tokens::kAtmosphere);
+    if (atmosphere.IsEmpty()) {
+        return std::nullopt;
+    }
+    return PlanetOf(scene, atmosphere);
+}
+
 BodyParams BodyParamsOf(const Scene& scene, const Path& path) {
     if (scene.TypeOf(path) != tokens::kCelestialBody) {
         throw std::invalid_argument("'" + path.String() +
@@ -3347,6 +3374,16 @@ std::optional<Bounds3> LocalBoundsOf(const Scene& scene,
                                      const Path& prim) {
     if (std::optional<Bounds3> extent = ExtentOf(scene, prim)) {
         return extent;
+    }
+    if (const std::optional<PlanetSphere> planet =
+            PlanetOf(scene, prim)) {
+        // The planet lies in world space, whatever the prim's
+        // transform.
+        const glm::vec3 centre(
+            glm::inverse(scene.WorldTransform(prim)) *
+            glm::dvec4(planet->centre, 1.0));
+        const glm::vec3 reach(static_cast<float>(planet->top));
+        return Bounds3{centre - reach, centre + reach};
     }
     if (!IsMeshType(scene.TypeOf(prim))) {
         return std::nullopt;

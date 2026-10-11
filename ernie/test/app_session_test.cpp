@@ -87,6 +87,50 @@ TEST(SessionTest, ControllerFromTransformKeepsViewsFromBelow) {
         OrbitController::kMinPitch);
 }
 
+TEST(SessionTest, OrbitsAboutAPlanetFromAboveItsAir) {
+    // The Earth's centre below the origin, the top of its air 100 km
+    // up; the view 20,000 km out, looking a little beside the centre.
+    const glm::dvec3 centre(0.0, 0.0, -6.371e6);
+    const double top = 6.471e6;
+    OrbitController orbit;
+    orbit.target = {-100.0, 0.0, 25.0};
+    orbit.yaw = 0.4f;
+    orbit.pitch = 0.3f;
+    orbit.distance = 2e7;
+    const glm::dvec3 eye = orbit.Eye();
+    const glm::dvec3 forward = glm::normalize(orbit.target - eye);
+    for (const auto [yaw, pitch] :
+         {std::pair{0.3f, 0.0f}, std::pair{0.0f, -0.4f},
+          std::pair{-0.2f, 0.25f}}) {
+        const std::optional<OrbitController> turned =
+            OrbitAboutPlanet(orbit, centre, top, yaw, pitch);
+        ASSERT_TRUE(turned.has_value());
+        const glm::dvec3 eye2 = turned->Eye();
+        const glm::dvec3 forward2 =
+            glm::normalize(turned->target - eye2);
+        EXPECT_NEAR(glm::length(eye2 - centre),
+                    glm::length(eye - centre), 1.0)
+            << "at the same altitude";
+        EXPECT_GT(glm::length(eye2 - eye), 1e6) << "moved";
+        EXPECT_NEAR(glm::dot(forward2, glm::normalize(centre - eye2)),
+                    glm::dot(forward, glm::normalize(centre - eye)),
+                    1e-4)
+            << "looking at the planet as before";
+        EXPECT_DOUBLE_EQ(turned->distance, orbit.distance);
+    }
+    // Down a long way: the eye goes round the planet, never into it.
+    OrbitController moving = orbit;
+    for (int i = 0; i < 40; ++i) {
+        moving = *OrbitAboutPlanet(moving, centre, top, 0.0f, -0.05f);
+        EXPECT_GT(glm::length(moving.Eye() - centre), top);
+    }
+
+    // Within the air, the usual orbit.
+    orbit.distance = 5e4;
+    EXPECT_FALSE(
+        OrbitAboutPlanet(orbit, centre, top, 0.3f, 0.0f).has_value());
+}
+
 TEST(SessionTest, LocalFromWorldUndoesTheParentsTransform) {
     Scene scene;
     const glm::dmat4 parent =

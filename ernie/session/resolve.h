@@ -425,6 +425,23 @@ AtmosphereParams AtmosphereParamsOf(const Scene& scene,
                                     const Path& path,
                                     const Path& terrain);
 
+/// The planet an Atmosphere wraps, in world space.
+struct PlanetSphere {
+    glm::dvec3 centre{0.0};
+    double radius = 0.0;  ///< Metres, to the ground.
+    double top = 0.0;     ///< Metres, to the top of its air.
+};
+
+/// The planet the Atmosphere at `path` wraps (`AtmosphereParamsOf`,
+/// over the scene's first visible Terrain), or none for another prim
+/// or one that cannot resolve.
+std::optional<PlanetSphere> PlanetOf(const Scene& scene,
+                                     const Path& path);
+
+/// The planet of the scene's first visible Atmosphere (`PlanetOf`),
+/// or none.
+std::optional<PlanetSphere> PlanetOf(const Scene& scene);
+
 /// A CelestialBody's centre (its transform's origin), radius and
 /// albedo.
 /// @throws std::invalid_argument for another prim type.
@@ -600,7 +617,8 @@ std::optional<Path> GpuXformAnchorOf(const Scene& scene,
 
 /// The prim's bounds in its own space: its `extent` if authored, else
 /// those of its geometry, a Mesh's CPU points or a UsdGeom
-/// primitive's shape (`PrimitiveMeshOf`); none for other prims or
+/// primitive's shape (`PrimitiveMeshOf`), or an Atmosphere's planet
+/// to the top of its air (`PlanetOf`); none for other prims or
 /// geometry that cannot be read.
 std::optional<Bounds3> LocalBoundsOf(const Scene& scene,
                                      const Path& prim);

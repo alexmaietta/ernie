@@ -1759,6 +1759,24 @@ struct Viewer::State {
         overlay.Polyline(roof, style);
     }
 
+    /// Above a planet's air, orbits about the planet's centre
+    /// (`OrbitAboutPlanet`); returns false within the air or without
+    /// a planet, for the usual orbit.
+    bool OrbitPlanet(float deltaYaw, float deltaPitch) {
+        const std::optional<PlanetSphere> planet = PlanetOf(scene);
+        if (!planet) {
+            return false;
+        }
+        const std::optional<OrbitController> turned =
+            OrbitAboutPlanet(controller, planet->centre, planet->top,
+                             deltaYaw, deltaPitch);
+        if (!turned) {
+            return false;
+        }
+        controller = *turned;
+        return true;
+    }
+
     void HandleNavigation(bool hovered, bool active, float height) {
         const ImGuiIO& io = ImGui::GetIO();
         const bool dragging =
@@ -1772,8 +1790,11 @@ struct Viewer::State {
         bool moved = false;
         if (active &&
             ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f)) {
-            controller.Orbit(-io.MouseDelta.x * 0.005f,
-                             io.MouseDelta.y * 0.005f);
+            if (!OrbitPlanet(-io.MouseDelta.x * 0.005f,
+                             io.MouseDelta.y * 0.005f)) {
+                controller.Orbit(-io.MouseDelta.x * 0.005f,
+                                 io.MouseDelta.y * 0.005f);
+            }
             moved = true;
         }
         // Right drags along the ground, middle across the screen (up

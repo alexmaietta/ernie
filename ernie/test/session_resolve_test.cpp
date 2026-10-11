@@ -924,3 +924,34 @@ TEST(AtmosphereParamsOf, PlacesThePlanet) {
                                            prims.terrain),
                  std::invalid_argument);
 }
+
+TEST(AtmosphereParamsOf, BoundsThePlanetToTheTopOfItsAir) {
+    Scene scene;
+    EXPECT_FALSE(ernie::PlanetOf(scene).has_value());
+    ernie::Atmosphere::Define(scene, "/World/Air");
+    const std::optional<ernie::PlanetSphere> planet =
+        ernie::PlanetOf(scene);
+    ASSERT_TRUE(planet.has_value());
+    EXPECT_DOUBLE_EQ(planet->radius, 6371.0088e3);
+    EXPECT_DOUBLE_EQ(planet->top, 6371.0088e3 + 100e3);
+    EXPECT_DOUBLE_EQ(planet->centre.z, -6371.0088e3);
+
+    // Its bounds are the planet's, where it lies in the world
+    // whatever the prim's transform: framing it frames the planet.
+    scene.Set(
+        "/World/Air", tokens::kTransform,
+        glm::translate(glm::dmat4(1.0), glm::dvec3(5.0, 0.0, 0.0)));
+    const std::optional<ernie::Bounds3> bounds =
+        ernie::LocalBoundsOf(scene, Path("/World/Air"));
+    ASSERT_TRUE(bounds.has_value());
+    const glm::vec3 centre = 0.5f * (bounds->first + bounds->second);
+    EXPECT_NEAR(centre.x, -5.0f, 1.0f);
+    EXPECT_NEAR(centre.z, -6371.0088e3f, 1.0f);
+    EXPECT_NEAR(bounds->second.z - centre.z, 6471.0088e3f, 1.0f);
+
+    scene.Set("/World/Air", tokens::kAtmospherePreset,
+              std::string("venus"));
+    EXPECT_FALSE(ernie::PlanetOf(scene).has_value());
+    EXPECT_FALSE(
+        ernie::LocalBoundsOf(scene, Path("/World/Air")).has_value());
+}
