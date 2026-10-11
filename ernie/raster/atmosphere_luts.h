@@ -71,6 +71,13 @@ class AtmosphereLuts {
         return *skyIrradiance_;
     }
 
+    /// The bending (radians) of rays leaving the atmosphere, by
+    /// apparent zenith angle and height (atmosphere.slang's
+    /// `refractionDeviation`).
+    const GpuImage& Refraction() const {
+        return *refraction_;
+    }
+
     /// atmosphere.slang's medium, densities and phase tables, or
     /// small placeholders without an atmosphere.
     const GpuBuffer& Medium() const {
@@ -107,6 +114,7 @@ class AtmosphereLuts {
     mutable std::unique_ptr<ComputePipeline> transmittancePipeline_;
     mutable std::unique_ptr<ComputePipeline> multiplePipeline_;
     mutable std::unique_ptr<ComputePipeline> irradiancePipeline_;
+    mutable std::unique_ptr<ComputePipeline> refractionPipeline_;
     std::optional<AtmosphereParams> params_;
     std::optional<BandedAtmosphere> banded_;
     std::unique_ptr<GpuBuffer> medium_;
@@ -115,6 +123,7 @@ class AtmosphereLuts {
     std::unique_ptr<GpuImage> transmittance_;
     std::unique_ptr<GpuImage> multipleScattering_;
     std::unique_ptr<GpuImage> skyIrradiance_;
+    std::unique_ptr<GpuImage> refraction_;
     mutable bool stale_ = false;
 };
 

@@ -27,6 +27,7 @@ constexpr DescriptorBinding kBindings[] = {
     {6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {7, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {8, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {9, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
 };
 
 /// atmosphere.slang's table sizes.
@@ -35,6 +36,8 @@ constexpr std::uint32_t kTransmittanceHeight = 64;
 constexpr std::uint32_t kMultipleScatteringSize = 32;
 constexpr std::uint32_t kIrradianceWidth = 64;
 constexpr std::uint32_t kIrradianceHeight = 16;
+constexpr std::uint32_t kRefractionWidth = 256;
+constexpr std::uint32_t kRefractionHeight = 32;
 
 constexpr VkBufferUsageFlags kStorage =
     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
@@ -68,7 +71,8 @@ AtmosphereLuts::AtmosphereLuts(const VulkanContext& context,
                            1.0f, false}),
       transmittance_(TableImage(context, 1, 1, 1)),
       multipleScattering_(TableImage(context, 1, 1, 1)),
-      skyIrradiance_(TableImage(context, 1, 1, 1)) {
+      skyIrradiance_(TableImage(context, 1, 1, 1)),
+      refraction_(TableImage(context, 1, 1, 1)) {
     // The placeholder tables are never written; shading reads them
     // only without an atmosphere, so their contents do not matter.
     Placeholders();
@@ -128,6 +132,7 @@ void AtmosphereLuts::Set(
         transmittance_ = TableImage(context_, 1, 1, 1);
         multipleScattering_ = TableImage(context_, 1, 1, 1);
         skyIrradiance_ = TableImage(context_, 1, 1, 1);
+        refraction_ = TableImage(context_, 1, 1, 1);
         stale_ = true;
         return;
     }
@@ -142,6 +147,8 @@ void AtmosphereLuts::Set(
                    kMultipleScatteringSize, groups);
     skyIrradiance_ = TableImage(context_, kIrradianceWidth,
                                 kIrradianceHeight, groups);
+    refraction_ = TableImage(context_, kRefractionWidth,
+                             kRefractionHeight, groups);
     stale_ = true;
 }
 
@@ -155,9 +162,10 @@ void AtmosphereLuts::Upload() {
 
     // atmosphere.slang's medium, in kilometres: per constituent its
     // scattering and absorption per band group, then the ground's
-    // albedo per band group.
+    // albedo per band group, then per constituent its refractivity
+    // per band group.
     std::vector<float> medium(
-        4 * (2 + 2 * constituents * groups + groups), 0.0f);
+        4 * (2 + 3 * constituents * groups + groups), 0.0f);
     medium[0] = static_cast<float>(banded.bottomRadius * 1e-3);
     medium[1] =
         static_cast<float>((banded.bottomRadius + top) * 1e-3);
@@ -179,6 +187,15 @@ void AtmosphereLuts::Upload() {
     for (std::size_t b = 0; b < bandCount; ++b) {
         medium[albedo + b] =
             static_cast<float>(params_->groundAlbedo);
+    }
+    // Then each constituent's refractivity per band group.
+    for (std::size_t c = 0; c < constituents; ++c) {
+        const std::size_t refractivity =
+            albedo + 4 * groups * (1 + c);
+        for (std::size_t b = 0; b < bandCount; ++b) {
+            medium[refractivity + b] =
+                banded.constituents[c].refractivity[b];
+        }
     }
 
     std::vector<float> densities(constituents * kDensitySamples);
@@ -214,6 +231,8 @@ void AtmosphereLuts::Record(VkCommandBuffer commands) const {
             commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         skyIrradiance_->Transition(
             commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        refraction_->Transition(
+            commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         return;
     }
     ERNIE_GPU_ZONE(context_, commands, "Atmosphere tables");
@@ -231,11 +250,15 @@ void AtmosphereLuts::Record(VkCommandBuffer commands) const {
         irradiancePipeline_ = std::make_unique<ComputePipeline>(
             context_, layout_,
             compiler_.CompileSpirv(modules, "skyIrradianceMain"));
+        refractionPipeline_ = std::make_unique<ComputePipeline>(
+            context_, layout_,
+            compiler_.CompileSpirv(modules, "refractionMain"));
     }
-    for (GpuImage* image :
-         {transmittance_.get(), multipleScattering_.get(),
-          skyIrradiance_.get()}) {
-        image->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    GpuImage* const tables[] = {
+        transmittance_.get(), multipleScattering_.get(),
+        skyIrradiance_.get(), refraction_.get()};
+    for (GpuImage* table : tables) {
+        table->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
     }
     const auto general = [](const GpuImage& image) {
         return DescriptorResource::Of(image.View(),
@@ -250,7 +273,8 @@ void AtmosphereLuts::Record(VkCommandBuffer commands) const {
         general(*multipleScattering_),
         DescriptorResource::Of(*phases_),
         general(*skyIrradiance_),
-        general(*multipleScattering_)};
+        general(*multipleScattering_),
+        general(*refraction_)};
     const std::uint32_t groups = transmittance_->Desc().layers;
     // Each table reads the ones before it.
     const auto barrier = [commands] {
@@ -283,11 +307,12 @@ void AtmosphereLuts::Record(VkCommandBuffer commands) const {
     barrier();
     dispatch(*irradiancePipeline_, kIrradianceWidth,
              kIrradianceHeight);
+    // Refraction reads the medium alone.
+    dispatch(*refractionPipeline_, kRefractionWidth,
+             kRefractionHeight);
 
-    for (GpuImage* image :
-         {transmittance_.get(), multipleScattering_.get(),
-          skyIrradiance_.get()}) {
-        image->Transition(commands,
+    for (GpuImage* table : tables) {
+        table->Transition(commands,
                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
 }

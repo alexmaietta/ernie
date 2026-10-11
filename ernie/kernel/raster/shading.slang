@@ -35,7 +35,8 @@
 // that lights the scene (13's, without its sun when that is lit on its own), 17 and 18 the dome
 // occlusion, raw and filtered, 19 the terrain's horizon map, 20 the lights' profiles, 21 the
 // terrain's heights, 22 the atmosphere's transmittance table, 23 its multiple scattering table,
-// 24 its medium, 25 its constituents' densities, 26 their phase functions.
+// 24 its medium, 25 its constituents' densities, 26 their phase functions, 28 its sky irradiance
+// table, 30 its refraction table.
 //
 // References:
 // - W. Jakob and J. Hanika, "A Low-Dimensional Function Space for Efficient Spectral Upsampling",
@@ -849,6 +850,71 @@ float4 occlusionSlice(float3 n, float3 tangent, float3 v, float2 horizons) {
 [[vk::binding(25, 0)]] StructuredBuffer<float> atmosphereDensities;
 [[vk::binding(26, 0)]] StructuredBuffer<float> atmospherePhases;
 [[vk::binding(28, 0)]] Texture2DArray<float4> atmosphereSkyIrradiance;
+[[vk::binding(30, 0)]] Texture2DArray<float4> atmosphereRefraction;
+
+// The apparent direction from `eye` (relative to the frame's origin, metres) of something at
+// infinity in true direction `w`, lifted towards the zenith by the atmosphere's refraction in the
+// middle band; `w` without an atmosphere or where its ray misses it. The bending is for the
+// apparent direction, which one fixed-point step finds from the true one.
+float3 apparentDirection(float3 eye, float3 w) {
+    if (sh.atmosphere[1].y == 0.0) {
+        return w;
+    }
+    let bottom = sh.atmosphere[0].w;
+    let top = sh.atmosphere[1].x;
+    let middle = uint(sh.range.z) / 2;
+    let p = eye * 1e-3 - sh.atmosphere[0].xyz;
+    // Started from the bending of a ray along the eye's horizon, so a body just below the
+    // geometric horizon, whose own ray would meet the ground, starts lifted clear of it; then
+    // apparent = true + bending(apparent), which contracts by about a quarter each step near the
+    // horizon (where the bending changes fastest), to within a tenth of an arcminute in four.
+    let r0 = length(p);
+    var apparent = w;
+    if (r0 <= top) {
+        let horizontal = refractionDeviation(atmosphereRefraction, tableSampler, r0,
+                                             horizonCosine(r0, bottom), middle / 4, bottom, top);
+        apparent = turnTowardsZenith(w, p / r0, horizontal[middle % 4]);
+    }
+    for (uint i = 0; i < 4; ++i) {
+        float start;
+        float end;
+        bool ground;
+        if (!clipToAtmosphere(p, apparent, bottom, top, start, end, ground)) {
+            return apparent;
+        }
+        let first = p + start * apparent;
+        let r = length(first);
+        let vertical = first / r;
+        let bending = refractionDeviation(atmosphereRefraction, tableSampler, r,
+                                          dot(vertical, apparent), middle / 4, bottom, top);
+        apparent = turnTowardsZenith(w, vertical, bending[middle % 4]);
+    }
+    return apparent;
+}
+
+// The true direction of what is seen from `eye` along apparent direction `d` beyond the atmosphere,
+// in the middle band: `d` turned down by its refraction.
+float3 trueDirection(float3 eye, float3 d) {
+    if (sh.atmosphere[1].y == 0.0) {
+        return d;
+    }
+    let bottom = sh.atmosphere[0].w;
+    let top = sh.atmosphere[1].x;
+    let middle = uint(sh.range.z) / 2;
+    let p = eye * 1e-3 - sh.atmosphere[0].xyz;
+    float start;
+    float end;
+    bool ground;
+    if (!clipToAtmosphere(p, d, bottom, top, start, end, ground)) {
+        return d;
+    }
+    let first = p + start * d;
+    let r = length(first);
+    let vertical = first / r;
+    let bending = refractionDeviation(atmosphereRefraction, tableSampler, r, dot(vertical, d),
+                                      middle / 4, bottom, top);
+    return turnTowardsZenith(d, vertical, -bending[middle % 4]);
+}
 
 // The light of the sky and the ground around a surface at `world` (relative to the frame's
 // origin, metres) facing `normal` (its bent normal where geometry occludes part of the sky), seen
@@ -973,6 +1039,12 @@ void atmosphereSky(inout float radiance[kMaxBands], float3 origin, float3 d,
         var scattered = float4(0.0);
         var transmittance = float4(1.0);
         var groundLight = float4(0.0);
+        // Refraction: rays that the air bends back up clear the ground just below the
+        // horizon, and what lies beyond the atmosphere shows from further down, where the bent
+        // ray came from (judged where the ray is in the atmosphere first).
+        var bending = float4(0.0);
+        var escapes = bool4(!ground);
+        var vertical = float3(0.0, 0.0, 1.0);
         if (inside) {
             scatterAlong(atmosphereMedium, atmosphereDensities, atmospherePhases,
                          atmosphereTransmittance, atmosphereMultiple, tableSampler, p, d, start,
@@ -985,6 +1057,13 @@ void atmosphereSky(inout float radiance[kMaxBands], float3 origin, float3 d,
                 groundLight = groundAlbedo(atmosphereMedium, group) / PI * toSun *
                               saturate(dot(up, sun));
             }
+            let first = p + start * d;
+            let r = length(first);
+            vertical = first / r;
+            let mu = dot(vertical, d);
+            bending = refractionDeviation(atmosphereRefraction, tableSampler, r, mu, group,
+                                          bottom, top);
+            escapes = escapesAtmosphere(atmosphereMedium, atmosphereDensities, r, mu, group);
         }
         for (uint k = 0; k < 4; ++k) {
             let band = group * 4 + k;
@@ -993,24 +1072,27 @@ void atmosphereSky(inout float radiance[kMaxBands], float3 origin, float3 d,
             }
             let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;
             let irradiance = bandValue(sh.irradiance, band);
-            let behind = ground ? irradiance * groundLight[k]
-                                : radiance[band] + irradiance * sunDisc(d, sun, sunSine,
-                                                                        wavelength,
-                                                                        pixelSolidAngle);
+            let beyond = turnTowardsZenith(d, vertical, -bending[k]);
+            let behind = !escapes[k]
+                             ? irradiance * groundLight[k]
+                             : radiance[band] + irradiance * sunDisc(beyond, sun, sunSine,
+                                                                     wavelength, pixelSolidAngle);
             radiance[band] = behind * transmittance[k] + irradiance * scattered[k];
         }
     }
 }
 
 // The sun's transmittance through the atmosphere in band `band` to the point `world` (relative to
-// the frame's origin, metres); 1 without an atmosphere. The sun's irradiance is then what arrives
-// above the atmosphere.
-float sunAtmosphereTransmittance(float3 world, uint band) {
+// the frame's origin, metres) along `towards`, the sun's apparent direction there
+// (`apparentDirection`), so the ground stays lit while the refracted sun still shows above its
+// horizon; 1 without an atmosphere. The sun's irradiance is then what arrives above the
+// atmosphere.
+float sunAtmosphereTransmittance(float3 world, float3 towards, uint band) {
     if (sh.atmosphere[1].y == 0.0) {
         return 1.0;
     }
     let p = world * 1e-3 - sh.atmosphere[0].xyz;
-    let groups = sunTransmittance(atmosphereTransmittance, tableSampler, p, sh.sun.xyz,
+    let groups = sunTransmittance(atmosphereTransmittance, tableSampler, p, towards,
                                   sh.atmosphere[1].z, band / 4, sh.atmosphere[0].w,
                                   sh.atmosphere[1].x);
     return groups[band % 4];
@@ -1384,6 +1466,8 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     aerialPerspective(world, ndc.xy, aerialTransmittance, aerialScattered);
     float surround[kMaxBands];
     skyLight(world, lookup, unlit ? 0.0 : occlusion, surround);
+    // The sun as refraction shows it here: still above the horizon a little after it has set.
+    let apparentSun = apparentDirection(world, sh.sun.xyz);
     for (uint first = 0; first < bands; first += 3) {
         float3 bandAlbedo = float3(0.0);
         float3 bandIrradiance = float3(0.0);
@@ -1393,7 +1477,8 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             bandAlbedo[k] = bandValue(material.reflectance, band) * albedo.x *
                             modulationAt(coefficients, scale, wavelength);
             bandIrradiance[k] =
-                bandValue(sh.irradiance, band) * sunAtmosphereTransmittance(world, band);
+                bandValue(sh.irradiance, band) *
+                sunAtmosphereTransmittance(world, apparentSun, band);
         }
         // How the model reflects light from all around: the scene's ambient light (from every
         // direction alike, so every lobe sees it whole) and the dome's.
@@ -1569,17 +1654,20 @@ float2 starOffset(StarFrame frame, float3 w) {
     return abs(at - frame.pixel);
 }
 
-// Adds the stars around world direction `d` to `radiance` (per band), as their tent-filtered
-// irradiance over the pixel's solid angle, landing as `frame` puts them.
-void addStars(inout float radiance[kMaxBands], float3 d, StarFrame frame, float pixelAngle,
-              float solidAngle) {
+// Adds the stars around world direction `d` (seen from `eye`, relative to the frame's origin) to
+// `radiance` (per band), as their tent-filtered irradiance over the pixel's solid angle, landing as
+// `frame` puts them: where the atmosphere's refraction lifts them, searching around where the
+// pixel looks beyond it.
+void addStars(inout float radiance[kMaxBands], float3 eye, float3 d, StarFrame frame,
+              float pixelAngle, float solidAngle) {
     // Points within a pixel and a half: farther ones give this pixel no weight.
     let reach = 1.5 * pixelAngle;
     if (reach > 0.2) {
         return;  // pixels so wide a point covers a crowd of cells: no stars
     }
-    let cat = float3(dot(sh.toCatalogue[0].xyz, d), dot(sh.toCatalogue[1].xyz, d),
-                     dot(sh.toCatalogue[2].xyz, d));
+    let beyond = trueDirection(eye, d);
+    let cat = float3(dot(sh.toCatalogue[0].xyz, beyond), dot(sh.toCatalogue[1].xyz, beyond),
+                     dot(sh.toCatalogue[2].xyz, beyond));
     let declination = asin(clamp(cat.z, -1.0, 1.0));
     var ascension = atan2(cat.y, cat.x);
     ascension = ascension < 0.0 ? ascension + 2.0 * PI : ascension;
@@ -1608,7 +1696,7 @@ void addStars(inout float radiance[kMaxBands], float3 d, StarFrame frame, float 
                 let local = float3(cosDec * cos(star.x), cosDec * sin(star.x), sin(star.y));
                 let w = sh.toCatalogue[0].xyz * local.x + sh.toCatalogue[1].xyz * local.y +
                         sh.toCatalogue[2].xyz * local.z;
-                let offset = starOffset(frame, w);
+                let offset = starOffset(frame, apparentDirection(eye, w));
                 if (offset.x < 0.0) {
                     continue;
                 }
@@ -1683,7 +1771,7 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
             // off the axis.
             let pixelAngle = 1.0 / frame.focal;
             let cosine = 1.0 / length(float3(x, line, 1.0));
-            addStars(radiance, d, frame, pixelAngle,
+            addStars(radiance, origin, d, frame, pixelAngle,
                      pixelAngle * pixelAngle * cosine * cosine * cosine);
         }
         let detector = 1.0 / frame.focal;
@@ -1746,7 +1834,7 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
         frame.b = b;
         frame.c = c;
         frame.pixel = pixel;
-        addStars(radiance, d, frame, pixelAngle, solidAngle);
+        addStars(radiance, sh.eye.xyz, d, frame, pixelAngle, solidAngle);
     }
     atmosphereSky(radiance, sh.eye.xyz, d, solidAngle);
     for (uint band = 0; band < bands; ++band) {

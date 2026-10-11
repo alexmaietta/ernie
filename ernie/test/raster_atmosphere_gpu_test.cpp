@@ -769,3 +769,112 @@ TEST_F(AtmosphereLutsTest, SkyIrradianceMatchesTheReference) {
         }
     }
 }
+
+// The refraction table against the CPU's ray trace at its texels'
+// own heights and apparent zenith angles, from overhead to the
+// horizon, at the ground, partway up and at the top (where rays below
+// the horizon cross the atmosphere and leave), in a blue and a red
+// band, for rays that leave the atmosphere.
+TEST_F(AtmosphereLutsTest, RefractionMatchesTheReference) {
+    ernie::ShaderCompiler compiler;
+    AtmosphereLuts luts(*context_, compiler);
+    luts.Set(Earth(), {380.0, 780.0, 16});
+    context_->Submit(
+        [&](VkCommandBuffer commands) { luts.Record(commands); });
+    const std::vector<float> table =
+        TableOf(*context_, luts.Refraction());
+    const BandedAtmosphere& air = luts.Banded();
+    const double bottom = air.bottomRadius;
+    const double height = air.topAltitude;
+    int compared = 0;
+    for (const int y : {0, 8, 31}) {
+        for (const int x : {0, 128, 220, 245, 252}) {
+            // refractionRMu: height up by the square, zenith angle
+            // across crowded towards 2 degrees past the horizon.
+            const double up = UnitOfTexel(y, 32);
+            const double r =
+                std::clamp(bottom + up * up * height, bottom + 0.1,
+                           bottom + height - 0.1);
+            const double horizon =
+                std::acos(-std::sqrt(std::max(
+                    1.0 - (bottom / r) * (bottom / r), 0.0))) +
+                0.0349;
+            const double s = 1.0 - UnitOfTexel(x, 256);
+            const double mu = std::cos(horizon * (1.0 - s * s));
+            for (const int band : {1, 14}) {
+                const BandedAtmosphere::Refraction reference =
+                    air.Refract(r, mu, band, 50.0);
+                if (reference.ground) {
+                    continue;
+                }
+                const std::size_t at =
+                    (static_cast<std::size_t>(band / 4) * 32 * 256 +
+                     static_cast<std::size_t>(y) * 256 +
+                     static_cast<std::size_t>(x)) *
+                        4 +
+                    static_cast<std::size_t>(band % 4);
+                EXPECT_NEAR(static_cast<double>(table[at]),
+                            reference.deviation,
+                            0.02 * reference.deviation + 2e-6)
+                    << "texel " << x << ", " << y << " band " << band;
+                ++compared;
+            }
+        }
+    }
+    EXPECT_GE(compared, 10);
+}
+
+// Refraction at sunset: the sun's true centre on the geometric
+// horizon shows whole, lifted by about half a degree, and flattened,
+// as the bending grows towards the horizon (its lower limb rises more
+// than its upper).
+TEST_F(RasterDelegateTest, RefractionLiftsAndFlattensTheSettingSun) {
+    // 1 mm of sensor at 50 mm: 1.15 degrees across, the 0.53 degree
+    // disc some 15 pixels wide; aimed half a degree up.
+    Scene scene =
+        SkyScene({0.0, 0.0, 2.0}, {1000.0, 0.0, 2.0 + 8.73}, 0.0);
+    scene.Set("/World/Air", tokens::kAtmosphereHazeOpticalDepth, 0.0);
+    ernie::Camera(scene, "/World/Camera")
+        .SetFocalLength(50.0)
+        .SetHorizontalAperture(1.0)
+        .SetVerticalAperture(1.0);
+    RasterDelegate delegate(*context_);
+    ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+    // The disc: pixels brighter than half its brightest in a red
+    // band.
+    constexpr std::size_t kBand = 12;
+    double brightest = 0.0;
+    for (std::size_t row = 0; row < kVarSize; ++row) {
+        for (std::size_t col = 0; col < kVarSize; ++col) {
+            brightest = std::max(
+                brightest, SpectrumAt(outputs, row, col)[kBand]);
+        }
+    }
+    std::size_t top = kVarSize;
+    std::size_t bottom = 0;
+    std::size_t left = kVarSize;
+    std::size_t right = 0;
+    for (std::size_t row = 0; row < kVarSize; ++row) {
+        for (std::size_t col = 0; col < kVarSize; ++col) {
+            if (SpectrumAt(outputs, row, col)[kBand] >
+                0.5 * brightest) {
+                top = std::min(top, row);
+                bottom = std::max(bottom, row);
+                left = std::min(left, col);
+                right = std::max(right, col);
+            }
+        }
+    }
+    ASSERT_LE(top, bottom);
+    // SkyScene's camera is +y up while it looks along +x, so the
+    // horizon runs down the image: rows run across it, columns up.
+    const double across = static_cast<double>(bottom - top + 1);
+    const double up = static_cast<double>(right - left + 1);
+    EXPECT_GT(across, 12.0) << "the whole disc shows";
+    EXPECT_LT(up / across, 0.92) << "flattened";
+    // Lifted: the camera aims half a degree up and the disc's centre
+    // shows near the middle rather than 14 pixels below it, where
+    // its true centre, on the horizon, lies.
+    const double centre = 0.5 * static_cast<double>(left + right);
+    EXPECT_LT(std::abs(centre - (kVarSize / 2.0 - 0.5)), 5.0);
+}

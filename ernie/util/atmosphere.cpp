@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <numbers>
 #include <stdexcept>
 #include <utility>
@@ -75,17 +76,78 @@ double NumberDensityForDepth(const OpticsModel& optics,
 }  // namespace
 
 DensityProfile DensityProfile::Exponential(double scaleHeight) {
-    return {
-        {{DensityLayer::Shape::Exponential, scaleHeight, 0.0, 1.0}}};
+    DensityProfile profile;
+    profile.layers = {
+        {DensityLayer::Shape::Exponential, scaleHeight, 0.0, 1.0}};
+    return profile;
 }
 
 DensityProfile DensityProfile::Tent(double peakAltitude,
                                     double halfWidth) {
-    return {
-        {{DensityLayer::Shape::Tent, peakAltitude, halfWidth, 1.0}}};
+    DensityProfile profile;
+    profile.layers = {
+        {DensityLayer::Shape::Tent, peakAltitude, halfWidth, 1.0}};
+    return profile;
+}
+
+DensityProfile
+DensityProfile::StandardAtmosphere(double surfaceTemperature,
+                                   double molarMass, double gravity) {
+    // U.S. Standard Atmosphere 1976, table 4: the layers' base
+    // heights (m) and lapse rates (K/m) to 84.852 km.
+    struct Layer {
+        double base;
+        double lapse;
+    };
+    static constexpr Layer kLayers[] = {
+        {0.0, -6.5e-3},     {11000.0, 0.0}, {20000.0, 1.0e-3},
+        {32000.0, 2.8e-3},  {47000.0, 0.0}, {51000.0, -2.8e-3},
+        {71000.0, -2.0e-3}, {84852.0, 0.0}};
+    const auto temperature = [&](double h) {
+        double t = surfaceTemperature;
+        for (std::size_t i = 0; i < std::size(kLayers); ++i) {
+            const double end = i + 1 < std::size(kLayers)
+                                   ? kLayers[i + 1].base
+                                   : 1e30;
+            t += kLayers[i].lapse *
+                 (std::clamp(h, kLayers[i].base, end) -
+                  kLayers[i].base);
+        }
+        return t;
+    };
+    constexpr double kStep = 100.0;
+    constexpr int kSamples = 1201;  // to 120 km
+    constexpr int kSubSteps = 10;
+    const double scale = molarMass * gravity / kGasConstant;
+    DensityProfile profile;
+    profile.tableStep = kStep;
+    profile.table.reserve(kSamples);
+    double logPressure = 0.0;  // relative to the ground's
+    profile.table.push_back(1.0);
+    for (int i = 1; i < kSamples; ++i) {
+        // d ln p / dh = -M g / (R T), by the midpoint rule.
+        for (int s = 0; s < kSubSteps; ++s) {
+            const double h =
+                (i - 1) * kStep + (s + 0.5) * kStep / kSubSteps;
+            logPressure -= scale / temperature(h) * kStep / kSubSteps;
+        }
+        const double h = i * kStep;
+        profile.table.push_back(std::exp(logPressure) *
+                                surfaceTemperature / temperature(h));
+    }
+    return profile;
 }
 
 double DensityProfile::operator()(double altitude) const {
+    if (!table.empty()) {
+        const double x =
+            std::clamp(altitude / tableStep, 0.0,
+                       static_cast<double>(table.size() - 1));
+        const auto i =
+            std::min(static_cast<std::size_t>(x), table.size() - 2);
+        const double t = x - static_cast<double>(i);
+        return table[i] + (table[i + 1] - table[i]) * t;
+    }
     double sum = 0.0;
     double weights = 0.0;
     for (const DensityLayer& layer : layers) {
@@ -188,12 +250,27 @@ EarthAtmosphere(double radius,
     atmosphere.bottomRadius = radius;
     atmosphere.topAltitude = 100e3;
 
-    const auto [airDensity, airProfile] = IsothermalGas(
-        options.surfacePressure, options.surfaceTemperature,
-        kAirMolarMass, options.gravity);
+    // Air with the U.S. Standard Atmosphere's temperatures: their
+    // fall through the troposphere shapes both the scattering and,
+    // through the density's gradient at the ground, the refraction
+    // near the horizon (some 3 arcminutes less than an isothermal
+    // column's).
+    const double airDensity =
+        options.surfacePressure /
+        (kBoltzmann * options.surfaceTemperature);
+    const DensityProfile airProfile =
+        DensityProfile::StandardAtmosphere(options.surfaceTemperature,
+                                           kAirMolarMass,
+                                           options.gravity);
+    // Air's refractivity at the reference state scaled to its density
+    // (refractivity is proportional to it, Gladstone-Dale).
+    const double airRatio = airDensity / kStandardNumberDensity;
     atmosphere.constituents.push_back(
         {"molecules", airDensity, airProfile,
-         AirMolecules(options.co2Fraction)});
+         AirMolecules(options.co2Fraction),
+         [airRatio, co2 = options.co2Fraction](double nm) {
+             return AirRefractivity(nm, co2) * airRatio;
+         }});
 
     // A tent from 10 to 40 km holds the column in a triangle of base
     // 30 km: peak * 15 km.
@@ -201,7 +278,7 @@ EarthAtmosphere(double radius,
         DensityProfile::Tent(25e3, 15e3);
     const double ozonePeak = options.ozoneColumn * kDobsonUnit / 15e3;
     atmosphere.constituents.push_back(
-        {"ozone", ozonePeak, ozoneProfile, OzoneMolecules()});
+        {"ozone", ozonePeak, ozoneProfile, OzoneMolecules(), {}});
 
     if (options.aerosolOpticalDepth > 0.0) {
         // Schneegans et al. 2024, CosmoScout VR
@@ -217,8 +294,11 @@ EarthAtmosphere(double radius,
         const double hazeDensity = NumberDensityForDepth(
             haze, hazeProfile, atmosphere.topAltitude, 550.0,
             options.aerosolOpticalDepth);
-        atmosphere.constituents.push_back(
-            {"aerosols", hazeDensity, hazeProfile, std::move(haze)});
+        atmosphere.constituents.push_back({"aerosols",
+                                           hazeDensity,
+                                           hazeProfile,
+                                           std::move(haze),
+                                           {}});
     }
     return atmosphere;
 }
@@ -232,9 +312,17 @@ AtmosphereModel MarsAtmosphere(double radius,
     const auto [gasDensity, gasProfile] = IsothermalGas(
         options.surfacePressure, options.surfaceTemperature,
         options.molarMass, options.gravity);
+    // CO2's refractivity and the remainder's (as air's) at the
+    // reference state, scaled to the gas's density (Gladstone-Dale).
+    const double gasRatio = gasDensity / kStandardNumberDensity;
     atmosphere.constituents.push_back(
         {"molecules", gasDensity, gasProfile,
-         CarbonDioxideMolecules(options.co2Fraction)});
+         CarbonDioxideMolecules(options.co2Fraction),
+         [gasRatio, co2 = options.co2Fraction](double nm) {
+             return (co2 * CarbonDioxideRefractivity(nm) +
+                     (1.0 - co2) * AirRefractivity(nm)) *
+                    gasRatio;
+         }});
 
     if (options.dustOpticalDepth > 0.0) {
         // Feldspar with 3% hematite (Ehlers et al. 2014), indexed
@@ -263,7 +351,7 @@ AtmosphereModel MarsAtmosphere(double radius,
             dust, dustProfile, atmosphere.topAltitude, 880.0,
             options.dustOpticalDepth);
         atmosphere.constituents.push_back(
-            {"dust", dustDensity, dustProfile, std::move(dust)});
+            {"dust", dustDensity, dustProfile, std::move(dust), {}});
     }
     return atmosphere;
 }
@@ -312,6 +400,81 @@ double BandedAtmosphere::TransmittanceToTop(double r, double mu,
     return std::exp(-depth);
 }
 
+double BandedAtmosphere::RefractiveIndex(double altitude,
+                                         int band) const {
+    const auto b = static_cast<std::size_t>(band);
+    double n = 1.0;
+    for (const BandedConstituent& constituent : constituents) {
+        n += static_cast<double>(constituent.refractivity[b]) *
+             constituent.density(altitude);
+    }
+    return n;
+}
+
+BandedAtmosphere::Refraction
+BandedAtmosphere::Refract(double r, double mu, int band,
+                          double step) const {
+    // In the plane of the ray and the planet's centre: x across, z
+    // up through the start.
+    const double top = bottomRadius + topAltitude;
+    const auto index = [&](double radius) {
+        return RefractiveIndex(radius - bottomRadius, band);
+    };
+    // The gradient of n, radial: dn/dr times the unit position.
+    const auto bend = [&](double px, double pz, double tx, double tz,
+                          double& ax, double& az) {
+        const double radius = std::sqrt(px * px + pz * pz);
+        const double h = 1.0;
+        const double dndr =
+            (index(radius + h) - index(radius - h)) / (2.0 * h);
+        const double gx = dndr * px / radius;
+        const double gz = dndr * pz / radius;
+        const double along = gx * tx + gz * tz;
+        const double n = index(radius);
+        ax = (gx - along * tx) / n;
+        az = (gz - along * tz) / n;
+    };
+    double px = 0.0;
+    double pz = r;
+    const double sine = std::sqrt(std::max(1.0 - mu * mu, 0.0));
+    double tx = sine;
+    double tz = mu;
+    Refraction result;
+    for (int i = 0; i < 1000000; ++i) {
+        const double radius = std::sqrt(px * px + pz * pz);
+        const bool outwards = px * tx + pz * tz > 0.0;
+        if (radius > top && outwards) {
+            break;
+        }
+        if (radius < bottomRadius) {
+            result.ground = true;
+            break;
+        }
+        // The midpoint rule on the ray equation: t' = (grad n -
+        // (grad n . t) t) / n.
+        double ax = 0.0;
+        double az = 0.0;
+        bend(px, pz, tx, tz, ax, az);
+        const double mx = px + 0.5 * step * tx;
+        const double mz = pz + 0.5 * step * tz;
+        double mtx = tx + 0.5 * step * ax;
+        double mtz = tz + 0.5 * step * az;
+        bend(mx, mz, mtx, mtz, ax, az);
+        px += step * mtx;
+        pz += step * mtz;
+        tx += step * ax;
+        tz += step * az;
+        const double length = std::sqrt(tx * tx + tz * tz);
+        tx /= length;
+        tz /= length;
+    }
+    // atan2 of the cross and dot products keeps small angles (Mars's
+    // microradians) that acos rounds away.
+    result.deviation = std::atan2(std::abs(sine * tz - mu * tx),
+                                  tx * sine + tz * mu);
+    return result;
+}
+
 BandedAtmosphere BandAverage(const AtmosphereModel& atmosphere,
                              const SpectralBands& bands,
                              int phaseAngles) {
@@ -335,12 +498,16 @@ BandedAtmosphere BandAverage(const AtmosphereModel& atmosphere,
         for (int band = 0; band < bands.count; ++band) {
             double scattering = 0.0;
             double absorption = 0.0;
+            double refractivity = 0.0;
             std::vector<double> phase(cosines.size(), 0.0);
             for (int s = 0; s < samples; ++s) {
                 const double nm = bands.Lower(band) +
                                   (s + 0.5) * bands.Width() / samples;
                 const ParticleOptics optics =
                     constituent.optics(nm, cosines);
+                if (constituent.refractivity) {
+                    refractivity += constituent.refractivity(nm);
+                }
                 scattering += optics.scattering;
                 absorption += optics.absorption;
                 for (std::size_t i = 0; i < cosines.size(); ++i) {
@@ -351,6 +518,8 @@ BandedAtmosphere BandAverage(const AtmosphereModel& atmosphere,
                 constituent.numberDensity * scattering / samples));
             banded.absorption.push_back(static_cast<float>(
                 constituent.numberDensity * absorption / samples));
+            banded.refractivity.push_back(
+                static_cast<float>(refractivity / samples));
             float* out =
                 banded.phase.data() +
                 static_cast<std::size_t>(band) * cosines.size();

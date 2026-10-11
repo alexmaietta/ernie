@@ -91,10 +91,13 @@ TEST(EarthAtmosphere, RayleighDepthMatchesBodhaine) {
     EXPECT_NEAR(Depth(earth, "molecules", 550.0) /
                     (0.097069 * 978.916 / 980.665),
                 1.0, 2e-3);
-    // Surface density p / (k T) and scale height R T / (M g).
+    // Surface density p / (k T), and the U.S. Standard Atmosphere's
+    // density at 11 km (its table 4: 0.36392 of 1.2250 kg m^-3; the
+    // table's heights are geopotential, 19 m below these at 11 km).
     const ernie::Constituent& molecules = Find(earth, "molecules");
     EXPECT_NEAR(molecules.numberDensity, 2.5469e25, 1e21);
-    EXPECT_NEAR(molecules.density.layers[0].height, 8434.5, 1.0);
+    EXPECT_NEAR(molecules.density(11000.0) / (0.36392 / 1.2250), 1.0,
+                3e-3);
     // Blue sky: scattering grows a little faster than lambda^-4, by
     // the dispersion of air (16.97 by Bodhaine et al.'s eq. 29).
     EXPECT_NEAR(Depth(earth, "molecules", 400.0) /
@@ -213,4 +216,76 @@ TEST(BandAverage, AveragesCoefficientsAndNormalisedPhases) {
     // Ozone only absorbs.
     EXPECT_FLOAT_EQ(banded.constituents[1].scattering[8], 0.0f);
     EXPECT_GT(banded.constituents[1].absorption[8], 0.0f);
+}
+
+// Refraction, against the two closed forms of an exponential
+// atmosphere: away from the horizon the plane-parallel (n0 - 1) tan
+// z, which no profile changes; at the horizon (n0 - 1) sqrt(pi r' /
+// 2H), Laplace's relation of refraction to air mass with Chapman's
+// grazing function, integrating the bending |dn/dr| = (n0 - 1) / H
+// exp(-x^2 / 2r'H) along the horizontal ray, which curves down with
+// k = r (n0 - 1) / H of the planet's curvature and so meets the air
+// as over a planet of radius r' = r / (1 - k) (geodesy's effective
+// radius): about 36 arcminutes for an isothermal Earth. Then the
+// U.S. Standard Atmosphere's falling temperature, against Bennett's
+// formula for the observed refraction at the horizon, 34.5
+// arcminutes (at 10 C and 1010 hPa; the standard's 15 C makes some
+// 1.7% less).
+//
+// References:
+// - A. T. Young, "Air mass and refraction", Applied Optics
+//   33(6):1108-1110, 1994. https://doi.org/10.1364/AO.33.001108
+// - G. G. Bennett, "The Calculation of Astronomical Refraction in
+//   Marine Navigation", Journal of Navigation 35(2):255-259, 1982.
+//   https://doi.org/10.1017/S0373463300022037
+TEST(BandedAtmosphere, RefractsAsTheClosedForms) {
+    const ernie::AtmosphereModel earth = ernie::EarthAtmosphere(
+        6371e3, {.ozoneColumn = 0.0, .aerosolOpticalDepth = 0.0});
+    ernie::BandedAtmosphere banded =
+        ernie::BandAverage(earth, {540.0, 560.0, 1}, 16);
+    const double n0 = banded.RefractiveIndex(0.0, 0);
+    EXPECT_NEAR((n0 - 1.0) / 2.78e-4, 1.0, 0.01);
+    const double r = banded.bottomRadius;
+
+    // The standard atmosphere, against Bennett.
+    constexpr double kArcminute = kPi / (180.0 * 60.0);
+    const double standard = banded.Refract(r + 1.0, 0.0, 0).deviation;
+    EXPECT_NEAR(standard / kArcminute, 34.5 * (1.0 - 0.017), 1.0);
+
+    // An isothermal column at the surface's 288.15 K, its scale
+    // height R T / (M g), against the closed forms.
+    const double height =
+        8.314462618 * 288.15 / (28.9644e-3 * 9.80665);
+    banded.constituents[0].density =
+        ernie::DensityProfile::Exponential(height);
+    EXPECT_NEAR(banded.Refract(r, 1.0, 0).deviation, 0.0, 1e-9);
+    const double mu45 = std::sqrt(0.5);
+    const ernie::BandedAtmosphere::Refraction slant =
+        banded.Refract(r, mu45, 0);
+    EXPECT_FALSE(slant.ground);
+    EXPECT_NEAR(slant.deviation / (n0 - 1.0), 1.0, 0.01);
+
+    const double k = r * (n0 - 1.0) / height;
+    const ernie::BandedAtmosphere::Refraction horizontal =
+        banded.Refract(r + 1.0, 0.0, 0);
+    EXPECT_FALSE(horizontal.ground) << "refraction lifts it clear";
+    EXPECT_NEAR(horizontal.deviation /
+                    ((n0 - 1.0) *
+                     std::sqrt(kPi * r / (2.0 * height * (1.0 - k)))),
+                1.0, 0.03);
+    EXPECT_GT(horizontal.deviation, standard)
+        << "an isothermal column bends more";
+    EXPECT_TRUE(banded.Refract(r + 1.0, -0.02, 0).ground);
+
+    // Mars: a hundredth of the air, and CO2's refractivity.
+    const ernie::AtmosphereModel mars =
+        ernie::MarsAtmosphere(3389.5e3, {.dustOpticalDepth = 0.0});
+    const ernie::BandedAtmosphere thin =
+        ernie::BandAverage(mars, {540.0, 560.0, 1}, 16);
+    const double m0 = thin.RefractiveIndex(0.0, 0);
+    EXPECT_GT(m0 - 1.0, 3e-6);
+    EXPECT_LT(m0 - 1.0, 4.5e-6);
+    EXPECT_NEAR(thin.Refract(thin.bottomRadius, mu45, 0).deviation /
+                    (m0 - 1.0),
+                1.0, 0.01);
 }

@@ -51,12 +51,35 @@ struct DensityLayer {
 ///   https://doi.org/10.1111/cgf.15010
 struct DensityProfile {
     std::vector<DensityLayer> layers;
+    /// In place of the layers when not empty: the relative density at
+    /// altitudes evenly `tableStep` m apart from the ground, linear
+    /// between them and the last beyond.
+    std::vector<double> table;
+    double tableStep = 0.0;
 
     static DensityProfile Exponential(double scaleHeight);
     static DensityProfile Tent(double peakAltitude, double halfWidth);
 
+    /// The density of a gas in hydrostatic equilibrium under the
+    /// temperature profile of the U.S. Standard Atmosphere 1976: its
+    /// lapse rates from the ground (-6.5 K/km to 11 km, 0 to 20 km,
+    /// +1 to 32 km, +2.8 to 47 km, 0 to 51 km, -2.8 to 71 km, -2 to
+    /// 84.852 km, then constant), shifted to start at
+    /// `surfaceTemperature`, relative to the ground's: d ln p / dh =
+    /// -M g / (R T) and density p / T, tabulated every 100 m to 120
+    /// km. Heights are taken as geometric (the standard's are
+    /// geopotential, 1.6% apart at 100 km).
+    ///
+    /// References:
+    /// - NOAA, NASA and USAF, "U.S. Standard Atmosphere, 1976",
+    ///   NOAA-S/T 76-1562, 1976, table 4.
+    ///   https://ntrs.nasa.gov/citations/19770009539
+    static DensityProfile
+    StandardAtmosphere(double surfaceTemperature, double molarMass,
+                       double gravity);
+
     /// The relative density at `altitude`; 0 for a profile without
-    /// layers.
+    /// layers or a table.
     double operator()(double altitude) const;
 
     /// The integral of the relative density from the ground to `top`
@@ -95,6 +118,11 @@ struct Constituent {
     double numberDensity = 0.0;
     DensityProfile density;
     OpticsModel optics;
+    /// Its refractivity n - 1 at a wavelength (nm) where its density
+    /// profile is 1, proportional to its density (the Gladstone-Dale
+    /// relation); none for constituents too sparse to bend light, as
+    /// aerosols and ozone are.
+    std::function<double(double)> refractivity;
 };
 
 /// A spherical shell of constituents around a planet of radius
@@ -113,8 +141,9 @@ struct AtmosphereModel {
 /// profile and a haze aerosol.
 struct EarthAtmosphereOptions {
     /// Sea-level state and gravity of the U.S. Standard Atmosphere
-    /// 1976, which give the molecules' number density p / (k T) and
-    /// scale height R T / (M g).
+    /// 1976, which give the molecules' number density p / (k T), and
+    /// with its lapse rates their density profile
+    /// (`DensityProfile::StandardAtmosphere`).
     double surfacePressure = 101325.0;
     double surfaceTemperature = 288.15;
     double gravity = 9.80665;
@@ -206,6 +235,9 @@ struct BandedConstituent {
     /// The phase function per band at `PhaseCosines`, band-major:
     /// phase[band * angles + i].
     std::vector<float> phase;
+    /// The refractivity n - 1 where the density profile is 1, per
+    /// band; zeros for a constituent without one.
+    std::vector<float> refractivity;
 };
 
 /// An atmosphere averaged over a camera's spectral bands, ready for
@@ -228,6 +260,25 @@ struct BandedAtmosphere {
     /// against. For rays above the horizon.
     double TransmittanceToTop(double r, double mu, int band,
                               int steps = 4000) const;
+
+    /// The refractive index of band `band` at `altitude`: 1 plus each
+    /// constituent's refractivity times its density.
+    double RefractiveIndex(double altitude, int band) const;
+
+    /// A refracted ray traced from radius `r` (m) at the apparent
+    /// zenith cosine `mu` out of the atmosphere, through its
+    /// spherically layered refractive index (`RefractiveIndex`), by
+    /// the ray equation d(n t)/ds = grad n with steps of at most
+    /// `step` m.
+    struct Refraction {
+        /// The angle (radians) between the ray's first and last
+        /// directions, its bending towards the ground.
+        double deviation = 0.0;
+        /// Whether it reached the ground rather than the top.
+        bool ground = false;
+    };
+    Refraction Refract(double r, double mu, int band,
+                       double step = 100.0) const;
 };
 
 /// Averages `atmosphere` over `bands`, sampling each band every 10 nm

@@ -408,6 +408,10 @@ struct Viewer::State {
     VkExtent2D requestedViewport{640, 360};
 
     OrbitController controller;
+    /// The active camera's world transform as the controller last
+    /// placed it or read it, to notice when something else (a demo's
+    /// views, a script) has moved the camera since.
+    std::optional<glm::dmat4> controllerPose;
     /// Which of the camera menu's orthographic views (Top, Front,
     /// Right) the perspective camera shows, or -1 for perspective.
     int orthographicView = -1;
@@ -944,6 +948,26 @@ struct Viewer::State {
                 activeCamera, LocalFromWorld(scene, activeCamera,
                                              controller.Transform()));
         }
+        if (scene.Has(activeCamera)) {
+            controllerPose = scene.WorldTransform(activeCamera);
+        }
+    }
+
+    /// Takes the controller to where the active camera is when
+    /// something else moved it since the controller placed it, so the
+    /// next drag orbits from there rather than throwing the camera
+    /// back. Orthographic views keep their own controller.
+    void SyncControllerToCamera() {
+        if (!scene.Has(activeCamera) || orthographicView >= 0) {
+            return;
+        }
+        const glm::dmat4 world = scene.WorldTransform(activeCamera);
+        if (controllerPose && *controllerPose == world) {
+            return;
+        }
+        controller = ControllerFromTransform(
+            world, controller.distance, controller.verticalFov);
+        controllerPose = world;
     }
 
     std::uint32_t ViewportWidth() const {
@@ -976,6 +1000,10 @@ struct Viewer::State {
                 current.orthographic
                     ? controller.verticalFov
                     : static_cast<float>(current.VerticalFov()));
+        }
+        controllerPose.reset();
+        if (scene.Has(camera)) {
+            controllerPose = scene.WorldTransform(camera);
         }
     }
 
@@ -1726,6 +1754,14 @@ struct Viewer::State {
 
     void HandleNavigation(bool hovered, bool active, float height) {
         const ImGuiIO& io = ImGui::GetIO();
+        const bool dragging =
+            active &&
+            (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) ||
+             ImGui::IsMouseDragging(ImGuiMouseButton_Right, 0.0f) ||
+             ImGui::IsMouseDragging(ImGuiMouseButton_Middle, 0.0f));
+        if (dragging || (hovered && io.MouseWheel != 0.0f)) {
+            SyncControllerToCamera();
+        }
         bool moved = false;
         if (active &&
             ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f)) {

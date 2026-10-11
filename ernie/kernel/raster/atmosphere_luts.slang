@@ -21,7 +21,8 @@
 // Bindings: 0 the medium, 1 the constituents' densities, 2 the transmittance table (storage),
 // 3 the transmittance table (sampled), 4 a linear sampler, 5 the multiple scattering table
 // (storage), 6 the constituents' phase functions, 7 the sky irradiance table (storage), 8 the
-// multiple scattering table (sampled). Every image is in the general layout.
+// multiple scattering table (sampled), 9 the refraction table (storage). Every image is in the
+// general layout.
 //
 // References:
 // - S. Hillaire, "A Scalable and Production Ready Sky and Atmosphere Rendering Technique",
@@ -54,6 +55,67 @@ static const uint kScatteringSteps = 128;
 [[vk::binding(6, 0)]] StructuredBuffer<float> phases;
 [[vk::image_format("rgba32f")]] [[vk::binding(7, 0)]] RWTexture2DArray<float4> irradianceOut;
 [[vk::binding(8, 0)]] Texture2DArray<float4> multiple;
+[[vk::image_format("rgba32f")]] [[vk::binding(9, 0)]] RWTexture2DArray<float4> refractionOut;
+
+// Refraction, per apparent zenith angle and height: a ray traced out of the atmosphere by the ray
+// equation d(n t)/ds = grad n through its spherically layered refractive index, the bands' bending
+// summed along one path (theirs part by microradians), each step's |dn/dr| sin(angle to the
+// vertical) / n. Steps grow from 0.2 km at the ground, where n changes fastest.
+static const uint kRefractionSteps = 20000;
+
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void refractionMain(uint3 id: SV_DispatchThreadID) {
+    if (id.x >= kRefractionWidth || id.y >= kRefractionHeight) {
+        return;
+    }
+    let bottom = atmosphereBottom(medium);
+    let top = atmosphereTop(medium);
+    let uv = (float2(id.xy) + 0.5) / float2(kRefractionWidth, kRefractionHeight);
+    float r;
+    float mu;
+    refractionRMu(uv, bottom, top, r, mu);
+    r = clamp(r, bottom + 1e-4, top - 1e-4);
+    // In the plane of the ray and the planet's centre: x across, y up through the start.
+    var p = float2(0.0, r);
+    var t = float2(sqrt(max(1.0 - mu * mu, 0.0)), mu);
+    var bent = float4(0.0);
+    for (uint i = 0; i < kRefractionSteps; ++i) {
+        var radius = length(p);
+        if (radius > top && dot(p, t) > 0.0) {
+            break;
+        }
+        if (radius < bottom) {
+            // A ray that meets the ground goes on straight through the planet and out again, as
+            // CosmoScout VR traces it: its bending then grows smoothly into that of the rays that
+            // just clear the ground, so the table interpolates without a step at the apparent
+            // horizon (which `escapesAtmosphere` decides apart).
+            let along = dot(p, t);
+            p += (-along + sqrt(max(along * along - (radius * radius - bottom * bottom), 0.0)) +
+                  1e-3) * t;
+            radius = length(p);
+        }
+        let altitude = radius - bottom;
+        let step = 0.2 + 0.05 * altitude;
+        let h = 0.05;
+        let below = refractivityAt(medium, densities, max(altitude - h, 0.0), id.z);
+        let above = refractivityAt(medium, densities, altitude + h, id.z);
+        let gradient = (above - below) / (min(altitude, h) + h);
+        let n = 1.0 + refractivityAt(medium, densities, altitude, id.z);
+        let up = p / radius;
+        let sine = abs(up.x * t.y - up.y * t.x);
+        bent += -gradient * sine / n * step;
+        // The shared path bends with the bands' mean.
+        let g = dot(gradient, float4(0.25)) * up;
+        t = normalize(t + step * (g - dot(g, t) * t) / dot(n, float4(0.25)));
+        p += step * t;
+    }
+    refractionOut[id] = bent;
+}
+
+uint group(uint3 id) {
+    return id.z;
+}
 
 static const uint kIrradianceSteps = 32;
 // The sine of the Sun's angular radius, 0.266 degrees, over which it sets behind the planet.

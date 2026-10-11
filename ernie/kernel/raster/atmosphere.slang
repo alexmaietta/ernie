@@ -31,6 +31,15 @@
 // - S. Schneegans, T. Meyran, I. Ginkel, G. Zachmann and A. Gerndt, "Physically Based Real-Time
 //   Rendering of Atmospheres using Mie Theory", Computer Graphics Forum 43(2), 2024 (tabulated
 //   phase functions per constituent). https://doi.org/10.1111/cgf.15010
+// - L. H. Auer and E. M. Standish, "Astronomical Refraction: Computational Method for All Zenith
+//   Angles", The Astronomical Journal 119(5):2472-2474, 2000 (refraction by integrating the ray
+//   through a spherically layered atmosphere). https://doi.org/10.1086/301325
+// - A. T. Young, "Sunset Science. IV. Low-Altitude Refraction", The Astronomical Journal
+//   127(6):3622-3637, 2004 (bending near the horizon, and its temperature gradient).
+//   https://doi.org/10.1086/420806
+// - S. Schneegans et al., "Physically Based Real-Time Rendering of Eclipses", Computer Graphics
+//   Forum 44, 2025, section 4 (a table of ray deviations by height and angle, traced on through
+//   the planet for continuity). https://diglib.eg.org/handle/10.1111/cgf70017
 // - D. Hestroffer and C. Magnan, "Wavelength dependency of the Solar limb darkening", Astronomy
 //   and Astrophysics 333:338-342, 1998 (the power law fitted to Neckel and Labs's and Pierce and
 //   Slaughter's measurements). https://ui.adsabs.harvard.edu/abs/1998A&A...333..338H
@@ -87,6 +96,84 @@ public float4 groundAlbedo(StructuredBuffer<float4> medium, uint group) {
     let constituents = uint(medium[0].z);
     let groups = uint(medium[1].x);
     return medium[2 + constituents * 2 * groups + group];
+}
+
+// The refractive index less 1 of band group `group` at `altitude` (km): each constituent's
+// refractivity where its density is 1 (after the ground albedo in the medium) times its density.
+public float4 refractivityAt(StructuredBuffer<float4> medium, StructuredBuffer<float> densities,
+                             float altitude, uint group) {
+    let constituents = uint(medium[0].z);
+    let groups = uint(medium[1].x);
+    let first = 2 + constituents * 2 * groups + groups;
+    var refractivity = float4(0.0);
+    for (uint c = 0; c < constituents; ++c) {
+        refractivity += densityAt(medium, densities, c, altitude) * medium[first + c * groups + group];
+    }
+    return refractivity;
+}
+
+// Whether a ray from radius r (km) at the apparent zenith cosine mu escapes to space for each
+// band of group `group` rather than meeting the ground, by Bouguer's invariant n r sin(zenith),
+// constant along a ray in a spherically layered atmosphere: it meets the ground only heading down
+// with n0 r sin z below the ground's n times its radius (with n r growing with height, as it does
+// without ducting).
+public bool4 escapesAtmosphere(StructuredBuffer<float4> medium, StructuredBuffer<float> densities,
+                               float r, float mu, uint group) {
+    let bottom = atmosphereBottom(medium);
+    if (mu >= 0.0) {
+        return bool4(true);
+    }
+    let n0 = 1.0 + refractivityAt(medium, densities, r - bottom, group);
+    let nb = 1.0 + refractivityAt(medium, densities, 0.0, group);
+    return n0 * r * sqrt(max(1.0 - mu * mu, 0.0)) >= nb * bottom;
+}
+
+// The refraction table's coordinates: across, the apparent zenith angle from 0 to 2 degrees below
+// the geometric horizon, crowded towards that end, where the bending changes fastest
+// (x = 1 - sqrt(1 - zenith / largest)); up, the square root of the height's fraction of the
+// atmosphere, crowded towards the ground; and back.
+static const float kRefractionMargin = 0.0349;  // 2 degrees
+public static const uint kRefractionWidth = 256;
+public static const uint kRefractionHeight = 32;
+
+float largestZenith(float r, float bottom) {
+    return acos(horizonCosine(r, bottom)) + kRefractionMargin;
+}
+
+public float2 refractionUv(float r, float mu, float bottom, float top) {
+    let zenith = acos(clamp(mu, -1.0, 1.0));
+    let x = 1.0 - sqrt(max(1.0 - zenith / largestZenith(r, bottom), 0.0));
+    let y = sqrt(clamp((r - bottom) / (top - bottom), 0.0, 1.0));
+    return float2(textureCoord(clamp(x, 0.0, 1.0), float(kRefractionWidth)),
+                  textureCoord(y, float(kRefractionHeight)));
+}
+
+public void refractionRMu(float2 uv, float bottom, float top, out float r, out float mu) {
+    let y = unitRange(uv.y, float(kRefractionHeight));
+    r = bottom + y * y * (top - bottom);
+    let x = unitRange(uv.x, float(kRefractionWidth));
+    let s = 1.0 - x;
+    mu = cos(largestZenith(r, bottom) * (1.0 - s * s));
+}
+
+// The bending (radians) of rays of band group `group` leaving radius r at apparent zenith cosine
+// mu, as the refraction table holds it: towards the ground, so the true direction of what such a
+// ray sees lies that much further from the zenith than the ray.
+public float4 refractionDeviation(Texture2DArray<float4> table, SamplerState linear, float r,
+                                  float mu, uint group, float bottom, float top) {
+    let uv = refractionUv(clamp(r, bottom, top), mu, bottom, top);
+    return table.SampleLevel(linear, float3(uv, float(group)), 0.0);
+}
+
+// Direction `d` turned in its vertical plane (through `up`) by `angle` radians towards the zenith;
+// a negative angle turns it towards the nadir.
+public float3 turnTowardsZenith(float3 d, float3 up, float angle) {
+    let across = up - dot(up, d) * d;
+    let size = length(across);
+    if (size < 1e-6) {
+        return d;
+    }
+    return d * cos(angle) + across / size * sin(angle);
 }
 
 // Distance from radius r along cosine mu to the sphere of radius `radius` outside it (the top).
