@@ -360,7 +360,9 @@ struct PrimTypeDef {
 /// - everything else is allowed: other namespaces (custom data such as `user:speed`), the type's
 ///   open namespaces (`PrimTypeDef::openNamespaces`), undeclared `primvars:*`, `xformOpOrder`
 ///   and ops Ernie does not know, and UsdShade connections (`<input>.connect`).
-/// A null `type` (an untyped prim, or one of a type not registered) checks transform ops only.
+/// A null `type` (an untyped prim, or one of a type not registered) checks only what Ernie reads
+/// on every prim: transform ops and Imageable's attributes (`visibility`, `ernie:world`,
+/// `ernie:quaternionOrder`), any other name being allowed.
 /// @throws std::invalid_argument naming the prim and the attribute.
 void Validate(const PrimTypeDef* type, const Path& path, std::string_view attribute,
               const Value* value);
@@ -446,13 +448,13 @@ class SchemaView {
         Edit().Clear(GetPath(), token);                                                            \
         return static_cast<Self&>(*this);                                                          \
     }                                                                                              \
-    /** For an `OrArray` attribute: the array written in place of its value, or null. */           \
+    /** For an `OrArray` attribute: the array written in place of its value, or null. */          \
     template <typename T = Type>                                                                   \
         requires ::ernie::kIsOrArray<T>                                                            \
     const ::ernie::Tensor* Read##Name() const {                                                    \
         return GetScene().Read(GetPath(), token);                                                  \
     }                                                                                              \
-    /** For an `OrArray` attribute: writes an array in place of its value (`Scene::Write`). */     \
+    /** For an `OrArray` attribute: writes an array in place of its value (`Scene::Write`). */    \
     template <typename T = Type>                                                                   \
         requires ::ernie::kIsOrArray<T>                                                            \
     Self& Write##Name(::ernie::Tensor array) {                                                     \

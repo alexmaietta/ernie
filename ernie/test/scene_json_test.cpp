@@ -414,11 +414,12 @@ TEST(SaveScene, EveryDeclaredAttributeRoundTripsAsItsKind) {
         for (const ernie::AttributeDef* def : type->AllAttributes()) {
             SCOPED_TRACE(std::string(type->name) + " " + std::string(def->name));
             if (def->kind == ernie::AttributeKind::Tensor) {
-                scene.Write(
-                    path, def->name,
-                    def->meta.integer
-                        ? Tensor::Copy<std::int32_t>(std::array<std::int32_t, 3>{1, 2, 3}, {3})
-                        : Tensor::Copy<float>(std::array<float, 6>{1, 2, 3, 4, 5, 6.5f}, {2, 3}));
+                scene.Write(path, def->name,
+                            def->meta.integer
+                                ? Tensor::Copy<std::int32_t>(std::array<std::int32_t, 3>{1, 2, 3},
+                                                             {3})
+                                : Tensor::Copy<float>(std::array<float, 6>{1, 2, 3, 4, 5, 6.5f},
+                                                      {2, 3}));
                 continue;
             }
             scene.Set(path, def->name, SampleOf(*def));
@@ -468,6 +469,23 @@ TEST(SaveScene, ArraysAndValuesAreCheckedByKind) {
     LoadScene(scene, R"({"/Group": {"xformOp:orient:pivot": [1, 0, 0, 0]}})");
     EXPECT_EQ(*scene.Get("/Group", "xformOp:orient:pivot")->Get<glm::dquat>(),
               glm::dquat(1, 0, 0, 0));
+}
+
+TEST(SaveScene, UntypedPrimsAreCheckedForWhatEveryPrimHas) {
+    Scene scene;
+    scene.Define("/Group", "");
+    scene.Define("/Custom", "Fiducial");  // A type that is not registered.
+    for (const char* path : {"/Group", "/Custom"}) {
+        SCOPED_TRACE(path);
+        // Imageable's attributes, which Ernie reads on every prim, by their kind.
+        EXPECT_THROW(scene.Set(path, tokens::kWorld, std::string("two")), std::invalid_argument);
+        EXPECT_THROW(scene.Set(path, tokens::kVisibility, 0.5), std::invalid_argument);
+        EXPECT_NO_THROW(scene.Set(path, tokens::kWorld, 2));
+        EXPECT_NO_THROW(scene.Set(path, tokens::kVisibility, std::string(tokens::kInvisible)));
+        // Any other name, as before.
+        EXPECT_NO_THROW(scene.Set(path, "radius", std::string("big")));
+        EXPECT_NO_THROW(scene.Set(path, tokens::kDisplayColor, glm::dvec4(1.0)));
+    }
 }
 
 TEST(LoadScene, TakesArraysBesideTheJsonWithoutCopying) {

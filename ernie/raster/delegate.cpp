@@ -170,16 +170,12 @@ std::optional<std::vector<float>> FloatAttribute(const Scene& scene, const Path&
 }
 
 /// The constant colour of a Gprim's `primvars:displayColor`: a colour value or a one-row array,
-/// else the declared fallback (colours per vertex are read as arrays, by name).
+/// else the declared fallback (colours per vertex are its array, `ReadDisplayColor`).
 glm::vec3 ConstantDisplayColor(const Gprim& gprim) {
-    const Scene& scene = gprim.GetScene();
-    if (scene.Get(gprim.GetPath(), tokens::kDisplayColor) == nullptr) {
-        if (const Tensor* tensor = scene.Read(gprim.GetPath(), tokens::kDisplayColor);
-            tensor != nullptr && tensor->Elements() == 3 &&
-            tensor->Location().kind == DeviceKind::Cpu) {
-            const std::vector<float> color = FloatsOf(*tensor, 3, tokens::kDisplayColor);
-            return glm::vec3(color[0], color[1], color[2]);
-        }
+    if (const Tensor* tensor = gprim.ReadDisplayColor();
+        tensor != nullptr && tensor->Elements() == 3 && tensor->Location().kind == DeviceKind::Cpu) {
+        const std::vector<float> color = FloatsOf(*tensor, 3, tokens::kDisplayColor);
+        return glm::vec3(color[0], color[1], color[2]);
     }
     return glm::vec3(gprim.GetDisplayColor());
 }
@@ -817,7 +813,7 @@ void RasterDelegate::SetMeshAttributes(const Scene& scene, const Path& path, std
         RequireCompute();
         meshes_.SetNormals(handle, *normals, scene.WriteStream(path, tokens::kNormals));
     }
-    const Tensor* colors = scene.Read(path, tokens::kDisplayColor);
+    const Tensor* colors = Gprim(scene, path).ReadDisplayColor();
     if (colors != nullptr && IsGpu(colors->Location().kind)) {
         RequireCompute();
         meshes_.SetColors(handle, *colors, scene.WriteStream(path, tokens::kDisplayColor));
@@ -1543,15 +1539,14 @@ void RasterDelegate::SyncPoints(const Scene& scene) {
         try {
             const ernie::Points cloud(scene, path);
             // A width for all from one value (a number, or an array of one written or not), else
-            // one per point: a float array, or a written array (`tensor`, the declared widths'
-            // array form, read by name).
+            // one per point: a float array, or a written array (`tensor`, `ReadWidths`).
             const auto widthsOf = [&](float& width, std::vector<float>& perPoint) -> const Tensor* {
                 std::vector<float> widths = cloud.GetWidths();
                 width = widths.size() == 1 ? widths.front() : 1.0f;
                 if (widths.size() > 1) {
                     perPoint = std::move(widths);
                 }
-                const Tensor* tensor = scene.Read(path, kWidths);
+                const Tensor* tensor = cloud.ReadWidths();
                 if (tensor != nullptr && tensor->Elements() == 1 &&
                     tensor->Location().kind == DeviceKind::Cpu) {
                     width = FloatsOf(*tensor, 1, kWidths).front();
@@ -1575,7 +1570,7 @@ void RasterDelegate::SyncPoints(const Scene& scene) {
                                   ? compute.Upload(Tensor::Copy<float>(
                                         perPoint, {static_cast<std::int64_t>(perPoint.size())}))
                                   : onDevice(widths);
-                const Tensor* colors = scene.Read(path, kDisplayColor);
+                const Tensor* colors = cloud.ReadDisplayColor();
                 if (colors != nullptr && colors->Elements() == points->Elements()) {
                     data.colors = onDevice(colors);
                 }
@@ -1592,8 +1587,7 @@ void RasterDelegate::SyncPoints(const Scene& scene) {
                 if (const Tensor* widths = widthsOf(data.width, data.widths)) {
                     data.widths = FloatsOf(*widths, 1, kWidths);
                 }
-                if (const Tensor* colors = scene.Read(path, kDisplayColor);
-                    colors != nullptr &&
+                if (const Tensor* colors = cloud.ReadDisplayColor(); colors != nullptr &&
                     static_cast<std::size_t>(colors->Elements()) == data.points.size() &&
                     data.points.size() > 3) {
                     data.colors = FloatsOf(*colors, 3, kDisplayColor);
