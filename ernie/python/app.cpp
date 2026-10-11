@@ -547,7 +547,7 @@ void BindApp(nb::module_& parent) {
                     : level == "warning" ? LogLevel::Warning
                     : level == "info"    ? LogLevel::Info
                                          : throw nb::value_error(
-                                            "level must be \"info\", "
+                                               "level must be \"info\", "
                                                "\"warning\" or "
                                                "\"error\"");
                 viewer.Log(parsed, std::move(text));

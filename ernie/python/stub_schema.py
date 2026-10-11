@@ -132,6 +132,8 @@ def main(output):
         "    @classmethod",
         "    def write_rows(cls, scene: Scene, prims: Any, *, stream: Any = None, **arrays: Any) -> None: ...",
         "    def set(self, *attribute: Any, **attributes: Any) -> Self: ...",
+        # Forwarded to the prim, as at run time (Schema.__getattr__).
+        "    def set_xform(self, *, translate: Any = None, rotate: Any = None, rotation_order: str = 'XYZ', orient: Any = None, scale: Any = None) -> Prim: ...",
         "    @property",
         "    def path(self) -> Path: ...",
         "    @property",

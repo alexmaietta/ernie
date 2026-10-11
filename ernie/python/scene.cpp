@@ -20,6 +20,7 @@
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
 #include <nanobind/stl/tuple.h>
+#include <nanobind/stl/variant.h>
 #include <nanobind/stl/vector.h>
 
 #include <array>
@@ -27,6 +28,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace ernie::python {
@@ -1479,23 +1481,22 @@ void BindScene(nb::module_& m) {
         result["body_to_local"] = MatrixToPython(terrain.bodyToLocal);
         return result;
     };
+    // One function for either grid, not overloads: the API docs
+    // (mkdocstrings) cannot resolve a stub function that is only
+    // overloads.
     m.def(
         "local_terrain_of",
-        [localTerrain](const PolarStereographicDem& dem,
+        [localTerrain](std::variant<const PolarStereographicDem*,
+                                    const CylindricalDem*>
+                           dem,
                        double latitude, double longitude,
                        std::uint32_t cells, double cellSize) {
-            return localTerrain(LocalTerrainOf(
-                dem, latitude, longitude, cells, cellSize));
-        },
-        nb::arg("dem"), nb::arg("latitude"), nb::arg("longitude"),
-        nb::arg("cells"), nb::arg("cell_size"));
-    m.def(
-        "local_terrain_of",
-        [localTerrain](const CylindricalDem& dem, double latitude,
-                       double longitude, std::uint32_t cells,
-                       double cellSize) {
-            return localTerrain(LocalTerrainOf(
-                dem, latitude, longitude, cells, cellSize));
+            return std::visit(
+                [&](const auto* grid) {
+                    return localTerrain(LocalTerrainOf(
+                        *grid, latitude, longitude, cells, cellSize));
+                },
+                dem);
         },
         nb::arg("dem"), nb::arg("latitude"), nb::arg("longitude"),
         nb::arg("cells"), nb::arg("cell_size"),

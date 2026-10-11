@@ -3423,8 +3423,8 @@ void Viewer::Frame(std::span<const Path> paths) {
     State& s = *state_;
     s.delegate->Sync(s.scene);
     // The prims' world box in double precision, so prims far from the
-    // origin frame as exactly as those at it; each with what lies under
-    // it, so an Xform frames its children.
+    // origin frame as exactly as those at it; each with what lies
+    // under it, so an Xform frames its children.
     bool any = false;
     glm::dvec3 low(std::numeric_limits<double>::max());
     glm::dvec3 high(std::numeric_limits<double>::lowest());
