@@ -534,7 +534,11 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1IesProfile/"><strong>IesProfile</strong></a> <br><em>A luminaire's photometric profile from an IES LM-63 file (type C photometry): its luminous intensity in candela over the vertical angle theta from its nadir (0, straight down its axis) to its zenith (180 degrees) and the horizontal angle phi around the axis.</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1IesProfile/"><strong>IesProfile</strong></a> <br><em>A luminaire's photometric profile from an IES LM-63 file: its luminous intensity in candela over its file's angles (</em> <code>IesType</code> <em>), which</em><code>Sample</code> <em>reads in any direction.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1IesTilt/"><strong>IesTilt</strong></a> <br><em>An IES file's tilt data (TILT=INCLUDE, or a tilt file): how its lamp's output changes as the luminaire tilts, for lamps whose output depends on their burning position (metal halide).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -1042,6 +1046,10 @@
 <tr>
 <td style="text-align: right;">typedef std::function&lt; <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a>(const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp;path, std::string_view attribute, const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp;device)&gt;</td>
 <td style="text-align: left;"><a href="#typedef-hostarrayreader"><strong>HostArrayReader</strong></a>  <br><em>A host copy of array</em> <code>attribute</code> <em>of</em><code>path</code> <em>, written as</em><code>device</code> <em>on a GPU: for the few arrays the CPU plans with, such as worlds.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">enum</td>
+<td style="text-align: left;"><a href="#enum-iestype"><strong>IesType</strong></a>  <br><em>An IES file's photometry: the axis its angles turn about, in the luminaire's frame (x its length and its 0 degree plane, y its width, z up; it shines down -z).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">enum</td>
@@ -1743,7 +1751,7 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1IesProfile/"><strong>IesProfile</strong></a></td>
-<td style="text-align: left;"><a href="#function-parseies"><strong>ParseIes</strong></a> (std::string_view text) <br><em>The profile of LM-63</em> <code>text</code> <em>(any of the 1986 to 2019 versions).</em></td>
+<td style="text-align: left;"><a href="#function-parseies"><strong>ParseIes</strong></a> (std::string_view text, const std::filesystem::path &amp; directory={}) <br><em>The profile of LM-63</em> <code>text</code> <em>(any of the 1986 to 2019 versions), of type A, B or C, with its tilt data from a TILT=INCLUDE block or a TILT=&lt;file&gt; named relative to</em><code>directory</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr glm::uvec3</td>
@@ -1795,7 +1803,7 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1IesProfile/"><strong>IesProfile</strong></a></td>
-<td style="text-align: left;"><a href="#function-readies"><strong>ReadIes</strong></a> (const std::filesystem::path &amp; path) <br><code>ParseIes</code> <em>of the file at</em><code>path</code> <em>.</em></td>
+<td style="text-align: left;"><a href="#function-readies"><strong>ReadIes</strong></a> (const std::filesystem::path &amp; path) <br><code>ParseIes</code> <em>of the file at</em><code>path</code> <em>, its tilt file beside it.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1IsdSensor/"><strong>IsdSensor</strong></a></td>
@@ -2232,6 +2240,16 @@
 <pre><code class="language-C++">using ernie::HostArrayReader = typedef std::function&lt;Tensor(const Path&amp; path, std::string_view attribute, const Tensor&amp; device)&gt;;
 </code></pre>
 <p>A delegate with compute interop gives one, which may keep the copy until the attribute is written again. </p>
+<hr>
+
+<h3 id="enum-iestype">enum IesType</h3>
+<p><em>An IES file's photometry: the axis its angles turn about, in the luminaire's frame (x its length and its 0 degree plane, y its width, z up; it shines down -z).</em> </p>
+<pre><code class="language-C++">enum ernie::IesType {
+    C = 1,
+    B = 2,
+    A = 3
+};
+</code></pre>
 <hr>
 
 <h3 id="enum-imageencoding">enum ImageEncoding</h3>
@@ -3965,15 +3983,15 @@ constexpr DType ernie::DTypeOf&lt; std::uint8_t &gt; ()
 <hr>
 
 <h3 id="function-parseies">function ParseIes</h3>
-<p><em>The profile of LM-63</em> <code>text</code> <em>(any of the 1986 to 2019 versions).</em></p>
+<p><em>The profile of LM-63</em> <code>text</code> <em>(any of the 1986 to 2019 versions), of type A, B or C, with its tilt data from a TILT=INCLUDE block or a TILT=&lt;file&gt; named relative to</em><code>directory</code> <em>.</em></p>
 <pre><code class="language-C++">IesProfile ernie::ParseIes (
-    std::string_view text
+    std::string_view text,
+    const std::filesystem::path &amp; directory={}
 ) 
 </code></pre>
-<p>A TILT=INCLUDE block is skipped; tilt files are not read. </p>
 <p><strong>Exception:</strong></p>
 <ul>
-<li><code>std::invalid_argument</code> for text that is not an LM-63 file, photometry other than type C, or angles out of order. </li>
+<li><code>std::invalid_argument</code> for text that is not an LM-63 file, an unknown photometric type, or angles out of order; std::runtime_error for a tilt file that cannot be read. </li>
 </ul>
 <hr>
 
@@ -4102,7 +4120,7 @@ constexpr DType ernie::DTypeOf&lt; std::uint8_t &gt; ()
 <hr>
 
 <h3 id="function-readies">function ReadIes</h3>
-<p><code>ParseIes</code> <em>of the file at</em><code>path</code> <em>.</em></p>
+<p><code>ParseIes</code> <em>of the file at</em><code>path</code> <em>, its tilt file beside it.</em></p>
 <pre><code class="language-C++">IesProfile ernie::ReadIes (
     const std::filesystem::path &amp; path
 ) 

@@ -203,6 +203,7 @@
 <p><a href="../files/"><strong>FileList</strong></a> <strong>&gt;</strong> <a href="../dir_057d52706067b881d9371cf136c38c31/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../dir_bc93cbf7ad62035943f355936009cdc4/"><strong>util</strong></a> <strong>&gt;</strong> <a href="./"><strong>ies.h</strong></a></p>
 <p><a href="../ies_8h_source/">Go to the source code of this file</a></p>
 <ul>
+<li><code>#include &lt;glm/glm.hpp&gt;</code></li>
 <li><code>#include &lt;filesystem&gt;</code></li>
 <li><code>#include &lt;string_view&gt;</code></li>
 <li><code>#include &lt;vector&gt;</code></li>
@@ -233,7 +234,11 @@
 <tbody>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1IesProfile/"><strong>IesProfile</strong></a> <br><em>A luminaire's photometric profile from an IES LM-63 file (type C photometry): its luminous intensity in candela over the vertical angle theta from its nadir (0, straight down its axis) to its zenith (180 degrees) and the horizontal angle phi around the axis.</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1IesProfile/"><strong>IesProfile</strong></a> <br><em>A luminaire's photometric profile from an IES LM-63 file: its luminous intensity in candela over its file's angles (</em> <code>IesType</code> <em>), which</em><code>Sample</code> <em>reads in any direction.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1IesTilt/"><strong>IesTilt</strong></a> <br><em>An IES file's tilt data (TILT=INCLUDE, or a tilt file): how its lamp's output changes as the luminaire tilts, for lamps whose output depends on their burning position (metal halide).</em></td>
 </tr>
 </tbody>
 </table>

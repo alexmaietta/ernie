@@ -221,6 +221,8 @@
 <li><strong>allocation_</strong> (<a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>, <a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
 <li><strong>attached_</strong> (<a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>, <a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
 <li><strong>alphaBlend</strong> (<a href="../structernie_1_1GraphicsPipelineDesc/"><strong>ernie::GraphicsPipelineDesc</strong></a>)</li>
+<li><strong>AngleOf</strong> (<a href="../structernie_1_1IesTilt/"><strong>ernie::IesTilt</strong></a>)</li>
+<li><strong>angles</strong> (<a href="../structernie_1_1IesTilt/"><strong>ernie::IesTilt</strong></a>)</li>
 <li><strong>At</strong> (<a href="../structernie_1_1Image/"><strong>ernie::Image</strong></a>)</li>
 <li><strong>albedo</strong> (<a href="../structernie_1_1MaterialSettings/"><strong>ernie::MaterialSettings</strong></a>)</li>
 <li><strong>albedoTexture</strong> (<a href="../structernie_1_1MaterialSettings/"><strong>ernie::MaterialSettings</strong></a>)</li>
@@ -559,6 +561,8 @@
 <li><strong>fragmentEntry</strong> (<a href="../structernie_1_1GraphicsPipelineDesc/"><strong>ernie::GraphicsPipelineDesc</strong></a>)</li>
 <li><strong>fragmentSpirv</strong> (<a href="../structernie_1_1GraphicsPipelineDesc/"><strong>ernie::GraphicsPipelineDesc</strong></a>)</li>
 <li><strong>Flux</strong> (<a href="../structernie_1_1IesProfile/"><strong>ernie::IesProfile</strong></a>)</li>
+<li><strong>Factor</strong> (<a href="../structernie_1_1IesTilt/"><strong>ernie::IesTilt</strong></a>)</li>
+<li><strong>factors</strong> (<a href="../structernie_1_1IesTilt/"><strong>ernie::IesTilt</strong></a>)</li>
 <li><strong>FitDistortion</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>)</li>
 <li><strong>FocalPlaneOf</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>)</li>
 <li><strong>FocalPlaneView</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>)</li>
@@ -632,6 +636,7 @@
 <li><strong>groupViews_</strong> (<a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
 <li><strong>GpuTimer</strong> (<a href="../classernie_1_1GpuTimer/"><strong>ernie::GpuTimer</strong></a>)</li>
 <li><strong>GraphicsPipeline</strong> (<a href="../classernie_1_1GraphicsPipeline/"><strong>ernie::GraphicsPipeline</strong></a>)</li>
+<li><strong>geometry</strong> (<a href="../structernie_1_1IesTilt/"><strong>ernie::IesTilt</strong></a>)</li>
 <li><strong>groupLayers</strong> (<a href="../structernie_1_1ImageDesc/"><strong>ernie::ImageDesc</strong></a>)</li>
 <li><strong>GroundToImage</strong> (<a href="../classernie_1_1IsdFrame/"><strong>ernie::IsdFrame</strong></a>, <a href="../classernie_1_1IsdLineScanner/"><strong>ernie::IsdLineScanner</strong></a>, <a href="../classernie_1_1IsdPushFrame/"><strong>ernie::IsdPushFrame</strong></a>)</li>
 <li><strong>Get</strong> (<a href="../classernie_1_1Prim/"><strong>ernie::Prim</strong></a>, <a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>, <a href="../classernie_1_1Value/"><strong>ernie::Value</strong></a>)</li>
@@ -1372,7 +1377,7 @@
 <li><strong>typeName</strong> (<a href="../structernie_1_1BrdfModel/"><strong>ernie::BrdfModel</strong></a>, <a href="../structernie_1_1SensorFilterModel/"><strong>ernie::SensorFilterModel</strong></a>)</li>
 <li><strong>ToCamera</strong> (<a href="../structernie_1_1CahvoreModel/"><strong>ernie::CahvoreModel</strong></a>)</li>
 <li><strong>transform</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
-<li><strong>type</strong> (<a href="../structernie_1_1ComputeArrayView/"><strong>ernie::ComputeArrayView</strong></a>, <a href="../structernie_1_1DescriptorBinding/"><strong>ernie::DescriptorBinding</strong></a>, <a href="../structernie_1_1LightParams/"><strong>ernie::LightParams</strong></a>, <a href="../structernie_1_1SensorFilterStep/"><strong>ernie::SensorFilterStep</strong></a>, <a href="../structernie_1_1app_1_1CreatableType/"><strong>ernie::app::CreatableType</strong></a>, <a href="../structernie_1_1EditHistory_1_1PrimSnapshot/"><strong>ernie::EditHistory::PrimSnapshot</strong></a>, <a href="../structernie_1_1EditHistory_1_1Step/"><strong>ernie::EditHistory::Step</strong></a>, <a href="../structernie_1_1Scene_1_1PrimData/"><strong>ernie::Scene::PrimData</strong></a>)</li>
+<li><strong>type</strong> (<a href="../structernie_1_1ComputeArrayView/"><strong>ernie::ComputeArrayView</strong></a>, <a href="../structernie_1_1DescriptorBinding/"><strong>ernie::DescriptorBinding</strong></a>, <a href="../structernie_1_1IesProfile/"><strong>ernie::IesProfile</strong></a>, <a href="../structernie_1_1LightParams/"><strong>ernie::LightParams</strong></a>, <a href="../structernie_1_1SensorFilterStep/"><strong>ernie::SensorFilterStep</strong></a>, <a href="../structernie_1_1app_1_1CreatableType/"><strong>ernie::app::CreatableType</strong></a>, <a href="../structernie_1_1EditHistory_1_1PrimSnapshot/"><strong>ernie::EditHistory::PrimSnapshot</strong></a>, <a href="../structernie_1_1EditHistory_1_1Step/"><strong>ernie::EditHistory::Step</strong></a>, <a href="../structernie_1_1Scene_1_1PrimData/"><strong>ernie::Scene::PrimData</strong></a>)</li>
 <li><strong>TriangleCount</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>, <a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
 <li><strong>trees_</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>)</li>
 <li><strong>tileSize</strong> (<a href="../structernie_1_1DetailSettings/"><strong>ernie::DetailSettings</strong></a>)</li>
@@ -1380,6 +1385,8 @@
 <li><strong>TexelBytes</strong> (<a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
 <li><strong>Transition</strong> (<a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
 <li><strong>translate</strong> (<a href="../structernie_1_1GpuXform/"><strong>ernie::GpuXform</strong></a>, <a href="../structernie_1_1XformOps/"><strong>ernie::XformOps</strong></a>)</li>
+<li><strong>Table</strong> (<a href="../structernie_1_1IesProfile/"><strong>ernie::IesProfile</strong></a>)</li>
+<li><strong>tilt</strong> (<a href="../structernie_1_1IesProfile/"><strong>ernie::IesProfile</strong></a>)</li>
 <li><strong>to</strong> (<a href="../structernie_1_1IsdLineScanner_1_1Strip/"><strong>ernie::IsdLineScanner::Strip</strong></a>, <a href="../structernie_1_1PushbroomStrip/"><strong>ernie::PushbroomStrip</strong></a>)</li>
 <li><strong>toTime</strong> (<a href="../structernie_1_1IsdLineScanner_1_1Strip/"><strong>ernie::IsdLineScanner::Strip</strong></a>)</li>
 <li><strong>TimeOrder</strong> (<a href="../classernie_1_1IsdPushFrame/"><strong>ernie::IsdPushFrame</strong></a>)</li>

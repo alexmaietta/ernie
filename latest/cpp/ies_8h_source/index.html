@@ -205,23 +205,46 @@
 <pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include &lt;glm/glm.hpp&gt;
+
 #include &lt;filesystem&gt;
 #include &lt;string_view&gt;
 #include &lt;vector&gt;
 
 namespace ernie {
 
+enum class IesType {
+    C = 1,
+    B = 2,
+    A = 3,
+};
+
+struct IesTilt {
+    int geometry = 0;
+    std::vector&lt;double&gt; angles;   
+    std::vector&lt;double&gt; factors;  
+
+    double AngleOf(const glm::dvec3&amp; x, const glm::dvec3&amp; y, const glm::dvec3&amp; z) const;
+
+    double Factor(double degrees) const;
+};
+
 struct IesProfile {
+    IesType type = IesType::C;
     std::vector&lt;double&gt; vertical;    
     std::vector&lt;double&gt; horizontal;  
     std::vector&lt;double&gt; candela;
+    IesTilt tilt;
 
     double Sample(double theta, double phi) const;
 
     double Flux() const;
+
+  private:
+    double Table(double v, double h) const;
 };
 
-IesProfile ParseIes(std::string_view text);
+IesProfile ParseIes(std::string_view text, const std::filesystem::path&amp; directory = {});
 
 IesProfile ReadIes(const std::filesystem::path&amp; path);
 

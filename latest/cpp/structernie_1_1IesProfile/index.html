@@ -201,7 +201,7 @@
               
                 <h1 id="struct-ernieiesprofile">Struct ernie::IesProfile</h1>
 <p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>IesProfile</strong></a></p>
-<p><em>A luminaire's photometric profile from an IES LM-63 file (type C photometry): its luminous intensity in candela over the vertical angle theta from its nadir (0, straight down its axis) to its zenith (180 degrees) and the horizontal angle phi around the axis.</em> <a href="#detailed-description">More...</a></p>
+<p><em>A luminaire's photometric profile from an IES LM-63 file: its luminous intensity in candela over its file's angles (</em> <code>IesType</code> <em>), which</em><code>Sample</code> <em>reads in any direction.</em><a href="#detailed-description">More...</a></p>
 <ul>
 <li><code>#include &lt;ernie/util/ies.h&gt;</code></li>
 </ul>
@@ -220,11 +220,19 @@
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; double &gt;</td>
-<td style="text-align: left;"><a href="#variable-horizontal"><strong>horizontal</strong></a>  <br><em>Degrees, increasing, from 0 (or 90 for 90 to 270).</em></td>
+<td style="text-align: left;"><a href="#variable-horizontal"><strong>horizontal</strong></a>  <br><em>Degrees, increasing.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1IesTilt/"><strong>IesTilt</strong></a></td>
+<td style="text-align: left;"><a href="#variable-tilt"><strong>tilt</strong></a>  <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../namespaceernie/#enum-iestype"><strong>IesType</strong></a></td>
+<td style="text-align: left;"><a href="#variable-type"><strong>type</strong></a>   = <code>IesType::C</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; double &gt;</td>
-<td style="text-align: left;"><a href="#variable-vertical"><strong>vertical</strong></a>  <br><em>Degrees, increasing, within 0 to 180.</em></td>
+<td style="text-align: left;"><a href="#variable-vertical"><strong>vertical</strong></a>  <br><em>Degrees, increasing.</em></td>
 </tr>
 </tbody>
 </table>
@@ -243,15 +251,16 @@
 </tr>
 <tr>
 <td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#function-sample"><strong>Sample</strong></a> (double theta, double phi) const<br><em>Candela towards</em> <code>theta</code> <em>degrees from the nadir and</em><code>phi</code> <em>degrees around the axis, linear in both between the file's angles, mirrored by the file's symmetry; 0 outside its vertical angles.</em></td>
+<td style="text-align: left;"><a href="#function-sample"><strong>Sample</strong></a> (double theta, double phi) const<br><em>Candela towards</em> <code>theta</code> <em>degrees from the nadir (-z) and</em><code>phi</code> <em>degrees around it from x towards y, in whichever coordinates the file uses: linear in both of its angles between those it gives, mirrored by its symmetry; 0 outside its angles.</em></td>
 </tr>
 </tbody>
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
-<p>Files give one half, quadrant or single plane of a symmetric luminaire, which <code>Sample</code> mirrors.</p>
+<p>Files give a half, quadrant or single plane of a symmetric luminaire, which <code>Sample</code> mirrors.</p>
 <p>References:
 * IES LM-63-19, Approved Method: IES Standard File Format for the Electronic Transfer of Photometric Data and Related Information, Illuminating Engineering Society, 2019.
-* I. Ashdown, "Parsing the IESNA LM-63 Photometric Data File", 1998, <a href="http://lumen.iee.put.poznan.pl/kw/iesna.txt">http://lumen.iee.put.poznan.pl/kw/iesna.txt</a> </p>
+* I. Ashdown, "Parsing the IESNA LM-63 Photometric Data File", 1998, <a href="http://lumen.iee.put.poznan.pl/kw/iesna.txt">http://lumen.iee.put.poznan.pl/kw/iesna.txt</a>
+* G. Ward, Radiance ies2rad, source.cal and tilt.cal (type B coordinates and tilt angles), <a href="https://github.com/NREL/Radiance/tree/master/src/cv">https://github.com/NREL/Radiance/tree/master/src/cv</a> </p>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
 <h3 id="variable-candela">variable candela</h3>
 <p><em>Candela,</em> <code>horizontal.size()</code> <em>rows of</em><code>vertical.size()</code> <em>, times the file's candela multiplier and ballast factor.</em></p>
@@ -260,13 +269,23 @@
 <hr>
 
 <h3 id="variable-horizontal">variable horizontal</h3>
-<p><em>Degrees, increasing, from 0 (or 90 for 90 to 270).</em> </p>
+<p><em>Degrees, increasing.</em> </p>
 <pre><code class="language-C++">std::vector&lt;double&gt; ernie::IesProfile::horizontal;
 </code></pre>
 <hr>
 
+<h3 id="variable-tilt">variable tilt</h3>
+<pre><code class="language-C++">IesTilt ernie::IesProfile::tilt;
+</code></pre>
+<hr>
+
+<h3 id="variable-type">variable type</h3>
+<pre><code class="language-C++">IesType ernie::IesProfile::type;
+</code></pre>
+<hr>
+
 <h3 id="variable-vertical">variable vertical</h3>
-<p><em>Degrees, increasing, within 0 to 180.</em> </p>
+<p><em>Degrees, increasing.</em> </p>
 <pre><code class="language-C++">std::vector&lt;double&gt; ernie::IesProfile::vertical;
 </code></pre>
 <hr>
@@ -278,7 +297,7 @@
 <hr>
 
 <h3 id="function-sample">function Sample</h3>
-<p><em>Candela towards</em> <code>theta</code> <em>degrees from the nadir and</em><code>phi</code> <em>degrees around the axis, linear in both between the file's angles, mirrored by the file's symmetry; 0 outside its vertical angles.</em></p>
+<p><em>Candela towards</em> <code>theta</code> <em>degrees from the nadir (-z) and</em><code>phi</code> <em>degrees around it from x towards y, in whichever coordinates the file uses: linear in both of its angles between those it gives, mirrored by its symmetry; 0 outside its angles.</em></p>
 <pre><code class="language-C++">double ernie::IesProfile::Sample (
     double theta,
     double phi
