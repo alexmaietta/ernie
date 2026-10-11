@@ -402,6 +402,8 @@ class MeshDrawable : public RasterDrawable {
                       const ShadowCasters& casters) const override;
     void RecordColor(VkCommandBuffer commands, const RasterFrame& frame, std::size_t view,
                      DrawPhase phase = DrawPhase::All) const override;
+    void RecordColorViews(VkCommandBuffer commands, std::span<const RasterFrame> frames,
+                          std::size_t first, DrawPhase phase = DrawPhase::All) const override;
 
     /// Draws again what view `view` drew of the draws that moved since the last frame (their
     /// transforms, instance arrays or points), as the colour pass did, with the motion pipeline.
@@ -550,10 +552,22 @@ class MeshDrawable : public RasterDrawable {
     /// Records the direct draws among them with `direct`, and the GPU-culled ones from their
     /// first (0) or second (1) set of draws, or none (-1). Returns the draw calls it recorded.
     /// With `motion`, the view's MotionUniforms: records with the motion pipeline instead.
+    /// What `Record` last bound into a command buffer: kept across the views of
+    /// `RecordColorViews`, whose frames bind the same resources.
+    struct RecordState {
+        const GraphicsPipeline* bound = nullptr;
+        std::uint32_t pushedMaterial = 0xFFFFFFFFu;
+        bool pushedCulled = false;
+    };
+    /// With `state`, starts from what it says is bound and leaves it as bound after.
     std::size_t Record(VkCommandBuffer commands, const RasterFrame& frame,
                        std::span<const VisibleRange> ranges, const glm::mat4& light,
                        const ShadowCasters* casters, bool shadow, bool direct, int culledSet,
-                       const DescriptorResource* motion = nullptr) const;
+                       const DescriptorResource* motion = nullptr,
+                       RecordState* state = nullptr) const;
+    /// `RecordColor`, from and into `state`.
+    void RecordColorState(VkCommandBuffer commands, const RasterFrame& frame, std::size_t view,
+                          DrawPhase phase, RecordState* state) const;
     /// Whether draw `item` moved since the last frame: its transform, instance arrays or points.
     bool Moving(std::size_t item) const;
     /// Records culling jobs `firstJob` to `firstJob + jobs` in cull.slang's mode `mode`, against

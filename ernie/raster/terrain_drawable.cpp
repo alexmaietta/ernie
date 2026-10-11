@@ -54,7 +54,8 @@ struct DrawConstants {
     std::uint32_t indexOffset;
     std::uint32_t records;
     std::uint32_t shadowFromFrame;
-    std::uint32_t padding[3];
+    std::uint32_t view;
+    std::uint32_t padding[2];
 };
 static_assert(sizeof(DrawConstants) == 96, "DrawConstants must match frame.slang");
 
@@ -62,7 +63,7 @@ constexpr VkShaderStageFlags kGraphics = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_
 
 /// Frame (0 to 4), material (5 to 9) and terrain (10 to 13) bindings; see terrain.slang.
 constexpr DescriptorBinding kBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {3, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
@@ -794,14 +795,15 @@ std::vector<DescriptorResource> TerrainDrawable::Resources(const RasterFrame& fr
 }
 
 void TerrainDrawable::DrawPatches(VkCommandBuffer commands, DrawRange range, const glm::mat4& light,
-                                  bool shadowFromFrame) const {
+                                  const RasterFrame& frame, bool shadow) const {
     if (range.count == 0) {
         return;
     }
     DrawConstants constants{};
     std::memcpy(constants.lightViewProj, glm::value_ptr(light), sizeof(constants.lightViewProj));
     constants.first = range.first;
-    constants.shadowFromFrame = shadowFromFrame ? 1u : 0u;
+    constants.shadowFromFrame = shadow && frame.shadowFromFrame ? 1u : 0u;
+    constants.view = frame.view;
     layout_.PushConstants(commands, &constants, sizeof(constants));
     const std::uint32_t cells = tree_.PatchCells();
     vkCmdDraw(commands, 6 * cells * cells, range.count, 0, 0);
@@ -815,7 +817,7 @@ void TerrainDrawable::RecordShadow(VkCommandBuffer commands, const RasterFrame& 
     }
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowPipeline_->Handle());
     layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, Resources(frame, 0));
-    DrawPatches(commands, cascadeRanges_[cascade], lightViewProjection, frame.shadowFromFrame);
+    DrawPatches(commands, cascadeRanges_[cascade], lightViewProjection, frame, true);
 }
 
 void TerrainDrawable::RecordColor(VkCommandBuffer commands, const RasterFrame& frame,
@@ -826,7 +828,7 @@ void TerrainDrawable::RecordColor(VkCommandBuffer commands, const RasterFrame& f
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
                       gbufferPipelines_[pushbroom_ ? 1 : 0]->Handle());
     layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, Resources(frame, view));
-    DrawPatches(commands, mainRanges_[view], glm::mat4(1.0f));
+    DrawPatches(commands, mainRanges_[view], glm::mat4(1.0f), frame);
 }
 
 }  // namespace ernie

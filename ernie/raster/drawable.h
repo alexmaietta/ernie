@@ -28,11 +28,13 @@ inline ShaderModuleSource ProjectionModule(bool pushbroom) {
             pushbroom ? shaders::kProjectionPushbroomSlang : shaders::kProjectionPinholeSlang};
 }
 
-/// The per-frame resources every raster pass binds (`frame.slang`): view and light uniforms,
-/// shadow uniforms, cascaded shadow maps, their comparison sampler and a clamping linear sampler,
-/// at bindings 0 to 4.
+/// The per-frame resources every raster pass binds (`frame.slang`): every view's view and light
+/// uniforms (a storage buffer, the same for all views), shadow uniforms, cascaded shadow maps,
+/// their comparison sampler and a clamping linear sampler, at bindings 0 to 4; and the view
+/// drawn, which draws name in their push constants (`DrawConstants::view`).
 struct RasterFrame {
     DescriptorResource uniforms;
+    std::uint32_t view = 0;
     DescriptorResource shadows;
     DescriptorResource shadowMap;
     DescriptorResource shadowSampler;
@@ -146,6 +148,16 @@ class RasterDrawable {
     /// `All` and `Occluders`.
     virtual void RecordColor(VkCommandBuffer commands, const RasterFrame& frame, std::size_t view,
                              DrawPhase phase = DrawPhase::All) const = 0;
+
+    /// `RecordColor` of views `first` to `first + frames.size()`, `frames` theirs, one after
+    /// another into the open rendering pass: drawables keep what every view binds alike (the
+    /// frame's resources are the same for all views but the view drawn) bound across them.
+    virtual void RecordColorViews(VkCommandBuffer commands, std::span<const RasterFrame> frames,
+                                  std::size_t first, DrawPhase phase = DrawPhase::All) const {
+        for (std::size_t v = 0; v < frames.size(); ++v) {
+            RecordColor(commands, frames[v], first + v, phase);
+        }
+    }
 
     /// Records, into view `view`'s open motion pass (one RG16 float attachment of raster-pixel
     /// motion, the G-buffer's depth to test against, not written), the draws of what moved since

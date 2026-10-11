@@ -41,7 +41,8 @@ struct DrawConstants {
     std::uint32_t indexOffset;
     std::uint32_t records;
     std::uint32_t shadowFromFrame;
-    std::uint32_t padding[3];
+    std::uint32_t view;
+    std::uint32_t padding[2];
 };
 static_assert(sizeof(DrawConstants) == 96, "DrawConstants must match frame.slang");
 
@@ -49,7 +50,7 @@ constexpr VkShaderStageFlags kGraphics = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_
 
 /// Frame (0 to 4), material (5 to 9) and points (10 to 13) bindings; see points.slang.
 constexpr DescriptorBinding kBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {3, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
@@ -67,7 +68,7 @@ constexpr DescriptorBinding kBindings[] = {
 
 /// The motion pass's: the points passes' and 14, the view's MotionUniforms (frame.slang).
 constexpr DescriptorBinding kMotionBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {3, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
@@ -660,6 +661,7 @@ void PointsDrawable::RecordMotion(VkCommandBuffer commands, const RasterFrame& f
         motionLayout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, resources);
         DrawConstants constants{};
         constants.first = i;
+        constants.view = frame.view;
         motionLayout_.PushConstants(commands, &constants, sizeof(constants));
         vkCmdDraw(commands, 6, static_cast<std::uint32_t>(cloud.count), 0, 0);
     }
@@ -680,6 +682,7 @@ void PointsDrawable::RecordShadow(VkCommandBuffer commands, const RasterFrame& f
                     sizeof(constants.lightViewProj));
         constants.first = static_cast<std::uint32_t>(i);
         constants.shadowFromFrame = frame.shadowFromFrame ? 1u : 0u;
+        constants.view = frame.view;
         layout_.PushConstants(commands, &constants, sizeof(constants));
         vkCmdDraw(commands, 6, static_cast<std::uint32_t>(count), 0, 0);
     }
@@ -696,6 +699,7 @@ void PointsDrawable::RecordColor(VkCommandBuffer commands, const RasterFrame& fr
         layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, Resources(frame, i));
         DrawConstants constants{};
         constants.first = i;
+        constants.view = frame.view;
         layout_.PushConstants(commands, &constants, sizeof(constants));
         vkCmdDraw(commands, 6, static_cast<std::uint32_t>(clouds_.at(items_[i].points).count), 0,
                   0);

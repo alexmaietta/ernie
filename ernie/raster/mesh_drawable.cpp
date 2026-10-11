@@ -54,7 +54,8 @@ struct DrawConstants {
     std::uint32_t indexOffset;
     std::uint32_t records;
     std::uint32_t shadowFromFrame;
-    std::uint32_t padding[3];
+    std::uint32_t view;
+    std::uint32_t padding[2];
 };
 static_assert(sizeof(DrawConstants) == 96, "DrawConstants must match frame.slang");
 
@@ -205,7 +206,7 @@ void Reserve(const VulkanContext& context, std::unique_ptr<GpuBuffer>& buffer, V
 
 /// Frame (0 to 4), material (5 to 9) and mesh (10 to 19, 21 to 26) bindings; see mesh.slang.
 constexpr DescriptorBinding kBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {3, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
@@ -236,7 +237,7 @@ constexpr DescriptorBinding kBindings[] = {
 /// The motion pass's: the mesh passes' and 20, the view's MotionUniforms (frame.slang), last as
 /// the pass appends it.
 constexpr DescriptorBinding kMotionBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {3, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
@@ -2444,11 +2445,14 @@ std::size_t MeshDrawable::DrawCount(std::size_t view) const {
 std::size_t MeshDrawable::Record(VkCommandBuffer commands, const RasterFrame& frame,
                                  std::span<const VisibleRange> ranges, const glm::mat4& light,
                                  const ShadowCasters* casters, bool shadow, bool direct,
-                                 int culledSet, const DescriptorResource* motion) const {
+                                 int culledSet, const DescriptorResource* motion,
+                                 RecordState* state) const {
     std::size_t calls = 0;
-    const GraphicsPipeline* bound = nullptr;
-    std::uint32_t pushed = std::numeric_limits<std::uint32_t>::max();
-    bool pushedCulled = false;
+    RecordState own;
+    RecordState& kept = state != nullptr ? *state : own;
+    const GraphicsPipeline*& bound = kept.bound;
+    std::uint32_t& pushed = kept.pushedMaterial;
+    bool& pushedCulled = kept.pushedCulled;
     const PipelineLayout& layout = motion != nullptr ? motionLayout_ : layout_;
     // Cutout materials draw with the cutout variants, made by `Prepare` when one appears.
     const auto cutout = [&](std::uint32_t item) {
@@ -2483,6 +2487,7 @@ std::size_t MeshDrawable::Record(VkCommandBuffer commands, const RasterFrame& fr
     DrawConstants constants{};
     std::memcpy(constants.lightViewProj, glm::value_ptr(light), sizeof(constants.lightViewProj));
     constants.shadowFromFrame = shadow && frame.shadowFromFrame ? 1u : 0u;
+    constants.view = frame.view;
 
     // GPU-culled ranges draw indirectly, each level a command with a per-draw record (mesh.slang
     // reads it by draw index). Consecutive commands that bind the same resources, which shadow
@@ -2641,6 +2646,20 @@ void MeshDrawable::RecordShadow(VkCommandBuffer commands, const RasterFrame& fra
 
 void MeshDrawable::RecordColor(VkCommandBuffer commands, const RasterFrame& frame, std::size_t view,
                                DrawPhase phase) const {
+    RecordColorState(commands, frame, view, phase, nullptr);
+}
+
+void MeshDrawable::RecordColorViews(VkCommandBuffer commands, std::span<const RasterFrame> frames,
+                                    std::size_t first, DrawPhase phase) const {
+    // The views bind the same resources: what one binds stays bound for the next.
+    RecordState state;
+    for (std::size_t v = 0; v < frames.size(); ++v) {
+        RecordColorState(commands, frames[v], first + v, phase, &state);
+    }
+}
+
+void MeshDrawable::RecordColorState(VkCommandBuffer commands, const RasterFrame& frame,
+                                    std::size_t view, DrawPhase phase, RecordState* state) const {
     if (view >= viewDraws_.size()) {
         return;
     }
@@ -2656,7 +2675,7 @@ void MeshDrawable::RecordColor(VkCommandBuffer commands, const RasterFrame& fram
         culledSet = occlusion_ == Occlusion::TwoPass ? 1 : 0;
     }
     const std::size_t calls = Record(commands, frame, viewDraws_[view], glm::mat4(1.0f), nullptr,
-                                     false, direct, culledSet);
+                                     false, direct, culledSet, nullptr, state);
     viewCalls_.resize(viewDraws_.size());
     viewCalls_[view] = (phase == DrawPhase::Occludees ? viewCalls_[view] : 0) + calls;
 }

@@ -26,24 +26,27 @@ struct GroundUniforms {
     float colour1[4];
     float viewport[4];
     std::uint32_t ids[4];
+    float padding[24];  ///< To `kUniformsStride`, so the views' are an array.
 };
-static_assert(sizeof(GroundUniforms) == 160, "GroundUniforms must match ground.slang");
+static_assert(sizeof(GroundUniforms) == 256, "GroundUniforms must match ground.slang");
 
-/// Each view's uniforms start at a multiple of this, the largest uniform offset alignment.
-constexpr VkDeviceSize kUniformsStride = 256;
+/// Each view's uniforms, one after another: ground.slang indexes them by the view drawn.
+constexpr VkDeviceSize kUniformsStride = sizeof(GroundUniforms);
 
 /// The views' uniforms, which views posed on the GPU patch (`RecordViewPoses`).
 constexpr VkBufferUsageFlags kUniformsUsage =
     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 
-/// frame.slang's per-draw push constants, which the pass declares but leaves unused.
+/// frame.slang's per-draw push constants, of which the pass sets only the view drawn (at word
+/// 21, `DrawConstants::view`).
 constexpr std::uint32_t kDrawConstantsSize = 96;
+constexpr std::size_t kViewWord = 21;
 
 constexpr VkShaderStageFlags kGraphics = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
 /// Frame (0 to 4), material (5 to 9) and ground (10) bindings; see ground.slang.
 constexpr DescriptorBinding kBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {3, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
@@ -53,7 +56,7 @@ constexpr DescriptorBinding kBindings[] = {
     {7, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {8, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {9, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
-    {10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
+    {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
 };
 
 }  // namespace
@@ -167,20 +170,32 @@ void GroundDrawable::RecordViewPoses(VkCommandBuffer commands) const {
 
 void GroundDrawable::RecordColor(VkCommandBuffer commands, const RasterFrame& frame,
                                  std::size_t view, DrawPhase phase) const {
-    if (!prepared_ || phase == DrawPhase::Occludees) {
+    RecordColorViews(commands, std::span(&frame, 1), view, phase);
+}
+
+void GroundDrawable::RecordColorViews(VkCommandBuffer commands,
+                                      std::span<const RasterFrame> frames,
+                                      std::size_t /*first*/, DrawPhase phase) const {
+    if (!prepared_ || phase == DrawPhase::Occludees || frames.empty()) {
         return;
     }
+    // Every view binds the same resources, the views' uniforms indexed by the view drawn.
+    const RasterFrame& frame = frames.front();
     std::vector<DescriptorResource> resources = {frame.uniforms, frame.shadows, frame.shadowMap,
                                                  frame.shadowSampler, frame.clampSampler};
     renderer_.MaterialOrDefault(params_.material).AppendResources(resources);
-    resources.push_back(
-        DescriptorResource::Of(uniforms_, view * kUniformsStride, sizeof(GroundUniforms)));
+    resources.push_back(DescriptorResource::Of(uniforms_));
     const GraphicsPipeline& pipeline =
         minimal_ != MinimalMode::Off ? *minimalPipelines_[minimal_ == MinimalMode::None ? 1 : 0]
                                      : *pipelines_[pushbroom_ ? 1 : 0];
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.Handle());
     layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, resources);
-    vkCmdDraw(commands, 3, 1, 0, 0);
+    for (std::size_t v = 0; v < frames.size(); ++v) {
+        std::uint32_t constants[kDrawConstantsSize / 4] = {};
+        constants[kViewWord] = frames[v].view;
+        layout_.PushConstants(commands, constants, sizeof(constants));
+        vkCmdDraw(commands, 3, 1, 0, 0);
+    }
 }
 
 }  // namespace ernie

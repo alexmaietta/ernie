@@ -27,9 +27,17 @@ struct GroundUniforms {
     float4 viewport;
     // Material, prim id.
     uint4 ids;
+    float4 padding[6];  // to 256 bytes, the views' stride
 }
 
-[[vk::binding(10, 0)]] ConstantBuffer<GroundUniforms> g;
+// Every view's uniforms, by the view drawn (`DrawConstants::view`).
+[[vk::binding(10, 0)]] StructuredBuffer<GroundUniforms> grounds;
+
+property GroundUniforms g {
+    get {
+        return grounds[draw.view];
+    }
+}
 
 struct VertexOutput {
     float4 position : SV_Position;

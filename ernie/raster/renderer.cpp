@@ -1985,9 +1985,12 @@ void RasterRenderer::EnsureViewBuffers(std::uint32_t views) {
 }
 
 RasterFrame RasterRenderer::Frame(std::uint32_t view) const {
-    return {DescriptorResource::Of(uniforms_, view * kUniformsStride, sizeof(Uniforms)),
-            DescriptorResource::Of(shadowUniforms_), DescriptorResource::Of(shadowMaps_->View()),
-            DescriptorResource::Of(shadowSampler_), DescriptorResource::Of(clampSampler_)};
+    return {DescriptorResource::Of(uniforms_),
+            view,
+            DescriptorResource::Of(shadowUniforms_),
+            DescriptorResource::Of(shadowMaps_->View()),
+            DescriptorResource::Of(shadowSampler_),
+            DescriptorResource::Of(clampSampler_)};
 }
 
 bool RasterRenderer::CanPresent(std::string_view name) {
@@ -2183,11 +2186,14 @@ void RasterRenderer::RecordViews(VkCommandBuffer commands, RenderTargets& target
         const auto draw = [&](DrawPhase phase, bool load) {
             targets.PrepareGBuffer(commands);
             BeginRendering(commands, targets.GBufferTarget(load));
+            // Each drawable draws every view in turn, keeping what they bind alike bound.
+            std::vector<RasterFrame> frames;
+            frames.reserve(layers);
             for (std::uint32_t v = 0; v < layers; ++v) {
-                const RasterFrame frame = Frame(first + v);
-                for (const RasterDrawable* drawable : drawables) {
-                    drawable->RecordColor(commands, frame, first + v, phase);
-                }
+                frames.push_back(Frame(first + v));
+            }
+            for (const RasterDrawable* drawable : drawables) {
+                drawable->RecordColorViews(commands, frames, first, phase);
             }
             vkCmdEndRendering(commands);
         };
@@ -2256,12 +2262,14 @@ void RasterRenderer::RecordMinimal(VkCommandBuffer commands, MinimalTargets& tar
             ERNIE_GPU_ZONE(context_, commands, "Minimal draw");
             targets.PrepareDraw(commands);
             BeginRendering(commands, targets.Target(views, clear));
+            std::vector<RasterFrame> frames;
+            frames.reserve(views);
             for (std::uint32_t v = 0; v < views; ++v) {
-                const RasterFrame frame = Frame(first + v);
-                for (const RasterDrawable* drawable : drawables) {
-                    if (drawable->DrawsMinimal()) {
-                        drawable->RecordColor(commands, frame, first + v, DrawPhase::All);
-                    }
+                frames.push_back(Frame(first + v));
+            }
+            for (const RasterDrawable* drawable : drawables) {
+                if (drawable->DrawsMinimal()) {
+                    drawable->RecordColorViews(commands, frames, first, DrawPhase::All);
                 }
             }
             vkCmdEndRendering(commands);
@@ -2413,7 +2421,8 @@ OverlayPass::Target RasterRenderer::OverlayTarget(RenderTargets& targets, std::u
                                                   std::uint32_t layer) const {
     OverlayPass::Target target;
     target.extent = extent_;
-    target.uniforms = Frame(view).uniforms;
+    // The overlays' own pass binds the one view's uniforms (overlay.slang).
+    target.uniforms = DescriptorResource::Of(uniforms_, view * kUniformsStride, sizeof(Uniforms));
     target.depth = targets.Depth().View();
     target.depthLayer = layer;
     target.world = view < viewWorlds_.size() ? viewWorlds_[view] : -1;

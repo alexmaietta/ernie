@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Per-frame resources every raster pass shares, at fixed bindings of its push-descriptor set:
-//   0 Uniforms (view and light), 1 Shadows, 2 cascaded shadow maps, 3 shadow comparison sampler,
-//   4 clamping linear sampler;
+//   0 every view's Uniforms (view and light; `u` is the drawn view's), 1 Shadows, 2 cascaded
+//   shadow maps, 3 shadow comparison sampler, 4 clamping linear sampler;
 // the per-draw push constants; and sun visibility and reflectance helpers. Materials take
 // bindings 5 to 9 (surface.slang) and each drawable's own resources start at 10.
 //
@@ -85,10 +85,11 @@ public struct DrawConstants {
     // (`s.lightViewProj[0]`, which the GPU may have fitted: a light posed on the GPU) instead of
     // `lightViewProj`.
     public uint shadowFromFrame;
-    // To 96 bytes, as uints: a uint3 would align to 16 and end at 108.
+    // The view drawn: its Uniforms in `views` (`u`).
+    public uint view;
+    // To 96 bytes, as uints: a uint2 would align to 8 and a uint3 to 16.
     uint padding0;
     uint padding1;
-    uint padding2;
 }
 
 public struct Shadows {
@@ -109,12 +110,21 @@ public struct Shadows {
     public float4 poisson[8];
 }
 
-[[vk::binding(0, 0)]] public ConstantBuffer<Uniforms> u;
+// Every view's Uniforms, so a pass binds them once for all its views and each draw names its
+// view (`DrawConstants::view`).
+[[vk::binding(0, 0)]] public StructuredBuffer<Uniforms> views;
 [[vk::binding(1, 0)]] public ConstantBuffer<Shadows> s;
 [[vk::binding(2, 0)]] public Texture2DArray<float> shadowMap;
 [[vk::binding(3, 0)]] public SamplerComparisonState shadowSampler;
 [[vk::binding(4, 0)]] public SamplerState clampSampler;
 [[vk::push_constant]] public ConstantBuffer<DrawConstants> draw;
+
+// The Uniforms of the view drawn.
+public property Uniforms u {
+    get {
+        return views[draw.view];
+    }
+}
 
 // The view-projection of the shadow pass drawing (`DrawConstants::shadowFromFrame`).
 public float4x4 shadowViewProj() {

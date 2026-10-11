@@ -86,6 +86,8 @@ class GroundDrawable : public RasterDrawable {
     void RecordViewPoses(VkCommandBuffer commands) const override;
     void RecordColor(VkCommandBuffer commands, const RasterFrame& frame, std::size_t view,
                      DrawPhase phase = DrawPhase::All) const override;
+    void RecordColorViews(VkCommandBuffer commands, std::span<const RasterFrame> frames,
+                          std::size_t first, DrawPhase phase = DrawPhase::All) const override;
 
   private:
     /// The pipeline for a frame camera's views, or a pushbroom's.
