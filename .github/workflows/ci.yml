@@ -59,25 +59,43 @@ jobs:
           python-version: "3.12"
       - uses: pre-commit/action@v3.0.1
 
-  # Ernie built from source and every test (C++, GPU, Python, the install test and the README's
-  # examples) on lavapipe under the Vulkan validation layer, with GCC on the oldest supported Python
-  # and Clang on the newest. Tests fail on any validation message, and on a missing driver or layer
-  # rather than skipping (ERNIE_TEST_REQUIRE_VALIDATION).
+  # Ernie built from source and tested on lavapipe under the Vulkan validation layer. GCC, on the
+  # oldest supported Python, runs every test (C++, GPU, Python, the install test and the README's
+  # examples) in three parts of every third test each (ctest -I part,,3), so the slow GPU tests run
+  # side by side; Clang, on the newest Python, runs the unit and Python tests. Tests fail on any
+  # validation message, and on a missing driver or layer rather than skipping
+  # (ERNIE_TEST_REQUIRE_VALIDATION).
   test:
-    name: test (${{ matrix.compiler }}, Python ${{ matrix.python }})
+    name: test (${{ matrix.name }})
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         include:
-          - compiler: gcc
+          - name: gcc, part 1 of 3
+            key: gcc-1
             cc: gcc
             cxx: g++
             python: "3.12"
-          - compiler: clang
+            tests: -I 1,,3
+          - name: gcc, part 2 of 3
+            key: gcc-2
+            cc: gcc
+            cxx: g++
+            python: "3.12"
+            tests: -I 2,,3
+          - name: gcc, part 3 of 3
+            key: gcc-3
+            cc: gcc
+            cxx: g++
+            python: "3.12"
+            tests: -I 3,,3
+          - name: clang, Python 3.14, unit and Python tests
+            key: clang
             cc: clang
             cxx: clang++
             python: "3.14"
+            tests: -L "unit|python"
     env:
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
@@ -100,7 +118,7 @@ jobs:
           uv pip install numpy pytest pillow nanobind
       - uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: test-${{ matrix.compiler }}
+          key: test-${{ matrix.cc }}
       # The fetched dependencies' sources (Slang alone is hundreds of MB), keyed on their pins.
       - uses: actions/cache@v6
         with:
@@ -125,7 +143,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: ninja-log-test-${{ matrix.compiler }}
+          name: ninja-log-test-${{ matrix.key }}
           path: |
             build/.ninja_log
             build/ccache-stats.tsv
@@ -136,11 +154,13 @@ jobs:
         run: |
           VK_DRIVER_FILES=$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' | head -n1)
           export VK_DRIVER_FILES VK_ICD_FILENAMES=$VK_DRIVER_FILES
-          xvfb-run -a ctest --test-dir build --output-on-failure -j4 --timeout 900
+          xvfb-run -a ctest --test-dir build --output-on-failure -j4 --timeout 900 ${{ matrix.tests }}
 
   # The C++ tests built with AddressSanitizer and UndefinedBehaviorSanitizer: the unit tests, and the
-  # GPU tests on lavapipe (Mesa's own leaks are not Ernie's, so leak checks are off).
+  # GPU tests on lavapipe (Mesa's own leaks are not Ernie's, so leak checks are off). On pushes to
+  # main and release tags, not pull requests, as it is the slowest job.
   sanitize:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     env:
       CC: clang
@@ -377,14 +397,29 @@ jobs:
           dnf install -y -q --enablerepo=crb libX11-devel libXrandr-devel libXinerama-devel \
             libXcursor-devel libXi-devel libXext-devel wayland-devel wayland-protocols-devel \
             libxkbcommon-devel rpm-build
+          dnf install -y -q epel-release
+          dnf install -y -q ccache
           command -v ninja >/dev/null || pipx install -q ninja
+      # The DEB and RPM builds differ only in where libraries install (lib, lib64): through ccache,
+      # the RPM build reuses every object the DEB build compiled, and later runs start warm.
+      - uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: packages-ccache-${{ github.sha }}
+          restore-keys: packages-ccache-
       - name: Build the packages
+        env:
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
         run: |
+          export CCACHE_DIR="$PWD/.ccache" CCACHE_MAXSIZE=2G
+          ccache --zero-stats
           for kind in deb rpm; do
             cmake --preset package-$kind
             cmake --build --preset package-$kind -j "$(nproc)"
             cpack --preset package-$kind
           done
+          ccache --show-stats
           mkdir packages
           cp build/package-deb/packages/*.deb build/package-deb/packages/*.tar.gz \
             build/package-rpm/packages/*.rpm packages/

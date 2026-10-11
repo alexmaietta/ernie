@@ -89,7 +89,9 @@ manylinux-x86_64-image = "manylinux_2_34"
 manylinux-aarch64-image = "manylinux_2_34"
 build-verbosity = 1
 test-extras = ["test"]
-test-command = "VK_DRIVER_FILES=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n 1) python -m pytest -q -p no:cacheprovider {project}/ernie/test/python"
+# A smoke test of the packaging: the README's examples (import and render), the scene API and the
+# bundled viewer. CI's test jobs run the whole suite from source.
+test-command = "VK_DRIVER_FILES=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n 1) python -m pytest -q -p no:cacheprovider {project}/ernie/test/python/test_readme.py {project}/ernie/test/python/test_scene.py {project}/ernie/test/python/test_app.py"
 # AlmaLinux 9 has no lavapipe for aarch64: CI tests that wheel on Ubuntu's arm64 runner instead
 # (the wheel-test job).
 test-skip = "*-manylinux_aarch64"
