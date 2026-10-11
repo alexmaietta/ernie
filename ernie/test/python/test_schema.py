@@ -41,6 +41,7 @@ def test_registry_describes_types_and_attributes():
         "blackbody",
         "illuminant D",
         "custom",
+        "sun",
     ]
     assert [a.py_name for a in sphere.attributes] == [
         "radius",

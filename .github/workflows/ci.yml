@@ -257,10 +257,13 @@ jobs:
             .deps/*-src
             .deps/*-subbuild
           key: deps-${{ runner.os }}-${{ hashFiles('cmake/third_party/**') }}
+      # Windows with debug information for the debugger below, in the
+      # objects (/Z7), which sccache caches as it cannot /Zi's PDBs.
       - name: Configure
         shell: bash
         run: >
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake -S . -B build
+          ${{ runner.os == 'Windows' && '-DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_POLICY_DEFAULT_CMP0141=NEW -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded' || '-DCMAKE_BUILD_TYPE=Release' }}
           -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
           "-DFETCHCONTENT_BASE_DIR=$PWD/.deps"
           -DERNIE_BUILD_TESTS=ON -DERNIE_BUILD_DEMOS=ON -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
@@ -268,6 +271,25 @@ jobs:
         run: cmake --build build --parallel 4
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure -j4 --timeout 900 -L unit
+      # Windows renders too, on Mesa's lavapipe; a failing test is run
+      # again under the debugger, which prints where it failed.
+      - name: Install Vulkan (lavapipe, Vulkan loader)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: .github/scripts/install-lavapipe-windows.sh
+      - name: GPU tests on lavapipe
+        if: runner.os == 'Windows'
+        run: ctest --test-dir build --output-on-failure -j4 --timeout 900 -L gpu
+      # ctest names a test "ernie_<suite>.<gtest name>", from the program
+      # ernie_tests_<suite>.
+      - name: Debug the first failing test
+        if: failure() && runner.os == 'Windows'
+        shell: bash
+        run: |
+          name=$(sed -n '1s/^[0-9]*://p' build/Testing/Temporary/LastTestsFailed.log)
+          suite=${name%%.*}
+          .github/scripts/debug-windows.sh build/bin \
+            "build/bin/ernie_tests_${suite#ernie_}.exe" "--gtest_filter=${name#*.}"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -336,10 +358,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       ERNIE_TEST_REQUIRE_VALIDATION: "1"
-      MESA_VERSION: "26.2.3"
-      MESA_SHA256: 3f3613adb43cfd0f2e665ce2400b130c275f0b3317cb3a05566320a3a67589ed
-      VULKAN_RT_VERSION: "1.4.363.0"
-      VULKAN_RT_SHA256: a25a927aa8b9f0371048f1861cf88ac3b9bc9b1fb332c42d897c8ab32695769a
     defaults:
       run:
         shell: bash
@@ -362,20 +380,7 @@ jobs:
         # device itself instead.
         run: |
           echo "ERNIE_TEST_REQUIRE_VALIDATION=0" >> "$GITHUB_ENV"
-          vulkan="$RUNNER_TEMP/vulkan"
-          mkdir -p "$vulkan" && cd "$vulkan"
-          curl -fsSL -o mesa.7z "https://github.com/pal1000/mesa-dist-win/releases/download/$MESA_VERSION/mesa3d-$MESA_VERSION-release-msvc.7z"
-          curl -fsSL -o rt.zip "https://sdk.lunarg.com/sdk/download/$VULKAN_RT_VERSION/windows/VulkanRT-X64-$VULKAN_RT_VERSION-Components.zip"
-          echo "$MESA_SHA256  mesa.7z" | sha256sum -c -
-          echo "$VULKAN_RT_SHA256  rt.zip" | sha256sum -c -
-          7z x -y -omesa mesa.7z > /dev/null
-          7z x -y -ort rt.zip > /dev/null
-          cp rt/*/x64/vulkan-1.dll mesa/x64/
-          cygpath -w "$vulkan/mesa/x64" >> "$GITHUB_PATH"
-          # Registered where the loader looks for drivers: it ignores
-          # VK_DRIVER_FILES in an elevated process, as the runner's are.
-          reg add 'HKLM\SOFTWARE\Khronos\Vulkan\Drivers' //f //t REG_DWORD //d 0 \
-            //v "$(cygpath -w "$vulkan/mesa/x64/lvp_icd.x86_64.json")"
+          .github/scripts/install-lavapipe-windows.sh
       - uses: astral-sh/setup-uv@v7
       - name: Install the wheel
         run: |
@@ -385,21 +390,26 @@ jobs:
         run: |
           tests="ernie/test/python/test_readme.py ernie/test/python/test_scene.py ernie/test/python/test_app.py"
           if [ "$RUNNER_OS" = Windows ]; then
-            # A device first, with the loader's log and the process's own
-            # exit status (bash reports a crash as 127).
-            check="$RUNNER_TEMP/device_check.py"
+            # A device made and released first, which the next step
+            # debugs if it fails.
             printf '%s\n' 'import ernie' 'print("imported", flush=True)' \
               'r = ernie.Renderer()' 'print("device", flush=True)' 'del r' \
-              'print("released", flush=True)' > "$check"
-            VK_LOADER_DEBUG=error,warn,driver pwsh -NoProfile -Command "
-              .venv\\Scripts\\python -X faulthandler '$(cygpath -w "$check")'
-              \$status = \$LASTEXITCODE
-              'exit status 0x{0:X8}' -f \$status
-              exit \$status"
+              'print("released", flush=True)' > "$RUNNER_TEMP/device_check.py"
+            .venv/Scripts/python -X faulthandler "$RUNNER_TEMP/device_check.py"
             .venv/Scripts/python -m pytest -q -p no:cacheprovider $tests
           else
             xvfb-run -a .venv/bin/python -m pytest -q -p no:cacheprovider $tests
           fi
+      # The venv's python.exe only starts the base interpreter, so the
+      # debugger runs that one, with the venv's packages.
+      - name: Debug the device check
+        if: failure() && runner.os == 'Windows'
+        run: |
+          python=$(.venv/Scripts/python -c "import sys; print(sys._base_executable)")
+          packages=$(cygpath -w "$PWD/.venv/Lib/site-packages")
+          PYTHONPATH="$packages" .github/scripts/debug-windows.sh \
+            "$packages/ernie" "$(cygpath -u "$python")" \
+            "$(cygpath -w "$RUNNER_TEMP/device_check.py")"
 
   sdist:
     needs: version
