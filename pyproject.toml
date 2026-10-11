@@ -130,6 +130,9 @@ ERNIE_BUILD_DEMOS = "OFF"
 # The viewer (ernie.app), with GLFW linked in: the windowing libraries load only when a window opens.
 ERNIE_BUILD_APP = "ON"
 ERNIE_USE_SYSTEM_GLFW = "OFF"
+# No libcurl in the wheel: its C++ demos read the cache the Python
+# demos fill (with urllib).
+ERNIE_DEMO_DOWNLOADS = "OFF"
 # The module links Ernie statically; libernie and the C++ install rules are for packages.
 ERNIE_INSTALL = "OFF"
 

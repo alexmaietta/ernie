@@ -1,6 +1,6 @@
 # Cameras and sensor models
 
-Camera models read from mission files, and instrument presets.
+Camera models read from mission files, planetary elevation models, and lens helpers. Instruments built from them as published, such as LROC's cameras and the Mars 2020 rover's, are demos: `demos/cameras/`.
 
 ::: ernie.CahvoreModel
 
@@ -12,20 +12,10 @@ Camera models read from mission files, and instrument presets.
 
 ::: ernie.IsdPushFrame
 
-::: ernie.author_lroc_nac
+::: ernie.CylindricalDem
 
-::: ernie.author_lroc_wac
+::: ernie.read_cylindrical_dem
 
-::: ernie.author_mars2020_navcam
-
-::: ernie.author_mars2020_navcam_pair
-
-::: ernie.author_mars2020_hazcam
-
-::: ernie.author_mars2020_hazcam_pair
-
-::: ernie.author_mastcamz
-
-::: ernie.author_mastcamz_pair
+::: ernie.local_terrain_of
 
 ::: ernie.author_singlet_chromatic

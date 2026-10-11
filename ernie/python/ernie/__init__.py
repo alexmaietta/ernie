@@ -29,9 +29,9 @@ name, write bulk data as arrays from any DLPack-capable framework
 `ernie.Camera.at(scene, path)` types an existing prim, and
 `ernie.typed(prim)` gives a prim its own class. Any attribute can also
 be set by USD name, `prim.set(tokens.FOCAL_LENGTH, 35.0)`. The
-authoring functions (`author_lroc_nac`, `IsdLineScanner.author_strip`,
-...) and render products take a prim as a str, a Path, a Prim or a
-typed prim.
+authoring functions (`IsdLineScanner.author_strip`,
+`author_singlet_chromatic`, ...) and render products take a prim as a
+str, a Path, a Prim or a typed prim.
 
 Attribute values map from Python as follows:
 
@@ -89,6 +89,7 @@ from ._ernie import (
     ChangeCursor,
     CudaArray,
     CudaArrayMapping,
+    CylindricalDem,
     Device,
     Dirty,
     Frame,
@@ -106,14 +107,6 @@ from ._ernie import (
     RenderVarOutput,
     Scene,
     Wireframe,
-    author_lroc_nac,
-    author_lroc_wac,
-    author_mars2020_hazcam,
-    author_mars2020_hazcam_pair,
-    author_mars2020_navcam,
-    author_mars2020_navcam_pair,
-    author_mastcamz,
-    author_mastcamz_pair,
     author_singlet_chromatic,
     celestial_to_local,
     color_index_to_temperature,
@@ -123,9 +116,11 @@ from ._ernie import (
     greenwich_sidereal_time,
     julian_date,
     load_image,
+    local_terrain_of,
     look_at_transform,
     prim_types,
     read_cahvore_models,
+    read_cylindrical_dem,
     save_scene,
     stage_type,
     star_illuminance,
@@ -144,6 +139,7 @@ __all__ = [
     "ChangeCursor",
     "CudaArray",
     "CudaArrayMapping",
+    "CylindricalDem",
     "Device",
     "Dirty",
     "Frame",
@@ -161,14 +157,6 @@ __all__ = [
     "RenderVarOutput",
     "Scene",
     "Wireframe",
-    "author_lroc_nac",
-    "author_lroc_wac",
-    "author_mars2020_hazcam",
-    "author_mars2020_hazcam_pair",
-    "author_mars2020_navcam",
-    "author_mars2020_navcam_pair",
-    "author_mastcamz",
-    "author_mastcamz_pair",
     "author_singlet_chromatic",
     "celestial_to_local",
     "color_index_to_temperature",
@@ -178,9 +166,11 @@ __all__ = [
     "greenwich_sidereal_time",
     "julian_date",
     "load_image",
+    "local_terrain_of",
     "look_at_transform",
     "prim_types",
     "read_cahvore_models",
+    "read_cylindrical_dem",
     "save_scene",
     "stage_type",
     "star_illuminance",

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/scene/isd.h"
 
+#include "ernie/scene/scene.h"
+#include "ernie/scene/tokens.h"
+
 #include "ernie/util/least_squares.h"
 
 #include <nlohmann/json.hpp>
@@ -1502,6 +1505,35 @@ IsdSensor ReadIsdFile(const std::string& path) {
     std::ostringstream text;
     text << file.rdbuf();
     return ReadIsd(text.str());
+}
+
+void AuthorIsdCamera(Scene& scene, const Path& path,
+                     const CameraParams& camera) {
+    using namespace tokens;
+    Prim prim = scene.Has(path) ? scene.GetPrim(path)
+                                : scene.Define(path, kCamera);
+    prim.Set(kTransform, camera.transform)
+        .Set(kCameraScan,
+             std::string(camera.pushbroom ? kPushbroom : kFrameScan))
+        .Set(kFocalLength, camera.focalLengthMm)
+        .Set(kVerticalAperture, camera.verticalApertureMm)
+        .Set(kHorizontalAperture,
+             camera.verticalApertureMm * camera.width / camera.height)
+        .Set(kHorizontalApertureOffset,
+             camera.horizontalApertureOffsetMm)
+        .Set(kVerticalApertureOffset,
+             camera.pushbroom ? 0.0 : camera.verticalApertureOffsetMm)
+        .Set(kPushbroomLineOffset,
+             camera.pushbroom ? camera.lineOffsetMm : 0.0)
+        .Set(kLensDistortion,
+             std::vector<float>{static_cast<float>(camera.lens.k1),
+                                static_cast<float>(camera.lens.k2),
+                                static_cast<float>(camera.lens.k3),
+                                static_cast<float>(camera.lens.p1),
+                                static_cast<float>(camera.lens.p2)})
+        .Set(kClippingRange,
+             glm::dvec2(camera.nearPlane, camera.farPlane))
+        .Set(kExposureTime, camera.exposureTime);
 }
 
 }  // namespace ernie

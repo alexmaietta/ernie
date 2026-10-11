@@ -49,6 +49,7 @@ function(ernie_install_licenses destination component)
         implot
         imguizmo
         glfw
+        curl
         ernie_font_inter_license
         ernie_font_lucide_license)
         FetchContent_GetProperties(${dependency})
@@ -106,6 +107,10 @@ function(ernie_install_licenses destination component)
         # A system GLFW is a dependency rather than built in.
         if(glfw_SOURCE_DIR)
             license(glfw "${glfw_SOURCE_DIR}/LICENSE.md")
+        endif()
+        # Built in when the system has no libcurl (curl.cmake).
+        if(curl_SOURCE_DIR)
+            license(curl "${curl_SOURCE_DIR}/COPYING")
         endif()
     endif()
 endfunction()

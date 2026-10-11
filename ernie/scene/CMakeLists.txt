@@ -6,10 +6,10 @@ ernie_add_library(
     brdf.cpp
     cahvore.cpp
     camera.cpp
+    dem.cpp
     camera_schemas.cpp
     edit_history.cpp
     geometry_schemas.cpp
-    instruments.cpp
     isd.cpp
     light_pattern.cpp
     light_schemas.cpp

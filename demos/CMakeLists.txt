@@ -12,14 +12,32 @@ file(GLOB ernie_demo_cpp CONFIGURE_DEPENDS
 add_library(ernie_demos OBJECT util.cpp ${ernie_demo_cpp})
 target_include_directories(ernie_demos
                            PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+# The data the demos read (LRO's ISDs), which the Python package ships
+# as ernie/demos/data.
+target_compile_definitions(
+    ernie_demos
+    PRIVATE
+        ERNIE_DEMO_DATA_DIR="${PROJECT_SOURCE_DIR}/ernie/test/fixtures/isd"
+)
 target_link_libraries(ernie_demos PRIVATE ernie_app
                                           ernie_build_options)
 set_target_properties(ernie_demos PROPERTIES POSITION_INDEPENDENT_CODE
                                              ON)
 
+# libcurl, for the demos to fetch their data (curl.cmake); every target
+# their objects go into links it.
+include("${PROJECT_SOURCE_DIR}/cmake/third_party/curl.cmake")
+set(ernie_demo_links)
+if(TARGET ernie_curl)
+    set(ernie_demo_links ernie_curl)
+    target_link_libraries(ernie_demos PRIVATE ernie_curl)
+endif()
+
 target_sources(ernie_viewer PRIVATE $<TARGET_OBJECTS:ernie_demos>)
+target_link_libraries(ernie_viewer PRIVATE ${ernie_demo_links})
 if(TARGET _ernie)
     target_sources(_ernie PRIVATE $<TARGET_OBJECTS:ernie_demos>)
+    target_link_libraries(_ernie PRIVATE ${ernie_demo_links})
 endif()
 
 if(ERNIE_BUILD_DEMOS)
@@ -32,8 +50,9 @@ if(ERNIE_BUILD_DEMOS)
                                   $<TARGET_OBJECTS:ernie_demos>)
         target_compile_definitions(
             ${program} PRIVATE ERNIE_DEMO_ID="${category}/${name}")
-        target_link_libraries(${program} PRIVATE ernie_app
-                                                 ernie_build_options)
+        target_link_libraries(
+            ${program} PRIVATE ernie_app ernie_build_options
+                               ${ernie_demo_links})
         if(ERNIE_INSTALL)
             install(TARGETS ${program}
                     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

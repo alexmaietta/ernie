@@ -16,6 +16,7 @@ ernie_add_test_suite(
     raster_shadow_cascades_test.cpp
     scene_brdf_test.cpp
     scene_cahvore_test.cpp
+    scene_dem_test.cpp
     scene_camera_schemas_test.cpp
     scene_camera_test.cpp
     scene_edit_history_test.cpp

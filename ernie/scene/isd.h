@@ -515,4 +515,18 @@ IsdSensor ReadIsd(std::string_view json);
 /// `ReadIsd`.
 IsdSensor ReadIsdFile(const std::string& path);
 
+class Scene;
+class Path;
+
+/// Authors the Camera prim at `path` (defined if missing) with an ISD
+/// camera's geometry and exposure time only, as Python's
+/// `author_framelet` does: `camera`'s transform, scan (frame or
+/// pushbroom), focal length, apertures (the horizontal from the
+/// image's aspect) and their offsets, pushbroom line offset,
+/// Brown-Conrady distortion, clipping range and exposure time. Its
+/// f-number, ISO, lens transmission and sensor stay as authored, so
+/// an instrument's own values (a demo's, say) are kept.
+void AuthorIsdCamera(Scene& scene, const Path& path,
+                     const CameraParams& camera);
+
 }  // namespace ernie

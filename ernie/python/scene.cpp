@@ -3,7 +3,7 @@
 
 #include "ernie/scene/cahvore.h"
 #include "ernie/scene/camera_schemas.h"
-#include "ernie/scene/instruments.h"
+#include "ernie/scene/dem.h"
 #include "ernie/scene/isd.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/schema.h"
@@ -1280,7 +1280,7 @@ void BindScene(nb::module_& m) {
                 using namespace tokens;
                 // The camera's geometry and line time only: its
                 // f-number, ISO, lens transmission and sensor stay as
-                // authored (`author_lroc_nac`, say).
+                // authored (by a demo's instrument, say).
                 Prim prim = scene.Has(Path(path))
                                 ? scene.GetPrim(Path(path))
                                 : scene.Define(Path(path), kCamera);
@@ -1402,34 +1402,8 @@ void BindScene(nb::module_& m) {
                 const IsdPushFrame::Framelet framelet =
                     s.FrameletOf(index);
                 const CameraParams& camera = framelet.camera;
-                using namespace tokens;
-                // The camera's geometry and exposure only, as
-                // `IsdLineScanner.author_strip`.
-                Prim prim = scene.Has(Path(path))
-                                ? scene.GetPrim(Path(path))
-                                : scene.Define(Path(path), kCamera);
-                prim.Set(kTransform, camera.transform)
-                    .Set(kCameraScan, std::string(kFrameScan))
-                    .Set(kFocalLength, camera.focalLengthMm)
-                    .Set(kVerticalAperture, camera.verticalApertureMm)
-                    .Set(kHorizontalAperture,
-                         camera.verticalApertureMm * camera.width /
-                             camera.height)
-                    .Set(kHorizontalApertureOffset,
-                         camera.horizontalApertureOffsetMm)
-                    .Set(kVerticalApertureOffset,
-                         camera.verticalApertureOffsetMm)
-                    .Set(kPushbroomLineOffset, 0.0)
-                    .Set(kLensDistortion,
-                         std::vector<float>{
-                             static_cast<float>(camera.lens.k1),
-                             static_cast<float>(camera.lens.k2),
-                             static_cast<float>(camera.lens.k3),
-                             static_cast<float>(camera.lens.p1),
-                             static_cast<float>(camera.lens.p2)})
-                    .Set(kClippingRange, glm::dvec2(camera.nearPlane,
-                                                    camera.farPlane))
-                    .Set(kExposureTime, camera.exposureTime);
+                // The camera's geometry and exposure only.
+                AuthorIsdCamera(scene, path, camera);
                 return nb::make_tuple(
                     camera.width, camera.height, framelet.firstLine,
                     framelet.rowsReversed, framelet.time);
@@ -1445,6 +1419,61 @@ void BindScene(nb::module_& m) {
             "render at that resolution, flip the rows if "
             "`rows_reversed`, and place them at "
             "`first_line` of the image.");
+
+    nb::class_<CylindricalDem>(
+        m, "CylindricalDem",
+        "A planet's radius on a simple cylindrical grid, as LOLA's "
+        "LDEM products hold it: heights in metres above "
+        "reference_radius, rows from the northern, each from the "
+        "western sample eastwards. Made empty, it is the bare "
+        "reference sphere of `reference_radius`.")
+        .def(
+            "__init__",
+            [](CylindricalDem* dem, double referenceRadius) {
+                new (dem) CylindricalDem();
+                dem->referenceRadius = referenceRadius;
+            },
+            nb::arg("reference_radius"))
+        .def_ro("lines", &CylindricalDem::lines)
+        .def_ro("samples", &CylindricalDem::samples)
+        .def_ro("pixels_per_degree", &CylindricalDem::pixelsPerDegree)
+        .def_ro("max_latitude", &CylindricalDem::maxLatitudeDeg)
+        .def_ro("west_longitude", &CylindricalDem::westLongitudeDeg)
+        .def_ro("reference_radius", &CylindricalDem::referenceRadius)
+        .def("height_at", &CylindricalDem::HeightAt,
+             nb::arg("latitude"), nb::arg("longitude"),
+             "The height (m) at planetocentric latitude and east "
+             "longitude (degrees), bilinear between cell centres.");
+    m.def("read_cylindrical_dem", &ReadCylindricalDem,
+          nb::arg("label_path"),
+          "Reads the DEM a PDS3 label describes (LOLA's LDEM "
+          "products: 16- or 32-bit integers or 32-bit reals on a "
+          "simple cylindrical grid).");
+    m.def(
+        "local_terrain_of",
+        [](const CylindricalDem& dem, double latitude,
+           double longitude, std::uint32_t cells, double cellSize) {
+            const LocalTerrain terrain = LocalTerrainOf(
+                dem, latitude, longitude, cells, cellSize);
+            nb::dict result;
+            result["heights"] = ArrayFromTensor(terrain.heights);
+            result["origin"] =
+                nb::make_tuple(terrain.origin.x, terrain.origin.y);
+            result["cell_size"] = terrain.cellSize;
+            result["body_to_local"] =
+                MatrixToPython(terrain.bodyToLocal);
+            return result;
+        },
+        nb::arg("dem"), nb::arg("latitude"), nb::arg("longitude"),
+        nb::arg("cells"), nb::arg("cell_size"),
+        "The cells x cells heightfield of `dem`, `cell_size` m "
+        "apart, "
+        "about a latitude and east longitude (degrees), in a local "
+        "frame there (x east, y north, z up, its origin on the "
+        "reference sphere), the planet's curvature in the heights: a "
+        "dict of heights (float32, the first row northern), origin "
+        "(x, y of the north-western cell), cell_size and "
+        "body_to_local (body-fixed metres to the local frame).");
 
     nb::class_<CahvoreModel>(
         m, "CahvoreModel",
@@ -1741,163 +1770,6 @@ void BindScene(nb::module_& m) {
             "`rows_reversed`.");
 
     m.def(
-        "author_lroc_nac",
-        [](Scene& scene, const PrimPath& camera,
-           const PrimPath& product, const std::string& side) {
-            if (side != "left" && side != "right") {
-                throw nb::value_error(
-                    "side must be 'left' or 'right'");
-            }
-            AuthorLrocNac(scene, Path(camera), Path(product),
-                          side == "left" ? LrocNac::Left
-                                         : LrocNac::Right);
-        },
-        nb::arg("scene"), nb::arg("camera"), nb::arg("product"),
-        nb::arg("side") = "left",
-        "Authors one of LROC's Narrow Angle Cameras (NAC-L or NAC-R) "
-        "as Robinson et al. 2010 "
-        "publish it (Table 2, Appendix A): Camera `camera`'s sensor "
-        "(400-760 nm, gain, detector "
-        "noise, full well, 12-bit ADC, f-number) and RenderProduct "
-        "`product`'s readout chain "
-        "(qe, noise, adc, even/odd readoutTaps, compandTable code 0) "
-        "whose RawDN is the 8-bit "
-        "numbers the NAC sends. Its geometry comes from the image's "
-        "ISD "
-        "(`IsdLineScanner.author_strip`). `camera` and `product` are "
-        "each a str, Path, Prim or "
-        "typed prim.");
-
-    m.def(
-        "author_lroc_wac",
-        [](Scene& scene, const PrimPath& camera,
-           const PrimPath& product, int band) {
-            try {
-                AuthorLrocWac(scene, Path(camera), Path(product),
-                              LrocWacBandNamed(band));
-            } catch (const std::invalid_argument& error) {
-                throw nb::value_error(error.what());
-            }
-        },
-        nb::arg("scene"), nb::arg("camera"), nb::arg("product"),
-        nb::arg("band") = 605,
-        "Authors one band of LROC's Wide Angle Camera (320, 360, "
-        "415, 565, 605, 645 or 690 nm, "
-        "by name or effective wavelength) as Robinson et al. 2010 "
-        "publish it (Tables 3 and 4): "
-        "Camera `camera`'s sensor (the passband at the effective QE "
-        "that gives Table 4's "
-        "responsivity, gain, detector noise, full well, 11-bit ADC, "
-        "f-number; its spectral "
-        "range narrowed to the passband) and RenderProduct "
-        "`product`'s readout chain (qe, "
-        "noise, adc). Its geometry comes from the image's ISD "
-        "(`IsdPushFrame.author_framelet`). `camera` and `product` "
-        "are each a str, Path, Prim or "
-        "typed prim.");
-
-    const auto bayerPattern = [](const std::string& name) {
-        const std::pair<const char*, BayerPattern> patterns[] = {
-            {"rggb", BayerPattern::Rggb},
-            {"bggr", BayerPattern::Bggr},
-            {"grbg", BayerPattern::Grbg},
-            {"gbrg", BayerPattern::Gbrg}};
-        for (const auto& [text, pattern] : patterns) {
-            if (name == text) {
-                return pattern;
-            }
-        }
-        throw nb::value_error(
-            "pattern must be 'rggb', 'bggr', 'grbg' or 'gbrg'");
-    };
-    m.def(
-        "author_mars2020_navcam",
-        [bayerPattern](Scene& scene, const PrimPath& camera,
-                       const PrimPath& product,
-                       const std::string& pattern,
-                       double jpegQuality) {
-            AuthorMars2020Navcam(scene, Path(camera), Path(product),
-                                 bayerPattern(pattern), jpegQuality);
-        },
-        nb::arg("scene"), nb::arg("camera"), nb::arg("product"),
-        nb::arg("pattern") = "rggb", nb::arg("jpeg_quality") = 85.0,
-        "Authors one of the Mars 2020 rover's Navcams as Maki et al. "
-        "2020 publish it (Table 2): "
-        "Camera `camera`'s f-theta fisheye (19.1 mm, f/12, 96 x 73 "
-        "degrees over 5120 x 3840 "
-        "pixels of 6.4 um) and RGB sensor (gain 0.24 DN/e-, 8 e- "
-        "dark noise, 15,000 e- full "
-        "well, 12-bit ADC), and RenderProduct `product`'s chain (qe, "
-        "bayer, noise, adc, "
-        "demosaic; cie, exposure, jpeg). The paper gives neither the "
-        "Bayer layout (`pattern`) "
-        "nor the JPEG quality (`jpeg_quality`). `camera` and "
-        "`product` are each a str, Path, "
-        "Prim or typed prim.");
-    m.def(
-        "author_mars2020_navcam_pair",
-        [bayerPattern](Scene& scene, const PrimPath& rig,
-                       const PrimPath& left, const PrimPath& right,
-                       const std::string& pattern,
-                       double jpegQuality) {
-            AuthorMars2020NavcamPair(
-                scene, Path(rig), Path(left), Path(right),
-                bayerPattern(pattern), jpegQuality);
-        },
-        nb::arg("scene"), nb::arg("rig"), nb::arg("left_product"),
-        nb::arg("right_product"), nb::arg("pattern") = "rggb",
-        nb::arg("jpeg_quality") = 85.0,
-        "The Navcam stereo pair on Xform `rig` (defined if missing; "
-        "pose it as the cameras' "
-        "frame, looking down -z with +y up): Cameras `rig`/Left and "
-        "`rig`/Right 42.4 cm apart "
-        "along x, each as `author_mars2020_navcam` with its product. "
-        "`rig` and the products are "
-        "each a str, Path, Prim or typed prim.");
-    m.def(
-        "author_mars2020_hazcam",
-        [bayerPattern](Scene& scene, const PrimPath& camera,
-                       const PrimPath& product,
-                       const std::string& pattern,
-                       double jpegQuality) {
-            AuthorMars2020Hazcam(scene, Path(camera), Path(product),
-                                 bayerPattern(pattern), jpegQuality);
-        },
-        nb::arg("scene"), nb::arg("camera"), nb::arg("product"),
-        nb::arg("pattern") = "rggb", nb::arg("jpeg_quality") = 85.0,
-        "Authors one of the Mars 2020 rover's Hazcams as Maki et al. "
-        "2020 publish it (Table 2), as "
-        "`author_mars2020_navcam` does a Navcam but through the "
-        "Hazcam's f-theta fisheye (14.0 mm, "
-        "f/12, 136 x 102 degrees, focused at 0.9 m), which renders "
-        "on cube faces. `camera` and "
-        "`product` are each a str, Path, Prim or typed prim.");
-    m.def(
-        "author_mars2020_hazcam_pair",
-        [bayerPattern](
-            Scene& scene, const PrimPath& rig, const PrimPath& left,
-            const PrimPath& right, const std::string& which,
-            const std::string& pattern, double jpegQuality) {
-            if (which != "front" && which != "rear") {
-                throw nb::value_error(
-                    "which must be 'front' or 'rear'");
-            }
-            AuthorMars2020HazcamPair(
-                scene, Path(rig), Path(left), Path(right),
-                which == "front" ? Mars2020Hazcams::Front
-                                 : Mars2020Hazcams::Rear,
-                bayerPattern(pattern), jpegQuality);
-        },
-        nb::arg("scene"), nb::arg("rig"), nb::arg("left_product"),
-        nb::arg("right_product"), nb::arg("which") = "front",
-        nb::arg("pattern") = "rggb", nb::arg("jpeg_quality") = 85.0,
-        "A Hazcam stereo pair on Xform `rig`: Cameras `rig`/Left and "
-        "`rig`/Right 24.8 cm apart "
-        "(front) or 93.4 cm (rear) along x, each as "
-        "`author_mars2020_hazcam` with its product. "
-        "`rig` and the products are each a str, Path, Prim or typed "
-        "prim.");
-    m.def(
         "author_singlet_chromatic",
         [](Scene& scene, const PrimPath& camera, double nd,
            double abbe, double lateral) {
@@ -1945,66 +1817,6 @@ void BindScene(nb::module_& m) {
         "by the axial colour; the lens resamples each band by the "
         "lateral. `camera` is a str, "
         "Path, Prim or typed prim.");
-    m.def(
-        "author_mastcamz",
-        [bayerPattern](Scene& scene, const PrimPath& camera,
-                       const PrimPath& product,
-                       const std::string& eye, int filter,
-                       double focalLength,
-                       const std::string& pattern) {
-            if (eye != "left" && eye != "right") {
-                throw nb::value_error(
-                    "eye must be 'left' or 'right'");
-            }
-            try {
-                AuthorMastcamZ(scene, Path(camera), Path(product),
-                               eye == "left" ? MastcamZEye::Left
-                                             : MastcamZEye::Right,
-                               filter, focalLength,
-                               bayerPattern(pattern));
-            } catch (const std::invalid_argument& error) {
-                throw nb::value_error(error.what());
-            }
-        },
-        nb::arg("scene"), nb::arg("camera"), nb::arg("product"),
-        nb::arg("eye") = "left", nb::arg("filter") = 0,
-        nb::arg("focal_length") = 26.0, nb::arg("pattern") = "rggb",
-        "Authors one Mastcam-Z camera through filter `filter` as "
-        "Bell et al. 2021 publish it "
-        "(Tables 3 and 5): the KAI-2020CM (1600 x 1200 pixels of 7.4 "
-        "um, 15.6 e-/DN, 11-bit) "
-        "behind the zoom at `focal_length` (26 to 110 mm). Filter 0 "
-        "is the Bayer RGB; 1 to 6 "
-        "the narrow bands (the left eye's 442 to 800 nm, the right's "
-        "800 to 1022 nm); 7 the "
-        "neutral-density solar filter. `camera` and `product` are "
-        "each a str, Path, Prim or "
-        "typed prim.");
-    m.def(
-        "author_mastcamz_pair",
-        [bayerPattern](
-            Scene& scene, const PrimPath& rig, const PrimPath& left,
-            const PrimPath& right, int leftFilter, int rightFilter,
-            double focalLength, const std::string& pattern) {
-            try {
-                AuthorMastcamZPair(scene, Path(rig), Path(left),
-                                   Path(right), leftFilter,
-                                   rightFilter, focalLength,
-                                   bayerPattern(pattern));
-            } catch (const std::invalid_argument& error) {
-                throw nb::value_error(error.what());
-            }
-        },
-        nb::arg("scene"), nb::arg("rig"), nb::arg("left_product"),
-        nb::arg("right_product"), nb::arg("left_filter") = 0,
-        nb::arg("right_filter") = 0, nb::arg("focal_length") = 26.0,
-        nb::arg("pattern") = "rggb",
-        "The Mastcam-Z pair on Xform `rig`: Cameras `rig`/Left and "
-        "`rig`/Right 24.4 cm apart "
-        "along x, each toed in 1.15 degrees, through their filters. "
-        "`rig` and the products are "
-        "each a str, Path, Prim or typed prim.");
-
     m.def(
         "look_at_transform",
         [](nb::handle eye, nb::handle target, nb::handle up) {

@@ -76,6 +76,7 @@ import os
 import re
 import struct
 import sys
+import urllib.request
 import zlib
 
 import numpy as np
@@ -440,6 +441,98 @@ def load_demo_class(path):
     return module.Demo
 
 
+def cache_dir():
+    """Where the demos keep data they fetch: $ERNIE_CACHE, else
+    $XDG_CACHE_HOME/ernie, else ~/.cache/ernie (C++
+    `demos::CacheDir`)."""
+    if os.environ.get("ERNIE_CACHE"):
+        return os.environ["ERNIE_CACHE"]
+    base = os.environ.get("XDG_CACHE_HOME") or os.path.join(
+        os.path.expanduser("~"), ".cache"
+    )
+    return os.path.join(base, "ernie")
+
+
+def can_download():
+    """Whether the demos may fetch data: $ERNIE_OFFLINE unset."""
+    return not os.environ.get("ERNIE_OFFLINE")
+
+
+def _open(request):
+    """`urlopen(request)`'s status, headers and body, tried up to three
+    times: servers drop connections mid-transfer now and then."""
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(
+                request, timeout=120
+            ) as response:
+                return (
+                    response.status,
+                    response.headers,
+                    response.read(),
+                )
+        except OSError as error:
+            if attempt == 2:
+                raise
+            print(
+                f"Fetching {request.full_url} failed: {error}; trying again"
+            )
+
+
+def _require_downloads():
+    if not can_download():
+        raise RuntimeError(
+            "The demos cannot fetch data: $ERNIE_OFFLINE is set"
+        )
+
+
+def download(url, path):
+    """Downloads `url` to `path`, its directory made as needed,
+    through `path` + ".part", renamed when complete."""
+    _require_downloads()
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "ernie-demos"}
+    )
+    _, _, body = _open(request)
+    with open(path + ".part", "wb") as f:
+        f.write(body)
+    os.replace(path + ".part", path)
+
+
+def fetch_ranges(url, ranges):
+    """The bytes of `ranges` [(first, last), ...] of `url`, each
+    inclusive, in one request (HTTP range requests; several come back
+    as multipart/byteranges, RFC 9110 section 14.6)."""
+    _require_downloads()
+    header = "bytes=" + ",".join(f"{a}-{b}" for a, b in ranges)
+    request = urllib.request.Request(
+        url, headers={"Range": header, "User-Agent": "ernie-demos"}
+    )
+    status, headers, body = _open(request)
+    if status != 206:
+        raise RuntimeError(f"{url} ignored the range request")
+    kind = headers.get("Content-Type", "")
+    if len(ranges) == 1:
+        return [body]
+    match = re.search(r"boundary=(.+)", kind)
+    if match is None:
+        raise RuntimeError(f"{url} sent no multipart boundary")
+    boundary = match.group(1).strip('"')
+    parts = {}
+    for part in body.split(b"--" + boundary.encode()):
+        head, sep, data = part.partition(b"\r\n\r\n")
+        found = re.search(rb"Content-Range: bytes (\d+)-(\d+)", head)
+        if not sep or not found:
+            continue
+        first, last = int(found.group(1)), int(found.group(2))
+        parts[first] = data[: last - first + 1]
+    result = [parts.get(a, b"") for a, _ in ranges]
+    if any(len(r) != b - a + 1 for r, (a, b) in zip(result, ranges)):
+        raise RuntimeError(f"{url} sent incomplete ranges")
+    return result
+
+
 def write_png(path, image):
     """Writes an (rows, cols, 3 or 4) uint8 image as PNG with only the
     standard library."""
@@ -560,10 +653,14 @@ __all__ = [
     "COMMON_ARGS",
     "Demo",
     "DemoEntry",
+    "cache_dir",
+    "can_download",
     "catalog",
     "create_parser",
     "default_args",
     "discover_demos",
+    "download",
+    "fetch_ranges",
     "heatmap",
     "init",
     "load_demo_class",

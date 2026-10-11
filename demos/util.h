@@ -8,9 +8,14 @@
 
 #include <glm/vec3.hpp>
 
+#include <cstdint>
+#include <filesystem>
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace ernie::demos {
 
@@ -28,6 +33,36 @@ glm::dvec3 MeanLinearRgb(const Tensor& image);
 /// The standard deviation of a uint8 image's colour channels (alpha
 /// left out), for checking an image is not flat.
 double ColourDeviation(const Tensor& image);
+
+/// Where fetched data lives, as Python's `ernie.demo.cache_dir`:
+/// $ERNIE_CACHE, else $XDG_CACHE_HOME/ernie, else ~/.cache/ernie.
+std::filesystem::path CacheDir();
+
+/// Whether the demos can fetch data: built with libcurl
+/// (ERNIE_DEMO_DOWNLOADS) and $ERNIE_OFFLINE unset.
+bool CanDownload();
+
+/// Downloads `url` to `path`, its directory made as needed, through
+/// `path` + ".part", renamed when complete.
+/// @throws std::runtime_error if it cannot (`CanDownload`), or on a
+/// failed request.
+void Download(const std::string& url,
+              const std::filesystem::path& path);
+
+/// The bytes of `ranges` of `url`, each [first, last] inclusive, in
+/// one request (HTTP range requests; several come back as
+/// multipart/byteranges).
+/// @throws std::runtime_error as `Download`, or if the server ignores
+/// the ranges.
+std::vector<std::string> FetchRanges(
+    const std::string& url,
+    std::span<const std::pair<std::uint64_t, std::uint64_t>> ranges);
+
+/// Data file `name` the demos ship (such as LRO's ISDs): in
+/// $ERNIE_DEMO_DATA, else the source tree's ISD fixtures, which the
+/// Python package ships as ernie/demos/data.
+/// @throws std::runtime_error if neither holds it.
+std::filesystem::path DataFile(std::string_view name);
 
 /// Throws std::runtime_error with `message` unless `condition` holds:
 /// a demo's checks.
