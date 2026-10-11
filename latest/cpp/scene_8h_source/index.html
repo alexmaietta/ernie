@@ -353,6 +353,8 @@ class Scene {
 
     const std::string&amp; TypeOf(const Path&amp; path) const;
 
+    const PrimTypeDef* SchemaOf(const Path&amp; path) const;
+
     std::vector&lt;Path&gt; Children(const Path&amp; path) const;
 
     std::vector&lt;Path&gt; Prims(std::string_view type = {}) const;

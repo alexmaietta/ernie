@@ -232,6 +232,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; float &gt;</td>
+<td style="text-align: left;"><a href="#variable-refractivity"><strong>refractivity</strong></a>  <br><em>The refractivity n - 1 where the density profile is 1, per band; zeros for a constituent without one.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; float &gt;</td>
 <td style="text-align: left;"><a href="#variable-scattering"><strong>scattering</strong></a>  <br><em>Scattering and absorption coefficients (m^-1) where the density profile is 1, per band.</em></td>
 </tr>
 </tbody>
@@ -255,6 +259,12 @@
 <h3 id="variable-phase">variable phase</h3>
 <p><em>The phase function per band at</em> <code>PhaseCosines</code> <em>, band-major: phase[band * angles + i].</em></p>
 <pre><code class="language-C++">std::vector&lt;float&gt; ernie::BandedConstituent::phase;
+</code></pre>
+<hr>
+
+<h3 id="variable-refractivity">variable refractivity</h3>
+<p><em>The refractivity n - 1 where the density profile is 1, per band; zeros for a constituent without one.</em> </p>
+<pre><code class="language-C++">std::vector&lt;float&gt; ernie::BandedConstituent::refractivity;
 </code></pre>
 <hr>
 

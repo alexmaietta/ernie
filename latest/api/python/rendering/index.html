@@ -335,6 +335,14 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            reset_time (ernie.Renderer.reset_time)" href="#ernie.Renderer.reset_time">reset_time</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Sets the sensor clock to <code>time</code> seconds; the next frame starts there.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            step (ernie.Renderer.step)" href="#ernie.Renderer.step">step</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -346,7 +354,7 @@
               <td><code><a class="autorefs autorefs-internal" title="            step_async (ernie.Renderer.step_async)" href="#ernie.Renderer.step_async">step_async</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Renders the RenderProduct prims <code>render_products</code> (or the settings' products, or a default one) and returns an Operation at once.</p>
+                  <p>Moves the sensor clock (<code>time</code>) on by <code>delta_time</code> seconds, then renders the RenderProduct prims <code>render_products</code> (or the settings' products, or a default one) over the clock since the last frame and returns an Operation at once.</p>
                 </div>
               </td>
             </tr>
@@ -436,6 +444,14 @@
               –
               <div class="doc-md-description">
                 <p>GPU memory, triangles and the backend's own counts, by name.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>time</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The sensor clock, seconds: where the last frame ended. Steps move it on by their delta_time; the scene's animation keeps its own (ernie.Stage(scene).time), as ovrtx keeps USD time apart from its step clock.</p>
               </div>
             </li>
             <li>
@@ -612,6 +628,29 @@
     <div class="doc doc-contents ">
 
         <p>GPU memory, triangles and the backend's own counts, by name.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Renderer.time" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">time</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">time: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The sensor clock, seconds: where the last frame ended. Steps move it on by their delta_time; the scene's animation keeps its own (ernie.Stage(scene).time), as ovrtx keeps USD time apart from its step clock.</p>
 
     </div>
 
@@ -824,13 +863,35 @@
 <div class="doc doc-object doc-function">
 
 
+<h3 id="ernie.Renderer.reset_time" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">reset_time</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">reset_time(time: float) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Sets the sensor clock to <code>time</code> seconds; the next frame starts there.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="ernie.Renderer.step" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">step</span>
 
 
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">step(
-    scene: Scene, render_products: object | None = None, settings: Path = ...
+    scene: Scene,
+    render_products: object | None = None,
+    settings: Path = ...,
+    delta_time: float = 0.0,
 ) -&gt; dict[str, RenderProductOutput]</code></pre>
 
     <div class="doc doc-contents ">
@@ -851,12 +912,15 @@
 
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">step_async(
-    scene: Scene, render_products: object | None = None, settings: Path = ...
+    scene: Scene,
+    render_products: object | None = None,
+    settings: Path = ...,
+    delta_time: float = 0.0,
 ) -&gt; Operation</code></pre>
 
     <div class="doc doc-contents ">
 
-        <p>Renders the RenderProduct prims <code>render_products</code> (or the settings' products, or a default one) and returns an Operation at once.</p>
+        <p>Moves the sensor clock (<code>time</code>) on by <code>delta_time</code> seconds, then renders the RenderProduct prims <code>render_products</code> (or the settings' products, or a default one) over the clock since the last frame and returns an Operation at once.</p>
 
 
     </div>
@@ -1147,6 +1211,22 @@
                 <p>Render vars by RenderVar path.</p>
               </div>
             </li>
+            <li>
+              <b><code>start_time</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Where on the sensor clock (Renderer.time) the frame starts, seconds: the last frame's end.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>time</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Where on the sensor clock the frame ends, seconds.</p>
+              </div>
+            </li>
         </ul>
       </td>
     </tr>
@@ -1181,6 +1261,52 @@
     <div class="doc doc-contents ">
 
         <p>Render vars by RenderVar path.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Frame.start_time" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">start_time</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">start_time: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Where on the sensor clock (Renderer.time) the frame starts, seconds: the last frame's end.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Frame.time" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">time</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">time: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Where on the sensor clock the frame ends, seconds.</p>
 
     </div>
 

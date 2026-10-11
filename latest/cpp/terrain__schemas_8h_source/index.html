@@ -228,6 +228,24 @@
     X(double, Exaggeration, ::ernie::tokens::kExaggeration, 1.0,                                   \
       (::ernie::AttributeMeta{.doc = &quot;Scales the heights as drawn.&quot;, .group = &quot;Terrain&quot;,           \
                               .max = 100.0}))                                                      \
+    X(std::string, ColorMode, ::ernie::tokens::kColorMode, ::ernie::tokens::kShaded,               \
+      (::ernie::AttributeMeta{.label = &quot;Colour&quot;, .doc = &quot;shaded: the material, lit; &quot;              \
+                                     &quot;colormap: a height ramp, unlit; shadedColormap: the ramp &quot;   \
+                                     &quot;times the material, lit (the ramps for showing heights); &quot;   \
+                                     &quot;hillshade: a GIS hillshade, grey and unlit.&quot;,                \
+                              .group = &quot;Terrain&quot;,                                                  \
+                              .options = {::ernie::tokens::kShaded, ::ernie::tokens::kColormap,    \
+                                          ::ernie::tokens::kShadedColormap,                        \
+                                          ::ernie::tokens::kHillshade}}))                          \
+    X(double, HillshadeAzimuth, ::ernie::tokens::kHillshadeAzimuth, 315.0,                         \
+      (::ernie::AttributeMeta{.label = &quot;Hillshade azimuth&quot;, .doc = &quot;Degrees clockwise from &quot;      \
+                                     &quot;north (+y; on a planet, towards +z) of the hillshade's &quot;     \
+                                     &quot;light; the GIS default 315, from the north-west.&quot;,          \
+                              .group = &quot;Terrain&quot;, .max = 360.0}))                                  \
+    X(double, HillshadeAltitude, ::ernie::tokens::kHillshadeAltitude, 45.0,                        \
+      (::ernie::AttributeMeta{.label = &quot;Hillshade altitude&quot;, .doc = &quot;Degrees above the horizon &quot;  \
+                                     &quot;of the hillshade's light.&quot;,                                  \
+                              .group = &quot;Terrain&quot;, .max = 90.0}))                                   \
     X(double, NoData, ::ernie::tokens::kNoData, 0.0,                                               \
       (::ernie::AttributeMeta{.doc = &quot;Height marking missing cells; unset, every cell is a &quot;       \
                                      &quot;height.&quot;,                                                    \

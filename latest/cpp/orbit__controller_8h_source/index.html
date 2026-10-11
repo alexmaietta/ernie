@@ -213,27 +213,27 @@ namespace ernie {
 
 class OrbitController {
   public:
-    glm::vec3 target{0.0f};
+    glm::dvec3 target{0.0};
     float yaw = 0.0f;  
     float pitch =
         0.6f;  
-    float distance =
-        100.0f;  
+    double distance =
+        100.0;  
     float verticalFov = 0.785398f;  
 
     static constexpr float kMinPitch = -1.55f;
     static constexpr float kMaxPitch = 1.55f;
 
-    glm::vec3 Eye() const;
+    glm::dvec3 Eye() const;
 
     glm::dmat4 Transform() const;
 
-    float NearPlane() const {
-        return distance * 0.01f;
+    double NearPlane() const {
+        return distance * 0.01;
     }
 
-    float FarPlane() const {
-        return distance * 100.0f;
+    double FarPlane() const {
+        return distance * 100.0;
     }
 
     void Apply(CameraParams&amp; camera) const;
@@ -249,8 +249,11 @@ class OrbitController {
 
     void Zoom(float steps);
 
-    void Frame(const glm::vec3&amp; boundsMin,
-               const glm::vec3&amp; boundsMax);
+    void Frame(const glm::dvec3&amp; boundsMin,
+               const glm::dvec3&amp; boundsMax);
+
+    static constexpr double kMinDistance = 1e-3;
+    static constexpr double kMaxDistance = 1e21;
 };
 
 }  // namespace ernie

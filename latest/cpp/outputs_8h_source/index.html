@@ -326,6 +326,8 @@ class RenderVarOutput {
 struct RenderProductOutput {
     Path product;
     std::map&lt;std::string, RenderVarOutput&gt; vars;
+    double startTime = 0.0;
+    double time = 0.0;
 };
 
 using RenderProductSetOutputs = std::map&lt;Path, RenderProductOutput&gt;;

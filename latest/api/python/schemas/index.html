@@ -6191,6 +6191,14 @@ six cube faces.</p>
               </div>
             </li>
             <li>
+              <b><code>color_mode</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>shaded: the material, lit; colormap: a height ramp, unlit; shadedColormap: the ramp times</p>
+              </div>
+            </li>
+            <li>
               <b><code>define</code></b>
                   (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._TerrainDefine">_TerrainDefine</span>]</code>)
               –
@@ -6212,6 +6220,22 @@ six cube faces.</p>
               –
               <div class="doc-md-description">
                 <p>float32 (rows, cols) heights in world units, the first row the northern; a planet's float32</p>
+              </div>
+            </li>
+            <li>
+              <b><code>hillshade_altitude</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Degrees above the horizon of the hillshade's light. Default 45.0. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>hillshade_azimuth</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Degrees clockwise from north (+y; on a planet, towards +z) of the hillshade's light; the GIS</p>
               </div>
             </li>
             <li>
@@ -6281,6 +6305,31 @@ six cube faces.</p>
 
 
 
+<h3 id="ernie.schema.Terrain.color_mode" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">color_mode</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">color_mode: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>shaded: the material, lit; colormap: a height ramp, unlit; shadedColormap: the ramp times
+the material, lit (the ramps for showing heights); hillshade: a GIS hillshade, grey and
+unlit. Default 'shaded'. USD name <code>ernie:colorMode</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Terrain.define" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
 
@@ -6340,6 +6389,54 @@ six cube faces.</p>
 
         <p>float32 (rows, cols) heights in world units, the first row the northern; a planet's float32
 (6, n + 1, n + 1) cube faces. USD name <code>heights</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Terrain.hillshade_altitude" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">hillshade_altitude</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">hillshade_altitude: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Degrees above the horizon of the hillshade's light. Default 45.0. USD name
+<code>ernie:hillshade:altitude</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Terrain.hillshade_azimuth" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">hillshade_azimuth</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">hillshade_azimuth: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Degrees clockwise from north (+y; on a planet, towards +z) of the hillshade's light; the GIS
+default 315, from the north-west. Default 315.0. USD name <code>ernie:hillshade:azimuth</code>.</p>
 
     </div>
 
@@ -6440,6 +6537,9 @@ name <code>ernie:radius</code>.</p>
     origin: Sequence[float] = ...,
     cell_size: float = ...,
     exaggeration: float = ...,
+    color_mode: str = ...,
+    hillshade_azimuth: float = ...,
+    hillshade_altitude: float = ...,
     no_data: float = ...,
     planet_radius: float = ...,
     translate: Sequence[float] = ...,
@@ -12945,7 +13045,15 @@ name <code>resolution</code>.</p>
                   (<code><span title="float">float</span></code>)
               –
               <div class="doc-md-description">
-                <p>Fraction of sunlight on unlit sides. Default 0.15. USD name <code>ernie:ambient</code>.</p>
+                <p>Luminance (cd/m^2) of light reaching every surface uniformly from all around, besides the</p>
+              </div>
+            </li>
+            <li>
+              <b><code>ambient_color</code></b>
+                  (<code><span title="tuple">tuple</span>[<span title="float">float</span>, <span title="float">float</span>, <span title="float">float</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>Linear RGB of the ambient light, whose luminance <code>ernie:ambient</code> sets whatever the colour's</p>
               </div>
             </li>
             <li>
@@ -12954,14 +13062,6 @@ name <code>resolution</code>.</p>
               –
               <div class="doc-md-description">
                 <p>Linear display colour of LdrColor's background. Default (0.0, 0.0, 0.0). USD name</p>
-              </div>
-            </li>
-            <li>
-              <b><code>color_mode</code></b>
-                  (<code><span title="str">str</span></code>)
-              –
-              <div class="doc-md-description">
-                <p>Default 'shadedColormap'. USD name <code>ernie:colorMode</code>.</p>
               </div>
             </li>
             <li>
@@ -13229,7 +13329,33 @@ name <code>resolution</code>.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Fraction of sunlight on unlit sides. Default 0.15. USD name <code>ernie:ambient</code>.</p>
+        <p>Luminance (cd/m^2) of light reaching every surface uniformly from all around, besides the
+lights; 0 none. A DomeLight gives the same, with a map. Default 0.0. USD name
+<code>ernie:ambient</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.ambient_color" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">ambient_color</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">ambient_color: tuple[float, float, float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Linear RGB of the ambient light, whose luminance <code>ernie:ambient</code> sets whatever the colour's
+brightness. Default (1.0, 1.0, 1.0). USD name <code>ernie:ambientColor</code>.</p>
 
     </div>
 
@@ -13254,29 +13380,6 @@ name <code>resolution</code>.</p>
 
         <p>Linear display colour of LdrColor's background. Default (0.0, 0.0, 0.0). USD name
 <code>ernie:clearColor</code>.</p>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h3 id="ernie.schema.RenderSettings.color_mode" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">color_mode</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">color_mode: str</code></pre>
-
-    <div class="doc doc-contents ">
-
-        <p>Default 'shadedColormap'. USD name <code>ernie:colorMode</code>.</p>
 
     </div>
 
@@ -13987,8 +14090,8 @@ The viewport's toolbar may override it. Default 'off'. USD name <code>ernie:wire
     minimal_constant_color: Sequence[float] = ...,
     products: str | Path | Prim | Schema | Sequence[str | Path | Prim | Schema] = ...,
     lights: str | Path | Prim | Schema | Sequence[str | Path | Prim | Schema] = ...,
-    color_mode: str = ...,
     ambient: float = ...,
+    ambient_color: Sequence[float] = ...,
     clear_color: Sequence[float] = ...,
     wireframe: str = ...,
     frame: int = ...,

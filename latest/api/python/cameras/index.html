@@ -156,21 +156,11 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.IsdPushFrame"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;IsdPushFrame</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie.author_lroc_nac"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;author_lroc_nac</a>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.CylindricalDem"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;CylindricalDem</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie.author_lroc_wac"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;author_lroc_wac</a>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.read_cylindrical_dem"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;read_cylindrical_dem</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie.author_mars2020_navcam"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;author_mars2020_navcam</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie.author_mars2020_navcam_pair"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;author_mars2020_navcam_pair</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie.author_mars2020_hazcam"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;author_mars2020_hazcam</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie.author_mars2020_hazcam_pair"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;author_mars2020_hazcam_pair</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie.author_mastcamz"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;author_mastcamz</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie.author_mastcamz_pair"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;author_mastcamz_pair</a>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.local_terrain_of"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;local_terrain_of</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.author_singlet_chromatic"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;author_singlet_chromatic</a>
     </li>
@@ -232,7 +222,7 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="cameras-and-sensor-models">Cameras and sensor models</h1>
-<p>Camera models read from mission files, and instrument presets.</p>
+<p>Camera models read from mission files, planetary elevation models, and lens helpers. Instruments built from them as published, such as LROC's cameras and the Mars 2020 rover's, are demos: <code>demos/cameras/</code>.</p>
 
 
 <div class="doc doc-object doc-class">
@@ -1946,24 +1936,300 @@
 
 </div>
 
-<div class="doc doc-object doc-function">
+<div class="doc doc-object doc-class">
 
 
-<h2 id="ernie.author_lroc_nac" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">author_lroc_nac</span>
+
+<h2 id="ernie.CylindricalDem" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">CylindricalDem</span>
 
 
 </h2>
-<pre class="highlight"><code class="language-python doc-signature">author_lroc_nac(
-    scene: Scene,
-    camera: str | Path | Prim | Schema,
-    product: str | Path | Prim | Schema,
-    side: str = "left",
-) -&gt; None</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">CylindricalDem(reference_radius: float)</code></pre>
 
     <div class="doc doc-contents first">
 
-        <p>Authors one of LROC's Narrow Angle Cameras (NAC-L or NAC-R) as Robinson et al. 2010 publish it (Table 2, Appendix A): Camera <code>camera</code>'s sensor (400-760 nm, gain, detector noise, full well, 12-bit ADC, f-number) and RenderProduct <code>product</code>'s readout chain (qe, noise, adc, even/odd readoutTaps, compandTable code 0) whose RawDN is the 8-bit numbers the NAC sends. Its geometry comes from the image's ISD (<code>IsdLineScanner.author_strip</code>). <code>camera</code> and <code>product</code> are each a str, Path, Prim or typed prim.</p>
+
+
+        <p>A planet's radius on a simple cylindrical grid, as LOLA's LDEM products hold it: heights in metres above reference_radius, rows from the northern, each from the western sample eastwards. Made empty, it is the bare reference sphere of <code>reference_radius</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            height_at (ernie.CylindricalDem.height_at)" href="#ernie.CylindricalDem.height_at">height_at</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The height (m) at planetocentric latitude and east longitude (degrees), bilinear between cell centres.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>lines</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>max_latitude</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>pixels_per_degree</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>reference_radius</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>samples</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>west_longitude</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.CylindricalDem.lines" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">lines</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">lines: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.CylindricalDem.max_latitude" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">max_latitude</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">max_latitude: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.CylindricalDem.pixels_per_degree" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">pixels_per_degree</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">pixels_per_degree: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.CylindricalDem.reference_radius" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">reference_radius</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">reference_radius: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.CylindricalDem.samples" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">samples</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">samples: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.CylindricalDem.west_longitude" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">west_longitude</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">west_longitude: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.CylindricalDem.height_at" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">height_at</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">height_at(latitude: float, longitude: float) -&gt; float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The height (m) at planetocentric latitude and east longitude (degrees), bilinear between cell centres.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.read_cylindrical_dem" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">read_cylindrical_dem</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">read_cylindrical_dem(label_path: str) -&gt; CylindricalDem</code></pre>
+
+    <div class="doc doc-contents first">
+
+        <p>Reads the DEM a PDS3 label describes (LOLA's LDEM products: 16- or 32-bit integers or 32-bit reals on a simple cylindrical grid).</p>
 
 
     </div>
@@ -1973,179 +2239,18 @@
 <div class="doc doc-object doc-function">
 
 
-<h2 id="ernie.author_lroc_wac" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">author_lroc_wac</span>
+<h2 id="ernie.local_terrain_of" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">local_terrain_of</span>
 
 
 </h2>
-<pre class="highlight"><code class="language-python doc-signature">author_lroc_wac(
-    scene: Scene,
-    camera: str | Path | Prim | Schema,
-    product: str | Path | Prim | Schema,
-    band: int = 605,
-) -&gt; None</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">local_terrain_of(
+    dem: CylindricalDem, latitude: float, longitude: float, cells: int, cell_size: float
+) -&gt; dict</code></pre>
 
     <div class="doc doc-contents first">
 
-        <p>Authors one band of LROC's Wide Angle Camera (320, 360, 415, 565, 605, 645 or 690 nm, by name or effective wavelength) as Robinson et al. 2010 publish it (Tables 3 and 4): Camera <code>camera</code>'s sensor (the passband at the effective QE that gives Table 4's responsivity, gain, detector noise, full well, 11-bit ADC, f-number; its spectral range narrowed to the passband) and RenderProduct <code>product</code>'s readout chain (qe, noise, adc). Its geometry comes from the image's ISD (<code>IsdPushFrame.author_framelet</code>). <code>camera</code> and <code>product</code> are each a str, Path, Prim or typed prim.</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="ernie.author_mars2020_navcam" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">author_mars2020_navcam</span>
-
-
-</h2>
-<pre class="highlight"><code class="language-python doc-signature">author_mars2020_navcam(
-    scene: Scene,
-    camera: str | Path | Prim | Schema,
-    product: str | Path | Prim | Schema,
-    pattern: str = "rggb",
-    jpeg_quality: float = 85.0,
-) -&gt; None</code></pre>
-
-    <div class="doc doc-contents first">
-
-        <p>Authors one of the Mars 2020 rover's Navcams as Maki et al. 2020 publish it (Table 2): Camera <code>camera</code>'s f-theta fisheye (19.1 mm, f/12, 96 x 73 degrees over 5120 x 3840 pixels of 6.4 um) and RGB sensor (gain 0.24 DN/e-, 8 e- dark noise, 15,000 e- full well, 12-bit ADC), and RenderProduct <code>product</code>'s chain (qe, bayer, noise, adc, demosaic; cie, exposure, jpeg). The paper gives neither the Bayer layout (<code>pattern</code>) nor the JPEG quality (<code>jpeg_quality</code>). <code>camera</code> and <code>product</code> are each a str, Path, Prim or typed prim.</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="ernie.author_mars2020_navcam_pair" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">author_mars2020_navcam_pair</span>
-
-
-</h2>
-<pre class="highlight"><code class="language-python doc-signature">author_mars2020_navcam_pair(
-    scene: Scene,
-    rig: str | Path | Prim | Schema,
-    left_product: str | Path | Prim | Schema,
-    right_product: str | Path | Prim | Schema,
-    pattern: str = "rggb",
-    jpeg_quality: float = 85.0,
-) -&gt; None</code></pre>
-
-    <div class="doc doc-contents first">
-
-        <p>The Navcam stereo pair on Xform <code>rig</code> (defined if missing; pose it as the cameras' frame, looking down -z with +y up): Cameras <code>rig</code>/Left and <code>rig</code>/Right 42.4 cm apart along x, each as <code>author_mars2020_navcam</code> with its product. <code>rig</code> and the products are each a str, Path, Prim or typed prim.</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="ernie.author_mars2020_hazcam" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">author_mars2020_hazcam</span>
-
-
-</h2>
-<pre class="highlight"><code class="language-python doc-signature">author_mars2020_hazcam(
-    scene: Scene,
-    camera: str | Path | Prim | Schema,
-    product: str | Path | Prim | Schema,
-    pattern: str = "rggb",
-    jpeg_quality: float = 85.0,
-) -&gt; None</code></pre>
-
-    <div class="doc doc-contents first">
-
-        <p>Authors one of the Mars 2020 rover's Hazcams as Maki et al. 2020 publish it (Table 2), as <code>author_mars2020_navcam</code> does a Navcam but through the Hazcam's f-theta fisheye (14.0 mm, f/12, 136 x 102 degrees, focused at 0.9 m), which renders on cube faces. <code>camera</code> and <code>product</code> are each a str, Path, Prim or typed prim.</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="ernie.author_mars2020_hazcam_pair" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">author_mars2020_hazcam_pair</span>
-
-
-</h2>
-<pre class="highlight"><code class="language-python doc-signature">author_mars2020_hazcam_pair(
-    scene: Scene,
-    rig: str | Path | Prim | Schema,
-    left_product: str | Path | Prim | Schema,
-    right_product: str | Path | Prim | Schema,
-    which: str = "front",
-    pattern: str = "rggb",
-    jpeg_quality: float = 85.0,
-) -&gt; None</code></pre>
-
-    <div class="doc doc-contents first">
-
-        <p>A Hazcam stereo pair on Xform <code>rig</code>: Cameras <code>rig</code>/Left and <code>rig</code>/Right 24.8 cm apart (front) or 93.4 cm (rear) along x, each as <code>author_mars2020_hazcam</code> with its product. <code>rig</code> and the products are each a str, Path, Prim or typed prim.</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="ernie.author_mastcamz" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">author_mastcamz</span>
-
-
-</h2>
-<pre class="highlight"><code class="language-python doc-signature">author_mastcamz(
-    scene: Scene,
-    camera: str | Path | Prim | Schema,
-    product: str | Path | Prim | Schema,
-    eye: str = "left",
-    filter: int = 0,
-    focal_length: float = 26.0,
-    pattern: str = "rggb",
-) -&gt; None</code></pre>
-
-    <div class="doc doc-contents first">
-
-        <p>Authors one Mastcam-Z camera through filter <code>filter</code> as Bell et al. 2021 publish it (Tables 3 and 5): the KAI-2020CM (1600 x 1200 pixels of 7.4 um, 15.6 e-/DN, 11-bit) behind the zoom at <code>focal_length</code> (26 to 110 mm). Filter 0 is the Bayer RGB; 1 to 6 the narrow bands (the left eye's 442 to 800 nm, the right's 800 to 1022 nm); 7 the neutral-density solar filter. <code>camera</code> and <code>product</code> are each a str, Path, Prim or typed prim.</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="ernie.author_mastcamz_pair" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">author_mastcamz_pair</span>
-
-
-</h2>
-<pre class="highlight"><code class="language-python doc-signature">author_mastcamz_pair(
-    scene: Scene,
-    rig: str | Path | Prim | Schema,
-    left_product: str | Path | Prim | Schema,
-    right_product: str | Path | Prim | Schema,
-    left_filter: int = 0,
-    right_filter: int = 0,
-    focal_length: float = 26.0,
-    pattern: str = "rggb",
-) -&gt; None</code></pre>
-
-    <div class="doc doc-contents first">
-
-        <p>The Mastcam-Z pair on Xform <code>rig</code>: Cameras <code>rig</code>/Left and <code>rig</code>/Right 24.4 cm apart along x, each toed in 1.15 degrees, through their filters. <code>rig</code> and the products are each a str, Path, Prim or typed prim.</p>
+        <p>The cells x cells heightfield of <code>dem</code>, <code>cell_size</code> m apart, about a latitude and east longitude (degrees), in a local frame there (x east, y north, z up, its origin on the reference sphere), the planet's curvature in the heights: a dict of heights (float32, the first row northern), origin (x, y of the north-western cell), cell_size and body_to_local (body-fixed metres to the local frame).</p>
 
 
     </div>

@@ -281,7 +281,7 @@
 </code></pre>
 <p><strong>Exception:</strong></p>
 <ul>
-<li><code>std::invalid_argument</code> if the id is not an identifier, names a built-in pattern ("spot", "line", "grid", "image") or is taken; there are more than <code>kMaxParams</code> parameters; the extent is not positive; or the type name is not an identifier or the source does not mention it. </li>
+<li><code>std::invalid_argument</code> if the id is not an identifier, names a built-in pattern ("spot", "line", "grid", "image", "dots") or is taken; there are more than <code>kMaxParams</code> parameters; the extent is not positive; or the type name is not an identifier or the source does not mention it. </li>
 </ul>
 <hr>
 
@@ -320,7 +320,8 @@
 <li>"spot": the beam itself, a Gaussian of <code>input.beam</code>;</li>
 <li>"line": parameters half fan angle (radians) and profile (1 Gaussian, else flat in angle), the beam's Gaussian across;</li>
 <li>"grid": parameters columns, rows and pitch along x and y (radians), a beamlet at each;</li>
-<li>"image": parameters tan of half the field of view along x and y, the laser's image over it. </li>
+<li>"image": parameters tan of half the field of view along x and y, the laser's image over it;</li>
+<li>"dots": parameters dots per tile along x and y, tiles along x and y, the jitter (cells), tan of half the field of view along x and y, and the seed; a beamlet at each dot. </li>
 </ul>
 <hr>
 

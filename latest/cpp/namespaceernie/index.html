@@ -223,7 +223,7 @@
               
                 <h1 id="namespace-ernie">Namespace ernie</h1>
 <p><a href="../namespaces/"><strong>Namespace List</strong></a> <strong>&gt;</strong> <a href="./"><strong>ernie</strong></a></p>
-<p><a href="../classernie_1_1Prim/"><em><strong>Prim</strong></em></a> <em>types as reflected schemas: each type declares its attributes once, as a list of (C++ type, name, USD token, fallback, metadata) entries, and that list gives both a typed view class over</em><code>Scene</code> <em>(</em><code>GetRadius</code> <em>,</em><code>HasRadius</code> <em>,</em><code>SetRadius</code> <em>) and the type's entry in a runtime registry (</em><code>PrimTypeDef</code> <em>), which generic code walks: Python's typed prim classes, the viewer's property panels, loaders.</em><a href="#detailed-description">More...</a></p>
+<p><em>Planetary digital elevation models, as the PDS archives them, and the local heightfields Ernie's</em> <a href="../classernie_1_1Terrain/"><em><strong>Terrain</strong></em></a> <em>draws of them.</em><a href="#detailed-description">More...</a></p>
 <h2 id="namespaces">Namespaces</h2>
 <table>
 <thead>
@@ -462,6 +462,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1CylindricalDem/"><strong>CylindricalDem</strong></a> <br><em>A planet's radius on a simple cylindrical (equirectangular) grid, as LOLA's LDEM products hold it:</em> <code>heights</code> <em>(metres above</em><code>referenceRadius</code> <em>) row by row from the northern, each row from the western sample eastwards,</em><code>pixelsPerDegree</code> <em>both ways.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1DensityLayer/"><strong>DensityLayer</strong></a> <br><em>One term of a vertical density profile, relative to the profile's reference density.</em></td>
 </tr>
 <tr>
@@ -662,6 +666,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1LocalTerrain/"><strong>LocalTerrain</strong></a> <br><em>A heightfield of a DEM about one point, in a local frame there: x east, y north and z up, its origin on the reference sphere at the point.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1LodPatch/"><strong>LodPatch</strong></a> <br><em>One square patch of</em> <code>PatchCells()</code> <em>x</em><code>PatchCells()</code> <em>grid quads whose vertices are</em><code>2^level</code> <em>raster cells apart.</em></td>
 </tr>
 <tr>
@@ -678,27 +686,11 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1LrocWacBandSpec/"><strong>LrocWacBandSpec</strong></a> <br><em>One WAC band's published values.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1MappedRenderVar/"><strong>MappedRenderVar</strong></a> <br><em>A mapped render var: a tensor for</em> <code>Cpu</code> <em>and</em><code>Gpu</code> <em>, a compute array for</em><code>GpuArray</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1Mars2020Hazcam/"><strong>Mars2020Hazcam</strong></a> <br><em>The Hazcams' optics (Maki et al.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1Mars2020Navcam/"><strong>Mars2020Navcam</strong></a> <br><em>The Mars 2020 rover Perseverance's Navcam pair (Maki et al.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1MarsAtmosphereOptions/"><strong>MarsAtmosphereOptions</strong></a> <br><em>Mars's atmosphere: an isothermal CO2 column and suspended dust.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1MastcamZ/"><strong>MastcamZ</strong></a> <br></td>
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
@@ -777,6 +769,10 @@
 <td style="text-align: left;"><a href="../classernie_1_1Path/"><strong>Path</strong></a> <br><em>Absolute path naming a prim in a</em> <code>Scene</code> <em>, as in USD:</em><code>/</code> <em>is the root and</em><code>/World/Sun</code> <em>is the child</em><code>Sun</code> <em>of</em><code>/World</code> <em>.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1Pds3Label/"><strong>Pds3Label</strong></a> <br><em>A PDS3 label's keywords, by name; a keyword inside an OBJECT prefixed with the object's name and a dot (</em> <code>IMAGE.LINES</code> <em>).</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1PipelineLayout/"><strong>PipelineLayout</strong></a> <br><em>A pipeline layout with one push-descriptor set and an optional push-constant block shared by all stages.</em></td>
 </tr>
@@ -842,7 +838,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1RenderProductOutput/"><strong>RenderProductOutput</strong></a> <br><em>The outputs of one render product in a step: its render vars by name.</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1RenderProductOutput/"><strong>RenderProductOutput</strong></a> <br><em>The outputs of one render product in a step: its render vars by name, and the span of the sensor clock its frame covers, seconds (</em> <code>RenderDelegate::Time</code> <em>), as ovrtx's frame start and end times.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -977,6 +973,10 @@
 <td style="text-align: left;"><a href="../classernie_1_1SphereLight/"><strong>SphereLight</strong></a> <br><em>A sphere (or point) light, optionally shaped to a cone around its -z axis.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1Stage/"><strong>Stage</strong></a> <br><em>A scene's stage metadata, as UsdStage keeps it on its pseudo-root: its units (the up axis, metres and kilograms per unit), its time (time codes and frames per second, the range animation plays over, and the time code it is at) and its default prim.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1Star/"><strong>Star</strong></a> <br><em>One star of a</em> <code>StarField</code> <em>, as renders take it: where it is and the black-body spectrum it shines with.</em></td>
 </tr>
@@ -1068,10 +1068,6 @@
 <td style="text-align: left;"><a href="#enum-axis"><strong>Axis</strong></a>  <br><em>The axis a primitive is built around, as UsdGeom's</em> <code>axis</code> <em>token.</em></td>
 </tr>
 <tr>
-<td style="text-align: right;">enum</td>
-<td style="text-align: left;"><a href="#enum-bayerpattern"><strong>BayerPattern</strong></a>  <br><em>The Bayer layouts of the</em> <code>bayer</code> <em>and</em><code>demosaic</code> <em>filters'</em><code>pattern</code> <em>.</em></td>
-</tr>
-<tr>
 <td style="text-align: right;">typedef std::pair&lt; glm::vec3, glm::vec3 &gt;</td>
 <td style="text-align: left;"><a href="#typedef-bounds3"><strong>Bounds3</strong></a>  <br><em>Axis-aligned world bounds, low and high corners.</em></td>
 </tr>
@@ -1145,14 +1141,6 @@
 </tr>
 <tr>
 <td style="text-align: right;">enum</td>
-<td style="text-align: left;"><a href="#enum-lrocnac"><strong>LrocNac</strong></a>  <br><em>LROC's two Narrow Angle Cameras, side by side across the track.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">enum</td>
-<td style="text-align: left;"><a href="#enum-lrocwacband"><strong>LrocWacBand</strong></a>  <br><em>The seven bands of LROC's Wide Angle</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>, by Robinson et al.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">enum</td>
 <td style="text-align: left;"><a href="#enum-mapdevice"><strong>MapDevice</strong></a>  <br><em>Where</em> <code>RenderVarOutput::Map</code> <em>delivers an output.</em></td>
 </tr>
 <tr>
@@ -1160,16 +1148,8 @@
 <td style="text-align: left;"><a href="#enum-markershape"><strong>MarkerShape</strong></a>  <br><em>The shape of a marker, drawn at a fixed size in pixels.</em></td>
 </tr>
 <tr>
-<td style="text-align: right;">enum</td>
-<td style="text-align: left;"><a href="#enum-mars2020hazcams"><strong>Mars2020Hazcams</strong></a>  <br><em>Perseverance's hazard cameras: two stereo pairs on the front of the rover body (looking down past the front wheels) and one on the back.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">enum</td>
-<td style="text-align: left;"><a href="#enum-mastcamzeye"><strong>MastcamZEye</strong></a>  <br><em>The Mars 2020 rover Perseverance's Mastcam-Z: two zoom cameras whose filter wheels hold the Bayer RGB's near-IR cut-off (filter 0), six narrow bands from 442 to 1022 nm (1 to 6) and a neutral-density solar filter (7), the left camera's bands visible and the right's reaching into the near infrared (Bell et al.</em></td>
-</tr>
-<tr>
 <td style="text-align: right;">enum std::uint32_t</td>
-<td style="text-align: left;"><a href="#enum-minimalmode"><strong>MinimalMode</strong></a>  <br><em>Minimal shading (</em> <code>ernie:minimal:mode</code> <em>), after RTX Minimal: for throughput, a product draws in one forward pass straight into its outputs, without the spectral shading, sensor filters, sky or dome; lit by the sun (the first distant light) and the ambient fraction.</em></td>
+<td style="text-align: left;"><a href="#enum-minimalmode"><strong>MinimalMode</strong></a>  <br><em>Minimal shading (</em> <code>ernie:minimal:mode</code> <em>), after RTX Minimal: for throughput, a product draws in one forward pass straight into its outputs, without the spectral shading, sensor filters, sky or dome; lit by the sun (the first distant light) and the scene's ambient light.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">enum</td>
@@ -1371,35 +1351,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-authorlrocnac"><strong>AuthorLrocNac</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; camera, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; product, <a href="./#enum-lrocnac"><strong>LrocNac</strong></a> which=LrocNac::Left) <br><em>Authors one of LROC's Narrow Angle Cameras as published, onto</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <strong><code>camera</code> <em>and the readout chain of</em><a href="../classernie_1_1RenderProduct/"><em><strong>RenderProduct</strong></em></a> </strong><code>product</code> <em>.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-authorlrocwac"><strong>AuthorLrocWac</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; camera, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; product, <a href="./#enum-lrocwacband"><strong>LrocWacBand</strong></a> band=LrocWacBand::Vis605) <br><em>Authors one band of LROC's Wide Angle</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>as published, onto</em><a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <strong><code>camera</code> <em>and the readout chain of</em><a href="../classernie_1_1RenderProduct/"><em><strong>RenderProduct</strong></em></a> </strong><code>product</code> <em>.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-authormars2020hazcam"><strong>AuthorMars2020Hazcam</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; camera, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; product, <a href="./#enum-bayerpattern"><strong>BayerPattern</strong></a> pattern=BayerPattern::Rggb, double jpegQuality=85.0) <br><em>Authors one of the Mars 2020 Hazcams as published, as</em> <code>AuthorMars2020Navcam</code> <em>does a Navcam but through the Hazcam's f-theta lens of 14.0 mm (</em><code>Mars2020Hazcam::FisheyeK1</code> <em>), f/12, focused at 0.9 m.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-authormars2020hazcampair"><strong>AuthorMars2020HazcamPair</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; rig, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; leftProduct, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; rightProduct, <a href="./#enum-mars2020hazcams"><strong>Mars2020Hazcams</strong></a> which=Mars2020Hazcams::Front, <a href="./#enum-bayerpattern"><strong>BayerPattern</strong></a> pattern=BayerPattern::Rggb, double jpegQuality=85.0) <br><em>A Hazcam pair on stereo rig</em> <code>rig</code> <em>(as</em><code>AuthorMars2020NavcamPair</code> <em>): Cameras</em><code>rig</code> <em>/Left and</em><code>rig</code> <em>/Right, 24.8 cm apart for the front pair or 93.4 cm for the rear, each authored as</em><code>AuthorMars2020Hazcam</code> <em>.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-authormars2020navcam"><strong>AuthorMars2020Navcam</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; camera, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; product, <a href="./#enum-bayerpattern"><strong>BayerPattern</strong></a> pattern=BayerPattern::Rggb, double jpegQuality=85.0) <br><em>Authors one of the Mars 2020 Navcams as published, onto</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <strong><code>camera</code> <em>and the readout chain of</em><a href="../classernie_1_1RenderProduct/"><em><strong>RenderProduct</strong></em></a> </strong><code>product</code> <em>:</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-authormars2020navcampair"><strong>AuthorMars2020NavcamPair</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; rig, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; leftProduct, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; rightProduct, <a href="./#enum-bayerpattern"><strong>BayerPattern</strong></a> pattern=BayerPattern::Rggb, double jpegQuality=85.0) <br><em>The Navcam pair on stereo rig</em> <code>rig</code> <em>(an</em><a href="../classernie_1_1Xform/"><em><strong>Xform</strong></em></a> <em>, defined if missing, posed by the caller as the cameras' shared frame, looking down its -z with +y up): Cameras</em><code>rig</code> <em>/Left and</em><code>rig</code> <em>/Right 42.4 cm apart along its x, each authored as</em><code>AuthorMars2020Navcam</code> <em>with products</em><code>leftProduct</code> <em>and</em><code>rightProduct</code> <em>.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-authormastcamz"><strong>AuthorMastcamZ</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; camera, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; product, <a href="./#enum-mastcamzeye"><strong>MastcamZEye</strong></a> eye, int filter, double focalLengthMm=<a href="../structernie_1_1MastcamZ/#variable-kshortestfocalmm"><strong>MastcamZ::kShortestFocalMm</strong></a>, <a href="./#enum-bayerpattern"><strong>BayerPattern</strong></a> pattern=BayerPattern::Rggb) <br><em>Authors one Mastcam-Z camera through filter</em> <code>filter</code> <em>as published, onto</em><a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <strong><code>camera</code> <em>and the readout chain of</em><a href="../classernie_1_1RenderProduct/"><em><strong>RenderProduct</strong></em></a> </strong><code>product</code> <em>:</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-authormastcamzpair"><strong>AuthorMastcamZPair</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; rig, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; leftProduct, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; rightProduct, int leftFilter, int rightFilter, double focalLengthMm=<a href="../structernie_1_1MastcamZ/#variable-kshortestfocalmm"><strong>MastcamZ::kShortestFocalMm</strong></a>, <a href="./#enum-bayerpattern"><strong>BayerPattern</strong></a> pattern=BayerPattern::Rggb) <br><em>The Mastcam-Z pair on stereo rig</em> <code>rig</code> <em>(an</em><a href="../classernie_1_1Xform/"><em><strong>Xform</strong></em></a> <em>, defined if missing, looking down its -z with +y up): Cameras</em><code>rig</code> <em>/Left and</em><code>rig</code> <em>/Right 24.4 cm apart along its x, each toed in 1.15 degrees, authored as</em><code>AuthorMastcamZ</code> <em>through filters</em><code>leftFilter</code> <em>and</em><code>rightFilter</code> <em>.</em></td>
+<td style="text-align: left;"><a href="#function-authorisdcamera"><strong>AuthorIsdCamera</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, const <a href="../structernie_1_1CameraParams/"><strong>CameraParams</strong></a> &amp; camera) <br><em>Authors the</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim at</em><code>path</code> <em>(defined if missing) with an ISD camera's geometry and exposure time only, as Python's</em><code>author_framelet</code> <em>does:</em><code>camera</code> <em>'s transform, scan (frame or pushbroom), focal length, apertures (the horizontal from the image's aspect) and their offsets, pushbroom line offset, Brown-Conrady distortion, clipping range and exposure time.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::optional&lt; <a href="./#enum-axis"><strong>Axis</strong></a> &gt;</td>
@@ -1424,6 +1376,10 @@
 <tr>
 <td style="text-align: right;">double</td>
 <td style="text-align: left;"><a href="#function-blackbodyspectralirradiance"><strong>BlackbodySpectralIrradiance</strong></a> (double wavelengthNm, double kelvin, double lux) <br><em>The spectral irradiance at</em> <code>wavelengthNm</code> <em>(W m^-2 nm^-1) of a black body at</em><code>kelvin</code> <em>whose illuminance is</em><code>lux</code> <em>, through the CIE photopic luminous efficiency (683 lm/W times y-bar).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#function-bodydirection"><strong>BodyDirection</strong></a> (double latitudeDeg, double longitudeDeg) <br><em>The body-fixed unit vector of planetocentric latitude</em> <code>latitudeDeg</code> <em>and east longitude</em><code>longitudeDeg</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../classernie_1_1Path/"><strong>Path</strong></a></td>
@@ -1834,20 +1790,16 @@
 <td style="text-align: left;"><a href="#function-localboundsof"><strong>LocalBoundsOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; prim) <br><em>The prim's bounds in its own space: its</em> <code>extent</code> <em>if authored, else those of its geometry, a</em><a href="../classernie_1_1Mesh/"><em><strong>Mesh</strong></em></a> <em>'s CPU points or a UsdGeom primitive's shape (</em><code>PrimitiveMeshOf</code> <em>); none for other prims or geometry that cannot be read.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="../structernie_1_1LocalTerrain/"><strong>LocalTerrain</strong></a></td>
+<td style="text-align: left;"><a href="#function-localterrainof"><strong>LocalTerrainOf</strong></a> (const <a href="../structernie_1_1CylindricalDem/"><strong>CylindricalDem</strong></a> &amp; dem, double latitudeDeg, double longitudeDeg, std::uint32_t cells, double cellSize) <br><em>The</em> <code>cells</code> <em>x</em><code>cells</code> <em>heightfield of</em><code>dem</code> <em>,</em><code>cellSize</code> <em>metres apart, about latitude</em><code>latitudeDeg</code> <em>and east longitude</em><code>longitudeDeg</code> <em>(</em><code>LocalTerrain</code> <em>).</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::vector&lt; std::pair&lt; std::string, <a href="../classernie_1_1Value/"><strong>Value</strong></a> &gt; &gt;</td>
 <td style="text-align: left;"><a href="#function-localtransformedits"><strong>LocalTransformEdits</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, const glm::dmat4 &amp; local) <br><em>The attribute values that give the prim at</em> <code>path</code> <em>the local transform</em><code>local</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::dmat4</td>
 <td style="text-align: left;"><a href="#function-lookattransform"><strong>LookAtTransform</strong></a> (glm::dvec3 eye, glm::dvec3 target, glm::dvec3 up) <br><em>Camera-to-world transform of a USD camera at</em> <code>eye</code> <em>looking at</em><code>target</code> <em>: the camera looks down its -z axis with +y up, so</em><code>up</code> <em>ends up in the camera's y-z plane.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;"><a href="./#enum-lrocwacband"><strong>LrocWacBand</strong></a></td>
-<td style="text-align: left;"><a href="#function-lrocwacbandnamed"><strong>LrocWacBandNamed</strong></a> (int nanometres) <br><em>The band whose Table 4 band name or effective wavelength is</em> <code>nanometres</code> <em>(605 or 604).</em></td>
-</tr>
-<tr>
-<td style="text-align: right;"><a href="../structernie_1_1LrocWacBandSpec/"><strong>LrocWacBandSpec</strong></a></td>
-<td style="text-align: left;"><a href="#function-lrocwacbandof"><strong>LrocWacBandOf</strong></a> (<a href="./#enum-lrocwacband"><strong>LrocWacBand</strong></a> band) <br><em>Band</em> <code>band</code> <em>'s values (Robinson et al. 2010, Tables 3 and 4).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1AtmosphereModel/"><strong>AtmosphereModel</strong></a></td>
@@ -1922,6 +1874,10 @@
 <td style="text-align: left;"><a href="#function-parseies"><strong>ParseIes</strong></a> (std::string_view text, const std::filesystem::path &amp; directory={}) <br><em>The profile of LM-63</em> <code>text</code> <em>(any of the 1986 to 2019 versions), of type A, B or C, with its tilt data from a TILT=INCLUDE block or a TILT=&lt;file&gt; named relative to</em><code>directory</code> <em>.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="../structernie_1_1Pds3Label/"><strong>Pds3Label</strong></a></td>
+<td style="text-align: left;"><a href="#function-parsepds3label"><strong>ParsePds3Label</strong></a> (std::string_view text) <br><em>Parses label text:</em> <code>KEY = value</code> <em>lines,</em><code>OBJECT</code> <em>/</em><code>END_OBJECT</code> <em>nesting, comments (</em><code>/* *&amp;zwj;/</code> <em>) and values continued over lines inside quotes or parentheses.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">constexpr glm::uvec3</td>
 <td style="text-align: left;"><a href="#function-pcg3d"><strong>Pcg3d</strong></a> (glm::uvec3 v) <br><em>The pcg3d hash: three well-mixed 32-bit words from three.</em></td>
 </tr>
@@ -1980,6 +1936,10 @@
 <tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1NamedCahvore/"><strong>NamedCahvore</strong></a> &gt;</td>
 <td style="text-align: left;"><a href="#function-readcahvoremodelsfile"><strong>ReadCahvoreModelsFile</strong></a> (const std::string &amp; path) <br><code>ReadCahvoreModels</code> <em>of the file at</em><code>path</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1CylindricalDem/"><strong>CylindricalDem</strong></a></td>
+<td style="text-align: left;"><a href="#function-readcylindricaldem"><strong>ReadCylindricalDem</strong></a> (const std::string &amp; labelPath) <br><em>Reads the DEM a PDS3 label at</em> <code>labelPath</code> <em>describes: its IMAGE object (16- or 32-bit LSB integers, or 32-bit LSB reals, each times SCALING_FACTOR, plus the label's OFFSET where the label says the heights are radii) in the file its ^IMAGE pointer names beside the label, on its IMAGE_MAP_PROJECTION's simple cylindrical grid.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1IesProfile/"><strong>IesProfile</strong></a></td>
@@ -2217,13 +2177,20 @@
 <p>Rays of a lens in the camera's frame, and the cube faces a wide camera's views are rendered on, for fields the single pinhole raster image cannot take (its tangent grows without bound towards 90 degrees off axis).</p>
 <p>Helpers for authoring and reading the schemas in <code>tokens.h</code>.</p>
 <p>Scenes described in JSON, the format of Python's <code>ernie.load_scene</code>:</p>
-<p>The view reads and writes the scene's attributes by their USD names, so it changes nothing about storage or change tracking; unset attributes read as the declared fallback, the one place Ernie keeps it.</p>
+<p><a href="../classernie_1_1Prim/"><strong>Prim</strong></a> types as reflected schemas: each type declares its attributes once, as a list of (C++ type, name, USD token, fallback, metadata) entries, and that list gives both a typed view class over <code>Scene</code> (<code>GetRadius</code>, <code>HasRadius</code>, <code>SetRadius</code>) and the type's entry in a runtime registry (<code>PrimTypeDef</code>), which generic code walks: Python's typed prim classes, the viewer's property panels, loaders.</p>
+<p>References:
+* NASA Planetary Data System, "Planetary Data System Standards
+  Reference", version 3.8, 2009: chapter 12 (the object description language of PDS3 labels).
+* G. A. Neumann, "Lunar Reconnaissance Orbiter Lunar Orbiter Laser
+  Altimeter Reduced Data Record and Derived Products Software
+  Interface Specification", version 2.42, 2010 (the LDEM products, their labels and simple cylindrical grids).
+* J. P. Snyder, "Map Projections: A Working Manual", USGS Professional Paper 1395, 1987 (the equirectangular projection).The view reads and writes the scene's attributes by their USD names, so it changes nothing about storage or change tracking; unset attributes read as the declared fallback, the one place Ernie keeps it.</p>
 <p>A schema's header declares its attributes with an X-macro list and its class with <code>ERNIE_SCHEMA_BODY</code>; its source defines the registry entry with <code>ERNIE_DEFINE_SCHEMA</code>, and <code>prim_type.cpp</code> lists it in the registry. See <code>light_schemas.h</code>.</p>
 <p>References:
 * Blender, Cycles' node types and sockets (<code>NODE_DEFINE</code>, <code>SOCKET_*</code>, <code>NODE_SOCKET_API</code>), <a href="https://projects.blender.org/blender/cycles/src/branch/main/src/graph/node_type.h">https://projects.blender.org/blender/cycles/src/branch/main/src/graph/node_type.h</a>
 * Pixar, UsdLux and generated schema classes, <a href="https://openusd.org/release/api/usd_lux_page_front.html">https://openusd.org/release/api/usd_lux_page_front.html</a></p>
 <ul>
-<li>The top level maps prim paths (absolute, or relative to the root) to prims.</li>
+<li>The top level maps prim paths (absolute, or relative to the root) to prims; "/" holds the stage metadata (<code>Stage</code>), as <code>{"/": {"upAxis": "Z", "timeCodesPerSecond": 60}}</code>.</li>
 <li>A prim is an object: <code>"type"</code> names its type (<code>Scene::Define</code>; registered or not). Without one, a new prim is untyped and an existing prim keeps its type and attributes. Keys whose values are objects are its children, by name; the other keys are its attributes, by the Python name of one its type declares (<code>AttributeDef::pyName</code>, "cell_size") or by USD name ("inputs:intensity").</li>
 <li><code>translate</code> (3 numbers), <code>rotate</code> (3 Euler angles in degrees), <code>rotation_order</code> ("XYZ", ..., "ZYX"), <code>orient</code> (a quaternion as [w, x, y, z], the real part first as USD writes one and as Python's <code>Quat(w, x, y, z)</code> takes it) and <code>scale</code> (one number or 3) set its transform ops (<code>SetXform</code>); <code>transform</code> sets <code>xformOp:transform</code> to a 4 x 4 matrix given as 4 rows of 4 numbers (math convention: column vectors, translation in the last column).</li>
 <li>Values convert as Python's do: booleans, integers (32-bit), other numbers as doubles, strings, arrays of strings, arrays of 2 numbers (<code>ivec2</code> when both are integers), 3 or 4 as vectors, other lengths as float arrays, and 4 x 4 nested arrays as matrices; nested arrays other than 4 x 4 are a float32 tensor.</li>
@@ -2275,17 +2242,6 @@ Rendering", Journal of Computer Graphics Techniques 9(3):21-38, 2020 (pcg3d).</p
     X,
     Y,
     Z
-};
-</code></pre>
-<hr>
-
-<h3 id="enum-bayerpattern">enum BayerPattern</h3>
-<p><em>The Bayer layouts of the</em> <code>bayer</code> <em>and</em><code>demosaic</code> <em>filters'</em><code>pattern</code> <em>.</em></p>
-<pre><code class="language-C++">enum ernie::BayerPattern {
-    Rggb = 0,
-    Bggr = 1,
-    Grbg = 2,
-    Gbrg = 3
 };
 </code></pre>
 <hr>
@@ -2481,30 +2437,6 @@ Rendering", Journal of Computer Graphics Techniques 9(3):21-38, 2020 (pcg3d).</p
 </code></pre>
 <hr>
 
-<h3 id="enum-lrocnac">enum LrocNac</h3>
-<p><em>LROC's two Narrow Angle Cameras, side by side across the track.</em> </p>
-<pre><code class="language-C++">enum ernie::LrocNac {
-    Left,
-    Right
-};
-</code></pre>
-<hr>
-
-<h3 id="enum-lrocwacband">enum LrocWacBand</h3>
-<p><em>The seven bands of LROC's Wide Angle</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>, by Robinson et al.</em></p>
-<pre><code class="language-C++">enum ernie::LrocWacBand {
-    Uv320,
-    Uv360,
-    Vis415,
-    Vis565,
-    Vis605,
-    Vis645,
-    Vis690
-};
-</code></pre>
-<p>2010's band names: two ultraviolet (read out 4 x 4 summed through the UV optics) and five visible. </p>
-<hr>
-
 <h3 id="enum-mapdevice">enum MapDevice</h3>
 <p><em>Where</em> <code>RenderVarOutput::Map</code> <em>delivers an output.</em></p>
 <pre><code class="language-C++">enum ernie::MapDevice {
@@ -2531,27 +2463,8 @@ Rendering", Journal of Computer Graphics Techniques 9(3):21-38, 2020 (pcg3d).</p
 </code></pre>
 <hr>
 
-<h3 id="enum-mars2020hazcams">enum Mars2020Hazcams</h3>
-<p><em>Perseverance's hazard cameras: two stereo pairs on the front of the rover body (looking down past the front wheels) and one on the back.</em> </p>
-<pre><code class="language-C++">enum ernie::Mars2020Hazcams {
-    Front,
-    Rear
-};
-</code></pre>
-<hr>
-
-<h3 id="enum-mastcamzeye">enum MastcamZEye</h3>
-<p><em>The Mars 2020 rover Perseverance's Mastcam-Z: two zoom cameras whose filter wheels hold the Bayer RGB's near-IR cut-off (filter 0), six narrow bands from 442 to 1022 nm (1 to 6) and a neutral-density solar filter (7), the left camera's bands visible and the right's reaching into the near infrared (Bell et al.</em> </p>
-<pre><code class="language-C++">enum ernie::MastcamZEye {
-    Left,
-    Right
-};
-</code></pre>
-<p>2021, Tables 3 and 5). </p>
-<hr>
-
 <h3 id="enum-minimalmode">enum MinimalMode</h3>
-<p><em>Minimal shading (</em> <code>ernie:minimal:mode</code> <em>), after RTX Minimal: for throughput, a product draws in one forward pass straight into its outputs, without the spectral shading, sensor filters, sky or dome; lit by the sun (the first distant light) and the ambient fraction.</em></p>
+<p><em>Minimal shading (</em> <code>ernie:minimal:mode</code> <em>), after RTX Minimal: for throughput, a product draws in one forward pass straight into its outputs, without the spectral shading, sensor filters, sky or dome; lit by the sun (the first distant light) and the scene's ambient light.</em></p>
 <pre><code class="language-C++">enum ernie::MinimalMode {
     Off = 0,
     None = 1,
@@ -2915,156 +2828,15 @@ Rendering", Journal of Computer Graphics Techniques 9(3):21-38, 2020 (pcg3d).</p
 </ul>
 <hr>
 
-<h3 id="function-authorlrocnac">function AuthorLrocNac</h3>
-<p><em>Authors one of LROC's Narrow Angle Cameras as published, onto</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <strong><code>camera</code> <em>and the readout chain of</em><a href="../classernie_1_1RenderProduct/"><em><strong>RenderProduct</strong></em></a> </strong><code>product</code> <em>.</em></p>
-<pre><code class="language-C++">void ernie::AuthorLrocNac (
+<h3 id="function-authorisdcamera">function AuthorIsdCamera</h3>
+<p><em>Authors the</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim at</em><code>path</code> <em>(defined if missing) with an ISD camera's geometry and exposure time only, as Python's</em><code>author_framelet</code> <em>does:</em><code>camera</code> <em>'s transform, scan (frame or pushbroom), focal length, apertures (the horizontal from the image's aspect) and their offsets, pushbroom line offset, Brown-Conrady distortion, clipping range and exposure time.</em></p>
+<pre><code class="language-C++">void ernie::AuthorIsdCamera (
     Scene &amp; scene,
-    const Path &amp; camera,
-    const Path &amp; product,
-    LrocNac which=LrocNac::Left
+    const Path &amp; path,
+    const CameraParams &amp; camera
 ) 
 </code></pre>
-<p>The image's geometry (pose along the orbit, focal length, detector line, summing, lens distortion and line time) comes from its ISD (<code>IsdLineScanner::StripOf</code>, Python's <code>IsdLineScanner.author_strip</code>); this sets the rest:
-* The sensor: one panchromatic channel over the 400-760 nm spectral response with the detector's average quantum efficiency through it (&gt; 60%: 0.6, its edges ramped over 10 nm; the paper gives no curve), the gain, detector noise and full well of NAC-L or NAC-R, a 12-bit ADC and the telescope's f-number.
-* The readout chain, SensorFilter prims under <code>product</code>: qe, noise, adc, readoutTaps (the even and odd pixels' two analog chains, offsets 0 until calibrated) and compandTable (the nominal 12- to 8-bit table, code 0), so RawDN holds the 8-bit numbers the NAC sends.</p>
-<p>Reference: M. S. Robinson et al., "Lunar Reconnaissance Orbiter
-Camera (LROC) Instrument Overview", Space Science Reviews 150:81-124, 2010: sections 3.1 and 4.1, Table 2 (focal ratio, gain, detector noise, full well, spectral response, digitisation) and Appendix A (bit-compression tables). </p>
-<p><strong>Exception:</strong></p>
-<ul>
-<li><code>std::invalid_argument</code> if <code>camera</code> is not a <a href="../classernie_1_1Camera/"><strong>Camera</strong></a> or <code>product</code> not a <a href="../classernie_1_1RenderProduct/"><strong>RenderProduct</strong></a>. </li>
-</ul>
-<hr>
-
-<h3 id="function-authorlrocwac">function AuthorLrocWac</h3>
-<p><em>Authors one band of LROC's Wide Angle</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>as published, onto</em><a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <strong><code>camera</code> <em>and the readout chain of</em><a href="../classernie_1_1RenderProduct/"><em><strong>RenderProduct</strong></em></a> </strong><code>product</code> <em>.</em></p>
-<pre><code class="language-C++">void ernie::AuthorLrocWac (
-    Scene &amp; scene,
-    const Path &amp; camera,
-    const Path &amp; product,
-    LrocWacBand band=LrocWacBand::Vis605
-) 
-</code></pre>
-<p>The image's geometry (each framelet's pose, focal length, lens distortion and exposure) comes from its ISD (<code>IsdPushFrame::FrameletOf</code>, Python's <code>IsdPushFrame.author_framelet</code>); this sets the rest:
-* The sensor: one channel through the band, its passband Table 4's FWHM wide about the effective wavelength (edges ramped over 2 nm about the half maxima, so its area is the FWHM's) at the band's effective quantum efficiency (<code>LrocWacBandSpec::EffectiveQe</code>), the lens's transmission 1 (in that efficiency); the KAI-1001's gain, read noise and full well; an 11-bit ADC; the band's optics' f-number. The camera's spectral range is narrowed to the passband, four bands across it.
-* The readout chain, SensorFilter prims under <code>product</code>: qe, noise and adc, so RawDN holds the 11-bit numbers before the WAC's companding to 8 bits, which the paper gives only as a figure (Fig. 25).</p>
-<p>Reference: M. S. Robinson et al., "Lunar Reconnaissance Orbiter
-Camera (LROC) Instrument Overview", Space Science Reviews 150:81-124, 2010: section 3.2, Table 3 (focal ratios, gain, read noise, full well, digitisation, summing) and Table 4 (bandpasses and responsivity). </p>
-<p><strong>Exception:</strong></p>
-<ul>
-<li><code>std::invalid_argument</code> if <code>camera</code> is not a <a href="../classernie_1_1Camera/"><strong>Camera</strong></a> or <code>product</code> not a <a href="../classernie_1_1RenderProduct/"><strong>RenderProduct</strong></a>. </li>
-</ul>
-<hr>
-
-<h3 id="function-authormars2020hazcam">function AuthorMars2020Hazcam</h3>
-<p><em>Authors one of the Mars 2020 Hazcams as published, as</em> <code>AuthorMars2020Navcam</code> <em>does a Navcam but through the Hazcam's f-theta lens of 14.0 mm (</em><code>Mars2020Hazcam::FisheyeK1</code> <em>), f/12, focused at 0.9 m.</em></p>
-<pre><code class="language-C++">void ernie::AuthorMars2020Hazcam (
-    Scene &amp; scene,
-    const Path &amp; camera,
-    const Path &amp; product,
-    BayerPattern pattern=BayerPattern::Rggb,
-    double jpegQuality=85.0
-) 
-</code></pre>
-<p>The flight cameras' own calibrations (CAHVORE, <code>CahvoreModel</code>) see a little less than the published fields (128.7 x 98.6 degrees for the front left); author one of them with <code>CahvoreModel</code>'s ray table for a particular camera's exact geometry.</p>
-<p>Reference: J. N. Maki et al., "The Mars 2020 Engineering Cameras
-and Microphone on the Perseverance Rover", Space Science Reviews 216:137, 2020, Table 2. </p>
-<p><strong>Exception:</strong></p>
-<ul>
-<li><code>std::invalid_argument</code> if <code>camera</code> is not a <a href="../classernie_1_1Camera/"><strong>Camera</strong></a> or <code>product</code> not a <a href="../classernie_1_1RenderProduct/"><strong>RenderProduct</strong></a>. </li>
-</ul>
-<hr>
-
-<h3 id="function-authormars2020hazcampair">function AuthorMars2020HazcamPair</h3>
-<p><em>A Hazcam pair on stereo rig</em> <code>rig</code> <em>(as</em><code>AuthorMars2020NavcamPair</code> <em>): Cameras</em><code>rig</code> <em>/Left and</em><code>rig</code> <em>/Right, 24.8 cm apart for the front pair or 93.4 cm for the rear, each authored as</em><code>AuthorMars2020Hazcam</code> <em>.</em></p>
-<pre><code class="language-C++">void ernie::AuthorMars2020HazcamPair (
-    Scene &amp; scene,
-    const Path &amp; rig,
-    const Path &amp; leftProduct,
-    const Path &amp; rightProduct,
-    Mars2020Hazcams which=Mars2020Hazcams::Front,
-    BayerPattern pattern=BayerPattern::Rggb,
-    double jpegQuality=85.0
-) 
-</code></pre>
-<hr>
-
-<h3 id="function-authormars2020navcam">function AuthorMars2020Navcam</h3>
-<p><em>Authors one of the Mars 2020 Navcams as published, onto</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <strong><code>camera</code> <em>and the readout chain of</em><a href="../classernie_1_1RenderProduct/"><em><strong>RenderProduct</strong></em></a> </strong><code>product</code> <em>:</em></p>
-<pre><code class="language-C++">void ernie::AuthorMars2020Navcam (
-    Scene &amp; scene,
-    const Path &amp; camera,
-    const Path &amp; product,
-    BayerPattern pattern=BayerPattern::Rggb,
-    double jpegQuality=85.0
-) 
-</code></pre>
-<ul>
-<li>The camera: the f-theta lens (<code>Mars2020Navcam::FisheyeK1</code>, Ernie's fisheye) of 19.1 mm over the full 32.77 x 24.58 mm frame, f/12, focused at 3.5 m. Render it at 5120 x 3840 for the detector's own 6.4 um pixels; a smaller resolution bins them (as the cameras can downsample), each pixel then wider and collecting more light.</li>
-<li>The sensor: RGB, the CMV-20000's gain, dark noise and full well, a 12-bit ADC. The paper gives the detector's QE only as 64.5% at 550 nm (monochrome, with microlenses; its table prints "55 nm"), with no colour responses, so the channels keep Ernie's generic RGB curves.</li>
-<li>The readout chain, SensorFilter prims under <code>product</code>: qe, bayer (<code>pattern</code>; the paper does not give the layout), noise, adc and demosaic (Malvar-He-Cutler), so RawDN holds the 12-bit numbers demosaiced; then cie, exposure and jpeg at <code>jpegQuality</code> for the 8-bit colour images the rover sends JPEG-compressed (the paper gives the quality as selectable). Fixed-pattern noise and dark current are not published; add <code>darkCurrent</code> or <code>defectPixels</code> filters to model them.</li>
-</ul>
-<p>Reference: J. N. Maki et al., "The Mars 2020 Engineering Cameras
-and Microphone on the Perseverance Rover: A Next-Generation
-Imaging System for Mars Exploration", Space Science Reviews 216:137, 2020, <a href="https://doi.org/10.1007/s11214-020-00765-9:">https://doi.org/10.1007/s11214-020-00765-9:</a> Table 2 and sections on the detector and flight software. </p>
-<p><strong>Exception:</strong></p>
-<ul>
-<li><code>std::invalid_argument</code> if <code>camera</code> is not a <a href="../classernie_1_1Camera/"><strong>Camera</strong></a> or <code>product</code> not a <a href="../classernie_1_1RenderProduct/"><strong>RenderProduct</strong></a>. </li>
-</ul>
-<hr>
-
-<h3 id="function-authormars2020navcampair">function AuthorMars2020NavcamPair</h3>
-<p><em>The Navcam pair on stereo rig</em> <code>rig</code> <em>(an</em><a href="../classernie_1_1Xform/"><em><strong>Xform</strong></em></a> <em>, defined if missing, posed by the caller as the cameras' shared frame, looking down its -z with +y up): Cameras</em><code>rig</code> <em>/Left and</em><code>rig</code> <em>/Right 42.4 cm apart along its x, each authored as</em><code>AuthorMars2020Navcam</code> <em>with products</em><code>leftProduct</code> <em>and</em><code>rightProduct</code> <em>.</em></p>
-<pre><code class="language-C++">void ernie::AuthorMars2020NavcamPair (
-    Scene &amp; scene,
-    const Path &amp; rig,
-    const Path &amp; leftProduct,
-    const Path &amp; rightProduct,
-    BayerPattern pattern=BayerPattern::Rggb,
-    double jpegQuality=85.0
-) 
-</code></pre>
-<hr>
-
-<h3 id="function-authormastcamz">function AuthorMastcamZ</h3>
-<p><em>Authors one Mastcam-Z camera through filter</em> <code>filter</code> <em>as published, onto</em><a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <strong><code>camera</code> <em>and the readout chain of</em><a href="../classernie_1_1RenderProduct/"><em><strong>RenderProduct</strong></em></a> </strong><code>product</code> <em>:</em></p>
-<pre><code class="language-C++">void ernie::AuthorMastcamZ (
-    Scene &amp; scene,
-    const Path &amp; camera,
-    const Path &amp; product,
-    MastcamZEye eye,
-    int filter,
-    double focalLengthMm=MastcamZ::kShortestFocalMm,
-    BayerPattern pattern=BayerPattern::Rggb
-) 
-</code></pre>
-<ul>
-<li>The camera: a pinhole of <code>focalLengthMm</code> (26 to 110) over the 11.84 x 8.88 mm detector at its f-number (<code>MastcamZ::FNumberAt</code>).</li>
-<li>Filter 0: an RGB sensor whose channels are Gaussians at Table 3's Bayer effective wavelengths and half widths, peaking at the detector's ~40%; the chain qe, bayer (<code>pattern</code>; the paper does not give the layout), noise, adc, demosaic.</li>
-<li>Filters 1 to 7: one channel, the filter's passband (Table 3's 2 x HWHM wide about its effective wavelength, ramped over 2 nm about the half maxima, times 10^-ND for filter 7) on the detector's response, Ernie's generic silicon curve scaled to the ~40% peak (the paper publishes no curve, and the Bayer microfilters' differences in a narrow band are left out); the camera's spectral range narrowed to the passband, four bands across it; the chain qe, noise, adc.</li>
-<li>The sensor: the KAI-2020CM's gain, read noise and full well for <code>eye</code>, an 11-bit ADC. <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> radiance past 830 nm follows what the scene gives there: materials' RGB albedo holds its 830 nm value, so give materials reflectance spectra for the near-IR bands.</li>
-</ul>
-<p>Reference: J. F. Bell III et al., "The Mars 2020 Perseverance
-Rover Mast Camera Zoom (Mastcam-Z) Multispectral, Stereoscopic
-Imaging Investigation", Space Science Reviews 217:24, 2021, <a href="https://doi.org/10.1007/s11214-020-00755-x:">https://doi.org/10.1007/s11214-020-00755-x:</a> Tables 3 and 5 and the focal plane section. </p>
-<p><strong>Exception:</strong></p>
-<ul>
-<li><code>std::invalid_argument</code> if <code>camera</code> is not a <a href="../classernie_1_1Camera/"><strong>Camera</strong></a>, <code>product</code> not a <a href="../classernie_1_1RenderProduct/"><strong>RenderProduct</strong></a>, <code>filter</code> outside 0 to 7 or <code>focalLengthMm</code> outside the zoom. </li>
-</ul>
-<hr>
-
-<h3 id="function-authormastcamzpair">function AuthorMastcamZPair</h3>
-<p><em>The Mastcam-Z pair on stereo rig</em> <code>rig</code> <em>(an</em><a href="../classernie_1_1Xform/"><em><strong>Xform</strong></em></a> <em>, defined if missing, looking down its -z with +y up): Cameras</em><code>rig</code> <em>/Left and</em><code>rig</code> <em>/Right 24.4 cm apart along its x, each toed in 1.15 degrees, authored as</em><code>AuthorMastcamZ</code> <em>through filters</em><code>leftFilter</code> <em>and</em><code>rightFilter</code> <em>.</em></p>
-<pre><code class="language-C++">void ernie::AuthorMastcamZPair (
-    Scene &amp; scene,
-    const Path &amp; rig,
-    const Path &amp; leftProduct,
-    const Path &amp; rightProduct,
-    int leftFilter,
-    int rightFilter,
-    double focalLengthMm=MastcamZ::kShortestFocalMm,
-    BayerPattern pattern=BayerPattern::Rggb
-) 
-</code></pre>
+<p>Its f-number, ISO, lens transmission and sensor stay as authored, so an instrument's own values (a demo's, say) are kept. </p>
 <hr>
 
 <h3 id="function-axisnamed">function AxisNamed</h3>
@@ -3120,6 +2892,15 @@ Imaging Investigation", Space Science Reviews 217:24, 2021, <a href="https://doi
 ) 
 </code></pre>
 <p>Accurate to a fraction of a percent from 1000 to 50000 K (interpolated in temperature). </p>
+<hr>
+
+<h3 id="function-bodydirection">function BodyDirection</h3>
+<p><em>The body-fixed unit vector of planetocentric latitude</em> <code>latitudeDeg</code> <em>and east longitude</em><code>longitudeDeg</code> <em>.</em></p>
+<pre><code class="language-C++">glm::dvec3 ernie::BodyDirection (
+    double latitudeDeg,
+    double longitudeDeg
+) 
+</code></pre>
 <hr>
 
 <h3 id="function-boundmaterial">function BoundMaterial</h3>
@@ -4192,6 +3973,22 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 </code></pre>
 <hr>
 
+<h3 id="function-localterrainof">function LocalTerrainOf</h3>
+<p><em>The</em> <code>cells</code> <em>x</em><code>cells</code> <em>heightfield of</em><code>dem</code> <em>,</em><code>cellSize</code> <em>metres apart, about latitude</em><code>latitudeDeg</code> <em>and east longitude</em><code>longitudeDeg</code> <em>(</em><code>LocalTerrain</code> <em>).</em></p>
+<pre><code class="language-C++">LocalTerrain ernie::LocalTerrainOf (
+    const CylindricalDem &amp; dem,
+    double latitudeDeg,
+    double longitudeDeg,
+    std::uint32_t cells,
+    double cellSize
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for fewer than 2 cells or a non-positive cell size. </li>
+</ul>
+<hr>
+
 <h3 id="function-localtransformedits">function LocalTransformEdits</h3>
 <p><em>The attribute values that give the prim at</em> <code>path</code> <em>the local transform</em><code>local</code> <em>.</em></p>
 <pre><code class="language-C++">std::vector&lt; std::pair&lt; std::string, Value &gt; &gt; ernie::LocalTransformEdits (
@@ -4215,26 +4012,6 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 <ul>
 <li><code>std::invalid_argument</code> if <code>eye</code> equals <code>target</code> or <code>up</code> is parallel to the view. </li>
 </ul>
-<hr>
-
-<h3 id="function-lrocwacbandnamed">function LrocWacBandNamed</h3>
-<p><em>The band whose Table 4 band name or effective wavelength is</em> <code>nanometres</code> <em>(605 or 604).</em></p>
-<pre><code class="language-C++">LrocWacBand ernie::LrocWacBandNamed (
-    int nanometres
-) 
-</code></pre>
-<p><strong>Exception:</strong></p>
-<ul>
-<li><code>std::invalid_argument</code> for neither. </li>
-</ul>
-<hr>
-
-<h3 id="function-lrocwacbandof">function LrocWacBandOf</h3>
-<p><em>Band</em> <code>band</code> <em>'s values (Robinson et al. 2010, Tables 3 and 4).</em></p>
-<pre><code class="language-C++">LrocWacBandSpec ernie::LrocWacBandOf (
-    LrocWacBand band
-) 
-</code></pre>
 <hr>
 
 <h3 id="function-marsatmosphere">function MarsAtmosphere</h3>
@@ -4462,6 +4239,14 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 </ul>
 <hr>
 
+<h3 id="function-parsepds3label">function ParsePds3Label</h3>
+<p><em>Parses label text:</em> <code>KEY = value</code> <em>lines,</em><code>OBJECT</code> <em>/</em><code>END_OBJECT</code> <em>nesting, comments (</em><code>/* *&amp;zwj;/</code> <em>) and values continued over lines inside quotes or parentheses.</em></p>
+<pre><code class="language-C++">Pds3Label ernie::ParsePds3Label (
+    std::string_view text
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-pcg3d">function Pcg3d</h3>
 <p><em>The pcg3d hash: three well-mixed 32-bit words from three.</em> </p>
 <pre><code class="language-C++">inline constexpr glm::uvec3 ernie::Pcg3d (
@@ -4621,6 +4406,18 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 <p><strong>Exception:</strong></p>
 <ul>
 <li><code>std::runtime_error</code> if the file cannot be read, or as <code>ReadCahvoreModels</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-readcylindricaldem">function ReadCylindricalDem</h3>
+<p><em>Reads the DEM a PDS3 label at</em> <code>labelPath</code> <em>describes: its IMAGE object (16- or 32-bit LSB integers, or 32-bit LSB reals, each times SCALING_FACTOR, plus the label's OFFSET where the label says the heights are radii) in the file its ^IMAGE pointer names beside the label, on its IMAGE_MAP_PROJECTION's simple cylindrical grid.</em></p>
+<pre><code class="language-C++">CylindricalDem ernie::ReadCylindricalDem (
+    const std::string &amp; labelPath
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::runtime_error</code> if a file cannot be read, or std::invalid_argument for another projection, sample type or a label it cannot follow. </li>
 </ul>
 <hr>
 

@@ -237,11 +237,13 @@ class Renderer {
 
     RenderProductSetOutputs Step(const Scene&amp; scene,
                                  std::span&lt;const Path&gt; products = {},
-                                 const Path&amp; settings = {});
+                                 const Path&amp; settings = {},
+                                 double deltaTime = 0.0);
 
     StepOperation StepAsync(const Scene&amp; scene,
                             std::span&lt;const Path&gt; products = {},
-                            const Path&amp; settings = {});
+                            const Path&amp; settings = {},
+                            double deltaTime = 0.0);
 
     Tensor Render(const Scene&amp; scene, const Path&amp; settings = {},
                   Device device = {});

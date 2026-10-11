@@ -218,6 +218,14 @@
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1DensityLayer/"><strong>DensityLayer</strong></a> &gt;</td>
 <td style="text-align: left;"><a href="#variable-layers"><strong>layers</strong></a>  <br></td>
 </tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; double &gt;</td>
+<td style="text-align: left;"><a href="#variable-table"><strong>table</strong></a>  <br><em>In place of the layers when not empty: the relative density at altitudes evenly</em> <code>tableStep</code> <em>m apart from the ground, linear between them and the last beyond.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-tablestep"><strong>tableStep</strong></a>   = <code>0.0</code><br></td>
+</tr>
 </tbody>
 </table>
 <h2 id="public-functions">Public Functions</h2>
@@ -235,7 +243,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#function-operator"><strong>operator()</strong></a> (double altitude) const<br><em>The relative density at</em> <code>altitude</code> <em>; 0 for a profile without layers.</em></td>
+<td style="text-align: left;"><a href="#function-operator"><strong>operator()</strong></a> (double altitude) const<br><em>The relative density at</em> <code>altitude</code> <em>; 0 for a profile without layers or a table.</em></td>
 </tr>
 </tbody>
 </table>
@@ -254,6 +262,10 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="./"><strong>DensityProfile</strong></a></td>
+<td style="text-align: left;"><a href="#function-standardatmosphere"><strong>StandardAtmosphere</strong></a> (double surfaceTemperature, double molarMass, double gravity) <br><em>The density of a gas in hydrostatic equilibrium under the temperature profile of the U.S.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>DensityProfile</strong></a></td>
 <td style="text-align: left;"><a href="#function-tent"><strong>Tent</strong></a> (double peakAltitude, double halfWidth) <br></td>
 </tr>
 </tbody>
@@ -269,6 +281,17 @@
 <pre><code class="language-C++">std::vector&lt;DensityLayer&gt; ernie::DensityProfile::layers;
 </code></pre>
 <hr>
+
+<h3 id="variable-table">variable table</h3>
+<p><em>In place of the layers when not empty: the relative density at altitudes evenly</em> <code>tableStep</code> <em>m apart from the ground, linear between them and the last beyond.</em></p>
+<pre><code class="language-C++">std::vector&lt;double&gt; ernie::DensityProfile::table;
+</code></pre>
+<hr>
+
+<h3 id="variable-tablestep">variable tableStep</h3>
+<pre><code class="language-C++">double ernie::DensityProfile::tableStep;
+</code></pre>
+<hr>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
 <h3 id="function-column">function Column</h3>
 <p><em>The integral of the relative density from the ground to</em> <code>top</code> <em>(m).</em></p>
@@ -279,7 +302,7 @@
 <hr>
 
 <h3 id="function-operator">function operator()</h3>
-<p><em>The relative density at</em> <code>altitude</code> <em>; 0 for a profile without layers.</em></p>
+<p><em>The relative density at</em> <code>altitude</code> <em>; 0 for a profile without layers or a table.</em></p>
 <pre><code class="language-C++">double ernie::DensityProfile::operator() (
     double altitude
 ) const
@@ -291,6 +314,19 @@
     double scaleHeight
 ) 
 </code></pre>
+<hr>
+
+<h3 id="function-standardatmosphere">function StandardAtmosphere</h3>
+<p><em>The density of a gas in hydrostatic equilibrium under the temperature profile of the U.S.</em> </p>
+<pre><code class="language-C++">static DensityProfile ernie::DensityProfile::StandardAtmosphere (
+    double surfaceTemperature,
+    double molarMass,
+    double gravity
+) 
+</code></pre>
+<p>Standard <a href="../classernie_1_1Atmosphere/"><strong>Atmosphere</strong></a> 1976: its lapse rates from the ground (-6.5 K/km to 11 km, 0 to 20 km, +1 to 32 km, +2.8 to 47 km, 0 to 51 km, -2.8 to 71 km, -2 to 84.852 km, then constant), shifted to start at <code>surfaceTemperature</code>, relative to the ground's: d ln p / dh = -M g / (R T) and density p / T, tabulated every 100 m to 120 km. Heights are taken as geometric (the standard's are geopotential, 1.6% apart at 100 km).</p>
+<p>References:
+* NOAA, NASA and USAF, "U.S. Standard Atmosphere, 1976", NOAA-S/T 76-1562, 1976, table 4. <a href="https://ntrs.nasa.gov/citations/19770009539">https://ntrs.nasa.gov/citations/19770009539</a> </p>
 <hr>
 
 <h3 id="function-tent">function Tent</h3>

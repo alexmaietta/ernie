@@ -293,11 +293,12 @@ class RenderDelegate {
 
     virtual StepOperation
     StepAsync(const Scene&amp; scene, std::span&lt;const Path&gt; products = {},
-              const Path&amp; settings = {}) = 0;
+              const Path&amp; settings = {}, double deltaTime = 0.0) = 0;
 
     RenderProductSetOutputs Step(const Scene&amp; scene,
                                  std::span&lt;const Path&gt; products = {},
-                                 const Path&amp; settings = {});
+                                 const Path&amp; settings = {},
+                                 double deltaTime = 0.0);
 
     Tensor Render(const Scene&amp; scene, const Path&amp; settings = {},
                   Device device = {});
@@ -334,14 +335,34 @@ class RenderDelegate {
 
     virtual std::optional&lt;Bounds3&gt; SceneBounds() const = 0;
 
+    double Time() const {
+        return time_;
+    }
+
+    void AdvanceTime(double deltaTime);
+
+    void ResetTime(double time);
+
   protected:
     RenderDelegate() = default;
+
+    struct TimeWindow {
+        double start = 0.0;
+        double end = 0.0;
+    };
+    TimeWindow TakeTimeWindow() {
+        const TimeWindow window{frameStart_, time_};
+        frameStart_ = time_;
+        return window;
+    }
 
     FrameId NextFrame(const Scene&amp; scene, const Path&amp; settings,
                       const Path&amp; product);
 
   private:
     std::map&lt;Path, std::uint64_t&gt; frameCounts_;
+    double time_ = 0.0;
+    double frameStart_ = 0.0;
 };
 
 std::vector&lt;std::string&gt; RenderBackends();

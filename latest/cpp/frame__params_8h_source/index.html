@@ -432,7 +432,8 @@ struct FrameParams {
         0.0f, 0.0f, 1.0f};  
     float sunAngle = 0.53f;
     std::vector&lt;float&gt; sunIrradiance;
-    float ambient = 0.15f;  
+    float ambient = 0.0f;
+    glm::vec3 ambientColor{1.0f};
     std::vector&lt;LightParams&gt; lights;
     std::optional&lt;DomeParams&gt; dome;
     DomeLightMode domeMode = DomeLightMode::Approximate;
@@ -477,6 +478,15 @@ struct FrameParams {
     glm::dmat4 posesParent{1.0};
 
     std::vector&lt;glm::dmat4&gt; previousPoses;
+
+    double time = 0.0;
+    double startTime = 0.0;
+    double timeCode = 0.0;
+    double timeCodesPerSecond = 24.0;
+
+    double TimeAt(double frames) const {
+        return time + frames * (time - startTime);
+    }
 
     std::vector&lt;std::int32_t&gt; worlds;
 

@@ -303,7 +303,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
-<td style="text-align: left;"><a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> <br><em>An interactive window onto an Ernie</em> <code>Scene</code> <em>: a docked viewport rendering the scene with a</em><code>RenderDelegate</code> <em>(the rasterizer), plus Stage, Property, Render Settings, Sensor, Stats and Log panels.</em></td>
+<td style="text-align: left;"><a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> <br><em>An interactive window onto an Ernie</em> <code>Scene</code> <em>: a docked viewport rendering the scene with a</em><code>RenderDelegate</code> <em>(the rasterizer), plus</em><a href="../classernie_1_1Stage/"><em><strong>Stage</strong></em></a> <em>, Property, Render Settings, Sensor, Stats and Log panels.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
@@ -389,7 +389,7 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../classernie_1_1OrbitController/"><strong>OrbitController</strong></a></td>
-<td style="text-align: left;"><a href="#function-controllerfromtransform"><strong>ControllerFromTransform</strong></a> (const glm::dmat4 &amp; world, float distance, float verticalFov) <br><em>An orbit controller reproducing the camera-to-world transform</em> <code>world</code> <em>: looking along its -z axis at a target</em><code>distance</code> <em>ahead, with</em><code>verticalFov</code> <em>.</em></td>
+<td style="text-align: left;"><a href="#function-controllerfromtransform"><strong>ControllerFromTransform</strong></a> (const glm::dmat4 &amp; world, double distance, float verticalFov) <br><em>An orbit controller reproducing the camera-to-world transform</em> <code>world</code> <em>: looking along its -z axis at a target</em><code>distance</code> <em>ahead, with</em><code>verticalFov</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::span&lt; const <a href="../structernie_1_1app_1_1CreatableType/"><strong>CreatableType</strong></a> &gt;</td>
@@ -497,7 +497,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">std::unique_ptr&lt; <a href="../classernie_1_1app_1_1Panel/"><strong>Panel</strong></a> &gt;</td>
-<td style="text-align: left;"><a href="#function-makestagepanel"><strong>MakeStagePanel</strong></a> () <br><em>The Stage panel: the scene's prim tree, with selection, framing, visibility toggles and a filter; the session's own prims show on request.</em></td>
+<td style="text-align: left;"><a href="#function-makestagepanel"><strong>MakeStagePanel</strong></a> () <br><em>The</em> <a href="../classernie_1_1Stage/"><em><strong>Stage</strong></em></a> <em>panel: the scene's prim tree, with selection, framing, visibility toggles and a filter; the session's own prims show on request.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -671,7 +671,7 @@
 <p><em>An orbit controller reproducing the camera-to-world transform</em> <code>world</code> <em>: looking along its -z axis at a target</em><code>distance</code> <em>ahead, with</em><code>verticalFov</code> <em>.</em></p>
 <pre><code class="language-C++">OrbitController ernie::app::ControllerFromTransform (
     const glm::dmat4 &amp; world,
-    float distance,
+    double distance,
     float verticalFov
 ) 
 </code></pre>
@@ -904,7 +904,7 @@ DemoInfo ernie::app::MakeDemoInfo (
 <hr>
 
 <h3 id="function-makestagepanel">function MakeStagePanel</h3>
-<p><em>The Stage panel: the scene's prim tree, with selection, framing, visibility toggles and a filter; the session's own prims show on request.</em> </p>
+<p><em>The</em> <a href="../classernie_1_1Stage/"><em><strong>Stage</strong></em></a> <em>panel: the scene's prim tree, with selection, framing, visibility toggles and a filter; the session's own prims show on request.</em></p>
 <pre><code class="language-C++">std::unique_ptr&lt; Panel &gt; ernie::app::MakeStagePanel () 
 </code></pre>
 <hr>

@@ -211,6 +211,26 @@ namespace ernie::tokens {
 
 inline constexpr std::string_view kSessionRoot = &quot;/__session&quot;;
 
+// Stage metadata (UsdStage's, which USD keeps on the stage's
+// pseudo-root; Ernie on its root prim `/`, `Stage`): the axis that
+// points up (&quot;Y&quot; or &quot;Z&quot;), metres and kilograms per scene unit, the
+// time codes and frames per second, the time codes animation plays
+// between, and the prim a reference to the scene brings in.
+inline constexpr std::string_view kUpAxis = &quot;upAxis&quot;;
+inline constexpr std::string_view kMetersPerUnit = &quot;metersPerUnit&quot;;
+inline constexpr std::string_view kKilogramsPerUnit =
+    &quot;kilogramsPerUnit&quot;;
+inline constexpr std::string_view kTimeCodesPerSecond =
+    &quot;timeCodesPerSecond&quot;;
+inline constexpr std::string_view kFramesPerSecond =
+    &quot;framesPerSecond&quot;;
+inline constexpr std::string_view kStartTimeCode = &quot;startTimeCode&quot;;
+inline constexpr std::string_view kEndTimeCode = &quot;endTimeCode&quot;;
+inline constexpr std::string_view kDefaultPrim = &quot;defaultPrim&quot;;
+inline constexpr std::string_view kTimeCode = &quot;ernie:timeCode&quot;;
+inline constexpr std::string_view kY = &quot;Y&quot;;
+inline constexpr std::string_view kZ = &quot;Z&quot;;
+
 // Prim types.
 inline constexpr std::string_view kXform = &quot;Xform&quot;;
 inline constexpr std::string_view kScope = &quot;Scope&quot;;
@@ -453,6 +473,18 @@ inline constexpr std::string_view kLaserGridRows =
     &quot;ernie:laser:gridRows&quot;;
 inline constexpr std::string_view kLaserGridPitch =
     &quot;ernie:laser:gridPitch&quot;;
+inline constexpr std::string_view kLaserDotColumns =
+    &quot;ernie:laser:dotColumns&quot;;
+inline constexpr std::string_view kLaserDotRows =
+    &quot;ernie:laser:dotRows&quot;;
+inline constexpr std::string_view kLaserDotTileColumns =
+    &quot;ernie:laser:dotTileColumns&quot;;
+inline constexpr std::string_view kLaserDotTileRows =
+    &quot;ernie:laser:dotTileRows&quot;;
+inline constexpr std::string_view kLaserDotJitter =
+    &quot;ernie:laser:dotJitter&quot;;
+inline constexpr std::string_view kLaserDotSeed =
+    &quot;ernie:laser:dotSeed&quot;;
 inline constexpr std::string_view kLaserEfficiency =
     &quot;ernie:laser:efficiency&quot;;
 inline constexpr std::string_view kLaserZeroOrder =
@@ -469,6 +501,7 @@ inline constexpr std::string_view kSpot = &quot;spot&quot;;
 inline constexpr std::string_view kLine = &quot;line&quot;;
 inline constexpr std::string_view kGrid = &quot;grid&quot;;
 inline constexpr std::string_view kImage = &quot;image&quot;;
+inline constexpr std::string_view kDots = &quot;dots&quot;;
 inline constexpr std::string_view kFlat = &quot;flat&quot;;
 inline constexpr std::string_view kGaussian = &quot;gaussian&quot;;
 inline constexpr std::string_view kShapingConeAngle =
@@ -732,8 +765,9 @@ inline constexpr std::string_view kSensorFilter =
 inline constexpr std::string_view kFilterType = &quot;ernie:filter:type&quot;;
 inline constexpr std::string_view kSourceName =
     &quot;sourceName&quot;;  
-inline constexpr std::string_view kAmbient =
-    &quot;ernie:ambient&quot;;  
+inline constexpr std::string_view kAmbient = &quot;ernie:ambient&quot;;
+inline constexpr std::string_view kAmbientColor =
+    &quot;ernie:ambientColor&quot;;
 inline constexpr std::string_view kDomeLightMode =
     &quot;ernie:domeLight:mode&quot;;
 inline constexpr std::string_view kDomeShadowRadius =
@@ -741,9 +775,14 @@ inline constexpr std::string_view kDomeShadowRadius =
 inline constexpr std::string_view kDomeDirections =
     &quot;ernie:domeLight:directions&quot;;
 inline constexpr std::string_view kColorMode = &quot;ernie:colorMode&quot;;
-inline constexpr std::string_view kHillshade = &quot;hillshade&quot;;
+inline constexpr std::string_view kShaded = &quot;shaded&quot;;
 inline constexpr std::string_view kColormap = &quot;colormap&quot;;
 inline constexpr std::string_view kShadedColormap = &quot;shadedColormap&quot;;
+inline constexpr std::string_view kHillshade = &quot;hillshade&quot;;
+inline constexpr std::string_view kHillshadeAzimuth =
+    &quot;ernie:hillshade:azimuth&quot;;
+inline constexpr std::string_view kHillshadeAltitude =
+    &quot;ernie:hillshade:altitude&quot;;
 inline constexpr std::string_view kWireframe = &quot;ernie:wireframe&quot;;
 inline constexpr std::string_view kOff = &quot;off&quot;;
 inline constexpr std::string_view kOverlay = &quot;overlay&quot;;

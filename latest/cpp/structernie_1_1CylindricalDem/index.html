@@ -3,9 +3,9 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1LrocWacBandSpec/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1CylindricalDem/" />
       <link rel="shortcut icon" href="../../img/favicon.ico" />
-    <title>Struct ernie::LrocWacBandSpec - Ernie</title>
+    <title>Struct ernie::CylindricalDem - Ernie</title>
     <link rel="stylesheet" href="../../css/theme.css" />
     <link rel="stylesheet" href="../../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -15,9 +15,9 @@
     
       <script>
         // Current page data
-        var mkdocs_page_name = "Struct ernie::LrocWacBandSpec";
-        var mkdocs_page_input_path = "cpp/structernie_1_1LrocWacBandSpec.md";
-        var mkdocs_page_url = "/ernie/latest/cpp/structernie_1_1LrocWacBandSpec/";
+        var mkdocs_page_name = "Struct ernie::CylindricalDem";
+        var mkdocs_page_input_path = "cpp/structernie_1_1CylindricalDem.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/structernie_1_1CylindricalDem/";
       </script>
     
     <!--[if lt IE 9]>
@@ -189,9 +189,9 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">Struct ernie::LrocWacBandSpec</li>
+      <li class="breadcrumb-item active">Struct ernie::CylindricalDem</li>
     <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/structernie_1_1LrocWacBandSpec.md">Edit on alexmaietta/ernie</a>
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/structernie_1_1CylindricalDem.md">Edit on alexmaietta/ernie</a>
     </li>
   </ul>
   <hr/>
@@ -199,11 +199,11 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="struct-ernielrocwacbandspec">Struct ernie::LrocWacBandSpec</h1>
-<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>LrocWacBandSpec</strong></a></p>
-<p><em>One WAC band's published values.</em> </p>
+                <h1 id="struct-erniecylindricaldem">Struct ernie::CylindricalDem</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>CylindricalDem</strong></a></p>
+<p><em>A planet's radius on a simple cylindrical (equirectangular) grid, as LOLA's LDEM products hold it:</em> <code>heights</code> <em>(metres above</em><code>referenceRadius</code> <em>) row by row from the northern, each row from the western sample eastwards,</em><code>pixelsPerDegree</code> <em>both ways.</em><a href="#detailed-description">More...</a></p>
 <ul>
-<li><code>#include &lt;ernie/scene/instruments.h&gt;</code></li>
+<li><code>#include &lt;ernie/scene/dem.h&gt;</code></li>
 </ul>
 <h2 id="public-attributes">Public Attributes</h2>
 <table>
@@ -215,28 +215,32 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#variable-effectivenm"><strong>effectiveNm</strong></a>  <br><em>Table 4's effective wavelength.</em></td>
+<td style="text-align: right;">std::vector&lt; float &gt;</td>
+<td style="text-align: left;"><a href="#variable-heights"><strong>heights</strong></a>  <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-lines"><strong>lines</strong></a>   = <code>0</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#variable-fnumber"><strong>fNumber</strong></a>  <br><em>Table 3: the visible optics' or the UV optics' (section 3.2.1's text gives 5.5 and 5.1 for the lens designs; the table's are the system's).</em></td>
+<td style="text-align: left;"><a href="#variable-maxlatitudedeg"><strong>maxLatitudeDeg</strong></a>   = <code>90.0</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#variable-fwhmnm"><strong>fwhmNm</strong></a>  <br><em>Table 4's full width at half maximum.</em></td>
+<td style="text-align: left;"><a href="#variable-pixelsperdegree"><strong>pixelsPerDegree</strong></a>   = <code>1.0</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#variable-namenm"><strong>nameNm</strong></a>  <br><em>Table 4's band name.</em></td>
+<td style="text-align: left;"><a href="#variable-referenceradius"><strong>referenceRadius</strong></a>   = <code>0.0</code><br><em>Metres.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-samples"><strong>samples</strong></a>   = <code>0</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#variable-pixelpitchum"><strong>pixelPitchUm</strong></a>  <br><em>The 9 um pixels, 4 x 4 summed in the UV (section 3.2).</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#variable-responsivity"><strong>responsivity</strong></a>  <br><em>Table 4's responsivity coefficient, (W/m^3/sr) / (DN/s).</em></td>
+<td style="text-align: left;"><a href="#variable-westlongitudedeg"><strong>westLongitudeDeg</strong></a>   = <code>0.0</code><br></td>
 </tr>
 </tbody>
 </table>
@@ -251,55 +255,60 @@
 <tbody>
 <tr>
 <td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#function-effectiveqe"><strong>EffectiveQe</strong></a> () const<br><em>The band's effective quantum efficiency, which with Ernie's camera equation turns a flat spectral radiance into Table 4's DN per second: gain h c / (RC FWHM pi / (4 N^2) A lambda_eff), the optics', filter's and fill factor's losses all in it.</em></td>
+<td style="text-align: left;"><a href="#function-heightat"><strong>HeightAt</strong></a> (double latitudeDeg, double longitudeDeg) const<br><em>The height at latitude</em> <code>latitudeDeg</code> <em>and east longitude</em><code>longitudeDeg</code> <em>(any multiple of 360 apart), bilinear between the cells' centres, clamped to the grid's edges.</em></td>
 </tr>
 </tbody>
 </table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>Sample s of line l is centred at latitude maxLatitude - (l + 0.5) / ppd and east longitude westLongitude + (s + 0.5) / ppd. </p>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
-<h3 id="variable-effectivenm">variable effectiveNm</h3>
-<p><em>Table 4's effective wavelength.</em> </p>
-<pre><code class="language-C++">double ernie::LrocWacBandSpec::effectiveNm;
+<h3 id="variable-heights">variable heights</h3>
+<pre><code class="language-C++">std::vector&lt;float&gt; ernie::CylindricalDem::heights;
 </code></pre>
 <hr>
 
-<h3 id="variable-fnumber">variable fNumber</h3>
-<p><em>Table 3: the visible optics' or the UV optics' (section 3.2.1's text gives 5.5 and 5.1 for the lens designs; the table's are the system's).</em> </p>
-<pre><code class="language-C++">double ernie::LrocWacBandSpec::fNumber;
+<h3 id="variable-lines">variable lines</h3>
+<pre><code class="language-C++">std::uint32_t ernie::CylindricalDem::lines;
 </code></pre>
 <hr>
 
-<h3 id="variable-fwhmnm">variable fwhmNm</h3>
-<p><em>Table 4's full width at half maximum.</em> </p>
-<pre><code class="language-C++">double ernie::LrocWacBandSpec::fwhmNm;
+<h3 id="variable-maxlatitudedeg">variable maxLatitudeDeg</h3>
+<pre><code class="language-C++">double ernie::CylindricalDem::maxLatitudeDeg;
 </code></pre>
 <hr>
 
-<h3 id="variable-namenm">variable nameNm</h3>
-<p><em>Table 4's band name.</em> </p>
-<pre><code class="language-C++">double ernie::LrocWacBandSpec::nameNm;
+<h3 id="variable-pixelsperdegree">variable pixelsPerDegree</h3>
+<pre><code class="language-C++">double ernie::CylindricalDem::pixelsPerDegree;
 </code></pre>
 <hr>
 
-<h3 id="variable-pixelpitchum">variable pixelPitchUm</h3>
-<p><em>The 9 um pixels, 4 x 4 summed in the UV (section 3.2).</em> </p>
-<pre><code class="language-C++">double ernie::LrocWacBandSpec::pixelPitchUm;
+<h3 id="variable-referenceradius">variable referenceRadius</h3>
+<p><em>Metres.</em> </p>
+<pre><code class="language-C++">double ernie::CylindricalDem::referenceRadius;
 </code></pre>
 <hr>
 
-<h3 id="variable-responsivity">variable responsivity</h3>
-<p><em>Table 4's responsivity coefficient, (W/m^3/sr) / (DN/s).</em> </p>
-<pre><code class="language-C++">double ernie::LrocWacBandSpec::responsivity;
+<h3 id="variable-samples">variable samples</h3>
+<pre><code class="language-C++">std::uint32_t ernie::CylindricalDem::samples;
+</code></pre>
+<hr>
+
+<h3 id="variable-westlongitudedeg">variable westLongitudeDeg</h3>
+<pre><code class="language-C++">double ernie::CylindricalDem::westLongitudeDeg;
 </code></pre>
 <hr>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
-<h3 id="function-effectiveqe">function EffectiveQe</h3>
-<p><em>The band's effective quantum efficiency, which with Ernie's camera equation turns a flat spectral radiance into Table 4's DN per second: gain h c / (RC FWHM pi / (4 N^2) A lambda_eff), the optics', filter's and fill factor's losses all in it.</em> </p>
-<pre><code class="language-C++">double ernie::LrocWacBandSpec::EffectiveQe () const
+<h3 id="function-heightat">function HeightAt</h3>
+<p><em>The height at latitude</em> <code>latitudeDeg</code> <em>and east longitude</em><code>longitudeDeg</code> <em>(any multiple of 360 apart), bilinear between the cells' centres, clamped to the grid's edges.</em></p>
+<pre><code class="language-C++">double ernie::CylindricalDem::HeightAt (
+    double latitudeDeg,
+    double longitudeDeg
+) const
 </code></pre>
 <hr>
 
 <hr />
-<p>The documentation for this class was generated from the following file <code>ernie/scene/instruments.h</code></p>
+<p>The documentation for this class was generated from the following file <code>ernie/scene/dem.h</code></p>
               
             </div>
           </div><footer>

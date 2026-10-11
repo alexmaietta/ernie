@@ -230,9 +230,15 @@ struct DensityLayer {
 
 struct DensityProfile {
     std::vector&lt;DensityLayer&gt; layers;
+    std::vector&lt;double&gt; table;
+    double tableStep = 0.0;
 
     static DensityProfile Exponential(double scaleHeight);
     static DensityProfile Tent(double peakAltitude, double halfWidth);
+
+    static DensityProfile
+    StandardAtmosphere(double surfaceTemperature, double molarMass,
+                       double gravity);
 
     double operator()(double altitude) const;
 
@@ -257,6 +263,7 @@ struct Constituent {
     double numberDensity = 0.0;
     DensityProfile density;
     OpticsModel optics;
+    std::function&lt;double(double)&gt; refractivity;
 };
 
 struct AtmosphereModel {
@@ -302,6 +309,7 @@ struct BandedConstituent {
     std::vector&lt;float&gt; scattering;
     std::vector&lt;float&gt; absorption;
     std::vector&lt;float&gt; phase;
+    std::vector&lt;float&gt; refractivity;
 };
 
 struct BandedAtmosphere {
@@ -315,6 +323,15 @@ struct BandedAtmosphere {
 
     double TransmittanceToTop(double r, double mu, int band,
                               int steps = 4000) const;
+
+    double RefractiveIndex(double altitude, int band) const;
+
+    struct Refraction {
+        double deviation = 0.0;
+        bool ground = false;
+    };
+    Refraction Refract(double r, double mu, int band,
+                       double step = 100.0) const;
 };
 
 BandedAtmosphere BandAverage(const AtmosphereModel&amp; atmosphere,

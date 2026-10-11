@@ -164,6 +164,10 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.DemoEntry"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;DemoEntry</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.cache_dir"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;cache_dir</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.can_download"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;can_download</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.catalog"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;catalog</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.create_parser"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;create_parser</a>
@@ -171,6 +175,10 @@
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.default_args"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;default_args</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.discover_demos"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;discover_demos</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.download"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;download</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.fetch_ranges"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;fetch_ranges</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.heatmap"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;heatmap</a>
     </li>
@@ -369,6 +377,22 @@ when the Demos panel switches away.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            cache_dir (ernie.demo.cache_dir)" href="#ernie.demo.cache_dir">cache_dir</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Where the demos keep data they fetch: $ERNIE_CACHE, else</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            can_download (ernie.demo.can_download)" href="#ernie.demo.can_download">can_download</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Whether the demos may fetch data: $ERNIE_OFFLINE unset.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            catalog (ernie.demo.catalog)" href="#ernie.demo.catalog">catalog</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -397,6 +421,22 @@ when the Demos panel switches away.</p>
               <td>
                 <div class="doc-md-description">
                   <p>The demos under <code>root</code>, <code>&lt;category&gt;/&lt;name&gt;.py</code> files that</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            download (ernie.demo.download)" href="#ernie.demo.download">download</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Downloads <code>url</code> to <code>path</code>, its directory made as needed,</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            fetch_ranges (ernie.demo.fetch_ranges)" href="#ernie.demo.fetch_ranges">fetch_ranges</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The bytes of <code>ranges</code> [(first, last), ...] of <code>url</code>, each</p>
                 </div>
               </td>
             </tr>
@@ -565,10 +605,14 @@ when the Demos panel switches away.</p>
     "COMMON_ARGS",
     "Demo",
     "DemoEntry",
+    "cache_dir",
+    "can_download",
     "catalog",
     "create_parser",
     "default_args",
     "discover_demos",
+    "download",
+    "fetch_ranges",
     "heatmap",
     "init",
     "load_demo_class",
@@ -1309,6 +1353,46 @@ name.</p>
 <div class="doc doc-object doc-function">
 
 
+<h2 id="ernie.demo.cache_dir" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">cache_dir</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">cache_dir()</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Where the demos keep data they fetch: $ERNIE_CACHE, else
+$XDG_CACHE_HOME/ernie, else ~/.cache/ernie (C++
+<code>demos::CacheDir</code>).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.demo.can_download" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">can_download</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">can_download()</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Whether the demos may fetch data: $ERNIE_OFFLINE unset.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h2 id="ernie.demo.catalog" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">catalog</span>
 
@@ -1381,6 +1465,47 @@ among them.</p>
 
         <p>The demos under <code>root</code>, <code>&lt;category&gt;/&lt;name&gt;.py</code> files that
 define a Demo class, by category and name.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.demo.download" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">download</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">download(url, path)</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Downloads <code>url</code> to <code>path</code>, its directory made as needed,
+through <code>path</code> + ".part", renamed when complete.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.demo.fetch_ranges" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">fetch_ranges</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">fetch_ranges(url, ranges)</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The bytes of <code>ranges</code> [(first, last), ...] of <code>url</code>, each
+inclusive, in one request (HTTP range requests; several come back
+as multipart/byteranges, RFC 9110 section 14.6).</p>
 
 
     </div>

@@ -3,9 +3,9 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1MastcamZ_1_1Filter/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/dem_8h/" />
       <link rel="shortcut icon" href="../../img/favicon.ico" />
-    <title>Struct ernie::MastcamZ::Filter - Ernie</title>
+    <title>File dem.h - Ernie</title>
     <link rel="stylesheet" href="../../css/theme.css" />
     <link rel="stylesheet" href="../../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -15,9 +15,9 @@
     
       <script>
         // Current page data
-        var mkdocs_page_name = "Struct ernie::MastcamZ::Filter";
-        var mkdocs_page_input_path = "cpp/structernie_1_1MastcamZ_1_1Filter.md";
-        var mkdocs_page_url = "/ernie/latest/cpp/structernie_1_1MastcamZ_1_1Filter/";
+        var mkdocs_page_name = "File dem.h";
+        var mkdocs_page_input_path = "cpp/dem_8h.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/dem_8h/";
       </script>
     
     <!--[if lt IE 9]>
@@ -189,9 +189,9 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">Struct ernie::MastcamZ::Filter</li>
+      <li class="breadcrumb-item active">File dem.h</li>
     <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/structernie_1_1MastcamZ_1_1Filter.md">Edit on alexmaietta/ernie</a>
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/dem_8h.md">Edit on alexmaietta/ernie</a>
     </li>
   </ul>
   <hr/>
@@ -199,13 +199,20 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="struct-erniemastcamzfilter">Struct ernie::MastcamZ::Filter</h1>
-<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../structernie_1_1MastcamZ/"><strong>MastcamZ</strong></a> <strong>&gt;</strong> <a href="./"><strong>Filter</strong></a></p>
-<p><em>A filter's Table 3 effective wavelength and half width at half maximum, nm (for filter 0, the green Bayer channel's), and its neutral density (filter 7's; 0 otherwise).</em> </p>
+                <h1 id="file-demh">File dem.h</h1>
+<p><a href="../files/"><strong>FileList</strong></a> <strong>&gt;</strong> <a href="../dir_057d52706067b881d9371cf136c38c31/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../dir_572d817874f40c61a249f0e7684d4315/"><strong>scene</strong></a> <strong>&gt;</strong> <a href="./"><strong>dem.h</strong></a></p>
+<p><a href="../dem_8h_source/">Go to the source code of this file</a></p>
 <ul>
-<li><code>#include &lt;ernie/scene/instruments.h&gt;</code></li>
+<li><code>#include "ernie/util/tensor.h"</code></li>
+<li><code>#include &lt;glm/glm.hpp&gt;</code></li>
+<li><code>#include &lt;cstdint&gt;</code></li>
+<li><code>#include &lt;map&gt;</code></li>
+<li><code>#include &lt;optional&gt;</code></li>
+<li><code>#include &lt;string&gt;</code></li>
+<li><code>#include &lt;string_view&gt;</code></li>
+<li><code>#include &lt;vector&gt;</code></li>
 </ul>
-<h2 id="public-attributes">Public Attributes</h2>
+<h2 id="namespaces">Namespaces</h2>
 <table>
 <thead>
 <tr>
@@ -215,37 +222,36 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#variable-effectivenm"><strong>effectiveNm</strong></a>  <br></td>
-</tr>
-<tr>
-<td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#variable-hwhmnm"><strong>hwhmNm</strong></a>  <br></td>
-</tr>
-<tr>
-<td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#variable-neutraldensity"><strong>neutralDensity</strong></a>  <br></td>
+<td style="text-align: right;">namespace</td>
+<td style="text-align: left;"><a href="../namespaceernie/"><strong>ernie</strong></a> <br><em>Planetary digital elevation models, as the PDS archives them, and the local heightfields Ernie's</em> <a href="../classernie_1_1Terrain/"><em><strong>Terrain</strong></em></a> <em>draws of them.</em></td>
 </tr>
 </tbody>
 </table>
-<h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
-<h3 id="variable-effectivenm">variable effectiveNm</h3>
-<pre><code class="language-C++">double ernie::MastcamZ::Filter::effectiveNm;
-</code></pre>
-<hr>
-
-<h3 id="variable-hwhmnm">variable hwhmNm</h3>
-<pre><code class="language-C++">double ernie::MastcamZ::Filter::hwhmNm;
-</code></pre>
-<hr>
-
-<h3 id="variable-neutraldensity">variable neutralDensity</h3>
-<pre><code class="language-C++">double ernie::MastcamZ::Filter::neutralDensity;
-</code></pre>
-<hr>
-
+<h2 id="classes">Classes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1CylindricalDem/"><strong>CylindricalDem</strong></a> <br><em>A planet's radius on a simple cylindrical (equirectangular) grid, as LOLA's LDEM products hold it:</em> <code>heights</code> <em>(metres above</em><code>referenceRadius</code> <em>) row by row from the northern, each row from the western sample eastwards,</em><code>pixelsPerDegree</code> <em>both ways.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1LocalTerrain/"><strong>LocalTerrain</strong></a> <br><em>A heightfield of a DEM about one point, in a local frame there: x east, y north and z up, its origin on the reference sphere at the point.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1Pds3Label/"><strong>Pds3Label</strong></a> <br><em>A PDS3 label's keywords, by name; a keyword inside an OBJECT prefixed with the object's name and a dot (</em> <code>IMAGE.LINES</code> <em>).</em></td>
+</tr>
+</tbody>
+</table>
 <hr />
-<p>The documentation for this class was generated from the following file <code>ernie/scene/instruments.h</code></p>
+<p>The documentation for this class was generated from the following file <code>ernie/scene/dem.h</code></p>
               
             </div>
           </div><footer>

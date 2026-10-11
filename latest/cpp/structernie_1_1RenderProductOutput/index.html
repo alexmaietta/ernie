@@ -201,7 +201,7 @@
               
                 <h1 id="struct-ernierenderproductoutput">Struct ernie::RenderProductOutput</h1>
 <p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>RenderProductOutput</strong></a></p>
-<p><em>The outputs of one render product in a step: its render vars by name.</em> </p>
+<p><em>The outputs of one render product in a step: its render vars by name, and the span of the sensor clock its frame covers, seconds (</em> <code>RenderDelegate::Time</code> <em>), as ovrtx's frame start and end times.</em></p>
 <ul>
 <li><code>#include &lt;ernie/session/outputs.h&gt;</code></li>
 </ul>
@@ -219,6 +219,14 @@
 <td style="text-align: left;"><a href="#variable-product"><strong>product</strong></a>  <br></td>
 </tr>
 <tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-starttime"><strong>startTime</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-time"><strong>time</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::map&lt; std::string, <a href="../classernie_1_1RenderVarOutput/"><strong>RenderVarOutput</strong></a> &gt;</td>
 <td style="text-align: left;"><a href="#variable-vars"><strong>vars</strong></a>  <br></td>
 </tr>
@@ -227,6 +235,16 @@
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
 <h3 id="variable-product">variable product</h3>
 <pre><code class="language-C++">Path ernie::RenderProductOutput::product;
+</code></pre>
+<hr>
+
+<h3 id="variable-starttime">variable startTime</h3>
+<pre><code class="language-C++">double ernie::RenderProductOutput::startTime;
+</code></pre>
+<hr>
+
+<h3 id="variable-time">variable time</h3>
+<pre><code class="language-C++">double ernie::RenderProductOutput::time;
 </code></pre>
 <hr>
 

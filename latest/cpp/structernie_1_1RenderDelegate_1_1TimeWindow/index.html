@@ -3,9 +3,9 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1MastcamZ/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1RenderDelegate_1_1TimeWindow/" />
       <link rel="shortcut icon" href="../../img/favicon.ico" />
-    <title>Struct ernie::MastcamZ - Ernie</title>
+    <title>Struct ernie::RenderDelegate::TimeWindow - Ernie</title>
     <link rel="stylesheet" href="../../css/theme.css" />
     <link rel="stylesheet" href="../../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -15,9 +15,9 @@
     
       <script>
         // Current page data
-        var mkdocs_page_name = "Struct ernie::MastcamZ";
-        var mkdocs_page_input_path = "cpp/structernie_1_1MastcamZ.md";
-        var mkdocs_page_url = "/ernie/latest/cpp/structernie_1_1MastcamZ/";
+        var mkdocs_page_name = "Struct ernie::RenderDelegate::TimeWindow";
+        var mkdocs_page_input_path = "cpp/structernie_1_1RenderDelegate_1_1TimeWindow.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/structernie_1_1RenderDelegate_1_1TimeWindow/";
       </script>
     
     <!--[if lt IE 9]>
@@ -189,9 +189,9 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">Struct ernie::MastcamZ</li>
+      <li class="breadcrumb-item active">Struct ernie::RenderDelegate::TimeWindow</li>
     <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/structernie_1_1MastcamZ.md">Edit on alexmaietta/ernie</a>
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/structernie_1_1RenderDelegate_1_1TimeWindow.md">Edit on alexmaietta/ernie</a>
     </li>
   </ul>
   <hr/>
@@ -199,12 +199,13 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="struct-erniemastcamz">Struct ernie::MastcamZ</h1>
-<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>MastcamZ</strong></a></p>
+                <h1 id="struct-ernierenderdelegatetimewindow">Struct ernie::RenderDelegate::TimeWindow</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../classernie_1_1RenderDelegate/"><strong>RenderDelegate</strong></a> <strong>&gt;</strong> <a href="./"><strong>TimeWindow</strong></a></p>
+<p><em>The span of the clock the next frame covers, from the last frame's end to now, which the frame after starts from.</em> </p>
 <ul>
-<li><code>#include &lt;ernie/scene/instruments.h&gt;</code></li>
+<li><code>#include &lt;ernie/session/delegate.h&gt;</code></li>
 </ul>
-<h2 id="classes">Classes</h2>
+<h2 id="public-attributes">Public Attributes</h2>
 <table>
 <thead>
 <tr>
@@ -214,212 +215,28 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1MastcamZ_1_1Filter/"><strong>Filter</strong></a> <br><em>A filter's Table 3 effective wavelength and half width at half maximum, nm (for filter 0, the green Bayer channel's), and its neutral density (filter 7's; 0 otherwise).</em></td>
-</tr>
-</tbody>
-</table>
-<h2 id="public-static-attributes">Public Static Attributes</h2>
-<table>
-<thead>
-<tr>
-<th style="text-align: right;">Type</th>
-<th style="text-align: left;">Name</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: right;">constexpr int</td>
-<td style="text-align: left;"><a href="#variable-kadcbits"><strong>kAdcBits</strong></a>   = <code>11</code><br></td>
-</tr>
-<tr>
-<td style="text-align: right;">constexpr double</td>
-<td style="text-align: left;"><a href="#variable-kbaselinem"><strong>kBaselineM</strong></a>   = <code>0.244</code><br></td>
-</tr>
-<tr>
-<td style="text-align: right;">constexpr double</td>
-<td style="text-align: left;"><a href="#variable-kelectronsperdn"><strong>kElectronsPerDn</strong></a>   = <code>15.6</code><br></td>
-</tr>
-<tr>
-<td style="text-align: right;">constexpr std::uint32_t</td>
-<td style="text-align: left;"><a href="#variable-kheight"><strong>kHeight</strong></a>   = <code>1200</code><br></td>
-</tr>
-<tr>
-<td style="text-align: right;">constexpr double</td>
-<td style="text-align: left;"><a href="#variable-klongestfocalmm"><strong>kLongestFocalMm</strong></a>   = <code>110.0</code><br></td>
-</tr>
-<tr>
-<td style="text-align: right;">constexpr double</td>
-<td style="text-align: left;"><a href="#variable-knarrowestfnumber"><strong>kNarrowestFNumber</strong></a>   = <code>9.5</code><br></td>
-</tr>
-<tr>
-<td style="text-align: right;">constexpr double</td>
-<td style="text-align: left;"><a href="#variable-kpeakqe"><strong>kPeakQe</strong></a>   = <code>0.40</code><br><em>The detector's peak quantum efficiency through its Bayer microlenses, ~40%.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">constexpr double</td>
-<td style="text-align: left;"><a href="#variable-kpixelpitchum"><strong>kPixelPitchUm</strong></a>   = <code>7.4</code><br></td>
-</tr>
-<tr>
-<td style="text-align: right;">constexpr double</td>
-<td style="text-align: left;"><a href="#variable-kshortestfocalmm"><strong>kShortestFocalMm</strong></a>   = <code>26.0</code><br><em>Zoom: 26 mm at f/6.7 to 110 mm at f/9.5.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">constexpr double</td>
-<td style="text-align: left;"><a href="#variable-ktoeindeg"><strong>kToeInDeg</strong></a>   = <code>/* multi line expression */</code><br><em>Each camera's, 2.3 degrees between them.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">constexpr double</td>
-<td style="text-align: left;"><a href="#variable-kwidestfnumber"><strong>kWidestFNumber</strong></a>   = <code>6.7</code><br></td>
-</tr>
-<tr>
-<td style="text-align: right;">constexpr std::uint32_t</td>
-<td style="text-align: left;"><a href="#variable-kwidth"><strong>kWidth</strong></a>   = <code>1600</code><br><em>The KAI-2020CM's 1600 x 1200 photoactive pixels of 7.4 um.</em></td>
-</tr>
-</tbody>
-</table>
-<h2 id="public-static-functions">Public Static Functions</h2>
-<table>
-<thead>
-<tr>
-<th style="text-align: right;">Type</th>
-<th style="text-align: left;">Name</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: right;">std::array&lt; <a href="../structernie_1_1MastcamZ_1_1Filter/"><strong>Filter</strong></a>, 3 &gt;</td>
-<td style="text-align: left;"><a href="#function-bayerof"><strong>BayerOf</strong></a> (<a href="../namespaceernie/#enum-mastcamzeye"><strong>MastcamZEye</strong></a> eye) <br><a href="../structernie_1_1MastcamZ_1_1Filter/"><em><strong>Filter</strong></em></a> <em>0's red, green and blue Bayer channels (Table 3).</em></td>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-end"><strong>end</strong></a>   = <code>0.0</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#function-fnumberat"><strong>FNumberAt</strong></a> (double focalLengthMm) <br><em>The f-number at focal length</em> <code>focalLengthMm</code> <em>, linearly between the zoom's ends (the paper gives only those).</em></td>
-</tr>
-<tr>
-<td style="text-align: right;"><a href="../structernie_1_1MastcamZ_1_1Filter/"><strong>Filter</strong></a></td>
-<td style="text-align: left;"><a href="#function-filterof"><strong>FilterOf</strong></a> (<a href="../namespaceernie/#enum-mastcamzeye"><strong>MastcamZEye</strong></a> eye, int filter) <br></td>
-</tr>
-<tr>
-<td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#function-fullwellelectrons"><strong>FullWellElectrons</strong></a> (<a href="../namespaceernie/#enum-mastcamzeye"><strong>MastcamZEye</strong></a> eye) <br><em>21826 (left), 21818 (right).</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#function-readnoiseelectrons"><strong>ReadNoiseElectrons</strong></a> (<a href="../namespaceernie/#enum-mastcamzeye"><strong>MastcamZEye</strong></a> eye) <br><em>22 (left), 21 (right).</em></td>
+<td style="text-align: left;"><a href="#variable-start"><strong>start</strong></a>   = <code>0.0</code><br></td>
 </tr>
 </tbody>
 </table>
-<h2 id="public-static-attributes-documentation">Public Static Attributes Documentation</h2>
-<h3 id="variable-kadcbits">variable kAdcBits</h3>
-<pre><code class="language-C++">constexpr int ernie::MastcamZ::kAdcBits;
+<h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-end">variable end</h3>
+<pre><code class="language-C++">double ernie::RenderDelegate::TimeWindow::end;
 </code></pre>
 <hr>
 
-<h3 id="variable-kbaselinem">variable kBaselineM</h3>
-<pre><code class="language-C++">constexpr double ernie::MastcamZ::kBaselineM;
-</code></pre>
-<hr>
-
-<h3 id="variable-kelectronsperdn">variable kElectronsPerDn</h3>
-<pre><code class="language-C++">constexpr double ernie::MastcamZ::kElectronsPerDn;
-</code></pre>
-<hr>
-
-<h3 id="variable-kheight">variable kHeight</h3>
-<pre><code class="language-C++">constexpr std::uint32_t ernie::MastcamZ::kHeight;
-</code></pre>
-<hr>
-
-<h3 id="variable-klongestfocalmm">variable kLongestFocalMm</h3>
-<pre><code class="language-C++">constexpr double ernie::MastcamZ::kLongestFocalMm;
-</code></pre>
-<hr>
-
-<h3 id="variable-knarrowestfnumber">variable kNarrowestFNumber</h3>
-<pre><code class="language-C++">constexpr double ernie::MastcamZ::kNarrowestFNumber;
-</code></pre>
-<hr>
-
-<h3 id="variable-kpeakqe">variable kPeakQe</h3>
-<p><em>The detector's peak quantum efficiency through its Bayer microlenses, ~40%.</em> </p>
-<pre><code class="language-C++">constexpr double ernie::MastcamZ::kPeakQe;
-</code></pre>
-<hr>
-
-<h3 id="variable-kpixelpitchum">variable kPixelPitchUm</h3>
-<pre><code class="language-C++">constexpr double ernie::MastcamZ::kPixelPitchUm;
-</code></pre>
-<hr>
-
-<h3 id="variable-kshortestfocalmm">variable kShortestFocalMm</h3>
-<p><em>Zoom: 26 mm at f/6.7 to 110 mm at f/9.5.</em> </p>
-<pre><code class="language-C++">constexpr double ernie::MastcamZ::kShortestFocalMm;
-</code></pre>
-<hr>
-
-<h3 id="variable-ktoeindeg">variable kToeInDeg</h3>
-<p><em>Each camera's, 2.3 degrees between them.</em> </p>
-<pre><code class="language-C++">constexpr double ernie::MastcamZ::kToeInDeg;
-</code></pre>
-<hr>
-
-<h3 id="variable-kwidestfnumber">variable kWidestFNumber</h3>
-<pre><code class="language-C++">constexpr double ernie::MastcamZ::kWidestFNumber;
-</code></pre>
-<hr>
-
-<h3 id="variable-kwidth">variable kWidth</h3>
-<p><em>The KAI-2020CM's 1600 x 1200 photoactive pixels of 7.4 um.</em> </p>
-<pre><code class="language-C++">constexpr std::uint32_t ernie::MastcamZ::kWidth;
-</code></pre>
-<hr>
-<h2 id="public-static-functions-documentation">Public Static Functions Documentation</h2>
-<h3 id="function-bayerof">function BayerOf</h3>
-<p><a href="../structernie_1_1MastcamZ_1_1Filter/"><em><strong>Filter</strong></em></a> <em>0's red, green and blue Bayer channels (Table 3).</em></p>
-<pre><code class="language-C++">static std::array&lt; Filter , 3 &gt; ernie::MastcamZ::BayerOf (
-    MastcamZEye eye
-) 
-</code></pre>
-<hr>
-
-<h3 id="function-fnumberat">function FNumberAt</h3>
-<p><em>The f-number at focal length</em> <code>focalLengthMm</code> <em>, linearly between the zoom's ends (the paper gives only those).</em></p>
-<pre><code class="language-C++">static double ernie::MastcamZ::FNumberAt (
-    double focalLengthMm
-) 
-</code></pre>
-<hr>
-
-<h3 id="function-filterof">function FilterOf</h3>
-<pre><code class="language-C++">static Filter ernie::MastcamZ::FilterOf (
-    MastcamZEye eye,
-    int filter
-) 
-</code></pre>
-<p><strong>Exception:</strong></p>
-<ul>
-<li><code>std::invalid_argument</code> for a filter outside 0 to 7. </li>
-</ul>
-<hr>
-
-<h3 id="function-fullwellelectrons">function FullWellElectrons</h3>
-<p><em>21826 (left), 21818 (right).</em> </p>
-<pre><code class="language-C++">static double ernie::MastcamZ::FullWellElectrons (
-    MastcamZEye eye
-) 
-</code></pre>
-<hr>
-
-<h3 id="function-readnoiseelectrons">function ReadNoiseElectrons</h3>
-<p><em>22 (left), 21 (right).</em> </p>
-<pre><code class="language-C++">static double ernie::MastcamZ::ReadNoiseElectrons (
-    MastcamZEye eye
-) 
+<h3 id="variable-start">variable start</h3>
+<pre><code class="language-C++">double ernie::RenderDelegate::TimeWindow::start;
 </code></pre>
 <hr>
 
 <hr />
-<p>The documentation for this class was generated from the following file <code>ernie/scene/instruments.h</code></p>
+<p>The documentation for this class was generated from the following file <code>ernie/session/delegate.h</code></p>
               
             </div>
           </div><footer>

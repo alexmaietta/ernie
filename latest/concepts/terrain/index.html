@@ -77,6 +77,8 @@
                   </li>
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">Terrain and planets</a>
     <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#colouring">Colouring</a>
+    </li>
     </ul>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../star-fields/">Star fields</a>
@@ -203,6 +205,37 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="terrain-and-planets">Terrain and planets</h1>
+<h2 id="colouring">Colouring</h2>
+<p>A Terrain's <code>ernie:colorMode</code> (Python <code>color_mode</code>) sets how it is coloured:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>What it draws</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>shaded</code> (default)</td>
+<td>The bound material, lit by the scene's lights: the physical image, for sensors.</td>
+</tr>
+<tr>
+<td><code>colormap</code></td>
+<td>A height ramp from blue lows to white highs, unlit.</td>
+</tr>
+<tr>
+<td><code>shadedColormap</code></td>
+<td>The height ramp times the material, lit.</td>
+</tr>
+<tr>
+<td><code>hillshade</code></td>
+<td>A GIS hillshade: grey and unlit, the cosine of the angle between the terrain's normal and a fixed light at <code>ernie:hillshade:azimuth</code> (degrees clockwise from north, default 315) and <code>ernie:hillshade:altitude</code> (degrees above the horizon, default 45), whatever the scene's lights.</td>
+</tr>
+</tbody>
+</table>
+<p>The ramps and the hillshade are for showing heights; only <code>shaded</code> gives radiances a camera would see. On a planet (a Terrain with <code>ernie:planetRadius</code>), north is towards +z and the hillshade's light is in each point's own east, north and up.</p>
+<pre><code class="language-python">scene.define(&quot;/World/Terrain&quot;, ernie.Terrain, heights=heights, color_mode=tokens.HILLSHADE, hillshade_azimuth=315.0)
+</code></pre>
               
             </div>
           </div><footer>

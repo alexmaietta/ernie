@@ -205,6 +205,21 @@
 <ul>
 <li><code>#include &lt;ernie/util/atmosphere.h&gt;</code></li>
 </ul>
+<h2 id="classes">Classes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1BandedAtmosphere_1_1Refraction/"><strong>Refraction</strong></a> <br><em>A refracted ray traced from radius</em> <code>r</code> <em>(m) at the apparent zenith cosine</em><code>mu</code> <em>out of the atmosphere, through its spherically layered refractive index (</em><code>RefractiveIndex</code> <em>), by the ray equation d(n t)/ds = grad n with steps of at most</em><code>step</code> <em>m.</em></td>
+</tr>
+</tbody>
+</table>
 <h2 id="public-attributes">Public Attributes</h2>
 <table>
 <thead>
@@ -250,6 +265,14 @@
 <td style="text-align: left;"><a href="#function-extinction"><strong>Extinction</strong></a> (double altitude, int band) const<br><em>The extinction coefficient (m^-1) of band</em> <code>band</code> <em>at</em><code>altitude</code> <em>.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="../structernie_1_1BandedAtmosphere_1_1Refraction/"><strong>Refraction</strong></a></td>
+<td style="text-align: left;"><a href="#function-refract"><strong>Refract</strong></a> (double r, double mu, int band, double step=100.0) const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-refractiveindex"><strong>RefractiveIndex</strong></a> (double altitude, int band) const<br><em>The refractive index of band</em> <code>band</code> <em>at</em><code>altitude</code> <em>: 1 plus each constituent's refractivity times its density.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">double</td>
 <td style="text-align: left;"><a href="#function-transmittancetotop"><strong>TransmittanceToTop</strong></a> (double r, double mu, int band, int steps=4000) const<br><em>The transmittance of band</em> <code>band</code> <em>from radius</em><code>r</code> <em>(m) along a ray at cosine</em><code>mu</code> <em>from the zenith to the top of the atmosphere, by the midpoint rule over</em><code>steps</code> <em>steps; the reference the renderer's transmittance table is tested against.</em></td>
 </tr>
@@ -284,6 +307,25 @@
 <h3 id="function-extinction">function Extinction</h3>
 <p><em>The extinction coefficient (m^-1) of band</em> <code>band</code> <em>at</em><code>altitude</code> <em>.</em></p>
 <pre><code class="language-C++">double ernie::BandedAtmosphere::Extinction (
+    double altitude,
+    int band
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-refract">function Refract</h3>
+<pre><code class="language-C++">Refraction ernie::BandedAtmosphere::Refract (
+    double r,
+    double mu,
+    int band,
+    double step=100.0
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-refractiveindex">function RefractiveIndex</h3>
+<p><em>The refractive index of band</em> <code>band</code> <em>at</em><code>altitude</code> <em>: 1 plus each constituent's refractivity times its density.</em></p>
+<pre><code class="language-C++">double ernie::BandedAtmosphere::RefractiveIndex (
     double altitude,
     int band
 ) const

@@ -237,7 +237,11 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
-<td style="text-align: left;"><a href="#variable-kambient"><strong>kAmbient</strong></a>   = <code>/* multi line expression */</code><br><em>float fraction of sunlight.</em></td>
+<td style="text-align: left;"><a href="#variable-kambient"><strong>kAmbient</strong></a>   = <code>"ernie:ambient"</code><br><em>float luminance (cd/m^2) of the scene's ambient light: white, uniformly from all around, besides the lights.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kambientcolor"><strong>kAmbientColor</strong></a>   = <code>/* multi line expression */</code><br><em>float3 linear RGB of the ambient light (its luminance</em> <code>kAmbient</code> <em>'s).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -349,7 +353,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
-<td style="text-align: left;"><a href="#variable-kcolormode"><strong>kColorMode</strong></a>   = <code>"ernie:colorMode"</code><br></td>
+<td style="text-align: left;"><a href="#variable-kcolormode"><strong>kColorMode</strong></a>   = <code>"ernie:colorMode"</code><br><em>token, on a</em> <a href="../classernie_1_1Terrain/"><em><strong>Terrain</strong></em></a> <em>: how it is coloured, "shaded" (its material, lit; the default), "colormap" (a height ramp, unlit), "shadedColormap" (the ramp times the material, lit) or "hillshade".</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -394,6 +398,10 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kcylinderlight"><strong>kCylinderLight</strong></a>   = <code>"CylinderLight"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kdefaultprim"><strong>kDefaultPrim</strong></a>   = <code>"defaultPrim"</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -469,6 +477,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kdots"><strong>kDots</strong></a>   = <code>"dots"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kearth"><strong>kEarth</strong></a>   = <code>"earth"</code><br></td>
 </tr>
 <tr>
@@ -478,6 +490,10 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kenablecolortemperature"><strong>kEnableColorTemperature</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kendtimecode"><strong>kEndTimeCode</strong></a>   = <code>"endTimeCode"</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -569,6 +585,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kframespersecond"><strong>kFramesPerSecond</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kgaussian"><strong>kGaussian</strong></a>   = <code>"gaussian"</code><br></td>
 </tr>
 <tr>
@@ -625,7 +645,15 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
-<td style="text-align: left;"><a href="#variable-khillshade"><strong>kHillshade</strong></a>   = <code>"hillshade"</code><br></td>
+<td style="text-align: left;"><a href="#variable-khillshade"><strong>kHillshade</strong></a>   = <code>"hillshade"</code><br><em>A GIS hillshade, grey and unlit: the cosine of the angle between the terrain's normal and a fixed light at</em> <code>ernie:hillshade:azimuth</code> <em>(degrees clockwise from north) and</em><code>ernie:hillshade:altitude</code> <em>(degrees above the horizon).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-khillshadealtitude"><strong>kHillshadeAltitude</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-khillshadeazimuth"><strong>kHillshadeAzimuth</strong></a>   = <code>/* multi line expression */</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -681,11 +709,39 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kkilogramsperunit"><strong>kKilogramsPerUnit</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-klaserapertureradius"><strong>kLaserApertureRadius</strong></a>   = <code>/* multi line expression */</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-klaserbeamquality"><strong>kLaserBeamQuality</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klaserdotcolumns"><strong>kLaserDotColumns</strong></a>   = <code>/* multi line expression */</code><br><em>"dots": dots per tile along x and y, one in each cell of a grid, jittered by up to</em> <code>dotJitter</code> <em>of a cell from its centre; tiles of the same dots along x and y; the seed the dots derive from.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klaserdotjitter"><strong>kLaserDotJitter</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klaserdotrows"><strong>kLaserDotRows</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klaserdotseed"><strong>kLaserDotSeed</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klaserdottilecolumns"><strong>kLaserDotTileColumns</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klaserdottilerows"><strong>kLaserDotTileRows</strong></a>   = <code>/* multi line expression */</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -721,7 +777,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
-<td style="text-align: left;"><a href="#variable-klaserpattern"><strong>kLaserPattern</strong></a>   = <code>/* multi line expression */</code><br><em>A laser's pattern: "spot" (its beam), "line" (fanned over</em> <code>fanAngle</code> <em>degrees along its x axis, its profile along the line "flat" as a Powell lens gives or "gaussian" as a cylindrical lens does, the beam's across it), "grid" (</em><code>gridColumns</code> <em>x</em><code>gridRows</code> <em>beamlets</em><code>gridPitch</code> <em>degrees apart along x and y, as a diffractive element splits it), "image" (</em><code>pattern:image</code> <em>over</em><code>pattern:fieldOfView</code> <em>, as a projector shows it) or a registered custom pattern (</em><code>LightPatternModel</code> <em>).</em></td>
+<td style="text-align: left;"><a href="#variable-klaserpattern"><strong>kLaserPattern</strong></a>   = <code>/* multi line expression */</code><br><em>A laser's pattern: "spot" (its beam), "line" (fanned over</em> <code>fanAngle</code> <em>degrees along its x axis, its profile along the line "flat" as a Powell lens gives or "gaussian" as a cylindrical lens does, the beam's across it), "grid" (</em><code>gridColumns</code> <em>x</em><code>gridRows</code> <em>beamlets</em><code>gridPitch</code> <em>degrees apart along x and y, as a diffractive element splits it), "dots" (a seeded field of</em><code>dotColumns</code> <em>x</em><code>dotRows</code> <em>dots per tile,</em><code>dotTileColumns</code> <em>x</em><code>dotTileRows</code> <em>tiles of the same dots over</em><code>pattern:fieldOfView</code> <em>, as a depth camera's projector makes), "image" (</em><code>pattern:image</code> <em>over</em><code>pattern:fieldOfView</code> <em>, as a projector shows it) or a registered custom pattern (</em><code>LightPatternModel</code> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -882,6 +938,10 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kmeter"><strong>kMeter</strong></a>   = <code>"ernie:meter"</code><br><em>bool: measure each frame's scene luminance (its histogram) for automatic exposure and exposure meters, read back from a later frame (</em> <code>RenderDelegate::MeteredLuminance</code> <em>); default off.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kmetersperunit"><strong>kMetersPerUnit</strong></a>   = <code>"metersPerUnit"</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -1217,6 +1277,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kshaded"><strong>kShaded</strong></a>   = <code>"shaded"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kshadedcolormap"><strong>kShadedColormap</strong></a>   = <code>"shadedColormap"</code><br></td>
 </tr>
 <tr>
@@ -1341,7 +1405,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
-<td style="text-align: left;"><a href="#variable-ksourcename"><strong>kSourceName</strong></a>   = <code>/* multi line expression */</code><br><a href="../classernie_1_1RenderVar/"><em><strong>RenderVar</strong></em></a> <em>name, e.g. "LdrColor".</em></td>
+<td style="text-align: left;"><a href="#variable-ksourcename"><strong>kSourceName</strong></a>   = <code>/* multi line expression */</code><br><a href="../classernie_1_1RenderVar/"><em><strong>RenderVar</strong></em></a> <em>name, e.g.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -1409,6 +1473,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kstarttimecode"><strong>kStartTimeCode</strong></a>   = <code>"startTimeCode"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-ksun"><strong>kSun</strong></a>   = <code>"sun"</code><br><em>The Sun above the atmosphere, measured (</em> <code>SolarSpectralIrradiance</code> <em>, the TSIS-1 Hybrid Solar Reference</em><a href="../classernie_1_1Spectrum/"><em><strong>Spectrum</strong></em></a> <em>) over its whole range.</em></td>
 </tr>
 <tr>
@@ -1426,6 +1494,14 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-ktextureddiffuse"><strong>kTexturedDiffuse</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-ktimecode"><strong>kTimeCode</strong></a>   = <code>"ernie:timeCode"</code><br><em>double: the time code the scene's animation is at (Ernie), as ovstage's</em> <code>apply_usd_time</code> <em>sets it: apart from a render delegate's sensor clock (</em><code>RenderDelegate::Time</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-ktimecodespersecond"><strong>kTimeCodesPerSecond</strong></a>   = <code>/* multi line expression */</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -1450,6 +1526,10 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-ktwopass"><strong>kTwoPass</strong></a>   = <code>"twoPass"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kupaxis"><strong>kUpAxis</strong></a>   = <code>"upAxis"</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -1559,6 +1639,14 @@
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kxyzw"><strong>kXyzw</strong></a>   = <code>"xyzw"</code><br></td>
 </tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-ky"><strong>kY</strong></a>   = <code>"Y"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kz"><strong>kZ</strong></a>   = <code>"Z"</code><br></td>
+</tr>
 </tbody>
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
@@ -1600,8 +1688,14 @@
 <hr>
 
 <h3 id="variable-kambient">variable kAmbient</h3>
-<p><em>float fraction of sunlight.</em> </p>
+<p><em>float luminance (cd/m^2) of the scene's ambient light: white, uniformly from all around, besides the lights.</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kAmbient;
+</code></pre>
+<hr>
+
+<h3 id="variable-kambientcolor">variable kAmbientColor</h3>
+<p><em>float3 linear RGB of the ambient light (its luminance</em> <code>kAmbient</code> <em>'s).</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kAmbientColor;
 </code></pre>
 <hr>
 
@@ -1760,6 +1854,7 @@
 <hr>
 
 <h3 id="variable-kcolormode">variable kColorMode</h3>
+<p><em>token, on a</em> <a href="../classernie_1_1Terrain/"><em><strong>Terrain</strong></em></a> <em>: how it is coloured, "shaded" (its material, lit; the default), "colormap" (a height ramp, unlit), "shadedColormap" (the ramp times the material, lit) or "hillshade".</em></p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kColorMode;
 </code></pre>
 <hr>
@@ -1818,6 +1913,11 @@
 
 <h3 id="variable-kcylinderlight">variable kCylinderLight</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kCylinderLight;
+</code></pre>
+<hr>
+
+<h3 id="variable-kdefaultprim">variable kDefaultPrim</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kDefaultPrim;
 </code></pre>
 <hr>
 
@@ -1914,6 +2014,11 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-kdots">variable kDots</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kDots;
+</code></pre>
+<hr>
+
 <h3 id="variable-kearth">variable kEarth</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kEarth;
 </code></pre>
@@ -1927,6 +2032,11 @@
 
 <h3 id="variable-kenablecolortemperature">variable kEnableColorTemperature</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kEnableColorTemperature;
+</code></pre>
+<hr>
+
+<h3 id="variable-kendtimecode">variable kEndTimeCode</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kEndTimeCode;
 </code></pre>
 <hr>
 
@@ -2051,6 +2161,11 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-kframespersecond">variable kFramesPerSecond</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kFramesPerSecond;
+</code></pre>
+<hr>
+
 <h3 id="variable-kgaussian">variable kGaussian</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kGaussian;
 </code></pre>
@@ -2129,7 +2244,18 @@
 <hr>
 
 <h3 id="variable-khillshade">variable kHillshade</h3>
+<p><em>A GIS hillshade, grey and unlit: the cosine of the angle between the terrain's normal and a fixed light at</em> <code>ernie:hillshade:azimuth</code> <em>(degrees clockwise from north) and</em><code>ernie:hillshade:altitude</code> <em>(degrees above the horizon).</em></p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kHillshade;
+</code></pre>
+<hr>
+
+<h3 id="variable-khillshadealtitude">variable kHillshadeAltitude</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kHillshadeAltitude;
+</code></pre>
+<hr>
+
+<h3 id="variable-khillshadeazimuth">variable kHillshadeAzimuth</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kHillshadeAzimuth;
 </code></pre>
 <hr>
 
@@ -2200,6 +2326,11 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-kkilogramsperunit">variable kKilogramsPerUnit</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kKilogramsPerUnit;
+</code></pre>
+<hr>
+
 <h3 id="variable-klaserapertureradius">variable kLaserApertureRadius</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserApertureRadius;
 </code></pre>
@@ -2207,6 +2338,37 @@
 
 <h3 id="variable-klaserbeamquality">variable kLaserBeamQuality</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserBeamQuality;
+</code></pre>
+<hr>
+
+<h3 id="variable-klaserdotcolumns">variable kLaserDotColumns</h3>
+<p><em>"dots": dots per tile along x and y, one in each cell of a grid, jittered by up to</em> <code>dotJitter</code> <em>of a cell from its centre; tiles of the same dots along x and y; the seed the dots derive from.</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserDotColumns;
+</code></pre>
+<hr>
+
+<h3 id="variable-klaserdotjitter">variable kLaserDotJitter</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserDotJitter;
+</code></pre>
+<hr>
+
+<h3 id="variable-klaserdotrows">variable kLaserDotRows</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserDotRows;
+</code></pre>
+<hr>
+
+<h3 id="variable-klaserdotseed">variable kLaserDotSeed</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserDotSeed;
+</code></pre>
+<hr>
+
+<h3 id="variable-klaserdottilecolumns">variable kLaserDotTileColumns</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserDotTileColumns;
+</code></pre>
+<hr>
+
+<h3 id="variable-klaserdottilerows">variable kLaserDotTileRows</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserDotTileRows;
 </code></pre>
 <hr>
 
@@ -2251,7 +2413,7 @@
 <hr>
 
 <h3 id="variable-klaserpattern">variable kLaserPattern</h3>
-<p><em>A laser's pattern: "spot" (its beam), "line" (fanned over</em> <code>fanAngle</code> <em>degrees along its x axis, its profile along the line "flat" as a Powell lens gives or "gaussian" as a cylindrical lens does, the beam's across it), "grid" (</em><code>gridColumns</code> <em>x</em><code>gridRows</code> <em>beamlets</em><code>gridPitch</code> <em>degrees apart along x and y, as a diffractive element splits it), "image" (</em><code>pattern:image</code> <em>over</em><code>pattern:fieldOfView</code> <em>, as a projector shows it) or a registered custom pattern (</em><code>LightPatternModel</code> <em>).</em></p>
+<p><em>A laser's pattern: "spot" (its beam), "line" (fanned over</em> <code>fanAngle</code> <em>degrees along its x axis, its profile along the line "flat" as a Powell lens gives or "gaussian" as a cylindrical lens does, the beam's across it), "grid" (</em><code>gridColumns</code> <em>x</em><code>gridRows</code> <em>beamlets</em><code>gridPitch</code> <em>degrees apart along x and y, as a diffractive element splits it), "dots" (a seeded field of</em><code>dotColumns</code> <em>x</em><code>dotRows</code> <em>dots per tile,</em><code>dotTileColumns</code> <em>x</em><code>dotTileRows</code> <em>tiles of the same dots over</em><code>pattern:fieldOfView</code> <em>, as a depth camera's projector makes), "image" (</em><code>pattern:image</code> <em>over</em><code>pattern:fieldOfView</code> <em>, as a projector shows it) or a registered custom pattern (</em><code>LightPatternModel</code> <em>).</em></p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserPattern;
 </code></pre>
 <p><code>efficiency</code> of the power goes into the pattern and <code>zeroOrder</code> stays in an undiffracted beam along the axis; the rest is lost. </p>
@@ -2376,7 +2538,7 @@
 <p><em>Physical sunlight (Ernie): total irradiance at normal incidence in W/m^2, and a spectrum of (wavelength nm, W m^-2 nm^-1) pairs.</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLightIrradiance;
 </code></pre>
-<p>Either one makes the light physical; without a spectrum it is a black body (the colour temperature when enabled, else the Sun's 5772 K) and without an irradiance a black body carries the solar constant, 1361 W/m^2. </p>
+<p>Either one makes the light physical; without a spectrum it has its <code>physical:illuminant</code>'s shape, else is a black body (the colour temperature when enabled, else the Sun's 5772 K), and without an irradiance a black body carries the solar constant, 1361 W/m^2. </p>
 <hr>
 
 <h3 id="variable-klightpower">variable kLightPower</h3>
@@ -2479,6 +2641,11 @@
 <h3 id="variable-kmeter">variable kMeter</h3>
 <p><em>bool: measure each frame's scene luminance (its histogram) for automatic exposure and exposure meters, read back from a later frame (</em> <code>RenderDelegate::MeteredLuminance</code> <em>); default off.</em></p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kMeter;
+</code></pre>
+<hr>
+
+<h3 id="variable-kmetersperunit">variable kMetersPerUnit</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kMetersPerUnit;
 </code></pre>
 <hr>
 
@@ -2947,6 +3114,11 @@
 <p>Render delegates skip it when falling back to the scene's first <a href="../classernie_1_1RenderSettings/"><strong>RenderSettings</strong></a> or <a href="../classernie_1_1Camera/"><strong>Camera</strong></a> and when gathering the scene's lights. </p>
 <hr>
 
+<h3 id="variable-kshaded">variable kShaded</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kShaded;
+</code></pre>
+<hr>
+
 <h3 id="variable-kshadedcolormap">variable kShadedColormap</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kShadedColormap;
 </code></pre>
@@ -3119,9 +3291,10 @@
 <hr>
 
 <h3 id="variable-ksourcename">variable kSourceName</h3>
-<p><a href="../classernie_1_1RenderVar/"><em><strong>RenderVar</strong></em></a> <em>name, e.g. "LdrColor".</em></p>
+<p><a href="../classernie_1_1RenderVar/"><em><strong>RenderVar</strong></em></a> <em>name, e.g.</em></p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kSourceName;
 </code></pre>
+<p>"LdrColor". </p>
 <hr>
 
 <h3 id="variable-kspectralbands">variable kSpectralBands</h3>
@@ -3216,6 +3389,11 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-kstarttimecode">variable kStartTimeCode</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kStartTimeCode;
+</code></pre>
+<hr>
+
 <h3 id="variable-ksun">variable kSun</h3>
 <p><em>The Sun above the atmosphere, measured (</em> <code>SolarSpectralIrradiance</code> <em>, the TSIS-1 Hybrid Solar Reference</em><a href="../classernie_1_1Spectrum/"><em><strong>Spectrum</strong></em></a> <em>) over its whole range.</em></p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kSun;
@@ -3239,6 +3417,17 @@
 
 <h3 id="variable-ktextureddiffuse">variable kTexturedDiffuse</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kTexturedDiffuse;
+</code></pre>
+<hr>
+
+<h3 id="variable-ktimecode">variable kTimeCode</h3>
+<p><em>double: the time code the scene's animation is at (Ernie), as ovstage's</em> <code>apply_usd_time</code> <em>sets it: apart from a render delegate's sensor clock (</em><code>RenderDelegate::Time</code> <em>).</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kTimeCode;
+</code></pre>
+<hr>
+
+<h3 id="variable-ktimecodespersecond">variable kTimeCodesPerSecond</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kTimeCodesPerSecond;
 </code></pre>
 <hr>
 
@@ -3272,6 +3461,11 @@
 
 <h3 id="variable-ktwopass">variable kTwoPass</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kTwoPass;
+</code></pre>
+<hr>
+
+<h3 id="variable-kupaxis">variable kUpAxis</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kUpAxis;
 </code></pre>
 <hr>
 
@@ -3424,6 +3618,16 @@
 
 <h3 id="variable-kxyzw">variable kXyzw</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kXyzw;
+</code></pre>
+<hr>
+
+<h3 id="variable-ky">variable kY</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kY;
+</code></pre>
+<hr>
+
+<h3 id="variable-kz">variable kZ</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kZ;
 </code></pre>
 <hr>
 

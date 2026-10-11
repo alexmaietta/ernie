@@ -255,13 +255,16 @@
       (::ernie::AttributeMeta{.doc = &quot;The lights rendered, when set (empty: none); unset, every &quot;  \
                                      &quot;visible light.&quot;,                                             \
                               .group = &quot;Image&quot;}))                                                  \
-    X(std::string, ColorMode, ::ernie::tokens::kColorMode, ::ernie::tokens::kShadedColormap,       \
-      (::ernie::AttributeMeta{.label = &quot;Terrain colour&quot;, .group = &quot;Image&quot;,                         \
-                              .options = {::ernie::tokens::kHillshade, ::ernie::tokens::kColormap, \
-                                          ::ernie::tokens::kShadedColormap}}))                     \
-    X(double, Ambient, ::ernie::tokens::kAmbient, 0.15,                                            \
-      (::ernie::AttributeMeta{.doc = &quot;Fraction of sunlight on unlit sides.&quot;, .group = &quot;Image&quot;,     \
-                              .max = 1.0}))                                                        \
+    X(double, Ambient, ::ernie::tokens::kAmbient, 0.0,                                             \
+      (::ernie::AttributeMeta{.doc = &quot;Luminance (cd/m^2) of light reaching every surface &quot;        \
+                                     &quot;uniformly from all around, besides the lights; 0 none. &quot;     \
+                                     &quot;A DomeLight gives the same, with a map.&quot;,                    \
+                              .group = &quot;Image&quot;, .max = 1e5}))                                      \
+    X(glm::dvec3, AmbientColor, ::ernie::tokens::kAmbientColor, glm::dvec3(1.0),                   \
+      (::ernie::AttributeMeta{.label = &quot;Ambient colour&quot;,                                           \
+                              .doc = &quot;Linear RGB of the ambient light, whose luminance &quot;           \
+                                     &quot;`ernie:ambient` sets whatever the colour's brightness.&quot;,     \
+                              .group = &quot;Image&quot;, .color = true}))                                   \
     X(glm::dvec3, ClearColor, ::ernie::tokens::kClearColor, glm::dvec3(0.0),                       \
       (::ernie::AttributeMeta{.label = &quot;Background&quot;, .doc = &quot;Linear display colour of LdrColor's &quot; \
                                                             &quot;background.&quot;,                         \

@@ -427,6 +427,12 @@ IsdSensor ReadIsd(std::string_view json);
 
 IsdSensor ReadIsdFile(const std::string&amp; path);
 
+class Scene;
+class Path;
+
+void AuthorIsdCamera(Scene&amp; scene, const Path&amp; path,
+                     const CameraParams&amp; camera);
+
 }  // namespace ernie
 </code></pre>
               

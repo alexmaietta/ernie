@@ -3,9 +3,9 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/instruments_8h_source/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/dem_8h_source/" />
       <link rel="shortcut icon" href="../../img/favicon.ico" />
-    <title>File instruments.h - Ernie</title>
+    <title>File dem.h - Ernie</title>
     <link rel="stylesheet" href="../../css/theme.css" />
     <link rel="stylesheet" href="../../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -15,9 +15,9 @@
     
       <script>
         // Current page data
-        var mkdocs_page_name = "File instruments.h";
-        var mkdocs_page_input_path = "cpp/instruments_8h_source.md";
-        var mkdocs_page_url = "/ernie/latest/cpp/instruments_8h_source/";
+        var mkdocs_page_name = "File dem.h";
+        var mkdocs_page_input_path = "cpp/dem_8h_source.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/dem_8h_source/";
       </script>
     
     <!--[if lt IE 9]>
@@ -189,9 +189,9 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">File instruments.h</li>
+      <li class="breadcrumb-item active">File dem.h</li>
     <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/instruments_8h_source.md">Edit on alexmaietta/ernie</a>
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/dem_8h_source.md">Edit on alexmaietta/ernie</a>
     </li>
   </ul>
   <hr/>
@@ -199,156 +199,61 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="file-instrumentsh">File instruments.h</h1>
-<p><a href="../files/"><strong>File List</strong></a> <strong>&gt;</strong> <a href="../dir_057d52706067b881d9371cf136c38c31/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../dir_572d817874f40c61a249f0e7684d4315/"><strong>scene</strong></a> <strong>&gt;</strong> <a href="../instruments_8h/"><strong>instruments.h</strong></a></p>
-<p><a href="../instruments_8h/">Go to the documentation of this file</a></p>
+                <h1 id="file-demh">File dem.h</h1>
+<p><a href="../files/"><strong>File List</strong></a> <strong>&gt;</strong> <a href="../dir_057d52706067b881d9371cf136c38c31/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../dir_572d817874f40c61a249f0e7684d4315/"><strong>scene</strong></a> <strong>&gt;</strong> <a href="../dem_8h/"><strong>dem.h</strong></a></p>
+<p><a href="../dem_8h/">Go to the documentation of this file</a></p>
 <pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-#include &quot;ernie/scene/path.h&quot;
-#include &quot;ernie/scene/scene.h&quot;
+#include &quot;ernie/util/tensor.h&quot;
 
-#include &lt;array&gt;
+#include &lt;glm/glm.hpp&gt;
+
 #include &lt;cstdint&gt;
+#include &lt;map&gt;
+#include &lt;optional&gt;
+#include &lt;string&gt;
+#include &lt;string_view&gt;
+#include &lt;vector&gt;
 
 namespace ernie {
 
-enum class LrocNac {
-    Left,   
-    Right,  
+struct Pds3Label {
+    std::map&lt;std::string, std::string, std::less&lt;&gt;&gt; values;
+
+    std::optional&lt;std::string&gt; Get(std::string_view key) const;
+    double Number(std::string_view key) const;
+    std::string Text(std::string_view key) const;
 };
 
-void AuthorLrocNac(Scene&amp; scene, const Path&amp; camera,
-                   const Path&amp; product,
-                   LrocNac which = LrocNac::Left);
+Pds3Label ParsePds3Label(std::string_view text);
 
-enum class LrocWacBand {
-    Uv320,
-    Uv360,
-    Vis415,
-    Vis565,
-    Vis605,
-    Vis645,  
-    Vis690,
+struct CylindricalDem {
+    std::uint32_t lines = 0;
+    std::uint32_t samples = 0;
+    double pixelsPerDegree = 1.0;
+    double maxLatitudeDeg = 90.0;
+    double westLongitudeDeg = 0.0;
+    double referenceRadius = 0.0;  
+    std::vector&lt;float&gt; heights;
+
+    double HeightAt(double latitudeDeg, double longitudeDeg) const;
 };
 
-struct LrocWacBandSpec {
-    double nameNm;        
-    double effectiveNm;   
-    double fwhmNm;        
-    double responsivity;  
-    double fNumber;
-    double pixelPitchUm;  
-    double EffectiveQe() const;
+CylindricalDem ReadCylindricalDem(const std::string&amp; labelPath);
+
+struct LocalTerrain {
+    Tensor heights;     
+    glm::dvec2 origin;  
+    double cellSize = 1.0;
+    glm::dmat4 bodyToLocal{1.0};
 };
 
-LrocWacBandSpec LrocWacBandOf(LrocWacBand band);
+LocalTerrain LocalTerrainOf(const CylindricalDem&amp; dem,
+                            double latitudeDeg, double longitudeDeg,
+                            std::uint32_t cells, double cellSize);
 
-LrocWacBand LrocWacBandNamed(int nanometres);
-
-void AuthorLrocWac(Scene&amp; scene, const Path&amp; camera,
-                   const Path&amp; product,
-                   LrocWacBand band = LrocWacBand::Vis605);
-
-enum class BayerPattern { Rggb = 0, Bggr = 1, Grbg = 2, Gbrg = 3 };
-
-struct Mars2020Navcam {
-    static constexpr double kFocalLengthMm = 19.1;
-    static constexpr double kFNumber = 12.0;
-    static constexpr double kBestFocusM = 3.5;
-    static constexpr double kBaselineM = 0.424;
-    static constexpr std::uint32_t kWidth = 5120;
-    static constexpr std::uint32_t kHeight = 3840;
-    static constexpr double kPixelPitchUm = 6.4;
-    static constexpr double kFieldOfViewDeg[3] = {96.0, 73.0, 120.0};
-    static constexpr double kElectronsPerDn =
-        1.0 / 0.24;  
-    static constexpr double kDarkNoiseElectrons =
-        8.0;  
-    static constexpr double kFullWellElectrons = 15000.0;
-    static constexpr int kAdcBits = 12;
-
-    static double FisheyeK1();
-};
-
-void AuthorMars2020Navcam(Scene&amp; scene, const Path&amp; camera,
-                          const Path&amp; product,
-                          BayerPattern pattern = BayerPattern::Rggb,
-                          double jpegQuality = 85.0);
-
-void AuthorMars2020NavcamPair(
-    Scene&amp; scene, const Path&amp; rig, const Path&amp; leftProduct,
-    const Path&amp; rightProduct,
-    BayerPattern pattern = BayerPattern::Rggb,
-    double jpegQuality = 85.0);
-
-enum class Mars2020Hazcams { Front, Rear };
-
-struct Mars2020Hazcam {
-    static constexpr double kFocalLengthMm = 14.0;
-    static constexpr double kFNumber = 12.0;
-    static constexpr double kBestFocusM = 0.9;
-    static constexpr double kFrontBaselineM = 0.248;
-    static constexpr double kRearBaselineM = 0.934;
-    static constexpr double kFieldOfViewDeg[3] = {136.0, 102.0,
-                                                  172.0};
-
-    static double FisheyeK1();
-};
-
-void AuthorMars2020Hazcam(Scene&amp; scene, const Path&amp; camera,
-                          const Path&amp; product,
-                          BayerPattern pattern = BayerPattern::Rggb,
-                          double jpegQuality = 85.0);
-
-void AuthorMars2020HazcamPair(
-    Scene&amp; scene, const Path&amp; rig, const Path&amp; leftProduct,
-    const Path&amp; rightProduct,
-    Mars2020Hazcams which = Mars2020Hazcams::Front,
-    BayerPattern pattern = BayerPattern::Rggb,
-    double jpegQuality = 85.0);
-
-enum class MastcamZEye { Left, Right };
-
-struct MastcamZ {
-    static constexpr std::uint32_t kWidth = 1600;
-    static constexpr std::uint32_t kHeight = 1200;
-    static constexpr double kPixelPitchUm = 7.4;
-    static constexpr double kElectronsPerDn = 15.6;
-    static constexpr int kAdcBits = 11;
-    static constexpr double kShortestFocalMm = 26.0;
-    static constexpr double kLongestFocalMm = 110.0;
-    static constexpr double kWidestFNumber = 6.7;
-    static constexpr double kNarrowestFNumber = 9.5;
-    static constexpr double kBaselineM = 0.244;
-    static constexpr double kToeInDeg =
-        1.15;  
-    static constexpr double kPeakQe = 0.40;
-
-    struct Filter {
-        double effectiveNm;
-        double hwhmNm;
-        double neutralDensity;
-    };
-    static Filter FilterOf(MastcamZEye eye, int filter);
-    static std::array&lt;Filter, 3&gt; BayerOf(MastcamZEye eye);
-    static double FNumberAt(double focalLengthMm);
-    static double FullWellElectrons(
-        MastcamZEye eye);  
-    static double
-    ReadNoiseElectrons(MastcamZEye eye);  
-};
-
-void AuthorMastcamZ(Scene&amp; scene, const Path&amp; camera,
-                    const Path&amp; product, MastcamZEye eye, int filter,
-                    double focalLengthMm = MastcamZ::kShortestFocalMm,
-                    BayerPattern pattern = BayerPattern::Rggb);
-
-void AuthorMastcamZPair(
-    Scene&amp; scene, const Path&amp; rig, const Path&amp; leftProduct,
-    const Path&amp; rightProduct, int leftFilter, int rightFilter,
-    double focalLengthMm = MastcamZ::kShortestFocalMm,
-    BayerPattern pattern = BayerPattern::Rggb);
+glm::dvec3 BodyDirection(double latitudeDeg, double longitudeDeg);
 
 }  // namespace ernie
 </code></pre>

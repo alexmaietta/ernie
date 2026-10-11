@@ -215,7 +215,7 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: right;">float</td>
+<td style="text-align: right;">double</td>
 <td style="text-align: left;"><a href="#variable-distance"><strong>distance</strong></a>   = <code>/* multi line expression */</code><br><em>World units from the eye to the target.</em></td>
 </tr>
 <tr>
@@ -223,8 +223,8 @@
 <td style="text-align: left;"><a href="#variable-pitch"><strong>pitch</strong></a>   = <code>/* multi line expression */</code><br><em>Radians, clamped to [kMinPitch, kMaxPitch].</em></td>
 </tr>
 <tr>
-<td style="text-align: right;">glm::vec3</td>
-<td style="text-align: left;"><a href="#variable-target"><strong>target</strong></a>   = <code>{0.0f}</code><br></td>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#variable-target"><strong>target</strong></a>   = <code>{0.0}</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">float</td>
@@ -246,8 +246,16 @@
 </thead>
 <tbody>
 <tr>
+<td style="text-align: right;">constexpr double</td>
+<td style="text-align: left;"><a href="#variable-kmaxdistance"><strong>kMaxDistance</strong></a>   = <code>1e21</code><br></td>
+</tr>
+<tr>
 <td style="text-align: right;">constexpr float</td>
 <td style="text-align: left;"><a href="#variable-kmaxpitch"><strong>kMaxPitch</strong></a>   = <code>1.55f</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr double</td>
+<td style="text-align: left;"><a href="#variable-kmindistance"><strong>kMinDistance</strong></a>   = <code>1e-3</code><br><em>The orbit distance's range: a millimetre to about 100,000 light-years.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr float</td>
@@ -269,23 +277,23 @@
 <td style="text-align: left;"><a href="#function-apply"><strong>Apply</strong></a> (<a href="../structernie_1_1CameraParams/"><strong>CameraParams</strong></a> &amp; camera) const<br><em>Sets</em> <code>camera</code> <em>'s transform, vertical field of view (through its aperture, keeping its focal length) and clipping range.</em></td>
 </tr>
 <tr>
-<td style="text-align: right;">glm::vec3</td>
+<td style="text-align: right;">glm::dvec3</td>
 <td style="text-align: left;"><a href="#function-eye"><strong>Eye</strong></a> () const<br><em>Eye position in world coordinates.</em></td>
 </tr>
 <tr>
-<td style="text-align: right;">float</td>
+<td style="text-align: right;">double</td>
 <td style="text-align: left;"><a href="#function-farplane"><strong>FarPlane</strong></a> () const<br></td>
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-frame"><strong>Frame</strong></a> (const glm::vec3 &amp; boundsMin, const glm::vec3 &amp; boundsMax) <br><em>Aims at the centre of the axis-aligned box [</em> <code>boundsMin</code> <em>,</em><code>boundsMax</code> <em>] from a distance at which its bounding sphere fits the vertical field of view with a small margin.</em></td>
+<td style="text-align: left;"><a href="#function-frame"><strong>Frame</strong></a> (const glm::dvec3 &amp; boundsMin, const glm::dvec3 &amp; boundsMax) <br><em>Aims at the centre of the axis-aligned box [</em> <code>boundsMin</code> <em>,</em><code>boundsMax</code> <em>] from a distance at which its bounding sphere fits the vertical field of view with a small margin.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1CameraParams/"><strong>CameraParams</strong></a></td>
 <td style="text-align: left;"><a href="#function-makecamera"><strong>MakeCamera</strong></a> (std::uint32_t width, std::uint32_t height) const<br><em>A default camera of</em> <code>width</code> <em>x</em><code>height</code> <em>with this pose, field of view and clipping range.</em></td>
 </tr>
 <tr>
-<td style="text-align: right;">float</td>
+<td style="text-align: right;">double</td>
 <td style="text-align: left;"><a href="#function-nearplane"><strong>NearPlane</strong></a> () const<br><em>Clipping planes scaled to the orbit distance.</em></td>
 </tr>
 <tr>
@@ -312,11 +320,12 @@
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
 <p>It holds no camera of its own: <code>Apply</code> writes its pose, field of view and clipping range into one.</p>
-<p>Yaw rotates around the vertical axis (0 looks north, positive turns the view clockwise seen from above); pitch is the elevation angle of the eye above the target's horizontal plane. </p>
+<p>Yaw rotates around the vertical axis (0 looks north, positive turns the view clockwise seen from above); pitch is the elevation angle of the eye above the target's horizontal plane.</p>
+<p>The target and distance are double precision, as the scene's transforms are, so the view orbits as smoothly light-years from the origin as at it (the renderer draws relative to a floating origin near the eye). </p>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
 <h3 id="variable-distance">variable distance</h3>
 <p><em>World units from the eye to the target.</em> </p>
-<pre><code class="language-C++">float ernie::OrbitController::distance;
+<pre><code class="language-C++">double ernie::OrbitController::distance;
 </code></pre>
 <hr>
 
@@ -327,7 +336,7 @@
 <hr>
 
 <h3 id="variable-target">variable target</h3>
-<pre><code class="language-C++">glm::vec3 ernie::OrbitController::target;
+<pre><code class="language-C++">glm::dvec3 ernie::OrbitController::target;
 </code></pre>
 <hr>
 
@@ -343,8 +352,19 @@
 </code></pre>
 <hr>
 <h2 id="public-static-attributes-documentation">Public Static Attributes Documentation</h2>
+<h3 id="variable-kmaxdistance">variable kMaxDistance</h3>
+<pre><code class="language-C++">constexpr double ernie::OrbitController::kMaxDistance;
+</code></pre>
+<hr>
+
 <h3 id="variable-kmaxpitch">variable kMaxPitch</h3>
 <pre><code class="language-C++">constexpr float ernie::OrbitController::kMaxPitch;
+</code></pre>
+<hr>
+
+<h3 id="variable-kmindistance">variable kMinDistance</h3>
+<p><em>The orbit distance's range: a millimetre to about 100,000 light-years.</em> </p>
+<pre><code class="language-C++">constexpr double ernie::OrbitController::kMinDistance;
 </code></pre>
 <hr>
 
@@ -364,20 +384,20 @@
 
 <h3 id="function-eye">function Eye</h3>
 <p><em>Eye position in world coordinates.</em> </p>
-<pre><code class="language-C++">glm::vec3 ernie::OrbitController::Eye () const
+<pre><code class="language-C++">glm::dvec3 ernie::OrbitController::Eye () const
 </code></pre>
 <hr>
 
 <h3 id="function-farplane">function FarPlane</h3>
-<pre><code class="language-C++">inline float ernie::OrbitController::FarPlane () const
+<pre><code class="language-C++">inline double ernie::OrbitController::FarPlane () const
 </code></pre>
 <hr>
 
 <h3 id="function-frame">function Frame</h3>
 <p><em>Aims at the centre of the axis-aligned box [</em> <code>boundsMin</code> <em>,</em><code>boundsMax</code> <em>] from a distance at which its bounding sphere fits the vertical field of view with a small margin.</em></p>
 <pre><code class="language-C++">void ernie::OrbitController::Frame (
-    const glm::vec3 &amp; boundsMin,
-    const glm::vec3 &amp; boundsMax
+    const glm::dvec3 &amp; boundsMin,
+    const glm::dvec3 &amp; boundsMax
 ) 
 </code></pre>
 <hr>
@@ -393,7 +413,7 @@
 
 <h3 id="function-nearplane">function NearPlane</h3>
 <p><em>Clipping planes scaled to the orbit distance.</em> </p>
-<pre><code class="language-C++">inline float ernie::OrbitController::NearPlane () const
+<pre><code class="language-C++">inline double ernie::OrbitController::NearPlane () const
 </code></pre>
 <hr>
 
@@ -438,7 +458,7 @@
     float steps
 ) 
 </code></pre>
-<p>Distance stays within [1e-3, 1e7]. </p>
+<p>Distance stays within [kMinDistance, kMaxDistance]. </p>
 <hr>
 
 <hr />

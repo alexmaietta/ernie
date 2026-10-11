@@ -3,9 +3,9 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1Mars2020Hazcam/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1BandedAtmosphere_1_1Refraction/" />
       <link rel="shortcut icon" href="../../img/favicon.ico" />
-    <title>Struct ernie::Mars2020Hazcam - Ernie</title>
+    <title>Struct ernie::BandedAtmosphere::Refraction - Ernie</title>
     <link rel="stylesheet" href="../../css/theme.css" />
     <link rel="stylesheet" href="../../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -15,9 +15,9 @@
     
       <script>
         // Current page data
-        var mkdocs_page_name = "Struct ernie::Mars2020Hazcam";
-        var mkdocs_page_input_path = "cpp/structernie_1_1Mars2020Hazcam.md";
-        var mkdocs_page_url = "/ernie/latest/cpp/structernie_1_1Mars2020Hazcam/";
+        var mkdocs_page_name = "Struct ernie::BandedAtmosphere::Refraction";
+        var mkdocs_page_input_path = "cpp/structernie_1_1BandedAtmosphere_1_1Refraction.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/structernie_1_1BandedAtmosphere_1_1Refraction/";
       </script>
     
     <!--[if lt IE 9]>
@@ -189,9 +189,9 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">Struct ernie::Mars2020Hazcam</li>
+      <li class="breadcrumb-item active">Struct ernie::BandedAtmosphere::Refraction</li>
     <li class="wy-breadcrumbs-aside">
-          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/structernie_1_1Mars2020Hazcam.md">Edit on alexmaietta/ernie</a>
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/structernie_1_1BandedAtmosphere_1_1Refraction.md">Edit on alexmaietta/ernie</a>
     </li>
   </ul>
   <hr/>
@@ -199,48 +199,13 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="struct-erniemars2020hazcam">Struct ernie::Mars2020Hazcam</h1>
-<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>Mars2020Hazcam</strong></a></p>
-<p><em>The Hazcams' optics (Maki et al.</em> <a href="#detailed-description">More...</a></p>
+                <h1 id="struct-erniebandedatmosphererefraction">Struct ernie::BandedAtmosphere::Refraction</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../structernie_1_1BandedAtmosphere/"><strong>BandedAtmosphere</strong></a> <strong>&gt;</strong> <a href="./"><strong>Refraction</strong></a></p>
+<p><em>A refracted ray traced from radius</em> <code>r</code> <em>(m) at the apparent zenith cosine</em><code>mu</code> <em>out of the atmosphere, through its spherically layered refractive index (</em><code>RefractiveIndex</code> <em>), by the ray equation d(n t)/ds = grad n with steps of at most</em><code>step</code> <em>m.</em></p>
 <ul>
-<li><code>#include &lt;ernie/scene/instruments.h&gt;</code></li>
+<li><code>#include &lt;ernie/util/atmosphere.h&gt;</code></li>
 </ul>
-<h2 id="public-static-attributes">Public Static Attributes</h2>
-<table>
-<thead>
-<tr>
-<th style="text-align: right;">Type</th>
-<th style="text-align: left;">Name</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: right;">constexpr double</td>
-<td style="text-align: left;"><a href="#variable-kbestfocusm"><strong>kBestFocusM</strong></a>   = <code>0.9</code><br></td>
-</tr>
-<tr>
-<td style="text-align: right;">constexpr double</td>
-<td style="text-align: left;"><a href="#variable-kfnumber"><strong>kFNumber</strong></a>   = <code>12.0</code><br></td>
-</tr>
-<tr>
-<td style="text-align: right;">constexpr double</td>
-<td style="text-align: left;"><a href="#variable-kfieldofviewdeg"><strong>kFieldOfViewDeg</strong></a>   = <code>/* multi line expression */</code><br><em>Fields of view, degrees: horizontal, vertical and diagonal.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">constexpr double</td>
-<td style="text-align: left;"><a href="#variable-kfocallengthmm"><strong>kFocalLengthMm</strong></a>   = <code>14.0</code><br></td>
-</tr>
-<tr>
-<td style="text-align: right;">constexpr double</td>
-<td style="text-align: left;"><a href="#variable-kfrontbaselinem"><strong>kFrontBaselineM</strong></a>   = <code>0.248</code><br></td>
-</tr>
-<tr>
-<td style="text-align: right;">constexpr double</td>
-<td style="text-align: left;"><a href="#variable-krearbaselinem"><strong>kRearBaselineM</strong></a>   = <code>0.934</code><br></td>
-</tr>
-</tbody>
-</table>
-<h2 id="public-static-functions">Public Static Functions</h2>
+<h2 id="public-attributes">Public Attributes</h2>
 <table>
 <thead>
 <tr>
@@ -251,53 +216,29 @@
 <tbody>
 <tr>
 <td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#function-fisheyek1"><strong>FisheyeK1</strong></a> () <br><em>The lens's Kannala-Brandt k1 for the published fields of view, as</em> <code>Mars2020Navcam::FisheyeK1</code> <em>.</em></td>
+<td style="text-align: left;"><a href="#variable-deviation"><strong>deviation</strong></a>   = <code>0.0</code><br><em>The angle (radians) between the ray's first and last directions, its bending towards the ground.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-ground"><strong>ground</strong></a>   = <code>false</code><br><em>Whether it reached the ground rather than the top.</em></td>
 </tr>
 </tbody>
 </table>
-<h2 id="detailed-description">Detailed Description</h2>
-<p>2020, Table 2), on the Navcams' camera body and detector (<code>Mars2020Navcam</code>'s sensor values). </p>
-<h2 id="public-static-attributes-documentation">Public Static Attributes Documentation</h2>
-<h3 id="variable-kbestfocusm">variable kBestFocusM</h3>
-<pre><code class="language-C++">constexpr double ernie::Mars2020Hazcam::kBestFocusM;
+<h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-deviation">variable deviation</h3>
+<p><em>The angle (radians) between the ray's first and last directions, its bending towards the ground.</em> </p>
+<pre><code class="language-C++">double ernie::BandedAtmosphere::Refraction::deviation;
 </code></pre>
 <hr>
 
-<h3 id="variable-kfnumber">variable kFNumber</h3>
-<pre><code class="language-C++">constexpr double ernie::Mars2020Hazcam::kFNumber;
+<h3 id="variable-ground">variable ground</h3>
+<p><em>Whether it reached the ground rather than the top.</em> </p>
+<pre><code class="language-C++">bool ernie::BandedAtmosphere::Refraction::ground;
 </code></pre>
-<hr>
-
-<h3 id="variable-kfieldofviewdeg">variable kFieldOfViewDeg</h3>
-<p><em>Fields of view, degrees: horizontal, vertical and diagonal.</em> </p>
-<pre><code class="language-C++">constexpr double ernie::Mars2020Hazcam::kFieldOfViewDeg[3];
-</code></pre>
-<hr>
-
-<h3 id="variable-kfocallengthmm">variable kFocalLengthMm</h3>
-<pre><code class="language-C++">constexpr double ernie::Mars2020Hazcam::kFocalLengthMm;
-</code></pre>
-<hr>
-
-<h3 id="variable-kfrontbaselinem">variable kFrontBaselineM</h3>
-<pre><code class="language-C++">constexpr double ernie::Mars2020Hazcam::kFrontBaselineM;
-</code></pre>
-<hr>
-
-<h3 id="variable-krearbaselinem">variable kRearBaselineM</h3>
-<pre><code class="language-C++">constexpr double ernie::Mars2020Hazcam::kRearBaselineM;
-</code></pre>
-<hr>
-<h2 id="public-static-functions-documentation">Public Static Functions Documentation</h2>
-<h3 id="function-fisheyek1">function FisheyeK1</h3>
-<p><em>The lens's Kannala-Brandt k1 for the published fields of view, as</em> <code>Mars2020Navcam::FisheyeK1</code> <em>.</em></p>
-<pre><code class="language-C++">static double ernie::Mars2020Hazcam::FisheyeK1 () 
-</code></pre>
-<p>Its corners reach 86 degrees off axis, so it renders on cube faces (<code>NeedsCubeFaces</code>). </p>
 <hr>
 
 <hr />
-<p>The documentation for this class was generated from the following file <code>ernie/scene/instruments.h</code></p>
+<p>The documentation for this class was generated from the following file <code>ernie/util/atmosphere.h</code></p>
               
             </div>
           </div><footer>

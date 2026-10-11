@@ -223,6 +223,10 @@
 <td style="text-align: left;"><a href="#function-addsensorfilter"><strong>AddSensorFilter</strong></a> (<a href="../structernie_1_1SensorFilterModel/"><strong>SensorFilterModel</strong></a> model) = 0<br><em>Registers custom sensor filter</em> <code>model</code> <em>for SensorFilter prims to name in</em><code>ernie:filter:type</code> <em>.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-advancetime"><strong>AdvanceTime</strong></a> (double deltaTime) <br><em>Moves the clock on by</em> <code>deltaTime</code> <em>seconds, which the next frame spans.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">virtual const <a href="../classernie_1_1BrdfRegistry/"><strong>BrdfRegistry</strong></a> &amp;</td>
 <td style="text-align: left;"><a href="#function-brdfs"><strong>Brdfs</strong></a> () const = 0<br><em>The reflectance models materials may name in</em> <code>ernie:brdf</code> <em>.</em></td>
 </tr>
@@ -267,6 +271,10 @@
 <td style="text-align: left;"><a href="#function-renderdelegate-12"><strong>RenderDelegate</strong></a> (const <a href="./"><strong>RenderDelegate</strong></a> &amp;) = delete<br></td>
 </tr>
 <tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-resettime"><strong>ResetTime</strong></a> (double time) <br><em>Sets the clock to</em> <code>time</code> <em>seconds; the next frame starts there.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">virtual std::optional&lt; <a href="../namespaceernie/#typedef-bounds3"><strong>Bounds3</strong></a> &gt;</td>
 <td style="text-align: left;"><a href="#function-scenebounds"><strong>SceneBounds</strong></a> () const = 0<br><em>World bounds of what the delegate draws as of its last</em> <code>Sync</code> <em>or</em><code>Update</code> <em>, for framing cameras; none if nothing has finite bounds (an infinite ground plane does not count).</em></td>
 </tr>
@@ -292,11 +300,11 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../namespaceernie/#typedef-renderproductsetoutputs"><strong>RenderProductSetOutputs</strong></a></td>
-<td style="text-align: left;"><a href="#function-step"><strong>Step</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, std::span&lt; const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; products={}, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; settings={}) <br><code>StepAsync(...).Fetch()</code> <em>.</em></td>
+<td style="text-align: left;"><a href="#function-step"><strong>Step</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, std::span&lt; const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; products={}, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; settings={}, double deltaTime=0.0) <br><code>StepAsync(...).Fetch()</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">virtual <a href="../classernie_1_1StepOperation/"><strong>StepOperation</strong></a></td>
-<td style="text-align: left;"><a href="#function-stepasync"><strong>StepAsync</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, std::span&lt; const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; products={}, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; settings={}) = 0<br><em>Renders</em> <code>products</code> <em>of</em><code>scene</code> <em>(see</em><code>ResolveRenderProducts</code> <em>) and returns at once: wait for or poll the operation, then fetch the outputs and map their render vars.</em></td>
+<td style="text-align: left;"><a href="#function-stepasync"><strong>StepAsync</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, std::span&lt; const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; products={}, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; settings={}, double deltaTime=0.0) = 0<br><em>Renders</em> <code>products</code> <em>of</em><code>scene</code> <em>(see</em><code>ResolveRenderProducts</code> <em>) and returns at once: wait for or poll the operation, then fetch the outputs and map their render vars.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">virtual std::vector&lt; <a href="../structernie_1_1TimelinePoint/"><strong>TimelinePoint</strong></a> &gt;</td>
@@ -305,6 +313,10 @@
 <tr>
 <td style="text-align: right;">virtual void</td>
 <td style="text-align: left;"><a href="#function-sync"><strong>Sync</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene) = 0<br><em>Uploads what changed in</em> <code>scene</code> <em>since the last call, or everything when</em><code>scene</code> <em>is not the scene of the last call.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-time"><strong>Time</strong></a> () const<br><em>The sensor clock, seconds: where the last frame ended.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">virtual void</td>
@@ -341,6 +353,10 @@
 <td style="text-align: right;"></td>
 <td style="text-align: left;"><a href="#function-renderdelegate-22"><strong>RenderDelegate</strong></a> () = default<br></td>
 </tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1RenderDelegate_1_1TimeWindow/"><strong>TimeWindow</strong></a></td>
+<td style="text-align: left;"><a href="#function-taketimewindow"><strong>TakeTimeWindow</strong></a> () <br></td>
+</tr>
 </tbody>
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
@@ -371,6 +387,18 @@
 <p><strong>Exception:</strong></p>
 <ul>
 <li><code>std::invalid_argument</code> if the model is invalid or fails to compile, or the backend runs no custom filters. </li>
+</ul>
+<hr>
+
+<h3 id="function-advancetime">function AdvanceTime</h3>
+<p><em>Moves the clock on by</em> <code>deltaTime</code> <em>seconds, which the next frame spans.</em></p>
+<pre><code class="language-C++">void ernie::RenderDelegate::AdvanceTime (
+    double deltaTime
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a negative or non-finite <code>deltaTime</code>. </li>
 </ul>
 <hr>
 
@@ -485,6 +513,18 @@
 </code></pre>
 <hr>
 
+<h3 id="function-resettime">function ResetTime</h3>
+<p><em>Sets the clock to</em> <code>time</code> <em>seconds; the next frame starts there.</em></p>
+<pre><code class="language-C++">void ernie::RenderDelegate::ResetTime (
+    double time
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a non-finite <code>time</code>. </li>
+</ul>
+<hr>
+
 <h3 id="function-scenebounds">function SceneBounds</h3>
 <p><em>World bounds of what the delegate draws as of its last</em> <code>Sync</code> <em>or</em><code>Update</code> <em>, for framing cameras; none if nothing has finite bounds (an infinite ground plane does not count).</em></p>
 <pre><code class="language-C++">virtual std::optional&lt; Bounds3 &gt; ernie::RenderDelegate::SceneBounds () const = 0
@@ -534,7 +574,8 @@
 <pre><code class="language-C++">RenderProductSetOutputs ernie::RenderDelegate::Step (
     const Scene &amp; scene,
     std::span&lt; const Path &gt; products={},
-    const Path &amp; settings={}
+    const Path &amp; settings={},
+    double deltaTime=0.0
 ) 
 </code></pre>
 <hr>
@@ -544,13 +585,15 @@
 <pre><code class="language-C++">virtual StepOperation ernie::RenderDelegate::StepAsync (
     const Scene &amp; scene,
     std::span&lt; const Path &gt; products={},
-    const Path &amp; settings={}
+    const Path &amp; settings={},
+    double deltaTime=0.0
 ) = 0
 </code></pre>
-<p>A product through several cameras or a camera with <code>ernie:poses</code> renders a batch of views (<code>ViewPosesOf</code>), such as one per environment in reinforcement learning, in one submission; its render vars gain a leading view dimension. Each product renders into a frame of its own that later steps reuse once its outputs are dropped and unmapped. Steps do not wait for earlier ones to finish: the next step is prepared while the last renders, so a loop that maps its outputs to CUDA without waiting keeps the GPU busy (a backend may bound the steps in flight, as the rasterizer does at two). </p>
+<p>A product through several cameras or a camera with <code>ernie:poses</code> renders a batch of views (<code>ViewPosesOf</code>), such as one per environment in reinforcement learning, in one submission; its render vars gain a leading view dimension. Each product renders into a frame of its own that later steps reuse once its outputs are dropped and unmapped. Steps do not wait for earlier ones to finish: the next step is prepared while the last renders, so a loop that maps its outputs to CUDA without waiting keeps the GPU busy (a backend may bound the steps in flight, as the rasterizer does at two).</p>
+<p>The step first moves the sensor clock on by <code>deltaTime</code> seconds (<code>AdvanceTime</code>; none by default), so its frames span the clock from the last frame's end to the new time, as ovrtx's <code>step</code> simulates [last time, last time + delta]. </p>
 <p><strong>Exception:</strong></p>
 <ul>
-<li><code>std::invalid_argument</code> as <code>ResolveRenderProducts</code> and <code>Update</code>. </li>
+<li><code>std::invalid_argument</code> as <code>ResolveRenderProducts</code>, <code>Update</code> and <code>AdvanceTime</code>. </li>
 </ul>
 <hr>
 
@@ -571,6 +614,13 @@
 <ul>
 <li><code>std::invalid_argument</code> naming the prim and attribute of data that cannot be uploaded. </li>
 </ul>
+<hr>
+
+<h3 id="function-time">function Time</h3>
+<p><em>The sensor clock, seconds: where the last frame ended.</em> </p>
+<pre><code class="language-C++">inline double ernie::RenderDelegate::Time () const
+</code></pre>
+<p>Steps advance it by their <code>deltaTime</code> (<code>StepAsync</code>), an interactive view by <code>AdvanceTime</code> before each <code>Update</code>, and <code>ResetTime</code> sets it, as ovrtx's <code>step</code> and <code>reset</code> do. Each frame spans the clock from the last frame's end to now (<code>FrameParams::startTime</code>, <code>time</code>): what its lights, pulses and rolling shutter run through. The scene's animation has a clock of its own (<code>Stage::GetTimeCode</code>), so it can hold or loop while sensors run on. </p>
 <hr>
 
 <h3 id="function-update">function Update</h3>
@@ -617,6 +667,11 @@
 
 <h3 id="function-renderdelegate-22">function RenderDelegate [2/2]</h3>
 <pre><code class="language-C++">ernie::RenderDelegate::RenderDelegate () = default
+</code></pre>
+<hr>
+
+<h3 id="function-taketimewindow">function TakeTimeWindow</h3>
+<pre><code class="language-C++">inline TimeWindow ernie::RenderDelegate::TakeTimeWindow () 
 </code></pre>
 <hr>
 
