@@ -673,6 +673,7 @@ class MeshDrawable : public RasterDrawable {
     /// draw index in batched draws (mesh.slang's binding 19).
     std::unique_ptr<GpuBuffer> drawRecords_;
     std::vector<std::uint32_t> itemIdOffsets_;  ///< Per draw, its first entry in `instanceIds_`.
+    std::vector<std::uint32_t> itemIndices_;    ///< Per draw, its mesh's index count.
 
     Culling culling_ = Culling::Gpu;
     bool drawsDirty_ = true;  ///< Whether the draws changed since `WriteDraws`.

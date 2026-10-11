@@ -1691,6 +1691,7 @@ void MeshDrawable::Prepare(const FrameParams& params, std::span<const ShadowCasc
 void MeshDrawable::WriteDraws() {
     ERNIE_ZONE("Mesh write draws");
     itemIdOffsets_.clear();
+    itemIndices_.clear();
     std::vector<GpuDraw> draws(items_.size());
     std::vector<std::uint32_t> instanceIds;
     itemPipelines_.clear();
@@ -1709,6 +1710,7 @@ void MeshDrawable::WriteDraws() {
         draw.offsets[1] = mesh.firstVertex;
         draw.offsets[2] = static_cast<std::uint32_t>(instanceIds.size());
         itemIdOffsets_.push_back(draw.offsets[2]);
+        itemIndices_.push_back(static_cast<std::uint32_t>(mesh.data.indices.size()));
         std::uint32_t flags = 0;
         flags |= mesh.data.normals.empty() ? 0u : kHasNormals;
         flags |= item.vertexColors && !mesh.data.colors.empty() ? kHasColors : 0u;
@@ -1902,12 +1904,16 @@ void MeshDrawable::Cull(const FrameParams& params, std::span<const ShadowCascade
     // Each draw range's world bounds, then the ranges each view and shadow view can see: all of
     // them without culling, else those whose bounds meet the frustum. With GPU culling, every
     // instanced range left becomes a job that tests its instances one by one (cull.slang).
+    // Only when a view or shadow view tests them on the CPU: with the views' poses on the GPU
+    // and shadow views the GPU fits, none does.
+    const bool tested =
+        culling_ != Culling::Off &&
+        (!params.posesOnGpu || std::any_of(cascades.begin(), cascades.end(),
+                                           [](const ShadowCascade& c) { return !c.gpuFitted; }));
     std::vector<std::vector<std::optional<Bounds3>>> bounds(items_.size());
-    for (std::size_t i = 0; i < items_.size(); ++i) {
+    for (std::size_t i = 0; i < items_.size() && tested; ++i) {
         for (const WorldRange& range : itemRanges_[i]) {
-            bounds[i].push_back(range.count == 0 || culling_ == Culling::Off
-                                    ? std::nullopt
-                                    : RangeBounds(i, range));
+            bounds[i].push_back(range.count == 0 ? std::nullopt : RangeBounds(i, range));
         }
     }
     std::vector<GpuCullJob> jobs;
@@ -1989,9 +1995,11 @@ void MeshDrawable::Cull(const FrameParams& params, std::span<const ShadowCascade
             if (range.count == 0 || (seen != nullptr && !seen->Draws(range.world))) {
                 continue;
             }
-            const std::optional<Bounds3>& box = bounds[i][r];
-            if (posed && box && !frustum.Intersects(box->first, box->second)) {
-                continue;
+            if (posed && culling_ != Culling::Off) {
+                const std::optional<Bounds3>& box = bounds[i][r];
+                if (box && !frustum.Intersects(box->first, box->second)) {
+                    continue;
+                }
             }
             VisibleRange entry{static_cast<std::uint32_t>(i), static_cast<std::uint32_t>(r)};
             if (culling_ == Culling::Gpu && items_[i].instancer) {
@@ -2591,8 +2599,7 @@ std::size_t MeshDrawable::Record(VkCommandBuffer commands, const RasterFrame& fr
         if (casters != nullptr && !casters->Draws(range.world)) {
             continue;
         }
-        const MeshItem& draw = items_[visible.item];
-        const auto vertices = static_cast<std::uint32_t>(meshes_.at(draw.mesh).data.indices.size());
+        const std::uint32_t vertices = itemIndices_[visible.item];
         if (vertices == 0) {
             continue;
         }
