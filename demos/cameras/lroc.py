@@ -111,6 +111,10 @@ WAC_BANDS = [
 # The ISD's band: 604 nm.
 ISD_BAND = 4
 
+# The UV bands' framelets: 16 detector rows, read out 4 x 4 summed
+# (Robinson et al. 2010, section 3.2).
+UV_ROWS = 16
+
 # The KAI-1001's gain, read noise and full well (Table 3).
 WAC_ELECTRONS_PER_DN = 25.9
 WAC_READ_NOISE = 66.0
@@ -798,36 +802,50 @@ class Demo(ernie.demo.Demo):
         """Under a flat spectrum, each band's DN per second over a
         framelet is the same radiance over its responsivity
         coefficient: rate times RC alike across the seven, Table 4's
-        values as Ernie renders them. The UV bands' coefficients are of
-        4 x 4 summed pixels, which collect 16 times the ISD's 9 um
-        pixel's light."""
+        values as Ernie renders them. The UV bands render as the camera
+        reads them, 4 x 4 summed into 36 um pixels (over the visible
+        framelet's geometry: the UV optics' own differ, but a pixel's
+        rate depends only on its area and the f-number)."""
         sun = ernie.DistantLight.at(self.scene, "/World/Sun")
         sun.set(
             physical_illuminant=tokens.CUSTOM,
             physical_custom_illuminant=[250.0, 1.0, 800.0, 1.0],
         )
-        self.use_framelet(
-            self.framelet_at(self.first_line + LINES // 2)
-        )
+        framelet = self.framelet_at(self.first_line + LINES // 2)
         exposure = 0.005
-        self.camera("/World/Wac").exposure_time = exposure
+        samples = self.wac.samples
+        product = ernie.RenderProduct.at(self.scene, "/Render/Wac")
         scaled = []
         for b, band in enumerate(WAC_BANDS):
+            self.use_framelet(framelet)
             self.use_wac_band(b)
-            self.camera("/World/Wac").sensor_noise = False
+            camera = self.camera("/World/Wac")
+            camera.set(sensor_noise=False, exposure_time=exposure)
+            # The UV bands' framelets: 16 detector rows read 4 x 4
+            # summed, 36 um pixels.
+            summed = round(band[5] / WAC_BANDS[ISD_BAND][5])
+            if summed > 1:
+                camera.vertical_aperture = (
+                    1e-3 * WAC_BANDS[ISD_BAND][5] * UV_ROWS
+                )
+                product.resolution = (
+                    samples // summed,
+                    UV_ROWS // summed,
+                )
             electrons = self.render_vars("/Render/Wac")["Electrons"]
             rate = (
                 float(np.mean(electrons, dtype=np.float64))
                 / exposure
                 / WAC_ELECTRONS_PER_DN
             )
-            summed = band[5] / WAC_BANDS[ISD_BAND][5]
-            scaled.append(rate * summed * summed * band[3])
+            scaled.append(rate * band[3])
+            product.resolution = (samples, self.wac.framelet_lines)
             print(
                 f"WAC {band[0]} nm: {rate:.1f} DN/s, effective QE "
                 f"{effective_qe(band):.4f}"
             )
         sun.physical_illuminant = tokens.SUN
+        self.use_framelet(framelet)
         self.use_wac_band(ISD_BAND)
         self.camera("/World/Wac").sensor_noise = False
         for value in scaled:

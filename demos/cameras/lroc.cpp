@@ -133,6 +133,10 @@ constexpr std::array<WacBand, 7> kWacBands = {{
 /// The ISD's band: 604 nm.
 constexpr std::size_t kIsdBand = 4;
 
+/// The UV bands' framelets: 16 detector rows, read out 4 x 4 summed
+/// (Robinson et al. 2010, section 3.2).
+constexpr double kUvRows = 16.0;
+
 /// The KAI-1001's gain, read noise and full well (Table 3).
 constexpr double kWacElectronsPerDn = 25.9;
 constexpr double kWacReadNoise = 66.0;
@@ -785,23 +789,38 @@ class LrocDemo : public app::Demo {
     /// Under a flat spectrum, each band's DN per second over a
     /// framelet is the same radiance over its responsivity
     /// coefficient: rate times RC alike across the seven, Table 4's
-    /// values as Ernie renders them. The UV bands' coefficients are
-    /// of 4 x 4 summed pixels, which collect 16 times the ISD's 9 um
-    /// pixel's light.
+    /// values as Ernie renders them. The UV bands render as the
+    /// camera reads them, 4 x 4 summed into 36 um pixels (over the
+    /// visible framelet's geometry: the UV optics' own differ, but a
+    /// pixel's rate depends only on its area and the f-number).
     void CheckWacResponsivities() {
         Scene& scene = GetScene();
         DistantLight sun(scene, "/World/Sun");
         sun.SetPhysicalIlluminant(std::string(tokens::kCustom))
             .SetPhysicalCustomIlluminant(
                 std::vector<float>{250.0f, 1.0f, 800.0f, 1.0f});
-        UseFramelet(FrameletAt(firstLine_ + kLines / 2));
+        const std::uint32_t framelet =
+            FrameletAt(firstLine_ + kLines / 2);
         constexpr double kExposure = 0.005;
-        Camera(scene, "/World/Wac").SetExposureTime(kExposure);
         const Path products[] = {"/Render/Wac"};
+        const auto samples = static_cast<double>(wac_.Isd().samples);
         std::vector<double> scaled;
         for (std::size_t b = 0; b < kWacBands.size(); ++b) {
+            UseFramelet(framelet);
             UseWacBand(b);
-            Camera(scene, "/World/Wac").SetSensorNoise(false);
+            Camera camera(scene, "/World/Wac");
+            camera.SetSensorNoise(false).SetExposureTime(kExposure);
+            // The UV bands' framelets: 16 detector rows read 4 x 4
+            // summed, 36 um pixels.
+            const double summed =
+                kWacBands[b].pixelUm / kWacBands[kIsdBand].pixelUm;
+            if (summed > 1.0) {
+                camera.SetVerticalAperture(
+                    1e-3 * kWacBands[kIsdBand].pixelUm * kUvRows);
+                RenderProduct(scene, "/Render/Wac")
+                    .SetResolution(glm::dvec2(samples / summed,
+                                              kUvRows / summed));
+            }
             RenderProductSetOutputs outputs =
                 GetRenderer().Step(scene, products);
             const Tensor electrons =
@@ -812,15 +831,16 @@ class LrocDemo : public app::Demo {
             }
             const double rate = sum / double(electrons.Elements()) /
                                 kExposure / kWacElectronsPerDn;
-            const double summed =
-                kWacBands[b].pixelUm / kWacBands[kIsdBand].pixelUm;
-            scaled.push_back(rate * summed * summed *
-                             kWacBands[b].responsivity);
+            scaled.push_back(rate * kWacBands[b].responsivity);
+            RenderProduct(scene, "/Render/Wac")
+                .SetResolution(
+                    glm::dvec2(samples, wac_.FrameletLines()));
             std::printf("WAC %d nm: %.1f DN/s, effective QE %.4f\n",
                         kWacBands[b].name, rate,
                         EffectiveQe(kWacBands[b]));
         }
         sun.SetPhysicalIlluminant(std::string(tokens::kSun));
+        UseFramelet(framelet);
         UseWacBand(kIsdBand);
         Camera(scene, "/World/Wac").SetSensorNoise(false);
         for (const double value : scaled) {
