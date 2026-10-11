@@ -3,8 +3,30 @@
 
 #include "ernie/util/profile.h"
 
+#if defined(_WIN32)
+// CUDA interop shares memory and semaphores as POSIX file descriptors; on Windows it would take
+// Win32 handles (VK_KHR_external_memory_win32). Until then Create reports it unavailable there, and
+// these stand-ins for the POSIX loader keep the rest compiling.
+namespace {
+constexpr int RTLD_NOW = 0;
+constexpr int RTLD_LOCAL = 0;
+void* dlopen(const char* /*path*/, int /*flags*/) {
+    return nullptr;
+}
+void* dlsym(void* /*library*/, const char* /*name*/) {
+    return nullptr;
+}
+int dlclose(void* /*library*/) {
+    return 0;
+}
+int close(int /*fd*/) {
+    return 0;
+}
+}  // namespace
+#else
 #include <dlfcn.h>
 #include <unistd.h>
+#endif
 
 #include <algorithm>
 #include <cstring>
@@ -338,6 +360,10 @@ std::unique_ptr<CudaInterop> CudaInterop::Create(const VulkanContext& context, s
         }
         return nullptr;
     };
+#if defined(_WIN32)
+    (void)context;
+    return fail("CUDA interop is not available on Windows yet");
+#endif
     if (!context.SupportsExternalMemory()) {
         return fail("the Vulkan device cannot export memory (VK_KHR_external_memory_fd)");
     }

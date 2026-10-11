@@ -20,6 +20,7 @@
 #include <exception>
 #include <fstream>
 #include <limits>
+#include <locale>
 #include <optional>
 #include <span>
 #include <sstream>
@@ -412,8 +413,12 @@ Json NumberJson(float value) {
     }
     char text[32];
     const auto written = std::to_chars(std::begin(text), std::end(text), value);
+    // Read back through a stream in the classic locale: Apple's libc++ has no floating-point
+    // from_chars, and strtod follows the C locale's decimal separator.
+    std::istringstream in(std::string(std::begin(text), written.ptr));
+    in.imbue(std::locale::classic());
     double shortest = 0.0;
-    std::from_chars(std::begin(text), written.ptr, shortest);
+    in >> shortest;
     return shortest;
 }
 
