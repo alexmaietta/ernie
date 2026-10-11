@@ -189,22 +189,24 @@ class Demo(ernie.demo.Demo):
             ambient=0.0,
         )
 
-        # The demo's option: which camera the viewport looks through,
-        # the viewer's own perspective camera first.
+        # The demo's option: which camera the viewport looks through.
         def look_through(index):
             if self.viewer is not None:
-                self.viewer.active_camera = (
-                    ernie.app.Viewer.perspective_camera
-                    if index == 0
-                    else self.cameras[index - 1].path
-                )
+                self.viewer.active_camera = self.cameras[index].path
 
         self.widgets.combo(
             "Camera",
-            ["perspective"] + [name for name, *_ in BANDS],
+            [name for name, *_ in BANDS],
             0,
             on_change=look_through,
         )
+        # Through the first camera, without the lights' gizmos over
+        # the beams.
+        if viewer is not None:
+            viewer.active_camera = self.cameras[0].path
+            display = viewer.viewport_display
+            display.lights = False
+            viewer.viewport_display = display
 
     def render_all(self):
         """Every camera's LdrColor, uint8 (rows, cols, 4)."""
