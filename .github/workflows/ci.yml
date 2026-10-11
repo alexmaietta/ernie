@@ -83,7 +83,10 @@ jobs:
       CXX: ${{ matrix.cxx }}
       ERNIE_TEST_REQUIRE_VALIDATION: "1"
     steps:
+      # The test fixtures' images are in Git LFS.
       - uses: actions/checkout@v7
+        with:
+          lfs: true
       - name: Install Vulkan (lavapipe, validation layers) and the app's window system headers
         run: |
           sudo apt-get update
@@ -145,6 +148,8 @@ jobs:
       ERNIE_TEST_REQUIRE_VALIDATION: "1"
     steps:
       - uses: actions/checkout@v7
+        with:
+          lfs: true
       - name: Install Vulkan (lavapipe, validation layers)
         run: |
           sudo apt-get update
@@ -203,6 +208,8 @@ jobs:
         os: [windows-2025, macos-15]
     steps:
       - uses: actions/checkout@v7
+        with:
+          lfs: true
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
@@ -252,6 +259,8 @@ jobs:
             runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v7
+        with:
+          lfs: true
       - name: Version
         run: >
           sed -i 's/set(ERNIE_VERSION_SUFFIX ""/set(ERNIE_VERSION_SUFFIX "${{ needs.version.outputs.suffix }}"/'
@@ -274,6 +283,8 @@ jobs:
       ERNIE_TEST_REQUIRE_VALIDATION: "1"
     steps:
       - uses: actions/checkout@v7
+        with:
+          lfs: true
       - uses: actions/download-artifact@v8
         with:
           name: wheel-linux-aarch64

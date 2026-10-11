@@ -21,7 +21,7 @@ Ernie's key features related to planetary robotics and sensing:
 - **Floating origin**: prevents precision issues in large-scale scenes.
 - **Viewer**: a viewer class to easily spin up a GUI with customizable panels to integrate with your own simulations or workflows.
 
-For a more detailed overview of the features, see our documentation.
+For a more detailed overview of the features, see our [documentation](https://alexmaietta.github.io/ernie/).
 
 Future work:
 

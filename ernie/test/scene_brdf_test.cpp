@@ -87,7 +87,8 @@ TEST(BrdfRegistry, AddsCustomModelsAndRejectsInvalidOnes) {
 }
 
 TEST(BrdfRegistry, ResolvesParametersWithDefaultsAndClamping) {
-    const BrdfModel* hapke = BrdfRegistry::WithBuiltins().Find("hapke");
+    const BrdfRegistry registry = BrdfRegistry::WithBuiltins();
+    const BrdfModel* hapke = registry.Find("hapke");
     ASSERT_NE(hapke, nullptr);
     const std::vector<float> defaults = hapke->Defaults();
     EXPECT_EQ(ResolveBrdfParams(*hapke, {}), defaults);

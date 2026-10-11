@@ -31,6 +31,8 @@ def test_demo_runs_its_checks_without_a_viewer(path, renderer):
                             timeout=600)
     if result.returncode != 0 and "No module named 'warp'" in result.stderr:
         pytest.skip("needs Warp")
+    if result.returncode != 0 and "needs CUDA interop" in result.stderr:
+        pytest.skip("needs CUDA interop")
     assert result.returncode == 0, result.stdout + result.stderr
 
 
