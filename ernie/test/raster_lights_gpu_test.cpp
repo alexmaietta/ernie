@@ -1590,9 +1590,11 @@ TEST_F(RasterDelegateTest,
     camera.SetExposureAdaptation(0.0);
     RasterDelegate fresh(*context_);
     const Tensor image = fresh.Render(scene);
-    EXPECT_NEAR(static_cast<int>(image.As<std::uint8_t>()[4 * (
-                    kVarSize / 2 * kVarSize + kVarSize / 2)]),
-                118, 8)
+    EXPECT_NEAR(
+        static_cast<int>(
+            image.As<std::uint8_t>()[4 * (kVarSize / 2 * kVarSize +
+                                          kVarSize / 2)]),
+        118, 8)
         << "LdrColor alone";
 }
 
