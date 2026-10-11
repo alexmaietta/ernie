@@ -57,7 +57,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+      # mypy checks the built package, so the test job runs it after the build.
       - uses: pre-commit/action@v3.0.1
+        env:
+          SKIP: mypy
 
   # Ernie built from source and tested on lavapipe under the Vulkan validation layer. GCC, on the
   # oldest supported Python, runs every test (C++, GPU, Python, the install test and the README's
@@ -112,7 +115,7 @@ jobs:
       - name: Python environment
         run: |
           uv venv --python ${{ matrix.python }}
-          uv pip install numpy pytest pillow nanobind
+          uv pip install numpy pytest pillow nanobind mypy
       - uses: hendrikmuhs/ccache-action@v1.2
         with:
           key: test-${{ matrix.cc }}
@@ -133,6 +136,11 @@ jobs:
           "-DPython_EXECUTABLE=$PWD/.venv/bin/python"
       - name: Build
         run: cmake --build build --parallel "$(nproc)"
+      # The package as built, with its stubs, and the demos ([tool.mypy]): pre-commit's mypy hook
+      # needs a build, so the format job skips it.
+      - name: Type check
+        if: matrix.key == 'clang'
+        run: .venv/bin/mypy
       # For the CI metrics (ci-metrics.yml): every compile's and link's time, and ccache's hits.
       - name: Compiler cache statistics
         if: always()

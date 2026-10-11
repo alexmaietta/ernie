@@ -5,7 +5,8 @@ time and its build and test steps' from the Actions API, and from the
 jobs' Ninja logs their compile time, compile count and ccache miss
 rate.
 
-    GH_TOKEN=... GITHUB_REPOSITORY=owner/repo python ci_metrics.py RUN_ID LOG_DIR OUTPUT
+    export GH_TOKEN=... GITHUB_REPOSITORY=owner/repo
+    python ci_metrics.py RUN_ID LOG_DIR OUTPUT
 
 LOG_DIR holds one directory per job's artifact (ninja-log-<job>), each
 with the build's .ninja_log and, where the job uses ccache,
@@ -30,8 +31,9 @@ STEPS = (
 
 
 def api(path):
+    repository = os.environ["GITHUB_REPOSITORY"]
     request = urllib.request.Request(
-        f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/{path}",
+        f"https://api.github.com/repos/{repository}/{path}",
         headers={
             "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
             "Accept": "application/vnd.github+json",
@@ -41,10 +43,11 @@ def api(path):
         return json.load(response)
 
 
+def parse(stamp):
+    return datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+
+
 def seconds(start, end):
-    parse = lambda stamp: datetime.fromisoformat(
-        stamp.replace("Z", "+00:00")
-    )  # noqa: E731
     return (parse(end) - parse(start)).total_seconds()
 
 
