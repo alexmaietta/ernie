@@ -6,7 +6,7 @@
 
 Ernie is a physically accurate, real-time, spectral renderer for interplanetary environments.
 
-We provide C++ and Python APIs and a Hydra-like scene API. It is a Vulkan 1.3 rasterizer that runs on Linux today, with Windows and macOS on the way. Ernie is designed around physical quantities rather than artistic parameters: lights, materials and cameras are described the way they are measured, so a render can be compared against a real instrument. For reinforcement learning, Ernie renders batches of cameras in one step, shares data zero copy with any DLPack tensor (PyTorch, JAX, Warp, NumPy), and has a fast mode with simpler shading.
+We provide C++ and Python APIs and a Hydra-like scene API. It is a Vulkan 1.3 rasterizer that runs on Linux, and builds on Windows and macOS (experimental: not yet tested there). Ernie is designed around physical quantities rather than artistic parameters: lights, materials and cameras are described the way they are measured, so a render can be compared against a real instrument. For reinforcement learning, Ernie renders batches of cameras in one step, shares data zero copy with any DLPack tensor (PyTorch, JAX, Warp, NumPy), and has a fast mode with simpler shading.
 
 Ernie's key features related to planetary robotics and sensing:
 
