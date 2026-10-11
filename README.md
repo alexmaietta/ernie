@@ -6,16 +6,17 @@
 
 Ernie is a physically accurate, real-time, spectral renderer for interplanetary environments.
 
-We provide C++ and Python APIs and a Hydra-like scene API. It is a Vulkan 1.3 rasterizer for Linux, Windows and macOS (through MoltenVK), each built and tested in CI; macOS has no GPU tests there yet. Ernie is designed around physical quantities rather than artistic parameters: lights, materials and cameras are described the way they are measured, so a render can be compared against a real instrument. For reinforcement learning, Ernie renders batches of cameras in one step, shares data zero copy with any DLPack tensor (PyTorch, JAX, Warp, NumPy), and has a fast mode with simpler shading.
+We provide C++ and Python APIs and a Hydra-like scene API. It is a Vulkan 1.3 rasterizer for Linux, Windows and macOS (through MoltenVK). Ernie is designed around physical quantities, efficient batched rendering and zero copy interop with any DLPack tensor (PyTorch, JAX, Warp, NumPy), with a fast mode for simpler shading.
 
-Ernie's key features related to planetary robotics and sensing:
+Ernie's key features are related to planetary robotics and sensing.
 
 - **Camera effects and modeling**: exposure, aperture, motion blur, rolling shutter, lens distortion and vignetting, with perspective, fisheye and orthographic projections.
-- **Real camera specs**: from quantum efficiency curves to full well, read noise, dark current, PRNU, DSNU, gain and ADC bit depth, and line-scan pushbroom cameras like LROC's, enabling users to model the noise and effects of those instruments.
+- **Real camera specs**: from quantum efficiency curves to full well, read noise, dark current, PRNU, DSNU, gain and ADC bit depth, and line-scan pushbroom cameras like LROC's, enabling users to model the noise and effects of those instruments. It also supports USGS CSM camera models for advanced, non-standard cameras and their noise.
 - **Terrain**: a first-class citizen, with a built-in Terrain prim type with continuous level of detail through quadtrees, updated in place where its heights change. With a radius, a Terrain is a whole planet or moon, drawn from orbit down to the ground with cube-sphere level of detail.
 - **GPU interop**: deforming meshes, instances and points from CUDA or Warp arrays without copies, useful for rover simulations and particle simulations.
 - **Spectral-first rendering**: light is carried in spectral bands (16 across 380-780 nm by default) from the light sources, through the materials, to the sensor.
 - **Star fields**: a built-in StarField prim allowing users to plug in their own star catalogs, with brightness from magnitudes and color from B-V indices, so you can see how camera exposure affects the visible stars.
+- **Atmosphere**: Earth and Mars skies from physical models, seen from the ground or from orbit, with aerial perspective dimming distant surfaces.
 - **Lighting**: distant lights have an angle parameter, giving smooth penumbrae based on the light's width in the sky. Lights also take illuminants (blackbody, CIE daylight) and custom spectral curves, for example to model Earthshine on the lunar surface.
 - **Customizable and extendable**: write your own sensor filters in Slang and build up your own chains (noise models, lens flare, vignetting), designed for efficiency and throughput, and plug in custom BRDFs for the planetary reflectances you encounter. Hapke, Lommel-Seeliger, lunar-Lambert, Oren-Nayar and Lambert come built in.
 - **Batch rendering**: many environments ("worlds"), each with its own camera, rendered in one step for RL and Monte Carlo workloads.
@@ -27,20 +28,16 @@ For a more detailed overview of the features, see our [documentation](https://al
 
 Future work:
 
-- A fully USD- and glTF-compliant renderer, loading OpenUSD, glTF, OBJ, STL and 3D Tiles, with the glTF material system, UsdPreviewSurface shaders and MDL.
-- Atmosphere rendering, both on and above a planet, for LEO simulations or Mars rovers.
+- A fully USD- and glTF-compliant renderer, loading OpenUSD, glTF, OBJ, STL and 3D Tiles, with the glTF material system, UsdPreviewSurface shaders and MDL and MaterialX support.
 - Dust and other volumes from particle simulations through NanoVDB.
+- Differentiable rendering.
 - Global illumination for reflections
-- USGS CSM camera models for advanced, non-standard cameras and their noise.
-- OpenXR, so users can easily connect headsets to an Ernie viewer.
+- OpenXR, so users can easily connect headsets to an Ernie viewer. Foveated rendering and eye adaptation effects.
 - A ray-tracing backend alongside the rasterizer.
-- A fast mode for RL training: a forward renderer with a smaller feature set and higher throughput.
-- Windows support, and tested macOS support.
-- Continued test assets and benchmark scenes.
-- Guassian splat and particle fields
-- More sensor support for Lidars and Radars.
+- Gaussian splat and particle fields.
+- Lidar and radar sensors.
 - Integrations into Newton Viewer, Chrono Sensor, and IsaacLab.
-- Compare benchmarks with Newton Warp Raytrace, Madrona both in speed, throughput, and image quality.
+- Compare benchmarks with RTX, Cycles, Newton Warp Raytrace, Madrona both in speed, throughput, and image quality.
 
 ## Getting Started
 
@@ -119,22 +116,26 @@ For the prim types and their attributes, transforms, relationships, arrays, vali
 
 Planned future examples.
 
+**Demos**
+
+- Cornell box
+
 **Cameras**
 
+- Pinhole, fisheye, orthographic
+- Distortion
 - LRO NAC and WAC
 - Shadowcam
 - Mars2020 Navcam, Mastcam
 - LWIR, NIR, UV
-- Pinhole, fisheye, orthographic
 - Narrowband camera
-- Distortion
 
 **Camera Filters and Noise**
 
 - Vignetting
 - Lens flare
 - Bloom
-- Narrowband filter viewing laser lines
+- Narrowband filter
 
 **Terrain**
 
@@ -160,7 +161,13 @@ Planned future examples.
 **Atmosphere**
 
 - Earth atmosphere (from orbit and ground)
-- Mars atmosphere
+- Mars atmosphere (compare against existing images)
+
+**Volumes**
+
+- NanoVDB interop
+- Clouds in Earth orbit
+- Dust clouds on lunar surface
 
 **Batched and RL**
 
