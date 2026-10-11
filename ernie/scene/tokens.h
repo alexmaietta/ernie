@@ -459,10 +459,10 @@ inline constexpr std::string_view kEnableColorTemperature =
     "inputs:enableColorTemperature";
 /// Physical sunlight (Ernie): total irradiance at normal incidence in
 /// W/m^2, and a spectrum of (wavelength nm, W m^-2 nm^-1) pairs.
-/// Either one makes the light physical; without a spectrum it is a
-/// black body (the colour temperature when enabled, else the Sun's
-/// 5772 K) and without an irradiance a black body carries the solar
-/// constant, 1361 W/m^2.
+/// Either one makes the light physical; without a spectrum it has its
+/// `physical:illuminant`'s shape, else is a black body (the colour
+/// temperature when enabled, else the Sun's 5772 K), and without an
+/// irradiance a black body carries the solar constant, 1361 W/m^2.
 inline constexpr std::string_view kLightIrradiance =
     "ernie:irradiance";
 inline constexpr std::string_view kLightSpectrum = "ernie:spectrum";

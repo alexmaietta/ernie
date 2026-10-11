@@ -1330,6 +1330,23 @@ std::vector<float> SunIrradianceOf(const Scene& scene,
         }
         return binned;
     }
+    if (sun.HasIrradiance() && !pairs &&
+        !sun.GetPhysicalIlluminant().empty()) {
+        // Another illuminant's shape (`IlluminantShape`), scaled to
+        // the irradiance over all it emits (1 nm steps to 3000 nm).
+        const std::function<double(double)> shape =
+            IlluminantShape(sun);
+        double total = 0.0;
+        for (double w = 0.5; w < 3000.0; w += 1.0) {
+            total += shape(w);
+        }
+        if (!(total > 0.0)) {
+            throw std::invalid_argument(
+                "Light '" + path.String() +
+                "' has an illuminant that emits nothing");
+        }
+        return BinShape(shape, bands, sun.GetIrradiance() / total);
+    }
     if (sun.HasIrradiance() || pairs) {
         if (pairs) {
             const Spectrum spectrum = Spectrum::FromPairs(*pairs);

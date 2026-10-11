@@ -1194,3 +1194,19 @@ TEST(SunIrradianceOf, TheSunIlluminantIsTheMeasuredSolarSpectrum) {
                     ernie::TotalSolarIrradiance(),
                 1e-6);
 }
+
+// Other illuminants shape the irradiance too: a flat custom one over
+// 250-800 nm carries 1361 W/m^2 as 1361 / 550 per nm in every band.
+TEST(SunIrradianceOf, AnIlluminantShapesTheIrradiance) {
+    Scene scene;
+    ernie::DistantLight::Define(scene, "/Sun")
+        .SetPhysicalIlluminant(std::string(tokens::kCustom))
+        .SetPhysicalCustomIlluminant(
+            std::vector<float>{250.0f, 1.0f, 800.0f, 1.0f})
+        .SetIrradiance(1361.0);
+    const ernie::SpectralBands bands{300.0, 720.0, 6};
+    for (const float value :
+         ernie::SunIrradianceOf(scene, "/Sun", bands)) {
+        EXPECT_NEAR(value, 1361.0f / 550.0f, 1e-3f);
+    }
+}
