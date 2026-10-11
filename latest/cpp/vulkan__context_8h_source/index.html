@@ -223,16 +223,20 @@ namespace ernie {
 
 #if defined(_WIN32)
 using ExternalHandle = void*;
-inline constexpr VkExternalMemoryHandleTypeFlagBits kExternalMemoryHandleType =
-    VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-inline constexpr VkExternalSemaphoreHandleTypeFlagBits kExternalSemaphoreHandleType =
-    VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+inline constexpr VkExternalMemoryHandleTypeFlagBits
+    kExternalMemoryHandleType =
+        VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+inline constexpr VkExternalSemaphoreHandleTypeFlagBits
+    kExternalSemaphoreHandleType =
+        VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #else
 using ExternalHandle = int;
-inline constexpr VkExternalMemoryHandleTypeFlagBits kExternalMemoryHandleType =
-    VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
-inline constexpr VkExternalSemaphoreHandleTypeFlagBits kExternalSemaphoreHandleType =
-    VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
+inline constexpr VkExternalMemoryHandleTypeFlagBits
+    kExternalMemoryHandleType =
+        VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+inline constexpr VkExternalSemaphoreHandleTypeFlagBits
+    kExternalSemaphoreHandleType =
+        VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif
 
 void CloseExternalHandle(ExternalHandle handle);
@@ -247,12 +251,14 @@ struct VulkanContextOptions {
 struct TimelinePoint {
     VkSemaphore semaphore = VK_NULL_HANDLE;
     std::uint64_t value = 0;
-    VkPipelineStageFlags2 stages = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    VkPipelineStageFlags2 stages =
+        VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 };
 
 class VulkanContext {
   public:
-    static std::unique_ptr&lt;VulkanContext&gt; Create(const VulkanContextOptions&amp; options = {});
+    static std::unique_ptr&lt;VulkanContext&gt;
+    Create(const VulkanContextOptions&amp; options = {});
 
     ~VulkanContext();
     VulkanContext(const VulkanContext&amp;) = delete;
@@ -311,7 +317,8 @@ class VulkanContext {
     }
 
     bool SupportsExternalMemory() const {
-        return exportMemory_ != nullptr &amp;&amp; exportSemaphore_ != nullptr;
+        return exportMemory_ != nullptr &amp;&amp;
+               exportSemaphore_ != nullptr;
     }
 
     ExternalHandle ExportMemory(VkDeviceMemory memory) const;
@@ -320,7 +327,9 @@ class VulkanContext {
 
     std::uint32_t DeviceLocalMemoryType(std::uint32_t typeBits) const;
 
-    VkSemaphore CreateTimelineSemaphore(std::uint64_t initial = 0, bool exportable = false) const;
+    VkSemaphore
+    CreateTimelineSemaphore(std::uint64_t initial = 0,
+                            bool exportable = false) const;
 
     bool ValidationEnabled() const {
         return validation_;
@@ -336,13 +345,16 @@ class VulkanContext {
                 std::span&lt;const TimelinePoint&gt; waits = {},
                 std::span&lt;const TimelinePoint&gt; signals = {}) const;
 
-    std::uint64_t SubmitAsync(const std::function&lt;void(VkCommandBuffer)&gt;&amp; record,
-                              std::span&lt;const TimelinePoint&gt; waits = {},
-                              std::span&lt;const TimelinePoint&gt; signals = {}) const;
+    std::uint64_t
+    SubmitAsync(const std::function&lt;void(VkCommandBuffer)&gt;&amp; record,
+                std::span&lt;const TimelinePoint&gt; waits = {},
+                std::span&lt;const TimelinePoint&gt; signals = {}) const;
 
     void WaitForSubmissions() const;
 
-    bool WaitForSubmission(std::uint64_t submission, std::uint64_t timeoutNs = UINT64_MAX) const;
+    bool
+    WaitForSubmission(std::uint64_t submission,
+                      std::uint64_t timeoutNs = UINT64_MAX) const;
 
     bool HasPendingSubmissions() const;
 
@@ -357,7 +369,8 @@ class VulkanContext {
     void CollectGpuProfile(VkCommandBuffer commands) const;
 
   private:
-    std::shared_ptr&lt;const void&gt; alive_ = std::make_shared&lt;char&gt;();  
+    std::shared_ptr&lt;const void&gt; alive_ =
+        std::make_shared&lt;char&gt;();  
     VulkanContext() = default;
     void Report(std::string message);
 
@@ -371,8 +384,9 @@ class VulkanContext {
     VkCommandPool commandPool_ = VK_NULL_HANDLE;
     PFN_vkDestroyDebugUtilsMessengerEXT destroyMessenger_ = nullptr;
     PFN_vkCmdPushDescriptorSetKHR pushDescriptorSet_ = nullptr;
-    // vkGetMemoryFdKHR and vkGetSemaphoreFdKHR, or their Win32 counterparts on Windows: kept as
-    // void functions so this header needs no Win32 types (and no &lt;windows.h&gt;).
+    // vkGetMemoryFdKHR and vkGetSemaphoreFdKHR, or their Win32
+    // counterparts on Windows: kept as void functions so this header
+    // needs no Win32 types (and no &lt;windows.h&gt;).
     PFN_vkVoidFunction exportMemory_ = nullptr;
     PFN_vkVoidFunction exportSemaphore_ = nullptr;
     std::string deviceName_;
@@ -383,14 +397,17 @@ class VulkanContext {
     bool multiDrawIndirect_ = false;
     bool validation_ = false;
     mutable std::mutex submitMutex_;
-    void* gpuProfiler_ = nullptr;  
+    void* gpuProfiler_ =
+        nullptr;  
     std::unique_ptr&lt;GpuTimer&gt; timer_;
     mutable std::mutex profilerMutex_;
     VkSemaphore submissions_ = VK_NULL_HANDLE;
     mutable std::uint64_t submitted_ = 0;
-    mutable std::vector&lt;std::pair&lt;VkCommandBuffer, std::uint64_t&gt;&gt; pending_;
+    mutable std::vector&lt;std::pair&lt;VkCommandBuffer, std::uint64_t&gt;&gt;
+        pending_;
 
-    VkCommandBuffer Record(const std::function&lt;void(VkCommandBuffer)&gt;&amp; record) const;
+    VkCommandBuffer
+    Record(const std::function&lt;void(VkCommandBuffer)&gt;&amp; record) const;
     void RecyclePending() const;
     std::unique_ptr&lt;std::function&lt;void(std::string)&gt;&gt; sink_;
     std::mutex messagesMutex_;

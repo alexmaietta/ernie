@@ -426,7 +426,8 @@
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
 <p>The CUDA driver (libcuda) is loaded at run time, so Ernie has no build dependency on the CUDA toolkit; without an NVIDIA driver <code>Create</code> reports CUDA unavailable. CUDA work runs in the device's primary context, the one CUDA frameworks use, on the legacy default stream, so it is ordered after work that frameworks hand over through DLPack. Signals to Vulkan all go on the legacy stream, after an event recorded on the stream the work ran on, so values arrive in order however many streams write.</p>
-<p>Reference: NVIDIA, CUDA Driver API, "External Resource Interoperability", <a href="https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__EXTRES__INTEROP.html">https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__EXTRES__INTEROP.html</a> </p>
+<p>Reference: NVIDIA, CUDA Driver API, "External Resource
+Interoperability", <a href="https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__EXTRES__INTEROP.html">https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__EXTRES__INTEROP.html</a> </p>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
 <h3 id="function-copy">function Copy</h3>
 <p><em>Queues a device-to-device copy of contiguous tensor</em> <code>source</code> <em>into contiguous tensor</em><code>destination</code> <em>of the same byte size on</em><code>stream</code> <em>, without waiting.</em></p>

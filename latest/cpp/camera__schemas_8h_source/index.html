@@ -401,7 +401,8 @@ class Camera : public Imageable {
     ERNIE_SCHEMA_DEFINE(Camera)
 
 
-    std::optional&lt;std::vector&lt;float&gt;&gt; GetSensorQe(std::string_view channel) const;
+    std::optional&lt;std::vector&lt;float&gt;&gt;
+    GetSensorQe(std::string_view channel) const;
 };
 
 std::vector&lt;const PrimTypeDef*&gt; CameraSchemaTypes();

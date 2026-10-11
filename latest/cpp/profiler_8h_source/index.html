@@ -212,7 +212,8 @@
 namespace ernie::profiler {
 
 struct Zone {
-    const char* name = &quot;&quot;;  
+    const char* name =
+        &quot;&quot;;  
     std::uint64_t start = 0;
     std::uint64_t end = 0;
     std::uint32_t thread = 0;

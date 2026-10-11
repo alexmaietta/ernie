@@ -323,8 +323,8 @@
 
 
 
-        <p>Base of the typed prim classes: a <code>Prim</code> of the class's registered type or one derived
-from it.</p>
+        <p>Base of the typed prim classes: a <code>Prim</code> of the class's
+registered type or one derived from it.</p>
 
 
 
@@ -394,7 +394,7 @@ from it.</p>
    (ernie.schema.Schema.at)" href="#ernie.schema.Schema.at">at</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>The existing prim at <code>path</code> in a Scene, or at <code>path</code> relative to a prim ("Surface",</p>
+                  <p>The existing prim at <code>path</code> in a Scene, or at <code>path</code></p>
                 </div>
               </td>
             </tr>
@@ -444,7 +444,7 @@ from it.</p>
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.Schema.set)" href="#ernie.schema.Schema.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Sets attributes by Python name, and the transform from <code>translate</code>, <code>rotate</code>,</p>
+                  <p>Sets attributes by Python name, and the transform from</p>
                 </div>
               </td>
             </tr>
@@ -465,7 +465,7 @@ from it.</p>
    (ernie.schema.Schema.write_rows)" href="#ernie.schema.Schema.write_rows">write_rows</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Writes row i of each array, by Python name, as that attribute of prim i of <code>prims</code> (a</p>
+                  <p>Writes row i of each array, by Python name, as that</p>
                 </div>
               </td>
             </tr>
@@ -750,8 +750,8 @@ from it.</p>
 
     <div class="doc doc-contents ">
 
-        <p>The existing prim at <code>path</code> in a Scene, or at <code>path</code> relative to a prim ("Surface",
-"Rig/Arm"), as this class.</p>
+        <p>The existing prim at <code>path</code> in a Scene, or at <code>path</code>
+relative to a prim ("Surface", "Rig/Arm"), as this class.</p>
 
 
 <table class="field-list">
@@ -775,7 +775,8 @@ from it.</p>
                   <code><span title="TypeError">TypeError</span></code>
               –
               <div class="doc-md-description">
-                <p>The prim is not of this class's type or one derived from it.</p>
+                <p>The prim is not of this class's type or one
+derived from it.</p>
               </div>
             </li>
         </ul>
@@ -878,9 +879,10 @@ from it.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Sets attributes by Python name, and the transform from <code>translate</code>, <code>rotate</code>,
-<code>rotation_order</code>, <code>orient</code> and <code>scale</code>; <code>set(token, value)</code> sets one by USD name.
-Returns this prim.</p>
+        <p>Sets attributes by Python name, and the transform from
+<code>translate</code>, <code>rotate</code>, <code>rotation_order</code>, <code>orient</code> and
+<code>scale</code>; <code>set(token, value)</code> sets one by USD name. Returns
+this prim.</p>
 
 
     </div>
@@ -920,12 +922,14 @@ Returns this prim.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Writes row i of each array, by Python name, as that attribute of prim i of <code>prims</code> (a
-PrimSet, or a list of paths), every step of a simulation:
-<code>ernie.PointInstancer.write_rows(scene, prims, positions=p, orientations=q)</code>.
-<code>translate</code>, <code>orient</code> (x, y, z, w) and <code>scale</code> write the transform ops, which from
-CUDA arrays pose the prims on the GPU. The arrays are DLPack arrays written without
-copying; <code>stream</code> is as for <code>Scene.write</code>.</p>
+        <p>Writes row i of each array, by Python name, as that
+attribute of prim i of <code>prims</code> (a PrimSet, or a list of
+paths), every step of a simulation:
+<code>ernie.PointInstancer.write_rows(scene, prims, positions=p,
+orientations=q)</code>. <code>translate</code>, <code>orient</code> (x, y, z, w) and
+<code>scale</code> write the transform ops, which from CUDA arrays pose
+the prims on the GPU. The arrays are DLPack arrays written
+without copying; <code>stream</code> is as for <code>Scene.write</code>.</p>
 
 
 <table class="field-list">
@@ -942,7 +946,8 @@ copying; <code>stream</code> is as for <code>Scene.write</code>.</p>
                   <code><span title="TypeError">TypeError</span></code>
               –
               <div class="doc-md-description">
-                <p>A name is not an array attribute of this class or a transform op.</p>
+                <p>A name is not an array attribute of this class
+or a transform op.</p>
               </div>
             </li>
         </ul>
@@ -976,9 +981,10 @@ copying; <code>stream</code> is as for <code>Scene.write</code>.</p>
 
     <div class="doc doc-contents first">
 
-        <p><code>prim</code> as an instance of its type's class, the most derived (a SphereLight's
-<code>ernie.SphereLight</code>, a Light given as <code>ernie.Light</code>), or the <code>Prim</code> itself when its type
-has no class (untyped, or not registered).</p>
+        <p><code>prim</code> as an instance of its type's class, the most derived
+(a SphereLight's <code>ernie.SphereLight</code>, a Light given as
+<code>ernie.Light</code>), or the <code>Prim</code> itself when its type has no
+class (untyped, or not registered).</p>
 
 
     </div>
@@ -999,14 +1005,18 @@ has no class (untyped, or not registered).</p>
 
     <div class="doc doc-contents first">
 
-        <p>Builds prims from a description, into <code>scene</code> or a new Scene, and returns the scene.</p>
-<p>The description is a dict (or JSON text, or the path of a <code>.json</code> file) from prim paths to
-prims; each prim is a dict whose <code>"type"</code> names its type (none for an untyped prim, or to
-leave an existing prim's type alone), whose dict values are its children by name, and whose
-other values are its attributes, by Python name (<code>radius</code>) or USD name
-(<code>"inputs:radius"</code>), with <code>translate</code>, <code>rotate</code>, <code>rotation_order</code>, <code>orient</code> and
-<code>scale</code> setting its transform ops (<code>orient</code> a <code>Quat</code> or [w, x, y, z]) and <code>transform</code>
-a 4 x 4 matrix (rows of four); C++ reads the same format (<code>ernie/scene/scene_json.h</code>)::</p>
+        <p>Builds prims from a description, into <code>scene</code> or a new Scene,
+and returns the scene.</p>
+<p>The description is a dict (or JSON text, or the path of a
+<code>.json</code> file) from prim paths to prims; each prim is a dict
+whose <code>"type"</code> names its type (none for an untyped prim, or to
+leave an existing prim's type alone), whose dict values are its
+children by name, and whose other values are its attributes, by
+Python name (<code>radius</code>) or USD name (<code>"inputs:radius"</code>), with
+<code>translate</code>, <code>rotate</code>, <code>rotation_order</code>, <code>orient</code> and
+<code>scale</code> setting its transform ops (<code>orient</code> a <code>Quat</code> or [w,
+x, y, z]) and <code>transform</code> a 4 x 4 matrix (rows of four); C++
+reads the same format (<code>ernie/scene/scene_json.h</code>)::</p>
 <pre><code>ernie.load_scene({
     "/World": {"type": "Xform",
         "Rock": {"type": "Sphere", "radius": 0.5, "translate": [0, 0, 1]},
@@ -1014,16 +1024,20 @@ a 4 x 4 matrix (rows of four); C++ reads the same format (<code>ernie/scene/scen
     "/Render/Settings": {"type": "RenderSettings", "resolution": [640, 480]},
 })
 </code></pre>
-<p>C++ loads it (<code>LoadScene</code>), so both read a description the same way: each value is read as
-its attribute's declared kind, checked as setting it is. Lists for array attributes become
-arrays: int32 for those of whole numbers (<code>face_vertex_indices</code>, <code>proto_indices</code>;
-<code>AttributeDef.is_integer</code>), float32 for the rest (<code>points</code>, <code>heights</code>), whatever the
-numbers look like; nested lists for one that takes an array in place of its value
-(<code>AttributeDef.takes_array</code>: per-vertex <code>display_color</code>) are a float32 array. A dict may
-hold <code>Quat</code>s, <code>Path</code>s and prims too, and arrays (NumPy, or any DLPack array, a CUDA one
-included): where an array goes, written as it is, shared and not copied, its dtype kept, as
-<code>Scene.write</code> writes one; elsewhere (<code>translate</code>, a <code>radius</code>) read as the numbers it
-holds, which needs a CPU array.</p>
+<p>C++ loads it (<code>LoadScene</code>), so both read a description the same
+way: each value is read as its attribute's declared kind, checked
+as setting it is. Lists for array attributes become arrays: int32
+for those of whole numbers (<code>face_vertex_indices</code>,
+<code>proto_indices</code>; <code>AttributeDef.is_integer</code>), float32 for the
+rest (<code>points</code>, <code>heights</code>), whatever the numbers look like;
+nested lists for one that takes an array in place of its value
+(<code>AttributeDef.takes_array</code>: per-vertex <code>display_color</code>) are a
+float32 array. A dict may hold <code>Quat</code>s, <code>Path</code>s and prims too,
+and arrays (NumPy, or any DLPack array, a CUDA one included):
+where an array goes, written as it is, shared and not copied, its
+dtype kept, as <code>Scene.write</code> writes one; elsewhere
+(<code>translate</code>, a <code>radius</code>) read as the numbers it holds, which
+needs a CPU array.</p>
 
 
 <table class="field-list">
@@ -1040,15 +1054,17 @@ holds, which needs a CPU array.</p>
                   <code><span title="ValueError">ValueError</span></code>
               –
               <div class="doc-md-description">
-                <p>A value its attribute does not take, or JSON that does not parse, naming
-the prim and key (or the line and column).</p>
+                <p>A value its attribute does not take, or JSON that
+does not parse, naming the prim and key (or the line and
+column).</p>
               </div>
             </li>
             <li>
                   <code><span title="TypeError">TypeError</span></code>
               –
               <div class="doc-md-description">
-                <p>The description is not a dict, JSON text or a file path.</p>
+                <p>The description is not a dict, JSON text or a file
+path.</p>
               </div>
             </li>
         </ul>

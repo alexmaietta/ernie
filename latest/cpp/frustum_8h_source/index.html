@@ -212,11 +212,13 @@
 namespace ernie {
 
 struct Frustum {
-    std::array&lt;glm::vec4, 6&gt; planes{};  
+    std::array&lt;glm::vec4, 6&gt;
+        planes{};  
 
     static Frustum FromMatrix(const glm::mat4&amp; viewProjection);
 
-    bool Intersects(const glm::vec3&amp; low, const glm::vec3&amp; high) const;
+    bool Intersects(const glm::vec3&amp; low,
+                    const glm::vec3&amp; high) const;
 };
 
 }  // namespace ernie

@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/scattering_8h_source/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>File scattering.h - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "File scattering.h";
+        var mkdocs_page_input_path = "cpp/scattering_8h_source.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/scattering_8h_source/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">File scattering.h</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/scattering_8h_source.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="file-scatteringh">File scattering.h</h1>
+<p><a href="../files/"><strong>File List</strong></a> <strong>&gt;</strong> <a href="../dir_057d52706067b881d9371cf136c38c31/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../dir_bc93cbf7ad62035943f355936009cdc4/"><strong>util</strong></a> <strong>&gt;</strong> <a href="../scattering_8h/"><strong>scattering.h</strong></a></p>
+<p><a href="../scattering_8h/">Go to the documentation of this file</a></p>
+<pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+#include &lt;complex&gt;
+#include &lt;span&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+namespace ernie {
+
+inline constexpr double kStandardNumberDensity = 2.546899e25;
+
+double AirRefractivity(double wavelengthNm,
+                       double co2Fraction = 360e-6);
+
+double CarbonDioxideRefractivity(double wavelengthNm);
+
+double AirKingFactor(double wavelengthNm,
+                     double co2Fraction = 360e-6);
+
+inline constexpr double kCarbonDioxideKingFactor = 1.15;
+
+double RayleighCrossSection(double wavelengthNm, double refractivity,
+                            double kingFactor);
+
+double RayleighPhase(double cosTheta, double kingFactor);
+
+struct MieEfficiencies {
+    double extinction = 0.0;
+    double scattering = 0.0;
+    double asymmetry = 0.0;
+
+    double Absorption() const {
+        // Rounding can leave a non-absorbing sphere slightly
+        // negative.
+        return extinction &gt; scattering ? extinction - scattering
+                                       : 0.0;
+    }
+};
+
+MieEfficiencies MieSphere(double sizeParameter,
+                          std::complex&lt;double&gt; refractiveIndex,
+                          std::span&lt;const double&gt; cosines,
+                          std::span&lt;double&gt; phase);
+
+struct LogNormalMode {
+    double medianRadius = 1e-6;
+    double sigma = 0.5;
+    double relativeNumber = 1.0;
+
+    static LogNormalMode FromEffective(double effectiveRadius,
+                                       double effectiveVariance,
+                                       double relativeNumber = 1.0);
+
+    double EffectiveRadius() const;
+    double EffectiveVariance() const;
+};
+
+class RefractiveIndex {
+  public:
+    RefractiveIndex() = default;
+
+    explicit RefractiveIndex(std::complex&lt;double&gt; value);
+
+    RefractiveIndex(std::vector&lt;double&gt; wavelengthsNm,
+                    std::vector&lt;std::complex&lt;double&gt;&gt; values);
+
+    std::complex&lt;double&gt; operator()(double wavelengthNm) const;
+
+  private:
+    std::vector&lt;double&gt; wavelengths_;
+    std::vector&lt;std::complex&lt;double&gt;&gt; values_;
+};
+
+std::complex&lt;double&gt; MaxwellGarnett(std::complex&lt;double&gt; matrix,
+                                    std::complex&lt;double&gt; inclusion,
+                                    double fraction);
+
+struct ParticleOptics {
+    double scattering = 0.0;
+    double absorption = 0.0;
+    std::vector&lt;double&gt; phase;
+};
+
+ParticleOptics MieParticles(std::span&lt;const LogNormalMode&gt; modes,
+                            std::complex&lt;double&gt; refractiveIndex,
+                            double wavelengthNm,
+                            std::span&lt;const double&gt; cosines,
+                            int radiusSamples = 96);
+
+double OzoneCrossSection(double wavelengthNm);
+
+const RefractiveIndex&amp; HematiteRefractiveIndex();
+
+}  // namespace ernie
+</code></pre>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../js/sidebar.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

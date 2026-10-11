@@ -230,7 +230,8 @@ class FrameUploads {
         return slot_;
     }
 
-    void Write(const GpuBuffer&amp; destination, std::span&lt;const std::byte&gt; bytes,
+    void Write(const GpuBuffer&amp; destination,
+               std::span&lt;const std::byte&gt; bytes,
                VkDeviceSize offset = 0);
 
     void Record(VkCommandBuffer commands);
@@ -241,14 +242,16 @@ class FrameUploads {
     struct Copy {
         VkBuffer destination = VK_NULL_HANDLE;
         std::weak_ptr&lt;const void&gt; lifetime;
-        const GpuBuffer* source = nullptr;  
+        const GpuBuffer* source =
+            nullptr;  
         VkBufferCopy region{};
     };
     struct Staging {
         std::vector&lt;std::unique_ptr&lt;GpuBuffer&gt;&gt; chunks;
         VkDeviceSize used = 0;  
     };
-    std::pair&lt;GpuBuffer*, VkDeviceSize&gt; Stage(std::span&lt;const std::byte&gt; bytes);
+    std::pair&lt;GpuBuffer*, VkDeviceSize&gt;
+    Stage(std::span&lt;const std::byte&gt; bytes);
 
     const VulkanContext&amp; context_;
     std::array&lt;Staging, kSlots&gt; slots_;

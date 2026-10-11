@@ -257,7 +257,8 @@ class Panel {
 
 class FunctionPanel final : public Panel {
   public:
-    FunctionPanel(std::string title, Dock dock, std::function&lt;void(Viewer&amp;)&gt; draw)
+    FunctionPanel(std::string title, Dock dock,
+                  std::function&lt;void(Viewer&amp;)&gt; draw)
         : Panel(std::move(title), dock), draw_(std::move(draw)) {}
 
     void Draw(Viewer&amp; viewer) override {
@@ -280,13 +281,16 @@ class WidgetPanel final : public Panel {
     Id Text(std::string text);
     Id Separator();
     Id Button(std::string label, std::function&lt;void()&gt; onClick);
-    Id Checkbox(std::string label, bool value, std::function&lt;void(bool)&gt; onChange);
+    Id Checkbox(std::string label, bool value,
+                std::function&lt;void(bool)&gt; onChange);
     Id Slider(std::string label, double min, double max, double value,
               std::function&lt;void(double)&gt; onChange);
-    Id Combo(std::string label, std::vector&lt;std::string&gt; items, std::size_t selected,
+    Id Combo(std::string label, std::vector&lt;std::string&gt; items,
+             std::size_t selected,
              std::function&lt;void(std::size_t)&gt; onChange);
 
-    Id Plot(std::string label, std::function&lt;std::vector&lt;float&gt;()&gt; source);
+    Id Plot(std::string label,
+            std::function&lt;std::vector&lt;float&gt;()&gt; source);
 
     void Set(Id widget, bool value);
     void Set(Id widget, double value);

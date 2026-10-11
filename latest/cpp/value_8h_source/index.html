@@ -220,10 +220,13 @@ namespace ernie {
 
 class Value {
   public:
-    using Data = std::variant&lt;std::monostate, bool, int, float, double, glm::ivec2, glm::vec2,
-                              glm::vec3, glm::vec4, glm::dvec2, glm::dvec3, glm::dvec4, glm::dmat4,
-                              glm::dquat, std::string, Path, std::vector&lt;float&gt;, std::vector&lt;Path&gt;,
-                              std::vector&lt;std::string&gt;&gt;;
+    using Data =
+        std::variant&lt;std::monostate, bool, int, float, double,
+                     glm::ivec2, glm::vec2, glm::vec3, glm::vec4,
+                     glm::dvec2, glm::dvec3, glm::dvec4, glm::dmat4,
+                     glm::dquat, std::string, Path,
+                     std::vector&lt;float&gt;, std::vector&lt;Path&gt;,
+                     std::vector&lt;std::string&gt;&gt;;
 
     Value() = default;
     Value(bool value) : data_(value) {}

@@ -225,11 +225,15 @@ namespace ernie {
 struct PushbroomStrip {
     glm::vec3 from{0.0f};
     glm::vec3 to{0.0f};
-    glm::quat fromRotation{1.0f, 0.0f, 0.0f, 0.0f};  
-    glm::quat toRotation{1.0f, 0.0f, 0.0f, 0.0f};    
+    glm::quat fromRotation{1.0f, 0.0f, 0.0f,
+                           0.0f};  
+    glm::quat toRotation{
+        1.0f, 0.0f, 0.0f,
+        0.0f};  
     float nearPlane = 0.1f;
     float farPlane = 1000.0f;
-    float scale = 1.0f;  
+    float scale =
+        1.0f;  
     float shift = 0.0f;  
     float line = 0.0f;   
 
@@ -240,7 +244,8 @@ struct PushbroomStrip {
     }
 };
 
-CameraView PushbroomEnvelope(const CameraParams&amp; camera, const glm::dmat4&amp; from,
+CameraView PushbroomEnvelope(const CameraParams&amp; camera,
+                             const glm::dmat4&amp; from,
                              const glm::dmat4&amp; to);
 
 enum class WorldShadows : std::uint32_t {
@@ -261,31 +266,42 @@ enum class WorldShadowFit : std::uint32_t {
 
 struct ShadowSettings {
     bool enabled = true;
-    int cascades = 3;                      
-    std::uint32_t resolution = 2048;       
-    float softness = 1.5f;                 
-    float normalOffset = 1.5f;             
-    float splitLambda = 0.8f;              
-    ShadowFit fit = ShadowFit::Scene;      
-    bool showCascades = false;             
-    std::uint32_t lightResolution = 1024;  
+    int cascades = 3;  
+    std::uint32_t resolution =
+        2048;  
+    float softness =
+        1.5f;  
+    float normalOffset =
+        1.5f;  
+    float splitLambda =
+        0.8f;  
+    ShadowFit fit =
+        ShadowFit::Scene;  
+    bool showCascades =
+        false;  
+    std::uint32_t lightResolution =
+        1024;  
     std::uint32_t worldResolution = 0;
 
-    static std::uint32_t AutoWorldResolution(std::uint32_t width, std::uint32_t height) {
+    static std::uint32_t AutoWorldResolution(std::uint32_t width,
+                                             std::uint32_t height) {
         std::uint32_t texels = 256;
-        while (texels &lt; 4 * std::max(width, height) &amp;&amp; texels &lt; 2048) {
+        while (texels &lt; 4 * std::max(width, height) &amp;&amp;
+               texels &lt; 2048) {
             texels *= 2;
         }
         return texels;
     }
-    WorldShadows worlds = WorldShadows::Separate;  
-    WorldShadowFit worldFit = WorldShadowFit::Scene;  
-    float worldMargin = 1.0f;  
+    WorldShadows worlds =
+        WorldShadows::Separate;  
+    WorldShadowFit worldFit =
+        WorldShadowFit::Scene;  
+    float worldMargin = 1.0f;   
 };
 
 enum class Wireframe : std::uint32_t {
-    Off = 0,         
-    Overlay = 1,     
+    Off = 0,      
+    Overlay = 1,  
     HiddenLine = 2,  
 };
 
@@ -302,8 +318,8 @@ enum class Occlusion : std::uint32_t {
 };
 
 enum class MinimalMode : std::uint32_t {
-    Off = 0,       
-    None = 1,      
+    Off = 0,   
+    None = 1,  
     Constant = 2,  
     Textured = 3,  
 };
@@ -318,13 +334,14 @@ enum class LightType : std::uint32_t {
 
 struct LightParams {
     LightType type = LightType::Sphere;
-    glm::dvec3 position{0.0};  
+    glm::dvec3 position{
+        0.0};  
     glm::vec3 direction{0.0f, 0.0f, 1.0f};
     glm::vec3 tangent{1.0f, 0.0f, 0.0f};
     glm::vec2 size{1.0f, 1.0f};  
     std::vector&lt;float&gt; spectrum;
     float radius = 0.0f;
-    float coneAngle = 180.0f;   
+    float coneAngle = 180.0f;  
     float coneSoftness = 0.0f;  
     float focus = 0.0f;
     std::vector&lt;float&gt; focusTint;
@@ -349,14 +366,15 @@ struct DomeParams {
 
 enum class DomeLightMode {
     Approximate,  
-    Full,         
-    Limited,      
+    Full,     
+    Limited,  
     Directions,
 };
 
 struct Star {
-    float rightAscension = 0.0f;  
-    float declination = 0.0f;     
+    float rightAscension =
+        0.0f;                  
+    float declination = 0.0f;  
     float temperature = 5772.0f;  
     float irradiance555 = 0.0f;
 };
@@ -369,7 +387,8 @@ struct FrameParams {
     CameraParams camera;
     double overscan = 1.0;
     bool sun = true;  
-    glm::vec3 sunDirection{0.0f, 0.0f, 1.0f};  
+    glm::vec3 sunDirection{
+        0.0f, 0.0f, 1.0f};  
     float sunAngle = 0.53f;
     std::vector&lt;float&gt; sunIrradiance;
     float ambient = 0.15f;  
@@ -379,13 +398,19 @@ struct FrameParams {
     float domeShadowRadius = 1.0f;
     std::uint32_t domeDirections = 16;
     bool domeDirectionsLit = false;
-    std::optional&lt;StarFieldParams&gt; stars;  
-    float exposure = 1.0f;                 
-    bool meter = false;                    
-    Culling culling = Culling::Gpu;        
-    Occlusion occlusion = Occlusion::Off;  
+    std::optional&lt;StarFieldParams&gt;
+        stars;  
+    float exposure =
+        1.0f;  
+    bool meter =
+        false;  
+    Culling culling =
+        Culling::Gpu;  
+    Occlusion occlusion =
+        Occlusion::Off;  
     float meshLodError = 1.0f;
-    Wireframe wireframe = Wireframe::Off;  
+    Wireframe wireframe =
+        Wireframe::Off;  
     ShadowSettings shadows;
     std::vector&lt;SensorFilterStep&gt; filters;
     std::vector&lt;std::string_view&gt; vars;
@@ -441,10 +466,12 @@ struct FrameParams {
     }
 
     CameraView View(std::size_t view = 0) const {
-        glm::dmat4 pose = poses.empty() ? camera.transform : poses.at(view);
+        glm::dmat4 pose =
+            poses.empty() ? camera.transform : poses.at(view);
         pose[3] -= glm::dvec4(origin, 0.0);
         if (camera.pushbroom) {
-            return PushbroomEnvelope(camera, PreviousPose(view), pose);
+            return PushbroomEnvelope(camera, PreviousPose(view),
+                                     pose);
         }
         return camera.RasterView(pose, overscan);
     }
@@ -457,10 +484,12 @@ struct FrameParams {
 
     FrameParams Faces(int faces) const;
 
-    static glm::dvec3 FaceIntrinsics(std::uint32_t width, std::uint32_t height);
+    static glm::dvec3 FaceIntrinsics(std::uint32_t width,
+                                     std::uint32_t height);
 };
 
-glm::dmat4 InterpolatePose(const glm::dmat4&amp; from, const glm::dmat4&amp; to, double s);
+glm::dmat4 InterpolatePose(const glm::dmat4&amp; from,
+                           const glm::dmat4&amp; to, double s);
 
 using Bounds3 = std::pair&lt;glm::vec3, glm::vec3&gt;;
 

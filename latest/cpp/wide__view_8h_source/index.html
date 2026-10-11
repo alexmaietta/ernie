@@ -217,7 +217,14 @@ namespace ernie {
 
 glm::dvec3 LensRay(const LensModel&amp; lens, glm::dvec2 distorted);
 
-enum class CubeFace { Front = 0, Right = 1, Left = 2, Up = 3, Down = 4, Back = 5 };
+enum class CubeFace {
+    Front = 0,
+    Right = 1,
+    Left = 2,
+    Up = 3,
+    Down = 4,
+    Back = 5
+};
 inline constexpr int kCubeFaces = 5;
 inline constexpr int kAllCubeFaces = 6;
 

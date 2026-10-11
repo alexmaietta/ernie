@@ -254,7 +254,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1AttributeMeta/"><strong>AttributeMeta</strong></a> <br><em>How an attribute is described and edited. Declared with designated initializers in this order.</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1AttributeMeta/"><strong>AttributeMeta</strong></a> <br><em>How an attribute is described and edited.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -341,11 +341,11 @@
 <tbody>
 <tr>
 <td style="text-align: right;">define</td>
-<td style="text-align: left;"><a href="./#define-ernie_attribute_accessors"><strong>ERNIE_ATTRIBUTE_ACCESSORS</strong></a> (Type, Name, token, fallback, meta) <code>/* multi line expression */</code><br><em>One attribute's accessors in a view class:</em> <code>Get&lt;Name&gt;</code> <em>(the fallback when unset),</em><code>Has&lt;Name&gt;</code> <em>(whether it is authored), and</em><code>Set&lt;Name&gt;</code> <em>and</em><code>Clear&lt;Name&gt;</code> <em>(removing it,</em><code>Scene::Clear</code> <em>), which return the view for chaining; for an</em><code>OrArray</code> <em>attribute,</em><code>Read&lt;Name&gt;</code> <em>and</em><code>Write&lt;Name&gt;</code> <em>too, its array.</em></td>
+<td style="text-align: left;"><a href="./#define-ernie_attribute_accessors"><strong>ERNIE_ATTRIBUTE_ACCESSORS</strong></a> (Type, Name, token, fallback, meta) <br><em>One attribute's accessors in a view class:</em> <code>Get&lt;Name&gt;</code> <em>(the fallback when unset),</em><code>Has&lt;Name&gt;</code> <em>(whether it is authored), and</em><code>Set&lt;Name&gt;</code> <em>and</em><code>Clear&lt;Name&gt;</code> <em>(removing it,</em><code>Scene::Clear</code> <em>), which return the view for chaining; for an</em><code>OrArray</code> <em>attribute,</em><code>Read&lt;Name&gt;</code> <em>and</em><code>Write&lt;Name&gt;</code> <em>too, its array.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">define</td>
-<td style="text-align: left;"><a href="./#define-ernie_attribute_def"><strong>ERNIE_ATTRIBUTE_DEF</strong></a> (Type, Name, token, fallback, meta) <code>::ernie::detail::MakeAttribute&amp;lt;Type&amp;gt;(token, #Name, fallback, meta),</code><br><em>One</em> <code>AttributeDef</code> <em>of an attribute list entry, for</em><code>ERNIE_DEFINE_SCHEMA</code> <em>.</em></td>
+<td style="text-align: left;"><a href="./#define-ernie_attribute_def"><strong>ERNIE_ATTRIBUTE_DEF</strong></a> (Type, Name, token, fallback, meta) <code>/* multi line expression */</code><br><em>One</em> <code>AttributeDef</code> <em>of an attribute list entry, for</em><code>ERNIE_DEFINE_SCHEMA</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">define</td>
@@ -353,7 +353,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">define</td>
-<td style="text-align: left;"><a href="./#define-ernie_define_schema"><strong>ERNIE_DEFINE_SCHEMA</strong></a> (Class, typeName, base, isAbstract, typeDoc, OWN_ATTRIBUTES) <code>[**ERNIE\_DEFINE\_OPEN\_SCHEMA**](prim__type_8h.md#define-ernie_define_open_schema)(Class, typeName, base, isAbstract, typeDoc, OWN\_ATTRIBUTES)</code><br><em>Defines</em> <code>Class::Definition()</code> <em>: the type</em><code>typeName</code> <em>, deriving from</em><code>base</code> <em>(a</em><code>PrimTypeDef*</code> <em>, or nullptr), declaring the attributes of</em><code>OWN_ATTRIBUTES</code> <em>.</em></td>
+<td style="text-align: left;"><a href="./#define-ernie_define_schema"><strong>ERNIE_DEFINE_SCHEMA</strong></a> (Class, typeName, base, isAbstract, typeDoc, OWN_ATTRIBUTES) <code>/* multi line expression */</code><br><em>Defines</em> <code>Class::Definition()</code> <em>: the type</em><code>typeName</code> <em>, deriving from</em><code>base</code> <em>(a</em><code>PrimTypeDef*</code> <em>, or nullptr), declaring the attributes of</em><code>OWN_ATTRIBUTES</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">define</td>
@@ -374,7 +374,7 @@
     token,
     fallback,
     meta
-) `/* multi line expression */`
+) 
 </code></pre>
 <hr>
 
@@ -386,7 +386,7 @@
     token,
     fallback,
     meta
-) `::ernie::detail::MakeAttribute&lt;Type&gt;(token, #Name, fallback, meta),`
+) `/* multi line expression */`
 </code></pre>
 <hr>
 
@@ -413,7 +413,7 @@
     isAbstract,
     typeDoc,
     OWN_ATTRIBUTES
-) `ERNIE_DEFINE_OPEN_SCHEMA (Class, typeName, base, isAbstract, typeDoc, OWN_ATTRIBUTES)`
+) `/* multi line expression */`
 </code></pre>
 <hr>
 

@@ -213,27 +213,27 @@
 <tbody>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
-<td style="text-align: left;"><a href="#variable-kdistancetocamera"><strong>kDistanceToCamera</strong></a>   = <code>"DistanceToCamera"</code><br><em>float32.</em></td>
+<td style="text-align: left;"><a href="#variable-kdistancetocamera"><strong>kDistanceToCamera</strong></a>   = <code>/* multi line expression */</code><br><em>float32.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
-<td style="text-align: left;"><a href="#variable-kdistancetoimageplane"><strong>kDistanceToImagePlane</strong></a>   = <code>"DistanceToImagePlane"</code><br><em>float32.</em></td>
+<td style="text-align: left;"><a href="#variable-kdistancetoimageplane"><strong>kDistanceToImagePlane</strong></a>   = <code>/* multi line expression */</code><br><em>float32.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
-<td style="text-align: left;"><a href="#variable-kelectrons"><strong>kElectrons</strong></a>   = <code>"Electrons"</code><br><em>float32 per sensor channel.</em></td>
+<td style="text-align: left;"><a href="#variable-kelectrons"><strong>kElectrons</strong></a>   = <code>/* multi line expression */</code><br><em>float32 per sensor channel.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
-<td style="text-align: left;"><a href="#variable-khdrcolor"><strong>kHdrColor</strong></a>   = <code>"HdrColor"</code><br><em>float32 linear sRGB, cd/m^2.</em></td>
+<td style="text-align: left;"><a href="#variable-khdrcolor"><strong>kHdrColor</strong></a>   = <code>/* multi line expression */</code><br><em>float32 linear sRGB, cd/m^2.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
-<td style="text-align: left;"><a href="#variable-kinstanceid"><strong>kInstanceId</strong></a>   = <code>"InstanceId"</code><br><em>uint32 instance index.</em></td>
+<td style="text-align: left;"><a href="#variable-kinstanceid"><strong>kInstanceId</strong></a>   = <code>/* multi line expression */</code><br><em>uint32 instance index.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
-<td style="text-align: left;"><a href="#variable-kldrcolor"><strong>kLdrColor</strong></a>   = <code>"LdrColor"</code><br><em>uint8 sRGB (rows, cols, 4).</em></td>
+<td style="text-align: left;"><a href="#variable-kldrcolor"><strong>kLdrColor</strong></a>   = <code>/* multi line expression */</code><br><em>uint8 sRGB (rows, cols, 4).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -241,19 +241,19 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
-<td style="text-align: left;"><a href="#variable-knormal"><strong>kNormal</strong></a>   = <code>"Normal"</code><br><em>float32 world shading normal (xyz).</em></td>
+<td style="text-align: left;"><a href="#variable-knormal"><strong>kNormal</strong></a>   = <code>/* multi line expression */</code><br><em>float32 world shading normal (xyz).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
-<td style="text-align: left;"><a href="#variable-kprimid"><strong>kPrimId</strong></a>   = <code>"PrimId"</code><br><em>uint32, 0 for background.</em></td>
+<td style="text-align: left;"><a href="#variable-kprimid"><strong>kPrimId</strong></a>   = <code>/* multi line expression */</code><br><em>uint32, 0 for background.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
-<td style="text-align: left;"><a href="#variable-krawdn"><strong>kRawDn</strong></a>   = <code>"RawDN"</code><br><em>uint16 per sensor channel.</em></td>
+<td style="text-align: left;"><a href="#variable-krawdn"><strong>kRawDn</strong></a>   = <code>/* multi line expression */</code><br><em>uint16 per sensor channel.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
-<td style="text-align: left;"><a href="#variable-kspectralradiance"><strong>kSpectralRadiance</strong></a>   = <code>"SpectralRadiance"</code><br><em>float32 spectral radiance at each sensor pixel, W m^-2 sr^-1 nm^-1, (bands, rows, cols).</em></td>
+<td style="text-align: left;"><a href="#variable-kspectralradiance"><strong>kSpectralRadiance</strong></a>   = <code>/* multi line expression */</code><br><em>float32 spectral radiance at each sensor pixel, W m^-2 sr^-1 nm^-1, (bands, rows, cols).</em></td>
 </tr>
 </tbody>
 </table>
@@ -298,7 +298,8 @@
 <p><em>float32 (x, y): how far, in sensor pixels, the point a pixel sees has moved across the image since the last frame (this frame's position minus the last's, x right and y down), from the camera's motion and the meshes', instances' and points' own; zero on a camera's first frame and for pushbroom cameras.</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kMotionVector;
 </code></pre>
-<p>Opt-in: "every var" leaves it out, as it costs extra passes. </p>
+<p>Opt-in: "every
+var" leaves it out, as it costs extra passes. </p>
 <hr>
 
 <h3 id="variable-knormal">variable kNormal</h3>

@@ -217,42 +217,50 @@
 
 namespace ernie {
 
-double GetNumber(const Scene&amp; scene, const Path&amp; path, std::string_view attribute, double fallback);
+double GetNumber(const Scene&amp; scene, const Path&amp; path,
+                 std::string_view attribute, double fallback);
 
-bool GetBool(const Scene&amp; scene, const Path&amp; path, std::string_view attribute, bool fallback);
+bool GetBool(const Scene&amp; scene, const Path&amp; path,
+             std::string_view attribute, bool fallback);
 
-glm::dvec2 GetVec2(const Scene&amp; scene, const Path&amp; path, std::string_view attribute,
-                   glm::dvec2 fallback);
+glm::dvec2 GetVec2(const Scene&amp; scene, const Path&amp; path,
+                   std::string_view attribute, glm::dvec2 fallback);
 
-glm::dvec3 GetVec3(const Scene&amp; scene, const Path&amp; path, std::string_view attribute,
-                   glm::dvec3 fallback);
+glm::dvec3 GetVec3(const Scene&amp; scene, const Path&amp; path,
+                   std::string_view attribute, glm::dvec3 fallback);
 
-std::optional&lt;std::vector&lt;float&gt;&gt; GetFloats(const Scene&amp; scene, const Path&amp; path,
-                                            std::string_view attribute);
+std::optional&lt;std::vector&lt;float&gt;&gt;
+GetFloats(const Scene&amp; scene, const Path&amp; path,
+          std::string_view attribute);
 
-std::string GetToken(const Scene&amp; scene, const Path&amp; path, std::string_view attribute,
+std::string GetToken(const Scene&amp; scene, const Path&amp; path,
+                     std::string_view attribute,
                      std::string_view fallback);
 
-Path GetTarget(const Scene&amp; scene, const Path&amp; path, std::string_view attribute);
+Path GetTarget(const Scene&amp; scene, const Path&amp; path,
+               std::string_view attribute);
 
 struct Connection {
     Path prim;
     std::string output;
 };
 
-std::optional&lt;Connection&gt; GetConnection(const Scene&amp; scene, const Path&amp; path,
+std::optional&lt;Connection&gt; GetConnection(const Scene&amp; scene,
+                                        const Path&amp; path,
                                         std::string_view input);
 
-void Connect(Scene&amp; scene, const Path&amp; path, std::string_view input, const Path&amp; source,
-             std::string_view output);
+void Connect(Scene&amp; scene, const Path&amp; path, std::string_view input,
+             const Path&amp; source, std::string_view output);
 
-glm::dmat4 LookAtTransform(glm::dvec3 eye, glm::dvec3 target, glm::dvec3 up);
+glm::dmat4 LookAtTransform(glm::dvec3 eye, glm::dvec3 target,
+                           glm::dvec3 up);
 
 glm::dmat4 DistantLightTransform(glm::dvec3 towardsLight);
 
 glm::dvec3 TowardsLight(const Scene&amp; scene, const Path&amp; light);
 
-void SetCamera(Scene&amp; scene, const Path&amp; path, const CameraParams&amp; camera);
+void SetCamera(Scene&amp; scene, const Path&amp; path,
+               const CameraParams&amp; camera);
 
 }  // namespace ernie
 </code></pre>

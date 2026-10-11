@@ -213,11 +213,13 @@
 namespace ernie {
 
 template &lt;std::size_t N&gt;
-std::array&lt;double, N&gt; SolveNormal(std::array&lt;std::array&lt;double, N&gt;, N&gt; normal,
-                                  std::array&lt;double, N&gt; right, std::size_t n) {
+std::array&lt;double, N&gt;
+SolveNormal(std::array&lt;std::array&lt;double, N&gt;, N&gt; normal,
+            std::array&lt;double, N&gt; right, std::size_t n) {
     std::array&lt;double, N&gt; scale{};
     for (std::size_t i = 0; i &lt; n; ++i) {
-        scale[i] = normal[i][i] &gt; 0.0 ? 1.0 / std::sqrt(normal[i][i]) : 0.0;
+        scale[i] =
+            normal[i][i] &gt; 0.0 ? 1.0 / std::sqrt(normal[i][i]) : 0.0;
     }
     for (std::size_t i = 0; i &lt; n; ++i) {
         for (std::size_t j = 0; j &lt; n; ++j) {
@@ -263,7 +265,8 @@ template &lt;std::size_t N&gt; struct NormalEquations {
     std::array&lt;std::array&lt;double, N&gt;, N&gt; normal{};
     std::array&lt;double, N&gt; right{};
 
-    void Add(const std::array&lt;double, N&gt;&amp; row, double value, std::size_t n = N) {
+    void Add(const std::array&lt;double, N&gt;&amp; row, double value,
+             std::size_t n = N) {
         for (std::size_t i = 0; i &lt; n; ++i) {
             for (std::size_t j = 0; j &lt; n; ++j) {
                 normal[i][j] += row[i] * row[j];

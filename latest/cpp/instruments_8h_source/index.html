@@ -218,7 +218,8 @@ enum class LrocNac {
     Right,  
 };
 
-void AuthorLrocNac(Scene&amp; scene, const Path&amp; camera, const Path&amp; product,
+void AuthorLrocNac(Scene&amp; scene, const Path&amp; camera,
+                   const Path&amp; product,
                    LrocNac which = LrocNac::Left);
 
 enum class LrocWacBand {
@@ -245,7 +246,8 @@ LrocWacBandSpec LrocWacBandOf(LrocWacBand band);
 
 LrocWacBand LrocWacBandNamed(int nanometres);
 
-void AuthorLrocWac(Scene&amp; scene, const Path&amp; camera, const Path&amp; product,
+void AuthorLrocWac(Scene&amp; scene, const Path&amp; camera,
+                   const Path&amp; product,
                    LrocWacBand band = LrocWacBand::Vis605);
 
 enum class BayerPattern { Rggb = 0, Bggr = 1, Grbg = 2, Gbrg = 3 };
@@ -259,20 +261,26 @@ struct Mars2020Navcam {
     static constexpr std::uint32_t kHeight = 3840;
     static constexpr double kPixelPitchUm = 6.4;
     static constexpr double kFieldOfViewDeg[3] = {96.0, 73.0, 120.0};
-    static constexpr double kElectronsPerDn = 1.0 / 0.24;  
-    static constexpr double kDarkNoiseElectrons = 8.0;     
+    static constexpr double kElectronsPerDn =
+        1.0 / 0.24;  
+    static constexpr double kDarkNoiseElectrons =
+        8.0;  
     static constexpr double kFullWellElectrons = 15000.0;
     static constexpr int kAdcBits = 12;
 
     static double FisheyeK1();
 };
 
-void AuthorMars2020Navcam(Scene&amp; scene, const Path&amp; camera, const Path&amp; product,
-                          BayerPattern pattern = BayerPattern::Rggb, double jpegQuality = 85.0);
+void AuthorMars2020Navcam(Scene&amp; scene, const Path&amp; camera,
+                          const Path&amp; product,
+                          BayerPattern pattern = BayerPattern::Rggb,
+                          double jpegQuality = 85.0);
 
-void AuthorMars2020NavcamPair(Scene&amp; scene, const Path&amp; rig, const Path&amp; leftProduct,
-                              const Path&amp; rightProduct, BayerPattern pattern = BayerPattern::Rggb,
-                              double jpegQuality = 85.0);
+void AuthorMars2020NavcamPair(
+    Scene&amp; scene, const Path&amp; rig, const Path&amp; leftProduct,
+    const Path&amp; rightProduct,
+    BayerPattern pattern = BayerPattern::Rggb,
+    double jpegQuality = 85.0);
 
 enum class Mars2020Hazcams { Front, Rear };
 
@@ -282,18 +290,23 @@ struct Mars2020Hazcam {
     static constexpr double kBestFocusM = 0.9;
     static constexpr double kFrontBaselineM = 0.248;
     static constexpr double kRearBaselineM = 0.934;
-    static constexpr double kFieldOfViewDeg[3] = {136.0, 102.0, 172.0};
+    static constexpr double kFieldOfViewDeg[3] = {136.0, 102.0,
+                                                  172.0};
 
     static double FisheyeK1();
 };
 
-void AuthorMars2020Hazcam(Scene&amp; scene, const Path&amp; camera, const Path&amp; product,
-                          BayerPattern pattern = BayerPattern::Rggb, double jpegQuality = 85.0);
+void AuthorMars2020Hazcam(Scene&amp; scene, const Path&amp; camera,
+                          const Path&amp; product,
+                          BayerPattern pattern = BayerPattern::Rggb,
+                          double jpegQuality = 85.0);
 
-void AuthorMars2020HazcamPair(Scene&amp; scene, const Path&amp; rig, const Path&amp; leftProduct,
-                              const Path&amp; rightProduct,
-                              Mars2020Hazcams which = Mars2020Hazcams::Front,
-                              BayerPattern pattern = BayerPattern::Rggb, double jpegQuality = 85.0);
+void AuthorMars2020HazcamPair(
+    Scene&amp; scene, const Path&amp; rig, const Path&amp; leftProduct,
+    const Path&amp; rightProduct,
+    Mars2020Hazcams which = Mars2020Hazcams::Front,
+    BayerPattern pattern = BayerPattern::Rggb,
+    double jpegQuality = 85.0);
 
 enum class MastcamZEye { Left, Right };
 
@@ -308,7 +321,8 @@ struct MastcamZ {
     static constexpr double kWidestFNumber = 6.7;
     static constexpr double kNarrowestFNumber = 9.5;
     static constexpr double kBaselineM = 0.244;
-    static constexpr double kToeInDeg = 1.15;  
+    static constexpr double kToeInDeg =
+        1.15;  
     static constexpr double kPeakQe = 0.40;
 
     struct Filter {
@@ -319,18 +333,22 @@ struct MastcamZ {
     static Filter FilterOf(MastcamZEye eye, int filter);
     static std::array&lt;Filter, 3&gt; BayerOf(MastcamZEye eye);
     static double FNumberAt(double focalLengthMm);
-    static double FullWellElectrons(MastcamZEye eye);   
-    static double ReadNoiseElectrons(MastcamZEye eye);  
+    static double FullWellElectrons(
+        MastcamZEye eye);  
+    static double
+    ReadNoiseElectrons(MastcamZEye eye);  
 };
 
-void AuthorMastcamZ(Scene&amp; scene, const Path&amp; camera, const Path&amp; product, MastcamZEye eye,
-                    int filter, double focalLengthMm = MastcamZ::kShortestFocalMm,
+void AuthorMastcamZ(Scene&amp; scene, const Path&amp; camera,
+                    const Path&amp; product, MastcamZEye eye, int filter,
+                    double focalLengthMm = MastcamZ::kShortestFocalMm,
                     BayerPattern pattern = BayerPattern::Rggb);
 
-void AuthorMastcamZPair(Scene&amp; scene, const Path&amp; rig, const Path&amp; leftProduct,
-                        const Path&amp; rightProduct, int leftFilter, int rightFilter,
-                        double focalLengthMm = MastcamZ::kShortestFocalMm,
-                        BayerPattern pattern = BayerPattern::Rggb);
+void AuthorMastcamZPair(
+    Scene&amp; scene, const Path&amp; rig, const Path&amp; leftProduct,
+    const Path&amp; rightProduct, int leftFilter, int rightFilter,
+    double focalLengthMm = MastcamZ::kShortestFocalMm,
+    BayerPattern pattern = BayerPattern::Rggb);
 
 }  // namespace ernie
 </code></pre>

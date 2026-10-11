@@ -421,19 +421,23 @@
 namespace ernie {
 
 class RenderSettingsBase : public Imageable {
-    ERNIE_SCHEMA_BODY(RenderSettingsBase, Imageable, ERNIE_RENDER_SETTINGS_BASE_ALL)
+    ERNIE_SCHEMA_BODY(RenderSettingsBase, Imageable,
+                      ERNIE_RENDER_SETTINGS_BASE_ALL)
 };
 
 class RenderSettings : public RenderSettingsBase {
-    ERNIE_SCHEMA_BODY(RenderSettings, RenderSettingsBase, ERNIE_RENDER_SETTINGS_ALL)
+    ERNIE_SCHEMA_BODY(RenderSettings, RenderSettingsBase,
+                      ERNIE_RENDER_SETTINGS_ALL)
     ERNIE_SCHEMA_DEFINE(RenderSettings)
 
 
-    static RenderSettings OrFallbacks(const Scene&amp; scene, const Path&amp; path);
+    static RenderSettings OrFallbacks(const Scene&amp; scene,
+                                      const Path&amp; path);
 };
 
 class RenderProduct : public RenderSettingsBase {
-    ERNIE_SCHEMA_BODY(RenderProduct, RenderSettingsBase, ERNIE_RENDER_PRODUCT_ALL)
+    ERNIE_SCHEMA_BODY(RenderProduct, RenderSettingsBase,
+                      ERNIE_RENDER_PRODUCT_ALL)
     ERNIE_SCHEMA_DEFINE(RenderProduct)
 };
 
@@ -443,7 +447,8 @@ class RenderVar : public Imageable {
 };
 
 class SensorFilterPrim : public Imageable {
-    ERNIE_SCHEMA_BODY(SensorFilterPrim, Imageable, ERNIE_SENSOR_FILTER_ALL)
+    ERNIE_SCHEMA_BODY(SensorFilterPrim, Imageable,
+                      ERNIE_SENSOR_FILTER_ALL)
     ERNIE_SCHEMA_DEFINE(SensorFilterPrim)
 };
 

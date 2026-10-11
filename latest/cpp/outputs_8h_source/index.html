@@ -259,7 +259,8 @@ class FrameImages {
 
 class ChunkedFrameImages final : public FrameImages {
   public:
-    explicit ChunkedFrameImages(std::vector&lt;std::unique_ptr&lt;FrameImages&gt;&gt; chunks);
+    explicit ChunkedFrameImages(
+        std::vector&lt;std::unique_ptr&lt;FrameImages&gt;&gt; chunks);
 
     VkExtent2D Extent() const override {
         return chunks_.front()-&gt;Extent();
@@ -284,7 +285,8 @@ struct ProductFrame;
 class RenderVarOutput {
   public:
     RenderVarOutput() = default;
-    RenderVarOutput(std::shared_ptr&lt;ProductFrame&gt; frame, Path path, std::string name);
+    RenderVarOutput(std::shared_ptr&lt;ProductFrame&gt; frame, Path path,
+                    std::string name);
 
     const Path&amp; GetPath() const {
         return path_;
@@ -303,7 +305,8 @@ class RenderVarOutput {
 
     DType Type() const;
 
-    MappedRenderVar Map(MapDevice device, std::uintptr_t syncStream = 1);
+    MappedRenderVar Map(MapDevice device,
+                        std::uintptr_t syncStream = 1);
 
     void Unmap(std::uintptr_t stream = 1);
 
@@ -311,7 +314,8 @@ class RenderVarOutput {
 
   private:
     std::vector&lt;GpuImage*&gt; Images() const;
-    MappedRenderVar MapLinear(const FrameImages::LinearVar&amp; linear, MapDevice device,
+    MappedRenderVar MapLinear(const FrameImages::LinearVar&amp; linear,
+                              MapDevice device,
                               std::uintptr_t syncStream);
 
     std::shared_ptr&lt;ProductFrame&gt; frame_;
@@ -328,10 +332,12 @@ using RenderProductSetOutputs = std::map&lt;Path, RenderProductOutput&gt;;
 
 class StepOperation {
   public:
-    StepOperation(const VulkanContext&amp; context, std::uint64_t submission,
+    StepOperation(const VulkanContext&amp; context,
+                  std::uint64_t submission,
                   RenderProductSetOutputs outputs);
 
-    bool Wait(std::chrono::nanoseconds timeout = std::chrono::nanoseconds::max());
+    bool Wait(std::chrono::nanoseconds timeout =
+                  std::chrono::nanoseconds::max());
 
     bool Done() {
         return Wait(std::chrono::nanoseconds::zero());

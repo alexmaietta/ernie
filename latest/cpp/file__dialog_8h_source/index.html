@@ -235,12 +235,14 @@ struct DirectoryEntry {
     std::filesystem::file_time_type modified{};
 };
 
-std::vector&lt;DirectoryEntry&gt; ListDirectory(const std::filesystem::path&amp; directory,
-                                          const FileFilter* filter, bool showHidden);
+std::vector&lt;DirectoryEntry&gt;
+ListDirectory(const std::filesystem::path&amp; directory,
+              const FileFilter* filter, bool showHidden);
 
-std::optional&lt;std::filesystem::path&gt; ChosenPath(const std::filesystem::path&amp; directory,
-                                                const std::string&amp; name, const FileFilter* filter,
-                                                bool save);
+std::optional&lt;std::filesystem::path&gt;
+ChosenPath(const std::filesystem::path&amp; directory,
+           const std::string&amp; name, const FileFilter* filter,
+           bool save);
 
 class FileDialog {
   public:
@@ -294,7 +296,8 @@ class FileDialog {
 
     bool Accept(const std::string&amp; name = {});
 
-    const std::optional&lt;std::filesystem::path&gt;&amp; ReplacePending() const {
+    const std::optional&lt;std::filesystem::path&gt;&amp;
+    ReplacePending() const {
         return replace_;
     }
 

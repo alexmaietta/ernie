@@ -226,16 +226,22 @@ bool IsSessionPath(const Path&amp; path);
 
 std::vector&lt;Path&gt; ViewableCameras(const Scene&amp; scene);
 
-void AuthorControllerCamera(Scene&amp; scene, const Path&amp; path, const OrbitController&amp; controller,
-                            std::uint32_t width, std::uint32_t height, bool orthographic = false);
+void AuthorControllerCamera(Scene&amp; scene, const Path&amp; path,
+                            const OrbitController&amp; controller,
+                            std::uint32_t width, std::uint32_t height,
+                            bool orthographic = false);
 
-OrbitController ControllerFromTransform(const glm::dmat4&amp; world, float distance, float verticalFov);
+OrbitController ControllerFromTransform(const glm::dmat4&amp; world,
+                                        float distance,
+                                        float verticalFov);
 
-glm::dmat4 LocalFromWorld(const Scene&amp; scene, const Path&amp; path, const glm::dmat4&amp; world);
+glm::dmat4 LocalFromWorld(const Scene&amp; scene, const Path&amp; path,
+                          const glm::dmat4&amp; world);
 
-void MirrorSettings(Scene&amp; scene, const Path&amp; source, const Path&amp; session,
-                    const std::map&lt;std::string, Value, std::less&lt;&gt;&gt;&amp; overrides,
-                    std::map&lt;std::string, std::uint64_t&gt;&amp; versions);
+void MirrorSettings(
+    Scene&amp; scene, const Path&amp; source, const Path&amp; session,
+    const std::map&lt;std::string, Value, std::less&lt;&gt;&gt;&amp; overrides,
+    std::map&lt;std::string, std::uint64_t&gt;&amp; versions);
 
 const Path&amp; CameraLightPath();
 
@@ -245,7 +251,8 @@ void UpdateSessionLights(Scene&amp; scene, const glm::dmat4&amp; cameraWorld);
 
 bool HasStageLights(const Scene&amp; scene);
 
-std::optional&lt;Bounds3&gt; Union(const std::vector&lt;std::optional&lt;Bounds3&gt;&gt;&amp; bounds);
+std::optional&lt;Bounds3&gt;
+Union(const std::vector&lt;std::optional&lt;Bounds3&gt;&gt;&amp; bounds);
 
 }  // namespace ernie::app
 </code></pre>

@@ -229,8 +229,9 @@ struct IsdRotation {
     IsdSamples&lt;glm::dquat&gt; quaternions;
     std::vector&lt;std::int64_t&gt; timeDependentFrames;
     std::vector&lt;std::int64_t&gt; constantFrames;
-    glm::dmat3 constantRotation{1.0};  
-    std::int64_t referenceFrame = 1;   
+    glm::dmat3 constantRotation{
+        1.0};  
+    std::int64_t referenceFrame = 1;  
 };
 
 struct IsdSensor {
@@ -263,8 +264,10 @@ struct IsdSensor {
     IsdSamples&lt;glm::dvec3&gt; velocities;
     std::int64_t positionFrame = 1;
     IsdSamples&lt;glm::dvec3&gt; sunPositions;
-    IsdRotation pointing;      
-    IsdRotation bodyRotation;  
+    IsdRotation
+        pointing;  
+    IsdRotation
+        bodyRotation;  
 
     double exposureDuration = 0.0;
     double interframeDelay = 0.0;
@@ -308,19 +311,25 @@ class IsdCameraModel {
   protected:
     explicit IsdCameraModel(IsdSensor isd);
 
-    static glm::dquat RotationAt(const IsdRotation&amp; rotation, double time);
+    static glm::dquat RotationAt(const IsdRotation&amp; rotation,
+                                 double time);
     glm::dvec2 FocalPlaneOf(double line, double sample) const;
     glm::dvec2 PixelOf(glm::dvec2 focal) const;
-    glm::dvec2 FocalPlaneView(const glm::dvec3&amp; ground, double time) const;
+    glm::dvec2 FocalPlaneView(const glm::dvec3&amp; ground,
+                              double time) const;
     glm::dvec3 LookAt(double time, double line, double sample) const;
-    glm::dvec3 EllipsoidIntersect(const glm::dvec3&amp; origin, const glm::dvec3&amp; look, double height,
+    glm::dvec3 EllipsoidIntersect(const glm::dvec3&amp; origin,
+                                  const glm::dvec3&amp; look,
+                                  double height,
                                   bool eitherSide = true) const;
     glm::dmat3 ErnieAxes(double line, double facing) const;
     glm::dmat4 PoseAt(double time, const glm::dmat3&amp; axes) const;
-    double FitDistortion(CameraParams&amp; camera, std::span&lt;const double&gt; lines,
+    double FitDistortion(CameraParams&amp; camera,
+                         std::span&lt;const double&gt; lines,
                          const glm::dmat3&amp; axes, double facing) const;
-    FrameView FrameViewOf(const std::function&lt;double(double)&gt;&amp; detectorLine, std::uint32_t rows,
-                          double time, double facing) const;
+    FrameView
+    FrameViewOf(const std::function&lt;double(double)&gt;&amp; detectorLine,
+                std::uint32_t rows, double time, double facing) const;
 
     IsdSensor isd_;
 
@@ -341,7 +350,8 @@ class IsdLineScanner : public IsdCameraModel {
 
     glm::dvec3 Look(double line, double sample) const;
 
-    glm::dvec3 ImageToGround(double line, double sample, double height = 0.0) const;
+    glm::dvec3 ImageToGround(double line, double sample,
+                             double height = 0.0) const;
 
     glm::dvec2 GroundToImage(const glm::dvec3&amp; ground) const;
 
@@ -356,7 +366,8 @@ class IsdLineScanner : public IsdCameraModel {
     Strip StripOf(std::uint32_t firstLine, std::uint32_t lines) const;
 
   private:
-    glm::dvec2 DetectorView(const glm::dvec3&amp; ground, double time) const;
+    glm::dvec2 DetectorView(const glm::dvec3&amp; ground,
+                            double time) const;
 };
 
 class IsdPushFrame : public IsdCameraModel {
@@ -371,7 +382,8 @@ class IsdPushFrame : public IsdCameraModel {
 
     glm::dvec3 Look(double line, double sample) const;
 
-    glm::dvec3 ImageToGround(double line, double sample, double height = 0.0) const;
+    glm::dvec3 ImageToGround(double line, double sample,
+                             double height = 0.0) const;
 
     glm::dvec2 GroundToImage(const glm::dvec3&amp; ground) const;
 
@@ -387,7 +399,8 @@ class IsdPushFrame : public IsdCameraModel {
   private:
     int TimeOrder(double line) const;
     double DetectorLine(double line) const;
-    double FrameDistance(int framelet, const glm::dvec3&amp; ground) const;
+    double FrameDistance(int framelet,
+                         const glm::dvec3&amp; ground) const;
 };
 
 class IsdFrame : public IsdCameraModel {
@@ -402,7 +415,8 @@ class IsdFrame : public IsdCameraModel {
 
     glm::dvec3 Look(double line, double sample) const;
 
-    glm::dvec3 ImageToGround(double line, double sample, double height = 0.0) const;
+    glm::dvec3 ImageToGround(double line, double sample,
+                             double height = 0.0) const;
 
     glm::dvec2 GroundToImage(const glm::dvec3&amp; ground) const;
 

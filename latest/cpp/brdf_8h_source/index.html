@@ -227,7 +227,8 @@ struct BrdfParam {
 };
 
 struct BrdfModel {
-    std::string id;    
+    std::string
+        id;  
     std::string name;  
     std::string description;
     std::vector&lt;std::string&gt; references;
@@ -264,7 +265,8 @@ std::vector&lt;ShaderModuleSource&gt; BrdfModules(const BrdfModel&amp; model);
 
 std::string BrdfModuleName(const BrdfModel&amp; model);
 
-std::vector&lt;float&gt; ResolveBrdfParams(const BrdfModel&amp; model, std::span&lt;const float&gt; values);
+std::vector&lt;float&gt; ResolveBrdfParams(const BrdfModel&amp; model,
+                                     std::span&lt;const float&gt; values);
 
 }  // namespace ernie
 </code></pre>

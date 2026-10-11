@@ -215,13 +215,15 @@ namespace ernie {
 
 class Scene;
 
-void LoadScene(Scene&amp; scene, std::string_view json, std::span&lt;const Tensor&gt; arrays = {});
+void LoadScene(Scene&amp; scene, std::string_view json,
+               std::span&lt;const Tensor&gt; arrays = {});
 
 void LoadSceneFile(Scene&amp; scene, const std::filesystem::path&amp; path);
 
 std::string SaveScene(const Scene&amp; scene);
 
-void SaveSceneFile(const Scene&amp; scene, const std::filesystem::path&amp; path);
+void SaveSceneFile(const Scene&amp; scene,
+                   const std::filesystem::path&amp; path);
 
 }  // namespace ernie
 </code></pre>

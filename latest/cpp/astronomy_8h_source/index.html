@@ -220,21 +220,26 @@ struct StarCatalogue {
     std::vector&lt;float&gt; colorIndex;
 };
 
-StarCatalogue SyntheticStars(std::size_t count, std::uint64_t seed = 1, double faintest = 6.5);
+StarCatalogue SyntheticStars(std::size_t count,
+                             std::uint64_t seed = 1,
+                             double faintest = 6.5);
 
 inline constexpr double kMagnitudeZeroLux = 2.54e-6;
 
-double StarIlluminance(double magnitude, double zeroPoint = kMagnitudeZeroLux);
+double StarIlluminance(double magnitude,
+                       double zeroPoint = kMagnitudeZeroLux);
 
 double ColorIndexToTemperature(double colorIndex);
 
-double BlackbodySpectralIrradiance(double wavelengthNm, double kelvin, double lux);
+double BlackbodySpectralIrradiance(double wavelengthNm, double kelvin,
+                                   double lux);
 
 double JulianDate(int year, int month, int day, double hours = 0.0);
 
 double GreenwichMeanSiderealTime(double julianDate);
 
-glm::dmat4 CelestialToLocal(double latitude, double longitude, double julianDate);
+glm::dmat4 CelestialToLocal(double latitude, double longitude,
+                            double julianDate);
 
 }  // namespace ernie
 </code></pre>

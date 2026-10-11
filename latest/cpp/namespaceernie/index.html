@@ -265,12 +265,16 @@
 </thead>
 <tbody>
 <tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1Atmosphere/"><strong>Atmosphere</strong></a> <br><em>A spherical shell of constituents around a planet of radius</em> <code>bottomRadius</code> <em>, up to</em><code>bottomRadius + topAltitude</code> <em>.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1AttributeDef/"><strong>AttributeDef</strong></a> <br><em>One declared attribute of a prim type.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1AttributeMeta/"><strong>AttributeMeta</strong></a> <br><em>How an attribute is described and edited. Declared with designated initializers in this order.</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1AttributeMeta/"><strong>AttributeMeta</strong></a> <br><em>How an attribute is described and edited.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -335,6 +339,14 @@
 <tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1AxisShape/"><strong>AxisShape</strong></a> <br><em>An implicit shape centred on its origin along one of its axes: a cylinder, cone, capsule or plane.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1BandedAtmosphere/"><strong>BandedAtmosphere</strong></a> <br><em>An atmosphere averaged over a camera's spectral bands, ready for rendering.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1BandedConstituent/"><strong>BandedConstituent</strong></a> <br><em>A constituent averaged over a camera's spectral bands.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
@@ -406,7 +418,11 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1Connection/"><strong>Connection</strong></a> <br><em>The source of a UsdShade connection: a</em> <a href="../classernie_1_1Shader/"><em><strong>Shader</strong></em></a> <em>prim and one of its outputs, e.g. "outputs:rgb".</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1Connection/"><strong>Connection</strong></a> <br><em>The source of a UsdShade connection: a</em> <a href="../classernie_1_1Shader/"><em><strong>Shader</strong></em></a> <em>prim and one of its outputs, e.g.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1Constituent/"><strong>Constituent</strong></a> <br><em>One constituent of an atmosphere:</em> <code>numberDensity</code> <em>particles per m^3 where its profile is 1.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
@@ -431,6 +447,14 @@
 <tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1CylinderLight/"><strong>CylinderLight</strong></a> <br><em>A cylinder along its x axis emitting from its side as a Lambertian emitter, not its caps.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1DensityLayer/"><strong>DensityLayer</strong></a> <br><em>One term of a vertical density profile, relative to the profile's reference density.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1DensityProfile/"><strong>DensityProfile</strong></a> <br><em>A vertical density profile: the weighted mean of its layers, so 1 at the ground for exponential and double exponential layers.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -475,6 +499,10 @@
 <tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1DomeSunExtraction/"><strong>DomeSunExtraction</strong></a> <br><em>The sun of a latitude-longitude dome map (</em> <code>tokens::kLightTexture</code> <em>layout) and the map without it, for lighting the sun as a shadowed distant light while the dome keeps the rest of the sky.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1EarthAtmosphereOptions/"><strong>EarthAtmosphereOptions</strong></a> <br><em>Earth's atmosphere: an isothermal dry-air column, ozone in a tent profile and a haze aerosol.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
@@ -614,6 +642,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1LogNormalMode/"><strong>LogNormalMode</strong></a> <br><em>One mode of a log-normal particle size distribution: the number of particles per unit ln(r) is Gaussian with median radius</em> <code>medianRadius</code> <em>(m) and standard deviation</em><code>sigma</code> <em>, and the mode holds</em><code>relativeNumber</code> <em>particles relative to the other modes.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1LrocWacBandSpec/"><strong>LrocWacBandSpec</strong></a> <br><em>One WAC band's published values.</em></td>
 </tr>
 <tr>
@@ -626,7 +658,11 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1Mars2020Navcam/"><strong>Mars2020Navcam</strong></a> <br><em>The Mars 2020 rover Perseverance's Navcam pair (Maki et al. 2020, Table 2).</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1Mars2020Navcam/"><strong>Mars2020Navcam</strong></a> <br><em>The Mars 2020 rover Perseverance's Navcam pair (Maki et al.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1MarsAtmosphereOptions/"><strong>MarsAtmosphereOptions</strong></a> <br><em>Mars's atmosphere: an isothermal CO2 column and suspended dust.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -647,6 +683,10 @@
 <tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1MeshData/"><strong>MeshData</strong></a> <br><em>Triangle mesh geometry in a mesh's own frame.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1MieEfficiencies/"><strong>MieEfficiencies</strong></a> <br><em>Mie efficiencies of a homogeneous sphere: cross sections over the geometric cross section pi r^2, and the asymmetry parameter g (the mean cosine of the scattering angle).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -695,6 +735,10 @@
 <tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1OverlayTriangle/"><strong>OverlayTriangle</strong></a> <br><em>A filled triangle.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1ParticleOptics/"><strong>ParticleOptics</strong></a> <br><em>Mean optical properties per particle of a particle population at one wavelength: scattering and absorption cross sections (m^2) and the phase function at the requested cosines.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
@@ -747,6 +791,10 @@
 <tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1RectLight/"><strong>RectLight</strong></a> <br><em>A rectangle in its xy plane emitting along -z.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1RefractiveIndex/"><strong>RefractiveIndex</strong></a> <br><em>A complex refractive index tabulated at increasing wavelengths (nm), linearly interpolated and constant beyond its ends.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
@@ -870,7 +918,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1ShaderModuleSource/"><strong>ShaderModuleSource</strong></a> <br><em>One Slang module given as source text. Other modules</em> <code>import</code> <em>it by</em><code>name</code> <em>.</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1ShaderModuleSource/"><strong>ShaderModuleSource</strong></a> <br><em>One Slang module given as source text.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -1100,6 +1148,10 @@
 <td style="text-align: left;"><a href="#enum-occlusion"><strong>Occlusion</strong></a>  <br><em>Whether the rasterizer also culls instances hidden behind others (</em> <code>ernie:occlusion</code> <em>), with GPU culling and for views only (not shadow views).</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">typedef std::function&lt; <a href="../structernie_1_1ParticleOptics/"><strong>ParticleOptics</strong></a>(double wavelengthNm, std::span&lt; const double &gt;)&gt;</td>
+<td style="text-align: left;"><a href="#typedef-opticsmodel"><strong>OpticsModel</strong></a>  <br><em>Optical properties of one particle or molecule at a wavelength (nm), with the phase function at the given cosines.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">enum std::uint8_t</td>
 <td style="text-align: left;"><a href="#enum-overlaydepth"><strong>OverlayDepth</strong></a>  <br><em>How an overlay item meets the scene's surfaces.</em></td>
 </tr>
@@ -1165,6 +1217,10 @@
 <tr>
 <td style="text-align: right;">constexpr double</td>
 <td style="text-align: left;"><a href="#variable-kboltzmann"><strong>kBoltzmann</strong></a>   = <code>1.380649e-23</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr double</td>
+<td style="text-align: left;"><a href="#variable-kcarbondioxidekingfactor"><strong>kCarbonDioxideKingFactor</strong></a>   = <code>1.15</code><br><em>The King factor of CO2 (Bates 1984, as used by Bodhaine et al.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr int</td>
@@ -1236,6 +1292,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr double</td>
+<td style="text-align: left;"><a href="#variable-kstandardnumberdensity"><strong>kStandardNumberDensity</strong></a>   = <code>2.546899e25</code><br><em>Number density of an ideal gas at 288.15 K and 101325 Pa (m^-3), the reference state of the refractive indices below: Avogadro's number over the molar volume at 273.15 K, scaled to 288.15 K.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr double</td>
 <td style="text-align: left;"><a href="#variable-kstefanboltzmann"><strong>kStefanBoltzmann</strong></a>   = <code>5.670374419e-8</code><br></td>
 </tr>
 </tbody>
@@ -1249,6 +1309,18 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-airkingfactor"><strong>AirKingFactor</strong></a> (double wavelengthNm, double co2Fraction=360e-6) <br><em>The King correction factor (6 + 3 rho) / (6 - 7 rho) of dry air for molecular anisotropy, from Bates's factors for N2 and O2, 1 for Ar and 1.15 for CO2, weighted by volume fraction.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./#typedef-opticsmodel"><strong>OpticsModel</strong></a></td>
+<td style="text-align: left;"><a href="#function-airmolecules"><strong>AirMolecules</strong></a> (double co2Fraction=360e-6) <br><em>Molecules of dry air: Rayleigh scattering after Bodhaine et al.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-airrefractivity"><strong>AirRefractivity</strong></a> (double wavelengthNm, double co2Fraction=360e-6) <br><em>The refractivity n - 1 of dry air at 288.15 K and 101325 Pa with a CO2 volume fraction</em> <code>co2Fraction</code> <em>(e.g.</em></td>
+</tr>
 <tr>
 <td style="text-align: right;">constexpr bool</td>
 <td style="text-align: left;"><a href="#function-any"><strong>Any</strong></a> (<a href="./#enum-dirty"><strong>Dirty</strong></a> bits, <a href="./#enum-dirty"><strong>Dirty</strong></a> flags) <br><em>Whether</em> <code>bits</code> <em>has any of</em><code>flags</code> <em>.</em></td>
@@ -1298,6 +1370,10 @@
 <td style="text-align: left;"><a href="#function-axisnamed"><strong>AxisNamed</strong></a> (std::string_view name) <br><em>The axis named "X", "Y" or "Z"; none for anything else.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="../structernie_1_1BandedAtmosphere/"><strong>BandedAtmosphere</strong></a></td>
+<td style="text-align: left;"><a href="#function-bandaverage"><strong>BandAverage</strong></a> (const <a href="../structernie_1_1Atmosphere/"><strong>Atmosphere</strong></a> &amp; atmosphere, const <a href="../structernie_1_1SpectralBands/"><strong>SpectralBands</strong></a> &amp; bands, int phaseAngles=256) <br><em>Averages</em> <code>atmosphere</code> <em>over</em><code>bands</code> <em>, sampling each band every 10 nm or less.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::vector&lt; const <a href="../structernie_1_1PrimTypeDef/"><strong>PrimTypeDef</strong></a> * &gt;</td>
 <td style="text-align: left;"><a href="#function-baseschematypes"><strong>BaseSchemaTypes</strong></a> () <br><em>This file's types' registry entries, bases first (</em> <code>PrimTypes</code> <em>).</em></td>
 </tr>
@@ -1323,7 +1399,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">std::string</td>
-<td style="text-align: left;"><a href="#function-brdfmodulename"><strong>BrdfModuleName</strong></a> (const <a href="../structernie_1_1BrdfModel/"><strong>BrdfModel</strong></a> &amp; model) <br><em>Name under which</em> <code>BrdfModules</code> <em>loads</em><code>model</code> <em>'s module, e.g. "brdf_hapke".</em></td>
+<td style="text-align: left;"><a href="#function-brdfmodulename"><strong>BrdfModuleName</strong></a> (const <a href="../structernie_1_1BrdfModel/"><strong>BrdfModel</strong></a> &amp; model) <br><em>Name under which</em> <code>BrdfModules</code> <em>loads</em><code>model</code> <em>'s module, e.g.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1ShaderModuleSource/"><strong>ShaderModuleSource</strong></a> &gt;</td>
@@ -1352,6 +1428,14 @@
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1MeshData/"><strong>MeshData</strong></a></td>
 <td style="text-align: left;"><a href="#function-capsulemesh"><strong>CapsuleMesh</strong></a> (float radius, float height, <a href="./#enum-axis"><strong>Axis</strong></a> axis=Axis::Z, std::uint32_t slices=48, std::uint32_t stacks=24) <br><em>A cylinder of</em> <code>height</code> <em>with hemispherical caps of</em><code>radius</code> <em>beyond it, so its total length is height + 2 radius (UsdGeomCapsule, default radius 0.5, height 1).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./#typedef-opticsmodel"><strong>OpticsModel</strong></a></td>
+<td style="text-align: left;"><a href="#function-carbondioxidemolecules"><strong>CarbonDioxideMolecules</strong></a> (double co2Fraction) <br><em>Molecules of a CO2 atmosphere such as Mars's: Rayleigh scattering by CO2 at volume fraction</em> <code>co2Fraction</code> <em>(Owens 1967, Bates 1984), with the remainder (on Mars mostly N2 and Ar, whose refractivities are within 7% of air's) scattering as air.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-carbondioxiderefractivity"><strong>CarbonDioxideRefractivity</strong></a> (double wavelengthNm) <br><em>The refractivity n - 1 of CO2 at 288.15 K and 101325 Pa.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::dmat4</td>
@@ -1514,6 +1598,10 @@
 <td style="text-align: left;"><a href="#function-domeparamsof"><strong>DomeParamsOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, const <a href="../structernie_1_1SpectralBands/"><strong>SpectralBands</strong></a> &amp; bands) <br><em>The</em> <a href="../classernie_1_1DomeLight/"><em><strong>DomeLight</strong></em></a> <em>at</em><code>path</code> <em>for</em><code>bands</code> <em>: radiance</em><code>ernie:spectrum</code> <em>(W m^-2 sr^-1 nm^-1), or in relative units</em><code>inputs:intensity</code> <em>times 2^</em><code>inputs:exposure</code> <em>as luminance (cd/m^2) with the shape of</em><code>inputs:color</code> <em>and the enabled colour temperature; its map</em><code>ernie:texture</code> <em>(uniform without one) rotated by its transform.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="../structernie_1_1Atmosphere/"><strong>Atmosphere</strong></a></td>
+<td style="text-align: left;"><a href="#function-earthatmosphere"><strong>EarthAtmosphere</strong></a> (double radius, const <a href="../structernie_1_1EarthAtmosphereOptions/"><strong>EarthAtmosphereOptions</strong></a> &amp; options={}) <br><em>Earth's atmosphere over a planet of radius</em> <code>radius</code> <em>(m).</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">float</td>
 <td style="text-align: left;"><a href="#function-encodeslopedeviation"><strong>EncodeSlopeDeviation</strong></a> (float sigma) <br><em>A slope standard deviation</em> <code>sigma</code> <em>(0 or more) as a value in [0, 1) for 8-bit storage, sigma / (1 + sigma), finest near 0;</em><code>DecodeSlopeDeviation</code> <em>inverts it.</em></td>
 </tr>
@@ -1614,6 +1702,10 @@
 <td style="text-align: left;"><a href="#function-greenwichmeansiderealtime"><strong>GreenwichMeanSiderealTime</strong></a> (double julianDate) <br><em>The Greenwich mean sidereal time in degrees [0, 360) at Julian date</em> <code>julianDate</code> <em>(UT).</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">const <a href="../classernie_1_1RefractiveIndex/"><strong>RefractiveIndex</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-hematiterefractiveindex"><strong>HematiteRefractiveIndex</strong></a> () <br><em>The refractive index of hematite (alpha-Fe2O3) over 220-1000 nm, as tabulated by CosmoScout VR (CC0) after Ehlers et al., used with feldspar for Martian dust.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../structernie_1_1Image/"><strong>Image</strong></a></td>
 <td style="text-align: left;"><a href="#function-imageoftensor"><strong>ImageOfTensor</strong></a> (const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp; tensor, <a href="./#enum-imageencoding"><strong>ImageEncoding</strong></a> encoding) <br><em>A detail texture tensor as an</em> <code>Image</code> <em>: float32 values are linear; uint8 values are sRGB-encoded when</em><code>encoding</code> <em>is</em><code>Srgb</code> <em>and linear otherwise.</em></td>
 </tr>
@@ -1710,6 +1802,10 @@
 <td style="text-align: left;"><a href="#function-lrocwacbandof"><strong>LrocWacBandOf</strong></a> (<a href="./#enum-lrocwacband"><strong>LrocWacBand</strong></a> band) <br><em>Band</em> <code>band</code> <em>'s values (Robinson et al. 2010, Tables 3 and 4).</em></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="../structernie_1_1Atmosphere/"><strong>Atmosphere</strong></a></td>
+<td style="text-align: left;"><a href="#function-marsatmosphere"><strong>MarsAtmosphere</strong></a> (double radius, const <a href="../structernie_1_1MarsAtmosphereOptions/"><strong>MarsAtmosphereOptions</strong></a> &amp; options={}) <br><em>Mars's atmosphere over a planet of radius</em> <code>radius</code> <em>(m).</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::vector&lt; const <a href="../structernie_1_1PrimTypeDef/"><strong>PrimTypeDef</strong></a> * &gt;</td>
 <td style="text-align: left;"><a href="#function-materialschematypes"><strong>MaterialSchemaTypes</strong></a> () <br><em>This file's types' registry entries, bases first (</em> <code>PrimTypes</code> <em>).</em></td>
 </tr>
@@ -1722,8 +1818,24 @@
 <td style="text-align: left;"><a href="#function-maxfieldangle"><strong>MaxFieldAngle</strong></a> (const <a href="../structernie_1_1CameraParams/"><strong>CameraParams</strong></a> &amp; camera) <br><em>The largest field angle</em> <code>camera</code> <em>sees, at the corner of its image farthest from its principal point (its edges' midpoints for a fisheye whose field folds no earlier).</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::complex&lt; double &gt;</td>
+<td style="text-align: left;"><a href="#function-maxwellgarnett"><strong>MaxwellGarnett</strong></a> (std::complex&lt; double &gt; matrix, std::complex&lt; double &gt; inclusion, double fraction) <br><em>The effective refractive index of a matrix with spherical inclusions taking the volume fraction</em> <code>fraction</code> <em>, by the Maxwell Garnett mixing rule on the permittivities m^2.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../structernie_1_1MeshData/"><strong>MeshData</strong></a></td>
 <td style="text-align: left;"><a href="#function-meshdataof"><strong>MeshDataOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; mesh) <br><em>The geometry of the</em> <a href="../classernie_1_1Mesh/"><em><strong>Mesh</strong></em></a> <em>prim at</em><code>mesh</code> <em>:</em><code>points</code> <em>,</em><code>faceVertexCounts</code> <em>and</em><code>faceVertexIndices</code> <em>(triangulated as fans), per-vertex</em><code>normals</code> <em>, and per-vertex</em><code>primvars:displayColor</code> <em>when it has one colour per point.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./#typedef-opticsmodel"><strong>OpticsModel</strong></a></td>
+<td style="text-align: left;"><a href="#function-mieaerosol"><strong>MieAerosol</strong></a> (std::vector&lt; <a href="../structernie_1_1LogNormalMode/"><strong>LogNormalMode</strong></a> &gt; modes, <a href="../classernie_1_1RefractiveIndex/"><strong>RefractiveIndex</strong></a> refractiveIndex, int radiusSamples=96) <br><em>Spherical particles with a log-normal size distribution and a refractive index that may vary with wavelength (</em> <code>MieParticles</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1ParticleOptics/"><strong>ParticleOptics</strong></a></td>
+<td style="text-align: left;"><a href="#function-mieparticles"><strong>MieParticles</strong></a> (std::span&lt; const <a href="../structernie_1_1LogNormalMode/"><strong>LogNormalMode</strong></a> &gt; modes, std::complex&lt; double &gt; refractiveIndex, double wavelengthNm, std::span&lt; const double &gt; cosines, int radiusSamples=96) <br><em>The mean Mie optics per particle of spheres of refractive index</em> <code>refractiveIndex</code> <em>with a multi-mode log-normal size distribution, at</em><code>wavelengthNm</code> <em>: each mode integrated over ln(r) with</em><code>radiusSamples</code> <em>trapezoid samples, the phase function weighted by scattering cross section.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1MieEfficiencies/"><strong>MieEfficiencies</strong></a></td>
+<td style="text-align: left;"><a href="#function-miesphere"><strong>MieSphere</strong></a> (double sizeParameter, std::complex&lt; double &gt; refractiveIndex, std::span&lt; const double &gt; cosines, std::span&lt; double &gt; phase) <br><em>Mie scattering by a homogeneous sphere of size parameter</em> <code>sizeParameter</code> <em>(2 pi r / lambda) and relative refractive index</em><code>refractiveIndex</code> <em>(n + ik with k &gt;= 0 for absorption), with its unpolarised phase function at</em><code>cosines</code> <em>written to</em><code>phase</code> <em>(same size, or empty to skip), summing the series to Wiscombe's number of terms.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="./#enum-minimalmode"><strong>MinimalMode</strong></a></td>
@@ -1750,12 +1862,24 @@
 <td style="text-align: left;"><a href="#function-overscanof"><strong>OverscanOf</strong></a> (const <a href="../structernie_1_1CameraParams/"><strong>CameraParams</strong></a> &amp; camera) <br><em>How much wider than the sensor's the raster image's field of view must be for every sensor pixel's undistorted ray to land in it: 1 without distortion, else the largest ratio along the sensor's border, plus one percent.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-ozonecrosssection"><strong>OzoneCrossSection</strong></a> (double wavelengthNm) <br><em>The absorption cross section of ozone (m^2) at 233 K, the 10 nm averages of the IUP Bremen measurements over 360-840 nm (including the Chappuis band) as tabulated by CosmoScout VR's scattering-table generator, placed at the bin centres.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./#typedef-opticsmodel"><strong>OpticsModel</strong></a></td>
+<td style="text-align: left;"><a href="#function-ozonemolecules"><strong>OzoneMolecules</strong></a> () <br><em>Ozone molecules: absorption only (</em> <code>OzoneCrossSection</code> <em>).</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../structernie_1_1IesProfile/"><strong>IesProfile</strong></a></td>
 <td style="text-align: left;"><a href="#function-parseies"><strong>ParseIes</strong></a> (std::string_view text, const std::filesystem::path &amp; directory={}) <br><em>The profile of LM-63</em> <code>text</code> <em>(any of the 1986 to 2019 versions), of type A, B or C, with its tilt data from a TILT=INCLUDE block or a TILT=&lt;file&gt; named relative to</em><code>directory</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr glm::uvec3</td>
-<td style="text-align: left;"><a href="#function-pcg3d"><strong>Pcg3d</strong></a> (glm::uvec3 v) <br><em>The pcg3d hash: three well-mixed 32-bit words from three. Shaders implement the same function.</em></td>
+<td style="text-align: left;"><a href="#function-pcg3d"><strong>Pcg3d</strong></a> (glm::uvec3 v) <br><em>The pcg3d hash: three well-mixed 32-bit words from three.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; double &gt;</td>
+<td style="text-align: left;"><a href="#function-phasecosines"><strong>PhaseCosines</strong></a> (int count) <br><em>The scattering angles of tabulated phase functions: theta_i = pi (i / (count - 1))^2, dense near the forward direction where aerosols' diffraction peaks are narrow.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">double</td>
@@ -1792,6 +1916,14 @@
 <tr>
 <td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#function-quaternionswfirst"><strong>QuaternionsWFirst</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) <br><em>Whether the quaternions in the prim's arrays put w first (</em> <code>tokens::kQuaternionOrder</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-rayleighcrosssection"><strong>RayleighCrossSection</strong></a> (double wavelengthNm, double refractivity, double kingFactor) <br><em>The Rayleigh scattering cross section (m^2) of one molecule of a gas with refractivity</em> <code>refractivity</code> <em>at</em><code>kStandardNumberDensity</code> <em>and King factor</em><code>kingFactor</code> <em>: 24 pi^3 (n^2 - 1)^2 / (lambda^4 Ns^2 (n^2 + 2)^2) F.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-rayleighphase"><strong>RayleighPhase</strong></a> (double cosTheta, double kingFactor) <br><em>The Rayleigh phase function with depolarisation, for the King factor</em> <code>kingFactor</code> <em>(1 for isotropic molecules): 3 / (16 pi) ((1 + 3 gamma) + (1 - gamma) mu^2) / (1 + 2 gamma) with gamma = rho / (2.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1NamedCahvore/"><strong>NamedCahvore</strong></a> &gt;</td>
@@ -2021,6 +2153,8 @@
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
 <p>Spectral quantities for Ernie's spectral rendering: wavelengths in nanometres, spectral irradiance in W m^-2 nm^-1 and spectral radiance in W m^-2 sr^-1 nm^-1.</p>
+<p><a href="../classernie_1_1Light/"><strong>Light</strong></a> scattering by molecules and particles, for participating media such as atmospheres: Rayleigh scattering by gases, Mie scattering by spheres and particle size distributions, and tabulated absorption cross sections.</p>
+<p>A planet's atmosphere as constituents (gases, aerosols, absorbers) with physical optical properties and vertical density profiles, and its reduction to a camera's spectral bands.</p>
 <p>Deterministic random streams shared by every render backend.</p>
 <p>How every render delegate reads a <code>Scene</code>: which prims a render uses, its render products, and the camera, lights, materials, meshes and instances as plain data, so backends differ only in how they draw.</p>
 <p>Rays of a lens in the camera's frame, and the cube faces a wide camera's views are rendered on, for fields the single pinhole raster image cannot take (its tangent grows without bound towards 90 degrees off axis).</p>
@@ -2048,10 +2182,15 @@
 <p>The readers accept any numeric type an author might use for an attribute (an <code>int</code>, <code>float</code> or <code>double</code> number; a <code>vec</code> or <code>dvec</code> vector), since bindings such as Python's produce doubles.</p>
 <p>The camera's frame is USD's: x right, y up, looking down -z. A cube face is a square pinhole view of 90 degrees (plus a margin) along one of the camera's axes; the sensor follows each pixel's lens ray to the face it leaves through. kernel/film/cube_faces.slang holds the same conventions for the sensor kernel.</p>
 <p>References:
-* N. Greene, "Environment Mapping and Other Applications of World Projections", IEEE Computer Graphics and Applications 6(11):21-29, 1986 (cube maps).
-* Khronos, "Vulkan Specification", 16.5.4 "Cube Map Face Selection" (selection by the largest-magnitude component).</p>
+* N. Greene, "Environment Mapping and Other Applications of World
+  Projections", IEEE Computer Graphics and Applications 6(11):21-29, 1986 (cube maps).
+* Khronos, "Vulkan Specification", 16.5.4 "Cube Map Face
+  Selection" (selection by the largest-magnitude component).</p>
 <p>Every random decision a renderer makes (sensor noise, and the samples of ray and path tracers) derives from three numbers: a seed the scene authors, a stream naming what is rendered (a render product, <code>StreamOf</code> its path) and the frame number. The same scene, settings and frame then render the same image on any machine, in any order, whatever else renders alongside.</p>
-<p>Reference: M. Jarzynski and M. Olano, "Hash Functions for GPU Rendering", Journal of Computer Graphics Techniques 9(3):21-38, 2020 (pcg3d). </p>
+<p>Reference: M. Jarzynski and M. Olano, "Hash Functions for GPU
+Rendering", Journal of Computer Graphics Techniques 9(3):21-38, 2020 (pcg3d).</p>
+<p>Altitudes and radii are in metres, number densities in m^-3, cross sections in m^2 and coefficients in m^-1.</p>
+<p>Wavelengths are in nanometres in vacuum, radii in metres and cross sections in m^2. Phase functions are in sr^-1, normalised to integrate to 1 over the sphere, and take the cosine of the scattering angle (1 is forward). </p>
 <h2 id="public-types-documentation">Public Types Documentation</h2>
 <h3 id="enum-attributekind">enum AttributeKind</h3>
 <p><em>What an attribute holds, from its declared C++ type.</em> </p>
@@ -2173,7 +2312,9 @@
     Added = 1u &lt;&lt; 0,
     Removed = 1u &lt;&lt; 1,
     Transform = 1u &lt;&lt; 2,
-    Topology = 1u &lt;&lt; 3,
+    Topology =
+        1u
+        &lt;&lt; 3,
     Points = 1u &lt;&lt; 4,
     Primvars = 1u &lt;&lt; 5,
     Material = 1u &lt;&lt; 6,
@@ -2383,6 +2524,12 @@
 </code></pre>
 <hr>
 
+<h3 id="typedef-opticsmodel">typedef OpticsModel</h3>
+<p><em>Optical properties of one particle or molecule at a wavelength (nm), with the phase function at the given cosines.</em> </p>
+<pre><code class="language-C++">using ernie::OpticsModel = typedef std::function&lt;ParticleOptics( double wavelengthNm, std::span&lt;const double&gt;)&gt;;
+</code></pre>
+<hr>
+
 <h3 id="enum-overlaydepth">enum OverlayDepth</h3>
 <p><em>How an overlay item meets the scene's surfaces.</em> </p>
 <pre><code class="language-C++">enum ernie::OverlayDepth {
@@ -2516,6 +2663,13 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-kcarbondioxidekingfactor">variable kCarbonDioxideKingFactor</h3>
+<p><em>The King factor of CO2 (Bates 1984, as used by Bodhaine et al.</em> </p>
+<pre><code class="language-C++">constexpr double ernie::kCarbonDioxideKingFactor;
+</code></pre>
+<p>1999). </p>
+<hr>
+
 <h3 id="variable-kcubefaces">variable kCubeFaces</h3>
 <pre><code class="language-C++">constexpr int ernie::kCubeFaces;
 </code></pre>
@@ -2609,11 +2763,52 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-kstandardnumberdensity">variable kStandardNumberDensity</h3>
+<p><em>Number density of an ideal gas at 288.15 K and 101325 Pa (m^-3), the reference state of the refractive indices below: Avogadro's number over the molar volume at 273.15 K, scaled to 288.15 K.</em> </p>
+<pre><code class="language-C++">constexpr double ernie::kStandardNumberDensity;
+</code></pre>
+<p>Reference: B. A. Bodhaine, N. B. Wood, E. G. Dutton and J. R. Slusser, "On Rayleigh Optical Depth Calculations", Journal of Atmospheric and Oceanic Technology 16(11):1854-1861, 1999, eq. (24). <a href="https://doi.org/10.1175/1520-0426(1999)016">https://doi.org/10.1175/1520-0426(1999)016</a>&lt;1854:ORODC&gt;2.0.CO;2 </p>
+<hr>
+
 <h3 id="variable-kstefanboltzmann">variable kStefanBoltzmann</h3>
 <pre><code class="language-C++">constexpr double ernie::kStefanBoltzmann;
 </code></pre>
 <hr>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-airkingfactor">function AirKingFactor</h3>
+<p><em>The King correction factor (6 + 3 rho) / (6 - 7 rho) of dry air for molecular anisotropy, from Bates's factors for N2 and O2, 1 for Ar and 1.15 for CO2, weighted by volume fraction.</em> </p>
+<pre><code class="language-C++">double ernie::AirKingFactor (
+    double wavelengthNm,
+    double co2Fraction=360e-6
+) 
+</code></pre>
+<p>References:
+* D. R. Bates, "Rayleigh scattering by air", Planetary and Space Science 32(6):785-790, 1984. <a href="https://doi.org/10.1016/0032-0633(84)90102-8">https://doi.org/10.1016/0032-0633(84)90102-8</a>
+* Bodhaine et al. 1999 (see <code>kStandardNumberDensity</code>), eqs. (5), (6) and (23). </p>
+<hr>
+
+<h3 id="function-airmolecules">function AirMolecules</h3>
+<p><em>Molecules of dry air: Rayleigh scattering after Bodhaine et al.</em> </p>
+<pre><code class="language-C++">OpticsModel ernie::AirMolecules (
+    double co2Fraction=360e-6
+) 
+</code></pre>
+<p>(1999) with a CO2 volume fraction <code>co2Fraction</code>. </p>
+<hr>
+
+<h3 id="function-airrefractivity">function AirRefractivity</h3>
+<p><em>The refractivity n - 1 of dry air at 288.15 K and 101325 Pa with a CO2 volume fraction</em> <code>co2Fraction</code> <em>(e.g.</em></p>
+<pre><code class="language-C++">double ernie::AirRefractivity (
+    double wavelengthNm,
+    double co2Fraction=360e-6
+) 
+</code></pre>
+<p>360e-6), from Peck and Reeder's dispersion formula for air with 300 ppm CO2 and Bodhaine et al.'s CO2 correction.</p>
+<p>References:
+* E. R. Peck and K. Reeder, "Dispersion of Air", Journal of the Optical Society of America 62(8):958-962, 1972. <a href="https://doi.org/10.1364/JOSA.62.000958">https://doi.org/10.1364/JOSA.62.000958</a>
+* Bodhaine et al. 1999 (see <code>kStandardNumberDensity</code>), eqs. (18) and (19). </p>
+<hr>
+
 <h3 id="function-any">function Any</h3>
 <p><em>Whether</em> <code>bits</code> <em>has any of</em><code>flags</code> <em>.</em></p>
 <pre><code class="language-C++">inline constexpr bool ernie::Any (
@@ -2656,8 +2851,8 @@
 <p>The image's geometry (pose along the orbit, focal length, detector line, summing, lens distortion and line time) comes from its ISD (<code>IsdLineScanner::StripOf</code>, Python's <code>IsdLineScanner.author_strip</code>); this sets the rest:
 * The sensor: one panchromatic channel over the 400-760 nm spectral response with the detector's average quantum efficiency through it (&gt; 60%: 0.6, its edges ramped over 10 nm; the paper gives no curve), the gain, detector noise and full well of NAC-L or NAC-R, a 12-bit ADC and the telescope's f-number.
 * The readout chain, SensorFilter prims under <code>product</code>: qe, noise, adc, readoutTaps (the even and odd pixels' two analog chains, offsets 0 until calibrated) and compandTable (the nominal 12- to 8-bit table, code 0), so RawDN holds the 8-bit numbers the NAC sends.</p>
-<p>Reference: M. S. Robinson et al., "Lunar Reconnaissance Orbiter Camera (LROC) Instrument
-Overview", Space Science Reviews 150:81-124, 2010: sections 3.1 and 4.1, Table 2 (focal ratio, gain, detector noise, full well, spectral response, digitisation) and Appendix A (bit-compression tables). </p>
+<p>Reference: M. S. Robinson et al., "Lunar Reconnaissance Orbiter
+Camera (LROC) Instrument Overview", Space Science Reviews 150:81-124, 2010: sections 3.1 and 4.1, Table 2 (focal ratio, gain, detector noise, full well, spectral response, digitisation) and Appendix A (bit-compression tables). </p>
 <p><strong>Exception:</strong></p>
 <ul>
 <li><code>std::invalid_argument</code> if <code>camera</code> is not a <a href="../classernie_1_1Camera/"><strong>Camera</strong></a> or <code>product</code> not a <a href="../classernie_1_1RenderProduct/"><strong>RenderProduct</strong></a>. </li>
@@ -2676,8 +2871,8 @@ Overview", Space Science Reviews 150:81-124, 2010: sections 3.1 and 4.1, Table 2
 <p>The image's geometry (each framelet's pose, focal length, lens distortion and exposure) comes from its ISD (<code>IsdPushFrame::FrameletOf</code>, Python's <code>IsdPushFrame.author_framelet</code>); this sets the rest:
 * The sensor: one channel through the band, its passband Table 4's FWHM wide about the effective wavelength (edges ramped over 2 nm about the half maxima, so its area is the FWHM's) at the band's effective quantum efficiency (<code>LrocWacBandSpec::EffectiveQe</code>), the lens's transmission 1 (in that efficiency); the KAI-1001's gain, read noise and full well; an 11-bit ADC; the band's optics' f-number. The camera's spectral range is narrowed to the passband, four bands across it.
 * The readout chain, SensorFilter prims under <code>product</code>: qe, noise and adc, so RawDN holds the 11-bit numbers before the WAC's companding to 8 bits, which the paper gives only as a figure (Fig. 25).</p>
-<p>Reference: M. S. Robinson et al., "Lunar Reconnaissance Orbiter Camera (LROC) Instrument
-Overview", Space Science Reviews 150:81-124, 2010: section 3.2, Table 3 (focal ratios, gain, read noise, full well, digitisation, summing) and Table 4 (bandpasses and responsivity). </p>
+<p>Reference: M. S. Robinson et al., "Lunar Reconnaissance Orbiter
+Camera (LROC) Instrument Overview", Space Science Reviews 150:81-124, 2010: section 3.2, Table 3 (focal ratios, gain, read noise, full well, digitisation, summing) and Table 4 (bandpasses and responsivity). </p>
 <p><strong>Exception:</strong></p>
 <ul>
 <li><code>std::invalid_argument</code> if <code>camera</code> is not a <a href="../classernie_1_1Camera/"><strong>Camera</strong></a> or <code>product</code> not a <a href="../classernie_1_1RenderProduct/"><strong>RenderProduct</strong></a>. </li>
@@ -2695,8 +2890,8 @@ Overview", Space Science Reviews 150:81-124, 2010: section 3.2, Table 3 (focal r
 ) 
 </code></pre>
 <p>The flight cameras' own calibrations (CAHVORE, <code>CahvoreModel</code>) see a little less than the published fields (128.7 x 98.6 degrees for the front left); author one of them with <code>CahvoreModel</code>'s ray table for a particular camera's exact geometry.</p>
-<p>Reference: J. N. Maki et al., "The Mars 2020 Engineering Cameras and Microphone on the
-Perseverance Rover", Space Science Reviews 216:137, 2020, Table 2. </p>
+<p>Reference: J. N. Maki et al., "The Mars 2020 Engineering Cameras
+and Microphone on the Perseverance Rover", Space Science Reviews 216:137, 2020, Table 2. </p>
 <p><strong>Exception:</strong></p>
 <ul>
 <li><code>std::invalid_argument</code> if <code>camera</code> is not a <a href="../classernie_1_1Camera/"><strong>Camera</strong></a> or <code>product</code> not a <a href="../classernie_1_1RenderProduct/"><strong>RenderProduct</strong></a>. </li>
@@ -2732,8 +2927,9 @@ Perseverance Rover", Space Science Reviews 216:137, 2020, Table 2. </p>
 <li>The sensor: RGB, the CMV-20000's gain, dark noise and full well, a 12-bit ADC. The paper gives the detector's QE only as 64.5% at 550 nm (monochrome, with microlenses; its table prints "55 nm"), with no colour responses, so the channels keep Ernie's generic RGB curves.</li>
 <li>The readout chain, SensorFilter prims under <code>product</code>: qe, bayer (<code>pattern</code>; the paper does not give the layout), noise, adc and demosaic (Malvar-He-Cutler), so RawDN holds the 12-bit numbers demosaiced; then cie, exposure and jpeg at <code>jpegQuality</code> for the 8-bit colour images the rover sends JPEG-compressed (the paper gives the quality as selectable). Fixed-pattern noise and dark current are not published; add <code>darkCurrent</code> or <code>defectPixels</code> filters to model them.</li>
 </ul>
-<p>Reference: J. N. Maki et al., "The Mars 2020 Engineering Cameras and Microphone on the
-Perseverance Rover: A Next-Generation Imaging System for Mars Exploration", Space Science Reviews 216:137, 2020, <a href="https://doi.org/10.1007/s11214-020-00765-9:">https://doi.org/10.1007/s11214-020-00765-9:</a> Table 2 and sections on the detector and flight software. </p>
+<p>Reference: J. N. Maki et al., "The Mars 2020 Engineering Cameras
+and Microphone on the Perseverance Rover: A Next-Generation
+Imaging System for Mars Exploration", Space Science Reviews 216:137, 2020, <a href="https://doi.org/10.1007/s11214-020-00765-9:">https://doi.org/10.1007/s11214-020-00765-9:</a> Table 2 and sections on the detector and flight software. </p>
 <p><strong>Exception:</strong></p>
 <ul>
 <li><code>std::invalid_argument</code> if <code>camera</code> is not a <a href="../classernie_1_1Camera/"><strong>Camera</strong></a> or <code>product</code> not a <a href="../classernie_1_1RenderProduct/"><strong>RenderProduct</strong></a>. </li>
@@ -2771,8 +2967,9 @@ Perseverance Rover: A Next-Generation Imaging System for Mars Exploration", Spac
 <li>Filters 1 to 7: one channel, the filter's passband (Table 3's 2 x HWHM wide about its effective wavelength, ramped over 2 nm about the half maxima, times 10^-ND for filter 7) on the detector's response, Ernie's generic silicon curve scaled to the ~40% peak (the paper publishes no curve, and the Bayer microfilters' differences in a narrow band are left out); the camera's spectral range narrowed to the passband, four bands across it; the chain qe, noise, adc.</li>
 <li>The sensor: the KAI-2020CM's gain, read noise and full well for <code>eye</code>, an 11-bit ADC. <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> radiance past 830 nm follows what the scene gives there: materials' RGB albedo holds its 830 nm value, so give materials reflectance spectra for the near-IR bands.</li>
 </ul>
-<p>Reference: J. F. Bell III et al., "The Mars 2020 Perseverance Rover Mast Camera Zoom
-(Mastcam-Z) Multispectral, Stereoscopic Imaging Investigation", Space Science Reviews 217:24, 2021, <a href="https://doi.org/10.1007/s11214-020-00755-x:">https://doi.org/10.1007/s11214-020-00755-x:</a> Tables 3 and 5 and the focal plane section. </p>
+<p>Reference: J. F. Bell III et al., "The Mars 2020 Perseverance
+Rover Mast Camera Zoom (Mastcam-Z) Multispectral, Stereoscopic
+Imaging Investigation", Space Science Reviews 217:24, 2021, <a href="https://doi.org/10.1007/s11214-020-00755-x:">https://doi.org/10.1007/s11214-020-00755-x:</a> Tables 3 and 5 and the focal plane section. </p>
 <p><strong>Exception:</strong></p>
 <ul>
 <li><code>std::invalid_argument</code> if <code>camera</code> is not a <a href="../classernie_1_1Camera/"><strong>Camera</strong></a>, <code>product</code> not a <a href="../classernie_1_1RenderProduct/"><strong>RenderProduct</strong></a>, <code>filter</code> outside 0 to 7 or <code>focalLengthMm</code> outside the zoom. </li>
@@ -2800,6 +2997,17 @@ Perseverance Rover: A Next-Generation Imaging System for Mars Exploration", Spac
     std::string_view name
 ) 
 </code></pre>
+<hr>
+
+<h3 id="function-bandaverage">function BandAverage</h3>
+<p><em>Averages</em> <code>atmosphere</code> <em>over</em><code>bands</code> <em>, sampling each band every 10 nm or less.</em></p>
+<pre><code class="language-C++">BandedAtmosphere ernie::BandAverage (
+    const Atmosphere &amp; atmosphere,
+    const SpectralBands &amp; bands,
+    int phaseAngles=256
+) 
+</code></pre>
+<p>Phase functions are averaged weighted by scattering, so that the band's scattered radiance is preserved. </p>
 <hr>
 
 <h3 id="function-baseschematypes">function BaseSchemaTypes</h3>
@@ -2856,11 +3064,12 @@ Perseverance Rover: A Next-Generation Imaging System for Mars Exploration", Spac
 <hr>
 
 <h3 id="function-brdfmodulename">function BrdfModuleName</h3>
-<p><em>Name under which</em> <code>BrdfModules</code> <em>loads</em><code>model</code> <em>'s module, e.g. "brdf_hapke".</em></p>
+<p><em>Name under which</em> <code>BrdfModules</code> <em>loads</em><code>model</code> <em>'s module, e.g.</em></p>
 <pre><code class="language-C++">std::string ernie::BrdfModuleName (
     const BrdfModel &amp; model
 ) 
 </code></pre>
+<p>"brdf_hapke". </p>
 <hr>
 
 <h3 id="function-brdfmodules">function BrdfModules</h3>
@@ -2937,6 +3146,26 @@ Perseverance Rover: A Next-Generation Imaging System for Mars Exploration", Spac
     std::uint32_t stacks=24
 ) 
 </code></pre>
+<hr>
+
+<h3 id="function-carbondioxidemolecules">function CarbonDioxideMolecules</h3>
+<p><em>Molecules of a CO2 atmosphere such as Mars's: Rayleigh scattering by CO2 at volume fraction</em> <code>co2Fraction</code> <em>(Owens 1967, Bates 1984), with the remainder (on Mars mostly N2 and Ar, whose refractivities are within 7% of air's) scattering as air.</em></p>
+<pre><code class="language-C++">OpticsModel ernie::CarbonDioxideMolecules (
+    double co2Fraction
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-carbondioxiderefractivity">function CarbonDioxideRefractivity</h3>
+<p><em>The refractivity n - 1 of CO2 at 288.15 K and 101325 Pa.</em> </p>
+<pre><code class="language-C++">double ernie::CarbonDioxideRefractivity (
+    double wavelengthNm
+) 
+</code></pre>
+<p>References:
+* J. C. Owens, "Optical Refractive Index of Air: Dependence on
+  Pressure, Temperature and Composition", Applied Optics 6(1):51-59, 1967. <a href="https://doi.org/10.1364/AO.6.000051">https://doi.org/10.1364/AO.6.000051</a>
+* Bodhaine et al. 1999 (see <code>kStandardNumberDensity</code>), eq. (27). </p>
 <hr>
 
 <h3 id="function-celestialtolocal">function CelestialToLocal</h3>
@@ -3038,8 +3267,8 @@ Perseverance Rover: A Next-Generation Imaging System for Mars Exploration", Spac
     double wavelengthNm
 ) 
 </code></pre>
-<p>Reference: C. Wyman, P.-P. Sloan and P. Shirley, "Simple Analytic Approximations to the CIE XYZ
-Color Matching Functions", Journal of Computer Graphics Techniques 2(2):1-11, 2013. </p>
+<p>Reference: C. Wyman, P.-P. Sloan and P. Shirley, "Simple Analytic
+Approximations to the CIE XYZ Color Matching Functions", Journal of Computer Graphics Techniques 2(2):1-11, 2013. </p>
 <hr>
 
 <h3 id="function-closeexternalhandle">function CloseExternalHandle</h3>
@@ -3289,7 +3518,8 @@ constexpr DType ernie::DTypeOf&lt; std::uint8_t &gt; ()
 ) 
 </code></pre>
 <p>Their irradiance adds up to the map's. Fewer when the map has fewer texels with energy.</p>
-<p>Reference: P. Debevec, "A Median Cut Algorithm for Light Probe Sampling", SIGGRAPH 2005 posters. <a href="https://vgl.ict.usc.edu/Research/MedianCut/MedianCutSampling.pdf">https://vgl.ict.usc.edu/Research/MedianCut/MedianCutSampling.pdf</a> </p>
+<p>Reference: P. Debevec, "A Median Cut Algorithm for Light Probe
+Sampling", SIGGRAPH 2005 posters. <a href="https://vgl.ict.usc.edu/Research/MedianCut/MedianCutSampling.pdf">https://vgl.ict.usc.edu/Research/MedianCut/MedianCutSampling.pdf</a> </p>
 <hr>
 
 <h3 id="function-domeirradiancesh">function DomeIrradianceSh</h3>
@@ -3330,6 +3560,23 @@ constexpr DType ernie::DTypeOf&lt; std::uint8_t &gt; ()
 <ul>
 <li><code>std::invalid_argument</code> for another prim type, an invalid map, bands or spectrum pairs. </li>
 </ul>
+<hr>
+
+<h3 id="function-earthatmosphere">function EarthAtmosphere</h3>
+<p><em>Earth's atmosphere over a planet of radius</em> <code>radius</code> <em>(m).</em></p>
+<pre><code class="language-C++">Atmosphere ernie::EarthAtmosphere (
+    double radius,
+    const EarthAtmosphereOptions &amp; options={}
+) 
+</code></pre>
+<p>The haze is Schneegans et al.'s bimodal log-normal fit to AERONET retrievals, with refractive index 1.4 + 0.015i.</p>
+<p>References:
+* NOAA, NASA and USAF, "U.S. Standard Atmosphere, 1976", NOAA-S/T 76-1562, 1976. <a href="https://ntrs.nasa.gov/citations/19770009539">https://ntrs.nasa.gov/citations/19770009539</a>
+* E. Bruneton, "Precomputed Atmospheric Scattering: a New
+  Implementation", 2017 (ozone profile and column). <a href="https://ebruneton.github.io/precomputed_atmospheric_scattering/">https://ebruneton.github.io/precomputed_atmospheric_scattering/</a>
+* Schneegans et al. 2024 (see <code>DensityProfile</code>), section 3 (haze).
+* B. N. Holben et al., "AERONET - A Federated Instrument Network
+  and Data Archive for Aerosol Characterization", Remote Sensing of Environment 66(1):1-16, 1998. <a href="https://doi.org/10.1016/S0034-4257(98)00031-5">https://doi.org/10.1016/S0034-4257(98)00031-5</a> </p>
 <hr>
 
 <h3 id="function-encodeslopedeviation">function EncodeSlopeDeviation</h3>
@@ -3603,6 +3850,17 @@ constexpr DType ernie::DTypeOf&lt; std::uint8_t &gt; ()
 <p>Reference: J. Meeus, "Astronomical Algorithms", 2nd edition, 1998, equation 12.4. </p>
 <hr>
 
+<h3 id="function-hematiterefractiveindex">function HematiteRefractiveIndex</h3>
+<p><em>The refractive index of hematite (alpha-Fe2O3) over 220-1000 nm, as tabulated by CosmoScout VR (CC0) after Ehlers et al., used with feldspar for Martian dust.</em> </p>
+<pre><code class="language-C++">const RefractiveIndex &amp; ernie::HematiteRefractiveIndex () 
+</code></pre>
+<p>References:
+* K. Ehlers, R. Chakrabarty and H. Moosmueller, "Blue moons and
+  Martian sunsets", Applied Optics 53(9):1808-1819, 2014. <a href="https://doi.org/10.1364/AO.53.001808">https://doi.org/10.1364/AO.53.001808</a>
+* S. Schneegans, T. Meyran, I. Ginkel, G. Zachmann and A. Gerndt, "Physically Based Real-Time Rendering of Atmospheres using Mie
+  Theory", Computer Graphics Forum 43(2), 2024. <a href="https://doi.org/10.1111/cgf.15010">https://doi.org/10.1111/cgf.15010</a> </p>
+<hr>
+
 <h3 id="function-imageoftensor">function ImageOfTensor</h3>
 <p><em>A detail texture tensor as an</em> <code>Image</code> <em>: float32 values are linear; uint8 values are sRGB-encoded when</em><code>encoding</code> <em>is</em><code>Srgb</code> <em>and linear otherwise.</em></p>
 <pre><code class="language-C++">Image ernie::ImageOfTensor (
@@ -3669,7 +3927,8 @@ constexpr DType ernie::DTypeOf&lt; std::uint8_t &gt; ()
     double s
 ) 
 </code></pre>
-<p>Reference: K. Shoemake, "Animating Rotation with Quaternion Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242">https://doi.org/10.1145/325165.325242</a> </p>
+<p>Reference: K. Shoemake, "Animating Rotation with Quaternion
+Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242">https://doi.org/10.1145/325165.325242</a> </p>
 <hr>
 
 <h3 id="function-isgpu">function IsGpu</h3>
@@ -3875,6 +4134,25 @@ constexpr DType ernie::DTypeOf&lt; std::uint8_t &gt; ()
 </code></pre>
 <hr>
 
+<h3 id="function-marsatmosphere">function MarsAtmosphere</h3>
+<p><em>Mars's atmosphere over a planet of radius</em> <code>radius</code> <em>(m).</em></p>
+<pre><code class="language-C++">Atmosphere ernie::MarsAtmosphere (
+    double radius,
+    const MarsAtmosphereOptions &amp; options={}
+) 
+</code></pre>
+<p>The dust is feldspar (n = 1.5) with 3% hematite by Maxwell Garnett mixing, as proposed by Ehlers et al., with Schneegans et al.'s bimodal log-normal sizes (effective radii 0.04 and 1.4 um, number ratio 1000:1, after Shaposhnikov et al.) and two double-exponential layers.</p>
+<p>References:
+* H. B. Franz et al., "Initial SAM calibration gas experiments on
+  Mars: Quadrupole mass spectrometer results and implications", Planetary and Space Science 138:44-54, 2017. <a href="https://doi.org/10.1016/j.pss.2017.01.014">https://doi.org/10.1016/j.pss.2017.01.014</a>
+* M. T. Lemmon et al., "Dust aerosol, clouds, and the atmospheric
+  optical depth record over 5 Mars years of the Mars Exploration
+  Rover mission", Icarus 251:96-111, 2015. <a href="https://doi.org/10.1016/j.icarus.2014.03.029">https://doi.org/10.1016/j.icarus.2014.03.029</a>
+* K. Ehlers, R. Chakrabarty and H. Moosmueller, "Blue moons and
+  Martian sunsets", Applied Optics 53(9):1808-1819, 2014. <a href="https://doi.org/10.1364/AO.53.001808">https://doi.org/10.1364/AO.53.001808</a>
+* Schneegans et al. 2024 (see <code>DensityProfile</code>), section 3 and table 1. </p>
+<hr>
+
 <h3 id="function-materialschematypes">function MaterialSchemaTypes</h3>
 <p><em>This file's types' registry entries, bases first (</em> <code>PrimTypes</code> <em>).</em></p>
 <pre><code class="language-C++">std::vector&lt; const PrimTypeDef * &gt; ernie::MaterialSchemaTypes () 
@@ -3904,6 +4182,20 @@ constexpr DType ernie::DTypeOf&lt; std::uint8_t &gt; ()
 </code></pre>
 <hr>
 
+<h3 id="function-maxwellgarnett">function MaxwellGarnett</h3>
+<p><em>The effective refractive index of a matrix with spherical inclusions taking the volume fraction</em> <code>fraction</code> <em>, by the Maxwell Garnett mixing rule on the permittivities m^2.</em></p>
+<pre><code class="language-C++">std::complex&lt; double &gt; ernie::MaxwellGarnett (
+    std::complex&lt; double &gt; matrix,
+    std::complex&lt; double &gt; inclusion,
+    double fraction
+) 
+</code></pre>
+<p>References:
+* J. C. Maxwell Garnett, "Colours in Metal Glasses and in Metallic
+  Films", Philosophical Transactions of the Royal Society A 203:385-420, 1904. <a href="https://doi.org/10.1098/rsta.1904.0024">https://doi.org/10.1098/rsta.1904.0024</a>
+* Bohren and Huffman 1983 (see <code>MieSphere</code>), section 8.5. </p>
+<hr>
+
 <h3 id="function-meshdataof">function MeshDataOf</h3>
 <p><em>The geometry of the</em> <a href="../classernie_1_1Mesh/"><em><strong>Mesh</strong></em></a> <em>prim at</em><code>mesh</code> <em>:</em><code>points</code> <em>,</em><code>faceVertexCounts</code> <em>and</em><code>faceVertexIndices</code> <em>(triangulated as fans), per-vertex</em><code>normals</code> <em>, and per-vertex</em><code>primvars:displayColor</code> <em>when it has one colour per point.</em></p>
 <pre><code class="language-C++">MeshData ernie::MeshDataOf (
@@ -3915,6 +4207,56 @@ constexpr DType ernie::DTypeOf&lt; std::uint8_t &gt; ()
 <p><strong>Exception:</strong></p>
 <ul>
 <li><code>std::invalid_argument</code> naming the attribute for arrays of the wrong type, size or device, or invalid topology. For a UsdGeom primitive (<a href="../classernie_1_1Cube/"><strong>Cube</strong></a>, <a href="../classernie_1_1Sphere/"><strong>Sphere</strong></a>, <a href="../classernie_1_1Cylinder/"><strong>Cylinder</strong></a>, <a href="../classernie_1_1Cone/"><strong>Cone</strong></a>, <a href="../classernie_1_1Capsule/"><strong>Capsule</strong></a>, <a href="../classernie_1_1Plane/"><strong>Plane</strong></a>) the generated mesh, <code>PrimitiveMeshOf</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-mieaerosol">function MieAerosol</h3>
+<p><em>Spherical particles with a log-normal size distribution and a refractive index that may vary with wavelength (</em> <code>MieParticles</code> <em>).</em></p>
+<pre><code class="language-C++">OpticsModel ernie::MieAerosol (
+    std::vector&lt; LogNormalMode &gt; modes,
+    RefractiveIndex refractiveIndex,
+    int radiusSamples=96
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-mieparticles">function MieParticles</h3>
+<p><em>The mean Mie optics per particle of spheres of refractive index</em> <code>refractiveIndex</code> <em>with a multi-mode log-normal size distribution, at</em><code>wavelengthNm</code> <em>: each mode integrated over ln(r) with</em><code>radiusSamples</code> <em>trapezoid samples, the phase function weighted by scattering cross section.</em></p>
+<pre><code class="language-C++">ParticleOptics ernie::MieParticles (
+    std::span&lt; const LogNormalMode &gt; modes,
+    std::complex&lt; double &gt; refractiveIndex,
+    double wavelengthNm,
+    std::span&lt; const double &gt; cosines,
+    int radiusSamples=96
+) 
+</code></pre>
+<p>Integrating deterministically, unlike Monte Carlo radius sampling, gives tables that are smooth across wavelengths.</p>
+<p>Reference: Hansen and Travis 1974 (see <code>LogNormalMode</code>), section 2. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if there are no modes or their numbers do not sum above zero. </li>
+</ul>
+<hr>
+
+<h3 id="function-miesphere">function MieSphere</h3>
+<p><em>Mie scattering by a homogeneous sphere of size parameter</em> <code>sizeParameter</code> <em>(2 pi r / lambda) and relative refractive index</em><code>refractiveIndex</code> <em>(n + ik with k &gt;= 0 for absorption), with its unpolarised phase function at</em><code>cosines</code> <em>written to</em><code>phase</code> <em>(same size, or empty to skip), summing the series to Wiscombe's number of terms.</em></p>
+<pre><code class="language-C++">MieEfficiencies ernie::MieSphere (
+    double sizeParameter,
+    std::complex&lt; double &gt; refractiveIndex,
+    std::span&lt; const double &gt; cosines,
+    std::span&lt; double &gt; phase
+) 
+</code></pre>
+<p>References:
+* G. Mie, "Beitraege zur Optik trueber Medien, speziell
+  kolloidaler Metalloesungen", Annalen der Physik 330(3):377-445,
+  * <a href="https://doi.org/10.1002/andp.19083300302">https://doi.org/10.1002/andp.19083300302</a></p>
+<ul>
+<li>C. F. Bohren and D. R. Huffman, "Absorption and Scattering of
+  Light by Small Particles", Wiley, 1983, chapter 4 and appendix A (BHMIE). <a href="https://doi.org/10.1002/9783527618156">https://doi.org/10.1002/9783527618156</a></li>
+<li>W. J. Lentz, "Generating Bessel functions in Mie scattering
+  calculations using continued fractions", Applied Optics 15(3):668-671, 1976. <a href="https://doi.org/10.1364/AO.15.000668">https://doi.org/10.1364/AO.15.000668</a></li>
+<li>W. J. Wiscombe, "Improved Mie scattering algorithms", Applied Optics 19(9):1505-1509, 1980. <a href="https://doi.org/10.1364/AO.19.001505">https://doi.org/10.1364/AO.19.001505</a> </li>
 </ul>
 <hr>
 
@@ -3982,6 +4324,28 @@ constexpr DType ernie::DTypeOf&lt; std::uint8_t &gt; ()
 </code></pre>
 <hr>
 
+<h3 id="function-ozonecrosssection">function OzoneCrossSection</h3>
+<p><em>The absorption cross section of ozone (m^2) at 233 K, the 10 nm averages of the IUP Bremen measurements over 360-840 nm (including the Chappuis band) as tabulated by CosmoScout VR's scattering-table generator, placed at the bin centres.</em> </p>
+<pre><code class="language-C++">double ernie::OzoneCrossSection (
+    double wavelengthNm
+) 
+</code></pre>
+<p>Zero outside 360-840 nm.</p>
+<p>References:
+* V. Gorshelev, A. Serdyuchenko, M. Weber, W. Chehade and J. P. Burrows, "High spectral resolution ozone absorption
+  cross-sections - Part 1: Measurements, data analysis and
+  comparison with previous measurements around 293 K", Atmospheric Measurement Techniques 7(2):609-624, 2014. <a href="https://doi.org/10.5194/amt-7-609-2014">https://doi.org/10.5194/amt-7-609-2014</a>
+* A. Serdyuchenko, V. Gorshelev, M. Weber, W. Chehade and J. P. Burrows, "High spectral resolution ozone absorption
+  cross-sections - Part 2: Temperature dependence", Atmospheric Measurement Techniques 7(2):625-636, 2014. <a href="https://doi.org/10.5194/amt-7-625-2014">https://doi.org/10.5194/amt-7-625-2014</a>
+* CosmoScout VR, plugins/csp-atmospheres/scattering-table-generator/ozoneMode.cpp (MIT), German Aerospace Center (DLR). <a href="https://github.com/cosmoscout/cosmoscout-vr">https://github.com/cosmoscout/cosmoscout-vr</a> </p>
+<hr>
+
+<h3 id="function-ozonemolecules">function OzoneMolecules</h3>
+<p><em>Ozone molecules: absorption only (</em> <code>OzoneCrossSection</code> <em>).</em></p>
+<pre><code class="language-C++">OpticsModel ernie::OzoneMolecules () 
+</code></pre>
+<hr>
+
 <h3 id="function-parseies">function ParseIes</h3>
 <p><em>The profile of LM-63</em> <code>text</code> <em>(any of the 1986 to 2019 versions), of type A, B or C, with its tilt data from a TILT=INCLUDE block or a TILT=&lt;file&gt; named relative to</em><code>directory</code> <em>.</em></p>
 <pre><code class="language-C++">IesProfile ernie::ParseIes (
@@ -3996,11 +4360,21 @@ constexpr DType ernie::DTypeOf&lt; std::uint8_t &gt; ()
 <hr>
 
 <h3 id="function-pcg3d">function Pcg3d</h3>
-<p><em>The pcg3d hash: three well-mixed 32-bit words from three. Shaders implement the same function.</em> </p>
+<p><em>The pcg3d hash: three well-mixed 32-bit words from three.</em> </p>
 <pre><code class="language-C++">inline constexpr glm::uvec3 ernie::Pcg3d (
     glm::uvec3 v
 ) 
 </code></pre>
+<p>Shaders implement the same function. </p>
+<hr>
+
+<h3 id="function-phasecosines">function PhaseCosines</h3>
+<p><em>The scattering angles of tabulated phase functions: theta_i = pi (i / (count - 1))^2, dense near the forward direction where aerosols' diffraction peaks are narrow.</em> </p>
+<pre><code class="language-C++">std::vector&lt; double &gt; ernie::PhaseCosines (
+    int count
+) 
+</code></pre>
+<p>Returns the cosines. </p>
 <hr>
 
 <h3 id="function-planckradiance">function PlanckRadiance</h3>
@@ -4093,6 +4467,34 @@ constexpr DType ernie::DTypeOf&lt; std::uint8_t &gt; ()
 <ul>
 <li><code>std::invalid_argument</code> for an order other than "xyzw" or "wxyz". </li>
 </ul>
+<hr>
+
+<h3 id="function-rayleighcrosssection">function RayleighCrossSection</h3>
+<p><em>The Rayleigh scattering cross section (m^2) of one molecule of a gas with refractivity</em> <code>refractivity</code> <em>at</em><code>kStandardNumberDensity</code> <em>and King factor</em><code>kingFactor</code> <em>: 24 pi^3 (n^2 - 1)^2 / (lambda^4 Ns^2 (n^2 + 2)^2) F.</em></p>
+<pre><code class="language-C++">double ernie::RayleighCrossSection (
+    double wavelengthNm,
+    double refractivity,
+    double kingFactor
+) 
+</code></pre>
+<p>It does not depend on the gas's density, as n - 1 is proportional to it.</p>
+<p>Reference: Bodhaine et al. 1999 (see <code>kStandardNumberDensity</code>), eq. (22). </p>
+<hr>
+
+<h3 id="function-rayleighphase">function RayleighPhase</h3>
+<p><em>The Rayleigh phase function with depolarisation, for the King factor</em> <code>kingFactor</code> <em>(1 for isotropic molecules): 3 / (16 pi) ((1 + 3 gamma) + (1 - gamma) mu^2) / (1 + 2 gamma) with gamma = rho / (2.</em></p>
+<pre><code class="language-C++">double ernie::RayleighPhase (
+    double cosTheta,
+    double kingFactor
+) 
+</code></pre>
+<ul>
+<li>rho) and rho the depolarisation ratio.</li>
+</ul>
+<p>References:
+* S. Chandrasekhar, "Radiative Transfer", Oxford University Press, 1950, chapter I.
+* A. Bucholtz, "Rayleigh-scattering calculations for the
+  terrestrial atmosphere", Applied Optics 34(15):2765-2773, 1995, eqs. (12)-(13). <a href="https://doi.org/10.1364/AO.34.002765">https://doi.org/10.1364/AO.34.002765</a> </p>
 <hr>
 
 <h3 id="function-readcahvoremodels">function ReadCahvoreModels</h3>
@@ -4327,7 +4729,8 @@ constexpr DType ernie::DTypeOf&lt; std::uint8_t &gt; ()
     double lateral=0.0
 ) 
 </code></pre>
-<p>The lateral colour is <code>lateral</code> times the relative change, the image's scale 1 + lateral (f / f_d - 1): 0 for a stop at the lens, where the chief ray passes undeviated, up to 1 for a distant stop. Tabulated every 10 nm from 300 to 1100 nm.</p>
+<p>The lateral colour is <code>lateral</code> times the relative change, the image's scale 1 + lateral (f / f_d
+* 1): 0 for a stop at the lens, where the chief ray passes undeviated, up to 1 for a distant stop. Tabulated every 10 nm from 300 to 1100 nm.</p>
 <p>References:
 * A.-L. Cauchy, "Mémoire sur la dispersion de la lumière", 1836.
 * E. Hecht, "Optics", 5th ed., Pearson, 2017, sections 6.3.2 (chromatic aberrations) and 6.2 (thick lenses).
@@ -4453,8 +4856,7 @@ std::array&lt; double, N &gt; ernie::SolveNormal (
 <p>References:
 * A. N. Cox (ed.), "Allen's Astrophysical Quantities", 4th edition, Springer, 2000 (the illuminance of a magnitude 0 star).
 * F. J. Ballesteros, "New insights into black bodies", EPL 97(3):34008, 2012 (B-V to temperature).
-* H. W. Jensen, F. Durand, J. Dorsey, M. M. Stark, P. Shirley and S. Premoze, "A
-  Physically-Based Night Sky Model", SIGGRAPH 2001, 399-408 (stars as black bodies by magnitude and colour index). <a href="https://doi.org/10.1145/383259.383306">https://doi.org/10.1145/383259.383306</a> </p>
+* H. W. Jensen, F. Durand, J. Dorsey, M. M. Stark, P. Shirley and S. Premoze, "A Physically-Based Night Sky Model", SIGGRAPH 2001, 399-408 (stars as black bodies by magnitude and colour index). <a href="https://doi.org/10.1145/383259.383306">https://doi.org/10.1145/383259.383306</a> </p>
 <p><strong>Exception:</strong></p>
 <ul>
 <li><code>std::invalid_argument</code> for another prim type, or arrays of mismatched lengths. </li>

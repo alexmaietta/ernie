@@ -282,7 +282,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">int</td>
-<td style="text-align: left;"><a href="#variable-pupiltype"><strong>pupilType</strong></a>   = <code>1</code><br><em>CAHVORE's type: 1 perspective, 2 fish-eye, 3 general.</em></td>
+<td style="text-align: left;"><a href="#variable-pupiltype"><strong>pupilType</strong></a>   = <code>/* multi line expression */</code><br><em>CAHVORE's type: 1 perspective, 2 fish-eye, 3 general.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::dvec3</td>
@@ -340,15 +340,17 @@
 <li>The CAHVORE type: 1 perspective (linearity 1), 2 fish-eye (linearity 0), 3 general, with its linearity between them. <a href="../structernie_1_1Image/"><strong>Image</strong></a> coordinates are the models': (0, 0) is the centre of the upper-left pixel, x to the right, y down.</li>
 </ul>
 <p>References:
-* Y. Yakimovsky and R. Cunningham, "A System for Extracting Three-Dimensional Measurements
-  from a Stereo Pair of TV Cameras", Computer Graphics and <a href="../structernie_1_1Image/"><strong>Image</strong></a> Processing 7(2):195-210, 1978 (CAHV).
-* D. B. Gennery, "Least-Squares Camera Calibration Including Lens Distortion and Automatic
-  Editing of Calibration Points", in A. Gruen and T. Huang (eds.), Calibration and Orientation of Cameras in Computer Vision, Springer, 2001, 123-136 (CAHVOR).
-* D. B. Gennery, "Generalized Camera Calibration Including Fish-Eye Lenses", International Journal of Computer Vision 68(3):239-266, 2006 (CAHVORE).
+* Y. Yakimovsky and R. Cunningham, "A System for Extracting
+  Three-Dimensional Measurements from a Stereo Pair of TV
+  Cameras", Computer Graphics and <a href="../structernie_1_1Image/"><strong>Image</strong></a> Processing 7(2):195-210, 1978 (CAHV).
+* D. B. Gennery, "Least-Squares Camera Calibration Including Lens
+  Distortion and Automatic Editing of Calibration Points", in A. Gruen and T. Huang (eds.), Calibration and Orientation of Cameras in Computer Vision, Springer, 2001, 123-136 (CAHVOR).
+* D. B. Gennery, "Generalized Camera Calibration Including
+  Fish-Eye Lenses", International Journal of Computer Vision 68(3):239-266, 2006 (CAHVORE).
 * T. Litwin's cmod library (cmod_cahv.c, cmod_cahvor.c, cmod_cahvore.c), as ported by NASA-AMMOS, "CameraModelUtilsJS", <a href="https://github.com/NASA-AMMOS/CameraModelUtilsJS">https://github.com/NASA-AMMOS/CameraModelUtilsJS</a> (Apache-2.0): <code>ImageToRay</code> follows its cahvore-utilities/cahvore.js.
 * PDS Imaging Node, "Geometric Camera Models" (MSL GEOMETRIC_CM.TXT), for the conventions.
-* S. Aiazzi et al., "IRIS: High-fidelity Perception Sensor Modeling for Closed-Loop
-  Planetary Simulations", AIAA SciTech 2022, AIAA 2022-1433 (CAHVORE camera rays in a planetary simulator). </p>
+* S. Aiazzi et al., "IRIS: High-fidelity Perception Sensor
+  Modeling for Closed-Loop Planetary Simulations", AIAA SciTech 2022, AIAA 2022-1433 (CAHVORE camera rays in a planetary simulator). </p>
 <h2 id="public-types-documentation">Public Types Documentation</h2>
 <h3 id="enum-kind">enum Kind</h3>
 <pre><code class="language-C++">enum ernie::CahvoreModel::Kind {

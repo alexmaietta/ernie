@@ -218,31 +218,38 @@ using CudaArrayView = ComputeArrayView;
 
 class CudaInterop final : public ComputeInterop {
   public:
-    static std::unique_ptr&lt;CudaInterop&gt; Create(const VulkanContext&amp; context,
-                                               std::string* why = nullptr);
+    static std::unique_ptr&lt;CudaInterop&gt;
+    Create(const VulkanContext&amp; context, std::string* why = nullptr);
     ~CudaInterop() override;
 
     DeviceKind Kind() const override {
         return DeviceKind::Cuda;
     }
     int Device() const override;
-    void CopyToBuffer(const Tensor&amp; source, GpuBuffer&amp; buffer, VkDeviceSize offset = 0,
+    void CopyToBuffer(const Tensor&amp; source, GpuBuffer&amp; buffer,
+                      VkDeviceSize offset = 0,
                       std::uintptr_t stream = 1) override;
-    void CopyColumnsToBuffer(const Tensor&amp; source, std::span&lt;const std::size_t&gt; order,
-                             GpuBuffer&amp; buffer, VkDeviceSize offset = 0,
+    void CopyColumnsToBuffer(const Tensor&amp; source,
+                             std::span&lt;const std::size_t&gt; order,
+                             GpuBuffer&amp; buffer,
+                             VkDeviceSize offset = 0,
                              std::uintptr_t stream = 1) override;
-    Tensor View(std::shared_ptr&lt;GpuBuffer&gt; buffer, DType type, std::vector&lt;std::int64_t&gt; shape,
+    Tensor View(std::shared_ptr&lt;GpuBuffer&gt; buffer, DType type,
+                std::vector&lt;std::int64_t&gt; shape,
                 VkDeviceSize offset = 0) override;
-    void Copy(const Tensor&amp; source, const Tensor&amp; destination, std::uintptr_t stream = 1) override;
+    void Copy(const Tensor&amp; source, const Tensor&amp; destination,
+              std::uintptr_t stream = 1) override;
     Tensor Upload(const Tensor&amp; host) override;
     ComputeArrayView MapImage(GpuImage&amp; image) override;
     Tensor DownloadArray(const ComputeArrayView&amp; view) override;
-    Tensor Download(const Tensor&amp; device, std::uintptr_t stream = 1) override;
+    Tensor Download(const Tensor&amp; device,
+                    std::uintptr_t stream = 1) override;
     TimelinePoint VulkanWait() const override;
     TimelinePoint NextVulkanSignal() override;
     void SignalVulkan(std::uintptr_t stream = 1) override;
     void WaitForVulkan(std::uintptr_t stream = 1) override;
-    void WaitForVulkan(std::uintptr_t stream, std::uint64_t value) override;
+    void WaitForVulkan(std::uintptr_t stream,
+                       std::uint64_t value) override;
     void Synchronize() override;
 
     struct State;

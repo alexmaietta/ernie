@@ -215,11 +215,14 @@ struct RasterView {
     const float* data = nullptr;
     std::size_t width = 0;
     std::size_t height = 0;
-    std::size_t rowStride = 0;  
+    std::size_t rowStride =
+        0;  
     double originX = 0.0;
     double originY = 0.0;
-    double cellSize = 1.0;        
-    std::optional&lt;float&gt; noData;  
+    double cellSize =
+        1.0;  
+    std::optional&lt;float&gt;
+        noData;  
 
     std::size_t Stride() const {
         return rowStride == 0 ? width : rowStride;

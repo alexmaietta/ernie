@@ -262,8 +262,9 @@ struct LensModel {
     double p1 = 0.0;
     double p2 = 0.0;
     std::array&lt;double, 4&gt; fisheye{};  
-    bool vignetting = false;    
-    double transmission = 1.0;  
+    bool vignetting = false;  
+    double transmission =
+        1.0;  
     std::shared_ptr&lt;const LensRayTable&gt; rays;
     Spectrum chromaticScale;
     Spectrum chromaticFocusMm;
@@ -271,11 +272,13 @@ struct LensModel {
     static constexpr double kMaxFisheyeFieldAngle = 3.141592653589793;
 
     bool IsPinhole() const {
-        return projection == LensProjection::Perspective &amp;&amp; !HasDistortion() &amp;&amp; rays == nullptr;
+        return projection == LensProjection::Perspective &amp;&amp;
+               !HasDistortion() &amp;&amp; rays == nullptr;
     }
 
     bool HasDistortion() const {
-        return k1 != 0.0 || k2 != 0.0 || k3 != 0.0 || p1 != 0.0 || p2 != 0.0;
+        return k1 != 0.0 || k2 != 0.0 || k3 != 0.0 || p1 != 0.0 ||
+               p2 != 0.0;
     }
 
     glm::dvec2 Distort(glm::dvec2 undistorted) const;
@@ -295,11 +298,14 @@ struct SensorChannel {
 struct SensorModel {
     std::vector&lt;SensorChannel&gt; channels;
     double fullWellElectrons = 20000.0;
-    double readNoiseElectrons = 3.0;      
-    double darkCurrentElectrons = 0.1;    
-    double prnu = 0.005;                  
-    double dsnuElectrons = 0.5;           
-    double electronsPerDnAtIso100 = 0.0;  
+    double readNoiseElectrons = 3.0;    
+    double darkCurrentElectrons = 0.1;  
+    double prnu =
+        0.005;  
+    double dsnuElectrons =
+        0.5;  
+    double electronsPerDnAtIso100 =
+        0.0;  
     int adcBits = 12;
     double blackLevelDn = 0.0;
     bool noise = true;
@@ -351,7 +357,8 @@ struct CameraParams {
 
     CameraView RasterView(double overscan = 1.0) const;
 
-    CameraView RasterView(const glm::dmat4&amp; pose, double overscan) const;
+    CameraView RasterView(const glm::dmat4&amp; pose,
+                          double overscan) const;
 
     double LinearExposureScale() const;
 
@@ -367,10 +374,12 @@ struct CameraParams {
 
     double IrradiancePerRadiance(glm::dvec2 normalised) const;
 
-    double Electrons(std::span&lt;const float&gt; radiance, std::size_t channel,
+    double Electrons(std::span&lt;const float&gt; radiance,
+                     std::size_t channel,
                      glm::dvec2 normalised = {0.0, 0.0}) const;
 
-    std::vector&lt;float&gt; ElectronsPerRadiance(std::size_t channel) const;
+    std::vector&lt;float&gt;
+    ElectronsPerRadiance(std::size_t channel) const;
 
     std::vector&lt;float&gt; PhotonsPerRadiance() const;
 
@@ -383,14 +392,17 @@ struct CameraParams {
     double SubframeTime(int subframe) const;
 };
 
-CameraParams CameraParamsOf(const Scene&amp; scene, const Path&amp; path, std::uint32_t width,
+CameraParams CameraParamsOf(const Scene&amp; scene, const Path&amp; path,
+                            std::uint32_t width,
                             std::uint32_t height);
 
-void SetSingletChromatic(LensModel&amp; lens, double focalLengthMm, double nd, double abbe,
+void SetSingletChromatic(LensModel&amp; lens, double focalLengthMm,
+                         double nd, double abbe,
                          double lateral = 0.0);
 
-CameraParams CameraParamsOf(const Scene&amp; scene, const Path&amp; path, std::uint32_t width,
-                            std::uint32_t height, const glm::dmat4&amp; transform);
+CameraParams CameraParamsOf(const Scene&amp; scene, const Path&amp; path,
+                            std::uint32_t width, std::uint32_t height,
+                            const glm::dmat4&amp; transform);
 
 }  // namespace ernie
 </code></pre>

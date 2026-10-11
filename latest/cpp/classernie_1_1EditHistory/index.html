@@ -220,7 +220,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-begingroup"><strong>BeginGroup</strong></a> () <br><em>Groups the edits until</em> <code>EndGroup</code> <em>into one step. Groups nest; the outermost counts.</em></td>
+<td style="text-align: left;"><a href="#function-begingroup"><strong>BeginGroup</strong></a> () <br><em>Groups the edits until</em> <code>EndGroup</code> <em>into one step.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -287,7 +287,8 @@
 <h2 id="detailed-description">Detailed Description</h2>
 <p>Each records what it changes, so <code>Undo</code> puts it back (an attribute's earlier value, or none; a removed subtree with its attributes and tensors) and <code>Redo</code> does it again.</p>
 <p>Continuous edits, such as dragging a slider or a gizmo, merge into one step: an <code>open</code> edit of the same attribute as the last step updates that step until <code>Close</code> (called when the drag ends). Edits between <code>BeginGroup</code> and <code>EndGroup</code>, such as defining a prim and setting its attributes, undo and redo together. Edits made to the scene directly are not recorded; undoing past one sets the attribute to what the history last saw.</p>
-<p>Reference: E. Gamma, R. Helm, R. Johnson and J. Vlissides, "Design Patterns", the Command pattern, Addison-Wesley, 1994. </p>
+<p>Reference: E. Gamma, R. Helm, R. Johnson and J. Vlissides, "Design
+Patterns", the Command pattern, Addison-Wesley, 1994. </p>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
 <h3 id="function-add">function Add</h3>
 <p><em>Copies the prim at</em> <code>path</code> <em>of</em><code>source</code> <em>and its descendants, with their attributes and tensors (shared), to the same path of</em><code>scene</code> <em>and records it; undoing removes them.</em></p>
@@ -305,9 +306,10 @@
 <hr>
 
 <h3 id="function-begingroup">function BeginGroup</h3>
-<p><em>Groups the edits until</em> <code>EndGroup</code> <em>into one step. Groups nest; the outermost counts.</em></p>
+<p><em>Groups the edits until</em> <code>EndGroup</code> <em>into one step.</em></p>
 <pre><code class="language-C++">void ernie::EditHistory::BeginGroup () 
 </code></pre>
+<p>Groups nest; the outermost counts. </p>
 <hr>
 
 <h3 id="function-canredo">function CanRedo</h3>

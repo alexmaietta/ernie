@@ -386,8 +386,7 @@
     std::uintptr_t stream=1
 ) 
 </code></pre>
-<p>Write into it on <code>stream</code> (which first waits for the frames already submitted), then <code>scene.Unmap(path, attribute,
-stream)</code>: the next frame draws the values without copying them. Map again each step, as the memory behind it may alternate (for motion blur). </p>
+<p>Write into it on <code>stream</code> (which first waits for the frames already submitted), then <code>scene.Unmap(path, attribute, stream)</code>: the next frame draws the values without copying them. Map again each step, as the memory behind it may alternate (for motion blur). </p>
 <p><strong>Exception:</strong></p>
 <ul>
 <li><code>std::invalid_argument</code> if the backend maps no arrays, has no compute interop, or cannot map that attribute of that prim. </li>

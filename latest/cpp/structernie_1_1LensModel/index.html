@@ -256,7 +256,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#variable-transmission"><strong>transmission</strong></a>   = <code>1.0</code><br><em>Fraction of light the optics pass.</em></td>
+<td style="text-align: left;"><a href="#variable-transmission"><strong>transmission</strong></a>   = <code>/* multi line expression */</code><br><em>Fraction of light the optics pass.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -319,8 +319,9 @@
 <p>The rasterizer draws a pinhole image and the sensor resamples it through the lens; a fisheye reaching past 60 degrees off axis is drawn on cube faces instead (<a href="../wide__view_8h/"><strong>wide_view.h</strong></a>), its field angle below <code>kMaxFisheyeFieldAngle</code>.</p>
 <p>References:
 * D. C. Brown, "Decentering Distortion of Lenses", Photogrammetric Engineering 32(3):444-462, 1966.
-* J. Kannala and S. S. Brandt, "A Generic Camera Model and Calibration Method for
-  Conventional, Wide-Angle, and Fish-Eye Lenses", IEEE TPAMI 28(8):1335-1340, 2006. <a href="https://doi.org/10.1109/TPAMI.2006.153">https://doi.org/10.1109/TPAMI.2006.153</a>
+* J. Kannala and S. S. Brandt, "A Generic Camera Model and
+  Calibration Method for Conventional, Wide-Angle, and Fish-Eye
+  Lenses", IEEE TPAMI 28(8):1335-1340, 2006. <a href="https://doi.org/10.1109/TPAMI.2006.153">https://doi.org/10.1109/TPAMI.2006.153</a>
 * OpenCV, "Camera Calibration and 3D Reconstruction", <a href="https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html">https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html</a>, and "Fisheye camera model", <a href="https://docs.opencv.org/4.x/db/d58/group__calib3d__fisheye.html">https://docs.opencv.org/4.x/db/d58/group__calib3d__fisheye.html</a> </p>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
 <h3 id="variable-chromaticfocusmm">variable chromaticFocusMm</h3>

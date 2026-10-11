@@ -228,8 +228,8 @@ struct PropertyField {
         Vec2,
         Vec3,
         Vec4,
-        Int2,    
-        Quat,    
+        Int2,  
+        Quat,  
         Matrix,  
         Text,
         Target,  
@@ -251,14 +251,17 @@ struct PropertySection {
 };
 
 std::string DrawPropertyFields(Viewer&amp; viewer, const Path&amp; path,
-                               std::span&lt;const PropertyField&gt; fields, float labelWidth,
+                               std::span&lt;const PropertyField&gt; fields,
+                               float labelWidth,
                                std::string_view filter = {});
 
-std::string DrawPropertySections(Viewer&amp; viewer, const Path&amp; path,
-                                 std::span&lt;const PropertySection&gt; sections, float labelWidth,
-                                 std::string_view filter = {});
+std::string
+DrawPropertySections(Viewer&amp; viewer, const Path&amp; path,
+                     std::span&lt;const PropertySection&gt; sections,
+                     float labelWidth, std::string_view filter = {});
 
-bool MatchesFilter(std::string_view label, std::string_view attribute, std::string_view filter);
+bool MatchesFilter(std::string_view label, std::string_view attribute,
+                   std::string_view filter);
 
 bool ResetSquare(const Viewer&amp; viewer, bool authored);
 

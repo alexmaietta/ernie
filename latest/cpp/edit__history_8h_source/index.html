@@ -223,15 +223,19 @@ namespace ernie {
 
 class EditHistory {
   public:
-    void Set(Scene&amp; scene, const Path&amp; path, std::string_view attribute, Value value,
+    void Set(Scene&amp; scene, const Path&amp; path,
+             std::string_view attribute, Value value,
              bool open = false);
 
-    void Set(Scene&amp; scene, const Path&amp; path, std::vector&lt;std::pair&lt;std::string, Value&gt;&gt; edits,
+    void Set(Scene&amp; scene, const Path&amp; path,
+             std::vector&lt;std::pair&lt;std::string, Value&gt;&gt; edits,
              bool open = false);
 
-    void Clear(Scene&amp; scene, const Path&amp; path, std::string_view attribute);
+    void Clear(Scene&amp; scene, const Path&amp; path,
+               std::string_view attribute);
 
-    void Define(Scene&amp; scene, const Path&amp; path, std::string_view type);
+    void Define(Scene&amp; scene, const Path&amp; path,
+                std::string_view type);
 
     bool Remove(Scene&amp; scene, const Path&amp; path);
 
@@ -274,30 +278,43 @@ class EditHistory {
     };
 
     struct Step {
-        enum class Kind { Attribute, Define, Remove, Add } kind = Kind::Attribute;
+        enum class Kind {
+            Attribute,
+            Define,
+            Remove,
+            Add
+        } kind = Kind::Attribute;
         Path path;
-        std::string attribute;            
-        std::optional&lt;Value&gt; before;      
-        std::optional&lt;Value&gt; after;       
-        std::string type;                 
-        std::vector&lt;PrimSnapshot&gt; prims;  
-        std::uint64_t group = 0;          
+        std::string attribute;  
+        std::optional&lt;Value&gt;
+            before;  
+        std::optional&lt;Value&gt; after;  
+        std::string type;            
+        std::vector&lt;PrimSnapshot&gt;
+            prims;  
+        std::uint64_t group =
+            0;  
     };
 
     void Push(Step step, bool open);
-    void Record(Scene&amp; scene, const Path&amp; path, std::string_view attribute,
+    void Record(Scene&amp; scene, const Path&amp; path,
+                std::string_view attribute,
                 std::optional&lt;Value&gt; value, bool open);
     static bool Apply(Scene&amp; scene, const Step&amp; step, bool forward);
     bool Move(Scene&amp; scene, bool forward);
-    static void Restore(Scene&amp; scene, const std::vector&lt;PrimSnapshot&gt;&amp; prims);
-    static std::vector&lt;PrimSnapshot&gt; Snapshot(const Scene&amp; scene, const Path&amp; path);
+    static void Restore(Scene&amp; scene,
+                        const std::vector&lt;PrimSnapshot&gt;&amp; prims);
+    static std::vector&lt;PrimSnapshot&gt; Snapshot(const Scene&amp; scene,
+                                              const Path&amp; path);
     std::string Label(const Step&amp; step) const;
 
     std::vector&lt;Step&gt; steps_;
-    std::size_t next_ = 0;  
+    std::size_t next_ =
+        0;  
     bool open_ = false;
     int groupDepth_ = 0;
-    std::uint64_t group_ = 0;  
+    std::uint64_t group_ =
+        0;  
     std::uint64_t nextGroup_ = 1;
 };
 

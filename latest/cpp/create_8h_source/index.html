@@ -229,14 +229,16 @@ std::span&lt;const CreatableType&gt; CreatableTypes();
 const CreatableType* FindCreatable(std::string_view type);
 
 struct CreateContext {
-    glm::dvec3 target{0.0};       
-    double scale = 1.0;           
-    glm::dmat4 parentWorld{1.0};  
-    CameraParams camera;          
-    Path activeCamera;            
+    glm::dvec3 target{0.0};  
+    double scale = 1.0;  
+    glm::dmat4 parentWorld{
+        1.0};  
+    CameraParams camera;  
+    Path activeCamera;    
 };
 
-void AuthorDefaultPrim(Scene&amp; scene, const Path&amp; path, std::string_view type,
+void AuthorDefaultPrim(Scene&amp; scene, const Path&amp; path,
+                       std::string_view type,
                        const CreateContext&amp; context);
 
 }  // namespace ernie::app

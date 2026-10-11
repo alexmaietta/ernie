@@ -227,11 +227,13 @@ namespace ernie {
 
 enum class Dirty : std::uint32_t {
     None = 0,
-    Added = 1u &lt;&lt; 0,       
-    Removed = 1u &lt;&lt; 1,     
-    Transform = 1u &lt;&lt; 2,   
-    Topology = 1u &lt;&lt; 3,    
-    Points = 1u &lt;&lt; 4,      
+    Added = 1u &lt;&lt; 0,    
+    Removed = 1u &lt;&lt; 1,  
+    Transform = 1u &lt;&lt; 2,  
+    Topology =
+        1u
+        &lt;&lt; 3,  
+    Points = 1u &lt;&lt; 4,  
     Primvars = 1u &lt;&lt; 5,    
     Material = 1u &lt;&lt; 6,    
     Params = 1u &lt;&lt; 7,      
@@ -239,11 +241,13 @@ enum class Dirty : std::uint32_t {
 };
 
 inline constexpr Dirty operator|(Dirty a, Dirty b) {
-    return static_cast&lt;Dirty&gt;(static_cast&lt;std::uint32_t&gt;(a) | static_cast&lt;std::uint32_t&gt;(b));
+    return static_cast&lt;Dirty&gt;(static_cast&lt;std::uint32_t&gt;(a) |
+                              static_cast&lt;std::uint32_t&gt;(b));
 }
 
 inline constexpr Dirty operator&amp;(Dirty a, Dirty b) {
-    return static_cast&lt;Dirty&gt;(static_cast&lt;std::uint32_t&gt;(a) &amp; static_cast&lt;std::uint32_t&gt;(b));
+    return static_cast&lt;Dirty&gt;(static_cast&lt;std::uint32_t&gt;(a) &amp;
+                              static_cast&lt;std::uint32_t&gt;(b));
 }
 
 inline constexpr Dirty&amp; operator|=(Dirty&amp; a, Dirty b) {
@@ -271,7 +275,8 @@ struct PrimTypeDef;
 class Prim {
   public:
     Prim() = default;
-    Prim(Scene* scene, Path path) : scene_(scene), path_(std::move(path)) {}
+    Prim(Scene* scene, Path path)
+        : scene_(scene), path_(std::move(path)) {}
 
     bool IsValid() const;
 
@@ -285,7 +290,8 @@ class Prim {
 
     const std::string&amp; Type() const;
 
-    Prim Define(std::string_view relative, std::string_view type) const;
+    Prim Define(std::string_view relative,
+                std::string_view type) const;
 
     Prim GetPrim(std::string_view relative) const;
 
@@ -297,7 +303,8 @@ class Prim {
 
     const Value* Get(std::string_view attribute) const;
 
-    template &lt;typename T&gt; T Get(std::string_view attribute, T fallback) const;
+    template &lt;typename T&gt;
+    T Get(std::string_view attribute, T fallback) const;
 
     const Tensor* Read(std::string_view attribute) const;
 
@@ -309,7 +316,8 @@ class Prim {
 class PrimSet {
   public:
     PrimSet() = default;
-    explicit PrimSet(std::vector&lt;Path&gt; paths) : paths_(std::move(paths)) {}
+    explicit PrimSet(std::vector&lt;Path&gt; paths)
+        : paths_(std::move(paths)) {}
 
     const std::vector&lt;Path&gt;&amp; Paths() const {
         return paths_;
@@ -322,8 +330,8 @@ class PrimSet {
   private:
     friend class Scene;
     std::vector&lt;Path&gt; paths_;
-    // The scene's prims as last resolved, valid for that scene (`Scene::Id`) until it removes
-    // prims.
+    // The scene's prims as last resolved, valid for that scene
+    // (`Scene::Id`) until it removes prims.
     mutable std::vector&lt;void*&gt; prims_;
     mutable std::uint64_t sceneId_ = 0;
     mutable std::uint64_t removals_ = 0;
@@ -349,44 +357,54 @@ class Scene {
 
     std::vector&lt;Path&gt; Prims(std::string_view type = {}) const;
 
-    void Set(const Path&amp; path, std::string_view attribute, Value value);
+    void Set(const Path&amp; path, std::string_view attribute,
+             Value value);
 
-    const Value* Get(const Path&amp; path, std::string_view attribute) const;
+    const Value* Get(const Path&amp; path,
+                     std::string_view attribute) const;
 
-    template &lt;typename T&gt; T Get(const Path&amp; path, std::string_view attribute, T fallback) const {
+    template &lt;typename T&gt;
+    T Get(const Path&amp; path, std::string_view attribute,
+          T fallback) const {
         const Value* value = Get(path, attribute);
         const T* typed = value != nullptr ? value-&gt;Get&lt;T&gt;() : nullptr;
         return typed != nullptr ? *typed : fallback;
     }
 
-    void Write(const Path&amp; path, std::string_view attribute, Tensor tensor,
-               std::uintptr_t stream = 1);
+    void Write(const Path&amp; path, std::string_view attribute,
+               Tensor tensor, std::uintptr_t stream = 1);
 
     Tensor Map(const Path&amp; path, std::string_view attribute);
 
-    void Unmap(const Path&amp; path, std::string_view attribute, std::uintptr_t stream = 1);
-    void Unmap(const PrimSet&amp; prims, std::string_view attribute, std::uintptr_t stream = 1);
-
-    std::uintptr_t WriteStream(const Path&amp; path, std::string_view attribute) const;
-
-    void Write(std::span&lt;const Path&gt; paths, std::string_view attribute, const Tensor&amp; rows,
+    void Unmap(const Path&amp; path, std::string_view attribute,
+               std::uintptr_t stream = 1);
+    void Unmap(const PrimSet&amp; prims, std::string_view attribute,
                std::uintptr_t stream = 1);
 
-    void Write(const PrimSet&amp; prims, std::string_view attribute, const Tensor&amp; rows,
+    std::uintptr_t WriteStream(const Path&amp; path,
+                               std::string_view attribute) const;
+
+    void Write(std::span&lt;const Path&gt; paths,
+               std::string_view attribute, const Tensor&amp; rows,
                std::uintptr_t stream = 1);
 
-    const std::pair&lt;Tensor, std::int64_t&gt;* RowOf(const Path&amp; path,
-                                                 std::string_view attribute) const;
+    void Write(const PrimSet&amp; prims, std::string_view attribute,
+               const Tensor&amp; rows, std::uintptr_t stream = 1);
+
+    const std::pair&lt;Tensor, std::int64_t&gt;*
+    RowOf(const Path&amp; path, std::string_view attribute) const;
 
     std::uint64_t OwnTransformVersion(const Path&amp; path) const;
 
-    const Tensor* Read(const Path&amp; path, std::string_view attribute) const;
+    const Tensor* Read(const Path&amp; path,
+                       std::string_view attribute) const;
 
     std::vector&lt;std::string&gt; Attributes(const Path&amp; path) const;
 
     bool Clear(const Path&amp; path, std::string_view attribute);
 
-    std::uint64_t AttributeVersion(const Path&amp; path, std::string_view attribute) const;
+    std::uint64_t AttributeVersion(const Path&amp; path,
+                                   std::string_view attribute) const;
 
     glm::dmat4 LocalTransform(const Path&amp; path) const;
 
@@ -435,22 +453,29 @@ class Scene {
         const PrimTypeDef* schema = nullptr;
         std::map&lt;std::string, Value, std::less&lt;&gt;&gt; values;
         std::map&lt;std::string, Tensor, std::less&lt;&gt;&gt; tensors;
-        std::map&lt;std::string, std::uintptr_t, std::less&lt;&gt;&gt; streams;  
-        std::map&lt;std::string, std::pair&lt;Tensor, std::int64_t&gt;, std::less&lt;&gt;&gt; rows;
+        std::map&lt;std::string, std::uintptr_t, std::less&lt;&gt;&gt;
+            streams;  
+        std::map&lt;std::string, std::pair&lt;Tensor, std::int64_t&gt;,
+                 std::less&lt;&gt;&gt;
+            rows;
         std::map&lt;std::string, std::uint64_t, std::less&lt;&gt;&gt; versions;
         std::array&lt;std::uint64_t, kStampCount&gt; stamps{};
         std::uint64_t ownTransform = 0;  
-        std::uint64_t latest = 0;        
+        std::uint64_t latest =
+            0;  
     };
 
     PrimData&amp; Find(const Path&amp; path);
     const PrimData&amp; Find(const Path&amp; path) const;
-    void Stamp(const Path&amp; path, PrimData&amp; prim, std::string_view attribute);
+    void Stamp(const Path&amp; path, PrimData&amp; prim,
+               std::string_view attribute);
     void Stamp(const Path&amp; path, PrimData&amp; prim, Dirty bit);
     PrimData&amp; CreateIfMissing(const Path&amp; path);
-    void WriteTensor(const Path&amp; path, PrimData&amp; prim, std::string_view attribute, Tensor tensor,
+    void WriteTensor(const Path&amp; path, PrimData&amp; prim,
+                     std::string_view attribute, Tensor tensor,
                      std::uintptr_t stream,
-                     std::optional&lt;std::pair&lt;Tensor, std::int64_t&gt;&gt; row = std::nullopt,
+                     std::optional&lt;std::pair&lt;Tensor, std::int64_t&gt;&gt;
+                         row = std::nullopt,
                      bool checked = false);
 
     std::map&lt;Path, PrimData&gt; prims_;
@@ -463,8 +488,11 @@ class Scene {
     UniqueId id_;
 };
 
-template &lt;typename T&gt; T Prim::Get(std::string_view attribute, T fallback) const {
-    return scene_ != nullptr ? scene_-&gt;Get&lt;T&gt;(path_, attribute, fallback) : fallback;
+template &lt;typename T&gt;
+T Prim::Get(std::string_view attribute, T fallback) const {
+    return scene_ != nullptr
+               ? scene_-&gt;Get&lt;T&gt;(path_, attribute, fallback)
+               : fallback;
 }
 
 }  // namespace ernie

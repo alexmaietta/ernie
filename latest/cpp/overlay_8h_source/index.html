@@ -232,12 +232,16 @@ enum class MarkerShape : std::uint8_t {
 };
 
 struct OverlayStyle {
-    glm::vec4 color{1.0f};  
-    float width = 2.0f;     
-    float size = 12.0f;     
+    glm::vec4 color{
+        1.0f};  
+    float width = 2.0f;  
+    float size =
+        12.0f;  
     OverlayDepth depth = OverlayDepth::Test;
     std::int32_t world = -1;  
-    glm::vec4 background{0.0f, 0.0f, 0.0f, 0.55f};  
+    glm::vec4 background{
+        0.0f, 0.0f, 0.0f,
+        0.55f};  
 };
 
 struct OverlayItem {
@@ -281,43 +285,56 @@ class Overlay {
         return version_;
     }
 
-    Overlay&amp; Line(const glm::dvec3&amp; a, const glm::dvec3&amp; b, const OverlayStyle&amp; style = {});
+    Overlay&amp; Line(const glm::dvec3&amp; a, const glm::dvec3&amp; b,
+                  const OverlayStyle&amp; style = {});
 
-    Overlay&amp; Polyline(std::span&lt;const glm::dvec3&gt; points, const OverlayStyle&amp; style = {},
+    Overlay&amp; Polyline(std::span&lt;const glm::dvec3&gt; points,
+                      const OverlayStyle&amp; style = {},
                       bool closed = false);
 
-    Overlay&amp; Lines(std::span&lt;const glm::dvec3&gt; endpoints, const OverlayStyle&amp; style = {},
+    Overlay&amp; Lines(std::span&lt;const glm::dvec3&gt; endpoints,
+                   const OverlayStyle&amp; style = {},
                    std::span&lt;const glm::vec4&gt; colors = {});
 
-    Overlay&amp; Arrow(const glm::dvec3&amp; from, const glm::dvec3&amp; to, const OverlayStyle&amp; style = {},
-                   double head = 0.0);
+    Overlay&amp; Arrow(const glm::dvec3&amp; from, const glm::dvec3&amp; to,
+                   const OverlayStyle&amp; style = {}, double head = 0.0);
 
-    Overlay&amp; Box(const glm::dvec3&amp; low, const glm::dvec3&amp; high, const OverlayStyle&amp; style = {},
+    Overlay&amp; Box(const glm::dvec3&amp; low, const glm::dvec3&amp; high,
+                 const OverlayStyle&amp; style = {},
                  const glm::dmat4&amp; transform = glm::dmat4(1.0));
 
-    Overlay&amp; Circle(const glm::dvec3&amp; centre, const glm::dvec3&amp; normal, double radius,
-                    const OverlayStyle&amp; style = {}, int segments = 48);
+    Overlay&amp; Circle(const glm::dvec3&amp; centre,
+                    const glm::dvec3&amp; normal, double radius,
+                    const OverlayStyle&amp; style = {},
+                    int segments = 48);
 
-    Overlay&amp; Sphere(const glm::dvec3&amp; centre, double radius, const OverlayStyle&amp; style = {});
+    Overlay&amp; Sphere(const glm::dvec3&amp; centre, double radius,
+                    const OverlayStyle&amp; style = {});
 
-    Overlay&amp; Axes(const glm::dmat4&amp; transform, double length, const OverlayStyle&amp; style = {});
+    Overlay&amp; Axes(const glm::dmat4&amp; transform, double length,
+                  const OverlayStyle&amp; style = {});
 
-    Overlay&amp; WireMesh(std::span&lt;const glm::dvec3&gt; points, std::span&lt;const std::uint32_t&gt; indices,
+    Overlay&amp; WireMesh(std::span&lt;const glm::dvec3&gt; points,
+                      std::span&lt;const std::uint32_t&gt; indices,
                       const OverlayStyle&amp; style = {},
                       const glm::dmat4&amp; transform = glm::dmat4(1.0));
 
-    Overlay&amp; Triangles(std::span&lt;const glm::dvec3&gt; points, std::span&lt;const std::uint32_t&gt; indices,
+    Overlay&amp; Triangles(std::span&lt;const glm::dvec3&gt; points,
+                       std::span&lt;const std::uint32_t&gt; indices,
                        const OverlayStyle&amp; style = {},
                        const glm::dmat4&amp; transform = glm::dmat4(1.0));
 
-    Overlay&amp; Marker(const glm::dvec3&amp; point, const OverlayStyle&amp; style = {},
+    Overlay&amp; Marker(const glm::dvec3&amp; point,
+                    const OverlayStyle&amp; style = {},
                     MarkerShape shape = MarkerShape::Circle);
 
-    Overlay&amp; Markers(std::span&lt;const glm::dvec3&gt; points, const OverlayStyle&amp; style = {},
+    Overlay&amp; Markers(std::span&lt;const glm::dvec3&gt; points,
+                     const OverlayStyle&amp; style = {},
                      MarkerShape shape = MarkerShape::Circle,
                      std::span&lt;const glm::vec4&gt; colors = {});
 
-    Overlay&amp; Label(const glm::dvec3&amp; point, std::string_view text, const OverlayStyle&amp; style = {});
+    Overlay&amp; Label(const glm::dvec3&amp; point, std::string_view text,
+                   const OverlayStyle&amp; style = {});
 
     const std::vector&lt;OverlaySegment&gt;&amp; Segments() const {
         return segments_;
@@ -332,12 +349,14 @@ class Overlay {
     }
 
     bool Empty() const {
-        return segments_.empty() &amp;&amp; triangles_.empty() &amp;&amp; sprites_.empty();
+        return segments_.empty() &amp;&amp; triangles_.empty() &amp;&amp;
+               sprites_.empty();
     }
 
   private:
     void Touch();
-    void AddSegment(const glm::dvec3&amp; a, const glm::dvec3&amp; b, const OverlayStyle&amp; style,
+    void AddSegment(const glm::dvec3&amp; a, const glm::dvec3&amp; b,
+                    const OverlayStyle&amp; style,
                     const glm::vec4&amp; color);
 
     std::vector&lt;OverlaySegment&gt; segments_;
@@ -347,8 +366,9 @@ class Overlay {
     std::uint64_t version_ = 0;
 };
 
-std::vector&lt;std::string&gt; SelectOverlays(std::string_view spec,
-                                        std::span&lt;const std::string&gt; available);
+std::vector&lt;std::string&gt;
+SelectOverlays(std::string_view spec,
+               std::span&lt;const std::string&gt; available);
 
 }  // namespace ernie
 </code></pre>

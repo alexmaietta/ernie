@@ -213,10 +213,12 @@
 namespace ernie {
 
 struct MeshData {
-    std::vector&lt;float&gt; points;           
-    std::vector&lt;std::uint32_t&gt; indices;  
-    std::vector&lt;float&gt; normals;          
-    std::vector&lt;float&gt; colors;           
+    std::vector&lt;float&gt; points;  
+    std::vector&lt;std::uint32_t&gt;
+        indices;  
+    std::vector&lt;float&gt; normals;  
+    std::vector&lt;float&gt;
+        colors;  
     std::vector&lt;float&gt; uvs;
 };
 
@@ -225,16 +227,18 @@ struct TriangleCorners {
     std::vector&lt;std::uint32_t&gt; faceVertices;
 };
 
-TriangleCorners TriangulatedCorners(std::span&lt;const std::int64_t&gt; faceVertexCounts);
+TriangleCorners
+TriangulatedCorners(std::span&lt;const std::int64_t&gt; faceVertexCounts);
 
-std::vector&lt;std::uint32_t&gt; TriangulateFaces(std::span&lt;const std::int64_t&gt; faceVertexCounts,
-                                            std::span&lt;const std::int64_t&gt; faceVertexIndices,
-                                            std::size_t pointCount);
+std::vector&lt;std::uint32_t&gt;
+TriangulateFaces(std::span&lt;const std::int64_t&gt; faceVertexCounts,
+                 std::span&lt;const std::int64_t&gt; faceVertexIndices,
+                 std::size_t pointCount);
 
 struct InstanceData {
     std::vector&lt;float&gt; positions;  
     std::vector&lt;float&gt;
-        orientations;           
+        orientations;  
     std::vector&lt;float&gt; scales;  
 };
 

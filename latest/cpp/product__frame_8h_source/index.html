@@ -217,11 +217,15 @@ namespace ernie {
 
 struct ProductFrame {
     const VulkanContext* context = nullptr;
-    ComputeInterop* compute = nullptr;    
-    std::unique_ptr&lt;FrameImages&gt; images;  
+    ComputeInterop* compute =
+        nullptr;  
+    std::unique_ptr&lt;FrameImages&gt;
+        images;  
     bool batched = false;  
-    std::uint64_t submission = 0;  
-    int arrayMaps = 0;             
+    std::uint64_t submission =
+        0;  
+    int arrayMaps =
+        0;  
     std::vector&lt;std::shared_ptr&lt;GpuBuffer&gt;&gt;* linearPool = nullptr;
 };
 

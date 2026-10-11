@@ -212,9 +212,11 @@ struct ImVec2;
 
 namespace ernie::app {
 
-void DrawPrimIcon(ImDrawList* draw, const ImVec2&amp; corner, float size, std::string_view type);
+void DrawPrimIcon(ImDrawList* draw, const ImVec2&amp; corner, float size,
+                  std::string_view type);
 
-void DrawRendererIcon(ImDrawList* draw, const ImVec2&amp; corner, float size);
+void DrawRendererIcon(ImDrawList* draw, const ImVec2&amp; corner,
+                      float size);
 
 void PrimIcon(std::string_view type, float size);
 

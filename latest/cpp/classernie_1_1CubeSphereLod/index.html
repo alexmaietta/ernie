@@ -235,7 +235,7 @@
 </tr>
 <tr>
 <td style="text-align: right;"></td>
-<td style="text-align: left;"><a href="#function-cubespherelod-23"><strong>CubeSphereLod</strong></a> (double radius, std::span&lt; const <a href="../structernie_1_1RasterView/"><strong>RasterView</strong></a>, <a href="./#variable-kfaces"><strong>kFaces</strong></a> &gt; faces, std::uint32_t leafCells) <br><em>Builds the height pyramids of six face rasters of</em> <code>FaceCells() + 1</code> <em>squared samples, in face order.</em></td>
+<td style="text-align: left;"><a href="#function-cubespherelod-23"><strong>CubeSphereLod</strong></a> (double radius, std::span&lt; const <a href="../structernie_1_1RasterView/"><strong>RasterView</strong></a>, <a href="./#variable-kfaces"><strong>kFaces</strong></a> &gt; faces, std::uint32_t leafCells) <br><em>Builds the height pyramids of six face rasters of</em> <code>FaceCells()</code></td>
 </tr>
 <tr>
 <td style="text-align: right;"></td>
@@ -337,9 +337,11 @@
 <p><code>Select</code> runs Strugar's algorithm on all six trees, using distances to each node's <code>CubeSphereRegion</code>. Neighbouring patches, across faces too, differ by at most one level when the first range is at least <code>MinFirstRange</code>. Odd vertices of a patch morph in 3D towards the midpoint of their two neighbours on the next coarser level: along the patch's edges these are the edge's own neighbours, and for vertices odd in both directions those on the quad diagonal from (1, 0) to (0, 1). Unlike the flat terrain's slide towards lower indices, this does not depend on which way a face's grid runs, so edges between faces match, and a fully morphed patch is exactly the coarser mesh.</p>
 <p>Positions on a planet need more precision than single floats. Selection works in doubles, and its frustum is relative to the eye: build it from a view-projection matrix whose view has the eye at the origin and the body frame's axes.</p>
 <p>References:
-* C. Ronchi, R. Iacono and P. S. Paolucci, "The 'Cubed Sphere': A New Method for the Solution of
-  Partial Differential Equations in Spherical Geometry", Journal of Computational Physics 124(1):93-114, 1996. <a href="https://doi.org/10.1006/jcph.1996.0047">https://doi.org/10.1006/jcph.1996.0047</a>
-* F. Strugar, "Continuous Distance-Dependent Level of Detail for Rendering Heightmaps", Journal of Graphics, GPU, and Game Tools 14(4):57-74, 2009. <a href="https://doi.org/10.1080/2151237X.2009.10129287">https://doi.org/10.1080/2151237X.2009.10129287</a> </p>
+* C. Ronchi, R. Iacono and P. S. Paolucci, "The 'Cubed Sphere': A
+  New Method for the Solution of Partial Differential Equations in
+  Spherical Geometry", Journal of Computational Physics 124(1):93-114, 1996. <a href="https://doi.org/10.1006/jcph.1996.0047">https://doi.org/10.1006/jcph.1996.0047</a>
+* F. Strugar, "Continuous Distance-Dependent Level of Detail for
+  Rendering Heightmaps", Journal of Graphics, GPU, and Game Tools 14(4):57-74, 2009. <a href="https://doi.org/10.1080/2151237X.2009.10129287">https://doi.org/10.1080/2151237X.2009.10129287</a> </p>
 <h2 id="public-static-attributes-documentation">Public Static Attributes Documentation</h2>
 <h3 id="variable-kfaces">variable kFaces</h3>
 <pre><code class="language-C++">constexpr std::uint32_t ernie::CubeSphereLod::kFaces;
@@ -352,14 +354,16 @@
 <hr>
 
 <h3 id="function-cubespherelod-23">function CubeSphereLod [2/3]</h3>
-<p><em>Builds the height pyramids of six face rasters of</em> <code>FaceCells() + 1</code> <em>squared samples, in face order.</em></p>
+<p><em>Builds the height pyramids of six face rasters of</em> <code>FaceCells()</code></p>
 <pre><code class="language-C++">ernie::CubeSphereLod::CubeSphereLod (
     double radius,
     std::span&lt; const RasterView , kFaces &gt; faces,
     std::uint32_t leafCells
 ) 
 </code></pre>
-<p>Samples that are not finite or equal a raster's nodata value are ignored, and nodes without valid samples are never selected. The tree keeps no reference to the rasters; their origins and cell sizes are not used. </p>
+<ul>
+<li>1 squared samples, in face order. Samples that are not finite or equal a raster's nodata value are ignored, and nodes without valid samples are never selected. The tree keeps no reference to the rasters; their origins and cell sizes are not used. </li>
+</ul>
 <p><strong>Parameters:</strong></p>
 <ul>
 <li><code>leafCells</code> Grid quads along a level-0 node; a power of two of at least 4. </li>

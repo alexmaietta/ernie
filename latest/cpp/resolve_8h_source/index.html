@@ -254,20 +254,24 @@ struct RenderProductSpec {
     VkExtent2D resolution{2048, 1080};
     std::vector&lt;std::pair&lt;Path, std::string&gt;&gt; vars;
     std::vector&lt;SensorFilterStep&gt; filters;
-    std::vector&lt;std::optional&lt;std::vector&lt;SensorFilterStep&gt;&gt;&gt; varFilters;
+    std::vector&lt;std::optional&lt;std::vector&lt;SensorFilterStep&gt;&gt;&gt;
+        varFilters;
     std::optional&lt;std::string&gt; overlays;
     std::optional&lt;MinimalMode&gt; minimal;
     std::optional&lt;glm::vec3&gt; minimalColor;
 };
 
-MinimalMode MinimalModeOf(const Scene&amp; scene, const Path&amp; prim, MinimalMode fallback);
+MinimalMode MinimalModeOf(const Scene&amp; scene, const Path&amp; prim,
+                          MinimalMode fallback);
 
-std::vector&lt;glm::dmat4&gt; ViewPosesOf(const Scene&amp; scene, std::span&lt;const Path&gt; cameras,
-                                    std::uint32_t width, std::uint32_t height,
-                                    const Tensor* hostPoses = nullptr);
+std::vector&lt;glm::dmat4&gt;
+ViewPosesOf(const Scene&amp; scene, std::span&lt;const Path&gt; cameras,
+            std::uint32_t width, std::uint32_t height,
+            const Tensor* hostPoses = nullptr);
 
-void CheckBatchCameras(const Scene&amp; scene, std::span&lt;const Path&gt; cameras, std::uint32_t width,
-                       std::uint32_t height);
+void CheckBatchCameras(const Scene&amp; scene,
+                       std::span&lt;const Path&gt; cameras,
+                       std::uint32_t width, std::uint32_t height);
 
 glm::dmat4 PosesParentOf(const Scene&amp; scene, const Path&amp; camera);
 
@@ -278,40 +282,54 @@ bool PosesAreQuaternions(const Tensor&amp; poses);
 std::int32_t WorldOf(const Scene&amp; scene, const Path&amp; path);
 
 using HostArrayReader =
-    std::function&lt;Tensor(const Path&amp; path, std::string_view attribute, const Tensor&amp; device)&gt;;
+    std::function&lt;Tensor(const Path&amp; path, std::string_view attribute,
+                         const Tensor&amp; device)&gt;;
 
-std::vector&lt;std::int32_t&gt; ViewWorldsOf(const Scene&amp; scene, std::span&lt;const Path&gt; cameras,
-                                       std::size_t views, const HostArrayReader&amp; read = {});
+std::vector&lt;std::int32_t&gt;
+ViewWorldsOf(const Scene&amp; scene, std::span&lt;const Path&gt; cameras,
+             std::size_t views, const HostArrayReader&amp; read = {});
 
-std::vector&lt;std::int32_t&gt; InstanceWorldsOf(const Scene&amp; scene, const Path&amp; instancer,
-                                           std::size_t count, const HostArrayReader&amp; read = {});
+std::vector&lt;std::int32_t&gt;
+InstanceWorldsOf(const Scene&amp; scene, const Path&amp; instancer,
+                 std::size_t count, const HostArrayReader&amp; read = {});
 
 std::vector&lt;RenderProductSpec&gt;
-ResolveRenderProducts(const Scene&amp; scene, std::span&lt;const Path&gt; products, const Path&amp; settings);
+ResolveRenderProducts(const Scene&amp; scene,
+                      std::span&lt;const Path&gt; products,
+                      const Path&amp; settings);
 
-RenderPrims ResolveRenderPrims(const Scene&amp; scene, const Path&amp; settings);
+RenderPrims ResolveRenderPrims(const Scene&amp; scene,
+                               const Path&amp; settings);
 
-std::optional&lt;std::uint64_t&gt; FrameOf(const Scene&amp; scene, const Path&amp; settings);
+std::optional&lt;std::uint64_t&gt; FrameOf(const Scene&amp; scene,
+                                     const Path&amp; settings);
 
 Path BoundMaterial(const Scene&amp; scene, const Path&amp; prim);
 
-std::vector&lt;float&gt; SunIrradianceOf(const Scene&amp; scene, const Path&amp; light,
+std::vector&lt;float&gt; SunIrradianceOf(const Scene&amp; scene,
+                                   const Path&amp; light,
                                    const SpectralBands&amp; bands);
 
-LightParams LightParamsOf(const Scene&amp; scene, const Path&amp; path, const SpectralBands&amp; bands);
+LightParams LightParamsOf(const Scene&amp; scene, const Path&amp; path,
+                          const SpectralBands&amp; bands);
 
-LightParams LightParamsOf(const Scene&amp; scene, const Path&amp; path, const SpectralBands&amp; bands,
+LightParams LightParamsOf(const Scene&amp; scene, const Path&amp; path,
+                          const SpectralBands&amp; bands,
                           const glm::dmat4&amp; world);
 
-std::array&lt;glm::vec3, 9&gt; DomeIrradianceSh(const Tensor&amp; latlong, const glm::dmat3&amp; rotation);
+std::array&lt;glm::vec3, 9&gt; DomeIrradianceSh(const Tensor&amp; latlong,
+                                          const glm::dmat3&amp; rotation);
 
-DomeParams DomeParamsOf(const Scene&amp; scene, const Path&amp; path, const SpectralBands&amp; bands);
+DomeParams DomeParamsOf(const Scene&amp; scene, const Path&amp; path,
+                        const SpectralBands&amp; bands);
 
 std::optional&lt;Image&gt; DomeMapOf(const Scene&amp; scene, const Path&amp; path);
 
 struct DomeSun {
-    glm::dvec3 direction{0.0, 0.0, 1.0};  
-    double angle = 0.53;                  
+    glm::dvec3 direction{
+        0.0, 0.0,
+        1.0};  
+    double angle = 0.53;  
     glm::dvec3 irradiance{0.0};
 };
 
@@ -324,15 +342,19 @@ std::optional&lt;DomeSunExtraction&gt; ExtractDomeSun(const Image&amp; map);
 inline constexpr double kDomeSunThreshold = 0.1;
 
 struct DomeDirection {
-    glm::dvec3 direction{0.0, 0.0, 1.0};  
+    glm::dvec3 direction{
+        0.0, 0.0,
+        1.0};  
     glm::dvec3 irradiance{0.0};  
 };
 
-std::vector&lt;DomeDirection&gt; DomeDirectionsOf(const Image&amp; map, std::size_t count);
+std::vector&lt;DomeDirection&gt; DomeDirectionsOf(const Image&amp; map,
+                                            std::size_t count);
 
 std::vector&lt;Star&gt; StarsOf(const Scene&amp; scene, const Path&amp; path);
 
-StarFieldParams StarFieldParamsOf(const Scene&amp; scene, const Path&amp; path);
+StarFieldParams StarFieldParamsOf(const Scene&amp; scene,
+                                  const Path&amp; path);
 
 double OverscanOf(const CameraParams&amp; camera);
 
@@ -344,10 +366,12 @@ Occlusion OcclusionOf(const Scene&amp; scene, const Path&amp; settings);
 
 Culling CullingOf(const Scene&amp; scene, const Path&amp; settings);
 
-FrameParams FrameParamsOf(const Scene&amp; scene, const RenderPrims&amp; prims, std::uint32_t width,
-                          std::uint32_t height);
+FrameParams FrameParamsOf(const Scene&amp; scene,
+                          const RenderPrims&amp; prims,
+                          std::uint32_t width, std::uint32_t height);
 
-MaterialSettings MaterialSettingsOf(const Scene&amp; scene, const Path&amp; material,
+MaterialSettings MaterialSettingsOf(const Scene&amp; scene,
+                                    const Path&amp; material,
                                     const BrdfRegistry&amp; brdfs);
 
 MeshData MeshDataOf(const Scene&amp; scene, const Path&amp; mesh);
@@ -356,10 +380,12 @@ bool IsMeshType(std::string_view type);
 
 MeshData PrimitiveMeshOf(const Scene&amp; scene, const Path&amp; path);
 
-InstanceData InstanceDataOf(const Scene&amp; scene, const Path&amp; instancer);
+InstanceData InstanceDataOf(const Scene&amp; scene,
+                            const Path&amp; instancer);
 
 std::vector&lt;std::vector&lt;std::uint32_t&gt;&gt;
-InstancesByPrototype(const Scene&amp; scene, const Path&amp; instancer, std::size_t prototypes);
+InstancesByPrototype(const Scene&amp; scene, const Path&amp; instancer,
+                     std::size_t prototypes);
 
 std::optional&lt;Bounds3&gt; ExtentOf(const Scene&amp; scene, const Path&amp; prim);
 
@@ -370,18 +396,22 @@ struct GpuXform {
     Tensor orient;
     Tensor scale;
     bool composed = false;
-    std::int64_t row = 0;       
-    std::uintptr_t stream = 1;  
-    bool wFirst = false;        
+    std::int64_t row = 0;  
+    std::uintptr_t stream =
+        1;                
+    bool wFirst = false;  
 };
 
-std::optional&lt;GpuXform&gt; GpuXformOf(const Scene&amp; scene, const Path&amp; path);
+std::optional&lt;GpuXform&gt; GpuXformOf(const Scene&amp; scene,
+                                   const Path&amp; path);
 
 bool QuaternionsWFirst(const Scene&amp; scene, const Path&amp; path);
 
-std::optional&lt;Path&gt; GpuXformAnchorOf(const Scene&amp; scene, const Path&amp; path);
+std::optional&lt;Path&gt; GpuXformAnchorOf(const Scene&amp; scene,
+                                     const Path&amp; path);
 
-std::optional&lt;Bounds3&gt; LocalBoundsOf(const Scene&amp; scene, const Path&amp; prim);
+std::optional&lt;Bounds3&gt; LocalBoundsOf(const Scene&amp; scene,
+                                     const Path&amp; prim);
 
 Image ImageOfTensor(const Tensor&amp; tensor, ImageEncoding encoding);
 

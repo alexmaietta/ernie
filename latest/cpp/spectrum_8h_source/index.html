@@ -248,7 +248,8 @@ class Spectrum {
   public:
     Spectrum() = default;
 
-    Spectrum(std::vector&lt;double&gt; wavelengthsNm, std::vector&lt;double&gt; values);
+    Spectrum(std::vector&lt;double&gt; wavelengthsNm,
+             std::vector&lt;double&gt; values);
 
     static Spectrum Constant(double value);
 
@@ -283,14 +284,16 @@ double PlanckRadiance(double wavelengthNm, double kelvin);
 
 double CieDaylight(double wavelengthNm, double kelvin);
 
-std::vector&lt;float&gt; BlackbodyIrradiance(const SpectralBands&amp; bands, double kelvin,
+std::vector&lt;float&gt; BlackbodyIrradiance(const SpectralBands&amp; bands,
+                                       double kelvin,
                                        double totalIrradiance);
 
 glm::dvec3 CieXyz(double wavelengthNm);
 
 std::vector&lt;glm::dvec3&gt; CieWeights(const SpectralBands&amp; bands);
 
-glm::dvec3 ToXyz(const SpectralBands&amp; bands, std::span&lt;const float&gt; values);
+glm::dvec3 ToXyz(const SpectralBands&amp; bands,
+                 std::span&lt;const float&gt; values);
 
 glm::dvec3 XyzToLinearSrgb(glm::dvec3 xyz);
 

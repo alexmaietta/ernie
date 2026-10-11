@@ -227,7 +227,8 @@ struct CahvoreModel {
     glm::dvec3 o{0.0, 0.0, 1.0};
     glm::dvec3 r{0.0};
     glm::dvec3 e{0.0};
-    int pupilType = 1;       
+    int pupilType =
+        1;  
     double linearity = 1.0;  
     std::uint32_t width = 0;
     std::uint32_t height = 0;
@@ -262,7 +263,8 @@ struct NamedCahvore {
 
 std::vector&lt;NamedCahvore&gt; ReadCahvoreModels(std::string_view json);
 
-std::vector&lt;NamedCahvore&gt; ReadCahvoreModelsFile(const std::string&amp; path);
+std::vector&lt;NamedCahvore&gt;
+ReadCahvoreModelsFile(const std::string&amp; path);
 
 }  // namespace ernie
 </code></pre>

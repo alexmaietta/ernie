@@ -217,7 +217,16 @@
 
 namespace ernie {
 
-enum class DType : std::uint8_t { UInt8, UInt16, UInt32, Int32, Int64, Float16, Float32, Float64 };
+enum class DType : std::uint8_t {
+    UInt8,
+    UInt16,
+    UInt32,
+    Int32,
+    Int64,
+    Float16,
+    Float32,
+    Float64
+};
 
 std::size_t SizeOf(DType type);
 
@@ -245,7 +254,8 @@ class Tensor {
     static Tensor Zeros(DType type, std::vector&lt;std::int64_t&gt; shape);
 
     template &lt;typename T&gt;
-    static Tensor Copy(std::span&lt;const T&gt; values, std::vector&lt;std::int64_t&gt; shape);
+    static Tensor Copy(std::span&lt;const T&gt; values,
+                       std::vector&lt;std::int64_t&gt; shape);
 
     static Tensor FromDlpack(DLManagedTensorVersioned* managed);
     static Tensor FromDlpack(DLManagedTensor* managed);
@@ -324,10 +334,13 @@ template &lt;&gt; constexpr DType DTypeOf&lt;double&gt;() {
 }
 
 template &lt;typename T&gt;
-Tensor Tensor::Copy(std::span&lt;const T&gt; values, std::vector&lt;std::int64_t&gt; shape) {
+Tensor Tensor::Copy(std::span&lt;const T&gt; values,
+                    std::vector&lt;std::int64_t&gt; shape) {
     Tensor tensor = Zeros(DTypeOf&lt;T&gt;(), std::move(shape));
-    if (static_cast&lt;std::size_t&gt;(tensor.Elements()) != values.size()) {
-        throw std::invalid_argument(&quot;Tensor::Copy shape does not match the number of values&quot;);
+    if (static_cast&lt;std::size_t&gt;(tensor.Elements()) !=
+        values.size()) {
+        throw std::invalid_argument(
+            &quot;Tensor::Copy shape does not match the number of values&quot;);
     }
     std::copy(values.begin(), values.end(), tensor.As&lt;T&gt;());
     return tensor;
@@ -335,7 +348,8 @@ Tensor Tensor::Copy(std::span&lt;const T&gt; values, std::vector&lt;std::int64_t
 
 template &lt;typename T&gt; T* Tensor::As() const {
     if (DTypeOf&lt;T&gt;() != type_) {
-        throw std::invalid_argument(&quot;Tensor::As with the wrong element type&quot;);
+        throw std::invalid_argument(
+            &quot;Tensor::As with the wrong element type&quot;);
     }
     return static_cast&lt;T*&gt;(data_);
 }

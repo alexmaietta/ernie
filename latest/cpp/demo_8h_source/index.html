@@ -229,15 +229,21 @@ struct DemoOptions {
     bool benchmark = false;
     std::optional&lt;double&gt; benchmarkSeconds;
     bool test = false;
-    std::filesystem::path output;     
-    bool paused = false;              
-    std::string device;               
-    std::string renderer = &quot;raster&quot;;  
-    bool validation = false;          
-    bool vsync = false;               
-    bool help = false;                
-    bool list = false;                
-    std::string demo;                 
+    std::filesystem::path output;  
+    bool paused =
+        false;  
+    std::string
+        device;  
+    std::string renderer =
+        &quot;raster&quot;;  
+    bool validation =
+        false;  
+    bool vsync =
+        false;  
+    bool help = false;  
+    bool list =
+        false;  
+    std::string demo;  
     std::vector&lt;std::string&gt; extra;
 
     bool Windowed() const {
@@ -295,13 +301,15 @@ class Demo {
     bool Untested() const;
 
     std::uint64_t frame = 0;  
-    double time = 0.0;        
+    double time = 0.0;  
     double frameDt = 1.0 / 60.0;
 
-    std::uint64_t numFrames = 100;   
-    double fixedDt = 1.0 / 60.0;     
-    double maxFrameDt = 1.0 / 30.0;  
-    std::string description;         
+    std::uint64_t numFrames =
+        100;                      
+    double fixedDt = 1.0 / 60.0;  
+    double maxFrameDt =
+        1.0 / 30.0;           
+    std::string description;  
 
   private:
     Viewer* viewer_;
@@ -318,7 +326,8 @@ struct DemoInfo {
     std::string category;     
     std::string name;         
     std::string description;  
-    std::function&lt;std::shared_ptr&lt;Demo&gt;(Viewer*, const DemoOptions&amp;)&gt; create;
+    std::function&lt;std::shared_ptr&lt;Demo&gt;(Viewer*, const DemoOptions&amp;)&gt;
+        create;
 
     std::string Label() const;
 
@@ -326,9 +335,12 @@ struct DemoInfo {
 };
 
 template &lt;typename T&gt;
-DemoInfo MakeDemoInfo(std::string category, std::string name, std::string description = {}) {
-    return {std::move(category), std::move(name), std::move(description),
-            [](Viewer* viewer, const DemoOptions&amp; options) -&gt; std::shared_ptr&lt;Demo&gt; {
+DemoInfo MakeDemoInfo(std::string category, std::string name,
+                      std::string description = {}) {
+    return {std::move(category), std::move(name),
+            std::move(description),
+            [](Viewer* viewer,
+               const DemoOptions&amp; options) -&gt; std::shared_ptr&lt;Demo&gt; {
                 return std::make_shared&lt;T&gt;(viewer, options);
             }};
 }
@@ -341,15 +353,19 @@ struct DemoRegistration {
     explicit DemoRegistration(DemoInfo info);
 };
 
-#define ERNIE_REGISTER_DEMO(Class, category, name, description)                                    \
-    static const ::ernie::app::DemoRegistration ernie_demo_registration_##Class(                   \
-        ::ernie::app::MakeDemoInfo&lt;Class&gt;(category, name, description))
+#define ERNIE_REGISTER_DEMO(Class, category, name, description)      \
+    static const ::ernie::app::DemoRegistration                      \
+        ernie_demo_registration_##Class(                             \
+            ::ernie::app::MakeDemoInfo&lt;Class&gt;(category, name,        \
+                                              description))
 
-std::optional&lt;std::size_t&gt; FindDemo(std::span&lt;const DemoInfo&gt; demos, std::string_view id);
+std::optional&lt;std::size_t&gt; FindDemo(std::span&lt;const DemoInfo&gt; demos,
+                                    std::string_view id);
 
 class DemoRunner {
   public:
-    explicit DemoRunner(DemoOptions options, const std::string&amp; title = &quot;Ernie demos&quot;);
+    explicit DemoRunner(DemoOptions options,
+                        const std::string&amp; title = &quot;Ernie demos&quot;);
     ~DemoRunner();
     DemoRunner(const DemoRunner&amp;) = delete;
     DemoRunner&amp; operator=(const DemoRunner&amp;) = delete;
@@ -357,7 +373,8 @@ class DemoRunner {
     Viewer* GetViewer();
     const DemoOptions&amp; Options() const;
 
-    void SetCatalog(std::vector&lt;DemoInfo&gt; demos, std::size_t current = 0);
+    void SetCatalog(std::vector&lt;DemoInfo&gt; demos,
+                    std::size_t current = 0);
     std::span&lt;const DemoInfo&gt; Catalog() const;
 
     std::shared_ptr&lt;Demo&gt; Create(std::size_t index);
@@ -373,7 +390,8 @@ class DemoRunner {
     std::unique_ptr&lt;State&gt; state_;
 };
 
-int DemoMain(int argc, char** argv, std::vector&lt;DemoInfo&gt; demos, std::size_t start = 0);
+int DemoMain(int argc, char** argv, std::vector&lt;DemoInfo&gt; demos,
+             std::size_t start = 0);
 
 }  // namespace ernie::app
 </code></pre>

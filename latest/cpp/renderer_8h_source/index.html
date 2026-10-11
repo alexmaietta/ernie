@@ -216,9 +216,10 @@
 namespace ernie {
 
 struct RendererOptions {
-    std::string backend = &quot;raster&quot;;  
-    std::string device;              
-    bool validation = false;         
+    std::string backend =
+        &quot;raster&quot;;  
+    std::string device;       
+    bool validation = false;  
 };
 
 class Renderer {
@@ -234,13 +235,16 @@ class Renderer {
 
     std::string DeviceName() const;
 
-    RenderProductSetOutputs Step(const Scene&amp; scene, std::span&lt;const Path&gt; products = {},
+    RenderProductSetOutputs Step(const Scene&amp; scene,
+                                 std::span&lt;const Path&gt; products = {},
                                  const Path&amp; settings = {});
 
-    StepOperation StepAsync(const Scene&amp; scene, std::span&lt;const Path&gt; products = {},
+    StepOperation StepAsync(const Scene&amp; scene,
+                            std::span&lt;const Path&gt; products = {},
                             const Path&amp; settings = {});
 
-    Tensor Render(const Scene&amp; scene, const Path&amp; settings = {}, Device device = {});
+    Tensor Render(const Scene&amp; scene, const Path&amp; settings = {},
+                  Device device = {});
 
     void Sync(const Scene&amp; scene);
 

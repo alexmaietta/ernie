@@ -235,44 +235,53 @@ enum class Lighting {
 };
 
 struct DockSizes {
-    float left = 0.24f;        
-    float right = 0.28f;       
+    float left = 0.24f;   
+    float right = 0.28f;  
     float rightLower = 0.62f;  
-    float bottom = 0.25f;      
+    float bottom = 0.25f;  
 };
 
 struct ViewerOptions {
     std::string title = &quot;Ernie&quot;;  
-    std::uint32_t width = 1600;   
-    std::uint32_t height = 900;   
-    bool hidden = false;          
-    bool validation = false;      
+    std::uint32_t width =
+        1600;  
+    std::uint32_t height =
+        900;  
+    bool hidden =
+        false;  
+    bool validation = false;  
     bool vsync = false;
-    std::string device;               
-    std::string renderer = &quot;raster&quot;;  
-    Theme theme = DarkTheme();        
-    std::filesystem::path layout;     
-    DockSizes docks;                  
-    Path settings;                    
+    std::string device;  
+    std::string renderer =
+        &quot;raster&quot;;  
+    Theme theme = DarkTheme();  
+    std::filesystem::path
+        layout;  
+    DockSizes docks;  
+    Path settings;  
 };
 
 struct ViewportDisplay {
-    bool lights = true;           
-    bool cameras = true;          
-    bool grid = true;             
-    bool selection = true;        
-    bool overlays = true;         
-    bool hud = true;              
-    bool hudFps = true;           
+    bool lights = true;   
+    bool cameras = true;  
+    bool grid = true;     
+    bool selection = true;  
+    bool overlays =
+        true;         
+    bool hud = true;  
+    bool hudFps = true;  
     bool hudDeviceMemory = true;  
     bool hudHostMemory = false;   
     bool hudResolution = true;    
     bool hudExposure = false;     
     bool hudTriangles = false;    
-    bool toolbarRenderer = true;  
-    bool toolbarVar = true;       
-    bool toolbarCamera = true;    
-    bool toolbarLighting = true;  
+    bool toolbarRenderer =
+        true;  
+    bool toolbarVar = true;  
+    bool toolbarCamera =
+        true;  
+    bool toolbarLighting =
+        true;  
 
     bool operator==(const ViewportDisplay&amp;) const = default;
 };
@@ -306,15 +315,20 @@ class Viewer {
 
     void Close();
 
-    std::uint64_t OnFrame(std::function&lt;void(Viewer&amp;, const FrameInfo&amp;)&gt; callback);
+    std::uint64_t
+    OnFrame(std::function&lt;void(Viewer&amp;, const FrameInfo&amp;)&gt; callback);
 
-    std::uint64_t OnUi(std::function&lt;void(Viewer&amp;, const FrameInfo&amp;)&gt; callback);
+    std::uint64_t
+    OnUi(std::function&lt;void(Viewer&amp;, const FrameInfo&amp;)&gt; callback);
 
-    std::uint64_t OnPreRender(std::function&lt;void(Viewer&amp;, const FrameInfo&amp;)&gt; callback);
+    std::uint64_t OnPreRender(
+        std::function&lt;void(Viewer&amp;, const FrameInfo&amp;)&gt; callback);
 
-    std::uint64_t OnPostRender(std::function&lt;void(Viewer&amp;, const FrameInfo&amp;)&gt; callback);
+    std::uint64_t OnPostRender(
+        std::function&lt;void(Viewer&amp;, const FrameInfo&amp;)&gt; callback);
 
-    std::uint64_t OnSelection(std::function&lt;void(Viewer&amp;, std::span&lt;const Path&gt;)&gt; callback);
+    std::uint64_t OnSelection(
+        std::function&lt;void(Viewer&amp;, std::span&lt;const Path&gt;)&gt; callback);
 
     void RemoveCallback(std::uint64_t id);
 
@@ -357,9 +371,11 @@ class Viewer {
     const std::vector&lt;Path&gt;&amp; Selection() const;
     void SetSelection(std::vector&lt;Path&gt; paths);
 
-    void Edit(const Path&amp; path, std::string_view attribute, Value value, bool open = false);
+    void Edit(const Path&amp; path, std::string_view attribute,
+              Value value, bool open = false);
 
-    void EditLocalTransform(const Path&amp; path, const glm::dmat4&amp; local, bool open = false);
+    void EditLocalTransform(const Path&amp; path, const glm::dmat4&amp; local,
+                            bool open = false);
 
     void ClearAttribute(const Path&amp; path, std::string_view attribute);
 
@@ -428,18 +444,23 @@ class Viewer {
     const ViewportDisplay&amp; GetViewportDisplay() const;
     void SetViewportDisplay(const ViewportDisplay&amp; display);
 
-    std::uint64_t AddViewportToggle(std::string label, bool shown = true, std::string overlay = {},
-                                    std::function&lt;void(Viewer&amp;, bool)&gt; changed = {});
+    std::uint64_t AddViewportToggle(
+        std::string label, bool shown = true,
+        std::string overlay = {},
+        std::function&lt;void(Viewer&amp;, bool)&gt; changed = {});
     bool ViewportToggleShown(std::uint64_t id) const;
     void SetViewportToggleShown(std::uint64_t id, bool shown);
 
-    std::uint64_t AddHudItem(std::string label, std::function&lt;std::string(Viewer&amp;)&gt; value,
-                             bool shown = true);
+    std::uint64_t
+    AddHudItem(std::string label,
+               std::function&lt;std::string(Viewer&amp;)&gt; value,
+               bool shown = true);
     bool HudItemShown(std::uint64_t id) const;
     void SetHudItemShown(std::uint64_t id, bool shown);
 
-    std::uint64_t AddViewportMenuItem(std::string label, std::function&lt;void(Viewer&amp;)&gt; action,
-                                      std::function&lt;bool(const Viewer&amp;)&gt; checked = {});
+    std::uint64_t AddViewportMenuItem(
+        std::string label, std::function&lt;void(Viewer&amp;)&gt; action,
+        std::function&lt;bool(const Viewer&amp;)&gt; checked = {});
 
     void RemoveViewportItem(std::uint64_t id);
 
@@ -447,32 +468,40 @@ class Viewer {
 
     void SetSettings(Path settings);
 
-    void Capture(const std::filesystem::path&amp; path, std::string var = {});
+    void Capture(const std::filesystem::path&amp; path,
+                 std::string var = {});
 
     void CaptureWindow(const std::filesystem::path&amp; path);
 
     Panel&amp; AddPanel(std::unique_ptr&lt;Panel&gt; panel);
 
-    template &lt;typename T, typename... Args&gt; T&amp; AddPanel(Args&amp;&amp;... args) {
-        return static_cast&lt;T&amp;&gt;(AddPanel(std::make_unique&lt;T&gt;(std::forward&lt;Args&gt;(args)...)));
+    template &lt;typename T, typename... Args&gt;
+    T&amp; AddPanel(Args&amp;&amp;... args) {
+        return static_cast&lt;T&amp;&gt;(AddPanel(
+            std::make_unique&lt;T&gt;(std::forward&lt;Args&gt;(args)...)));
     }
 
-    Panel&amp; AddPanel(std::string title, Dock dock, std::function&lt;void(Viewer&amp;)&gt; draw);
+    Panel&amp; AddPanel(std::string title, Dock dock,
+                    std::function&lt;void(Viewer&amp;)&gt; draw);
 
     Panel* FindPanel(std::string_view title);
 
     void FocusPanel(std::string_view title);
 
-    WidgetPanel&amp; AddWidgetPanel(std::string title, Dock dock = Dock::Right);
+    WidgetPanel&amp; AddWidgetPanel(std::string title,
+                                Dock dock = Dock::Right);
 
     void RemovePanel(const std::string&amp; title);
 
-    void OpenFileDialog(FileDialogOptions options,
-                        std::function&lt;void(Viewer&amp;, const std::filesystem::path&amp;)&gt; done);
+    void OpenFileDialog(
+        FileDialogOptions options,
+        std::function&lt;void(Viewer&amp;, const std::filesystem::path&amp;)&gt;
+            done);
 
     FileDialog&amp; GetFileDialog();
 
-    void AddMenuItem(const std::string&amp; menu, const std::string&amp; label,
+    void AddMenuItem(const std::string&amp; menu,
+                     const std::string&amp; label,
                      std::function&lt;void(Viewer&amp;)&gt; action);
 
     void SaveLayout(const std::filesystem::path&amp; path) const;

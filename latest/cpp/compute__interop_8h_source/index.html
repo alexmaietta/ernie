@@ -223,15 +223,16 @@ struct ComputeArrayView {
     std::uint32_t width = 0;
     std::uint32_t height = 0;
     std::uint32_t channels = 0;
-    DType type = DType::UInt8;           
-    DeviceKind kind = DeviceKind::Cuda;  
-    int device = 0;                      
+    DType type = DType::UInt8;  
+    DeviceKind kind =
+        DeviceKind::Cuda;  
+    int device = 0;        
 };
 
 class ComputeInterop {
   public:
-    static std::unique_ptr&lt;ComputeInterop&gt; Create(const VulkanContext&amp; context,
-                                                  std::string* why = nullptr);
+    static std::unique_ptr&lt;ComputeInterop&gt;
+    Create(const VulkanContext&amp; context, std::string* why = nullptr);
 
     virtual ~ComputeInterop() = default;
     ComputeInterop(const ComputeInterop&amp;) = delete;
@@ -245,15 +246,19 @@ class ComputeInterop {
         return {Kind(), Device()};
     }
 
-    virtual void CopyToBuffer(const Tensor&amp; source, GpuBuffer&amp; buffer, VkDeviceSize offset = 0,
+    virtual void CopyToBuffer(const Tensor&amp; source, GpuBuffer&amp; buffer,
+                              VkDeviceSize offset = 0,
                               std::uintptr_t stream = 1) = 0;
 
-    virtual void CopyColumnsToBuffer(const Tensor&amp; source, std::span&lt;const std::size_t&gt; order,
-                                     GpuBuffer&amp; buffer, VkDeviceSize offset = 0,
-                                     std::uintptr_t stream = 1) = 0;
+    virtual void
+    CopyColumnsToBuffer(const Tensor&amp; source,
+                        std::span&lt;const std::size_t&gt; order,
+                        GpuBuffer&amp; buffer, VkDeviceSize offset = 0,
+                        std::uintptr_t stream = 1) = 0;
 
     virtual Tensor View(std::shared_ptr&lt;GpuBuffer&gt; buffer, DType type,
-                        std::vector&lt;std::int64_t&gt; shape, VkDeviceSize offset = 0) = 0;
+                        std::vector&lt;std::int64_t&gt; shape,
+                        VkDeviceSize offset = 0) = 0;
 
     virtual void Copy(const Tensor&amp; source, const Tensor&amp; destination,
                       std::uintptr_t stream = 1) = 0;
@@ -264,7 +269,8 @@ class ComputeInterop {
 
     virtual Tensor DownloadArray(const ComputeArrayView&amp; view) = 0;
 
-    virtual Tensor Download(const Tensor&amp; device, std::uintptr_t stream = 1) = 0;
+    virtual Tensor Download(const Tensor&amp; device,
+                            std::uintptr_t stream = 1) = 0;
 
     virtual TimelinePoint VulkanWait() const = 0;
 
@@ -274,7 +280,8 @@ class ComputeInterop {
 
     virtual void WaitForVulkan(std::uintptr_t stream = 1) = 0;
 
-    virtual void WaitForVulkan(std::uintptr_t stream, std::uint64_t value) = 0;
+    virtual void WaitForVulkan(std::uintptr_t stream,
+                               std::uint64_t value) = 0;
 
     virtual void Synchronize() = 0;
 

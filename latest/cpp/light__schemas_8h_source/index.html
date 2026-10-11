@@ -390,25 +390,30 @@ class Light : public Imageable {
 };
 
 class BoundableLight : public Light {
-    ERNIE_SCHEMA_BODY(BoundableLight, Light, ERNIE_BOUNDABLE_LIGHT_ALL)
+    ERNIE_SCHEMA_BODY(BoundableLight, Light,
+                      ERNIE_BOUNDABLE_LIGHT_ALL)
 };
 
 class NonboundableLight : public Light {
-    ERNIE_SCHEMA_BODY(NonboundableLight, Light, ERNIE_NONBOUNDABLE_LIGHT_ALL)
+    ERNIE_SCHEMA_BODY(NonboundableLight, Light,
+                      ERNIE_NONBOUNDABLE_LIGHT_ALL)
 };
 
 class DistantLight : public NonboundableLight {
-    ERNIE_SCHEMA_BODY(DistantLight, NonboundableLight, ERNIE_DISTANT_LIGHT_ALL)
+    ERNIE_SCHEMA_BODY(DistantLight, NonboundableLight,
+                      ERNIE_DISTANT_LIGHT_ALL)
     ERNIE_SCHEMA_DEFINE(DistantLight)
 };
 
 class DomeLight : public NonboundableLight {
-    ERNIE_SCHEMA_BODY(DomeLight, NonboundableLight, ERNIE_DOME_LIGHT_ALL)
+    ERNIE_SCHEMA_BODY(DomeLight, NonboundableLight,
+                      ERNIE_DOME_LIGHT_ALL)
     ERNIE_SCHEMA_DEFINE(DomeLight)
 };
 
 class SphereLight : public BoundableLight {
-    ERNIE_SCHEMA_BODY(SphereLight, BoundableLight, ERNIE_SPHERE_LIGHT_ALL)
+    ERNIE_SCHEMA_BODY(SphereLight, BoundableLight,
+                      ERNIE_SPHERE_LIGHT_ALL)
     ERNIE_SCHEMA_DEFINE(SphereLight)
 };
 
@@ -423,7 +428,8 @@ class DiskLight : public BoundableLight {
 };
 
 class CylinderLight : public BoundableLight {
-    ERNIE_SCHEMA_BODY(CylinderLight, BoundableLight, ERNIE_CYLINDER_LIGHT_ALL)
+    ERNIE_SCHEMA_BODY(CylinderLight, BoundableLight,
+                      ERNIE_CYLINDER_LIGHT_ALL)
     ERNIE_SCHEMA_DEFINE(CylinderLight)
 };
 

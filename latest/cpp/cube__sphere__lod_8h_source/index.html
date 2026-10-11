@@ -220,8 +220,9 @@
 namespace ernie {
 
 struct CubeSphereRegion {
-    glm::dvec3 axis{0.0, 0.0, 1.0};  
-    double angle = 0.0;              
+    glm::dvec3 axis{0.0, 0.0,
+                    1.0};  
+    double angle = 0.0;  
     double inner = 0.0;
     double outer = 0.0;
 
@@ -240,16 +241,21 @@ class CubeSphereLod {
 
     CubeSphereLod() = default;
 
-    CubeSphereLod(double radius, std::span&lt;const RasterView, kFaces&gt; faces,
+    CubeSphereLod(double radius,
+                  std::span&lt;const RasterView, kFaces&gt; faces,
                   std::uint32_t leafCells);
 
-    CubeSphereLod(double radius, std::uint32_t faceCells, std::uint32_t leafCells);
+    CubeSphereLod(double radius, std::uint32_t faceCells,
+                  std::uint32_t leafCells);
 
-    static glm::dvec3 FaceDirection(std::uint32_t face, double s, double t);
+    static glm::dvec3 FaceDirection(std::uint32_t face, double s,
+                                    double t);
 
-    static std::pair&lt;std::uint32_t, glm::dvec2&gt; FacePoint(const glm::dvec3&amp; direction);
+    static std::pair&lt;std::uint32_t, glm::dvec2&gt;
+    FacePoint(const glm::dvec3&amp; direction);
 
-    glm::dvec3 VertexDirection(std::uint32_t face, std::uint32_t col, std::uint32_t row) const;
+    glm::dvec3 VertexDirection(std::uint32_t face, std::uint32_t col,
+                               std::uint32_t row) const;
 
     bool Empty() const {
         return faceCells_ == 0;
@@ -279,40 +285,56 @@ class CubeSphereLod {
         return trees_[0].LeavesPerSide();
     }
 
-    void SetLeaves(std::uint32_t face, std::span&lt;const glm::vec2&gt; leaves);
+    void SetLeaves(std::uint32_t face,
+                   std::span&lt;const glm::vec2&gt; leaves);
 
     glm::vec2 HeightRange() const;
 
-    CubeSphereRegion NodeRegion(std::uint32_t face, std::uint32_t level, std::uint32_t x,
-                                std::uint32_t y, float exaggeration) const;
+    CubeSphereRegion NodeRegion(std::uint32_t face,
+                                std::uint32_t level, std::uint32_t x,
+                                std::uint32_t y,
+                                float exaggeration) const;
 
     double OccluderRadius(float exaggeration) const;
 
     double MinFirstRange(float exaggeration, float morphStart) const;
 
-    std::vector&lt;LodRange&gt; Ranges(double firstRange, float morphStart) const;
+    std::vector&lt;LodRange&gt; Ranges(double firstRange,
+                                 float morphStart) const;
 
-    void Select(const glm::dvec3&amp; eye, std::span&lt;const LodRange&gt; ranges, const Frustum* frustum,
-                float exaggeration, bool cullHorizon, std::vector&lt;LodPatch&gt;&amp; out) const;
+    void Select(const glm::dvec3&amp; eye,
+                std::span&lt;const LodRange&gt; ranges,
+                const Frustum* frustum, float exaggeration,
+                bool cullHorizon, std::vector&lt;LodPatch&gt;&amp; out) const;
 
     void SelectAll(std::vector&lt;LodPatch&gt;&amp; out) const;
 
-    std::uint64_t TriangleCount(std::span&lt;const LodPatch&gt; patches) const;
+    std::uint64_t
+    TriangleCount(std::span&lt;const LodPatch&gt; patches) const;
 
   private:
-    void Shape(double radius, std::uint32_t faceCells, std::uint32_t leafCells);
+    void Shape(double radius, std::uint32_t faceCells,
+               std::uint32_t leafCells);
 
-    bool Hidden(const CubeSphereRegion&amp; region, const glm::dvec3&amp; eye, const Frustum* frustum,
-                double occluder) const;
-    bool SelectNode(std::uint32_t face, std::uint32_t level, std::uint32_t x, std::uint32_t y,
-                    const glm::dvec3&amp; eye, std::span&lt;const LodRange&gt; ranges, const Frustum* frustum,
-                    float exaggeration, double occluder, std::vector&lt;LodPatch&gt;&amp; out) const;
-    void EmitQuarters(std::uint32_t face, std::uint32_t level, std::uint32_t x, std::uint32_t y,
-                      const glm::dvec3&amp; eye, const Frustum* frustum, float exaggeration,
-                      double occluder, std::vector&lt;LodPatch&gt;&amp; out) const;
-    void EmitChildArea(std::uint32_t face, std::uint32_t level, std::uint32_t childX,
-                       std::uint32_t childY, const glm::dvec3&amp; eye, const Frustum* frustum,
-                       float exaggeration, double occluder, std::vector&lt;LodPatch&gt;&amp; out) const;
+    bool Hidden(const CubeSphereRegion&amp; region, const glm::dvec3&amp; eye,
+                const Frustum* frustum, double occluder) const;
+    bool SelectNode(std::uint32_t face, std::uint32_t level,
+                    std::uint32_t x, std::uint32_t y,
+                    const glm::dvec3&amp; eye,
+                    std::span&lt;const LodRange&gt; ranges,
+                    const Frustum* frustum, float exaggeration,
+                    double occluder,
+                    std::vector&lt;LodPatch&gt;&amp; out) const;
+    void EmitQuarters(std::uint32_t face, std::uint32_t level,
+                      std::uint32_t x, std::uint32_t y,
+                      const glm::dvec3&amp; eye, const Frustum* frustum,
+                      float exaggeration, double occluder,
+                      std::vector&lt;LodPatch&gt;&amp; out) const;
+    void EmitChildArea(std::uint32_t face, std::uint32_t level,
+                       std::uint32_t childX, std::uint32_t childY,
+                       const glm::dvec3&amp; eye, const Frustum* frustum,
+                       float exaggeration, double occluder,
+                       std::vector&lt;LodPatch&gt;&amp; out) const;
 
     double radius_ = 0.0;
     std::uint32_t faceCells_ = 0;

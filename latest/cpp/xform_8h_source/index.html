@@ -224,19 +224,29 @@ namespace ernie {
 
 class Scene;
 
-enum class RotationOrder : std::uint8_t { XYZ, XZY, YXZ, YZX, ZXY, ZYX };
+enum class RotationOrder : std::uint8_t {
+    XYZ,
+    XZY,
+    YXZ,
+    YZX,
+    ZXY,
+    ZYX
+};
 
 std::string_view RotateOp(RotationOrder order);
 
 glm::dmat3 EulerRotation(glm::dvec3 degrees, RotationOrder order);
 
-glm::dvec3 EulerAngles(const glm::dmat3&amp; rotation, RotationOrder order);
+glm::dvec3 EulerAngles(const glm::dmat3&amp; rotation,
+                       RotationOrder order);
 
 struct XformOps {
     std::optional&lt;glm::dvec3&gt; translate;
-    std::optional&lt;glm::dvec3&gt; rotate;  
+    std::optional&lt;glm::dvec3&gt;
+        rotate;  
     RotationOrder rotationOrder = RotationOrder::XYZ;
-    std::optional&lt;glm::dquat&gt; orient;  
+    std::optional&lt;glm::dquat&gt;
+        orient;  
     std::optional&lt;glm::dvec3&gt; scale;
 };
 
@@ -244,14 +254,17 @@ void SetXform(Scene&amp; scene, const Path&amp; path, const XformOps&amp; xform)
 
 glm::dmat4 ComposeXformOps(const Scene&amp; scene, const Path&amp; path);
 
-using GpuOpReader = std::function&lt;Tensor(std::string_view attribute, const Tensor&amp; device)&gt;;
+using GpuOpReader = std::function&lt;Tensor(std::string_view attribute,
+                                         const Tensor&amp; device)&gt;;
 
-glm::dmat4 ComposeXformOps(const Scene&amp; scene, const Path&amp; path, const GpuOpReader* read);
+glm::dmat4 ComposeXformOps(const Scene&amp; scene, const Path&amp; path,
+                           const GpuOpReader* read);
 
 bool ResetsXformStack(const Scene&amp; scene, const Path&amp; path);
 
-std::vector&lt;std::pair&lt;std::string, Value&gt;&gt; LocalTransformEdits(const Scene&amp; scene, const Path&amp; path,
-                                                               const glm::dmat4&amp; local);
+std::vector&lt;std::pair&lt;std::string, Value&gt;&gt;
+LocalTransformEdits(const Scene&amp; scene, const Path&amp; path,
+                    const glm::dmat4&amp; local);
 
 bool IsXformAttribute(std::string_view attribute);
 

@@ -232,10 +232,12 @@ inline constexpr std::uint32_t StreamOf(std::string_view name) {
     return hash;
 }
 
-inline constexpr std::uint32_t FrameSeed(std::uint32_t seed, std::uint32_t stream,
+inline constexpr std::uint32_t FrameSeed(std::uint32_t seed,
+                                         std::uint32_t stream,
                                          std::uint64_t frame) {
-    const glm::uvec3 h = Pcg3d(glm::uvec3(seed, stream ^ static_cast&lt;std::uint32_t&gt;(frame &gt;&gt; 32u),
-                                          static_cast&lt;std::uint32_t&gt;(frame)));
+    const glm::uvec3 h = Pcg3d(glm::uvec3(
+        seed, stream ^ static_cast&lt;std::uint32_t&gt;(frame &gt;&gt; 32u),
+        static_cast&lt;std::uint32_t&gt;(frame)));
     return h.x ^ h.y ^ h.z;
 }
 

@@ -239,18 +239,21 @@ enum class AttributeKind {
     FloatArray,     
     Tensor,         
     Quat,           
-    Matrix,         
+    Matrix,  
 };
 
 struct AttributeMeta {
     std::string_view label;  
     std::string_view doc;
-    std::string_view group;  
-    double min = 0.0;        
+    std::string_view
+        group;  
+    double min = 0.0;  
     double max = 0.0;
-    std::vector&lt;std::string_view&gt; options;  
-    bool color = false;                     
-    bool asset = false;                     
+    std::vector&lt;std::string_view&gt;
+        options;  
+    bool color =
+        false;  
+    bool asset = false;  
     bool integer = false;
     bool lenient = false;
     std::optional&lt;Dirty&gt; dirty;
@@ -266,7 +269,8 @@ template &lt;&gt; struct AttributeTraits&lt;bool&gt; {
     static constexpr AttributeKind kKind = AttributeKind::Bool;
     using Result = bool;
     using Arg = bool;
-    static bool Read(const Scene&amp; scene, const Path&amp; path, std::string_view name, bool fallback) {
+    static bool Read(const Scene&amp; scene, const Path&amp; path,
+                     std::string_view name, bool fallback) {
         return GetBool(scene, path, name, fallback);
     }
     static std::optional&lt;bool&gt; From(const Value&amp; value);
@@ -276,8 +280,10 @@ template &lt;&gt; struct AttributeTraits&lt;int&gt; {
     static constexpr AttributeKind kKind = AttributeKind::Int;
     using Result = int;
     using Arg = int;
-    static int Read(const Scene&amp; scene, const Path&amp; path, std::string_view name, int fallback) {
-        return static_cast&lt;int&gt;(GetNumber(scene, path, name, fallback));
+    static int Read(const Scene&amp; scene, const Path&amp; path,
+                    std::string_view name, int fallback) {
+        return static_cast&lt;int&gt;(
+            GetNumber(scene, path, name, fallback));
     }
     static std::optional&lt;int&gt; From(const Value&amp; value);
 };
@@ -286,8 +292,8 @@ template &lt;&gt; struct AttributeTraits&lt;double&gt; {
     static constexpr AttributeKind kKind = AttributeKind::Double;
     using Result = double;
     using Arg = double;
-    static double Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
-                       double fallback) {
+    static double Read(const Scene&amp; scene, const Path&amp; path,
+                       std::string_view name, double fallback) {
         return GetNumber(scene, path, name, fallback);
     }
     static std::optional&lt;double&gt; From(const Value&amp; value);
@@ -297,7 +303,8 @@ template &lt;&gt; struct AttributeTraits&lt;glm::dvec2&gt; {
     static constexpr AttributeKind kKind = AttributeKind::Vec2;
     using Result = glm::dvec2;
     using Arg = glm::dvec2;
-    static glm::dvec2 Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
+    static glm::dvec2 Read(const Scene&amp; scene, const Path&amp; path,
+                           std::string_view name,
                            glm::dvec2 fallback) {
         return GetVec2(scene, path, name, fallback);
     }
@@ -308,7 +315,8 @@ template &lt;&gt; struct AttributeTraits&lt;glm::dvec3&gt; {
     static constexpr AttributeKind kKind = AttributeKind::Vec3;
     using Result = glm::dvec3;
     using Arg = glm::dvec3;
-    static glm::dvec3 Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
+    static glm::dvec3 Read(const Scene&amp; scene, const Path&amp; path,
+                           std::string_view name,
                            glm::dvec3 fallback) {
         return GetVec3(scene, path, name, fallback);
     }
@@ -319,7 +327,8 @@ template &lt;&gt; struct AttributeTraits&lt;glm::dvec4&gt; {
     static constexpr AttributeKind kKind = AttributeKind::Vec4;
     using Result = glm::dvec4;
     using Arg = glm::dvec4;
-    static glm::dvec4 Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
+    static glm::dvec4 Read(const Scene&amp; scene, const Path&amp; path,
+                           std::string_view name,
                            glm::dvec4 fallback);
     static std::optional&lt;glm::dvec4&gt; From(const Value&amp; value);
 };
@@ -328,7 +337,8 @@ template &lt;&gt; struct AttributeTraits&lt;glm::dquat&gt; {
     static constexpr AttributeKind kKind = AttributeKind::Quat;
     using Result = glm::dquat;
     using Arg = glm::dquat;
-    static glm::dquat Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
+    static glm::dquat Read(const Scene&amp; scene, const Path&amp; path,
+                           std::string_view name,
                            glm::dquat fallback);
     static std::optional&lt;glm::dquat&gt; From(const Value&amp; value);
 };
@@ -337,7 +347,8 @@ template &lt;&gt; struct AttributeTraits&lt;glm::dmat4&gt; {
     static constexpr AttributeKind kKind = AttributeKind::Matrix;
     using Result = glm::dmat4;
     using Arg = const glm::dmat4&amp;;
-    static glm::dmat4 Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
+    static glm::dmat4 Read(const Scene&amp; scene, const Path&amp; path,
+                           std::string_view name,
                            const glm::dmat4&amp; fallback);
     static std::optional&lt;glm::dmat4&gt; From(const Value&amp; value);
 };
@@ -346,7 +357,8 @@ template &lt;&gt; struct AttributeTraits&lt;std::string&gt; {
     static constexpr AttributeKind kKind = AttributeKind::Token;
     using Result = std::string;
     using Arg = std::string_view;
-    static std::string Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
+    static std::string Read(const Scene&amp; scene, const Path&amp; path,
+                            std::string_view name,
                             std::string_view fallback) {
         return GetToken(scene, path, name, fallback);
     }
@@ -354,10 +366,12 @@ template &lt;&gt; struct AttributeTraits&lt;std::string&gt; {
 };
 
 template &lt;&gt; struct AttributeTraits&lt;Path&gt; {
-    static constexpr AttributeKind kKind = AttributeKind::Relationship;
+    static constexpr AttributeKind kKind =
+        AttributeKind::Relationship;
     using Result = Path;
     using Arg = const Path&amp;;
-    static Path Read(const Scene&amp; scene, const Path&amp; path, std::string_view name, const Path&amp;) {
+    static Path Read(const Scene&amp; scene, const Path&amp; path,
+                     std::string_view name, const Path&amp;) {
         return GetTarget(scene, path, name);
     }
     static std::optional&lt;Path&gt; From(const Value&amp; value);
@@ -386,10 +400,13 @@ class Targets {
 };
 
 template &lt;&gt; struct AttributeTraits&lt;std::vector&lt;Path&gt;&gt; {
-    static constexpr AttributeKind kKind = AttributeKind::Relationships;
+    static constexpr AttributeKind kKind =
+        AttributeKind::Relationships;
     using Result = std::vector&lt;Path&gt;;
     using Arg = const Targets&amp;;
-    static std::vector&lt;Path&gt; Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
+    static std::vector&lt;Path&gt; Read(const Scene&amp; scene,
+                                  const Path&amp; path,
+                                  std::string_view name,
                                   const std::vector&lt;Path&gt;&amp; fallback);
     static std::optional&lt;std::vector&lt;Path&gt;&gt; From(const Value&amp; value);
     static std::optional&lt;Value&gt; Store(const Value&amp; value);
@@ -399,8 +416,9 @@ template &lt;&gt; struct AttributeTraits&lt;std::vector&lt;float&gt;&gt; {
     static constexpr AttributeKind kKind = AttributeKind::FloatArray;
     using Result = std::vector&lt;float&gt;;
     using Arg = std::vector&lt;float&gt;;
-    static std::vector&lt;float&gt; Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
-                                   const std::vector&lt;float&gt;&amp; fallback);
+    static std::vector&lt;float&gt;
+    Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
+         const std::vector&lt;float&gt;&amp; fallback);
     static std::optional&lt;std::vector&lt;float&gt;&gt; From(const Value&amp; value);
 };
 
@@ -408,8 +426,8 @@ template &lt;&gt; struct AttributeTraits&lt;Tensor&gt; {
     static constexpr AttributeKind kKind = AttributeKind::Tensor;
     using Result = const Tensor*;
     using Arg = Tensor;
-    static const Tensor* Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
-                              std::nullptr_t) {
+    static const Tensor* Read(const Scene&amp; scene, const Path&amp; path,
+                              std::string_view name, std::nullptr_t) {
         return scene.Read(path, name);
     }
 };
@@ -419,16 +437,19 @@ template &lt;typename T&gt; struct OrArray {
 };
 
 template &lt;typename T&gt; inline constexpr bool kIsOrArray = false;
-template &lt;typename T&gt; inline constexpr bool kIsOrArray&lt;OrArray&lt;T&gt;&gt; = true;
+template &lt;typename T&gt;
+inline constexpr bool kIsOrArray&lt;OrArray&lt;T&gt;&gt; = true;
 
-template &lt;typename T&gt; struct AttributeTraits&lt;OrArray&lt;T&gt;&gt; : AttributeTraits&lt;T&gt; {};
+template &lt;typename T&gt;
+struct AttributeTraits&lt;OrArray&lt;T&gt;&gt; : AttributeTraits&lt;T&gt; {};
 
 class AttributeDef {
   public:
-    std::string_view name;  
-    std::string member;     
-    std::string pyName;     
-    std::string label;      
+    std::string_view
+        name;            
+    std::string member;  
+    std::string pyName;  
+    std::string label;  
     AttributeKind kind = AttributeKind::Double;
     Value fallback;  
     AttributeMeta meta;
@@ -440,18 +461,24 @@ class AttributeDef {
     Value Coerce(const Value&amp; value) const;
 
     template &lt;typename T&gt;
-    static AttributeDef Make(std::string_view name, std::string_view member, const T&amp; fallback,
-                             AttributeMeta meta);
-    static AttributeDef MakeTensor(std::string_view name, std::string_view member,
+    static AttributeDef Make(std::string_view name,
+                             std::string_view member,
+                             const T&amp; fallback, AttributeMeta meta);
+    static AttributeDef MakeTensor(std::string_view name,
+                                   std::string_view member,
                                    AttributeMeta meta);
 
   private:
-    static AttributeDef Describe(std::string_view name, std::string_view member, AttributeKind kind,
+    static AttributeDef Describe(std::string_view name,
+                                 std::string_view member,
+                                 AttributeKind kind,
                                  AttributeMeta meta);
 
-    friend const AttributeDef* FindXformOp(std::string_view attribute);
+    friend const AttributeDef*
+    FindXformOp(std::string_view attribute);
 
-    Value (*read_)(const AttributeDef&amp;, const Scene&amp;, const Path&amp;) = nullptr;
+    Value (*read_)(const AttributeDef&amp;, const Scene&amp;,
+                   const Path&amp;) = nullptr;
     std::optional&lt;Value&gt; (*from_)(const Value&amp;) = nullptr;
 };
 
@@ -476,8 +503,8 @@ struct PrimTypeDef {
     std::vector&lt;const AttributeDef*&gt; AllAttributes() const;
 };
 
-void Validate(const PrimTypeDef* type, const Path&amp; path, std::string_view attribute,
-              const Value* value);
+void Validate(const PrimTypeDef* type, const Path&amp; path,
+              std::string_view attribute, const Value* value);
 
 std::span&lt;const PrimTypeDef* const&gt; PrimTypes();
 
@@ -508,11 +535,13 @@ class SchemaView {
     }
 
   protected:
-    SchemaView(const Scene&amp; scene, Path path, const PrimTypeDef&amp; type);
+    SchemaView(const Scene&amp; scene, Path path,
+               const PrimTypeDef&amp; type);
     SchemaView(Scene&amp; scene, Path path, const PrimTypeDef&amp; type);
 
     bool Has(std::string_view name) const {
-        return scene_-&gt;Get(path_, name) != nullptr || scene_-&gt;Read(path_, name) != nullptr;
+        return scene_-&gt;Get(path_, name) != nullptr ||
+               scene_-&gt;Read(path_, name) != nullptr;
     }
 
     Scene&amp; Edit() const;
@@ -526,103 +555,119 @@ class SchemaView {
 
 }  // namespace ernie
 
-#define ERNIE_ATTRIBUTE_ACCESSORS(Type, Name, token, fallback, meta)                               \
-    ::ernie::AttributeTraits&lt;Type&gt;::Result Get##Name() const {                                     \
-        return ::ernie::AttributeTraits&lt;Type&gt;::Read(GetScene(), GetPath(), token, fallback);       \
-    }                                                                                              \
-    bool Has##Name() const {                                                                       \
-        return Has(token);                                                                         \
-    }                                                                                              \
-    Self&amp; Set##Name(::ernie::AttributeTraits&lt;Type&gt;::Arg value) {                                   \
-        ::ernie::detail::WriteAttribute&lt;Type&gt;(Edit(), GetPath(), token, value);                    \
-        return static_cast&lt;Self&amp;&gt;(*this);                                                          \
-    }                                                                                              \
-    Self&amp; Clear##Name() {                                                                          \
-        Edit().Clear(GetPath(), token);                                                            \
-        return static_cast&lt;Self&amp;&gt;(*this);                                                          \
-    }                                                                                              \
-           \
-    template &lt;typename T = Type&gt;                                                                   \
-        requires ::ernie::kIsOrArray&lt;T&gt;                                                            \
-    const ::ernie::Tensor* Read##Name() const {                                                    \
-        return GetScene().Read(GetPath(), token);                                                  \
-    }                                                                                              \
-     \
-    template &lt;typename T = Type&gt;                                                                   \
-        requires ::ernie::kIsOrArray&lt;T&gt;                                                            \
-    Self&amp; Write##Name(::ernie::Tensor array) {                                                     \
-        Edit().Write(GetPath(), token, std::move(array));                                          \
-        return static_cast&lt;Self&amp;&gt;(*this);                                                          \
+#define ERNIE_ATTRIBUTE_ACCESSORS(Type, Name, token, fallback, meta) \
+    ::ernie::AttributeTraits&lt;Type&gt;::Result Get##Name() const {       \
+        return ::ernie::AttributeTraits&lt;Type&gt;::Read(                 \
+            GetScene(), GetPath(), token, fallback);                 \
+    }                                                                \
+    bool Has##Name() const {                                         \
+        return Has(token);                                           \
+    }                                                                \
+    Self&amp; Set##Name(::ernie::AttributeTraits&lt;Type&gt;::Arg value) {     \
+        ::ernie::detail::WriteAttribute&lt;Type&gt;(Edit(), GetPath(),     \
+                                              token, value);         \
+        return static_cast&lt;Self&amp;&gt;(*this);                            \
+    }                                                                \
+    Self&amp; Clear##Name() {                                            \
+        Edit().Clear(GetPath(), token);                              \
+        return static_cast&lt;Self&amp;&gt;(*this);                            \
+    }                                                                \
+                                        \
+    template &lt;typename T = Type&gt;                                     \
+        requires ::ernie::kIsOrArray&lt;T&gt;                              \
+    const ::ernie::Tensor* Read##Name() const {                      \
+        return GetScene().Read(GetPath(), token);                    \
+    }                                                                \
+                                    \
+    template &lt;typename T = Type&gt;                                     \
+        requires ::ernie::kIsOrArray&lt;T&gt;                              \
+    Self&amp; Write##Name(::ernie::Tensor array) {                       \
+        Edit().Write(GetPath(), token, std::move(array));            \
+        return static_cast&lt;Self&amp;&gt;(*this);                            \
     }
 
-#define ERNIE_SCHEMA_BODY(Class, Base, ATTRIBUTES)                                                 \
-  public:                                                                                          \
-    using Self = Class;                                                                            \
-           \
-    Class(const ::ernie::Scene&amp; scene, ::ernie::Path path)                                         \
-        : Base(scene, std::move(path), Definition()) {}                                            \
-    Class(::ernie::Scene&amp; scene, ::ernie::Path path)                                               \
-        : Base(scene, std::move(path), Definition()) {}                                            \
+#define ERNIE_SCHEMA_BODY(Class, Base, ATTRIBUTES)                   \
+  public:                                                            \
+    using Self = Class;                                              \
+                                          \
+    Class(const ::ernie::Scene&amp; scene, ::ernie::Path path)           \
+        : Base(scene, std::move(path), Definition()) {}              \
+    Class(::ernie::Scene&amp; scene, ::ernie::Path path)                 \
+        : Base(scene, std::move(path), Definition()) {}              \
+                                \
+    static const ::ernie::PrimTypeDef&amp; Definition();                 \
+    ATTRIBUTES(ERNIE_ATTRIBUTE_ACCESSORS)                            \
+                    \
+    Self&amp; SetTransform(const glm::dmat4&amp; matrix) {                   \
+        Edit().Set(GetPath(), ::ernie::tokens::kTransform,           \
+                   ::ernie::Value(matrix));                          \
+        return static_cast&lt;Self&amp;&gt;(*this);                            \
+    }                                                                \
+                                \
+    Self&amp; SetXform(const ::ernie::XformOps&amp; ops) {                   \
+        ::ernie::SetXform(Edit(), GetPath(), ops);                   \
+        return static_cast&lt;Self&amp;&gt;(*this);                            \
+    }                                                                \
+                                 \
+    glm::dmat4 GetLocalTransform() const {                           \
+        return GetScene().LocalTransform(GetPath());                 \
+    }                                                                \
+                                 \
+    Self&amp; Set(std::string_view attribute, ::ernie::Value value) {    \
+        Edit().Set(GetPath(), attribute, std::move(value));          \
+        return static_cast&lt;Self&amp;&gt;(*this);                            \
+    }                                                                \
                                                               \
-    static const ::ernie::PrimTypeDef&amp; Definition();                                               \
-    ATTRIBUTES(ERNIE_ATTRIBUTE_ACCESSORS)                                                          \
-      \
-    Self&amp; SetTransform(const glm::dmat4&amp; matrix) {                                                 \
-        Edit().Set(GetPath(), ::ernie::tokens::kTransform, ::ernie::Value(matrix));                \
-        return static_cast&lt;Self&amp;&gt;(*this);                                                          \
-    }                                                                                              \
-   \
-    Self&amp; SetXform(const ::ernie::XformOps&amp; ops) {                                                 \
-        ::ernie::SetXform(Edit(), GetPath(), ops);                                                 \
-        return static_cast&lt;Self&amp;&gt;(*this);                                                          \
-    }                                                                                              \
-                     \
-    glm::dmat4 GetLocalTransform() const {                                                         \
-        return GetScene().LocalTransform(GetPath());                                               \
-    }                                                                                              \
-    \
-    Self&amp; Set(std::string_view attribute, ::ernie::Value value) {                                  \
-        Edit().Set(GetPath(), attribute, std::move(value));                                        \
-        return static_cast&lt;Self&amp;&gt;(*this);                                                          \
-    }                                                                                              \
-                              \
-    Self&amp; Write(std::string_view attribute, ::ernie::Tensor tensor) {                              \
-        Edit().Write(GetPath(), attribute, std::move(tensor));                                     \
-        return static_cast&lt;Self&amp;&gt;(*this);                                                          \
-    }                                                                                              \
-                                                                                                   \
-  protected:                                                                                       \
-    Class(const ::ernie::Scene&amp; scene, ::ernie::Path path, const ::ernie::PrimTypeDef&amp; type)       \
-        : Base(scene, std::move(path), type) {}                                                    \
-    Class(::ernie::Scene&amp; scene, ::ernie::Path path, const ::ernie::PrimTypeDef&amp; type)             \
-        : Base(scene, std::move(path), type) {}                                                    \
-                                                                                                   \
+    Self&amp; Write(std::string_view attribute,                          \
+                ::ernie::Tensor tensor) {                            \
+        Edit().Write(GetPath(), attribute, std::move(tensor));       \
+        return static_cast&lt;Self&amp;&gt;(*this);                            \
+    }                                                                \
+                                                                     \
+  protected:                                                         \
+    Class(const ::ernie::Scene&amp; scene, ::ernie::Path path,           \
+          const ::ernie::PrimTypeDef&amp; type)                          \
+        : Base(scene, std::move(path), type) {}                      \
+    Class(::ernie::Scene&amp; scene, ::ernie::Path path,                 \
+          const ::ernie::PrimTypeDef&amp; type)                          \
+        : Base(scene, std::move(path), type) {}                      \
+                                                                     \
   public:
 
-#define ERNIE_SCHEMA_DEFINE(Class)                                                                 \
-    static Class Define(::ernie::Scene&amp; scene, const ::ernie::Path&amp; path) {                        \
-        scene.Define(path, Definition().name);                                                     \
-        return Class(scene, path);                                                                 \
+#define ERNIE_SCHEMA_DEFINE(Class)                                   \
+    static Class Define(::ernie::Scene&amp; scene,                       \
+                        const ::ernie::Path&amp; path) {                 \
+        scene.Define(path, Definition().name);                       \
+        return Class(scene, path);                                   \
     }
 
-#define ERNIE_ATTRIBUTE_DEF(Type, Name, token, fallback, meta)                                     \
-    ::ernie::detail::MakeAttribute&lt;Type&gt;(token, #Name, fallback, meta),
+#define ERNIE_ATTRIBUTE_DEF(Type, Name, token, fallback, meta)       \
+    ::ernie::detail::MakeAttribute&lt;Type&gt;(token, #Name, fallback,     \
+                                         meta),
 
-#define ERNIE_DEFINE_SCHEMA(Class, typeName, base, isAbstract, typeDoc, OWN_ATTRIBUTES)            \
-    ERNIE_DEFINE_OPEN_SCHEMA(Class, typeName, base, isAbstract, typeDoc, OWN_ATTRIBUTES)
+#define ERNIE_DEFINE_SCHEMA(Class, typeName, base, isAbstract,       \
+                            typeDoc, OWN_ATTRIBUTES)                 \
+    ERNIE_DEFINE_OPEN_SCHEMA(Class, typeName, base, isAbstract,      \
+                             typeDoc, OWN_ATTRIBUTES)
 
-#define ERNIE_DEFINE_OPEN_SCHEMA(Class, typeName, base, isAbstract, typeDoc, OWN_ATTRIBUTES, ...)  \
-    const ::ernie::PrimTypeDef&amp; Class::Definition() {                                              \
-        static const ::ernie::PrimTypeDef definition{                                              \
-            typeName,     base, isAbstract, typeDoc, {OWN_ATTRIBUTES(ERNIE_ATTRIBUTE_DEF)},        \
-            {__VA_ARGS__}};                                                                        \
-        return definition;                                                                         \
+#define ERNIE_DEFINE_OPEN_SCHEMA(Class, typeName, base, isAbstract,  \
+                                 typeDoc, OWN_ATTRIBUTES, ...)       \
+    const ::ernie::PrimTypeDef&amp; Class::Definition() {                \
+        static const ::ernie::PrimTypeDef definition{                \
+            typeName,                                                \
+            base,                                                    \
+            isAbstract,                                              \
+            typeDoc,                                                 \
+            {OWN_ATTRIBUTES(ERNIE_ATTRIBUTE_DEF)},                   \
+            {__VA_ARGS__}};                                          \
+        return definition;                                           \
     }
 
 namespace ernie::detail {
 
 template &lt;typename T&gt;
-void WriteAttribute(Scene&amp; scene, const Path&amp; path, std::string_view name,
+void WriteAttribute(Scene&amp; scene, const Path&amp; path,
+                    std::string_view name,
                     typename AttributeTraits&lt;T&gt;::Arg value) {
     if constexpr (kIsOrArray&lt;T&gt;) {
         WriteAttribute&lt;typename T::Value&gt;(scene, path, name, value);
@@ -638,15 +683,19 @@ void WriteAttribute(Scene&amp; scene, const Path&amp; path, std::string_view nam
 }
 
 template &lt;typename T, typename Fallback&gt;
-AttributeDef MakeAttribute(std::string_view name, std::string_view member, const Fallback&amp; fallback,
-                           AttributeMeta meta) {
+AttributeDef
+MakeAttribute(std::string_view name, std::string_view member,
+              const Fallback&amp; fallback, AttributeMeta meta) {
     if constexpr (kIsOrArray&lt;T&gt;) {
         meta.array = true;
-        return MakeAttribute&lt;typename T::Value&gt;(name, member, fallback, std::move(meta));
+        return MakeAttribute&lt;typename T::Value&gt;(
+            name, member, fallback, std::move(meta));
     } else if constexpr (std::is_same_v&lt;T, Tensor&gt;) {
-        return AttributeDef::MakeTensor(name, member, std::move(meta));
+        return AttributeDef::MakeTensor(name, member,
+                                        std::move(meta));
     } else {
-        return AttributeDef::Make&lt;T&gt;(name, member, T(fallback), std::move(meta));
+        return AttributeDef::Make&lt;T&gt;(name, member, T(fallback),
+                                     std::move(meta));
     }
 }
 
@@ -655,18 +704,23 @@ AttributeDef MakeAttribute(std::string_view name, std::string_view member, const
 namespace ernie {
 
 template &lt;typename T&gt;
-AttributeDef AttributeDef::Make(std::string_view name, std::string_view member, const T&amp; fallback,
-                                AttributeMeta meta) {
-    AttributeDef def = Describe(name, member, AttributeTraits&lt;T&gt;::kKind, std::move(meta));
+AttributeDef
+AttributeDef::Make(std::string_view name, std::string_view member,
+                   const T&amp; fallback, AttributeMeta meta) {
+    AttributeDef def = Describe(
+        name, member, AttributeTraits&lt;T&gt;::kKind, std::move(meta));
     if constexpr (!std::is_same_v&lt;T, Path&gt;) {
         def.fallback = Value(fallback);
     }
-    def.read_ = [](const AttributeDef&amp; self, const Scene&amp; scene, const Path&amp; path) -&gt; Value {
+    def.read_ = [](const AttributeDef&amp; self, const Scene&amp; scene,
+                   const Path&amp; path) -&gt; Value {
         if constexpr (std::is_same_v&lt;T, Path&gt;) {
-            const Path target = AttributeTraits&lt;Path&gt;::Read(scene, path, self.name, Path());
+            const Path target = AttributeTraits&lt;Path&gt;::Read(
+                scene, path, self.name, Path());
             return target.IsEmpty() ? Value() : Value(target);
         } else {
-            return Value(AttributeTraits&lt;T&gt;::Read(scene, path, self.name, *self.fallback.Get&lt;T&gt;()));
+            return Value(AttributeTraits&lt;T&gt;::Read(
+                scene, path, self.name, *self.fallback.Get&lt;T&gt;()));
         }
     };
     def.from_ = [](const Value&amp; value) -&gt; std::optional&lt;Value&gt; {

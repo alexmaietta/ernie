@@ -218,26 +218,50 @@
 namespace ernie {
 
 namespace render_vars {
-inline constexpr std::string_view kLdrColor = &quot;LdrColor&quot;;  
-inline constexpr std::string_view kHdrColor = &quot;HdrColor&quot;;  
-inline constexpr std::string_view kSpectralRadiance = &quot;SpectralRadiance&quot;;
-inline constexpr std::string_view kElectrons = &quot;Electrons&quot;;  
-inline constexpr std::string_view kRawDn = &quot;RawDN&quot;;          
-inline constexpr std::string_view kDistanceToImagePlane = &quot;DistanceToImagePlane&quot;;  
-inline constexpr std::string_view kDistanceToCamera = &quot;DistanceToCamera&quot;;          
-inline constexpr std::string_view kNormal = &quot;Normal&quot;;  
-inline constexpr std::string_view kPrimId = &quot;PrimId&quot;;  
-inline constexpr std::string_view kInstanceId = &quot;InstanceId&quot;;  
+inline constexpr std::string_view kLdrColor =
+    &quot;LdrColor&quot;;  
+inline constexpr std::string_view kHdrColor =
+    &quot;HdrColor&quot;;  
+inline constexpr std::string_view kSpectralRadiance =
+    &quot;SpectralRadiance&quot;;
+inline constexpr std::string_view kElectrons =
+    &quot;Electrons&quot;;  
+inline constexpr std::string_view kRawDn =
+    &quot;RawDN&quot;;  
+inline constexpr std::string_view kDistanceToImagePlane =
+    &quot;DistanceToImagePlane&quot;;  
+inline constexpr std::string_view kDistanceToCamera =
+    &quot;DistanceToCamera&quot;;  
+inline constexpr std::string_view kNormal =
+    &quot;Normal&quot;;  
+inline constexpr std::string_view kPrimId =
+    &quot;PrimId&quot;;  
+inline constexpr std::string_view kInstanceId =
+    &quot;InstanceId&quot;;  
 inline constexpr std::string_view kMotionVector = &quot;MotionVector&quot;;
 }  // namespace render_vars
 
 inline constexpr std::array&lt;std::string_view, 11&gt; kRenderVarNames{
-    render_vars::kSpectralRadiance, render_vars::kElectrons,   render_vars::kRawDn,
-    render_vars::kHdrColor,         render_vars::kLdrColor,    render_vars::kDistanceToImagePlane,
-    render_vars::kDistanceToCamera, render_vars::kNormal,      render_vars::kPrimId,
-    render_vars::kInstanceId,       render_vars::kMotionVector};
+    render_vars::kSpectralRadiance,
+    render_vars::kElectrons,
+    render_vars::kRawDn,
+    render_vars::kHdrColor,
+    render_vars::kLdrColor,
+    render_vars::kDistanceToImagePlane,
+    render_vars::kDistanceToCamera,
+    render_vars::kNormal,
+    render_vars::kPrimId,
+    render_vars::kInstanceId,
+    render_vars::kMotionVector};
 
-enum class SensorFilter : std::uint8_t { Lens, Qe, Noise, Adc, Cie, Exposure };
+enum class SensorFilter : std::uint8_t {
+    Lens,
+    Qe,
+    Noise,
+    Adc,
+    Cie,
+    Exposure
+};
 
 inline constexpr std::array&lt;SensorFilter, 6&gt; kSensorFilters{
     SensorFilter::Lens, SensorFilter::Qe,  SensorFilter::Noise,
@@ -249,13 +273,26 @@ std::optional&lt;SensorFilter&gt; SensorFilterNamed(std::string_view name);
 
 std::vector&lt;SensorFilter&gt; DefaultFilterChain();
 
-std::vector&lt;SensorFilter&gt; CheckFilterChain(std::span&lt;const SensorFilter&gt; chain);
+std::vector&lt;SensorFilter&gt;
+CheckFilterChain(std::span&lt;const SensorFilter&gt; chain);
 
-std::vector&lt;std::string_view&gt; VarsWrittenBy(std::span&lt;const SensorFilter&gt; chain);
+std::vector&lt;std::string_view&gt;
+VarsWrittenBy(std::span&lt;const SensorFilter&gt; chain);
 
-enum class FilterKind : std::uint8_t { Spatial, Band, Integrator, Pixel };
+enum class FilterKind : std::uint8_t {
+    Spatial,
+    Band,
+    Integrator,
+    Pixel
+};
 
-enum class FilterDomain : std::uint8_t { Spectrum, Electrons, Digital, Rgb, Display };
+enum class FilterDomain : std::uint8_t {
+    Spectrum,
+    Electrons,
+    Digital,
+    Rgb,
+    Display
+};
 
 FilterKind KindOf(SensorFilter filter);
 
@@ -265,7 +302,8 @@ inline constexpr std::array&lt;std::string_view, kMaxAovs&gt; kAovSlotNames{
     &quot;Aov0&quot;, &quot;Aov1&quot;, &quot;Aov2&quot;, &quot;Aov3&quot;, &quot;Aov4&quot;, &quot;Aov5&quot;, &quot;Aov6&quot;, &quot;Aov7&quot;};
 
 struct SensorFilterOutput {
-    std::string name;  
+    std::string
+        name;  
     std::string description;
 };
 
@@ -277,7 +315,8 @@ struct SensorFilterParam {
     std::vector&lt;float&gt; defaults = {};
 };
 
-std::vector&lt;float&gt; ResampleCurve(std::span&lt;const float&gt; values, std::size_t size);
+std::vector&lt;float&gt; ResampleCurve(std::span&lt;const float&gt; values,
+                                 std::size_t size);
 
 struct SensorFilterModel {
     std::string id;  
@@ -287,8 +326,9 @@ struct SensorFilterModel {
     FilterKind kind = FilterKind::Pixel;
     FilterDomain domain = FilterDomain::Electrons;
     std::vector&lt;SensorFilterParam&gt; params;
-    std::string typeName;  
-    std::string slang;     
+    std::string
+        typeName;  
+    std::string slang;  
     std::vector&lt;SensorFilterOutput&gt; outputs = {};
     std::uint32_t states = 0;
     bool pyramid = false;
@@ -320,7 +360,8 @@ std::vector&lt;SensorFilterModel&gt; StandardSensorFilters();
 struct SensorFilterStep {
     std::string type;
     std::map&lt;std::string, float, std::less&lt;&gt;&gt; inputs;
-    std::map&lt;std::string, std::vector&lt;float&gt;, std::less&lt;&gt;&gt; arrays = {};
+    std::map&lt;std::string, std::vector&lt;float&gt;, std::less&lt;&gt;&gt; arrays =
+        {};
 
     std::optional&lt;SensorFilter&gt; Builtin() const {
         return SensorFilterNamed(type);
@@ -329,18 +370,23 @@ struct SensorFilterStep {
     bool operator==(const SensorFilterStep&amp;) const = default;
 };
 
-std::vector&lt;SensorFilterStep&gt; StepsOf(std::span&lt;const SensorFilter&gt; chain);
+std::vector&lt;SensorFilterStep&gt;
+StepsOf(std::span&lt;const SensorFilter&gt; chain);
 
-std::vector&lt;SensorFilterStep&gt; CheckFilterChain(std::span&lt;const SensorFilterStep&gt; chain,
-                                               const SensorFilterRegistry&amp; registry);
+std::vector&lt;SensorFilterStep&gt;
+CheckFilterChain(std::span&lt;const SensorFilterStep&gt; chain,
+                 const SensorFilterRegistry&amp; registry);
 
-std::vector&lt;std::string_view&gt; VarsWrittenBy(std::span&lt;const SensorFilterStep&gt; chain,
-                                            const SensorFilterRegistry&amp; registry);
+std::vector&lt;std::string_view&gt;
+VarsWrittenBy(std::span&lt;const SensorFilterStep&gt; chain,
+              const SensorFilterRegistry&amp; registry);
 
-std::vector&lt;std::string&gt; AovOutputsOf(std::span&lt;const SensorFilterStep&gt; chain,
-                                      const SensorFilterRegistry&amp; registry);
+std::vector&lt;std::string&gt;
+AovOutputsOf(std::span&lt;const SensorFilterStep&gt; chain,
+             const SensorFilterRegistry&amp; registry);
 
-std::vector&lt;std::string_view&gt; RequiredVars(std::span&lt;const std::string_view&gt; requested);
+std::vector&lt;std::string_view&gt;
+RequiredVars(std::span&lt;const std::string_view&gt; requested);
 
 }  // namespace ernie
 </code></pre>

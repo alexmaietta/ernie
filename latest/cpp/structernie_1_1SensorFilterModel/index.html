@@ -236,7 +236,11 @@
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1SensorFilterOutput/"><strong>SensorFilterOutput</strong></a> &gt;</td>
-<td style="text-align: left;"><a href="#variable-outputs"><strong>outputs</strong></a>   = <code>{}</code><br><em>Its AOVs, which it writes with</em> <code>writeOutput(pixel, index, value)</code> <em>in this order.</em></td>
+<td style="text-align: left;"><a href="#variable-outputs"><strong>outputs</strong></a>   = <code>{}</code><br><em>Its AOVs, which it writes with</em> `writeOutput(pixel, index,</td>
+</tr>
+<tr>
+<td style="text-align: right;">value)` <em>in this order.</em></td>
+<td style="text-align: left;"></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1SensorFilterParam/"><strong>SensorFilterParam</strong></a> &gt;</td>
@@ -295,7 +299,8 @@
 <hr>
 
 <h3 id="variable-outputs">variable outputs</h3>
-<p><em>Its AOVs, which it writes with</em> <code>writeOutput(pixel, index, value)</code> <em>in this order.</em></p>
+<p><em>Its AOVs, which it writes with</em> <code>writeOutput(pixel, index,
+value)</code> <em>in this order.</em></p>
 <pre><code class="language-C++">std::vector&lt;SensorFilterOutput&gt; ernie::SensorFilterModel::outputs;
 </code></pre>
 <hr>

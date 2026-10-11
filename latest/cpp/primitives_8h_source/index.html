@@ -219,29 +219,37 @@ enum class Axis { X, Y, Z };
 
 std::optional&lt;Axis&gt; AxisNamed(std::string_view name);
 
-// Triangle meshes of UsdGeom's implicit primitives, centred on the origin, with outward per-vertex
-// normals and counter-clockwise triangles seen from outside. Curved surfaces share vertices for
-// smooth normals; faces meeting at an edge (box faces, caps, a cone's base) have their own.
+// Triangle meshes of UsdGeom's implicit primitives, centred on the
+// origin, with outward per-vertex normals and counter-clockwise
+// triangles seen from outside. Curved surfaces share vertices for
+// smooth normals; faces meeting at an edge (box faces, caps, a cone's
+// base) have their own.
 //
-// Shapes are built around +z and turned to `axis` by a cyclic permutation of the coordinates
-// (z to x for X, z to y for Y), which keeps their handedness. `slices` divide circles and
-// `stacks` divide a sphere from pole to pole (a capsule's caps get half each).
+// Shapes are built around +z and turned to `axis` by a cyclic
+// permutation of the coordinates (z to x for X, z to y for Y), which
+// keeps their handedness. `slices` divide circles and `stacks` divide
+// a sphere from pole to pole (a capsule's caps get half each).
 //
 // Reference: Pixar, &quot;UsdGeom: USD Geometry Schema&quot;,
-// https://openusd.org/release/api/usd_geom_page_front.html (Cube, Sphere, Cylinder, Cone,
-// Capsule and Plane).
-// Each throws std::invalid_argument for sizes that are not positive and finite (the capsule's
-// height, its cylinder's length, may be 0), or fewer than 3 slices or 2 stacks.
+// https://openusd.org/release/api/usd_geom_page_front.html (Cube,
+// Sphere, Cylinder, Cone, Capsule and Plane). Each throws
+// std::invalid_argument for sizes that are not positive and finite
+// (the capsule's height, its cylinder's length, may be 0), or fewer
+// than 3 slices or 2 stacks.
 
 MeshData BoxMesh(const glm::vec3&amp; size);
 
-MeshData SphereMesh(float radius, std::uint32_t slices = 48, std::uint32_t stacks = 24);
+MeshData SphereMesh(float radius, std::uint32_t slices = 48,
+                    std::uint32_t stacks = 24);
 
-MeshData CylinderMesh(float radius, float height, Axis axis = Axis::Z, std::uint32_t slices = 48);
+MeshData CylinderMesh(float radius, float height, Axis axis = Axis::Z,
+                      std::uint32_t slices = 48);
 
-MeshData ConeMesh(float radius, float height, Axis axis = Axis::Z, std::uint32_t slices = 48);
+MeshData ConeMesh(float radius, float height, Axis axis = Axis::Z,
+                  std::uint32_t slices = 48);
 
-MeshData CapsuleMesh(float radius, float height, Axis axis = Axis::Z, std::uint32_t slices = 48,
+MeshData CapsuleMesh(float radius, float height, Axis axis = Axis::Z,
+                     std::uint32_t slices = 48,
                      std::uint32_t stacks = 24);
 
 MeshData PlaneMesh(float width, float length, Axis axis = Axis::Z);

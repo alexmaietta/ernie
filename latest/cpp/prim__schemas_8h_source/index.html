@@ -216,9 +216,10 @@
 
 namespace ernie::app {
 
-std::vector&lt;PropertySection&gt; SchemaOf(const Scene&amp; scene, const Path&amp; path,
-                                      const BrdfRegistry&amp; brdfs,
-                                      const SensorFilterRegistry&amp; filters);
+std::vector&lt;PropertySection&gt;
+SchemaOf(const Scene&amp; scene, const Path&amp; path,
+         const BrdfRegistry&amp; brdfs,
+         const SensorFilterRegistry&amp; filters);
 
 std::vector&lt;PropertySection&gt; CameraSchema();
 

@@ -218,8 +218,10 @@
 namespace ernie {
 
 struct LodPatch {
-    std::uint32_t originX = 0;  
-    std::uint32_t originY = 0;  
+    std::uint32_t originX =
+        0;  
+    std::uint32_t originY =
+        0;  
     std::uint32_t level = 0;
     std::uint32_t face = 0;  
 
@@ -239,8 +241,8 @@ class LodQuadtree {
 
     LodQuadtree(const RasterView&amp; heights, std::uint32_t leafCells);
 
-    LodQuadtree(std::uint32_t width, std::uint32_t height, double cellSize,
-                std::uint32_t leafCells);
+    LodQuadtree(std::uint32_t width, std::uint32_t height,
+                double cellSize, std::uint32_t leafCells);
 
     std::uint32_t LeavesPerSide() const {
         return Empty() ? 0 : NodesPerSide(0);
@@ -249,7 +251,8 @@ class LodQuadtree {
     void SetLeaves(std::span&lt;const glm::vec2&gt; leaves);
 
     glm::vec2 HeightRange() const {
-        return Empty() ? glm::vec2(1.0f, 0.0f) : heights_[levels_ - 1].front();
+        return Empty() ? glm::vec2(1.0f, 0.0f)
+                       : heights_[levels_ - 1].front();
     }
 
     bool Empty() const {
@@ -274,24 +277,33 @@ class LodQuadtree {
 
     float MinFirstRange(float exaggeration, float morphStart) const;
 
-    std::vector&lt;LodRange&gt; Ranges(float firstRange, float morphStart) const;
+    std::vector&lt;LodRange&gt; Ranges(float firstRange,
+                                 float morphStart) const;
 
-    void Select(const glm::vec3&amp; eye, std::span&lt;const LodRange&gt; ranges, const Frustum* frustum,
-                float exaggeration, std::vector&lt;LodPatch&gt;&amp; out) const;
+    void Select(const glm::vec3&amp; eye,
+                std::span&lt;const LodRange&gt; ranges,
+                const Frustum* frustum, float exaggeration,
+                std::vector&lt;LodPatch&gt;&amp; out) const;
 
     void SelectAll(std::vector&lt;LodPatch&gt;&amp; out) const;
 
-    std::uint64_t TriangleCount(std::span&lt;const LodPatch&gt; patches) const;
+    std::uint64_t
+    TriangleCount(std::span&lt;const LodPatch&gt; patches) const;
 
-    const glm::vec2&amp; NodeHeights(std::uint32_t level, std::uint32_t x, std::uint32_t y) const {
-        return heights_[level][static_cast&lt;std::size_t&gt;(y) * NodesPerSide(level) + x];
+    const glm::vec2&amp; NodeHeights(std::uint32_t level, std::uint32_t x,
+                                 std::uint32_t y) const {
+        return heights_[level][static_cast&lt;std::size_t&gt;(y) *
+                                   NodesPerSide(level) +
+                               x];
     }
 
-    std::pair&lt;glm::vec3, glm::vec3&gt; NodeBounds(std::uint32_t level, std::uint32_t x,
-                                               std::uint32_t y, float exaggeration) const;
+    std::pair&lt;glm::vec3, glm::vec3&gt;
+    NodeBounds(std::uint32_t level, std::uint32_t x, std::uint32_t y,
+               float exaggeration) const;
 
   private:
-    void Shape(std::uint32_t width, std::uint32_t height, double cellSize, std::uint32_t leafCells);
+    void Shape(std::uint32_t width, std::uint32_t height,
+               double cellSize, std::uint32_t leafCells);
     void BuildParents();
 
     std::uint32_t NodesPerSide(std::uint32_t level) const {
@@ -302,13 +314,18 @@ class LodQuadtree {
         return leafCells_ &lt;&lt; level;
     }
 
-    bool SelectNode(std::uint32_t level, std::uint32_t x, std::uint32_t y, const glm::vec3&amp; eye,
-                    std::span&lt;const LodRange&gt; ranges, const Frustum* frustum, float exaggeration,
+    bool SelectNode(std::uint32_t level, std::uint32_t x,
+                    std::uint32_t y, const glm::vec3&amp; eye,
+                    std::span&lt;const LodRange&gt; ranges,
+                    const Frustum* frustum, float exaggeration,
                     std::vector&lt;LodPatch&gt;&amp; out) const;
-    void EmitQuarters(std::uint32_t level, std::uint32_t x, std::uint32_t y, const Frustum* frustum,
-                      float exaggeration, std::vector&lt;LodPatch&gt;&amp; out) const;
-    void EmitChildArea(std::uint32_t level, std::uint32_t childX, std::uint32_t childY,
-                       const Frustum* frustum, float exaggeration,
+    void EmitQuarters(std::uint32_t level, std::uint32_t x,
+                      std::uint32_t y, const Frustum* frustum,
+                      float exaggeration,
+                      std::vector&lt;LodPatch&gt;&amp; out) const;
+    void EmitChildArea(std::uint32_t level, std::uint32_t childX,
+                       std::uint32_t childY, const Frustum* frustum,
+                       float exaggeration,
                        std::vector&lt;LodPatch&gt;&amp; out) const;
 
     std::uint32_t leafCells_ = 0;
@@ -318,8 +335,9 @@ class LodQuadtree {
     float originX_ = 0.0f;
     float originY_ = 0.0f;
     float pixelSize_ = 1.0f;
-    std::vector&lt;std::vector&lt;glm::vec2&gt;&gt; heights_;  
-    std::vector&lt;float&gt; maxHeightSpan_;             
+    std::vector&lt;std::vector&lt;glm::vec2&gt;&gt;
+        heights_;  
+    std::vector&lt;float&gt; maxHeightSpan_;  
 };
 
 }  // namespace ernie

@@ -223,8 +223,9 @@ class Swapchain {
         VkSemaphore rendered = VK_NULL_HANDLE;
     };
 
-    Swapchain(const VulkanContext&amp; context, VkSurfaceKHR surface, std::uint32_t width,
-              std::uint32_t height, bool vsync = true);
+    Swapchain(const VulkanContext&amp; context, VkSurfaceKHR surface,
+              std::uint32_t width, std::uint32_t height,
+              bool vsync = true);
     ~Swapchain();
     Swapchain(const Swapchain&amp;) = delete;
     Swapchain&amp; operator=(const Swapchain&amp;) = delete;

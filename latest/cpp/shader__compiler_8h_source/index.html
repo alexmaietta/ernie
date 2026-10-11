@@ -222,11 +222,13 @@ class ShaderCompiler {
     ShaderCompiler(const ShaderCompiler&amp;) = delete;
     ShaderCompiler&amp; operator=(const ShaderCompiler&amp;) = delete;
 
-    std::vector&lt;std::uint32_t&gt; CompileSpirv(std::span&lt;const ShaderModuleSource&gt; modules,
-                                            const std::string&amp; entryPoint) const;
+    std::vector&lt;std::uint32_t&gt;
+    CompileSpirv(std::span&lt;const ShaderModuleSource&gt; modules,
+                 const std::string&amp; entryPoint) const;
 
-    std::string CompileWgsl(std::span&lt;const ShaderModuleSource&gt; modules,
-                            const std::string&amp; entryPoint) const;
+    std::string
+    CompileWgsl(std::span&lt;const ShaderModuleSource&gt; modules,
+                const std::string&amp; entryPoint) const;
 
   private:
     struct Impl;

@@ -235,8 +235,9 @@ struct RendererInfo {
 };
 
 struct RenderStats {
-    std::uint64_t gpuBytes = 0;   
-    std::uint64_t triangles = 0;  
+    std::uint64_t gpuBytes = 0;  
+    std::uint64_t triangles =
+        0;  
     std::vector&lt;std::pair&lt;std::string, std::uint64_t&gt;&gt; counters;
 };
 
@@ -261,30 +262,37 @@ class RenderDelegate {
 
     virtual void Sync(const Scene&amp; scene) = 0;
 
-    virtual void Update(const Scene&amp; scene, const Path&amp; settings, VkExtent2D extent) = 0;
+    virtual void Update(const Scene&amp; scene, const Path&amp; settings,
+                        VkExtent2D extent) = 0;
 
     virtual std::vector&lt;TimelinePoint&gt; SubmitWaits() const = 0;
 
-    virtual Tensor MapArray(Scene&amp; scene, const Path&amp; path, std::string_view attribute,
+    virtual Tensor MapArray(Scene&amp; scene, const Path&amp; path,
+                            std::string_view attribute,
                             std::uintptr_t stream = 1);
 
-    virtual Tensor MapArray(Scene&amp; scene, const PrimSet&amp; prims, std::string_view attribute,
+    virtual Tensor MapArray(Scene&amp; scene, const PrimSet&amp; prims,
+                            std::string_view attribute,
                             std::uintptr_t stream = 1);
 
     virtual std::vector&lt;std::string&gt; ViewVars() const {
         return Info().viewVars;
     }
 
-    virtual void Record(VkCommandBuffer commands, const RenderingTarget&amp; target,
+    virtual void Record(VkCommandBuffer commands,
+                        const RenderingTarget&amp; target,
                         std::string_view var) = 0;
 
-    virtual StepOperation StepAsync(const Scene&amp; scene, std::span&lt;const Path&gt; products = {},
-                                    const Path&amp; settings = {}) = 0;
+    virtual StepOperation
+    StepAsync(const Scene&amp; scene, std::span&lt;const Path&gt; products = {},
+              const Path&amp; settings = {}) = 0;
 
-    RenderProductSetOutputs Step(const Scene&amp; scene, std::span&lt;const Path&gt; products = {},
+    RenderProductSetOutputs Step(const Scene&amp; scene,
+                                 std::span&lt;const Path&gt; products = {},
                                  const Path&amp; settings = {});
 
-    Tensor Render(const Scene&amp; scene, const Path&amp; settings = {}, Device device = {});
+    Tensor Render(const Scene&amp; scene, const Path&amp; settings = {},
+                  Device device = {});
 
     virtual ComputeInterop* Compute(std::string* why = nullptr) = 0;
 
@@ -302,7 +310,8 @@ class RenderDelegate {
         static_cast&lt;void&gt;(var);
     }
 
-    virtual void SetHighlight(std::span&lt;const Path&gt; paths, glm::vec4 colour) {
+    virtual void SetHighlight(std::span&lt;const Path&gt; paths,
+                              glm::vec4 colour) {
         static_cast&lt;void&gt;(paths);
         static_cast&lt;void&gt;(colour);
     }
@@ -320,7 +329,8 @@ class RenderDelegate {
   protected:
     RenderDelegate() = default;
 
-    FrameId NextFrame(const Scene&amp; scene, const Path&amp; settings, const Path&amp; product);
+    FrameId NextFrame(const Scene&amp; scene, const Path&amp; settings,
+                      const Path&amp; product);
 
   private:
     std::map&lt;Path, std::uint64_t&gt; frameCounts_;
@@ -328,10 +338,10 @@ class RenderDelegate {
 
 std::vector&lt;std::string&gt; RenderBackends();
 
-std::unique_ptr&lt;RenderDelegate&gt;
-CreateRenderDelegate(std::string_view backend, const VulkanContext&amp; context,
-                     VkFormat presentFormat = VK_FORMAT_R8G8B8A8_UNORM,
-                     BrdfRegistry brdfs = BrdfRegistry::WithBuiltins());
+std::unique_ptr&lt;RenderDelegate&gt; CreateRenderDelegate(
+    std::string_view backend, const VulkanContext&amp; context,
+    VkFormat presentFormat = VK_FORMAT_R8G8B8A8_UNORM,
+    BrdfRegistry brdfs = BrdfRegistry::WithBuiltins());
 
 }  // namespace ernie
 </code></pre>

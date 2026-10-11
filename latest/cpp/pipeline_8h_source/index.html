@@ -227,16 +227,23 @@ struct DescriptorResource {
     VkDescriptorImageInfo image{};
 
     static DescriptorResource Of(const GpuBuffer&amp; buffer);
-    static DescriptorResource Of(const GpuBuffer&amp; buffer, VkDeviceSize offset, VkDeviceSize range);
-    static DescriptorResource Of(VkImageView view,
-                                 VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    static DescriptorResource Of(const GpuBuffer&amp; buffer,
+                                 VkDeviceSize offset,
+                                 VkDeviceSize range);
+    static DescriptorResource
+    Of(VkImageView view,
+       VkImageLayout layout =
+           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     static DescriptorResource Of(const Sampler&amp; sampler);
-    static DescriptorResource Of(VkImageView view, VkImageLayout layout, const Sampler&amp; sampler);
+    static DescriptorResource Of(VkImageView view,
+                                 VkImageLayout layout,
+                                 const Sampler&amp; sampler);
 };
 
 class PipelineLayout {
   public:
-    PipelineLayout(const VulkanContext&amp; context, std::span&lt;const DescriptorBinding&gt; bindings,
+    PipelineLayout(const VulkanContext&amp; context,
+                   std::span&lt;const DescriptorBinding&gt; bindings,
                    std::uint32_t pushConstantBytes = 0);
     ~PipelineLayout();
     PipelineLayout(const PipelineLayout&amp;) = delete;
@@ -249,7 +256,8 @@ class PipelineLayout {
     void Push(VkCommandBuffer commands, VkPipelineBindPoint point,
               std::span&lt;const DescriptorResource&gt; resources) const;
 
-    void PushConstants(VkCommandBuffer commands, const void* data, std::uint32_t bytes) const;
+    void PushConstants(VkCommandBuffer commands, const void* data,
+                       std::uint32_t bytes) const;
 
   private:
     const VulkanContext&amp; context_;
@@ -260,11 +268,15 @@ class PipelineLayout {
 
 class ComputePipeline {
   public:
-    ComputePipeline(const VulkanContext&amp; context, const PipelineLayout&amp; layout,
-                    std::span&lt;const std::uint32_t&gt; spirv, const std::string&amp; entryPoint = &quot;main&quot;);
+    ComputePipeline(const VulkanContext&amp; context,
+                    const PipelineLayout&amp; layout,
+                    std::span&lt;const std::uint32_t&gt; spirv,
+                    const std::string&amp; entryPoint = &quot;main&quot;);
 
-    ComputePipeline(const VulkanContext&amp; context, std::span&lt;const std::uint32_t&gt; spirv,
-                    std::uint32_t storageBuffers, const std::string&amp; entryPoint = &quot;main&quot;);
+    ComputePipeline(const VulkanContext&amp; context,
+                    std::span&lt;const std::uint32_t&gt; spirv,
+                    std::uint32_t storageBuffers,
+                    const std::string&amp; entryPoint = &quot;main&quot;);
     ~ComputePipeline();
     ComputePipeline(const ComputePipeline&amp;) = delete;
     ComputePipeline&amp; operator=(const ComputePipeline&amp;) = delete;
@@ -273,16 +285,19 @@ class ComputePipeline {
         return pipeline_;
     }
 
-    void Dispatch(VkCommandBuffer commands, std::span&lt;const DescriptorResource&gt; resources,
+    void Dispatch(VkCommandBuffer commands,
+                  std::span&lt;const DescriptorResource&gt; resources,
                   std::uint32_t groupsX, std::uint32_t groupsY = 1,
                   std::uint32_t groupsZ = 1) const;
 
-    void Dispatch(VkCommandBuffer commands, std::span&lt;const GpuBuffer* const&gt; buffers,
+    void Dispatch(VkCommandBuffer commands,
+                  std::span&lt;const GpuBuffer* const&gt; buffers,
                   std::uint32_t groupsX, std::uint32_t groupsY = 1,
                   std::uint32_t groupsZ = 1) const;
 
   private:
-    void Create(std::span&lt;const std::uint32_t&gt; spirv, const std::string&amp; entryPoint);
+    void Create(std::span&lt;const std::uint32_t&gt; spirv,
+                const std::string&amp; entryPoint);
 
     const VulkanContext&amp; context_;
     std::unique_ptr&lt;PipelineLayout&gt; ownedLayout_;
@@ -292,23 +307,28 @@ class ComputePipeline {
 
 struct GraphicsPipelineDesc {
     std::span&lt;const std::uint32_t&gt; vertexSpirv;
-    std::span&lt;const std::uint32_t&gt; fragmentSpirv;  
+    std::span&lt;const std::uint32_t&gt;
+        fragmentSpirv;  
     std::string vertexEntry = &quot;main&quot;;
     std::string fragmentEntry = &quot;main&quot;;
-    VkFormat colorFormat = VK_FORMAT_UNDEFINED;  
+    VkFormat colorFormat =
+        VK_FORMAT_UNDEFINED;  
     std::vector&lt;VkFormat&gt; colorFormats;
     VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
     VkCompareOp depthCompare = VK_COMPARE_OP_LESS;
     bool depthWrite = true;  
-    VkColorComponentFlags colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                           VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    float depthBiasSlope = 0.0f;  
+    VkColorComponentFlags colorWriteMask =
+        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    float depthBiasSlope =
+        0.0f;  
     bool alphaBlend = false;
 };
 
 class GraphicsPipeline {
   public:
-    GraphicsPipeline(const VulkanContext&amp; context, const PipelineLayout&amp; layout,
+    GraphicsPipeline(const VulkanContext&amp; context,
+                     const PipelineLayout&amp; layout,
                      const GraphicsPipelineDesc&amp; desc);
     ~GraphicsPipeline();
     GraphicsPipeline(const GraphicsPipeline&amp;) = delete;
@@ -324,7 +344,8 @@ class GraphicsPipeline {
 };
 
 struct RenderingTarget {
-    VkImageView color = VK_NULL_HANDLE;  
+    VkImageView color =
+        VK_NULL_HANDLE;  
     VkImageView depth = VK_NULL_HANDLE;
     VkExtent2D extent{};
     VkClearColorValue clearColor{};
@@ -335,10 +356,12 @@ struct RenderingTarget {
     std::uint32_t layers = 1;
 };
 
-void TransitionImage(VkCommandBuffer commands, VkImage image, VkImageAspectFlags aspect,
-                     VkImageLayout from, VkImageLayout to);
+void TransitionImage(VkCommandBuffer commands, VkImage image,
+                     VkImageAspectFlags aspect, VkImageLayout from,
+                     VkImageLayout to);
 
-void BeginRendering(VkCommandBuffer commands, const RenderingTarget&amp; target);
+void BeginRendering(VkCommandBuffer commands,
+                    const RenderingTarget&amp; target);
 
 }  // namespace ernie
 </code></pre>

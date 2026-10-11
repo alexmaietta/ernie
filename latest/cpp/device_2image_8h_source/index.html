@@ -305,11 +305,14 @@ VkImageAspectFlags AspectOf(VkFormat format);
 struct SamplerDesc {
     VkFilter filter = VK_FILTER_LINEAR;
     VkSamplerMipmapMode mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    VkSamplerAddressMode addressMode =
+        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     float maxAnisotropy = 1.0f;  
-    bool compare = false;        
+    bool compare =
+        false;  
     std::optional&lt;VkSamplerAddressMode&gt; addressModeV;
-    VkBorderColor borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+    VkBorderColor borderColor =
+        VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
 };
 
 class Sampler {

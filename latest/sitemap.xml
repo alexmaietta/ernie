@@ -169,6 +169,10 @@
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1Atmosphere/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1AttributeDef/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
@@ -238,6 +242,14 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1AxisShape/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1BandedAtmosphere/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1BandedConstituent/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
@@ -321,6 +333,10 @@
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1Constituent/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1Cube/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
@@ -342,6 +358,14 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1CylinderLight/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1DensityLayer/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1DensityProfile/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
@@ -386,6 +410,10 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1DomeSunExtraction/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1EarthAtmosphereOptions/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
@@ -545,6 +573,10 @@
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1LogNormalMode/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1LrocWacBandSpec/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
@@ -558,6 +590,10 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1Mars2020Navcam/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1MarsAtmosphereOptions/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
@@ -582,6 +618,10 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1MeshData/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1MieEfficiencies/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
@@ -630,6 +670,10 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1OverlayTriangle/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1ParticleOptics/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
@@ -682,6 +726,10 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1RectLight/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1RefractiveIndex/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
@@ -1621,6 +1669,14 @@
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/atmosphere_8h/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/atmosphere_8h_source/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/ies_8h/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
@@ -1674,6 +1730,14 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/raster__view_8h_source/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/scattering_8h/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/scattering_8h_source/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>

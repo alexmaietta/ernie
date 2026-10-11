@@ -247,7 +247,7 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../namespaceernie/#enum-culling"><strong>Culling</strong></a></td>
-<td style="text-align: left;"><a href="#variable-culling"><strong>culling</strong></a>   = <code>Culling::Gpu</code><br><em>How draws outside a view are culled.</em></td>
+<td style="text-align: left;"><a href="#variable-culling"><strong>culling</strong></a>   = <code>/* multi line expression */</code><br><em>How draws outside a view are culled.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::optional&lt; <a href="../structernie_1_1DomeParams/"><strong>DomeParams</strong></a> &gt;</td>
@@ -271,7 +271,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">float</td>
-<td style="text-align: left;"><a href="#variable-exposure"><strong>exposure</strong></a>   = <code>1.0f</code><br><em>Extra scale on the photographic output.</em></td>
+<td style="text-align: left;"><a href="#variable-exposure"><strong>exposure</strong></a>   = <code>/* multi line expression */</code><br><em>Extra scale on the photographic output.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1SensorFilterStep/"><strong>SensorFilterStep</strong></a> &gt;</td>
@@ -291,7 +291,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
-<td style="text-align: left;"><a href="#variable-meter"><strong>meter</strong></a>   = <code>false</code><br><em>Measure the scene's luminance (</em> <code>tokens::kMeter</code> <em>).</em></td>
+<td style="text-align: left;"><a href="#variable-meter"><strong>meter</strong></a>   = <code>/* multi line expression */</code><br><em>Measure the scene's luminance (</em> <code>tokens::kMeter</code> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../namespaceernie/#enum-minimalmode"><strong>MinimalMode</strong></a></td>
@@ -303,7 +303,7 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../namespaceernie/#enum-occlusion"><strong>Occlusion</strong></a></td>
-<td style="text-align: left;"><a href="#variable-occlusion"><strong>occlusion</strong></a>   = <code>Occlusion::Off</code><br><em>Whether views cull instances hidden by others.</em></td>
+<td style="text-align: left;"><a href="#variable-occlusion"><strong>occlusion</strong></a>   = <code>/* multi line expression */</code><br><em>Whether views cull instances hidden by others.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::dvec3</td>
@@ -359,7 +359,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">glm::vec3</td>
-<td style="text-align: left;"><a href="#variable-sundirection"><strong>sunDirection</strong></a>   = <code>{0.0f, 0.0f, 1.0f}</code><br><em>Unit vector pointing towards the sun.</em></td>
+<td style="text-align: left;"><a href="#variable-sundirection"><strong>sunDirection</strong></a>   = <code>/* multi line expression */</code><br><em>Unit vector pointing towards the sun.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; float &gt;</td>
@@ -371,7 +371,7 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../namespaceernie/#enum-wireframe"><strong>Wireframe</strong></a></td>
-<td style="text-align: left;"><a href="#variable-wireframe"><strong>wireframe</strong></a>   = <code>Wireframe::Off</code><br><em>How triangle edges are drawn.</em></td>
+<td style="text-align: left;"><a href="#variable-wireframe"><strong>wireframe</strong></a>   = <code>/* multi line expression */</code><br><em>How triangle edges are drawn.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; std::int32_t &gt;</td>
@@ -564,8 +564,8 @@
 </code></pre>
 <p>Chosen near the camera and moved only when the camera gets far from it (<code>RasterDelegate</code>), so what is expressed relative to it is recomputed rarely.</p>
 <p>References:
-* C. Thorne, "Using a Floating Origin to Improve Fidelity and Performance of Large,
-  Distributed Virtual Worlds", CW 2005. <a href="https://doi.org/10.1109/CW.2005.94">https://doi.org/10.1109/CW.2005.94</a>
+* C. Thorne, "Using a Floating Origin to Improve Fidelity and
+  Performance of Large, Distributed Virtual Worlds", CW 2005. <a href="https://doi.org/10.1109/CW.2005.94">https://doi.org/10.1109/CW.2005.94</a>
 * P. Cozzi and K. Ring, "3D Engine Design for Virtual Globes", CRC Press, 2011, chapter 5 (rendering relative to center and to eye). </p>
 <hr>
 

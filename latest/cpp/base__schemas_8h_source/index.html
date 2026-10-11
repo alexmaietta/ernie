@@ -254,7 +254,8 @@
 namespace ernie {
 
 class Imageable : public SchemaView {
-    ERNIE_SCHEMA_BODY(Imageable, SchemaView, ERNIE_IMAGEABLE_ATTRIBUTES)
+    ERNIE_SCHEMA_BODY(Imageable, SchemaView,
+                      ERNIE_IMAGEABLE_ATTRIBUTES)
 };
 
 class Xform : public Imageable {

@@ -215,16 +215,16 @@
 namespace ernie {
 
 enum class BufferMemory {
-    Device,    
-    Upload,    
+    Device,  
+    Upload,  
     Readback,  
     Shared,
 };
 
 class GpuBuffer {
   public:
-    GpuBuffer(const VulkanContext&amp; context, VkDeviceSize size, VkBufferUsageFlags usage,
-              BufferMemory memory);
+    GpuBuffer(const VulkanContext&amp; context, VkDeviceSize size,
+              VkBufferUsageFlags usage, BufferMemory memory);
     ~GpuBuffer();
     GpuBuffer(GpuBuffer&amp;&amp; other) noexcept;
     GpuBuffer&amp; operator=(GpuBuffer&amp;&amp; other) noexcept;
@@ -239,9 +239,11 @@ class GpuBuffer {
         return size_;
     }
 
-    void Write(std::span&lt;const std::byte&gt; bytes, VkDeviceSize offset = 0);
+    void Write(std::span&lt;const std::byte&gt; bytes,
+               VkDeviceSize offset = 0);
 
-    void Read(std::span&lt;std::byte&gt; bytes, VkDeviceSize offset = 0) const;
+    void Read(std::span&lt;std::byte&gt; bytes,
+              VkDeviceSize offset = 0) const;
 
     BufferMemory Memory() const {
         return memory_;
@@ -269,7 +271,8 @@ class GpuBuffer {
     void Release();
 
     const VulkanContext* context_ = nullptr;
-    std::weak_ptr&lt;const void&gt; contextAlive_;  
+    std::weak_ptr&lt;const void&gt;
+        contextAlive_;  
     VkBuffer buffer_ = VK_NULL_HANDLE;
     VmaAllocation allocation_ = VK_NULL_HANDLE;
     VkDeviceMemory sharedMemory_ = VK_NULL_HANDLE;

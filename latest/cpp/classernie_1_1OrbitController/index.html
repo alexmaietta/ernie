@@ -216,11 +216,11 @@
 <tbody>
 <tr>
 <td style="text-align: right;">float</td>
-<td style="text-align: left;"><a href="#variable-distance"><strong>distance</strong></a>   = <code>100.0f</code><br><em>World units from the eye to the target.</em></td>
+<td style="text-align: left;"><a href="#variable-distance"><strong>distance</strong></a>   = <code>/* multi line expression */</code><br><em>World units from the eye to the target.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">float</td>
-<td style="text-align: left;"><a href="#variable-pitch"><strong>pitch</strong></a>   = <code>0.6f</code><br><em>Radians, clamped to [kMinPitch, kMaxPitch].</em></td>
+<td style="text-align: left;"><a href="#variable-pitch"><strong>pitch</strong></a>   = <code>/* multi line expression */</code><br><em>Radians, clamped to [kMinPitch, kMaxPitch].</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::vec3</td>
@@ -306,7 +306,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-zoom"><strong>Zoom</strong></a> (float steps) <br><em>Zooms by</em> <code>steps</code> <em>scroll steps; positive moves closer. Distance stays within [1e-3, 1e7].</em></td>
+<td style="text-align: left;"><a href="#function-zoom"><strong>Zoom</strong></a> (float steps) <br><em>Zooms by</em> <code>steps</code> <em>scroll steps; positive moves closer.</em></td>
 </tr>
 </tbody>
 </table>
@@ -433,11 +433,12 @@
 <hr>
 
 <h3 id="function-zoom">function Zoom</h3>
-<p><em>Zooms by</em> <code>steps</code> <em>scroll steps; positive moves closer. Distance stays within [1e-3, 1e7].</em></p>
+<p><em>Zooms by</em> <code>steps</code> <em>scroll steps; positive moves closer.</em></p>
 <pre><code class="language-C++">void ernie::OrbitController::Zoom (
     float steps
 ) 
 </code></pre>
+<p>Distance stays within [1e-3, 1e7]. </p>
 <hr>
 
 <hr />

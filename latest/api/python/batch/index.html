@@ -220,8 +220,9 @@
 <a id="ernie.batch"></a>
     <div class="doc doc-contents first">
 
-        <p>Batched cameras for reinforcement learning: one camera renders a view per environment, each
-from its own pose of its own world, and every step hands back the observations as GPU arrays.</p>
+        <p>Batched cameras for reinforcement learning: one camera renders a
+view per environment, each from its own pose of its own world, and
+every step hands back the observations as GPU arrays.</p>
 <pre><code>import ernie
 from ernie.batch import BatchCamera
 
@@ -235,22 +236,26 @@ for step in range(steps):
     observations = camera.step(poses, stream=torch.cuda.current_stream().cuda_stream)
     rgb = torch.from_dlpack(observations["LdrColor"])[..., :3]  # (4096, 64, 64, 3) uint8
 </code></pre>
-<p>Nothing waits on the host: poses written as a contiguous float32 CUDA array stay on the GPU
-(<code>tokens.POSES_DEVICE</code>), the render is submitted and the next step is prepared while it runs,
-and the observations are ready for work queued on <code>stream</code> after the call. Each step's arrays
-belong to that step's frame: keep them as long as needed, but drop them before many more steps,
-or each step renders into a frame of its own.</p>
-<p>Observation shapes: LdrColor (views, rows, cols, 4) uint8 sRGB; HdrColor, Electrons and Normal
-(views, rows, cols, 4) float32; DistanceToCamera and DistanceToImagePlane (views, rows, cols)
-float32; PrimId and InstanceId (views, rows, cols) uint32; RawDN (views, rows, cols, 4) uint16;
-SpectralRadiance (views, bands, rows, cols) float32. Only the vars asked for are rendered and
-held.</p>
+<p>Nothing waits on the host: poses written as a contiguous float32 CUDA
+array stay on the GPU (<code>tokens.POSES_DEVICE</code>), the render is submitted
+and the next step is prepared while it runs, and the observations are
+ready for work queued on <code>stream</code> after the call. Each step's arrays
+belong to that step's frame: keep them as long as needed, but drop
+them before many more steps, or each step renders into a frame of its
+own.</p>
+<p>Observation shapes: LdrColor (views, rows, cols, 4) uint8 sRGB;
+HdrColor, Electrons and Normal (views, rows, cols, 4) float32;
+DistanceToCamera and DistanceToImagePlane (views, rows, cols) float32;
+PrimId and InstanceId (views, rows, cols) uint32; RawDN (views, rows,
+cols, 4) uint16; SpectralRadiance (views, bands, rows, cols) float32.
+Only the vars asked for are rendered and held.</p>
 <p>References:
-- B. Shacklett et al., "An Extensible, Data-Oriented Architecture for High-Performance,
-  Many-World Simulation", SIGGRAPH 2023 (Madrona's batch renderer).
-  https://madrona-engine.github.io/
-- M. Mittal et al., "Orbit: A Unified Simulation Framework for Interactive Robot Learning
-  Environments", IEEE RA-L 2023 (Isaac Lab's tiled cameras). https://isaac-sim.github.io/IsaacLab/</p>
+- B. Shacklett et al., "An Extensible, Data-Oriented Architecture for
+  High-Performance, Many-World Simulation", SIGGRAPH 2023 (Madrona's
+  batch renderer). https://madrona-engine.github.io/
+- M. Mittal et al., "Orbit: A Unified Simulation Framework for
+  Interactive Robot Learning Environments", IEEE RA-L 2023 (Isaac
+  Lab's tiled cameras). https://isaac-sim.github.io/IsaacLab/</p>
 
 
 
@@ -274,7 +279,7 @@ held.</p>
             <td><code><a class="autorefs autorefs-internal" title="            BatchCamera (ernie.batch.BatchCamera)" href="#ernie.batch.BatchCamera">BatchCamera</a></code></td>
             <td>
               <div class="doc-md-description">
-                <p>A batch of <code>views</code> views through the Camera prim <code>camera</code> of <code>scene</code>, rendered by</p>
+                <p>A batch of <code>views</code> views through the Camera prim <code>camera</code> of</p>
               </div>
             </td>
           </tr>
@@ -344,17 +349,21 @@ held.</p>
 
 
 
-        <p>A batch of <code>views</code> views through the Camera prim <code>camera</code> of <code>scene</code>, rendered by
-<code>renderer</code> as the render product <code>product</code> at <code>resolution</code> (columns, rows) with
-<code>render_vars</code>.</p>
-<p>The camera keeps its lens and sensor; each view replaces its transform with a pose under the
-camera's parent (<code>tokens.POSES</code>) and sees one world (<code>tokens.WORLDS</code>) besides what every
-world shares, or every world for -1. A missing camera is defined with default settings. Until
-the first poses, every view takes the camera's own transform, and views see every world.</p>
-<p><code>minimal</code> draws the product with minimal shading (<code>tokens.MINIMAL_MODE</code>) for throughput:
-"none" (black, for distances, normals and ids alone), "constantDiffuse" (<code>minimal_color</code> lit
-by the sun and ambient) or "texturedDiffuse" (surfaces' diffuse colours so lit), in one
-forward pass straight into the observations, which then map to CUDA without a copy.</p>
+        <p>A batch of <code>views</code> views through the Camera prim <code>camera</code> of
+<code>scene</code>, rendered by <code>renderer</code> as the render product <code>product</code> at
+<code>resolution</code> (columns, rows) with <code>render_vars</code>.</p>
+<p>The camera keeps its lens and sensor; each view replaces its
+transform with a pose under the camera's parent (<code>tokens.POSES</code>)
+and sees one world (<code>tokens.WORLDS</code>) besides what every world
+shares, or every world for -1. A missing camera is defined with
+default settings. Until the first poses, every view takes the
+camera's own transform, and views see every world.</p>
+<p><code>minimal</code> draws the product with minimal shading
+(<code>tokens.MINIMAL_MODE</code>) for throughput: "none" (black, for
+distances, normals and ids alone), "constantDiffuse"
+(<code>minimal_color</code> lit by the sun and ambient) or "texturedDiffuse"
+(surfaces' diffuse colours so lit), in one forward pass straight
+into the observations, which then map to CUDA without a copy.</p>
 
 
 
@@ -379,7 +388,7 @@ forward pass straight into the observations, which then map to CUDA without a co
               <td><code><a class="autorefs autorefs-internal" title="            map_poses (ernie.batch.BatchCamera.map_poses)" href="#ernie.batch.BatchCamera.map_poses">map_poses</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>The views' poses as a writable CUDA array over the renderer's own memory, holding the</p>
+                  <p>The views' poses as a writable CUDA array over the</p>
                 </div>
               </td>
             </tr>
@@ -387,7 +396,7 @@ forward pass straight into the observations, which then map to CUDA without a co
               <td><code><a class="autorefs autorefs-internal" title="            set_poses (ernie.batch.BatchCamera.set_poses)" href="#ernie.batch.BatchCamera.set_poses">set_poses</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Sets every view's camera-to-world pose under the camera's parent: a (views, 4, 4)</p>
+                  <p>Sets every view's camera-to-world pose under the camera's</p>
                 </div>
               </td>
             </tr>
@@ -395,7 +404,7 @@ forward pass straight into the observations, which then map to CUDA without a co
               <td><code><a class="autorefs autorefs-internal" title="            set_worlds (ernie.batch.BatchCamera.set_worlds)" href="#ernie.batch.BatchCamera.set_worlds">set_worlds</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Sets the world each view sees (<code>tokens.WORLD</code> of the environments' prims): a (views,)</p>
+                  <p>Sets the world each view sees (<code>tokens.WORLD</code> of the</p>
                 </div>
               </td>
             </tr>
@@ -403,7 +412,7 @@ forward pass straight into the observations, which then map to CUDA without a co
               <td><code><a class="autorefs autorefs-internal" title="            step (ernie.batch.BatchCamera.step)" href="#ernie.batch.BatchCamera.step">step</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Renders a step, after setting <code>poses</code> and <code>worlds</code> when given, and returns each render</p>
+                  <p>Renders a step, after setting <code>poses</code> and <code>worlds</code> when</p>
                 </div>
               </td>
             </tr>
@@ -650,10 +659,12 @@ forward pass straight into the observations, which then map to CUDA without a co
 
     <div class="doc doc-contents ">
 
-        <p>The views' poses as a writable CUDA array over the renderer's own memory, holding the
-poses as they are: write the next step's poses into it on <code>stream</code> and call <code>step()</code>
-without poses, and nothing is copied. Map again each step. Needs poses written on the GPU
-first (a contiguous float32 CUDA array, as <code>set_poses</code> takes).</p>
+        <p>The views' poses as a writable CUDA array over the
+renderer's own memory, holding the poses as they are: write
+the next step's poses into it on <code>stream</code> and call <code>step()</code>
+without poses, and nothing is copied. Map again each step.
+Needs poses written on the GPU first (a contiguous float32
+CUDA array, as <code>set_poses</code> takes).</p>
 
 
     </div>
@@ -672,9 +683,11 @@ first (a contiguous float32 CUDA array, as <code>set_poses</code> takes).</p>
 
     <div class="doc doc-contents ">
 
-        <p>Sets every view's camera-to-world pose under the camera's parent: a (views, 4, 4)
-array in the math convention (translation in the last column) from any DLPack framework.
-Contiguous float32 CUDA arrays stay on the GPU, copied after the work queued on <code>stream</code>.</p>
+        <p>Sets every view's camera-to-world pose under the camera's
+parent: a (views, 4, 4) array in the math convention
+(translation in the last column) from any DLPack framework.
+Contiguous float32 CUDA arrays stay on the GPU, copied after
+the work queued on <code>stream</code>.</p>
 
 
     </div>
@@ -693,9 +706,11 @@ Contiguous float32 CUDA arrays stay on the GPU, copied after the work queued on 
 
     <div class="doc doc-contents ">
 
-        <p>Sets the world each view sees (<code>tokens.WORLD</code> of the environments' prims): a (views,)
-int32 array, -1 for every world. A CUDA array is copied to the host once per write, after
-the work queued on <code>stream</code>, for planning the views' shadows.</p>
+        <p>Sets the world each view sees (<code>tokens.WORLD</code> of the
+environments' prims): a (views,) int32 array, -1 for every
+world. A CUDA array is copied to the host once per write,
+after the work queued on <code>stream</code>, for planning the views'
+shadows.</p>
 
 
     </div>
@@ -716,12 +731,14 @@ the work queued on <code>stream</code>, for planning the views' shadows.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Renders a step, after setting <code>poses</code> and <code>worlds</code> when given, and returns each render
-var's observations by name.</p>
-<p>With device="cuda", the arrays are in GPU memory (DLPack, e.g. torch.from_dlpack) and the
-call returns once the step is submitted: work queued on CUDA stream <code>stream</code> (a CUstream
-handle or DLPack stream number, default the legacy stream) after it sees the finished
-render. With device="cpu", it waits for the render and returns NumPy arrays.</p>
+        <p>Renders a step, after setting <code>poses</code> and <code>worlds</code> when
+given, and returns each render var's observations by name.</p>
+<p>With device="cuda", the arrays are in GPU memory (DLPack, e.g.
+torch.from_dlpack) and the call returns once the step is
+submitted: work queued on CUDA stream <code>stream</code> (a CUstream
+handle or DLPack stream number, default the legacy stream)
+after it sees the finished render. With device="cpu", it waits
+for the render and returns NumPy arrays.</p>
 
 
     </div>

@@ -216,14 +216,20 @@
 namespace ernie {
 
 struct DetailSettings {
-    float tileSize = 4.0f;        
-    float albedoStrength = 1.0f;  
-    float normalStrength = 1.0f;  
+    float tileSize =
+        4.0f;  
+    float albedoStrength =
+        1.0f;  
+    float normalStrength =
+        1.0f;  
     bool directXNormals = false;  
-    bool hexTiling = true;        
-    float hexRotation = 1.0f;     
-    float hexContrast = 0.6f;     
-    float hexSharpness = 7.0f;    
+    bool hexTiling =
+        true;  
+    float hexRotation =
+        1.0f;  
+    float hexContrast = 0.6f;  
+    float hexSharpness =
+        7.0f;  
 };
 
 enum class TextureWrap { Repeat, Mirror, Clamp, Black };
@@ -238,7 +244,7 @@ struct TextureReader {
     std::string file;   
     std::string image;  
     std::string uvSet = &quot;st&quot;;  
-    int channel = -1;          
+    int channel = -1;  
     TextureWrap wrapS = TextureWrap::Repeat;
     TextureWrap wrapT = TextureWrap::Repeat;
     TextureColorSpace colorSpace = TextureColorSpace::Auto;
@@ -254,11 +260,13 @@ struct TextureReader {
 };
 
 struct MaterialSettings {
-    std::string brdf = &quot;lambert&quot;;   
-    std::vector&lt;float&gt; brdfParams;  
+    std::string brdf = &quot;lambert&quot;;  
+    std::vector&lt;float&gt;
+        brdfParams;  
     glm::vec3 albedo{1.0f};  
     Spectrum reflectance;
-    bool useAlbedoMap = true;  
+    bool useAlbedoMap =
+        true;  
     DetailSettings detail;
     std::optional&lt;TextureReader&gt; albedoTexture;
     std::optional&lt;TextureReader&gt; normalTexture;

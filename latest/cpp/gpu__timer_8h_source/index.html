@@ -215,7 +215,8 @@ namespace ernie {
 
 class GpuTimer {
   public:
-    GpuTimer(VkDevice device, std::uint32_t timestampBits, float periodNs);
+    GpuTimer(VkDevice device, std::uint32_t timestampBits,
+             float periodNs);
     ~GpuTimer();
     GpuTimer(const GpuTimer&amp;) = delete;
     GpuTimer&amp; operator=(const GpuTimer&amp;) = delete;
@@ -242,8 +243,10 @@ class GpuTimer {
     double periodNs_ = 1.0;
     std::mutex mutex_;
     std::vector&lt;Pending&gt; pending_;
-    std::vector&lt;std::uint32_t&gt; free_;  
-    std::uint32_t depth_ = 0;          
+    std::vector&lt;std::uint32_t&gt;
+        free_;  
+    std::uint32_t depth_ =
+        0;  
 };
 
 }  // namespace ernie

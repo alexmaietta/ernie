@@ -235,8 +235,10 @@ struct Image {
     std::vector&lt;glm::vec4&gt; pixels;
 
     Image() = default;
-    Image(std::uint32_t w, std::uint32_t h, const glm::vec4&amp; fill = glm::vec4(0.0f))
-        : width(w), height(h), pixels(static_cast&lt;std::size_t&gt;(w) * h, fill) {}
+    Image(std::uint32_t w, std::uint32_t h,
+          const glm::vec4&amp; fill = glm::vec4(0.0f))
+        : width(w), height(h),
+          pixels(static_cast&lt;std::size_t&gt;(w) * h, fill) {}
 
     glm::vec4&amp; At(std::uint32_t x, std::uint32_t y) {
         return pixels[static_cast&lt;std::size_t&gt;(y) * width + x];
@@ -249,14 +251,16 @@ struct Image {
     glm::vec4 Mean() const;
 };
 
-Image LoadImageFile(const std::filesystem::path&amp; path, ImageEncoding encoding);
+Image LoadImageFile(const std::filesystem::path&amp; path,
+                    ImageEncoding encoding);
 
 float SrgbToLinear(float value);
 float LinearToSrgb(float value);
 
 std::vector&lt;Image&gt; MipChain(const Image&amp; image, MipFilter filter);
 
-std::vector&lt;std::uint8_t&gt; ToRgba8(const Image&amp; image, ImageEncoding encoding);
+std::vector&lt;std::uint8_t&gt; ToRgba8(const Image&amp; image,
+                                  ImageEncoding encoding);
 
 }  // namespace ernie
 </code></pre>
