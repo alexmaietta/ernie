@@ -621,6 +621,14 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            jitter (ernie.IsdFrame.jitter)" href="#ernie.IsdFrame.jitter">jitter</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The rolling shutter's jitter (line, sample) in pixels at image line <code>line</code>, as usgscsm's <code>removeJitter</code> takes it; (0, 0) when the ISD has no <code>jitter</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            position (ernie.IsdFrame.position)" href="#ernie.IsdFrame.position">position</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -915,6 +923,25 @@
     <div class="doc doc-contents ">
 
         <p>Where pixel (<code>line</code>, <code>sample</code>)'s ray first meets the body's ellipsoid raised by <code>height</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdFrame.jitter" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">jitter</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">jitter(line: float) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The rolling shutter's jitter (line, sample) in pixels at image line <code>line</code>, as usgscsm's <code>removeJitter</code> takes it; (0, 0) when the ISD has no <code>jitter</code>.</p>
 
 
     </div>
@@ -2192,6 +2219,7 @@
     <script>var base_url = "../../..";</script>
     <script src="../../../js/theme_extra.js"></script>
     <script src="../../../js/theme.js"></script>
+      <script src="../../../js/sidebar.js"></script>
       <script src="../../../search/main.js"></script>
       <script src="../../../js/version-select.js"></script>
     <script>

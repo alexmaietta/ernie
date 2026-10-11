@@ -286,6 +286,10 @@
 <td style="text-align: left;"><a href="#function-getviewer"><strong>GetViewer</strong></a> () <br><em>The viewer, or null without one.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-gui"><strong>Gui</strong></a> () <br><em>Draws the demo's own controls with Dear ImGui (</em> <code>#include &lt;imgui.h&gt;</code> <em>) in the Demos panel's Options section each frame, after its</em><code>Widgets</code> <em>, as Newton's examples'</em><code>gui(ui)</code> <em>does; nothing by default.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp;</td>
 <td style="text-align: left;"><a href="#function-image"><strong>Image</strong></a> () const<br><em>The last frame rendered without a viewer (</em> <code>Render</code> <em>), LdrColor uint8 (rows, cols, 4); empty in a viewer.</em></td>
 </tr>
@@ -322,6 +326,10 @@
 <td style="text-align: left;"><a href="#function-sharedrenderer"><strong>SharedRenderer</strong></a> () <br><code>GetRenderer</code> <em>shared, for holders that may outlive the demo, such as its Python wrapper.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::shared_ptr&lt; <a href="../classernie_1_1app_1_1WidgetPanel/"><strong>WidgetPanel</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-sharedwidgets"><strong>SharedWidgets</strong></a> () <br><code>Widgets</code> <em>shared, for holders that may outlive the demo, such as its Python wrapper.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">virtual void</td>
 <td style="text-align: left;"><a href="#function-step"><strong>Step</strong></a> () <br><em>Advances the scene by</em> <code>frameDt</code> <em>seconds; nothing by default, for a still scene.</em></td>
 </tr>
@@ -336,6 +344,10 @@
 <tr>
 <td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#function-untested"><strong>Untested</strong></a> () const<br><em>Whether a</em> <code>--test</code> <em>run found no checks: neither</em><code>TestPostStep</code> <em>nor</em><code>TestFinal</code> <em>is overridden.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1app_1_1WidgetPanel/"><strong>WidgetPanel</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-widgets"><strong>Widgets</strong></a> () <br><em>The demo's controls in the Demos panel's Options section, as widgets (sliders, checkboxes, combos) rather than ImGui calls, as Python demos add theirs (</em> <code>widgets</code> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="./"><strong>Demo</strong></a> &amp;</td>
@@ -448,6 +460,13 @@
 </code></pre>
 <hr>
 
+<h3 id="function-gui">function Gui</h3>
+<p><em>Draws the demo's own controls with Dear ImGui (</em> <code>#include &lt;imgui.h&gt;</code> <em>) in the Demos panel's Options section each frame, after its</em><code>Widgets</code> <em>, as Newton's examples'</em><code>gui(ui)</code> <em>does; nothing by default.</em></p>
+<pre><code class="language-C++">virtual void ernie::app::Demo::Gui () 
+</code></pre>
+<p>Runs only in a viewer. </p>
+<hr>
+
 <h3 id="function-image">function Image</h3>
 <p><em>The last frame rendered without a viewer (</em> <code>Render</code> <em>), LdrColor uint8 (rows, cols, 4); empty in a viewer.</em></p>
 <pre><code class="language-C++">const Tensor &amp; ernie::app::Demo::Image () const
@@ -508,6 +527,12 @@
 </code></pre>
 <hr>
 
+<h3 id="function-sharedwidgets">function SharedWidgets</h3>
+<p><code>Widgets</code> <em>shared, for holders that may outlive the demo, such as its Python wrapper.</em></p>
+<pre><code class="language-C++">std::shared_ptr&lt; WidgetPanel &gt; ernie::app::Demo::SharedWidgets () 
+</code></pre>
+<hr>
+
 <h3 id="function-step">function Step</h3>
 <p><em>Advances the scene by</em> <code>frameDt</code> <em>seconds; nothing by default, for a still scene.</em></p>
 <pre><code class="language-C++">virtual void ernie::app::Demo::Step () 
@@ -532,6 +557,13 @@
 <pre><code class="language-C++">bool ernie::app::Demo::Untested () const
 </code></pre>
 <p>Meaningful once <code>TestFinal</code> has run. </p>
+<hr>
+
+<h3 id="function-widgets">function Widgets</h3>
+<p><em>The demo's controls in the Demos panel's Options section, as widgets (sliders, checkboxes, combos) rather than ImGui calls, as Python demos add theirs (</em> <code>widgets</code> <em>).</em></p>
+<pre><code class="language-C++">WidgetPanel &amp; ernie::app::Demo::Widgets () 
+</code></pre>
+<p>Add them in the constructor, with or without a viewer; the runner drops them, with their callbacks, when the demo ends or is replaced. </p>
 <hr>
 
 <h3 id="function-operator">function operator=</h3>
@@ -583,6 +615,7 @@
     <script>var base_url = "../..";</script>
     <script src="../../js/theme_extra.js"></script>
     <script src="../../js/theme.js"></script>
+      <script src="../../js/sidebar.js"></script>
       <script src="../../search/main.js"></script>
       <script src="../../js/version-select.js"></script>
     <script>

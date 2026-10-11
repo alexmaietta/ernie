@@ -217,7 +217,7 @@
 <tbody>
 <tr>
 <td style="text-align: right;">glm::dvec2</td>
-<td style="text-align: left;"><a href="#function-groundtoimage"><strong>GroundToImage</strong></a> (const glm::dvec3 &amp; ground) const<br><em>The image coordinates (line, sample) of body-fixed point</em> <code>ground</code> <em>.</em></td>
+<td style="text-align: left;"><a href="#function-groundtoimage"><strong>GroundToImage</strong></a> (const glm::dvec3 &amp; ground) const<br><em>The image coordinates (line, sample) of body-fixed point</em> <code>ground</code> <em>, the jitter added by fixed-point iteration as usgscsm's</em><code>addJitter</code> <em>(to 1e-10 pixels).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">double</td>
@@ -232,8 +232,12 @@
 <td style="text-align: left;"><a href="#function-isdframe"><strong>IsdFrame</strong></a> (<a href="../structernie_1_1IsdSensor/"><strong>IsdSensor</strong></a> isd) <br></td>
 </tr>
 <tr>
+<td style="text-align: right;">glm::dvec2</td>
+<td style="text-align: left;"><a href="#function-jitter"><strong>Jitter</strong></a> (double line) const<br><em>The rolling shutter's jitter (line, sample) at image line</em> <code>line</code> <em>, pixels, as usgscsm's</em><code>removeJitter</code> <em>takes it: the polynomials at the exposure time of line round(</em><code>line</code> <em>) (clamped to the ISD's lines); zero without jitter.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">glm::dvec3</td>
-<td style="text-align: left;"><a href="#function-look"><strong>Look</strong></a> (double line, double sample) const<br><em>The unit body-fixed direction of pixel (</em> <code>line</code> <em>,</em><code>sample</code> <em>)'s ray.</em></td>
+<td style="text-align: left;"><a href="#function-look"><strong>Look</strong></a> (double line, double sample) const<br><em>The unit body-fixed direction of pixel (</em> <code>line</code> <em>,</em><code>sample</code> <em>)'s ray, its jitter removed.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1IsdCameraModel_1_1FrameView/"><strong>FrameView</strong></a></td>
@@ -362,11 +366,12 @@
 </tbody>
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
-<p>Unlike the line scanner, the camera looks along (x, y, f) in the sensor's frame, and a ray meets the ellipsoid at its first intersection along it. Rolling-shutter jitter (<code>jitter</code>) is not read.</p>
-<p>Reference: usgscsm's <code>UsgsAstroFrameSensorModel</code> (<code>imageToGround</code>, <code>groundToImage</code>, <code>losEllipsoidIntersect</code>, <code>constructStateFromIsd</code>). </p>
+<p>Unlike the line scanner, the camera looks along (x, y, f) in the sensor's frame, and a ray meets the ellipsoid at its first intersection along it. A rolling shutter's jitter (<code>jitter</code>), as usgscsm models it, moves each image line's pixels by an offset polynomial in the line's exposure time, the pose left at the centre time: image coordinates less the jitter are the unjittered camera's.</p>
+<p>References:
+* usgscsm's <code>UsgsAstroFrameSensorModel</code> (<code>imageToGround</code>, <code>groundToImage</code>, <code>losEllipsoidIntersect</code>, <code>constructStateFromIsd</code>), and its src/Utilities.cpp (<code>removeJitter</code>, <code>addJitter</code>). </p>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
 <h3 id="function-groundtoimage">function GroundToImage</h3>
-<p><em>The image coordinates (line, sample) of body-fixed point</em> <code>ground</code> <em>.</em></p>
+<p><em>The image coordinates (line, sample) of body-fixed point</em> <code>ground</code> <em>, the jitter added by fixed-point iteration as usgscsm's</em><code>addJitter</code> <em>(to 1e-10 pixels).</em></p>
 <pre><code class="language-C++">glm::dvec2 ernie::IsdFrame::GroundToImage (
     const glm::dvec3 &amp; ground
 ) const
@@ -400,8 +405,16 @@
 </ul>
 <hr>
 
+<h3 id="function-jitter">function Jitter</h3>
+<p><em>The rolling shutter's jitter (line, sample) at image line</em> <code>line</code> <em>, pixels, as usgscsm's</em><code>removeJitter</code> <em>takes it: the polynomials at the exposure time of line round(</em><code>line</code> <em>) (clamped to the ISD's lines); zero without jitter.</em></p>
+<pre><code class="language-C++">glm::dvec2 ernie::IsdFrame::Jitter (
+    double line
+) const
+</code></pre>
+<hr>
+
 <h3 id="function-look">function Look</h3>
-<p><em>The unit body-fixed direction of pixel (</em> <code>line</code> <em>,</em><code>sample</code> <em>)'s ray.</em></p>
+<p><em>The unit body-fixed direction of pixel (</em> <code>line</code> <em>,</em><code>sample</code> <em>)'s ray, its jitter removed.</em></p>
 <pre><code class="language-C++">glm::dvec3 ernie::IsdFrame::Look (
     double line,
     double sample
@@ -413,6 +426,7 @@
 <p><em>The image as Ernie renders it: a frame camera of the image's samples by its lines, its exposure left as authored (frame ISDs carry none).</em> </p>
 <pre><code class="language-C++">FrameView ernie::IsdFrame::View () const
 </code></pre>
+<p>The jitter is a shift of each line's pixels, which Ernie's camera cannot take exactly: a rolling shutter (<code>rollingShutter</code>) moves the pose linearly across the rows, while usgscsm keeps the pose and moves the pixels by a polynomial in time. So its midrange over the lines moves the principal point and the rest, half its range, is added to <code>distortionResidualPixels</code>. </p>
 <hr>
 
 <hr />
@@ -452,6 +466,7 @@
     <script>var base_url = "../..";</script>
     <script src="../../js/theme_extra.js"></script>
     <script src="../../js/theme.js"></script>
+      <script src="../../js/sidebar.js"></script>
       <script src="../../search/main.js"></script>
       <script src="../../js/version-select.js"></script>
     <script>

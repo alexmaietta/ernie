@@ -224,7 +224,7 @@ python -m ernie.demos --list
 python -m ernie.demos lighting/illuminants    # one by name, with its options after it
 </code></pre>
 <p>From a checkout, run the files themselves (<code>PYTHONPATH=build/python python demos/lighting/illuminants.py</code>), or a C++ demo's own program, which <code>-DERNIE_BUILD_DEMOS=ON</code> builds as <code>demo_&lt;category&gt;_&lt;name&gt;</code> (<code>build/bin/demo_lighting_illuminants</code>).</p>
-<p>Each opens the viewer with a Demos panel on the left. Its menu lists the demos in the same language, by category; choosing one clears the scene and builds that demo in the same window. The panel also pauses, single-steps and resets the demo.</p>
+<p>Each opens the viewer with a Demos panel at the bottom, a tab beside the Log and Stats. It lists the demos in the same language under a collapsing header per category; choosing one clears the scene and builds that demo in the same window. Below the list it pauses, single-steps and resets the running demo, describes it, and shows its options.</p>
 <p>Every demo takes these options:</p>
 <table>
 <thead>
@@ -310,10 +310,9 @@ class Demo(ernie.demo.Demo):
             tokens.TRANSFORM, ernie.distant_light_transform((0.4, -0.6, 0.7)))
         world.define(&quot;Camera&quot;, ernie.Camera).set(
             tokens.TRANSFORM, ernie.look_at_transform((0, -8, 3), (0, 0, 0.5)))
-        if viewer is not None:
-            panel = viewer.add_panel(&quot;Ball&quot;)
-            panel.slider(&quot;Radius&quot;, 0.1, 2.0, 0.5,
-                         on_change=lambda value: self.ball.set(radius=value))
+        # The demo's options, shown in the Demos panel.
+        self.widgets.slider(&quot;Radius&quot;, 0.1, 2.0, 0.5,
+                            on_change=lambda value: self.ball.set(radius=value))
 
     def step(self):
         self.ball.set(translate=(2.0 * self.time, 0, 0.5))
@@ -327,7 +326,8 @@ if __name__ == &quot;__main__&quot;:
 </code></pre>
 <p>What to know:</p>
 <ul>
-<li><code>viewer</code> is <code>None</code> under <code>--viewer null</code>, so put panels and other viewer calls under <code>if viewer is not None</code>. Give the scene a camera of its own: without a viewer, and in tests, the scene renders through it.</li>
+<li>A demo's own controls go in the Demos panel's Options section: add widgets to <code>self.widgets</code> (sliders, checkboxes, combos, buttons, plots), which works with or without a viewer. C++ demos can also override <code>Gui()</code> and draw there with Dear ImGui, as Newton's examples' <code>gui(ui)</code> does.</li>
+<li><code>viewer</code> is <code>None</code> under <code>--viewer null</code>, so put other viewer calls (such as <code>active_camera</code>) under <code>if viewer is not None</code>. Give the scene a camera of its own: without a viewer, and in tests, the scene renders through it.</li>
 <li>In a window <code>frame_dt</code> is the real time since the last frame (at most <code>max_frame_dt</code>). Without one it is <code>fixed_dt</code>, so runs repeat exactly. <code>self.time</code> is the demo's clock at the start of the step.</li>
 <li>A demo uses the viewer as any application does: <code>add_panel</code>, <code>on_frame</code>, <code>add_hud_item</code>, <code>active_camera</code>, <code>viewport_display</code>. A demo registers in a scope of its own (<code>Viewer.scope</code>), so when the Demos panel switches away, what it added is removed, and the viewport's display settings are restored. A camera, lighting or RenderSettings it chooses is kept over the viewer's reset of its session.</li>
 <li>Add your own options by overriding the class method <code>create_parser</code>, adding to what <code>super().create_parser()</code> returns. Give every option a default: the Demos panel opens demos with their defaults.</li>
@@ -347,7 +347,7 @@ class BallDemo : public ernie::app::Demo {
         : Demo(viewer, options) {
         numFrames = 120;
         ernie::Sphere::Define(GetScene(), &quot;/World/Ball&quot;).SetRadius(0.5);
-        // ... a sun and a camera, and a panel when GetViewer() is not null
+        // ... a sun, a camera, and options: Widgets().Slider(...), or override Gui()
     }
 
     void Step() override {
@@ -411,6 +411,7 @@ int main(int argc, char** argv) {
     <script>var base_url = "../..";</script>
     <script src="../../js/theme_extra.js"></script>
     <script src="../../js/theme.js"></script>
+      <script src="../../js/sidebar.js"></script>
       <script src="../../search/main.js"></script>
       <script src="../../js/version-select.js"></script>
     <script>

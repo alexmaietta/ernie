@@ -4412,6 +4412,9 @@ std::array&lt; double, N &gt; ernie::SolveNormal (
 <li><code>compand</code> (pixel, digital): square-root companding from <code>inputBits</code> to <code>outputBits</code>; after <code>adc</code>.</li>
 <li><code>toneCurve</code> (pixel, display): each channel through <code>curve</code> (33 samples over 0 to 1); after <code>exposure</code>.</li>
 <li><code>spectralTransmission</code> (band): each band times <code>curve</code> (48 samples, 360 to 830 nm), a measured filter's transmission; before <code>qe</code> and <code>cie</code>.</li>
+<li><code>glare</code> (spatial, rgb; pyramid): a wide power-law halo of scattered light around bright sources in the image; after <code>cie</code>.</li>
+<li><code>flare</code> (spatial, electrons; pyramid): lens flare ghosts, the image's bright sources as defocused aperture shapes on the line through the principal point, each at its own scale, size and coating tint; after <code>qe</code>, before <code>noise</code>.</li>
+<li><code>strayLight</code> (band): the sun's light from outside the field as a veil over the image, its irradiance times the optics' point source transmittance at its angle off the axis (from the frame's sun, which the image lacks); before <code>qe</code> and <code>cie</code>.</li>
 <li><code>lag</code> (pixel, electrons; temporal): a <code>fraction</code> of each frame's charge read out with the next.</li>
 <li><code>temporalAverage</code> (pixel, rgb; temporal): an exponential moving average, <code>alpha</code> the new frame's weight. Each file's header cites its references. </li>
 </ul>
@@ -4756,6 +4759,7 @@ std::array&lt; double, N &gt; ernie::SolveNormal (
     <script>var base_url = "../..";</script>
     <script src="../../js/theme_extra.js"></script>
     <script src="../../js/theme.js"></script>
+      <script src="../../js/sidebar.js"></script>
       <script src="../../search/main.js"></script>
       <script src="../../js/version-select.js"></script>
     <script>

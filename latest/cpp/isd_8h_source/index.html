@@ -273,6 +273,10 @@ struct IsdSensor {
     bool frameletsFlipped = false;
     bool frameletOrderReversed = false;
 
+    std::vector&lt;double&gt; jitterLineTimes;
+    std::vector&lt;double&gt; lineJitter;
+    std::vector&lt;double&gt; sampleJitter;
+
     bool IsLineScanner() const;
 
     bool IsPushFrame() const;
@@ -394,6 +398,8 @@ class IsdFrame : public IsdCameraModel {
         return isd_.centerTime;
     }
 
+    glm::dvec2 Jitter(double line) const;
+
     glm::dvec3 Look(double line, double sample) const;
 
     glm::dvec3 ImageToGround(double line, double sample, double height = 0.0) const;
@@ -444,6 +450,7 @@ IsdSensor ReadIsdFile(const std::string&amp; path);
     <script>var base_url = "../..";</script>
     <script src="../../js/theme_extra.js"></script>
     <script src="../../js/theme.js"></script>
+      <script src="../../js/sidebar.js"></script>
       <script src="../../search/main.js"></script>
       <script src="../../js/version-select.js"></script>
     <script>

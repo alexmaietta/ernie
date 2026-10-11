@@ -275,6 +275,14 @@
 <td style="text-align: left;"><a href="#variable-interframedelay"><strong>interframeDelay</strong></a>   = <code>0.0</code><br></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::vector&lt; double &gt;</td>
+<td style="text-align: left;"><a href="#variable-jitterlinetimes"><strong>jitterLineTimes</strong></a>  <br><em>Frame cameras' rolling-shutter jitter, usgscsm's</em> <code>jitter</code> <em>: each image line's exposure time (</em><code>lineExposureTimes</code> <em>, line l's at index round(l) - 1, clamped to the list), and the line and sample jitter, pixels, as polynomials in that time with no constant term, highest power first (</em><code>lineJitterCoefficients</code> <em>and</em><code>sampleJitterCoefficients</code> <em>: c0 t^n + ... + c(n-1) t).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; double &gt;</td>
+<td style="text-align: left;"><a href="#variable-linejitter"><strong>lineJitter</strong></a>  <br></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::vector&lt; std::array&lt; double, 3 &gt; &gt;</td>
 <td style="text-align: left;"><a href="#variable-linerates"><strong>lineRates</strong></a>  <br><em>Line scanners' timing,</em> <code>line_scan_rate</code> <em>: from each start line on, (start line, its time relative to</em><code>centerTime</code> <em>, seconds per line).</em></td>
 </tr>
@@ -305,6 +313,10 @@
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1IsdSamples/"><strong>IsdSamples</strong></a>&lt; glm::dvec3 &gt;</td>
 <td style="text-align: left;"><a href="#variable-positions"><strong>positions</strong></a>  <br><em>The sensor's and the sun's positions and velocities relative to the body's centre, in</em> <code>positionFrame</code> <em>(1 is J2000), metres and metres per second.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; double &gt;</td>
+<td style="text-align: left;"><a href="#variable-samplejitter"><strong>sampleJitter</strong></a>  <br></td>
 </tr>
 <tr>
 <td style="text-align: right;">double</td>
@@ -460,6 +472,18 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-jitterlinetimes">variable jitterLineTimes</h3>
+<p><em>Frame cameras' rolling-shutter jitter, usgscsm's</em> <code>jitter</code> <em>: each image line's exposure time (</em><code>lineExposureTimes</code> <em>, line l's at index round(l) - 1, clamped to the list), and the line and sample jitter, pixels, as polynomials in that time with no constant term, highest power first (</em><code>lineJitterCoefficients</code> <em>and</em><code>sampleJitterCoefficients</code> <em>: c0 t^n + ... + c(n-1) t).</em></p>
+<pre><code class="language-C++">std::vector&lt;double&gt; ernie::IsdSensor::jitterLineTimes;
+</code></pre>
+<p>Empty when the ISD has none. </p>
+<hr>
+
+<h3 id="variable-linejitter">variable lineJitter</h3>
+<pre><code class="language-C++">std::vector&lt;double&gt; ernie::IsdSensor::lineJitter;
+</code></pre>
+<hr>
+
 <h3 id="variable-linerates">variable lineRates</h3>
 <p><em>Line scanners' timing,</em> <code>line_scan_rate</code> <em>: from each start line on, (start line, its time relative to</em><code>centerTime</code> <em>, seconds per line).</em></p>
 <pre><code class="language-C++">std::vector&lt;std::array&lt;double, 3&gt; &gt; ernie::IsdSensor::lineRates;
@@ -501,6 +525,11 @@
 <h3 id="variable-positions">variable positions</h3>
 <p><em>The sensor's and the sun's positions and velocities relative to the body's centre, in</em> <code>positionFrame</code> <em>(1 is J2000), metres and metres per second.</em></p>
 <pre><code class="language-C++">IsdSamples&lt;glm::dvec3&gt; ernie::IsdSensor::positions;
+</code></pre>
+<hr>
+
+<h3 id="variable-samplejitter">variable sampleJitter</h3>
+<pre><code class="language-C++">std::vector&lt;double&gt; ernie::IsdSensor::sampleJitter;
 </code></pre>
 <hr>
 
@@ -611,6 +640,7 @@
     <script>var base_url = "../..";</script>
     <script src="../../js/theme_extra.js"></script>
     <script src="../../js/theme.js"></script>
+      <script src="../../js/sidebar.js"></script>
       <script src="../../search/main.js"></script>
       <script src="../../js/version-select.js"></script>
     <script>
