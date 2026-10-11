@@ -1,0 +1,46 @@
+# Each CI run on main, recorded: its wall time, its jobs' and their build and test steps' times, and
+# from the Ninja logs the compile time, compile count and ccache miss rate, kept on gh-pages under
+# dev/ci with charts (https://alexmaietta.github.io/ernie/dev/ci/). A metric 30% worse than the last
+# run's gets a commit comment.
+name: CI metrics
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  record:
+    if: github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pattern: ninja-log-*
+          path: ninja-logs
+      - name: Collect the metrics
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 .github/scripts/ci_metrics.py "${{ github.event.workflow_run.id }}" ninja-logs metrics.json
+      - uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: CI
+          tool: customSmallerIsBetter
+          output-file-path: metrics.json
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: dev/ci
+          ref: ${{ github.event.workflow_run.head_sha }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          alert-threshold: "130%"
+          comment-on-alert: true
+          fail-on-alert: false
+          max-items-in-chart: 200

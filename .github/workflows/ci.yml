@@ -115,6 +115,20 @@ jobs:
           "-DPython_EXECUTABLE=$PWD/.venv/bin/python"
       - name: Build
         run: cmake --build build --parallel "$(nproc)"
+      # For the CI metrics (ci-metrics.yml): every compile's and link's time, and ccache's hits.
+      - name: Compiler cache statistics
+        if: always()
+        run: ccache --print-stats > build/ccache-stats.tsv || true
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ninja-log-test-${{ matrix.compiler }}
+          path: |
+            build/.ninja_log
+            build/ccache-stats.tsv
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 30
       - name: Test on lavapipe
         run: |
           VK_DRIVER_FILES=$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' | head -n1)
@@ -154,6 +168,19 @@ jobs:
           -DERNIE_BUILD_TESTS=ON -DERNIE_BUILD_PYTHON=OFF -DERNIE_BUILD_APP=OFF -DERNIE_INSTALL=OFF
       - name: Build
         run: cmake --build build --parallel "$(nproc)"
+      - name: Compiler cache statistics
+        if: always()
+        run: ccache --print-stats > build/ccache-stats.tsv || true
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ninja-log-sanitize
+          path: |
+            build/.ninja_log
+            build/ccache-stats.tsv
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 30
       - name: Test on lavapipe
         env:
           ASAN_OPTIONS: detect_leaks=0
@@ -200,6 +227,14 @@ jobs:
           -DERNIE_BUILD_TESTS=ON -DERNIE_BUILD_DEMOS=ON -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
       - name: Build
         run: cmake --build build --parallel 4
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ninja-log-build-${{ matrix.os }}
+          path: build/.ninja_log
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 30
 
   # The release wheels: manylinux_2_34, one per architecture, each tested on lavapipe
   # (configuration in pyproject.toml, [tool.cibuildwheel]).
