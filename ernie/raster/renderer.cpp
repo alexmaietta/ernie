@@ -100,6 +100,7 @@ constexpr std::uint32_t kSkyDome = 1;
 constexpr std::uint32_t kSkyMap = 2;
 constexpr std::uint32_t kSkyStars = 4;
 constexpr std::uint32_t kSkyLighting = 8;
+constexpr std::uint32_t kSkyAtmosphere = 16;
 
 struct LightGpu {
     float position[4];
@@ -234,6 +235,10 @@ constexpr DescriptorBinding kShadingBindings[] = {
     {20, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {21, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {22, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {23, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {24, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {25, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {26, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
 /// shading.slang's ShadingConstants: the dispatch's model and first
@@ -2168,6 +2173,9 @@ void RasterRenderer::Update(
     if (params.dome && params.dome->visible) {
         sky_ |= kSkyDome | (hasDomeMap_ ? kSkyMap : 0u);
     }
+    if (params.atmosphere) {
+        sky_ |= kSkyAtmosphere;
+    }
     if (params.stars && starCount_ > 0) {
         sky_ |= kSkyStars;
     }
@@ -3833,7 +3841,11 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
             sampled(terrainHorizon_.heights != nullptr
                         ? *terrainHorizon_.heights
                         : *noHeights_),
-            sampled(atmosphere_->Transmittance())};
+            sampled(atmosphere_->Transmittance()),
+            sampled(atmosphere_->MultipleScattering()),
+            DescriptorResource::Of(atmosphere_->Medium()),
+            DescriptorResource::Of(atmosphere_->Densities()),
+            DescriptorResource::Of(atmosphere_->Phases())};
         // The dispatch's model and first view, and the terrain
         // horizon (none without its image).
         const auto constantsFor = [&](std::uint32_t model) {
@@ -3893,9 +3905,11 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
                                          sizeof(constants));
             vkCmdDispatch(commands, groupsX, groupsY, views);
         }
-        // The pixels no geometry covers, when the dome or stars show
-        // there; else the lens reads them as no radiance.
+        // The pixels no geometry covers, when the dome, stars or the
+        // atmosphere show there; else the lens reads them as no
+        // radiance.
         if (sky_ != 0) {
+            ERNIE_GPU_ZONE(context_, commands, "Sky");
             vkCmdBindPipeline(
                 commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                 skyPipelines_[pushbroom_ ? 1 : 0]->Handle());

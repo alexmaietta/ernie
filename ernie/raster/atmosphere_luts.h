@@ -10,6 +10,7 @@
 
 #include <memory>
 #include <optional>
+#include <vector>
 
 namespace ernie {
 
@@ -63,6 +64,20 @@ class AtmosphereLuts {
         return *multipleScattering_;
     }
 
+    /// atmosphere.slang's medium, densities and phase tables, or
+    /// small placeholders without an atmosphere.
+    const GpuBuffer& Medium() const {
+        return *medium_;
+    }
+
+    const GpuBuffer& Densities() const {
+        return *densities_;
+    }
+
+    const GpuBuffer& Phases() const {
+        return *phases_;
+    }
+
     /// The atmosphere's model from its settings (`EarthAtmosphere`,
     /// `MarsAtmosphere`).
     static AtmosphereModel ModelOf(const AtmosphereParams& params);
@@ -73,6 +88,9 @@ class AtmosphereLuts {
 
   private:
     void Upload();
+    void Placeholders();
+    std::unique_ptr<GpuBuffer>
+    Buffer(const std::vector<float>& values) const;
 
     const VulkanContext& context_;
     const ShaderCompiler& compiler_;
@@ -85,6 +103,7 @@ class AtmosphereLuts {
     std::optional<BandedAtmosphere> banded_;
     std::unique_ptr<GpuBuffer> medium_;
     std::unique_ptr<GpuBuffer> densities_;
+    std::unique_ptr<GpuBuffer> phases_;
     std::unique_ptr<GpuImage> transmittance_;
     std::unique_ptr<GpuImage> multipleScattering_;
     mutable bool stale_ = false;

@@ -33,7 +33,8 @@
 // 12 their view-projections, 13 the dome's map, 14 the stars, 15 their grid cells, 16 the map
 // that lights the scene (13's, without its sun when that is lit on its own), 17 and 18 the dome
 // occlusion, raw and filtered, 19 the terrain's horizon map, 20 the lights' profiles, 21 the
-// terrain's heights, 22 the atmosphere's transmittance table.
+// terrain's heights, 22 the atmosphere's transmittance table, 23 its multiple scattering table,
+// 24 its medium, 25 its constituents' densities, 26 their phase functions.
 //
 // References:
 // - W. Jakob and J. Hanika, "A Low-Dimensional Function Space for Efficient Spectral Upsampling",
@@ -105,6 +106,7 @@ static const uint kSkyStars = 4;  // and the stars
 // Not drawn but lighting: a dome lights the scene, visible or not (its map, or a white
 // placeholder without one, bound either way).
 static const uint kSkyLighting = 8;
+static const uint kSkyAtmosphere = 16;  // the atmosphere, over the dome and stars
 
 static const uint kMaxLights = 16;
 
@@ -717,6 +719,66 @@ float4 occlusionSlice(float3 n, float3 tangent, float3 v, float2 horizons) {
 [[vk::binding(21, 0)]] Texture2D<float> terrainHeights;
 // The atmosphere's transmittance to its top (atmosphere.slang), a layer per four bands.
 [[vk::binding(22, 0)]] Texture2DArray<float4> atmosphereTransmittance;
+[[vk::binding(23, 0)]] Texture2DArray<float4> atmosphereMultiple;
+[[vk::binding(24, 0)]] StructuredBuffer<float4> atmosphereMedium;
+[[vk::binding(25, 0)]] StructuredBuffer<float> atmosphereDensities;
+[[vk::binding(26, 0)]] StructuredBuffer<float> atmospherePhases;
+
+// Steps of the sky's march through the atmosphere per pixel.
+static const uint kSkySteps = 48;
+
+// The atmosphere between the eye at `origin` (relative to the frame's origin, metres) and the
+// dome and stars along `d`: their light dims by its transmittance and the sun's light it scatters
+// adds; the sun's disc, of `pixelSolidAngle` or larger, shows dimmed through it; and a ray that
+// meets the planet where no geometry is drawn sees its ground, a Lambertian surface of the ground
+// albedo lit by the dimmed sun.
+void atmosphereSky(inout float radiance[kMaxBands], float3 origin, float3 d,
+                   float pixelSolidAngle) {
+    if ((sh.sky.x & kSkyAtmosphere) == 0 || sh.atmosphere[1].y == 0.0) {
+        return;
+    }
+    let bands = uint(sh.range.z);
+    let bottom = sh.atmosphere[0].w;
+    let top = sh.atmosphere[1].x;
+    let sunSine = sh.atmosphere[1].z;
+    let sun = sh.sun.xyz;
+    let p = origin * 1e-3 - sh.atmosphere[0].xyz;
+    float start;
+    float end;
+    bool ground;
+    let inside = clipToAtmosphere(p, d, bottom, top, start, end, ground);
+    for (uint group = 0; group * 4 < bands; ++group) {
+        var scattered = float4(0.0);
+        var transmittance = float4(1.0);
+        var groundLight = float4(0.0);
+        if (inside) {
+            scatterAlong(atmosphereMedium, atmosphereDensities, atmospherePhases,
+                         atmosphereTransmittance, atmosphereMultiple, tableSampler, p, d, start,
+                         end, sun, sunSine, group, kSkySteps, scattered, transmittance);
+            if (ground) {
+                let hit = p + end * d;
+                let up = normalize(hit);
+                let toSun = sunTransmittance(atmosphereTransmittance, tableSampler, hit, sun,
+                                             sunSine, group, bottom, top);
+                groundLight = groundAlbedo(atmosphereMedium, group) / PI * toSun *
+                              saturate(dot(up, sun));
+            }
+        }
+        for (uint k = 0; k < 4; ++k) {
+            let band = group * 4 + k;
+            if (band >= bands) {
+                break;
+            }
+            let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;
+            let irradiance = bandValue(sh.irradiance, band);
+            let behind = ground ? irradiance * groundLight[k]
+                                : radiance[band] + irradiance * sunDisc(d, sun, sunSine,
+                                                                        wavelength,
+                                                                        pixelSolidAngle);
+            radiance[band] = behind * transmittance[k] + irradiance * scattered[k];
+        }
+    }
+}
 
 // The sun's transmittance through the atmosphere in band `band` to the point `world` (relative to
 // the frame's origin, metres); 1 without an atmosphere. The sun's irradiance is then what arrives
@@ -1382,6 +1444,10 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
             addStars(radiance, d, frame, pixelAngle,
                      pixelAngle * pixelAngle * cosine * cosine * cosine);
         }
+        let detector = 1.0 / frame.focal;
+        let offAxis = 1.0 / length(float3(x, line, 1.0));
+        atmosphereSky(radiance, origin, d,
+                      detector * detector * offAxis * offAxis * offAxis);
         for (uint band = 0; band < bands; ++band) {
             spectral[int3(id.xy, id.z * bands + band)] = radiance[band];
         }
@@ -1402,6 +1468,8 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
                     bandValue(sh.dome, band) * modulationAt(coefficients, scale, wavelength);
             }
         }
+        // Each pixel's ray starts on the near plane.
+        atmosphereSky(radiance, cameraPoint(sh.invViewProj, sh.strip, ndc, 0.0), d, 0.0);
         for (uint band = 0; band < bands; ++band) {
             spectral[int3(id.xy, id.z * bands + band)] = radiance[band];
         }
@@ -1438,6 +1506,7 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
         frame.pixel = pixel;
         addStars(radiance, d, frame, pixelAngle, solidAngle);
     }
+    atmosphereSky(radiance, sh.eye.xyz, d, solidAngle);
     for (uint band = 0; band < bands; ++band) {
         spectral[int3(id.xy, id.z * bands + band)] = radiance[band];
     }

@@ -63,9 +63,26 @@ AtmosphereLuts::AtmosphereLuts(const VulkanContext& context,
                            1.0f, false}),
       transmittance_(TableImage(context, 1, 1, 1)),
       multipleScattering_(TableImage(context, 1, 1, 1)) {
-    // The placeholders are never written; shading reads them only
-    // without an atmosphere, so their contents do not matter.
+    // The placeholder tables are never written; shading reads them
+    // only without an atmosphere, so their contents do not matter.
+    Placeholders();
     stale_ = true;
+}
+
+void AtmosphereLuts::Placeholders() {
+    const std::vector<float> zeros(8, 0.0f);
+    medium_ = Buffer(zeros);
+    densities_ = Buffer(zeros);
+    phases_ = Buffer(zeros);
+}
+
+std::unique_ptr<GpuBuffer>
+AtmosphereLuts::Buffer(const std::vector<float>& values) const {
+    auto buffer = std::make_unique<GpuBuffer>(
+        context_, values.size() * sizeof(float), kStorage,
+        BufferMemory::Upload);
+    buffer->Write(std::as_bytes(std::span(values)));
+    return buffer;
 }
 
 AtmosphereModel
@@ -101,8 +118,7 @@ void AtmosphereLuts::Set(
     vkDeviceWaitIdle(context_.Device());
     if (!params) {
         banded_.reset();
-        medium_.reset();
-        densities_.reset();
+        Placeholders();
         transmittance_ = TableImage(context_, 1, 1, 1);
         multipleScattering_ = TableImage(context_, 1, 1, 1);
         stale_ = true;
@@ -139,6 +155,8 @@ void AtmosphereLuts::Upload() {
     medium[2] = static_cast<float>(constituents);
     medium[3] = static_cast<float>(kDensitySamples);
     medium[4] = static_cast<float>(groups);
+    medium[5] = static_cast<float>(bandCount);
+    medium[6] = static_cast<float>(banded.phaseAngles);
     for (std::size_t c = 0; c < constituents; ++c) {
         const BandedConstituent& constituent = banded.constituents[c];
         const std::size_t scattering = 4 * (2 + c * 2 * groups);
@@ -163,15 +181,16 @@ void AtmosphereLuts::Upload() {
         }
     }
 
-    const auto upload = [&](const std::vector<float>& values) {
-        auto buffer = std::make_unique<GpuBuffer>(
-            context_, values.size() * sizeof(float), kStorage,
-            BufferMemory::Upload);
-        buffer->Write(std::as_bytes(std::span(values)));
-        return buffer;
-    };
-    medium_ = upload(medium);
-    densities_ = upload(densities);
+    // Each constituent's phase tables, band-major, back to back.
+    std::vector<float> phases;
+    for (const BandedConstituent& constituent : banded.constituents) {
+        phases.insert(phases.end(), constituent.phase.begin(),
+                      constituent.phase.end());
+    }
+
+    medium_ = Buffer(medium);
+    densities_ = Buffer(densities);
+    phases_ = Buffer(phases);
 }
 
 void AtmosphereLuts::Record(VkCommandBuffer commands) const {

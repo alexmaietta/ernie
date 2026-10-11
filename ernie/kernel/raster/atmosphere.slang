@@ -4,10 +4,12 @@
 // spectral bands four to a float4 ("band groups").
 //
 // The medium (`AtmosphereLuts`): `medium[0]` the bottom and top radii, the constituent count and
-// the density samples per constituent; `medium[1].x` the band groups; then per constituent its
-// scattering coefficients for each group and its absorption coefficients for each group, where
-// its density is 1; then the ground albedo for each group. `densities` holds each constituent's
-// relative density at `samples` altitudes evenly from the ground to the top.
+// the density samples per constituent; `medium[1]` the band groups, the bands and the phase table's
+// angles; then per constituent its scattering coefficients for each group and its absorption
+// coefficients for each group, where its density is 1; then the ground albedo for each group.
+// `densities` holds each constituent's relative density at `samples` altitudes evenly from the
+// ground to the top, and `phases` each constituent's phase function (sr^-1) per band, band-major,
+// at scattering angles theta_i = pi (i / (angles - 1))^2 (`PhaseCosines`).
 //
 // The transmittance table holds the transmittance from radius r along cosine mu (from the zenith)
 // to the top of the atmosphere for rays that miss the ground, in Bruneton's parameterisation,
@@ -22,9 +24,19 @@
 //   "Transmittance" and "Precomputation" (texture parameterisations).
 //   https://ebruneton.github.io/precomputed_atmospheric_scattering/
 // - S. Hillaire, "A Scalable and Production Ready Sky and Atmosphere Rendering Technique",
-//   Computer Graphics Forum 39(4):13-22, 2020, section 5.5 (multiple scattering).
-//   https://doi.org/10.1111/cgf.14050
+//   Computer Graphics Forum 39(4):13-22, 2020, sections 5.5 (multiple scattering) and 5.6 (the
+//   sky's ray march, with multiple scattering from Psi_ms). https://doi.org/10.1111/cgf.14050
+// - S. Hillaire, "Physically Based and Unified Volumetric Rendering in Frostbite", SIGGRAPH 2015
+//   Advances in Real-Time Rendering course (energy-conserving integration of in-scattering).
+// - S. Schneegans, T. Meyran, I. Ginkel, G. Zachmann and A. Gerndt, "Physically Based Real-Time
+//   Rendering of Atmospheres using Mie Theory", Computer Graphics Forum 43(2), 2024 (tabulated
+//   phase functions per constituent). https://doi.org/10.1111/cgf.15010
+// - D. Hestroffer and C. Magnan, "Wavelength dependency of the Solar limb darkening", Astronomy
+//   and Astrophysics 333:338-342, 1998 (the power law fitted to Neckel and Labs's and Pierce and
+//   Slaughter's measurements). https://ui.adsabs.harvard.edu/abs/1998A&A...333..338H
 module atmosphere;
+
+static const float kPi = 3.14159265358979;
 
 public static const uint kTransmittanceWidth = 256;
 public static const uint kTransmittanceHeight = 64;
@@ -175,4 +187,128 @@ public float4 multipleScattering(Texture2DArray<float4> table, SamplerState line
                                  float muSun, uint group, float bottom, float top) {
     let uv = multipleScatteringUv(r, muSun, bottom, top);
     return table.SampleLevel(linear, float3(uv, float(group)), 0.0);
+}
+
+// The phase function (sr^-1) of constituent `c` in band `band` at scattering cosine `nu`, linear
+// between its table's angles.
+float phaseAt(StructuredBuffer<float4> medium, StructuredBuffer<float> phases, uint c, uint band,
+              float nu) {
+    let bands = uint(medium[1].y);
+    let angles = uint(medium[1].z);
+    let u = sqrt(acos(clamp(nu, -1.0, 1.0)) / kPi);
+    let x = u * float(angles - 1);
+    let i = min(uint(x), angles - 2);
+    let base = (c * bands + min(band, bands - 1)) * angles;
+    return lerp(phases[base + i], phases[base + i + 1], x - float(i));
+}
+
+// Where a ray from `p` (km from the planet's centre) along unit `d` crosses the atmosphere: from
+// `start` to `end`, the ground or the top, and whether it ends on the ground; false if it misses
+// the atmosphere. A point below the ground starts on it.
+public bool clipToAtmosphere(float3 p, float3 d, float bottom, float top, out float start,
+                             out float end, out bool ground) {
+    start = 0.0;
+    end = 0.0;
+    ground = false;
+    let r = max(length(p), bottom);
+    let mu = dot(p, d) / max(length(p), 1e-6);
+    let toTop = r * r * (mu * mu - 1.0) + top * top;
+    if (toTop < 0.0) {
+        return false;
+    }
+    if (r > top) {
+        if (mu >= 0.0) {
+            return false;
+        }
+        start = -r * mu - sqrt(toTop);
+    }
+    end = -r * mu + sqrt(toTop);
+    let toGround = r * r * (mu * mu - 1.0) + bottom * bottom;
+    if (mu < 0.0 && toGround >= 0.0) {
+        end = max(-r * mu - sqrt(toGround), start);
+        ground = true;
+    }
+    return end > start;
+}
+
+// The light the atmosphere scatters towards `p` (km from the planet's centre) along the segment
+// from `p + start d` to `p + end d`, per unit sun irradiance (sr^-1), for band group `group`; and
+// the transmittance across it. Single scattering takes each constituent's own phase function and
+// the sun's transmittance with the planet's shadow; multiple scattering takes Psi_ms. Each step's
+// in-scattering is integrated exactly for constant coefficients. Steps crowd towards the start
+// when it is inside the atmosphere, where the air is densest along rays from the ground, and are
+// even across rays from space.
+public void scatterAlong(StructuredBuffer<float4> medium, StructuredBuffer<float> densities,
+                         StructuredBuffer<float> phases, Texture2DArray<float4> transmittanceTable,
+                         Texture2DArray<float4> multipleTable, SamplerState linear, float3 p,
+                         float3 d, float start, float end, float3 sun, float sunSine,
+                         uint group, uint steps, out float4 radiance, out float4 transmittance) {
+    let bottom = atmosphereBottom(medium);
+    let top = atmosphereTop(medium);
+    let constituents = uint(medium[0].z);
+    let groups = uint(medium[1].x);
+    let nu = dot(d, sun);
+    let crowd = start == 0.0;
+    radiance = float4(0.0);
+    transmittance = float4(1.0);
+    var previous = start;
+    for (uint s = 0; s < steps; ++s) {
+        let x = float(s + 1) / float(steps);
+        let next = start + (end - start) * (crowd ? x * x : x);
+        let step = next - previous;
+        let t = 0.5 * (previous + next);
+        previous = next;
+        let point = p + t * d;
+        let r = length(point);
+        let altitude = r - bottom;
+        float4 extinction = float4(0.0);
+        float4 scattering = float4(0.0);
+        float4 phased = float4(0.0);
+        for (uint c = 0; c < constituents; ++c) {
+            let density = densityAt(medium, densities, c, altitude);
+            let sc = density * medium[2 + c * 2 * groups + group];
+            let ab = density * medium[2 + c * 2 * groups + groups + group];
+            extinction += sc + ab;
+            scattering += sc;
+            float4 phase;
+            for (uint k = 0; k < 4; ++k) {
+                phase[k] = phaseAt(medium, phases, c, group * 4 + k, nu);
+            }
+            phased += sc * phase;
+        }
+        let up = point / r;
+        let muSun = dot(up, sun);
+        let toSun = sunTransmittance(transmittanceTable, linear, point, sun, sunSine, group, bottom,
+                                     top);
+        let multiple = multipleScattering(multipleTable, linear, r, muSun, group, bottom, top);
+        let source = phased * toSun + scattering * multiple;
+        let sample = exp(-extinction * step);
+        let fraction = select(extinction > 0.0, (1.0 - sample) / max(extinction, 1e-20),
+                              float4(step));
+        radiance += transmittance * source * fraction;
+        transmittance *= sample;
+    }
+}
+
+// The radiance of the sun's disc towards `d`, per unit irradiance (sr^-1), in band `band` of
+// `wavelength` nm: Hestroffer and Magnan's limb darkening, I(mu) / I(0) = mu^alpha with
+// alpha = -0.023 + 0.292 / lambda (um), over a disc of angular radius sine `sunSine`, normalised so
+// the disc integrates to 1 (its mean is 2 / (alpha + 2) of its centre). A disc smaller than the
+// pixel, of solid angle `pixelSolidAngle`, fills the pixel whose centre lies within the pixel's
+// own angular radius of the sun's centre, keeping its irradiance. 0 off the disc.
+public float sunDisc(float3 d, float3 sun, float sunSine, float wavelength, float pixelSolidAngle) {
+    let cosine = dot(d, sun);
+    let sine = sqrt(max(1.0 - cosine * cosine, 0.0));
+    let solidAngle = 2.0 * kPi * (1.0 - sqrt(max(1.0 - sunSine * sunSine, 0.0)));
+    if (pixelSolidAngle > solidAngle) {
+        let pixelRadius = sqrt(pixelSolidAngle / kPi);
+        return cosine > 0.0 && sine < pixelRadius ? 1.0 / pixelSolidAngle : 0.0;
+    }
+    if (cosine <= 0.0 || sine >= sunSine) {
+        return 0.0;
+    }
+    let alpha = max(-0.023 + 292.0 / wavelength, 0.0);
+    let ratio = sine / sunSine;
+    let mu = sqrt(max(1.0 - ratio * ratio, 0.0));
+    return pow(mu, alpha) * (alpha + 2.0) / (2.0 * solidAngle);
 }
