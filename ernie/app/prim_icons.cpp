@@ -213,7 +213,7 @@ void DrawPrimIcon(ImDrawList* draw, const ImVec2& corner, float size, std::strin
         Ball(draw, at, Rgb(110, 92, 140), Rgb(150, 128, 178), Rgb(206, 198, 214));
     } else if (type == kDistantLight) {
         Sun(draw, at);
-    } else if (type == kSphereLight) {
+    } else if (type == kSphereLight || type == kCylinderLight) {
         Bulb(draw, at);
     } else if (type == kRectLight || type == kDiskLight) {
         Panel(draw, at, type == kDiskLight);

@@ -150,6 +150,17 @@
     X(double, Radius, ::ernie::tokens::kRadius, 0.5,                                               \
       (::ernie::AttributeMeta{.doc = "Metres.", .group = "Shape", .max = 1000.0}))
 
+#define ERNIE_CYLINDER_LIGHT_ATTRIBUTES(X)                                                         \
+    X(double, Length, ::ernie::tokens::kLength, 1.0,                                               \
+      (::ernie::AttributeMeta{.doc = "Metres along x.", .group = "Shape", .max = 1000.0}))         \
+    X(double, Radius, ::ernie::tokens::kRadius, 0.5,                                               \
+      (::ernie::AttributeMeta{.doc = "Metres.", .group = "Shape", .max = 1000.0}))                 \
+    X(bool, TreatAsLine, ::ernie::tokens::kTreatAsLine, false,                                     \
+      (::ernie::AttributeMeta{.label = "Line",                                                     \
+                              .doc = "A hint that it may be drawn as a line; Ernie keeps its "     \
+                                     "radius.",                                                    \
+                              .group = "Shape"}))
+
 #define ERNIE_DOME_LIGHT_ATTRIBUTES(X)                                                             \
     X(std::string, TextureFile, ::ernie::tokens::kTextureFile, "",                                 \
       (::ernie::AttributeMeta{.doc = "USD's map file; not read yet: write the map as a texture.",  \
@@ -172,6 +183,7 @@
 #define ERNIE_SPHERE_LIGHT_ALL(X) ERNIE_BOUNDABLE_LIGHT_ALL(X) ERNIE_SPHERE_LIGHT_ATTRIBUTES(X)
 #define ERNIE_RECT_LIGHT_ALL(X) ERNIE_BOUNDABLE_LIGHT_ALL(X) ERNIE_RECT_LIGHT_ATTRIBUTES(X)
 #define ERNIE_DISK_LIGHT_ALL(X) ERNIE_BOUNDABLE_LIGHT_ALL(X) ERNIE_DISK_LIGHT_ATTRIBUTES(X)
+#define ERNIE_CYLINDER_LIGHT_ALL(X) ERNIE_BOUNDABLE_LIGHT_ALL(X) ERNIE_CYLINDER_LIGHT_ATTRIBUTES(X)
 // clang-format on
 
 namespace ernie {
@@ -222,6 +234,12 @@ class RectLight : public BoundableLight {
 class DiskLight : public BoundableLight {
     ERNIE_SCHEMA_BODY(DiskLight, BoundableLight, ERNIE_DISK_LIGHT_ALL)
     ERNIE_SCHEMA_DEFINE(DiskLight)
+};
+
+/// A cylinder along its x axis emitting from its side as a Lambertian emitter, not its caps.
+class CylinderLight : public BoundableLight {
+    ERNIE_SCHEMA_BODY(CylinderLight, BoundableLight, ERNIE_CYLINDER_LIGHT_ALL)
+    ERNIE_SCHEMA_DEFINE(CylinderLight)
 };
 
 /// This file's types' registry entries, bases first (`PrimTypes`).

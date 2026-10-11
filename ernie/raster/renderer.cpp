@@ -1224,7 +1224,8 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
         if (glm::length(light.direction) == 0.0f) {
             throw std::invalid_argument("A light's direction must not be zero");
         }
-        const bool area = light.type == LightType::Rect || light.type == LightType::Disk;
+        const bool area = light.type == LightType::Rect || light.type == LightType::Disk ||
+                          light.type == LightType::Cylinder;
         if (area && std::abs(glm::dot(glm::normalize(light.tangent),
                                       glm::normalize(light.direction))) > 1e-3f) {
             throw std::invalid_argument("A rect or disk light's tangent must be perpendicular to "

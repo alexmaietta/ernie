@@ -160,7 +160,7 @@ void UpdateSessionLights(Scene& scene, const glm::dmat4& cameraWorld) {
 bool HasStageLights(const Scene& scene) {
     for (const std::string_view type :
          {tokens::kDistantLight, tokens::kSphereLight, tokens::kRectLight, tokens::kDiskLight,
-          tokens::kDomeLight}) {
+          tokens::kCylinderLight, tokens::kDomeLight}) {
         for (const Path& path : scene.Prims(type)) {
             if (!IsSessionPath(path) && scene.IsVisible(path)) {
                 return true;

@@ -1245,7 +1245,8 @@ struct Viewer::State {
         const bool rect = type == tokens::kRectLight;
         const bool disk = type == tokens::kDiskLight;
         const bool distant = type == tokens::kDistantLight;
-        if (!sphere && !rect && !disk && !distant) {
+        const bool cylinder = type == tokens::kCylinderLight;
+        if (!sphere && !rect && !disk && !distant && !cylinder) {
             return false;
         }
         const double reach = 0.12 * static_cast<double>(controller.distance);
@@ -1282,6 +1283,18 @@ struct Viewer::State {
                 }
             } else {
                 overlay.Arrow(centre, centre + down * reach, style, 0.18 * reach);
+            }
+            return true;
+        }
+        if (cylinder) {
+            // Its tube: a ring at each end and four lines along it, scaled with the prim.
+            const CylinderLight light(std::as_const(scene), path);
+            const glm::dvec3 half = 0.5 * light.GetLength() * glm::length(glm::dvec3(world[0])) * x;
+            const double radius = light.GetRadius() * glm::length(glm::dvec3(world[1]));
+            overlay.Circle(centre - half, x, radius, style);
+            overlay.Circle(centre + half, x, radius, style);
+            for (const glm::dvec3 side : {y, -y, down, -down}) {
+                overlay.Line(centre - half + radius * side, centre + half + radius * side, style);
             }
             return true;
         }
@@ -1354,8 +1367,9 @@ struct Viewer::State {
         style.depth = OverlayDepth::XRay;
         if (display.lights) {
             style.color = kLampDimColor;
-            for (const std::string_view type : {tokens::kDistantLight, tokens::kSphereLight,
-                                                tokens::kRectLight, tokens::kDiskLight}) {
+            for (const std::string_view type :
+                 {tokens::kDistantLight, tokens::kSphereLight, tokens::kRectLight,
+                  tokens::kDiskLight, tokens::kCylinderLight}) {
                 for (const Path& path : scene.Prims(type)) {
                     if (!IsSessionPath(path) && !selected(path)) {
                         DrawLightGizmo(overlay, path, scene.WorldTransform(path), style);

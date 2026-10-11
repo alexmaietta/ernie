@@ -1566,6 +1566,7 @@ void BindScene(nb::module_& m) {
         {"SPHERE_LIGHT", tokens::kSphereLight},
         {"RECT_LIGHT", tokens::kRectLight},
         {"DISK_LIGHT", tokens::kDiskLight},
+        {"CYLINDER_LIGHT", tokens::kCylinderLight},
         {"DOME_LIGHT", tokens::kDomeLight},
         {"MATERIAL", tokens::kMaterial},
         {"TERRAIN", tokens::kTerrain},

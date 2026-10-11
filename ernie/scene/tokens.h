@@ -36,6 +36,7 @@ inline constexpr std::string_view kDistantLight = "DistantLight";
 inline constexpr std::string_view kSphereLight = "SphereLight";
 inline constexpr std::string_view kRectLight = "RectLight";
 inline constexpr std::string_view kDiskLight = "DiskLight";
+inline constexpr std::string_view kCylinderLight = "CylinderLight";
 inline constexpr std::string_view kDomeLight = "DomeLight";
 inline constexpr std::string_view kMaterial = "Material";
 inline constexpr std::string_view kTerrain = "Terrain";
@@ -207,6 +208,9 @@ inline constexpr std::string_view kNormalize = "inputs:normalize";
 inline constexpr std::string_view kAngle = "inputs:angle";  ///< Degrees subtended.
 inline constexpr std::string_view kRadius = "inputs:radius";
 inline constexpr std::string_view kTreatAsPoint = "treatAsPoint";  ///< bool: radius 0.
+/// A CylinderLight's length along its x axis, and whether it may be drawn as a line (a hint).
+inline constexpr std::string_view kLength = "inputs:length";
+inline constexpr std::string_view kTreatAsLine = "treatAsLine";
 /// Degrees off the axis that a light reaches, and the fraction of that angle over which it fades.
 inline constexpr std::string_view kShapingConeAngle = "inputs:shaping:cone:angle";
 inline constexpr std::string_view kShapingConeSoftness = "inputs:shaping:cone:softness";

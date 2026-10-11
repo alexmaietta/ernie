@@ -103,9 +103,9 @@ static const uint kMaxLights = 16;
 
 struct LightGpu {
     // xyz: position (sphere, rect, disk) or unit direction towards the light (distant), w: type,
-    // 0 distant, 1 sphere, 2 rect, 3 disk.
+    // 0 distant, 1 sphere, 2 rect, 3 disk, 4 cylinder.
     float4 position;
-    // xyz: unit cone axis, w: sphere radius.
+    // xyz: unit cone axis, w: sphere or cylinder radius.
     float4 axis;
     // Cosine of the cone's angle (-2 without a cone), cosine where its falloff starts, first
     // shadow view, shadow view count (0 without shadows, 1, or 6 for a cube).
@@ -115,7 +115,8 @@ struct LightGpu {
     // focus exponent (sphere, rect, disk; 0 unfocused); w: its IES profile's slot in
     // `lightProfiles` plus 1, 0 without.
     float4 shadow;
-    // Rect and disk: half width along the light's +x and half height along its +y, as vectors.
+    // Rect and disk: half width along the light's +x and half height along its +y, as vectors;
+    // a cylinder's half length along +x.
     float4 extentX;
     float4 extentY;
     // Spectral irradiance (distant, W m^-2 nm^-1), intensity (sphere, W sr^-1 nm^-1) or
@@ -241,6 +242,7 @@ float3 domeIrradiance(float3 n) {
 }
 
 static const uint kDiskSides = 16;
+static const uint kCylinderArc = 8;  // points on each end's arc of a cylinder's outline
 static const uint kMaxPolygon = kDiskSides + 1;
 
 // The vector form factor of a rect or disk light at `world` with unit normal `n`: half the sum
@@ -249,12 +251,34 @@ static const uint kMaxPolygon = kDiskSides + 1;
 // light's radiance times dot(n, V). Zero when the emitter faces away or lies below the horizon.
 float3 areaFormFactor(LightGpu light, float3 world, float3 n) {
     let centre = light.position.xyz;
-    if (dot(world - centre, light.axis.xyz) <= 0.0) {
-        return float3(0.0);
-    }
+    let type = uint(light.position.w);
     float3 polygon[kMaxPolygon];
     uint count = 0;
-    if (uint(light.position.w) == 2) {
+    if (type == 4) {
+        // A cylinder's side, by its outline from `world` (a uniformly bright surface lights a
+        // point by its outline alone): at each end the arc of the end circle facing `world`,
+        // between the tangent points, the ends joined along the side.
+        let along = normalize(light.extentX.xyz);
+        let out = world - centre;
+        let facing = out - dot(out, along) * along;
+        let distance = length(facing);
+        let radius = light.axis.w;
+        if (distance <= radius) {
+            return float3(0.0);  // inside it
+        }
+        let toward = facing / distance;
+        let across = cross(along, toward);
+        let tangent = acos(radius / distance);
+        for (uint i = 0; i < kCylinderArc; ++i) {
+            let a = tangent * (2.0 * float(i) / float(kCylinderArc - 1) - 1.0);
+            let rim = radius * (cos(a) * toward + sin(a) * across);
+            polygon[i] = centre + light.extentX.xyz + rim;
+            polygon[2 * kCylinderArc - 1 - i] = centre - light.extentX.xyz + rim;
+        }
+        count = 2 * kCylinderArc;
+    } else if (dot(world - centre, light.axis.xyz) <= 0.0) {
+        return float3(0.0);
+    } else if (type == 2) {
         polygon[0] = centre - light.extentX.xyz - light.extentY.xyz;
         polygon[1] = centre + light.extentX.xyz - light.extentY.xyz;
         polygon[2] = centre + light.extentX.xyz + light.extentY.xyz;

@@ -290,7 +290,66 @@ double CornerFormFactor(double a, double b, double h) {
     return (x / sx * std::atan(y / sx) + y / sy * std::atan(x / sy)) / (2.0 * M_PI);
 }
 
+/// Irradiance per unit radiance on the ground (normal +z) at `q` from the side of a Lambertian
+/// cylinder `length` long along x and `radius` wide, its axis `height` above the origin: the
+/// integral of cos cos / d^2 over the part of its surface that faces `q`, by brute force.
+double CylinderIrradiance(double length, double radius, double height, const glm::dvec3& q) {
+    constexpr int kAround = 720;
+    constexpr int kAlong = 800;
+    const double dPhi = 2.0 * M_PI / kAround;
+    const double dT = length / kAlong;
+    double sum = 0.0;
+    for (int i = 0; i < kAround; ++i) {
+        const double phi = (i + 0.5) * dPhi;
+        const glm::dvec3 normal(0.0, std::cos(phi), std::sin(phi));
+        for (int j = 0; j < kAlong; ++j) {
+            const glm::dvec3 p =
+                glm::dvec3(-0.5 * length + (j + 0.5) * dT, 0.0, height) + radius * normal;
+            const glm::dvec3 d = q - p;
+            const double d2 = glm::dot(d, d);
+            const double out = glm::dot(normal, d);
+            const double in = -d.z;
+            if (out > 0.0 && in > 0.0) {
+                sum += out * in / (d2 * d2);
+            }
+        }
+    }
+    return sum * radius * dPhi * dT;
+}
+
+/// The ground point (z = 0) at the centre of FlatScene's var pixel holding (`x`, `y`).
+glm::dvec3 PixelCentre(const Scene& scene, float x, float y) {
+    const auto [row, col] = PixelOf(scene, x, y);
+    const glm::mat4 inverse = glm::inverse(
+        ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize).RasterView().ViewProjection());
+    const glm::vec2 ndc((static_cast<float>(col) + 0.5f) / kVarSize * 2.0f - 1.0f,
+                        1.0f - (static_cast<float>(row) + 0.5f) / kVarSize * 2.0f);
+    glm::vec4 near = inverse * glm::vec4(ndc, 0.0f, 1.0f);
+    glm::vec4 far = inverse * glm::vec4(ndc, 1.0f, 1.0f);
+    near /= near.w;
+    far /= far.w;
+    const float t = near.z / (near.z - far.z);
+    return glm::dvec3(glm::vec3(near + t * (far - near)));
+}
+
 }  // namespace
+
+TEST_F(RasterDelegateTest, CylinderLightsLightAsTheirSidesDo) {
+    // A tube 8 m long and 2 m across, 10 m up along x, lit from its side only (no caps).
+    RasterDelegate delegate(*context_);
+    const double radiance = 1000.0 * UnitLuminanceRadiance();
+    Scene scene = AreaLightScene(tokens::kCylinderLight);
+    ernie::CylinderLight(scene, "/World/Panel").SetLength(8.0).SetRadius(1.0);
+    for (const glm::dvec2 at : {glm::dvec2(0.0, 0.0), glm::dvec2(6.0, 0.0), glm::dvec2(0.0, 6.0)}) {
+        // At the pixel's centre, which the coarse image puts up to half a pixel off `at`.
+        const glm::dvec3 centre =
+            PixelCentre(scene, static_cast<float>(at.x), static_cast<float>(at.y));
+        const double expected = 0.5 / M_PI * radiance * CylinderIrradiance(8.0, 1.0, 10.0, centre);
+        EXPECT_NEAR(RadianceAt(delegate, scene, static_cast<float>(at.x), static_cast<float>(at.y)),
+                    expected, 0.03 * expected)
+            << "at " << at.x << ", " << at.y;
+    }
+}
 
 TEST_F(RasterDelegateTest, RectAndDiskLightsMatchTheirFormFactors) {
     RasterDelegate delegate(*context_);

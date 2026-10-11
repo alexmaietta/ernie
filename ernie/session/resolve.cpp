@@ -618,7 +618,7 @@ RenderPrims ResolveRenderPrims(const Scene& scene, const Path& settings) {
     } else {
         for (const std::string_view type :
              {tokens::kDistantLight, tokens::kSphereLight, tokens::kRectLight, tokens::kDiskLight,
-              tokens::kDomeLight}) {
+              tokens::kCylinderLight, tokens::kDomeLight}) {
             for (const Path& path : scene.Prims(type)) {
                 if (!InSession(path) && scene.IsVisible(path)) {
                     candidates.push_back(path);
@@ -637,7 +637,8 @@ RenderPrims ResolveRenderPrims(const Scene& scene, const Path& settings) {
                 prims.dome = path;
             }
         } else if (type == tokens::kDistantLight || type == tokens::kSphereLight ||
-                   type == tokens::kRectLight || type == tokens::kDiskLight) {
+                   type == tokens::kRectLight || type == tokens::kDiskLight ||
+                   type == tokens::kCylinderLight) {
             prims.lights.push_back(path);
         }
     }
@@ -1043,7 +1044,8 @@ std::vector<float> SunIrradianceOf(const Scene& scene, const Path& path,
 LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBands& bands) {
     const std::string_view type = scene.TypeOf(path);
     const bool known = type == tokens::kDistantLight || type == tokens::kSphereLight ||
-                       type == tokens::kRectLight || type == tokens::kDiskLight;
+                       type == tokens::kRectLight || type == tokens::kDiskLight ||
+                       type == tokens::kCylinderLight;
     return LightParamsOf(scene, path, bands, known ? scene.WorldTransform(path) : glm::dmat4(1.0));
 }
 
@@ -1060,9 +1062,11 @@ LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBa
         light.spectrum = SunIrradianceOf(scene, path, bands);
         return light;
     }
-    if (type != kSphereLight && type != kRectLight && type != kDiskLight) {
+    if (type != kSphereLight && type != kRectLight && type != kDiskLight &&
+        type != kCylinderLight) {
         throw std::invalid_argument("'" + path.String() +
-                                    "' is not a DistantLight, SphereLight, RectLight or DiskLight");
+                                    "' is not a DistantLight, SphereLight, RectLight, DiskLight or "
+                                    "CylinderLight");
     }
     const BoundableLight emitter(scene, path);
     light.shadows = emitter.GetShadowEnable();
@@ -1080,6 +1084,34 @@ LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBa
         throw std::invalid_argument("Light '" + path.String() + "' has a degenerate transform");
     }
     light.tangent = glm::vec3(glm::normalize(x));
+    if (type == kCylinderLight) {
+        // Lambertian over its side, 2 pi r l: a power over pi times that. An illuminance facing
+        // its middle takes its silhouette as l by 2 r, close beyond a few radii. Focus and IES
+        // profiles do not shape it.
+        const CylinderLight cylinder(scene, path);
+        light.type = LightType::Cylinder;
+        light.size = glm::vec2(cylinder.GetLength() * glm::length(xAxis), 0.0f);
+        light.radius = static_cast<float>(cylinder.GetRadius() * glm::length(yAxis));
+        const double length = light.size.x;
+        const double radius = light.radius;
+        const double area = 2.0 * M_PI * radius * length;
+        if (!(area > 0.0)) {
+            throw std::invalid_argument("Light '" + path.String() + "' has no area");
+        }
+        const std::optional<std::vector<float>> pairs = SpectrumPairs(emitter);
+        if (emitter.IsPhotometric()) {
+            const auto perLux = [&](double distance) {
+                return RectLuminancePerLux(length, 2.0 * radius, distance);
+            };
+            light.spectrum = RelativeSpectrum(emitter, bands,
+                                              PhotometricAreaValue(emitter, M_PI * area, perLux));
+        } else if (emitter.HasPower() || pairs) {
+            light.spectrum = LampSpectrum(emitter, bands, pairs ? &*pairs : nullptr, M_PI * area);
+        } else {
+            light.spectrum = RelativeSpectrum(emitter, bands, LightIntensity(emitter, area));
+        }
+        return light;
+    }
     SetFocus(light, emitter, bands);
     light.profile = ProfileOf(emitter);
     if (type != kSphereLight) {

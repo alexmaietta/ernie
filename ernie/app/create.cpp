@@ -40,6 +40,7 @@ constexpr CreatableType kTypes[] = {
     {kSphereLight, "Sphere Light", "Lights", "SphereLight", "/World"},
     {kRectLight, "Rect Light", "Lights", "RectLight", "/World"},
     {kDiskLight, "Disk Light", "Lights", "DiskLight", "/World"},
+    {kCylinderLight, "Cylinder Light", "Lights", "CylinderLight", "/World"},
     {kDomeLight, "Dome Light", "Lights", "Dome", "/World"},
     {kStarField, "Star Field", "Lights", "Stars", "/World"},
     {kCamera, "Camera from View", "Cameras", "Camera", "/World"},
@@ -69,7 +70,7 @@ enum class StageLightUnits { None, Relative, Photometric };
 StageLightUnits LightUnitsOf(const Scene& scene, const Path& created) {
     StageLightUnits units = StageLightUnits::None;
     for (const std::string_view type :
-         {kDistantLight, kSphereLight, kRectLight, kDiskLight, kDomeLight}) {
+         {kDistantLight, kSphereLight, kRectLight, kDiskLight, kCylinderLight, kDomeLight}) {
         for (const Path& light : scene.Prims(type)) {
             if (light == created || IsSessionPath(light)) {
                 continue;
@@ -185,7 +186,8 @@ void AuthorDefaultPrim(Scene& scene, const Path& path, std::string_view type,
         write(kStarsDeclination, stars.declination);
         write(kStarsMagnitude, stars.magnitude);
         write(kStarsColorIndex, stars.colorIndex);
-    } else if (type == kSphereLight || type == kRectLight || type == kDiskLight) {
+    } else if (type == kSphereLight || type == kRectLight || type == kDiskLight ||
+               type == kCylinderLight) {
         // Next to photometric lights, a 100 W bulb's 1600 lumens; otherwise a radiance lighting
         // the target below it as a relative sun of 1 does: the distance squared over the area.
         constexpr double kAbove = 3.0;
@@ -198,6 +200,10 @@ void AuthorDefaultPrim(Scene& scene, const Path& path, std::string_view type,
         } else if (type == kRectLight) {
             RectLight(scene, path).SetWidth(s).SetHeight(s);
             area = s * s;
+        } else if (type == kCylinderLight) {
+            // A tube seen side on: its silhouette's area.
+            CylinderLight(scene, path).SetLength(s).SetRadius(0.05 * s);
+            area = 0.1 * s * s;
         } else {
             DiskLight(scene, path).SetRadius(0.5 * s);
             area = M_PI * 0.25 * s * s;

@@ -25,6 +25,9 @@ ERNIE_DEFINE_SCHEMA(RectLight, tokens::kRectLight, &BoundableLight::Definition()
                     "A rectangle in its xy plane emitting along -z.", ERNIE_RECT_LIGHT_ATTRIBUTES)
 ERNIE_DEFINE_SCHEMA(DiskLight, tokens::kDiskLight, &BoundableLight::Definition(), false,
                     "A disk in its xy plane emitting along -z.", ERNIE_DISK_LIGHT_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(CylinderLight, tokens::kCylinderLight, &BoundableLight::Definition(), false,
+                    "A cylinder along its x axis emitting from its side, not its caps.",
+                    ERNIE_CYLINDER_LIGHT_ATTRIBUTES)
 
 bool Light::IsPhotometric() const {
     return Has(tokens::kPhotometricIlluminance) || Has(tokens::kPhotometricIlluminanceDistance) ||
@@ -39,7 +42,8 @@ std::vector<const PrimTypeDef*> LightSchemaTypes() {
             &DomeLight::Definition(),
             &SphereLight::Definition(),
             &RectLight::Definition(),
-            &DiskLight::Definition()};
+            &DiskLight::Definition(),
+            &CylinderLight::Definition()};
 }
 
 }  // namespace ernie

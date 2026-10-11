@@ -463,6 +463,39 @@ TEST(LightParamsOf, IesProfilesShapeLightsInEveryUnit) {
     std::filesystem::remove(file);
 }
 
+TEST(LightParamsOf, CylinderLightsEmitFromTheirSides) {
+    const ernie::SpectralBands bands{380.0, 780.0, 40};
+    Scene scene;
+    const auto luminous = [&](std::string_view path) {
+        return Luminous(ernie::LightParamsOf(scene, path, bands).spectrum, bands);
+    };
+    // 2 m long, 0.25 m in radius, scaled up 2 along its length.
+    ernie::CylinderLight tube = ernie::CylinderLight::Define(scene, "/Tube")
+                                    .SetLength(1.0)
+                                    .SetRadius(0.25)
+                                    .SetIntensity(5.0)
+                                    .SetTransform(glm::scale(glm::dmat4(1.0), glm::dvec3(2, 1, 1)));
+    const LightParams params = ernie::LightParamsOf(scene, "/Tube", bands);
+    EXPECT_EQ(params.type, ernie::LightType::Cylinder);
+    EXPECT_FLOAT_EQ(params.size.x, 2.0f);
+    EXPECT_FLOAT_EQ(params.radius, 0.25f);
+    EXPECT_NEAR(params.tangent.x, 1.0f, 1e-6f) << "along its x axis";
+    EXPECT_NEAR(luminous("/Tube"), 5.0, 0.05) << "its luminance";
+    EXPECT_EQ(ernie::ResolveRenderPrims(scene, {}).lights, std::vector<Path>{Path("/Tube")});
+
+    // Normalized, over its side's area, 2 pi r l = pi m^2.
+    tube.SetNormalize(true);
+    EXPECT_NEAR(luminous("/Tube"), 5.0 / M_PI, 0.05 / M_PI);
+    // 1000 lumens from its side: over pi times its area; or 50 lux 3 m from its middle, through
+    // its 2 m by 0.5 m silhouette.
+    tube.SetPhotometricPower(1000.0);
+    EXPECT_NEAR(luminous("/Tube"), 1000.0 / (M_PI * M_PI), 0.01 * 1000.0 / (M_PI * M_PI));
+    tube.SetPhotometricIlluminance(50.0).SetPhotometricIlluminanceDistance(3.0);
+    const double luminance =
+        50.0 / OnAxisIlluminancePerLuminance({1.0, 0.25}, 3.0, [](glm::dvec2) { return true; });
+    EXPECT_NEAR(luminous("/Tube"), luminance, 0.01 * luminance);
+}
+
 TEST(LightParamsOf, FocusedLightsKeepTheirPower) {
     const ernie::SpectralBands bands{380.0, 780.0, 40};
     Scene scene;

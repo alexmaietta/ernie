@@ -154,6 +154,9 @@ enum class LightType : std::uint32_t {
                   ///< ShapingAPI): lamps and spot lights.
     Rect = 2,     ///< A one-sided Lambertian rectangle (UsdLux RectLight): panels, windows.
     Disk = 3,     ///< A one-sided Lambertian disk (UsdLux DiskLight).
+    /// A Lambertian cylinder's side (UsdLux CylinderLight): tubes, `size.x` long along `tangent`
+    /// and `radius` wide, shaded through its outline from the shaded point.
+    Cylinder = 4,
 };
 
 /// A light besides the sun, resolved for a frame from its prim (`LightParamsOf`). In the
