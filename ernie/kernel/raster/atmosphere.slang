@@ -231,6 +231,27 @@ public bool clipToAtmosphere(float3 p, float3 d, float bottom, float top, out fl
     return end > start;
 }
 
+// The part of the segment from `p` (km from the planet's centre) along unit `d` for `span` km
+// that lies inside the top of the atmosphere, from `start` to `end`; false if none does. The
+// ground does not clip it: the segment ends on a surface, which may lie below the planet's mean
+// sphere or, on a flat terrain, beyond its horizon.
+public bool clipSegment(float3 p, float3 d, float span, float top, out float start,
+                        out float end) {
+    start = 0.0;
+    end = 0.0;
+    let r = length(p);
+    let mu = dot(p, d) / max(r, 1e-6);
+    let toTop = r * r * (mu * mu - 1.0) + top * top;
+    if (toTop < 0.0) {
+        return false;
+    }
+    if (r > top) {
+        start = -r * mu - sqrt(toTop);
+    }
+    end = min(span, -r * mu + sqrt(toTop));
+    return end > max(start, 0.0);
+}
+
 // The light the atmosphere scatters towards `p` (km from the planet's centre) along the segment
 // from `p + start d` to `p + end d`, per unit sun irradiance (sr^-1), for band group `group`; and
 // the transmittance across it. Single scattering takes each constituent's own phase function and

@@ -17,6 +17,7 @@
 #include <cmath>
 #include <numbers>
 #include <optional>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -376,27 +377,32 @@ double PhaseAt(const BandedAtmosphere& air, std::size_t constituent,
            static_cast<double>(phase[at + 1]) * (x - i);
 }
 
-/// The light the air scatters along a vertical ray through the whole
-/// atmosphere, per unit sun irradiance, with the sun `elevation` up:
-/// looking straight up from the ground, or `down` from the top.
-/// Single scattering by each constituent's phase function and the
-/// reference transmittance, multiple scattering from the renderer's
-/// Psi_ms table, over 2000 steps.
+/// The light the air scatters along a vertical ray between the
+/// altitudes `low` and `high` (the whole atmosphere when `high` is
+/// negative), per unit sun irradiance, with the sun `elevation` up:
+/// looking straight up from `low`, or `down` from `high`; and its
+/// transmittance into `transmittance` when given. Single scattering
+/// by each constituent's phase function and the reference
+/// transmittance, multiple scattering from the renderer's Psi_ms
+/// table, over 2000 steps.
 double VerticalReference(const BandedAtmosphere& air,
                          const std::vector<float>& multiple, int band,
-                         double elevation, bool down) {
+                         double elevation, bool down,
+                         double low = 0.0, double high = -1.0,
+                         double* through = nullptr) {
     const double muSun = std::sin(elevation);
     // The scattering cosine between the light's way and the view's.
     const double nu = down ? -muSun : muSun;
     const double bottom = air.bottomRadius;
     const double height = air.topAltitude;
+    const double top = high < 0.0 ? height : high;
     constexpr int kSteps = 2000;
-    const double step = height / kSteps;
+    const double step = (top - low) / kSteps;
     double transmittance = 1.0;
     double radiance = 0.0;
     for (int s = 0; s < kSteps; ++s) {
         const double altitude =
-            down ? height - (s + 0.5) * step : (s + 0.5) * step;
+            down ? top - (s + 0.5) * step : low + (s + 0.5) * step;
         double extinction = 0.0;
         double scattering = 0.0;
         double phased = 0.0;
@@ -428,6 +434,9 @@ double VerticalReference(const BandedAtmosphere& air,
         radiance += transmittance * source * (1.0 - sample) /
                     std::max(extinction, 1e-30);
         transmittance *= sample;
+    }
+    if (through != nullptr) {
+        *through = transmittance;
     }
     return radiance;
 }
@@ -560,5 +569,62 @@ TEST_F(RasterDelegateTest, TheSunsDiscCarriesItsDimmedIrradiance) {
                                    static_cast<int>(band));
         EXPECT_NEAR(irradiance / expected, 1.0, 0.03)
             << "band " << band;
+    }
+}
+
+// Aerial perspective: the ground 2 km below the camera, seen through
+// the air, dims by its transmittance and gains the sun's light the
+// air scatters up on the way.
+TEST_F(RasterDelegateTest, TheAirHazesTheGroundBelow) {
+    constexpr double kElevation = 30.0;
+    const double e = kElevation * kPi / 180.0;
+    const double height = 2000.0;
+    const auto render = [&](bool atmosphere) {
+        Scene scene = FlatScene();
+        scene.Set("/World/Sun", tokens::kTransform,
+                  ernie::DistantLightTransform(
+                      {std::cos(e), 0.0, std::sin(e)}));
+        scene.Set("/World/Camera", tokens::kTransform,
+                  ernie::LookAtTransform({0.0, 0.0, height},
+                                         {0.0, 0.0, 0.0},
+                                         {0.0, 1.0, 0.0}));
+        if (atmosphere) {
+            ernie::Atmosphere::Define(scene, "/World/Air");
+        }
+        RasterDelegate delegate(*context_);
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        std::vector<double> spectrum =
+            SpectrumAt(outputs, kVarSize / 2, kVarSize / 2);
+        std::optional<BandedAtmosphere> air;
+        std::vector<float> multiple;
+        if (atmosphere) {
+            const ernie::AtmosphereLuts& tables =
+                delegate.Renderer().AtmosphereTables();
+            air = tables.Banded();
+            multiple =
+                TableOf(*context_, tables.MultipleScattering());
+        }
+        return std::make_tuple(
+            spectrum, air, multiple,
+            ernie::SunIrradianceOf(scene, "/World/Sun",
+                                   air ? air->bands
+                                       : ernie::SpectralBands{}));
+    };
+    const auto [clear, none, noTable, noSun] = render(false);
+    const auto [hazed, air, multiple, sun] = render(true);
+    ASSERT_TRUE(air.has_value());
+    for (std::size_t b = 0; b < clear.size(); ++b) {
+        const int band = static_cast<int>(b);
+        // The ground itself under the dimmed sun, then the air
+        // between.
+        const double toSun = air->TransmittanceToTop(
+            air->bottomRadius, std::sin(e), band);
+        double through = 1.0;
+        const double scattered = VerticalReference(
+            *air, multiple, band, e, true, 0.0, height, &through);
+        const double expected =
+            clear[b] * toSun * through +
+            static_cast<double>(sun[b]) * scattered;
+        EXPECT_NEAR(hazed[b] / expected, 1.0, 0.02) << "band " << b;
     }
 }

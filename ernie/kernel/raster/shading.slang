@@ -724,8 +724,59 @@ float4 occlusionSlice(float3 n, float3 tangent, float3 v, float2 horizons) {
 [[vk::binding(25, 0)]] StructuredBuffer<float> atmosphereDensities;
 [[vk::binding(26, 0)]] StructuredBuffer<float> atmospherePhases;
 
-// Steps of the sky's march through the atmosphere per pixel.
+// Steps of the sky's march through the atmosphere per pixel, and of the aerial perspective's
+// between the eye and a surface.
 static const uint kSkySteps = 48;
+static const uint kAerialSteps = 32;
+
+// Aerial perspective: the atmosphere between the eye and the surface point `world` (relative to
+// the frame's origin, metres) seen through the pixel at `ndc`. Per band, the transmittance across
+// it and the sun's light it scatters towards the eye, per unit irradiance; 1 and 0 without an
+// atmosphere. The eye is the camera's centre, the near plane's point for an orthographic camera,
+// or the row's pose for a pushbroom.
+void aerialPerspective(float3 world, float2 ndc, out float transmittance[kMaxBands],
+                       out float scattered[kMaxBands]) {
+    let bands = uint(sh.range.z);
+    for (uint band = 0; band < kMaxBands; ++band) {
+        transmittance[band] = 1.0;
+        scattered[band] = 0.0;
+    }
+    if (sh.atmosphere[1].y == 0.0) {
+        return;
+    }
+    float3 eye;
+    if (kPushbroomCamera) {
+        float3 ray;
+        cameraRayThrough(sh.invViewProj, sh.strip, ndc, eye, ray);
+    } else if (sh.range.w != 0.0) {
+        eye = cameraPoint(sh.invViewProj, sh.strip, ndc, 0.0);
+    } else {
+        eye = sh.eye.xyz;
+    }
+    let toSurface = (world - eye) * 1e-3;
+    let span = length(toSurface);
+    if (span <= 0.0) {
+        return;
+    }
+    let p = eye * 1e-3 - sh.atmosphere[0].xyz;
+    let d = toSurface / span;
+    float start;
+    float end;
+    if (!clipSegment(p, d, span, sh.atmosphere[1].x, start, end)) {
+        return;
+    }
+    for (uint group = 0; group * 4 < bands; ++group) {
+        float4 light;
+        float4 through;
+        scatterAlong(atmosphereMedium, atmosphereDensities, atmospherePhases,
+                     atmosphereTransmittance, atmosphereMultiple, tableSampler, p, d, max(start, 0.0),
+                     end, sh.sun.xyz, sh.atmosphere[1].z, group, kAerialSteps, light, through);
+        for (uint k = 0; k < 4 && group * 4 + k < bands; ++k) {
+            transmittance[group * 4 + k] = through[k];
+            scattered[group * 4 + k] = light[k];
+        }
+    }
+}
 
 // The atmosphere between the eye at `origin` (relative to the frame's origin, metres) and the
 // dome and stars along `d`: their light dims by its transmittance and the sun's light it scatters
@@ -1152,6 +1203,9 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         lightDirections[k] = toLight;
         lightScales[k] = scale;
     }
+    float aerialTransmittance[kMaxBands];
+    float aerialScattered[kMaxBands];
+    aerialPerspective(world, ndc.xy, aerialTransmittance, aerialScattered);
     for (uint first = 0; first < bands; first += 3) {
         float3 bandAlbedo = float3(0.0);
         float3 bandIrradiance = float3(0.0);
@@ -1215,8 +1269,12 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                     : radianceFactors(n, lightDirections[k], v, bandAlbedo, slopeVariance, params);
             radiance += lightScales[k] * lightSpectrum / PI * factors;
         }
+        // Through the air to the eye: dimmed, with the sun's light it scatters on the way.
         for (uint k = 0; k < 3 && first + k < bands; ++k) {
-            spectral[int3(id.xy, id.z * bands + first + k)] = radiance[k];
+            let band = first + k;
+            spectral[int3(id.xy, id.z * bands + band)] =
+                radiance[k] * aerialTransmittance[band] +
+                bandValue(sh.irradiance, band) * aerialScattered[band];
         }
     }
 }
