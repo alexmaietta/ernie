@@ -408,6 +408,7 @@ TEST_F(ViewerTest, PanelsDockWhereTheyAsk) {
     std::ifstream file(path);
     const std::string text{std::istreambuf_iterator<char>(file),
                            std::istreambuf_iterator<char>()};
+    file.close();  // Windows removes no file that is open.
     const auto docked = [&](const std::string& title) {
         const std::size_t at = text.find("[Window][" + title + "]");
         if (at == std::string::npos) {
@@ -568,6 +569,7 @@ TEST_F(ViewerTest, OpensAndSavesScenesAsJson) {
     const std::string text(
         (std::istreambuf_iterator<char>(savedFile)),
         std::istreambuf_iterator<char>());
+    savedFile.close();  // Windows removes no file that is open.
     EXPECT_NE(text.find("\"/World\""), std::string::npos) << text;
     EXPECT_EQ(text.find(Viewer::SessionRoot().String()),
               std::string::npos)
@@ -872,6 +874,7 @@ TEST_F(ViewerTest, LayoutsRoundTripThroughFiles) {
     std::ifstream file(path);
     const std::string text{std::istreambuf_iterator<char>(file),
                            std::istreambuf_iterator<char>()};
+    file.close();  // Windows removes no file that is open.
     EXPECT_NE(text.find("[Docking]"), std::string::npos);
     EXPECT_NE(text.find("Viewport"), std::string::npos);
     viewer_->LoadLayout(path);
