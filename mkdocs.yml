@@ -22,6 +22,10 @@ theme:
 extra_css:
   - css/extra.css
 
+# The sidebar scrolls to the current page's entry without moving the page (js/sidebar.js).
+extra_javascript:
+  - js/sidebar.js
+
 nav:
   - Home: index.md
   - Getting started:
