@@ -1,0 +1,1590 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1app_1_1Viewer/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Class ernie::app::Viewer - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Class ernie::app::Viewer";
+        var mkdocs_page_input_path = "cpp/classernie_1_1app_1_1Viewer.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/classernie_1_1app_1_1Viewer/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Class ernie::app::Viewer</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/classernie_1_1app_1_1Viewer.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-ernieappviewer">Class ernie::app::Viewer</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../namespaceernie_1_1app/"><strong>app</strong></a> <strong>&gt;</strong> <a href="./"><strong>Viewer</strong></a></p>
+<p><em>An interactive window onto an Ernie</em> <code>Scene</code> <em>: a docked viewport rendering the scene with a</em><code>RenderDelegate</code> <em>(the rasterizer), plus Stage, Property, Render Settings, Sensor, Stats and Log panels.</em><a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/app/viewer.h&gt;</code></li>
+</ul>
+<h2 id="public-types">Public Types</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">enum</td>
+<td style="text-align: left;"><a href="#enum-exposure"><strong>Exposure</strong></a>  <br><em>How the viewport exposes its image:</em> <code>Auto</code> <em>keys the scene's metered average luminance to middle grey (adapting over a fraction of a second),</em><code>Camera</code> <em>(the default) takes the camera's own exposure attributes as they are, and</em><code>Default</code> <em>is automatic through the viewer's own camera and the camera's own through a scene camera.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">enum</td>
+<td style="text-align: left;"><a href="#enum-gizmo"><strong>Gizmo</strong></a>  <br><em>What the transform gizmo on a single selected prim does: none, or translate, rotate or scale (the W, E and R keys), in world or local axes.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-activecamera"><strong>ActiveCamera</strong></a> () const<br><em>The</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim the viewport looks through;</em><code>PerspectiveCamera()</code> <em>until changed.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#function-addhuditem"><strong>AddHudItem</strong></a> (std::string label, std::function&lt; std::string(<a href="./"><strong>Viewer</strong></a> &amp;)&gt; value, bool shown=true) <br><em>Adds a line to the viewport's heads-up display, "label: value" with the text</em> <code>value</code> <em>returns (asked a few times a second), such as a physics step's time; the eye menu's Heads Up Display submenu toggles it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-addmenuitem"><strong>AddMenuItem</strong></a> (const std::string &amp; menu, const std::string &amp; label, std::function&lt; void(<a href="./"><strong>Viewer</strong></a> &amp;)&gt; action) <br><em>Adds</em> <code>label</code> <em>to the menu bar's</em><code>menu</code> <em>(created if needed), running</em><code>action</code> <em>when chosen.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1app_1_1Panel/"><strong>Panel</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-addpanel-13"><strong>AddPanel</strong></a> (std::unique_ptr&lt; <a href="../classernie_1_1app_1_1Panel/"><strong>Panel</strong></a> &gt; panel) <br><em>Adds a dockable panel, shown under Window in the menu bar.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">T &amp;</td>
+<td style="text-align: left;"><a href="#function-addpanel-23"><strong>AddPanel</strong></a> (Args &amp;&amp;... args) <br><em>Constructs a</em> <code>T</code> <em>(a</em><code>Panel</code> <em>subclass) from</em><code>args</code> <em>and adds it; returns it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1app_1_1Panel/"><strong>Panel</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-addpanel-33"><strong>AddPanel</strong></a> (std::string title, <a href="../namespaceernie_1_1app/#enum-dock"><strong>Dock</strong></a> dock, std::function&lt; void(<a href="./"><strong>Viewer</strong></a> &amp;)&gt; draw) <br><em>Adds a panel titled</em> <code>title</code> <em>that calls</em><code>draw</code> <em>to draw its contents with Dear ImGui; for panels that need no class of their own.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#function-addviewportmenuitem"><strong>AddViewportMenuItem</strong></a> (std::string label, std::function&lt; void(<a href="./"><strong>Viewer</strong></a> &amp;)&gt; action, std::function&lt; bool(const <a href="./"><strong>Viewer</strong></a> &amp;)&gt; checked={}) <br><em>Adds</em> <code>label</code> <em>to the viewport's settings menu (its leftmost pill), running</em><code>action</code> <em>when chosen; with</em><code>checked</code> <em>, the item shows a check mark while it returns true.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#function-addviewporttoggle"><strong>AddViewportToggle</strong></a> (std::string label, bool shown=true, std::string overlay={}, std::function&lt; void(<a href="./"><strong>Viewer</strong></a> &amp;, bool)&gt; changed={}) <br><em>Adds a toggle to the viewport's eye menu, after the built-in ones, for what an application draws over the scene, such as physics contacts or labels.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1app_1_1WidgetPanel/"><strong>WidgetPanel</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-addwidgetpanel"><strong>AddWidgetPanel</strong></a> (std::string title, <a href="../namespaceernie_1_1app/#enum-dock"><strong>Dock</strong></a> dock=Dock::Right) <br><em>Adds a</em> <code>WidgetPanel</code> <em>titled</em><code>title</code> <em>, for widgets added without ImGui (Python's panels).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-autoexposing"><strong>AutoExposing</strong></a> () const<br><em>Whether the viewport currently exposes automatically (</em> <code>Exposure</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../classernie_1_1BrdfRegistry/"><strong>BrdfRegistry</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-brdfs"><strong>Brdfs</strong></a> () const<br><em>The reflectance models of the current backend, for material editors.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Path/"><strong>Path</strong></a></td>
+<td style="text-align: left;"><a href="#function-camerafromview"><strong>CameraFromView</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) <br><em>Defines a</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim at</em><code>path</code> <em>in the scene with the active camera's transform and lens, and returns it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-cameras"><strong>Cameras</strong></a> () const<br><em>The cameras the viewport can look through: the viewer's own, then the scene's</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prims by path.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-capture"><strong>Capture</strong></a> (const std::filesystem::path &amp; path, std::string var={}) <br><em>Writes the next viewport frame to</em> <code>path</code> <em>as PNG, showing</em><code>var</code> <em>(the shown var when empty) as the viewport draws it, and on screen for that frame.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-capturewindow"><strong>CaptureWindow</strong></a> (const std::filesystem::path &amp; path) <br><em>Writes the whole window as last drawn, UI and all, to</em> <code>path</code> <em>as PNG: for screenshot tests of the interface.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-clearattribute"><strong>ClearAttribute</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute) <br><em>Clears</em> <code>attribute</code> <em>of the prim at</em><code>path</code> <em>, back to its fallback, as an undoable GUI edit.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-clearlog"><strong>ClearLog</strong></a> () <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-clearscene"><strong>ClearScene</strong></a> () <br><em>Empties the stage for new content: removes every prim but the viewer's own and every overlay but the viewer's (named with a leading "__"), clears the selection and undo history, and forgets the settings, camera and lighting the application chose.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-close"><strong>Close</strong></a> () <br><em>Asks the window to close;</em> <code>Run</code> <em>returns and</em><code>Step</code> <em>returns false after the current frame.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1VulkanContext/"><strong>VulkanContext</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-context-12"><strong>Context</strong></a> () <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../classernie_1_1VulkanContext/"><strong>VulkanContext</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-context-22"><strong>Context</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Path/"><strong>Path</strong></a></td>
+<td style="text-align: left;"><a href="#function-create"><strong>Create</strong></a> (std::string_view type) <br><em>Creates a prim of</em> <code>type</code> <em>, any of the Create menu's (</em><code>CreatableTypes</code> <em>), with defaults that make it show (</em><code>AuthorDefaultPrim</code> <em>): under the selected</em><a href="../classernie_1_1Xform/"><em><strong>Xform</strong></em></a> <em>or</em><a href="../classernie_1_1Scope/"><em><strong>Scope</strong></em></a> <em>if one is, else its type's usual parent, at the view's target and scale.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1RenderDelegate/"><strong>RenderDelegate</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-delegate"><strong>Delegate</strong></a> () <br><em>The current backend itself, for what the viewer does not wrap, such as CUDA bindings.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-delete"><strong>Delete</strong></a> (std::span&lt; const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; paths) <br><em>Deletes the prims at</em> <code>paths</code> <em>and their descendants as one undo step and clears the selection; the viewer's own prims are left alone.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-duplicate"><strong>Duplicate</strong></a> (std::span&lt; const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; paths) <br><em>Copies the prims at</em> <code>paths</code> <em>with their descendants and attributes (sharing tensors) beside themselves, named</em><code>&lt;name&gt;_01</code> <em>,</em><code>&lt;name&gt;_02</code> <em>... with the first free number, as one undo step (Ctrl+D); selects and returns the copies.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-edit"><strong>Edit</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute, <a href="../classernie_1_1Value/"><strong>Value</strong></a> value, bool open=false) <br><em>Sets</em> <code>attribute</code> <em>of the prim at</em><code>path</code> <em>as a GUI edit, through the viewer's undo history (</em><code>History</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-editlocaltransform"><strong>EditLocalTransform</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, const glm::dmat4 &amp; local, bool open=false) <br><em>Gives the prim at</em> <code>path</code> <em>the local transform</em><code>local</code> <em>as a GUI edit, as</em><code>Edit</code> <em>does, through its own transform ops where they can represent it (</em><code>LocalTransformEdits</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-exposurecompensation"><strong>ExposureCompensation</strong></a> () const<br><em>Stops of exposure compensation on top of either mode (</em> <code>tokens::kExposureCompensation</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1app_1_1Panel/"><strong>Panel</strong></a> *</td>
+<td style="text-align: left;"><a href="#function-findpanel"><strong>FindPanel</strong></a> (std::string_view title) <br><em>The panel titled</em> <code>title</code> <em>, built-in ("Stats") or added; null if there is none.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-focuspanel"><strong>FocusPanel</strong></a> (std::string_view title) <br><em>Shows the panel titled</em> <code>title</code> <em>and brings it to the front: where it shares a dock with other panels its tab becomes the selected one, and it takes keyboard focus.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-frame"><strong>Frame</strong></a> (std::span&lt; const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; paths={}) <br><em>Frames</em> <code>paths</code> <em>(the whole scene when empty) with the active camera (the F key).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./#enum-exposure"><strong>Exposure</strong></a></td>
+<td style="text-align: left;"><a href="#function-getexposure"><strong>GetExposure</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1app_1_1FileDialog/"><strong>FileDialog</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-getfiledialog"><strong>GetFileDialog</strong></a> () <br><em>The file dialog, open or not: for choosing through it from code, as tests do.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./#enum-gizmo"><strong>Gizmo</strong></a></td>
+<td style="text-align: left;"><a href="#function-getgizmo"><strong>GetGizmo</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../namespaceernie_1_1app/#enum-lighting"><strong>Lighting</strong></a></td>
+<td style="text-align: left;"><a href="#function-getlighting"><strong>GetLighting</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-getscene"><strong>GetScene</strong></a> () <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../structernie_1_1app_1_1Theme/"><strong>Theme</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-gettheme"><strong>GetTheme</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../structernie_1_1app_1_1ViewportDisplay/"><strong>ViewportDisplay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-getviewportdisplay"><strong>GetViewportDisplay</strong></a> () const<br><em>What the viewport draws over the scene and its heads-up display lists.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-getvsync"><strong>GetVsync</strong></a> () const<br><em>Whether frames wait for the display's refresh (</em> <code>ViewerOptions::vsync</code> <em>); without it the viewer draws as fast as it renders, without tearing where the display allows.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::optional&lt; <a href="../namespaceernie/#enum-wireframe"><strong>Wireframe</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-getwireframe"><strong>GetWireframe</strong></a> () const<br><em>How the viewport draws triangle edges: a mode overriding the render settings' own (</em> <code>ernie:wireframe</code> <em>) in the viewport only, or none (the default) to follow them.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-gizmolocal"><strong>GizmoLocal</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1EditHistory/"><strong>EditHistory</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-history"><strong>History</strong></a> () <br><em>The GUI edits, for undo and redo.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-huditemshown"><strong>HudItemShown</strong></a> (std::uint64_t id) const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-isopen"><strong>IsOpen</strong></a> () const<br><em>Whether the window is open.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-loadlayout"><strong>LoadLayout</strong></a> (const std::filesystem::path &amp; path) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-log"><strong>Log</strong></a> (<a href="../namespaceernie_1_1app/#enum-loglevel"><strong>LogLevel</strong></a> level, std::string text) <br><em>Adds a message to the viewer's log, shown in the Log panel; the viewer itself logs render errors as they start.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const std::deque&lt; <a href="../structernie_1_1app_1_1LogEntry/"><strong>LogEntry</strong></a> &gt; &amp;</td>
+<td style="text-align: left;"><a href="#function-logentries"><strong>LogEntries</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::optional&lt; double &gt;</td>
+<td style="text-align: left;"><a href="#function-meteredev"><strong>MeteredEv</strong></a> () const<br><em>The EV100 of the scene's average luminance as last metered (EV = log2(L x 100 / 12.5)), if the backend meters.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#function-newscope"><strong>NewScope</strong></a> () <br><em>Registration scopes, for applications that host others' code, as the demo runner hosts demos: what is added (callbacks, panels, menu items, viewport toggles, heads-up display and viewport menu items) belongs to the scope current when it is added, and</em> <code>RemoveScope</code> <em>removes all of it at once.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#function-onframe"><strong>OnFrame</strong></a> (std::function&lt; void(<a href="./"><strong>Viewer</strong></a> &amp;, const <a href="../structernie_1_1app_1_1FrameInfo/"><strong>FrameInfo</strong></a> &amp;)&gt; callback) <br><em>Adds a callback run at the start of every frame, before the UI and the render, so its edits show in that frame.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#function-onpostrender"><strong>OnPostRender</strong></a> (std::function&lt; void(<a href="./"><strong>Viewer</strong></a> &amp;, const <a href="../structernie_1_1app_1_1FrameInfo/"><strong>FrameInfo</strong></a> &amp;)&gt; callback) <br><em>Adds a callback run after the frame is submitted and presented; the GPU may still be rendering it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#function-onprerender"><strong>OnPreRender</strong></a> (std::function&lt; void(<a href="./"><strong>Viewer</strong></a> &amp;, const <a href="../structernie_1_1app_1_1FrameInfo/"><strong>FrameInfo</strong></a> &amp;)&gt; callback) <br><em>Adds a callback run after the UI and just before the scene is synced and rendered: the scene then holds this frame's GUI edits, and the callback's own edits show in this frame.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#function-onselection"><strong>OnSelection</strong></a> (std::function&lt; void(<a href="./"><strong>Viewer</strong></a> &amp;, std::span&lt; const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt;)&gt; callback) <br><em>Adds a callback run when the selection changes, by click or by</em> <code>SetSelection</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#function-onui"><strong>OnUi</strong></a> (std::function&lt; void(<a href="./"><strong>Viewer</strong></a> &amp;, const <a href="../structernie_1_1app_1_1FrameInfo/"><strong>FrameInfo</strong></a> &amp;)&gt; callback) <br><em>Adds a callback run during the UI, after the panels, inside the Dear ImGui frame: for keyboard shortcuts (</em> <code>ImGui::IsKeyPressed</code> <em>) and overlays.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-openfiledialog"><strong>OpenFileDialog</strong></a> (<a href="../structernie_1_1app_1_1FileDialogOptions/"><strong>FileDialogOptions</strong></a> options, std::function&lt; void(<a href="./"><strong>Viewer</strong></a> &amp;, const std::filesystem::path &amp;)&gt; done) <br><em>Opens the viewer's file dialog (</em> <code>FileDialog</code> <em>), modal over the window, to choose a file to open or to save as</em><code>options</code> <em>says.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-openscene"><strong>OpenScene</strong></a> (const std::filesystem::path &amp; path) <br><em>Replaces the stage with the scene the JSON file at</em> <code>path</code> <em>describes (</em><code>LoadSceneFile</code> <em>,</em><a href="../scene__json_8h/"><em><strong>ernie/scene/scene_json.h</strong></em></a> <em>), as File &gt; Open</em><a href="../classernie_1_1Scene/"><em><strong>Scene</strong></em></a> <em>does: empties the stage (</em><code>ClearScene</code> <em>), loads the file and starts the session over (</em><code>ResetSession</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Path/"><strong>Path</strong></a></td>
+<td style="text-align: left;"><a href="#function-pick"><strong>Pick</strong></a> (std::uint32_t x, std::uint32_t y) <br><em>The prim the viewport shows at pixel (</em> <code>x</code> <em>,</em><code>y</code> <em>) of its image (</em><code>RenderDelegate::Pick</code> <em>), as a click selects; the empty path for the background or a session prim.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-redo"><strong>Redo</strong></a> () <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-removecallback"><strong>RemoveCallback</strong></a> (std::uint64_t id) <br><em>Removes the frame, UI, pre-render, post-render or selection callback with id</em> <code>id</code> <em>; unknown ids are ignored.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-removepanel"><strong>RemovePanel</strong></a> (const std::string &amp; title) <br><em>Removes the panel titled</em> <code>title</code> <em>; built-in panels are only hidden.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-removescope"><strong>RemoveScope</strong></a> (std::uint64_t scope) <br><em>Removes everything added in</em> <code>scope</code> <em>; built-in panels are only hidden, as</em><code>RemovePanel</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-removeviewportitem"><strong>RemoveViewportItem</strong></a> (std::uint64_t id) <br><em>Removes the viewport toggle, heads-up display item or viewport menu item with id</em> <code>id</code> <em>; unknown ids are ignored.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Path/"><strong>Path</strong></a></td>
+<td style="text-align: left;"><a href="#function-rename"><strong>Rename</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view name) <br><em>Renames the prim at</em> <code>path</code> <em>to</em><code>name</code> <em>, moving its descendants with it, as one undo step (F2 in the Stage), keeping the selection on it; returns its new path.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const std::string &amp;</td>
+<td style="text-align: left;"><a href="#function-renderer"><strong>Renderer</strong></a> () const<br><em>The render backend the viewport draws with.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-resetsession"><strong>ResetSession</strong></a> () <br><em>Starts over on the scene's present content, once an application has replaced it (as</em> <code>OpenScene</code> <em>and the demo runner do): clears the selection and undo history, and picks the</em><a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>, the camera (</em><code>PerspectiveCamera()</code> <em>, framing the scene) and the lighting as on opening, except those the application chose (</em><code>SetSettings</code> <em>,</em><code>SetActiveCamera</code> <em>,</em><code>SetLighting</code> <em>) since the scene was cleared (</em><code>ClearScene</code> <em>) or the viewer opened.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-run"><strong>Run</strong></a> () <br><em>Draws frames until the window closes or</em> <code>Close</code> <em>is called.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-savelayout"><strong>SaveLayout</strong></a> (const std::filesystem::path &amp; path) const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-savescene"><strong>SaveScene</strong></a> (const std::filesystem::path &amp; path) <br><em>Writes the stage, every prim but the viewer's own, to</em> <code>path</code> <em>as JSON (</em><code>SaveSceneFile</code> <em>), as File &gt; Save</em><a href="../classernie_1_1Scene/"><em><strong>Scene</strong></em></a> <em>As does.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#function-scope"><strong>Scope</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">const std::vector&lt; <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; &amp;</td>
+<td style="text-align: left;"><a href="#function-selection"><strong>Selection</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setactivecamera"><strong>SetActiveCamera</strong></a> (<a href="../classernie_1_1Path/"><strong>Path</strong></a> camera) <br><em>Looks through the</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim at</em><code>camera</code> <em>, the viewer's or the scene's.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setexposure"><strong>SetExposure</strong></a> (<a href="./#enum-exposure"><strong>Exposure</strong></a> exposure) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setexposurecompensation"><strong>SetExposureCompensation</strong></a> (double stops) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setgizmo"><strong>SetGizmo</strong></a> (<a href="./#enum-gizmo"><strong>Gizmo</strong></a> gizmo) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setgizmolocal"><strong>SetGizmoLocal</strong></a> (bool local) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-sethuditemshown"><strong>SetHudItemShown</strong></a> (std::uint64_t id, bool shown) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setlighting"><strong>SetLighting</strong></a> (<a href="../namespaceernie_1_1app/#enum-lighting"><strong>Lighting</strong></a> lighting) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setrenderer"><strong>SetRenderer</strong></a> (const std::string &amp; name) <br><em>Switches the viewport to the render backend</em> <code>name</code> <em>, waiting for the GPU; the new backend syncs the whole scene on its next frame.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setscope"><strong>SetScope</strong></a> (std::uint64_t scope) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setselection"><strong>SetSelection</strong></a> (std::vector&lt; <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; paths) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setsettings"><strong>SetSettings</strong></a> (<a href="../classernie_1_1Path/"><strong>Path</strong></a> settings) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-settheme"><strong>SetTheme</strong></a> (const <a href="../structernie_1_1app_1_1Theme/"><strong>Theme</strong></a> &amp; theme) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setviewband"><strong>SetViewBand</strong></a> (int band) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setviewvar"><strong>SetViewVar</strong></a> (std::string name) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setviewportdisplay"><strong>SetViewportDisplay</strong></a> (const <a href="../structernie_1_1app_1_1ViewportDisplay/"><strong>ViewportDisplay</strong></a> &amp; display) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setviewporttoggleshown"><strong>SetViewportToggleShown</strong></a> (std::uint64_t id, bool shown) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setvsync"><strong>SetVsync</strong></a> (bool vsync) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setwireframe"><strong>SetWireframe</strong></a> (std::optional&lt; <a href="../namespaceernie/#enum-wireframe"><strong>Wireframe</strong></a> &gt; mode) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-settings"><strong>Settings</strong></a> () const<br><em>The</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim the viewport renders with.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1RenderStats/"><strong>RenderStats</strong></a></td>
+<td style="text-align: left;"><a href="#function-stats"><strong>Stats</strong></a> () const<br><em>What the current backend holds and drew last frame: GPU memory, triangles and its own counters.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-step"><strong>Step</strong></a> () <br><em>Processes window events, syncs the scene, renders the viewport and the UI and presents one frame.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-sync"><strong>Sync</strong></a> () <br><em>Syncs the scene into the current backend now, rather than at the next frame, to check newly authored data.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-undo"><strong>Undo</strong></a> () <br><em>Undoes or redoes the last GUI edit (Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y); returns whether there was one.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">int</td>
+<td style="text-align: left;"><a href="#function-viewband"><strong>ViewBand</strong></a> () const<br><em>The spectral band the viewport shows while it shows SpectralRadiance, or -1 (the default) for the mean over the camera's bands (</em> <code>RenderDelegate::SetViewBand</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const std::string &amp;</td>
+<td style="text-align: left;"><a href="#function-viewvar"><strong>ViewVar</strong></a> () const<br><em>The render var the viewport shows,</em> <code>LdrColor</code> <em>until changed: any of the backend's</em><code>RendererInfo::viewVars</code> <em>, such as</em><code>DistanceToCamera</code> <em>,</em><code>Normal</code> <em>or</em><code>PrimId</code> <em>, each drawn as a display image (see</em><code>RasterRenderer::CanPresent</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-viewer-12"><strong>Viewer</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../structernie_1_1app_1_1ViewerOptions/"><strong>ViewerOptions</strong></a> &amp; options={}) <br><em>Opens the window and initializes Vulkan, ImGui and the render delegate.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-viewer-22"><strong>Viewer</strong></a> (const <a href="./"><strong>Viewer</strong></a> &amp;) = delete<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-viewporttoggleshown"><strong>ViewportToggleShown</strong></a> (std::uint64_t id) const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Viewer</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-operator"><strong>operator=</strong></a> (const <a href="./"><strong>Viewer</strong></a> &amp;) = delete<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-viewer"><strong>~Viewer</strong></a> () <br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-static-functions">Public Static Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-perspectivecamera"><strong>PerspectiveCamera</strong></a> () <br><em>The viewer's perspective camera,</em> <code>/__session/Perspective</code> <em>, framing the scene's bounds when the viewer opens.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; std::string &gt;</td>
+<td style="text-align: left;"><a href="#function-renderers"><strong>Renderers</strong></a> () <br><em>The render backends the viewer can switch between, such as "raster".</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-sessionroot"><strong>SessionRoot</strong></a> () <br><em>Root of the prims the viewer defines for its own use,</em> <code>/__session</code> <em>.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>The viewer keeps no scene state of its own: panels read the scene each frame and write edits back through <code>Scene::Set</code>, so edits from code and from the GUI are one history, seen by both. What only the GUI needs (its cameras, the viewport's render product, lighting presets) is defined under <code>SessionRoot()</code>, which panels hide unless asked to show it.</p>
+<p>The viewer defines its own perspective camera on opening, framing the scene (<code>PerspectiveCamera()</code>, the default view). The viewport looks through it or any <a href="../classernie_1_1Camera/"><strong>Camera</strong></a> prim of the scene; navigating moves whichever camera it looks through.</p>
+<p>Drive it in one of two ways, both on the thread that created it (GLFW needs the main thread on macOS):
+* <code>Run()</code> loops until the window closes;
+* <code>Step()</code> draws one frame and returns, for callers that own the loop, such as a simulation.</p>
+<p>Each frame runs, in order: <code>OnFrame</code> callbacks; the UI, whose panels may edit the scene, then <code>OnUi</code> callbacks; <code>OnPreRender</code> callbacks; the scene's sync and render, and presentation; <code>OnPostRender</code> callbacks. Callbacks run on the viewer's thread; an exception from one ends that frame and propagates out of <code>Step</code> or <code>Run</code>, and the viewer can step again afterwards.</p>
+<p>Applications extend it with panels (<code>AddPanel</code>), menu items (<code>AddMenuItem</code>) and callbacks; TerrainGen's viewer is one such application, adding its terrain configuration panels. </p>
+<h2 id="public-types-documentation">Public Types Documentation</h2>
+<h3 id="enum-exposure">enum Exposure</h3>
+<p><em>How the viewport exposes its image:</em> <code>Auto</code> <em>keys the scene's metered average luminance to middle grey (adapting over a fraction of a second),</em><code>Camera</code> <em>(the default) takes the camera's own exposure attributes as they are, and</em><code>Default</code> <em>is automatic through the viewer's own camera and the camera's own through a scene camera.</em></p>
+<pre><code class="language-C++">enum ernie::app::Viewer::Exposure {
+    Default,
+    Auto,
+    Camera
+};
+</code></pre>
+<hr>
+
+<h3 id="enum-gizmo">enum Gizmo</h3>
+<p><em>What the transform gizmo on a single selected prim does: none, or translate, rotate or scale (the W, E and R keys), in world or local axes.</em> </p>
+<pre><code class="language-C++">enum ernie::app::Viewer::Gizmo {
+    None,
+    Translate,
+    Rotate,
+    Scale
+};
+</code></pre>
+<hr>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-activecamera">function ActiveCamera</h3>
+<p><em>The</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim the viewport looks through;</em><code>PerspectiveCamera()</code> <em>until changed.</em></p>
+<pre><code class="language-C++">const Path &amp; ernie::app::Viewer::ActiveCamera () const
+</code></pre>
+<p>If the scene's camera is removed, the viewport falls back to <code>PerspectiveCamera()</code>. </p>
+<hr>
+
+<h3 id="function-addhuditem">function AddHudItem</h3>
+<p><em>Adds a line to the viewport's heads-up display, "label: value" with the text</em> <code>value</code> <em>returns (asked a few times a second), such as a physics step's time; the eye menu's Heads Up Display submenu toggles it.</em></p>
+<pre><code class="language-C++">std::uint64_t ernie::app::Viewer::AddHudItem (
+    std::string label,
+    std::function&lt; std::string( Viewer &amp;)&gt; value,
+    bool shown=true
+) 
+</code></pre>
+<p>Returns an id for <code>HudItemShown</code>, <code>SetHudItemShown</code> and <code>RemoveViewportItem</code>. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for an empty label or no <code>value</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-addmenuitem">function AddMenuItem</h3>
+<p><em>Adds</em> <code>label</code> <em>to the menu bar's</em><code>menu</code> <em>(created if needed), running</em><code>action</code> <em>when chosen.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::AddMenuItem (
+    const std::string &amp; menu,
+    const std::string &amp; label,
+    std::function&lt; void( Viewer &amp;)&gt; action
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-addpanel-13">function AddPanel [1/3]</h3>
+<p><em>Adds a dockable panel, shown under Window in the menu bar.</em> </p>
+<pre><code class="language-C++">Panel &amp; ernie::app::Viewer::AddPanel (
+    std::unique_ptr&lt; Panel &gt; panel
+) 
+</code></pre>
+<p>Returns the panel. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a null panel or a title in use or reserved ("Viewport"). </li>
+</ul>
+<hr>
+
+<h3 id="function-addpanel-23">function AddPanel [2/3]</h3>
+<p><em>Constructs a</em> <code>T</code> <em>(a</em><code>Panel</code> <em>subclass) from</em><code>args</code> <em>and adds it; returns it.</em></p>
+<pre><code class="language-C++">template&lt;typename T, typename... Args&gt;
+inline T &amp; ernie::app::Viewer::AddPanel (
+    Args &amp;&amp;... args
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-addpanel-33">function AddPanel [3/3]</h3>
+<p><em>Adds a panel titled</em> <code>title</code> <em>that calls</em><code>draw</code> <em>to draw its contents with Dear ImGui; for panels that need no class of their own.</em></p>
+<pre><code class="language-C++">Panel &amp; ernie::app::Viewer::AddPanel (
+    std::string title,
+    Dock dock,
+    std::function&lt; void( Viewer &amp;)&gt; draw
+) 
+</code></pre>
+<p>Returns the panel. </p>
+<hr>
+
+<h3 id="function-addviewportmenuitem">function AddViewportMenuItem</h3>
+<p><em>Adds</em> <code>label</code> <em>to the viewport's settings menu (its leftmost pill), running</em><code>action</code> <em>when chosen; with</em><code>checked</code> <em>, the item shows a check mark while it returns true.</em></p>
+<pre><code class="language-C++">std::uint64_t ernie::app::Viewer::AddViewportMenuItem (
+    std::string label,
+    std::function&lt; void( Viewer &amp;)&gt; action,
+    std::function&lt; bool(const Viewer &amp;)&gt; checked={}
+) 
+</code></pre>
+<p>Returns an id for <code>RemoveViewportItem</code>. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for an empty label or no <code>action</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-addviewporttoggle">function AddViewportToggle</h3>
+<p><em>Adds a toggle to the viewport's eye menu, after the built-in ones, for what an application draws over the scene, such as physics contacts or labels.</em> </p>
+<pre><code class="language-C++">std::uint64_t ernie::app::Viewer::AddViewportToggle (
+    std::string label,
+    bool shown=true,
+    std::string overlay={},
+    std::function&lt; void( Viewer &amp;, bool)&gt; changed={}
+) 
+</code></pre>
+<p>With <code>overlay</code>, the toggle shows or hides that scene overlay in the viewport (whatever the <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> Overlays toggle says); either way <code>changed</code>, if given, is told when the user switches it. Returns an id for <code>ViewportToggleShown</code>, <code>SetViewportToggleShown</code> and <code>RemoveViewportItem</code>. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for an empty label. </li>
+</ul>
+<hr>
+
+<h3 id="function-addwidgetpanel">function AddWidgetPanel</h3>
+<p><em>Adds a</em> <code>WidgetPanel</code> <em>titled</em><code>title</code> <em>, for widgets added without ImGui (Python's panels).</em></p>
+<pre><code class="language-C++">WidgetPanel &amp; ernie::app::Viewer::AddWidgetPanel (
+    std::string title,
+    Dock dock=Dock::Right
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-autoexposing">function AutoExposing</h3>
+<p><em>Whether the viewport currently exposes automatically (</em> <code>Exposure</code> <em>).</em></p>
+<pre><code class="language-C++">bool ernie::app::Viewer::AutoExposing () const
+</code></pre>
+<hr>
+
+<h3 id="function-brdfs">function Brdfs</h3>
+<p><em>The reflectance models of the current backend, for material editors.</em> </p>
+<pre><code class="language-C++">const BrdfRegistry &amp; ernie::app::Viewer::Brdfs () const
+</code></pre>
+<hr>
+
+<h3 id="function-camerafromview">function CameraFromView</h3>
+<p><em>Defines a</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim at</em><code>path</code> <em>in the scene with the active camera's transform and lens, and returns it.</em></p>
+<pre><code class="language-C++">Path ernie::app::Viewer::CameraFromView (
+    const Path &amp; path
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if <code>path</code> exists or is under <code>SessionRoot()</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-cameras">function Cameras</h3>
+<p><em>The cameras the viewport can look through: the viewer's own, then the scene's</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prims by path.</em></p>
+<pre><code class="language-C++">std::vector&lt; Path &gt; ernie::app::Viewer::Cameras () const
+</code></pre>
+<hr>
+
+<h3 id="function-capture">function Capture</h3>
+<p><em>Writes the next viewport frame to</em> <code>path</code> <em>as PNG, showing</em><code>var</code> <em>(the shown var when empty) as the viewport draws it, and on screen for that frame.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::Capture (
+    const std::filesystem::path &amp; path,
+    std::string var={}
+) 
+</code></pre>
+<p>For a var's own values, render it headless (<code>RenderDelegate::StepAsync</code>). </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> as <code>SetViewVar</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-capturewindow">function CaptureWindow</h3>
+<p><em>Writes the whole window as last drawn, UI and all, to</em> <code>path</code> <em>as PNG: for screenshot tests of the interface.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::CaptureWindow (
+    const std::filesystem::path &amp; path
+) 
+</code></pre>
+<p>Only a hidden viewer (<code>ViewerOptions::hidden</code>) can. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::logic_error</code> for a viewer with a window, or std::runtime_error if the file cannot be written. </li>
+</ul>
+<hr>
+
+<h3 id="function-clearattribute">function ClearAttribute</h3>
+<p><em>Clears</em> <code>attribute</code> <em>of the prim at</em><code>path</code> <em>, back to its fallback, as an undoable GUI edit.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::ClearAttribute (
+    const Path &amp; path,
+    std::string_view attribute
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-clearlog">function ClearLog</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::ClearLog () 
+</code></pre>
+<hr>
+
+<h3 id="function-clearscene">function ClearScene</h3>
+<p><em>Empties the stage for new content: removes every prim but the viewer's own and every overlay but the viewer's (named with a leading "__"), clears the selection and undo history, and forgets the settings, camera and lighting the application chose.</em> </p>
+<pre><code class="language-C++">void ernie::app::Viewer::ClearScene () 
+</code></pre>
+<p>Call <code>ResetSession</code> once the new content is in. </p>
+<hr>
+
+<h3 id="function-close">function Close</h3>
+<p><em>Asks the window to close;</em> <code>Run</code> <em>returns and</em><code>Step</code> <em>returns false after the current frame.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::Close () 
+</code></pre>
+<hr>
+
+<h3 id="function-context-12">function Context [1/2]</h3>
+<pre><code class="language-C++">VulkanContext &amp; ernie::app::Viewer::Context () 
+</code></pre>
+<hr>
+
+<h3 id="function-context-22">function Context [2/2]</h3>
+<pre><code class="language-C++">const VulkanContext &amp; ernie::app::Viewer::Context () const
+</code></pre>
+<hr>
+
+<h3 id="function-create">function Create</h3>
+<p><em>Creates a prim of</em> <code>type</code> <em>, any of the Create menu's (</em><code>CreatableTypes</code> <em>), with defaults that make it show (</em><code>AuthorDefaultPrim</code> <em>): under the selected</em><a href="../classernie_1_1Xform/"><em><strong>Xform</strong></em></a> <em>or</em><a href="../classernie_1_1Scope/"><em><strong>Scope</strong></em></a> <em>if one is, else its type's usual parent, at the view's target and scale.</em></p>
+<pre><code class="language-C++">Path ernie::app::Viewer::Create (
+    std::string_view type
+) 
+</code></pre>
+<p>A material is bound to the selected geometry. One undo step; selects the new prim and returns its path. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a type the menu does not offer. </li>
+</ul>
+<hr>
+
+<h3 id="function-delegate">function Delegate</h3>
+<p><em>The current backend itself, for what the viewer does not wrap, such as CUDA bindings.</em> </p>
+<pre><code class="language-C++">RenderDelegate &amp; ernie::app::Viewer::Delegate () 
+</code></pre>
+<hr>
+
+<h3 id="function-delete">function Delete</h3>
+<p><em>Deletes the prims at</em> <code>paths</code> <em>and their descendants as one undo step and clears the selection; the viewer's own prims are left alone.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::Delete (
+    std::span&lt; const Path &gt; paths
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-duplicate">function Duplicate</h3>
+<p><em>Copies the prims at</em> <code>paths</code> <em>with their descendants and attributes (sharing tensors) beside themselves, named</em><code>&lt;name&gt;_01</code> <em>,</em><code>&lt;name&gt;_02</code> <em>... with the first free number, as one undo step (Ctrl+D); selects and returns the copies.</em></p>
+<pre><code class="language-C++">std::vector&lt; Path &gt; ernie::app::Viewer::Duplicate (
+    std::span&lt; const Path &gt; paths
+) 
+</code></pre>
+<p>The viewer's own prims are left alone. </p>
+<hr>
+
+<h3 id="function-edit">function Edit</h3>
+<p><em>Sets</em> <code>attribute</code> <em>of the prim at</em><code>path</code> <em>as a GUI edit, through the viewer's undo history (</em><code>History</code> <em>).</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::Edit (
+    const Path &amp; path,
+    std::string_view attribute,
+    Value value,
+    bool open=false
+) 
+</code></pre>
+<p>With <code>open</code>, a continuing edit (a drag) merges into one undo step, which ends once no widget or gizmo is in use. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> as <code>Scene::Set</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-editlocaltransform">function EditLocalTransform</h3>
+<p><em>Gives the prim at</em> <code>path</code> <em>the local transform</em><code>local</code> <em>as a GUI edit, as</em><code>Edit</code> <em>does, through its own transform ops where they can represent it (</em><code>LocalTransformEdits</code> <em>).</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::EditLocalTransform (
+    const Path &amp; path,
+    const glm::dmat4 &amp; local,
+    bool open=false
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-exposurecompensation">function ExposureCompensation</h3>
+<p><em>Stops of exposure compensation on top of either mode (</em> <code>tokens::kExposureCompensation</code> <em>).</em></p>
+<pre><code class="language-C++">double ernie::app::Viewer::ExposureCompensation () const
+</code></pre>
+<hr>
+
+<h3 id="function-findpanel">function FindPanel</h3>
+<p><em>The panel titled</em> <code>title</code> <em>, built-in ("Stats") or added; null if there is none.</em></p>
+<pre><code class="language-C++">Panel * ernie::app::Viewer::FindPanel (
+    std::string_view title
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-focuspanel">function FocusPanel</h3>
+<p><em>Shows the panel titled</em> <code>title</code> <em>and brings it to the front: where it shares a dock with other panels its tab becomes the selected one, and it takes keyboard focus.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::FocusPanel (
+    std::string_view title
+) 
+</code></pre>
+<p>Takes effect on the next frame in which the panel has already been drawn once, so a panel focused before the first frame (such as the Log over Stats at the bottom) is in front once its docked place exists. The last panel focused in a dock wins. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if there is no panel titled <code>title</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-frame">function Frame</h3>
+<p><em>Frames</em> <code>paths</code> <em>(the whole scene when empty) with the active camera (the F key).</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::Frame (
+    std::span&lt; const Path &gt; paths={}
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-getexposure">function GetExposure</h3>
+<pre><code class="language-C++">Exposure ernie::app::Viewer::GetExposure () const
+</code></pre>
+<hr>
+
+<h3 id="function-getfiledialog">function GetFileDialog</h3>
+<p><em>The file dialog, open or not: for choosing through it from code, as tests do.</em> </p>
+<pre><code class="language-C++">FileDialog &amp; ernie::app::Viewer::GetFileDialog () 
+</code></pre>
+<hr>
+
+<h3 id="function-getgizmo">function GetGizmo</h3>
+<pre><code class="language-C++">Gizmo ernie::app::Viewer::GetGizmo () const
+</code></pre>
+<hr>
+
+<h3 id="function-getlighting">function GetLighting</h3>
+<pre><code class="language-C++">Lighting ernie::app::Viewer::GetLighting () const
+</code></pre>
+<hr>
+
+<h3 id="function-getscene">function GetScene</h3>
+<pre><code class="language-C++">Scene &amp; ernie::app::Viewer::GetScene () 
+</code></pre>
+<hr>
+
+<h3 id="function-gettheme">function GetTheme</h3>
+<pre><code class="language-C++">const Theme &amp; ernie::app::Viewer::GetTheme () const
+</code></pre>
+<hr>
+
+<h3 id="function-getviewportdisplay">function GetViewportDisplay</h3>
+<p><em>What the viewport draws over the scene and its heads-up display lists.</em> </p>
+<pre><code class="language-C++">const ViewportDisplay &amp; ernie::app::Viewer::GetViewportDisplay () const
+</code></pre>
+<hr>
+
+<h3 id="function-getvsync">function GetVsync</h3>
+<p><em>Whether frames wait for the display's refresh (</em> <code>ViewerOptions::vsync</code> <em>); without it the viewer draws as fast as it renders, without tearing where the display allows.</em></p>
+<pre><code class="language-C++">bool ernie::app::Viewer::GetVsync () const
+</code></pre>
+<p>Always false for a hidden viewer. </p>
+<hr>
+
+<h3 id="function-getwireframe">function GetWireframe</h3>
+<p><em>How the viewport draws triangle edges: a mode overriding the render settings' own (</em> <code>ernie:wireframe</code> <em>) in the viewport only, or none (the default) to follow them.</em></p>
+<pre><code class="language-C++">std::optional&lt; Wireframe &gt; ernie::app::Viewer::GetWireframe () const
+</code></pre>
+<p>The Z key cycles through off, overlay and hidden line. </p>
+<hr>
+
+<h3 id="function-gizmolocal">function GizmoLocal</h3>
+<pre><code class="language-C++">bool ernie::app::Viewer::GizmoLocal () const
+</code></pre>
+<hr>
+
+<h3 id="function-history">function History</h3>
+<p><em>The GUI edits, for undo and redo.</em> </p>
+<pre><code class="language-C++">EditHistory &amp; ernie::app::Viewer::History () 
+</code></pre>
+<hr>
+
+<h3 id="function-huditemshown">function HudItemShown</h3>
+<pre><code class="language-C++">bool ernie::app::Viewer::HudItemShown (
+    std::uint64_t id
+) const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for an id that is no heads-up display item. </li>
+</ul>
+<hr>
+
+<h3 id="function-isopen">function IsOpen</h3>
+<p><em>Whether the window is open.</em> </p>
+<pre><code class="language-C++">bool ernie::app::Viewer::IsOpen () const
+</code></pre>
+<hr>
+
+<h3 id="function-loadlayout">function LoadLayout</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::LoadLayout (
+    const std::filesystem::path &amp; path
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::runtime_error</code> if the file cannot be read. </li>
+</ul>
+<hr>
+
+<h3 id="function-log">function Log</h3>
+<p><em>Adds a message to the viewer's log, shown in the Log panel; the viewer itself logs render errors as they start.</em> </p>
+<pre><code class="language-C++">void ernie::app::Viewer::Log (
+    LogLevel level,
+    std::string text
+) 
+</code></pre>
+<p>The log keeps the latest few thousand messages. </p>
+<hr>
+
+<h3 id="function-logentries">function LogEntries</h3>
+<pre><code class="language-C++">const std::deque&lt; LogEntry &gt; &amp; ernie::app::Viewer::LogEntries () const
+</code></pre>
+<hr>
+
+<h3 id="function-meteredev">function MeteredEv</h3>
+<p><em>The EV100 of the scene's average luminance as last metered (EV = log2(L x 100 / 12.5)), if the backend meters.</em> </p>
+<pre><code class="language-C++">std::optional&lt; double &gt; ernie::app::Viewer::MeteredEv () const
+</code></pre>
+<hr>
+
+<h3 id="function-newscope">function NewScope</h3>
+<p><em>Registration scopes, for applications that host others' code, as the demo runner hosts demos: what is added (callbacks, panels, menu items, viewport toggles, heads-up display and viewport menu items) belongs to the scope current when it is added, and</em> <code>RemoveScope</code> <em>removes all of it at once.</em></p>
+<pre><code class="language-C++">std::uint64_t ernie::app::Viewer::NewScope () 
+</code></pre>
+<p><a href="../classernie_1_1Scope/"><strong>Scope</strong></a> 0, current until <code>SetScope</code>, is the application's own. <code>NewScope</code> returns a scope not used before, without making it current. </p>
+<hr>
+
+<h3 id="function-onframe">function OnFrame</h3>
+<p><em>Adds a callback run at the start of every frame, before the UI and the render, so its edits show in that frame.</em> </p>
+<pre><code class="language-C++">std::uint64_t ernie::app::Viewer::OnFrame (
+    std::function&lt; void( Viewer &amp;, const FrameInfo &amp;)&gt; callback
+) 
+</code></pre>
+<p>Returns an id for <code>RemoveCallback</code>. </p>
+<hr>
+
+<h3 id="function-onpostrender">function OnPostRender</h3>
+<p><em>Adds a callback run after the frame is submitted and presented; the GPU may still be rendering it.</em> </p>
+<pre><code class="language-C++">std::uint64_t ernie::app::Viewer::OnPostRender (
+    std::function&lt; void( Viewer &amp;, const FrameInfo &amp;)&gt; callback
+) 
+</code></pre>
+<p>Edits show in the next frame. Returns an id for <code>RemoveCallback</code>. </p>
+<hr>
+
+<h3 id="function-onprerender">function OnPreRender</h3>
+<p><em>Adds a callback run after the UI and just before the scene is synced and rendered: the scene then holds this frame's GUI edits, and the callback's own edits show in this frame.</em> </p>
+<pre><code class="language-C++">std::uint64_t ernie::app::Viewer::OnPreRender (
+    std::function&lt; void( Viewer &amp;, const FrameInfo &amp;)&gt; callback
+) 
+</code></pre>
+<p>Returns an id for <code>RemoveCallback</code>. </p>
+<hr>
+
+<h3 id="function-onselection">function OnSelection</h3>
+<p><em>Adds a callback run when the selection changes, by click or by</em> <code>SetSelection</code> <em>.</em></p>
+<pre><code class="language-C++">std::uint64_t ernie::app::Viewer::OnSelection (
+    std::function&lt; void( Viewer &amp;, std::span&lt; const Path &gt;)&gt; callback
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-onui">function OnUi</h3>
+<p><em>Adds a callback run during the UI, after the panels, inside the Dear ImGui frame: for keyboard shortcuts (</em> <code>ImGui::IsKeyPressed</code> <em>) and overlays.</em></p>
+<pre><code class="language-C++">std::uint64_t ernie::app::Viewer::OnUi (
+    std::function&lt; void( Viewer &amp;, const FrameInfo &amp;)&gt; callback
+) 
+</code></pre>
+<p>Returns an id for <code>RemoveCallback</code>. </p>
+<hr>
+
+<h3 id="function-openfiledialog">function OpenFileDialog</h3>
+<p><em>Opens the viewer's file dialog (</em> <code>FileDialog</code> <em>), modal over the window, to choose a file to open or to save as</em><code>options</code> <em>says.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::OpenFileDialog (
+    FileDialogOptions options,
+    std::function&lt; void( Viewer &amp;, const std::filesystem::path &amp;)&gt; done
+) 
+</code></pre>
+<p><code>done</code> runs on the viewer's thread with the chosen path once the user confirms, and never if they cancel; a dialog already open is replaced. </p>
+<hr>
+
+<h3 id="function-openscene">function OpenScene</h3>
+<p><em>Replaces the stage with the scene the JSON file at</em> <code>path</code> <em>describes (</em><code>LoadSceneFile</code> <em>,</em><a href="../scene__json_8h/"><em><strong>ernie/scene/scene_json.h</strong></em></a> <em>), as File &gt; Open</em><a href="../classernie_1_1Scene/"><em><strong>Scene</strong></em></a> <em>does: empties the stage (</em><code>ClearScene</code> <em>), loads the file and starts the session over (</em><code>ResetSession</code> <em>).</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::OpenScene (
+    const std::filesystem::path &amp; path
+) 
+</code></pre>
+<p>The file is checked first, by loading it into a scene of its own, so a file that does not load leaves the stage as it was. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a file that cannot be read or does not load, or that describes prims under <code>SessionRoot()</code>; or as <code>ResetSession</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-pick">function Pick</h3>
+<p><em>The prim the viewport shows at pixel (</em> <code>x</code> <em>,</em><code>y</code> <em>) of its image (</em><code>RenderDelegate::Pick</code> <em>), as a click selects; the empty path for the background or a session prim.</em></p>
+<pre><code class="language-C++">Path ernie::app::Viewer::Pick (
+    std::uint32_t x,
+    std::uint32_t y
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-redo">function Redo</h3>
+<pre><code class="language-C++">bool ernie::app::Viewer::Redo () 
+</code></pre>
+<hr>
+
+<h3 id="function-removecallback">function RemoveCallback</h3>
+<p><em>Removes the frame, UI, pre-render, post-render or selection callback with id</em> <code>id</code> <em>; unknown ids are ignored.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::RemoveCallback (
+    std::uint64_t id
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-removepanel">function RemovePanel</h3>
+<p><em>Removes the panel titled</em> <code>title</code> <em>; built-in panels are only hidden.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::RemovePanel (
+    const std::string &amp; title
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-removescope">function RemoveScope</h3>
+<p><em>Removes everything added in</em> <code>scope</code> <em>; built-in panels are only hidden, as</em><code>RemovePanel</code> <em>.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::RemoveScope (
+    std::uint64_t scope
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for scope 0. </li>
+</ul>
+<hr>
+
+<h3 id="function-removeviewportitem">function RemoveViewportItem</h3>
+<p><em>Removes the viewport toggle, heads-up display item or viewport menu item with id</em> <code>id</code> <em>; unknown ids are ignored.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::RemoveViewportItem (
+    std::uint64_t id
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-rename">function Rename</h3>
+<p><em>Renames the prim at</em> <code>path</code> <em>to</em><code>name</code> <em>, moving its descendants with it, as one undo step (F2 in the Stage), keeping the selection on it; returns its new path.</em></p>
+<pre><code class="language-C++">Path ernie::app::Viewer::Rename (
+    const Path &amp; path,
+    std::string_view name
+) 
+</code></pre>
+<p>Relationships to it (material bindings, cameras) still name the old path. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for an invalid name, a name taken by a sibling, the root or a viewer prim. </li>
+</ul>
+<hr>
+
+<h3 id="function-renderer">function Renderer</h3>
+<p><em>The render backend the viewport draws with.</em> </p>
+<pre><code class="language-C++">const std::string &amp; ernie::app::Viewer::Renderer () const
+</code></pre>
+<hr>
+
+<h3 id="function-resetsession">function ResetSession</h3>
+<p><em>Starts over on the scene's present content, once an application has replaced it (as</em> <code>OpenScene</code> <em>and the demo runner do): clears the selection and undo history, and picks the</em><a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>, the camera (</em><code>PerspectiveCamera()</code> <em>, framing the scene) and the lighting as on opening, except those the application chose (</em><code>SetSettings</code> <em>,</em><code>SetActiveCamera</code> <em>,</em><code>SetLighting</code> <em>) since the scene was cleared (</em><code>ClearScene</code> <em>) or the viewer opened.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::ResetSession () 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> as <code>Sync</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-run">function Run</h3>
+<p><em>Draws frames until the window closes or</em> <code>Close</code> <em>is called.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::Run () 
+</code></pre>
+<hr>
+
+<h3 id="function-savelayout">function SaveLayout</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::SaveLayout (
+    const std::filesystem::path &amp; path
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-savescene">function SaveScene</h3>
+<p><em>Writes the stage, every prim but the viewer's own, to</em> <code>path</code> <em>as JSON (</em><code>SaveSceneFile</code> <em>), as File &gt; Save</em><a href="../classernie_1_1Scene/"><em><strong>Scene</strong></em></a> <em>As does.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::SaveScene (
+    const std::filesystem::path &amp; path
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> as <code>SaveSceneFile</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-scope">function Scope</h3>
+<pre><code class="language-C++">std::uint64_t ernie::app::Viewer::Scope () const
+</code></pre>
+<hr>
+
+<h3 id="function-selection">function Selection</h3>
+<pre><code class="language-C++">const std::vector&lt; Path &gt; &amp; ernie::app::Viewer::Selection () const
+</code></pre>
+<hr>
+
+<h3 id="function-setactivecamera">function SetActiveCamera</h3>
+<p><em>Looks through the</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim at</em><code>camera</code> <em>, the viewer's or the scene's.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::SetActiveCamera (
+    Path camera
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if <code>camera</code> is not a <a href="../classernie_1_1Camera/"><strong>Camera</strong></a> prim. </li>
+</ul>
+<hr>
+
+<h3 id="function-setexposure">function SetExposure</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::SetExposure (
+    Exposure exposure
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-setexposurecompensation">function SetExposureCompensation</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::SetExposureCompensation (
+    double stops
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-setgizmo">function SetGizmo</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::SetGizmo (
+    Gizmo gizmo
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-setgizmolocal">function SetGizmoLocal</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::SetGizmoLocal (
+    bool local
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-sethuditemshown">function SetHudItemShown</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::SetHudItemShown (
+    std::uint64_t id,
+    bool shown
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-setlighting">function SetLighting</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::SetLighting (
+    Lighting lighting
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-setrenderer">function SetRenderer</h3>
+<p><em>Switches the viewport to the render backend</em> <code>name</code> <em>, waiting for the GPU; the new backend syncs the whole scene on its next frame.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::SetRenderer (
+    const std::string &amp; name
+) 
+</code></pre>
+<p>References from <code>Delegate()</code> become invalid. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a backend not in <code>Renderers()</code>, or std::runtime_error if it cannot start, in which case the current backend stays. </li>
+</ul>
+<hr>
+
+<h3 id="function-setscope">function SetScope</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::SetScope (
+    std::uint64_t scope
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-setselection">function SetSelection</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::SetSelection (
+    std::vector&lt; Path &gt; paths
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-setsettings">function SetSettings</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::SetSettings (
+    Path settings
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if <code>settings</code> is not a <a href="../classernie_1_1RenderSettings/"><strong>RenderSettings</strong></a> prim. </li>
+</ul>
+<hr>
+
+<h3 id="function-settheme">function SetTheme</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::SetTheme (
+    const Theme &amp; theme
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-setviewband">function SetViewBand</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::SetViewBand (
+    int band
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-setviewvar">function SetViewVar</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::SetViewVar (
+    std::string name
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a name not in the backend's <code>RendererInfo::viewVars</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-setviewportdisplay">function SetViewportDisplay</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::SetViewportDisplay (
+    const ViewportDisplay &amp; display
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-setviewporttoggleshown">function SetViewportToggleShown</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::SetViewportToggleShown (
+    std::uint64_t id,
+    bool shown
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-setvsync">function SetVsync</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::SetVsync (
+    bool vsync
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-setwireframe">function SetWireframe</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::SetWireframe (
+    std::optional&lt; Wireframe &gt; mode
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-settings">function Settings</h3>
+<p><em>The</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim the viewport renders with.</em></p>
+<pre><code class="language-C++">const Path &amp; ernie::app::Viewer::Settings () const
+</code></pre>
+<hr>
+
+<h3 id="function-stats">function Stats</h3>
+<p><em>What the current backend holds and drew last frame: GPU memory, triangles and its own counters.</em> </p>
+<pre><code class="language-C++">RenderStats ernie::app::Viewer::Stats () const
+</code></pre>
+<hr>
+
+<h3 id="function-step">function Step</h3>
+<p><em>Processes window events, syncs the scene, renders the viewport and the UI and presents one frame.</em> </p>
+<pre><code class="language-C++">bool ernie::app::Viewer::Step () 
+</code></pre>
+<p>Returns whether the window is still open. </p>
+<hr>
+
+<h3 id="function-sync">function Sync</h3>
+<p><em>Syncs the scene into the current backend now, rather than at the next frame, to check newly authored data.</em> </p>
+<pre><code class="language-C++">void ernie::app::Viewer::Sync () 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> naming the prim and attribute of data the backend cannot use. </li>
+</ul>
+<hr>
+
+<h3 id="function-undo">function Undo</h3>
+<p><em>Undoes or redoes the last GUI edit (Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y); returns whether there was one.</em> </p>
+<pre><code class="language-C++">bool ernie::app::Viewer::Undo () 
+</code></pre>
+<hr>
+
+<h3 id="function-viewband">function ViewBand</h3>
+<p><em>The spectral band the viewport shows while it shows SpectralRadiance, or -1 (the default) for the mean over the camera's bands (</em> <code>RenderDelegate::SetViewBand</code> <em>).</em></p>
+<pre><code class="language-C++">int ernie::app::Viewer::ViewBand () const
+</code></pre>
+<hr>
+
+<h3 id="function-viewvar">function ViewVar</h3>
+<p><em>The render var the viewport shows,</em> <code>LdrColor</code> <em>until changed: any of the backend's</em><code>RendererInfo::viewVars</code> <em>, such as</em><code>DistanceToCamera</code> <em>,</em><code>Normal</code> <em>or</em><code>PrimId</code> <em>, each drawn as a display image (see</em><code>RasterRenderer::CanPresent</code> <em>).</em></p>
+<pre><code class="language-C++">const std::string &amp; ernie::app::Viewer::ViewVar () const
+</code></pre>
+<p>Switching to a backend that cannot show it goes back to <code>LdrColor</code>. </p>
+<hr>
+
+<h3 id="function-viewer-12">function Viewer [1/2]</h3>
+<p><em>Opens the window and initializes Vulkan, ImGui and the render delegate.</em> </p>
+<pre><code class="language-C++">explicit ernie::app::Viewer::Viewer (
+    Scene &amp; scene,
+    const ViewerOptions &amp; options={}
+) 
+</code></pre>
+<p><code>scene</code> must outlive the viewer. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::runtime_error</code> if the window or GPU cannot be initialized. </li>
+</ul>
+<hr>
+
+<h3 id="function-viewer-22">function Viewer [2/2]</h3>
+<pre><code class="language-C++">ernie::app::Viewer::Viewer (
+    const Viewer &amp;
+) = delete
+</code></pre>
+<hr>
+
+<h3 id="function-viewporttoggleshown">function ViewportToggleShown</h3>
+<pre><code class="language-C++">bool ernie::app::Viewer::ViewportToggleShown (
+    std::uint64_t id
+) const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for an id that is no toggle. </li>
+</ul>
+<hr>
+
+<h3 id="function-operator">function operator=</h3>
+<pre><code class="language-C++">Viewer &amp; ernie::app::Viewer::operator= (
+    const Viewer &amp;
+) = delete
+</code></pre>
+<hr>
+
+<h3 id="function-viewer">function ~Viewer</h3>
+<pre><code class="language-C++">ernie::app::Viewer::~Viewer () 
+</code></pre>
+<hr>
+<h2 id="public-static-functions-documentation">Public Static Functions Documentation</h2>
+<h3 id="function-perspectivecamera">function PerspectiveCamera</h3>
+<p><em>The viewer's perspective camera,</em> <code>/__session/Perspective</code> <em>, framing the scene's bounds when the viewer opens.</em></p>
+<pre><code class="language-C++">static const Path &amp; ernie::app::Viewer::PerspectiveCamera () 
+</code></pre>
+<hr>
+
+<h3 id="function-renderers">function Renderers</h3>
+<p><em>The render backends the viewer can switch between, such as "raster".</em> </p>
+<pre><code class="language-C++">static std::vector&lt; std::string &gt; ernie::app::Viewer::Renderers () 
+</code></pre>
+<hr>
+
+<h3 id="function-sessionroot">function SessionRoot</h3>
+<p><em>Root of the prims the viewer defines for its own use,</em> <code>/__session</code> <em>.</em></p>
+<pre><code class="language-C++">static const Path &amp; ernie::app::Viewer::SessionRoot () 
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/app/viewer.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

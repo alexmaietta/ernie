@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1LodQuadtree/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Class ernie::LodQuadtree - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Class ernie::LodQuadtree";
+        var mkdocs_page_input_path = "cpp/classernie_1_1LodQuadtree.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/classernie_1_1LodQuadtree/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Class ernie::LodQuadtree</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/classernie_1_1LodQuadtree.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-ernielodquadtree">Class ernie::LodQuadtree</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>LodQuadtree</strong></a></p>
+<p><em>Quadtree over a heightfield for continuous distance-dependent level of detail (CDLOD).</em> <a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/geometry/lod_quadtree.h&gt;</code></li>
+</ul>
+<h2 id="public-static-attributes">Public Static Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">constexpr std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-kmaxlevels"><strong>kMaxLevels</strong></a>   = <code>16</code><br><em>Most levels a tree may have; the shaders size their per-level morph table to match.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-empty"><strong>Empty</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec2</td>
+<td style="text-align: left;"><a href="#function-heightrange"><strong>HeightRange</strong></a> () const<br><em>The (min, max) height over every node, min above max without valid cells.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#function-leafcells"><strong>LeafCells</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#function-leafsize"><strong>LeafSize</strong></a> () const<br><em>World width of a level-0 node.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#function-leavesperside"><strong>LeavesPerSide</strong></a> () const<br><em>Level-0 nodes along each side:</em> <code>SetLeaves</code> <em>takes their square, row-major.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#function-levels"><strong>Levels</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-lodquadtree-13"><strong>LodQuadtree</strong></a> () = default<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-lodquadtree-23"><strong>LodQuadtree</strong></a> (const <a href="../structernie_1_1RasterView/"><strong>RasterView</strong></a> &amp; heights, std::uint32_t leafCells) <br><em>Builds the min/max height pyramid of</em> <code>heights</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-lodquadtree-33"><strong>LodQuadtree</strong></a> (std::uint32_t width, std::uint32_t height, double cellSize, std::uint32_t leafCells) <br><em>A tree over a</em> <code>width</code> <em>x</em><code>height</code> <em>raster of cells</em><code>cellSize</code> <em>wide with its north-west corner at x = y = 0, whose leaves' min and max heights come later (</em><code>SetLeaves</code> <em>), such as from the GPU; until then no node is selected.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#function-minfirstrange"><strong>MinFirstRange</strong></a> (float exaggeration, float morphStart) const<br><em>Smallest first range for which selection keeps neighbours within one level of each other and every shared edge is fully morphed on the finer side and unmorphed on the coarser side.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::pair&lt; glm::vec3, glm::vec3 &gt;</td>
+<td style="text-align: left;"><a href="#function-nodebounds"><strong>NodeBounds</strong></a> (std::uint32_t level, std::uint32_t x, std::uint32_t y, float exaggeration) const<br><em>World bounds of the node at (</em> <code>x</code> <em>,</em><code>y</code> <em>) on</em><code>level</code> <em>; empty (low &gt; high) for nodes without valid cells.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const glm::vec2 &amp;</td>
+<td style="text-align: left;"><a href="#function-nodeheights"><strong>NodeHeights</strong></a> (std::uint32_t level, std::uint32_t x, std::uint32_t y) const<br><em>The (min, max) height of the node at (</em> <code>x</code> <em>,</em><code>y</code> <em>) on</em><code>level</code> <em>, min above max without valid cells.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#function-patchcells"><strong>PatchCells</strong></a> () const<br><em>Grid quads along each patch side, half of</em> <code>LeafCells()</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1LodRange/"><strong>LodRange</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-ranges"><strong>Ranges</strong></a> (float firstRange, float morphStart) const<br><em>Per-level ranges with</em> <code>range[L] = firstRange * 2^L</code> <em>and morphing over the last</em><code>1 - morphStart</code> <em>of each band</em><code>[range[L-1], range[L]]</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-select"><strong>Select</strong></a> (const glm::vec3 &amp; eye, std::span&lt; const <a href="../structernie_1_1LodRange/"><strong>LodRange</strong></a> &gt; ranges, const <a href="../structernie_1_1Frustum/"><strong>Frustum</strong></a> * frustum, float exaggeration, std::vector&lt; <a href="../structernie_1_1LodPatch/"><strong>LodPatch</strong></a> &gt; &amp; out) const<br><em>Appends the patches to draw for an eye at</em> <code>eye</code> <em>with the given</em><code>ranges</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-selectall"><strong>SelectAll</strong></a> (std::vector&lt; <a href="../structernie_1_1LodPatch/"><strong>LodPatch</strong></a> &gt; &amp; out) const<br><em>Appends level-0 patches covering the whole raster, for drawing at full resolution.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setleaves"><strong>SetLeaves</strong></a> (std::span&lt; const glm::vec2 &gt; leaves) <br><em>Replaces every leaf's (min, max) height, min above max for a leaf without valid cells, and rebuilds the levels above.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#function-trianglecount"><strong>TriangleCount</strong></a> (std::span&lt; const <a href="../structernie_1_1LodPatch/"><strong>LodPatch</strong></a> &gt; patches) const<br><em>Triangles inside the raster drawn for</em> <code>patches</code> <em>; quads past the raster's edge collapse to zero area in the shader and are not counted.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>A level-0 node spans <code>leafCells</code> x <code>leafCells</code> grid quads; a level-L node spans <code>leafCells * 2^L</code> and the single root node covers the whole raster. The tree stores only each node's min and max height, so selection can bound nodes in 3D for range and frustum tests.</p>
+<p><code>Select</code> walks the tree from the root and picks, for each region, the coarsest level whose range covers it (Strugar 2009, algorithm 1). Every node is drawn as its four quarters, so all patches share one <code>PatchCells()</code> grid and differ only in origin and vertex spacing.</p>
+<p>Within each level's range the vertex shader morphs vertices towards the next coarser level, so switching level never pops; see <code>terrain.slang</code>. With a first range of at least <code>MinFirstRange</code>, neighbouring patches differ by at most one level and their shared edges match exactly, so no skirts or stitching are needed.</p>
+<p>References:
+* F. Strugar, "Continuous Distance-Dependent Level of Detail for Rendering Heightmaps", Journal of Graphics, GPU, and Game Tools 14(4):57-74, 2009. <a href="https://doi.org/10.1080/2151237X.2009.10129287">https://doi.org/10.1080/2151237X.2009.10129287</a>
+* P. Lindstrom, D. Koller, W. Ribarsky, L. F. Hodges, N. Faust and G. A. Turner, "Real-Time,
+  Continuous Level of Detail Rendering of Height Fields", SIGGRAPH '96, 109-118, 1996. <a href="https://doi.org/10.1145/237170.237217">https://doi.org/10.1145/237170.237217</a> </p>
+<h2 id="public-static-attributes-documentation">Public Static Attributes Documentation</h2>
+<h3 id="variable-kmaxlevels">variable kMaxLevels</h3>
+<p><em>Most levels a tree may have; the shaders size their per-level morph table to match.</em> </p>
+<pre><code class="language-C++">constexpr std::uint32_t ernie::LodQuadtree::kMaxLevels;
+</code></pre>
+<hr>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-empty">function Empty</h3>
+<pre><code class="language-C++">inline bool ernie::LodQuadtree::Empty () const
+</code></pre>
+<hr>
+
+<h3 id="function-heightrange">function HeightRange</h3>
+<p><em>The (min, max) height over every node, min above max without valid cells.</em> </p>
+<pre><code class="language-C++">inline glm::vec2 ernie::LodQuadtree::HeightRange () const
+</code></pre>
+<hr>
+
+<h3 id="function-leafcells">function LeafCells</h3>
+<pre><code class="language-C++">inline std::uint32_t ernie::LodQuadtree::LeafCells () const
+</code></pre>
+<hr>
+
+<h3 id="function-leafsize">function LeafSize</h3>
+<p><em>World width of a level-0 node.</em> </p>
+<pre><code class="language-C++">inline float ernie::LodQuadtree::LeafSize () const
+</code></pre>
+<hr>
+
+<h3 id="function-leavesperside">function LeavesPerSide</h3>
+<p><em>Level-0 nodes along each side:</em> <code>SetLeaves</code> <em>takes their square, row-major.</em></p>
+<pre><code class="language-C++">inline std::uint32_t ernie::LodQuadtree::LeavesPerSide () const
+</code></pre>
+<hr>
+
+<h3 id="function-levels">function Levels</h3>
+<pre><code class="language-C++">inline std::uint32_t ernie::LodQuadtree::Levels () const
+</code></pre>
+<hr>
+
+<h3 id="function-lodquadtree-13">function LodQuadtree [1/3]</h3>
+<pre><code class="language-C++">ernie::LodQuadtree::LodQuadtree () = default
+</code></pre>
+<hr>
+
+<h3 id="function-lodquadtree-23">function LodQuadtree [2/3]</h3>
+<p><em>Builds the min/max height pyramid of</em> <code>heights</code> <em>.</em></p>
+<pre><code class="language-C++">ernie::LodQuadtree::LodQuadtree (
+    const RasterView &amp; heights,
+    std::uint32_t leafCells
+) 
+</code></pre>
+<p>Cells that are not finite or equal the nodata value are ignored, and nodes without valid cells are never selected. The tree keeps no reference to <code>heights</code>. </p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>leafCells</code> Grid quads along a level-0 node; a power of two of at least 4. </li>
+</ul>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if <code>leafCells</code> is invalid, the raster is smaller than 2 x 2, or the tree would need more than <code>kMaxLevels</code> levels. </li>
+</ul>
+<hr>
+
+<h3 id="function-lodquadtree-33">function LodQuadtree [3/3]</h3>
+<p><em>A tree over a</em> <code>width</code> <em>x</em><code>height</code> <em>raster of cells</em><code>cellSize</code> <em>wide with its north-west corner at x = y = 0, whose leaves' min and max heights come later (</em><code>SetLeaves</code> <em>), such as from the GPU; until then no node is selected.</em></p>
+<pre><code class="language-C++">ernie::LodQuadtree::LodQuadtree (
+    std::uint32_t width,
+    std::uint32_t height,
+    double cellSize,
+    std::uint32_t leafCells
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> as the other constructor. </li>
+</ul>
+<hr>
+
+<h3 id="function-minfirstrange">function MinFirstRange</h3>
+<p><em>Smallest first range for which selection keeps neighbours within one level of each other and every shared edge is fully morphed on the finer side and unmorphed on the coarser side.</em> </p>
+<pre><code class="language-C++">float ernie::LodQuadtree::MinFirstRange (
+    float exaggeration,
+    float morphStart
+) const
+</code></pre>
+<p>For each level L below the root this needs the 3D diagonal of every level-L node to be at most <code>morphStart * range[L]</code>: any vertex on an edge between levels L and L+1 then lies between <code>range[L]</code> (finer side fully morphed) and the coarser level's morph start. </p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>morphStart</code> Fraction of each level's distance band before morphing starts, in (0, 1). </li>
+</ul>
+<hr>
+
+<h3 id="function-nodebounds">function NodeBounds</h3>
+<p><em>World bounds of the node at (</em> <code>x</code> <em>,</em><code>y</code> <em>) on</em><code>level</code> <em>; empty (low &gt; high) for nodes without valid cells.</em></p>
+<pre><code class="language-C++">std::pair&lt; glm::vec3, glm::vec3 &gt; ernie::LodQuadtree::NodeBounds (
+    std::uint32_t level,
+    std::uint32_t x,
+    std::uint32_t y,
+    float exaggeration
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-nodeheights">function NodeHeights</h3>
+<p><em>The (min, max) height of the node at (</em> <code>x</code> <em>,</em><code>y</code> <em>) on</em><code>level</code> <em>, min above max without valid cells.</em></p>
+<pre><code class="language-C++">inline const glm::vec2 &amp; ernie::LodQuadtree::NodeHeights (
+    std::uint32_t level,
+    std::uint32_t x,
+    std::uint32_t y
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-patchcells">function PatchCells</h3>
+<p><em>Grid quads along each patch side, half of</em> <code>LeafCells()</code> <em>.</em></p>
+<pre><code class="language-C++">inline std::uint32_t ernie::LodQuadtree::PatchCells () const
+</code></pre>
+<hr>
+
+<h3 id="function-ranges">function Ranges</h3>
+<p><em>Per-level ranges with</em> <code>range[L] = firstRange * 2^L</code> <em>and morphing over the last</em><code>1 - morphStart</code> <em>of each band</em><code>[range[L-1], range[L]]</code> <em>.</em></p>
+<pre><code class="language-C++">std::vector&lt; LodRange &gt; ernie::LodQuadtree::Ranges (
+    float firstRange,
+    float morphStart
+) const
+</code></pre>
+<p>The root's range is infinite and it never morphs. </p>
+<hr>
+
+<h3 id="function-select">function Select</h3>
+<p><em>Appends the patches to draw for an eye at</em> <code>eye</code> <em>with the given</em><code>ranges</code> <em>.</em></p>
+<pre><code class="language-C++">void ernie::LodQuadtree::Select (
+    const glm::vec3 &amp; eye,
+    std::span&lt; const LodRange &gt; ranges,
+    const Frustum * frustum,
+    float exaggeration,
+    std::vector&lt; LodPatch &gt; &amp; out
+) const
+</code></pre>
+<p>Nodes outside <code>frustum</code> are skipped; pass nullptr to keep everything in range. </p>
+<hr>
+
+<h3 id="function-selectall">function SelectAll</h3>
+<p><em>Appends level-0 patches covering the whole raster, for drawing at full resolution.</em> </p>
+<pre><code class="language-C++">void ernie::LodQuadtree::SelectAll (
+    std::vector&lt; LodPatch &gt; &amp; out
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-setleaves">function SetLeaves</h3>
+<p><em>Replaces every leaf's (min, max) height, min above max for a leaf without valid cells, and rebuilds the levels above.</em> </p>
+<pre><code class="language-C++">void ernie::LodQuadtree::SetLeaves (
+    std::span&lt; const glm::vec2 &gt; leaves
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a count other than <code>LeavesPerSide()</code> squared. </li>
+</ul>
+<hr>
+
+<h3 id="function-trianglecount">function TriangleCount</h3>
+<p><em>Triangles inside the raster drawn for</em> <code>patches</code> <em>; quads past the raster's edge collapse to zero area in the shader and are not counted.</em></p>
+<pre><code class="language-C++">std::uint64_t ernie::LodQuadtree::TriangleCount (
+    std::span&lt; const LodPatch &gt; patches
+) const
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/geometry/lod_quadtree.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

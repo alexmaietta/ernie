@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/annotated/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Classes - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Classes";
+        var mkdocs_page_input_path = "cpp/annotated.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/annotated/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" >C++</a>
+    <ul class="current">
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2 current"><a class="reference internal current" href="#">Classes</a>
+    <ul class="current">
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">API reference</li>
+          <li class="breadcrumb-item">C++</li>
+      <li class="breadcrumb-item active">Classes</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/annotated.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-list">Class List</h1>
+<p>Here are the classes, structs, unions and interfaces with brief descriptions:</p>
+<ul>
+<li><strong>namespace</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <a href="../classernie_1_1Prim/"><em><strong>Prim</strong></em></a> <em>types as reflected schemas: each type declares its attributes once, as a list of (C++ type, name, USD token, fallback, metadata) entries, and that list gives both a typed view class over</em><code>Scene</code> <em>(</em><code>GetRadius</code> <em>,</em><code>HasRadius</code> <em>,</em><code>SetRadius</code> <em>) and the type's entry in a runtime registry (</em><code>PrimTypeDef</code> <em>), which generic code walks: Python's typed prim classes, the viewer's property panels, loaders.</em>    <ul>
+<li><strong>class</strong> <a href="../classernie_1_1AttributeDef/"><strong>AttributeDef</strong></a> <em>One declared attribute of a prim type.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1AttributeMeta/"><strong>AttributeMeta</strong></a> <em>How an attribute is described and edited. Declared with designated initializers in this order.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits/"><strong>AttributeTraits</strong></a> <em>How the declared C++ type</em> <code>T</code> <em>reads, writes and converts:</em><code>Read</code> <em>with the fallback (accepting any numeric or vector type an author used, as</em><code>GetNumber</code> <em>does),</em><code>Write</code> <em>, and</em><code>From</code> <em>, a value as</em><code>T</code> <em>or nullopt when it cannot be one.</em></li>
+<li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01Path_01_4/"><strong>AttributeTraits&lt; Path &gt;</strong></a>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01Tensor_01_4/"><strong>AttributeTraits&lt; Tensor &gt;</strong></a> <em>Bulk data: reads the written tensor or null (there is no fallback), writes with</em> <code>Scene::Write</code> <em>.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01bool_01_4/"><strong>AttributeTraits&lt; bool &gt;</strong></a>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01double_01_4/"><strong>AttributeTraits&lt; double &gt;</strong></a>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01glm_1_1dvec2_01_4/"><strong>AttributeTraits&lt; glm::dvec2 &gt;</strong></a>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01glm_1_1dvec3_01_4/"><strong>AttributeTraits&lt; glm::dvec3 &gt;</strong></a>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01glm_1_1dvec4_01_4/"><strong>AttributeTraits&lt; glm::dvec4 &gt;</strong></a>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01int_01_4/"><strong>AttributeTraits&lt; int &gt;</strong></a>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01std_1_1string_01_4/"><strong>AttributeTraits&lt; std::string &gt;</strong></a>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01std_1_1vector_3_01Path_01_4_01_4/"><strong>AttributeTraits&lt; std::vector&lt; Path &gt; &gt;</strong></a>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1AttributeTraits_3_01std_1_1vector_3_01float_01_4_01_4/"><strong>AttributeTraits&lt; std::vector&lt; float &gt; &gt;</strong></a>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1AxisShape/"><strong>AxisShape</strong></a> <em>An implicit shape centred on its origin along one of its axes: a cylinder, cone, capsule or plane.</em> </li>
+<li><strong>class</strong> <a href="../classernie_1_1Boundable/"><strong>Boundable</strong></a> <em>What has local bounds: geometry and instancers, with an optional authored extent.</em> </li>
+<li><strong>class</strong> <a href="../classernie_1_1BoundableLight/"><strong>BoundableLight</strong></a> <em>An area light (sphere, rect, disk): a radiant power, or a photometric power or illuminance.</em> </li>
+<li><strong>struct</strong> <a href="../structernie_1_1BrdfModel/"><strong>BrdfModel</strong></a> <em>A reflectance model: shader source plus parameter metadata.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1BrdfParam/"><strong>BrdfParam</strong></a> <em>One scalar parameter of a reflectance model, with what a UI needs to edit it.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1BrdfRegistry/"><strong>BrdfRegistry</strong></a> <em>Reflectance models available to a renderer, keyed by</em> <code>BrdfModel::id</code> <em>.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1CahvoreModel/"><strong>CahvoreModel</strong></a> <em>A camera calibrated in JPL's CAHV family of models, as Mars rovers' cameras are (their PDS labels' GEOMETRIC_CAMERA_MODEL, JPL's camera model files): CAHV, a linear (pinhole) model; CAHVOR, with radial distortion about an optical axis; and CAHVORE, with a fish-eye term and an entrance pupil that moves along the optical axis with the field angle, so its rays do not meet at one point.</em>     <ul>
+<li><strong>struct</strong> <a href="../structernie_1_1CahvoreModel_1_1ErnieCamera/"><strong>ErnieCamera</strong></a> <em>The model as Ernie renders it, in the model's frame (camera to frame).</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1CahvoreModel_1_1Ray/"><strong>Ray</strong></a> <em>A projection ray: its origin (C, or for CAHVORE the entrance pupil's position for its field angle) and unit direction.</em>     </li>
+</ul>
+</li>
+<li><strong>class</strong> <a href="../classernie_1_1Camera/"><strong>Camera</strong></a> <em>A camera looking down its -z axis with +y up: UsdGeomCamera's projection, apertures, clipping, exposure and shutter, and Ernie's lens, scan, spectral sampling, sensor and view poses.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1CameraParams/"><strong>CameraParams</strong></a> <em>A camera's parameters resolved from its</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim (</em><code>CameraParamsOf</code> <em>): a physically based pinhole camera for one image, with UsdGeomCamera's pose, projection and exposure attributes, a spectral range, a lens and a sensor.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1CameraView/"><strong>CameraView</strong></a> <em>The raster view of a camera for one frame, derived from a</em> <code>CameraParams</code> <em>by</em><code>CameraParams::RasterView</code> <em>: what the rasterizer's passes need.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1Capsule/"><strong>Capsule</strong></a> <em>A cylinder with hemispherical caps along its axis.</em> </li>
+<li><strong>struct</strong> <a href="../structernie_1_1Change/"><strong>Change</strong></a> <em>A prim's changes since a consumer last looked.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1ChangeCursor/"><strong>ChangeCursor</strong></a> <em>A consumer's position in a scene's history; see</em> <code>Scene::Changes</code> <em>.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1ChunkedFrameImages/"><strong>ChunkedFrameImages</strong></a> <em>The images of a frame of a batch of views that do not fit one set of images (such as more views than an image has layers): consecutive chunks of the views, each its own</em> <code>FrameImages</code> <em>.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1ComputeArrayView/"><strong>ComputeArrayView</strong></a> <em>A Vulkan image seen by a compute API in place, as an opaque array handle (a</em> <code>CUarray</code> <em>for CUDA, a</em><code>hipArray_t</code> <em>for HIP): read it with that API's texture or surface objects or 2D array copies.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1ComputeInterop/"><strong>ComputeInterop</strong></a> <em>Zero-copy sharing between a Vulkan device and the compute device behind it (CUDA or HIP), so arrays from compute frameworks (PyTorch, JAX, CuPy, Warp, simulators) reach Ernie's buffers, and Ernie's results reach them, without passing through host memory.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1ComputePipeline/"><strong>ComputePipeline</strong></a> <em>A compute pipeline over a</em> <code>PipelineLayout</code> <em>.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1Cone/"><strong>Cone</strong></a> <em>A capped cone along its axis, its apex at +height / 2.</em> </li>
+<li><strong>struct</strong> <a href="../structernie_1_1Connection/"><strong>Connection</strong></a> <em>The source of a UsdShade connection: a</em> <a href="../classernie_1_1Shader/"><em><strong>Shader</strong></em></a> <em>prim and one of its outputs, e.g. "outputs:rgb".</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1Cube/"><strong>Cube</strong></a> <em>A box centred on its origin,</em> <code>size</code> <em>along each axis.</em></li>
+<li><strong>class</strong> <a href="../classernie_1_1CubeSphereLod/"><strong>CubeSphereLod</strong></a> <em>CDLOD terrain over a whole planet: six</em> <code>LodQuadtree</code> <em>height pyramids, one per face of a cube projected onto a sphere of radius</em><code>Radius()</code> <em>(a quadrilateralized or "cubed" sphere).</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1CubeSphereRegion/"><strong>CubeSphereRegion</strong></a> <em>Region of space holding one node of a</em> <code>CubeSphereLod</code> <em>: every direction within</em><code>angle</code> <em>of</em><code>axis</code> <em>, between radii</em><code>inner</code> <em>and</em><code>outer</code> <em>from the body's centre.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1CudaInterop/"><strong>CudaInterop</strong></a> <code>ComputeInterop</code> <em>for the CUDA device behind a Vulkan device.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1Cylinder/"><strong>Cylinder</strong></a> <em>A capped cylinder along its axis.</em> </li>
+<li><strong>struct</strong> <a href="../structernie_1_1DescriptorBinding/"><strong>DescriptorBinding</strong></a> <em>One binding of a pipeline's push-descriptor set (set 0).</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1DescriptorResource/"><strong>DescriptorResource</strong></a> <em>What a binding points at when descriptors are pushed.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1DetailSettings/"><strong>DetailSettings</strong></a> <em>Tiling of the detail albedo and normal textures.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1Device/"><strong>Device</strong></a>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1DiskLight/"><strong>DiskLight</strong></a> <em>A disk in its xy plane emitting along -z.</em> </li>
+<li><strong>class</strong> <a href="../classernie_1_1DistantLight/"><strong>DistantLight</strong></a> <em>A light at infinity shining along the -z axis of its transform, such as the Sun.</em> </li>
+<li><strong>struct</strong> <a href="../structernie_1_1DomeDirection/"><strong>DomeDirection</strong></a> <em>One of a dome map's regions of about equal energy (</em> <code>DomeDirectionsOf</code> <em>), in the map's frame.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1DomeLight/"><strong>DomeLight</strong></a> <a href="../classernie_1_1Light/"><em><strong>Light</strong></em></a> <em>from every direction, optionally from a latitude-longitude map.</em></li>
+<li><strong>struct</strong> <a href="../structernie_1_1DomeParams/"><strong>DomeParams</strong></a> <em>An environment light at infinity (UsdLux</em> <a href="../classernie_1_1DomeLight/"><em><strong>DomeLight</strong></em></a> <em>) resolved for a frame (</em><code>DomeParamsOf</code> <em>): radiance from every direction, the spectrum</em><code>radiance</code> <em>(W m^-2 sr^-1 nm^-1 per camera band) times a relative RGB map whose cosine-convolved spherical harmonics are</em><code>sh</code> <em>.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1DomeSun/"><strong>DomeSun</strong></a> <em>A sun found in a dome's map (</em> <code>ExtractDomeSun</code> <em>), in the map's frame.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1DomeSunExtraction/"><strong>DomeSunExtraction</strong></a> <em>The sun of a latitude-longitude dome map (</em> <code>tokens::kLightTexture</code> <em>layout) and the map without it, for lighting the sun as a shadowed distant light while the dome keeps the rest of the sky.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1EditHistory/"><strong>EditHistory</strong></a> <em>Undo and redo for scene edits made through it: attribute sets and clears, prims defined, and prims removed with their descendants.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1FrameId/"><strong>FrameId</strong></a> <em>Where an image sits in the deterministic random streams of</em> <code>sampling.h</code> <em>.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1FrameImages/"><strong>FrameImages</strong></a> <em>The images a backend renders one frame of a render product into, by render var name: what</em> <code>RenderVarOutput</code> <em>reads, whatever the backend.</em>    <ul>
+<li><strong>struct</strong> <a href="../structernie_1_1FrameImages_1_1LinearVar/"><strong>LinearVar</strong></a> <em>A render var the frame holds as one linear buffer over every view rather than an image: written by the frame's own submission, in memory a compute API views in place (</em> <code>BufferMemory::Shared</code> <em>), texels of</em><code>format</code> <em>view after view.</em>    </li>
+</ul>
+</li>
+<li><strong>struct</strong> <a href="../structernie_1_1FrameParams/"><strong>FrameParams</strong></a> <em>Per-frame parameters of a render, whatever the backend: the camera, the sun, the other lights, the sensor filters and the frame's place in the random streams.</em>     <ul>
+<li><strong>struct</strong> <a href="../structernie_1_1FrameParams_1_1SensorChain/"><strong>SensorChain</strong></a> <em>Several sensor chains over the one raster image, each writing its own vars (render vars with their own</em> <code>ernie:filters</code> <em>); empty runs</em><code>filters</code> <em>for</em><code>vars</code> <em>.</em>    </li>
+</ul>
+</li>
+<li><strong>class</strong> <a href="../classernie_1_1FrameUploads/"><strong>FrameUploads</strong></a> <em>Host data bound for device buffers, staged for one frame in flight and copied by that frame's own commands (</em> <code>Record</code> <em>), so the host can prepare a frame while the device still runs earlier ones that read the same buffers: the copies wait on the device for that earlier work, in queue order, rather than the host waiting for it.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1Frustum/"><strong>Frustum</strong></a> <em>Six world-space clip planes of a view-projection matrix, for culling axis-aligned boxes.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1Gprim/"><strong>Gprim</strong></a> <em>Geometry: drawn in a display colour, or with a bound material.</em> </li>
+<li><strong>class</strong> <a href="../classernie_1_1GpuBuffer/"><strong>GpuBuffer</strong></a> <em>A Vulkan buffer with its memory, allocated through VMA.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1GpuImage/"><strong>GpuImage</strong></a> <em>A device-local Vulkan image with a view of all its mips and layers, allocated through VMA.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1GpuTimer/"><strong>GpuTimer</strong></a> <em>Times GPU zones (</em> <code>ERNIE_GPU_ZONE</code> <em>) for Ernie's profiler (</em><a href="../profiler_8h/"><em><strong>ernie/util/profiler.h</strong></em></a> <em>) with timestamp queries: a zone writes one timestamp where it starts and one where it ends in its command buffer, and</em><code>Collect</code> <em>hands finished zones to the profiler without waiting for the device, then frees their queries by host reset (Vulkan 1.2's hostQueryReset).</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1GpuXform/"><strong>GpuXform</strong></a> <em>A prim posed on the GPU: its transform ops are rows of GPU arrays, one row per prim of one</em> <code>Scene::Write</code> <em>of many paths, so a renderer composes its local transform per instance from the arrays whole, as a</em><a href="../classernie_1_1PointInstancer/"><em><strong>PointInstancer</strong></em></a> <em>'s: translate, then orient, then scale.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1GraphicsPipeline/"><strong>GraphicsPipeline</strong></a> <em>A graphics pipeline for dynamic rendering, with dynamic viewport and scissor and no culling.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1GraphicsPipelineDesc/"><strong>GraphicsPipelineDesc</strong></a> <em>Fixed-function state of a graphics pipeline that draws triangle lists without vertex buffers.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1GroundPlane/"><strong>GroundPlane</strong></a> <em>Ernie: an infinite horizontal floor facing +z at a world height, drawn with its material, optionally as a checkerboard.</em> </li>
+<li><strong>struct</strong> <a href="../structernie_1_1IesProfile/"><strong>IesProfile</strong></a> <em>A luminaire's photometric profile from an IES LM-63 file (type C photometry): its luminous intensity in candela over the vertical angle theta from its nadir (0, straight down its axis) to its zenith (180 degrees) and the horizontal angle phi around the axis.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1Image/"><strong>Image</strong></a> <em>RGBA image with linear float channels, rows top to bottom.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1ImageDesc/"><strong>ImageDesc</strong></a> <em>Description of a 2D image or 2D image array.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1Imageable/"><strong>Imageable</strong></a> <em>What every prim has: visibility and the world it is in.</em> </li>
+<li><strong>struct</strong> <a href="../structernie_1_1InstanceData/"><strong>InstanceData</strong></a> <em>Per-instance arrays of a point instancer, as UsdGeomPointInstancer defines them.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1IsdCameraModel/"><strong>IsdCameraModel</strong></a> <em>What usgscsm's camera models of image support data share, in the body-fixed frame in metres:</em>     <ul>
+<li><strong>struct</strong> <a href="../structernie_1_1IsdCameraModel_1_1FrameView/"><strong>FrameView</strong></a> <em>A frame of the detector as Ernie renders it: a frame camera of the image's samples by its rows, posed (</em> <code>camera.transform</code> <em>, camera to body-fixed world) when the frame is exposed, the lens's distortion fitted as Brown-Conrady terms (and scale).</em>    </li>
+</ul>
+</li>
+<li><strong>class</strong> <a href="../classernie_1_1IsdFrame/"><strong>IsdFrame</strong></a> <em>A frame camera from its image support data, its geometry as usgscsm's frame model (</em> <code>UsgsAstroFrameSensorModel</code> <em>) computes it (</em><code>IsdCameraModel</code> <em>): the whole image is exposed at once, at the ISD's centre time, from one position and orientation.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1IsdLineScanner/"><strong>IsdLineScanner</strong></a> <em>A line scanner (pushbroom camera) from its image support data, its geometry as usgscsm's line scanner model (</em> <code>UsgsAstroLsSensorModel</code> <em>) computes it (</em><code>IsdCameraModel</code> <em>): line l is exposed around its time</em><code>ImageTime(l)</code> <em>, a rate's start time plus its seconds per line times (l - its start line + 0.5), through detector line 0.</em>    <ul>
+<li><strong>struct</strong> <a href="../structernie_1_1IsdLineScanner_1_1Strip/"><strong>Strip</strong></a> <em>A strip of</em> <code>lines</code> <em>image lines from</em><code>firstLine</code> <em>as Ernie renders it: a pushbroom camera (</em><code>CameraParams::pushbroom</code> <em>) whose rows are those lines, posed</em><code>from</code> <em>at the strip's first line's start and</em><code>to</code> <em>at its end (camera to body-fixed world).</em>    </li>
+</ul>
+</li>
+<li><strong>class</strong> <a href="../classernie_1_1IsdPushFrame/"><strong>IsdPushFrame</strong></a> <em>A push-frame camera (LROC's WAC, MRO's MARCI) from its image support data, its geometry as usgscsm's push-frame model (</em> <code>UsgsAstroPushFrameSensorModel</code> <em>) computes it (</em><code>IsdCameraModel</code> <em>): the image is a stack of framelets, each a frame of</em><code>FrameletLines</code> <em>lines exposed at once.</em>    <ul>
+<li><strong>struct</strong> <a href="../structernie_1_1IsdPushFrame_1_1Framelet/"><strong>Framelet</strong></a> <a href="../structernie_1_1IsdPushFrame_1_1Framelet/"><em><strong>Framelet</strong></em></a> __<code>framelet</code> <em>(in image order, from the top) as Ernie renders it: a frame camera of the image's samples by</em><code>FrameletLines</code> <em>lines, posed when it is exposed (camera to body-fixed world), its exposure the ISD's, the lens's distortion fitted as Brown-Conrady terms (and scale).</em>    </li>
+</ul>
+</li>
+<li><strong>struct</strong> <a href="../structernie_1_1IsdRotation/"><strong>IsdRotation</strong></a> <em>A rotation sampled over time between two NAIF frames, as ALE reads it (</em> <code>ale::Orientations</code> <em>): quaternions (w, x, y, z, scalar first) of the time-dependent rotation of vectors from the reference frame into the first of</em><code>timeDependentFrames</code> <em>, and a constant rotation (row-major, applied to vectors after it) on into the first of</em><code>constantFrames</code> <em>.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1IsdSamples/"><strong>IsdSamples</strong></a> <em>States sampled over time: ephemeris times (seconds past J2000, TDB) and a value at each.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1IsdSensor/"><strong>IsdSensor</strong></a> <em>A camera's image support data (ISD) in the Community Sensor Model's JSON form, as ALE (the USGS Abstraction Layer for Ephemerides) writes it from SPICE kernels for planetary cameras such as LRO's NAC and WAC, MRO's CTX and HiRISE: the image's size and timing, the focal plane's map to detector pixels, the optics, and the spacecraft's and the body's states over the image.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1LensModel/"><strong>LensModel</strong></a> <em>A lens: its projection, natural vignetting and transmission.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1LensRayTable/"><strong>LensRayTable</strong></a> <em>A lens given as its rays: unit directions in the camera's frame at every</em> <code>step</code> <em>th sensor pixel corner, (</em><code>width</code> <em>/</em><code>step</code> <em>+ 1) by (</em><code>height</code> <em>/</em><code>step</code> <em>+ 1) of them row by row from the top left, interpolated between.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1Light/"><strong>Light</strong></a> <em>Any light: UsdLux's LightAPI inputs, its spectrum's shape and Ernie's physical spectrum.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1LightParams/"><strong>LightParams</strong></a> <em>A light besides the sun, resolved for a frame from its prim (</em> <code>LightParamsOf</code> <em>).</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1LodPatch/"><strong>LodPatch</strong></a> <em>One square patch of</em> <code>PatchCells()</code> <em>x</em><code>PatchCells()</code> <em>grid quads whose vertices are</em><code>2^level</code> <em>raster cells apart.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1LodQuadtree/"><strong>LodQuadtree</strong></a> <em>Quadtree over a heightfield for continuous distance-dependent level of detail (CDLOD).</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1LodRange/"><strong>LodRange</strong></a> <em>Distances from the LOD eye, in world units, over which one level's vertices morph towards the next coarser level's.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1LrocWacBandSpec/"><strong>LrocWacBandSpec</strong></a> <em>One WAC band's published values.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1MappedRenderVar/"><strong>MappedRenderVar</strong></a> <em>A mapped render var: a tensor for</em> <code>Cpu</code> <em>and</em><code>Gpu</code> <em>, a compute array for</em><code>GpuArray</code> <em>.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1Mars2020Hazcam/"><strong>Mars2020Hazcam</strong></a> <em>The Hazcams' optics (Maki et al.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1Mars2020Navcam/"><strong>Mars2020Navcam</strong></a> <em>The Mars 2020 rover Perseverance's Navcam pair (Maki et al. 2020, Table 2).</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1MastcamZ/"><strong>MastcamZ</strong></a>     <ul>
+<li><strong>struct</strong> <a href="../structernie_1_1MastcamZ_1_1Filter/"><strong>Filter</strong></a> <em>A filter's Table 3 effective wavelength and half width at half maximum, nm (for filter 0, the green Bayer channel's), and its neutral density (filter 7's; 0 otherwise).</em>     </li>
+</ul>
+</li>
+<li><strong>class</strong> <a href="../classernie_1_1Material/"><strong>Material</strong></a> <em>How a surface reflects light: Ernie's own inputs, or a UsdPreviewSurface its</em> <code>outputs:surface</code> <em>connects to.</em></li>
+<li><strong>struct</strong> <a href="../structernie_1_1MaterialSettings/"><strong>MaterialSettings</strong></a> <em>How a surface reflects light: a material's settings.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1Mesh/"><strong>Mesh</strong></a> <em>A polygon mesh: points and the faces over them.</em> </li>
+<li><strong>struct</strong> <a href="../structernie_1_1MeshData/"><strong>MeshData</strong></a> <em>Triangle mesh geometry in a mesh's own frame.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1NamedCahvore/"><strong>NamedCahvore</strong></a> <em>A named camera model in a frame, as camera model files list them.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1NonboundableLight/"><strong>NonboundableLight</strong></a> <em>A light at infinity (distant, dome), whose photometric brightness is an illuminance.</em> </li>
+<li><strong>struct</strong> <a href="../structernie_1_1NormalEquations/"><strong>NormalEquations</strong></a> <em>Accumulates the normal equations of a linear least-squares fit, row by row.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1OffscreenTarget/"><strong>OffscreenTarget</strong></a> <em>A colour and depth target for headless rendering, with readback of the colour image.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1OrbitController/"><strong>OrbitController</strong></a> <em>Interactive orbit control of a</em> <code>CameraParams</code> <em>around a target point in a z-up world, for inspecting terrain.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1Overlay/"><strong>Overlay</strong></a> <em>A named layer of debug drawing: lines, shapes, markers and labels in world coordinates, drawn over the images of render products that ask for it (</em> <code>tokens::kOverlays</code> <em>), after the sensor filters, so they never reach observations that do not.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1OverlayItem/"><strong>OverlayItem</strong></a> <em>What every overlay item carries besides its geometry.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1OverlaySegment/"><strong>OverlaySegment</strong></a> <em>A line segment of</em> <code>width</code> <em>pixels.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1OverlaySprite/"><strong>OverlaySprite</strong></a> <em>A rectangle facing the image at a fixed size in pixels, placed by a world point:</em> <code>rect</code> <em>spans (x0, y0) to (x1, y1) pixels from where</em><code>anchor</code> <em>projects, y down.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> <em>How overlay items look.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1OverlayTriangle/"><strong>OverlayTriangle</strong></a> <em>A filled triangle.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1Path/"><strong>Path</strong></a> <em>Absolute path naming a prim in a</em> <code>Scene</code> <em>, as in USD:</em><code>/</code> <em>is the root and</em><code>/World/Sun</code> <em>is the child</em><code>Sun</code> <em>of</em><code>/World</code> <em>.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1PipelineLayout/"><strong>PipelineLayout</strong></a> <em>A pipeline layout with one push-descriptor set and an optional push-constant block shared by all stages.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1Plane/"><strong>Plane</strong></a> <em>A one-sided rectangle facing along its axis.</em> </li>
+<li><strong>class</strong> <a href="../classernie_1_1PointBased/"><strong>PointBased</strong></a> <em>Geometry from an array of points: a mesh or a point cloud.</em> </li>
+<li><strong>class</strong> <a href="../classernie_1_1PointInstancer/"><strong>PointInstancer</strong></a> <em>Instances of its prototypes (the</em> <code>prototypes</code> <em>relationship's targets) at rows of positions, orientations and scales.</em></li>
+<li><strong>class</strong> <a href="../classernie_1_1Points/"><strong>Points</strong></a> <a href="../classernie_1_1Points/"><em><strong>Points</strong></em></a> <em>drawn as spheres</em><code>widths</code> <em>across, coloured by their display colour.</em></li>
+<li><strong>class</strong> <a href="../classernie_1_1Prim/"><strong>Prim</strong></a> <em>Handle to a prim in a</em> <code>Scene</code> <em>: its path plus the scene, for chained edits.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1PrimSet/"><strong>PrimSet</strong></a> <em>A fixed list of prims to write rows of one tensor to at once (</em> <code>Scene::Write</code> <em>), such as a simulation's bodies every step: the scene looks the prims up the first time and keeps them, looking them up again only after prims are removed or for another scene.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1PrimTypeDef/"><strong>PrimTypeDef</strong></a> <em>A registered prim type: its name (</em> <code>Scene::Define</code> <em>'s type), its base, and the attributes it declares itself; abstract ones, such as "Light", are bases only.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1ProductFrame/"><strong>ProductFrame</strong></a> <em>A rendered frame of a render product: its render targets and how to reach them.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1PushbroomStrip/"><strong>PushbroomStrip</strong></a> <em>A pushbroom camera's strip for one frame (</em> <code>CameraParams::pushbroom</code> <em>), as its shaders project with it (projection_pushbroom.slang): its rows' poses run from</em><code>from</code> <em>(the top row's camera position) to</em><code>to</code> <em>(the bottom row's), turning from</em><code>fromRotation</code> <em>to</em><code>toRotation</code> <em>along the great arc.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1RasterView/"><strong>RasterView</strong></a> <em>Non-owning view of a north-up grid of</em> <code>float</code> <em>samples with square cells: the form in which Ernie takes heightfields and albedo maps.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1RectLight/"><strong>RectLight</strong></a> <em>A rectangle in its xy plane emitting along -z.</em> </li>
+<li><strong>class</strong> <a href="../classernie_1_1RenderDelegate/"><strong>RenderDelegate</strong></a> <em>A render backend for a</em> <code>Scene</code> <em>, after Hydra's HdRenderDelegate: the rasterizer, and in future ray and path tracers, behind one interface that applications, the GUI viewer and the Python bindings drive without knowing which backend renders.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1RenderPrims/"><strong>RenderPrims</strong></a> <em>The prims a render of</em> <code>scene</code> <em>uses, as every render delegate resolves them:</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1RenderProduct/"><strong>RenderProduct</strong></a> <em>One image a render writes: its camera (or a batch of cameras), resolution, render vars and sensor filter chain.</em> </li>
+<li><strong>struct</strong> <a href="../structernie_1_1RenderProductOutput/"><strong>RenderProductOutput</strong></a> <em>The outputs of one render product in a step: its render vars by name.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1RenderProductSpec/"><strong>RenderProductSpec</strong></a> <em>A render product to draw, resolved from UsdRender prims.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1RenderSettings/"><strong>RenderSettings</strong></a> <em>A render's settings: its camera, resolution and products, and the rasterizer's options.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1RenderSettingsBase/"><strong>RenderSettingsBase</strong></a> <em>What render settings and products share (UsdRender's</em> <a href="../classernie_1_1RenderSettingsBase/"><em><strong>RenderSettingsBase</strong></em></a> <em>): the camera, the resolution, and what a product sets in place of its settings' (overlays, minimal shading).</em></li>
+<li><strong>struct</strong> <a href="../structernie_1_1RenderStats/"><strong>RenderStats</strong></a> <em>What a delegate holds, for statistics panels.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1RenderVar/"><strong>RenderVar</strong></a> <em>An output of a render product, named by its source, optionally with its own sensor chain.</em> </li>
+<li><strong>class</strong> <a href="../classernie_1_1RenderVarOutput/"><strong>RenderVarOutput</strong></a> <em>One render var of one rendered frame, such as</em> <code>LdrColor</code> <em>, named after UsdRender's</em><a href="../classernie_1_1RenderVar/"><em><strong>RenderVar</strong></em></a> <em>.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1Renderer/"><strong>Renderer</strong></a> <em>Ernie's front door for rendering a</em> <code>Scene</code> <em>headless: a GPU and a render backend on it, with no graphics API to set up.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1RendererInfo/"><strong>RendererInfo</strong></a> <em>What a render backend is and does, so applications, settings panels and bindings can adapt.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1RendererOptions/"><strong>RendererOptions</strong></a> <em>Options for creating a</em> <code>Renderer</code> <em>.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1RenderingTarget/"><strong>RenderingTarget</strong></a> <em>Attachments of one dynamic-rendering pass.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1Sampler/"><strong>Sampler</strong></a> <em>An owned</em> <code>VkSampler</code> <em>.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1SamplerDesc/"><strong>SamplerDesc</strong></a> <a href="../classernie_1_1Sampler/"><em><strong>Sampler</strong></em></a> <em>filtering and addressing.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> <em>A lightweight, USD-shaped scene for Ernie: a tree of typed prims named by</em> <code>Path</code> <em>, each holding attributes by USD name, plus change tracking for render delegates.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1SchemaView/"><strong>SchemaView</strong></a> <em>Base of the typed views: a handle to one prim of a registered type, read-only when made from a const scene.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1Scope/"><strong>Scope</strong></a> <em>A grouping without a transform of its own.</em> </li>
+<li><strong>class</strong> <a href="../classernie_1_1ScopedGpuZone/"><strong>ScopedGpuZone</strong></a> <em>An</em> <code>ERNIE_GPU_ZONE</code> <em>for Ernie's profiler: timestamps around the rest of the scope's commands.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1SensorChannel/"><strong>SensorChannel</strong></a> <em>One channel of a sensor: its quantum efficiency (electrons per photon) over wavelength.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1SensorFilterModel/"><strong>SensorFilterModel</strong></a> <em>A sensor filter written in Slang, run in the fused sensor kernel like the built-in ones: a struct</em> <code>typeName</code> <em>in module</em><code>slang</code> <em>implementing</em><code>IBandFilter</code> <em>(kind</em><code>Band</code> <em>, domain</em><code>Spectrum</code> <em>),</em><code>IPixelFilter</code> <em>(kind</em><code>Pixel</code> <em>, on one of the other domains), or for kind</em><code>Spatial</code> <em>, which reads the pixels around its own,</em><code>ISpatialBandFilter</code> <em>(domain</em><code>Spectrum</code> <em>) or</em><code>ISpatialPixelFilter</code> <em>(the other domains).</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1SensorFilterOutput/"><strong>SensorFilterOutput</strong></a> <em>One output of a sensor filter.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1SensorFilterParam/"><strong>SensorFilterParam</strong></a> <em>A custom filter's parameter: a float its prim sets as</em> <code>inputs:&lt;name&gt;</code> <em>, or with</em><code>size</code> <em>above 1 an array of floats (</em><code>float name[size]</code> <em>in the filter's</em><code>Params</code> <em>, such as a curve; sensor.slang's</em><code>curveAt</code> <em>reads one), which the prim sets as a float array of any length, resampled linearly to</em><code>size</code> <em>(a single number fills it).</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1SensorFilterPrim/"><strong>SensorFilterPrim</strong></a> <em>A SensorFilter prim (Ernie), one step of a sensor filter chain: a filter type and its</em> <code>inputs:*</code> <em>parameters.</em></li>
+<li><strong>class</strong> <a href="../classernie_1_1SensorFilterRegistry/"><strong>SensorFilterRegistry</strong></a> <em>Custom sensor filters a renderer can run, by</em> <code>SensorFilterModel::id</code> <em>.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1SensorFilterStep/"><strong>SensorFilterStep</strong></a> <em>One filter of a product's chain: a SensorFilter prim's</em> <code>ernie:filter:type</code> <em>, a built-in's name or a registered filter's id, with the floats of its</em><code>inputs:*</code> <em>attributes by name (without "inputs:").</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1SensorModel/"><strong>SensorModel</strong></a> <em>An image sensor: channels with quantum efficiency curves, full well, noise, gain and ADC.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1Shader/"><strong>Shader</strong></a> <em>A node of a material's network, of the type</em> <code>info:id</code> <em>names, its inputs constants or connections (</em><code>&lt;input&gt;.connect</code> <em>) to other shaders' outputs.</em></li>
+<li><strong>class</strong> <a href="../classernie_1_1ShaderCompiler/"><strong>ShaderCompiler</strong></a> <em>Compiles Slang modules at run time with the Slang compiler library, so shaders can be composed from built-in and user-supplied modules (such as custom reflectance models).</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1ShaderModuleSource/"><strong>ShaderModuleSource</strong></a> <em>One Slang module given as source text. Other modules</em> <code>import</code> <em>it by</em><code>name</code> <em>.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1ShadowSettings/"><strong>ShadowSettings</strong></a> <em>Cascaded shadow map options.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1SigmoidSpectrum/"><strong>SigmoidSpectrum</strong></a> <em>A smooth reflectance spectrum in Jakob and Hanika's sigmoid-polynomial form: s(lambda) = 1/2 + x / (2 sqrt(1 + x^2)) with x = c0 t^2 + c1 t + c2 and t the wavelength mapped from 360-830 nm to 0-1.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1SpectralBands/"><strong>SpectralBands</strong></a> <em>A wavelength range split into</em> <code>count</code> <em>bands of equal width, the spectral sampling of one camera.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1Spectrum/"><strong>Spectrum</strong></a> <em>A spectrum tabulated at increasing wavelengths and linearly interpolated between them; constant beyond the first and last samples.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1Sphere/"><strong>Sphere</strong></a> <em>A sphere centred on its origin.</em> </li>
+<li><strong>class</strong> <a href="../classernie_1_1SphereLight/"><strong>SphereLight</strong></a> <em>A sphere (or point) light, optionally shaped to a cone around its -z axis.</em> </li>
+<li><strong>struct</strong> <a href="../structernie_1_1Star/"><strong>Star</strong></a> <em>One star of a</em> <code>StarField</code> <em>, as renders take it: where it is and the black-body spectrum it shines with.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1StarCatalogue/"><strong>StarCatalogue</strong></a> <em>A star catalogue as a</em> <a href="../classernie_1_1StarField/"><em><strong>StarField</strong></em></a> <em>'s arrays take it: right ascension and declination in degrees, visual magnitude and B-V colour index per star.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1StarField/"><strong>StarField</strong></a> <em>Stars from a catalogue as points of light at infinity, behind everything else, each with a black-body spectrum.</em> </li>
+<li><strong>struct</strong> <a href="../structernie_1_1StarFieldParams/"><strong>StarFieldParams</strong></a> <em>The stars of a</em> <a href="../classernie_1_1StarField/"><em><strong>StarField</strong></em></a> <em>prim (</em><code>StarsOf</code> <em>) are uploaded when they change; each frame takes only where the catalogue's frame lies (</em><code>StarFieldParamsOf</code> <em>).</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1StepOperation/"><strong>StepOperation</strong></a> <em>A submitted step: poll or wait for its GPU work, then fetch its outputs.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1Swapchain/"><strong>Swapchain</strong></a> <em>A presentation swapchain for a window surface, with one "rendered" semaphore per image.</em>     <ul>
+<li><strong>struct</strong> <a href="../structernie_1_1Swapchain_1_1Frame/"><strong>Frame</strong></a> <em>One acquired image, ready to render into after waiting on</em> <code>acquired</code> <em>; signal</em><code>rendered</code> <em>when done and pass the frame to</em><code>Present</code> <em>.</em>    </li>
+</ul>
+</li>
+<li><strong>class</strong> <a href="../classernie_1_1Targets/"><strong>Targets</strong></a> <em>Relationship targets given to a setter: one target (a</em> <code>Path</code> <em>or its text), stored as a single</em><code>Path</code> <em>, or a list of them, stored as a list; reads take either.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> <em>A strided n-dimensional view of typed memory with an optional owner that keeps it alive: Ernie's end of DLPack.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1Terrain/"><strong>Terrain</strong></a> <em>A north-up heightfield (x east, y north, z up) drawn with its bound material, or, with a planet radius, a whole planet of six cube faces (</em> <code>CubeSphereLod</code> <em>).</em></li>
+<li><strong>struct</strong> <a href="../structernie_1_1TextureReader/"><strong>TextureReader</strong></a> <em>A texture read through mesh texture coordinates: a UsdUVTexture with the primvar reader and UsdTransform2d feeding it, which is also glTF's textureInfo with KHR_texture_transform and MaterialX's image, texcoord and place2d nodes.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1TimelinePoint/"><strong>TimelinePoint</strong></a> <em>A wait for or a signal of a timeline semaphore value in a submission.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1TriangleCorners/"><strong>TriangleCorners</strong></a> <em>Where each corner of</em> <code>TriangulateFaces</code> <em>' triangles comes from: its face and its position in</em><code>faceVertexIndices</code> <em>, for primvars with uniform and faceVarying interpolation.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1Value/"><strong>Value</strong></a> <em>A scene attribute value: one of the scalar, vector, matrix, token, relationship and small-array types Ernie's schemas use.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1Volume/"><strong>Volume</strong></a> <em>A volume (UsdVol); Ernie does not draw volumes yet.</em> </li>
+<li><strong>class</strong> <a href="../classernie_1_1VulkanContext/"><strong>VulkanContext</strong></a> <em>Owns a Vulkan instance, device, graphics and compute queue, and memory allocator.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1VulkanContextOptions/"><strong>VulkanContextOptions</strong></a> <em>Options for</em> <code>VulkanContext::Create</code> <em>.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1Xform/"><strong>Xform</strong></a> <em>A transform grouping its children.</em> </li>
+<li><strong>struct</strong> <a href="../structernie_1_1XformOps/"><strong>XformOps</strong></a> <em>A prim's local transform as translate, rotate (Euler angles or a quaternion) and scale, the ops of USD's UsdGeomXformCommonAPI.</em>     </li>
+<li><strong>namespace</strong> <a href="../namespaceernie_1_1app/"><strong>app</strong></a>     <ul>
+<li><strong>struct</strong> <a href="../structernie_1_1app_1_1CreatableType/"><strong>CreatableType</strong></a> <em>A prim type the viewer's Create menu makes, with its menu label and group, the name new prims take, and the prim they go under unless a group prim is selected.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1app_1_1CreateContext/"><strong>CreateContext</strong></a> <em>Where a new prim goes and what it starts from.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1app_1_1Demo/"><strong>Demo</strong></a> <em>A demo: a scene built in the constructor, advanced by</em> <code>Step</code> <em>, drawn by</em><code>Render</code> <em>and checked by</em><code>TestFinal</code> <em>, run by</em><code>DemoRunner</code> <em>in a window, headless or without a viewer.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1app_1_1DemoInfo/"><strong>DemoInfo</strong></a> <em>A demo the runner can build, for the Demos panel and</em> <code>DemoMain</code> <em>.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1app_1_1DemoOptions/"><strong>DemoOptions</strong></a> <em>The options every demo takes (</em> <code>ParseDemoOptions</code> <em>), as Newton's examples share theirs.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1app_1_1DemoRunner/"><strong>DemoRunner</strong></a> <em>Runs demos as Newton's examples run: opens the viewer the options ask for (or none), runs a demo until its window closes or it has run its frames, then writes</em> <code>--output</code> <em>, runs its final test and reports the benchmark.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1app_1_1DirectoryEntry/"><strong>DirectoryEntry</strong></a> <em>One row of a folder listing.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1app_1_1DockSizes/"><strong>DockSizes</strong></a> <em>The default layout's docks as fractions of the window: what each takes of the space left once the docks before it are placed (left, then the right column, then the bottom).</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1app_1_1FileDialog/"><strong>FileDialog</strong></a> <em>A modal file browser drawn with Dear ImGui, which</em> <code>Viewer</code> <em>shows for</em><code>OpenFileDialog</code> <em>: a folder's contents with an Up button, an editable path and shortcuts to home, the working directory, the root and the folders used recently, a name field, a file type menu and Open (or Save) and Cancel.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1app_1_1FileDialogOptions/"><strong>FileDialogOptions</strong></a> <em>What a file dialog asks for (</em> <code>Viewer::OpenFileDialog</code> <em>).</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1app_1_1FileFilter/"><strong>FileFilter</strong></a> <em>A choice of the file dialog's file type menu: a label and the extensions it shows, such as {"Terrain configurations", {".json"}}; no extensions shows every file.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1app_1_1FrameInfo/"><strong>FrameInfo</strong></a> <em>Per-frame information passed to</em> <code>OnFrame</code> <em>,</em><code>OnPreRender</code> <em>and</em><code>OnPostRender</code> <em>callbacks.</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1app_1_1FunctionPanel/"><strong>FunctionPanel</strong></a> <em>A panel that draws its contents by calling a function.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1app_1_1LogEntry/"><strong>LogEntry</strong></a> <em>One message of the viewer's log (</em> <code>Viewer::Log</code> <em>).</em>    </li>
+<li><strong>class</strong> <a href="../classernie_1_1app_1_1Panel/"><strong>Panel</strong></a> <em>A dockable window of the viewer.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1app_1_1PropertyField/"><strong>PropertyField</strong></a> <em>One known attribute a panel edits: how to show it, and what Ernie uses when it is not authored.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1app_1_1PropertySection/"><strong>PropertySection</strong></a> <em>A titled group of fields, such as a prim type's "Light" or "Shape" attributes.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1app_1_1Theme/"><strong>Theme</strong></a> <em>Colours (sRGB-encoded with alpha, as written to the screen) and metrics of the viewer's UI.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> <em>An interactive window onto an Ernie</em> <code>Scene</code> <em>: a docked viewport rendering the scene with a</em><code>RenderDelegate</code> <em>(the rasterizer), plus Stage, Property, Render Settings, Sensor, Stats and Log panels.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1app_1_1ViewerOptions/"><strong>ViewerOptions</strong></a> <em>Options for opening a</em> <code>Viewer</code> <em>.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1app_1_1ViewportDisplay/"><strong>ViewportDisplay</strong></a> <em>What the viewport draws over the scene, as Kit's viewport "show by type" menu (the eye) and heads-up display settings choose.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1app_1_1WidgetPanel/"><strong>WidgetPanel</strong></a> <em>A panel of simple widgets described by data rather than ImGui calls, so code without ImGui bindings (Python) can build one.</em>     </li>
+<li><strong>namespace</strong> <a href="../namespaceernie_1_1app_1_1icons/"><strong>icons</strong></a> <em>Lucide icon glyphs (lucide-static 1.52.0, private-use codepoints) as UTF-8 strings, for text drawn with the viewer's font, which has the icons merged in:</em> <code>ImGui::Button(icons::kSave)</code> <em>, or</em><code>std::string(icons::kCamera) + " Camera"</code> <em>as a label.</em>    </li>
+</ul>
+</li>
+<li><strong>namespace</strong> <a href="../namespaceernie_1_1detail/"><strong>detail</strong></a> <em>What the view macros expand to.</em>     </li>
+<li><strong>namespace</strong> <a href="../namespaceernie_1_1profiler/"><strong>profiler</strong></a> <em>Ernie's in-process profiler: the zones of</em> <code>ERNIE_ZONE</code> <em>and</em><code>ERNIE_GPU_ZONE</code> <em>(</em><a href="../profile_8h/"><em><strong>ernie/util/profile.h</strong></em></a> <em>,</em><a href="../gpu__profile_8h/"><em><strong>ernie/device/gpu_profile.h</strong></em></a> <em>) recorded frame by frame for a profiler panel, alongside Tracy's (which streams them to its own viewer in a profiling build).</em>    <ul>
+<li><strong>struct</strong> <a href="../structernie_1_1profiler_1_1Frame/"><strong>Frame</strong></a> <em>One frame's zones.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1profiler_1_1ScopedZone/"><strong>ScopedZone</strong></a> <em>Times the rest of the enclosing scope as a CPU zone named</em> <code>name</code> <em>while recording.</em>    </li>
+<li><strong>struct</strong> <a href="../structernie_1_1profiler_1_1Zone/"><strong>Zone</strong></a> <em>A timed span: a CPU zone of thread</em> <code>thread</code> <em>, or a GPU zone (</em><code>thread</code> <em>unused) on the device's own clock.</em>    </li>
+</ul>
+</li>
+<li><strong>namespace</strong> <a href="../namespaceernie_1_1render__vars/"><strong>render_vars</strong></a> <em>Render var names, after Omniverse's where it has the quantity.</em>     </li>
+<li><strong>namespace</strong> <a href="../namespaceernie_1_1tokens/"><strong>tokens</strong></a> <a href="../classernie_1_1Prim/"><em><strong>Prim</strong></em></a> <em>type and attribute names, following UsdGeom, UsdLux, UsdShade and UsdRender where those schemas have the concept, with Ernie's own under</em><code>ernie:</code> <em>.</em>    </li>
+</ul>
+</li>
+<li><strong>struct</strong> <a href="../structernie_1_1EditHistory_1_1PrimSnapshot/"><strong>PrimSnapshot</strong></a> <em>One prim of a removed subtree, enough to define it again.</em>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1EditHistory_1_1Step/"><strong>Step</strong></a>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1FrameUploads_1_1Copy/"><strong>Copy</strong></a>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1FrameUploads_1_1Staging/"><strong>Staging</strong></a>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1GpuTimer_1_1Pending/"><strong>Pending</strong></a>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1Scene_1_1PrimData/"><strong>PrimData</strong></a>     </li>
+<li><strong>struct</strong> <a href="../structernie_1_1Scene_1_1UniqueId/"><strong>UniqueId</strong></a> <em>A process-wide unique id that copies and assignments renew.</em>     </li>
+<li><strong>namespace</strong> <a href="../namespacestd/"><strong>std</strong></a>     <ul>
+<li><strong>struct</strong> <a href="../structstd_1_1hash_3_01ernie_1_1Path_01_4/"><strong>hash&lt; ernie::Path &gt;</strong></a>     </li>
+</ul>
+</li>
+</ul>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../../api/cpp/" class="btn btn-neutral float-left" title="Overview"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../hierarchy/" class="btn btn-neutral float-right" title="Class hierarchy">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+      <span><a href="../../api/cpp/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../hierarchy/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

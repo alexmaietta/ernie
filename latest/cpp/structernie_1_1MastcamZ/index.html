@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1MastcamZ/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Struct ernie::MastcamZ - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Struct ernie::MastcamZ";
+        var mkdocs_page_input_path = "cpp/structernie_1_1MastcamZ.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/structernie_1_1MastcamZ/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Struct ernie::MastcamZ</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/structernie_1_1MastcamZ.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="struct-erniemastcamz">Struct ernie::MastcamZ</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>MastcamZ</strong></a></p>
+<ul>
+<li><code>#include &lt;ernie/scene/instruments.h&gt;</code></li>
+</ul>
+<h2 id="classes">Classes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1MastcamZ_1_1Filter/"><strong>Filter</strong></a> <br><em>A filter's Table 3 effective wavelength and half width at half maximum, nm (for filter 0, the green Bayer channel's), and its neutral density (filter 7's; 0 otherwise).</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-static-attributes">Public Static Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">constexpr int</td>
+<td style="text-align: left;"><a href="#variable-kadcbits"><strong>kAdcBits</strong></a>   = <code>11</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr double</td>
+<td style="text-align: left;"><a href="#variable-kbaselinem"><strong>kBaselineM</strong></a>   = <code>0.244</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr double</td>
+<td style="text-align: left;"><a href="#variable-kelectronsperdn"><strong>kElectronsPerDn</strong></a>   = <code>15.6</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-kheight"><strong>kHeight</strong></a>   = <code>1200</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr double</td>
+<td style="text-align: left;"><a href="#variable-klongestfocalmm"><strong>kLongestFocalMm</strong></a>   = <code>110.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr double</td>
+<td style="text-align: left;"><a href="#variable-knarrowestfnumber"><strong>kNarrowestFNumber</strong></a>   = <code>9.5</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr double</td>
+<td style="text-align: left;"><a href="#variable-kpeakqe"><strong>kPeakQe</strong></a>   = <code>0.40</code><br><em>The detector's peak quantum efficiency through its Bayer microlenses, ~40%.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr double</td>
+<td style="text-align: left;"><a href="#variable-kpixelpitchum"><strong>kPixelPitchUm</strong></a>   = <code>7.4</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr double</td>
+<td style="text-align: left;"><a href="#variable-kshortestfocalmm"><strong>kShortestFocalMm</strong></a>   = <code>26.0</code><br><em>Zoom: 26 mm at f/6.7 to 110 mm at f/9.5.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr double</td>
+<td style="text-align: left;"><a href="#variable-ktoeindeg"><strong>kToeInDeg</strong></a>   = <code>1.15</code><br><em>Each camera's, 2.3 degrees between them.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr double</td>
+<td style="text-align: left;"><a href="#variable-kwidestfnumber"><strong>kWidestFNumber</strong></a>   = <code>6.7</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-kwidth"><strong>kWidth</strong></a>   = <code>1600</code><br><em>The KAI-2020CM's 1600 x 1200 photoactive pixels of 7.4 um.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-static-functions">Public Static Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">std::array&lt; <a href="../structernie_1_1MastcamZ_1_1Filter/"><strong>Filter</strong></a>, 3 &gt;</td>
+<td style="text-align: left;"><a href="#function-bayerof"><strong>BayerOf</strong></a> (<a href="../namespaceernie/#enum-mastcamzeye"><strong>MastcamZEye</strong></a> eye) <br><a href="../structernie_1_1MastcamZ_1_1Filter/"><em><strong>Filter</strong></em></a> <em>0's red, green and blue Bayer channels (Table 3).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-fnumberat"><strong>FNumberAt</strong></a> (double focalLengthMm) <br><em>The f-number at focal length</em> <code>focalLengthMm</code> <em>, linearly between the zoom's ends (the paper gives only those).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1MastcamZ_1_1Filter/"><strong>Filter</strong></a></td>
+<td style="text-align: left;"><a href="#function-filterof"><strong>FilterOf</strong></a> (<a href="../namespaceernie/#enum-mastcamzeye"><strong>MastcamZEye</strong></a> eye, int filter) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-fullwellelectrons"><strong>FullWellElectrons</strong></a> (<a href="../namespaceernie/#enum-mastcamzeye"><strong>MastcamZEye</strong></a> eye) <br><em>21826 (left), 21818 (right).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-readnoiseelectrons"><strong>ReadNoiseElectrons</strong></a> (<a href="../namespaceernie/#enum-mastcamzeye"><strong>MastcamZEye</strong></a> eye) <br><em>22 (left), 21 (right).</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-static-attributes-documentation">Public Static Attributes Documentation</h2>
+<h3 id="variable-kadcbits">variable kAdcBits</h3>
+<pre><code class="language-C++">constexpr int ernie::MastcamZ::kAdcBits;
+</code></pre>
+<hr>
+
+<h3 id="variable-kbaselinem">variable kBaselineM</h3>
+<pre><code class="language-C++">constexpr double ernie::MastcamZ::kBaselineM;
+</code></pre>
+<hr>
+
+<h3 id="variable-kelectronsperdn">variable kElectronsPerDn</h3>
+<pre><code class="language-C++">constexpr double ernie::MastcamZ::kElectronsPerDn;
+</code></pre>
+<hr>
+
+<h3 id="variable-kheight">variable kHeight</h3>
+<pre><code class="language-C++">constexpr std::uint32_t ernie::MastcamZ::kHeight;
+</code></pre>
+<hr>
+
+<h3 id="variable-klongestfocalmm">variable kLongestFocalMm</h3>
+<pre><code class="language-C++">constexpr double ernie::MastcamZ::kLongestFocalMm;
+</code></pre>
+<hr>
+
+<h3 id="variable-knarrowestfnumber">variable kNarrowestFNumber</h3>
+<pre><code class="language-C++">constexpr double ernie::MastcamZ::kNarrowestFNumber;
+</code></pre>
+<hr>
+
+<h3 id="variable-kpeakqe">variable kPeakQe</h3>
+<p><em>The detector's peak quantum efficiency through its Bayer microlenses, ~40%.</em> </p>
+<pre><code class="language-C++">constexpr double ernie::MastcamZ::kPeakQe;
+</code></pre>
+<hr>
+
+<h3 id="variable-kpixelpitchum">variable kPixelPitchUm</h3>
+<pre><code class="language-C++">constexpr double ernie::MastcamZ::kPixelPitchUm;
+</code></pre>
+<hr>
+
+<h3 id="variable-kshortestfocalmm">variable kShortestFocalMm</h3>
+<p><em>Zoom: 26 mm at f/6.7 to 110 mm at f/9.5.</em> </p>
+<pre><code class="language-C++">constexpr double ernie::MastcamZ::kShortestFocalMm;
+</code></pre>
+<hr>
+
+<h3 id="variable-ktoeindeg">variable kToeInDeg</h3>
+<p><em>Each camera's, 2.3 degrees between them.</em> </p>
+<pre><code class="language-C++">constexpr double ernie::MastcamZ::kToeInDeg;
+</code></pre>
+<hr>
+
+<h3 id="variable-kwidestfnumber">variable kWidestFNumber</h3>
+<pre><code class="language-C++">constexpr double ernie::MastcamZ::kWidestFNumber;
+</code></pre>
+<hr>
+
+<h3 id="variable-kwidth">variable kWidth</h3>
+<p><em>The KAI-2020CM's 1600 x 1200 photoactive pixels of 7.4 um.</em> </p>
+<pre><code class="language-C++">constexpr std::uint32_t ernie::MastcamZ::kWidth;
+</code></pre>
+<hr>
+<h2 id="public-static-functions-documentation">Public Static Functions Documentation</h2>
+<h3 id="function-bayerof">function BayerOf</h3>
+<p><a href="../structernie_1_1MastcamZ_1_1Filter/"><em><strong>Filter</strong></em></a> <em>0's red, green and blue Bayer channels (Table 3).</em></p>
+<pre><code class="language-C++">static std::array&lt; Filter , 3 &gt; ernie::MastcamZ::BayerOf (
+    MastcamZEye eye
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-fnumberat">function FNumberAt</h3>
+<p><em>The f-number at focal length</em> <code>focalLengthMm</code> <em>, linearly between the zoom's ends (the paper gives only those).</em></p>
+<pre><code class="language-C++">static double ernie::MastcamZ::FNumberAt (
+    double focalLengthMm
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-filterof">function FilterOf</h3>
+<pre><code class="language-C++">static Filter ernie::MastcamZ::FilterOf (
+    MastcamZEye eye,
+    int filter
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a filter outside 0 to 7. </li>
+</ul>
+<hr>
+
+<h3 id="function-fullwellelectrons">function FullWellElectrons</h3>
+<p><em>21826 (left), 21818 (right).</em> </p>
+<pre><code class="language-C++">static double ernie::MastcamZ::FullWellElectrons (
+    MastcamZEye eye
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-readnoiseelectrons">function ReadNoiseElectrons</h3>
+<p><em>22 (left), 21 (right).</em> </p>
+<pre><code class="language-C++">static double ernie::MastcamZ::ReadNoiseElectrons (
+    MastcamZEye eye
+) 
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/scene/instruments.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

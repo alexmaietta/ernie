@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1Path/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Class ernie::Path - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Class ernie::Path";
+        var mkdocs_page_input_path = "cpp/classernie_1_1Path.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/classernie_1_1Path/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Class ernie::Path</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/classernie_1_1Path.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-erniepath">Class ernie::Path</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>Path</strong></a></p>
+<p><em>Absolute path naming a prim in a</em> <code>Scene</code> <em>, as in USD:</em><code>/</code> <em>is the root and</em><code>/World/Sun</code> <em>is the child</em><code>Sun</code> <em>of</em><code>/World</code> <em>.</em><a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/scene/path.h&gt;</code></li>
+</ul>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Path</strong></a></td>
+<td style="text-align: left;"><a href="#function-child"><strong>Child</strong></a> (std::string_view name) const<br><em>The child</em> <code>name</code> <em>of this path.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-hasprefix"><strong>HasPrefix</strong></a> (const <a href="./"><strong>Path</strong></a> &amp; ancestor) const<br><em>Whether this path is</em> <code>ancestor</code> <em>or lies below it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-isempty"><strong>IsEmpty</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-isroot"><strong>IsRoot</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string_view</td>
+<td style="text-align: left;"><a href="#function-name"><strong>Name</strong></a> () const<br><em>The last name, or an empty view for the root and the empty path.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Path</strong></a></td>
+<td style="text-align: left;"><a href="#function-parent"><strong>Parent</strong></a> () const<br><em>The parent path; the root and the empty path have an empty parent.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-path-14"><strong>Path</strong></a> () = default<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-path-24"><strong>Path</strong></a> (std::string_view text) <br><em>Parses</em> <code>text</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-path-34"><strong>Path</strong></a> (const char * text) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-path-44"><strong>Path</strong></a> (const std::string &amp; text) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">const std::string &amp;</td>
+<td style="text-align: left;"><a href="#function-string"><strong>String</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">auto</td>
+<td style="text-align: left;"><a href="#function-operator"><strong>operator&lt;=&gt;</strong></a> (const <a href="./"><strong>Path</strong></a> &amp;) const<br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-static-functions">Public Static Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-isvalidname"><strong>IsValidName</strong></a> (std::string_view name) <br><em>Whether</em> <code>name</code> <em>is a valid prim name.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Path</strong></a></td>
+<td style="text-align: left;"><a href="#function-root"><strong>Root</strong></a> () <br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>Names are identifiers: a letter or underscore followed by letters, digits and underscores. A default-constructed path is empty and names nothing. Paths order by their text, so a prim's descendants follow it contiguously.</p>
+<p>Reference: Pixar, "SdfPath", <a href="https://openusd.org/release/api/class_sdf_path.html">https://openusd.org/release/api/class_sdf_path.html</a> </p>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-child">function Child</h3>
+<p><em>The child</em> <code>name</code> <em>of this path.</em></p>
+<pre><code class="language-C++">Path ernie::Path::Child (
+    std::string_view name
+) const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if this path is empty or <code>name</code> is not a valid name. </li>
+</ul>
+<hr>
+
+<h3 id="function-hasprefix">function HasPrefix</h3>
+<p><em>Whether this path is</em> <code>ancestor</code> <em>or lies below it.</em></p>
+<pre><code class="language-C++">bool ernie::Path::HasPrefix (
+    const Path &amp; ancestor
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-isempty">function IsEmpty</h3>
+<pre><code class="language-C++">inline bool ernie::Path::IsEmpty () const
+</code></pre>
+<hr>
+
+<h3 id="function-isroot">function IsRoot</h3>
+<pre><code class="language-C++">inline bool ernie::Path::IsRoot () const
+</code></pre>
+<hr>
+
+<h3 id="function-name">function Name</h3>
+<p><em>The last name, or an empty view for the root and the empty path.</em> </p>
+<pre><code class="language-C++">std::string_view ernie::Path::Name () const
+</code></pre>
+<hr>
+
+<h3 id="function-parent">function Parent</h3>
+<p><em>The parent path; the root and the empty path have an empty parent.</em> </p>
+<pre><code class="language-C++">Path ernie::Path::Parent () const
+</code></pre>
+<hr>
+
+<h3 id="function-path-14">function Path [1/4]</h3>
+<pre><code class="language-C++">ernie::Path::Path () = default
+</code></pre>
+<hr>
+
+<h3 id="function-path-24">function Path [2/4]</h3>
+<p><em>Parses</em> <code>text</code> <em>.</em></p>
+<pre><code class="language-C++">ernie::Path::Path (
+    std::string_view text
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if <code>text</code> is not an absolute path of valid names. </li>
+</ul>
+<hr>
+
+<h3 id="function-path-34">function Path [3/4]</h3>
+<pre><code class="language-C++">inline ernie::Path::Path (
+    const char * text
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-path-44">function Path [4/4]</h3>
+<pre><code class="language-C++">inline ernie::Path::Path (
+    const std::string &amp; text
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-string">function String</h3>
+<pre><code class="language-C++">inline const std::string &amp; ernie::Path::String () const
+</code></pre>
+<hr>
+
+<h3 id="function-operator">function operator&lt;=&gt;</h3>
+<pre><code class="language-C++">auto ernie::Path::operator&lt;=&gt; (
+    const Path &amp;
+) const
+</code></pre>
+<hr>
+<h2 id="public-static-functions-documentation">Public Static Functions Documentation</h2>
+<h3 id="function-isvalidname">function IsValidName</h3>
+<p><em>Whether</em> <code>name</code> <em>is a valid prim name.</em></p>
+<pre><code class="language-C++">static bool ernie::Path::IsValidName (
+    std::string_view name
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-root">function Root</h3>
+<pre><code class="language-C++">static Path ernie::Path::Root () 
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/scene/path.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

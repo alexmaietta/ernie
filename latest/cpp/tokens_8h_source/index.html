@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/tokens_8h_source/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>File tokens.h - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "File tokens.h";
+        var mkdocs_page_input_path = "cpp/tokens_8h_source.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/tokens_8h_source/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">File tokens.h</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/tokens_8h_source.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="file-tokensh">File tokens.h</h1>
+<p><a href="../files/"><strong>File List</strong></a> <strong>&gt;</strong> <a href="../dir_057d52706067b881d9371cf136c38c31/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../dir_572d817874f40c61a249f0e7684d4315/"><strong>scene</strong></a> <strong>&gt;</strong> <a href="../tokens_8h/"><strong>tokens.h</strong></a></p>
+<p><a href="../tokens_8h/">Go to the documentation of this file</a></p>
+<pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+#include &lt;string_view&gt;
+
+namespace ernie::tokens {
+
+inline constexpr std::string_view kSessionRoot = &quot;/__session&quot;;
+
+// Prim types.
+inline constexpr std::string_view kXform = &quot;Xform&quot;;
+inline constexpr std::string_view kScope = &quot;Scope&quot;;
+inline constexpr std::string_view kMesh = &quot;Mesh&quot;;
+inline constexpr std::string_view kCube = &quot;Cube&quot;;
+inline constexpr std::string_view kSphere = &quot;Sphere&quot;;
+inline constexpr std::string_view kCylinder = &quot;Cylinder&quot;;
+inline constexpr std::string_view kCone = &quot;Cone&quot;;
+inline constexpr std::string_view kCapsule = &quot;Capsule&quot;;
+inline constexpr std::string_view kPlane = &quot;Plane&quot;;
+inline constexpr std::string_view kPointInstancer = &quot;PointInstancer&quot;;
+inline constexpr std::string_view kGeomPoints = &quot;Points&quot;;
+inline constexpr std::string_view kVolume = &quot;Volume&quot;;
+inline constexpr std::string_view kCamera = &quot;Camera&quot;;
+inline constexpr std::string_view kDistantLight = &quot;DistantLight&quot;;
+inline constexpr std::string_view kSphereLight = &quot;SphereLight&quot;;
+inline constexpr std::string_view kRectLight = &quot;RectLight&quot;;
+inline constexpr std::string_view kDiskLight = &quot;DiskLight&quot;;
+inline constexpr std::string_view kDomeLight = &quot;DomeLight&quot;;
+inline constexpr std::string_view kMaterial = &quot;Material&quot;;
+inline constexpr std::string_view kTerrain = &quot;Terrain&quot;;
+inline constexpr std::string_view kGroundPlane = &quot;GroundPlane&quot;;  
+inline constexpr std::string_view kStarField = &quot;StarField&quot;;  
+inline constexpr std::string_view kRenderSettings = &quot;RenderSettings&quot;;
+inline constexpr std::string_view kRenderProduct = &quot;RenderProduct&quot;;
+inline constexpr std::string_view kRenderVar = &quot;RenderVar&quot;;
+
+// Imageable and Xformable (UsdGeom).
+inline constexpr std::string_view kTransform = &quot;xformOp:transform&quot;;  
+inline constexpr std::string_view kXformOpOrder = &quot;xformOpOrder&quot;;  
+inline constexpr std::string_view kResetXformStack = &quot;!resetXformStack!&quot;;
+inline constexpr std::string_view kTranslate = &quot;xformOp:translate&quot;;  
+inline constexpr std::string_view kScale = &quot;xformOp:scale&quot;;          
+inline constexpr std::string_view kOrient = &quot;xformOp:orient&quot;;
+inline constexpr std::string_view kRotateX = &quot;xformOp:rotateX&quot;;
+inline constexpr std::string_view kRotateY = &quot;xformOp:rotateY&quot;;
+inline constexpr std::string_view kRotateZ = &quot;xformOp:rotateZ&quot;;
+inline constexpr std::string_view kRotateXYZ = &quot;xformOp:rotateXYZ&quot;;
+inline constexpr std::string_view kRotateXZY = &quot;xformOp:rotateXZY&quot;;
+inline constexpr std::string_view kRotateYXZ = &quot;xformOp:rotateYXZ&quot;;
+inline constexpr std::string_view kRotateYZX = &quot;xformOp:rotateYZX&quot;;
+inline constexpr std::string_view kRotateZXY = &quot;xformOp:rotateZXY&quot;;
+inline constexpr std::string_view kRotateZYX = &quot;xformOp:rotateZYX&quot;;
+inline constexpr std::string_view kXformExtent = &quot;ernie:xform:extent&quot;;
+inline constexpr std::string_view kQuaternionOrder = &quot;ernie:quaternionOrder&quot;;
+inline constexpr std::string_view kXyzw = &quot;xyzw&quot;;
+inline constexpr std::string_view kWxyz = &quot;wxyz&quot;;
+inline constexpr std::string_view kVisibility = &quot;visibility&quot;;  
+inline constexpr std::string_view kInherited = &quot;inherited&quot;;
+inline constexpr std::string_view kInvisible = &quot;invisible&quot;;
+
+// Geometry (UsdGeom Mesh, PointInstancer).
+inline constexpr std::string_view kPoints = &quot;points&quot;;
+inline constexpr std::string_view kNormals = &quot;normals&quot;;
+inline constexpr std::string_view kWidths = &quot;widths&quot;;
+inline constexpr std::string_view kFaceVertexCounts = &quot;faceVertexCounts&quot;;
+inline constexpr std::string_view kFaceVertexIndices = &quot;faceVertexIndices&quot;;
+inline constexpr std::string_view kDisplayColor = &quot;primvars:displayColor&quot;;
+inline constexpr std::string_view kPositions = &quot;positions&quot;;
+inline constexpr std::string_view kOrientations = &quot;orientations&quot;;
+inline constexpr std::string_view kScales = &quot;scales&quot;;
+inline constexpr std::string_view kVelocities = &quot;velocities&quot;;
+inline constexpr std::string_view kExtent = &quot;extent&quot;;
+inline constexpr std::string_view kProtoIndices = &quot;protoIndices&quot;;
+inline constexpr std::string_view kPrototypes = &quot;prototypes&quot;;
+
+// Implicit primitives (UsdGeom Cube, Sphere, Cylinder, Cone, Capsule, Plane), drawn as meshes
+// (`ernie::BoxMesh` and the other generators).
+inline constexpr std::string_view kSize = &quot;size&quot;;  
+inline constexpr std::string_view kGeomRadius = &quot;radius&quot;;
+inline constexpr std::string_view kGeomHeight = &quot;height&quot;;
+inline constexpr std::string_view kGeomWidth = &quot;width&quot;;    
+inline constexpr std::string_view kGeomLength = &quot;length&quot;;  
+inline constexpr std::string_view kAxis = &quot;axis&quot;;          
+
+// Material binding (UsdShade MaterialBindingAPI): a Path.
+inline constexpr std::string_view kMaterialBinding = &quot;material:binding&quot;;
+
+// Camera (UsdGeom Camera). Focal length and apertures share a unit, conventionally millimetres;
+// only their ratio sets the field of view.
+inline constexpr std::string_view kFocalLength = &quot;focalLength&quot;;
+inline constexpr std::string_view kHorizontalAperture = &quot;horizontalAperture&quot;;
+inline constexpr std::string_view kVerticalAperture = &quot;verticalAperture&quot;;
+inline constexpr std::string_view kClippingRange = &quot;clippingRange&quot;;  
+inline constexpr std::string_view kProjection = &quot;projection&quot;;  
+inline constexpr std::string_view kPerspective = &quot;perspective&quot;;
+inline constexpr std::string_view kOrthographic = &quot;orthographic&quot;;
+inline constexpr std::string_view kCameraExposure = &quot;exposure&quot;;  
+inline constexpr std::string_view kHorizontalApertureOffset = &quot;horizontalApertureOffset&quot;;
+inline constexpr std::string_view kVerticalApertureOffset = &quot;verticalApertureOffset&quot;;
+inline constexpr std::string_view kExposureTime = &quot;exposure:time&quot;;  
+inline constexpr std::string_view kExposureIso = &quot;exposure:iso&quot;;
+inline constexpr std::string_view kExposureFStop = &quot;exposure:fStop&quot;;
+inline constexpr std::string_view kExposureResponsivity = &quot;exposure:responsivity&quot;;
+inline constexpr std::string_view kFStop = &quot;fStop&quot;;
+inline constexpr std::string_view kFocusDistance = &quot;focusDistance&quot;;
+inline constexpr std::string_view kShutterOpen = &quot;shutter:open&quot;;
+inline constexpr std::string_view kShutterClose = &quot;shutter:close&quot;;
+inline constexpr std::string_view kShutterSamples = &quot;ernie:shutter:samples&quot;;
+inline constexpr std::string_view kShutterRolling = &quot;ernie:shutter:rolling&quot;;
+inline constexpr std::string_view kCameraScan = &quot;ernie:camera:scan&quot;;
+inline constexpr std::string_view kFrameScan = &quot;frame&quot;;
+inline constexpr std::string_view kPushbroom = &quot;pushbroom&quot;;
+inline constexpr std::string_view kPushbroomLineOffset = &quot;ernie:pushbroom:lineOffset&quot;;
+
+// Physical camera (Ernie): spectral sampling, lens and sensor. Spectra are float arrays of
+// interleaved (wavelength in nm, value) pairs.
+inline constexpr std::string_view kSpectralRange = &quot;ernie:spectral:range&quot;;  
+inline constexpr std::string_view kSpectralBands = &quot;ernie:spectral:bands&quot;;  
+inline constexpr std::string_view kLensProjection = &quot;ernie:lens:projection&quot;;
+inline constexpr std::string_view kFisheye = &quot;fisheye&quot;;
+inline constexpr std::string_view kLensDistortion = &quot;ernie:lens:distortion&quot;;  
+inline constexpr std::string_view kLensFisheye = &quot;ernie:lens:fisheye&quot;;
+inline constexpr std::string_view kLensRays = &quot;ernie:lens:rays&quot;;
+inline constexpr std::string_view kLensRaysStep = &quot;ernie:lens:raysStep&quot;;
+inline constexpr std::string_view kLensChromaticScale = &quot;ernie:lens:chromatic:scale&quot;;
+inline constexpr std::string_view kLensChromaticFocus = &quot;ernie:lens:chromatic:focus&quot;;
+inline constexpr std::string_view kLensVignetting = &quot;ernie:lens:vignetting&quot;;      
+inline constexpr std::string_view kLensTransmission = &quot;ernie:lens:transmission&quot;;  
+inline constexpr std::string_view kSensorType = &quot;ernie:sensor:type&quot;;  
+inline constexpr std::string_view kSensorQePrefix = &quot;ernie:sensor:qe:&quot;;
+inline constexpr std::string_view kSensorQeR = &quot;ernie:sensor:qe:r&quot;;
+inline constexpr std::string_view kSensorQeG = &quot;ernie:sensor:qe:g&quot;;
+inline constexpr std::string_view kSensorQeB = &quot;ernie:sensor:qe:b&quot;;
+inline constexpr std::string_view kSensorQeMono = &quot;ernie:sensor:qe:mono&quot;;
+inline constexpr std::string_view kSensorFullWell = &quot;ernie:sensor:fullWell&quot;;        
+inline constexpr std::string_view kSensorReadNoise = &quot;ernie:sensor:readNoise&quot;;      
+inline constexpr std::string_view kSensorDarkCurrent = &quot;ernie:sensor:darkCurrent&quot;;  
+inline constexpr std::string_view kSensorPrnu = &quot;ernie:sensor:prnu&quot;;                
+inline constexpr std::string_view kSensorDsnu = &quot;ernie:sensor:dsnu&quot;;                
+inline constexpr std::string_view kSensorGain = &quot;ernie:sensor:electronsPerDn&quot;;      
+inline constexpr std::string_view kSensorAdcBits = &quot;ernie:sensor:adcBits&quot;;
+inline constexpr std::string_view kSensorBlackLevel = &quot;ernie:sensor:blackLevel&quot;;  
+inline constexpr std::string_view kSensorPixelPitch = &quot;ernie:sensor:pixelPitch&quot;;
+inline constexpr std::string_view kSensorNoise = &quot;ernie:sensor:noise&quot;;  
+inline constexpr std::string_view kSensorSeed = &quot;ernie:sensor:seed&quot;;    
+
+// Lights (UsdLux). A DistantLight shines along the -z axis of its transform, and a SphereLight's
+// cone (ShapingAPI) is around its -z axis.
+inline constexpr std::string_view kIntensity = &quot;inputs:intensity&quot;;
+inline constexpr std::string_view kExposure = &quot;inputs:exposure&quot;;  
+inline constexpr std::string_view kColor = &quot;inputs:color&quot;;
+inline constexpr std::string_view kNormalize = &quot;inputs:normalize&quot;;
+inline constexpr std::string_view kAngle = &quot;inputs:angle&quot;;  
+inline constexpr std::string_view kRadius = &quot;inputs:radius&quot;;
+inline constexpr std::string_view kTreatAsPoint = &quot;treatAsPoint&quot;;  
+inline constexpr std::string_view kShapingConeAngle = &quot;inputs:shaping:cone:angle&quot;;
+inline constexpr std::string_view kShapingConeSoftness = &quot;inputs:shaping:cone:softness&quot;;
+inline constexpr std::string_view kShapingFocus = &quot;inputs:shaping:focus&quot;;
+inline constexpr std::string_view kShapingFocusTint = &quot;inputs:shaping:focusTint&quot;;
+inline constexpr std::string_view kShapingIesFile = &quot;inputs:shaping:ies:file&quot;;
+inline constexpr std::string_view kShapingIesAngleScale = &quot;inputs:shaping:ies:angleScale&quot;;
+inline constexpr std::string_view kShapingIesNormalize = &quot;inputs:shaping:ies:normalize&quot;;
+inline constexpr std::string_view kWidth = &quot;inputs:width&quot;;
+inline constexpr std::string_view kHeight = &quot;inputs:height&quot;;
+inline constexpr std::string_view kTextureFile = &quot;inputs:texture:file&quot;;
+inline constexpr std::string_view kShadowEnable = &quot;inputs:shadow:enable&quot;;
+inline constexpr std::string_view kColorTemperature = &quot;inputs:colorTemperature&quot;;  
+inline constexpr std::string_view kEnableColorTemperature = &quot;inputs:enableColorTemperature&quot;;
+inline constexpr std::string_view kLightIrradiance = &quot;ernie:irradiance&quot;;
+inline constexpr std::string_view kLightSpectrum = &quot;ernie:spectrum&quot;;
+inline constexpr std::string_view kLightPower = &quot;ernie:power&quot;;
+inline constexpr std::string_view kLightTexture = &quot;ernie:texture&quot;;
+
+// Physical lighting (Omniverse's PhysicalLightIlluminantAPI and Photometric*LightAPI): the shape of
+// a light's spectrum, and its brightness in photometric units. Authoring any `photometric:` value
+// puts the light in photometric units: its brightness then comes from them alone, not from
+// `inputs:intensity`, `inputs:exposure`, `ernie:power` or `ernie:irradiance`.
+//
+inline constexpr std::string_view kPhysicalIlluminant = &quot;physical:illuminant&quot;;
+inline constexpr std::string_view kWhite = &quot;white&quot;;
+inline constexpr std::string_view kBlackbody = &quot;blackbody&quot;;
+inline constexpr std::string_view kIlluminantD = &quot;illuminant D&quot;;
+inline constexpr std::string_view kCustom = &quot;custom&quot;;
+inline constexpr std::string_view kPhysicalCustomIlluminant = &quot;physical:customIlluminant&quot;;
+inline constexpr std::string_view kPhotometricIlluminance = &quot;photometric:illuminance&quot;;
+inline constexpr std::string_view kPhotometricIlluminanceDistance =
+    &quot;photometric:illuminance:distance&quot;;
+inline constexpr std::string_view kPhotometricPower = &quot;photometric:power&quot;;
+
+inline constexpr std::string_view kVisibleInPrimaryRay = &quot;visibleInPrimaryRay&quot;;
+
+// Star field (Ernie): stars from a catalogue as points of light at infinity, behind everything
+// else, each with a black-body spectrum. The prim's transform takes the catalogue's frame, J2000
+// equatorial with x towards right ascension 0 and z the north celestial pole, into the world
+// (`CelestialToLocal` places it over a site at a time). A star's illuminance is
+// `ernie:stars:zeroPoint` times 10^(-0.4 magnitude) times 2^`inputs:exposure`. Renders draw the
+// first visible StarField.
+//
+inline constexpr std::string_view kStarsRightAscension = &quot;ernie:stars:rightAscension&quot;;
+inline constexpr std::string_view kStarsDeclination = &quot;ernie:stars:declination&quot;;
+inline constexpr std::string_view kStarsDirection = &quot;ernie:stars:direction&quot;;
+inline constexpr std::string_view kStarsMagnitude = &quot;ernie:stars:magnitude&quot;;
+inline constexpr std::string_view kStarsColorIndex = &quot;ernie:stars:colorIndex&quot;;
+inline constexpr std::string_view kStarsTemperature = &quot;ernie:stars:temperature&quot;;
+inline constexpr std::string_view kStarsMagnitudeLimit = &quot;ernie:stars:magnitudeLimit&quot;;
+inline constexpr std::string_view kStarsZeroPoint = &quot;ernie:stars:zeroPoint&quot;;
+
+// Terrain (Ernie): a north-up heightfield, x east, y north, z up.
+inline constexpr std::string_view kHeights = &quot;heights&quot;;          
+inline constexpr std::string_view kOrigin = &quot;ernie:origin&quot;;      
+inline constexpr std::string_view kCellSize = &quot;ernie:cellSize&quot;;  
+inline constexpr std::string_view kNoData = &quot;ernie:noData&quot;;      
+inline constexpr std::string_view kExaggeration = &quot;ernie:exaggeration&quot;;  
+inline constexpr std::string_view kPlanetRadius = &quot;ernie:radius&quot;;
+inline constexpr std::string_view kHeightsDirty = &quot;ernie:heights:dirty&quot;;
+
+// Ground plane (Ernie): an infinite horizontal plane facing +z, drawn with its material binding.
+inline constexpr std::string_view kGroundHeight = &quot;ernie:height&quot;;       
+inline constexpr std::string_view kChecker = &quot;ernie:checker&quot;;           
+inline constexpr std::string_view kCheckerSize = &quot;ernie:checker:size&quot;;  
+inline constexpr std::string_view kCheckerColor0 = &quot;ernie:checker:color0&quot;;
+inline constexpr std::string_view kCheckerColor1 = &quot;ernie:checker:color1&quot;;
+
+// Material (Ernie surface). BRDF parameters are `inputs:&lt;parameter id&gt;`.
+inline constexpr std::string_view kBrdf = &quot;ernie:brdf&quot;;             
+inline constexpr std::string_view kAlbedo = &quot;inputs:albedo&quot;;        
+inline constexpr std::string_view kAlbedoMap = &quot;inputs:albedoMap&quot;;  
+inline constexpr std::string_view kAlbedoMapOrigin = &quot;inputs:albedoMap:origin&quot;;
+inline constexpr std::string_view kAlbedoMapCellSize = &quot;inputs:albedoMap:cellSize&quot;;
+inline constexpr std::string_view kAlbedoMapNoData = &quot;inputs:albedoMap:noData&quot;;
+inline constexpr std::string_view kAlbedoMapEnable = &quot;inputs:albedoMap:enable&quot;;  
+inline constexpr std::string_view kDetailAlbedo = &quot;inputs:detailAlbedo&quot;;
+inline constexpr std::string_view kDetailNormal = &quot;inputs:detailNormal&quot;;
+inline constexpr std::string_view kDetailTileSize = &quot;inputs:detail:tileSize&quot;;
+inline constexpr std::string_view kDetailAlbedoStrength = &quot;inputs:detail:albedoStrength&quot;;
+inline constexpr std::string_view kDetailNormalStrength = &quot;inputs:detail:normalStrength&quot;;
+inline constexpr std::string_view kDetailDirectXNormals = &quot;inputs:detail:directXNormals&quot;;
+inline constexpr std::string_view kDetailHexTiling = &quot;inputs:detail:hexTiling&quot;;
+inline constexpr std::string_view kDetailHexRotation = &quot;inputs:detail:hexRotation&quot;;
+inline constexpr std::string_view kDetailHexContrast = &quot;inputs:detail:hexContrast&quot;;
+inline constexpr std::string_view kDetailHexSharpness = &quot;inputs:detail:hexSharpness&quot;;
+
+// UsdShade networks. A Material's `outputs:surface.connect` names a UsdPreviewSurface Shader, whose
+// inputs are constants or connections to other Shaders' outputs: a connection is the attribute
+// `&lt;input&gt;.connect` holding the source's property path as text, e.g. &quot;/Looks/M/Tex.outputs:rgb&quot;
+// (`GetConnection`). Ernie reads UsdPreviewSurface's diffuseColor, normal, roughness, metallic,
+// ior, useSpecularWorkflow, specularColor, clearcoat and clearcoatRoughness, UsdUVTexture,
+// UsdPrimvarReader_float2 and UsdTransform2d; a Material without a surface keeps Ernie's own
+// inputs above. A Material with one shades with the `preview_surface` model unless it names
+// another in `ernie:brdf`, which then reads its parameters from the Material as before.
+//
+// Reference: Pixar, &quot;UsdPreviewSurface Specification&quot;,
+// https://openusd.org/release/spec_usdpreviewsurface.html
+inline constexpr std::string_view kShader = &quot;Shader&quot;;
+inline constexpr std::string_view kInfoId = &quot;info:id&quot;;  
+inline constexpr std::string_view kUsdPreviewSurface = &quot;UsdPreviewSurface&quot;;
+inline constexpr std::string_view kUsdUVTexture = &quot;UsdUVTexture&quot;;
+inline constexpr std::string_view kUsdPrimvarReaderFloat2 = &quot;UsdPrimvarReader_float2&quot;;
+inline constexpr std::string_view kUsdTransform2d = &quot;UsdTransform2d&quot;;
+inline constexpr std::string_view kConnectSuffix = &quot;.connect&quot;;
+inline constexpr std::string_view kSurfaceOutput = &quot;outputs:surface&quot;;
+inline constexpr std::string_view kDiffuseColor = &quot;inputs:diffuseColor&quot;;  
+inline constexpr std::string_view kNormalInput = &quot;inputs:normal&quot;;
+inline constexpr std::string_view kRoughness = &quot;inputs:roughness&quot;;
+inline constexpr std::string_view kMetallic = &quot;inputs:metallic&quot;;
+inline constexpr std::string_view kIor = &quot;inputs:ior&quot;;
+inline constexpr std::string_view kUseSpecularWorkflow = &quot;inputs:useSpecularWorkflow&quot;;  
+inline constexpr std::string_view kSpecularColor = &quot;inputs:specularColor&quot;;              
+inline constexpr std::string_view kClearcoat = &quot;inputs:clearcoat&quot;;
+inline constexpr std::string_view kClearcoatRoughness = &quot;inputs:clearcoatRoughness&quot;;
+inline constexpr std::string_view kEmissiveColor = &quot;inputs:emissiveColor&quot;;
+inline constexpr std::string_view kOpacity = &quot;inputs:opacity&quot;;
+inline constexpr std::string_view kOpacityThreshold = &quot;inputs:opacityThreshold&quot;;
+inline constexpr std::string_view kFile = &quot;inputs:file&quot;;
+inline constexpr std::string_view kShaderTexture = &quot;ernie:texture&quot;;
+inline constexpr std::string_view kSt = &quot;inputs:st&quot;;
+inline constexpr std::string_view kWrapS = &quot;inputs:wrapS&quot;;
+inline constexpr std::string_view kWrapT = &quot;inputs:wrapT&quot;;
+inline constexpr std::string_view kShaderScale = &quot;inputs:scale&quot;;
+inline constexpr std::string_view kShaderBias = &quot;inputs:bias&quot;;
+inline constexpr std::string_view kSourceColorSpace = &quot;inputs:sourceColorSpace&quot;;
+inline constexpr std::string_view kVarname = &quot;inputs:varname&quot;;  
+inline constexpr std::string_view kIn = &quot;inputs:in&quot;;
+inline constexpr std::string_view kRotation = &quot;inputs:rotation&quot;;
+inline constexpr std::string_view kTranslation = &quot;inputs:translation&quot;;
+
+// Mesh texture coordinates (UsdGeom primvars): float32 (n, 2). `primvars:&lt;name&gt;:indices` indexes
+// them (an indexed primvar), and `primvars:&lt;name&gt;:interpolation` (USD's metadata, as an
+// attribute: &quot;constant&quot;, &quot;uniform&quot;, &quot;vertex&quot; or &quot;faceVarying&quot;) says what each covers; without it
+// the count decides: one per point is vertex, one per face vertex faceVarying, one per face
+// uniform, one constant.
+inline constexpr std::string_view kPrimvarsPrefix = &quot;primvars:&quot;;
+inline constexpr std::string_view kIndicesSuffix = &quot;:indices&quot;;
+inline constexpr std::string_view kInterpolationSuffix = &quot;:interpolation&quot;;
+
+// Render settings (UsdRender), with Ernie's rasterizer options under `ernie:`.
+inline constexpr std::string_view kCameraRel = &quot;camera&quot;;       
+inline constexpr std::string_view kResolution = &quot;resolution&quot;;  
+inline constexpr std::string_view kPoses = &quot;ernie:poses&quot;;
+inline constexpr std::string_view kPosesDevice = &quot;ernie:poses:device&quot;;
+inline constexpr std::string_view kHost = &quot;host&quot;;
+inline constexpr std::string_view kWorld = &quot;ernie:world&quot;;
+inline constexpr std::string_view kWorlds = &quot;ernie:worlds&quot;;
+inline constexpr std::string_view kFrame = &quot;ernie:frame&quot;;
+inline constexpr std::string_view kLightsRel = &quot;ernie:lights&quot;;
+inline constexpr std::string_view kProducts = &quot;products&quot;;        
+inline constexpr std::string_view kOrderedVars = &quot;orderedVars&quot;;  
+inline constexpr std::string_view kFilters = &quot;ernie:filters&quot;;
+inline constexpr std::string_view kSensorFilter = &quot;SensorFilter&quot;;  
+inline constexpr std::string_view kFilterType = &quot;ernie:filter:type&quot;;
+inline constexpr std::string_view kSourceName = &quot;sourceName&quot;;  
+inline constexpr std::string_view kAmbient = &quot;ernie:ambient&quot;;  
+inline constexpr std::string_view kDomeLightMode = &quot;ernie:domeLight:mode&quot;;
+inline constexpr std::string_view kDomeShadowRadius = &quot;ernie:domeLight:shadowRadius&quot;;
+inline constexpr std::string_view kDomeDirections = &quot;ernie:domeLight:directions&quot;;
+inline constexpr std::string_view kColorMode = &quot;ernie:colorMode&quot;;
+inline constexpr std::string_view kHillshade = &quot;hillshade&quot;;
+inline constexpr std::string_view kColormap = &quot;colormap&quot;;
+inline constexpr std::string_view kShadedColormap = &quot;shadedColormap&quot;;
+inline constexpr std::string_view kWireframe = &quot;ernie:wireframe&quot;;
+inline constexpr std::string_view kOff = &quot;off&quot;;
+inline constexpr std::string_view kOverlay = &quot;overlay&quot;;
+inline constexpr std::string_view kHiddenLine = &quot;hiddenLine&quot;;
+inline constexpr std::string_view kOverlays = &quot;ernie:overlays&quot;;
+inline constexpr std::string_view kMinimalMode = &quot;ernie:minimal:mode&quot;;
+inline constexpr std::string_view kNone = &quot;none&quot;;
+inline constexpr std::string_view kConstantDiffuse = &quot;constantDiffuse&quot;;
+inline constexpr std::string_view kTexturedDiffuse = &quot;texturedDiffuse&quot;;
+inline constexpr std::string_view kMinimalConstantColor = &quot;ernie:minimal:constantColor&quot;;
+inline constexpr std::string_view kCulling = &quot;ernie:culling&quot;;
+inline constexpr std::string_view kCpu = &quot;cpu&quot;;
+inline constexpr std::string_view kGpu = &quot;gpu&quot;;
+inline constexpr std::string_view kOcclusion = &quot;ernie:occlusion&quot;;
+inline constexpr std::string_view kOccluders = &quot;occluders&quot;;
+inline constexpr std::string_view kTwoPass = &quot;twoPass&quot;;
+inline constexpr std::string_view kClearColor = &quot;ernie:clearColor&quot;;                
+inline constexpr std::string_view kShadowCascades = &quot;ernie:shadows:cascades&quot;;      
+inline constexpr std::string_view kShadowResolution = &quot;ernie:shadows:resolution&quot;;  
+inline constexpr std::string_view kShadowWorldResolution = &quot;ernie:shadows:worldResolution&quot;;
+inline constexpr std::string_view kShadowWorlds = &quot;ernie:shadows:worlds&quot;;
+inline constexpr std::string_view kSeparate = &quot;separate&quot;;
+inline constexpr std::string_view kShared = &quot;shared&quot;;
+inline constexpr std::string_view kMerged = &quot;merged&quot;;
+inline constexpr std::string_view kShadowWorldFit = &quot;ernie:shadows:worldFit&quot;;
+inline constexpr std::string_view kScene = &quot;scene&quot;;
+inline constexpr std::string_view kWorldFit = &quot;world&quot;;
+inline constexpr std::string_view kShadowWorldMargin = &quot;ernie:shadows:worldMargin&quot;;
+inline constexpr std::string_view kShadowFit = &quot;ernie:shadows:fit&quot;;
+inline constexpr std::string_view kExposureCompensation = &quot;ernie:exposure&quot;;
+inline constexpr std::string_view kMeter = &quot;ernie:meter&quot;;
+inline constexpr std::string_view kVisible = &quot;visible&quot;;
+inline constexpr std::string_view kShadowSoftness = &quot;ernie:shadows:softness&quot;;
+inline constexpr std::string_view kShadowNormalOffset = &quot;ernie:shadows:normalOffset&quot;;
+inline constexpr std::string_view kShadowSplitLambda = &quot;ernie:shadows:splitLambda&quot;;
+inline constexpr std::string_view kShadowShowCascades = &quot;ernie:shadows:showCascades&quot;;
+inline constexpr std::string_view kLodEnable = &quot;ernie:lod:enable&quot;;
+inline constexpr std::string_view kLodDetail = &quot;ernie:lod:detail&quot;;
+inline constexpr std::string_view kLodMorphStart = &quot;ernie:lod:morphStart&quot;;
+inline constexpr std::string_view kLodFreeze = &quot;ernie:lod:freeze&quot;;
+inline constexpr std::string_view kLodShowLevels = &quot;ernie:lod:showLevels&quot;;
+inline constexpr std::string_view kLodMeshError = &quot;ernie:lod:meshError&quot;;
+
+inline constexpr std::string_view kLdrColor = &quot;LdrColor&quot;;
+
+}  // namespace ernie::tokens
+</code></pre>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1Overlay/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Class ernie::Overlay - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Class ernie::Overlay";
+        var mkdocs_page_input_path = "cpp/classernie_1_1Overlay.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/classernie_1_1Overlay/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Class ernie::Overlay</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/classernie_1_1Overlay.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-ernieoverlay">Class ernie::Overlay</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>Overlay</strong></a></p>
+<p><em>A named layer of debug drawing: lines, shapes, markers and labels in world coordinates, drawn over the images of render products that ask for it (</em> <code>tokens::kOverlays</code> <em>), after the sensor filters, so they never reach observations that do not.</em><a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/scene/overlay.h&gt;</code></li>
+</ul>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-arrow"><strong>Arrow</strong></a> (const glm::dvec3 &amp; from, const glm::dvec3 &amp; to, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, double head=0.0) <br><em>A line from</em> <code>from</code> <em>to</em><code>to</code> <em>with a cone for its head,</em><code>head</code> <em>long (a fifth of the arrow when 0).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-axes"><strong>Axes</strong></a> (const glm::dmat4 &amp; transform, double length, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}) <br><em>The x, y and z axes of</em> <code>transform</code> <em>,</em><code>length</code> <em>long, in red, green and blue.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-box"><strong>Box</strong></a> (const glm::dvec3 &amp; low, const glm::dvec3 &amp; high, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, const glm::dmat4 &amp; transform=glm::dmat4(1.0)) <br><em>The edges of the box from</em> <code>low</code> <em>to</em><code>high</code> <em>, placed by</em><code>transform</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-circle"><strong>Circle</strong></a> (const glm::dvec3 &amp; centre, const glm::dvec3 &amp; normal, double radius, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, int segments=48) <br><em>A circle of</em> <code>radius</code> <em>around</em><code>centre</code> <em>, in the plane facing</em><code>normal</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-clear"><strong>Clear</strong></a> () <br><em>Removes every item.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-empty"><strong>Empty</strong></a> () const<br><em>Whether the layer has no items.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const std::vector&lt; <a href="../structernie_1_1OverlayTriangle/"><strong>OverlayTriangle</strong></a> &gt; &amp;</td>
+<td style="text-align: left;"><a href="#function-fills"><strong>Fills</strong></a> () const<br><em>The filled triangles, of</em> <code>Triangles</code> <em>and arrow heads.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-isvisible"><strong>IsVisible</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-label"><strong>Label</strong></a> (const glm::dvec3 &amp; point, std::string_view text, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}) <br><code>text</code> <em>(ASCII; lines split at '</em> <em>')</em><code>style.size</code> <em>pixels tall, beside</em><code>point</code> <em>, over a backing box of</em><code>style.background</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-line"><strong>Line</strong></a> (const glm::dvec3 &amp; a, const glm::dvec3 &amp; b, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-lines"><strong>Lines</strong></a> (std::span&lt; const glm::dvec3 &gt; endpoints, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, std::span&lt; const glm::vec4 &gt; colors={}) <br><em>Many segments at once:</em> <code>endpoints</code> <em>in pairs, each segment coloured by</em><code>colors</code> <em>when given (one per segment), else by the style.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-marker"><strong>Marker</strong></a> (const glm::dvec3 &amp; point, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, <a href="../namespaceernie/#enum-markershape"><strong>MarkerShape</strong></a> shape=MarkerShape::Circle) <br><em>A marker of</em> <code>style.size</code> <em>pixels at</em><code>point</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-markers"><strong>Markers</strong></a> (std::span&lt; const glm::dvec3 &gt; points, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, <a href="../namespaceernie/#enum-markershape"><strong>MarkerShape</strong></a> shape=MarkerShape::Circle, std::span&lt; const glm::vec4 &gt; colors={}) <br><em>Markers at every point, each coloured by</em> <code>colors</code> <em>when given (one per point).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-overlay"><strong>Overlay</strong></a> () <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-polyline"><strong>Polyline</strong></a> (std::span&lt; const glm::dvec3 &gt; points, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, bool closed=false) <br><em>Segments through</em> <code>points</code> <em>in order, back to the first with</em><code>closed</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const std::vector&lt; <a href="../structernie_1_1OverlaySegment/"><strong>OverlaySegment</strong></a> &gt; &amp;</td>
+<td style="text-align: left;"><a href="#function-segments"><strong>Segments</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-setvisible"><strong>SetVisible</strong></a> (bool visible) <br><em>Hides or shows the layer everywhere, keeping its items.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-sphere"><strong>Sphere</strong></a> (const glm::dvec3 &amp; centre, double radius, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}) <br><em>Three great circles of a sphere, one around each axis.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const std::vector&lt; <a href="../structernie_1_1OverlaySprite/"><strong>OverlaySprite</strong></a> &gt; &amp;</td>
+<td style="text-align: left;"><a href="#function-sprites"><strong>Sprites</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-triangles"><strong>Triangles</strong></a> (std::span&lt; const glm::dvec3 &gt; points, std::span&lt; const std::uint32_t &gt; indices, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, const glm::dmat4 &amp; transform=glm::dmat4(1.0)) <br><em>The filled triangles</em> <code>indices</code> <em>(in threes) over</em><code>points</code> <em>, placed by</em><code>transform</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#function-version"><strong>Version</strong></a> () const<br><em>Advances with every change, and differs between overlays.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-wiremesh"><strong>WireMesh</strong></a> (std::span&lt; const glm::dvec3 &gt; points, std::span&lt; const std::uint32_t &gt; indices, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, const glm::dmat4 &amp; transform=glm::dmat4(1.0)) <br><em>The edges of the triangles</em> <code>indices</code> <em>(in threes) over</em><code>points</code> <em>, placed by</em><code>transform</code> <em>, each shared edge once.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>Items stay until <code>Clear</code>; a simulation redrawing each step clears and adds again.</p>
+<p>Every shape reduces to segments, triangles and sprites (<code>Segments</code>, <code>Triangles</code>, <code>Sprites</code>), which the renderer draws as they are. </p>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-arrow">function Arrow</h3>
+<p><em>A line from</em> <code>from</code> <em>to</em><code>to</code> <em>with a cone for its head,</em><code>head</code> <em>long (a fifth of the arrow when 0).</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Arrow (
+    const glm::dvec3 &amp; from,
+    const glm::dvec3 &amp; to,
+    const OverlayStyle &amp; style={},
+    double head=0.0
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-axes">function Axes</h3>
+<p><em>The x, y and z axes of</em> <code>transform</code> <em>,</em><code>length</code> <em>long, in red, green and blue.</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Axes (
+    const glm::dmat4 &amp; transform,
+    double length,
+    const OverlayStyle &amp; style={}
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-box">function Box</h3>
+<p><em>The edges of the box from</em> <code>low</code> <em>to</em><code>high</code> <em>, placed by</em><code>transform</code> <em>.</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Box (
+    const glm::dvec3 &amp; low,
+    const glm::dvec3 &amp; high,
+    const OverlayStyle &amp; style={},
+    const glm::dmat4 &amp; transform=glm::dmat4(1.0)
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-circle">function Circle</h3>
+<p><em>A circle of</em> <code>radius</code> <em>around</em><code>centre</code> <em>, in the plane facing</em><code>normal</code> <em>.</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Circle (
+    const glm::dvec3 &amp; centre,
+    const glm::dvec3 &amp; normal,
+    double radius,
+    const OverlayStyle &amp; style={},
+    int segments=48
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-clear">function Clear</h3>
+<p><em>Removes every item.</em> </p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Clear () 
+</code></pre>
+<hr>
+
+<h3 id="function-empty">function Empty</h3>
+<p><em>Whether the layer has no items.</em> </p>
+<pre><code class="language-C++">inline bool ernie::Overlay::Empty () const
+</code></pre>
+<hr>
+
+<h3 id="function-fills">function Fills</h3>
+<p><em>The filled triangles, of</em> <code>Triangles</code> <em>and arrow heads.</em></p>
+<pre><code class="language-C++">inline const std::vector&lt; OverlayTriangle &gt; &amp; ernie::Overlay::Fills () const
+</code></pre>
+<hr>
+
+<h3 id="function-isvisible">function IsVisible</h3>
+<pre><code class="language-C++">inline bool ernie::Overlay::IsVisible () const
+</code></pre>
+<hr>
+
+<h3 id="function-label">function Label</h3>
+<p><code>text</code> <em>(ASCII; lines split at '</em> <em>')</em><code>style.size</code> <em>pixels tall, beside</em><code>point</code> <em>, over a backing box of</em><code>style.background</code> <em>.</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Label (
+    const glm::dvec3 &amp; point,
+    std::string_view text,
+    const OverlayStyle &amp; style={}
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-line">function Line</h3>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Line (
+    const glm::dvec3 &amp; a,
+    const glm::dvec3 &amp; b,
+    const OverlayStyle &amp; style={}
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-lines">function Lines</h3>
+<p><em>Many segments at once:</em> <code>endpoints</code> <em>in pairs, each segment coloured by</em><code>colors</code> <em>when given (one per segment), else by the style.</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Lines (
+    std::span&lt; const glm::dvec3 &gt; endpoints,
+    const OverlayStyle &amp; style={},
+    std::span&lt; const glm::vec4 &gt; colors={}
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for an odd endpoint count or a colour count that differs. </li>
+</ul>
+<hr>
+
+<h3 id="function-marker">function Marker</h3>
+<p><em>A marker of</em> <code>style.size</code> <em>pixels at</em><code>point</code> <em>.</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Marker (
+    const glm::dvec3 &amp; point,
+    const OverlayStyle &amp; style={},
+    MarkerShape shape=MarkerShape::Circle
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-markers">function Markers</h3>
+<p><em>Markers at every point, each coloured by</em> <code>colors</code> <em>when given (one per point).</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Markers (
+    std::span&lt; const glm::dvec3 &gt; points,
+    const OverlayStyle &amp; style={},
+    MarkerShape shape=MarkerShape::Circle,
+    std::span&lt; const glm::vec4 &gt; colors={}
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a colour count that differs from the point count. </li>
+</ul>
+<hr>
+
+<h3 id="function-overlay">function Overlay</h3>
+<pre><code class="language-C++">ernie::Overlay::Overlay () 
+</code></pre>
+<hr>
+
+<h3 id="function-polyline">function Polyline</h3>
+<p><em>Segments through</em> <code>points</code> <em>in order, back to the first with</em><code>closed</code> <em>.</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Polyline (
+    std::span&lt; const glm::dvec3 &gt; points,
+    const OverlayStyle &amp; style={},
+    bool closed=false
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-segments">function Segments</h3>
+<pre><code class="language-C++">inline const std::vector&lt; OverlaySegment &gt; &amp; ernie::Overlay::Segments () const
+</code></pre>
+<hr>
+
+<h3 id="function-setvisible">function SetVisible</h3>
+<p><em>Hides or shows the layer everywhere, keeping its items.</em> </p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::SetVisible (
+    bool visible
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-sphere">function Sphere</h3>
+<p><em>Three great circles of a sphere, one around each axis.</em> </p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Sphere (
+    const glm::dvec3 &amp; centre,
+    double radius,
+    const OverlayStyle &amp; style={}
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-sprites">function Sprites</h3>
+<pre><code class="language-C++">inline const std::vector&lt; OverlaySprite &gt; &amp; ernie::Overlay::Sprites () const
+</code></pre>
+<hr>
+
+<h3 id="function-triangles">function Triangles</h3>
+<p><em>The filled triangles</em> <code>indices</code> <em>(in threes) over</em><code>points</code> <em>, placed by</em><code>transform</code> <em>.</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Triangles (
+    std::span&lt; const glm::dvec3 &gt; points,
+    std::span&lt; const std::uint32_t &gt; indices,
+    const OverlayStyle &amp; style={},
+    const glm::dmat4 &amp; transform=glm::dmat4(1.0)
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> as <code>WireMesh</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-version">function Version</h3>
+<p><em>Advances with every change, and differs between overlays.</em> </p>
+<pre><code class="language-C++">inline std::uint64_t ernie::Overlay::Version () const
+</code></pre>
+<hr>
+
+<h3 id="function-wiremesh">function WireMesh</h3>
+<p><em>The edges of the triangles</em> <code>indices</code> <em>(in threes) over</em><code>points</code> <em>, placed by</em><code>transform</code> <em>, each shared edge once.</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::WireMesh (
+    std::span&lt; const glm::dvec3 &gt; points,
+    std::span&lt; const std::uint32_t &gt; indices,
+    const OverlayStyle &amp; style={},
+    const glm::dmat4 &amp; transform=glm::dmat4(1.0)
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for an index count not a multiple of 3 or an index out of range. </li>
+</ul>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/scene/overlay.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

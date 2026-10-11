@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/namespace_member_functions/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Functions - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Functions";
+        var mkdocs_page_input_path = "cpp/namespace_member_functions.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/namespace_member_functions/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" >C++</a>
+    <ul class="current">
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2 current"><a class="reference internal current" href="#">Functions</a>
+    <ul class="current">
+    <li class="toctree-l3"><a class="reference internal" href="#a">a</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#b">b</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#c">c</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#d">d</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#e">e</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#f">f</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#g">g</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#h">h</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#i">i</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#j">j</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#k">k</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#l">l</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#m">m</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#n">n</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#o">o</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#p">p</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#q">q</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#r">r</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#s">s</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#t">t</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#u">u</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#v">v</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#w">w</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#x">x</a>
+    </li>
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">API reference</li>
+          <li class="breadcrumb-item">C++</li>
+      <li class="breadcrumb-item active">Functions</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/namespace_member_functions.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="namespace-member-functions">Namespace Member Functions</h1>
+<h2 id="a">a</h2>
+<ul>
+<li><strong>Any</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>AovOutputsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>AspectOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>AuthorLrocNac</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>AuthorLrocWac</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>AuthorMars2020Hazcam</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>AuthorMars2020HazcamPair</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>AuthorMars2020Navcam</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>AuthorMars2020NavcamPair</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>AuthorMastcamZ</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>AuthorMastcamZPair</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>AxisNamed</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ApplyTheme</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>AuthorControllerCamera</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>AuthorDefaultPrim</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>AddGpuZone</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
+</ul>
+<h2 id="b">b</h2>
+<ul>
+<li><strong>BaseSchemaTypes</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>BeginRendering</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>BlackbodyIrradiance</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>BlackbodySpectralIrradiance</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>BoundMaterial</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>BoxMesh</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>BrdfModuleName</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>BrdfModules</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>BrdfSlang</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>BeginPropertyTable</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>BeginFrame</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
+</ul>
+<h2 id="c">c</h2>
+<ul>
+<li><strong>CameraParamsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CameraRay</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CameraSchemaTypes</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CapsuleMesh</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CelestialToLocal</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CheckBatchCameras</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CheckFilterChain</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CheckRasterView</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CheckVk</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CieDaylight</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CieWeights</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CieXyz</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CloseExternalHandle</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ColorIndexToTemperature</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ComposeXformOps</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ConeMesh</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>Connect</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CreateRenderDelegate</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CubeFaceAxes</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CubeFaceExtent</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CubeFaceOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CubeFacePlane</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CubeFaceRay</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CubeFacesOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CullingOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CylinderMesh</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>CameraLightPath</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>CameraSchema</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>ChosenPath</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>ControllerFromTransform</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>CreatableTypes</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>Clear</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
+<li><strong>CurrentFrame</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
+</ul>
+<h2 id="d">d</h2>
+<ul>
+<li><strong>DTypeOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>DTypeOf&lt; double &gt;</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>DTypeOf&lt; float &gt;</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>DTypeOf&lt; std::int32_t &gt;</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>DTypeOf&lt; std::int64_t &gt;</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>DTypeOf&lt; std::uint16_t &gt;</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>DTypeOf&lt; std::uint32_t &gt;</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>DTypeOf&lt; std::uint8_t &gt;</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>DecodeSlopeDeviation</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>DefaultFilterChain</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>DirtyOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>DistantLightTransform</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>DomeDirectionsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>DomeIrradianceSh</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>DomeMapOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>DomeParamsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>DarkTheme</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>DefaultLightPath</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>DemoMain</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>DemoOptionsHelp</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>DrawPrimIcon</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>DrawPropertyFields</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>DrawPropertySections</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>DrawRendererIcon</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+</ul>
+<h2 id="e">e</h2>
+<ul>
+<li><strong>EncodeSlopeDeviation</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>EqualEnergyXyzToLinearSrgb</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>EulerAngles</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>EulerRotation</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ExtentOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ExtractDomeSun</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>Enabled</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
+</ul>
+<h2 id="f">f</h2>
+<ul>
+<li><strong>FindPrimType</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>FrameOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>FrameParamsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>FrameSeed</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>FindCreatable</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>Frames</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
+</ul>
+<h2 id="g">g</h2>
+<ul>
+<li><strong>GeometrySchemaTypes</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>GetBool</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>GetConnection</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>GetFloats</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>GetNumber</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>GetPrimType</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>GetTarget</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>GetToken</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>GetVec2</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>GetVec3</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>GpuPosesOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>GpuXformAnchorOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>GpuXformOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>GreenwichMeanSiderealTime</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+</ul>
+<h2 id="h">h</h2>
+<ul>
+<li><strong>HasStageLights</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>HasTransform</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>History</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
+</ul>
+<h2 id="i">i</h2>
+<ul>
+<li><strong>ImageOfTensor</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>InstanceDataOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>InstanceWorldsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>InstancesByPrototype</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>InterpolatePose</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>IsGpu</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>IsMeshType</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>IsXformAttribute</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>IsSessionPath</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+</ul>
+<h2 id="j">j</h2>
+<ul>
+<li><strong>JulianDate</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+</ul>
+<h2 id="k">k</h2>
+<ul>
+<li><strong>KindOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+</ul>
+<h2 id="l">l</h2>
+<ul>
+<li><strong>LensRay</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>LightParamsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>LightSchemaTypes</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>LinearToSrgb</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>LoadImage</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>LoadScene</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>LoadSceneFile</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>LoadVulkanLoader</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>LocalBoundsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>LocalTransformEdits</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>LookAtTransform</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>LrocWacBandNamed</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>LrocWacBandOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>LightTheme</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>ListDirectory</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>LocalFromWorld</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+</ul>
+<h2 id="m">m</h2>
+<ul>
+<li><strong>MaterialSchemaTypes</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>MaterialSettingsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>MaxFieldAngle</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>MeshDataOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>MinimalModeOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>MipChain</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>MakeCameraPanel</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>MakeDemoInfo</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>MakeLogPanel</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>MakeProfilerPanel</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>MakePropertiesPanel</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>MakeSettingsPanel</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>MakeStagePanel</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>MatchesFilter</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>MirrorSettings</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>MakeAttribute</strong> (<a href="../namespaceernie_1_1detail/"><strong>ernie::detail</strong></a>)</li>
+</ul>
+<h2 id="n">n</h2>
+<ul>
+<li><strong>NameOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>NeedsCubeFaces</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>Now</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
+</ul>
+<h2 id="o">o</h2>
+<ul>
+<li><strong>OcclusionOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>OverscanOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>operator&amp;</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>operator|</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>operator|=</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+</ul>
+<h2 id="p">p</h2>
+<ul>
+<li><strong>ParseIes</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>Pcg3d</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>PlanckRadiance</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>PlaneMesh</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>PosesAreQuaternions</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>PosesParentOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>PrimTypeOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>PrimTypes</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>PrimitiveMeshOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>PushbroomEnvelope</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ParseDemoOptions</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>PrimIcon</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>PropertyLabelWidth</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+</ul>
+<h2 id="q">q</h2>
+<ul>
+<li><strong>QuaternionsWFirst</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+</ul>
+<h2 id="r">r</h2>
+<ul>
+<li><strong>ReadCahvoreModels</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ReadCahvoreModelsFile</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ReadIes</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ReadIsd</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ReadIsdFile</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ReflectanceToLinearSrgb</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>RenderBackends</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>RenderSchemaTypes</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>RequiredVars</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ResampleCurve</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ResetsXformStack</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ResolveBrdfParams</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ResolveRenderPrims</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ResolveRenderProducts</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>RgbToSigmoid</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>RgbToSpectrum</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>RotateOp</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>RenderSettingsSchema</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>ResetSquare</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+</ul>
+<h2 id="s">s</h2>
+<ul>
+<li><strong>SaveScene</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>SaveSceneFile</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>SelectOverlays</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>SensorFilterNamed</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>SetCamera</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>SetSingletChromatic</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>SetXform</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>SizeOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>SnakeCase</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>SolveNormal</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>SphereMesh</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>SrgbToLinear</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>StandardSensorFilters</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>StarFieldParamsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>StarIlluminance</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>StarsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>StepsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>StreamOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>SunIrradianceOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>SyntheticStars</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>SchemaOf</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>SectionHeader</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>SessionRootPath</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>SetEnabled</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
+<li><strong>SetHistory</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
+<li><strong>SetThreadName</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
+</ul>
+<h2 id="t">t</h2>
+<ul>
+<li><strong>TerrainSchemaTypes</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ToRgba8</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ToXyz</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>TowardsLight</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>TransitionImage</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>TriangulateFaces</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>TriangulatedCorners</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ThreadIndex</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
+<li><strong>ThreadNames</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
+</ul>
+<h2 id="u">u</h2>
+<ul>
+<li><strong>Union</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>UpdateSessionLights</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+</ul>
+<h2 id="v">v</h2>
+<ul>
+<li><strong>Validate</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>VarsWrittenBy</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ViewPosesOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ViewWorldsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ViewableCameras</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+</ul>
+<h2 id="w">w</h2>
+<ul>
+<li><strong>WireframeOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>WireframeToken</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>WorldOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>WriteAttribute</strong> (<a href="../namespaceernie_1_1detail/"><strong>ernie::detail</strong></a>)</li>
+</ul>
+<h2 id="x">x</h2>
+<ul>
+<li><strong>XyzToLinearSrgb</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+</ul>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../hierarchy/" class="btn btn-neutral float-left" title="Class hierarchy"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../namespaceernie/" class="btn btn-neutral float-right" title="Namespace ernie">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+      <span><a href="../hierarchy/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../namespaceernie/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1IsdCameraModel/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Class ernie::IsdCameraModel - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Class ernie::IsdCameraModel";
+        var mkdocs_page_input_path = "cpp/classernie_1_1IsdCameraModel.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/classernie_1_1IsdCameraModel/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Class ernie::IsdCameraModel</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/classernie_1_1IsdCameraModel.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-ernieisdcameramodel">Class ernie::IsdCameraModel</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>IsdCameraModel</strong></a></p>
+<p><em>What usgscsm's camera models of image support data share, in the body-fixed frame in metres:</em> <a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/scene/isd.h&gt;</code></li>
+</ul>
+<p>Inherited by the following classes: <a href="../classernie_1_1IsdFrame/">ernie::IsdFrame</a>,  <a href="../classernie_1_1IsdLineScanner/">ernie::IsdLineScanner</a>,  <a href="../classernie_1_1IsdPushFrame/">ernie::IsdPushFrame</a></p>
+<h2 id="classes">Classes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1IsdCameraModel_1_1FrameView/"><strong>FrameView</strong></a> <br><em>A frame of the detector as Ernie renders it: a frame camera of the image's samples by its rows, posed (</em> <code>camera.transform</code> <em>, camera to body-fixed world) when the frame is exposed, the lens's distortion fitted as Brown-Conrady terms (and scale).</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">glm::dvec2</td>
+<td style="text-align: left;"><a href="#function-distort"><strong>Distort</strong></a> (glm::dvec2 undistorted) const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../structernie_1_1IsdSensor/"><strong>IsdSensor</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-isd"><strong>Isd</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#function-position"><strong>Position</strong></a> (double time) const<br><em>The sensor's body-fixed position at ephemeris time</em> <code>time</code> <em>, metres.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dquat</td>
+<td style="text-align: left;"><a href="#function-sensortobody"><strong>SensorToBody</strong></a> (double time) const<br><em>The rotation from the sensor's frame to the body's at</em> <code>time</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#function-sunposition"><strong>SunPosition</strong></a> (double time) const<br><em>The sun's body-fixed position at</em> <code>time</code> <em>, metres, interpolated in the ISD's frame and rotated into the body's.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec2</td>
+<td style="text-align: left;"><a href="#function-undistort"><strong>Undistort</strong></a> (glm::dvec2 distorted) const<br><em>Undistorted focal plane coordinates (mm) of distorted</em> <code>distorted</code> <em>, and the inverse.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="protected-attributes">Protected Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1IsdSensor/"><strong>IsdSensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-isd_"><strong>isd_</strong></a>  <br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="protected-functions">Protected Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#function-ellipsoidintersect"><strong>EllipsoidIntersect</strong></a> (const glm::dvec3 &amp; origin, const glm::dvec3 &amp; look, double height, bool eitherSide=true) const<br><em>Where the ray from</em> <code>origin</code> <em>along</em><code>look</code> <em>meets the ellipsoid raised by</em><code>height</code> <em>: the intersection nearer the origin (on either side, as usgscsm's line scanner takes it; or the first along</em><code>look</code> <em>when not</em><code>eitherSide</code> <em>, as its frame camera does), or the ray's point nearest the ellipsoid.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dmat3</td>
+<td style="text-align: left;"><a href="#function-ernieaxes"><strong>ErnieAxes</strong></a> (double line, double facing) const<br><em>Ernie's camera axes (columns) in the sensor's frame for an image of the detector's samples across x: x along the samples as they increase, z back from the scene (</em> <code>facing</code> <em>-1 when the scene lies behind usgscsm's look, as for NAIF's +z boresights), y completing them.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-fitdistortion"><strong>FitDistortion</strong></a> (<a href="../structernie_1_1CameraParams/"><strong>CameraParams</strong></a> &amp; camera, std::span&lt; const double &gt; lines, const glm::dmat3 &amp; axes, double facing) const<br><em>Fits the lens's distortion at detector lines</em> <code>lines</code> <em>across the samples as Brown-Conrady terms on</em><code>camera</code> <em>(and a scale into its focal length, from a radial model's constant term), with</em><code>facing</code> <em>and</em><code>axes</code> <em>as</em><code>ErnieAxes</code> <em>; returns the fit's largest departure from the ISD's, in pixels.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec2</td>
+<td style="text-align: left;"><a href="#function-focalplaneof"><strong>FocalPlaneOf</strong></a> (double line, double sample) const<br><em>Focal plane coordinates (distorted, mm) of detector line</em> <code>line</code> <em>and image sample</em><code>sample</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec2</td>
+<td style="text-align: left;"><a href="#function-focalplaneview"><strong>FocalPlaneView</strong></a> (const glm::dvec3 &amp; ground, double time) const<br><em>Undistorted focal plane coordinates of</em> <code>ground</code> <em>as the sensor sees it at</em><code>time</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1IsdCameraModel_1_1FrameView/"><strong>FrameView</strong></a></td>
+<td style="text-align: left;"><a href="#function-frameviewof"><strong>FrameViewOf</strong></a> (const std::function&lt; double(double)&gt; &amp; detectorLine, std::uint32_t rows, double time, double facing) const<br><em>The frame camera of</em> <code>rows</code> <em>image rows exposed at</em><code>time</code> <em>, row coordinate r (0 the top edge,</em><code>rows</code> <em>the bottom) on detector line</em><code>detectorLine(r)</code> <em>, with</em><code>facing</code> <em>as</em><code>ErnieAxes</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-isdcameramodel"><strong>IsdCameraModel</strong></a> (<a href="../structernie_1_1IsdSensor/"><strong>IsdSensor</strong></a> isd) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#function-lookat"><strong>LookAt</strong></a> (double time, double line, double sample) const<br><em>The unit body-fixed direction of the ray at</em> <code>time</code> <em>through detector line</em><code>line</code> <em>and sample</em><code>sample</code> <em>(</em><code>IsdLineScanner::Look</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec2</td>
+<td style="text-align: left;"><a href="#function-pixelof"><strong>PixelOf</strong></a> (glm::dvec2 focal) const<br><a href="../structernie_1_1Image/"><em><strong>Image</strong></em></a> <em>(line on the detector, sample) of distorted focal plane point</em><code>focal</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dmat4</td>
+<td style="text-align: left;"><a href="#function-poseat"><strong>PoseAt</strong></a> (double time, const glm::dmat3 &amp; axes) const<br><em>The camera-to-body pose of Ernie's camera on</em> <code>axes</code> <em>at</em><code>time</code> <em>.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="protected-static-functions">Protected Static Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">glm::dquat</td>
+<td style="text-align: left;"><a href="#function-rotationat"><strong>RotationAt</strong></a> (const <a href="../structernie_1_1IsdRotation/"><strong>IsdRotation</strong></a> &amp; rotation, double time) <br><em>The rotation</em> <code>rotation</code> <em>describes at</em><code>time</code> <em>: its constant after its time-dependent part.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<ul>
+<li><a href="../structernie_1_1Image/"><strong>Image</strong></a> coordinates are CSM's: (line, sample) with the first pixel's centre at (0.5, 0.5).</li>
+<li>The sensor's position is sampled as usgscsm samples it: at least 25 even times over the states, each a cubic Hermite of the states around it (ALE's spline) rotated into the body's frame, then interpolated eighth-order Lagrange (fewer points near the ends). Its orientation, sensor to body = body rotation x inverse pointing, is taken at the union of their times (each interpolated along the great arc), resampled evenly and interpolated the same way.</li>
+<li>Detector line d and sample s lie on the focal plane at the inverse of <code>focal2pixel</code> of (d x line summing + starting detector line - detector centre line, s x sample summing + starting detector sample - detector centre sample), in mm; the lens's distortion moves it; the camera looks along (-x, -y, -f) in the sensor's frame.</li>
+</ul>
+<p>Light-time and aberration corrections are left out, as usgscsm leaves them out. </p>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-distort">function Distort</h3>
+<pre><code class="language-C++">glm::dvec2 ernie::IsdCameraModel::Distort (
+    glm::dvec2 undistorted
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-isd">function Isd</h3>
+<pre><code class="language-C++">inline const IsdSensor &amp; ernie::IsdCameraModel::Isd () const
+</code></pre>
+<hr>
+
+<h3 id="function-position">function Position</h3>
+<p><em>The sensor's body-fixed position at ephemeris time</em> <code>time</code> <em>, metres.</em></p>
+<pre><code class="language-C++">glm::dvec3 ernie::IsdCameraModel::Position (
+    double time
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-sensortobody">function SensorToBody</h3>
+<p><em>The rotation from the sensor's frame to the body's at</em> <code>time</code> <em>.</em></p>
+<pre><code class="language-C++">glm::dquat ernie::IsdCameraModel::SensorToBody (
+    double time
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-sunposition">function SunPosition</h3>
+<p><em>The sun's body-fixed position at</em> <code>time</code> <em>, metres, interpolated in the ISD's frame and rotated into the body's.</em></p>
+<pre><code class="language-C++">glm::dvec3 ernie::IsdCameraModel::SunPosition (
+    double time
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-undistort">function Undistort</h3>
+<p><em>Undistorted focal plane coordinates (mm) of distorted</em> <code>distorted</code> <em>, and the inverse.</em></p>
+<pre><code class="language-C++">glm::dvec2 ernie::IsdCameraModel::Undistort (
+    glm::dvec2 distorted
+) const
+</code></pre>
+<hr>
+<h2 id="protected-attributes-documentation">Protected Attributes Documentation</h2>
+<h3 id="variable-isd_">variable isd_</h3>
+<pre><code class="language-C++">IsdSensor ernie::IsdCameraModel::isd_;
+</code></pre>
+<hr>
+<h2 id="protected-functions-documentation">Protected Functions Documentation</h2>
+<h3 id="function-ellipsoidintersect">function EllipsoidIntersect</h3>
+<p><em>Where the ray from</em> <code>origin</code> <em>along</em><code>look</code> <em>meets the ellipsoid raised by</em><code>height</code> <em>: the intersection nearer the origin (on either side, as usgscsm's line scanner takes it; or the first along</em><code>look</code> <em>when not</em><code>eitherSide</code> <em>, as its frame camera does), or the ray's point nearest the ellipsoid.</em></p>
+<pre><code class="language-C++">glm::dvec3 ernie::IsdCameraModel::EllipsoidIntersect (
+    const glm::dvec3 &amp; origin,
+    const glm::dvec3 &amp; look,
+    double height,
+    bool eitherSide=true
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-ernieaxes">function ErnieAxes</h3>
+<p><em>Ernie's camera axes (columns) in the sensor's frame for an image of the detector's samples across x: x along the samples as they increase, z back from the scene (</em> <code>facing</code> <em>-1 when the scene lies behind usgscsm's look, as for NAIF's +z boresights), y completing them.</em></p>
+<pre><code class="language-C++">glm::dmat3 ernie::IsdCameraModel::ErnieAxes (
+    double line,
+    double facing
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-fitdistortion">function FitDistortion</h3>
+<p><em>Fits the lens's distortion at detector lines</em> <code>lines</code> <em>across the samples as Brown-Conrady terms on</em><code>camera</code> <em>(and a scale into its focal length, from a radial model's constant term), with</em><code>facing</code> <em>and</em><code>axes</code> <em>as</em><code>ErnieAxes</code> <em>; returns the fit's largest departure from the ISD's, in pixels.</em></p>
+<pre><code class="language-C++">double ernie::IsdCameraModel::FitDistortion (
+    CameraParams &amp; camera,
+    std::span&lt; const double &gt; lines,
+    const glm::dmat3 &amp; axes,
+    double facing
+) const
+</code></pre>
+<p>One line fits along it only (x) and radially, as a pushbroom's lens resamples; more fit both of the image's directions with the tangential terms too, which a radtan model's map onto exactly. </p>
+<hr>
+
+<h3 id="function-focalplaneof">function FocalPlaneOf</h3>
+<p><em>Focal plane coordinates (distorted, mm) of detector line</em> <code>line</code> <em>and image sample</em><code>sample</code> <em>.</em></p>
+<pre><code class="language-C++">glm::dvec2 ernie::IsdCameraModel::FocalPlaneOf (
+    double line,
+    double sample
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-focalplaneview">function FocalPlaneView</h3>
+<p><em>Undistorted focal plane coordinates of</em> <code>ground</code> <em>as the sensor sees it at</em><code>time</code> <em>.</em></p>
+<pre><code class="language-C++">glm::dvec2 ernie::IsdCameraModel::FocalPlaneView (
+    const glm::dvec3 &amp; ground,
+    double time
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-frameviewof">function FrameViewOf</h3>
+<p><em>The frame camera of</em> <code>rows</code> <em>image rows exposed at</em><code>time</code> <em>, row coordinate r (0 the top edge,</em><code>rows</code> <em>the bottom) on detector line</em><code>detectorLine(r)</code> <em>, with</em><code>facing</code> <em>as</em><code>ErnieAxes</code> <em>.</em></p>
+<pre><code class="language-C++">FrameView ernie::IsdCameraModel::FrameViewOf (
+    const std::function&lt; double(double)&gt; &amp; detectorLine,
+    std::uint32_t rows,
+    double time,
+    double facing
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-isdcameramodel">function IsdCameraModel</h3>
+<pre><code class="language-C++">explicit ernie::IsdCameraModel::IsdCameraModel (
+    IsdSensor isd
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if <code>isd</code> has no states or rotations, a singular focal plane map, or a distortion model other than none and usgscsm's: "radial", "transverse", "radtan" (OpenCV's radial-tangential, coefficients k1, k2, p1, p2, k3 on coordinates over the focal length), "lrolrocnac", "kaguyalism", "dawnfc", "cahvor", "kplo_shadowcam" and "cassis" (TGO CaSSIS's rational model, its 18 correcting coefficients then 18 distorting); or with the wrong number of coefficients for its model. </li>
+</ul>
+<hr>
+
+<h3 id="function-lookat">function LookAt</h3>
+<p><em>The unit body-fixed direction of the ray at</em> <code>time</code> <em>through detector line</em><code>line</code> <em>and sample</em><code>sample</code> <em>(</em><code>IsdLineScanner::Look</code> <em>).</em></p>
+<pre><code class="language-C++">glm::dvec3 ernie::IsdCameraModel::LookAt (
+    double time,
+    double line,
+    double sample
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-pixelof">function PixelOf</h3>
+<p><a href="../structernie_1_1Image/"><em><strong>Image</strong></em></a> <em>(line on the detector, sample) of distorted focal plane point</em><code>focal</code> <em>.</em></p>
+<pre><code class="language-C++">glm::dvec2 ernie::IsdCameraModel::PixelOf (
+    glm::dvec2 focal
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-poseat">function PoseAt</h3>
+<p><em>The camera-to-body pose of Ernie's camera on</em> <code>axes</code> <em>at</em><code>time</code> <em>.</em></p>
+<pre><code class="language-C++">glm::dmat4 ernie::IsdCameraModel::PoseAt (
+    double time,
+    const glm::dmat3 &amp; axes
+) const
+</code></pre>
+<hr>
+<h2 id="protected-static-functions-documentation">Protected Static Functions Documentation</h2>
+<h3 id="function-rotationat">function RotationAt</h3>
+<p><em>The rotation</em> <code>rotation</code> <em>describes at</em><code>time</code> <em>: its constant after its time-dependent part.</em></p>
+<pre><code class="language-C++">static glm::dquat ernie::IsdCameraModel::RotationAt (
+    const IsdRotation &amp; rotation,
+    double time
+) 
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/scene/isd.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

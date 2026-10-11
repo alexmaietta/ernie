@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1Tensor/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Class ernie::Tensor - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Class ernie::Tensor";
+        var mkdocs_page_input_path = "cpp/classernie_1_1Tensor.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/classernie_1_1Tensor/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Class ernie::Tensor</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/classernie_1_1Tensor.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-ernietensor">Class ernie::Tensor</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>Tensor</strong></a></p>
+<p><em>A strided n-dimensional view of typed memory with an optional owner that keeps it alive: Ernie's end of DLPack.</em> <a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/util/tensor.h&gt;</code></li>
+</ul>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">T *</td>
+<td style="text-align: left;"><a href="#function-as"><strong>As</strong></a> () const<br><em>Typed pointer to the first element.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#function-contiguous"><strong>Contiguous</strong></a> () const<br><em>A contiguous, owning CPU copy, or this tensor itself when it already is contiguous on the CPU.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void *</td>
+<td style="text-align: left;"><a href="#function-data"><strong>Data</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::int64_t</td>
+<td style="text-align: left;"><a href="#function-elements"><strong>Elements</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-empty"><strong>Empty</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-iscontiguous"><strong>IsContiguous</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1Device/"><strong>Device</strong></a></td>
+<td style="text-align: left;"><a href="#function-location"><strong>Location</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::size_t</td>
+<td style="text-align: left;"><a href="#function-rank"><strong>Rank</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#function-row"><strong>Row</strong></a> (std::int64_t index) const<br><em>A view of entry</em> <code>index</code> <em>along the first dimension, sharing this tensor's memory and owner.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const std::vector&lt; std::int64_t &gt; &amp;</td>
+<td style="text-align: left;"><a href="#function-shape"><strong>Shape</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">const std::vector&lt; std::int64_t &gt; &amp;</td>
+<td style="text-align: left;"><a href="#function-strides"><strong>Strides</strong></a> () const<br><em>Strides in elements, filled in for contiguous tensors.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-tensor-12"><strong>Tensor</strong></a> () = default<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-tensor-22"><strong>Tensor</strong></a> (void * data, <a href="../namespaceernie/#enum-dtype"><strong>DType</strong></a> type, std::vector&lt; std::int64_t &gt; shape, std::vector&lt; std::int64_t &gt; strides={}, <a href="../structernie_1_1Device/"><strong>Device</strong></a> device={}, std::shared_ptr&lt; const void &gt; owner={}) <br><em>A view of</em> <code>data</code> <em>;</em><code>owner</code> <em>, if given, is kept alive as long as any copy of the view.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">DLManagedTensorVersioned *</td>
+<td style="text-align: left;"><a href="#function-todlpack"><strong>ToDlpack</strong></a> () const<br><em>Exports this tensor; the result keeps the memory alive until the consumer calls its deleter.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../namespaceernie/#enum-dtype"><strong>DType</strong></a></td>
+<td style="text-align: left;"><a href="#function-type"><strong>Type</strong></a> () const<br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-static-functions">Public Static Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#function-copy"><strong>Copy</strong></a> (std::span&lt; const T &gt; values, std::vector&lt; std::int64_t &gt; shape) <br><em>An owning, contiguous CPU copy of</em> <code>values</code> <em>with</em><code>shape</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#function-fromdlpack-12"><strong>FromDlpack</strong></a> (DLManagedTensorVersioned * managed) <br><em>Adopts a DLPack tensor; its deleter runs when the last</em> <code>Tensor</code> <em>referencing it is gone.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#function-fromdlpack-22"><strong>FromDlpack</strong></a> (DLManagedTensor * managed) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#function-zeros"><strong>Zeros</strong></a> (<a href="../namespaceernie/#enum-dtype"><strong>DType</strong></a> type, std::vector&lt; std::int64_t &gt; shape) <br><em>An owning, contiguous CPU tensor filled with zeros.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>Shapes and strides are in elements, as in DLPack; empty strides mean row-major contiguous. Copies share the memory and its owner. <code>FromDlpack</code> adopts a producer's tensor without copying and calls its deleter when the last <code>Tensor</code> referencing it is gone; <code>ToDlpack</code> hands memory to a consumer the same way.</p>
+<p>Reference: DLPack, <a href="https://dmlc.github.io/dlpack/latest/">https://dmlc.github.io/dlpack/latest/</a> </p>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-as">function As</h3>
+<p><em>Typed pointer to the first element.</em> </p>
+<pre><code class="language-C++">template&lt;typename T&gt;
+T * ernie::Tensor::As () const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if <code>T</code> does not match the element type. </li>
+</ul>
+<hr>
+
+<h3 id="function-contiguous">function Contiguous</h3>
+<p><em>A contiguous, owning CPU copy, or this tensor itself when it already is contiguous on the CPU.</em> </p>
+<pre><code class="language-C++">Tensor ernie::Tensor::Contiguous () const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a tensor that is not on the CPU. </li>
+</ul>
+<hr>
+
+<h3 id="function-data">function Data</h3>
+<pre><code class="language-C++">inline void * ernie::Tensor::Data () const
+</code></pre>
+<hr>
+
+<h3 id="function-elements">function Elements</h3>
+<pre><code class="language-C++">std::int64_t ernie::Tensor::Elements () const
+</code></pre>
+<hr>
+
+<h3 id="function-empty">function Empty</h3>
+<pre><code class="language-C++">inline bool ernie::Tensor::Empty () const
+</code></pre>
+<hr>
+
+<h3 id="function-iscontiguous">function IsContiguous</h3>
+<pre><code class="language-C++">bool ernie::Tensor::IsContiguous () const
+</code></pre>
+<hr>
+
+<h3 id="function-location">function Location</h3>
+<pre><code class="language-C++">inline Device ernie::Tensor::Location () const
+</code></pre>
+<hr>
+
+<h3 id="function-rank">function Rank</h3>
+<pre><code class="language-C++">inline std::size_t ernie::Tensor::Rank () const
+</code></pre>
+<hr>
+
+<h3 id="function-row">function Row</h3>
+<p><em>A view of entry</em> <code>index</code> <em>along the first dimension, sharing this tensor's memory and owner.</em></p>
+<pre><code class="language-C++">Tensor ernie::Tensor::Row (
+    std::int64_t index
+) const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::out_of_range</code> if the tensor has no dimensions or <code>index</code> is out of range. </li>
+</ul>
+<hr>
+
+<h3 id="function-shape">function Shape</h3>
+<pre><code class="language-C++">inline const std::vector&lt; std::int64_t &gt; &amp; ernie::Tensor::Shape () const
+</code></pre>
+<hr>
+
+<h3 id="function-strides">function Strides</h3>
+<p><em>Strides in elements, filled in for contiguous tensors.</em> </p>
+<pre><code class="language-C++">inline const std::vector&lt; std::int64_t &gt; &amp; ernie::Tensor::Strides () const
+</code></pre>
+<hr>
+
+<h3 id="function-tensor-12">function Tensor [1/2]</h3>
+<pre><code class="language-C++">ernie::Tensor::Tensor () = default
+</code></pre>
+<hr>
+
+<h3 id="function-tensor-22">function Tensor [2/2]</h3>
+<p><em>A view of</em> <code>data</code> <em>;</em><code>owner</code> <em>, if given, is kept alive as long as any copy of the view.</em></p>
+<pre><code class="language-C++">ernie::Tensor::Tensor (
+    void * data,
+    DType type,
+    std::vector&lt; std::int64_t &gt; shape,
+    std::vector&lt; std::int64_t &gt; strides={},
+    Device device={},
+    std::shared_ptr&lt; const void &gt; owner={}
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if a dimension is negative or strides do not match the shape's rank. </li>
+</ul>
+<hr>
+
+<h3 id="function-todlpack">function ToDlpack</h3>
+<p><em>Exports this tensor; the result keeps the memory alive until the consumer calls its deleter.</em> </p>
+<pre><code class="language-C++">DLManagedTensorVersioned * ernie::Tensor::ToDlpack () const
+</code></pre>
+<hr>
+
+<h3 id="function-type">function Type</h3>
+<pre><code class="language-C++">inline DType ernie::Tensor::Type () const
+</code></pre>
+<hr>
+<h2 id="public-static-functions-documentation">Public Static Functions Documentation</h2>
+<h3 id="function-copy">function Copy</h3>
+<p><em>An owning, contiguous CPU copy of</em> <code>values</code> <em>with</em><code>shape</code> <em>.</em></p>
+<pre><code class="language-C++">template&lt;typename T&gt;
+static Tensor ernie::Tensor::Copy (
+    std::span&lt; const T &gt; values,
+    std::vector&lt; std::int64_t &gt; shape
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if the shape's element count differs from <code>values.size()</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-fromdlpack-12">function FromDlpack [1/2]</h3>
+<p><em>Adopts a DLPack tensor; its deleter runs when the last</em> <code>Tensor</code> <em>referencing it is gone.</em></p>
+<pre><code class="language-C++">static Tensor ernie::Tensor::FromDlpack (
+    DLManagedTensorVersioned * managed
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for an unsupported data type, lanes or device; the producer's deleter still runs. </li>
+</ul>
+<hr>
+
+<h3 id="function-fromdlpack-22">function FromDlpack [2/2]</h3>
+<pre><code class="language-C++">static Tensor ernie::Tensor::FromDlpack (
+    DLManagedTensor * managed
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-zeros">function Zeros</h3>
+<p><em>An owning, contiguous CPU tensor filled with zeros.</em> </p>
+<pre><code class="language-C++">static Tensor ernie::Tensor::Zeros (
+    DType type,
+    std::vector&lt; std::int64_t &gt; shape
+) 
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/util/tensor.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

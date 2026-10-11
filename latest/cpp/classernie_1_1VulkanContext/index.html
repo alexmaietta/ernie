@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1VulkanContext/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Class ernie::VulkanContext - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Class ernie::VulkanContext";
+        var mkdocs_page_input_path = "cpp/classernie_1_1VulkanContext.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/classernie_1_1VulkanContext/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Class ernie::VulkanContext</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/classernie_1_1VulkanContext.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-ernievulkancontext">Class ernie::VulkanContext</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>VulkanContext</strong></a></p>
+<p><em>Owns a Vulkan instance, device, graphics and compute queue, and memory allocator.</em> <a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/device/vulkan_context.h&gt;</code></li>
+</ul>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">std::weak_ptr&lt; const void &gt;</td>
+<td style="text-align: left;"><a href="#function-alive"><strong>Alive</strong></a> () const<br><em>Expires when the context is destroyed, for objects that may outlive it, such as buffers behind arrays a scene still holds after its renderer is gone: they then leave their handles to the destroyed device rather than destroy them.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">VmaAllocator</td>
+<td style="text-align: left;"><a href="#function-allocator"><strong>Allocator</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-collectgpuprofile"><strong>CollectGpuProfile</strong></a> (VkCommandBuffer commands) const<br><em>Records into</em> <code>commands</code> <em>, outside a rendering pass, the collection of finished GPU zones for Tracy, and hands those Ernie's profiler timed to it; nothing without either.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkSemaphore</td>
+<td style="text-align: left;"><a href="#function-createtimelinesemaphore"><strong>CreateTimelineSemaphore</strong></a> (std::uint64_t initial=0, bool exportable=false) const<br><em>Creates a timeline semaphore at</em> <code>initial</code> <em>, exportable as a POSIX file descriptor when</em><code>exportable</code> <em>is set (which needs</em><code>SupportsExternalMemory</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkDevice</td>
+<td style="text-align: left;"><a href="#function-device"><strong>Device</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#function-devicelocalmemorytype"><strong>DeviceLocalMemoryType</strong></a> (std::uint32_t typeBits) const<br><em>The index of a device-local memory type among</em> <code>typeBits</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const std::string &amp;</td>
+<td style="text-align: left;"><a href="#function-devicename"><strong>DeviceName</strong></a> () const<br><a href="../structernie_1_1Device/"><em><strong>Device</strong></em></a> <em>name, e.g. "NVIDIA GeForce RTX 5070 Laptop GPU".</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const std::array&lt; std::uint8_t, VK_UUID_SIZE &gt; &amp;</td>
+<td style="text-align: left;"><a href="#function-deviceuuid"><strong>DeviceUuid</strong></a> () const<br><a href="../structernie_1_1Device/"><em><strong>Device</strong></em></a> <em>UUID, which CUDA reports too, for matching devices across APIs.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../namespaceernie/#typedef-externalhandle"><strong>ExternalHandle</strong></a></td>
+<td style="text-align: left;"><a href="#function-exportmemory"><strong>ExportMemory</strong></a> (VkDeviceMemory memory) const<br><em>A new handle to</em> <code>memory</code> <em>, allocated exportable as</em><code>kExternalMemoryHandleType</code> <em>, which the importer takes (</em><code>CloseExternalHandle</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../namespaceernie/#typedef-externalhandle"><strong>ExternalHandle</strong></a></td>
+<td style="text-align: left;"><a href="#function-exportsemaphore"><strong>ExportSemaphore</strong></a> (VkSemaphore semaphore) const<br><em>A new handle to</em> <code>semaphore</code> <em>, created exportable (</em><code>CreateTimelineSemaphore</code> <em>), as</em><code>ExportMemory</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void *</td>
+<td style="text-align: left;"><a href="#function-gpuprofiler"><strong>GpuProfiler</strong></a> () const<br><em>The Tracy Vulkan context of a profiling build (ERNIE_TRACY) for</em> <code>ERNIE_GPU_ZONE</code> <em>; null otherwise.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-haspendingsubmissions"><strong>HasPendingSubmissions</strong></a> () const<br><em>Whether</em> <code>SubmitAsync</code> <em>work is still pending on the device.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkInstance</td>
+<td style="text-align: left;"><a href="#function-instance"><strong>Instance</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">const VkPhysicalDeviceLimits &amp;</td>
+<td style="text-align: left;"><a href="#function-limits"><strong>Limits</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkPhysicalDevice</td>
+<td style="text-align: left;"><a href="#function-physicaldevice"><strong>PhysicalDevice</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">PFN_vkCmdPushDescriptorSetKHR</td>
+<td style="text-align: left;"><a href="#function-pushdescriptorset"><strong>PushDescriptorSet</strong></a> () const<br><code>vkCmdPushDescriptorSetKHR</code> <em>for this device.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkQueue</td>
+<td style="text-align: left;"><a href="#function-queue"><strong>Queue</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#function-queuefamily"><strong>QueueFamily</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-submit"><strong>Submit</strong></a> (const std::function&lt; void(VkCommandBuffer)&gt; &amp; record, std::span&lt; const <a href="../structernie_1_1TimelinePoint/"><strong>TimelinePoint</strong></a> &gt; waits={}, std::span&lt; const <a href="../structernie_1_1TimelinePoint/"><strong>TimelinePoint</strong></a> &gt; signals={}) const<br><em>Records commands with</em> <code>record</code> <em>into a one-off command buffer, submits it and waits for the device to finish it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#function-submitasync"><strong>SubmitAsync</strong></a> (const std::function&lt; void(VkCommandBuffer)&gt; &amp; record, std::span&lt; const <a href="../structernie_1_1TimelinePoint/"><strong>TimelinePoint</strong></a> &gt; waits={}, std::span&lt; const <a href="../structernie_1_1TimelinePoint/"><strong>TimelinePoint</strong></a> &gt; signals={}) const<br><em>Like</em> <code>Submit</code> <em>, but returns once the work is submitted, without waiting for the device; its command buffer is recycled after the device finishes it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-supportsanisotropy"><strong>SupportsAnisotropy</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-supportsexternalmemory"><strong>SupportsExternalMemory</strong></a> () const<br><em>Whether buffers can be allocated with</em> <code>BufferMemory::Shared</code> <em>: memory and semaphores exported for CUDA interop, as POSIX file descriptors (VK_KHR_external_memory_fd and VK_KHR_external_semaphore_fd) or, on Windows, Win32 handles (their _win32 counterparts).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-supportsmultidrawindirect"><strong>SupportsMultiDrawIndirect</strong></a> () const<br><em>Whether one indirect draw call may draw several commands (</em> <code>multiDrawIndirect</code> <em>); without it, callers issue one call per command.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-supportsrayquery"><strong>SupportsRayQuery</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; std::string &gt;</td>
+<td style="text-align: left;"><a href="#function-takevalidationmessages"><strong>TakeValidationMessages</strong></a> () <br><em>Validation and error messages reported since the last call, oldest first.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1GpuTimer/"><strong>GpuTimer</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-timer"><strong>Timer</strong></a> () const<br><em>The timer of</em> <code>ERNIE_GPU_ZONE</code> <em>s for Ernie's own profiler (</em><a href="../profiler_8h/"><em><strong>ernie/util/profiler.h</strong></em></a> <em>); it times nothing on devices without timestamps or host query reset.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-validationenabled"><strong>ValidationEnabled</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-vulkancontext-12"><strong>VulkanContext</strong></a> (const <a href="./"><strong>VulkanContext</strong></a> &amp;) = delete<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-waitforsubmission"><strong>WaitForSubmission</strong></a> (std::uint64_t submission, std::uint64_t timeoutNs=UINT64_MAX) const<br><em>Waits up to</em> <code>timeoutNs</code> <em>nanoseconds (0 polls) for</em><code>SubmitAsync</code> <em>submission</em><code>submission</code> <em>; true once the device has finished it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-waitforsubmissions"><strong>WaitForSubmissions</strong></a> () const<br><em>Waits until the device has finished every</em> <code>SubmitAsync</code> <em>submission.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>VulkanContext</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-operator"><strong>operator=</strong></a> (const <a href="./"><strong>VulkanContext</strong></a> &amp;) = delete<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-vulkancontext"><strong>~VulkanContext</strong></a> () <br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-static-functions">Public Static Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">std::unique_ptr&lt; <a href="./"><strong>VulkanContext</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-create"><strong>Create</strong></a> (const <a href="../structernie_1_1VulkanContextOptions/"><strong>VulkanContextOptions</strong></a> &amp; options={}) <br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>Requires Vulkan 1.3 with dynamic rendering, synchronization2, demote to helper invocation, timeline semaphores and shader draw parameters, plus push descriptors. Ray queries are enabled when the device supports them. Vulkan is loaded at run time through volk: the system loader on Linux and Windows, MoltenVK on macOS (with the portability extensions it needs). Several contexts may exist at once, on the same or different devices: core functions go through the loader's dispatch, and extension functions come from the context that enabled them (e.g. <code>PushDescriptorSet</code>), never from volk's globals. </p>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-alive">function Alive</h3>
+<p><em>Expires when the context is destroyed, for objects that may outlive it, such as buffers behind arrays a scene still holds after its renderer is gone: they then leave their handles to the destroyed device rather than destroy them.</em> </p>
+<pre><code class="language-C++">inline std::weak_ptr&lt; const void &gt; ernie::VulkanContext::Alive () const
+</code></pre>
+<hr>
+
+<h3 id="function-allocator">function Allocator</h3>
+<pre><code class="language-C++">inline VmaAllocator ernie::VulkanContext::Allocator () const
+</code></pre>
+<hr>
+
+<h3 id="function-collectgpuprofile">function CollectGpuProfile</h3>
+<p><em>Records into</em> <code>commands</code> <em>, outside a rendering pass, the collection of finished GPU zones for Tracy, and hands those Ernie's profiler timed to it; nothing without either.</em></p>
+<pre><code class="language-C++">void ernie::VulkanContext::CollectGpuProfile (
+    VkCommandBuffer commands
+) const
+</code></pre>
+<p><code>Submit</code> and <code>SubmitAsync</code> collect at the start of every command buffer, so only command buffers recorded elsewhere need it, such as an app's frames. </p>
+<hr>
+
+<h3 id="function-createtimelinesemaphore">function CreateTimelineSemaphore</h3>
+<p><em>Creates a timeline semaphore at</em> <code>initial</code> <em>, exportable as a POSIX file descriptor when</em><code>exportable</code> <em>is set (which needs</em><code>SupportsExternalMemory</code> <em>).</em></p>
+<pre><code class="language-C++">VkSemaphore ernie::VulkanContext::CreateTimelineSemaphore (
+    std::uint64_t initial=0,
+    bool exportable=false
+) const
+</code></pre>
+<p>The caller destroys it. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::runtime_error</code> if creation fails. </li>
+</ul>
+<hr>
+
+<h3 id="function-device">function Device</h3>
+<pre><code class="language-C++">inline VkDevice ernie::VulkanContext::Device () const
+</code></pre>
+<hr>
+
+<h3 id="function-devicelocalmemorytype">function DeviceLocalMemoryType</h3>
+<p><em>The index of a device-local memory type among</em> <code>typeBits</code> <em>.</em></p>
+<pre><code class="language-C++">std::uint32_t ernie::VulkanContext::DeviceLocalMemoryType (
+    std::uint32_t typeBits
+) const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::runtime_error</code> if there is none. </li>
+</ul>
+<hr>
+
+<h3 id="function-devicename">function DeviceName</h3>
+<p><a href="../structernie_1_1Device/"><em><strong>Device</strong></em></a> <em>name, e.g. "NVIDIA GeForce RTX 5070 Laptop GPU".</em></p>
+<pre><code class="language-C++">inline const std::string &amp; ernie::VulkanContext::DeviceName () const
+</code></pre>
+<hr>
+
+<h3 id="function-deviceuuid">function DeviceUuid</h3>
+<p><a href="../structernie_1_1Device/"><em><strong>Device</strong></em></a> <em>UUID, which CUDA reports too, for matching devices across APIs.</em></p>
+<pre><code class="language-C++">inline const std::array&lt; std::uint8_t, VK_UUID_SIZE &gt; &amp; ernie::VulkanContext::DeviceUuid () const
+</code></pre>
+<hr>
+
+<h3 id="function-exportmemory">function ExportMemory</h3>
+<p><em>A new handle to</em> <code>memory</code> <em>, allocated exportable as</em><code>kExternalMemoryHandleType</code> <em>, which the importer takes (</em><code>CloseExternalHandle</code> <em>).</em></p>
+<pre><code class="language-C++">ExternalHandle ernie::VulkanContext::ExportMemory (
+    VkDeviceMemory memory
+) const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::runtime_error</code> without <code>SupportsExternalMemory</code>, or if the export fails. </li>
+</ul>
+<hr>
+
+<h3 id="function-exportsemaphore">function ExportSemaphore</h3>
+<p><em>A new handle to</em> <code>semaphore</code> <em>, created exportable (</em><code>CreateTimelineSemaphore</code> <em>), as</em><code>ExportMemory</code> <em>.</em></p>
+<pre><code class="language-C++">ExternalHandle ernie::VulkanContext::ExportSemaphore (
+    VkSemaphore semaphore
+) const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::runtime_error</code> as <code>ExportMemory</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-gpuprofiler">function GpuProfiler</h3>
+<p><em>The Tracy Vulkan context of a profiling build (ERNIE_TRACY) for</em> <code>ERNIE_GPU_ZONE</code> <em>; null otherwise.</em></p>
+<pre><code class="language-C++">inline void * ernie::VulkanContext::GpuProfiler () const
+</code></pre>
+<p>GPU zones are calibrated against the CPU's clock when the device has VK_KHR_calibrated_timestamps (or the EXT). </p>
+<hr>
+
+<h3 id="function-haspendingsubmissions">function HasPendingSubmissions</h3>
+<p><em>Whether</em> <code>SubmitAsync</code> <em>work is still pending on the device.</em></p>
+<pre><code class="language-C++">bool ernie::VulkanContext::HasPendingSubmissions () const
+</code></pre>
+<hr>
+
+<h3 id="function-instance">function Instance</h3>
+<pre><code class="language-C++">inline VkInstance ernie::VulkanContext::Instance () const
+</code></pre>
+<hr>
+
+<h3 id="function-limits">function Limits</h3>
+<pre><code class="language-C++">inline const VkPhysicalDeviceLimits &amp; ernie::VulkanContext::Limits () const
+</code></pre>
+<hr>
+
+<h3 id="function-physicaldevice">function PhysicalDevice</h3>
+<pre><code class="language-C++">inline VkPhysicalDevice ernie::VulkanContext::PhysicalDevice () const
+</code></pre>
+<hr>
+
+<h3 id="function-pushdescriptorset">function PushDescriptorSet</h3>
+<p><code>vkCmdPushDescriptorSetKHR</code> <em>for this device.</em></p>
+<pre><code class="language-C++">inline PFN_vkCmdPushDescriptorSetKHR ernie::VulkanContext::PushDescriptorSet () const
+</code></pre>
+<hr>
+
+<h3 id="function-queue">function Queue</h3>
+<pre><code class="language-C++">inline VkQueue ernie::VulkanContext::Queue () const
+</code></pre>
+<hr>
+
+<h3 id="function-queuefamily">function QueueFamily</h3>
+<pre><code class="language-C++">inline std::uint32_t ernie::VulkanContext::QueueFamily () const
+</code></pre>
+<hr>
+
+<h3 id="function-submit">function Submit</h3>
+<p><em>Records commands with</em> <code>record</code> <em>into a one-off command buffer, submits it and waits for the device to finish it.</em></p>
+<pre><code class="language-C++">void ernie::VulkanContext::Submit (
+    const std::function&lt; void(VkCommandBuffer)&gt; &amp; record,
+    std::span&lt; const TimelinePoint &gt; waits={},
+    std::span&lt; const TimelinePoint &gt; signals={}
+) const
+</code></pre>
+<p>Its writes are then visible to the host and to later submissions. The submission waits for <code>waits</code> before starting and signals <code>signals</code> when done. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::runtime_error</code> if submission fails. </li>
+</ul>
+<hr>
+
+<h3 id="function-submitasync">function SubmitAsync</h3>
+<p><em>Like</em> <code>Submit</code> <em>, but returns once the work is submitted, without waiting for the device; its command buffer is recycled after the device finishes it.</em></p>
+<pre><code class="language-C++">std::uint64_t ernie::VulkanContext::SubmitAsync (
+    const std::function&lt; void(VkCommandBuffer)&gt; &amp; record,
+    std::span&lt; const TimelinePoint &gt; waits={},
+    std::span&lt; const TimelinePoint &gt; signals={}
+) const
+</code></pre>
+<p>Use <code>signals</code> to tell other work (such as CUDA) when it is done, or <code>WaitForSubmission</code> with the returned number. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::runtime_error</code> if submission fails. </li>
+</ul>
+<hr>
+
+<h3 id="function-supportsanisotropy">function SupportsAnisotropy</h3>
+<pre><code class="language-C++">inline bool ernie::VulkanContext::SupportsAnisotropy () const
+</code></pre>
+<hr>
+
+<h3 id="function-supportsexternalmemory">function SupportsExternalMemory</h3>
+<p><em>Whether buffers can be allocated with</em> <code>BufferMemory::Shared</code> <em>: memory and semaphores exported for CUDA interop, as POSIX file descriptors (VK_KHR_external_memory_fd and VK_KHR_external_semaphore_fd) or, on Windows, Win32 handles (their _win32 counterparts).</em></p>
+<pre><code class="language-C++">inline bool ernie::VulkanContext::SupportsExternalMemory () const
+</code></pre>
+<hr>
+
+<h3 id="function-supportsmultidrawindirect">function SupportsMultiDrawIndirect</h3>
+<p><em>Whether one indirect draw call may draw several commands (</em> <code>multiDrawIndirect</code> <em>); without it, callers issue one call per command.</em></p>
+<pre><code class="language-C++">inline bool ernie::VulkanContext::SupportsMultiDrawIndirect () const
+</code></pre>
+<hr>
+
+<h3 id="function-supportsrayquery">function SupportsRayQuery</h3>
+<pre><code class="language-C++">inline bool ernie::VulkanContext::SupportsRayQuery () const
+</code></pre>
+<hr>
+
+<h3 id="function-takevalidationmessages">function TakeValidationMessages</h3>
+<p><em>Validation and error messages reported since the last call, oldest first.</em> </p>
+<pre><code class="language-C++">std::vector&lt; std::string &gt; ernie::VulkanContext::TakeValidationMessages () 
+</code></pre>
+<hr>
+
+<h3 id="function-timer">function Timer</h3>
+<p><em>The timer of</em> <code>ERNIE_GPU_ZONE</code> <em>s for Ernie's own profiler (</em><a href="../profiler_8h/"><em><strong>ernie/util/profiler.h</strong></em></a> <em>); it times nothing on devices without timestamps or host query reset.</em></p>
+<pre><code class="language-C++">inline GpuTimer &amp; ernie::VulkanContext::Timer () const
+</code></pre>
+<hr>
+
+<h3 id="function-validationenabled">function ValidationEnabled</h3>
+<pre><code class="language-C++">inline bool ernie::VulkanContext::ValidationEnabled () const
+</code></pre>
+<hr>
+
+<h3 id="function-vulkancontext-12">function VulkanContext [1/2]</h3>
+<pre><code class="language-C++">ernie::VulkanContext::VulkanContext (
+    const VulkanContext &amp;
+) = delete
+</code></pre>
+<hr>
+
+<h3 id="function-waitforsubmission">function WaitForSubmission</h3>
+<p><em>Waits up to</em> <code>timeoutNs</code> <em>nanoseconds (0 polls) for</em><code>SubmitAsync</code> <em>submission</em><code>submission</code> <em>; true once the device has finished it.</em></p>
+<pre><code class="language-C++">bool ernie::VulkanContext::WaitForSubmission (
+    std::uint64_t submission,
+    std::uint64_t timeoutNs=UINT64_MAX
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-waitforsubmissions">function WaitForSubmissions</h3>
+<p><em>Waits until the device has finished every</em> <code>SubmitAsync</code> <em>submission.</em></p>
+<pre><code class="language-C++">void ernie::VulkanContext::WaitForSubmissions () const
+</code></pre>
+<hr>
+
+<h3 id="function-operator">function operator=</h3>
+<pre><code class="language-C++">VulkanContext &amp; ernie::VulkanContext::operator= (
+    const VulkanContext &amp;
+) = delete
+</code></pre>
+<hr>
+
+<h3 id="function-vulkancontext">function ~VulkanContext</h3>
+<pre><code class="language-C++">ernie::VulkanContext::~VulkanContext () 
+</code></pre>
+<hr>
+<h2 id="public-static-functions-documentation">Public Static Functions Documentation</h2>
+<h3 id="function-create">function Create</h3>
+<pre><code class="language-C++">static std::unique_ptr&lt; VulkanContext &gt; ernie::VulkanContext::Create (
+    const VulkanContextOptions &amp; options={}
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::runtime_error</code> if Vulkan cannot be loaded or no device meets the requirements. </li>
+</ul>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/device/vulkan_context.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

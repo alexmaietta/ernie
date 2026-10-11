@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1Prim/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Class ernie::Prim - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Class ernie::Prim";
+        var mkdocs_page_input_path = "cpp/classernie_1_1Prim.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/classernie_1_1Prim/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Class ernie::Prim</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/classernie_1_1Prim.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-ernieprim">Class ernie::Prim</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>Prim</strong></a></p>
+<p><em>Handle to a prim in a</em> <code>Scene</code> <em>: its path plus the scene, for chained edits.</em><a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/scene/scene.h&gt;</code></li>
+</ul>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Prim</strong></a></td>
+<td style="text-align: left;"><a href="#function-define"><strong>Define</strong></a> (std::string_view relative, std::string_view type) const<br><em>As</em> <code>Scene::Define</code> <em>at</em><code>relative</code> <em>below this prim: a name such as "Rock", or names joined by '/' such as "Rig/Arm".</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../classernie_1_1Value/"><strong>Value</strong></a> *</td>
+<td style="text-align: left;"><a href="#function-get-12"><strong>Get</strong></a> (std::string_view attribute) const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">T</td>
+<td style="text-align: left;"><a href="#function-get-22"><strong>Get</strong></a> (std::string_view attribute, T fallback) const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-getpath"><strong>GetPath</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Prim</strong></a></td>
+<td style="text-align: left;"><a href="#function-getprim"><strong>GetPrim</strong></a> (std::string_view relative) const<br><em>As</em> <code>Scene::GetPrim</code> <em>at</em><code>relative</code> <em>below this prim, as</em><code>Define</code> <em>names it: invalid if there is none or the handle is empty.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-isvalid"><strong>IsValid</strong></a> () const<br><em>Whether the handle names a prim that exists.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-prim-12"><strong>Prim</strong></a> () = default<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-prim-22"><strong>Prim</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> * scene, <a href="../classernie_1_1Path/"><strong>Path</strong></a> path) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> *</td>
+<td style="text-align: left;"><a href="#function-read"><strong>Read</strong></a> (std::string_view attribute) const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Prim</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-set"><strong>Set</strong></a> (std::string_view attribute, <a href="../classernie_1_1Value/"><strong>Value</strong></a> value) <br><em>As</em> <code>Scene::Set</code> <em>; returns this handle for chaining.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Prim</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-setxform"><strong>SetXform</strong></a> (const <a href="../structernie_1_1XformOps/"><strong>XformOps</strong></a> &amp; xform) <br><em>As</em> <code>SetXform</code> <em>(</em><a href="../xform_8h/"><em><strong>ernie/scene/xform.h</strong></em></a> <em>); returns this handle for chaining.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const std::string &amp;</td>
+<td style="text-align: left;"><a href="#function-type"><strong>Type</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Prim</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-write"><strong>Write</strong></a> (std::string_view attribute, <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> tensor) <br><em>As</em> <code>Scene::Write</code> <em>; returns this handle for chaining.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-operator-bool"><strong>operator bool</strong></a> () const<br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>Copyable and cheap; valid while the scene lives, though the prim it names may be removed. </p>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-define">function Define</h3>
+<p><em>As</em> <code>Scene::Define</code> <em>at</em><code>relative</code> <em>below this prim: a name such as "Rock", or names joined by '/' such as "Rig/Arm".</em></p>
+<pre><code class="language-C++">Prim ernie::Prim::Define (
+    std::string_view relative,
+    std::string_view type
+) const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if the handle is empty or a name is not valid. </li>
+</ul>
+<hr>
+
+<h3 id="function-get-12">function Get [1/2]</h3>
+<pre><code class="language-C++">const Value * ernie::Prim::Get (
+    std::string_view attribute
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-get-22">function Get [2/2]</h3>
+<pre><code class="language-C++">template&lt;typename T&gt;
+T ernie::Prim::Get (
+    std::string_view attribute,
+    T fallback
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-getpath">function GetPath</h3>
+<pre><code class="language-C++">inline const Path &amp; ernie::Prim::GetPath () const
+</code></pre>
+<hr>
+
+<h3 id="function-getprim">function GetPrim</h3>
+<p><em>As</em> <code>Scene::GetPrim</code> <em>at</em><code>relative</code> <em>below this prim, as</em><code>Define</code> <em>names it: invalid if there is none or the handle is empty.</em></p>
+<pre><code class="language-C++">Prim ernie::Prim::GetPrim (
+    std::string_view relative
+) const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if a name is not valid. </li>
+</ul>
+<hr>
+
+<h3 id="function-isvalid">function IsValid</h3>
+<p><em>Whether the handle names a prim that exists.</em> </p>
+<pre><code class="language-C++">bool ernie::Prim::IsValid () const
+</code></pre>
+<hr>
+
+<h3 id="function-prim-12">function Prim [1/2]</h3>
+<pre><code class="language-C++">ernie::Prim::Prim () = default
+</code></pre>
+<hr>
+
+<h3 id="function-prim-22">function Prim [2/2]</h3>
+<pre><code class="language-C++">inline ernie::Prim::Prim (
+    Scene * scene,
+    Path path
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-read">function Read</h3>
+<pre><code class="language-C++">const Tensor * ernie::Prim::Read (
+    std::string_view attribute
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-set">function Set</h3>
+<p><em>As</em> <code>Scene::Set</code> <em>; returns this handle for chaining.</em></p>
+<pre><code class="language-C++">Prim &amp; ernie::Prim::Set (
+    std::string_view attribute,
+    Value value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-setxform">function SetXform</h3>
+<p><em>As</em> <code>SetXform</code> <em>(</em><a href="../xform_8h/"><em><strong>ernie/scene/xform.h</strong></em></a> <em>); returns this handle for chaining.</em></p>
+<pre><code class="language-C++">Prim &amp; ernie::Prim::SetXform (
+    const XformOps &amp; xform
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-type">function Type</h3>
+<pre><code class="language-C++">const std::string &amp; ernie::Prim::Type () const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if the prim does not exist. </li>
+</ul>
+<hr>
+
+<h3 id="function-write">function Write</h3>
+<p><em>As</em> <code>Scene::Write</code> <em>; returns this handle for chaining.</em></p>
+<pre><code class="language-C++">Prim &amp; ernie::Prim::Write (
+    std::string_view attribute,
+    Tensor tensor
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-operator-bool">function operator bool</h3>
+<pre><code class="language-C++">inline explicit ernie::Prim::operator bool () const
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/scene/scene.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

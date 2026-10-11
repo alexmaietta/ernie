@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/class_member_functions/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Class Member Functions - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Class Member Functions";
+        var mkdocs_page_input_path = "cpp/class_member_functions.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/class_member_functions/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Class Member Functions</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/class_member_functions.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-member-functions">Class Member Functions</h1>
+<h2 id="a">a</h2>
+<ul>
+<li><strong>Add</strong> (<a href="../classernie_1_1BrdfRegistry/"><strong>ernie::BrdfRegistry</strong></a>, <a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>, <a href="../structernie_1_1NormalEquations/"><strong>ernie::NormalEquations</strong></a>, <a href="../classernie_1_1SensorFilterRegistry/"><strong>ernie::SensorFilterRegistry</strong></a>)</li>
+<li><strong>Apply</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>, <a href="../classernie_1_1OrbitController/"><strong>ernie::OrbitController</strong></a>)</li>
+<li><strong>AllocationSize</strong> (<a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>, <a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
+<li><strong>Attach</strong> (<a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>, <a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
+<li><strong>Attached</strong> (<a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>, <a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
+<li><strong>At</strong> (<a href="../structernie_1_1Image/"><strong>ernie::Image</strong></a>)</li>
+<li><strong>AddSegment</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>)</li>
+<li><strong>Arrow</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>)</li>
+<li><strong>Axes</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>)</li>
+<li><strong>AllAttributes</strong> (<a href="../structernie_1_1PrimTypeDef/"><strong>ernie::PrimTypeDef</strong></a>)</li>
+<li><strong>AddSensorFilter</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>)</li>
+<li><strong>AttributeVersion</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>Attributes</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>AutoWorldResolution</strong> (<a href="../structernie_1_1ShadowSettings/"><strong>ernie::ShadowSettings</strong></a>)</li>
+<li><strong>Average</strong> (<a href="../classernie_1_1Spectrum/"><strong>ernie::Spectrum</strong></a>)</li>
+<li><strong>Acquire</strong> (<a href="../classernie_1_1Swapchain/"><strong>ernie::Swapchain</strong></a>)</li>
+<li><strong>As</strong> (<a href="../classernie_1_1Tensor/"><strong>ernie::Tensor</strong></a>)</li>
+<li><strong>Alive</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>Allocator</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>Accept</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>ActiveCamera</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>AddHudItem</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>AddMenuItem</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>AddPanel</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>AddViewportMenuItem</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>AddViewportToggle</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>AddWidgetPanel</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>AutoExposing</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+</ul>
+<h2 id="b">b</h2>
+<ul>
+<li><strong>BrdfRegistry</strong> (<a href="../classernie_1_1BrdfRegistry/"><strong>ernie::BrdfRegistry</strong></a>)</li>
+<li><strong>Box</strong> (<a href="../structernie_1_1CubeSphereRegion/"><strong>ernie::CubeSphereRegion</strong></a>, <a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>)</li>
+<li><strong>BeginGroup</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>)</li>
+<li><strong>Begin</strong> (<a href="../classernie_1_1FrameUploads/"><strong>ernie::FrameUploads</strong></a>, <a href="../classernie_1_1GpuTimer/"><strong>ernie::GpuTimer</strong></a>)</li>
+<li><strong>Bytes</strong> (<a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
+<li><strong>BuildParents</strong> (<a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>BayerOf</strong> (<a href="../structernie_1_1MastcamZ/"><strong>ernie::MastcamZ</strong></a>)</li>
+<li><strong>Brdfs</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Builtin</strong> (<a href="../structernie_1_1SensorFilterStep/"><strong>ernie::SensorFilterStep</strong></a>)</li>
+<li><strong>Bin</strong> (<a href="../classernie_1_1Spectrum/"><strong>ernie::Spectrum</strong></a>)</li>
+<li><strong>Button</strong> (<a href="../classernie_1_1app_1_1WidgetPanel/"><strong>ernie::app::WidgetPanel</strong></a>)</li>
+</ul>
+<h2 id="c">c</h2>
+<ul>
+<li><strong>Coerce</strong> (<a href="../classernie_1_1AttributeDef/"><strong>ernie::AttributeDef</strong></a>)</li>
+<li><strong>Check</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>, <a href="../structernie_1_1SpectralBands/"><strong>ernie::SpectralBands</strong></a>)</li>
+<li><strong>ChunkedFrameImages</strong> (<a href="../classernie_1_1ChunkedFrameImages/"><strong>ernie::ChunkedFrameImages</strong></a>)</li>
+<li><strong>Chunks</strong> (<a href="../classernie_1_1ChunkedFrameImages/"><strong>ernie::ChunkedFrameImages</strong></a>)</li>
+<li><strong>ComputeInterop</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>)</li>
+<li><strong>Copy</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>, <a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>, <a href="../classernie_1_1Tensor/"><strong>ernie::Tensor</strong></a>)</li>
+<li><strong>CopyColumnsToBuffer</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>, <a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>)</li>
+<li><strong>CopyToBuffer</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>, <a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>)</li>
+<li><strong>Create</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>, <a href="../classernie_1_1ComputePipeline/"><strong>ernie::ComputePipeline</strong></a>, <a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>, <a href="../classernie_1_1Swapchain/"><strong>ernie::Swapchain</strong></a>, <a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>, <a href="../classernie_1_1app_1_1DemoRunner/"><strong>ernie::app::DemoRunner</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>ComputePipeline</strong> (<a href="../classernie_1_1ComputePipeline/"><strong>ernie::ComputePipeline</strong></a>)</li>
+<li><strong>CubeSphereLod</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>)</li>
+<li><strong>CheckOnDevice</strong> (<a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>)</li>
+<li><strong>CudaInterop</strong> (<a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>)</li>
+<li><strong>CanRedo</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>)</li>
+<li><strong>CanUndo</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>)</li>
+<li><strong>Clear</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>, <a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>, <a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>, <a href="../classernie_1_1app_1_1WidgetPanel/"><strong>ernie::app::WidgetPanel</strong></a>)</li>
+<li><strong>Close</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>, <a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Collect</strong> (<a href="../classernie_1_1GpuTimer/"><strong>ernie::GpuTimer</strong></a>)</li>
+<li><strong>Cutout</strong> (<a href="../structernie_1_1MaterialSettings/"><strong>ernie::MaterialSettings</strong></a>)</li>
+<li><strong>Color</strong> (<a href="../classernie_1_1OffscreenTarget/"><strong>ernie::OffscreenTarget</strong></a>)</li>
+<li><strong>ColorBytes</strong> (<a href="../classernie_1_1OffscreenTarget/"><strong>ernie::OffscreenTarget</strong></a>)</li>
+<li><strong>ColorFormat</strong> (<a href="../classernie_1_1OffscreenTarget/"><strong>ernie::OffscreenTarget</strong></a>)</li>
+<li><strong>CopyColor</strong> (<a href="../classernie_1_1OffscreenTarget/"><strong>ernie::OffscreenTarget</strong></a>)</li>
+<li><strong>Circle</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>)</li>
+<li><strong>Child</strong> (<a href="../classernie_1_1Path/"><strong>ernie::Path</strong></a>)</li>
+<li><strong>Compute</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>)</li>
+<li><strong>Context</strong> (<a href="../classernie_1_1Renderer/"><strong>ernie::Renderer</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Changes</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>Children</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>Clone</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>CreateIfMissing</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>CompileSpirv</strong> (<a href="../classernie_1_1ShaderCompiler/"><strong>ernie::ShaderCompiler</strong></a>)</li>
+<li><strong>CompileWgsl</strong> (<a href="../classernie_1_1ShaderCompiler/"><strong>ernie::ShaderCompiler</strong></a>)</li>
+<li><strong>Centre</strong> (<a href="../structernie_1_1SpectralBands/"><strong>ernie::SpectralBands</strong></a>)</li>
+<li><strong>Constant</strong> (<a href="../classernie_1_1Spectrum/"><strong>ernie::Spectrum</strong></a>)</li>
+<li><strong>Contiguous</strong> (<a href="../classernie_1_1Tensor/"><strong>ernie::Tensor</strong></a>)</li>
+<li><strong>CollectGpuProfile</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>CreateTimelineSemaphore</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>Catalog</strong> (<a href="../classernie_1_1app_1_1DemoRunner/"><strong>ernie::app::DemoRunner</strong></a>)</li>
+<li><strong>Cancel</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>Choose</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>ChosenFilter</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>ConfirmReplace</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>CameraFromView</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Cameras</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Capture</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>CaptureWindow</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>ClearAttribute</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>ClearLog</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>ClearScene</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Checkbox</strong> (<a href="../classernie_1_1app_1_1WidgetPanel/"><strong>ernie::app::WidgetPanel</strong></a>)</li>
+<li><strong>Combo</strong> (<a href="../classernie_1_1app_1_1WidgetPanel/"><strong>ernie::app::WidgetPanel</strong></a>)</li>
+</ul>
+<h2 id="d">d</h2>
+<ul>
+<li><strong>Describe</strong> (<a href="../classernie_1_1AttributeDef/"><strong>ernie::AttributeDef</strong></a>)</li>
+<li><strong>Defaults</strong> (<a href="../structernie_1_1BrdfModel/"><strong>ernie::BrdfModel</strong></a>)</li>
+<li><strong>Device</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>, <a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>, <a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>Download</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>, <a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>)</li>
+<li><strong>DownloadArray</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>, <a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>)</li>
+<li><strong>Dispatch</strong> (<a href="../classernie_1_1ComputePipeline/"><strong>ernie::ComputePipeline</strong></a>)</li>
+<li><strong>Distance</strong> (<a href="../structernie_1_1CubeSphereRegion/"><strong>ernie::CubeSphereRegion</strong></a>)</li>
+<li><strong>DevicePointer</strong> (<a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>)</li>
+<li><strong>Define</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>, <a href="../classernie_1_1Prim/"><strong>ernie::Prim</strong></a>, <a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>Desc</strong> (<a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
+<li><strong>Distort</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>, <a href="../structernie_1_1LensModel/"><strong>ernie::LensModel</strong></a>)</li>
+<li><strong>DetectorView</strong> (<a href="../classernie_1_1IsdLineScanner/"><strong>ernie::IsdLineScanner</strong></a>)</li>
+<li><strong>DetectorLine</strong> (<a href="../classernie_1_1IsdPushFrame/"><strong>ernie::IsdPushFrame</strong></a>)</li>
+<li><strong>DepthFormat</strong> (<a href="../classernie_1_1OffscreenTarget/"><strong>ernie::OffscreenTarget</strong></a>)</li>
+<li><strong>Delegate</strong> (<a href="../classernie_1_1Renderer/"><strong>ernie::Renderer</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>DeviceName</strong> (<a href="../classernie_1_1Renderer/"><strong>ernie::Renderer</strong></a>, <a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>Done</strong> (<a href="../classernie_1_1StepOperation/"><strong>ernie::StepOperation</strong></a>)</li>
+<li><strong>Destroy</strong> (<a href="../classernie_1_1Swapchain/"><strong>ernie::Swapchain</strong></a>)</li>
+<li><strong>Data</strong> (<a href="../classernie_1_1Tensor/"><strong>ernie::Tensor</strong></a>)</li>
+<li><strong>DeviceLocalMemoryType</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>DeviceUuid</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>Demo</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
+<li><strong>Description</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
+<li><strong>DemoRunner</strong> (<a href="../classernie_1_1app_1_1DemoRunner/"><strong>ernie::app::DemoRunner</strong></a>)</li>
+<li><strong>Directory</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>Draw</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>, <a href="../classernie_1_1app_1_1FunctionPanel/"><strong>ernie::app::FunctionPanel</strong></a>, <a href="../classernie_1_1app_1_1Panel/"><strong>ernie::app::Panel</strong></a>, <a href="../classernie_1_1app_1_1WidgetPanel/"><strong>ernie::app::WidgetPanel</strong></a>)</li>
+<li><strong>Delete</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Duplicate</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+</ul>
+<h2 id="e">e</h2>
+<ul>
+<li><strong>Electrons</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
+<li><strong>ElectronsPerRadiance</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
+<li><strong>Eye</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>, <a href="../classernie_1_1OrbitController/"><strong>ernie::OrbitController</strong></a>)</li>
+<li><strong>Extent</strong> (<a href="../classernie_1_1ChunkedFrameImages/"><strong>ernie::ChunkedFrameImages</strong></a>, <a href="../classernie_1_1FrameImages/"><strong>ernie::FrameImages</strong></a>, <a href="../classernie_1_1OffscreenTarget/"><strong>ernie::OffscreenTarget</strong></a>, <a href="../classernie_1_1Swapchain/"><strong>ernie::Swapchain</strong></a>)</li>
+<li><strong>EmitChildArea</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>, <a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>EmitQuarters</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>, <a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>Empty</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>, <a href="../structernie_1_1CubeSphereRegion/"><strong>ernie::CubeSphereRegion</strong></a>, <a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>, <a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>, <a href="../classernie_1_1Spectrum/"><strong>ernie::Spectrum</strong></a>, <a href="../classernie_1_1Tensor/"><strong>ernie::Tensor</strong></a>, <a href="../classernie_1_1Value/"><strong>ernie::Value</strong></a>)</li>
+<li><strong>EndGroup</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>)</li>
+<li><strong>ExportHandle</strong> (<a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>, <a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
+<li><strong>End</strong> (<a href="../classernie_1_1GpuTimer/"><strong>ernie::GpuTimer</strong></a>)</li>
+<li><strong>EllipsoidIntersect</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>)</li>
+<li><strong>ErnieAxes</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>)</li>
+<li><strong>EffectiveQe</strong> (<a href="../structernie_1_1LrocWacBandSpec/"><strong>ernie::LrocWacBandSpec</strong></a>)</li>
+<li><strong>Edit</strong> (<a href="../classernie_1_1SchemaView/"><strong>ernie::SchemaView</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>ElectronsPerDn</strong> (<a href="../structernie_1_1SensorModel/"><strong>ernie::SensorModel</strong></a>)</li>
+<li><strong>Elements</strong> (<a href="../classernie_1_1Tensor/"><strong>ernie::Tensor</strong></a>)</li>
+<li><strong>ExportMemory</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>ExportSemaphore</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>Entries</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>Error</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>EditLocalTransform</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>ExposureCompensation</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+</ul>
+<h2 id="f">f</h2>
+<ul>
+<li><strong>From</strong> (<a href="../structernie_1_1AttributeTraits_3_01Path_01_4/"><strong>ernie::AttributeTraits&lt; Path &gt;</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01bool_01_4/"><strong>ernie::AttributeTraits&lt; bool &gt;</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01double_01_4/"><strong>ernie::AttributeTraits&lt; double &gt;</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01glm_1_1dvec2_01_4/"><strong>ernie::AttributeTraits&lt; glm::dvec2 &gt;</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01glm_1_1dvec3_01_4/"><strong>ernie::AttributeTraits&lt; glm::dvec3 &gt;</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01glm_1_1dvec4_01_4/"><strong>ernie::AttributeTraits&lt; glm::dvec4 &gt;</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01int_01_4/"><strong>ernie::AttributeTraits&lt; int &gt;</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01std_1_1string_01_4/"><strong>ernie::AttributeTraits&lt; std::string &gt;</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01std_1_1vector_3_01Path_01_4_01_4/"><strong>ernie::AttributeTraits&lt; std::vector&lt; Path &gt; &gt;</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01std_1_1vector_3_01float_01_4_01_4/"><strong>ernie::AttributeTraits&lt; std::vector&lt; float &gt; &gt;</strong></a>)</li>
+<li><strong>Find</strong> (<a href="../classernie_1_1BrdfRegistry/"><strong>ernie::BrdfRegistry</strong></a>, <a href="../structernie_1_1PrimTypeDef/"><strong>ernie::PrimTypeDef</strong></a>, <a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>, <a href="../classernie_1_1SensorFilterRegistry/"><strong>ernie::SensorFilterRegistry</strong></a>)</li>
+<li><strong>FocalLengthPixels</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
+<li><strong>Forward</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
+<li><strong>FaceCells</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>)</li>
+<li><strong>FaceDirection</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>)</li>
+<li><strong>FacePoint</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>)</li>
+<li><strong>FaceIntrinsics</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>)</li>
+<li><strong>Faces</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>)</li>
+<li><strong>FrameUploads</strong> (<a href="../classernie_1_1FrameUploads/"><strong>ernie::FrameUploads</strong></a>)</li>
+<li><strong>FromMatrix</strong> (<a href="../structernie_1_1Frustum/"><strong>ernie::Frustum</strong></a>)</li>
+<li><strong>Flux</strong> (<a href="../structernie_1_1IesProfile/"><strong>ernie::IesProfile</strong></a>)</li>
+<li><strong>FitDistortion</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>)</li>
+<li><strong>FocalPlaneOf</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>)</li>
+<li><strong>FocalPlaneView</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>)</li>
+<li><strong>FrameViewOf</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>)</li>
+<li><strong>FrameDistance</strong> (<a href="../classernie_1_1IsdPushFrame/"><strong>ernie::IsdPushFrame</strong></a>)</li>
+<li><strong>FrameletLines</strong> (<a href="../classernie_1_1IsdPushFrame/"><strong>ernie::IsdPushFrame</strong></a>)</li>
+<li><strong>FrameletOf</strong> (<a href="../classernie_1_1IsdPushFrame/"><strong>ernie::IsdPushFrame</strong></a>)</li>
+<li><strong>Framelets</strong> (<a href="../classernie_1_1IsdPushFrame/"><strong>ernie::IsdPushFrame</strong></a>)</li>
+<li><strong>FieldAngle</strong> (<a href="../structernie_1_1LensModel/"><strong>ernie::LensModel</strong></a>)</li>
+<li><strong>FisheyeK1</strong> (<a href="../structernie_1_1Mars2020Hazcam/"><strong>ernie::Mars2020Hazcam</strong></a>, <a href="../structernie_1_1Mars2020Navcam/"><strong>ernie::Mars2020Navcam</strong></a>)</li>
+<li><strong>FNumberAt</strong> (<a href="../structernie_1_1MastcamZ/"><strong>ernie::MastcamZ</strong></a>)</li>
+<li><strong>FilterOf</strong> (<a href="../structernie_1_1MastcamZ/"><strong>ernie::MastcamZ</strong></a>)</li>
+<li><strong>FullWellElectrons</strong> (<a href="../structernie_1_1MastcamZ/"><strong>ernie::MastcamZ</strong></a>)</li>
+<li><strong>FarPlane</strong> (<a href="../classernie_1_1OrbitController/"><strong>ernie::OrbitController</strong></a>)</li>
+<li><strong>Frame</strong> (<a href="../classernie_1_1OrbitController/"><strong>ernie::OrbitController</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Fills</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>)</li>
+<li><strong>FindByPyName</strong> (<a href="../structernie_1_1PrimTypeDef/"><strong>ernie::PrimTypeDef</strong></a>)</li>
+<li><strong>FindOverlay</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>FromPairs</strong> (<a href="../classernie_1_1Spectrum/"><strong>ernie::Spectrum</strong></a>)</li>
+<li><strong>Fetch</strong> (<a href="../classernie_1_1StepOperation/"><strong>ernie::StepOperation</strong></a>)</li>
+<li><strong>Format</strong> (<a href="../classernie_1_1Swapchain/"><strong>ernie::Swapchain</strong></a>)</li>
+<li><strong>FromDlpack</strong> (<a href="../classernie_1_1Tensor/"><strong>ernie::Tensor</strong></a>)</li>
+<li><strong>FixedDt</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
+<li><strong>Filter</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>FunctionPanel</strong> (<a href="../classernie_1_1app_1_1FunctionPanel/"><strong>ernie::app::FunctionPanel</strong></a>)</li>
+<li><strong>FindPanel</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>FocusPanel</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+</ul>
+<h2 id="g">g</h2>
+<ul>
+<li><strong>GetSensorQe</strong> (<a href="../classernie_1_1Camera/"><strong>ernie::Camera</strong></a>)</li>
+<li><strong>GpuBuffer</strong> (<a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>)</li>
+<li><strong>GpuImage</strong> (<a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
+<li><strong>GroupView</strong> (<a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
+<li><strong>GpuTimer</strong> (<a href="../classernie_1_1GpuTimer/"><strong>ernie::GpuTimer</strong></a>)</li>
+<li><strong>GraphicsPipeline</strong> (<a href="../classernie_1_1GraphicsPipeline/"><strong>ernie::GraphicsPipeline</strong></a>)</li>
+<li><strong>GroundToImage</strong> (<a href="../classernie_1_1IsdFrame/"><strong>ernie::IsdFrame</strong></a>, <a href="../classernie_1_1IsdLineScanner/"><strong>ernie::IsdLineScanner</strong></a>, <a href="../classernie_1_1IsdPushFrame/"><strong>ernie::IsdPushFrame</strong></a>)</li>
+<li><strong>Get</strong> (<a href="../classernie_1_1Prim/"><strong>ernie::Prim</strong></a>, <a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>, <a href="../classernie_1_1Value/"><strong>ernie::Value</strong></a>)</li>
+<li><strong>GetPath</strong> (<a href="../classernie_1_1Prim/"><strong>ernie::Prim</strong></a>, <a href="../classernie_1_1RenderVarOutput/"><strong>ernie::RenderVarOutput</strong></a>, <a href="../classernie_1_1SchemaView/"><strong>ernie::SchemaView</strong></a>)</li>
+<li><strong>GetPrim</strong> (<a href="../classernie_1_1Prim/"><strong>ernie::Prim</strong></a>, <a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>, <a href="../classernie_1_1SchemaView/"><strong>ernie::SchemaView</strong></a>)</li>
+<li><strong>GetOverlay</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>GetScene</strong> (<a href="../classernie_1_1SchemaView/"><strong>ernie::SchemaView</strong></a>, <a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>GpuProfiler</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>GetRenderer</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
+<li><strong>GetViewer</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>, <a href="../classernie_1_1app_1_1DemoRunner/"><strong>ernie::app::DemoRunner</strong></a>)</li>
+<li><strong>GetDock</strong> (<a href="../classernie_1_1app_1_1Panel/"><strong>ernie::app::Panel</strong></a>)</li>
+<li><strong>GetExposure</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>GetFileDialog</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>GetGizmo</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>GetLighting</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>GetTheme</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>GetViewportDisplay</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>GetVsync</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>GetWireframe</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>GizmoLocal</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+</ul>
+<h2 id="h">h</h2>
+<ul>
+<li><strong>Handle</strong> (<a href="../classernie_1_1ComputePipeline/"><strong>ernie::ComputePipeline</strong></a>, <a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>, <a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>, <a href="../classernie_1_1GraphicsPipeline/"><strong>ernie::GraphicsPipeline</strong></a>, <a href="../classernie_1_1PipelineLayout/"><strong>ernie::PipelineLayout</strong></a>, <a href="../classernie_1_1Sampler/"><strong>ernie::Sampler</strong></a>)</li>
+<li><strong>HeightRange</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>, <a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>Hidden</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>)</li>
+<li><strong>HasDistortion</strong> (<a href="../structernie_1_1LensModel/"><strong>ernie::LensModel</strong></a>)</li>
+<li><strong>HasPrefix</strong> (<a href="../classernie_1_1Path/"><strong>ernie::Path</strong></a>)</li>
+<li><strong>Height</strong> (<a href="../classernie_1_1RenderVarOutput/"><strong>ernie::RenderVarOutput</strong></a>)</li>
+<li><strong>Has</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>, <a href="../classernie_1_1SchemaView/"><strong>ernie::SchemaView</strong></a>)</li>
+<li><strong>HasPendingSubmissions</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>History</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>HudItemShown</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+</ul>
+<h2 id="i">i</h2>
+<ul>
+<li><strong>ImageToRay</strong> (<a href="../structernie_1_1CahvoreModel/"><strong>ernie::CahvoreModel</strong></a>)</li>
+<li><strong>IrradiancePerRadiance</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
+<li><strong>IsOrthographic</strong> (<a href="../structernie_1_1CameraView/"><strong>ernie::CameraView</strong></a>)</li>
+<li><strong>Intersects</strong> (<a href="../structernie_1_1Frustum/"><strong>ernie::Frustum</strong></a>)</li>
+<li><strong>Image</strong> (<a href="../structernie_1_1Image/"><strong>ernie::Image</strong></a>, <a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
+<li><strong>Isd</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>)</li>
+<li><strong>IsdCameraModel</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>)</li>
+<li><strong>ImageTime</strong> (<a href="../classernie_1_1IsdFrame/"><strong>ernie::IsdFrame</strong></a>, <a href="../classernie_1_1IsdLineScanner/"><strong>ernie::IsdLineScanner</strong></a>, <a href="../classernie_1_1IsdPushFrame/"><strong>ernie::IsdPushFrame</strong></a>)</li>
+<li><strong>ImageToGround</strong> (<a href="../classernie_1_1IsdFrame/"><strong>ernie::IsdFrame</strong></a>, <a href="../classernie_1_1IsdLineScanner/"><strong>ernie::IsdLineScanner</strong></a>, <a href="../classernie_1_1IsdPushFrame/"><strong>ernie::IsdPushFrame</strong></a>)</li>
+<li><strong>IsdFrame</strong> (<a href="../classernie_1_1IsdFrame/"><strong>ernie::IsdFrame</strong></a>)</li>
+<li><strong>IsdLineScanner</strong> (<a href="../classernie_1_1IsdLineScanner/"><strong>ernie::IsdLineScanner</strong></a>)</li>
+<li><strong>IsdPushFrame</strong> (<a href="../classernie_1_1IsdPushFrame/"><strong>ernie::IsdPushFrame</strong></a>)</li>
+<li><strong>IsFrame</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>)</li>
+<li><strong>IsLineScanner</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>)</li>
+<li><strong>IsPushFrame</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>)</li>
+<li><strong>IsPinhole</strong> (<a href="../structernie_1_1LensModel/"><strong>ernie::LensModel</strong></a>)</li>
+<li><strong>IsPhotometric</strong> (<a href="../classernie_1_1Light/"><strong>ernie::Light</strong></a>)</li>
+<li><strong>IsVisible</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>, <a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>, <a href="../classernie_1_1app_1_1Panel/"><strong>ernie::app::Panel</strong></a>)</li>
+<li><strong>IsEmpty</strong> (<a href="../classernie_1_1Path/"><strong>ernie::Path</strong></a>)</li>
+<li><strong>IsRoot</strong> (<a href="../classernie_1_1Path/"><strong>ernie::Path</strong></a>)</li>
+<li><strong>IsValidName</strong> (<a href="../classernie_1_1Path/"><strong>ernie::Path</strong></a>)</li>
+<li><strong>IsValid</strong> (<a href="../classernie_1_1Prim/"><strong>ernie::Prim</strong></a>, <a href="../structernie_1_1RasterView/"><strong>ernie::RasterView</strong></a>)</li>
+<li><strong>IsA</strong> (<a href="../structernie_1_1PrimTypeDef/"><strong>ernie::PrimTypeDef</strong></a>)</li>
+<li><strong>IsOpen</strong> (<a href="../structernie_1_1PrimTypeDef/"><strong>ernie::PrimTypeDef</strong></a>, <a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Intrinsics</strong> (<a href="../structernie_1_1PushbroomStrip/"><strong>ernie::PushbroomStrip</strong></a>)</li>
+<li><strong>Info</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>, <a href="../classernie_1_1Renderer/"><strong>ernie::Renderer</strong></a>)</li>
+<li><strong>Images</strong> (<a href="../classernie_1_1RenderVarOutput/"><strong>ernie::RenderVarOutput</strong></a>)</li>
+<li><strong>IsMapped</strong> (<a href="../classernie_1_1RenderVarOutput/"><strong>ernie::RenderVarOutput</strong></a>)</li>
+<li><strong>Id</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>Integral</strong> (<a href="../classernie_1_1Spectrum/"><strong>ernie::Spectrum</strong></a>)</li>
+<li><strong>ImageCount</strong> (<a href="../classernie_1_1Swapchain/"><strong>ernie::Swapchain</strong></a>)</li>
+<li><strong>IsContiguous</strong> (<a href="../classernie_1_1Tensor/"><strong>ernie::Tensor</strong></a>)</li>
+<li><strong>Is</strong> (<a href="../classernie_1_1Value/"><strong>ernie::Value</strong></a>)</li>
+<li><strong>Instance</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+</ul>
+<h2 id="k">k</h2>
+<ul>
+<li><strong>Kind</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>, <a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>)</li>
+</ul>
+<h2 id="l">l</h2>
+<ul>
+<li><strong>Linearity</strong> (<a href="../structernie_1_1CahvoreModel/"><strong>ernie::CahvoreModel</strong></a>)</li>
+<li><strong>LinearExposureScale</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
+<li><strong>Location</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>, <a href="../classernie_1_1Tensor/"><strong>ernie::Tensor</strong></a>)</li>
+<li><strong>LeafCells</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>, <a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>LeavesPerSide</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>, <a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>Levels</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>, <a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>Label</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>, <a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>, <a href="../structernie_1_1app_1_1DemoInfo/"><strong>ernie::app::DemoInfo</strong></a>)</li>
+<li><strong>Linear</strong> (<a href="../classernie_1_1FrameImages/"><strong>ernie::FrameImages</strong></a>)</li>
+<li><strong>Lifetime</strong> (<a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>)</li>
+<li><strong>LayerView</strong> (<a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
+<li><strong>Layout</strong> (<a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
+<li><strong>LookAt</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>)</li>
+<li><strong>Look</strong> (<a href="../classernie_1_1IsdFrame/"><strong>ernie::IsdFrame</strong></a>, <a href="../classernie_1_1IsdLineScanner/"><strong>ernie::IsdLineScanner</strong></a>, <a href="../classernie_1_1IsdPushFrame/"><strong>ernie::IsdPushFrame</strong></a>)</li>
+<li><strong>LeafSize</strong> (<a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>LodQuadtree</strong> (<a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>Line</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>)</li>
+<li><strong>Lines</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>)</li>
+<li><strong>LocalTransform</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>Lower</strong> (<a href="../structernie_1_1SpectralBands/"><strong>ernie::SpectralBands</strong></a>)</li>
+<li><strong>Limits</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>LoadLayout</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Log</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>LogEntries</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+</ul>
+<h2 id="m">m</h2>
+<ul>
+<li><strong>Make</strong> (<a href="../classernie_1_1AttributeDef/"><strong>ernie::AttributeDef</strong></a>)</li>
+<li><strong>MakeTensor</strong> (<a href="../classernie_1_1AttributeDef/"><strong>ernie::AttributeDef</strong></a>)</li>
+<li><strong>Models</strong> (<a href="../classernie_1_1BrdfRegistry/"><strong>ernie::BrdfRegistry</strong></a>, <a href="../classernie_1_1SensorFilterRegistry/"><strong>ernie::SensorFilterRegistry</strong></a>)</li>
+<li><strong>MapImage</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>, <a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>)</li>
+<li><strong>MinFirstRange</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>, <a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>Move</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>)</li>
+<li><strong>Memory</strong> (<a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>)</li>
+<li><strong>MipView</strong> (<a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
+<li><strong>Mean</strong> (<a href="../structernie_1_1Image/"><strong>ernie::Image</strong></a>)</li>
+<li><strong>MakeCamera</strong> (<a href="../classernie_1_1OrbitController/"><strong>ernie::OrbitController</strong></a>)</li>
+<li><strong>Marker</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>)</li>
+<li><strong>Markers</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>)</li>
+<li><strong>MapArray</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>)</li>
+<li><strong>MeteredLuminance</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>)</li>
+<li><strong>Map</strong> (<a href="../classernie_1_1RenderVarOutput/"><strong>ernie::RenderVarOutput</strong></a>, <a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>MapLinear</strong> (<a href="../classernie_1_1RenderVarOutput/"><strong>ernie::RenderVarOutput</strong></a>)</li>
+<li><strong>Mono</strong> (<a href="../structernie_1_1SensorModel/"><strong>ernie::SensorModel</strong></a>)</li>
+<li><strong>MinImageCount</strong> (<a href="../classernie_1_1Swapchain/"><strong>ernie::Swapchain</strong></a>)</li>
+<li><strong>MaxFrameDt</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
+<li><strong>Matches</strong> (<a href="../structernie_1_1app_1_1FileFilter/"><strong>ernie::app::FileFilter</strong></a>)</li>
+<li><strong>MeteredEv</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+</ul>
+<h2 id="n">n</h2>
+<ul>
+<li><strong>NextVulkanSignal</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>, <a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>)</li>
+<li><strong>NodeRegion</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>)</li>
+<li><strong>NaturalVignetting</strong> (<a href="../structernie_1_1LensModel/"><strong>ernie::LensModel</strong></a>)</li>
+<li><strong>NodeBounds</strong> (<a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>NodeCells</strong> (<a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>NodeHeights</strong> (<a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>NodesPerSide</strong> (<a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>NearPlane</strong> (<a href="../classernie_1_1OrbitController/"><strong>ernie::OrbitController</strong></a>)</li>
+<li><strong>Name</strong> (<a href="../classernie_1_1Path/"><strong>ernie::Path</strong></a>, <a href="../classernie_1_1RenderVarOutput/"><strong>ernie::RenderVarOutput</strong></a>, <a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>NextFrame</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>)</li>
+<li><strong>NumFrames</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
+<li><strong>Navigate</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>NewScope</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+</ul>
+<h2 id="o">o</h2>
+<ul>
+<li><strong>OrthographicPixelSize</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
+<li><strong>operator=</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>, <a href="../classernie_1_1ComputePipeline/"><strong>ernie::ComputePipeline</strong></a>, <a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>, <a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>, <a href="../classernie_1_1GpuTimer/"><strong>ernie::GpuTimer</strong></a>, <a href="../classernie_1_1GraphicsPipeline/"><strong>ernie::GraphicsPipeline</strong></a>, <a href="../classernie_1_1PipelineLayout/"><strong>ernie::PipelineLayout</strong></a>, <a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>, <a href="../classernie_1_1Renderer/"><strong>ernie::Renderer</strong></a>, <a href="../classernie_1_1Sampler/"><strong>ernie::Sampler</strong></a>, <a href="../classernie_1_1ScopedGpuZone/"><strong>ernie::ScopedGpuZone</strong></a>, <a href="../classernie_1_1ShaderCompiler/"><strong>ernie::ShaderCompiler</strong></a>, <a href="../classernie_1_1Swapchain/"><strong>ernie::Swapchain</strong></a>, <a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>, <a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>, <a href="../classernie_1_1app_1_1DemoRunner/"><strong>ernie::app::DemoRunner</strong></a>, <a href="../classernie_1_1app_1_1Panel/"><strong>ernie::app::Panel</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>, <a href="../classernie_1_1profiler_1_1ScopedZone/"><strong>ernie::profiler::ScopedZone</strong></a>, <a href="../structernie_1_1Scene_1_1UniqueId/"><strong>ernie::Scene::UniqueId</strong></a>)</li>
+<li><strong>OccluderRadius</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>)</li>
+<li><strong>Of</strong> (<a href="../structernie_1_1DescriptorResource/"><strong>ernie::DescriptorResource</strong></a>)</li>
+<li><strong>operator==</strong> (<a href="../structernie_1_1Device/"><strong>ernie::Device</strong></a>, <a href="../structernie_1_1LodPatch/"><strong>ernie::LodPatch</strong></a>, <a href="../structernie_1_1SensorFilterStep/"><strong>ernie::SensorFilterStep</strong></a>, <a href="../structernie_1_1SpectralBands/"><strong>ernie::SpectralBands</strong></a>, <a href="../classernie_1_1Value/"><strong>ernie::Value</strong></a>, <a href="../structernie_1_1app_1_1ViewportDisplay/"><strong>ernie::app::ViewportDisplay</strong></a>)</li>
+<li><strong>OffscreenTarget</strong> (<a href="../classernie_1_1OffscreenTarget/"><strong>ernie::OffscreenTarget</strong></a>)</li>
+<li><strong>Orbit</strong> (<a href="../classernie_1_1OrbitController/"><strong>ernie::OrbitController</strong></a>)</li>
+<li><strong>Overlay</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>)</li>
+<li><strong>operator&lt;=&gt;</strong> (<a href="../classernie_1_1Path/"><strong>ernie::Path</strong></a>)</li>
+<li><strong>operator bool</strong> (<a href="../classernie_1_1Prim/"><strong>ernie::Prim</strong></a>)</li>
+<li><strong>operator()</strong> (<a href="../structernie_1_1RasterView/"><strong>ernie::RasterView</strong></a>, <a href="../structernie_1_1SigmoidSpectrum/"><strong>ernie::SigmoidSpectrum</strong></a>, <a href="../classernie_1_1Spectrum/"><strong>ernie::Spectrum</strong></a>, <a href="../structstd_1_1hash_3_01ernie_1_1Path_01_4/"><strong>std::hash&lt; ernie::Path &gt;</strong></a>)</li>
+<li><strong>OrFallbacks</strong> (<a href="../classernie_1_1RenderSettings/"><strong>ernie::RenderSettings</strong></a>)</li>
+<li><strong>OverlayNames</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>OwnTransformVersion</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>Outputs</strong> (<a href="../classernie_1_1StepOperation/"><strong>ernie::StepOperation</strong></a>)</li>
+<li><strong>Options</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>, <a href="../classernie_1_1app_1_1DemoRunner/"><strong>ernie::app::DemoRunner</strong></a>, <a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>OwnScene</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
+<li><strong>Open</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>OnFrame</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>OnPostRender</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>OnPreRender</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>OnSelection</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>OnUi</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>OpenFileDialog</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>OpenScene</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+</ul>
+<h2 id="p">p</h2>
+<ul>
+<li><strong>PointToImage</strong> (<a href="../structernie_1_1CahvoreModel/"><strong>ernie::CahvoreModel</strong></a>)</li>
+<li><strong>PhotonsPerRadiance</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
+<li><strong>PixelPitchMetres</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
+<li><strong>PrincipalPoint</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
+<li><strong>PatchCells</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>, <a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>Push</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>, <a href="../classernie_1_1PipelineLayout/"><strong>ernie::PipelineLayout</strong></a>)</li>
+<li><strong>PreviousPose</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>)</li>
+<li><strong>Pending</strong> (<a href="../classernie_1_1FrameUploads/"><strong>ernie::FrameUploads</strong></a>)</li>
+<li><strong>PixelOf</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>)</li>
+<li><strong>PoseAt</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>)</li>
+<li><strong>Position</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>)</li>
+<li><strong>Prepare</strong> (<a href="../classernie_1_1OffscreenTarget/"><strong>ernie::OffscreenTarget</strong></a>)</li>
+<li><strong>Pan</strong> (<a href="../classernie_1_1OrbitController/"><strong>ernie::OrbitController</strong></a>)</li>
+<li><strong>PanVertical</strong> (<a href="../classernie_1_1OrbitController/"><strong>ernie::OrbitController</strong></a>)</li>
+<li><strong>Polyline</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>)</li>
+<li><strong>Parent</strong> (<a href="../classernie_1_1Path/"><strong>ernie::Path</strong></a>)</li>
+<li><strong>Path</strong> (<a href="../classernie_1_1Path/"><strong>ernie::Path</strong></a>)</li>
+<li><strong>PipelineLayout</strong> (<a href="../classernie_1_1PipelineLayout/"><strong>ernie::PipelineLayout</strong></a>)</li>
+<li><strong>PushConstants</strong> (<a href="../classernie_1_1PipelineLayout/"><strong>ernie::PipelineLayout</strong></a>)</li>
+<li><strong>Prim</strong> (<a href="../classernie_1_1Prim/"><strong>ernie::Prim</strong></a>)</li>
+<li><strong>Paths</strong> (<a href="../classernie_1_1PrimSet/"><strong>ernie::PrimSet</strong></a>, <a href="../classernie_1_1Targets/"><strong>ernie::Targets</strong></a>)</li>
+<li><strong>PrimSet</strong> (<a href="../classernie_1_1PrimSet/"><strong>ernie::PrimSet</strong></a>)</li>
+<li><strong>Packed</strong> (<a href="../structernie_1_1PushbroomStrip/"><strong>ernie::PushbroomStrip</strong></a>)</li>
+<li><strong>Pick</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>PrimPath</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>, <a href="../classernie_1_1Renderer/"><strong>ernie::Renderer</strong></a>)</li>
+<li><strong>Prims</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>PrimType</strong> (<a href="../classernie_1_1SchemaView/"><strong>ernie::SchemaView</strong></a>)</li>
+<li><strong>Present</strong> (<a href="../classernie_1_1Swapchain/"><strong>ernie::Swapchain</strong></a>)</li>
+<li><strong>PresentMode</strong> (<a href="../classernie_1_1Swapchain/"><strong>ernie::Swapchain</strong></a>)</li>
+<li><strong>PhysicalDevice</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>PushDescriptorSet</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>Panel</strong> (<a href="../classernie_1_1app_1_1Panel/"><strong>ernie::app::Panel</strong></a>)</li>
+<li><strong>PerspectiveCamera</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Plot</strong> (<a href="../classernie_1_1app_1_1WidgetPanel/"><strong>ernie::app::WidgetPanel</strong></a>)</li>
+</ul>
+<h2 id="q">q</h2>
+<ul>
+<li><strong>Queue</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>QueueFamily</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+</ul>
+<h2 id="r">r</h2>
+<ul>
+<li><strong>Read</strong> (<a href="../classernie_1_1AttributeDef/"><strong>ernie::AttributeDef</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01Path_01_4/"><strong>ernie::AttributeTraits&lt; Path &gt;</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01Tensor_01_4/"><strong>ernie::AttributeTraits&lt; Tensor &gt;</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01bool_01_4/"><strong>ernie::AttributeTraits&lt; bool &gt;</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01double_01_4/"><strong>ernie::AttributeTraits&lt; double &gt;</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01glm_1_1dvec2_01_4/"><strong>ernie::AttributeTraits&lt; glm::dvec2 &gt;</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01glm_1_1dvec3_01_4/"><strong>ernie::AttributeTraits&lt; glm::dvec3 &gt;</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01glm_1_1dvec4_01_4/"><strong>ernie::AttributeTraits&lt; glm::dvec4 &gt;</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01int_01_4/"><strong>ernie::AttributeTraits&lt; int &gt;</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01std_1_1string_01_4/"><strong>ernie::AttributeTraits&lt; std::string &gt;</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01std_1_1vector_3_01Path_01_4_01_4/"><strong>ernie::AttributeTraits&lt; std::vector&lt; Path &gt; &gt;</strong></a>, <a href="../structernie_1_1AttributeTraits_3_01std_1_1vector_3_01float_01_4_01_4/"><strong>ernie::AttributeTraits&lt; std::vector&lt; float &gt; &gt;</strong></a>, <a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>, <a href="../classernie_1_1Prim/"><strong>ernie::Prim</strong></a>, <a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>RayTable</strong> (<a href="../structernie_1_1CahvoreModel/"><strong>ernie::CahvoreModel</strong></a>)</li>
+<li><strong>RasterView</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
+<li><strong>Radius</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>)</li>
+<li><strong>Ranges</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>, <a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>Record</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>, <a href="../classernie_1_1FrameUploads/"><strong>ernie::FrameUploads</strong></a>, <a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>, <a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>Redo</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>RedoLabel</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>)</li>
+<li><strong>Remove</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>, <a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>, <a href="../classernie_1_1app_1_1WidgetPanel/"><strong>ernie::app::WidgetPanel</strong></a>)</li>
+<li><strong>Reset</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>)</li>
+<li><strong>Restore</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>)</li>
+<li><strong>Relative</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>)</li>
+<li><strong>Release</strong> (<a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>, <a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
+<li><strong>RotationAt</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>)</li>
+<li><strong>RayAt</strong> (<a href="../structernie_1_1LensRayTable/"><strong>ernie::LensRayTable</strong></a>)</li>
+<li><strong>ReadNoiseElectrons</strong> (<a href="../structernie_1_1MastcamZ/"><strong>ernie::MastcamZ</strong></a>)</li>
+<li><strong>ReadColor</strong> (<a href="../classernie_1_1OffscreenTarget/"><strong>ernie::OffscreenTarget</strong></a>)</li>
+<li><strong>RecordCopyColor</strong> (<a href="../classernie_1_1OffscreenTarget/"><strong>ernie::OffscreenTarget</strong></a>)</li>
+<li><strong>Root</strong> (<a href="../classernie_1_1Path/"><strong>ernie::Path</strong></a>)</li>
+<li><strong>Render</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>, <a href="../classernie_1_1Renderer/"><strong>ernie::Renderer</strong></a>, <a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
+<li><strong>RenderDelegate</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>)</li>
+<li><strong>RenderVarOutput</strong> (<a href="../classernie_1_1RenderVarOutput/"><strong>ernie::RenderVarOutput</strong></a>)</li>
+<li><strong>Renderer</strong> (<a href="../classernie_1_1Renderer/"><strong>ernie::Renderer</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>RemoveOverlay</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>RowOf</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>Rgb</strong> (<a href="../structernie_1_1SensorModel/"><strong>ernie::SensorModel</strong></a>)</li>
+<li><strong>Resize</strong> (<a href="../classernie_1_1Swapchain/"><strong>ernie::Swapchain</strong></a>)</li>
+<li><strong>Rank</strong> (<a href="../classernie_1_1Tensor/"><strong>ernie::Tensor</strong></a>)</li>
+<li><strong>Row</strong> (<a href="../classernie_1_1Tensor/"><strong>ernie::Tensor</strong></a>)</li>
+<li><strong>Raw</strong> (<a href="../classernie_1_1Value/"><strong>ernie::Value</strong></a>)</li>
+<li><strong>RecyclePending</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>Report</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>RenderImage</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
+<li><strong>RequestReset</strong> (<a href="../classernie_1_1app_1_1DemoRunner/"><strong>ernie::app::DemoRunner</strong></a>)</li>
+<li><strong>RequestSwitch</strong> (<a href="../classernie_1_1app_1_1DemoRunner/"><strong>ernie::app::DemoRunner</strong></a>)</li>
+<li><strong>Run</strong> (<a href="../classernie_1_1app_1_1DemoRunner/"><strong>ernie::app::DemoRunner</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Recent</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>Refresh</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>ReplacePending</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>RemoveCallback</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>RemovePanel</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>RemoveScope</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>RemoveViewportItem</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Rename</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Renderers</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>ResetSession</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+</ul>
+<h2 id="s">s</h2>
+<ul>
+<li><strong>Store</strong> (<a href="../structernie_1_1AttributeTraits_3_01std_1_1vector_3_01Path_01_4_01_4/"><strong>ernie::AttributeTraits&lt; std::vector&lt; Path &gt; &gt;</strong></a>)</li>
+<li><strong>SetVerticalFov</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
+<li><strong>SubframeTime</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
+<li><strong>Subframes</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>, <a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>)</li>
+<li><strong>SignalVulkan</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>, <a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>)</li>
+<li><strong>Synchronize</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>, <a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>)</li>
+<li><strong>Select</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>, <a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>SelectAll</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>, <a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>SelectNode</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>, <a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>SetLeaves</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>, <a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>Shape</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>, <a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>, <a href="../classernie_1_1RenderVarOutput/"><strong>ernie::RenderVarOutput</strong></a>, <a href="../classernie_1_1Tensor/"><strong>ernie::Tensor</strong></a>)</li>
+<li><strong>SignalVulkanAfter</strong> (<a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>)</li>
+<li><strong>Set</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>, <a href="../classernie_1_1Prim/"><strong>ernie::Prim</strong></a>, <a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>, <a href="../classernie_1_1app_1_1WidgetPanel/"><strong>ernie::app::WidgetPanel</strong></a>)</li>
+<li><strong>Size</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>, <a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>, <a href="../classernie_1_1PrimSet/"><strong>ernie::PrimSet</strong></a>)</li>
+<li><strong>Snapshot</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>)</li>
+<li><strong>Strip</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>)</li>
+<li><strong>Slot</strong> (<a href="../classernie_1_1FrameUploads/"><strong>ernie::FrameUploads</strong></a>)</li>
+<li><strong>Stage</strong> (<a href="../classernie_1_1FrameUploads/"><strong>ernie::FrameUploads</strong></a>)</li>
+<li><strong>Sample</strong> (<a href="../structernie_1_1IesProfile/"><strong>ernie::IesProfile</strong></a>)</li>
+<li><strong>SensorToBody</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>)</li>
+<li><strong>SunPosition</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>)</li>
+<li><strong>StripOf</strong> (<a href="../classernie_1_1IsdLineScanner/"><strong>ernie::IsdLineScanner</strong></a>)</li>
+<li><strong>Solve</strong> (<a href="../structernie_1_1NormalEquations/"><strong>ernie::NormalEquations</strong></a>)</li>
+<li><strong>Segments</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>)</li>
+<li><strong>SetVisible</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>, <a href="../classernie_1_1app_1_1Panel/"><strong>ernie::app::Panel</strong></a>)</li>
+<li><strong>Sphere</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>)</li>
+<li><strong>Sprites</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>)</li>
+<li><strong>String</strong> (<a href="../classernie_1_1Path/"><strong>ernie::Path</strong></a>)</li>
+<li><strong>SetXform</strong> (<a href="../classernie_1_1Prim/"><strong>ernie::Prim</strong></a>)</li>
+<li><strong>Stride</strong> (<a href="../structernie_1_1RasterView/"><strong>ernie::RasterView</strong></a>)</li>
+<li><strong>SceneBounds</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>)</li>
+<li><strong>SensorFilters</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>)</li>
+<li><strong>SetHighlight</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>)</li>
+<li><strong>SetViewBand</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>SetViewVar</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Stats</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>, <a href="../classernie_1_1Renderer/"><strong>ernie::Renderer</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Step</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>, <a href="../classernie_1_1Renderer/"><strong>ernie::Renderer</strong></a>, <a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>StepAsync</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>, <a href="../classernie_1_1Renderer/"><strong>ernie::Renderer</strong></a>)</li>
+<li><strong>SubmitWaits</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>)</li>
+<li><strong>Sync</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>, <a href="../classernie_1_1Renderer/"><strong>ernie::Renderer</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Sampler</strong> (<a href="../classernie_1_1Sampler/"><strong>ernie::Sampler</strong></a>)</li>
+<li><strong>Scene</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>SetLocalTransform</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>Stamp</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>SchemaView</strong> (<a href="../classernie_1_1SchemaView/"><strong>ernie::SchemaView</strong></a>)</li>
+<li><strong>ScopedGpuZone</strong> (<a href="../classernie_1_1ScopedGpuZone/"><strong>ernie::ScopedGpuZone</strong></a>)</li>
+<li><strong>ShaderCompiler</strong> (<a href="../classernie_1_1ShaderCompiler/"><strong>ernie::ShaderCompiler</strong></a>)</li>
+<li><strong>Spectrum</strong> (<a href="../classernie_1_1Spectrum/"><strong>ernie::Spectrum</strong></a>)</li>
+<li><strong>StepOperation</strong> (<a href="../classernie_1_1StepOperation/"><strong>ernie::StepOperation</strong></a>)</li>
+<li><strong>SetVsync</strong> (<a href="../classernie_1_1Swapchain/"><strong>ernie::Swapchain</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Swapchain</strong> (<a href="../classernie_1_1Swapchain/"><strong>ernie::Swapchain</strong></a>)</li>
+<li><strong>Strides</strong> (<a href="../classernie_1_1Tensor/"><strong>ernie::Tensor</strong></a>)</li>
+<li><strong>Source</strong> (<a href="../structernie_1_1TextureReader/"><strong>ernie::TextureReader</strong></a>)</li>
+<li><strong>Submit</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>SubmitAsync</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>SupportsAnisotropy</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>SupportsExternalMemory</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>SupportsMultiDrawIndirect</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>SupportsRayQuery</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>SaveOutput</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
+<li><strong>SharedRenderer</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
+<li><strong>SetCatalog</strong> (<a href="../classernie_1_1app_1_1DemoRunner/"><strong>ernie::app::DemoRunner</strong></a>)</li>
+<li><strong>SetFilter</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>SetName</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>SetShowHidden</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>ShowHidden</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>SaveLayout</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>SaveScene</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Scope</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Selection</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>SessionRoot</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>SetActiveCamera</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>SetExposure</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>SetExposureCompensation</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>SetGizmo</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>SetGizmoLocal</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>SetHudItemShown</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>SetLighting</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>SetRenderer</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>SetScope</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>SetSelection</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>SetSettings</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>SetTheme</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>SetViewportDisplay</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>SetViewportToggleShown</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>SetWireframe</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Settings</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Separator</strong> (<a href="../classernie_1_1app_1_1WidgetPanel/"><strong>ernie::app::WidgetPanel</strong></a>)</li>
+<li><strong>Slider</strong> (<a href="../classernie_1_1app_1_1WidgetPanel/"><strong>ernie::app::WidgetPanel</strong></a>)</li>
+<li><strong>ScopedZone</strong> (<a href="../classernie_1_1profiler_1_1ScopedZone/"><strong>ernie::profiler::ScopedZone</strong></a>)</li>
+</ul>
+<h2 id="t">t</h2>
+<ul>
+<li><strong>ToCamera</strong> (<a href="../structernie_1_1CahvoreModel/"><strong>ernie::CahvoreModel</strong></a>)</li>
+<li><strong>TriangleCount</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>, <a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
+<li><strong>TexelBytes</strong> (<a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
+<li><strong>Transition</strong> (<a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
+<li><strong>TimeOrder</strong> (<a href="../classernie_1_1IsdPushFrame/"><strong>ernie::IsdPushFrame</strong></a>)</li>
+<li><strong>Transform</strong> (<a href="../classernie_1_1OrbitController/"><strong>ernie::OrbitController</strong></a>)</li>
+<li><strong>Touch</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>)</li>
+<li><strong>Triangles</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>)</li>
+<li><strong>Type</strong> (<a href="../classernie_1_1Prim/"><strong>ernie::Prim</strong></a>, <a href="../classernie_1_1RenderVarOutput/"><strong>ernie::RenderVarOutput</strong></a>, <a href="../classernie_1_1Tensor/"><strong>ernie::Tensor</strong></a>)</li>
+<li><strong>TakeValidationMessages</strong> (<a href="../classernie_1_1Renderer/"><strong>ernie::Renderer</strong></a>, <a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>TypeOf</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>Tabulate</strong> (<a href="../structernie_1_1SigmoidSpectrum/"><strong>ernie::SigmoidSpectrum</strong></a>)</li>
+<li><strong>Targets</strong> (<a href="../classernie_1_1Targets/"><strong>ernie::Targets</strong></a>)</li>
+<li><strong>ToValue</strong> (<a href="../classernie_1_1Targets/"><strong>ernie::Targets</strong></a>)</li>
+<li><strong>Tensor</strong> (<a href="../classernie_1_1Tensor/"><strong>ernie::Tensor</strong></a>)</li>
+<li><strong>ToDlpack</strong> (<a href="../classernie_1_1Tensor/"><strong>ernie::Tensor</strong></a>)</li>
+<li><strong>Timer</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>TestFinal</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
+<li><strong>TestPostStep</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
+<li><strong>Title</strong> (<a href="../classernie_1_1app_1_1Panel/"><strong>ernie::app::Panel</strong></a>)</li>
+<li><strong>Text</strong> (<a href="../classernie_1_1app_1_1WidgetPanel/"><strong>ernie::app::WidgetPanel</strong></a>)</li>
+</ul>
+<h2 id="u">u</h2>
+<ul>
+<li><strong>Upload</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>, <a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>, <a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
+<li><strong>Undo</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>UndoLabel</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>)</li>
+<li><strong>Undistort</strong> (<a href="../classernie_1_1IsdCameraModel/"><strong>ernie::IsdCameraModel</strong></a>, <a href="../structernie_1_1LensModel/"><strong>ernie::LensModel</strong></a>)</li>
+<li><strong>Update</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>)</li>
+<li><strong>Unmap</strong> (<a href="../classernie_1_1RenderVarOutput/"><strong>ernie::RenderVarOutput</strong></a>, <a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>Untested</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
+<li><strong>Up</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>UniqueId</strong> (<a href="../structernie_1_1Scene_1_1UniqueId/"><strong>ernie::Scene::UniqueId</strong></a>)</li>
+</ul>
+<h2 id="v">v</h2>
+<ul>
+<li><strong>VerticalFov</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
+<li><strong>ViewProjection</strong> (<a href="../structernie_1_1CameraView/"><strong>ernie::CameraView</strong></a>)</li>
+<li><strong>Var</strong> (<a href="../classernie_1_1ChunkedFrameImages/"><strong>ernie::ChunkedFrameImages</strong></a>, <a href="../classernie_1_1FrameImages/"><strong>ernie::FrameImages</strong></a>)</li>
+<li><strong>Views</strong> (<a href="../classernie_1_1ChunkedFrameImages/"><strong>ernie::ChunkedFrameImages</strong></a>, <a href="../classernie_1_1FrameImages/"><strong>ernie::FrameImages</strong></a>, <a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>, <a href="../classernie_1_1RenderVarOutput/"><strong>ernie::RenderVarOutput</strong></a>)</li>
+<li><strong>View</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>, <a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>, <a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>, <a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>, <a href="../classernie_1_1IsdFrame/"><strong>ernie::IsdFrame</strong></a>)</li>
+<li><strong>VulkanWait</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>, <a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>)</li>
+<li><strong>VertexDirection</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>)</li>
+<li><strong>ViewCamera</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>)</li>
+<li><strong>ViewWorld</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>)</li>
+<li><strong>Version</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>, <a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>ViewVars</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>)</li>
+<li><strong>Values</strong> (<a href="../classernie_1_1Spectrum/"><strong>ernie::Spectrum</strong></a>)</li>
+<li><strong>Vsync</strong> (<a href="../classernie_1_1Swapchain/"><strong>ernie::Swapchain</strong></a>)</li>
+<li><strong>Value</strong> (<a href="../classernie_1_1Value/"><strong>ernie::Value</strong></a>)</li>
+<li><strong>ValidationEnabled</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>VulkanContext</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>ViewBand</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>ViewVar</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>Viewer</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>ViewportToggleShown</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+</ul>
+<h2 id="w">w</h2>
+<ul>
+<li><strong>WithBuiltins</strong> (<a href="../classernie_1_1BrdfRegistry/"><strong>ernie::BrdfRegistry</strong></a>)</li>
+<li><strong>WaitForVulkan</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>, <a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>)</li>
+<li><strong>Write</strong> (<a href="../classernie_1_1FrameUploads/"><strong>ernie::FrameUploads</strong></a>, <a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>, <a href="../classernie_1_1Prim/"><strong>ernie::Prim</strong></a>, <a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>WireMesh</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>)</li>
+<li><strong>Width</strong> (<a href="../classernie_1_1RenderVarOutput/"><strong>ernie::RenderVarOutput</strong></a>, <a href="../structernie_1_1SpectralBands/"><strong>ernie::SpectralBands</strong></a>)</li>
+<li><strong>WorldTransform</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>WriteStream</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>WriteTensor</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
+<li><strong>WithStandard</strong> (<a href="../classernie_1_1SensorFilterRegistry/"><strong>ernie::SensorFilterRegistry</strong></a>)</li>
+<li><strong>Wavelengths</strong> (<a href="../classernie_1_1Spectrum/"><strong>ernie::Spectrum</strong></a>)</li>
+<li><strong>Wait</strong> (<a href="../classernie_1_1StepOperation/"><strong>ernie::StepOperation</strong></a>)</li>
+<li><strong>WaitForSubmission</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>WaitForSubmissions</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>Windowed</strong> (<a href="../structernie_1_1app_1_1DemoOptions/"><strong>ernie::app::DemoOptions</strong></a>)</li>
+<li><strong>WidgetPanel</strong> (<a href="../classernie_1_1app_1_1WidgetPanel/"><strong>ernie::app::WidgetPanel</strong></a>)</li>
+</ul>
+<h2 id="z">z</h2>
+<ul>
+<li><strong>Zoom</strong> (<a href="../classernie_1_1OrbitController/"><strong>ernie::OrbitController</strong></a>)</li>
+<li><strong>Zeros</strong> (<a href="../classernie_1_1Tensor/"><strong>ernie::Tensor</strong></a>)</li>
+</ul>
+<h2 id="_1">~</h2>
+<ul>
+<li><strong>~ComputeInterop</strong> (<a href="../classernie_1_1ComputeInterop/"><strong>ernie::ComputeInterop</strong></a>)</li>
+<li><strong>~ComputePipeline</strong> (<a href="../classernie_1_1ComputePipeline/"><strong>ernie::ComputePipeline</strong></a>)</li>
+<li><strong>~CudaInterop</strong> (<a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>)</li>
+<li><strong>~FrameImages</strong> (<a href="../classernie_1_1FrameImages/"><strong>ernie::FrameImages</strong></a>)</li>
+<li><strong>~GpuBuffer</strong> (<a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>)</li>
+<li><strong>~GpuImage</strong> (<a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
+<li><strong>~GpuTimer</strong> (<a href="../classernie_1_1GpuTimer/"><strong>ernie::GpuTimer</strong></a>)</li>
+<li><strong>~GraphicsPipeline</strong> (<a href="../classernie_1_1GraphicsPipeline/"><strong>ernie::GraphicsPipeline</strong></a>)</li>
+<li><strong>~PipelineLayout</strong> (<a href="../classernie_1_1PipelineLayout/"><strong>ernie::PipelineLayout</strong></a>)</li>
+<li><strong>~RenderDelegate</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>)</li>
+<li><strong>~Renderer</strong> (<a href="../classernie_1_1Renderer/"><strong>ernie::Renderer</strong></a>)</li>
+<li><strong>~Sampler</strong> (<a href="../classernie_1_1Sampler/"><strong>ernie::Sampler</strong></a>)</li>
+<li><strong>~ScopedGpuZone</strong> (<a href="../classernie_1_1ScopedGpuZone/"><strong>ernie::ScopedGpuZone</strong></a>)</li>
+<li><strong>~ShaderCompiler</strong> (<a href="../classernie_1_1ShaderCompiler/"><strong>ernie::ShaderCompiler</strong></a>)</li>
+<li><strong>~Swapchain</strong> (<a href="../classernie_1_1Swapchain/"><strong>ernie::Swapchain</strong></a>)</li>
+<li><strong>~VulkanContext</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>~Demo</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
+<li><strong>~DemoRunner</strong> (<a href="../classernie_1_1app_1_1DemoRunner/"><strong>ernie::app::DemoRunner</strong></a>)</li>
+<li><strong>~Panel</strong> (<a href="../classernie_1_1app_1_1Panel/"><strong>ernie::app::Panel</strong></a>)</li>
+<li><strong>~Viewer</strong> (<a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
+<li><strong>~WidgetPanel</strong> (<a href="../classernie_1_1app_1_1WidgetPanel/"><strong>ernie::app::WidgetPanel</strong></a>)</li>
+<li><strong>~ScopedZone</strong> (<a href="../classernie_1_1profiler_1_1ScopedZone/"><strong>ernie::profiler::ScopedZone</strong></a>)</li>
+</ul>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

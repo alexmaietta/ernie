@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/light__schemas_8h_source/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>File light_schemas.h - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "File light_schemas.h";
+        var mkdocs_page_input_path = "cpp/light__schemas_8h_source.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/light__schemas_8h_source/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">File light_schemas.h</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/light__schemas_8h_source.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="file-light_schemash">File light_schemas.h</h1>
+<p><a href="../files/"><strong>File List</strong></a> <strong>&gt;</strong> <a href="../dir_057d52706067b881d9371cf136c38c31/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../dir_572d817874f40c61a249f0e7684d4315/"><strong>scene</strong></a> <strong>&gt;</strong> <a href="../light__schemas_8h/"><strong>light_schemas.h</strong></a></p>
+<p><a href="../light__schemas_8h/">Go to the documentation of this file</a></p>
+<pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+#include &quot;ernie/scene/base_schemas.h&quot;
+#include &quot;ernie/scene/prim_type.h&quot;
+#include &quot;ernie/scene/tokens.h&quot;
+
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+
+// clang-format off
+#define ERNIE_PHOTOMETRIC_SWITCH                                                                   \
+    &quot; Setting any photometric value puts the light in photometric units: they alone then set its &quot; \
+    &quot;brightness.&quot;
+
+#define ERNIE_LIGHT_ATTRIBUTES(X)                                                                  \
+    X(double, Intensity, ::ernie::tokens::kIntensity, 1.0,                                         \
+      (::ernie::AttributeMeta{.group = &quot;Light&quot;, .max = 1e6}))                                      \
+    X(double, Exposure, ::ernie::tokens::kExposure, 0.0,                                           \
+      (::ernie::AttributeMeta{.doc = &quot;Stops; scales the intensity by 2^exposure.&quot;,                 \
+                              .group = &quot;Light&quot;, .min = -16.0, .max = 16.0}))                       \
+    X(glm::dvec3, Color, ::ernie::tokens::kColor, glm::dvec3(1.0),                                 \
+      (::ernie::AttributeMeta{.label = &quot;Colour&quot;, .doc = &quot;Linear RGB tint.&quot;, .group = &quot;Light&quot;,      \
+                              .color = true}))                                                     \
+    X(bool, EnableColorTemperature, ::ernie::tokens::kEnableColorTemperature, false,               \
+      (::ernie::AttributeMeta{.label = &quot;Use temperature&quot;, .group = &quot;Light&quot;}))                      \
+    X(double, ColorTemperature, ::ernie::tokens::kColorTemperature, 6500.0,                        \
+      (::ernie::AttributeMeta{.label = &quot;Temperature&quot;, .doc = &quot;Kelvin.&quot;, .group = &quot;Light&quot;,          \
+                              .min = 1000.0, .max = 20000.0}))                                     \
+    X(bool, ShadowEnable, ::ernie::tokens::kShadowEnable, true,                                    \
+      (::ernie::AttributeMeta{.label = &quot;Shadows&quot;, .group = &quot;Light&quot;}))                              \
+    X(bool, Normalize, ::ernie::tokens::kNormalize, false,                                         \
+      (::ernie::AttributeMeta{.doc = &quot;Divides the intensity by the light's size (its area, or a &quot;  \
+                                     &quot;distant light's projected solid angle), so resizing it &quot;     \
+                                     &quot;keeps its power; domes ignore it.&quot;,                          \
+                              .group = &quot;Light&quot;}))                                                  \
+    X(std::string, PhysicalIlluminant, ::ernie::tokens::kPhysicalIlluminant, &quot;&quot;,                   \
+      (::ernie::AttributeMeta{                                                                     \
+          .label = &quot;Illuminant&quot;,                                                                   \
+          .doc = &quot;The spectrum's shape: \&quot;white\&quot; (flat) or \&quot;blackbody\&quot;, both over 380 to 780 &quot;  \
+                 &quot;nm as Omniverse's, \&quot;illuminant D\&quot; (black body and D at the temperature), or &quot;  \
+                 &quot;\&quot;custom\&quot; (the custom illuminant's pairs). Unset: a black body if the &quot;         \
+                 &quot;temperature is used, else flat, over the whole range.&quot;,                          \
+          .group = &quot;Spectrum&quot;,                                                                     \
+          .options = {::ernie::tokens::kWhite, ::ernie::tokens::kBlackbody,                        \
+                      ::ernie::tokens::kIlluminantD, ::ernie::tokens::kCustom}}))                  \
+    X(std::vector&lt;float&gt;, PhysicalCustomIlluminant, ::ernie::tokens::kPhysicalCustomIlluminant,    \
+      std::vector&lt;float&gt;{},                                                                        \
+      (::ernie::AttributeMeta{.doc = &quot;(nm, value) pairs, wavelengths increasing, of a \&quot;custom\&quot; &quot; \
+                                     &quot;illuminant's shape; zero outside them.&quot;,                     \
+                              .group = &quot;Spectrum&quot;}))                                               \
+    X(std::vector&lt;float&gt;, Spectrum, ::ernie::tokens::kLightSpectrum, std::vector&lt;float&gt;{},         \
+      (::ernie::AttributeMeta{.doc = &quot;(nm, value) pairs of a physical light's spectrum: W m^-2 &quot;   \
+                                     &quot;nm^-1 for a distant light, W sr^-1 nm^-1 for a sphere, W &quot;   \
+                                     &quot;m^-2 sr^-1 nm^-1 for a rect, disk or dome.&quot;,                 \
+                              .group = &quot;Spectrum&quot;}))
+
+#define ERNIE_BOUNDABLE_LIGHT_ATTRIBUTES(X)                                                        \
+    X(double, Power, ::ernie::tokens::kLightPower, 0.0,                                            \
+      (::ernie::AttributeMeta{.doc = &quot;Radiant flux in W over 360 to 830 nm, in place of the &quot;      \
+                                     &quot;intensity when set.&quot;,                                        \
+                              .group = &quot;Shape&quot;, .max = 1e7}))                                      \
+    X(double, ShapingFocus, ::ernie::tokens::kShapingFocus, 0.0,                                   \
+      (::ernie::AttributeMeta{.label = &quot;Focus&quot;,                                                    \
+                              .doc = &quot;Emission falls off as |cos|^focus off the axis; a power &quot;    \
+                                     &quot;stays the power.&quot;,                                           \
+                              .group = &quot;Shape&quot;, .max = 1000.0}))                                   \
+    X(glm::dvec3, ShapingFocusTint, ::ernie::tokens::kShapingFocusTint, glm::dvec3(0.0),           \
+      (::ernie::AttributeMeta{.label = &quot;Focus tint&quot;,                                               \
+                              .doc = &quot;Linear RGB the focus falloff fades to; white undoes it.&quot;,    \
+                              .group = &quot;Shape&quot;, .color = true}))                                   \
+    X(std::string, ShapingIesFile, ::ernie::tokens::kShapingIesFile, &quot;&quot;,                           \
+      (::ernie::AttributeMeta{.label = &quot;IES profile&quot;,                                              \
+                              .doc = &quot;An IES LM-63 file shaping the light, its nadir along -z.&quot;,   \
+                              .group = &quot;Shape&quot;, .asset = true}))                                   \
+    X(double, ShapingIesAngleScale, ::ernie::tokens::kShapingIesAngleScale, 0.0,                   \
+      (::ernie::AttributeMeta{.label = &quot;IES angle scale&quot;,                                          \
+                              .doc = &quot;Scales the profile's vertical angle about the nadir (above &quot; \
+                                     &quot;0) or zenith (below 0); 0 leaves it.&quot;,                       \
+                              .group = &quot;Shape&quot;, .min = -10.0, .max = 10.0}))                       \
+    X(bool, ShapingIesNormalize, ::ernie::tokens::kShapingIesNormalize, false,                     \
+      (::ernie::AttributeMeta{.label = &quot;IES normalize&quot;,                                            \
+                              .doc = &quot;Keeps the light's power as without the profile; otherwise &quot; \
+                                     &quot;its candela multiply the intensity.&quot;,                        \
+                              .group = &quot;Shape&quot;}))                                                  \
+    X(double, PhotometricPower, ::ernie::tokens::kPhotometricPower, 1600.0,                        \
+      (::ernie::AttributeMeta{.label = &quot;Power&quot;,                                                    \
+                              .doc = &quot;Luminous flux in lumens, whatever the colour or cone.&quot;       \
+                                     ERNIE_PHOTOMETRIC_SWITCH,                                     \
+                              .group = &quot;Photometric&quot;, .max = 1e6}))                                \
+    X(double, PhotometricIlluminance, ::ernie::tokens::kPhotometricIlluminance, 0.0,               \
+      (::ernie::AttributeMeta{.label = &quot;Illuminance&quot;,                                              \
+                              .doc = &quot;Lux on a surface facing it on its axis at the distance &quot;     \
+                                     &quot;below, in place of the power when both are above 0.&quot;,        \
+                              .group = &quot;Photometric&quot;, .max = 200000.0}))                           \
+    X(double, PhotometricIlluminanceDistance, ::ernie::tokens::kPhotometricIlluminanceDistance,    \
+      0.0,                                                                                         \
+      (::ernie::AttributeMeta{.label = &quot;At distance&quot;, .doc = &quot;Metres; 0 uses the power.&quot;,          \
+                              .group = &quot;Photometric&quot;, .max = 1000.0}))
+
+#define ERNIE_NONBOUNDABLE_LIGHT_ATTRIBUTES(X)                                                     \
+    X(double, PhotometricIlluminance, ::ernie::tokens::kPhotometricIlluminance, 10000.0,           \
+      (::ernie::AttributeMeta{.label = &quot;Illuminance&quot;,                                              \
+                              .doc = &quot;Lux: on a surface facing a distant light, on an &quot;            \
+                                     &quot;upward-facing surface under a dome.&quot; ERNIE_PHOTOMETRIC_SWITCH, \
+                              .group = &quot;Photometric&quot;, .max = 200000.0}))
+
+#define ERNIE_DISTANT_LIGHT_ATTRIBUTES(X)                                                          \
+    X(double, Angle, ::ernie::tokens::kAngle, 0.53,                                                \
+      (::ernie::AttributeMeta{.doc = &quot;Degrees the light subtends; widens penumbrae.&quot;,              \
+                              .group = &quot;Shape&quot;, .max = 30.0}))                                     \
+    X(double, Irradiance, ::ernie::tokens::kLightIrradiance, 1361.0,                               \
+      (::ernie::AttributeMeta{.doc = &quot;W/m^2 at normal incidence; the Sun's by default. Set, or &quot;   \
+                                     &quot;with a spectrum, the light is physical.&quot;,                    \
+                              .group = &quot;Shape&quot;, .max = 1e5}))
+
+#define ERNIE_SPHERE_LIGHT_ATTRIBUTES(X)                                                           \
+    X(double, Radius, ::ernie::tokens::kRadius, 0.5,                                               \
+      (::ernie::AttributeMeta{.doc = &quot;Metres.&quot;, .group = &quot;Shape&quot;, .max = 1000.0}))                 \
+    X(bool, TreatAsPoint, ::ernie::tokens::kTreatAsPoint, false,                                   \
+      (::ernie::AttributeMeta{.label = &quot;Point&quot;, .doc = &quot;Light as a point: radius 0.&quot;,              \
+                              .group = &quot;Shape&quot;}))                                                  \
+    X(double, ShapingConeAngle, ::ernie::tokens::kShapingConeAngle, 180.0,                         \
+      (::ernie::AttributeMeta{.label = &quot;Cone angle&quot;, .doc = &quot;Degrees off the axis it reaches; &quot;    \
+                                                            &quot;180 unshaped.&quot;,                       \
+                              .group = &quot;Shape&quot;, .max = 180.0}))                                    \
+    X(double, ShapingConeSoftness, ::ernie::tokens::kShapingConeSoftness, 0.0,                     \
+      (::ernie::AttributeMeta{.label = &quot;Cone softness&quot;,                                            \
+                              .doc = &quot;Fraction of the cone angle over which it fades.&quot;,            \
+                              .group = &quot;Shape&quot;, .max = 1.0}))
+
+#define ERNIE_RECT_LIGHT_ATTRIBUTES(X)                                                             \
+    X(double, Width, ::ernie::tokens::kWidth, 1.0,                                                 \
+      (::ernie::AttributeMeta{.doc = &quot;Metres along x.&quot;, .group = &quot;Shape&quot;, .max = 1000.0}))         \
+    X(double, Height, ::ernie::tokens::kHeight, 1.0,                                               \
+      (::ernie::AttributeMeta{.doc = &quot;Metres along y.&quot;, .group = &quot;Shape&quot;, .max = 1000.0}))
+
+#define ERNIE_DISK_LIGHT_ATTRIBUTES(X)                                                             \
+    X(double, Radius, ::ernie::tokens::kRadius, 0.5,                                               \
+      (::ernie::AttributeMeta{.doc = &quot;Metres.&quot;, .group = &quot;Shape&quot;, .max = 1000.0}))
+
+#define ERNIE_DOME_LIGHT_ATTRIBUTES(X)                                                             \
+    X(std::string, TextureFile, ::ernie::tokens::kTextureFile, &quot;&quot;,                                 \
+      (::ernie::AttributeMeta{.doc = &quot;USD's map file; not read yet: write the map as a texture.&quot;,  \
+                              .group = &quot;Shape&quot;, .asset = true}))                                   \
+    X(::ernie::Tensor, Texture, ::ernie::tokens::kLightTexture, nullptr,                           \
+      (::ernie::AttributeMeta{.doc = &quot;float32 (rows, cols, 3 or 4) linear RGB scaling its &quot;        \
+                                     &quot;radiance, latitude-longitude around the dome's +z axis.&quot;,    \
+                              .group = &quot;Shape&quot;}))                                                  \
+    X(bool, VisibleInPrimaryRay, ::ernie::tokens::kVisibleInPrimaryRay, true,                      \
+      (::ernie::AttributeMeta{.doc = &quot;Shows behind the scene where camera rays meet nothing; &quot;     \
+                                     &quot;off, it still lights the scene.&quot;,                            \
+                              .group = &quot;Shape&quot;}))
+
+// Every attribute of each type, its bases' first, for its accessors.
+#define ERNIE_LIGHT_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_LIGHT_ATTRIBUTES(X)
+#define ERNIE_BOUNDABLE_LIGHT_ALL(X) ERNIE_LIGHT_ALL(X) ERNIE_BOUNDABLE_LIGHT_ATTRIBUTES(X)
+#define ERNIE_NONBOUNDABLE_LIGHT_ALL(X) ERNIE_LIGHT_ALL(X) ERNIE_NONBOUNDABLE_LIGHT_ATTRIBUTES(X)
+#define ERNIE_DISTANT_LIGHT_ALL(X) ERNIE_NONBOUNDABLE_LIGHT_ALL(X) ERNIE_DISTANT_LIGHT_ATTRIBUTES(X)
+#define ERNIE_DOME_LIGHT_ALL(X) ERNIE_NONBOUNDABLE_LIGHT_ALL(X) ERNIE_DOME_LIGHT_ATTRIBUTES(X)
+#define ERNIE_SPHERE_LIGHT_ALL(X) ERNIE_BOUNDABLE_LIGHT_ALL(X) ERNIE_SPHERE_LIGHT_ATTRIBUTES(X)
+#define ERNIE_RECT_LIGHT_ALL(X) ERNIE_BOUNDABLE_LIGHT_ALL(X) ERNIE_RECT_LIGHT_ATTRIBUTES(X)
+#define ERNIE_DISK_LIGHT_ALL(X) ERNIE_BOUNDABLE_LIGHT_ALL(X) ERNIE_DISK_LIGHT_ATTRIBUTES(X)
+// clang-format on
+
+namespace ernie {
+
+class Light : public Imageable {
+    ERNIE_SCHEMA_BODY(Light, Imageable, ERNIE_LIGHT_ALL)
+
+
+    bool IsPhotometric() const;
+};
+
+class BoundableLight : public Light {
+    ERNIE_SCHEMA_BODY(BoundableLight, Light, ERNIE_BOUNDABLE_LIGHT_ALL)
+};
+
+class NonboundableLight : public Light {
+    ERNIE_SCHEMA_BODY(NonboundableLight, Light, ERNIE_NONBOUNDABLE_LIGHT_ALL)
+};
+
+class DistantLight : public NonboundableLight {
+    ERNIE_SCHEMA_BODY(DistantLight, NonboundableLight, ERNIE_DISTANT_LIGHT_ALL)
+    ERNIE_SCHEMA_DEFINE(DistantLight)
+};
+
+class DomeLight : public NonboundableLight {
+    ERNIE_SCHEMA_BODY(DomeLight, NonboundableLight, ERNIE_DOME_LIGHT_ALL)
+    ERNIE_SCHEMA_DEFINE(DomeLight)
+};
+
+class SphereLight : public BoundableLight {
+    ERNIE_SCHEMA_BODY(SphereLight, BoundableLight, ERNIE_SPHERE_LIGHT_ALL)
+    ERNIE_SCHEMA_DEFINE(SphereLight)
+};
+
+class RectLight : public BoundableLight {
+    ERNIE_SCHEMA_BODY(RectLight, BoundableLight, ERNIE_RECT_LIGHT_ALL)
+    ERNIE_SCHEMA_DEFINE(RectLight)
+};
+
+class DiskLight : public BoundableLight {
+    ERNIE_SCHEMA_BODY(DiskLight, BoundableLight, ERNIE_DISK_LIGHT_ALL)
+    ERNIE_SCHEMA_DEFINE(DiskLight)
+};
+
+std::vector&lt;const PrimTypeDef*&gt; LightSchemaTypes();
+
+}  // namespace ernie
+</code></pre>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/namespaceernie_1_1render__vars/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Namespace ernie::render_vars - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Namespace ernie::render_vars";
+        var mkdocs_page_input_path = "cpp/namespaceernie_1_1render__vars.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/namespaceernie_1_1render__vars/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Namespace ernie::render_vars</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/namespaceernie_1_1render__vars.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="namespace-ernierender_vars">Namespace ernie::render_vars</h1>
+<p><a href="../namespaces/"><strong>Namespace List</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>render_vars</strong></a></p>
+<p><em>Render var names, after Omniverse's where it has the quantity.</em> </p>
+<h2 id="public-attributes">Public Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kdistancetocamera"><strong>kDistanceToCamera</strong></a>   = <code>"DistanceToCamera"</code><br><em>float32.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kdistancetoimageplane"><strong>kDistanceToImagePlane</strong></a>   = <code>"DistanceToImagePlane"</code><br><em>float32.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kelectrons"><strong>kElectrons</strong></a>   = <code>"Electrons"</code><br><em>float32 per sensor channel.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-khdrcolor"><strong>kHdrColor</strong></a>   = <code>"HdrColor"</code><br><em>float32 linear sRGB, cd/m^2.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kinstanceid"><strong>kInstanceId</strong></a>   = <code>"InstanceId"</code><br><em>uint32 instance index.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kldrcolor"><strong>kLdrColor</strong></a>   = <code>"LdrColor"</code><br><em>uint8 sRGB (rows, cols, 4).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kmotionvector"><strong>kMotionVector</strong></a>   = <code>"MotionVector"</code><br><em>float32 (x, y): how far, in sensor pixels, the point a pixel sees has moved across the image since the last frame (this frame's position minus the last's, x right and y down), from the camera's motion and the meshes', instances' and points' own; zero on a camera's first frame and for pushbroom cameras.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-knormal"><strong>kNormal</strong></a>   = <code>"Normal"</code><br><em>float32 world shading normal (xyz).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kprimid"><strong>kPrimId</strong></a>   = <code>"PrimId"</code><br><em>uint32, 0 for background.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-krawdn"><strong>kRawDn</strong></a>   = <code>"RawDN"</code><br><em>uint16 per sensor channel.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kspectralradiance"><strong>kSpectralRadiance</strong></a>   = <code>"SpectralRadiance"</code><br><em>float32 spectral radiance at each sensor pixel, W m^-2 sr^-1 nm^-1, (bands, rows, cols).</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-kdistancetocamera">variable kDistanceToCamera</h3>
+<p><em>float32.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kDistanceToCamera;
+</code></pre>
+<hr>
+
+<h3 id="variable-kdistancetoimageplane">variable kDistanceToImagePlane</h3>
+<p><em>float32.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kDistanceToImagePlane;
+</code></pre>
+<hr>
+
+<h3 id="variable-kelectrons">variable kElectrons</h3>
+<p><em>float32 per sensor channel.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kElectrons;
+</code></pre>
+<hr>
+
+<h3 id="variable-khdrcolor">variable kHdrColor</h3>
+<p><em>float32 linear sRGB, cd/m^2.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kHdrColor;
+</code></pre>
+<hr>
+
+<h3 id="variable-kinstanceid">variable kInstanceId</h3>
+<p><em>uint32 instance index.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kInstanceId;
+</code></pre>
+<hr>
+
+<h3 id="variable-kldrcolor">variable kLdrColor</h3>
+<p><em>uint8 sRGB (rows, cols, 4).</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kLdrColor;
+</code></pre>
+<hr>
+
+<h3 id="variable-kmotionvector">variable kMotionVector</h3>
+<p><em>float32 (x, y): how far, in sensor pixels, the point a pixel sees has moved across the image since the last frame (this frame's position minus the last's, x right and y down), from the camera's motion and the meshes', instances' and points' own; zero on a camera's first frame and for pushbroom cameras.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kMotionVector;
+</code></pre>
+<p>Opt-in: "every var" leaves it out, as it costs extra passes. </p>
+<hr>
+
+<h3 id="variable-knormal">variable kNormal</h3>
+<p><em>float32 world shading normal (xyz).</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kNormal;
+</code></pre>
+<hr>
+
+<h3 id="variable-kprimid">variable kPrimId</h3>
+<p><em>uint32, 0 for background.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kPrimId;
+</code></pre>
+<hr>
+
+<h3 id="variable-krawdn">variable kRawDn</h3>
+<p><em>uint16 per sensor channel.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kRawDn;
+</code></pre>
+<hr>
+
+<h3 id="variable-kspectralradiance">variable kSpectralRadiance</h3>
+<p><em>float32 spectral radiance at each sensor pixel, W m^-2 sr^-1 nm^-1, (bands, rows, cols).</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kSpectralRadiance;
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/scene/sensor_filters.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/namespaceernie_1_1app/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Namespace ernie::app - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Namespace ernie::app";
+        var mkdocs_page_input_path = "cpp/namespaceernie_1_1app.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/namespaceernie_1_1app/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Namespace ernie::app</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/namespaceernie_1_1app.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="namespace-ernieapp">Namespace ernie::app</h1>
+<p><a href="../namespaces/"><strong>Namespace List</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>app</strong></a></p>
+<h2 id="namespaces">Namespaces</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">namespace</td>
+<td style="text-align: left;"><a href="../namespaceernie_1_1app_1_1icons/"><strong>icons</strong></a> <br><em>Lucide icon glyphs (lucide-static 1.52.0, private-use codepoints) as UTF-8 strings, for text drawn with the viewer's font, which has the icons merged in:</em> <code>ImGui::Button(icons::kSave)</code> <em>, or</em><code>std::string(icons::kCamera) + " Camera"</code> <em>as a label.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="classes">Classes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1CreatableType/"><strong>CreatableType</strong></a> <br><em>A prim type the viewer's Create menu makes, with its menu label and group, the name new prims take, and the prim they go under unless a group prim is selected.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1CreateContext/"><strong>CreateContext</strong></a> <br><em>Where a new prim goes and what it starts from.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1app_1_1Demo/"><strong>Demo</strong></a> <br><em>A demo: a scene built in the constructor, advanced by</em> <code>Step</code> <em>, drawn by</em><code>Render</code> <em>and checked by</em><code>TestFinal</code> <em>, run by</em><code>DemoRunner</code> <em>in a window, headless or without a viewer.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1DemoInfo/"><strong>DemoInfo</strong></a> <br><em>A demo the runner can build, for the Demos panel and</em> <code>DemoMain</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1DemoOptions/"><strong>DemoOptions</strong></a> <br><em>The options every demo takes (</em> <code>ParseDemoOptions</code> <em>), as Newton's examples share theirs.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1app_1_1DemoRunner/"><strong>DemoRunner</strong></a> <br><em>Runs demos as Newton's examples run: opens the viewer the options ask for (or none), runs a demo until its window closes or it has run its frames, then writes</em> <code>--output</code> <em>, runs its final test and reports the benchmark.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1DirectoryEntry/"><strong>DirectoryEntry</strong></a> <br><em>One row of a folder listing.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1DockSizes/"><strong>DockSizes</strong></a> <br><em>The default layout's docks as fractions of the window: what each takes of the space left once the docks before it are placed (left, then the right column, then the bottom).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1app_1_1FileDialog/"><strong>FileDialog</strong></a> <br><em>A modal file browser drawn with Dear ImGui, which</em> <code>Viewer</code> <em>shows for</em><code>OpenFileDialog</code> <em>: a folder's contents with an Up button, an editable path and shortcuts to home, the working directory, the root and the folders used recently, a name field, a file type menu and Open (or Save) and Cancel.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1FileDialogOptions/"><strong>FileDialogOptions</strong></a> <br><em>What a file dialog asks for (</em> <code>Viewer::OpenFileDialog</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1FileFilter/"><strong>FileFilter</strong></a> <br><em>A choice of the file dialog's file type menu: a label and the extensions it shows, such as {"Terrain configurations", {".json"}}; no extensions shows every file.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1FrameInfo/"><strong>FrameInfo</strong></a> <br><em>Per-frame information passed to</em> <code>OnFrame</code> <em>,</em><code>OnPreRender</code> <em>and</em><code>OnPostRender</code> <em>callbacks.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1app_1_1FunctionPanel/"><strong>FunctionPanel</strong></a> <br><em>A panel that draws its contents by calling a function.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1LogEntry/"><strong>LogEntry</strong></a> <br><em>One message of the viewer's log (</em> <code>Viewer::Log</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1app_1_1Panel/"><strong>Panel</strong></a> <br><em>A dockable window of the viewer.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1PropertyField/"><strong>PropertyField</strong></a> <br><em>One known attribute a panel edits: how to show it, and what Ernie uses when it is not authored.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1PropertySection/"><strong>PropertySection</strong></a> <br><em>A titled group of fields, such as a prim type's "Light" or "Shape" attributes.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1Theme/"><strong>Theme</strong></a> <br><em>Colours (sRGB-encoded with alpha, as written to the screen) and metrics of the viewer's UI.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> <br><em>An interactive window onto an Ernie</em> <code>Scene</code> <em>: a docked viewport rendering the scene with a</em><code>RenderDelegate</code> <em>(the rasterizer), plus Stage, Property, Render Settings, Sensor, Stats and Log panels.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1ViewerOptions/"><strong>ViewerOptions</strong></a> <br><em>Options for opening a</em> <code>Viewer</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1ViewportDisplay/"><strong>ViewportDisplay</strong></a> <br><em>What the viewport draws over the scene, as Kit's viewport "show by type" menu (the eye) and heads-up display settings choose.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1app_1_1WidgetPanel/"><strong>WidgetPanel</strong></a> <br><em>A panel of simple widgets described by data rather than ImGui calls, so code without ImGui bindings (Python) can build one.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-types">Public Types</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">enum</td>
+<td style="text-align: left;"><a href="#enum-dock"><strong>Dock</strong></a>  <br><em>Where a panel docks in the viewer's default layout, around the viewport.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">enum</td>
+<td style="text-align: left;"><a href="#enum-lighting"><strong>Lighting</strong></a>  <br><em>How the viewport lights the scene.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">enum</td>
+<td style="text-align: left;"><a href="#enum-loglevel"><strong>LogLevel</strong></a>  <br><em>How serious a log message is.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-applytheme"><strong>ApplyTheme</strong></a> (const <a href="../structernie_1_1app_1_1Theme/"><strong>Theme</strong></a> &amp; theme, float contentScale, ImGuiStyle &amp; style) <br><em>Resets</em> <code>style</code> <em>and writes</em><code>theme</code> <em>'s colours and metrics into it, with sizes and fonts scaled by</em><code>contentScale</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-authorcontrollercamera"><strong>AuthorControllerCamera</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, const <a href="../classernie_1_1OrbitController/"><strong>OrbitController</strong></a> &amp; controller, std::uint32_t width, std::uint32_t height, bool orthographic=false) <br><em>Defines the</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim at</em><code>path</code> <em>with</em><code>controller</code> <em>'s pose, field of view and clipping range, for an image of</em><code>width</code> <em>x</em><code>height</code> <em>; an existing one takes the pose and clipping range and keeps its own lens.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-authordefaultprim"><strong>AuthorDefaultPrim</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view type, const <a href="../structernie_1_1app_1_1CreateContext/"><strong>CreateContext</strong></a> &amp; context) <br><em>Defines a prim of</em> <code>type</code> <em>at</em><code>path</code> <em>in</em><code>scene</code> <em>(a scratch scene, copied into the real one as one undo step) with defaults that make it show: geometry at the view's target at the view's scale, lights above it shining down, a camera with the view's pose and lens, a terrain of gentle relief, a point instancer of a few spheres, and render prims wired to the active camera.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-beginpropertytable"><strong>BeginPropertyTable</strong></a> (const char * id, float labelWidth) <br><em>Sets up a property table</em> <code>id</code> <em>of a label column</em><code>labelWidth</code> <em>wide, a value column and a reset column; returns false (and nothing to end) when it is clipped.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-cameralightpath"><strong>CameraLightPath</strong></a> () <br><em>The session's camera light,</em> <code>/__session/Lights/Camera</code> <em>: a distant light shining along the viewing direction, without shadows.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1app_1_1PropertySection/"><strong>PropertySection</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-cameraschema"><strong>CameraSchema</strong></a> () <br><em>A</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim's sections from its declaration (</em><code>Camera</code> <em>): lens, exposure, shutter, sensor and views, without the "Prim" section every prim has.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::optional&lt; std::filesystem::path &gt;</td>
+<td style="text-align: left;"><a href="#function-chosenpath"><strong>ChosenPath</strong></a> (const std::filesystem::path &amp; directory, const std::string &amp; name, const <a href="../structernie_1_1app_1_1FileFilter/"><strong>FileFilter</strong></a> * filter, bool save) <br><em>The path a dialog in</em> <code>directory</code> <em>returns for</em><code>name</code> <em>as typed: an absolute name as it is, else</em><code>directory / name</code> <em>, made lexically normal.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1OrbitController/"><strong>OrbitController</strong></a></td>
+<td style="text-align: left;"><a href="#function-controllerfromtransform"><strong>ControllerFromTransform</strong></a> (const glm::dmat4 &amp; world, float distance, float verticalFov) <br><em>An orbit controller reproducing the camera-to-world transform</em> <code>world</code> <em>: looking along its -z axis at a target</em><code>distance</code> <em>ahead, with</em><code>verticalFov</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::span&lt; const <a href="../structernie_1_1app_1_1CreatableType/"><strong>CreatableType</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-creatabletypes"><strong>CreatableTypes</strong></a> () <br><em>Every type the Create menu offers, by group.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1app_1_1Theme/"><strong>Theme</strong></a></td>
+<td style="text-align: left;"><a href="#function-darktheme"><strong>DarkTheme</strong></a> () <br><em>The default dark theme.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-defaultlightpath"><strong>DefaultLightPath</strong></a> () <br><em>The session's default light,</em> <code>/__session/Lights/Default</code> <em>: a white sun from above with shadows.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">int</td>
+<td style="text-align: left;"><a href="#function-demomain"><strong>DemoMain</strong></a> (int argc, char ** argv, std::vector&lt; <a href="../structernie_1_1app_1_1DemoInfo/"><strong>DemoInfo</strong></a> &gt; demos, std::size_t start=0) <br><em>A demo program's</em> <code>main</code> <em>: parses the command line (</em><code>ParseDemoOptions</code> <em>), then prints the help (</em><code>--help</code> <em>) or the demos (</em><code>--list</code> <em>), or runs</em><code>demos[start]</code> <em>(or the one</em><code>--demo NAME</code> <em>names) with all of</em><code>demos</code> <em>in the Demos panel.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string_view</td>
+<td style="text-align: left;"><a href="#function-demooptionshelp"><strong>DemoOptionsHelp</strong></a> () <br><em>The shared options' help, one per line, for a demo's</em> <code>--help</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-drawprimicon"><strong>DrawPrimIcon</strong></a> (ImDrawList * draw, const ImVec2 &amp; corner, float size, std::string_view type) <br><em>Draws the icon of a prim of</em> <code>type</code> <em>into the square of</em><code>size</code> <em>pixels at</em><code>corner</code> <em>of</em><code>draw</code> <em>: small coloured vector drawings in the manner of Omniverse Kit's stage icons (an axis tripod for transforms, a folder for scopes, shaded solids for geometry, a sphere for materials, yellow lamps for lights, a camera, a film frame for render prims), drawn rather than taken from a font so they stay crisp at any size and need no image assets.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#function-drawpropertyfields"><strong>DrawPropertyFields</strong></a> (<a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> &amp; viewer, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::span&lt; const <a href="../structernie_1_1app_1_1PropertyField/"><strong>PropertyField</strong></a> &gt; fields, float labelWidth, std::string_view filter={}) <br><em>Draws</em> <code>fields</code> <em>of the prim at</em><code>path</code> <em>as rows of a table, as Omniverse's property widgets do: a label (</em><code>labelWidth</code> <em>pixels; muted while the attribute is unset), the value's widget, and a reset square, blue once the attribute is authored, which resets it to its fallback when clicked (</em><code>Viewer::ClearAttribute</code> <em>; so does a right-click on the label).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#function-drawpropertysections"><strong>DrawPropertySections</strong></a> (<a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> &amp; viewer, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::span&lt; const <a href="../structernie_1_1app_1_1PropertySection/"><strong>PropertySection</strong></a> &gt; sections, float labelWidth, std::string_view filter={}) <br><em>Draws each of</em> <code>sections</code> <em>under a collapsing header, open by default; with a</em><code>filter</code> <em>, only the sections with fields that match it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-drawrenderericon"><strong>DrawRendererIcon</strong></a> (ImDrawList * draw, const ImVec2 &amp; corner, float size) <br><em>Draws the viewport's renderer icon, a lit ball on the ground, into the square of</em> <code>size</code> <em>pixels at</em><code>corner</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../structernie_1_1app_1_1CreatableType/"><strong>CreatableType</strong></a> *</td>
+<td style="text-align: left;"><a href="#function-findcreatable"><strong>FindCreatable</strong></a> (std::string_view type) <br><em>The type the Create menu offers as</em> <code>type</code> <em>; null if it offers none.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-hasstagelights"><strong>HasStageLights</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene) <br><em>Whether the scene has a visible light outside the session root.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-hastransform"><strong>HasTransform</strong></a> (std::string_view type) <br><em>Whether prims of</em> <code>type</code> <em>are placed by their transform, for the Transform section.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-issessionpath"><strong>IsSessionPath</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) <br><em>Whether</em> <code>path</code> <em>is the session root or under it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1app_1_1Theme/"><strong>Theme</strong></a></td>
+<td style="text-align: left;"><a href="#function-lighttheme"><strong>LightTheme</strong></a> () <br><em>A light theme with the same metrics and accent.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1app_1_1DirectoryEntry/"><strong>DirectoryEntry</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-listdirectory"><strong>ListDirectory</strong></a> (const std::filesystem::path &amp; directory, const <a href="../structernie_1_1app_1_1FileFilter/"><strong>FileFilter</strong></a> * filter, bool showHidden) <br><em>The folders and the files</em> <code>filter</code> <em>matches (every file without one) in</em><code>directory</code> <em>, folders first, each sorted by name without regard to case; names starting with a dot only with</em><code>showHidden</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dmat4</td>
+<td style="text-align: left;"><a href="#function-localfromworld"><strong>LocalFromWorld</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, const glm::dmat4 &amp; world) <br><em>The local transform that places the prim at</em> <code>path</code> <em>at the world transform</em><code>world</code> <em>, given its ancestors' transforms.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::unique_ptr&lt; <a href="../classernie_1_1app_1_1Panel/"><strong>Panel</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-makecamerapanel"><strong>MakeCameraPanel</strong></a> () <br><em>The</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>panel: the active camera's lens, exposure and sensor, its channels' quantum efficiency over wavelength and as binned into its bands, and Create</em><a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>from View.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1app_1_1DemoInfo/"><strong>DemoInfo</strong></a></td>
+<td style="text-align: left;"><a href="#function-makedemoinfo"><strong>MakeDemoInfo</strong></a> (std::string category, std::string name, std::string description={}) <br><em>A</em> <code>DemoInfo</code> <em>for the demo class</em><code>T</code> <em>, constructed from (Viewer*, const</em><a href="../structernie_1_1app_1_1DemoOptions/"><em><strong>DemoOptions</strong></em></a> <em>&amp;).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::unique_ptr&lt; <a href="../classernie_1_1app_1_1Panel/"><strong>Panel</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-makelogpanel"><strong>MakeLogPanel</strong></a> () <br><em>The Log panel: the viewer's messages (</em> <code>Viewer::Log</code> <em>), filtered by level and text.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::unique_ptr&lt; <a href="../classernie_1_1app_1_1Panel/"><strong>Panel</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-makeprofilerpanel"><strong>MakeProfilerPanel</strong></a> () <br><em>The Profiler panel, hidden until shown: Ernie's profiler (</em> <a href="../profiler_8h/"><em><strong>ernie/util/profiler.h</strong></em></a> <em>) recording while it shows, with frame times, a timeline of the CPU and GPU zones of a frame, and their totals, after Omniverse Kit's profiler window.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::unique_ptr&lt; <a href="../classernie_1_1app_1_1Panel/"><strong>Panel</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-makepropertiespanel"><strong>MakePropertiesPanel</strong></a> () <br><em>The Properties panel: the selected prim's attributes as widgets by value type, editing through the viewer's undo history, with a reset back to each attribute's fallback; bulk data shows its shape.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::unique_ptr&lt; <a href="../classernie_1_1app_1_1Panel/"><strong>Panel</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-makesettingspanel"><strong>MakeSettingsPanel</strong></a> () <br><em>The Settings panel.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::unique_ptr&lt; <a href="../classernie_1_1app_1_1Panel/"><strong>Panel</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-makestagepanel"><strong>MakeStagePanel</strong></a> () <br><em>The Stage panel: the scene's prim tree, with selection, framing, visibility toggles and a filter; the session's own prims show on request.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-matchesfilter"><strong>MatchesFilter</strong></a> (std::string_view label, std::string_view attribute, std::string_view filter) <br><em>Whether</em> <code>label</code> <em>or</em><code>attribute</code> <em>contains</em><code>filter</code> <em>, ignoring case; always for an empty filter.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-mirrorsettings"><strong>MirrorSettings</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; source, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; session, const std::map&lt; std::string, <a href="../classernie_1_1Value/"><strong>Value</strong></a>, std::less&lt;&gt; &gt; &amp; overrides, std::map&lt; std::string, std::uint64_t &gt; &amp; versions) <br><em>Mirrors the</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim</em><code>source</code> <em>into the session's</em><a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim</em><code>session</code> <em>, defining it if needed: every value attribute of</em><code>source</code> <em>is copied, except those in</em><code>overrides</code> <em>, which take the given values; attributes neither has any more are cleared.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1app_1_1DemoOptions/"><strong>DemoOptions</strong></a></td>
+<td style="text-align: left;"><a href="#function-parsedemooptions"><strong>ParseDemoOptions</strong></a> (std::span&lt; const std::string &gt; args) <br><em>Parses the shared options from</em> <code>args</code> <em>(the command line without the program name), leaving the others in</em><code>DemoOptions::extra</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-primicon"><strong>PrimIcon</strong></a> (std::string_view type, float size) <br><em>Reserves a</em> <code>size</code> <em>square at the cursor, as an item, and draws</em><code>type</code> <em>'s icon in it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#function-propertylabelwidth"><strong>PropertyLabelWidth</strong></a> (const <a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> &amp; viewer) <br><em>The label column's width in pixels for the viewer's theme and font.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1app_1_1PropertySection/"><strong>PropertySection</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-rendersettingsschema"><strong>RenderSettingsSchema</strong></a> () <br><em>A</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim's sections: image, culling and level of detail, and shadows.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-resetsquare"><strong>ResetSquare</strong></a> (const <a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> &amp; viewer, bool authored) <br><em>A row's reset square: filled with the accent when</em> <code>authored</code> <em>, an outline otherwise.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1app_1_1PropertySection/"><strong>PropertySection</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-schemaof"><strong>SchemaOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, const <a href="../classernie_1_1BrdfRegistry/"><strong>BrdfRegistry</strong></a> &amp; brdfs, const <a href="../classernie_1_1SensorFilterRegistry/"><strong>SensorFilterRegistry</strong></a> &amp; filters) <br><em>The attributes Ernie reads on the prim at</em> <code>path</code> <em>, by its type, in sections with the fallbacks Ernie uses: shape parameters of the UsdGeom primitives, UsdLux light inputs, materials and their BRDF's parameters (from</em><code>brdfs</code> <em>), cameras, render prims and sensor filters (their types from</em><code>filters</code> <em>), and what every prim may carry (visibility, world).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-sectionheader"><strong>SectionHeader</strong></a> (const <a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> &amp; viewer, const char * title) <br><em>A collapsible section bar titled</em> <code>title</code> <em>in the theme's header colour, open by default, as Kit's collapsable frames; returns whether it is open.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-sessionrootpath"><strong>SessionRootPath</strong></a> () <br><code>/__session</code> <em>: the root of the prims the viewer defines for its own use.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::optional&lt; <a href="../namespaceernie/#typedef-bounds3"><strong>Bounds3</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-union"><strong>Union</strong></a> (const std::vector&lt; std::optional&lt; <a href="../namespaceernie/#typedef-bounds3"><strong>Bounds3</strong></a> &gt; &gt; &amp; bounds) <br><em>The union of</em> <code>bounds</code> <em>, ignoring missing ones; none if all are missing.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-updatesessionlights"><strong>UpdateSessionLights</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const glm::dmat4 &amp; cameraWorld) <br><em>Defines the session lights if missing, and turns the camera light to shine along the -z axis of</em> <code>cameraWorld</code> <em>; sets nothing that is already so.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-viewablecameras"><strong>ViewableCameras</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene) <br><em>The</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prims of</em><code>scene</code> <em>the viewport can look through: those under the session root first, then the scene's own, each in path order.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-types-documentation">Public Types Documentation</h2>
+<h3 id="enum-dock">enum Dock</h3>
+<p><em>Where a panel docks in the viewer's default layout, around the viewport.</em> </p>
+<pre><code class="language-C++">enum ernie::app::Dock {
+    Left,
+    Right,
+    Bottom,
+    Floating,
+    RightLower
+};
+</code></pre>
+<hr>
+
+<h3 id="enum-lighting">enum Lighting</h3>
+<p><em>How the viewport lights the scene.</em> </p>
+<pre><code class="language-C++">enum ernie::app::Lighting {
+    Stage,
+    Camera,
+    Default
+};
+</code></pre>
+<p>The viewer opens with <code>Stage</code> when the scene has lights and <code>Default</code> otherwise. </p>
+<hr>
+
+<h3 id="enum-loglevel">enum LogLevel</h3>
+<p><em>How serious a log message is.</em> </p>
+<pre><code class="language-C++">enum ernie::app::LogLevel {
+    Info,
+    Warning,
+    Error
+};
+</code></pre>
+<hr>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-applytheme">function ApplyTheme</h3>
+<p><em>Resets</em> <code>style</code> <em>and writes</em><code>theme</code> <em>'s colours and metrics into it, with sizes and fonts scaled by</em><code>contentScale</code> <em>.</em></p>
+<pre><code class="language-C++">void ernie::app::ApplyTheme (
+    const Theme &amp; theme,
+    float contentScale,
+    ImGuiStyle &amp; style
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-authorcontrollercamera">function AuthorControllerCamera</h3>
+<p><em>Defines the</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim at</em><code>path</code> <em>with</em><code>controller</code> <em>'s pose, field of view and clipping range, for an image of</em><code>width</code> <em>x</em><code>height</code> <em>; an existing one takes the pose and clipping range and keeps its own lens.</em></p>
+<pre><code class="language-C++">void ernie::app::AuthorControllerCamera (
+    Scene &amp; scene,
+    const Path &amp; path,
+    const OrbitController &amp; controller,
+    std::uint32_t width,
+    std::uint32_t height,
+    bool orthographic=false
+) 
+</code></pre>
+<p>With <code>orthographic</code>, it is an orthographic camera as tall as the view at the controller's target (back to the controller's field of view without). </p>
+<hr>
+
+<h3 id="function-authordefaultprim">function AuthorDefaultPrim</h3>
+<p><em>Defines a prim of</em> <code>type</code> <em>at</em><code>path</code> <em>in</em><code>scene</code> <em>(a scratch scene, copied into the real one as one undo step) with defaults that make it show: geometry at the view's target at the view's scale, lights above it shining down, a camera with the view's pose and lens, a terrain of gentle relief, a point instancer of a few spheres, and render prims wired to the active camera.</em></p>
+<pre><code class="language-C++">void ernie::app::AuthorDefaultPrim (
+    Scene &amp; scene,
+    const Path &amp; path,
+    std::string_view type,
+    const CreateContext &amp; context
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a type <code>CreatableTypes</code> does not list. </li>
+</ul>
+<hr>
+
+<h3 id="function-beginpropertytable">function BeginPropertyTable</h3>
+<p><em>Sets up a property table</em> <code>id</code> <em>of a label column</em><code>labelWidth</code> <em>wide, a value column and a reset column; returns false (and nothing to end) when it is clipped.</em></p>
+<pre><code class="language-C++">bool ernie::app::BeginPropertyTable (
+    const char * id,
+    float labelWidth
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-cameralightpath">function CameraLightPath</h3>
+<p><em>The session's camera light,</em> <code>/__session/Lights/Camera</code> <em>: a distant light shining along the viewing direction, without shadows.</em></p>
+<pre><code class="language-C++">const Path &amp; ernie::app::CameraLightPath () 
+</code></pre>
+<hr>
+
+<h3 id="function-cameraschema">function CameraSchema</h3>
+<p><em>A</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim's sections from its declaration (</em><code>Camera</code> <em>): lens, exposure, shutter, sensor and views, without the "Prim" section every prim has.</em></p>
+<pre><code class="language-C++">std::vector&lt; PropertySection &gt; ernie::app::CameraSchema () 
+</code></pre>
+<hr>
+
+<h3 id="function-chosenpath">function ChosenPath</h3>
+<p><em>The path a dialog in</em> <code>directory</code> <em>returns for</em><code>name</code> <em>as typed: an absolute name as it is, else</em><code>directory / name</code> <em>, made lexically normal.</em></p>
+<pre><code class="language-C++">std::optional&lt; std::filesystem::path &gt; ernie::app::ChosenPath (
+    const std::filesystem::path &amp; directory,
+    const std::string &amp; name,
+    const FileFilter * filter,
+    bool save
+) 
+</code></pre>
+<p>Saving with <code>filter</code>, a name without an extension gets the filter's first one. None for an empty or blank name. </p>
+<hr>
+
+<h3 id="function-controllerfromtransform">function ControllerFromTransform</h3>
+<p><em>An orbit controller reproducing the camera-to-world transform</em> <code>world</code> <em>: looking along its -z axis at a target</em><code>distance</code> <em>ahead, with</em><code>verticalFov</code> <em>.</em></p>
+<pre><code class="language-C++">OrbitController ernie::app::ControllerFromTransform (
+    const glm::dmat4 &amp; world,
+    float distance,
+    float verticalFov
+) 
+</code></pre>
+<p>Pitch is clamped to the controller's range, so views from below the horizon come back looking from just above it. </p>
+<hr>
+
+<h3 id="function-creatabletypes">function CreatableTypes</h3>
+<p><em>Every type the Create menu offers, by group.</em> </p>
+<pre><code class="language-C++">std::span&lt; const CreatableType &gt; ernie::app::CreatableTypes () 
+</code></pre>
+<hr>
+
+<h3 id="function-darktheme">function DarkTheme</h3>
+<p><em>The default dark theme.</em> </p>
+<pre><code class="language-C++">Theme ernie::app::DarkTheme () 
+</code></pre>
+<hr>
+
+<h3 id="function-defaultlightpath">function DefaultLightPath</h3>
+<p><em>The session's default light,</em> <code>/__session/Lights/Default</code> <em>: a white sun from above with shadows.</em></p>
+<pre><code class="language-C++">const Path &amp; ernie::app::DefaultLightPath () 
+</code></pre>
+<hr>
+
+<h3 id="function-demomain">function DemoMain</h3>
+<p><em>A demo program's</em> <code>main</code> <em>: parses the command line (</em><code>ParseDemoOptions</code> <em>), then prints the help (</em><code>--help</code> <em>) or the demos (</em><code>--list</code> <em>), or runs</em><code>demos[start]</code> <em>(or the one</em><code>--demo NAME</code> <em>names) with all of</em><code>demos</code> <em>in the Demos panel.</em></p>
+<pre><code class="language-C++">int ernie::app::DemoMain (
+    int argc,
+    char ** argv,
+    std::vector&lt; DemoInfo &gt; demos,
+    std::size_t start=0
+) 
+</code></pre>
+<p>Returns the exit status, printing any error. </p>
+<hr>
+
+<h3 id="function-demooptionshelp">function DemoOptionsHelp</h3>
+<p><em>The shared options' help, one per line, for a demo's</em> <code>--help</code> <em>.</em></p>
+<pre><code class="language-C++">std::string_view ernie::app::DemoOptionsHelp () 
+</code></pre>
+<hr>
+
+<h3 id="function-drawprimicon">function DrawPrimIcon</h3>
+<p><em>Draws the icon of a prim of</em> <code>type</code> <em>into the square of</em><code>size</code> <em>pixels at</em><code>corner</code> <em>of</em><code>draw</code> <em>: small coloured vector drawings in the manner of Omniverse Kit's stage icons (an axis tripod for transforms, a folder for scopes, shaded solids for geometry, a sphere for materials, yellow lamps for lights, a camera, a film frame for render prims), drawn rather than taken from a font so they stay crisp at any size and need no image assets.</em></p>
+<pre><code class="language-C++">void ernie::app::DrawPrimIcon (
+    ImDrawList * draw,
+    const ImVec2 &amp; corner,
+    float size,
+    std::string_view type
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-drawpropertyfields">function DrawPropertyFields</h3>
+<p><em>Draws</em> <code>fields</code> <em>of the prim at</em><code>path</code> <em>as rows of a table, as Omniverse's property widgets do: a label (</em><code>labelWidth</code> <em>pixels; muted while the attribute is unset), the value's widget, and a reset square, blue once the attribute is authored, which resets it to its fallback when clicked (</em><code>Viewer::ClearAttribute</code> <em>; so does a right-click on the label).</em></p>
+<pre><code class="language-C++">std::string ernie::app::DrawPropertyFields (
+    Viewer &amp; viewer,
+    const Path &amp; path,
+    std::span&lt; const PropertyField &gt; fields,
+    float labelWidth,
+    std::string_view filter={}
+) 
+</code></pre>
+<p>Edits go through the viewer's undo history (<code>Viewer::Edit</code>). Only fields whose label or attribute contains <code>filter</code> (case aside) show. Returns the first error an edit raised, or an empty string. </p>
+<hr>
+
+<h3 id="function-drawpropertysections">function DrawPropertySections</h3>
+<p><em>Draws each of</em> <code>sections</code> <em>under a collapsing header, open by default; with a</em><code>filter</code> <em>, only the sections with fields that match it.</em></p>
+<pre><code class="language-C++">std::string ernie::app::DrawPropertySections (
+    Viewer &amp; viewer,
+    const Path &amp; path,
+    std::span&lt; const PropertySection &gt; sections,
+    float labelWidth,
+    std::string_view filter={}
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-drawrenderericon">function DrawRendererIcon</h3>
+<p><em>Draws the viewport's renderer icon, a lit ball on the ground, into the square of</em> <code>size</code> <em>pixels at</em><code>corner</code> <em>.</em></p>
+<pre><code class="language-C++">void ernie::app::DrawRendererIcon (
+    ImDrawList * draw,
+    const ImVec2 &amp; corner,
+    float size
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-findcreatable">function FindCreatable</h3>
+<p><em>The type the Create menu offers as</em> <code>type</code> <em>; null if it offers none.</em></p>
+<pre><code class="language-C++">const CreatableType * ernie::app::FindCreatable (
+    std::string_view type
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-hasstagelights">function HasStageLights</h3>
+<p><em>Whether the scene has a visible light outside the session root.</em> </p>
+<pre><code class="language-C++">bool ernie::app::HasStageLights (
+    const Scene &amp; scene
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-hastransform">function HasTransform</h3>
+<p><em>Whether prims of</em> <code>type</code> <em>are placed by their transform, for the Transform section.</em></p>
+<pre><code class="language-C++">bool ernie::app::HasTransform (
+    std::string_view type
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-issessionpath">function IsSessionPath</h3>
+<p><em>Whether</em> <code>path</code> <em>is the session root or under it.</em></p>
+<pre><code class="language-C++">bool ernie::app::IsSessionPath (
+    const Path &amp; path
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-lighttheme">function LightTheme</h3>
+<p><em>A light theme with the same metrics and accent.</em> </p>
+<pre><code class="language-C++">Theme ernie::app::LightTheme () 
+</code></pre>
+<hr>
+
+<h3 id="function-listdirectory">function ListDirectory</h3>
+<p><em>The folders and the files</em> <code>filter</code> <em>matches (every file without one) in</em><code>directory</code> <em>, folders first, each sorted by name without regard to case; names starting with a dot only with</em><code>showHidden</code> <em>.</em></p>
+<pre><code class="language-C++">std::vector&lt; DirectoryEntry &gt; ernie::app::ListDirectory (
+    const std::filesystem::path &amp; directory,
+    const FileFilter * filter,
+    bool showHidden
+) 
+</code></pre>
+<p>Entries that cannot be inspected are left out. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::filesystem::filesystem_error</code> if <code>directory</code> cannot be read. </li>
+</ul>
+<hr>
+
+<h3 id="function-localfromworld">function LocalFromWorld</h3>
+<p><em>The local transform that places the prim at</em> <code>path</code> <em>at the world transform</em><code>world</code> <em>, given its ancestors' transforms.</em></p>
+<pre><code class="language-C++">glm::dmat4 ernie::app::LocalFromWorld (
+    const Scene &amp; scene,
+    const Path &amp; path,
+    const glm::dmat4 &amp; world
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-makecamerapanel">function MakeCameraPanel</h3>
+<p><em>The</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>panel: the active camera's lens, exposure and sensor, its channels' quantum efficiency over wavelength and as binned into its bands, and Create</em><a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>from View.</em></p>
+<pre><code class="language-C++">std::unique_ptr&lt; Panel &gt; ernie::app::MakeCameraPanel () 
+</code></pre>
+<hr>
+
+<h3 id="function-makedemoinfo">function MakeDemoInfo</h3>
+<p><em>A</em> <code>DemoInfo</code> <em>for the demo class</em><code>T</code> <em>, constructed from (Viewer*, const</em><a href="../structernie_1_1app_1_1DemoOptions/"><em><strong>DemoOptions</strong></em></a> <em>&amp;).</em></p>
+<pre><code class="language-C++">template&lt;typename T&gt;
+DemoInfo ernie::app::MakeDemoInfo (
+    std::string category,
+    std::string name,
+    std::string description={}
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-makelogpanel">function MakeLogPanel</h3>
+<p><em>The Log panel: the viewer's messages (</em> <code>Viewer::Log</code> <em>), filtered by level and text.</em></p>
+<pre><code class="language-C++">std::unique_ptr&lt; Panel &gt; ernie::app::MakeLogPanel () 
+</code></pre>
+<hr>
+
+<h3 id="function-makeprofilerpanel">function MakeProfilerPanel</h3>
+<p><em>The Profiler panel, hidden until shown: Ernie's profiler (</em> <a href="../profiler_8h/"><em><strong>ernie/util/profiler.h</strong></em></a> <em>) recording while it shows, with frame times, a timeline of the CPU and GPU zones of a frame, and their totals, after Omniverse Kit's profiler window.</em></p>
+<pre><code class="language-C++">std::unique_ptr&lt; Panel &gt; ernie::app::MakeProfilerPanel () 
+</code></pre>
+<hr>
+
+<h3 id="function-makepropertiespanel">function MakePropertiesPanel</h3>
+<p><em>The Properties panel: the selected prim's attributes as widgets by value type, editing through the viewer's undo history, with a reset back to each attribute's fallback; bulk data shows its shape.</em> </p>
+<pre><code class="language-C++">std::unique_ptr&lt; Panel &gt; ernie::app::MakePropertiesPanel () 
+</code></pre>
+<hr>
+
+<h3 id="function-makesettingspanel">function MakeSettingsPanel</h3>
+<p><em>The Settings panel.</em> </p>
+<pre><code class="language-C++">std::unique_ptr&lt; Panel &gt; ernie::app::MakeSettingsPanel () 
+</code></pre>
+<p>Render: the viewport's <a href="../classernie_1_1RenderSettings/"><strong>RenderSettings</strong></a> prim and the settings the renderer reads (image, culling and level of detail, shadows), with their fallbacks. <a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a>: the viewport's own (renderer, shown var, lighting, wireframe, vsync, gizmo, theme). </p>
+<hr>
+
+<h3 id="function-makestagepanel">function MakeStagePanel</h3>
+<p><em>The Stage panel: the scene's prim tree, with selection, framing, visibility toggles and a filter; the session's own prims show on request.</em> </p>
+<pre><code class="language-C++">std::unique_ptr&lt; Panel &gt; ernie::app::MakeStagePanel () 
+</code></pre>
+<hr>
+
+<h3 id="function-matchesfilter">function MatchesFilter</h3>
+<p><em>Whether</em> <code>label</code> <em>or</em><code>attribute</code> <em>contains</em><code>filter</code> <em>, ignoring case; always for an empty filter.</em></p>
+<pre><code class="language-C++">bool ernie::app::MatchesFilter (
+    std::string_view label,
+    std::string_view attribute,
+    std::string_view filter
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-mirrorsettings">function MirrorSettings</h3>
+<p><em>Mirrors the</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim</em><code>source</code> <em>into the session's</em><a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim</em><code>session</code> <em>, defining it if needed: every value attribute of</em><code>source</code> <em>is copied, except those in</em><code>overrides</code> <em>, which take the given values; attributes neither has any more are cleared.</em></p>
+<pre><code class="language-C++">void ernie::app::MirrorSettings (
+    Scene &amp; scene,
+    const Path &amp; source,
+    const Path &amp; session,
+    const std::map&lt; std::string, Value , std::less&lt;&gt; &gt; &amp; overrides,
+    std::map&lt; std::string, std::uint64_t &gt; &amp; versions
+) 
+</code></pre>
+<p>Only what changed is set: <code>versions</code> remembers what was copied, so pass the same map every frame. An empty <code>source</code> leaves only the overrides. </p>
+<hr>
+
+<h3 id="function-parsedemooptions">function ParseDemoOptions</h3>
+<p><em>Parses the shared options from</em> <code>args</code> <em>(the command line without the program name), leaving the others in</em><code>DemoOptions::extra</code> <em>.</em></p>
+<pre><code class="language-C++">DemoOptions ernie::app::ParseDemoOptions (
+    std::span&lt; const std::string &gt; args
+) 
+</code></pre>
+<p><code>--benchmark</code> implies <code>--viewer null</code>. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a bad or missing value. </li>
+</ul>
+<hr>
+
+<h3 id="function-primicon">function PrimIcon</h3>
+<p><em>Reserves a</em> <code>size</code> <em>square at the cursor, as an item, and draws</em><code>type</code> <em>'s icon in it.</em></p>
+<pre><code class="language-C++">void ernie::app::PrimIcon (
+    std::string_view type,
+    float size
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-propertylabelwidth">function PropertyLabelWidth</h3>
+<p><em>The label column's width in pixels for the viewer's theme and font.</em> </p>
+<pre><code class="language-C++">float ernie::app::PropertyLabelWidth (
+    const Viewer &amp; viewer
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-rendersettingsschema">function RenderSettingsSchema</h3>
+<p><em>A</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim's sections: image, culling and level of detail, and shadows.</em></p>
+<pre><code class="language-C++">std::vector&lt; PropertySection &gt; ernie::app::RenderSettingsSchema () 
+</code></pre>
+<hr>
+
+<h3 id="function-resetsquare">function ResetSquare</h3>
+<p><em>A row's reset square: filled with the accent when</em> <code>authored</code> <em>, an outline otherwise.</em></p>
+<pre><code class="language-C++">bool ernie::app::ResetSquare (
+    const Viewer &amp; viewer,
+    bool authored
+) 
+</code></pre>
+<p>Returns whether it was clicked while authored. </p>
+<hr>
+
+<h3 id="function-schemaof">function SchemaOf</h3>
+<p><em>The attributes Ernie reads on the prim at</em> <code>path</code> <em>, by its type, in sections with the fallbacks Ernie uses: shape parameters of the UsdGeom primitives, UsdLux light inputs, materials and their BRDF's parameters (from</em><code>brdfs</code> <em>), cameras, render prims and sensor filters (their types from</em><code>filters</code> <em>), and what every prim may carry (visibility, world).</em></p>
+<pre><code class="language-C++">std::vector&lt; PropertySection &gt; ernie::app::SchemaOf (
+    const Scene &amp; scene,
+    const Path &amp; path,
+    const BrdfRegistry &amp; brdfs,
+    const SensorFilterRegistry &amp; filters
+) 
+</code></pre>
+<p>Empty for prims Ernie reads nothing from. </p>
+<hr>
+
+<h3 id="function-sectionheader">function SectionHeader</h3>
+<p><em>A collapsible section bar titled</em> <code>title</code> <em>in the theme's header colour, open by default, as Kit's collapsable frames; returns whether it is open.</em></p>
+<pre><code class="language-C++">bool ernie::app::SectionHeader (
+    const Viewer &amp; viewer,
+    const char * title
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-sessionrootpath">function SessionRootPath</h3>
+<p><code>/__session</code> <em>: the root of the prims the viewer defines for its own use.</em></p>
+<pre><code class="language-C++">const Path &amp; ernie::app::SessionRootPath () 
+</code></pre>
+<hr>
+
+<h3 id="function-union">function Union</h3>
+<p><em>The union of</em> <code>bounds</code> <em>, ignoring missing ones; none if all are missing.</em></p>
+<pre><code class="language-C++">std::optional&lt; Bounds3 &gt; ernie::app::Union (
+    const std::vector&lt; std::optional&lt; Bounds3 &gt; &gt; &amp; bounds
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-updatesessionlights">function UpdateSessionLights</h3>
+<p><em>Defines the session lights if missing, and turns the camera light to shine along the -z axis of</em> <code>cameraWorld</code> <em>; sets nothing that is already so.</em></p>
+<pre><code class="language-C++">void ernie::app::UpdateSessionLights (
+    Scene &amp; scene,
+    const glm::dmat4 &amp; cameraWorld
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-viewablecameras">function ViewableCameras</h3>
+<p><em>The</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prims of</em><code>scene</code> <em>the viewport can look through: those under the session root first, then the scene's own, each in path order.</em></p>
+<pre><code class="language-C++">std::vector&lt; Path &gt; ernie::app::ViewableCameras (
+    const Scene &amp; scene
+) 
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/app/builtin_panels.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

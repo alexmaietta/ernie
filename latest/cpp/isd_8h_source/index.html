@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/isd_8h_source/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>File isd.h - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "File isd.h";
+        var mkdocs_page_input_path = "cpp/isd_8h_source.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/isd_8h_source/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">File isd.h</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/isd_8h_source.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="file-isdh">File isd.h</h1>
+<p><a href="../files/"><strong>File List</strong></a> <strong>&gt;</strong> <a href="../dir_057d52706067b881d9371cf136c38c31/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../dir_572d817874f40c61a249f0e7684d4315/"><strong>scene</strong></a> <strong>&gt;</strong> <a href="../isd_8h/"><strong>isd.h</strong></a></p>
+<p><a href="../isd_8h/">Go to the documentation of this file</a></p>
+<pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+#include &quot;ernie/scene/camera.h&quot;
+
+#include &lt;glm/glm.hpp&gt;
+#include &lt;glm/gtc/quaternion.hpp&gt;
+
+#include &lt;array&gt;
+#include &lt;cstdint&gt;
+#include &lt;functional&gt;
+#include &lt;span&gt;
+#include &lt;string&gt;
+#include &lt;string_view&gt;
+#include &lt;vector&gt;
+
+namespace ernie {
+
+template &lt;typename T&gt; struct IsdSamples {
+    std::vector&lt;double&gt; times;
+    std::vector&lt;T&gt; values;
+};
+
+struct IsdRotation {
+    IsdSamples&lt;glm::dquat&gt; quaternions;
+    std::vector&lt;std::int64_t&gt; timeDependentFrames;
+    std::vector&lt;std::int64_t&gt; constantFrames;
+    glm::dmat3 constantRotation{1.0};  
+    std::int64_t referenceFrame = 1;   
+};
+
+struct IsdSensor {
+    std::string model;  
+    std::string platform;
+    std::string sensor;
+    std::uint32_t lines = 0;
+    std::uint32_t samples = 0;
+
+    double focalLengthMm = 0.0;
+    std::array&lt;double, 3&gt; focalToLine{};
+    std::array&lt;double, 3&gt; focalToSample{};
+    double detectorCenterLine = 0.0;
+    double detectorCenterSample = 0.0;
+    double startingDetectorLine = 0.0;
+    double startingDetectorSample = 0.0;
+    double lineSumming = 1.0;
+    double sampleSumming = 1.0;
+    std::string distortion;
+    std::vector&lt;double&gt; distortionCoefficients;
+
+    std::vector&lt;std::array&lt;double, 3&gt;&gt; lineRates;
+    double startingTime = 0.0;  
+    double centerTime = 0.0;
+
+    double semiMajorAxis = 0.0;
+    double semiMinorAxis = 0.0;
+
+    IsdSamples&lt;glm::dvec3&gt; positions;
+    IsdSamples&lt;glm::dvec3&gt; velocities;
+    std::int64_t positionFrame = 1;
+    IsdSamples&lt;glm::dvec3&gt; sunPositions;
+    IsdRotation pointing;      
+    IsdRotation bodyRotation;  
+
+    double exposureDuration = 0.0;
+    double interframeDelay = 0.0;
+    std::uint32_t frameletHeight = 0;
+    std::uint32_t frameletOverlap = 0;
+    bool frameletsFlipped = false;
+    bool frameletOrderReversed = false;
+
+    bool IsLineScanner() const;
+
+    bool IsPushFrame() const;
+
+    bool IsFrame() const;
+};
+
+class IsdCameraModel {
+  public:
+    const IsdSensor&amp; Isd() const {
+        return isd_;
+    }
+
+    glm::dvec3 Position(double time) const;
+
+    glm::dquat SensorToBody(double time) const;
+
+    glm::dvec3 SunPosition(double time) const;
+
+    glm::dvec2 Undistort(glm::dvec2 distorted) const;
+    glm::dvec2 Distort(glm::dvec2 undistorted) const;
+
+    struct FrameView {
+        CameraParams camera;
+        bool rowsReversed = false;
+        double distortionResidualPixels = 0.0;
+    };
+
+  protected:
+    explicit IsdCameraModel(IsdSensor isd);
+
+    static glm::dquat RotationAt(const IsdRotation&amp; rotation, double time);
+    glm::dvec2 FocalPlaneOf(double line, double sample) const;
+    glm::dvec2 PixelOf(glm::dvec2 focal) const;
+    glm::dvec2 FocalPlaneView(const glm::dvec3&amp; ground, double time) const;
+    glm::dvec3 LookAt(double time, double line, double sample) const;
+    glm::dvec3 EllipsoidIntersect(const glm::dvec3&amp; origin, const glm::dvec3&amp; look, double height,
+                                  bool eitherSide = true) const;
+    glm::dmat3 ErnieAxes(double line, double facing) const;
+    glm::dmat4 PoseAt(double time, const glm::dmat3&amp; axes) const;
+    double FitDistortion(CameraParams&amp; camera, std::span&lt;const double&gt; lines,
+                         const glm::dmat3&amp; axes, double facing) const;
+    FrameView FrameViewOf(const std::function&lt;double(double)&gt;&amp; detectorLine, std::uint32_t rows,
+                          double time, double facing) const;
+
+    IsdSensor isd_;
+
+  private:
+    std::vector&lt;glm::dvec3&gt; positionNodes_;
+    double positionStart_ = 0.0;
+    double positionStep_ = 1.0;
+    std::vector&lt;glm::dvec4&gt; quaternionNodes_;
+    double quaternionStart_ = 0.0;
+    double quaternionStep_ = 1.0;
+};
+
+class IsdLineScanner : public IsdCameraModel {
+  public:
+    explicit IsdLineScanner(IsdSensor isd);
+
+    double ImageTime(double line) const;
+
+    glm::dvec3 Look(double line, double sample) const;
+
+    glm::dvec3 ImageToGround(double line, double sample, double height = 0.0) const;
+
+    glm::dvec2 GroundToImage(const glm::dvec3&amp; ground) const;
+
+    struct Strip {
+        CameraParams camera;
+        glm::dmat4 from{1.0};
+        glm::dmat4 to{1.0};
+        double fromTime = 0.0;
+        double toTime = 0.0;
+        double distortionResidualPixels = 0.0;
+    };
+    Strip StripOf(std::uint32_t firstLine, std::uint32_t lines) const;
+
+  private:
+    glm::dvec2 DetectorView(const glm::dvec3&amp; ground, double time) const;
+};
+
+class IsdPushFrame : public IsdCameraModel {
+  public:
+    explicit IsdPushFrame(IsdSensor isd);
+
+    std::uint32_t FrameletLines() const;
+
+    std::uint32_t Framelets() const;
+
+    double ImageTime(double line) const;
+
+    glm::dvec3 Look(double line, double sample) const;
+
+    glm::dvec3 ImageToGround(double line, double sample, double height = 0.0) const;
+
+    glm::dvec2 GroundToImage(const glm::dvec3&amp; ground) const;
+
+    struct Framelet {
+        CameraParams camera;  
+        double time = 0.0;
+        std::uint32_t firstLine = 0;
+        bool rowsReversed = false;
+        double distortionResidualPixels = 0.0;
+    };
+    Framelet FrameletOf(std::uint32_t framelet) const;
+
+  private:
+    int TimeOrder(double line) const;
+    double DetectorLine(double line) const;
+    double FrameDistance(int framelet, const glm::dvec3&amp; ground) const;
+};
+
+class IsdFrame : public IsdCameraModel {
+  public:
+    explicit IsdFrame(IsdSensor isd);
+
+    double ImageTime() const {
+        return isd_.centerTime;
+    }
+
+    glm::dvec3 Look(double line, double sample) const;
+
+    glm::dvec3 ImageToGround(double line, double sample, double height = 0.0) const;
+
+    glm::dvec2 GroundToImage(const glm::dvec3&amp; ground) const;
+
+    FrameView View() const;
+};
+
+IsdSensor ReadIsd(std::string_view json);
+
+IsdSensor ReadIsdFile(const std::string&amp; path);
+
+}  // namespace ernie
+</code></pre>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1LensModel/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Struct ernie::LensModel - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Struct ernie::LensModel";
+        var mkdocs_page_input_path = "cpp/structernie_1_1LensModel.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/structernie_1_1LensModel/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Struct ernie::LensModel</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/structernie_1_1LensModel.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="struct-ernielensmodel">Struct ernie::LensModel</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>LensModel</strong></a></p>
+<p><em>A lens: its projection, natural vignetting and transmission.</em> <a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/scene/camera.h&gt;</code></li>
+</ul>
+<h2 id="public-attributes">Public Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Spectrum/"><strong>Spectrum</strong></a></td>
+<td style="text-align: left;"><a href="#variable-chromaticfocusmm"><strong>chromaticFocusMm</strong></a>  <br><em>Axial colour (</em> <code>ernie:lens:chromatic:focus</code> <em>): the lens's focal length shift per wavelength in millimetres, the sensor staying at the reference's focus, which the</em><code>defocus</code> <em>filter blurs each band by.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Spectrum/"><strong>Spectrum</strong></a></td>
+<td style="text-align: left;"><a href="#variable-chromaticscale"><strong>chromaticScale</strong></a>  <br><em>Lateral colour (</em> <code>ernie:lens:chromatic:scale</code> <em>): the image's scale per wavelength relative to the reference's, about the principal point, which the sensor resamples each band at.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::array&lt; double, 4 &gt;</td>
+<td style="text-align: left;"><a href="#variable-fisheye"><strong>fisheye</strong></a>   = <code>{}</code><br><em>Kannala-Brandt k1 to k4.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-k1"><strong>k1</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-k2"><strong>k2</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-k3"><strong>k3</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-p1"><strong>p1</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-p2"><strong>p2</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../namespaceernie/#enum-lensprojection"><strong>LensProjection</strong></a></td>
+<td style="text-align: left;"><a href="#variable-projection"><strong>projection</strong></a>   = <code>LensProjection::Perspective</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::shared_ptr&lt; const <a href="../structernie_1_1LensRayTable/"><strong>LensRayTable</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#variable-rays"><strong>rays</strong></a>  <br><em>The lens's rays, in place of its projection and distortion when set (</em> <code>ernie:lens:rays</code> <em>): each sensor pixel sees along its interpolated ray, on cube faces past 60 degrees off axis.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-transmission"><strong>transmission</strong></a>   = <code>1.0</code><br><em>Fraction of light the optics pass.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-vignetting"><strong>vignetting</strong></a>   = <code>false</code><br><em>Natural falloff of irradiance off axis (cos^4 for pinholes).</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-static-attributes">Public Static Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">constexpr double</td>
+<td style="text-align: left;"><a href="#variable-kmaxfisheyefieldangle"><strong>kMaxFisheyeFieldAngle</strong></a>   = <code>3.141592653589793</code><br><em>The largest field angle a fisheye may see, in radians (180 degrees off axis, a 360 degree field): one fisheye reaching past 60 degrees renders on cube faces (</em> <a href="../wide__view_8h/"><em><strong>wide_view.h</strong></em></a> <em>), which with the back face cover every ray.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">glm::dvec2</td>
+<td style="text-align: left;"><a href="#function-distort"><strong>Distort</strong></a> (glm::dvec2 undistorted) const<br><em>Distorted normalised image coordinates of pinhole ones</em> <code>undistorted</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-fieldangle"><strong>FieldAngle</strong></a> (glm::dvec2 distorted) const<br><em>The field angle in radians of the ray landing at normalised image coordinates</em> <code>distorted</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-hasdistortion"><strong>HasDistortion</strong></a> () const<br><em>Whether Brown-Conrady distortion is set.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-ispinhole"><strong>IsPinhole</strong></a> () const<br><em>Whether the lens is a pinhole: perspective without distortion.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-naturalvignetting"><strong>NaturalVignetting</strong></a> (glm::dvec2 distorted) const<br><em>The irradiance at normalised image coordinates</em> <code>distorted</code> <em>relative to the axis, from the aperture's foreshortening and the solid angle the image there sees: cos(theta) sin(theta) / (theta_d theta_d'), cos^4(theta) for a pinhole.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec2</td>
+<td style="text-align: left;"><a href="#function-undistort"><strong>Undistort</strong></a> (glm::dvec2 distorted) const<br><em>The inverse of</em> <code>Distort</code> <em>: pinhole normalised image coordinates of the ray landing at</em><code>distorted</code> <em>.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>A perspective lens has radial and tangential distortion (Brown-Conrady, in OpenCV's convention), which maps undistorted normalised image coordinates (x, y) = (X/Z, Y/Z) to distorted ones: x' = x (1 + k1 r^2 + k2 r^4 + k3 r^6) + 2 p1 x y + p2 (r^2 + 2 x^2) y' = y (1 + k1 r^2 + k2 r^4 + k3 r^6) + p1 (r^2 + 2 y^2) + 2 p2 x y A fisheye lens maps them to theta_d / r (x, y), with theta = atan(r) (OpenCV's fisheye model).</p>
+<p>The rasterizer draws a pinhole image and the sensor resamples it through the lens; a fisheye reaching past 60 degrees off axis is drawn on cube faces instead (<a href="../wide__view_8h/"><strong>wide_view.h</strong></a>), its field angle below <code>kMaxFisheyeFieldAngle</code>.</p>
+<p>References:
+* D. C. Brown, "Decentering Distortion of Lenses", Photogrammetric Engineering 32(3):444-462, 1966.
+* J. Kannala and S. S. Brandt, "A Generic Camera Model and Calibration Method for
+  Conventional, Wide-Angle, and Fish-Eye Lenses", IEEE TPAMI 28(8):1335-1340, 2006. <a href="https://doi.org/10.1109/TPAMI.2006.153">https://doi.org/10.1109/TPAMI.2006.153</a>
+* OpenCV, "Camera Calibration and 3D Reconstruction", <a href="https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html">https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html</a>, and "Fisheye camera model", <a href="https://docs.opencv.org/4.x/db/d58/group__calib3d__fisheye.html">https://docs.opencv.org/4.x/db/d58/group__calib3d__fisheye.html</a> </p>
+<h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-chromaticfocusmm">variable chromaticFocusMm</h3>
+<p><em>Axial colour (</em> <code>ernie:lens:chromatic:focus</code> <em>): the lens's focal length shift per wavelength in millimetres, the sensor staying at the reference's focus, which the</em><code>defocus</code> <em>filter blurs each band by.</em></p>
+<pre><code class="language-C++">Spectrum ernie::LensModel::chromaticFocusMm;
+</code></pre>
+<p>Empty for none. </p>
+<hr>
+
+<h3 id="variable-chromaticscale">variable chromaticScale</h3>
+<p><em>Lateral colour (</em> <code>ernie:lens:chromatic:scale</code> <em>): the image's scale per wavelength relative to the reference's, about the principal point, which the sensor resamples each band at.</em></p>
+<pre><code class="language-C++">Spectrum ernie::LensModel::chromaticScale;
+</code></pre>
+<p>Empty for none. </p>
+<hr>
+
+<h3 id="variable-fisheye">variable fisheye</h3>
+<p><em>Kannala-Brandt k1 to k4.</em> </p>
+<pre><code class="language-C++">std::array&lt;double, 4&gt; ernie::LensModel::fisheye;
+</code></pre>
+<hr>
+
+<h3 id="variable-k1">variable k1</h3>
+<pre><code class="language-C++">double ernie::LensModel::k1;
+</code></pre>
+<hr>
+
+<h3 id="variable-k2">variable k2</h3>
+<pre><code class="language-C++">double ernie::LensModel::k2;
+</code></pre>
+<hr>
+
+<h3 id="variable-k3">variable k3</h3>
+<pre><code class="language-C++">double ernie::LensModel::k3;
+</code></pre>
+<hr>
+
+<h3 id="variable-p1">variable p1</h3>
+<pre><code class="language-C++">double ernie::LensModel::p1;
+</code></pre>
+<hr>
+
+<h3 id="variable-p2">variable p2</h3>
+<pre><code class="language-C++">double ernie::LensModel::p2;
+</code></pre>
+<hr>
+
+<h3 id="variable-projection">variable projection</h3>
+<pre><code class="language-C++">LensProjection ernie::LensModel::projection;
+</code></pre>
+<hr>
+
+<h3 id="variable-rays">variable rays</h3>
+<p><em>The lens's rays, in place of its projection and distortion when set (</em> <code>ernie:lens:rays</code> <em>): each sensor pixel sees along its interpolated ray, on cube faces past 60 degrees off axis.</em></p>
+<pre><code class="language-C++">std::shared_ptr&lt;const LensRayTable&gt; ernie::LensModel::rays;
+</code></pre>
+<p>Its natural vignetting follows the rays: the pixel's solid angle and the aperture's foreshortening. </p>
+<hr>
+
+<h3 id="variable-transmission">variable transmission</h3>
+<p><em>Fraction of light the optics pass.</em> </p>
+<pre><code class="language-C++">double ernie::LensModel::transmission;
+</code></pre>
+<hr>
+
+<h3 id="variable-vignetting">variable vignetting</h3>
+<p><em>Natural falloff of irradiance off axis (cos^4 for pinholes).</em> </p>
+<pre><code class="language-C++">bool ernie::LensModel::vignetting;
+</code></pre>
+<hr>
+<h2 id="public-static-attributes-documentation">Public Static Attributes Documentation</h2>
+<h3 id="variable-kmaxfisheyefieldangle">variable kMaxFisheyeFieldAngle</h3>
+<p><em>The largest field angle a fisheye may see, in radians (180 degrees off axis, a 360 degree field): one fisheye reaching past 60 degrees renders on cube faces (</em> <a href="../wide__view_8h/"><em><strong>wide_view.h</strong></em></a> <em>), which with the back face cover every ray.</em></p>
+<pre><code class="language-C++">constexpr double ernie::LensModel::kMaxFisheyeFieldAngle;
+</code></pre>
+<hr>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-distort">function Distort</h3>
+<p><em>Distorted normalised image coordinates of pinhole ones</em> <code>undistorted</code> <em>.</em></p>
+<pre><code class="language-C++">glm::dvec2 ernie::LensModel::Distort (
+    glm::dvec2 undistorted
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-fieldangle">function FieldAngle</h3>
+<p><em>The field angle in radians of the ray landing at normalised image coordinates</em> <code>distorted</code> <em>.</em></p>
+<pre><code class="language-C++">double ernie::LensModel::FieldAngle (
+    glm::dvec2 distorted
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-hasdistortion">function HasDistortion</h3>
+<p><em>Whether Brown-Conrady distortion is set.</em> </p>
+<pre><code class="language-C++">inline bool ernie::LensModel::HasDistortion () const
+</code></pre>
+<hr>
+
+<h3 id="function-ispinhole">function IsPinhole</h3>
+<p><em>Whether the lens is a pinhole: perspective without distortion.</em> </p>
+<pre><code class="language-C++">inline bool ernie::LensModel::IsPinhole () const
+</code></pre>
+<hr>
+
+<h3 id="function-naturalvignetting">function NaturalVignetting</h3>
+<p><em>The irradiance at normalised image coordinates</em> <code>distorted</code> <em>relative to the axis, from the aperture's foreshortening and the solid angle the image there sees: cos(theta) sin(theta) / (theta_d theta_d'), cos^4(theta) for a pinhole.</em></p>
+<pre><code class="language-C++">double ernie::LensModel::NaturalVignetting (
+    glm::dvec2 distorted
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-undistort">function Undistort</h3>
+<p><em>The inverse of</em> <code>Distort</code> <em>: pinhole normalised image coordinates of the ray landing at</em><code>distorted</code> <em>.</em></p>
+<pre><code class="language-C++">glm::dvec2 ernie::LensModel::Undistort (
+    glm::dvec2 distorted
+) const
+</code></pre>
+<p>By fixed-point iteration for perspective lenses, accurate for moderate distortion; by Newton's method on the field angle for fisheyes. </p>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/scene/camera.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

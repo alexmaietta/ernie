@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1Scene/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Class ernie::Scene - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Class ernie::Scene";
+        var mkdocs_page_input_path = "cpp/classernie_1_1Scene.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/classernie_1_1Scene/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Class ernie::Scene</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/classernie_1_1Scene.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-erniescene">Class ernie::Scene</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>Scene</strong></a></p>
+<p><em>A lightweight, USD-shaped scene for Ernie: a tree of typed prims named by</em> <code>Path</code> <em>, each holding attributes by USD name, plus change tracking for render delegates.</em><a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/scene/scene.h&gt;</code></li>
+</ul>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#function-attributeversion"><strong>AttributeVersion</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute) const<br><em>The version at which</em> <code>attribute</code> <em>was last set, written or cleared on the prim at</em><code>path</code> <em>, or 0 if it never was or the prim does not exist.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; std::string &gt;</td>
+<td style="text-align: left;"><a href="#function-attributes"><strong>Attributes</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) const<br><em>The attribute names set or written on the prim at</em> <code>path</code> <em>, in name order.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1Change/"><strong>Change</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-changes"><strong>Changes</strong></a> (<a href="../structernie_1_1ChangeCursor/"><strong>ChangeCursor</strong></a> &amp; cursor) const<br><em>The prims changed since</em> <code>cursor</code> <em>, in path order, and advances</em><code>cursor</code> <em>to</em><code>Version()</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-children"><strong>Children</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) const<br><em>The children of</em> <code>path</code> <em>, in path order.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-clear"><strong>Clear</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute) <br><em>Removes</em> <code>attribute</code> <em>from the prim; false if it was not set.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Prim/"><strong>Prim</strong></a></td>
+<td style="text-align: left;"><a href="#function-clone"><strong>Clone</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; source, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; destination) <br><em>Copies the prim at</em> <code>source</code> <em>and its descendants to</em><code>destination</code> <em>, as one environment is copied into many: types, values and tensors (sharing the tensors' memory) come along, and relationships to prims inside</em><code>source</code> <em>, such as a</em><a href="../classernie_1_1PointInstancer/"><em><strong>PointInstancer</strong></em></a> <em>'s prototypes or a bound material, point to their copies.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Prim/"><strong>Prim</strong></a></td>
+<td style="text-align: left;"><a href="#function-define"><strong>Define</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view type) <br><em>Defines the prim at</em> <code>path</code> <em>with</em><code>type</code> <em>and returns it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../classernie_1_1Overlay/"><strong>Overlay</strong></a> *</td>
+<td style="text-align: left;"><a href="#function-findoverlay"><strong>FindOverlay</strong></a> (std::string_view name) const<br><em>The overlay named</em> <code>name</code> <em>, or null.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../classernie_1_1Value/"><strong>Value</strong></a> *</td>
+<td style="text-align: left;"><a href="#function-get-12"><strong>Get</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute) const<br><em>The value of</em> <code>attribute</code> <em>, or null if it is unset or holds a tensor.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">T</td>
+<td style="text-align: left;"><a href="#function-get-22"><strong>Get</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute, T fallback) const<br><em>The value of</em> <code>attribute</code> <em>as</em><code>T</code> <em>, or</em><code>fallback</code> <em>if it is unset or of another type.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Overlay/"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-getoverlay"><strong>GetOverlay</strong></a> (std::string_view name) <br><em>The overlay (debug drawing layer) named</em> <code>name</code> <em>, created empty if missing.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Prim/"><strong>Prim</strong></a></td>
+<td style="text-align: left;"><a href="#function-getprim"><strong>GetPrim</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) <br><em>Handle to the prim at</em> <code>path</code> <em>, invalid if there is none.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-has"><strong>Has</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#function-id"><strong>Id</strong></a> () const<br><em>Unique among the scenes of this process, copies included, so a consumer can tell when it is handed a different scene and its</em> <code>ChangeCursor</code> <em>no longer applies.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-isvisible"><strong>IsVisible</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) const<br><em>Whether neither the prim nor any ancestor has</em> <code>visibility</code> <em>set to</em><code>invisible</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dmat4</td>
+<td style="text-align: left;"><a href="#function-localtransform"><strong>LocalTransform</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) const<br><em>The prim's local transform from its transform ops (</em> <code>ComposeXformOps</code> <em>,</em><a href="../xform_8h/"><em><strong>ernie/scene/xform.h</strong></em></a> <em>):</em><code>xformOp:transform</code> <em>, or the ops</em><code>xformOpOrder</code> <em>lists; identity without either.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#function-map"><strong>Map</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute) <br><em>Starts writing the tensor of</em> <code>attribute</code> <em>in place, as a simulation does to the same arrays every step: returns the tensor, sharing its memory, to write into until</em><code>Unmap</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; std::string &gt;</td>
+<td style="text-align: left;"><a href="#function-overlaynames"><strong>OverlayNames</strong></a> () const<br><em>The overlays' names, sorted.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#function-owntransformversion"><strong>OwnTransformVersion</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) const<br><em>The version at which the prim's own transform ops (</em> <code>xformOpOrder</code> <em>,</em><code>xformOp:*</code> <em>) last changed, as opposed to its ancestors' (which stamp it</em><code>Dirty::Transform</code> <em>too); 0 if never or for no prim.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-prims"><strong>Prims</strong></a> (std::string_view type={}) const<br><em>Every prim but the root, in path order, or only those of</em> <code>type</code> <em>when it is not empty.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> *</td>
+<td style="text-align: left;"><a href="#function-read"><strong>Read</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute) const<br><em>The tensor of</em> <code>attribute</code> <em>, or null if it is unset or holds a value.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-remove"><strong>Remove</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) <br><em>Removes the prim and its descendants; false if it did not exist.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-removeoverlay"><strong>RemoveOverlay</strong></a> (std::string_view name) <br><em>Removes the overlay named</em> <code>name</code> <em>; returns whether there was one.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const std::pair&lt; <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a>, std::int64_t &gt; *</td>
+<td style="text-align: left;"><a href="#function-rowof"><strong>RowOf</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute) const<br><em>The tensor</em> <code>attribute</code> <em>of the prim at</em><code>path</code> <em>was written from as one row by the</em><code>Write</code> <em>of many paths, and that row; null if it was written or set otherwise since.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-scene"><strong>Scene</strong></a> () <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-set"><strong>Set</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute, <a href="../classernie_1_1Value/"><strong>Value</strong></a> value) <br><em>Sets</em> <code>attribute</code> <em>on the prim at</em><code>path</code> <em>, replacing any tensor of that name.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setlocaltransform"><strong>SetLocalTransform</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, const glm::dmat4 &amp; local) <br><em>Gives the prim the local transform</em> <code>local</code> <em>, through its own transform ops where they can represent it (</em><code>LocalTransformEdits</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const std::string &amp;</td>
+<td style="text-align: left;"><a href="#function-typeof"><strong>TypeOf</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-unmap-12"><strong>Unmap</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute, std::uintptr_t stream=1) <br><em>Ends</em> <code>Map</code> <em>: records that</em><code>attribute</code> <em>changed, so consumers read it again, and for a CUDA tensor that its contents are written on</em><code>stream</code> <em>(as</em><code>Write</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-unmap-22"><strong>Unmap</strong></a> (const <a href="../classernie_1_1PrimSet/"><strong>PrimSet</strong></a> &amp; prims, std::string_view attribute, std::uintptr_t stream=1) <br><code>Unmap</code> <em>of each prim of</em><code>prims</code> <em>, such as rows of one array mapped over them.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#function-version"><strong>Version</strong></a> () const<br><em>Increases with every edit.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dmat4</td>
+<td style="text-align: left;"><a href="#function-worldtransform"><strong>WorldTransform</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) const<br><em>The product of the local transforms from the root down to the prim, starting below the nearest prim (itself included) whose</em> <code>xformOpOrder</code> <em>resets the transform stack.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-write-13"><strong>Write</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute, <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> tensor, std::uintptr_t stream=1) <br><em>Writes</em> <code>tensor</code> <em>as</em><code>attribute</code> <em>of the prim at</em><code>path</code> <em>, replacing any value of that name.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-write-23"><strong>Write</strong></a> (std::span&lt; const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; paths, std::string_view attribute, const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp; rows, std::uintptr_t stream=1) <br><em>Writes row</em> <code>i</code> <em>of</em><code>rows</code> <em>(</em><code>Tensor::Row</code> <em>) as</em><code>attribute</code> <em>of</em><code>paths[i]</code> <em>, so one tensor from a simulation updates many prims at once without copying.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-write-33"><strong>Write</strong></a> (const <a href="../classernie_1_1PrimSet/"><strong>PrimSet</strong></a> &amp; prims, std::string_view attribute, const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp; rows, std::uintptr_t stream=1) <br><em>As the</em> <code>Write</code> <em>of many paths, to the prims of</em><code>prims</code> <em>, looked up once and kept (</em><code>PrimSet</code> <em>): the way to write a simulation's arrays every step.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uintptr_t</td>
+<td style="text-align: left;"><a href="#function-writestream"><strong>WriteStream</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute) const<br><em>The CUDA stream the latest contents of tensor</em> <code>attribute</code> <em>were written on (as</em><code>Write</code> <em>).</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>Small values (<code>Value</code>: scalars, vectors, matrices, tokens, relationships) are set one at a time; bulk data (<code>Tensor</code>: heights, points, instance transforms) is written as tensors, either to one prim or as rows of one tensor spread over many prims without copying. On a prim of a registered type (<code>prim_type.h</code>), setting and writing check the attribute against its declaration (<code>Validate</code>): a misspelt name or a value of the wrong type throws, while custom attributes in namespaces of their own are free.</p>
+<p>Every edit advances <code>Version()</code> and stamps the prim's dirty bit for that attribute (<code>DirtyOf</code>); transform and visibility edits stamp the prim's descendants too. Each consumer keeps a <code>ChangeCursor</code> and calls <code>Changes</code> to get every prim changed since its last call, so several consumers can follow one scene independently. <code>Changes</code> costs O(prims).</p>
+<p>Defining a prim defines its missing ancestors as typeless prims, as <code>UsdStage::DefinePrim</code> does. The root <code>/</code> always exists, untyped.</p>
+<p>References:
+* Pixar, "UsdStage", <a href="https://openusd.org/release/api/class_usd_stage.html">https://openusd.org/release/api/class_usd_stage.html</a>
+* Pixar, "HdChangeTracker" (dirty bits), <a href="https://openusd.org/release/api/class_hd_change_tracker.html">https://openusd.org/release/api/class_hd_change_tracker.html</a> </p>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-attributeversion">function AttributeVersion</h3>
+<p><em>The version at which</em> <code>attribute</code> <em>was last set, written or cleared on the prim at</em><code>path</code> <em>, or 0 if it never was or the prim does not exist.</em></p>
+<pre><code class="language-C++">std::uint64_t ernie::Scene::AttributeVersion (
+    const Path &amp; path,
+    std::string_view attribute
+) const
+</code></pre>
+<p>Lets consumers skip work for attributes that have not changed, such as re-uploading a heightfield when only a display option moved. </p>
+<hr>
+
+<h3 id="function-attributes">function Attributes</h3>
+<p><em>The attribute names set or written on the prim at</em> <code>path</code> <em>, in name order.</em></p>
+<pre><code class="language-C++">std::vector&lt; std::string &gt; ernie::Scene::Attributes (
+    const Path &amp; path
+) const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if the prim does not exist. </li>
+</ul>
+<hr>
+
+<h3 id="function-changes">function Changes</h3>
+<p><em>The prims changed since</em> <code>cursor</code> <em>, in path order, and advances</em><code>cursor</code> <em>to</em><code>Version()</code> <em>.</em></p>
+<pre><code class="language-C++">std::vector&lt; Change &gt; ernie::Scene::Changes (
+    ChangeCursor &amp; cursor
+) const
+</code></pre>
+<p>A prim added since the cursor reports <code>Added</code> alone (with <code>Removed</code> if an older prim of that path was removed meanwhile), since consumers rebuild new prims fully. A default cursor sees every prim as added. </p>
+<hr>
+
+<h3 id="function-children">function Children</h3>
+<p><em>The children of</em> <code>path</code> <em>, in path order.</em></p>
+<pre><code class="language-C++">std::vector&lt; Path &gt; ernie::Scene::Children (
+    const Path &amp; path
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-clear">function Clear</h3>
+<p><em>Removes</em> <code>attribute</code> <em>from the prim; false if it was not set.</em></p>
+<pre><code class="language-C++">bool ernie::Scene::Clear (
+    const Path &amp; path,
+    std::string_view attribute
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if the prim does not exist. </li>
+</ul>
+<hr>
+
+<h3 id="function-clone">function Clone</h3>
+<p><em>Copies the prim at</em> <code>source</code> <em>and its descendants to</em><code>destination</code> <em>, as one environment is copied into many: types, values and tensors (sharing the tensors' memory) come along, and relationships to prims inside</em><code>source</code> <em>, such as a</em><a href="../classernie_1_1PointInstancer/"><em><strong>PointInstancer</strong></em></a> <em>'s prototypes or a bound material, point to their copies.</em></p>
+<pre><code class="language-C++">Prim ernie::Scene::Clone (
+    const Path &amp; source,
+    const Path &amp; destination
+) 
+</code></pre>
+<p>Returns the copy. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if <code>source</code> does not exist, or <code>destination</code> exists, is the root, or is inside <code>source</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-define">function Define</h3>
+<p><em>Defines the prim at</em> <code>path</code> <em>with</em><code>type</code> <em>and returns it.</em></p>
+<pre><code class="language-C++">Prim ernie::Scene::Define (
+    const Path &amp; path,
+    std::string_view type
+) 
+</code></pre>
+<p>An existing prim of the same type is returned unchanged; one of another type is retyped, loses its attributes and reports <code>Added</code>. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for the empty path or the root. </li>
+</ul>
+<hr>
+
+<h3 id="function-findoverlay">function FindOverlay</h3>
+<p><em>The overlay named</em> <code>name</code> <em>, or null.</em></p>
+<pre><code class="language-C++">const Overlay * ernie::Scene::FindOverlay (
+    std::string_view name
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-get-12">function Get [1/2]</h3>
+<p><em>The value of</em> <code>attribute</code> <em>, or null if it is unset or holds a tensor.</em></p>
+<pre><code class="language-C++">const Value * ernie::Scene::Get (
+    const Path &amp; path,
+    std::string_view attribute
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-get-22">function Get [2/2]</h3>
+<p><em>The value of</em> <code>attribute</code> <em>as</em><code>T</code> <em>, or</em><code>fallback</code> <em>if it is unset or of another type.</em></p>
+<pre><code class="language-C++">template&lt;typename T&gt;
+inline T ernie::Scene::Get (
+    const Path &amp; path,
+    std::string_view attribute,
+    T fallback
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-getoverlay">function GetOverlay</h3>
+<p><em>The overlay (debug drawing layer) named</em> <code>name</code> <em>, created empty if missing.</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Scene::GetOverlay (
+    std::string_view name
+) 
+</code></pre>
+<p>Overlays are not prims: their edits leave <code>Version()</code> alone, and each tracks its own (<code>Overlay::Version</code>). </p>
+<hr>
+
+<h3 id="function-getprim">function GetPrim</h3>
+<p><em>Handle to the prim at</em> <code>path</code> <em>, invalid if there is none.</em></p>
+<pre><code class="language-C++">Prim ernie::Scene::GetPrim (
+    const Path &amp; path
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-has">function Has</h3>
+<pre><code class="language-C++">bool ernie::Scene::Has (
+    const Path &amp; path
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-id">function Id</h3>
+<p><em>Unique among the scenes of this process, copies included, so a consumer can tell when it is handed a different scene and its</em> <code>ChangeCursor</code> <em>no longer applies.</em></p>
+<pre><code class="language-C++">inline std::uint64_t ernie::Scene::Id () const
+</code></pre>
+<hr>
+
+<h3 id="function-isvisible">function IsVisible</h3>
+<p><em>Whether neither the prim nor any ancestor has</em> <code>visibility</code> <em>set to</em><code>invisible</code> <em>.</em></p>
+<pre><code class="language-C++">bool ernie::Scene::IsVisible (
+    const Path &amp; path
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-localtransform">function LocalTransform</h3>
+<p><em>The prim's local transform from its transform ops (</em> <code>ComposeXformOps</code> <em>,</em><a href="../xform_8h/"><em><strong>ernie/scene/xform.h</strong></em></a> <em>):</em><code>xformOp:transform</code> <em>, or the ops</em><code>xformOpOrder</code> <em>lists; identity without either.</em></p>
+<pre><code class="language-C++">glm::dmat4 ernie::Scene::LocalTransform (
+    const Path &amp; path
+) const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> as <code>ComposeXformOps</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-map">function Map</h3>
+<p><em>Starts writing the tensor of</em> <code>attribute</code> <em>in place, as a simulation does to the same arrays every step: returns the tensor, sharing its memory, to write into until</em><code>Unmap</code> <em>.</em></p>
+<pre><code class="language-C++">Tensor ernie::Scene::Map (
+    const Path &amp; path,
+    std::string_view attribute
+) 
+</code></pre>
+<p>Consumers see the new contents only after <code>Unmap</code>. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if the prim does not exist or <code>attribute</code> is not a tensor. </li>
+</ul>
+<hr>
+
+<h3 id="function-overlaynames">function OverlayNames</h3>
+<p><em>The overlays' names, sorted.</em> </p>
+<pre><code class="language-C++">std::vector&lt; std::string &gt; ernie::Scene::OverlayNames () const
+</code></pre>
+<hr>
+
+<h3 id="function-owntransformversion">function OwnTransformVersion</h3>
+<p><em>The version at which the prim's own transform ops (</em> <code>xformOpOrder</code> <em>,</em><code>xformOp:*</code> <em>) last changed, as opposed to its ancestors' (which stamp it</em><code>Dirty::Transform</code> <em>too); 0 if never or for no prim.</em></p>
+<pre><code class="language-C++">std::uint64_t ernie::Scene::OwnTransformVersion (
+    const Path &amp; path
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-prims">function Prims</h3>
+<p><em>Every prim but the root, in path order, or only those of</em> <code>type</code> <em>when it is not empty.</em></p>
+<pre><code class="language-C++">std::vector&lt; Path &gt; ernie::Scene::Prims (
+    std::string_view type={}
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-read">function Read</h3>
+<p><em>The tensor of</em> <code>attribute</code> <em>, or null if it is unset or holds a value.</em></p>
+<pre><code class="language-C++">const Tensor * ernie::Scene::Read (
+    const Path &amp; path,
+    std::string_view attribute
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-remove">function Remove</h3>
+<p><em>Removes the prim and its descendants; false if it did not exist.</em> </p>
+<pre><code class="language-C++">bool ernie::Scene::Remove (
+    const Path &amp; path
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for the root. </li>
+</ul>
+<hr>
+
+<h3 id="function-removeoverlay">function RemoveOverlay</h3>
+<p><em>Removes the overlay named</em> <code>name</code> <em>; returns whether there was one.</em></p>
+<pre><code class="language-C++">bool ernie::Scene::RemoveOverlay (
+    std::string_view name
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-rowof">function RowOf</h3>
+<p><em>The tensor</em> <code>attribute</code> <em>of the prim at</em><code>path</code> <em>was written from as one row by the</em><code>Write</code> <em>of many paths, and that row; null if it was written or set otherwise since.</em></p>
+<pre><code class="language-C++">const std::pair&lt; Tensor , std::int64_t &gt; * ernie::Scene::RowOf (
+    const Path &amp; path,
+    std::string_view attribute
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-scene">function Scene</h3>
+<pre><code class="language-C++">ernie::Scene::Scene () 
+</code></pre>
+<hr>
+
+<h3 id="function-set">function Set</h3>
+<p><em>Sets</em> <code>attribute</code> <em>on the prim at</em><code>path</code> <em>, replacing any tensor of that name.</em></p>
+<pre><code class="language-C++">void ernie::Scene::Set (
+    const Path &amp; path,
+    std::string_view attribute,
+    Value value
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if the prim does not exist. </li>
+</ul>
+<hr>
+
+<h3 id="function-setlocaltransform">function SetLocalTransform</h3>
+<p><em>Gives the prim the local transform</em> <code>local</code> <em>, through its own transform ops where they can represent it (</em><code>LocalTransformEdits</code> <em>).</em></p>
+<pre><code class="language-C++">void ernie::Scene::SetLocalTransform (
+    const Path &amp; path,
+    const glm::dmat4 &amp; local
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-typeof">function TypeOf</h3>
+<pre><code class="language-C++">const std::string &amp; ernie::Scene::TypeOf (
+    const Path &amp; path
+) const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if the prim does not exist. </li>
+</ul>
+<hr>
+
+<h3 id="function-unmap-12">function Unmap [1/2]</h3>
+<p><em>Ends</em> <code>Map</code> <em>: records that</em><code>attribute</code> <em>changed, so consumers read it again, and for a CUDA tensor that its contents are written on</em><code>stream</code> <em>(as</em><code>Write</code> <em>).</em></p>
+<pre><code class="language-C++">void ernie::Scene::Unmap (
+    const Path &amp; path,
+    std::string_view attribute,
+    std::uintptr_t stream=1
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if the prim does not exist or <code>attribute</code> is not a tensor. </li>
+</ul>
+<hr>
+
+<h3 id="function-unmap-22">function Unmap [2/2]</h3>
+<p><code>Unmap</code> <em>of each prim of</em><code>prims</code> <em>, such as rows of one array mapped over them.</em></p>
+<pre><code class="language-C++">void ernie::Scene::Unmap (
+    const PrimSet &amp; prims,
+    std::string_view attribute,
+    std::uintptr_t stream=1
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> as <code>Unmap</code>, unmapping none. </li>
+</ul>
+<hr>
+
+<h3 id="function-version">function Version</h3>
+<p><em>Increases with every edit.</em> </p>
+<pre><code class="language-C++">inline std::uint64_t ernie::Scene::Version () const
+</code></pre>
+<hr>
+
+<h3 id="function-worldtransform">function WorldTransform</h3>
+<p><em>The product of the local transforms from the root down to the prim, starting below the nearest prim (itself included) whose</em> <code>xformOpOrder</code> <em>resets the transform stack.</em></p>
+<pre><code class="language-C++">glm::dmat4 ernie::Scene::WorldTransform (
+    const Path &amp; path
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-write-13">function Write [1/3]</h3>
+<p><em>Writes</em> <code>tensor</code> <em>as</em><code>attribute</code> <em>of the prim at</em><code>path</code> <em>, replacing any value of that name.</em></p>
+<pre><code class="language-C++">void ernie::Scene::Write (
+    const Path &amp; path,
+    std::string_view attribute,
+    Tensor tensor,
+    std::uintptr_t stream=1
+) 
+</code></pre>
+<p>The scene keeps the tensor, sharing its memory, until the attribute is replaced or removed. For a CUDA tensor, <code>stream</code> is the CUDA stream (DLPack numbering: 1 the legacy default stream, 2 per-thread default, else a <code>CUstream</code>) its contents are written on: consumers read it on the GPU in order after that stream's work queued so far. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if the prim does not exist. </li>
+</ul>
+<hr>
+
+<h3 id="function-write-23">function Write [2/3]</h3>
+<p><em>Writes row</em> <code>i</code> <em>of</em><code>rows</code> <em>(</em><code>Tensor::Row</code> <em>) as</em><code>attribute</code> <em>of</em><code>paths[i]</code> <em>, so one tensor from a simulation updates many prims at once without copying.</em></p>
+<pre><code class="language-C++">void ernie::Scene::Write (
+    std::span&lt; const Path &gt; paths,
+    std::string_view attribute,
+    const Tensor &amp; rows,
+    std::uintptr_t stream=1
+) 
+</code></pre>
+<p>For a CUDA tensor, <code>stream</code> is the stream its contents are written on, as <code>Write</code>. Consumers may use the tensor whole (<code>RowOf</code>), such as a renderer posing many prims from one GPU array. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if a prim does not exist or the first dimension of <code>rows</code> is not <code>paths.size()</code>; nothing is written then. </li>
+</ul>
+<hr>
+
+<h3 id="function-write-33">function Write [3/3]</h3>
+<p><em>As the</em> <code>Write</code> <em>of many paths, to the prims of</em><code>prims</code> <em>, looked up once and kept (</em><code>PrimSet</code> <em>): the way to write a simulation's arrays every step.</em></p>
+<pre><code class="language-C++">void ernie::Scene::Write (
+    const PrimSet &amp; prims,
+    std::string_view attribute,
+    const Tensor &amp; rows,
+    std::uintptr_t stream=1
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> as the <code>Write</code> of many paths. </li>
+</ul>
+<hr>
+
+<h3 id="function-writestream">function WriteStream</h3>
+<p><em>The CUDA stream the latest contents of tensor</em> <code>attribute</code> <em>were written on (as</em><code>Write</code> <em>).</em></p>
+<pre><code class="language-C++">std::uintptr_t ernie::Scene::WriteStream (
+    const Path &amp; path,
+    std::string_view attribute
+) const
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/scene/scene.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

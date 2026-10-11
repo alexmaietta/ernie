@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/render__schemas_8h_source/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>File render_schemas.h - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "File render_schemas.h";
+        var mkdocs_page_input_path = "cpp/render__schemas_8h_source.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/render__schemas_8h_source/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">File render_schemas.h</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/render__schemas_8h_source.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="file-render_schemash">File render_schemas.h</h1>
+<p><a href="../files/"><strong>File List</strong></a> <strong>&gt;</strong> <a href="../dir_057d52706067b881d9371cf136c38c31/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../dir_572d817874f40c61a249f0e7684d4315/"><strong>scene</strong></a> <strong>&gt;</strong> <a href="../render__schemas_8h/"><strong>render_schemas.h</strong></a></p>
+<p><a href="../render__schemas_8h/">Go to the documentation of this file</a></p>
+<pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+#include &quot;ernie/scene/base_schemas.h&quot;
+#include &quot;ernie/scene/prim_type.h&quot;
+#include &quot;ernie/scene/sensor_filters.h&quot;
+#include &quot;ernie/scene/tokens.h&quot;
+
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+
+// clang-format off
+#define ERNIE_RENDER_SETTINGS_BASE_ATTRIBUTES(X)                                                   \
+    X(std::vector&lt;::ernie::Path&gt;, Camera, ::ernie::tokens::kCameraRel,                             \
+      std::vector&lt;::ernie::Path&gt;{},                                                                \
+      (::ernie::AttributeMeta{.doc = &quot;The camera rendered, or a product's batch of cameras (one &quot;  \
+                                     &quot;view each); unset, the settings' camera, else the scene's &quot;  \
+                                     &quot;first.&quot;,                                                     \
+                              .group = &quot;Image&quot;, .options = {::ernie::tokens::kCamera},             \
+                              .plural = &quot;cameras&quot;}))                                               \
+    X(glm::dvec2, Resolution, ::ernie::tokens::kResolution, glm::dvec2(2048.0, 1080.0),            \
+      (::ernie::AttributeMeta{.doc = &quot;Pixels, width and height; a product's, unset, its &quot;          \
+                                     &quot;settings'.&quot;,                                                 \
+                              .group = &quot;Image&quot;}))                                                  \
+    X(std::string, Overlays, ::ernie::tokens::kOverlays, &quot;&quot;,                                       \
+      (::ernie::AttributeMeta{.doc = &quot;\&quot;*\&quot; or names of overlays drawn over LdrColor; the &quot;        \
+                                     &quot;viewport shows every overlay unless set.&quot;,                   \
+                              .group = &quot;Image&quot;}))                                                  \
+    X(std::string, MinimalMode, ::ernie::tokens::kMinimalMode, ::ernie::tokens::kOff,              \
+      (::ernie::AttributeMeta{.label = &quot;Minimal mode&quot;,                                             \
+                              .doc = &quot;Minimal shading for throughput: no colour (\&quot;none\&quot;), one &quot;  \
+                                     &quot;colour or surfaces' diffuse colours, lit by the sun and &quot;    \
+                                     &quot;ambient, without sensor filters.&quot;,                           \
+                              .group = &quot;Minimal&quot;,                                                  \
+                              .options = {::ernie::tokens::kOff, ::ernie::tokens::kNone,           \
+                                          ::ernie::tokens::kConstantDiffuse,                       \
+                                          ::ernie::tokens::kTexturedDiffuse}}))                    \
+    X(glm::dvec3, MinimalConstantColor, ::ernie::tokens::kMinimalConstantColor, glm::dvec3(1.0),   \
+      (::ernie::AttributeMeta{.label = &quot;Constant colour&quot;, .doc = &quot;Linear RGB of constantDiffuse.&quot;, \
+                              .group = &quot;Minimal&quot;, .color = true}))
+
+#define ERNIE_RENDER_SETTINGS_ATTRIBUTES(X)                                                        \
+    X(std::vector&lt;::ernie::Path&gt;, Products, ::ernie::tokens::kProducts,                            \
+      std::vector&lt;::ernie::Path&gt;{},                                                                \
+      (::ernie::AttributeMeta{.doc = &quot;The RenderProducts rendered; none, one image of the &quot;        \
+                                     &quot;settings' own.&quot;,                                             \
+                              .group = &quot;Image&quot;, .options = {::ernie::tokens::kRenderProduct}}))    \
+    X(std::vector&lt;::ernie::Path&gt;, Lights, ::ernie::tokens::kLightsRel,                             \
+      std::vector&lt;::ernie::Path&gt;{},                                                                \
+      (::ernie::AttributeMeta{.doc = &quot;The lights rendered, when set (empty: none); unset, every &quot;  \
+                                     &quot;visible light.&quot;,                                             \
+                              .group = &quot;Image&quot;}))                                                  \
+    X(std::string, ColorMode, ::ernie::tokens::kColorMode, ::ernie::tokens::kShadedColormap,       \
+      (::ernie::AttributeMeta{.label = &quot;Terrain colour&quot;, .group = &quot;Image&quot;,                         \
+                              .options = {::ernie::tokens::kHillshade, ::ernie::tokens::kColormap, \
+                                          ::ernie::tokens::kShadedColormap}}))                     \
+    X(double, Ambient, ::ernie::tokens::kAmbient, 0.15,                                            \
+      (::ernie::AttributeMeta{.doc = &quot;Fraction of sunlight on unlit sides.&quot;, .group = &quot;Image&quot;,     \
+                              .max = 1.0}))                                                        \
+    X(glm::dvec3, ClearColor, ::ernie::tokens::kClearColor, glm::dvec3(0.0),                       \
+      (::ernie::AttributeMeta{.label = &quot;Background&quot;, .doc = &quot;Linear display colour of LdrColor's &quot; \
+                                                            &quot;background.&quot;,                         \
+                              .group = &quot;Image&quot;, .color = true}))                                   \
+    X(std::string, Wireframe, ::ernie::tokens::kWireframe, ::ernie::tokens::kOff,                  \
+      (::ernie::AttributeMeta{.doc = &quot;Triangle edges over shaded surfaces, or on flat unlit ones; &quot; \
+                                     &quot;a bool is \&quot;overlay\&quot; or \&quot;off\&quot;. The viewport's toolbar &quot;   \
+                                     &quot;may override it.&quot;,                                           \
+                              .group = &quot;Image&quot;,                                                    \
+                              .options = {::ernie::tokens::kOff, ::ernie::tokens::kOverlay,        \
+                                          ::ernie::tokens::kHiddenLine},                           \
+                              .lenient = true}))                                                   \
+    X(int, Frame, ::ernie::tokens::kFrame, 0,                                                      \
+      (::ernie::AttributeMeta{.doc = &quot;The frame noise derives from; counts up by itself unless &quot;   \
+                                     &quot;set.&quot;,                                                       \
+                              .group = &quot;Image&quot;}))                                                  \
+    X(double, ExposureCompensation, ::ernie::tokens::kExposureCompensation, 0.0,                   \
+      (::ernie::AttributeMeta{.label = &quot;Exposure&quot;, .doc = &quot;Stops on the photographic outputs, on &quot; \
+                                                          &quot;top of the camera's exposure.&quot;,         \
+                              .group = &quot;Image&quot;, .min = -16.0, .max = 16.0}))                       \
+    X(bool, Meter, ::ernie::tokens::kMeter, false,                                                 \
+      (::ernie::AttributeMeta{.doc = &quot;Measure each frame's luminance, for automatic exposure and &quot; \
+                                     &quot;meters.&quot;,                                                    \
+                              .group = &quot;Image&quot;}))                                                  \
+    X(std::string, Culling, ::ernie::tokens::kCulling, ::ernie::tokens::kGpu,                      \
+      (::ernie::AttributeMeta{.doc = &quot;What lies outside a view is skipped: whole draws (cpu), &quot;    \
+                                     &quot;then every instance (gpu).&quot;,                                 \
+                              .group = &quot;Culling and LOD&quot;,                                          \
+                              .options = {::ernie::tokens::kOff, ::ernie::tokens::kCpu,            \
+                                          ::ernie::tokens::kGpu}}))                                \
+    X(std::string, Occlusion, ::ernie::tokens::kOcclusion, ::ernie::tokens::kOff,                  \
+      (::ernie::AttributeMeta{.doc = &quot;With GPU culling, also skip instances hidden behind &quot;        \
+                                     &quot;occluders, or behind instances seen last frame (twoPass).&quot;,  \
+                              .group = &quot;Culling and LOD&quot;,                                          \
+                              .options = {::ernie::tokens::kOff, ::ernie::tokens::kOccluders,      \
+                                          ::ernie::tokens::kTwoPass}}))                            \
+    X(double, LodMeshError, ::ernie::tokens::kLodMeshError, 1.0,                                   \
+      (::ernie::AttributeMeta{.label = &quot;Mesh LOD error&quot;,                                           \
+                              .doc = &quot;Pixels of error a coarser mesh level may add.&quot;,              \
+                              .group = &quot;Culling and LOD&quot;, .max = 16.0}))                           \
+    X(bool, LodEnable, ::ernie::tokens::kLodEnable, true,                                          \
+      (::ernie::AttributeMeta{.label = &quot;Terrain LOD&quot;, .group = &quot;Culling and LOD&quot;}))                \
+    X(double, LodDetail, ::ernie::tokens::kLodDetail, 4.0,                                         \
+      (::ernie::AttributeMeta{.label = &quot;Terrain detail&quot;,                                           \
+                              .doc = &quot;First LOD range in level-0 node widths.&quot;,                    \
+                              .group = &quot;Culling and LOD&quot;, .min = 1.0, .max = 16.0}))               \
+    X(double, LodMorphStart, ::ernie::tokens::kLodMorphStart, 0.67,                                \
+      (::ernie::AttributeMeta{.label = &quot;Morph start&quot;,                                              \
+                              .doc = &quot;Fraction of each level's band before morphing starts.&quot;,      \
+                              .group = &quot;Culling and LOD&quot;, .max = 1.0}))                            \
+    X(bool, LodFreeze, ::ernie::tokens::kLodFreeze, false,                                         \
+      (::ernie::AttributeMeta{.label = &quot;Freeze LOD&quot;, .group = &quot;Culling and LOD&quot;}))                 \
+    X(bool, LodShowLevels, ::ernie::tokens::kLodShowLevels, false,                                 \
+      (::ernie::AttributeMeta{.label = &quot;Show LOD levels&quot;, .group = &quot;Culling and LOD&quot;}))            \
+    X(std::string, ShadowFit, ::ernie::tokens::kShadowFit, ::ernie::tokens::kScene,                \
+      (::ernie::AttributeMeta{.label = &quot;Fit&quot;,                                                      \
+                              .doc = &quot;visible: sample distribution shadow maps (the viewport's &quot;   \
+                                     &quot;default).&quot;,                                                  \
+                              .group = &quot;Shadows&quot;,                                                  \
+                              .options = {::ernie::tokens::kScene, ::ernie::tokens::kVisible}}))   \
+    X(int, ShadowCascades, ::ernie::tokens::kShadowCascades, 3,                                    \
+      (::ernie::AttributeMeta{.label = &quot;Cascades&quot;, .group = &quot;Shadows&quot;, .min = 1.0, .max = 4.0}))   \
+    X(int, ShadowResolution, ::ernie::tokens::kShadowResolution, 2048,                             \
+      (::ernie::AttributeMeta{.label = &quot;Resolution&quot;, .doc = &quot;Texels along each cascade's side.&quot;,   \
+                              .group = &quot;Shadows&quot;, .min = 256.0, .max = 8192.0}))                   \
+    X(double, ShadowSoftness, ::ernie::tokens::kShadowSoftness, 1.5,                               \
+      (::ernie::AttributeMeta{.label = &quot;Softness&quot;, .doc = &quot;Filter radius in texels.&quot;,              \
+                              .group = &quot;Shadows&quot;, .max = 8.0}))                                    \
+    X(double, ShadowNormalOffset, ::ernie::tokens::kShadowNormalOffset, 1.5,                       \
+      (::ernie::AttributeMeta{.label = &quot;Normal offset&quot;, .doc = &quot;Texels along the normal.&quot;,         \
+                              .group = &quot;Shadows&quot;, .max = 8.0}))                                    \
+    X(double, ShadowSplitLambda, ::ernie::tokens::kShadowSplitLambda, 0.8,                         \
+      (::ernie::AttributeMeta{.label = &quot;Split lambda&quot;,                                             \
+                              .doc = &quot;Logarithmic weight of the cascades' splits.&quot;,                \
+                              .group = &quot;Shadows&quot;, .max = 1.0}))                                    \
+    X(bool, ShadowShowCascades, ::ernie::tokens::kShadowShowCascades, false,                       \
+      (::ernie::AttributeMeta{.label = &quot;Show cascades&quot;, .group = &quot;Shadows&quot;}))                      \
+    X(std::string, ShadowWorlds, ::ernie::tokens::kShadowWorlds, ::ernie::tokens::kSeparate,       \
+      (::ernie::AttributeMeta{.label = &quot;Worlds&quot;,                                                   \
+                              .doc = &quot;Batches of views of several worlds: a map per world, one &quot;   \
+                                     &quot;of what they share, or one of every world's casters.&quot;,       \
+                              .group = &quot;Shadows&quot;,                                                  \
+                              .options = {::ernie::tokens::kSeparate, ::ernie::tokens::kShared,    \
+                                          ::ernie::tokens::kMerged}}))                             \
+    X(std::string, ShadowWorldFit, ::ernie::tokens::kShadowWorldFit, ::ernie::tokens::kScene,      \
+      (::ernie::AttributeMeta{.label = &quot;World fit&quot;,                                                \
+                              .doc = &quot;What each world's map covers: the scene, or the world's &quot;    \
+                                     &quot;casters and the margin.&quot;,                                    \
+                              .group = &quot;Shadows&quot;,                                                  \
+                              .options = {::ernie::tokens::kScene, ::ernie::tokens::kWorldFit}}))  \
+    X(int, ShadowWorldResolution, ::ernie::tokens::kShadowWorldResolution, 0,                      \
+      (::ernie::AttributeMeta{.label = &quot;World resolution&quot;, .doc = &quot;0 for automatic.&quot;,              \
+                              .group = &quot;Shadows&quot;, .max = 8192.0}))                                 \
+    X(double, ShadowWorldMargin, ::ernie::tokens::kShadowWorldMargin, 1.0,                         \
+      (::ernie::AttributeMeta{.label = &quot;World margin&quot;, .doc = &quot;Metres past the world's casters.&quot;,  \
+                              .group = &quot;Shadows&quot;, .max = 100.0}))                                  \
+    X(std::string, DomeLightMode, ::ernie::tokens::kDomeLightMode, &quot;approximate&quot;,                  \
+      (::ernie::AttributeMeta{.label = &quot;Mode&quot;,                                                     \
+                              .doc = &quot;approximate: unoccluded; full: also shadowed; directions: &quot;  \
+                                     &quot;full, diffuse from shadowed directions; limited: &quot;           \
+                                     &quot;reflections only.&quot;,                                          \
+                              .group = &quot;Dome light&quot;,                                               \
+                              .options = {&quot;approximate&quot;, &quot;full&quot;, &quot;directions&quot;, &quot;limited&quot;}}))       \
+    X(double, DomeShadowRadius, ::ernie::tokens::kDomeShadowRadius, 1.0,                           \
+      (::ernie::AttributeMeta{.label = &quot;Shadow radius&quot;,                                            \
+                              .doc = &quot;World distance within which geometry shadows the dome.&quot;,     \
+                              .group = &quot;Dome light&quot;, .max = 100.0}))                               \
+    X(int, DomeDirections, ::ernie::tokens::kDomeDirections, 16,                                   \
+      (::ernie::AttributeMeta{.label = &quot;Directions&quot;,                                               \
+                              .doc = &quot;Shadowed directions lighting the dome's diffuse light.&quot;,     \
+                              .group = &quot;Dome light&quot;, .min = 1.0, .max = 1024.0}))
+
+#define ERNIE_RENDER_PRODUCT_ATTRIBUTES(X)                                                         \
+    X(std::vector&lt;::ernie::Path&gt;, OrderedVars, ::ernie::tokens::kOrderedVars,                      \
+      std::vector&lt;::ernie::Path&gt;{},                                                                \
+      (::ernie::AttributeMeta{.label = &quot;Render vars&quot;,                                              \
+                              .doc = &quot;The RenderVars written; none, LdrColor alone.&quot;,              \
+                              .group = &quot;Image&quot;, .options = {::ernie::tokens::kRenderVar}}))        \
+    X(std::vector&lt;::ernie::Path&gt;, Filters, ::ernie::tokens::kFilters,                              \
+      std::vector&lt;::ernie::Path&gt;{},                                                                \
+      (::ernie::AttributeMeta{.doc = &quot;The SensorFilter prims of its sensor chain, in order.&quot;,      \
+                              .group = &quot;Image&quot;, .options = {::ernie::tokens::kSensorFilter}}))
+
+#define ERNIE_RENDER_VAR_ATTRIBUTES(X)                                                             \
+    X(std::string, SourceName, ::ernie::tokens::kSourceName, ::ernie::tokens::kLdrColor,           \
+      (::ernie::AttributeMeta{                                                                     \
+          .label = &quot;Source&quot;,                                                                       \
+          .doc = &quot;The output: a render var name, or \&quot;aov:&lt;output&gt;\&quot; of a custom filter.&quot;,         \
+          .group = &quot;Var&quot;,                                                                          \
+          .options = std::vector&lt;std::string_view&gt;(::ernie::kRenderVarNames.begin(),               \
+                                                   ::ernie::kRenderVarNames.end())}))              \
+    X(std::vector&lt;::ernie::Path&gt;, Filters, ::ernie::tokens::kFilters,                              \
+      std::vector&lt;::ernie::Path&gt;{},                                                                \
+      (::ernie::AttributeMeta{.doc = &quot;Its own sensor chain's SensorFilter prims, in place of &quot;     \
+                                     &quot;its product's, when set.&quot;,                                   \
+                              .group = &quot;Var&quot;, .options = {::ernie::tokens::kSensorFilter}}))
+
+#define ERNIE_SENSOR_FILTER_ATTRIBUTES(X)                                                          \
+    X(std::string, FilterType, ::ernie::tokens::kFilterType, &quot;&quot;,                                   \
+      (::ernie::AttributeMeta{.label = &quot;Type&quot;,                                                     \
+                              .doc = &quot;A built-in filter (lens, qe, noise, adc, cie, exposure) or &quot; \
+                                     &quot;a custom filter's id; its parameters are inputs:*.&quot;,         \
+                              .group = &quot;Filter&quot;,                                                   \
+                              .options = {&quot;lens&quot;, &quot;qe&quot;, &quot;noise&quot;, &quot;adc&quot;, &quot;cie&quot;, &quot;exposure&quot;}}))
+
+// Every attribute of each type, its bases' first, for its accessors.
+#define ERNIE_RENDER_SETTINGS_BASE_ALL(X)                                                          \
+    ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_RENDER_SETTINGS_BASE_ATTRIBUTES(X)
+#define ERNIE_RENDER_SETTINGS_ALL(X)                                                               \
+    ERNIE_RENDER_SETTINGS_BASE_ALL(X) ERNIE_RENDER_SETTINGS_ATTRIBUTES(X)
+#define ERNIE_RENDER_PRODUCT_ALL(X)                                                                \
+    ERNIE_RENDER_SETTINGS_BASE_ALL(X) ERNIE_RENDER_PRODUCT_ATTRIBUTES(X)
+#define ERNIE_RENDER_VAR_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_RENDER_VAR_ATTRIBUTES(X)
+#define ERNIE_SENSOR_FILTER_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_SENSOR_FILTER_ATTRIBUTES(X)
+// clang-format on
+
+namespace ernie {
+
+class RenderSettingsBase : public Imageable {
+    ERNIE_SCHEMA_BODY(RenderSettingsBase, Imageable, ERNIE_RENDER_SETTINGS_BASE_ALL)
+};
+
+class RenderSettings : public RenderSettingsBase {
+    ERNIE_SCHEMA_BODY(RenderSettings, RenderSettingsBase, ERNIE_RENDER_SETTINGS_ALL)
+    ERNIE_SCHEMA_DEFINE(RenderSettings)
+
+
+    static RenderSettings OrFallbacks(const Scene&amp; scene, const Path&amp; path);
+};
+
+class RenderProduct : public RenderSettingsBase {
+    ERNIE_SCHEMA_BODY(RenderProduct, RenderSettingsBase, ERNIE_RENDER_PRODUCT_ALL)
+    ERNIE_SCHEMA_DEFINE(RenderProduct)
+};
+
+class RenderVar : public Imageable {
+    ERNIE_SCHEMA_BODY(RenderVar, Imageable, ERNIE_RENDER_VAR_ALL)
+    ERNIE_SCHEMA_DEFINE(RenderVar)
+};
+
+class SensorFilterPrim : public Imageable {
+    ERNIE_SCHEMA_BODY(SensorFilterPrim, Imageable, ERNIE_SENSOR_FILTER_ALL)
+    ERNIE_SCHEMA_DEFINE(SensorFilterPrim)
+};
+
+std::vector&lt;const PrimTypeDef*&gt; RenderSchemaTypes();
+
+}  // namespace ernie
+</code></pre>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

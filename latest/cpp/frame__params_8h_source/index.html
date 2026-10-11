@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/frame__params_8h_source/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>File frame_params.h - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "File frame_params.h";
+        var mkdocs_page_input_path = "cpp/frame__params_8h_source.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/frame__params_8h_source/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">File frame_params.h</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/frame__params_8h_source.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="file-frame_paramsh">File frame_params.h</h1>
+<p><a href="../files/"><strong>File List</strong></a> <strong>&gt;</strong> <a href="../dir_057d52706067b881d9371cf136c38c31/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../dir_ab8975e862a3e97518d11d8e693cf9b5/"><strong>session</strong></a> <strong>&gt;</strong> <a href="../frame__params_8h/"><strong>frame_params.h</strong></a></p>
+<p><a href="../frame__params_8h/">Go to the documentation of this file</a></p>
+<pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+#include &quot;ernie/scene/camera.h&quot;
+#include &quot;ernie/scene/sensor_filters.h&quot;
+
+#include &lt;glm/glm.hpp&gt;
+#include &lt;glm/gtc/quaternion.hpp&gt;
+
+#include &lt;algorithm&gt;
+#include &lt;array&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdint&gt;
+#include &lt;optional&gt;
+#include &lt;string_view&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+namespace ernie {
+
+struct PushbroomStrip {
+    glm::vec3 from{0.0f};
+    glm::vec3 to{0.0f};
+    glm::quat fromRotation{1.0f, 0.0f, 0.0f, 0.0f};  
+    glm::quat toRotation{1.0f, 0.0f, 0.0f, 0.0f};    
+    float nearPlane = 0.1f;
+    float farPlane = 1000.0f;
+    float scale = 1.0f;  
+    float shift = 0.0f;  
+    float line = 0.0f;   
+
+    glm::mat4 Packed() const;
+
+    glm::vec4 Intrinsics() const {
+        return {scale, shift, line, 0.0f};
+    }
+};
+
+CameraView PushbroomEnvelope(const CameraParams&amp; camera, const glm::dmat4&amp; from,
+                             const glm::dmat4&amp; to);
+
+enum class WorldShadows : std::uint32_t {
+    Separate = 0,
+    Shared = 1,
+    Merged = 2,
+};
+
+enum class ShadowFit : std::uint32_t {
+    Scene = 0,    
+    Visible = 1,  
+};
+
+enum class WorldShadowFit : std::uint32_t {
+    Scene = 0,  
+    World = 1,
+};
+
+struct ShadowSettings {
+    bool enabled = true;
+    int cascades = 3;                      
+    std::uint32_t resolution = 2048;       
+    float softness = 1.5f;                 
+    float normalOffset = 1.5f;             
+    float splitLambda = 0.8f;              
+    ShadowFit fit = ShadowFit::Scene;      
+    bool showCascades = false;             
+    std::uint32_t lightResolution = 1024;  
+    std::uint32_t worldResolution = 0;
+
+    static std::uint32_t AutoWorldResolution(std::uint32_t width, std::uint32_t height) {
+        std::uint32_t texels = 256;
+        while (texels &lt; 4 * std::max(width, height) &amp;&amp; texels &lt; 2048) {
+            texels *= 2;
+        }
+        return texels;
+    }
+    WorldShadows worlds = WorldShadows::Separate;  
+    WorldShadowFit worldFit = WorldShadowFit::Scene;  
+    float worldMargin = 1.0f;  
+};
+
+enum class Wireframe : std::uint32_t {
+    Off = 0,         
+    Overlay = 1,     
+    HiddenLine = 2,  
+};
+
+enum class Culling : std::uint32_t {
+    Off = 0,  
+    Cpu = 1,  
+    Gpu = 2,  
+};
+
+enum class Occlusion : std::uint32_t {
+    Off = 0,  
+    Occluders = 1,
+    TwoPass = 2,
+};
+
+enum class MinimalMode : std::uint32_t {
+    Off = 0,       
+    None = 1,      
+    Constant = 2,  
+    Textured = 3,  
+};
+
+enum class LightType : std::uint32_t {
+    Distant = 0,  
+    Sphere = 1,   
+    Rect = 2,     
+    Disk = 3,     
+};
+
+struct LightParams {
+    LightType type = LightType::Sphere;
+    glm::dvec3 position{0.0};  
+    glm::vec3 direction{0.0f, 0.0f, 1.0f};
+    glm::vec3 tangent{1.0f, 0.0f, 0.0f};
+    glm::vec2 size{1.0f, 1.0f};  
+    std::vector&lt;float&gt; spectrum;
+    float radius = 0.0f;
+    float coneAngle = 180.0f;   
+    float coneSoftness = 0.0f;  
+    float focus = 0.0f;
+    std::vector&lt;float&gt; focusTint;
+    std::vector&lt;float&gt; profile;
+    static constexpr int kProfileRows = 129;
+    static constexpr int kProfileColumns = 64;
+    bool shadows = true;
+    bool domeDiffuse = false;
+    std::int32_t world = -1;
+    bool posedOnGpu = false;
+
+    static constexpr float kMaxSpotConeDegrees = 75.0f;
+};
+
+struct DomeParams {
+    std::vector&lt;float&gt; radiance;
+    std::array&lt;glm::vec3, 9&gt; sh{};
+    bool visible = true;
+    glm::mat3 toDome{1.0f};
+    bool shadow = true;
+};
+
+enum class DomeLightMode {
+    Approximate,  
+    Full,         
+    Limited,      
+    Directions,
+};
+
+struct Star {
+    float rightAscension = 0.0f;  
+    float declination = 0.0f;     
+    float temperature = 5772.0f;  
+    float irradiance555 = 0.0f;
+};
+
+struct StarFieldParams {
+    glm::mat3 toCatalogue{1.0f};
+};
+
+struct FrameParams {
+    CameraParams camera;
+    double overscan = 1.0;
+    bool sun = true;  
+    glm::vec3 sunDirection{0.0f, 0.0f, 1.0f};  
+    float sunAngle = 0.53f;
+    std::vector&lt;float&gt; sunIrradiance;
+    float ambient = 0.15f;  
+    std::vector&lt;LightParams&gt; lights;
+    std::optional&lt;DomeParams&gt; dome;
+    DomeLightMode domeMode = DomeLightMode::Approximate;
+    float domeShadowRadius = 1.0f;
+    std::uint32_t domeDirections = 16;
+    bool domeDirectionsLit = false;
+    std::optional&lt;StarFieldParams&gt; stars;  
+    float exposure = 1.0f;                 
+    bool meter = false;                    
+    Culling culling = Culling::Gpu;        
+    Occlusion occlusion = Occlusion::Off;  
+    float meshLodError = 1.0f;
+    Wireframe wireframe = Wireframe::Off;  
+    ShadowSettings shadows;
+    std::vector&lt;SensorFilterStep&gt; filters;
+    std::vector&lt;std::string_view&gt; vars;
+    struct SensorChain {
+        std::vector&lt;SensorFilterStep&gt; filters;
+        std::vector&lt;std::string_view&gt; vars;
+        std::uint32_t aovOffset = 0;
+    };
+    std::vector&lt;SensorChain&gt; chains;
+    std::string overlays;
+    MinimalMode minimal = MinimalMode::Off;
+    glm::vec3 minimalColor{1.0f};
+    glm::vec3 clearColor{0.0f};  
+    std::uint64_t frame = 0;
+    std::uint32_t stream = 0;
+
+    std::vector&lt;glm::dmat4&gt; poses;
+
+    bool posesOnGpu = false;
+    bool posesQuaternions = false;
+    glm::dmat4 posesParent{1.0};
+
+    std::vector&lt;glm::dmat4&gt; previousPoses;
+
+    std::vector&lt;std::int32_t&gt; worlds;
+
+    std::int32_t ViewWorld(std::size_t view) const {
+        return view &lt; worlds.size() ? worlds[view] : -1;
+    }
+
+    std::size_t Views() const {
+        return poses.empty() ? 1 : poses.size();
+    }
+
+    CameraParams ViewCamera(std::size_t view) const {
+        CameraParams result = camera;
+        if (!poses.empty()) {
+            result.transform = poses.at(view);
+        }
+        return result;
+    }
+
+    glm::dvec3 origin{0.0};
+
+    glm::mat4 Relative(const glm::dmat4&amp; world) const {
+        glm::dmat4 relative = world;
+        relative[3] -= glm::dvec4(origin, 0.0);
+        return glm::mat4(relative);
+    }
+
+    glm::vec3 Relative(const glm::dvec3&amp; world) const {
+        return glm::vec3(world - origin);
+    }
+
+    CameraView View(std::size_t view = 0) const {
+        glm::dmat4 pose = poses.empty() ? camera.transform : poses.at(view);
+        pose[3] -= glm::dvec4(origin, 0.0);
+        if (camera.pushbroom) {
+            return PushbroomEnvelope(camera, PreviousPose(view), pose);
+        }
+        return camera.RasterView(pose, overscan);
+    }
+
+    glm::dmat4 PreviousPose(std::size_t view = 0) const;
+
+    PushbroomStrip Strip(std::size_t view = 0) const;
+
+    FrameParams Subframes() const;
+
+    FrameParams Faces(int faces) const;
+
+    static glm::dvec3 FaceIntrinsics(std::uint32_t width, std::uint32_t height);
+};
+
+glm::dmat4 InterpolatePose(const glm::dmat4&amp; from, const glm::dmat4&amp; to, double s);
+
+using Bounds3 = std::pair&lt;glm::vec3, glm::vec3&gt;;
+
+}  // namespace ernie
+</code></pre>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

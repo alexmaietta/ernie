@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1CameraParams/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Struct ernie::CameraParams - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Struct ernie::CameraParams";
+        var mkdocs_page_input_path = "cpp/structernie_1_1CameraParams.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/structernie_1_1CameraParams/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Struct ernie::CameraParams</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/structernie_1_1CameraParams.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="struct-erniecameraparams">Struct ernie::CameraParams</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>CameraParams</strong></a></p>
+<p><em>A camera's parameters resolved from its</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim (</em><code>CameraParamsOf</code> <em>): a physically based pinhole camera for one image, with UsdGeomCamera's pose, projection and exposure attributes, a spectral range, a lens and a sensor.</em><a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/scene/camera.h&gt;</code></li>
+</ul>
+<h2 id="public-attributes">Public Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1SpectralBands/"><strong>SpectralBands</strong></a></td>
+<td style="text-align: left;"><a href="#variable-bands"><strong>bands</strong></a>  <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-exposurestops"><strong>exposureStops</strong></a>   = <code>0.0</code><br><em>USD</em> <code>exposure</code> <em>: scales the photographic output by 2^stops.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-exposuretime"><strong>exposureTime</strong></a>   = <code>1.0</code><br><em>Seconds.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-fstop"><strong>fStop</strong></a>   = <code>1.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-farplane"><strong>farPlane</strong></a>   = <code>1e6</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-focallengthmm"><strong>focalLengthMm</strong></a>   = <code>50.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-focusdistance"><strong>focusDistance</strong></a>   = <code>0.0</code><br><em>USD</em> <code>focusDistance</code> <em>, scene units; 0 focuses at infinity.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-height"><strong>height</strong></a>   = <code>1</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-horizontalapertureoffsetmm"><strong>horizontalApertureOffsetMm</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-iso"><strong>iso</strong></a>   = <code>100.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1LensModel/"><strong>LensModel</strong></a></td>
+<td style="text-align: left;"><a href="#variable-lens"><strong>lens</strong></a>  <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-lensfstop"><strong>lensFStop</strong></a>   = <code>0.0</code><br><em>USD</em> <code>fStop</code> <em>: the lens's f-number for depth of field; 0 is a pinhole, all in focus.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-lineoffsetmm"><strong>lineOffsetMm</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-nearplane"><strong>nearPlane</strong></a>   = <code>1.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-orthographic"><strong>orthographic</strong></a>   = <code>false</code><br><em>USD</em> <code>projection</code> <em>"orthographic": the apertures and offsets below are in tenths of a scene unit, and the focal length is unused.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-orthographicpixelpitchum"><strong>orthographicPixelPitchUm</strong></a>   = <code>5.0</code><br><em>An orthographic camera's pixel pitch on its sensor, in micrometres, for the camera equation; a perspective camera's follows from its aperture.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-pushbroom"><strong>pushbroom</strong></a>   = <code>false</code><br><em>A pushbroom (line scan) camera (</em> <code>ernie:camera:scan</code> <em>"pushbroom"): one detector line along the image's x axis,</em><code>lineOffsetMm</code> <em>off the principal point along y on the focal plane, read out once per image row as the camera moves.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-responsivity"><strong>responsivity</strong></a>   = <code>1.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-rollingshutter"><strong>rollingShutter</strong></a>   = <code>0.0</code><br><em>Rolling shutter readout: the top row's interval comes this many frames before the bottom row's, rows in between in proportion; 0 is a global shutter.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1SensorModel/"><strong>SensorModel</strong></a></td>
+<td style="text-align: left;"><a href="#variable-sensor"><strong>sensor</strong></a>   = <code>[**SensorModel::Rgb**](structernie_1_1SensorModel.md#function-rgb)()</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-shutterclose"><strong>shutterClose</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-shutteropen"><strong>shutterOpen</strong></a>   = <code>0.0</code><br><em>USD</em> <code>shutter:open</code> <em>and</em><code>shutter:close</code> <em>: the interval each row integrates over, in frames relative to the frame's time, the last frame's at -1.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">int</td>
+<td style="text-align: left;"><a href="#variable-shuttersamples"><strong>shutterSamples</strong></a>   = <code>8</code><br><em>Sub-frames rendered across the shutter and the readout when either is open.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dmat4</td>
+<td style="text-align: left;"><a href="#variable-transform"><strong>transform</strong></a>   = <code>{1.0}</code><br><a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>to world.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-verticalaperturemm"><strong>verticalApertureMm</strong></a>   = <code>15.2908</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-verticalapertureoffsetmm"><strong>verticalApertureOffsetMm</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-width"><strong>width</strong></a>   = <code>1</code><br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-static-attributes">Public Static Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">constexpr int</td>
+<td style="text-align: left;"><a href="#variable-kmaxshuttersamples"><strong>kMaxShutterSamples</strong></a>   = <code>64</code><br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-check"><strong>Check</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-electrons"><strong>Electrons</strong></a> (std::span&lt; const float &gt; radiance, std::size_t channel, glm::dvec2 normalised={0.0, 0.0}) const<br><em>Mean electrons a pixel at normalised coordinates</em> <code>normalised</code> <em>collects in channel</em><code>channel</code> <em>from band radiances</em><code>radiance</code> <em>(W m^-2 sr^-1 nm^-1, one per band), before dark current, noise and clipping.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; float &gt;</td>
+<td style="text-align: left;"><a href="#function-electronsperradiance"><strong>ElectronsPerRadiance</strong></a> (std::size_t channel) const<br><em>Per-band factors f_i so that</em> <code>Electrons</code> <em>= sum_i radiance_i f_i at the image centre.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#function-eye"><strong>Eye</strong></a> () const<br><em>The camera's position in the world.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-focallengthpixels"><strong>FocalLengthPixels</strong></a> () const<br><em>Focal length in pixels, of a perspective camera.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#function-forward"><strong>Forward</strong></a> () const<br><em>Unit viewing direction in the world, the transform's -z axis.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-irradianceperradiance"><strong>IrradiancePerRadiance</strong></a> (glm::dvec2 normalised) const<br><em>Irradiance at the sensor per unit scene radiance at normalised image coordinates (</em> <code>x</code> <em>,</em><code>y</code> <em>) on the sensor: pi t cos^4(theta) / (4 N^2) for a pinhole, the lens's</em><code>NaturalVignetting</code> <em>in place of cos^4, which is left out when vignetting is off.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-linearexposurescale"><strong>LinearExposureScale</strong></a> () const<br><em>USD's ratio between incident luminance and the normalised photographic output: responsivity * time * (iso / 100) * 2^exposure / fStop^2.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-orthographicpixelsize"><strong>OrthographicPixelSize</strong></a> () const<br><em>An orthographic camera's side of a pixel in the scene, in scene units.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; float &gt;</td>
+<td style="text-align: left;"><a href="#function-photonsperradiance"><strong>PhotonsPerRadiance</strong></a> () const<br><em>Per-band photons a pixel at the image centre collects over the exposure per unit spectral radiance (the camera equation: optics, pixel area, time and band width over the photon energy), before quantum efficiency:</em> <code>ElectronsPerRadiance</code> <em>without the channel's QE.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-pixelpitchmetres"><strong>PixelPitchMetres</strong></a> () const<br><em>Side of a pixel on the sensor, in metres.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec2</td>
+<td style="text-align: left;"><a href="#function-principalpoint"><strong>PrincipalPoint</strong></a> () const<br><em>The principal point in pixels, from the image's top-left corner.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1CameraView/"><strong>CameraView</strong></a></td>
+<td style="text-align: left;"><a href="#function-rasterview-12"><strong>RasterView</strong></a> (double overscan=1.0) const<br><em>The raster view: the inverse pose, and a projection with the focal length divided by</em> <code>overscan</code> <em>(so with lens distortion it covers the undistorted rays of every sensor pixel), the principal point and the clipping range.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1CameraView/"><strong>CameraView</strong></a></td>
+<td style="text-align: left;"><a href="#function-rasterview-22"><strong>RasterView</strong></a> (const glm::dmat4 &amp; pose, double overscan) const<br><code>RasterView</code> <em>from camera-to-world</em><code>pose</code> <em>in place of</em><code>transform</code> <em>, such as one view of a batch, without copying the camera.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setverticalfov"><strong>SetVerticalFov</strong></a> (double radians) <br><em>Sets the vertical aperture so the image spans</em> <code>radians</code> <em>vertically at the focal length.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-subframetime"><strong>SubframeTime</strong></a> (int subframe) const<br><em>The time of sub-frame</em> <code>subframe</code> <em>in frames relative to the frame's: evenly spaced from the top row's opening to the bottom row's closing, the last at</em><code>shutterClose</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">int</td>
+<td style="text-align: left;"><a href="#function-subframes"><strong>Subframes</strong></a> () const<br><em>The sub-frames a frame renders: 1 with the shutter closed (open equal to close) and a global shutter, else</em> <code>shutterSamples</code> <em>, at least 2.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-verticalfov"><strong>VerticalFov</strong></a> () const<br><em>The vertical field of view in radians.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>The pose <code>transform</code> maps camera to world coordinates; as in USD the camera looks down its -z axis with +y up. Interactive controls such as <code>OrbitController</code> write it.</p>
+<p>Focal length and apertures are read in millimetres. The image fits the vertical aperture: pixels are square with a pitch of <code>verticalAperture / height</code>, and the horizontal aperture follows from the image's aspect. Aperture offsets shift the principal point.</p>
+<p>An <code>orthographic</code> camera follows UsdGeomCamera (and GfCamera): its apertures and their offsets are in tenths of a scene unit, the size of the view in the scene, and it has no focal length; every ray runs along the view direction. Its optics are telecentric, without fall-off off axis or depth of field, and its pixels have the pitch <code>orthographicPixelPitchUm</code> on the sensor. Its lens has no distortion. Distances to the camera are from its image plane. <a href="../classernie_1_1Terrain/"><strong>Terrain</strong></a> levels of detail still follow the distance from the camera's position, so place it near what it sees.</p>
+<p>Radiometry follows the camera equation: a scene radiance L reaches the sensor as irradiance E = L pi t cos^4(theta) / (4 N^2) for an object far away, with transmission t, f-number N and field angle theta; a pixel collects E times its area times the exposure time, converted to photons and electrons per band. The photographic outputs instead scale luminance by USD's linear exposure scale; with a one-channel (monochrome) sensor they are grey, weighting the bands by that channel's quantum efficiency, scaled so a flat spectrum keeps its luminance.</p>
+<p>References:
+* B. K. P. Horn, "Robot Vision", MIT Press, 1986 (the image irradiance equation E = L (pi / 4) (d / f)^2 cos^4(alpha), with N = f / d).
+* Pixar, "UsdGeomCamera", <a href="https://openusd.org/release/api/class_usd_geom_camera.html">https://openusd.org/release/api/class_usd_geom_camera.html</a> </p>
+<h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-bands">variable bands</h3>
+<pre><code class="language-C++">SpectralBands ernie::CameraParams::bands;
+</code></pre>
+<hr>
+
+<h3 id="variable-exposurestops">variable exposureStops</h3>
+<p><em>USD</em> <code>exposure</code> <em>: scales the photographic output by 2^stops.</em></p>
+<pre><code class="language-C++">double ernie::CameraParams::exposureStops;
+</code></pre>
+<hr>
+
+<h3 id="variable-exposuretime">variable exposureTime</h3>
+<p><em>Seconds.</em> </p>
+<pre><code class="language-C++">double ernie::CameraParams::exposureTime;
+</code></pre>
+<hr>
+
+<h3 id="variable-fstop">variable fStop</h3>
+<pre><code class="language-C++">double ernie::CameraParams::fStop;
+</code></pre>
+<hr>
+
+<h3 id="variable-farplane">variable farPlane</h3>
+<pre><code class="language-C++">double ernie::CameraParams::farPlane;
+</code></pre>
+<hr>
+
+<h3 id="variable-focallengthmm">variable focalLengthMm</h3>
+<pre><code class="language-C++">double ernie::CameraParams::focalLengthMm;
+</code></pre>
+<hr>
+
+<h3 id="variable-focusdistance">variable focusDistance</h3>
+<p><em>USD</em> <code>focusDistance</code> <em>, scene units; 0 focuses at infinity.</em></p>
+<pre><code class="language-C++">double ernie::CameraParams::focusDistance;
+</code></pre>
+<hr>
+
+<h3 id="variable-height">variable height</h3>
+<pre><code class="language-C++">std::uint32_t ernie::CameraParams::height;
+</code></pre>
+<hr>
+
+<h3 id="variable-horizontalapertureoffsetmm">variable horizontalApertureOffsetMm</h3>
+<pre><code class="language-C++">double ernie::CameraParams::horizontalApertureOffsetMm;
+</code></pre>
+<hr>
+
+<h3 id="variable-iso">variable iso</h3>
+<pre><code class="language-C++">double ernie::CameraParams::iso;
+</code></pre>
+<hr>
+
+<h3 id="variable-lens">variable lens</h3>
+<pre><code class="language-C++">LensModel ernie::CameraParams::lens;
+</code></pre>
+<hr>
+
+<h3 id="variable-lensfstop">variable lensFStop</h3>
+<p><em>USD</em> <code>fStop</code> <em>: the lens's f-number for depth of field; 0 is a pinhole, all in focus.</em></p>
+<pre><code class="language-C++">double ernie::CameraParams::lensFStop;
+</code></pre>
+<hr>
+
+<h3 id="variable-lineoffsetmm">variable lineOffsetMm</h3>
+<pre><code class="language-C++">double ernie::CameraParams::lineOffsetMm;
+</code></pre>
+<hr>
+
+<h3 id="variable-nearplane">variable nearPlane</h3>
+<pre><code class="language-C++">double ernie::CameraParams::nearPlane;
+</code></pre>
+<hr>
+
+<h3 id="variable-orthographic">variable orthographic</h3>
+<p><em>USD</em> <code>projection</code> <em>"orthographic": the apertures and offsets below are in tenths of a scene unit, and the focal length is unused.</em></p>
+<pre><code class="language-C++">bool ernie::CameraParams::orthographic;
+</code></pre>
+<hr>
+
+<h3 id="variable-orthographicpixelpitchum">variable orthographicPixelPitchUm</h3>
+<p><em>An orthographic camera's pixel pitch on its sensor, in micrometres, for the camera equation; a perspective camera's follows from its aperture.</em> </p>
+<pre><code class="language-C++">double ernie::CameraParams::orthographicPixelPitchUm;
+</code></pre>
+<hr>
+
+<h3 id="variable-pushbroom">variable pushbroom</h3>
+<p><em>A pushbroom (line scan) camera (</em> <code>ernie:camera:scan</code> <em>"pushbroom"): one detector line along the image's x axis,</em><code>lineOffsetMm</code> <em>off the principal point along y on the focal plane, read out once per image row as the camera moves.</em></p>
+<pre><code class="language-C++">bool ernie::CameraParams::pushbroom;
+</code></pre>
+<p>Row r (from the top) is exposed at the pose (r + 0.5) / height of the way from the last frame's pose to this frame's, so a frame is one strip of the scan. Its lens may distort radially (k1 to k3, with r^2 from the line's distance off the axis too), moving pixels along the line only; it has no tangential distortion, shutter interval or rolling readout of its own.</p>
+<p>Reference: R. Gupta and R. I. Hartley, "Linear Pushbroom Cameras", IEEE TPAMI 19(9):963-975,
+* </p>
+<hr>
+
+<h3 id="variable-responsivity">variable responsivity</h3>
+<pre><code class="language-C++">double ernie::CameraParams::responsivity;
+</code></pre>
+<hr>
+
+<h3 id="variable-rollingshutter">variable rollingShutter</h3>
+<p><em>Rolling shutter readout: the top row's interval comes this many frames before the bottom row's, rows in between in proportion; 0 is a global shutter.</em> </p>
+<pre><code class="language-C++">double ernie::CameraParams::rollingShutter;
+</code></pre>
+<hr>
+
+<h3 id="variable-sensor">variable sensor</h3>
+<pre><code class="language-C++">SensorModel ernie::CameraParams::sensor;
+</code></pre>
+<hr>
+
+<h3 id="variable-shutterclose">variable shutterClose</h3>
+<pre><code class="language-C++">double ernie::CameraParams::shutterClose;
+</code></pre>
+<hr>
+
+<h3 id="variable-shutteropen">variable shutterOpen</h3>
+<p><em>USD</em> <code>shutter:open</code> <em>and</em><code>shutter:close</code> <em>: the interval each row integrates over, in frames relative to the frame's time, the last frame's at -1.</em></p>
+<pre><code class="language-C++">double ernie::CameraParams::shutterOpen;
+</code></pre>
+<p>Equal (the default) for no motion blur. </p>
+<hr>
+
+<h3 id="variable-shuttersamples">variable shutterSamples</h3>
+<p><em>Sub-frames rendered across the shutter and the readout when either is open.</em> </p>
+<pre><code class="language-C++">int ernie::CameraParams::shutterSamples;
+</code></pre>
+<hr>
+
+<h3 id="variable-transform">variable transform</h3>
+<p><a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>to world.</em></p>
+<pre><code class="language-C++">glm::dmat4 ernie::CameraParams::transform;
+</code></pre>
+<hr>
+
+<h3 id="variable-verticalaperturemm">variable verticalApertureMm</h3>
+<pre><code class="language-C++">double ernie::CameraParams::verticalApertureMm;
+</code></pre>
+<hr>
+
+<h3 id="variable-verticalapertureoffsetmm">variable verticalApertureOffsetMm</h3>
+<pre><code class="language-C++">double ernie::CameraParams::verticalApertureOffsetMm;
+</code></pre>
+<hr>
+
+<h3 id="variable-width">variable width</h3>
+<pre><code class="language-C++">std::uint32_t ernie::CameraParams::width;
+</code></pre>
+<hr>
+<h2 id="public-static-attributes-documentation">Public Static Attributes Documentation</h2>
+<h3 id="variable-kmaxshuttersamples">variable kMaxShutterSamples</h3>
+<pre><code class="language-C++">constexpr int ernie::CameraParams::kMaxShutterSamples;
+</code></pre>
+<hr>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-check">function Check</h3>
+<pre><code class="language-C++">void ernie::CameraParams::Check () const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for non-positive sizes, times, f-numbers, ISO or focal length, a bad clipping range, a degenerate transform, a bad spectral range, no sensor channels or more than four, or a shutter closing before it opens, a negative rolling readout or shutter samples outside 1 to <code>kMaxShutterSamples</code>, an orthographic camera with lens distortion or a fisheye or a non-positive pixel pitch, a pushbroom that is orthographic, has a fisheye or tangential distortion or more than one sub-frame, or a fisheye with Brown-Conrady distortion or a field reaching past <code>LensModel::kMaxFisheyeFieldAngle</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-electrons">function Electrons</h3>
+<p><em>Mean electrons a pixel at normalised coordinates</em> <code>normalised</code> <em>collects in channel</em><code>channel</code> <em>from band radiances</em><code>radiance</code> <em>(W m^-2 sr^-1 nm^-1, one per band), before dark current, noise and clipping.</em></p>
+<pre><code class="language-C++">double ernie::CameraParams::Electrons (
+    std::span&lt; const float &gt; radiance,
+    std::size_t channel,
+    glm::dvec2 normalised={0.0, 0.0}
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-electronsperradiance">function ElectronsPerRadiance</h3>
+<p><em>Per-band factors f_i so that</em> <code>Electrons</code> <em>= sum_i radiance_i f_i at the image centre.</em></p>
+<pre><code class="language-C++">std::vector&lt; float &gt; ernie::CameraParams::ElectronsPerRadiance (
+    std::size_t channel
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-eye">function Eye</h3>
+<p><em>The camera's position in the world.</em> </p>
+<pre><code class="language-C++">inline glm::dvec3 ernie::CameraParams::Eye () const
+</code></pre>
+<hr>
+
+<h3 id="function-focallengthpixels">function FocalLengthPixels</h3>
+<p><em>Focal length in pixels, of a perspective camera.</em> </p>
+<pre><code class="language-C++">double ernie::CameraParams::FocalLengthPixels () const
+</code></pre>
+<hr>
+
+<h3 id="function-forward">function Forward</h3>
+<p><em>Unit viewing direction in the world, the transform's -z axis.</em> </p>
+<pre><code class="language-C++">glm::dvec3 ernie::CameraParams::Forward () const
+</code></pre>
+<hr>
+
+<h3 id="function-irradianceperradiance">function IrradiancePerRadiance</h3>
+<p><em>Irradiance at the sensor per unit scene radiance at normalised image coordinates (</em> <code>x</code> <em>,</em><code>y</code> <em>) on the sensor: pi t cos^4(theta) / (4 N^2) for a pinhole, the lens's</em><code>NaturalVignetting</code> <em>in place of cos^4, which is left out when vignetting is off.</em></p>
+<pre><code class="language-C++">double ernie::CameraParams::IrradiancePerRadiance (
+    glm::dvec2 normalised
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-linearexposurescale">function LinearExposureScale</h3>
+<p><em>USD's ratio between incident luminance and the normalised photographic output: responsivity * time * (iso / 100) * 2^exposure / fStop^2.</em> </p>
+<pre><code class="language-C++">double ernie::CameraParams::LinearExposureScale () const
+</code></pre>
+<hr>
+
+<h3 id="function-orthographicpixelsize">function OrthographicPixelSize</h3>
+<p><em>An orthographic camera's side of a pixel in the scene, in scene units.</em> </p>
+<pre><code class="language-C++">double ernie::CameraParams::OrthographicPixelSize () const
+</code></pre>
+<hr>
+
+<h3 id="function-photonsperradiance">function PhotonsPerRadiance</h3>
+<p><em>Per-band photons a pixel at the image centre collects over the exposure per unit spectral radiance (the camera equation: optics, pixel area, time and band width over the photon energy), before quantum efficiency:</em> <code>ElectronsPerRadiance</code> <em>without the channel's QE.</em></p>
+<pre><code class="language-C++">std::vector&lt; float &gt; ernie::CameraParams::PhotonsPerRadiance () const
+</code></pre>
+<hr>
+
+<h3 id="function-pixelpitchmetres">function PixelPitchMetres</h3>
+<p><em>Side of a pixel on the sensor, in metres.</em> </p>
+<pre><code class="language-C++">double ernie::CameraParams::PixelPitchMetres () const
+</code></pre>
+<hr>
+
+<h3 id="function-principalpoint">function PrincipalPoint</h3>
+<p><em>The principal point in pixels, from the image's top-left corner.</em> </p>
+<pre><code class="language-C++">glm::dvec2 ernie::CameraParams::PrincipalPoint () const
+</code></pre>
+<hr>
+
+<h3 id="function-rasterview-12">function RasterView [1/2]</h3>
+<p><em>The raster view: the inverse pose, and a projection with the focal length divided by</em> <code>overscan</code> <em>(so with lens distortion it covers the undistorted rays of every sensor pixel), the principal point and the clipping range.</em></p>
+<pre><code class="language-C++">CameraView ernie::CameraParams::RasterView (
+    double overscan=1.0
+) const
+</code></pre>
+<p>An orthographic camera's spans its apertures in the scene (<code>overscan</code> 1, as it has no distortion). </p>
+<hr>
+
+<h3 id="function-rasterview-22">function RasterView [2/2]</h3>
+<p><code>RasterView</code> <em>from camera-to-world</em><code>pose</code> <em>in place of</em><code>transform</code> <em>, such as one view of a batch, without copying the camera.</em></p>
+<pre><code class="language-C++">CameraView ernie::CameraParams::RasterView (
+    const glm::dmat4 &amp; pose,
+    double overscan
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-setverticalfov">function SetVerticalFov</h3>
+<p><em>Sets the vertical aperture so the image spans</em> <code>radians</code> <em>vertically at the focal length.</em></p>
+<pre><code class="language-C++">void ernie::CameraParams::SetVerticalFov (
+    double radians
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-subframetime">function SubframeTime</h3>
+<p><em>The time of sub-frame</em> <code>subframe</code> <em>in frames relative to the frame's: evenly spaced from the top row's opening to the bottom row's closing, the last at</em><code>shutterClose</code> <em>.</em></p>
+<pre><code class="language-C++">double ernie::CameraParams::SubframeTime (
+    int subframe
+) const
+</code></pre>
+<p>Each row's exposure interpolates its interval linearly between them. </p>
+<hr>
+
+<h3 id="function-subframes">function Subframes</h3>
+<p><em>The sub-frames a frame renders: 1 with the shutter closed (open equal to close) and a global shutter, else</em> <code>shutterSamples</code> <em>, at least 2.</em></p>
+<pre><code class="language-C++">int ernie::CameraParams::Subframes () const
+</code></pre>
+<hr>
+
+<h3 id="function-verticalfov">function VerticalFov</h3>
+<p><em>The vertical field of view in radians.</em> </p>
+<pre><code class="language-C++">double ernie::CameraParams::VerticalFov () const
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/scene/camera.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

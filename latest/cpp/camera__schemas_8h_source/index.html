@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/camera__schemas_8h_source/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>File camera_schemas.h - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "File camera_schemas.h";
+        var mkdocs_page_input_path = "cpp/camera__schemas_8h_source.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/camera__schemas_8h_source/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">File camera_schemas.h</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/camera__schemas_8h_source.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="file-camera_schemash">File camera_schemas.h</h1>
+<p><a href="../files/"><strong>File List</strong></a> <strong>&gt;</strong> <a href="../dir_057d52706067b881d9371cf136c38c31/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../dir_572d817874f40c61a249f0e7684d4315/"><strong>scene</strong></a> <strong>&gt;</strong> <a href="../camera__schemas_8h/"><strong>camera_schemas.h</strong></a></p>
+<p><a href="../camera__schemas_8h/">Go to the documentation of this file</a></p>
+<pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+#include &quot;ernie/scene/base_schemas.h&quot;
+#include &quot;ernie/scene/prim_type.h&quot;
+#include &quot;ernie/scene/tokens.h&quot;
+#include &quot;ernie/util/tensor.h&quot;
+
+#include &lt;optional&gt;
+#include &lt;string&gt;
+#include &lt;string_view&gt;
+#include &lt;vector&gt;
+
+
+// clang-format off
+#define ERNIE_CAMERA_ATTRIBUTES(X)                                                                 \
+    X(std::string, Projection, ::ernie::tokens::kProjection, &quot;perspective&quot;,                        \
+      (::ernie::AttributeMeta{.doc = &quot;Orthographic reads the apertures in tenths of a scene unit.&quot;, \
+                              .group = &quot;Lens&quot;,                                                     \
+                              .options = {::ernie::tokens::kPerspective,                           \
+                                          ::ernie::tokens::kOrthographic}}))                       \
+    X(double, FocalLength, ::ernie::tokens::kFocalLength, 50.0,                                    \
+      (::ernie::AttributeMeta{.doc = &quot;mm.&quot;, .group = &quot;Lens&quot;, .min = 1.0, .max = 2000.0}))          \
+    X(double, VerticalAperture, ::ernie::tokens::kVerticalAperture, 15.2908,                       \
+      (::ernie::AttributeMeta{.doc = &quot;mm; tenths of a scene unit when orthographic.&quot;,            \
+                              .group = &quot;Lens&quot;, .min = 0.1, .max = 100.0}))                         \
+    X(double, HorizontalAperture, ::ernie::tokens::kHorizontalAperture, 20.955,                    \
+      (::ernie::AttributeMeta{.doc = &quot;mm; not read: the image's aspect sets the horizontal &quot;       \
+                                     &quot;extent. Written for other USD readers.&quot;,                     \
+                              .group = &quot;Lens&quot;, .min = 0.1, .max = 100.0}))                         \
+    X(double, HorizontalApertureOffset, ::ernie::tokens::kHorizontalApertureOffset, 0.0,           \
+      (::ernie::AttributeMeta{.label = &quot;Horizontal offset&quot;, .doc = &quot;mm.&quot;,.group = &quot;Lens&quot;,          \
+                              .min = -50.0, .max = 50.0}))                                         \
+    X(double, VerticalApertureOffset, ::ernie::tokens::kVerticalApertureOffset, 0.0,               \
+      (::ernie::AttributeMeta{.label = &quot;Vertical offset&quot;, .doc = &quot;mm.&quot;,.group = &quot;Lens&quot;,            \
+                              .min = -50.0, .max = 50.0}))                                         \
+    X(glm::dvec2, ClippingRange, ::ernie::tokens::kClippingRange, glm::dvec2(1.0, 1e6),            \
+      (::ernie::AttributeMeta{.doc = &quot;Near and far, scene units.&quot;, .group = &quot;Lens&quot;}))              \
+    X(double, FStop, ::ernie::tokens::kFStop, 0.0,                                                 \
+      (::ernie::AttributeMeta{.label = &quot;Lens f-number&quot;,                                            \
+                              .doc = &quot;For depth of field and diffraction; 0 is a pinhole, all in &quot; \
+                                     &quot;focus.&quot;,                                                     \
+                              .group = &quot;Lens&quot;, .max = 64.0}))                                      \
+    X(double, FocusDistance, ::ernie::tokens::kFocusDistance, 0.0,                                 \
+      (::ernie::AttributeMeta{.doc = &quot;Scene units; 0 focuses at infinity.&quot;, .group = &quot;Lens&quot;,       \
+                              .max = 1e4}))                                                        \
+    X(std::string, LensProjection, ::ernie::tokens::kLensProjection, &quot;perspective&quot;,                \
+      (::ernie::AttributeMeta{.doc = &quot;Rectilinear, or a Kannala-Brandt fisheye.&quot;,                  \
+                              .group = &quot;Lens&quot;,                                                     \
+                              .options = {::ernie::tokens::kPerspective,                           \
+                                          ::ernie::tokens::kFisheye}}))                            \
+    X(std::vector&lt;float&gt;, LensDistortion, ::ernie::tokens::kLensDistortion, std::vector&lt;float&gt;{},  \
+      (::ernie::AttributeMeta{.doc = &quot;Brown-Conrady k1 k2 k3 p1 p2; missing ones are 0.&quot;,          \
+                              .group = &quot;Lens&quot;}))                                                   \
+    X(std::vector&lt;float&gt;, LensFisheye, ::ernie::tokens::kLensFisheye, std::vector&lt;float&gt;{},        \
+      (::ernie::AttributeMeta{.doc = &quot;Kannala-Brandt k1 k2 k3 k4 of a fisheye; none is &quot;           \
+                                     &quot;equidistant.&quot;,                                               \
+                              .group = &quot;Lens&quot;}))                                                   \
+    X(bool, LensVignetting, ::ernie::tokens::kLensVignetting, false,                               \
+      (::ernie::AttributeMeta{.label = &quot;Vignetting&quot;,                                               \
+                              .doc = &quot;Natural falloff of irradiance off axis.&quot;, .group = &quot;Lens&quot;})) \
+    X(double, LensTransmission, ::ernie::tokens::kLensTransmission, 1.0,                           \
+      (::ernie::AttributeMeta{.label = &quot;Transmission&quot;, .doc = &quot;Fraction of light the optics pass.&quot;, \
+                              .group = &quot;Lens&quot;, .max = 1.0}))                                       \
+    X(std::vector&lt;float&gt;, LensChromaticScale, ::ernie::tokens::kLensChromaticScale,                \
+      std::vector&lt;float&gt;{},                                                                        \
+      (::ernie::AttributeMeta{.doc = &quot;(nm, scale) pairs: lateral colour, the image's scale per &quot;   \
+                                     &quot;wavelength.&quot;,                                                \
+                              .group = &quot;Lens&quot;}))                                                   \
+    X(std::vector&lt;float&gt;, LensChromaticFocus, ::ernie::tokens::kLensChromaticFocus,                \
+      std::vector&lt;float&gt;{},                                                                        \
+      (::ernie::AttributeMeta{.doc = &quot;(nm, mm) pairs: axial colour, the focal length's shift per &quot; \
+                                     &quot;wavelength.&quot;,                                                \
+                              .group = &quot;Lens&quot;}))                                                   \
+    X(::ernie::Tensor, LensRays, ::ernie::tokens::kLensRays, nullptr,                              \
+      (::ernie::AttributeMeta{.doc = &quot;float32 (rows, columns, 3) CPU tensor of unit directions in &quot; \
+                                     &quot;the camera's frame every rays step pixels, in place of the &quot; \
+                                     &quot;projection and distortion.&quot;,                                 \
+                              .group = &quot;Lens&quot;}))                                                   \
+    X(int, LensRaysStep, ::ernie::tokens::kLensRaysStep, 8,                                        \
+      (::ernie::AttributeMeta{.label = &quot;Rays step&quot;, .doc = &quot;Pixels between the lens's rays.&quot;,      \
+                              .group = &quot;Lens&quot;, .min = 1.0, .max = 256.0}))                         \
+    X(double, Exposure, ::ernie::tokens::kCameraExposure, 0.0,                                     \
+      (::ernie::AttributeMeta{.doc = &quot;Stops; scales the photographic outputs.&quot;,.group = &quot;Exposure&quot;, \
+                              .min = -16.0, .max = 16.0}))                                         \
+    X(double, ExposureTime, ::ernie::tokens::kExposureTime, 1.0,                                   \
+      (::ernie::AttributeMeta{.doc = &quot;Seconds.&quot;,.group = &quot;Exposure&quot;, .min = 1e-6, .max = 10.0}))   \
+    X(double, ExposureIso, ::ernie::tokens::kExposureIso, 100.0,                                   \
+      (::ernie::AttributeMeta{.label = &quot;ISO&quot;, .group = &quot;Exposure&quot;, .min = 25.0, .max = 102400.0})) \
+    X(double, ExposureFStop, ::ernie::tokens::kExposureFStop, 1.0,                                 \
+      (::ernie::AttributeMeta{.label = &quot;f-number&quot;, .group = &quot;Exposure&quot;, .min = 0.5, .max = 64.0})) \
+    X(double, ExposureResponsivity, ::ernie::tokens::kExposureResponsivity, 1.0,                   \
+      (::ernie::AttributeMeta{.label = &quot;Responsivity&quot;, .group = &quot;Exposure&quot;, .max = 100.0}))        \
+    X(double, ShutterOpen, ::ernie::tokens::kShutterOpen, 0.0,                                     \
+      (::ernie::AttributeMeta{.label = &quot;Open&quot;,                                                     \
+                              .doc = &quot;Frames from the frame's time; motion blurs from here to &quot;    \
+                                     &quot;the close.&quot;,                                               \
+                              .group = &quot;Shutter&quot;, .min = -2.0, .max = 1.0}))                       \
+    X(double, ShutterClose, ::ernie::tokens::kShutterClose, 0.0,                                   \
+      (::ernie::AttributeMeta{.label = &quot;Close&quot;, .doc = &quot;Frames from the frame's time.&quot;,             \
+                              .group = &quot;Shutter&quot;, .min = -2.0, .max = 1.0}))                       \
+    X(int, ShutterSamples, ::ernie::tokens::kShutterSamples, 8,                                    \
+      (::ernie::AttributeMeta{.label = &quot;Samples&quot;, .doc = &quot;Sub-frames rendered across the shutter.&quot;, \
+                              .group = &quot;Shutter&quot;, .min = 1.0, .max = 64.0}))                       \
+    X(double, ShutterRolling, ::ernie::tokens::kShutterRolling, 0.0,                               \
+      (::ernie::AttributeMeta{.label = &quot;Rolling readout&quot;,                                          \
+                              .doc = &quot;Frames between the top row's exposure and the bottom &quot;       \
+                                     &quot;row's; 0 is global.&quot;,                                       \
+                              .group = &quot;Shutter&quot;, .max = 2.0}))                                    \
+    X(std::string, Scan, ::ernie::tokens::kCameraScan, &quot;frame&quot;,                                    \
+      (::ernie::AttributeMeta{.doc = &quot;Pushbroom: a line scanner whose rows run from the last &quot;     \
+                                     &quot;frame's pose to this one's.&quot;,                               \
+                              .group = &quot;Shutter&quot;,                                                  \
+                              .options = {::ernie::tokens::kFrameScan,                             \
+                                          ::ernie::tokens::kPushbroom}}))                          \
+    X(double, PushbroomLineOffset, ::ernie::tokens::kPushbroomLineOffset, 0.0,                     \
+      (::ernie::AttributeMeta{.label = &quot;Line offset&quot;,                                              \
+                              .doc = &quot;mm; the pushbroom's detector line from the principal point.&quot;, \
+                              .group = &quot;Shutter&quot;, .min = -50.0, .max = 50.0}))                     \
+    X(glm::dvec2, SpectralRange, ::ernie::tokens::kSpectralRange, glm::dvec2(380.0, 780.0),        \
+      (::ernie::AttributeMeta{.doc = &quot;nm.&quot;,.group = &quot;Sensor&quot;}))                                    \
+    X(int, SpectralBands, ::ernie::tokens::kSpectralBands, 16,                                     \
+      (::ernie::AttributeMeta{.label = &quot;Bands&quot;, .group = &quot;Sensor&quot;, .min = 1.0, .max = 64.0}))      \
+    X(std::string, SensorType, ::ernie::tokens::kSensorType, &quot;rgb&quot;,                                \
+      (::ernie::AttributeMeta{.label = &quot;Type&quot;, .group = &quot;Sensor&quot;, .options = {&quot;rgb&quot;, &quot;mono&quot;}}))    \
+    X(bool, SensorNoise, ::ernie::tokens::kSensorNoise, true,                                      \
+      (::ernie::AttributeMeta{.label = &quot;Noise&quot;, .group = &quot;Sensor&quot;}))                               \
+    X(double, SensorFullWell, ::ernie::tokens::kSensorFullWell, 20000.0,                           \
+      (::ernie::AttributeMeta{.label = &quot;Full well&quot;, .doc = &quot;Electrons.&quot;, .group = &quot;Sensor&quot;,         \
+                              .min = 100.0, .max = 1e6}))                                          \
+    X(double, SensorReadNoise, ::ernie::tokens::kSensorReadNoise, 3.0,                             \
+      (::ernie::AttributeMeta{.label = &quot;Read noise&quot;, .doc = &quot;Electrons, standard deviation.&quot;, .group = &quot;Sensor&quot;,        \
+                              .max = 100.0}))                                                      \
+    X(double, SensorDarkCurrent, ::ernie::tokens::kSensorDarkCurrent, 0.1,                         \
+      (::ernie::AttributeMeta{.label = &quot;Dark current&quot;, .doc = &quot;Electrons per second.&quot;,              \
+                              .group = &quot;Sensor&quot;, .max = 1000.0}))                                  \
+    X(double, SensorPrnu, ::ernie::tokens::kSensorPrnu, 0.005,                                     \
+      (::ernie::AttributeMeta{.label = &quot;PRNU&quot;,                                                     \
+                              .doc = &quot;Standard deviation of the per-pixel relative gain.&quot;,          \
+                              .group = &quot;Sensor&quot;, .max = 0.2}))                                     \
+    X(double, SensorDsnu, ::ernie::tokens::kSensorDsnu, 0.5,                                       \
+      (::ernie::AttributeMeta{.label = &quot;DSNU&quot;, .doc = &quot;Electrons, standard deviation of the per-pixel offset.&quot;, .group = &quot;Sensor&quot;,              \
+                              .max = 100.0}))                                                      \
+    X(double, SensorElectronsPerDn, ::ernie::tokens::kSensorGain, 0.0,                             \
+      (::ernie::AttributeMeta{.label = &quot;Electrons per DN&quot;,                                         \
+                              .doc = &quot;At ISO 100; 0 for the full well over the ADC range.&quot;,         \
+                              .group = &quot;Sensor&quot;, .max = 1000.0}))                                  \
+    X(int, SensorAdcBits, ::ernie::tokens::kSensorAdcBits, 12,                                     \
+      (::ernie::AttributeMeta{.label = &quot;ADC bits&quot;, .group = &quot;Sensor&quot;, .min = 1.0, .max = 16.0}))   \
+    X(double, SensorBlackLevel, ::ernie::tokens::kSensorBlackLevel, 0.0,                           \
+      (::ernie::AttributeMeta{.label = &quot;Black level&quot;, .doc = &quot;DN.&quot;, .group = &quot;Sensor&quot;,              \
+                              .max = 4096.0}))                                                     \
+    X(double, SensorPixelPitch, ::ernie::tokens::kSensorPixelPitch, 5.0,                           \
+      (::ernie::AttributeMeta{.label = &quot;Pixel pitch&quot;, .doc = &quot;Micrometres, of orthographic cameras.&quot;, \
+                              .group = &quot;Sensor&quot;, .min = 0.1, .max = 100.0}))                       \
+    X(int, SensorSeed, ::ernie::tokens::kSensorSeed, 0,                                            \
+      (::ernie::AttributeMeta{.label = &quot;Seed&quot;, .doc = &quot;Of the sensor's noise.&quot;,                    \
+                              .group = &quot;Sensor&quot;}))                                                 \
+    X(std::vector&lt;float&gt;, SensorQeR, ::ernie::tokens::kSensorQeR, std::vector&lt;float&gt;{},            \
+      (::ernie::AttributeMeta{.doc = &quot;(nm, electrons per photon) pairs of an rgb sensor's red &quot;    \
+                                     &quot;channel; unset keeps the generic curve.&quot;,                    \
+                              .group = &quot;Sensor&quot;}))                                                 \
+    X(std::vector&lt;float&gt;, SensorQeG, ::ernie::tokens::kSensorQeG, std::vector&lt;float&gt;{},            \
+      (::ernie::AttributeMeta{.doc = &quot;(nm, electrons per photon) pairs of an rgb sensor's green &quot;  \
+                                     &quot;channel; unset keeps the generic curve.&quot;,                    \
+                              .group = &quot;Sensor&quot;}))                                                 \
+    X(std::vector&lt;float&gt;, SensorQeB, ::ernie::tokens::kSensorQeB, std::vector&lt;float&gt;{},            \
+      (::ernie::AttributeMeta{.doc = &quot;(nm, electrons per photon) pairs of an rgb sensor's blue &quot;   \
+                                     &quot;channel; unset keeps the generic curve.&quot;,                    \
+                              .group = &quot;Sensor&quot;}))                                                 \
+    X(std::vector&lt;float&gt;, SensorQeMono, ::ernie::tokens::kSensorQeMono, std::vector&lt;float&gt;{},      \
+      (::ernie::AttributeMeta{.doc = &quot;(nm, electrons per photon) pairs of a mono sensor's &quot;        \
+                                     &quot;channel; unset keeps the generic silicon curve.&quot;,            \
+                              .group = &quot;Sensor&quot;}))                                                 \
+    X(::ernie::Tensor, Poses, ::ernie::tokens::kPoses, nullptr,                                    \
+      (::ernie::AttributeMeta{.doc = &quot;float32 or float64 (views, 4, 4) local transforms, or &quot;      \
+                                     &quot;(views, 7) positions and unit quaternions: one image per &quot;   \
+                                     &quot;pose, each in place of the camera's own transform.&quot;,         \
+                              .group = &quot;Views&quot;}))                                                  \
+    X(std::string, PosesDevice, ::ernie::tokens::kPosesDevice, &quot;gpu&quot;,                              \
+      (::ernie::AttributeMeta{.doc = &quot;Where poses written as a CUDA array go: \&quot;gpu\&quot; keeps them &quot; \
+                                     &quot;there, \&quot;host\&quot; downloads them first.&quot;,                      \
+                              .group = &quot;Views&quot;,                                                    \
+                              .options = {::ernie::tokens::kGpu, ::ernie::tokens::kHost}}))        \
+    X(::ernie::Tensor, Worlds, ::ernie::tokens::kWorlds, nullptr,                                  \
+      (::ernie::AttributeMeta{.doc = &quot;int (views,): each pose's world, in place of the camera's &quot;  \
+                                     &quot;world.&quot;,                                                     \
+                              .group = &quot;Views&quot;}))
+
+#define ERNIE_CAMERA_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_CAMERA_ATTRIBUTES(X)
+// clang-format on
+
+namespace ernie {
+
+class Camera : public Imageable {
+    ERNIE_SCHEMA_BODY(Camera, Imageable, ERNIE_CAMERA_ALL)
+    ERNIE_SCHEMA_DEFINE(Camera)
+
+
+    std::optional&lt;std::vector&lt;float&gt;&gt; GetSensorQe(std::string_view channel) const;
+};
+
+std::vector&lt;const PrimTypeDef*&gt; CameraSchemaTypes();
+
+}  // namespace ernie
+</code></pre>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

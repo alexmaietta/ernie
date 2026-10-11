@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1GraphicsPipelineDesc/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Struct ernie::GraphicsPipelineDesc - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Struct ernie::GraphicsPipelineDesc";
+        var mkdocs_page_input_path = "cpp/structernie_1_1GraphicsPipelineDesc.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/structernie_1_1GraphicsPipelineDesc/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Struct ernie::GraphicsPipelineDesc</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/structernie_1_1GraphicsPipelineDesc.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="struct-erniegraphicspipelinedesc">Struct ernie::GraphicsPipelineDesc</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>GraphicsPipelineDesc</strong></a></p>
+<p><em>Fixed-function state of a graphics pipeline that draws triangle lists without vertex buffers.</em> </p>
+<ul>
+<li><code>#include &lt;ernie/device/pipeline.h&gt;</code></li>
+</ul>
+<h2 id="public-attributes">Public Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-alphablend"><strong>alphaBlend</strong></a>   = <code>false</code><br><em>Blend colour over the attachment by its alpha (source over), keeping the attachment's alpha; otherwise replace it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkFormat</td>
+<td style="text-align: left;"><a href="#variable-colorformat"><strong>colorFormat</strong></a>   = <code>VK\_FORMAT\_UNDEFINED</code><br><em>Undefined for depth-only passes.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; VkFormat &gt;</td>
+<td style="text-align: left;"><a href="#variable-colorformats"><strong>colorFormats</strong></a>  <br><em>Several colour attachments in this order, replacing</em> <code>colorFormat</code> <em>when not empty.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkColorComponentFlags</td>
+<td style="text-align: left;"><a href="#variable-colorwritemask"><strong>colorWriteMask</strong></a>   = <code>/* multi line expression */</code><br><em>The channels the colour attachments take, the others kept.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-depthbiasslope"><strong>depthBiasSlope</strong></a>   = <code>0.0f</code><br><em>Slope-scaled depth bias, e.g.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkCompareOp</td>
+<td style="text-align: left;"><a href="#variable-depthcompare"><strong>depthCompare</strong></a>   = <code>VK\_COMPARE\_OP\_LESS</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkFormat</td>
+<td style="text-align: left;"><a href="#variable-depthformat"><strong>depthFormat</strong></a>   = <code>VK\_FORMAT\_D32\_SFLOAT</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-depthwrite"><strong>depthWrite</strong></a>   = <code>true</code><br><em>Off tests against the depth attachment without changing it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#variable-fragmententry"><strong>fragmentEntry</strong></a>   = <code>"main"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::span&lt; const std::uint32_t &gt;</td>
+<td style="text-align: left;"><a href="#variable-fragmentspirv"><strong>fragmentSpirv</strong></a>  <br><em>Empty for depth-only passes.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#variable-vertexentry"><strong>vertexEntry</strong></a>   = <code>"main"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::span&lt; const std::uint32_t &gt;</td>
+<td style="text-align: left;"><a href="#variable-vertexspirv"><strong>vertexSpirv</strong></a>  <br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-alphablend">variable alphaBlend</h3>
+<p><em>Blend colour over the attachment by its alpha (source over), keeping the attachment's alpha; otherwise replace it.</em> </p>
+<pre><code class="language-C++">bool ernie::GraphicsPipelineDesc::alphaBlend;
+</code></pre>
+<hr>
+
+<h3 id="variable-colorformat">variable colorFormat</h3>
+<p><em>Undefined for depth-only passes.</em> </p>
+<pre><code class="language-C++">VkFormat ernie::GraphicsPipelineDesc::colorFormat;
+</code></pre>
+<hr>
+
+<h3 id="variable-colorformats">variable colorFormats</h3>
+<p><em>Several colour attachments in this order, replacing</em> <code>colorFormat</code> <em>when not empty.</em></p>
+<pre><code class="language-C++">std::vector&lt;VkFormat&gt; ernie::GraphicsPipelineDesc::colorFormats;
+</code></pre>
+<hr>
+
+<h3 id="variable-colorwritemask">variable colorWriteMask</h3>
+<p><em>The channels the colour attachments take, the others kept.</em> </p>
+<pre><code class="language-C++">VkColorComponentFlags ernie::GraphicsPipelineDesc::colorWriteMask;
+</code></pre>
+<hr>
+
+<h3 id="variable-depthbiasslope">variable depthBiasSlope</h3>
+<p><em>Slope-scaled depth bias, e.g.</em> </p>
+<pre><code class="language-C++">float ernie::GraphicsPipelineDesc::depthBiasSlope;
+</code></pre>
+<p>for shadow maps. </p>
+<hr>
+
+<h3 id="variable-depthcompare">variable depthCompare</h3>
+<pre><code class="language-C++">VkCompareOp ernie::GraphicsPipelineDesc::depthCompare;
+</code></pre>
+<hr>
+
+<h3 id="variable-depthformat">variable depthFormat</h3>
+<pre><code class="language-C++">VkFormat ernie::GraphicsPipelineDesc::depthFormat;
+</code></pre>
+<hr>
+
+<h3 id="variable-depthwrite">variable depthWrite</h3>
+<p><em>Off tests against the depth attachment without changing it.</em> </p>
+<pre><code class="language-C++">bool ernie::GraphicsPipelineDesc::depthWrite;
+</code></pre>
+<hr>
+
+<h3 id="variable-fragmententry">variable fragmentEntry</h3>
+<pre><code class="language-C++">std::string ernie::GraphicsPipelineDesc::fragmentEntry;
+</code></pre>
+<hr>
+
+<h3 id="variable-fragmentspirv">variable fragmentSpirv</h3>
+<p><em>Empty for depth-only passes.</em> </p>
+<pre><code class="language-C++">std::span&lt;const std::uint32_t&gt; ernie::GraphicsPipelineDesc::fragmentSpirv;
+</code></pre>
+<hr>
+
+<h3 id="variable-vertexentry">variable vertexEntry</h3>
+<pre><code class="language-C++">std::string ernie::GraphicsPipelineDesc::vertexEntry;
+</code></pre>
+<hr>
+
+<h3 id="variable-vertexspirv">variable vertexSpirv</h3>
+<pre><code class="language-C++">std::span&lt;const std::uint32_t&gt; ernie::GraphicsPipelineDesc::vertexSpirv;
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/device/pipeline.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

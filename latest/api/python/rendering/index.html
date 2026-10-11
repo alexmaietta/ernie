@@ -1,0 +1,2288 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/api/python/rendering/" />
+      <link rel="shortcut icon" href="../../../img/favicon.ico" />
+    <title>Rendering - Ernie</title>
+    <link rel="stylesheet" href="../../../css/theme.css" />
+    <link rel="stylesheet" href="../../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../../css/extra.css" rel="stylesheet" />
+        <link href="../../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Rendering";
+        var mkdocs_page_input_path = "api/python/rendering.md";
+        var mkdocs_page_url = "/ernie/latest/api/python/rendering/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul class="current">
+                  <li class="toctree-l1 current"><a class="reference internal current" >Python</a>
+    <ul class="current">
+                <li class="toctree-l2"><a class="reference internal" href="../scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2 current"><a class="reference internal current" href="#">Rendering</a>
+    <ul class="current">
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.Renderer"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;Renderer</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.Operation"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;Operation</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.Frame"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;Frame</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.RenderProductOutput"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;RenderProductOutput</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.RenderVarOutput"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;RenderVarOutput</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.Device"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;Device</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.CudaArray"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;CudaArray</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.CudaArrayMapping"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;CudaArrayMapping</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.Wireframe"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;Wireframe</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.load_image"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;load_image</a>
+    </li>
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../cpp/annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../cpp/hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../cpp/namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../cpp/namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../cpp/files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">API reference</li>
+          <li class="breadcrumb-item">Python</li>
+      <li class="breadcrumb-item active">Rendering</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/api/python/rendering.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="rendering">Rendering</h1>
+<p>Rendering scenes and render products, and reading their outputs on the host or the GPU.</p>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="ernie.Renderer" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Renderer</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">Renderer(backend: str = 'raster', validation: bool = False, device: str = '')</code></pre>
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>Renders a Scene's terrain, meshes, materials, lights, cameras and render settings on a GPU, with one of Ernie's render backends.</p>
+
+        <p>Opens a GPU, preferring one whose name contains <code>device</code>, with the Vulkan validation layer when <code>validation</code> is set and it is installed, and the render <code>backend</code> (see <code>backends</code>) on it. Raises RuntimeError without a Vulkan device and ValueError for an unknown backend.</p>
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            add_sensor_filter (ernie.Renderer.add_sensor_filter)" href="#ernie.Renderer.add_sensor_filter">add_sensor_filter</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Registers a sensor filter written in Slang, for SensorFilter prims to name in ernie:filter:type: struct <code>type_name</code> in module <code>slang</code> implementing IBandFilter (kind="band", on the spectrum), IPixelFilter (kind="pixel", domain "electrons", "digital", "rgb" or "display"), or for kind="spatial", which reads the pixels around its own through a SpatialImage, ISpatialBandFilter (domain "spectrum") or ISpatialPixelFilter (the others), with a nested Params struct of one float per parameter. <code>params</code> is {name: default} in order, or a list of {"name", "default", "description"}; prims set them as inputs:<name>. Raises ValueError for an invalid filter or one that fails to compile, with the compiler's diagnostics.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            backends
+
+
+  
+      staticmethod
+   (ernie.Renderer.backends)" href="#ernie.Renderer.backends">backends</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The names of the render backends.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            cuda_copy (ernie.Renderer.cuda_copy)" href="#ernie.Renderer.cuda_copy">cuda_copy</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Queues a device-to-device copy between CUDA arrays of the same size on <code>stream</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            cuda_download (ernie.Renderer.cuda_download)" href="#ernie.Renderer.cuda_download">cuda_download</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>A host copy of a CUDA array.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            cuda_upload (ernie.Renderer.cuda_upload)" href="#ernie.Renderer.cuda_upload">cuda_upload</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>A copy of a host array in CUDA memory, for frameworks without CUDA arrays of their own.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            prim_path (ernie.Renderer.prim_path)" href="#ernie.Renderer.prim_path">prim_path</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The prim path of a PrimId render var value; the empty path for 0 (background) or an unknown id.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            render (ernie.Renderer.render)" href="#ernie.Renderer.render">render</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Renders <code>scene</code> as the RenderSettings prim <code>settings</code> (or the first one) describes and returns the LdrColor render var: a read-only uint8 array (rows, cols, 4). With device="cuda" the array stays in GPU memory shared with Vulkan, for torch.from_dlpack and friends; it keeps the renderer alive.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            step (ernie.Renderer.step)" href="#ernie.Renderer.step">step</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>step_async(...).wait().fetch(): the outputs by render product path, each with .frames[0].render_vars by RenderVar path.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            step_async (ernie.Renderer.step_async)" href="#ernie.Renderer.step_async">step_async</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Renders the RenderProduct prims <code>render_products</code> (or the settings' products, or a default one) and returns an Operation at once.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            sync (ernie.Renderer.sync)" href="#ernie.Renderer.sync">sync</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Uploads the parts of the scene that changed since the last sync.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            take_validation_messages (ernie.Renderer.take_validation_messages)" href="#ernie.Renderer.take_validation_messages">take_validation_messages</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Vulkan validation messages since the last call.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>backend</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>brdfs</code></b>
+                  (<code><span title="list">list</span>[<span title="str">str</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>cuda_available</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Whether CUDA arrays can be written to scenes this renderer draws, and rendered to.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>device_name</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>progressive</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Whether consecutive steps of an unchanged scene refine one image.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>sensor_filters</code></b>
+                  (<code><span title="list">list</span>[<span title="str">str</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>The sensor filter types render products may use: the built-in ones, then the registered ones.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>stats</code></b>
+                  (<code><span title="dict">dict</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>GPU memory, triangles and the backend's own counts, by name.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>validation_enabled</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Whether the Vulkan validation layer is on: asked for with <code>validation</code> and installed.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Renderer.backend" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">backend</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">backend: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Renderer.brdfs" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">brdfs</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">brdfs: list[str]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Renderer.cuda_available" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">cuda_available</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">cuda_available: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Whether CUDA arrays can be written to scenes this renderer draws, and rendered to.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Renderer.device_name" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">device_name</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">device_name: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Renderer.progressive" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">progressive</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">progressive: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Whether consecutive steps of an unchanged scene refine one image.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Renderer.sensor_filters" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">sensor_filters</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">sensor_filters: list[str]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The sensor filter types render products may use: the built-in ones, then the registered ones.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Renderer.stats" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">stats</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">stats: dict</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>GPU memory, triangles and the backend's own counts, by name.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Renderer.validation_enabled" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">validation_enabled</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">validation_enabled: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Whether the Vulkan validation layer is on: asked for with <code>validation</code> and installed.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Renderer.add_sensor_filter" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">add_sensor_filter</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">add_sensor_filter(
+    id: str,
+    type_name: str,
+    slang: str,
+    kind: str = "pixel",
+    domain: object | None = None,
+    params: object | None = None,
+    name: str = "",
+    description: str = "",
+) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Registers a sensor filter written in Slang, for SensorFilter prims to name in ernie:filter:type: struct <code>type_name</code> in module <code>slang</code> implementing IBandFilter (kind="band", on the spectrum), IPixelFilter (kind="pixel", domain "electrons", "digital", "rgb" or "display"), or for kind="spatial", which reads the pixels around its own through a SpatialImage, ISpatialBandFilter (domain "spectrum") or ISpatialPixelFilter (the others), with a nested Params struct of one float per parameter. <code>params</code> is {name: default} in order, or a list of {"name", "default", "description"}; prims set them as inputs:<name>. Raises ValueError for an invalid filter or one that fails to compile, with the compiler's diagnostics.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Renderer.backends" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">backends</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">backends() -&gt; list[str]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The names of the render backends.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Renderer.cuda_copy" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">cuda_copy</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">cuda_copy(
+    source: Annotated[NDArray, dict(writable=False)],
+    destination: Annotated[NDArray, dict(writable=False)],
+    stream: object | None = None,
+) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Queues a device-to-device copy between CUDA arrays of the same size on <code>stream</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Renderer.cuda_download" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">cuda_download</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">cuda_download(array: Annotated[NDArray, dict(writable=False)]) -&gt; object</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>A host copy of a CUDA array.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Renderer.cuda_upload" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">cuda_upload</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">cuda_upload(array: Annotated[NDArray, dict(writable=False)]) -&gt; object</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>A copy of a host array in CUDA memory, for frameworks without CUDA arrays of their own.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Renderer.prim_path" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">prim_path</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">prim_path(id: int) -&gt; Path</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The prim path of a PrimId render var value; the empty path for 0 (background) or an unknown id.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Renderer.render" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">render</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">render(scene: Scene, settings: Path = ..., device: str = 'cpu') -&gt; object</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Renders <code>scene</code> as the RenderSettings prim <code>settings</code> (or the first one) describes and returns the LdrColor render var: a read-only uint8 array (rows, cols, 4). With device="cuda" the array stays in GPU memory shared with Vulkan, for torch.from_dlpack and friends; it keeps the renderer alive.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Renderer.step" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">step</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">step(
+    scene: Scene, render_products: object | None = None, settings: Path = ...
+) -&gt; dict[str, RenderProductOutput]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>step_async(...).wait().fetch(): the outputs by render product path, each with .frames[0].render_vars by RenderVar path.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Renderer.step_async" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">step_async</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">step_async(
+    scene: Scene, render_products: object | None = None, settings: Path = ...
+) -&gt; Operation</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Renders the RenderProduct prims <code>render_products</code> (or the settings' products, or a default one) and returns an Operation at once.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Renderer.sync" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">sync</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">sync(scene: Scene) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Uploads the parts of the scene that changed since the last sync.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Renderer.take_validation_messages" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">take_validation_messages</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">take_validation_messages() -&gt; list[str]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Vulkan validation messages since the last call.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="ernie.Operation" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Operation</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>A submitted step: wait or poll, then fetch.</p>
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            fetch (ernie.Operation.fetch)" href="#ernie.Operation.fetch">fetch</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The step's outputs by render product path, waiting for the step first.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            outputs (ernie.Operation.outputs)" href="#ernie.Operation.outputs">outputs</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The step's outputs without waiting, for CUDA mappings that order on the GPU.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            wait (ernie.Operation.wait)" href="#ernie.Operation.wait">wait</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Waits up to <code>timeout_ns</code> nanoseconds (None: forever, 0: poll) for the step; returns the operation once it is done, for .fetch(), or None while it is pending.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>done</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Operation.done" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">done</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">done: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Operation.fetch" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">fetch</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">fetch() -&gt; dict[str, RenderProductOutput]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The step's outputs by render product path, waiting for the step first.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Operation.outputs" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">outputs</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">outputs() -&gt; dict[str, RenderProductOutput]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The step's outputs without waiting, for CUDA mappings that order on the GPU.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Operation.wait" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">wait</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">wait(timeout_ns: int | None = None) -&gt; object</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Waits up to <code>timeout_ns</code> nanoseconds (None: forever, 0: poll) for the step; returns the operation once it is done, for .fetch(), or None while it is pending.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="ernie.Frame" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Frame</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>A rendered frame of a render product.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>render_vars</code></b>
+                  (<code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="            RenderVarOutput (ernie._ernie.RenderVarOutput)" href="#ernie.RenderVarOutput">RenderVarOutput</a>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>Render vars by RenderVar path.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Frame.render_vars" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">render_vars</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">render_vars: dict[str, RenderVarOutput]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Render vars by RenderVar path.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="ernie.RenderProductOutput" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">RenderProductOutput</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>The outputs of one render product.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>frames</code></b>
+                  (<code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="            Frame (ernie._ernie.Frame)" href="#ernie.Frame">Frame</a>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>product</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.RenderProductOutput.frames" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">frames</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">frames: list[Frame]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.RenderProductOutput.product" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">product</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">product: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="ernie.RenderVarOutput" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">RenderVarOutput</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>One output of a rendered frame, such as LdrColor, of a UsdRender RenderVar.</p>
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            map (ernie.RenderVarOutput.map)" href="#ernie.RenderVarOutput.map">map</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Maps the output: Device.CPU waits for the render and returns a NumPy array; Device.CUDA and Device.CUDA_ARRAY make CUDA stream <code>sync_stream</code> (a CUstream handle or DLPack stream number, default the legacy stream) wait for the render on the GPU and return at once.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            unmap (ernie.RenderVarOutput.unmap)" href="#ernie.RenderVarOutput.unmap">unmap</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Ends a CUDA_ARRAY mapping; the renderer waits for the work queued on <code>stream</code> before rendering into the frame again.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>dtype</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The NumPy name of the element type: uint8, uint16, uint32 or float32.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>mapped</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>name</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>path</code></b>
+                  (<code><a class="autorefs autorefs-internal" title="            Path (ernie._ernie.Path)" href="../scene/#ernie.Path">Path</a></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>shape</code></b>
+                  (<code><span title="tuple">tuple</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>(height, width, channels), (height, width) for single-channel vars, or (bands, height, width) for SpectralRadiance.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.RenderVarOutput.dtype" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">dtype</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">dtype: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The NumPy name of the element type: uint8, uint16, uint32 or float32.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.RenderVarOutput.mapped" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">mapped</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">mapped: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.RenderVarOutput.name" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">name</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">name: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.RenderVarOutput.path" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">path</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">path: Path</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.RenderVarOutput.shape" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shape</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">shape: tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>(height, width, channels), (height, width) for single-channel vars, or (bands, height, width) for SpectralRadiance.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.RenderVarOutput.map" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">map</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">map(device: Device = Device.CPU, sync_stream: object | None = None) -&gt; object</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Maps the output: Device.CPU waits for the render and returns a NumPy array; Device.CUDA and Device.CUDA_ARRAY make CUDA stream <code>sync_stream</code> (a CUstream handle or DLPack stream number, default the legacy stream) wait for the render on the GPU and return at once.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.RenderVarOutput.unmap" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">unmap</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">unmap(stream: object | None = None) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Ends a CUDA_ARRAY mapping; the renderer waits for the work queued on <code>stream</code> before rendering into the frame again.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="ernie.Device" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Device</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="enum.Enum">Enum</span></code></p>
+
+
+
+        <p>Where RenderVarOutput.map delivers an output.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>CPU</code></b>
+              –
+              <div class="doc-md-description">
+                <p>A NumPy array; the texels are copied to the host.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>CUDA</code></b>
+              –
+              <div class="doc-md-description">
+                <p>A linear CUDA array the GPU fills from the render, without the host.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>CUDA_ARRAY</code></b>
+              –
+              <div class="doc-md-description">
+                <p>The rendered image itself as a CUDA array (CUarray): no copy at all.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Device.CPU" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">CPU</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">CPU = 0</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>A NumPy array; the texels are copied to the host.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Device.CUDA" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">CUDA</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">CUDA = 1</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>A linear CUDA array the GPU fills from the render, without the host.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Device.CUDA_ARRAY" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">CUDA_ARRAY</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">CUDA_ARRAY = 2</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The rendered image itself as a CUDA array (CUarray): no copy at all.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="ernie.CudaArray" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">CudaArray</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>A render in CUDA memory. Pass it to torch.from_dlpack, cupy.from_dlpack or jax.dlpack.from_dlpack: its <strong>dlpack</strong> makes the consumer's stream wait for the render on the GPU, without blocking the host.</p>
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            __dlpack__ (ernie.CudaArray.__dlpack__)" href="#ernie.CudaArray.__dlpack__">__dlpack__</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            __dlpack_device__ (ernie.CudaArray.__dlpack_device__)" href="#ernie.CudaArray.__dlpack_device__">__dlpack_device__</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>shape</code></b>
+                  (<code><span title="tuple">tuple</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.CudaArray.shape" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shape</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">shape: tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.CudaArray.__dlpack__" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">__dlpack__</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">__dlpack__(
+    *,
+    stream: object | None = None,
+    max_version: object | None = None,
+    dl_device: object | None = None,
+    copy: object | None = None,
+) -&gt; object</code></pre>
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.CudaArray.__dlpack_device__" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">__dlpack_device__</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">__dlpack_device__() -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="ernie.CudaArrayMapping" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">CudaArrayMapping</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>A render var mapped as a CUDA array: the frame's image, read in place with CUDA texture or surface APIs or wp.Texture2D(cuda_array=mapping.cuda_array). Unmap the render var when done.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>cuda_array</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The CUarray handle.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>device_id</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>shape</code></b>
+                  (<code><span title="tuple">tuple</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.CudaArrayMapping.cuda_array" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">cuda_array</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">cuda_array: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The CUarray handle.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.CudaArrayMapping.device_id" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">device_id</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">device_id: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.CudaArrayMapping.shape" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shape</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">shape: tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="ernie.Wireframe" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Wireframe</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="enum.Enum">Enum</span></code></p>
+
+
+
+        <p>How the rasterizer draws triangle edges (tokens.WIREFRAME).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>HIDDEN_LINE</code></b>
+              –
+              <div class="doc-md-description">
+                <p>Triangle edges on flat, unlit surfaces that hide the edges behind them.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>OFF</code></b>
+              –
+              <div class="doc-md-description">
+                <p>Shaded surfaces only.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>OVERLAY</code></b>
+              –
+              <div class="doc-md-description">
+                <p>Triangle edges over the shaded surfaces.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Wireframe.HIDDEN_LINE" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">HIDDEN_LINE</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">HIDDEN_LINE = 2</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Triangle edges on flat, unlit surfaces that hide the edges behind them.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Wireframe.OFF" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">OFF</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">OFF = 0</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Shaded surfaces only.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Wireframe.OVERLAY" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">OVERLAY</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">OVERLAY = 1</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Triangle edges over the shaded surfaces.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.load_image" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">load_image</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">load_image(path: str | PathLike, srgb: bool = True) -&gt; object</code></pre>
+
+    <div class="doc doc-contents first">
+
+        <p>A PNG, JPEG or OpenEXR image as a linear float32 (rows, cols, 4) array: PNG and JPEG values decode as sRGB (srgb) or as linear data such as normal maps; EXR is linear.</p>
+
+
+    </div>
+
+</div>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../schemas/" class="btn btn-neutral float-left" title="Prim types"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../cameras/" class="btn btn-neutral float-right" title="Cameras and sensor models">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+      <span><a href="../schemas/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../cameras/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../../..";</script>
+    <script src="../../../js/theme_extra.js"></script>
+    <script src="../../../js/theme.js"></script>
+      <script src="../../../search/main.js"></script>
+      <script src="../../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

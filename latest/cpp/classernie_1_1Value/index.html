@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1Value/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Class ernie::Value - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Class ernie::Value";
+        var mkdocs_page_input_path = "cpp/classernie_1_1Value.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/classernie_1_1Value/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Class ernie::Value</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/classernie_1_1Value.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-ernievalue">Class ernie::Value</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>Value</strong></a></p>
+<p><em>A scene attribute value: one of the scalar, vector, matrix, token, relationship and small-array types Ernie's schemas use.</em> <a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/scene/value.h&gt;</code></li>
+</ul>
+<h2 id="public-types">Public Types</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">typedef std::variant&lt; std::monostate, bool, int, float, double, glm::ivec2, glm::vec2, glm::vec3, glm::vec4, glm::dvec2, glm::dvec3, glm::dvec4, glm::dmat4, glm::dquat, std::string, <a href="../classernie_1_1Path/"><strong>Path</strong></a>, std::vector&lt; float &gt;, std::vector&lt; <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt;, std::vector&lt; std::string &gt; &gt;</td>
+<td style="text-align: left;"><a href="#typedef-data"><strong>Data</strong></a>  <br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-empty"><strong>Empty</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">const T *</td>
+<td style="text-align: left;"><a href="#function-get"><strong>Get</strong></a> () const<br><em>The value as</em> <code>T</code> <em>, or null if it holds another type.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-is"><strong>Is</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="./#typedef-data"><strong>Data</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-raw"><strong>Raw</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-121"><strong>Value</strong></a> () = default<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-221"><strong>Value</strong></a> (bool value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-321"><strong>Value</strong></a> (int value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-421"><strong>Value</strong></a> (float value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-521"><strong>Value</strong></a> (double value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-621"><strong>Value</strong></a> (glm::ivec2 value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-721"><strong>Value</strong></a> (glm::vec2 value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-821"><strong>Value</strong></a> (glm::vec3 value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-921"><strong>Value</strong></a> (glm::vec4 value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-1021"><strong>Value</strong></a> (glm::dvec2 value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-1121"><strong>Value</strong></a> (glm::dvec3 value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-1221"><strong>Value</strong></a> (glm::dvec4 value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-1321"><strong>Value</strong></a> (const glm::dmat4 &amp; value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-1421"><strong>Value</strong></a> (glm::dquat value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-1521"><strong>Value</strong></a> (std::string value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-1621"><strong>Value</strong></a> (std::string_view value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-1721"><strong>Value</strong></a> (const char * value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-1821"><strong>Value</strong></a> (<a href="../classernie_1_1Path/"><strong>Path</strong></a> value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-1921"><strong>Value</strong></a> (std::vector&lt; float &gt; value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-2021"><strong>Value</strong></a> (std::vector&lt; <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-value-2121"><strong>Value</strong></a> (std::vector&lt; std::string &gt; value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-operator"><strong>operator==</strong></a> (const <a href="./"><strong>Value</strong></a> &amp;) const<br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>Bulk per-element data goes in a <code>Tensor</code> instead.</p>
+<p>Strings serve both as USD tokens (<code>"invisible"</code>, <code>"lambert"</code>) and asset paths, and string lists as token arrays such as <code>xformOpOrder</code>; <code>Path</code> values are relationship targets such as <code>material:binding</code>, and path lists relationships with several targets such as a <a href="../classernie_1_1PointInstancer/"><strong>PointInstancer</strong></a>'s <code>prototypes</code>. Quaternions are rotations such as <code>xformOp:orient</code>. </p>
+<h2 id="public-types-documentation">Public Types Documentation</h2>
+<h3 id="typedef-data">typedef Data</h3>
+<pre><code class="language-C++">using ernie::Value::Data =  std::variant&lt;std::monostate, bool, int, float, double, glm::ivec2, glm::vec2, glm::vec3, glm::vec4, glm::dvec2, glm::dvec3, glm::dvec4, glm::dmat4, glm::dquat, std::string, Path, std::vector&lt;float&gt;, std::vector&lt;Path&gt;, std::vector&lt;std::string&gt; &gt;;
+</code></pre>
+<hr>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-empty">function Empty</h3>
+<pre><code class="language-C++">inline bool ernie::Value::Empty () const
+</code></pre>
+<hr>
+
+<h3 id="function-get">function Get</h3>
+<p><em>The value as</em> <code>T</code> <em>, or null if it holds another type.</em></p>
+<pre><code class="language-C++">template&lt;typename T&gt;
+inline const T * ernie::Value::Get () const
+</code></pre>
+<hr>
+
+<h3 id="function-is">function Is</h3>
+<pre><code class="language-C++">template&lt;typename T&gt;
+inline bool ernie::Value::Is () const
+</code></pre>
+<hr>
+
+<h3 id="function-raw">function Raw</h3>
+<pre><code class="language-C++">inline const Data &amp; ernie::Value::Raw () const
+</code></pre>
+<hr>
+
+<h3 id="function-value-121">function Value [1/21]</h3>
+<pre><code class="language-C++">ernie::Value::Value () = default
+</code></pre>
+<hr>
+
+<h3 id="function-value-221">function Value [2/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    bool value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-value-321">function Value [3/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    int value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-value-421">function Value [4/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    float value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-value-521">function Value [5/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    double value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-value-621">function Value [6/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    glm::ivec2 value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-value-721">function Value [7/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    glm::vec2 value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-value-821">function Value [8/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    glm::vec3 value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-value-921">function Value [9/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    glm::vec4 value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-value-1021">function Value [10/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    glm::dvec2 value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-value-1121">function Value [11/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    glm::dvec3 value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-value-1221">function Value [12/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    glm::dvec4 value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-value-1321">function Value [13/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    const glm::dmat4 &amp; value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-value-1421">function Value [14/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    glm::dquat value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-value-1521">function Value [15/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    std::string value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-value-1621">function Value [16/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    std::string_view value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-value-1721">function Value [17/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    const char * value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-value-1821">function Value [18/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    Path value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-value-1921">function Value [19/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    std::vector&lt; float &gt; value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-value-2021">function Value [20/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    std::vector&lt; Path &gt; value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-value-2121">function Value [21/21]</h3>
+<pre><code class="language-C++">inline ernie::Value::Value (
+    std::vector&lt; std::string &gt; value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-operator">function operator==</h3>
+<pre><code class="language-C++">bool ernie::Value::operator== (
+    const Value &amp;
+) const
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/scene/value.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

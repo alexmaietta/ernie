@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1IsdSensor/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Struct ernie::IsdSensor - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Struct ernie::IsdSensor";
+        var mkdocs_page_input_path = "cpp/structernie_1_1IsdSensor.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/structernie_1_1IsdSensor/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Struct ernie::IsdSensor</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/structernie_1_1IsdSensor.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="struct-ernieisdsensor">Struct ernie::IsdSensor</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>IsdSensor</strong></a></p>
+<p><em>A camera's image support data (ISD) in the Community Sensor Model's JSON form, as ALE (the USGS Abstraction Layer for Ephemerides) writes it from SPICE kernels for planetary cameras such as LRO's NAC and WAC, MRO's CTX and HiRISE: the image's size and timing, the focal plane's map to detector pixels, the optics, and the spacecraft's and the body's states over the image.</em> <a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/scene/isd.h&gt;</code></li>
+</ul>
+<h2 id="public-attributes">Public Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1IsdRotation/"><strong>IsdRotation</strong></a></td>
+<td style="text-align: left;"><a href="#variable-bodyrotation"><strong>bodyRotation</strong></a>  <br><code>body_rotation</code> <em>: to the body-fixed frame.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-centertime"><strong>centerTime</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-detectorcenterline"><strong>detectorCenterLine</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-detectorcentersample"><strong>detectorCenterSample</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#variable-distortion"><strong>distortion</strong></a>  <br><code>optical_distortion</code> <em>'s model name (such as "radial", "transverse", "lrolrocnac") and coefficients; for "transverse" the x coefficients then the y (ten each: the cubic polynomial's terms 1, x, y, x^2, xy, y^2, x^3, x^2 y, x y^2, y^3), for "kaguyalism" boresight x, the four x coefficients, boresight y, the four y (as usgscsm's</em><code>getDistortionCoeffs</code> <em>packs them).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; double &gt;</td>
+<td style="text-align: left;"><a href="#variable-distortioncoefficients"><strong>distortionCoefficients</strong></a>  <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-exposureduration"><strong>exposureDuration</strong></a>   = <code>0.0</code><br><em>Push-frame cameras' framelets:</em> <code>exposure_duration</code> <em>and</em><code>interframe_delay</code> <em>(seconds),</em><code>framelet_height</code> <em>(detector lines, the overlap included),</em><code>num_lines_overlap</code> <em>(lines shared with the next framelet, even),</em><code>framelets_flipped</code> <em>and</em><code>framelet_order_reversed</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-focallengthmm"><strong>focalLengthMm</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::array&lt; double, 3 &gt;</td>
+<td style="text-align: left;"><a href="#variable-focaltoline"><strong>focalToLine</strong></a>   = <code>{}</code><br><em>Detector line and sample from focal plane x and y in mm: a0 + a1 x + a2 y.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::array&lt; double, 3 &gt;</td>
+<td style="text-align: left;"><a href="#variable-focaltosample"><strong>focalToSample</strong></a>   = <code>{}</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-frameletheight"><strong>frameletHeight</strong></a>   = <code>0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-frameletorderreversed"><strong>frameletOrderReversed</strong></a>   = <code>false</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-frameletoverlap"><strong>frameletOverlap</strong></a>   = <code>0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-frameletsflipped"><strong>frameletsFlipped</strong></a>   = <code>false</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-interframedelay"><strong>interframeDelay</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; std::array&lt; double, 3 &gt; &gt;</td>
+<td style="text-align: left;"><a href="#variable-linerates"><strong>lineRates</strong></a>  <br><em>Line scanners' timing,</em> <code>line_scan_rate</code> <em>: from each start line on, (start line, its time relative to</em><code>centerTime</code> <em>, seconds per line).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-linesumming"><strong>lineSumming</strong></a>   = <code>1.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-lines"><strong>lines</strong></a>   = <code>0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#variable-model"><strong>model</strong></a>  <br><code>name_model</code> <em>, such as USGS_ASTRO_LINE_SCANNER_SENSOR_MODEL.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#variable-platform"><strong>platform</strong></a>  <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1IsdRotation/"><strong>IsdRotation</strong></a></td>
+<td style="text-align: left;"><a href="#variable-pointing"><strong>pointing</strong></a>  <br><code>instrument_pointing</code> <em>: to the sensor's frame.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::int64_t</td>
+<td style="text-align: left;"><a href="#variable-positionframe"><strong>positionFrame</strong></a>   = <code>1</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1IsdSamples/"><strong>IsdSamples</strong></a>&lt; glm::dvec3 &gt;</td>
+<td style="text-align: left;"><a href="#variable-positions"><strong>positions</strong></a>  <br><em>The sensor's and the sun's positions and velocities relative to the body's centre, in</em> <code>positionFrame</code> <em>(1 is J2000), metres and metres per second.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-samplesumming"><strong>sampleSumming</strong></a>   = <code>1.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-samples"><strong>samples</strong></a>   = <code>0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-semimajoraxis"><strong>semiMajorAxis</strong></a>   = <code>0.0</code><br><em>Body radii, metres.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-semiminoraxis"><strong>semiMinorAxis</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#variable-sensor"><strong>sensor</strong></a>  <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-startingdetectorline"><strong>startingDetectorLine</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-startingdetectorsample"><strong>startingDetectorSample</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-startingtime"><strong>startingTime</strong></a>   = <code>0.0</code><br><em>Ephemeris seconds.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1IsdSamples/"><strong>IsdSamples</strong></a>&lt; glm::dvec3 &gt;</td>
+<td style="text-align: left;"><a href="#variable-sunpositions"><strong>sunPositions</strong></a>  <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1IsdSamples/"><strong>IsdSamples</strong></a>&lt; glm::dvec3 &gt;</td>
+<td style="text-align: left;"><a href="#variable-velocities"><strong>velocities</strong></a>  <br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-isframe"><strong>IsFrame</strong></a> () const<br><em>Whether the ISD is a frame camera's (USGS_ASTRO_FRAME_SENSOR_MODEL).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-islinescanner"><strong>IsLineScanner</strong></a> () const<br><em>Whether the ISD is a line scanner's (</em> <code>model</code> <em>USGS_ASTRO_LINE_SCANNER_SENSOR_MODEL).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-ispushframe"><strong>IsPushFrame</strong></a> () const<br><em>Whether the ISD is a push-frame camera's (USGS_ASTRO_PUSH_FRAME_SENSOR_MODEL).</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>Lengths are converted to metres; everything else is kept in the ISD's own frames and conventions.</p>
+<p>References:
+* USGS Astrogeology, "ALE: Abstraction Layer for Ephemerides", <a href="https://github.com/DOI-USGS/ale">https://github.com/DOI-USGS/ale</a>
+* USGS Astrogeology, "usgscsm: Community Sensor Model plugin", <a href="https://github.com/DOI-USGS/usgscsm">https://github.com/DOI-USGS/usgscsm</a> (the sensor models that read these ISDs; its src/Distortion.cpp the lens models).
+* USGS Astrogeology, ISIS's distortion maps (LroNarrowAngleDistortionMap, ShadowCamDistortionMap, TgoCassisDistortionMap), <a href="https://github.com/DOI-USGS/ISIS3">https://github.com/DOI-USGS/ISIS3</a>
+* S. Tulyakov et al., "Geometric calibration of Colour and Stereo Surface Imaging System of
+  ESA's Trace Gas Orbiter", Advances in Space Research 61(1), 2018 (CaSSIS's rational model).
+* NGA, "Community Sensor Model (CSM) Technical Requirements Document", version 3.0.4. </p>
+<h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-bodyrotation">variable bodyRotation</h3>
+<p><code>body_rotation</code> <em>: to the body-fixed frame.</em></p>
+<pre><code class="language-C++">IsdRotation ernie::IsdSensor::bodyRotation;
+</code></pre>
+<hr>
+
+<h3 id="variable-centertime">variable centerTime</h3>
+<pre><code class="language-C++">double ernie::IsdSensor::centerTime;
+</code></pre>
+<hr>
+
+<h3 id="variable-detectorcenterline">variable detectorCenterLine</h3>
+<pre><code class="language-C++">double ernie::IsdSensor::detectorCenterLine;
+</code></pre>
+<hr>
+
+<h3 id="variable-detectorcentersample">variable detectorCenterSample</h3>
+<pre><code class="language-C++">double ernie::IsdSensor::detectorCenterSample;
+</code></pre>
+<hr>
+
+<h3 id="variable-distortion">variable distortion</h3>
+<p><code>optical_distortion</code> <em>'s model name (such as "radial", "transverse", "lrolrocnac") and coefficients; for "transverse" the x coefficients then the y (ten each: the cubic polynomial's terms 1, x, y, x^2, xy, y^2, x^3, x^2 y, x y^2, y^3), for "kaguyalism" boresight x, the four x coefficients, boresight y, the four y (as usgscsm's</em><code>getDistortionCoeffs</code> <em>packs them).</em></p>
+<pre><code class="language-C++">std::string ernie::IsdSensor::distortion;
+</code></pre>
+<hr>
+
+<h3 id="variable-distortioncoefficients">variable distortionCoefficients</h3>
+<pre><code class="language-C++">std::vector&lt;double&gt; ernie::IsdSensor::distortionCoefficients;
+</code></pre>
+<hr>
+
+<h3 id="variable-exposureduration">variable exposureDuration</h3>
+<p><em>Push-frame cameras' framelets:</em> <code>exposure_duration</code> <em>and</em><code>interframe_delay</code> <em>(seconds),</em><code>framelet_height</code> <em>(detector lines, the overlap included),</em><code>num_lines_overlap</code> <em>(lines shared with the next framelet, even),</em><code>framelets_flipped</code> <em>and</em><code>framelet_order_reversed</code> <em>.</em></p>
+<pre><code class="language-C++">double ernie::IsdSensor::exposureDuration;
+</code></pre>
+<hr>
+
+<h3 id="variable-focallengthmm">variable focalLengthMm</h3>
+<pre><code class="language-C++">double ernie::IsdSensor::focalLengthMm;
+</code></pre>
+<hr>
+
+<h3 id="variable-focaltoline">variable focalToLine</h3>
+<p><em>Detector line and sample from focal plane x and y in mm: a0 + a1 x + a2 y.</em> </p>
+<pre><code class="language-C++">std::array&lt;double, 3&gt; ernie::IsdSensor::focalToLine;
+</code></pre>
+<hr>
+
+<h3 id="variable-focaltosample">variable focalToSample</h3>
+<pre><code class="language-C++">std::array&lt;double, 3&gt; ernie::IsdSensor::focalToSample;
+</code></pre>
+<hr>
+
+<h3 id="variable-frameletheight">variable frameletHeight</h3>
+<pre><code class="language-C++">std::uint32_t ernie::IsdSensor::frameletHeight;
+</code></pre>
+<hr>
+
+<h3 id="variable-frameletorderreversed">variable frameletOrderReversed</h3>
+<pre><code class="language-C++">bool ernie::IsdSensor::frameletOrderReversed;
+</code></pre>
+<hr>
+
+<h3 id="variable-frameletoverlap">variable frameletOverlap</h3>
+<pre><code class="language-C++">std::uint32_t ernie::IsdSensor::frameletOverlap;
+</code></pre>
+<hr>
+
+<h3 id="variable-frameletsflipped">variable frameletsFlipped</h3>
+<pre><code class="language-C++">bool ernie::IsdSensor::frameletsFlipped;
+</code></pre>
+<hr>
+
+<h3 id="variable-interframedelay">variable interframeDelay</h3>
+<pre><code class="language-C++">double ernie::IsdSensor::interframeDelay;
+</code></pre>
+<hr>
+
+<h3 id="variable-linerates">variable lineRates</h3>
+<p><em>Line scanners' timing,</em> <code>line_scan_rate</code> <em>: from each start line on, (start line, its time relative to</em><code>centerTime</code> <em>, seconds per line).</em></p>
+<pre><code class="language-C++">std::vector&lt;std::array&lt;double, 3&gt; &gt; ernie::IsdSensor::lineRates;
+</code></pre>
+<hr>
+
+<h3 id="variable-linesumming">variable lineSumming</h3>
+<pre><code class="language-C++">double ernie::IsdSensor::lineSumming;
+</code></pre>
+<hr>
+
+<h3 id="variable-lines">variable lines</h3>
+<pre><code class="language-C++">std::uint32_t ernie::IsdSensor::lines;
+</code></pre>
+<hr>
+
+<h3 id="variable-model">variable model</h3>
+<p><code>name_model</code> <em>, such as USGS_ASTRO_LINE_SCANNER_SENSOR_MODEL.</em></p>
+<pre><code class="language-C++">std::string ernie::IsdSensor::model;
+</code></pre>
+<hr>
+
+<h3 id="variable-platform">variable platform</h3>
+<pre><code class="language-C++">std::string ernie::IsdSensor::platform;
+</code></pre>
+<hr>
+
+<h3 id="variable-pointing">variable pointing</h3>
+<p><code>instrument_pointing</code> <em>: to the sensor's frame.</em></p>
+<pre><code class="language-C++">IsdRotation ernie::IsdSensor::pointing;
+</code></pre>
+<hr>
+
+<h3 id="variable-positionframe">variable positionFrame</h3>
+<pre><code class="language-C++">std::int64_t ernie::IsdSensor::positionFrame;
+</code></pre>
+<hr>
+
+<h3 id="variable-positions">variable positions</h3>
+<p><em>The sensor's and the sun's positions and velocities relative to the body's centre, in</em> <code>positionFrame</code> <em>(1 is J2000), metres and metres per second.</em></p>
+<pre><code class="language-C++">IsdSamples&lt;glm::dvec3&gt; ernie::IsdSensor::positions;
+</code></pre>
+<hr>
+
+<h3 id="variable-samplesumming">variable sampleSumming</h3>
+<pre><code class="language-C++">double ernie::IsdSensor::sampleSumming;
+</code></pre>
+<hr>
+
+<h3 id="variable-samples">variable samples</h3>
+<pre><code class="language-C++">std::uint32_t ernie::IsdSensor::samples;
+</code></pre>
+<hr>
+
+<h3 id="variable-semimajoraxis">variable semiMajorAxis</h3>
+<p><em>Body radii, metres.</em> </p>
+<pre><code class="language-C++">double ernie::IsdSensor::semiMajorAxis;
+</code></pre>
+<hr>
+
+<h3 id="variable-semiminoraxis">variable semiMinorAxis</h3>
+<pre><code class="language-C++">double ernie::IsdSensor::semiMinorAxis;
+</code></pre>
+<hr>
+
+<h3 id="variable-sensor">variable sensor</h3>
+<pre><code class="language-C++">std::string ernie::IsdSensor::sensor;
+</code></pre>
+<hr>
+
+<h3 id="variable-startingdetectorline">variable startingDetectorLine</h3>
+<pre><code class="language-C++">double ernie::IsdSensor::startingDetectorLine;
+</code></pre>
+<hr>
+
+<h3 id="variable-startingdetectorsample">variable startingDetectorSample</h3>
+<pre><code class="language-C++">double ernie::IsdSensor::startingDetectorSample;
+</code></pre>
+<hr>
+
+<h3 id="variable-startingtime">variable startingTime</h3>
+<p><em>Ephemeris seconds.</em> </p>
+<pre><code class="language-C++">double ernie::IsdSensor::startingTime;
+</code></pre>
+<hr>
+
+<h3 id="variable-sunpositions">variable sunPositions</h3>
+<pre><code class="language-C++">IsdSamples&lt;glm::dvec3&gt; ernie::IsdSensor::sunPositions;
+</code></pre>
+<hr>
+
+<h3 id="variable-velocities">variable velocities</h3>
+<pre><code class="language-C++">IsdSamples&lt;glm::dvec3&gt; ernie::IsdSensor::velocities;
+</code></pre>
+<hr>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-isframe">function IsFrame</h3>
+<p><em>Whether the ISD is a frame camera's (USGS_ASTRO_FRAME_SENSOR_MODEL).</em> </p>
+<pre><code class="language-C++">bool ernie::IsdSensor::IsFrame () const
+</code></pre>
+<hr>
+
+<h3 id="function-islinescanner">function IsLineScanner</h3>
+<p><em>Whether the ISD is a line scanner's (</em> <code>model</code> <em>USGS_ASTRO_LINE_SCANNER_SENSOR_MODEL).</em></p>
+<pre><code class="language-C++">bool ernie::IsdSensor::IsLineScanner () const
+</code></pre>
+<hr>
+
+<h3 id="function-ispushframe">function IsPushFrame</h3>
+<p><em>Whether the ISD is a push-frame camera's (USGS_ASTRO_PUSH_FRAME_SENSOR_MODEL).</em> </p>
+<pre><code class="language-C++">bool ernie::IsdSensor::IsPushFrame () const
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/scene/isd.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

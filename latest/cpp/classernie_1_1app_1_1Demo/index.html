@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1app_1_1Demo/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Class ernie::app::Demo - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Class ernie::app::Demo";
+        var mkdocs_page_input_path = "cpp/classernie_1_1app_1_1Demo.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/classernie_1_1app_1_1Demo/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Class ernie::app::Demo</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/classernie_1_1app_1_1Demo.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-ernieappdemo">Class ernie::app::Demo</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../namespaceernie_1_1app/"><strong>app</strong></a> <strong>&gt;</strong> <a href="./"><strong>Demo</strong></a></p>
+<p><em>A demo: a scene built in the constructor, advanced by</em> <code>Step</code> <em>, drawn by</em><code>Render</code> <em>and checked by</em><code>TestFinal</code> <em>, run by</em><code>DemoRunner</code> <em>in a window, headless or without a viewer.</em><a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/app/demo.h&gt;</code></li>
+</ul>
+<h2 id="public-attributes">Public Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#variable-description"><strong>description</strong></a>  <br><code>Description</code> <em>, for demos to set.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-fixeddt"><strong>fixedDt</strong></a>   = <code>1.0 / 60.0</code><br><code>FixedDt</code> <em>, for demos to set.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#variable-frame"><strong>frame</strong></a>   = <code>0</code><br><em>Steps taken so far.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-framedt"><strong>frameDt</strong></a>   = <code>1.0 / 60.0</code><br><em>Seconds this step advances: in a window the time since the last frame (at most</em> <code>MaxFrameDt</code> <em>), else</em><code>FixedDt</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-maxframedt"><strong>maxFrameDt</strong></a>   = <code>1.0 / 30.0</code><br><code>MaxFrameDt</code> <em>, for demos to set.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#variable-numframes"><strong>numFrames</strong></a>   = <code>100</code><br><code>NumFrames</code> <em>, for demos to set.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-time"><strong>time</strong></a>   = <code>0.0</code><br><a href="./"><em><strong>Demo</strong></em></a> <em>seconds at the start of this step.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-close"><strong>Close</strong></a> () <br><em>Releases what the demo holds beyond the scene and viewer, when it ends or the Demos panel replaces it; for timing reports and the like.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-demo-12"><strong>Demo</strong></a> (<a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> * viewer, const <a href="../structernie_1_1app_1_1DemoOptions/"><strong>DemoOptions</strong></a> &amp; options) <br><code>viewer</code> <em>is null without one.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-demo-22"><strong>Demo</strong></a> (const <a href="./"><strong>Demo</strong></a> &amp;) = delete<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual std::string</td>
+<td style="text-align: left;"><a href="#function-description"><strong>Description</strong></a> () const<br><em>One line on what the demo shows, for the Demos panel and the log.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual double</td>
+<td style="text-align: left;"><a href="#function-fixeddt"><strong>FixedDt</strong></a> () const<br><em>Seconds a step advances without a window, for runs that repeat:</em> <code>fixedDt</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Renderer/"><strong>Renderer</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-getrenderer"><strong>GetRenderer</strong></a> () <br><em>A renderer of the demo's own, opened on first use with the run's device, backend and validation: for rendering without a viewer, batches and tests.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-getscene"><strong>GetScene</strong></a> () <br><em>The scene to build into: the viewer's, or the demo's own without a viewer.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> *</td>
+<td style="text-align: left;"><a href="#function-getviewer"><strong>GetViewer</strong></a> () <br><em>The viewer, or null without one.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-image"><strong>Image</strong></a> () const<br><em>The last frame rendered without a viewer (</em> <code>Render</code> <em>), LdrColor uint8 (rows, cols, 4); empty in a viewer.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual double</td>
+<td style="text-align: left;"><a href="#function-maxframedt"><strong>MaxFrameDt</strong></a> () const<br><em>The longest step in a window, so a stall does not throw the demo:</em> <code>maxFrameDt</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual std::uint64_t</td>
+<td style="text-align: left;"><a href="#function-numframes"><strong>NumFrames</strong></a> () const<br><em>Frames to run without a window when</em> <code>--num-frames</code> <em>is not given:</em><code>numFrames</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../structernie_1_1app_1_1DemoOptions/"><strong>DemoOptions</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-options"><strong>Options</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::shared_ptr&lt; <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-ownscene"><strong>OwnScene</strong></a> () <br><em>The demo's own scene, shared, without a viewer (for holders that may outlive the demo, such as its Python wrapper); null with a viewer, whose owner holds the scene.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-render"><strong>Render</strong></a> () <br><em>Draws a frame: the viewer's next, or without one the scene through</em> <code>GetRenderer</code> <em>into</em><code>Image</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#function-renderimage"><strong>RenderImage</strong></a> () <br><em>The scene's LdrColor as its</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>(or its first camera) describe, uint8 (rows, cols, 4): the last frame without a viewer, else rendered now with</em><code>GetRenderer</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-saveoutput"><strong>SaveOutput</strong></a> (const std::filesystem::path &amp; path) <br><em>Writes</em> <code>--output</code> <em>: the viewport's next frame in a viewer, else the scene's LdrColor (</em><code>RenderImage</code> <em>) as PNG.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::shared_ptr&lt; <a href="../classernie_1_1Renderer/"><strong>Renderer</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-sharedrenderer"><strong>SharedRenderer</strong></a> () <br><code>GetRenderer</code> <em>shared, for holders that may outlive the demo, such as its Python wrapper.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-step"><strong>Step</strong></a> () <br><em>Advances the scene by</em> <code>frameDt</code> <em>seconds; nothing by default, for a still scene.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-testfinal"><strong>TestFinal</strong></a> () <br><em>Checks at the end of a</em> <code>--test</code> <em>run; throw to fail.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-testpoststep"><strong>TestPostStep</strong></a> () <br><em>Checks after every step, under</em> <code>--test</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-untested"><strong>Untested</strong></a> () const<br><em>Whether a</em> <code>--test</code> <em>run found no checks: neither</em><code>TestPostStep</code> <em>nor</em><code>TestFinal</code> <em>is overridden.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Demo</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-operator"><strong>operator=</strong></a> (const <a href="./"><strong>Demo</strong></a> &amp;) = delete<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual</td>
+<td style="text-align: left;"><a href="#function-demo"><strong>~Demo</strong></a> () <br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>Ernie's own demos derive from it, in C++ and in Python (<code>ernie.demo.Demo</code>), as may any application's.</p>
+<p>The scene is the viewer's, or one of the demo's own without a viewer. Give it a camera of its own, even for a demo meant for the viewer (which frames the scene with its own camera): without a viewer, and in tests (<code>RenderImage</code>), the scene renders through it.</p>
+<p>In the viewer a demo uses it as any application does (<code>Viewer::AddPanel</code>, <code>OnFrame</code>, <code>SetActiveCamera</code>...); when the Demos panel switches away, what it added is removed (in the demo's scope, <code>Viewer::SetScope</code>) and the viewport's display settings are restored.</p>
+<p>References:
+* Newton's examples (<code>newton.examples</code>: <code>Example</code>, <code>create_parser</code>, <code>init</code>, <code>run</code> and the example browser), <a href="https://github.com/newton-physics/newton">https://github.com/newton-physics/newton</a> </p>
+<h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-description">variable description</h3>
+<p><code>Description</code> <em>, for demos to set.</em></p>
+<pre><code class="language-C++">std::string ernie::app::Demo::description;
+</code></pre>
+<hr>
+
+<h3 id="variable-fixeddt">variable fixedDt</h3>
+<p><code>FixedDt</code> <em>, for demos to set.</em></p>
+<pre><code class="language-C++">double ernie::app::Demo::fixedDt;
+</code></pre>
+<hr>
+
+<h3 id="variable-frame">variable frame</h3>
+<p><em>Steps taken so far.</em> </p>
+<pre><code class="language-C++">std::uint64_t ernie::app::Demo::frame;
+</code></pre>
+<hr>
+
+<h3 id="variable-framedt">variable frameDt</h3>
+<p><em>Seconds this step advances: in a window the time since the last frame (at most</em> <code>MaxFrameDt</code> <em>), else</em><code>FixedDt</code> <em>.</em></p>
+<pre><code class="language-C++">double ernie::app::Demo::frameDt;
+</code></pre>
+<hr>
+
+<h3 id="variable-maxframedt">variable maxFrameDt</h3>
+<p><code>MaxFrameDt</code> <em>, for demos to set.</em></p>
+<pre><code class="language-C++">double ernie::app::Demo::maxFrameDt;
+</code></pre>
+<hr>
+
+<h3 id="variable-numframes">variable numFrames</h3>
+<p><code>NumFrames</code> <em>, for demos to set.</em></p>
+<pre><code class="language-C++">std::uint64_t ernie::app::Demo::numFrames;
+</code></pre>
+<hr>
+
+<h3 id="variable-time">variable time</h3>
+<p><a href="./"><em><strong>Demo</strong></em></a> <em>seconds at the start of this step.</em></p>
+<pre><code class="language-C++">double ernie::app::Demo::time;
+</code></pre>
+<hr>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-close">function Close</h3>
+<p><em>Releases what the demo holds beyond the scene and viewer, when it ends or the Demos panel replaces it; for timing reports and the like.</em> </p>
+<pre><code class="language-C++">virtual void ernie::app::Demo::Close () 
+</code></pre>
+<hr>
+
+<h3 id="function-demo-12">function Demo [1/2]</h3>
+<p><code>viewer</code> <em>is null without one.</em></p>
+<pre><code class="language-C++">ernie::app::Demo::Demo (
+    Viewer * viewer,
+    const DemoOptions &amp; options
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-demo-22">function Demo [2/2]</h3>
+<pre><code class="language-C++">ernie::app::Demo::Demo (
+    const Demo &amp;
+) = delete
+</code></pre>
+<hr>
+
+<h3 id="function-description">function Description</h3>
+<p><em>One line on what the demo shows, for the Demos panel and the log.</em> </p>
+<pre><code class="language-C++">virtual std::string ernie::app::Demo::Description () const
+</code></pre>
+<hr>
+
+<h3 id="function-fixeddt">function FixedDt</h3>
+<p><em>Seconds a step advances without a window, for runs that repeat:</em> <code>fixedDt</code> <em>.</em></p>
+<pre><code class="language-C++">virtual double ernie::app::Demo::FixedDt () const
+</code></pre>
+<hr>
+
+<h3 id="function-getrenderer">function GetRenderer</h3>
+<p><em>A renderer of the demo's own, opened on first use with the run's device, backend and validation: for rendering without a viewer, batches and tests.</em> </p>
+<pre><code class="language-C++">Renderer &amp; ernie::app::Demo::GetRenderer () 
+</code></pre>
+<hr>
+
+<h3 id="function-getscene">function GetScene</h3>
+<p><em>The scene to build into: the viewer's, or the demo's own without a viewer.</em> </p>
+<pre><code class="language-C++">Scene &amp; ernie::app::Demo::GetScene () 
+</code></pre>
+<hr>
+
+<h3 id="function-getviewer">function GetViewer</h3>
+<p><em>The viewer, or null without one.</em> </p>
+<pre><code class="language-C++">Viewer * ernie::app::Demo::GetViewer () 
+</code></pre>
+<hr>
+
+<h3 id="function-image">function Image</h3>
+<p><em>The last frame rendered without a viewer (</em> <code>Render</code> <em>), LdrColor uint8 (rows, cols, 4); empty in a viewer.</em></p>
+<pre><code class="language-C++">const Tensor &amp; ernie::app::Demo::Image () const
+</code></pre>
+<hr>
+
+<h3 id="function-maxframedt">function MaxFrameDt</h3>
+<p><em>The longest step in a window, so a stall does not throw the demo:</em> <code>maxFrameDt</code> <em>.</em></p>
+<pre><code class="language-C++">virtual double ernie::app::Demo::MaxFrameDt () const
+</code></pre>
+<hr>
+
+<h3 id="function-numframes">function NumFrames</h3>
+<p><em>Frames to run without a window when</em> <code>--num-frames</code> <em>is not given:</em><code>numFrames</code> <em>.</em></p>
+<pre><code class="language-C++">virtual std::uint64_t ernie::app::Demo::NumFrames () const
+</code></pre>
+<hr>
+
+<h3 id="function-options">function Options</h3>
+<pre><code class="language-C++">const DemoOptions &amp; ernie::app::Demo::Options () const
+</code></pre>
+<hr>
+
+<h3 id="function-ownscene">function OwnScene</h3>
+<p><em>The demo's own scene, shared, without a viewer (for holders that may outlive the demo, such as its Python wrapper); null with a viewer, whose owner holds the scene.</em> </p>
+<pre><code class="language-C++">std::shared_ptr&lt; Scene &gt; ernie::app::Demo::OwnScene () 
+</code></pre>
+<hr>
+
+<h3 id="function-render">function Render</h3>
+<p><em>Draws a frame: the viewer's next, or without one the scene through</em> <code>GetRenderer</code> <em>into</em><code>Image</code> <em>.</em></p>
+<pre><code class="language-C++">virtual void ernie::app::Demo::Render () 
+</code></pre>
+<hr>
+
+<h3 id="function-renderimage">function RenderImage</h3>
+<p><em>The scene's LdrColor as its</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>(or its first camera) describe, uint8 (rows, cols, 4): the last frame without a viewer, else rendered now with</em><code>GetRenderer</code> <em>.</em></p>
+<pre><code class="language-C++">Tensor ernie::app::Demo::RenderImage () 
+</code></pre>
+<p>Not the viewport's image: the viewer's camera is not the scene's. </p>
+<hr>
+
+<h3 id="function-saveoutput">function SaveOutput</h3>
+<p><em>Writes</em> <code>--output</code> <em>: the viewport's next frame in a viewer, else the scene's LdrColor (</em><code>RenderImage</code> <em>) as PNG.</em></p>
+<pre><code class="language-C++">virtual void ernie::app::Demo::SaveOutput (
+    const std::filesystem::path &amp; path
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::runtime_error</code> if the file cannot be written. </li>
+</ul>
+<hr>
+
+<h3 id="function-sharedrenderer">function SharedRenderer</h3>
+<p><code>GetRenderer</code> <em>shared, for holders that may outlive the demo, such as its Python wrapper.</em></p>
+<pre><code class="language-C++">std::shared_ptr&lt; Renderer &gt; ernie::app::Demo::SharedRenderer () 
+</code></pre>
+<hr>
+
+<h3 id="function-step">function Step</h3>
+<p><em>Advances the scene by</em> <code>frameDt</code> <em>seconds; nothing by default, for a still scene.</em></p>
+<pre><code class="language-C++">virtual void ernie::app::Demo::Step () 
+</code></pre>
+<hr>
+
+<h3 id="function-testfinal">function TestFinal</h3>
+<p><em>Checks at the end of a</em> <code>--test</code> <em>run; throw to fail.</em></p>
+<pre><code class="language-C++">virtual void ernie::app::Demo::TestFinal () 
+</code></pre>
+<hr>
+
+<h3 id="function-testpoststep">function TestPostStep</h3>
+<p><em>Checks after every step, under</em> <code>--test</code> <em>.</em></p>
+<pre><code class="language-C++">virtual void ernie::app::Demo::TestPostStep () 
+</code></pre>
+<p>A demo overrides this, <code>TestFinal</code> or both; the runner fails a test run of a demo that overrides neither. </p>
+<hr>
+
+<h3 id="function-untested">function Untested</h3>
+<p><em>Whether a</em> <code>--test</code> <em>run found no checks: neither</em><code>TestPostStep</code> <em>nor</em><code>TestFinal</code> <em>is overridden.</em></p>
+<pre><code class="language-C++">bool ernie::app::Demo::Untested () const
+</code></pre>
+<p>Meaningful once <code>TestFinal</code> has run. </p>
+<hr>
+
+<h3 id="function-operator">function operator=</h3>
+<pre><code class="language-C++">Demo &amp; ernie::app::Demo::operator= (
+    const Demo &amp;
+) = delete
+</code></pre>
+<hr>
+
+<h3 id="function-demo">function ~Demo</h3>
+<pre><code class="language-C++">virtual ernie::app::Demo::~Demo () 
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/app/demo.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

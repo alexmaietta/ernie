@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1GpuImage/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Class ernie::GpuImage - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Class ernie::GpuImage";
+        var mkdocs_page_input_path = "cpp/classernie_1_1GpuImage.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/classernie_1_1GpuImage/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Class ernie::GpuImage</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/classernie_1_1GpuImage.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-erniegpuimage">Class ernie::GpuImage</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>GpuImage</strong></a></p>
+<p><em>A device-local Vulkan image with a view of all its mips and layers, allocated through VMA.</em> <a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/device/image.h&gt;</code></li>
+</ul>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">VkDeviceSize</td>
+<td style="text-align: left;"><a href="#function-allocationsize"><strong>AllocationSize</strong></a> () const<br><em>For shared images, the size of the image's dedicated memory allocation.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-attach"><strong>Attach</strong></a> (std::shared_ptr&lt; void &gt; object) <br><em>Keeps</em> <code>object</code> <em>, such as a CUDA import of the image's memory, until the image is destroyed, releasing it before the memory is freed.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const std::shared_ptr&lt; void &gt; &amp;</td>
+<td style="text-align: left;"><a href="#function-attached"><strong>Attached</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkDeviceSize</td>
+<td style="text-align: left;"><a href="#function-bytes"><strong>Bytes</strong></a> () const<br><em>Bytes of device memory the image occupies.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../structernie_1_1ImageDesc/"><strong>ImageDesc</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-desc"><strong>Desc</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../namespaceernie/#typedef-externalhandle"><strong>ExternalHandle</strong></a></td>
+<td style="text-align: left;"><a href="#function-exporthandle"><strong>ExportHandle</strong></a> () const<br><em>For shared images, a new handle to the image's memory (a file descriptor, or a Win32 handle on Windows), owned by the caller until it imports it elsewhere (</em> <code>CloseExternalHandle</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-gpuimage-13"><strong>GpuImage</strong></a> (const <a href="../classernie_1_1VulkanContext/"><strong>VulkanContext</strong></a> &amp; context, const <a href="../structernie_1_1ImageDesc/"><strong>ImageDesc</strong></a> &amp; desc) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-gpuimage-23"><strong>GpuImage</strong></a> (<a href="./"><strong>GpuImage</strong></a> &amp;&amp; other) noexcept<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-gpuimage-33"><strong>GpuImage</strong></a> (const <a href="./"><strong>GpuImage</strong></a> &amp;) = delete<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkImageView</td>
+<td style="text-align: left;"><a href="#function-groupview"><strong>GroupView</strong></a> (std::uint32_t group) const<br><em>View of layer group</em> <code>group</code> <em>(</em><code>ImageDesc::groupLayers</code> <em>layers from</em><code>group</code> <em>times that) as a 2D array; with a single group, the view of every layer.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkImage</td>
+<td style="text-align: left;"><a href="#function-handle"><strong>Handle</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkImageView</td>
+<td style="text-align: left;"><a href="#function-layerview"><strong>LayerView</strong></a> (std::uint32_t layer) const<br><em>View of one layer's first mip, e.g.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkImageLayout</td>
+<td style="text-align: left;"><a href="#function-layout"><strong>Layout</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkImageView</td>
+<td style="text-align: left;"><a href="#function-mipview"><strong>MipView</strong></a> (std::uint32_t mip) const<br><em>View of mip</em> <code>mip</code> <em>alone, of every layer as a 2D array for array images, such as one level of a depth pyramid of a batch of views; a 2D view of it otherwise.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-transition"><strong>Transition</strong></a> (VkCommandBuffer commands, VkImageLayout layout) <br><em>Records a barrier moving every subresource to</em> <code>layout</code> <em>; waits for and makes visible all earlier work, which is simple rather than minimal.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-upload"><strong>Upload</strong></a> (std::span&lt; const std::span&lt; const std::byte &gt; &gt; mipData) <br><em>Uploads tightly packed texels for each mip of layer 0 (</em> <code>mipData[m]</code> <em>holds mip</em><code>m</code> <em>), or of every layer in turn (</em><code>mipData[l * mips + m]</code> <em>holds mip</em><code>m</code> <em>of layer</em><code>l</code> <em>), and leaves the image ready for sampling in fragment and compute shaders.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkImageView</td>
+<td style="text-align: left;"><a href="#function-view"><strong>View</strong></a> () const<br><em>View of every mip and layer (</em> <code>VK_IMAGE_VIEW_TYPE_2D_ARRAY</code> <em>when there are several layers).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>GpuImage</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-operator"><strong>operator=</strong></a> (<a href="./"><strong>GpuImage</strong></a> &amp;&amp; other) noexcept<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>GpuImage</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-operator_1"><strong>operator=</strong></a> (const <a href="./"><strong>GpuImage</strong></a> &amp;) = delete<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-gpuimage"><strong>~GpuImage</strong></a> () <br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-static-functions">Public Static Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#function-texelbytes"><strong>TexelBytes</strong></a> (VkFormat format) <br><em>Bytes per texel of the formats Ernie uploads and reads back.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>The image tracks one layout for all its subresources; <code>Transition</code> records the barrier that moves it to a new one. </p>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-allocationsize">function AllocationSize</h3>
+<p><em>For shared images, the size of the image's dedicated memory allocation.</em> </p>
+<pre><code class="language-C++">inline VkDeviceSize ernie::GpuImage::AllocationSize () const
+</code></pre>
+<hr>
+
+<h3 id="function-attach">function Attach</h3>
+<p><em>Keeps</em> <code>object</code> <em>, such as a CUDA import of the image's memory, until the image is destroyed, releasing it before the memory is freed.</em></p>
+<pre><code class="language-C++">inline void ernie::GpuImage::Attach (
+    std::shared_ptr&lt; void &gt; object
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-attached">function Attached</h3>
+<pre><code class="language-C++">inline const std::shared_ptr&lt; void &gt; &amp; ernie::GpuImage::Attached () const
+</code></pre>
+<hr>
+
+<h3 id="function-bytes">function Bytes</h3>
+<p><em>Bytes of device memory the image occupies.</em> </p>
+<pre><code class="language-C++">inline VkDeviceSize ernie::GpuImage::Bytes () const
+</code></pre>
+<hr>
+
+<h3 id="function-desc">function Desc</h3>
+<pre><code class="language-C++">inline const ImageDesc &amp; ernie::GpuImage::Desc () const
+</code></pre>
+<hr>
+
+<h3 id="function-exporthandle">function ExportHandle</h3>
+<p><em>For shared images, a new handle to the image's memory (a file descriptor, or a Win32 handle on Windows), owned by the caller until it imports it elsewhere (</em> <code>CloseExternalHandle</code> <em>).</em></p>
+<pre><code class="language-C++">ExternalHandle ernie::GpuImage::ExportHandle () const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::logic_error</code> for other images, or std::runtime_error if export fails. </li>
+</ul>
+<hr>
+
+<h3 id="function-gpuimage-13">function GpuImage [1/3]</h3>
+<pre><code class="language-C++">ernie::GpuImage::GpuImage (
+    const VulkanContext &amp; context,
+    const ImageDesc &amp; desc
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::runtime_error</code> if allocation fails. </li>
+</ul>
+<hr>
+
+<h3 id="function-gpuimage-23">function GpuImage [2/3]</h3>
+<pre><code class="language-C++">ernie::GpuImage::GpuImage (
+    GpuImage &amp;&amp; other
+) noexcept
+</code></pre>
+<hr>
+
+<h3 id="function-gpuimage-33">function GpuImage [3/3]</h3>
+<pre><code class="language-C++">ernie::GpuImage::GpuImage (
+    const GpuImage &amp;
+) = delete
+</code></pre>
+<hr>
+
+<h3 id="function-groupview">function GroupView</h3>
+<p><em>View of layer group</em> <code>group</code> <em>(</em><code>ImageDesc::groupLayers</code> <em>layers from</em><code>group</code> <em>times that) as a 2D array; with a single group, the view of every layer.</em></p>
+<pre><code class="language-C++">VkImageView ernie::GpuImage::GroupView (
+    std::uint32_t group
+) const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::out_of_range</code> for a group the image does not have. </li>
+</ul>
+<hr>
+
+<h3 id="function-handle">function Handle</h3>
+<pre><code class="language-C++">inline VkImage ernie::GpuImage::Handle () const
+</code></pre>
+<hr>
+
+<h3 id="function-layerview">function LayerView</h3>
+<p><em>View of one layer's first mip, e.g.</em> </p>
+<pre><code class="language-C++">VkImageView ernie::GpuImage::LayerView (
+    std::uint32_t layer
+) const
+</code></pre>
+<p>to render into one cascade of a shadow map. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::out_of_range</code> for a layer the image does not have. </li>
+</ul>
+<hr>
+
+<h3 id="function-layout">function Layout</h3>
+<pre><code class="language-C++">inline VkImageLayout ernie::GpuImage::Layout () const
+</code></pre>
+<hr>
+
+<h3 id="function-mipview">function MipView</h3>
+<p><em>View of mip</em> <code>mip</code> <em>alone, of every layer as a 2D array for array images, such as one level of a depth pyramid of a batch of views; a 2D view of it otherwise.</em></p>
+<pre><code class="language-C++">VkImageView ernie::GpuImage::MipView (
+    std::uint32_t mip
+) const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::out_of_range</code> for a mip the image does not have. </li>
+</ul>
+<hr>
+
+<h3 id="function-transition">function Transition</h3>
+<p><em>Records a barrier moving every subresource to</em> <code>layout</code> <em>; waits for and makes visible all earlier work, which is simple rather than minimal.</em></p>
+<pre><code class="language-C++">void ernie::GpuImage::Transition (
+    VkCommandBuffer commands,
+    VkImageLayout layout
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-upload">function Upload</h3>
+<p><em>Uploads tightly packed texels for each mip of layer 0 (</em> <code>mipData[m]</code> <em>holds mip</em><code>m</code> <em>), or of every layer in turn (</em><code>mipData[l * mips + m]</code> <em>holds mip</em><code>m</code> <em>of layer</em><code>l</code> <em>), and leaves the image ready for sampling in fragment and compute shaders.</em></p>
+<pre><code class="language-C++">void ernie::GpuImage::Upload (
+    std::span&lt; const std::span&lt; const std::byte &gt; &gt; mipData
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if the number of mips or a mip's size does not match. </li>
+</ul>
+<hr>
+
+<h3 id="function-view">function View</h3>
+<p><em>View of every mip and layer (</em> <code>VK_IMAGE_VIEW_TYPE_2D_ARRAY</code> <em>when there are several layers).</em></p>
+<pre><code class="language-C++">inline VkImageView ernie::GpuImage::View () const
+</code></pre>
+<hr>
+
+<h3 id="function-operator">function operator=</h3>
+<pre><code class="language-C++">GpuImage &amp; ernie::GpuImage::operator= (
+    GpuImage &amp;&amp; other
+) noexcept
+</code></pre>
+<hr>
+
+<h3 id="function-operator_1">function operator=</h3>
+<pre><code class="language-C++">GpuImage &amp; ernie::GpuImage::operator= (
+    const GpuImage &amp;
+) = delete
+</code></pre>
+<hr>
+
+<h3 id="function-gpuimage">function ~GpuImage</h3>
+<pre><code class="language-C++">ernie::GpuImage::~GpuImage () 
+</code></pre>
+<hr>
+<h2 id="public-static-functions-documentation">Public Static Functions Documentation</h2>
+<h3 id="function-texelbytes">function TexelBytes</h3>
+<p><em>Bytes per texel of the formats Ernie uploads and reads back.</em> </p>
+<pre><code class="language-C++">static std::uint32_t ernie::GpuImage::TexelBytes (
+    VkFormat format
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for other formats. </li>
+</ul>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/device/image.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

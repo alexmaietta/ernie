@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/geometry__schemas_8h_source/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>File geometry_schemas.h - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "File geometry_schemas.h";
+        var mkdocs_page_input_path = "cpp/geometry__schemas_8h_source.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/geometry__schemas_8h_source/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">File geometry_schemas.h</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/geometry__schemas_8h_source.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="file-geometry_schemash">File geometry_schemas.h</h1>
+<p><a href="../files/"><strong>File List</strong></a> <strong>&gt;</strong> <a href="../dir_057d52706067b881d9371cf136c38c31/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../dir_572d817874f40c61a249f0e7684d4315/"><strong>scene</strong></a> <strong>&gt;</strong> <a href="../geometry__schemas_8h/"><strong>geometry_schemas.h</strong></a></p>
+<p><a href="../geometry__schemas_8h/">Go to the documentation of this file</a></p>
+<pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+#include &quot;ernie/scene/base_schemas.h&quot;
+#include &quot;ernie/scene/prim_type.h&quot;
+#include &quot;ernie/scene/tokens.h&quot;
+
+#include &lt;vector&gt;
+
+
+// clang-format off
+#define ERNIE_GEOM_SHAPE_RANGE .group = &quot;Shape&quot;, .min = 0.0, .max = 1000.0
+
+#define ERNIE_CUBE_ATTRIBUTES(X)                                                                   \
+    X(double, Size, ::ernie::tokens::kSize, 2.0,                                                   \
+      (::ernie::AttributeMeta{.doc = &quot;Edge length, metres.&quot;, ERNIE_GEOM_SHAPE_RANGE}))
+
+#define ERNIE_SPHERE_ATTRIBUTES(X)                                                                 \
+    X(double, Radius, ::ernie::tokens::kGeomRadius, 1.0,                                           \
+      (::ernie::AttributeMeta{.doc = &quot;Metres.&quot;, ERNIE_GEOM_SHAPE_RANGE}))
+
+#define ERNIE_AXIS_SHAPE_ATTRIBUTES(X)                                                             \
+    X(std::string, Axis, ::ernie::tokens::kAxis, &quot;Z&quot;,                                              \
+      (::ernie::AttributeMeta{.doc = &quot;The axis of its height, or a plane's normal.&quot;,               \
+                              .group = &quot;Shape&quot;, .options = {&quot;X&quot;, &quot;Y&quot;, &quot;Z&quot;}}))
+
+// A cylinder's and a cone's; a capsule's have other fallbacks.
+#define ERNIE_CYLINDER_ATTRIBUTES(X)                                                               \
+    X(double, Radius, ::ernie::tokens::kGeomRadius, 1.0,                                           \
+      (::ernie::AttributeMeta{.doc = &quot;Metres.&quot;, ERNIE_GEOM_SHAPE_RANGE}))                          \
+    X(double, Height, ::ernie::tokens::kGeomHeight, 2.0,                                           \
+      (::ernie::AttributeMeta{.doc = &quot;Metres along the axis.&quot;, ERNIE_GEOM_SHAPE_RANGE}))
+
+#define ERNIE_CAPSULE_ATTRIBUTES(X)                                                                \
+    X(double, Radius, ::ernie::tokens::kGeomRadius, 0.5,                                           \
+      (::ernie::AttributeMeta{.doc = &quot;Metres, of the cylinder and its end caps.&quot;,                  \
+                              ERNIE_GEOM_SHAPE_RANGE}))                                            \
+    X(double, Height, ::ernie::tokens::kGeomHeight, 1.0,                                           \
+      (::ernie::AttributeMeta{.doc = &quot;Metres along the axis of the cylinder between the caps.&quot;,    \
+                              ERNIE_GEOM_SHAPE_RANGE}))
+
+#define ERNIE_PLANE_ATTRIBUTES(X)                                                                  \
+    X(double, Width, ::ernie::tokens::kGeomWidth, 2.0,                                             \
+      (::ernie::AttributeMeta{.doc = &quot;Metres along x, or z when the axis is X.&quot;,                   \
+                              ERNIE_GEOM_SHAPE_RANGE}))                                            \
+    X(double, Length, ::ernie::tokens::kGeomLength, 2.0,                                           \
+      (::ernie::AttributeMeta{.doc = &quot;Metres along y, or z when the axis is Y.&quot;,                   \
+                              ERNIE_GEOM_SHAPE_RANGE}))
+
+#define ERNIE_POINT_BASED_ATTRIBUTES(X)                                                            \
+    X(::ernie::Tensor, Points, ::ernie::tokens::kPoints, nullptr,                                  \
+      (::ernie::AttributeMeta{.doc = &quot;float32 or float64 (n, 3) positions in the prim's frame.&quot;,   \
+                              .group = &quot;Geometry&quot;, .dirty = ::ernie::Dirty::Points}))
+
+#define ERNIE_MESH_ATTRIBUTES(X)                                                                   \
+    X(::ernie::Tensor, FaceVertexCounts, ::ernie::tokens::kFaceVertexCounts, nullptr,              \
+      (::ernie::AttributeMeta{.doc = &quot;Integer number of vertices of each face.&quot;,                   \
+                              .group = &quot;Geometry&quot;, .integer = true,                                \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(::ernie::Tensor, FaceVertexIndices, ::ernie::tokens::kFaceVertexIndices, nullptr,            \
+      (::ernie::AttributeMeta{.doc = &quot;Integer point indices of the faces' vertices, in order.&quot;,    \
+                              .group = &quot;Geometry&quot;, .integer = true,                                \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(::ernie::Tensor, Normals, ::ernie::tokens::kNormals, nullptr,                                \
+      (::ernie::AttributeMeta{.doc = &quot;(n, 3) normals, one per point; ignored when of another &quot;     \
+                                     &quot;count.&quot;,                                                     \
+                              .group = &quot;Geometry&quot;, .dirty = ::ernie::Dirty::Points}))
+
+#define ERNIE_POINTS_ATTRIBUTES(X)                                                                 \
+    X(std::vector&lt;float&gt;, Widths, ::ernie::tokens::kWidths, std::vector&lt;float&gt;{1.0f},             \
+      (::ernie::AttributeMeta{.doc = &quot;Diameters: one for every point, or one per point. Many &quot;     \
+                                     &quot;points' widths may be written as an array instead.&quot;,         \
+                              .group = &quot;Geometry&quot;, .min = 0.0, .max = 1000.0}))
+
+#define ERNIE_POINT_INSTANCER_ATTRIBUTES(X)                                                        \
+    X(::ernie::Tensor, Positions, ::ernie::tokens::kPositions, nullptr,                            \
+      (::ernie::AttributeMeta{.doc = &quot;(n, 3) instance positions in the instancer's frame; the &quot;    \
+                                     &quot;number of instances.&quot;,                                       \
+                              .group = &quot;Instances&quot;, .dirty = ::ernie::Dirty::Points}))             \
+    X(::ernie::Tensor, Orientations, ::ernie::tokens::kOrientations, nullptr,                      \
+      (::ernie::AttributeMeta{.doc = &quot;(n, 4) instance rotations as quaternions.&quot;,                  \
+                              .group = &quot;Instances&quot;, .dirty = ::ernie::Dirty::Points}))             \
+    X(::ernie::Tensor, Scales, ::ernie::tokens::kScales, nullptr,                                  \
+      (::ernie::AttributeMeta{.doc = &quot;(n, 3) instance scales.&quot;, .group = &quot;Instances&quot;,              \
+                              .dirty = ::ernie::Dirty::Points}))                                   \
+    X(::ernie::Tensor, ProtoIndices, ::ernie::tokens::kProtoIndices, nullptr,                      \
+      (::ernie::AttributeMeta{.doc = &quot;Integer prototype of each instance, of the prototypes &quot;      \
+                                     &quot;relationship's targets; the first for all when unset.&quot;,      \
+                              .group = &quot;Instances&quot;, .integer = true,                               \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(std::vector&lt;::ernie::Path&gt;, Prototypes, ::ernie::tokens::kPrototypes,                        \
+      std::vector&lt;::ernie::Path&gt;{},                                                                \
+      (::ernie::AttributeMeta{.doc = &quot;The prims instanced, indexed by the proto indices.&quot;,         \
+                              .group = &quot;Instances&quot;, .dirty = ::ernie::Dirty::Topology}))           \
+    X(::ernie::Tensor, Worlds, ::ernie::tokens::kWorlds, nullptr,                                  \
+      (::ernie::AttributeMeta{.doc = &quot;int (n,): each instance's world, in place of the &quot;           \
+                                     &quot;instancer's world.&quot;,                                         \
+                              .group = &quot;Instances&quot;}))
+
+#define ERNIE_GROUND_PLANE_ATTRIBUTES(X)                                                           \
+    X(double, Height, ::ernie::tokens::kGroundHeight, 0.0,                                         \
+      (::ernie::AttributeMeta{.doc = &quot;World z&quot;, .group = &quot;Ground&quot;, .min = -1e4, .max = 1e4}))      \
+    X(bool, Checker, ::ernie::tokens::kChecker, false,                                             \
+      (::ernie::AttributeMeta{.label = &quot;Checkerboard&quot;,                                             \
+                              .doc = &quot;Multiplies the material's albedo by checker squares.&quot;,       \
+                              .group = &quot;Ground&quot;}))                                                 \
+    X(double, CheckerSize, ::ernie::tokens::kCheckerSize, 1.0,                                     \
+      (::ernie::AttributeMeta{.doc = &quot;Edge of a square, metres; positive.&quot;, .group = &quot;Ground&quot;,     \
+                              .min = 0.001, .max = 1000.0}))                                       \
+    X(glm::dvec3, CheckerColor0, ::ernie::tokens::kCheckerColor0, glm::dvec3(1.0),                 \
+      (::ernie::AttributeMeta{.label = &quot;Checker colour 0&quot;, .doc = &quot;Linear RGB.&quot;,                   \
+                              .group = &quot;Ground&quot;, .color = true}))                                  \
+    X(glm::dvec3, CheckerColor1, ::ernie::tokens::kCheckerColor1, glm::dvec3(0.5),                 \
+      (::ernie::AttributeMeta{.label = &quot;Checker colour 1&quot;, .doc = &quot;Linear RGB.&quot;,                   \
+                              .group = &quot;Ground&quot;, .color = true}))                                  \
+    X(::ernie::Path, MaterialBinding, ::ernie::tokens::kMaterialBinding, ::ernie::Path(),          \
+      (::ernie::AttributeMeta{.label = &quot;Material&quot;, .doc = &quot;The Material prim it is drawn with.&quot;,   \
+                              .group = &quot;Ground&quot;, .options = {::ernie::tokens::kMaterial},          \
+                              .dirty = ::ernie::Dirty::Material}))
+
+// Every attribute of each type, its bases' first, for its accessors.
+#define ERNIE_CUBE_ALL(X) ERNIE_GPRIM_ALL(X) ERNIE_CUBE_ATTRIBUTES(X)
+#define ERNIE_SPHERE_ALL(X) ERNIE_GPRIM_ALL(X) ERNIE_SPHERE_ATTRIBUTES(X)
+#define ERNIE_AXIS_SHAPE_ALL(X) ERNIE_GPRIM_ALL(X) ERNIE_AXIS_SHAPE_ATTRIBUTES(X)
+#define ERNIE_CYLINDER_ALL(X) ERNIE_AXIS_SHAPE_ALL(X) ERNIE_CYLINDER_ATTRIBUTES(X)
+#define ERNIE_CAPSULE_ALL(X) ERNIE_AXIS_SHAPE_ALL(X) ERNIE_CAPSULE_ATTRIBUTES(X)
+#define ERNIE_PLANE_ALL(X) ERNIE_AXIS_SHAPE_ALL(X) ERNIE_PLANE_ATTRIBUTES(X)
+#define ERNIE_POINT_BASED_ALL(X) ERNIE_GPRIM_ALL(X) ERNIE_POINT_BASED_ATTRIBUTES(X)
+#define ERNIE_MESH_ALL(X) ERNIE_POINT_BASED_ALL(X) ERNIE_MESH_ATTRIBUTES(X)
+#define ERNIE_POINTS_ALL(X) ERNIE_POINT_BASED_ALL(X) ERNIE_POINTS_ATTRIBUTES(X)
+#define ERNIE_POINT_INSTANCER_ALL(X) ERNIE_BOUNDABLE_ALL(X) ERNIE_POINT_INSTANCER_ATTRIBUTES(X)
+#define ERNIE_GROUND_PLANE_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_GROUND_PLANE_ATTRIBUTES(X)
+// clang-format on
+
+namespace ernie {
+
+class Cube : public Gprim {
+    ERNIE_SCHEMA_BODY(Cube, Gprim, ERNIE_CUBE_ALL)
+    ERNIE_SCHEMA_DEFINE(Cube)
+};
+
+class Sphere : public Gprim {
+    ERNIE_SCHEMA_BODY(Sphere, Gprim, ERNIE_SPHERE_ALL)
+    ERNIE_SCHEMA_DEFINE(Sphere)
+};
+
+class AxisShape : public Gprim {
+    ERNIE_SCHEMA_BODY(AxisShape, Gprim, ERNIE_AXIS_SHAPE_ALL)
+};
+
+class Cylinder : public AxisShape {
+    ERNIE_SCHEMA_BODY(Cylinder, AxisShape, ERNIE_CYLINDER_ALL)
+    ERNIE_SCHEMA_DEFINE(Cylinder)
+};
+
+class Cone : public AxisShape {
+    ERNIE_SCHEMA_BODY(Cone, AxisShape, ERNIE_CYLINDER_ALL)
+    ERNIE_SCHEMA_DEFINE(Cone)
+};
+
+class Capsule : public AxisShape {
+    ERNIE_SCHEMA_BODY(Capsule, AxisShape, ERNIE_CAPSULE_ALL)
+    ERNIE_SCHEMA_DEFINE(Capsule)
+};
+
+class Plane : public AxisShape {
+    ERNIE_SCHEMA_BODY(Plane, AxisShape, ERNIE_PLANE_ALL)
+    ERNIE_SCHEMA_DEFINE(Plane)
+};
+
+class PointBased : public Gprim {
+    ERNIE_SCHEMA_BODY(PointBased, Gprim, ERNIE_POINT_BASED_ALL)
+};
+
+class Mesh : public PointBased {
+    ERNIE_SCHEMA_BODY(Mesh, PointBased, ERNIE_MESH_ALL)
+    ERNIE_SCHEMA_DEFINE(Mesh)
+};
+
+class Points : public PointBased {
+    ERNIE_SCHEMA_BODY(Points, PointBased, ERNIE_POINTS_ALL)
+    ERNIE_SCHEMA_DEFINE(Points)
+};
+
+class PointInstancer : public Boundable {
+    ERNIE_SCHEMA_BODY(PointInstancer, Boundable, ERNIE_POINT_INSTANCER_ALL)
+    ERNIE_SCHEMA_DEFINE(PointInstancer)
+};
+
+class Volume : public Gprim {
+    ERNIE_SCHEMA_BODY(Volume, Gprim, ERNIE_GPRIM_ALL)
+    ERNIE_SCHEMA_DEFINE(Volume)
+};
+
+class GroundPlane : public Imageable {
+    ERNIE_SCHEMA_BODY(GroundPlane, Imageable, ERNIE_GROUND_PLANE_ALL)
+    ERNIE_SCHEMA_DEFINE(GroundPlane)
+};
+
+std::vector&lt;const PrimTypeDef*&gt; GeometrySchemaTypes();
+
+}  // namespace ernie
+</code></pre>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1CahvoreModel/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Struct ernie::CahvoreModel - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Struct ernie::CahvoreModel";
+        var mkdocs_page_input_path = "cpp/structernie_1_1CahvoreModel.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/structernie_1_1CahvoreModel/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Struct ernie::CahvoreModel</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/structernie_1_1CahvoreModel.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="struct-erniecahvoremodel">Struct ernie::CahvoreModel</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>CahvoreModel</strong></a></p>
+<p><em>A camera calibrated in JPL's CAHV family of models, as Mars rovers' cameras are (their PDS labels' GEOMETRIC_CAMERA_MODEL, JPL's camera model files): CAHV, a linear (pinhole) model; CAHVOR, with radial distortion about an optical axis; and CAHVORE, with a fish-eye term and an entrance pupil that moves along the optical axis with the field angle, so its rays do not meet at one point.</em> <a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/scene/cahvore.h&gt;</code></li>
+</ul>
+<h2 id="classes">Classes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1CahvoreModel_1_1ErnieCamera/"><strong>ErnieCamera</strong></a> <br><em>The model as Ernie renders it, in the model's frame (camera to frame).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1CahvoreModel_1_1Ray/"><strong>Ray</strong></a> <br><em>A projection ray: its origin (C, or for CAHVORE the entrance pupil's position for its field angle) and unit direction.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-types">Public Types</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">enum</td>
+<td style="text-align: left;"><a href="#enum-kind"><strong>Kind</strong></a>  <br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-attributes">Public Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#variable-a"><strong>a</strong></a>   = <code>{0.0, 0.0, 1.0}</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#variable-c"><strong>c</strong></a>   = <code>{0.0}</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#variable-e"><strong>e</strong></a>   = <code>{0.0}</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#variable-h"><strong>h</strong></a>   = <code>{0.0}</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-height"><strong>height</strong></a>   = <code>0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./#enum-kind"><strong>Kind</strong></a></td>
+<td style="text-align: left;"><a href="#variable-kind"><strong>kind</strong></a>   = <code>Kind::Cahv</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-linearity"><strong>linearity</strong></a>   = <code>1.0</code><br><em>CAHVORE type 3's.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#variable-o"><strong>o</strong></a>   = <code>{0.0, 0.0, 1.0}</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">int</td>
+<td style="text-align: left;"><a href="#variable-pupiltype"><strong>pupilType</strong></a>   = <code>1</code><br><em>CAHVORE's type: 1 perspective, 2 fish-eye, 3 general.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#variable-r"><strong>r</strong></a>   = <code>{0.0}</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#variable-v"><strong>v</strong></a>   = <code>{0.0}</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-width"><strong>width</strong></a>   = <code>0</code><br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1CahvoreModel_1_1Ray/"><strong>Ray</strong></a></td>
+<td style="text-align: left;"><a href="#function-imagetoray"><strong>ImageToRay</strong></a> (glm::dvec2 image) const<br><em>The ray through image point</em> <code>image</code> <em>(cmod's 2d_to_3d).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-linearity"><strong>Linearity</strong></a> () const<br><em>CAHVORE's linearity for its type: 1 for perspective, 0 for fish-eye, else</em> <code>linearity</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec2</td>
+<td style="text-align: left;"><a href="#function-pointtoimage"><strong>PointToImage</strong></a> (const glm::dvec3 &amp; point) const<br><em>The image point of 3D point</em> <code>point</code> <em>: CAHV and CAHVOR in closed form (cmod's 3d_to_2d), CAHVORE by Newton's method on</em><code>ImageToRay</code> <em>from its CAHV projection.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1LensRayTable/"><strong>LensRayTable</strong></a></td>
+<td style="text-align: left;"><a href="#function-raytable"><strong>RayTable</strong></a> (std::uint32_t step=8) const<br><em>The model's exact rays, every</em> <code>step</code> <em>pixels across</em><code>ToCamera</code> <em>'s image, in its camera's frame (its rows flipped for a mirrored model): a lens that takes the model's distortion about its tilted optical axis, which</em><code>ToCamera</code> <em>'s parametric lens leaves as a residual.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1CahvoreModel_1_1ErnieCamera/"><strong>ErnieCamera</strong></a></td>
+<td style="text-align: left;"><a href="#function-tocamera"><strong>ToCamera</strong></a> (double pixelPitchUm) const<br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<ul>
+<li>C: the projection centre (for CAHVORE, the entrance pupil at zero field angle), in the model's frame and units (metres for rovers).</li>
+<li>A: the unit axis perpendicular to the image plane, pointing into the scene.</li>
+<li>H, V: image x (right) and y (down) of point P are (P - C) . H / (P - C) . A and (P - C) . V / (P - C) . A for a CAHV model: H and V hold the focal lengths in pixels and the image centre.</li>
+<li>O: the unit optical axis about which the distortion is radial.</li>
+<li>R: radial distortion coefficients (rho0, rho1, rho2).</li>
+<li>E: the entrance pupil's movement coefficients (epsilon0 to epsilon2).</li>
+<li>The CAHVORE type: 1 perspective (linearity 1), 2 fish-eye (linearity 0), 3 general, with its linearity between them. <a href="../structernie_1_1Image/"><strong>Image</strong></a> coordinates are the models': (0, 0) is the centre of the upper-left pixel, x to the right, y down.</li>
+</ul>
+<p>References:
+* Y. Yakimovsky and R. Cunningham, "A System for Extracting Three-Dimensional Measurements
+  from a Stereo Pair of TV Cameras", Computer Graphics and <a href="../structernie_1_1Image/"><strong>Image</strong></a> Processing 7(2):195-210, 1978 (CAHV).
+* D. B. Gennery, "Least-Squares Camera Calibration Including Lens Distortion and Automatic
+  Editing of Calibration Points", in A. Gruen and T. Huang (eds.), Calibration and Orientation of Cameras in Computer Vision, Springer, 2001, 123-136 (CAHVOR).
+* D. B. Gennery, "Generalized Camera Calibration Including Fish-Eye Lenses", International Journal of Computer Vision 68(3):239-266, 2006 (CAHVORE).
+* T. Litwin's cmod library (cmod_cahv.c, cmod_cahvor.c, cmod_cahvore.c), as ported by NASA-AMMOS, "CameraModelUtilsJS", <a href="https://github.com/NASA-AMMOS/CameraModelUtilsJS">https://github.com/NASA-AMMOS/CameraModelUtilsJS</a> (Apache-2.0): <code>ImageToRay</code> follows its cahvore-utilities/cahvore.js.
+* PDS Imaging Node, "Geometric Camera Models" (MSL GEOMETRIC_CM.TXT), for the conventions.
+* S. Aiazzi et al., "IRIS: High-fidelity Perception Sensor Modeling for Closed-Loop
+  Planetary Simulations", AIAA SciTech 2022, AIAA 2022-1433 (CAHVORE camera rays in a planetary simulator). </p>
+<h2 id="public-types-documentation">Public Types Documentation</h2>
+<h3 id="enum-kind">enum Kind</h3>
+<pre><code class="language-C++">enum ernie::CahvoreModel::Kind {
+    Cahv,
+    Cahvor,
+    Cahvore
+};
+</code></pre>
+<hr>
+<h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-a">variable a</h3>
+<pre><code class="language-C++">glm::dvec3 ernie::CahvoreModel::a;
+</code></pre>
+<hr>
+
+<h3 id="variable-c">variable c</h3>
+<pre><code class="language-C++">glm::dvec3 ernie::CahvoreModel::c;
+</code></pre>
+<hr>
+
+<h3 id="variable-e">variable e</h3>
+<pre><code class="language-C++">glm::dvec3 ernie::CahvoreModel::e;
+</code></pre>
+<hr>
+
+<h3 id="variable-h">variable h</h3>
+<pre><code class="language-C++">glm::dvec3 ernie::CahvoreModel::h;
+</code></pre>
+<hr>
+
+<h3 id="variable-height">variable height</h3>
+<pre><code class="language-C++">std::uint32_t ernie::CahvoreModel::height;
+</code></pre>
+<hr>
+
+<h3 id="variable-kind">variable kind</h3>
+<pre><code class="language-C++">Kind ernie::CahvoreModel::kind;
+</code></pre>
+<hr>
+
+<h3 id="variable-linearity">variable linearity</h3>
+<p><em>CAHVORE type 3's.</em> </p>
+<pre><code class="language-C++">double ernie::CahvoreModel::linearity;
+</code></pre>
+<hr>
+
+<h3 id="variable-o">variable o</h3>
+<pre><code class="language-C++">glm::dvec3 ernie::CahvoreModel::o;
+</code></pre>
+<hr>
+
+<h3 id="variable-pupiltype">variable pupilType</h3>
+<p><em>CAHVORE's type: 1 perspective, 2 fish-eye, 3 general.</em> </p>
+<pre><code class="language-C++">int ernie::CahvoreModel::pupilType;
+</code></pre>
+<hr>
+
+<h3 id="variable-r">variable r</h3>
+<pre><code class="language-C++">glm::dvec3 ernie::CahvoreModel::r;
+</code></pre>
+<hr>
+
+<h3 id="variable-v">variable v</h3>
+<pre><code class="language-C++">glm::dvec3 ernie::CahvoreModel::v;
+</code></pre>
+<hr>
+
+<h3 id="variable-width">variable width</h3>
+<pre><code class="language-C++">std::uint32_t ernie::CahvoreModel::width;
+</code></pre>
+<hr>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-imagetoray">function ImageToRay</h3>
+<p><em>The ray through image point</em> <code>image</code> <em>(cmod's 2d_to_3d).</em></p>
+<pre><code class="language-C++">Ray ernie::CahvoreModel::ImageToRay (
+    glm::dvec2 image
+) const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a degenerate model or a point its distortion cannot undo. </li>
+</ul>
+<hr>
+
+<h3 id="function-linearity">function Linearity</h3>
+<p><em>CAHVORE's linearity for its type: 1 for perspective, 0 for fish-eye, else</em> <code>linearity</code> <em>.</em></p>
+<pre><code class="language-C++">double ernie::CahvoreModel::Linearity () const
+</code></pre>
+<hr>
+
+<h3 id="function-pointtoimage">function PointToImage</h3>
+<p><em>The image point of 3D point</em> <code>point</code> <em>: CAHV and CAHVOR in closed form (cmod's 3d_to_2d), CAHVORE by Newton's method on</em><code>ImageToRay</code> <em>from its CAHV projection.</em></p>
+<pre><code class="language-C++">glm::dvec2 ernie::CahvoreModel::PointToImage (
+    const glm::dvec3 &amp; point
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-raytable">function RayTable</h3>
+<p><em>The model's exact rays, every</em> <code>step</code> <em>pixels across</em><code>ToCamera</code> <em>'s image, in its camera's frame (its rows flipped for a mirrored model): a lens that takes the model's distortion about its tilted optical axis, which</em><code>ToCamera</code> <em>'s parametric lens leaves as a residual.</em></p>
+<pre><code class="language-C++">LensRayTable ernie::CahvoreModel::RayTable (
+    std::uint32_t step=8
+) const
+</code></pre>
+<p>The entrance pupil's movement is still left out. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> as <code>ToCamera</code>, or for a step of 0. </li>
+</ul>
+<hr>
+
+<h3 id="function-tocamera">function ToCamera</h3>
+<pre><code class="language-C++">ErnieCamera ernie::CahvoreModel::ToCamera (
+    double pixelPitchUm
+) const
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>pixelPitchUm</code> the detector's pixel pitch, which the models do not hold: Ernie's apertures and focal length are physical, for the camera equation. </li>
+</ul>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> without an image size or a positive pitch, or for a model whose image axes are more than a degree from perpendicular (not a physical camera). </li>
+</ul>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/scene/cahvore.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

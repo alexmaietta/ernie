@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1OrbitController/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Class ernie::OrbitController - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Class ernie::OrbitController";
+        var mkdocs_page_input_path = "cpp/classernie_1_1OrbitController.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/classernie_1_1OrbitController/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Class ernie::OrbitController</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/classernie_1_1OrbitController.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-ernieorbitcontroller">Class ernie::OrbitController</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>OrbitController</strong></a></p>
+<p><em>Interactive orbit control of a</em> <code>CameraParams</code> <em>around a target point in a z-up world, for inspecting terrain.</em><a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/scene/orbit_controller.h&gt;</code></li>
+</ul>
+<h2 id="public-attributes">Public Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-distance"><strong>distance</strong></a>   = <code>100.0f</code><br><em>World units from the eye to the target.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-pitch"><strong>pitch</strong></a>   = <code>0.6f</code><br><em>Radians, clamped to [kMinPitch, kMaxPitch].</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec3</td>
+<td style="text-align: left;"><a href="#variable-target"><strong>target</strong></a>   = <code>{0.0f}</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-verticalfov"><strong>verticalFov</strong></a>   = <code>0.785398f</code><br><em>Radians.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-yaw"><strong>yaw</strong></a>   = <code>0.0f</code><br><em>Radians.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-static-attributes">Public Static Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">constexpr float</td>
+<td style="text-align: left;"><a href="#variable-kmaxpitch"><strong>kMaxPitch</strong></a>   = <code>1.55f</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr float</td>
+<td style="text-align: left;"><a href="#variable-kminpitch"><strong>kMinPitch</strong></a>   = <code>-1.55f</code><br><em>Pitch stops short of straight down and up, where the view's up vector degenerates; views may look up from below the ground.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-apply"><strong>Apply</strong></a> (<a href="../structernie_1_1CameraParams/"><strong>CameraParams</strong></a> &amp; camera) const<br><em>Sets</em> <code>camera</code> <em>'s transform, vertical field of view (through its aperture, keeping its focal length) and clipping range.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec3</td>
+<td style="text-align: left;"><a href="#function-eye"><strong>Eye</strong></a> () const<br><em>Eye position in world coordinates.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#function-farplane"><strong>FarPlane</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-frame"><strong>Frame</strong></a> (const glm::vec3 &amp; boundsMin, const glm::vec3 &amp; boundsMax) <br><em>Aims at the centre of the axis-aligned box [</em> <code>boundsMin</code> <em>,</em><code>boundsMax</code> <em>] from a distance at which its bounding sphere fits the vertical field of view with a small margin.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1CameraParams/"><strong>CameraParams</strong></a></td>
+<td style="text-align: left;"><a href="#function-makecamera"><strong>MakeCamera</strong></a> (std::uint32_t width, std::uint32_t height) const<br><em>A default camera of</em> <code>width</code> <em>x</em><code>height</code> <em>with this pose, field of view and clipping range.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#function-nearplane"><strong>NearPlane</strong></a> () const<br><em>Clipping planes scaled to the orbit distance.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-orbit"><strong>Orbit</strong></a> (float deltaYaw, float deltaPitch) <br><em>Rotates by</em> <code>deltaYaw</code> <em>and</em><code>deltaPitch</code> <em>radians, clamping pitch.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-pan"><strong>Pan</strong></a> (float dx, float dy, float viewportHeight) <br><em>Moves the target parallel to the ground by a screen-space drag of (</em> <code>dx</code> <em>,</em><code>dy</code> <em>) pixels in a viewport</em><code>viewportHeight</code> <em>pixels tall, so the terrain follows the cursor at the target depth.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-panvertical"><strong>PanVertical</strong></a> (float dx, float dy, float viewportHeight) <br><em>Moves the target across the screen by a drag of (</em> <code>dx</code> <em>,</em><code>dy</code> <em>) pixels: sideways as</em><code>Pan</code> <em>, and up and down along world z.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dmat4</td>
+<td style="text-align: left;"><a href="#function-transform"><strong>Transform</strong></a> () const<br><em>Camera-to-world transform of the eye looking at the target, +z up.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-zoom"><strong>Zoom</strong></a> (float steps) <br><em>Zooms by</em> <code>steps</code> <em>scroll steps; positive moves closer. Distance stays within [1e-3, 1e7].</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>It holds no camera of its own: <code>Apply</code> writes its pose, field of view and clipping range into one.</p>
+<p>Yaw rotates around the vertical axis (0 looks north, positive turns the view clockwise seen from above); pitch is the elevation angle of the eye above the target's horizontal plane. </p>
+<h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-distance">variable distance</h3>
+<p><em>World units from the eye to the target.</em> </p>
+<pre><code class="language-C++">float ernie::OrbitController::distance;
+</code></pre>
+<hr>
+
+<h3 id="variable-pitch">variable pitch</h3>
+<p><em>Radians, clamped to [kMinPitch, kMaxPitch].</em> </p>
+<pre><code class="language-C++">float ernie::OrbitController::pitch;
+</code></pre>
+<hr>
+
+<h3 id="variable-target">variable target</h3>
+<pre><code class="language-C++">glm::vec3 ernie::OrbitController::target;
+</code></pre>
+<hr>
+
+<h3 id="variable-verticalfov">variable verticalFov</h3>
+<p><em>Radians.</em> </p>
+<pre><code class="language-C++">float ernie::OrbitController::verticalFov;
+</code></pre>
+<hr>
+
+<h3 id="variable-yaw">variable yaw</h3>
+<p><em>Radians.</em> </p>
+<pre><code class="language-C++">float ernie::OrbitController::yaw;
+</code></pre>
+<hr>
+<h2 id="public-static-attributes-documentation">Public Static Attributes Documentation</h2>
+<h3 id="variable-kmaxpitch">variable kMaxPitch</h3>
+<pre><code class="language-C++">constexpr float ernie::OrbitController::kMaxPitch;
+</code></pre>
+<hr>
+
+<h3 id="variable-kminpitch">variable kMinPitch</h3>
+<p><em>Pitch stops short of straight down and up, where the view's up vector degenerates; views may look up from below the ground.</em> </p>
+<pre><code class="language-C++">constexpr float ernie::OrbitController::kMinPitch;
+</code></pre>
+<hr>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-apply">function Apply</h3>
+<p><em>Sets</em> <code>camera</code> <em>'s transform, vertical field of view (through its aperture, keeping its focal length) and clipping range.</em></p>
+<pre><code class="language-C++">void ernie::OrbitController::Apply (
+    CameraParams &amp; camera
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-eye">function Eye</h3>
+<p><em>Eye position in world coordinates.</em> </p>
+<pre><code class="language-C++">glm::vec3 ernie::OrbitController::Eye () const
+</code></pre>
+<hr>
+
+<h3 id="function-farplane">function FarPlane</h3>
+<pre><code class="language-C++">inline float ernie::OrbitController::FarPlane () const
+</code></pre>
+<hr>
+
+<h3 id="function-frame">function Frame</h3>
+<p><em>Aims at the centre of the axis-aligned box [</em> <code>boundsMin</code> <em>,</em><code>boundsMax</code> <em>] from a distance at which its bounding sphere fits the vertical field of view with a small margin.</em></p>
+<pre><code class="language-C++">void ernie::OrbitController::Frame (
+    const glm::vec3 &amp; boundsMin,
+    const glm::vec3 &amp; boundsMax
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-makecamera">function MakeCamera</h3>
+<p><em>A default camera of</em> <code>width</code> <em>x</em><code>height</code> <em>with this pose, field of view and clipping range.</em></p>
+<pre><code class="language-C++">CameraParams ernie::OrbitController::MakeCamera (
+    std::uint32_t width,
+    std::uint32_t height
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-nearplane">function NearPlane</h3>
+<p><em>Clipping planes scaled to the orbit distance.</em> </p>
+<pre><code class="language-C++">inline float ernie::OrbitController::NearPlane () const
+</code></pre>
+<hr>
+
+<h3 id="function-orbit">function Orbit</h3>
+<p><em>Rotates by</em> <code>deltaYaw</code> <em>and</em><code>deltaPitch</code> <em>radians, clamping pitch.</em></p>
+<pre><code class="language-C++">void ernie::OrbitController::Orbit (
+    float deltaYaw,
+    float deltaPitch
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-pan">function Pan</h3>
+<p><em>Moves the target parallel to the ground by a screen-space drag of (</em> <code>dx</code> <em>,</em><code>dy</code> <em>) pixels in a viewport</em><code>viewportHeight</code> <em>pixels tall, so the terrain follows the cursor at the target depth.</em></p>
+<pre><code class="language-C++">void ernie::OrbitController::Pan (
+    float dx,
+    float dy,
+    float viewportHeight
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-panvertical">function PanVertical</h3>
+<p><em>Moves the target across the screen by a drag of (</em> <code>dx</code> <em>,</em><code>dy</code> <em>) pixels: sideways as</em><code>Pan</code> <em>, and up and down along world z.</em></p>
+<pre><code class="language-C++">void ernie::OrbitController::PanVertical (
+    float dx,
+    float dy,
+    float viewportHeight
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-transform">function Transform</h3>
+<p><em>Camera-to-world transform of the eye looking at the target, +z up.</em> </p>
+<pre><code class="language-C++">glm::dmat4 ernie::OrbitController::Transform () const
+</code></pre>
+<hr>
+
+<h3 id="function-zoom">function Zoom</h3>
+<p><em>Zooms by</em> <code>steps</code> <em>scroll steps; positive moves closer. Distance stays within [1e-3, 1e7].</em></p>
+<pre><code class="language-C++">void ernie::OrbitController::Zoom (
+    float steps
+) 
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/scene/orbit_controller.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

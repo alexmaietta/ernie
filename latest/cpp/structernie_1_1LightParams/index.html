@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1LightParams/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Struct ernie::LightParams - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Struct ernie::LightParams";
+        var mkdocs_page_input_path = "cpp/structernie_1_1LightParams.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/structernie_1_1LightParams/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Struct ernie::LightParams</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/structernie_1_1LightParams.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="struct-ernielightparams">Struct ernie::LightParams</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>LightParams</strong></a></p>
+<p><em>A light besides the sun, resolved for a frame from its prim (</em> <code>LightParamsOf</code> <em>).</em><a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/session/frame_params.h&gt;</code></li>
+</ul>
+<h2 id="public-attributes">Public Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-coneangle"><strong>coneAngle</strong></a>   = <code>180.0f</code><br><em>Degrees off the axis that are lit; 180 lights every direction.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-conesoftness"><strong>coneSoftness</strong></a>   = <code>0.0f</code><br><em>Fraction of the cone, at its edge, over which light fades out.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec3</td>
+<td style="text-align: left;"><a href="#variable-direction"><strong>direction</strong></a>   = <code>{0.0f, 0.0f, 1.0f}</code><br><em>Distant: unit vector towards the light.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-domediffuse"><strong>domeDiffuse</strong></a>   = <code>false</code><br><em>A direction of a dome (</em> <code>DomeLightMode::Directions</code> <em>): it lights with the model's diffuse response to surrounding light (</em><code>IBrdf::environment</code> <em>), as the dome's diffuse light would, while the dome keeps its specular light.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-focus"><strong>focus</strong></a>   = <code>0.0f</code><br><a href="../classernie_1_1Sphere/"><em><strong>Sphere</strong></em></a> <em>, rect and disk (UsdLux's shaping focus):</em><code>spectrum</code> <em>is the emission along the axis, and off it the emission per band is spectrum x lerp(focusTint, 1, |cos|^focus), cos of the angle between the axis and the direction from the light.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; float &gt;</td>
+<td style="text-align: left;"><a href="#variable-focustint"><strong>focusTint</strong></a>  <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-posedongpu"><strong>posedOnGpu</strong></a>   = <code>false</code><br><em>Posed on the GPU under a prim posed there (a lamp on a robot's link):</em> <code>position</code> <em>,</em><code>direction</code> <em>and</em><code>tangent</code> <em>are the CPU's estimate, and the renderer takes the pose the GPU composes for the light and its shadow views (</em><code>RasterRenderer::LightPoseBuffer</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#variable-position"><strong>position</strong></a>   = <code>{0.0}</code><br><a href="../classernie_1_1Sphere/"><em><strong>Sphere</strong></em></a> <em>, rect and disk: world centre.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; float &gt;</td>
+<td style="text-align: left;"><a href="#variable-profile"><strong>profile</strong></a>  <br><a href="../classernie_1_1Sphere/"><em><strong>Sphere</strong></em></a> <em>, rect and disk with an IES profile: its candela,</em><code>kProfileRows</code> <em>rows of</em><code>kProfileColumns</code> <em>, row i at i x 180 / (kProfileRows - 1) degrees off the axis (its angle scale applied) and column j at j x 360 / kProfileColumns degrees around it from the light's +x towards +y; the emission per band is spectrum x the profile, interpolated, besides cone and focus.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-radius"><strong>radius</strong></a>   = <code>0.0f</code><br><a href="../classernie_1_1Sphere/"><em><strong>Sphere</strong></em></a> <em>radius (irradiance follows the inverse square law outside it and is capped at its surface value inside), or disk radius.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-shadows"><strong>shadows</strong></a>   = <code>true</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec2</td>
+<td style="text-align: left;"><a href="#variable-size"><strong>size</strong></a>   = <code>{1.0f, 1.0f}</code><br><em>Rect: width and height.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; float &gt;</td>
+<td style="text-align: left;"><a href="#variable-spectrum"><strong>spectrum</strong></a>  <br><em>One value per band of the camera.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec3</td>
+<td style="text-align: left;"><a href="#variable-tangent"><strong>tangent</strong></a>   = <code>{1.0f, 0.0f, 0.0f}</code><br><em>Rect and disk: unit vector along the emitter's width, the light's +x; its height runs along the light's +y,</em> <code>tangent</code> <em>x</em><code>direction</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../namespaceernie/#enum-lighttype"><strong>LightType</strong></a></td>
+<td style="text-align: left;"><a href="#variable-type"><strong>type</strong></a>   = <code>LightType::Sphere</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::int32_t</td>
+<td style="text-align: left;"><a href="#variable-world"><strong>world</strong></a>   = <code>-1</code><br><em>The world the light shines in (</em> <code>tokens::kWorld</code> <em>): views of a batch see their world's lights and the shared ones (-1).</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-static-attributes">Public Static Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">constexpr float</td>
+<td style="text-align: left;"><a href="#variable-kmaxspotconedegrees"><strong>kMaxSpotConeDegrees</strong></a>   = <code>75.0f</code><br><em>Cones up to this half angle (degrees) get one perspective shadow map, wider ones a cube.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr int</td>
+<td style="text-align: left;"><a href="#variable-kprofilecolumns"><strong>kProfileColumns</strong></a>   = <code>64</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr int</td>
+<td style="text-align: left;"><a href="#variable-kprofilerows"><strong>kProfileRows</strong></a>   = <code>129</code><br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>In the rasterizer, distant lights get one orthographic shadow map over the scene; sphere lights a perspective map when their cone is at most <code>kMaxSpotConeDegrees</code>, else six (a cube); rect and disk lights a cube at their centre.</p>
+<p>The rasterizer shades rect and disk lights with their exact Lambertian irradiance, the vector form factor of the emitter clipped to the receiver's horizon (Lambert's polygon formula; Arvo 1994), and the receiver's BRDF evaluated along that vector. Disks are integrated as 16-gons of the same area.</p>
+<p>Reference: J. Arvo, "The Irradiance Jacobian for Partially Occluded Polyhedral Sources", SIGGRAPH '94, 343-350, 1994. <a href="https://doi.org/10.1145/192161.192250">https://doi.org/10.1145/192161.192250</a> </p>
+<h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-coneangle">variable coneAngle</h3>
+<p><em>Degrees off the axis that are lit; 180 lights every direction.</em> </p>
+<pre><code class="language-C++">float ernie::LightParams::coneAngle;
+</code></pre>
+<hr>
+
+<h3 id="variable-conesoftness">variable coneSoftness</h3>
+<p><em>Fraction of the cone, at its edge, over which light fades out.</em> </p>
+<pre><code class="language-C++">float ernie::LightParams::coneSoftness;
+</code></pre>
+<hr>
+
+<h3 id="variable-direction">variable direction</h3>
+<p><em>Distant: unit vector towards the light.</em> </p>
+<pre><code class="language-C++">glm::vec3 ernie::LightParams::direction;
+</code></pre>
+<p>Others: unit axis the light emits along (its -z): the cone's axis, or the normal of the emitting face. </p>
+<hr>
+
+<h3 id="variable-domediffuse">variable domeDiffuse</h3>
+<p><em>A direction of a dome (</em> <code>DomeLightMode::Directions</code> <em>): it lights with the model's diffuse response to surrounding light (</em><code>IBrdf::environment</code> <em>), as the dome's diffuse light would, while the dome keeps its specular light.</em></p>
+<pre><code class="language-C++">bool ernie::LightParams::domeDiffuse;
+</code></pre>
+<hr>
+
+<h3 id="variable-focus">variable focus</h3>
+<p><a href="../classernie_1_1Sphere/"><em><strong>Sphere</strong></em></a> <em>, rect and disk (UsdLux's shaping focus):</em><code>spectrum</code> <em>is the emission along the axis, and off it the emission per band is spectrum x lerp(focusTint, 1, |cos|^focus), cos of the angle between the axis and the direction from the light.</em></p>
+<pre><code class="language-C++">float ernie::LightParams::focus;
+</code></pre>
+<p>An empty tint is black. </p>
+<hr>
+
+<h3 id="variable-focustint">variable focusTint</h3>
+<pre><code class="language-C++">std::vector&lt;float&gt; ernie::LightParams::focusTint;
+</code></pre>
+<hr>
+
+<h3 id="variable-posedongpu">variable posedOnGpu</h3>
+<p><em>Posed on the GPU under a prim posed there (a lamp on a robot's link):</em> <code>position</code> <em>,</em><code>direction</code> <em>and</em><code>tangent</code> <em>are the CPU's estimate, and the renderer takes the pose the GPU composes for the light and its shadow views (</em><code>RasterRenderer::LightPoseBuffer</code> <em>).</em></p>
+<pre><code class="language-C++">bool ernie::LightParams::posedOnGpu;
+</code></pre>
+<p>Its size, radius and spectrum keep the estimate's scale. </p>
+<hr>
+
+<h3 id="variable-position">variable position</h3>
+<p><a href="../classernie_1_1Sphere/"><em><strong>Sphere</strong></em></a> <em>, rect and disk: world centre.</em></p>
+<pre><code class="language-C++">glm::dvec3 ernie::LightParams::position;
+</code></pre>
+<hr>
+
+<h3 id="variable-profile">variable profile</h3>
+<p><a href="../classernie_1_1Sphere/"><em><strong>Sphere</strong></em></a> <em>, rect and disk with an IES profile: its candela,</em><code>kProfileRows</code> <em>rows of</em><code>kProfileColumns</code> <em>, row i at i x 180 / (kProfileRows - 1) degrees off the axis (its angle scale applied) and column j at j x 360 / kProfileColumns degrees around it from the light's +x towards +y; the emission per band is spectrum x the profile, interpolated, besides cone and focus.</em></p>
+<pre><code class="language-C++">std::vector&lt;float&gt; ernie::LightParams::profile;
+</code></pre>
+<p>Empty without one. </p>
+<hr>
+
+<h3 id="variable-radius">variable radius</h3>
+<p><a href="../classernie_1_1Sphere/"><em><strong>Sphere</strong></em></a> <em>radius (irradiance follows the inverse square law outside it and is capped at its surface value inside), or disk radius.</em></p>
+<pre><code class="language-C++">float ernie::LightParams::radius;
+</code></pre>
+<hr>
+
+<h3 id="variable-shadows">variable shadows</h3>
+<pre><code class="language-C++">bool ernie::LightParams::shadows;
+</code></pre>
+<hr>
+
+<h3 id="variable-size">variable size</h3>
+<p><em>Rect: width and height.</em> </p>
+<pre><code class="language-C++">glm::vec2 ernie::LightParams::size;
+</code></pre>
+<hr>
+
+<h3 id="variable-spectrum">variable spectrum</h3>
+<p><em>One value per band of the camera.</em> </p>
+<pre><code class="language-C++">std::vector&lt;float&gt; ernie::LightParams::spectrum;
+</code></pre>
+<p>Distant: spectral irradiance at normal incidence, W m^-2 nm^-1. <a href="../classernie_1_1Sphere/"><strong>Sphere</strong></a>: spectral radiant intensity, W sr^-1 nm^-1, the same in every direction inside the cone. Rect and disk: spectral radiance of the emitting face, W m^-2 sr^-1 nm^-1. </p>
+<hr>
+
+<h3 id="variable-tangent">variable tangent</h3>
+<p><em>Rect and disk: unit vector along the emitter's width, the light's +x; its height runs along the light's +y,</em> <code>tangent</code> <em>x</em><code>direction</code> <em>.</em></p>
+<pre><code class="language-C++">glm::vec3 ernie::LightParams::tangent;
+</code></pre>
+<hr>
+
+<h3 id="variable-type">variable type</h3>
+<pre><code class="language-C++">LightType ernie::LightParams::type;
+</code></pre>
+<hr>
+
+<h3 id="variable-world">variable world</h3>
+<p><em>The world the light shines in (</em> <code>tokens::kWorld</code> <em>): views of a batch see their world's lights and the shared ones (-1).</em></p>
+<pre><code class="language-C++">std::int32_t ernie::LightParams::world;
+</code></pre>
+<hr>
+<h2 id="public-static-attributes-documentation">Public Static Attributes Documentation</h2>
+<h3 id="variable-kmaxspotconedegrees">variable kMaxSpotConeDegrees</h3>
+<p><em>Cones up to this half angle (degrees) get one perspective shadow map, wider ones a cube.</em> </p>
+<pre><code class="language-C++">constexpr float ernie::LightParams::kMaxSpotConeDegrees;
+</code></pre>
+<hr>
+
+<h3 id="variable-kprofilecolumns">variable kProfileColumns</h3>
+<pre><code class="language-C++">constexpr int ernie::LightParams::kProfileColumns;
+</code></pre>
+<hr>
+
+<h3 id="variable-kprofilerows">variable kProfileRows</h3>
+<pre><code class="language-C++">constexpr int ernie::LightParams::kProfileRows;
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/session/frame_params.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

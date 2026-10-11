@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/files/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Files - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Files";
+        var mkdocs_page_input_path = "cpp/files.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/files/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" >C++</a>
+    <ul class="current">
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2 current"><a class="reference internal current" href="#">Files</a>
+    <ul class="current">
+    </ul>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">API reference</li>
+          <li class="breadcrumb-item">C++</li>
+      <li class="breadcrumb-item active">Files</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/files.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="file-list">File List</h1>
+<p>Here is a list of all files with brief descriptions:</p>
+<ul>
+<li><strong>dir</strong> <a href="../dir_057d52706067b881d9371cf136c38c31/"><strong>ernie</strong></a>     <ul>
+<li><strong>dir</strong> <a href="../dir_f4fe4d3e53c5fa699a052b25aca1662c/"><strong>app</strong></a>     <ul>
+<li><strong>file</strong> <a href="../app_8h/"><strong>app.h</strong></a> </li>
+<li><strong>file</strong> <a href="../builtin__panels_8h/"><strong>builtin_panels.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../create_8h/"><strong>create.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../demo_8h/"><strong>demo.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../file__dialog_8h/"><strong>file_dialog.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../icons_8h/"><strong>icons.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../panel_8h/"><strong>panel.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../prim__icons_8h/"><strong>prim_icons.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../prim__schemas_8h/"><strong>prim_schemas.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../property__fields_8h/"><strong>property_fields.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../session_8h/"><strong>session.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../theme_8h/"><strong>theme.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../viewer_8h/"><strong>viewer.h</strong></a>     </li>
+</ul>
+</li>
+<li><strong>dir</strong> <a href="../dir_b0c7a12f8e9ab3adbc5e778572fb81e7/"><strong>device</strong></a>     <ul>
+<li><strong>file</strong> <a href="../buffer_8h/"><strong>buffer.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../compute__interop_8h/"><strong>compute_interop.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../cuda__interop_8h/"><strong>cuda_interop.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../frame__uploads_8h/"><strong>frame_uploads.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../gpu__profile_8h/"><strong>gpu_profile.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../gpu__timer_8h/"><strong>gpu_timer.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../device_2image_8h/"><strong>image.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../offscreen__target_8h/"><strong>offscreen_target.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../pipeline_8h/"><strong>pipeline.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../shader__compiler_8h/"><strong>shader_compiler.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../swapchain_8h/"><strong>swapchain.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../vulkan__context_8h/"><strong>vulkan_context.h</strong></a>     </li>
+</ul>
+</li>
+<li><strong>dir</strong> <a href="../dir_976c0a957dbcb521e07cc1e7a2e2f2bf/"><strong>geometry</strong></a>     <ul>
+<li><strong>file</strong> <a href="../cube__sphere__lod_8h/"><strong>cube_sphere_lod.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../frustum_8h/"><strong>frustum.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../lod__quadtree_8h/"><strong>lod_quadtree.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../mesh__data_8h/"><strong>mesh_data.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../primitives_8h/"><strong>primitives.h</strong></a>     </li>
+</ul>
+</li>
+<li><strong>dir</strong> <a href="../dir_572d817874f40c61a249f0e7684d4315/"><strong>scene</strong></a>     <ul>
+<li><strong>file</strong> <a href="../base__schemas_8h/"><strong>base_schemas.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../brdf_8h/"><strong>brdf.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../cahvore_8h/"><strong>cahvore.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../camera_8h/"><strong>camera.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../camera__schemas_8h/"><strong>camera_schemas.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../edit__history_8h/"><strong>edit_history.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../geometry__schemas_8h/"><strong>geometry_schemas.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../instruments_8h/"><strong>instruments.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../isd_8h/"><strong>isd.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../light__schemas_8h/"><strong>light_schemas.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../material_8h/"><strong>material.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../material__schemas_8h/"><strong>material_schemas.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../orbit__controller_8h/"><strong>orbit_controller.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../overlay_8h/"><strong>overlay.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../path_8h/"><strong>path.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../prim__type_8h/"><strong>prim_type.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../render__schemas_8h/"><strong>render_schemas.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../scene_8h/"><strong>scene.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../scene__json_8h/"><strong>scene_json.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../schema_8h/"><strong>schema.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../sensor__filters_8h/"><strong>sensor_filters.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../terrain__schemas_8h/"><strong>terrain_schemas.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../tokens_8h/"><strong>tokens.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../value_8h/"><strong>value.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../wide__view_8h/"><strong>wide_view.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../xform_8h/"><strong>xform.h</strong></a>     </li>
+</ul>
+</li>
+<li><strong>dir</strong> <a href="../dir_ab8975e862a3e97518d11d8e693cf9b5/"><strong>session</strong></a>     <ul>
+<li><strong>file</strong> <a href="../delegate_8h/"><strong>delegate.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../frame__params_8h/"><strong>frame_params.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../outputs_8h/"><strong>outputs.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../product__frame_8h/"><strong>product_frame.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../renderer_8h/"><strong>renderer.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../resolve_8h/"><strong>resolve.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../sampling_8h/"><strong>sampling.h</strong></a>     </li>
+</ul>
+</li>
+<li><strong>dir</strong> <a href="../dir_bc93cbf7ad62035943f355936009cdc4/"><strong>util</strong></a>     <ul>
+<li><strong>file</strong> <a href="../astronomy_8h/"><strong>astronomy.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../ies_8h/"><strong>ies.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../util_2image_8h/"><strong>image.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../least__squares_8h/"><strong>least_squares.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../profile_8h/"><strong>profile.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../profiler_8h/"><strong>profiler.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../raster__checks_8h/"><strong>raster_checks.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../raster__view_8h/"><strong>raster_view.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../shader__source_8h/"><strong>shader_source.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../spectrum_8h/"><strong>spectrum.h</strong></a>     </li>
+<li><strong>file</strong> <a href="../tensor_8h/"><strong>tensor.h</strong></a>     </li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../namespaceernie/" class="btn btn-neutral float-left" title="Namespace ernie"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+      <span><a href="../namespaceernie/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

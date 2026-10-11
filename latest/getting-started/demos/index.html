@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/getting-started/demos/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Demos - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Demos";
+        var mkdocs_page_input_path = "getting-started/demos.md";
+        var mkdocs_page_url = "/ernie/latest/getting-started/demos/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="../installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Demos</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#running-a-demo">Running a demo</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#writing-a-demo">Writing a demo</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#demos-in-your-own-project">Demos in your own project</a>
+    </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../cpp/annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../cpp/hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../cpp/namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../cpp/namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../cpp/files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Getting started</li>
+      <li class="breadcrumb-item active">Demos</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/getting-started/demos.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="demos">Demos</h1>
+<p>Ernie's demos show its features one at a time: lighting in physical units, real orbital cameras, terrain and planets, GPU interop, batched rendering for reinforcement learning. Each is one file, <code>demo_&lt;category&gt;_&lt;description&gt;.py</code>, and runs the same way, after Newton's examples. The package ships them, as <code>ernie.demos</code>.</p>
+<h2 id="running-a-demo">Running a demo</h2>
+<pre><code class="language-sh">python -m ernie.demos                         # the sun panel demo
+python -m ernie.demos --list                  # every demo's name
+python -m ernie.demos lighting_illuminants    # one by name, with its options after it
+</code></pre>
+<p>From a checkout, run the files themselves: <code>PYTHONPATH=build/python python demos/python/demo_lighting_illuminants.py</code>.</p>
+<p>This opens the viewer on the demo's scene, with a Demos panel on the left. Its menu lists every demo beside this one, by category; choosing one clears the scene and builds that demo in the same window. The panel also pauses, single-steps and resets the demo.</p>
+<p>Every demo takes these options:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--viewer window</code></td>
+<td>Opens the viewer (the default).</td>
+</tr>
+<tr>
+<td><code>--viewer null</code></td>
+<td>No viewer: each frame renders the scene's RenderSettings (or its first camera) with an <code>ernie.Renderer</code>.</td>
+</tr>
+<tr>
+<td><code>--headless</code></td>
+<td>Renders the viewer without a window, overlays and all; no display needed.</td>
+</tr>
+<tr>
+<td><code>--num-frames N</code></td>
+<td>Stops after N frames. Without it a window runs until closed, and the other modes run the demo's own count.</td>
+</tr>
+<tr>
+<td><code>--benchmark [SECONDS]</code></td>
+<td>Implies <code>--viewer null</code> and prints frames per second after a few frames' warm-up, stopping after SECONDS or <code>--num-frames</code>.</td>
+</tr>
+<tr>
+<td><code>--test</code></td>
+<td>Runs the demo's checks: <code>test_post_step</code> after every step and <code>test_final</code> at the end.</td>
+</tr>
+<tr>
+<td><code>--output PATH</code></td>
+<td>Writes the last frame, or the demo's own composite, as PNG.</td>
+</tr>
+<tr>
+<td><code>--paused</code></td>
+<td>Starts paused; the Demos panel resumes.</td>
+</tr>
+<tr>
+<td><code>--device NAME</code></td>
+<td>Prefers the GPU whose name contains NAME.</td>
+</tr>
+<tr>
+<td><code>--renderer NAME</code></td>
+<td>The render backend.</td>
+</tr>
+<tr>
+<td><code>--validation</code></td>
+<td>Enables the Vulkan validation layer where installed.</td>
+</tr>
+<tr>
+<td><code>--vsync</code></td>
+<td>Waits for the display's refresh.</td>
+</tr>
+</tbody>
+</table>
+<p>A demo's own options follow these; <code>--help</code> lists them all. For example:</p>
+<pre><code class="language-sh">python -m ernie.demos lighting_illuminants --viewer null --output illuminants.png
+python -m ernie.demos overlays_debug_draw --headless --output overlays.png
+python -m ernie.demos viewer_sun_panel --benchmark --num-frames 300
+python -m ernie.demos overlays_debug_draw --viewer null --test
+</code></pre>
+<p>The Python tests run every demo with <code>--viewer null --test</code> (<code>ernie/test/python/test_demos.py</code>).</p>
+<h2 id="writing-a-demo">Writing a demo</h2>
+<p>A demo subclasses <code>ernie.demo.Demo</code>. It builds its scene into <code>self.scene</code> in <code>__init__</code>, moves it in <code>step</code> by <code>self.frame_dt</code> seconds, and checks itself in <code>test_final</code>:</p>
+<pre><code class="language-python">import ernie
+import ernie.demo
+from ernie import tokens
+
+
+class Demo(ernie.demo.Demo):
+    num_frames = 120  # frames to run without a window
+
+    def __init__(self, viewer, args):
+        super().__init__(viewer, args)
+        world = self.scene.define(&quot;/World&quot;, ernie.Xform)
+        world.define(&quot;Ground&quot;, ernie.GroundPlane, checker=True)
+        self.ball = world.define(&quot;Ball&quot;, ernie.Sphere, radius=0.5, translate=(0, 0, 0.5))
+        world.define(&quot;Sun&quot;, ernie.DistantLight).set(
+            tokens.TRANSFORM, ernie.distant_light_transform((0.4, -0.6, 0.7)))
+        world.define(&quot;Camera&quot;, ernie.Camera).set(
+            tokens.TRANSFORM, ernie.look_at_transform((0, -8, 3), (0, 0, 0.5)))
+        if viewer is not None:
+            panel = viewer.add_panel(&quot;Ball&quot;)
+            panel.slider(&quot;Radius&quot;, 0.1, 2.0, 0.5,
+                         on_change=lambda value: self.ball.set(radius=value))
+
+    def step(self):
+        self.ball.set(translate=(2.0 * self.time, 0, 0.5))
+
+    def test_final(self):
+        assert self.render_image()[..., :3].std() &gt; 1.0
+
+
+if __name__ == &quot;__main__&quot;:
+    ernie.demo.main(Demo)
+</code></pre>
+<p>What to know:</p>
+<ul>
+<li><code>viewer</code> is <code>None</code> under <code>--viewer null</code>, so put panels and other viewer calls under <code>if viewer is not None</code>. Give the scene a camera of its own: without a viewer, and in tests, the scene renders through it.</li>
+<li>In a window <code>frame_dt</code> is the real time since the last frame (at most <code>max_frame_dt</code>). Without one it is <code>fixed_dt</code>, so runs repeat exactly. <code>self.time</code> is the demo's clock at the start of the step.</li>
+<li>A demo uses the viewer as any application does: <code>add_panel</code>, <code>on_frame</code>, <code>add_hud_item</code>, <code>active_camera</code>, <code>viewport_display</code>. A demo registers in a scope of its own (<code>Viewer.scope</code>), so when the Demos panel switches away, what it added is removed, and the viewport's display settings are restored. A camera, lighting or RenderSettings it chooses is kept over the viewer's reset of its session.</li>
+<li>Add your own options by overriding the class method <code>create_parser</code>, adding to what <code>super().create_parser()</code> returns. Give every option a default: the Demos panel opens demos with their defaults.</li>
+<li>Override <code>save_output(path)</code> for a composite <code>--output</code> (images side by side, a contact sheet), and <code>render</code> when the per-frame render should differ, as for batch renders through <code>self.renderer</code>. <code>self.map(path, attribute, stream)</code> maps an attribute through the viewer or the renderer, whichever draws the demo, for in-place GPU writes. <code>close()</code> runs when the demo ends or is switched away.</li>
+<li>Name the file <code>demo_&lt;category&gt;_&lt;description&gt;.py</code> and put it with the others, and the Demos panel lists it under its category.</li>
+</ul>
+<p><code>ernie.demo.init</code> and <code>ernie.demo.run</code> are <code>main</code>'s two halves, for a script that builds its own parser or runs a demo it constructs itself.</p>
+<h2 id="demos-in-your-own-project">Demos in your own project</h2>
+<p>The base class and the loop are C++ (<code>ernie::app::Demo</code> and <code>ernie::app::DemoRunner</code>, in <code>ernie/app/demo.h</code>), and <code>ernie.demo.Demo</code> derives from them through Python bindings. So a project of your own, in Python or in C++, writes demos the same way, outside Ernie's repository, and runs them with the same options, the same <code>--test</code> checks and the same Demos panel, which lists the demo files beside the one that runs.</p>
+<p>In C++, derive from <code>ernie::app::Demo</code>, override what you need, and hand the demos to <code>DemoMain</code>, which parses the shared options (leaving the others in <code>DemoOptions::extra</code>), opens the viewer and runs the first; its Demos panel lists them all:</p>
+<pre><code class="language-cpp">#include &lt;ernie/app/demo.h&gt;
+#include &lt;ernie/scene/geometry_schemas.h&gt;
+
+class BallDemo : public ernie::app::Demo {
+  public:
+    BallDemo(ernie::app::Viewer* viewer, const ernie::app::DemoOptions&amp; options)
+        : Demo(viewer, options) {
+        numFrames = 120;
+        ernie::Sphere::Define(GetScene(), &quot;/World/Ball&quot;).SetRadius(0.5);
+        // ... a sun and a camera, and a panel when GetViewer() is not null
+    }
+
+    void Step() override {
+        ernie::SetXform(GetScene(), &quot;/World/Ball&quot;, {.translate = glm::dvec3(2.0 * time, 0.0, 0.5)});
+    }
+
+    void TestFinal() override {
+        if (RenderImage().Empty()) {
+            throw std::runtime_error(&quot;nothing rendered&quot;);
+        }
+    }
+};
+
+int main(int argc, char** argv) {
+    return ernie::app::DemoMain(argc, argv,
+                                {ernie::app::MakeDemoInfo&lt;BallDemo&gt;(&quot;example&quot;, &quot;ball&quot;)});
+}
+</code></pre>
+<p>The C++ names follow Python's: <code>Step</code>, <code>Render</code>, <code>SaveOutput</code>, <code>TestPostStep</code>, <code>TestFinal</code> and <code>Close</code> to override; <code>GetScene</code>, <code>GetViewer</code> (null without one), <code>GetRenderer</code>, <code>RenderImage</code>, <code>frame</code>, <code>time</code> and <code>frameDt</code>; and <code>numFrames</code>, <code>fixedDt</code>, <code>maxFrameDt</code> and <code>description</code> to set. <code>demos/cpp</code> has two, built with <code>-DERNIE_BUILD_DEMOS=ON</code>.</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../viewer/" class="btn btn-neutral float-left" title="Viewer"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../../concepts/scene/" class="btn btn-neutral float-right" title="Scene description">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+      <span><a href="../viewer/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../../concepts/scene/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/material__schemas_8h_source/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>File material_schemas.h - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "File material_schemas.h";
+        var mkdocs_page_input_path = "cpp/material__schemas_8h_source.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/material__schemas_8h_source/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">File material_schemas.h</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/material__schemas_8h_source.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="file-material_schemash">File material_schemas.h</h1>
+<p><a href="../files/"><strong>File List</strong></a> <strong>&gt;</strong> <a href="../dir_057d52706067b881d9371cf136c38c31/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../dir_572d817874f40c61a249f0e7684d4315/"><strong>scene</strong></a> <strong>&gt;</strong> <a href="../material__schemas_8h/"><strong>material_schemas.h</strong></a></p>
+<p><a href="../material__schemas_8h/">Go to the documentation of this file</a></p>
+<pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+#include &quot;ernie/scene/base_schemas.h&quot;
+#include &quot;ernie/scene/prim_type.h&quot;
+#include &quot;ernie/scene/tokens.h&quot;
+
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+
+// clang-format off
+#define ERNIE_MATERIAL_ATTRIBUTES(X)                                                               \
+    X(std::string, Brdf, ::ernie::tokens::kBrdf, &quot;lambert&quot;,                                        \
+      (::ernie::AttributeMeta{.label = &quot;BRDF&quot;,                                                     \
+                              .doc = &quot;The reflectance model, a BrdfRegistry id; unset with a &quot;     \
+                                     &quot;UsdPreviewSurface connected, \&quot;preview_surface\&quot;.&quot;,          \
+                              .group = &quot;Surface&quot;}))                                                \
+    X(glm::dvec3, Albedo, ::ernie::tokens::kAlbedo, glm::dvec3(1.0),                               \
+      (::ernie::AttributeMeta{.doc = &quot;Linear RGB&quot;, .group = &quot;Surface&quot;, .color = true}))            \
+    X(bool, AlbedoMapEnable, ::ernie::tokens::kAlbedoMapEnable, true,                              \
+      (::ernie::AttributeMeta{.label = &quot;Use albedo map&quot;, .group = &quot;Surface&quot;}))                     \
+    X(::ernie::Tensor, AlbedoMap, ::ernie::tokens::kAlbedoMap, nullptr,                            \
+      (::ernie::AttributeMeta{.doc = &quot;float32 (rows, cols) albedo per cell of the grid below.&quot;,    \
+                              .group = &quot;Surface&quot;}))                                                \
+    X(glm::dvec2, AlbedoMapOrigin, ::ernie::tokens::kAlbedoMapOrigin, glm::dvec2(0.0),             \
+      (::ernie::AttributeMeta{.doc = &quot;World x and y of the albedo map's north-west corner.&quot;,       \
+                              .group = &quot;Surface&quot;}))                                                \
+    X(double, AlbedoMapCellSize, ::ernie::tokens::kAlbedoMapCellSize, 1.0,                         \
+      (::ernie::AttributeMeta{.doc = &quot;World units per albedo map cell.&quot;, .group = &quot;Surface&quot;,       \
+                              .max = 1e5}))                                                        \
+    X(double, AlbedoMapNoData, ::ernie::tokens::kAlbedoMapNoData, 0.0,                             \
+      (::ernie::AttributeMeta{.doc = &quot;The albedo map value marking missing cells; none unless &quot;    \
+                                     &quot;set.&quot;,                                                       \
+                              .group = &quot;Surface&quot;}))                                                \
+    X(glm::dvec3, EmissiveColor, ::ernie::tokens::kEmissiveColor, glm::dvec3(0.0),                 \
+      (::ernie::AttributeMeta{.label = &quot;Emission&quot;,                                                 \
+                              .doc = &quot;Linear RGB radiance in cd/m^2 for white, without a &quot;         \
+                                     &quot;UsdPreviewSurface (whose own is read then).&quot;,                \
+                              .group = &quot;Surface&quot;, .color = true}))                                 \
+    X(::ernie::Tensor, DetailAlbedo, ::ernie::tokens::kDetailAlbedo, nullptr,                      \
+      (::ernie::AttributeMeta{.doc = &quot;float32 linear or uint8 sRGB (rows, cols, 1, 3 or 4) albedo &quot; \
+                                     &quot;tiled over the surface.&quot;,                                    \
+                              .group = &quot;Detail textures&quot;}))                                        \
+    X(::ernie::Tensor, DetailNormal, ::ernie::tokens::kDetailNormal, nullptr,                      \
+      (::ernie::AttributeMeta{.doc = &quot;float32 or uint8 linear (rows, cols, 3 or 4) tangent-space &quot; \
+                                     &quot;normal map tiled over the surface.&quot;,                         \
+                              .group = &quot;Detail textures&quot;}))                                        \
+    X(double, DetailTileSize, ::ernie::tokens::kDetailTileSize, 4.0,                               \
+      (::ernie::AttributeMeta{.label = &quot;Tile size&quot;,                                                \
+                              .doc = &quot;World units covered by one repeat of the textures.&quot;,         \
+                              .group = &quot;Detail textures&quot;, .max = 1000.0}))                         \
+    X(double, DetailAlbedoStrength, ::ernie::tokens::kDetailAlbedoStrength, 1.0,                   \
+      (::ernie::AttributeMeta{.label = &quot;Albedo strength&quot;,                                          \
+                              .doc = &quot;0 ignores the detail albedo, 1 applies it fully.&quot;,           \
+                              .group = &quot;Detail textures&quot;, .max = 1.0}))                            \
+    X(double, DetailNormalStrength, ::ernie::tokens::kDetailNormalStrength, 1.0,                   \
+      (::ernie::AttributeMeta{.label = &quot;Normal strength&quot;,                                          \
+                              .doc = &quot;Scale on the detail normal map's slopes.&quot;,                   \
+                              .group = &quot;Detail textures&quot;, .max = 4.0}))                            \
+    X(bool, DetailDirectxNormals, ::ernie::tokens::kDetailDirectXNormals, false,                   \
+      (::ernie::AttributeMeta{.label = &quot;DirectX normals&quot;,                                          \
+                              .doc = &quot;Green points down the image (DirectX) rather than up.&quot;,      \
+                              .group = &quot;Detail textures&quot;}))                                        \
+    X(bool, DetailHexTiling, ::ernie::tokens::kDetailHexTiling, true,                              \
+      (::ernie::AttributeMeta{.label = &quot;Hex tiling&quot;,                                               \
+                              .doc = &quot;Hide repetition with hex-tiling (Mikkelsen 2022).&quot;,          \
+                              .group = &quot;Detail textures&quot;}))                                        \
+    X(double, DetailHexRotation, ::ernie::tokens::kDetailHexRotation, 1.0,                         \
+      (::ernie::AttributeMeta{.label = &quot;Hex rotation&quot;,                                             \
+                              .doc = &quot;Random tile rotation, 0 none to 1 any angle.&quot;,               \
+                              .group = &quot;Detail textures&quot;, .max = 1.0}))                            \
+    X(double, DetailHexContrast, ::ernie::tokens::kDetailHexContrast, 0.6,                         \
+      (::ernie::AttributeMeta{.label = &quot;Hex contrast&quot;,                                             \
+                              .doc = &quot;Weight of sample luminance in the tile blend, 0 to 1.&quot;,      \
+                              .group = &quot;Detail textures&quot;, .max = 1.0}))                            \
+    X(double, DetailHexSharpness, ::ernie::tokens::kDetailHexSharpness, 7.0,                       \
+      (::ernie::AttributeMeta{.label = &quot;Hex sharpness&quot;,                                            \
+                              .doc = &quot;Exponent on the barycentric blend weights.&quot;,                 \
+                              .group = &quot;Detail textures&quot;, .min = 1.0, .max = 32.0}))
+
+#define ERNIE_SHADER_ATTRIBUTES(X)                                                                 \
+    X(std::string, InfoId, ::ernie::tokens::kInfoId, &quot;&quot;,                                           \
+      (::ernie::AttributeMeta{.label = &quot;Shader&quot;,                                                   \
+                              .doc = &quot;The shader's type; Ernie reads the four below.&quot;,             \
+                              .group = &quot;Shader&quot;,                                                   \
+                              .options = {::ernie::tokens::kUsdPreviewSurface,                     \
+                                          ::ernie::tokens::kUsdUVTexture,                          \
+                                          ::ernie::tokens::kUsdPrimvarReaderFloat2,                \
+                                          ::ernie::tokens::kUsdTransform2d}}))                     \
+    X(glm::dvec3, DiffuseColor, ::ernie::tokens::kDiffuseColor, glm::dvec3(0.18),                  \
+      (::ernie::AttributeMeta{.label = &quot;Diffuse colour&quot;, .doc = &quot;Linear RGB albedo.&quot;,              \
+                              .group = &quot;Preview surface&quot;, .color = true}))                         \
+    X(double, Roughness, ::ernie::tokens::kRoughness, 0.5,                                         \
+      (::ernie::AttributeMeta{.group = &quot;Preview surface&quot;, .max = 1.0}))                            \
+    X(double, Metallic, ::ernie::tokens::kMetallic, 0.0,                                           \
+      (::ernie::AttributeMeta{.group = &quot;Preview surface&quot;, .max = 1.0}))                            \
+    X(double, Ior, ::ernie::tokens::kIor, 1.5,                                                     \
+      (::ernie::AttributeMeta{.label = &quot;Index of refraction&quot;, .group = &quot;Preview surface&quot;,          \
+                              .min = 1.0, .max = 3.0}))                                            \
+    X(bool, UseSpecularWorkflow, ::ernie::tokens::kUseSpecularWorkflow, false,                     \
+      (::ernie::AttributeMeta{.label = &quot;Specular workflow&quot;,                                        \
+                              .doc = &quot;Specular colour in place of metallic; USD's int 0 or 1.&quot;,    \
+                              .group = &quot;Preview surface&quot;}))                                        \
+    X(glm::dvec3, SpecularColor, ::ernie::tokens::kSpecularColor, glm::dvec3(0.0),                 \
+      (::ernie::AttributeMeta{.label = &quot;Specular colour&quot;,                                          \
+                              .doc = &quot;Linear RGB reflectance at normal incidence, in the &quot;         \
+                                     &quot;specular workflow.&quot;,                                         \
+                              .group = &quot;Preview surface&quot;, .color = true}))                         \
+    X(double, Clearcoat, ::ernie::tokens::kClearcoat, 0.0,                                         \
+      (::ernie::AttributeMeta{.group = &quot;Preview surface&quot;, .max = 1.0}))                            \
+    X(double, ClearcoatRoughness, ::ernie::tokens::kClearcoatRoughness, 0.01,                      \
+      (::ernie::AttributeMeta{.group = &quot;Preview surface&quot;, .max = 1.0}))                            \
+    X(glm::dvec3, EmissiveColor, ::ernie::tokens::kEmissiveColor, glm::dvec3(0.0),                 \
+      (::ernie::AttributeMeta{.label = &quot;Emission&quot;,                                                 \
+                              .doc = &quot;Linear RGB radiance in cd/m^2 for white.&quot;,                   \
+                              .group = &quot;Preview surface&quot;, .color = true}))                         \
+    X(double, Opacity, ::ernie::tokens::kOpacity, 1.0,                                             \
+      (::ernie::AttributeMeta{.group = &quot;Preview surface&quot;, .max = 1.0}))                            \
+    X(double, OpacityThreshold, ::ernie::tokens::kOpacityThreshold, 0.0,                           \
+      (::ernie::AttributeMeta{.doc = &quot;Above 0, surfaces less opaque are cut out.&quot;,                 \
+                              .group = &quot;Preview surface&quot;, .max = 1.0}))                            \
+    X(std::string, File, ::ernie::tokens::kFile, &quot;&quot;,                                               \
+      (::ernie::AttributeMeta{.doc = &quot;Image file: PNG, JPEG or EXR.&quot;, .group = &quot;Texture&quot;,          \
+                              .asset = true}))                                                     \
+    X(::ernie::Tensor, Texture, ::ernie::tokens::kShaderTexture, nullptr,                          \
+      (::ernie::AttributeMeta{.doc = &quot;float32 or uint8 (rows, cols, channels) image, rows top to &quot; \
+                                     &quot;bottom, in place of the file.&quot;,                              \
+                              .group = &quot;Texture&quot;}))                                                \
+    X(std::string, WrapS, ::ernie::tokens::kWrapS, &quot;useMetadata&quot;,                                  \
+      (::ernie::AttributeMeta{.label = &quot;Wrap s&quot;, .doc = &quot;useMetadata repeats.&quot;,                    \
+                              .group = &quot;Texture&quot;,                                                  \
+                              .options = {&quot;repeat&quot;, &quot;mirror&quot;, &quot;clamp&quot;, &quot;black&quot;, &quot;useMetadata&quot;}}))  \
+    X(std::string, WrapT, ::ernie::tokens::kWrapT, &quot;useMetadata&quot;,                                  \
+      (::ernie::AttributeMeta{.label = &quot;Wrap t&quot;, .doc = &quot;useMetadata repeats.&quot;,                    \
+                              .group = &quot;Texture&quot;,                                                  \
+                              .options = {&quot;repeat&quot;, &quot;mirror&quot;, &quot;clamp&quot;, &quot;black&quot;, &quot;useMetadata&quot;}}))  \
+    X(std::string, SourceColorSpace, ::ernie::tokens::kSourceColorSpace, &quot;auto&quot;,                   \
+      (::ernie::AttributeMeta{.label = &quot;Colour space&quot;,                                             \
+                              .doc = &quot;auto: sRGB for 8-bit images, raw otherwise.&quot;,                \
+                              .group = &quot;Texture&quot;, .options = {&quot;auto&quot;, &quot;raw&quot;, &quot;sRGB&quot;}}))            \
+    X(glm::dvec4, Bias, ::ernie::tokens::kShaderBias, glm::dvec4(0.0),                             \
+      (::ernie::AttributeMeta{.doc = &quot;Added to the texture's linear values after its scale.&quot;,      \
+                              .group = &quot;Texture&quot;}))                                                \
+    X(double, Rotation, ::ernie::tokens::kRotation, 0.0,                                           \
+      (::ernie::AttributeMeta{.doc = &quot;Degrees, counter-clockwise, after the scale.&quot;,               \
+                              .group = &quot;Transform 2D&quot;, .min = -360.0, .max = 360.0}))              \
+    X(glm::dvec2, Translation, ::ernie::tokens::kTranslation, glm::dvec2(0.0),                     \
+      (::ernie::AttributeMeta{.doc = &quot;Added after the rotation.&quot;, .group = &quot;Transform 2D&quot;}))       \
+    X(std::string, Varname, ::ernie::tokens::kVarname, &quot;st&quot;,                                       \
+      (::ernie::AttributeMeta{.label = &quot;Primvar&quot;,                                                  \
+                              .doc = &quot;The mesh primvar of the texture coordinates.&quot;,               \
+                              .group = &quot;Primvar reader&quot;}))
+
+#define ERNIE_MATERIAL_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_MATERIAL_ATTRIBUTES(X)
+#define ERNIE_SHADER_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_SHADER_ATTRIBUTES(X)
+// clang-format on
+
+namespace ernie {
+
+class Material : public Imageable {
+    ERNIE_SCHEMA_BODY(Material, Imageable, ERNIE_MATERIAL_ALL)
+    ERNIE_SCHEMA_DEFINE(Material)
+};
+
+class Shader : public Imageable {
+    ERNIE_SCHEMA_BODY(Shader, Imageable, ERNIE_SHADER_ALL)
+    ERNIE_SCHEMA_DEFINE(Shader)
+};
+
+std::vector&lt;const PrimTypeDef*&gt; MaterialSchemaTypes();
+
+}  // namespace ernie
+</code></pre>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

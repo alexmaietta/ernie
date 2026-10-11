@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1RenderDelegate/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Class ernie::RenderDelegate - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Class ernie::RenderDelegate";
+        var mkdocs_page_input_path = "cpp/classernie_1_1RenderDelegate.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/classernie_1_1RenderDelegate/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Class ernie::RenderDelegate</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/classernie_1_1RenderDelegate.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-ernierenderdelegate">Class ernie::RenderDelegate</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>RenderDelegate</strong></a></p>
+<p><em>A render backend for a</em> <code>Scene</code> <em>, after Hydra's HdRenderDelegate: the rasterizer, and in future ray and path tracers, behind one interface that applications, the GUI viewer and the Python bindings drive without knowing which backend renders.</em><a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/session/delegate.h&gt;</code></li>
+</ul>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-addsensorfilter"><strong>AddSensorFilter</strong></a> (<a href="../structernie_1_1SensorFilterModel/"><strong>SensorFilterModel</strong></a> model) = 0<br><em>Registers custom sensor filter</em> <code>model</code> <em>for SensorFilter prims to name in</em><code>ernie:filter:type</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual const <a href="../classernie_1_1BrdfRegistry/"><strong>BrdfRegistry</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-brdfs"><strong>Brdfs</strong></a> () const = 0<br><em>The reflectance models materials may name in</em> <code>ernie:brdf</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual <a href="../classernie_1_1ComputeInterop/"><strong>ComputeInterop</strong></a> *</td>
+<td style="text-align: left;"><a href="#function-compute"><strong>Compute</strong></a> (std::string * why=nullptr) = 0<br><em>The compute interop (CUDA or HIP) of the delegate's device, connected on first use; null if unavailable, with the reason in</em> <code>why</code> <em>if given.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual const <a href="../structernie_1_1RendererInfo/"><strong>RendererInfo</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-info"><strong>Info</strong></a> () const = 0<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#function-maparray-12"><strong>MapArray</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute, std::uintptr_t stream=1) <br><em>Maps array</em> <code>attribute</code> <em>of the prim at</em><code>path</code> <em>for writing in place on the compute device: syncs</em><code>scene</code> <em>, writes into it as that attribute a tensor over the renderer's own memory for it, holding its values as they are, and returns that tensor.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#function-maparray-22"><strong>MapArray</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1PrimSet/"><strong>PrimSet</strong></a> &amp; prims, std::string_view attribute, std::uintptr_t stream=1) <br><em>Maps array</em> <code>attribute</code> <em>written as rows of one array over</em><code>prims</code> <em>(</em><code>Scene::Write</code> <em>of a</em><a href="../classernie_1_1PrimSet/"><em><strong>PrimSet</strong></em></a> <em>), as the single prim's</em><code>MapArray</code> <em>: writes the tensor as those rows, prim i's row i, and returns it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual std::optional&lt; double &gt;</td>
+<td style="text-align: left;"><a href="#function-meteredluminance"><strong>MeteredLuminance</strong></a> () const<br><em>The scene's average luminance in cd/m^2 a recent frame measured with metering on (</em> <code>tokens::kMeter</code> <em>), for automatic exposure and meters; none before one has, or from backends that do not meter.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual <a href="../classernie_1_1Path/"><strong>Path</strong></a></td>
+<td style="text-align: left;"><a href="#function-pick"><strong>Pick</strong></a> (std::uint32_t x, std::uint32_t y) <br><em>The prim the last frame</em> <code>Record</code> <em>drew shows at pixel (</em><code>x</code> <em>,</em><code>y</code> <em>) of its image, from its PrimId; the empty path for the background, a pixel outside the image, or a backend that cannot tell.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual <a href="../classernie_1_1Path/"><strong>Path</strong></a></td>
+<td style="text-align: left;"><a href="#function-primpath"><strong>PrimPath</strong></a> (std::uint32_t id) const = 0<br><em>The prim path of a PrimId render var value, or the empty path for 0 or an unknown id.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-record"><strong>Record</strong></a> (VkCommandBuffer commands, const <a href="../structernie_1_1RenderingTarget/"><strong>RenderingTarget</strong></a> &amp; target, std::string_view var) = 0<br><em>Records the frame prepared by the last</em> <code>Update</code> <em>and draws its render var</em><code>var</code> <em>(one of</em><code>ViewVars</code> <em>) into</em><code>target.color</code> <em>(in the colour attachment layout, of the delegate's present format), as an image for display.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#function-render"><strong>Render</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; settings={}, <a href="../structernie_1_1Device/"><strong>Device</strong></a> device={}) <br><em>Renders the first product of the settings and returns its</em> <code>LdrColor</code> <em>: a uint8 (rows, cols, 4) RGBA tensor, rows top to bottom, on the CPU, or with a GPU compute</em><code>device</code> <em>(CUDA or ROCm) a linear tensor there that the GPU fills without the host.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-renderdelegate-12"><strong>RenderDelegate</strong></a> (const <a href="./"><strong>RenderDelegate</strong></a> &amp;) = delete<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual std::optional&lt; <a href="../namespaceernie/#typedef-bounds3"><strong>Bounds3</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-scenebounds"><strong>SceneBounds</strong></a> () const = 0<br><em>World bounds of what the delegate draws as of its last</em> <code>Sync</code> <em>or</em><code>Update</code> <em>, for framing cameras; none if nothing has finite bounds (an infinite ground plane does not count).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual const <a href="../classernie_1_1SensorFilterRegistry/"><strong>SensorFilterRegistry</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-sensorfilters"><strong>SensorFilters</strong></a> () const = 0<br><em>The custom sensor filters registered so far.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-sethighlight"><strong>SetHighlight</strong></a> (std::span&lt; const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; paths, glm::vec4 colour) <br><em>Outlines the prims at</em> <code>paths</code> <em>and their descendants in</em><code>Record</code> <em>'s image, as Omniverse Kit outlines its selection, in display colour</em><code>colour</code> <em>(sRGB-encoded rgb, alpha its opacity); none for no paths.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-setviewband"><strong>SetViewBand</strong></a> (int band) <br><em>Which spectral band</em> <code>Record</code> <em>shows when it presents SpectralRadiance: 0 to the camera's band count - 1, or -1 for the mean over the bands; backends that cannot choose ignore it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-setviewvar"><strong>SetViewVar</strong></a> (std::string_view var) <br><em>The render var the next</em> <code>Record</code> <em>draws, for</em><code>Update</code> <em>to prepare the vars only drawing it needs (such as the opt-in MotionVector); call before</em><code>Update</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual <a href="../structernie_1_1RenderStats/"><strong>RenderStats</strong></a></td>
+<td style="text-align: left;"><a href="#function-stats"><strong>Stats</strong></a> () const = 0<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../namespaceernie/#typedef-renderproductsetoutputs"><strong>RenderProductSetOutputs</strong></a></td>
+<td style="text-align: left;"><a href="#function-step"><strong>Step</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, std::span&lt; const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; products={}, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; settings={}) <br><code>StepAsync(...).Fetch()</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual <a href="../classernie_1_1StepOperation/"><strong>StepOperation</strong></a></td>
+<td style="text-align: left;"><a href="#function-stepasync"><strong>StepAsync</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, std::span&lt; const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; products={}, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; settings={}) = 0<br><em>Renders</em> <code>products</code> <em>of</em><code>scene</code> <em>(see</em><code>ResolveRenderProducts</code> <em>) and returns at once: wait for or poll the operation, then fetch the outputs and map their render vars.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual std::vector&lt; <a href="../structernie_1_1TimelinePoint/"><strong>TimelinePoint</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-submitwaits"><strong>SubmitWaits</strong></a> () const = 0<br><em>Semaphore waits the submission of commands from</em> <code>Record</code> <em>needs, for CUDA copies into the delegate's buffers that may still be running; empty without CUDA inputs.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-sync"><strong>Sync</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene) = 0<br><em>Uploads what changed in</em> <code>scene</code> <em>since the last call, or everything when</em><code>scene</code> <em>is not the scene of the last call.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-update"><strong>Update</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; settings, VkExtent2D extent) = 0<br><em>Syncs, then prepares to draw the scene as the</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim</em><code>settings</code> <em>describes into an image of</em><code>extent</code> <em>, for</em><code>Record</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual std::vector&lt; std::string &gt;</td>
+<td style="text-align: left;"><a href="#function-viewvars"><strong>ViewVars</strong></a> () const<br><em>The render vars</em> <code>Record</code> <em>can draw of the frame the last</em><code>Update</code> <em>prepared:</em><code>Info() .viewVars</code> <em>and what that frame adds, such as the AOVs its sensor filters write ("aov:&lt;name&gt;").</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>RenderDelegate</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-operator"><strong>operator=</strong></a> (const <a href="./"><strong>RenderDelegate</strong></a> &amp;) = delete<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual</td>
+<td style="text-align: left;"><a href="#function-renderdelegate"><strong>~RenderDelegate</strong></a> () = default<br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="protected-functions">Protected Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1FrameId/"><strong>FrameId</strong></a></td>
+<td style="text-align: left;"><a href="#function-nextframe"><strong>NextFrame</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; settings, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; product) <br><em>The frame of the next image of</em> <code>product</code> <em>(the settings' path for the interactive view): the</em><code>ernie:frame</code> <em>of the resolved</em><a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim</em><code>settings</code> <em>when authored, else how many images of the product this delegate rendered before; and the product's stream,</em><code>StreamOf</code> <em>its path.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-renderdelegate-22"><strong>RenderDelegate</strong></a> () = default<br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>The scene is the single source of truth. A delegate pulls its changes on <code>Sync</code> (each delegate keeps its own <code>ChangeCursor</code>) and uploads only what changed, so there is no separate render index. Every backend reads the scene with the same resolution rules (<code>resolve.h</code>) and writes the same render vars through the camera's sensor filters (<code>sensor_filters.h</code>).</p>
+<p>There are two ways to render:
+* headless and in simulation: <code>StepAsync</code> (or <code>Step</code> and <code>Render</code>) renders the UsdRender products of a scene and returns their render vars;
+* interactively: <code>Update</code> then <code>Record</code> into the application's own command buffer each frame, submitted after <code>SubmitWaits</code>.</p>
+<p>Rendering is deterministic: an image's noise and samples derive from the camera's <code>ernie:sensor:seed</code>, its render product's path and its frame number (<code>NextFrame</code>), so the same scene renders the same images on any machine and whatever else renders alongside. </p>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-addsensorfilter">function AddSensorFilter</h3>
+<p><em>Registers custom sensor filter</em> <code>model</code> <em>for SensorFilter prims to name in</em><code>ernie:filter:type</code> <em>.</em></p>
+<pre><code class="language-C++">virtual void ernie::RenderDelegate::AddSensorFilter (
+    SensorFilterModel model
+) = 0
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if the model is invalid or fails to compile, or the backend runs no custom filters. </li>
+</ul>
+<hr>
+
+<h3 id="function-brdfs">function Brdfs</h3>
+<p><em>The reflectance models materials may name in</em> <code>ernie:brdf</code> <em>.</em></p>
+<pre><code class="language-C++">virtual const BrdfRegistry &amp; ernie::RenderDelegate::Brdfs () const = 0
+</code></pre>
+<hr>
+
+<h3 id="function-compute">function Compute</h3>
+<p><em>The compute interop (CUDA or HIP) of the delegate's device, connected on first use; null if unavailable, with the reason in</em> <code>why</code> <em>if given.</em></p>
+<pre><code class="language-C++">virtual ComputeInterop * ernie::RenderDelegate::Compute (
+    std::string * why=nullptr
+) = 0
+</code></pre>
+<hr>
+
+<h3 id="function-info">function Info</h3>
+<pre><code class="language-C++">virtual const RendererInfo &amp; ernie::RenderDelegate::Info () const = 0
+</code></pre>
+<hr>
+
+<h3 id="function-maparray-12">function MapArray [1/2]</h3>
+<p><em>Maps array</em> <code>attribute</code> <em>of the prim at</em><code>path</code> <em>for writing in place on the compute device: syncs</em><code>scene</code> <em>, writes into it as that attribute a tensor over the renderer's own memory for it, holding its values as they are, and returns that tensor.</em></p>
+<pre><code class="language-C++">virtual Tensor ernie::RenderDelegate::MapArray (
+    Scene &amp; scene,
+    const Path &amp; path,
+    std::string_view attribute,
+    std::uintptr_t stream=1
+) 
+</code></pre>
+<p>Write into it on <code>stream</code> (which first waits for the frames already submitted), then <code>scene.Unmap(path, attribute,
+stream)</code>: the next frame draws the values without copying them. Map again each step, as the memory behind it may alternate (for motion blur). </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if the backend maps no arrays, has no compute interop, or cannot map that attribute of that prim. </li>
+</ul>
+<hr>
+
+<h3 id="function-maparray-22">function MapArray [2/2]</h3>
+<p><em>Maps array</em> <code>attribute</code> <em>written as rows of one array over</em><code>prims</code> <em>(</em><code>Scene::Write</code> <em>of a</em><a href="../classernie_1_1PrimSet/"><em><strong>PrimSet</strong></em></a> <em>), as the single prim's</em><code>MapArray</code> <em>: writes the tensor as those rows, prim i's row i, and returns it.</em></p>
+<pre><code class="language-C++">virtual Tensor ernie::RenderDelegate::MapArray (
+    Scene &amp; scene,
+    const PrimSet &amp; prims,
+    std::string_view attribute,
+    std::uintptr_t stream=1
+) 
+</code></pre>
+<p>Unmap every prim (<code>Scene::Unmap</code> of the <a href="../classernie_1_1PrimSet/"><strong>PrimSet</strong></a>) after writing. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> as the single prim's. </li>
+</ul>
+<hr>
+
+<h3 id="function-meteredluminance">function MeteredLuminance</h3>
+<p><em>The scene's average luminance in cd/m^2 a recent frame measured with metering on (</em> <code>tokens::kMeter</code> <em>), for automatic exposure and meters; none before one has, or from backends that do not meter.</em></p>
+<pre><code class="language-C++">inline virtual std::optional&lt; double &gt; ernie::RenderDelegate::MeteredLuminance () const
+</code></pre>
+<hr>
+
+<h3 id="function-pick">function Pick</h3>
+<p><em>The prim the last frame</em> <code>Record</code> <em>drew shows at pixel (</em><code>x</code> <em>,</em><code>y</code> <em>) of its image, from its PrimId; the empty path for the background, a pixel outside the image, or a backend that cannot tell.</em></p>
+<pre><code class="language-C++">inline virtual Path ernie::RenderDelegate::Pick (
+    std::uint32_t x,
+    std::uint32_t y
+) 
+</code></pre>
+<p>Waits for the device, so for clicks rather than every frame. </p>
+<hr>
+
+<h3 id="function-primpath">function PrimPath</h3>
+<p><em>The prim path of a PrimId render var value, or the empty path for 0 or an unknown id.</em> </p>
+<pre><code class="language-C++">virtual Path ernie::RenderDelegate::PrimPath (
+    std::uint32_t id
+) const = 0
+</code></pre>
+<hr>
+
+<h3 id="function-record">function Record</h3>
+<p><em>Records the frame prepared by the last</em> <code>Update</code> <em>and draws its render var</em><code>var</code> <em>(one of</em><code>ViewVars</code> <em>) into</em><code>target.color</code> <em>(in the colour attachment layout, of the delegate's present format), as an image for display.</em></p>
+<pre><code class="language-C++">virtual void ernie::RenderDelegate::Record (
+    VkCommandBuffer commands,
+    const RenderingTarget &amp; target,
+    std::string_view var
+) = 0
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a var not in <code>ViewVars</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-render">function Render</h3>
+<p><em>Renders the first product of the settings and returns its</em> <code>LdrColor</code> <em>: a uint8 (rows, cols, 4) RGBA tensor, rows top to bottom, on the CPU, or with a GPU compute</em><code>device</code> <em>(CUDA or ROCm) a linear tensor there that the GPU fills without the host.</em></p>
+<pre><code class="language-C++">Tensor ernie::RenderDelegate::Render (
+    const Scene &amp; scene,
+    const Path &amp; settings={},
+    Device device={}
+) 
+</code></pre>
+<p>A GPU result returns without waiting for the render; work reading it must first wait with <code>ComputeInterop::WaitForVulkan</code> (Python's <code>__dlpack__</code> does so on the consumer's stream; <code>ComputeInterop::Download</code> does so itself). It stays valid while the tensor lives, but not beyond the delegate's Vulkan context. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> as <code>StepAsync</code> and <code>RenderVarOutput::Map</code>, or for a GPU device other than the delegate's. </li>
+</ul>
+<hr>
+
+<h3 id="function-renderdelegate-12">function RenderDelegate [1/2]</h3>
+<pre><code class="language-C++">ernie::RenderDelegate::RenderDelegate (
+    const RenderDelegate &amp;
+) = delete
+</code></pre>
+<hr>
+
+<h3 id="function-scenebounds">function SceneBounds</h3>
+<p><em>World bounds of what the delegate draws as of its last</em> <code>Sync</code> <em>or</em><code>Update</code> <em>, for framing cameras; none if nothing has finite bounds (an infinite ground plane does not count).</em></p>
+<pre><code class="language-C++">virtual std::optional&lt; Bounds3 &gt; ernie::RenderDelegate::SceneBounds () const = 0
+</code></pre>
+<hr>
+
+<h3 id="function-sensorfilters">function SensorFilters</h3>
+<p><em>The custom sensor filters registered so far.</em> </p>
+<pre><code class="language-C++">virtual const SensorFilterRegistry &amp; ernie::RenderDelegate::SensorFilters () const = 0
+</code></pre>
+<hr>
+
+<h3 id="function-sethighlight">function SetHighlight</h3>
+<p><em>Outlines the prims at</em> <code>paths</code> <em>and their descendants in</em><code>Record</code> <em>'s image, as Omniverse Kit outlines its selection, in display colour</em><code>colour</code> <em>(sRGB-encoded rgb, alpha its opacity); none for no paths.</em></p>
+<pre><code class="language-C++">inline virtual void ernie::RenderDelegate::SetHighlight (
+    std::span&lt; const Path &gt; paths,
+    glm::vec4 colour
+) 
+</code></pre>
+<p>Backends that cannot outline ignore it. </p>
+<hr>
+
+<h3 id="function-setviewband">function SetViewBand</h3>
+<p><em>Which spectral band</em> <code>Record</code> <em>shows when it presents SpectralRadiance: 0 to the camera's band count - 1, or -1 for the mean over the bands; backends that cannot choose ignore it.</em></p>
+<pre><code class="language-C++">inline virtual void ernie::RenderDelegate::SetViewBand (
+    int band
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-setviewvar">function SetViewVar</h3>
+<p><em>The render var the next</em> <code>Record</code> <em>draws, for</em><code>Update</code> <em>to prepare the vars only drawing it needs (such as the opt-in MotionVector); call before</em><code>Update</code> <em>.</em></p>
+<pre><code class="language-C++">inline virtual void ernie::RenderDelegate::SetViewVar (
+    std::string_view var
+) 
+</code></pre>
+<p>Backends that render every var regardless ignore it. </p>
+<hr>
+
+<h3 id="function-stats">function Stats</h3>
+<pre><code class="language-C++">virtual RenderStats ernie::RenderDelegate::Stats () const = 0
+</code></pre>
+<hr>
+
+<h3 id="function-step">function Step</h3>
+<p><code>StepAsync(...).Fetch()</code> <em>.</em></p>
+<pre><code class="language-C++">RenderProductSetOutputs ernie::RenderDelegate::Step (
+    const Scene &amp; scene,
+    std::span&lt; const Path &gt; products={},
+    const Path &amp; settings={}
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-stepasync">function StepAsync</h3>
+<p><em>Renders</em> <code>products</code> <em>of</em><code>scene</code> <em>(see</em><code>ResolveRenderProducts</code> <em>) and returns at once: wait for or poll the operation, then fetch the outputs and map their render vars.</em></p>
+<pre><code class="language-C++">virtual StepOperation ernie::RenderDelegate::StepAsync (
+    const Scene &amp; scene,
+    std::span&lt; const Path &gt; products={},
+    const Path &amp; settings={}
+) = 0
+</code></pre>
+<p>A product through several cameras or a camera with <code>ernie:poses</code> renders a batch of views (<code>ViewPosesOf</code>), such as one per environment in reinforcement learning, in one submission; its render vars gain a leading view dimension. Each product renders into a frame of its own that later steps reuse once its outputs are dropped and unmapped. Steps do not wait for earlier ones to finish: the next step is prepared while the last renders, so a loop that maps its outputs to CUDA without waiting keeps the GPU busy (a backend may bound the steps in flight, as the rasterizer does at two). </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> as <code>ResolveRenderProducts</code> and <code>Update</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-submitwaits">function SubmitWaits</h3>
+<p><em>Semaphore waits the submission of commands from</em> <code>Record</code> <em>needs, for CUDA copies into the delegate's buffers that may still be running; empty without CUDA inputs.</em></p>
+<pre><code class="language-C++">virtual std::vector&lt; TimelinePoint &gt; ernie::RenderDelegate::SubmitWaits () const = 0
+</code></pre>
+<hr>
+
+<h3 id="function-sync">function Sync</h3>
+<p><em>Uploads what changed in</em> <code>scene</code> <em>since the last call, or everything when</em><code>scene</code> <em>is not the scene of the last call.</em></p>
+<pre><code class="language-C++">virtual void ernie::RenderDelegate::Sync (
+    const Scene &amp; scene
+) = 0
+</code></pre>
+<p>An upload that fails is not retried until its attributes change again. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> naming the prim and attribute of data that cannot be uploaded. </li>
+</ul>
+<hr>
+
+<h3 id="function-update">function Update</h3>
+<p><em>Syncs, then prepares to draw the scene as the</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim</em><code>settings</code> <em>describes into an image of</em><code>extent</code> <em>, for</em><code>Record</code> <em>.</em></p>
+<pre><code class="language-C++">virtual void ernie::RenderDelegate::Update (
+    const Scene &amp; scene,
+    const Path &amp; settings,
+    VkExtent2D extent
+) = 0
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> as <code>Sync</code> and the scene's resolution (<code>resolve.h</code>). </li>
+</ul>
+<hr>
+
+<h3 id="function-viewvars">function ViewVars</h3>
+<p><em>The render vars</em> <code>Record</code> <em>can draw of the frame the last</em><code>Update</code> <em>prepared:</em><code>Info() .viewVars</code> <em>and what that frame adds, such as the AOVs its sensor filters write ("aov:&lt;name&gt;").</em></p>
+<pre><code class="language-C++">inline virtual std::vector&lt; std::string &gt; ernie::RenderDelegate::ViewVars () const
+</code></pre>
+<hr>
+
+<h3 id="function-operator">function operator=</h3>
+<pre><code class="language-C++">RenderDelegate &amp; ernie::RenderDelegate::operator= (
+    const RenderDelegate &amp;
+) = delete
+</code></pre>
+<hr>
+
+<h3 id="function-renderdelegate">function ~RenderDelegate</h3>
+<pre><code class="language-C++">virtual ernie::RenderDelegate::~RenderDelegate () = default
+</code></pre>
+<hr>
+<h2 id="protected-functions-documentation">Protected Functions Documentation</h2>
+<h3 id="function-nextframe">function NextFrame</h3>
+<p><em>The frame of the next image of</em> <code>product</code> <em>(the settings' path for the interactive view): the</em><code>ernie:frame</code> <em>of the resolved</em><a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim</em><code>settings</code> <em>when authored, else how many images of the product this delegate rendered before; and the product's stream,</em><code>StreamOf</code> <em>its path.</em></p>
+<pre><code class="language-C++">FrameId ernie::RenderDelegate::NextFrame (
+    const Scene &amp; scene,
+    const Path &amp; settings,
+    const Path &amp; product
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-renderdelegate-22">function RenderDelegate [2/2]</h3>
+<pre><code class="language-C++">ernie::RenderDelegate::RenderDelegate () = default
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/session/delegate.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

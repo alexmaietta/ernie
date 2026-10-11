@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/demo_8h_source/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>File demo.h - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "File demo.h";
+        var mkdocs_page_input_path = "cpp/demo_8h_source.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/demo_8h_source/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">File demo.h</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/demo_8h_source.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="file-demoh">File demo.h</h1>
+<p><a href="../files/"><strong>File List</strong></a> <strong>&gt;</strong> <a href="../dir_f4fe4d3e53c5fa699a052b25aca1662c/"><strong>app</strong></a> <strong>&gt;</strong> <a href="../demo_8h/"><strong>demo.h</strong></a></p>
+<p><a href="../demo_8h/">Go to the documentation of this file</a></p>
+<pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+#include &quot;ernie/app/viewer.h&quot;
+#include &quot;ernie/scene/scene.h&quot;
+#include &quot;ernie/session/renderer.h&quot;
+#include &quot;ernie/util/tensor.h&quot;
+
+#include &lt;cstdint&gt;
+#include &lt;filesystem&gt;
+#include &lt;functional&gt;
+#include &lt;memory&gt;
+#include &lt;optional&gt;
+#include &lt;span&gt;
+#include &lt;string&gt;
+#include &lt;string_view&gt;
+#include &lt;vector&gt;
+
+namespace ernie::app {
+
+struct DemoOptions {
+    bool viewer = true;
+    bool headless = false;  
+    std::optional&lt;std::uint64_t&gt; numFrames;
+    bool benchmark = false;
+    std::optional&lt;double&gt; benchmarkSeconds;
+    bool test = false;
+    std::filesystem::path output;     
+    bool paused = false;              
+    std::string device;               
+    std::string renderer = &quot;raster&quot;;  
+    bool validation = false;          
+    bool vsync = false;               
+    bool help = false;                
+    bool list = false;                
+    std::string demo;                 
+    std::vector&lt;std::string&gt; extra;
+
+    bool Windowed() const {
+        return viewer &amp;&amp; !headless;
+    }
+};
+
+DemoOptions ParseDemoOptions(std::span&lt;const std::string&gt; args);
+
+std::string_view DemoOptionsHelp();
+
+class Demo {
+  public:
+    Demo(Viewer* viewer, const DemoOptions&amp; options);
+    virtual ~Demo();
+    Demo(const Demo&amp;) = delete;
+    Demo&amp; operator=(const Demo&amp;) = delete;
+
+    virtual void Step();
+
+    virtual void Render();
+
+    virtual void SaveOutput(const std::filesystem::path&amp; path);
+
+    virtual void TestPostStep();
+
+    virtual void TestFinal();
+
+    virtual void Close();
+
+    virtual std::uint64_t NumFrames() const;
+    virtual double FixedDt() const;
+    virtual double MaxFrameDt() const;
+    virtual std::string Description() const;
+
+    Scene&amp; GetScene();
+    std::shared_ptr&lt;Scene&gt; OwnScene();
+    Viewer* GetViewer();
+    const DemoOptions&amp; Options() const;
+
+    Renderer&amp; GetRenderer();
+
+    std::shared_ptr&lt;Renderer&gt; SharedRenderer();
+
+    const Tensor&amp; Image() const;
+
+    Tensor RenderImage();
+
+    bool Untested() const;
+
+    std::uint64_t frame = 0;  
+    double time = 0.0;        
+    double frameDt = 1.0 / 60.0;
+
+    std::uint64_t numFrames = 100;   
+    double fixedDt = 1.0 / 60.0;     
+    double maxFrameDt = 1.0 / 30.0;  
+    std::string description;         
+
+  private:
+    Viewer* viewer_;
+    DemoOptions options_;
+    std::shared_ptr&lt;Scene&gt; ownScene_;
+    std::shared_ptr&lt;Renderer&gt; renderer_;
+    Tensor image_;
+    bool untestedSteps_ = false;
+    bool untestedFinal_ = false;
+};
+
+struct DemoInfo {
+    std::string category;     
+    std::string name;         
+    std::string description;  
+    std::function&lt;std::shared_ptr&lt;Demo&gt;(Viewer*, const DemoOptions&amp;)&gt; create;
+
+    std::string Label() const;
+};
+
+template &lt;typename T&gt;
+DemoInfo MakeDemoInfo(std::string category, std::string name, std::string description = {}) {
+    return {std::move(category), std::move(name), std::move(description),
+            [](Viewer* viewer, const DemoOptions&amp; options) -&gt; std::shared_ptr&lt;Demo&gt; {
+                return std::make_shared&lt;T&gt;(viewer, options);
+            }};
+}
+
+class DemoRunner {
+  public:
+    explicit DemoRunner(DemoOptions options, const std::string&amp; title = &quot;Ernie demos&quot;);
+    ~DemoRunner();
+    DemoRunner(const DemoRunner&amp;) = delete;
+    DemoRunner&amp; operator=(const DemoRunner&amp;) = delete;
+
+    Viewer* GetViewer();
+    const DemoOptions&amp; Options() const;
+
+    void SetCatalog(std::vector&lt;DemoInfo&gt; demos, std::size_t current = 0);
+    std::span&lt;const DemoInfo&gt; Catalog() const;
+
+    std::shared_ptr&lt;Demo&gt; Create(std::size_t index);
+
+    void RequestSwitch(std::size_t index);
+
+    void RequestReset();
+
+    std::shared_ptr&lt;Demo&gt; Run(std::shared_ptr&lt;Demo&gt; demo);
+
+  private:
+    struct State;
+    std::unique_ptr&lt;State&gt; state_;
+};
+
+int DemoMain(int argc, char** argv, std::vector&lt;DemoInfo&gt; demos, std::size_t start = 0);
+
+}  // namespace ernie::app
+</code></pre>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/api/python/demo/" />
+      <link rel="shortcut icon" href="../../../img/favicon.ico" />
+    <title>Demos - Ernie</title>
+    <link rel="stylesheet" href="../../../css/theme.css" />
+    <link rel="stylesheet" href="../../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../../css/extra.css" rel="stylesheet" />
+        <link href="../../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Demos";
+        var mkdocs_page_input_path = "api/python/demo.md";
+        var mkdocs_page_url = "/ernie/latest/api/python/demo/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul class="current">
+                  <li class="toctree-l1 current"><a class="reference internal current" >Python</a>
+    <ul class="current">
+                <li class="toctree-l2"><a class="reference internal" href="../scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../app/">Viewer</a>
+                </li>
+                <li class="toctree-l2 current"><a class="reference internal current" href="#">Demos</a>
+    <ul class="current">
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo"><code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;demo</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.COMMON_ARGS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;COMMON_ARGS</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.__all__"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;__all__</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.Demo"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;Demo</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.DemoEntry"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;DemoEntry</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.catalog"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;catalog</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.create_parser"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;create_parser</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.default_args"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;default_args</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.discover_demos"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;discover_demos</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.init"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;init</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.load_demo_class"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;load_demo_class</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.main"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;main</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.options_from_args"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;options_from_args</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.run"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;run</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.write_png"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;write_png</a>
+    </li>
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../cpp/annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../cpp/hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../cpp/namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../cpp/namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../cpp/files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">API reference</li>
+          <li class="breadcrumb-item">Python</li>
+      <li class="breadcrumb-item active">Demos</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/api/python/demo.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="demos">Demos</h1>
+<p>The demo base class, the loop that runs demos in a window, headless or through a bare renderer, and the viewer's Demos panel (<code>ernie.demo</code>).</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<a id="ernie.demo"></a>
+    <div class="doc doc-contents first">
+
+        <p>Demos: a base class for Ernie's demos and the loop that runs them, in a window, headless or
+through a bare renderer, with a Demos panel to switch between them.</p>
+<p>A demo subclasses Demo, builds its scene into <code>self.scene</code> in <code>__init__</code>, advances it in <code>step</code>
+and checks itself in <code>test_final</code>. Its scene has a Camera of its own, even when the demo is meant
+for the viewer (which frames the scene with its own camera): without a viewer (<code>--viewer null</code>,
+<code>--benchmark</code>) and in tests (<code>render_image</code>) the scene renders through it::</p>
+<pre><code>import ernie
+import ernie.demo
+from ernie import tokens
+
+class Demo(ernie.demo.Demo):
+    def __init__(self, viewer, args):
+        super().__init__(viewer, args)
+        self.ball = self.scene.define("/World/Ball", ernie.Sphere, radius=0.5)
+        self.scene.define("/World/Sun", ernie.DistantLight)
+        self.scene.define("/World/Camera", ernie.Camera).set(
+            tokens.TRANSFORM, ernie.look_at_transform((0, -5, 2), (0, 0, 0)))
+
+    def step(self):
+        self.ball.set(translate=(0, 0, self.time))  # moved by self.frame_dt each step
+
+    def test_final(self):
+        assert self.render_image()[..., :3].any()
+
+if __name__ == "__main__":
+    ernie.demo.main(Demo)
+</code></pre>
+<p><code>main(Demo)</code> is <code>init(Demo.create_parser())</code> then <code>run(Demo(viewer, args), args)</code>, as Newton's
+examples run. The common options:</p>
+<ul>
+<li><code>--viewer window</code> (the default) opens the viewer, with a Demos panel listing the demos beside
+  this one to switch to, pause, step and reset; <code>--headless</code> renders the viewer without a window
+  (no display needed); <code>--viewer null</code> has no viewer and renders the scene's RenderSettings
+  through an <code>ernie.Renderer</code> each frame.</li>
+<li><code>--num-frames N</code> stops after N frames (in a window, runs until it closes without it).</li>
+<li><code>--benchmark [SECONDS]</code> forces <code>--viewer null</code>, and reports frames per second after a few
+  frames' warm-up, stopping after SECONDS or <code>--num-frames</code>, whichever comes first.</li>
+<li><code>--test</code> calls the demo's <code>test_post_step</code> after every step and <code>test_final</code> at the end; one of
+  them must exist.</li>
+<li><code>--output PATH</code> writes the last frame (or what <code>save_output</code> makes) as PNG.</li>
+<li><code>--paused</code>, <code>--device</code>, <code>--renderer</code>, <code>--validation</code> and <code>--vsync</code>.</li>
+</ul>
+<p>The base class and the loop are C++'s (<code>ernie.app.Demo</code>, <code>ernie.app.DemoRunner</code>; ernie/app/demo.h),
+which C++ demos derive from and run the same way; this module adds argparse options, NumPy images
+and the demos found beside a Python one. In the viewer, a demo uses it as any application does
+(<code>add_panel</code>, <code>on_frame</code>, <code>active_camera</code> ...); what it adds is removed (it registers in a scope
+of its own, <code>Viewer.scope</code>), and the viewport's display settings are restored, when the Demos
+panel switches away.</p>
+<p>References:
+- Newton's examples (<code>newton.examples</code>: <code>Example</code>, <code>create_parser</code>, <code>init</code>, <code>run</code> and the
+  example browser), https://github.com/newton-physics/newton</p>
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Classes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="            Demo (ernie.demo.Demo)" href="#ernie.demo.Demo">Demo</a></code></td>
+            <td>
+              <div class="doc-md-description">
+                <p>A demo: a scene built in <code>__init__</code>, advanced by <code>step</code>, rendered by <code>render</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="            DemoEntry (ernie.demo.DemoEntry)" href="#ernie.demo.DemoEntry">DemoEntry</a></code></td>
+            <td>
+              <div class="doc-md-description">
+                <p>A demo file: its path, category and name from <code>demo_&lt;category&gt;_&lt;name&gt;.py</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+<p><span class="doc-section-title">Functions:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            catalog (ernie.demo.catalog)" href="#ernie.demo.catalog">catalog</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The Demos panel's entries for a run of <code>demo_class</code>, <code>(infos, current)</code>: the demo files</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            create_parser (ernie.demo.create_parser)" href="#ernie.demo.create_parser">create_parser</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>An argument parser with the options every demo shares; <code>Demo.create_parser</code> calls it.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            default_args (ernie.demo.default_args)" href="#ernie.demo.default_args">default_args</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The parser's defaults, for a demo the Demos panel opens.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            discover_demos (ernie.demo.discover_demos)" href="#ernie.demo.discover_demos">discover_demos</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The <code>demo_*.py</code> files in <code>directory</code> that define a Demo class, by category and name.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            init (ernie.demo.init)" href="#ernie.demo.init">init</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Parses the command line and opens the viewer it asks for: <code>(viewer, args)</code>, with viewer an</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            load_demo_class (ernie.demo.load_demo_class)" href="#ernie.demo.load_demo_class">load_demo_class</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Imports the demo file at <code>path</code> afresh (its directory first on sys.path, for the helpers</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            main (ernie.demo.main)" href="#ernie.demo.main">main</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Runs <code>demo_class</code> from the command line: <code>run(demo_class(*init(...)), args)</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            options_from_args (ernie.demo.options_from_args)" href="#ernie.demo.options_from_args">options_from_args</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The <code>ernie.app.DemoOptions</code> the parsed arguments of <code>create_parser</code> describe.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            run (ernie.demo.run)" href="#ernie.demo.run">run</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Steps and renders <code>demo</code> until its window closes or it has run <code>--num-frames</code>, then writes</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            write_png (ernie.demo.write_png)" href="#ernie.demo.write_png">write_png</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Writes an (rows, cols, 3 or 4) uint8 image as PNG with only the standard library.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>COMMON_ARGS</code></b>
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.demo.COMMON_ARGS" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">COMMON_ARGS</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">COMMON_ARGS = (
+    "viewer",
+    "headless",
+    "device",
+    "renderer",
+    "validation",
+    "vsync",
+    "paused",
+)
+</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.demo.__all__" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">__all__</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">__all__ = [
+    "COMMON_ARGS",
+    "Demo",
+    "DemoEntry",
+    "catalog",
+    "create_parser",
+    "default_args",
+    "discover_demos",
+    "init",
+    "load_demo_class",
+    "main",
+    "options_from_args",
+    "run",
+    "write_png",
+]
+</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="ernie.demo.Demo" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Demo</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">Demo(viewer, args)</code></pre>
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="ernie.demo._app.Demo">Demo</span></code></p>
+
+
+
+        <p>A demo: a scene built in <code>__init__</code>, advanced by <code>step</code>, rendered by <code>render</code>.</p>
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>viewer</code></b>
+              –
+              <div class="doc-md-description">
+                <p>The viewer the demo shows in, or None under <code>--viewer null</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>args</code></b>
+              –
+              <div class="doc-md-description">
+                <p>The parsed arguments (<code>create_parser</code>).</p>
+              </div>
+            </li>
+            <li>
+              <b><code>scene</code></b>
+              –
+              <div class="doc-md-description">
+                <p>The Scene to build into: the viewer's, or a new one without a viewer.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>renderer</code></b>
+              –
+              <div class="doc-md-description">
+                <p>An <code>ernie.Renderer</code> of the demo's own, opened on first use.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>frame</code></b>
+              –
+              <div class="doc-md-description">
+                <p>Steps taken so far.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>time</code></b>
+              –
+              <div class="doc-md-description">
+                <p>Demo seconds at the start of this step.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>frame_dt</code></b>
+              –
+              <div class="doc-md-description">
+                <p>Seconds this step advances: the time since the last frame in a window
+(at most <code>max_frame_dt</code>), else <code>fixed_dt</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>image</code></b>
+              –
+              <div class="doc-md-description">
+                <p>The last LdrColor rendered without a viewer, uint8 (rows, cols, 4).</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            create_parser
+
+
+  
+      classmethod
+   (ernie.demo.Demo.create_parser)" href="#ernie.demo.Demo.create_parser">create_parser</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The common options; override and add a demo's own to the parser this returns.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            description
+
+
+  
+      classmethod
+   (ernie.demo.Demo.description)" href="#ernie.demo.Demo.description">description</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The first paragraph of the demo's module docstring, on one line.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            map (ernie.demo.Demo.map)" href="#ernie.demo.Demo.map">map</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>A CUDA array over the renderer's own copy of an attribute, to write in place and then</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            render (ernie.demo.Demo.render)" href="#ernie.demo.Demo.render">render</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Draws a frame: through the viewer, or with <code>renderer</code> into <code>image</code> without one.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            render_image (ernie.demo.Demo.render_image)" href="#ernie.demo.Demo.render_image">render_image</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The scene's LdrColor as its RenderSettings (or its first Camera) describe, uint8</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            save_output (ernie.demo.Demo.save_output)" href="#ernie.demo.Demo.save_output">save_output</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Writes <code>--output</code>: the viewport's next frame in a viewer, else the last frame.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.Demo.args" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">args</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">args = args</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.Demo.fixed_dt" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">fixed_dt</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">fixed_dt = 1.0 / 60.0</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.Demo.frame_dt" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">frame_dt</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">frame_dt = self.fixed_dt</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.Demo.image" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">image</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">image = None</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.Demo.max_frame_dt" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">max_frame_dt</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">max_frame_dt = 1.0 / 30.0</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.Demo.num_frames" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">num_frames</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">num_frames = 100</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.Demo.title" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">title</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">title = ''</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.Demo.viewer" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">viewer</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">viewer = viewer</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.demo.Demo.create_parser" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">create_parser</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">create_parser()</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The common options; override and add a demo's own to the parser this returns.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.demo.Demo.description" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">description</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">description()</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The first paragraph of the demo's module docstring, on one line.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.demo.Demo.map" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">map</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">map(path, attribute, stream=None)</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>A CUDA array over the renderer's own copy of an attribute, to write in place and then
+<code>scene.unmap</code>: the viewer's (<code>Viewer.map</code>) or <code>renderer</code>'s (<code>Renderer.map</code>).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.demo.Demo.render" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">render</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">render()</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Draws a frame: through the viewer, or with <code>renderer</code> into <code>image</code> without one.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.demo.Demo.render_image" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">render_image</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">render_image()</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The scene's LdrColor as its RenderSettings (or its first Camera) describe, uint8
+(rows, cols, 4): the last frame without a viewer, else rendered now with <code>renderer</code>, for
+tests. Not the viewport: the viewer's own camera is not the scene's.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.demo.Demo.save_output" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">save_output</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">save_output(path)</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Writes <code>--output</code>: the viewport's next frame in a viewer, else the last frame.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="ernie.demo.DemoEntry" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">DemoEntry</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">DemoEntry(path)</code></pre>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>A demo file: its path, category and name from <code>demo_&lt;category&gt;_&lt;name&gt;.py</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>category</code></b>
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>label</code></b>
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>name</code></b>
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>path</code></b>
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.DemoEntry.category" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">category</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">category = parts[1] if len(parts) &gt; 1 else 'other'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.DemoEntry.label" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">label</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">label</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.DemoEntry.name" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">name</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">name = parts[2].replace('_', ' ') if len(parts) &gt; 2 else stem</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.DemoEntry.path" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">path</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">path = path</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.demo.catalog" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">catalog</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">catalog(demo_class, args)</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The Demos panel's entries for a run of <code>demo_class</code>, <code>(infos, current)</code>: the demo files
+beside its module, or the class alone when it is not among them.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.demo.create_parser" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">create_parser</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">create_parser(demo_class=Demo)</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>An argument parser with the options every demo shares; <code>Demo.create_parser</code> calls it.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.demo.default_args" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">default_args</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">default_args(parser)</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The parser's defaults, for a demo the Demos panel opens.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.demo.discover_demos" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">discover_demos</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">discover_demos(directory)</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The <code>demo_*.py</code> files in <code>directory</code> that define a Demo class, by category and name.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.demo.init" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">init</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">init(parser=None, title='Ernie demos')</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Parses the command line and opens the viewer it asks for: <code>(viewer, args)</code>, with viewer an
+<code>ernie.app.Viewer</code> on a new Scene, or None under <code>--viewer null</code> and <code>--benchmark</code>. The
+runner (<code>ernie.app.DemoRunner</code>) rides along in the arguments for <code>run</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.demo.load_demo_class" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">load_demo_class</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">load_demo_class(path)</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Imports the demo file at <code>path</code> afresh (its directory first on sys.path, for the helpers
+beside it) and returns its Demo class.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.demo.main" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">main</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">main(demo_class)</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Runs <code>demo_class</code> from the command line: <code>run(demo_class(*init(...)), args)</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.demo.options_from_args" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">options_from_args</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">options_from_args(args)</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The <code>ernie.app.DemoOptions</code> the parsed arguments of <code>create_parser</code> describe.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.demo.run" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">run</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">run(demo, args)</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Steps and renders <code>demo</code> until its window closes or it has run <code>--num-frames</code>, then writes
+<code>--output</code>, runs its final test and reports the benchmark. In a window the Demos panel lists
+the demo files beside this one. Returns the demo running at the end.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.demo.write_png" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">write_png</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">write_png(path, image)</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Writes an (rows, cols, 3 or 4) uint8 image as PNG with only the standard library.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../app/" class="btn btn-neutral float-left" title="Viewer"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../tokens/" class="btn btn-neutral float-right" title="Tokens">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+      <span><a href="../app/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../tokens/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../../..";</script>
+    <script src="../../../js/theme_extra.js"></script>
+    <script src="../../../js/theme.js"></script>
+      <script src="../../../search/main.js"></script>
+      <script src="../../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

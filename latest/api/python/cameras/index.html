@@ -1,0 +1,2204 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/api/python/cameras/" />
+      <link rel="shortcut icon" href="../../../img/favicon.ico" />
+    <title>Cameras and sensor models - Ernie</title>
+    <link rel="stylesheet" href="../../../css/theme.css" />
+    <link rel="stylesheet" href="../../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../../css/extra.css" rel="stylesheet" />
+        <link href="../../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Cameras and sensor models";
+        var mkdocs_page_input_path = "api/python/cameras.md";
+        var mkdocs_page_url = "/ernie/latest/api/python/cameras/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul class="current">
+                  <li class="toctree-l1 current"><a class="reference internal current" >Python</a>
+    <ul class="current">
+                <li class="toctree-l2"><a class="reference internal" href="../scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2 current"><a class="reference internal current" href="#">Cameras and sensor models</a>
+    <ul class="current">
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.CahvoreModel"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;CahvoreModel</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.read_cahvore_models"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;read_cahvore_models</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.IsdFrame"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;IsdFrame</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.IsdLineScanner"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;IsdLineScanner</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.IsdPushFrame"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;IsdPushFrame</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.author_lroc_nac"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;author_lroc_nac</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.author_lroc_wac"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;author_lroc_wac</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.author_mars2020_navcam"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;author_mars2020_navcam</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.author_mars2020_navcam_pair"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;author_mars2020_navcam_pair</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.author_mars2020_hazcam"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;author_mars2020_hazcam</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.author_mars2020_hazcam_pair"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;author_mars2020_hazcam_pair</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.author_mastcamz"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;author_mastcamz</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.author_mastcamz_pair"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;author_mastcamz_pair</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.author_singlet_chromatic"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;author_singlet_chromatic</a>
+    </li>
+    </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../cpp/annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../cpp/hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../cpp/namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../cpp/namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../../cpp/files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">API reference</li>
+          <li class="breadcrumb-item">Python</li>
+      <li class="breadcrumb-item active">Cameras and sensor models</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/api/python/cameras.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="cameras-and-sensor-models">Cameras and sensor models</h1>
+<p>Camera models read from mission files, and instrument presets.</p>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="ernie.CahvoreModel" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">CahvoreModel</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>A camera in JPL's CAHV, CAHVOR or CAHVORE model, as Mars rovers' cameras are calibrated. Image coordinates are the models': (0, 0) the centre of the upper-left pixel, x right, y down.</p>
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            author_camera (ernie.CahvoreModel.author_camera)" href="#ernie.CahvoreModel.author_camera">author_camera</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Authors the Camera prim at <code>path</code> (a str, Path, Prim or typed prim) as the model in Ernie's camera (perspective with Brown-Conrady terms, or a Kannala-Brandt fisheye for CAHVORE), posed in the model's frame, and with <code>rays_step</code> above 0 the model's own rays every that many pixels (<code>ernie:lens:rays</code>), which the sensor follows in place of the fit: exact but for CAHVORE's moving entrance pupil. Returns (width, height, rows_reversed, residual_pixels), the residual the fit's alone: render at that resolution and flip the rows if <code>rows_reversed</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            fit (ernie.CahvoreModel.fit)" href="#ernie.CahvoreModel.fit">fit</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>How the model converts to Ernie's camera at pixel pitch <code>pixel_pitch_um</code>: its residual_pixels, pupil_shift_max, field_angle_max (radians), focal_length_mm and whether it is a fisheye.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            image_to_ray (ernie.CahvoreModel.image_to_ray)" href="#ernie.CahvoreModel.image_to_ray">image_to_ray</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>(origin, unit direction) of the ray through image (x, y).</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            point_to_image (ernie.CahvoreModel.point_to_image)" href="#ernie.CahvoreModel.point_to_image">point_to_image</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The image (x, y) of 3D point <code>point</code>.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>height</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>kind</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>width</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.CahvoreModel.height" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">height</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">height: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.CahvoreModel.kind" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">kind</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">kind: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.CahvoreModel.width" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">width</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">width: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.CahvoreModel.author_camera" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">author_camera</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">author_camera(
+    scene: Scene,
+    path: str | Path | Prim | Schema,
+    pixel_pitch_um: float,
+    rays_step: int = 8,
+) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Authors the Camera prim at <code>path</code> (a str, Path, Prim or typed prim) as the model in Ernie's camera (perspective with Brown-Conrady terms, or a Kannala-Brandt fisheye for CAHVORE), posed in the model's frame, and with <code>rays_step</code> above 0 the model's own rays every that many pixels (<code>ernie:lens:rays</code>), which the sensor follows in place of the fit: exact but for CAHVORE's moving entrance pupil. Returns (width, height, rows_reversed, residual_pixels), the residual the fit's alone: render at that resolution and flip the rows if <code>rows_reversed</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.CahvoreModel.fit" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">fit</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">fit(pixel_pitch_um: float) -&gt; dict</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>How the model converts to Ernie's camera at pixel pitch <code>pixel_pitch_um</code>: its residual_pixels, pupil_shift_max, field_angle_max (radians), focal_length_mm and whether it is a fisheye.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.CahvoreModel.image_to_ray" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">image_to_ray</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">image_to_ray(x: float, y: float) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>(origin, unit direction) of the ray through image (x, y).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.CahvoreModel.point_to_image" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">point_to_image</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">point_to_image(point: object) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The image (x, y) of 3D point <code>point</code>.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.read_cahvore_models" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">read_cahvore_models</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">read_cahvore_models(path: str) -&gt; list</code></pre>
+
+    <div class="doc doc-contents first">
+
+        <p>(name, frame, CahvoreModel) for each model of the camera model JSON file at <code>path</code>, in NASA-JPL's m2020-urdf-models form.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="ernie.IsdFrame" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">IsdFrame</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>A frame camera from its image support data, as usgscsm's frame model reads it: the whole image exposed at once from one pose. Body-fixed frame, metres; CSM image coordinates.</p>
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            author_camera (ernie.IsdFrame.author_camera)" href="#ernie.IsdFrame.author_camera">author_camera</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Authors the Camera prim at <code>path</code> (a str, Path, Prim or typed prim) as the image's frame camera, posed when it is exposed, with the lens's distortion fitted as <code>ernie:lens:distortion</code>. Returns (samples, lines, rows_reversed): render at that resolution and flip the rows if <code>rows_reversed</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            from_file
+
+
+  
+      staticmethod
+   (ernie.IsdFrame.from_file)" href="#ernie.IsdFrame.from_file">from_file</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The frame camera of the ISD file at <code>path</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            from_json
+
+
+  
+      staticmethod
+   (ernie.IsdFrame.from_json)" href="#ernie.IsdFrame.from_json">from_json</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The frame camera of ISD JSON text <code>json</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            ground_to_image (ernie.IsdFrame.ground_to_image)" href="#ernie.IsdFrame.ground_to_image">ground_to_image</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The (line, sample) that sees body-fixed point <code>ground</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            image_to_ground (ernie.IsdFrame.image_to_ground)" href="#ernie.IsdFrame.image_to_ground">image_to_ground</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Where pixel (<code>line</code>, <code>sample</code>)'s ray first meets the body's ellipsoid raised by <code>height</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            position (ernie.IsdFrame.position)" href="#ernie.IsdFrame.position">position</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The sensor's body-fixed position at <code>time</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            sun_position (ernie.IsdFrame.sun_position)" href="#ernie.IsdFrame.sun_position">sun_position</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The sun's body-fixed position at <code>time</code>.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>image_time</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Ephemeris seconds (TDB past J2000) at which the image is exposed.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>lines</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>platform</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>samples</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>sensor</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.IsdFrame.image_time" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">image_time</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">image_time: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Ephemeris seconds (TDB past J2000) at which the image is exposed.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.IsdFrame.lines" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">lines</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">lines: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.IsdFrame.platform" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">platform</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">platform: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.IsdFrame.samples" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">samples</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">samples: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.IsdFrame.sensor" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">sensor</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">sensor: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdFrame.author_camera" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">author_camera</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">author_camera(scene: Scene, path: str | Path | Prim | Schema) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Authors the Camera prim at <code>path</code> (a str, Path, Prim or typed prim) as the image's frame camera, posed when it is exposed, with the lens's distortion fitted as <code>ernie:lens:distortion</code>. Returns (samples, lines, rows_reversed): render at that resolution and flip the rows if <code>rows_reversed</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdFrame.from_file" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">from_file</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">from_file(path: str) -&gt; IsdFrame</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The frame camera of the ISD file at <code>path</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdFrame.from_json" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">from_json</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">from_json(json: str) -&gt; IsdFrame</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The frame camera of ISD JSON text <code>json</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdFrame.ground_to_image" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">ground_to_image</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">ground_to_image(ground: object) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The (line, sample) that sees body-fixed point <code>ground</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdFrame.image_to_ground" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">image_to_ground</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">image_to_ground(line: float, sample: float, height: float = 0.0) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Where pixel (<code>line</code>, <code>sample</code>)'s ray first meets the body's ellipsoid raised by <code>height</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdFrame.position" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">position</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">position(time: float) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The sensor's body-fixed position at <code>time</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdFrame.sun_position" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">sun_position</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">sun_position(time: float) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The sun's body-fixed position at <code>time</code>.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="ernie.IsdLineScanner" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">IsdLineScanner</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>A line scanner (pushbroom camera) from its image support data (ALE's ISD JSON, as usgscsm reads it): its timing, detector and trajectory in the body-fixed frame, metres. Image coordinates are CSM's (line, sample), the first pixel's centre at (0.5, 0.5).</p>
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            author_strip (ernie.IsdLineScanner.author_strip)" href="#ernie.IsdLineScanner.author_strip">author_strip</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Authors the Camera prim at <code>path</code> (a str, Path, Prim or typed prim) as the pushbroom of the strip of <code>lines</code> lines from <code>first_line</code> (with the lens's distortion along the detector fitted as <code>ernie:lens:distortion</code>), posed at its end (or its start), and returns the render resolution it needs, (samples, lines). Render an image strip by strip: author the first strip at its start and step once, then author each strip at its end and step.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            from_file
+
+
+  
+      staticmethod
+   (ernie.IsdLineScanner.from_file)" href="#ernie.IsdLineScanner.from_file">from_file</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The line scanner of the ISD file at <code>path</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            from_json
+
+
+  
+      staticmethod
+   (ernie.IsdLineScanner.from_json)" href="#ernie.IsdLineScanner.from_json">from_json</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The line scanner of ISD JSON text <code>json</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            ground_to_image (ernie.IsdLineScanner.ground_to_image)" href="#ernie.IsdLineScanner.ground_to_image">ground_to_image</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The (line, sample) that sees body-fixed point <code>ground</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            image_time (ernie.IsdLineScanner.image_time)" href="#ernie.IsdLineScanner.image_time">image_time</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Ephemeris seconds (TDB past J2000) at which <code>line</code> is exposed.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            image_to_ground (ernie.IsdLineScanner.image_to_ground)" href="#ernie.IsdLineScanner.image_to_ground">image_to_ground</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Where pixel (<code>line</code>, <code>sample</code>)'s ray meets the body's ellipsoid raised by <code>height</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            position (ernie.IsdLineScanner.position)" href="#ernie.IsdLineScanner.position">position</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The sensor's body-fixed position at <code>time</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            strip (ernie.IsdLineScanner.strip)" href="#ernie.IsdLineScanner.strip">strip</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>(from, to, from_time, to_time): the camera poses and times bounding the strip of <code>lines</code> lines from <code>first_line</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            sun_position (ernie.IsdLineScanner.sun_position)" href="#ernie.IsdLineScanner.sun_position">sun_position</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The sun's body-fixed position at <code>time</code>.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>lines</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>platform</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>samples</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>sensor</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.IsdLineScanner.lines" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">lines</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">lines: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.IsdLineScanner.platform" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">platform</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">platform: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.IsdLineScanner.samples" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">samples</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">samples: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.IsdLineScanner.sensor" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">sensor</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">sensor: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdLineScanner.author_strip" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">author_strip</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">author_strip(
+    scene: Scene,
+    path: str | Path | Prim | Schema,
+    first_line: int,
+    lines: int,
+    at_end: bool = True,
+) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Authors the Camera prim at <code>path</code> (a str, Path, Prim or typed prim) as the pushbroom of the strip of <code>lines</code> lines from <code>first_line</code> (with the lens's distortion along the detector fitted as <code>ernie:lens:distortion</code>), posed at its end (or its start), and returns the render resolution it needs, (samples, lines). Render an image strip by strip: author the first strip at its start and step once, then author each strip at its end and step.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdLineScanner.from_file" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">from_file</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">from_file(path: str) -&gt; IsdLineScanner</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The line scanner of the ISD file at <code>path</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdLineScanner.from_json" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">from_json</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">from_json(json: str) -&gt; IsdLineScanner</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The line scanner of ISD JSON text <code>json</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdLineScanner.ground_to_image" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">ground_to_image</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">ground_to_image(ground: object) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The (line, sample) that sees body-fixed point <code>ground</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdLineScanner.image_time" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">image_time</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">image_time(line: float) -&gt; float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Ephemeris seconds (TDB past J2000) at which <code>line</code> is exposed.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdLineScanner.image_to_ground" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">image_to_ground</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">image_to_ground(line: float, sample: float, height: float = 0.0) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Where pixel (<code>line</code>, <code>sample</code>)'s ray meets the body's ellipsoid raised by <code>height</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdLineScanner.position" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">position</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">position(time: float) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The sensor's body-fixed position at <code>time</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdLineScanner.strip" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">strip</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">strip(first_line: int, lines: int) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>(from, to, from_time, to_time): the camera poses and times bounding the strip of <code>lines</code> lines from <code>first_line</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdLineScanner.sun_position" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">sun_position</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">sun_position(time: float) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The sun's body-fixed position at <code>time</code>.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="ernie.IsdPushFrame" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">IsdPushFrame</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>A push-frame camera (LROC's WAC, MRO's MARCI) from its image support data, as usgscsm's push-frame model reads it: the image is a stack of framelets, each a frame of <code>framelet_lines</code> lines exposed at once. Body-fixed frame, metres; CSM image coordinates.</p>
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            author_framelet (ernie.IsdPushFrame.author_framelet)" href="#ernie.IsdPushFrame.author_framelet">author_framelet</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Authors the Camera prim at <code>path</code> (a str, Path, Prim or typed prim) as framelet <code>framelet</code> (in image order, from the top): a frame camera posed when it is exposed, with the lens's distortion fitted as <code>ernie:lens:distortion</code>. Returns (samples, lines, first_line, rows_reversed, time): render at that resolution, flip the rows if <code>rows_reversed</code>, and place them at <code>first_line</code> of the image.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            from_file
+
+
+  
+      staticmethod
+   (ernie.IsdPushFrame.from_file)" href="#ernie.IsdPushFrame.from_file">from_file</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The push-frame camera of the ISD file at <code>path</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            from_json
+
+
+  
+      staticmethod
+   (ernie.IsdPushFrame.from_json)" href="#ernie.IsdPushFrame.from_json">from_json</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The push-frame camera of ISD JSON text <code>json</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            ground_to_image (ernie.IsdPushFrame.ground_to_image)" href="#ernie.IsdPushFrame.ground_to_image">ground_to_image</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The (line, sample) that sees body-fixed point <code>ground</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            image_time (ernie.IsdPushFrame.image_time)" href="#ernie.IsdPushFrame.image_time">image_time</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Ephemeris seconds (TDB past J2000) at the middle of <code>line</code>'s framelet's exposure.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            image_to_ground (ernie.IsdPushFrame.image_to_ground)" href="#ernie.IsdPushFrame.image_to_ground">image_to_ground</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Where pixel (<code>line</code>, <code>sample</code>)'s ray meets the body's ellipsoid raised by <code>height</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            position (ernie.IsdPushFrame.position)" href="#ernie.IsdPushFrame.position">position</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The sensor's body-fixed position at <code>time</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            sun_position (ernie.IsdPushFrame.sun_position)" href="#ernie.IsdPushFrame.sun_position">sun_position</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The sun's body-fixed position at <code>time</code>.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>framelet_lines</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>framelets</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>lines</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>platform</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>samples</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>sensor</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.IsdPushFrame.framelet_lines" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">framelet_lines</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">framelet_lines: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.IsdPushFrame.framelets" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">framelets</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">framelets: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.IsdPushFrame.lines" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">lines</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">lines: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.IsdPushFrame.platform" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">platform</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">platform: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.IsdPushFrame.samples" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">samples</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">samples: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.IsdPushFrame.sensor" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">sensor</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">sensor: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdPushFrame.author_framelet" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">author_framelet</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">author_framelet(scene: Scene, path: str | Path | Prim | Schema, framelet: int) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Authors the Camera prim at <code>path</code> (a str, Path, Prim or typed prim) as framelet <code>framelet</code> (in image order, from the top): a frame camera posed when it is exposed, with the lens's distortion fitted as <code>ernie:lens:distortion</code>. Returns (samples, lines, first_line, rows_reversed, time): render at that resolution, flip the rows if <code>rows_reversed</code>, and place them at <code>first_line</code> of the image.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdPushFrame.from_file" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">from_file</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">from_file(path: str) -&gt; IsdPushFrame</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The push-frame camera of the ISD file at <code>path</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdPushFrame.from_json" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">from_json</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">from_json(json: str) -&gt; IsdPushFrame</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The push-frame camera of ISD JSON text <code>json</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdPushFrame.ground_to_image" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">ground_to_image</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">ground_to_image(ground: object) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The (line, sample) that sees body-fixed point <code>ground</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdPushFrame.image_time" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">image_time</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">image_time(line: float) -&gt; float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Ephemeris seconds (TDB past J2000) at the middle of <code>line</code>'s framelet's exposure.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdPushFrame.image_to_ground" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">image_to_ground</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">image_to_ground(line: float, sample: float, height: float = 0.0) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Where pixel (<code>line</code>, <code>sample</code>)'s ray meets the body's ellipsoid raised by <code>height</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdPushFrame.position" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">position</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">position(time: float) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The sensor's body-fixed position at <code>time</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.IsdPushFrame.sun_position" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">sun_position</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">sun_position(time: float) -&gt; tuple</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The sun's body-fixed position at <code>time</code>.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.author_lroc_nac" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">author_lroc_nac</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">author_lroc_nac(
+    scene: Scene,
+    camera: str | Path | Prim | Schema,
+    product: str | Path | Prim | Schema,
+    side: str = "left",
+) -&gt; None</code></pre>
+
+    <div class="doc doc-contents first">
+
+        <p>Authors one of LROC's Narrow Angle Cameras (NAC-L or NAC-R) as Robinson et al. 2010 publish it (Table 2, Appendix A): Camera <code>camera</code>'s sensor (400-760 nm, gain, detector noise, full well, 12-bit ADC, f-number) and RenderProduct <code>product</code>'s readout chain (qe, noise, adc, even/odd readoutTaps, compandTable code 0) whose RawDN is the 8-bit numbers the NAC sends. Its geometry comes from the image's ISD (<code>IsdLineScanner.author_strip</code>). <code>camera</code> and <code>product</code> are each a str, Path, Prim or typed prim.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.author_lroc_wac" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">author_lroc_wac</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">author_lroc_wac(
+    scene: Scene,
+    camera: str | Path | Prim | Schema,
+    product: str | Path | Prim | Schema,
+    band: int = 605,
+) -&gt; None</code></pre>
+
+    <div class="doc doc-contents first">
+
+        <p>Authors one band of LROC's Wide Angle Camera (320, 360, 415, 565, 605, 645 or 690 nm, by name or effective wavelength) as Robinson et al. 2010 publish it (Tables 3 and 4): Camera <code>camera</code>'s sensor (the passband at the effective QE that gives Table 4's responsivity, gain, detector noise, full well, 11-bit ADC, f-number; its spectral range narrowed to the passband) and RenderProduct <code>product</code>'s readout chain (qe, noise, adc). Its geometry comes from the image's ISD (<code>IsdPushFrame.author_framelet</code>). <code>camera</code> and <code>product</code> are each a str, Path, Prim or typed prim.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.author_mars2020_navcam" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">author_mars2020_navcam</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">author_mars2020_navcam(
+    scene: Scene,
+    camera: str | Path | Prim | Schema,
+    product: str | Path | Prim | Schema,
+    pattern: str = "rggb",
+    jpeg_quality: float = 85.0,
+) -&gt; None</code></pre>
+
+    <div class="doc doc-contents first">
+
+        <p>Authors one of the Mars 2020 rover's Navcams as Maki et al. 2020 publish it (Table 2): Camera <code>camera</code>'s f-theta fisheye (19.1 mm, f/12, 96 x 73 degrees over 5120 x 3840 pixels of 6.4 um) and RGB sensor (gain 0.24 DN/e-, 8 e- dark noise, 15,000 e- full well, 12-bit ADC), and RenderProduct <code>product</code>'s chain (qe, bayer, noise, adc, demosaic; cie, exposure, jpeg). The paper gives neither the Bayer layout (<code>pattern</code>) nor the JPEG quality (<code>jpeg_quality</code>). <code>camera</code> and <code>product</code> are each a str, Path, Prim or typed prim.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.author_mars2020_navcam_pair" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">author_mars2020_navcam_pair</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">author_mars2020_navcam_pair(
+    scene: Scene,
+    rig: str | Path | Prim | Schema,
+    left_product: str | Path | Prim | Schema,
+    right_product: str | Path | Prim | Schema,
+    pattern: str = "rggb",
+    jpeg_quality: float = 85.0,
+) -&gt; None</code></pre>
+
+    <div class="doc doc-contents first">
+
+        <p>The Navcam stereo pair on Xform <code>rig</code> (defined if missing; pose it as the cameras' frame, looking down -z with +y up): Cameras <code>rig</code>/Left and <code>rig</code>/Right 42.4 cm apart along x, each as <code>author_mars2020_navcam</code> with its product. <code>rig</code> and the products are each a str, Path, Prim or typed prim.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.author_mars2020_hazcam" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">author_mars2020_hazcam</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">author_mars2020_hazcam(
+    scene: Scene,
+    camera: str | Path | Prim | Schema,
+    product: str | Path | Prim | Schema,
+    pattern: str = "rggb",
+    jpeg_quality: float = 85.0,
+) -&gt; None</code></pre>
+
+    <div class="doc doc-contents first">
+
+        <p>Authors one of the Mars 2020 rover's Hazcams as Maki et al. 2020 publish it (Table 2), as <code>author_mars2020_navcam</code> does a Navcam but through the Hazcam's f-theta fisheye (14.0 mm, f/12, 136 x 102 degrees, focused at 0.9 m), which renders on cube faces. <code>camera</code> and <code>product</code> are each a str, Path, Prim or typed prim.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.author_mars2020_hazcam_pair" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">author_mars2020_hazcam_pair</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">author_mars2020_hazcam_pair(
+    scene: Scene,
+    rig: str | Path | Prim | Schema,
+    left_product: str | Path | Prim | Schema,
+    right_product: str | Path | Prim | Schema,
+    which: str = "front",
+    pattern: str = "rggb",
+    jpeg_quality: float = 85.0,
+) -&gt; None</code></pre>
+
+    <div class="doc doc-contents first">
+
+        <p>A Hazcam stereo pair on Xform <code>rig</code>: Cameras <code>rig</code>/Left and <code>rig</code>/Right 24.8 cm apart (front) or 93.4 cm (rear) along x, each as <code>author_mars2020_hazcam</code> with its product. <code>rig</code> and the products are each a str, Path, Prim or typed prim.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.author_mastcamz" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">author_mastcamz</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">author_mastcamz(
+    scene: Scene,
+    camera: str | Path | Prim | Schema,
+    product: str | Path | Prim | Schema,
+    eye: str = "left",
+    filter: int = 0,
+    focal_length: float = 26.0,
+    pattern: str = "rggb",
+) -&gt; None</code></pre>
+
+    <div class="doc doc-contents first">
+
+        <p>Authors one Mastcam-Z camera through filter <code>filter</code> as Bell et al. 2021 publish it (Tables 3 and 5): the KAI-2020CM (1600 x 1200 pixels of 7.4 um, 15.6 e-/DN, 11-bit) behind the zoom at <code>focal_length</code> (26 to 110 mm). Filter 0 is the Bayer RGB; 1 to 6 the narrow bands (the left eye's 442 to 800 nm, the right's 800 to 1022 nm); 7 the neutral-density solar filter. <code>camera</code> and <code>product</code> are each a str, Path, Prim or typed prim.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.author_mastcamz_pair" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">author_mastcamz_pair</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">author_mastcamz_pair(
+    scene: Scene,
+    rig: str | Path | Prim | Schema,
+    left_product: str | Path | Prim | Schema,
+    right_product: str | Path | Prim | Schema,
+    left_filter: int = 0,
+    right_filter: int = 0,
+    focal_length: float = 26.0,
+    pattern: str = "rggb",
+) -&gt; None</code></pre>
+
+    <div class="doc doc-contents first">
+
+        <p>The Mastcam-Z pair on Xform <code>rig</code>: Cameras <code>rig</code>/Left and <code>rig</code>/Right 24.4 cm apart along x, each toed in 1.15 degrees, through their filters. <code>rig</code> and the products are each a str, Path, Prim or typed prim.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.author_singlet_chromatic" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">author_singlet_chromatic</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">author_singlet_chromatic(
+    scene: Scene,
+    camera: str | Path | Prim | Schema,
+    nd: float = 1.5168,
+    abbe: float = 64.17,
+    lateral: float = 0.0,
+) -&gt; None</code></pre>
+
+    <div class="doc doc-contents first">
+
+        <p>Authors Camera <code>camera</code>'s chromatic aberration (<code>ernie:lens:chromatic:scale</code> and <code>:focus</code>) as a thin singlet of its focal length in a glass of index <code>nd</code> and Abbe number <code>abbe</code> (by default SCHOTT N-BK7) would have: axial colour from the glass's dispersion (Cauchy, f_C - f_F = f / V), lateral colour <code>lateral</code> times its relative focal change (0 with the stop at the lens, up to 1 for a distant stop). The <code>defocus</code> filter blurs by the axial colour; the lens resamples each band by the lateral. <code>camera</code> is a str, Path, Prim or typed prim.</p>
+
+
+    </div>
+
+</div>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../rendering/" class="btn btn-neutral float-left" title="Rendering"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../astronomy/" class="btn btn-neutral float-right" title="Astronomy">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+      <span><a href="../rendering/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../astronomy/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../../..";</script>
+    <script src="../../../js/theme_extra.js"></script>
+    <script src="../../../js/theme.js"></script>
+      <script src="../../../search/main.js"></script>
+      <script src="../../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

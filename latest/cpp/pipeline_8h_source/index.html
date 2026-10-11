@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/pipeline_8h_source/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>File pipeline.h - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "File pipeline.h";
+        var mkdocs_page_input_path = "cpp/pipeline_8h_source.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/pipeline_8h_source/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">File pipeline.h</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/pipeline_8h_source.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="file-pipelineh">File pipeline.h</h1>
+<p><a href="../files/"><strong>File List</strong></a> <strong>&gt;</strong> <a href="../dir_b0c7a12f8e9ab3adbc5e778572fb81e7/"><strong>device</strong></a> <strong>&gt;</strong> <a href="../pipeline_8h/"><strong>pipeline.h</strong></a></p>
+<p><a href="../pipeline_8h/">Go to the documentation of this file</a></p>
+<pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+#include &quot;ernie/device/buffer.h&quot;
+#include &quot;ernie/device/image.h&quot;
+#include &quot;ernie/device/vulkan_context.h&quot;
+
+#include &lt;cstdint&gt;
+#include &lt;span&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+namespace ernie {
+
+struct DescriptorBinding {
+    std::uint32_t binding = 0;
+    VkDescriptorType type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    VkShaderStageFlags stages = VK_SHADER_STAGE_ALL;
+};
+
+struct DescriptorResource {
+    VkDescriptorBufferInfo buffer{};
+    VkDescriptorImageInfo image{};
+
+    static DescriptorResource Of(const GpuBuffer&amp; buffer);
+    static DescriptorResource Of(const GpuBuffer&amp; buffer, VkDeviceSize offset, VkDeviceSize range);
+    static DescriptorResource Of(VkImageView view,
+                                 VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    static DescriptorResource Of(const Sampler&amp; sampler);
+    static DescriptorResource Of(VkImageView view, VkImageLayout layout, const Sampler&amp; sampler);
+};
+
+class PipelineLayout {
+  public:
+    PipelineLayout(const VulkanContext&amp; context, std::span&lt;const DescriptorBinding&gt; bindings,
+                   std::uint32_t pushConstantBytes = 0);
+    ~PipelineLayout();
+    PipelineLayout(const PipelineLayout&amp;) = delete;
+    PipelineLayout&amp; operator=(const PipelineLayout&amp;) = delete;
+
+    VkPipelineLayout Handle() const {
+        return layout_;
+    }
+
+    void Push(VkCommandBuffer commands, VkPipelineBindPoint point,
+              std::span&lt;const DescriptorResource&gt; resources) const;
+
+    void PushConstants(VkCommandBuffer commands, const void* data, std::uint32_t bytes) const;
+
+  private:
+    const VulkanContext&amp; context_;
+    std::vector&lt;DescriptorBinding&gt; bindings_;
+    VkDescriptorSetLayout setLayout_ = VK_NULL_HANDLE;
+    VkPipelineLayout layout_ = VK_NULL_HANDLE;
+};
+
+class ComputePipeline {
+  public:
+    ComputePipeline(const VulkanContext&amp; context, const PipelineLayout&amp; layout,
+                    std::span&lt;const std::uint32_t&gt; spirv, const std::string&amp; entryPoint = &quot;main&quot;);
+
+    ComputePipeline(const VulkanContext&amp; context, std::span&lt;const std::uint32_t&gt; spirv,
+                    std::uint32_t storageBuffers, const std::string&amp; entryPoint = &quot;main&quot;);
+    ~ComputePipeline();
+    ComputePipeline(const ComputePipeline&amp;) = delete;
+    ComputePipeline&amp; operator=(const ComputePipeline&amp;) = delete;
+
+    VkPipeline Handle() const {
+        return pipeline_;
+    }
+
+    void Dispatch(VkCommandBuffer commands, std::span&lt;const DescriptorResource&gt; resources,
+                  std::uint32_t groupsX, std::uint32_t groupsY = 1,
+                  std::uint32_t groupsZ = 1) const;
+
+    void Dispatch(VkCommandBuffer commands, std::span&lt;const GpuBuffer* const&gt; buffers,
+                  std::uint32_t groupsX, std::uint32_t groupsY = 1,
+                  std::uint32_t groupsZ = 1) const;
+
+  private:
+    void Create(std::span&lt;const std::uint32_t&gt; spirv, const std::string&amp; entryPoint);
+
+    const VulkanContext&amp; context_;
+    std::unique_ptr&lt;PipelineLayout&gt; ownedLayout_;
+    const PipelineLayout* layout_ = nullptr;
+    VkPipeline pipeline_ = VK_NULL_HANDLE;
+};
+
+struct GraphicsPipelineDesc {
+    std::span&lt;const std::uint32_t&gt; vertexSpirv;
+    std::span&lt;const std::uint32_t&gt; fragmentSpirv;  
+    std::string vertexEntry = &quot;main&quot;;
+    std::string fragmentEntry = &quot;main&quot;;
+    VkFormat colorFormat = VK_FORMAT_UNDEFINED;  
+    std::vector&lt;VkFormat&gt; colorFormats;
+    VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
+    VkCompareOp depthCompare = VK_COMPARE_OP_LESS;
+    bool depthWrite = true;  
+    VkColorComponentFlags colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                           VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    float depthBiasSlope = 0.0f;  
+    bool alphaBlend = false;
+};
+
+class GraphicsPipeline {
+  public:
+    GraphicsPipeline(const VulkanContext&amp; context, const PipelineLayout&amp; layout,
+                     const GraphicsPipelineDesc&amp; desc);
+    ~GraphicsPipeline();
+    GraphicsPipeline(const GraphicsPipeline&amp;) = delete;
+    GraphicsPipeline&amp; operator=(const GraphicsPipeline&amp;) = delete;
+
+    VkPipeline Handle() const {
+        return pipeline_;
+    }
+
+  private:
+    const VulkanContext&amp; context_;
+    VkPipeline pipeline_ = VK_NULL_HANDLE;
+};
+
+struct RenderingTarget {
+    VkImageView color = VK_NULL_HANDLE;  
+    VkImageView depth = VK_NULL_HANDLE;
+    VkExtent2D extent{};
+    VkClearColorValue clearColor{};
+    bool loadColor = false;  
+    std::vector&lt;VkImageView&gt; colors;
+    std::vector&lt;VkClearColorValue&gt; clearColors;
+    bool loadDepth = false;
+    std::uint32_t layers = 1;
+};
+
+void TransitionImage(VkCommandBuffer commands, VkImage image, VkImageAspectFlags aspect,
+                     VkImageLayout from, VkImageLayout to);
+
+void BeginRendering(VkCommandBuffer commands, const RenderingTarget&amp; target);
+
+}  // namespace ernie
+</code></pre>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

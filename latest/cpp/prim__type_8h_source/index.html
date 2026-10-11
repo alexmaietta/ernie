@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/prim__type_8h_source/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>File prim_type.h - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "File prim_type.h";
+        var mkdocs_page_input_path = "cpp/prim__type_8h_source.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/prim__type_8h_source/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">File prim_type.h</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/prim__type_8h_source.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="file-prim_typeh">File prim_type.h</h1>
+<p><a href="../files/"><strong>File List</strong></a> <strong>&gt;</strong> <a href="../dir_057d52706067b881d9371cf136c38c31/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../dir_572d817874f40c61a249f0e7684d4315/"><strong>scene</strong></a> <strong>&gt;</strong> <a href="../prim__type_8h/"><strong>prim_type.h</strong></a></p>
+<p><a href="../prim__type_8h/">Go to the documentation of this file</a></p>
+<pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+#include &quot;ernie/scene/scene.h&quot;
+#include &quot;ernie/scene/schema.h&quot;
+#include &quot;ernie/scene/tokens.h&quot;
+#include &quot;ernie/scene/value.h&quot;
+#include &quot;ernie/scene/xform.h&quot;
+#include &quot;ernie/util/tensor.h&quot;
+
+#include &lt;glm/glm.hpp&gt;
+
+#include &lt;cstddef&gt;
+#include &lt;initializer_list&gt;
+#include &lt;optional&gt;
+#include &lt;span&gt;
+#include &lt;string&gt;
+#include &lt;string_view&gt;
+#include &lt;type_traits&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+namespace ernie {
+
+enum class AttributeKind {
+    Bool,
+    Int,
+    Double,
+    Vec2,
+    Vec3,
+    Vec4,
+    Token,          
+    Relationship,   
+    Relationships,  
+    FloatArray,     
+    Tensor,         
+};
+
+struct AttributeMeta {
+    std::string_view label;  
+    std::string_view doc;
+    std::string_view group;  
+    double min = 0.0;        
+    double max = 0.0;
+    std::vector&lt;std::string_view&gt; options;  
+    bool color = false;                     
+    bool asset = false;                     
+    bool integer = false;
+    bool lenient = false;
+    std::optional&lt;Dirty&gt; dirty;
+    std::string_view plural;
+};
+
+class AttributeDef;
+
+template &lt;typename T&gt; struct AttributeTraits;
+
+template &lt;&gt; struct AttributeTraits&lt;bool&gt; {
+    static constexpr AttributeKind kKind = AttributeKind::Bool;
+    using Result = bool;
+    using Arg = bool;
+    static bool Read(const Scene&amp; scene, const Path&amp; path, std::string_view name, bool fallback) {
+        return GetBool(scene, path, name, fallback);
+    }
+    static std::optional&lt;bool&gt; From(const Value&amp; value);
+};
+
+template &lt;&gt; struct AttributeTraits&lt;int&gt; {
+    static constexpr AttributeKind kKind = AttributeKind::Int;
+    using Result = int;
+    using Arg = int;
+    static int Read(const Scene&amp; scene, const Path&amp; path, std::string_view name, int fallback) {
+        return static_cast&lt;int&gt;(GetNumber(scene, path, name, fallback));
+    }
+    static std::optional&lt;int&gt; From(const Value&amp; value);
+};
+
+template &lt;&gt; struct AttributeTraits&lt;double&gt; {
+    static constexpr AttributeKind kKind = AttributeKind::Double;
+    using Result = double;
+    using Arg = double;
+    static double Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
+                       double fallback) {
+        return GetNumber(scene, path, name, fallback);
+    }
+    static std::optional&lt;double&gt; From(const Value&amp; value);
+};
+
+template &lt;&gt; struct AttributeTraits&lt;glm::dvec2&gt; {
+    static constexpr AttributeKind kKind = AttributeKind::Vec2;
+    using Result = glm::dvec2;
+    using Arg = glm::dvec2;
+    static glm::dvec2 Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
+                           glm::dvec2 fallback) {
+        return GetVec2(scene, path, name, fallback);
+    }
+    static std::optional&lt;glm::dvec2&gt; From(const Value&amp; value);
+};
+
+template &lt;&gt; struct AttributeTraits&lt;glm::dvec3&gt; {
+    static constexpr AttributeKind kKind = AttributeKind::Vec3;
+    using Result = glm::dvec3;
+    using Arg = glm::dvec3;
+    static glm::dvec3 Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
+                           glm::dvec3 fallback) {
+        return GetVec3(scene, path, name, fallback);
+    }
+    static std::optional&lt;glm::dvec3&gt; From(const Value&amp; value);
+};
+
+template &lt;&gt; struct AttributeTraits&lt;glm::dvec4&gt; {
+    static constexpr AttributeKind kKind = AttributeKind::Vec4;
+    using Result = glm::dvec4;
+    using Arg = glm::dvec4;
+    static glm::dvec4 Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
+                           glm::dvec4 fallback);
+    static std::optional&lt;glm::dvec4&gt; From(const Value&amp; value);
+};
+
+template &lt;&gt; struct AttributeTraits&lt;std::string&gt; {
+    static constexpr AttributeKind kKind = AttributeKind::Token;
+    using Result = std::string;
+    using Arg = std::string_view;
+    static std::string Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
+                            std::string_view fallback) {
+        return GetToken(scene, path, name, fallback);
+    }
+    static std::optional&lt;std::string&gt; From(const Value&amp; value);
+};
+
+template &lt;&gt; struct AttributeTraits&lt;Path&gt; {
+    static constexpr AttributeKind kKind = AttributeKind::Relationship;
+    using Result = Path;
+    using Arg = const Path&amp;;
+    static Path Read(const Scene&amp; scene, const Path&amp; path, std::string_view name, const Path&amp;) {
+        return GetTarget(scene, path, name);
+    }
+    static std::optional&lt;Path&gt; From(const Value&amp; value);
+};
+
+class Targets {
+  public:
+    Targets(Path target) : paths_{std::move(target)}, single_(true) {}
+    Targets(const char* target) : Targets(Path(target)) {}
+    Targets(std::string_view target) : Targets(Path(target)) {}
+    Targets(const std::string&amp; target) : Targets(Path(target)) {}
+    Targets(std::vector&lt;Path&gt; targets) : paths_(std::move(targets)) {}
+    Targets(std::initializer_list&lt;Path&gt; targets) : paths_(targets) {}
+
+    const std::vector&lt;Path&gt;&amp; Paths() const {
+        return paths_;
+    }
+
+    Value ToValue() const {
+        return single_ ? Value(paths_.front()) : Value(paths_);
+    }
+
+  private:
+    std::vector&lt;Path&gt; paths_;
+    bool single_ = false;
+};
+
+template &lt;&gt; struct AttributeTraits&lt;std::vector&lt;Path&gt;&gt; {
+    static constexpr AttributeKind kKind = AttributeKind::Relationships;
+    using Result = std::vector&lt;Path&gt;;
+    using Arg = const Targets&amp;;
+    static std::vector&lt;Path&gt; Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
+                                  const std::vector&lt;Path&gt;&amp; fallback);
+    static std::optional&lt;std::vector&lt;Path&gt;&gt; From(const Value&amp; value);
+    static std::optional&lt;Value&gt; Store(const Value&amp; value);
+};
+
+template &lt;&gt; struct AttributeTraits&lt;std::vector&lt;float&gt;&gt; {
+    static constexpr AttributeKind kKind = AttributeKind::FloatArray;
+    using Result = std::vector&lt;float&gt;;
+    using Arg = std::vector&lt;float&gt;;
+    static std::vector&lt;float&gt; Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
+                                   const std::vector&lt;float&gt;&amp; fallback);
+    static std::optional&lt;std::vector&lt;float&gt;&gt; From(const Value&amp; value);
+};
+
+template &lt;&gt; struct AttributeTraits&lt;Tensor&gt; {
+    static constexpr AttributeKind kKind = AttributeKind::Tensor;
+    using Result = const Tensor*;
+    using Arg = Tensor;
+    static const Tensor* Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
+                              std::nullptr_t) {
+        return scene.Read(path, name);
+    }
+};
+
+class AttributeDef {
+  public:
+    std::string_view name;  
+    std::string member;     
+    std::string pyName;     
+    std::string label;      
+    AttributeKind kind = AttributeKind::Double;
+    Value fallback;  
+    AttributeMeta meta;
+
+    Value Read(const Scene&amp; scene, const Path&amp; path) const {
+        return read_(*this, scene, path);
+    }
+
+    Value Coerce(const Value&amp; value) const;
+
+    template &lt;typename T&gt;
+    static AttributeDef Make(std::string_view name, std::string_view member, const T&amp; fallback,
+                             AttributeMeta meta);
+    static AttributeDef MakeTensor(std::string_view name, std::string_view member,
+                                   AttributeMeta meta);
+
+  private:
+    static AttributeDef Describe(std::string_view name, std::string_view member, AttributeKind kind,
+                                 AttributeMeta meta);
+
+    Value (*read_)(const AttributeDef&amp;, const Scene&amp;, const Path&amp;) = nullptr;
+    std::optional&lt;Value&gt; (*from_)(const Value&amp;) = nullptr;
+};
+
+struct PrimTypeDef {
+    std::string_view name;
+    const PrimTypeDef* base = nullptr;
+    bool abstract = false;
+    std::string_view doc;
+    std::vector&lt;AttributeDef&gt; attributes;
+    std::vector&lt;std::string_view&gt; openNamespaces;
+
+    bool IsA(const PrimTypeDef&amp; other) const;
+
+    bool IsOpen(std::string_view space) const;
+
+    const AttributeDef* Find(std::string_view name) const;
+
+    const AttributeDef* FindByPyName(std::string_view name) const;
+
+    std::vector&lt;const AttributeDef*&gt; AllAttributes() const;
+};
+
+void Validate(const PrimTypeDef&amp; type, const Path&amp; path, std::string_view attribute,
+              const Value* value);
+
+std::span&lt;const PrimTypeDef* const&gt; PrimTypes();
+
+const PrimTypeDef* FindPrimType(std::string_view name);
+
+const PrimTypeDef&amp; GetPrimType(std::string_view name);
+
+const PrimTypeDef* PrimTypeOf(const Scene&amp; scene, const Path&amp; path);
+
+std::string SnakeCase(std::string_view member);
+
+class SchemaView {
+  public:
+    const Path&amp; GetPath() const {
+        return path_;
+    }
+
+    const Scene&amp; GetScene() const {
+        return *scene_;
+    }
+
+    Prim GetPrim() const {
+        return Prim(&amp;Edit(), path_);
+    }
+
+    const PrimTypeDef&amp; PrimType() const {
+        return *type_;
+    }
+
+  protected:
+    SchemaView(const Scene&amp; scene, Path path, const PrimTypeDef&amp; type);
+    SchemaView(Scene&amp; scene, Path path, const PrimTypeDef&amp; type);
+
+    bool Has(std::string_view name) const {
+        return scene_-&gt;Get(path_, name) != nullptr || scene_-&gt;Read(path_, name) != nullptr;
+    }
+
+    Scene&amp; Edit() const;
+
+  private:
+    const Scene* scene_ = nullptr;
+    Scene* mutable_ = nullptr;
+    Path path_;
+    const PrimTypeDef* type_ = nullptr;
+};
+
+}  // namespace ernie
+
+#define ERNIE_ATTRIBUTE_ACCESSORS(Type, Name, token, fallback, meta)                               \
+    ::ernie::AttributeTraits&lt;Type&gt;::Result Get##Name() const {                                     \
+        return ::ernie::AttributeTraits&lt;Type&gt;::Read(GetScene(), GetPath(), token, fallback);       \
+    }                                                                                              \
+    bool Has##Name() const {                                                                       \
+        return Has(token);                                                                         \
+    }                                                                                              \
+    Self&amp; Set##Name(::ernie::AttributeTraits&lt;Type&gt;::Arg value) {                                   \
+        ::ernie::detail::WriteAttribute&lt;Type&gt;(Edit(), GetPath(), token, value);                    \
+        return static_cast&lt;Self&amp;&gt;(*this);                                                          \
+    }                                                                                              \
+    Self&amp; Clear##Name() {                                                                          \
+        Edit().Clear(GetPath(), token);                                                            \
+        return static_cast&lt;Self&amp;&gt;(*this);                                                          \
+    }
+
+#define ERNIE_SCHEMA_BODY(Class, Base, ATTRIBUTES)                                                 \
+  public:                                                                                          \
+    using Self = Class;                                                                            \
+           \
+    Class(const ::ernie::Scene&amp; scene, ::ernie::Path path)                                         \
+        : Base(scene, std::move(path), Definition()) {}                                            \
+    Class(::ernie::Scene&amp; scene, ::ernie::Path path)                                               \
+        : Base(scene, std::move(path), Definition()) {}                                            \
+                                                              \
+    static const ::ernie::PrimTypeDef&amp; Definition();                                               \
+    ATTRIBUTES(ERNIE_ATTRIBUTE_ACCESSORS)                                                          \
+      \
+    Self&amp; SetTransform(const glm::dmat4&amp; matrix) {                                                 \
+        Edit().Set(GetPath(), ::ernie::tokens::kTransform, ::ernie::Value(matrix));                \
+        return static_cast&lt;Self&amp;&gt;(*this);                                                          \
+    }                                                                                              \
+   \
+    Self&amp; SetXform(const ::ernie::XformOps&amp; ops) {                                                 \
+        ::ernie::SetXform(Edit(), GetPath(), ops);                                                 \
+        return static_cast&lt;Self&amp;&gt;(*this);                                                          \
+    }                                                                                              \
+                     \
+    glm::dmat4 GetLocalTransform() const {                                                         \
+        return GetScene().LocalTransform(GetPath());                                               \
+    }                                                                                              \
+    \
+    Self&amp; Set(std::string_view attribute, ::ernie::Value value) {                                  \
+        Edit().Set(GetPath(), attribute, std::move(value));                                        \
+        return static_cast&lt;Self&amp;&gt;(*this);                                                          \
+    }                                                                                              \
+                              \
+    Self&amp; Write(std::string_view attribute, ::ernie::Tensor tensor) {                              \
+        Edit().Write(GetPath(), attribute, std::move(tensor));                                     \
+        return static_cast&lt;Self&amp;&gt;(*this);                                                          \
+    }                                                                                              \
+                                                                                                   \
+  protected:                                                                                       \
+    Class(const ::ernie::Scene&amp; scene, ::ernie::Path path, const ::ernie::PrimTypeDef&amp; type)       \
+        : Base(scene, std::move(path), type) {}                                                    \
+    Class(::ernie::Scene&amp; scene, ::ernie::Path path, const ::ernie::PrimTypeDef&amp; type)             \
+        : Base(scene, std::move(path), type) {}                                                    \
+                                                                                                   \
+  public:
+
+#define ERNIE_SCHEMA_DEFINE(Class)                                                                 \
+    static Class Define(::ernie::Scene&amp; scene, const ::ernie::Path&amp; path) {                        \
+        scene.Define(path, Definition().name);                                                     \
+        return Class(scene, path);                                                                 \
+    }
+
+#define ERNIE_ATTRIBUTE_DEF(Type, Name, token, fallback, meta)                                     \
+    ::ernie::detail::MakeAttribute&lt;Type&gt;(token, #Name, fallback, meta),
+
+#define ERNIE_DEFINE_SCHEMA(Class, typeName, base, isAbstract, typeDoc, OWN_ATTRIBUTES)            \
+    ERNIE_DEFINE_OPEN_SCHEMA(Class, typeName, base, isAbstract, typeDoc, OWN_ATTRIBUTES)
+
+#define ERNIE_DEFINE_OPEN_SCHEMA(Class, typeName, base, isAbstract, typeDoc, OWN_ATTRIBUTES, ...)  \
+    const ::ernie::PrimTypeDef&amp; Class::Definition() {                                              \
+        static const ::ernie::PrimTypeDef definition{                                              \
+            typeName,     base, isAbstract, typeDoc, {OWN_ATTRIBUTES(ERNIE_ATTRIBUTE_DEF)},        \
+            {__VA_ARGS__}};                                                                        \
+        return definition;                                                                         \
+    }
+
+namespace ernie::detail {
+
+template &lt;typename T&gt;
+void WriteAttribute(Scene&amp; scene, const Path&amp; path, std::string_view name,
+                    typename AttributeTraits&lt;T&gt;::Arg value) {
+    if constexpr (std::is_same_v&lt;T, Tensor&gt;) {
+        scene.Write(path, name, std::move(value));
+    } else if constexpr (std::is_same_v&lt;T, std::string&gt;) {
+        scene.Set(path, name, Value(std::string(value)));
+    } else if constexpr (std::is_same_v&lt;T, std::vector&lt;Path&gt;&gt;) {
+        scene.Set(path, name, value.ToValue());
+    } else {
+        scene.Set(path, name, Value(value));
+    }
+}
+
+template &lt;typename T, typename Fallback&gt;
+AttributeDef MakeAttribute(std::string_view name, std::string_view member, const Fallback&amp; fallback,
+                           AttributeMeta meta) {
+    if constexpr (std::is_same_v&lt;T, Tensor&gt;) {
+        return AttributeDef::MakeTensor(name, member, std::move(meta));
+    } else {
+        return AttributeDef::Make&lt;T&gt;(name, member, T(fallback), std::move(meta));
+    }
+}
+
+}  // namespace ernie::detail
+
+namespace ernie {
+
+template &lt;typename T&gt;
+AttributeDef AttributeDef::Make(std::string_view name, std::string_view member, const T&amp; fallback,
+                                AttributeMeta meta) {
+    AttributeDef def = Describe(name, member, AttributeTraits&lt;T&gt;::kKind, std::move(meta));
+    if constexpr (!std::is_same_v&lt;T, Path&gt;) {
+        def.fallback = Value(fallback);
+    }
+    def.read_ = [](const AttributeDef&amp; self, const Scene&amp; scene, const Path&amp; path) -&gt; Value {
+        if constexpr (std::is_same_v&lt;T, Path&gt;) {
+            const Path target = AttributeTraits&lt;Path&gt;::Read(scene, path, self.name, Path());
+            return target.IsEmpty() ? Value() : Value(target);
+        } else {
+            return Value(AttributeTraits&lt;T&gt;::Read(scene, path, self.name, *self.fallback.Get&lt;T&gt;()));
+        }
+    };
+    def.from_ = [](const Value&amp; value) -&gt; std::optional&lt;Value&gt; {
+        if constexpr (std::is_same_v&lt;T, std::vector&lt;Path&gt;&gt;) {
+            return AttributeTraits&lt;T&gt;::Store(value);
+        } else if (auto converted = AttributeTraits&lt;T&gt;::From(value)) {
+            return Value(std::move(*converted));
+        }
+        return std::nullopt;
+    };
+    return def;
+}
+
+}  // namespace ernie
+</code></pre>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

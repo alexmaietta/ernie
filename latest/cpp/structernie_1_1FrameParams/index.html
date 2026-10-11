@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1FrameParams/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Struct ernie::FrameParams - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Struct ernie::FrameParams";
+        var mkdocs_page_input_path = "cpp/structernie_1_1FrameParams.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/structernie_1_1FrameParams/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Struct ernie::FrameParams</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/structernie_1_1FrameParams.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="struct-ernieframeparams">Struct ernie::FrameParams</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>FrameParams</strong></a></p>
+<p><em>Per-frame parameters of a render, whatever the backend: the camera, the sun, the other lights, the sensor filters and the frame's place in the random streams.</em> <a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/session/frame_params.h&gt;</code></li>
+</ul>
+<h2 id="classes">Classes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1FrameParams_1_1SensorChain/"><strong>SensorChain</strong></a> <br><em>Several sensor chains over the one raster image, each writing its own vars (render vars with their own</em> <code>ernie:filters</code> <em>); empty runs</em><code>filters</code> <em>for</em><code>vars</code> <em>.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-attributes">Public Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-ambient"><strong>ambient</strong></a>   = <code>0.15f</code><br><em>Fraction of sunlight reaching surfaces without shading.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1CameraParams/"><strong>CameraParams</strong></a></td>
+<td style="text-align: left;"><a href="#variable-camera"><strong>camera</strong></a>  <br><em>The camera: pose, projection, spectral bands, exposure, lens and sensor.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1FrameParams_1_1SensorChain/"><strong>SensorChain</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#variable-chains"><strong>chains</strong></a>  <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec3</td>
+<td style="text-align: left;"><a href="#variable-clearcolor"><strong>clearColor</strong></a>   = <code>{0.0f}</code><br><em>Linear display colour of the background in LdrColor.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../namespaceernie/#enum-culling"><strong>Culling</strong></a></td>
+<td style="text-align: left;"><a href="#variable-culling"><strong>culling</strong></a>   = <code>Culling::Gpu</code><br><em>How draws outside a view are culled.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::optional&lt; <a href="../structernie_1_1DomeParams/"><strong>DomeParams</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#variable-dome"><strong>dome</strong></a>  <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-domedirections"><strong>domeDirections</strong></a>   = <code>16</code><br><em>How many shadowed directions light the dome's diffuse light in</em> <code>DomeLightMode::Directions</code> <em>(</em><code>tokens::kDomeDirections</code> <em>), and whether</em><code>lights</code> <em>holds them this frame, so the dome's own diffuse light stays off.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-domedirectionslit"><strong>domeDirectionsLit</strong></a>   = <code>false</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../namespaceernie/#enum-domelightmode"><strong>DomeLightMode</strong></a></td>
+<td style="text-align: left;"><a href="#variable-domemode"><strong>domeMode</strong></a>   = <code>DomeLightMode::Approximate</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-domeshadowradius"><strong>domeShadowRadius</strong></a>   = <code>1.0f</code><br><em>World distance within which geometry shadows a dome in</em> <code>DomeLightMode::Full</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-exposure"><strong>exposure</strong></a>   = <code>1.0f</code><br><em>Extra scale on the photographic output.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1SensorFilterStep/"><strong>SensorFilterStep</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#variable-filters"><strong>filters</strong></a>  <br><em>The sensor filters to run, with their inputs (</em> <code>CheckFilterChain</code> <em>); empty runs</em><code>DefaultFilterChain</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#variable-frame"><strong>frame</strong></a>   = <code>0</code><br><em>The frame number temporal noise derives from (</em> <code>FrameSeed</code> <em>): rendering the same frame again gives the same image, and consecutive frames independent noise.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1LightParams/"><strong>LightParams</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#variable-lights"><strong>lights</strong></a>  <br><em>Other lights; the rasterizer takes</em> <code>RasterRenderer::kMaxLights</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-meshloderror"><strong>meshLodError</strong></a>   = <code>1.0f</code><br><em>The simplification error, in pixels, up to which instanced meshes draw a coarser level of detail with GPU culling; 0 draws the full meshes.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-meter"><strong>meter</strong></a>   = <code>false</code><br><em>Measure the scene's luminance (</em> <code>tokens::kMeter</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../namespaceernie/#enum-minimalmode"><strong>MinimalMode</strong></a></td>
+<td style="text-align: left;"><a href="#variable-minimal"><strong>minimal</strong></a>   = <code>MinimalMode::Off</code><br><em>Minimal shading (</em> <code>MinimalMode</code> <em>), and its constant colour (linear RGB).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec3</td>
+<td style="text-align: left;"><a href="#variable-minimalcolor"><strong>minimalColor</strong></a>   = <code>{1.0f}</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../namespaceernie/#enum-occlusion"><strong>Occlusion</strong></a></td>
+<td style="text-align: left;"><a href="#variable-occlusion"><strong>occlusion</strong></a>   = <code>Occlusion::Off</code><br><em>Whether views cull instances hidden by others.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#variable-origin"><strong>origin</strong></a>   = <code>{0.0}</code><br><em>The world position the GPU's coordinates are relative to (camera-relative rendering, a floating origin): passes see world points as</em> <code>point - origin</code> <em>, so float precision follows the camera instead of the world's origin, as planet-scale scenes need.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#variable-overlays"><strong>overlays</strong></a>  <br><em>The overlays drawn over LdrColor (</em> <code>tokens::kOverlays</code> <em>): "*", names, or empty for none.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-overscan"><strong>overscan</strong></a>   = <code>1.0</code><br><em>How much wider than the camera's the raster view's field of view is, so that with lens distortion it covers the undistorted rays of every sensor pixel (</em> <code>OverscanOf</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; glm::dmat4 &gt;</td>
+<td style="text-align: left;"><a href="#variable-poses"><strong>poses</strong></a>  <br><em>Camera-to-world poses of a batch of views that share</em> <code>camera</code> <em>'s lens and sensor, one image each, such as one camera per environment in reinforcement learning; empty for the single view of</em><code>camera.transform</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-posesongpu"><strong>posesOnGpu</strong></a>   = <code>false</code><br><em>Whether the views' poses come from the GPU (</em> <code>ernie:poses</code> <em>written as a CUDA array and copied device to device), each the camera's parent world transform</em><code>posesParent</code> <em>after its pose;</em><code>poses</code> <em>are then only estimates (the last such frame's, or the camera's own transform) for work the CPU plans, such as terrain levels of detail, and CPU frustum tests of the views are skipped.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dmat4</td>
+<td style="text-align: left;"><a href="#variable-posesparent"><strong>posesParent</strong></a>   = <code>{1.0}</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-posesquaternions"><strong>posesQuaternions</strong></a>   = <code>false</code><br><em>With</em> <code>posesOnGpu</code> <em>: the GPU poses are rows of seven numbers, a position and a unit quaternion (x, y, z, qx, qy, qz, qw), rather than row-major 4 x 4 matrices.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; glm::dmat4 &gt;</td>
+<td style="text-align: left;"><a href="#variable-previousposes"><strong>previousPoses</strong></a>  <br><em>The views' camera-to-world poses at the last frame (time -1), one per view, for motion blur; empty when there is no last frame, which holds the camera still.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1ShadowSettings/"><strong>ShadowSettings</strong></a></td>
+<td style="text-align: left;"><a href="#variable-shadows"><strong>shadows</strong></a>  <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::optional&lt; <a href="../structernie_1_1StarFieldParams/"><strong>StarFieldParams</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#variable-stars"><strong>stars</strong></a>  <br><em>Stars behind everything, as last uploaded.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-stream"><strong>stream</strong></a>   = <code>0</code><br><em>Decorrelates images rendered with the same seed and frame, such as the products of one step:</em> <code>StreamOf</code> <em>the render product's path.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-sun"><strong>sun</strong></a>   = <code>true</code><br><em>Off lights the scene with</em> <code>lights</code> <em>alone (no sun, ambient or cascades).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-sunangle"><strong>sunAngle</strong></a>   = <code>0.53f</code><br><em>Angular diameter of the sun's disk in degrees, which widens shadow penumbrae with the distance from the occluder (percentage-closer soft shadows); 0 keeps</em> <code>shadows.softness</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec3</td>
+<td style="text-align: left;"><a href="#variable-sundirection"><strong>sunDirection</strong></a>   = <code>{0.0f, 0.0f, 1.0f}</code><br><em>Unit vector pointing towards the sun.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; float &gt;</td>
+<td style="text-align: left;"><a href="#variable-sunirradiance"><strong>sunIrradiance</strong></a>  <br><em>The sun's spectral irradiance at normal incidence per band of</em> <code>camera.bands</code> <em>, in W m^-2 nm^-1.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; std::string_view &gt;</td>
+<td style="text-align: left;"><a href="#variable-vars"><strong>vars</strong></a>  <br><em>The render vars wanted from the frame; empty for all.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../namespaceernie/#enum-wireframe"><strong>Wireframe</strong></a></td>
+<td style="text-align: left;"><a href="#variable-wireframe"><strong>wireframe</strong></a>   = <code>Wireframe::Off</code><br><em>How triangle edges are drawn.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; std::int32_t &gt;</td>
+<td style="text-align: left;"><a href="#variable-worlds"><strong>worlds</strong></a>  <br><em>The world each view sees (</em> <code>tokens::kWorld</code> <em>): its own and the shared one, or every world for -1; empty for every view seeing every world.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>FrameParams</strong></a></td>
+<td style="text-align: left;"><a href="#function-faces"><strong>Faces</strong></a> (int faces) const<br><em>The frame as the</em> <code>faces</code> <em>cube faces of a wide camera see it (</em><a href="../wide__view_8h/"><em><strong>wide_view.h</strong></em></a> <em>): a view per view and face, view</em><code>v</code> <em>'s face</em><code>f</code> <em>at</em><code>v * faces + f</code> <em>, posed at the view's pose turned onto the face (</em><code>CubeFaceAxes</code> <em>, its previous pose too) and seeing the view's world, and</em><code>camera</code> <em>a centred pinhole of the same image whose square of 90 degrees plus a margin (</em><code>CubeFaceExtent</code> <em>) spans the image's shorter side.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dmat4</td>
+<td style="text-align: left;"><a href="#function-previouspose"><strong>PreviousPose</strong></a> (std::size_t view=0) const<br><em>View</em> <code>view</code> <em>'s pose at the last frame relative to</em><code>origin</code> <em>: its pose now without one.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::mat4</td>
+<td style="text-align: left;"><a href="#function-relative-12"><strong>Relative</strong></a> (const glm::dmat4 &amp; world) const<br><em>World transform</em> <code>world</code> <em>relative to</em><code>origin</code> <em>, in float for the GPU.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec3</td>
+<td style="text-align: left;"><a href="#function-relative-22"><strong>Relative</strong></a> (const glm::dvec3 &amp; world) const<br><em>World point</em> <code>world</code> <em>relative to</em><code>origin</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1PushbroomStrip/"><strong>PushbroomStrip</strong></a></td>
+<td style="text-align: left;"><a href="#function-strip"><strong>Strip</strong></a> (std::size_t view=0) const<br><em>A pushbroom camera's strip of view</em> <code>view</code> <em>, from its last frame's pose to this one's.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>FrameParams</strong></a></td>
+<td style="text-align: left;"><a href="#function-subframes"><strong>Subframes</strong></a> () const<br><em>The frame as its sub-frames see it, for motion blur (</em> <code>CameraParams::Subframes</code> <em>): a view per sub-frame and view, sub-frame</em><code>k</code> <em>'s from</em><code>k *  Views()</code> <em>on, each posed at</em><code>camera.SubframeTime(k)</code> <em>between</em><code>previousPoses</code> <em>and its pose (</em><code>InterpolatePose</code> <em>) and seeing its view's world.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1CameraView/"><strong>CameraView</strong></a></td>
+<td style="text-align: left;"><a href="#function-view"><strong>View</strong></a> (std::size_t view=0) const<br><em>The raster view the passes draw view</em> <code>view</code> <em>with,</em><code>ViewCamera(view).RasterView(overscan)</code> <em>relative to</em><code>origin</code> <em>and without copying the camera.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1CameraParams/"><strong>CameraParams</strong></a></td>
+<td style="text-align: left;"><a href="#function-viewcamera"><strong>ViewCamera</strong></a> (std::size_t view) const<br><em>The camera of view</em> <code>view</code> <em>:</em><code>camera</code> <em>at that view's pose.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::int32_t</td>
+<td style="text-align: left;"><a href="#function-viewworld"><strong>ViewWorld</strong></a> (std::size_t view) const<br><em>The world view</em> <code>view</code> <em>sees, -1 for every world.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::size_t</td>
+<td style="text-align: left;"><a href="#function-views"><strong>Views</strong></a> () const<br><em>The number of views:</em> <code>poses</code> <em>' or 1.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-static-functions">Public Static Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#function-faceintrinsics"><strong>FaceIntrinsics</strong></a> (std::uint32_t width, std::uint32_t height) <br><em>The tangent-plane focal length, in raster pixels, and the principal point of a cube face of a camera of</em> <code>width</code> <em>x</em><code>height</code> <em>pixels (</em><code>Faces</code> <em>): the face's image-plane coordinates (x, y) land at (cx + f x, cy - f y).</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p><code>shadows</code> tunes the rasterizer's shadow maps; tracers ignore it. </p>
+<h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-ambient">variable ambient</h3>
+<p><em>Fraction of sunlight reaching surfaces without shading.</em> </p>
+<pre><code class="language-C++">float ernie::FrameParams::ambient;
+</code></pre>
+<hr>
+
+<h3 id="variable-camera">variable camera</h3>
+<p><em>The camera: pose, projection, spectral bands, exposure, lens and sensor.</em> </p>
+<pre><code class="language-C++">CameraParams ernie::FrameParams::camera;
+</code></pre>
+<p>Its <code>width</code> and <code>height</code> are the image size, which the render targets must have. </p>
+<hr>
+
+<h3 id="variable-chains">variable chains</h3>
+<pre><code class="language-C++">std::vector&lt;SensorChain&gt; ernie::FrameParams::chains;
+</code></pre>
+<hr>
+
+<h3 id="variable-clearcolor">variable clearColor</h3>
+<p><em>Linear display colour of the background in LdrColor.</em> </p>
+<pre><code class="language-C++">glm::vec3 ernie::FrameParams::clearColor;
+</code></pre>
+<hr>
+
+<h3 id="variable-culling">variable culling</h3>
+<p><em>How draws outside a view are culled.</em> </p>
+<pre><code class="language-C++">Culling ernie::FrameParams::culling;
+</code></pre>
+<hr>
+
+<h3 id="variable-dome">variable dome</h3>
+<pre><code class="language-C++">std::optional&lt;DomeParams&gt; ernie::FrameParams::dome;
+</code></pre>
+<hr>
+
+<h3 id="variable-domedirections">variable domeDirections</h3>
+<p><em>How many shadowed directions light the dome's diffuse light in</em> <code>DomeLightMode::Directions</code> <em>(</em><code>tokens::kDomeDirections</code> <em>), and whether</em><code>lights</code> <em>holds them this frame, so the dome's own diffuse light stays off.</em></p>
+<pre><code class="language-C++">std::uint32_t ernie::FrameParams::domeDirections;
+</code></pre>
+<hr>
+
+<h3 id="variable-domedirectionslit">variable domeDirectionsLit</h3>
+<pre><code class="language-C++">bool ernie::FrameParams::domeDirectionsLit;
+</code></pre>
+<hr>
+
+<h3 id="variable-domemode">variable domeMode</h3>
+<pre><code class="language-C++">DomeLightMode ernie::FrameParams::domeMode;
+</code></pre>
+<hr>
+
+<h3 id="variable-domeshadowradius">variable domeShadowRadius</h3>
+<p><em>World distance within which geometry shadows a dome in</em> <code>DomeLightMode::Full</code> <em>.</em></p>
+<pre><code class="language-C++">float ernie::FrameParams::domeShadowRadius;
+</code></pre>
+<hr>
+
+<h3 id="variable-exposure">variable exposure</h3>
+<p><em>Extra scale on the photographic output.</em> </p>
+<pre><code class="language-C++">float ernie::FrameParams::exposure;
+</code></pre>
+<hr>
+
+<h3 id="variable-filters">variable filters</h3>
+<p><em>The sensor filters to run, with their inputs (</em> <code>CheckFilterChain</code> <em>); empty runs</em><code>DefaultFilterChain</code> <em>.</em></p>
+<pre><code class="language-C++">std::vector&lt;SensorFilterStep&gt; ernie::FrameParams::filters;
+</code></pre>
+<hr>
+
+<h3 id="variable-frame">variable frame</h3>
+<p><em>The frame number temporal noise derives from (</em> <code>FrameSeed</code> <em>): rendering the same frame again gives the same image, and consecutive frames independent noise.</em></p>
+<pre><code class="language-C++">std::uint64_t ernie::FrameParams::frame;
+</code></pre>
+<hr>
+
+<h3 id="variable-lights">variable lights</h3>
+<p><em>Other lights; the rasterizer takes</em> <code>RasterRenderer::kMaxLights</code> <em>.</em></p>
+<pre><code class="language-C++">std::vector&lt;LightParams&gt; ernie::FrameParams::lights;
+</code></pre>
+<hr>
+
+<h3 id="variable-meshloderror">variable meshLodError</h3>
+<p><em>The simplification error, in pixels, up to which instanced meshes draw a coarser level of detail with GPU culling; 0 draws the full meshes.</em> </p>
+<pre><code class="language-C++">float ernie::FrameParams::meshLodError;
+</code></pre>
+<hr>
+
+<h3 id="variable-meter">variable meter</h3>
+<p><em>Measure the scene's luminance (</em> <code>tokens::kMeter</code> <em>).</em></p>
+<pre><code class="language-C++">bool ernie::FrameParams::meter;
+</code></pre>
+<hr>
+
+<h3 id="variable-minimal">variable minimal</h3>
+<p><em>Minimal shading (</em> <code>MinimalMode</code> <em>), and its constant colour (linear RGB).</em></p>
+<pre><code class="language-C++">MinimalMode ernie::FrameParams::minimal;
+</code></pre>
+<hr>
+
+<h3 id="variable-minimalcolor">variable minimalColor</h3>
+<pre><code class="language-C++">glm::vec3 ernie::FrameParams::minimalColor;
+</code></pre>
+<hr>
+
+<h3 id="variable-occlusion">variable occlusion</h3>
+<p><em>Whether views cull instances hidden by others.</em> </p>
+<pre><code class="language-C++">Occlusion ernie::FrameParams::occlusion;
+</code></pre>
+<hr>
+
+<h3 id="variable-origin">variable origin</h3>
+<p><em>The world position the GPU's coordinates are relative to (camera-relative rendering, a floating origin): passes see world points as</em> <code>point - origin</code> <em>, so float precision follows the camera instead of the world's origin, as planet-scale scenes need.</em></p>
+<pre><code class="language-C++">glm::dvec3 ernie::FrameParams::origin;
+</code></pre>
+<p>Chosen near the camera and moved only when the camera gets far from it (<code>RasterDelegate</code>), so what is expressed relative to it is recomputed rarely.</p>
+<p>References:
+* C. Thorne, "Using a Floating Origin to Improve Fidelity and Performance of Large,
+  Distributed Virtual Worlds", CW 2005. <a href="https://doi.org/10.1109/CW.2005.94">https://doi.org/10.1109/CW.2005.94</a>
+* P. Cozzi and K. Ring, "3D Engine Design for Virtual Globes", CRC Press, 2011, chapter 5 (rendering relative to center and to eye). </p>
+<hr>
+
+<h3 id="variable-overlays">variable overlays</h3>
+<p><em>The overlays drawn over LdrColor (</em> <code>tokens::kOverlays</code> <em>): "*", names, or empty for none.</em></p>
+<pre><code class="language-C++">std::string ernie::FrameParams::overlays;
+</code></pre>
+<hr>
+
+<h3 id="variable-overscan">variable overscan</h3>
+<p><em>How much wider than the camera's the raster view's field of view is, so that with lens distortion it covers the undistorted rays of every sensor pixel (</em> <code>OverscanOf</code> <em>).</em></p>
+<pre><code class="language-C++">double ernie::FrameParams::overscan;
+</code></pre>
+<hr>
+
+<h3 id="variable-poses">variable poses</h3>
+<p><em>Camera-to-world poses of a batch of views that share</em> <code>camera</code> <em>'s lens and sensor, one image each, such as one camera per environment in reinforcement learning; empty for the single view of</em><code>camera.transform</code> <em>.</em></p>
+<pre><code class="language-C++">std::vector&lt;glm::dmat4&gt; ernie::FrameParams::poses;
+</code></pre>
+<hr>
+
+<h3 id="variable-posesongpu">variable posesOnGpu</h3>
+<p><em>Whether the views' poses come from the GPU (</em> <code>ernie:poses</code> <em>written as a CUDA array and copied device to device), each the camera's parent world transform</em><code>posesParent</code> <em>after its pose;</em><code>poses</code> <em>are then only estimates (the last such frame's, or the camera's own transform) for work the CPU plans, such as terrain levels of detail, and CPU frustum tests of the views are skipped.</em></p>
+<pre><code class="language-C++">bool ernie::FrameParams::posesOnGpu;
+</code></pre>
+<hr>
+
+<h3 id="variable-posesparent">variable posesParent</h3>
+<pre><code class="language-C++">glm::dmat4 ernie::FrameParams::posesParent;
+</code></pre>
+<hr>
+
+<h3 id="variable-posesquaternions">variable posesQuaternions</h3>
+<p><em>With</em> <code>posesOnGpu</code> <em>: the GPU poses are rows of seven numbers, a position and a unit quaternion (x, y, z, qx, qy, qz, qw), rather than row-major 4 x 4 matrices.</em></p>
+<pre><code class="language-C++">bool ernie::FrameParams::posesQuaternions;
+</code></pre>
+<hr>
+
+<h3 id="variable-previousposes">variable previousPoses</h3>
+<p><em>The views' camera-to-world poses at the last frame (time -1), one per view, for motion blur; empty when there is no last frame, which holds the camera still.</em> </p>
+<pre><code class="language-C++">std::vector&lt;glm::dmat4&gt; ernie::FrameParams::previousPoses;
+</code></pre>
+<hr>
+
+<h3 id="variable-shadows">variable shadows</h3>
+<pre><code class="language-C++">ShadowSettings ernie::FrameParams::shadows;
+</code></pre>
+<hr>
+
+<h3 id="variable-stars">variable stars</h3>
+<p><em>Stars behind everything, as last uploaded.</em> </p>
+<pre><code class="language-C++">std::optional&lt;StarFieldParams&gt; ernie::FrameParams::stars;
+</code></pre>
+<hr>
+
+<h3 id="variable-stream">variable stream</h3>
+<p><em>Decorrelates images rendered with the same seed and frame, such as the products of one step:</em> <code>StreamOf</code> <em>the render product's path.</em></p>
+<pre><code class="language-C++">std::uint32_t ernie::FrameParams::stream;
+</code></pre>
+<hr>
+
+<h3 id="variable-sun">variable sun</h3>
+<p><em>Off lights the scene with</em> <code>lights</code> <em>alone (no sun, ambient or cascades).</em></p>
+<pre><code class="language-C++">bool ernie::FrameParams::sun;
+</code></pre>
+<hr>
+
+<h3 id="variable-sunangle">variable sunAngle</h3>
+<p><em>Angular diameter of the sun's disk in degrees, which widens shadow penumbrae with the distance from the occluder (percentage-closer soft shadows); 0 keeps</em> <code>shadows.softness</code> <em>.</em></p>
+<pre><code class="language-C++">float ernie::FrameParams::sunAngle;
+</code></pre>
+<hr>
+
+<h3 id="variable-sundirection">variable sunDirection</h3>
+<p><em>Unit vector pointing towards the sun.</em> </p>
+<pre><code class="language-C++">glm::vec3 ernie::FrameParams::sunDirection;
+</code></pre>
+<hr>
+
+<h3 id="variable-sunirradiance">variable sunIrradiance</h3>
+<p><em>The sun's spectral irradiance at normal incidence per band of</em> <code>camera.bands</code> <em>, in W m^-2 nm^-1.</em></p>
+<pre><code class="language-C++">std::vector&lt;float&gt; ernie::FrameParams::sunIrradiance;
+</code></pre>
+<p>Empty means a flat spectrum scaled so a white Lambertian surface facing the sun has a luminance of 1 cd/m^2 (relative units). </p>
+<hr>
+
+<h3 id="variable-vars">variable vars</h3>
+<p><em>The render vars wanted from the frame; empty for all.</em> </p>
+<pre><code class="language-C++">std::vector&lt;std::string_view&gt; ernie::FrameParams::vars;
+</code></pre>
+<p>Only they are held, and filters that produce none of them do not run (the sensor fuses the rest, <code>PlanSensor</code>). </p>
+<hr>
+
+<h3 id="variable-wireframe">variable wireframe</h3>
+<p><em>How triangle edges are drawn.</em> </p>
+<pre><code class="language-C++">Wireframe ernie::FrameParams::wireframe;
+</code></pre>
+<hr>
+
+<h3 id="variable-worlds">variable worlds</h3>
+<p><em>The world each view sees (</em> <code>tokens::kWorld</code> <em>): its own and the shared one, or every world for -1; empty for every view seeing every world.</em></p>
+<pre><code class="language-C++">std::vector&lt;std::int32_t&gt; ernie::FrameParams::worlds;
+</code></pre>
+<hr>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-faces">function Faces</h3>
+<p><em>The frame as the</em> <code>faces</code> <em>cube faces of a wide camera see it (</em><a href="../wide__view_8h/"><em><strong>wide_view.h</strong></em></a> <em>): a view per view and face, view</em><code>v</code> <em>'s face</em><code>f</code> <em>at</em><code>v * faces + f</code> <em>, posed at the view's pose turned onto the face (</em><code>CubeFaceAxes</code> <em>, its previous pose too) and seeing the view's world, and</em><code>camera</code> <em>a centred pinhole of the same image whose square of 90 degrees plus a margin (</em><code>CubeFaceExtent</code> <em>) spans the image's shorter side.</em></p>
+<pre><code class="language-C++">FrameParams ernie::FrameParams::Faces (
+    int faces
+) const
+</code></pre>
+<p>The raster passes draw these; the sensor follows the original camera's lens rays onto them. A copy for one face. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for faces other than 1, <code>kCubeFaces</code> and <code>kAllCubeFaces</code>, or with the poses on the GPU. </li>
+</ul>
+<hr>
+
+<h3 id="function-previouspose">function PreviousPose</h3>
+<p><em>View</em> <code>view</code> <em>'s pose at the last frame relative to</em><code>origin</code> <em>: its pose now without one.</em></p>
+<pre><code class="language-C++">glm::dmat4 ernie::FrameParams::PreviousPose (
+    std::size_t view=0
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-relative-12">function Relative [1/2]</h3>
+<p><em>World transform</em> <code>world</code> <em>relative to</em><code>origin</code> <em>, in float for the GPU.</em></p>
+<pre><code class="language-C++">inline glm::mat4 ernie::FrameParams::Relative (
+    const glm::dmat4 &amp; world
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-relative-22">function Relative [2/2]</h3>
+<p><em>World point</em> <code>world</code> <em>relative to</em><code>origin</code> <em>.</em></p>
+<pre><code class="language-C++">inline glm::vec3 ernie::FrameParams::Relative (
+    const glm::dvec3 &amp; world
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-strip">function Strip</h3>
+<p><em>A pushbroom camera's strip of view</em> <code>view</code> <em>, from its last frame's pose to this one's.</em></p>
+<pre><code class="language-C++">PushbroomStrip ernie::FrameParams::Strip (
+    std::size_t view=0
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-subframes">function Subframes</h3>
+<p><em>The frame as its sub-frames see it, for motion blur (</em> <code>CameraParams::Subframes</code> <em>): a view per sub-frame and view, sub-frame</em><code>k</code> <em>'s from</em><code>k *  Views()</code> <em>on, each posed at</em><code>camera.SubframeTime(k)</code> <em>between</em><code>previousPoses</code> <em>and its pose (</em><code>InterpolatePose</code> <em>) and seeing its view's world.</em></p>
+<pre><code class="language-C++">FrameParams ernie::FrameParams::Subframes () const
+</code></pre>
+<p>A copy for a frame of one sub-frame. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for <code>previousPoses</code> of another view count. </li>
+</ul>
+<hr>
+
+<h3 id="function-view">function View</h3>
+<p><em>The raster view the passes draw view</em> <code>view</code> <em>with,</em><code>ViewCamera(view).RasterView(overscan)</code> <em>relative to</em><code>origin</code> <em>and without copying the camera.</em></p>
+<pre><code class="language-C++">inline CameraView ernie::FrameParams::View (
+    std::size_t view=0
+) const
+</code></pre>
+<p>A pushbroom's is a pinhole view around its whole strip (<code>PushbroomEnvelope</code>), for what the CPU plans: culling, levels of detail and shadow cascades. </p>
+<hr>
+
+<h3 id="function-viewcamera">function ViewCamera</h3>
+<p><em>The camera of view</em> <code>view</code> <em>:</em><code>camera</code> <em>at that view's pose.</em></p>
+<pre><code class="language-C++">inline CameraParams ernie::FrameParams::ViewCamera (
+    std::size_t view
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-viewworld">function ViewWorld</h3>
+<p><em>The world view</em> <code>view</code> <em>sees, -1 for every world.</em></p>
+<pre><code class="language-C++">inline std::int32_t ernie::FrameParams::ViewWorld (
+    std::size_t view
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-views">function Views</h3>
+<p><em>The number of views:</em> <code>poses</code> <em>' or 1.</em></p>
+<pre><code class="language-C++">inline std::size_t ernie::FrameParams::Views () const
+</code></pre>
+<hr>
+<h2 id="public-static-functions-documentation">Public Static Functions Documentation</h2>
+<h3 id="function-faceintrinsics">function FaceIntrinsics</h3>
+<p><em>The tangent-plane focal length, in raster pixels, and the principal point of a cube face of a camera of</em> <code>width</code> <em>x</em><code>height</code> <em>pixels (</em><code>Faces</code> <em>): the face's image-plane coordinates (x, y) land at (cx + f x, cy - f y).</em></p>
+<pre><code class="language-C++">static glm::dvec3 ernie::FrameParams::FaceIntrinsics (
+    std::uint32_t width,
+    std::uint32_t height
+) 
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/session/frame_params.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
