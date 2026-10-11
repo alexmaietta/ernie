@@ -40,6 +40,11 @@
                               .min = 1000.0, .max = 20000.0}))                                     \
     X(bool, ShadowEnable, ::ernie::tokens::kShadowEnable, true,                                    \
       (::ernie::AttributeMeta{.label = "Shadows", .group = "Light"}))                              \
+    X(bool, Normalize, ::ernie::tokens::kNormalize, false,                                         \
+      (::ernie::AttributeMeta{.doc = "Divides the intensity by the light's size (its area, or a "  \
+                                     "distant light's projected solid angle), so resizing it "     \
+                                     "keeps its power; domes ignore it.",                          \
+                              .group = "Light"}))                                                  \
     X(std::string, PhysicalIlluminant, ::ernie::tokens::kPhysicalIlluminant, "",                   \
       (::ernie::AttributeMeta{                                                                     \
           .label = "Illuminant",                                                                   \
@@ -66,6 +71,15 @@
       (::ernie::AttributeMeta{.doc = "Radiant flux in W over 360 to 830 nm, in place of the "      \
                                      "intensity when set.",                                        \
                               .group = "Shape", .max = 1e7}))                                      \
+    X(double, ShapingFocus, ::ernie::tokens::kShapingFocus, 0.0,                                   \
+      (::ernie::AttributeMeta{.label = "Focus",                                                    \
+                              .doc = "Emission falls off as |cos|^focus off the axis; a power "    \
+                                     "stays the power.",                                           \
+                              .group = "Shape", .max = 1000.0}))                                   \
+    X(glm::dvec3, ShapingFocusTint, ::ernie::tokens::kShapingFocusTint, glm::dvec3(0.0),           \
+      (::ernie::AttributeMeta{.label = "Focus tint",                                               \
+                              .doc = "Linear RGB the focus falloff fades to; white undoes it.",    \
+                              .group = "Shape", .color = true}))                                   \
     X(double, PhotometricPower, ::ernie::tokens::kPhotometricPower, 1600.0,                        \
       (::ernie::AttributeMeta{.label = "Power",                                                    \
                               .doc = "Luminous flux in lumens, whatever the colour or cone."       \

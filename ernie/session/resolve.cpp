@@ -117,6 +117,18 @@ double LightIntensity(const Light& light) {
     return light.GetIntensity() * std::exp2(light.GetExposure());
 }
 
+/// `LightIntensity`, divided by `size` when the light normalizes (UsdLux's `inputs:normalize`:
+/// its world surface area, or a distant light's projected solid angle); a size of 0, a point's,
+/// leaves it.
+///
+/// References:
+/// - Pixar, UsdLux LightAPI, inputs:normalize,
+///   https://openusd.org/dev/user_guides/schemas/usdLux/LightAPI.html
+double LightIntensity(const Light& light, double size) {
+    const double intensity = LightIntensity(light);
+    return light.GetNormalize() && size > 0.0 ? intensity / size : intensity;
+}
+
 /// The black body temperature of a light with `inputs:enableColorTemperature`, else 0.
 double ColorTemperature(const Light& light) {
     return light.GetEnableColorTemperature() ? light.GetColorTemperature() : 0.0;
@@ -201,18 +213,63 @@ std::function<double(double)> IlluminantShape(const Light& light) {
     return [base, tint](double w) { return base(w) * tint(w); };
 }
 
-/// The solid angle a light emitting into a cone around its axis spreads its power over: the
-/// integral of its falloff, which rises by a smoothstep in the cosine off the axis from
-/// `cosOuter` to `cosInner` (as the shading's), so 2 pi (1 - (cosOuter + cosInner) / 2); 4 pi
-/// for a cone of 180 degrees.
-double ConeSolidAngle(double angleDegrees, double softness) {
-    if (angleDegrees >= 180.0) {
-        return 4.0 * M_PI;
+/// How a sphere, rect or disk light's emission falls off around its axis: its cone (spheres)
+/// and its focus.
+struct EmissionShape {
+    double coneAngle = 180.0;  ///< Degrees.
+    double coneSoftness = 0.0;
+    double focus = 0.0;
+    double tintLuminance = 0.0;  ///< Of the focus tint, what the focus falloff fades to.
+
+    /// The emission at cosine `c` off the axis over that along it: the cone's smoothstep in the
+    /// cosine (as the shading's) times lerp(tint, 1, |c|^focus).
+    double operator()(double c) const {
+        double cone = 1.0;
+        if (coneAngle < 180.0) {
+            const double angle = glm::radians(std::max(coneAngle, 0.0));
+            const double outer = std::cos(angle);
+            const double inner = std::cos(angle * (1.0 - std::clamp(coneSoftness, 0.0, 1.0)));
+            const double t = std::clamp((c - outer) / std::max(inner - outer, 1e-12), 0.0, 1.0);
+            cone = t * t * (3.0 - 2.0 * t);
+        }
+        const double focused = focus > 0.0 ? std::pow(std::abs(c), focus) : 1.0;
+        return cone * (tintLuminance + (1.0 - tintLuminance) * focused);
     }
-    const double angle = glm::radians(std::max(angleDegrees, 0.0));
-    const double cosOuter = std::cos(angle);
-    const double cosInner = std::cos(angle * (1.0 - std::clamp(softness, 0.0, 1.0)));
-    return std::max(2.0 * M_PI * (1.0 - 0.5 * (cosOuter + cosInner)), 1e-9);
+};
+
+/// The solid angle a light spreads its power over, so that a power gives the same flux whatever
+/// its shape: for a sphere the integral of `shape` over the sphere (4 pi unshaped), for a flat
+/// Lambertian emitter of its cosine-weighted value over the hemisphere it faces (pi unshaped),
+/// per unit area. A focus tint counts by its luminance.
+double EmittedSolidAngle(const EmissionShape& shape, bool flat) {
+    constexpr int kSteps = 8192;
+    const double low = flat ? 0.0 : -1.0;
+    const double step = (1.0 - low) / kSteps;
+    double sum = 0.0;
+    for (int i = 0; i < kSteps; ++i) {
+        const double c = low + (i + 0.5) * step;
+        sum += (flat ? c : 1.0) * shape(c);
+    }
+    return std::max(2.0 * M_PI * sum * step, 1e-9);
+}
+
+/// The shape of a sphere, rect or disk light's emission (`EmissionShape`), with `coneAngle` and
+/// `coneSoftness` its cone's (180 and 0 for none).
+EmissionShape EmissionShapeOf(const BoundableLight& light, double coneAngle, double coneSoftness) {
+    const glm::dvec3 tint = glm::clamp(light.GetShapingFocusTint(), 0.0, 1.0);
+    return {coneAngle, coneSoftness, std::max(light.GetShapingFocus(), 0.0),
+            0.2126 * tint.r + 0.7152 * tint.g + 0.0722 * tint.b};
+}
+
+/// `light`'s focus and its tint per band of `bands` (`LightParams::focus`), the tint upsampled
+/// as `inputs:color` is (`RgbToSigmoid`); no tint when it is black.
+void SetFocus(LightParams& light, const BoundableLight& emitter, const SpectralBands& bands) {
+    light.focus = static_cast<float>(std::max(emitter.GetShapingFocus(), 0.0));
+    const glm::dvec3 tint = glm::clamp(emitter.GetShapingFocusTint(), 0.0, 1.0);
+    if (light.focus > 0.0f && tint != glm::dvec3(0.0)) {
+        const SigmoidSpectrum shape = RgbToSigmoid(tint);
+        light.focusTint = BinShape([&](double w) { return shape(w); }, bands, 1.0);
+    }
 }
 
 /// Luminance of a Lambertian disk of `radius` that gives 1 lux to a surface facing it on its
@@ -248,7 +305,7 @@ double RectLuminancePerLux(double width, double height, double distance) {
 /// and its distance above 0, the value lighting a surface facing it on its axis that far away
 /// with that illuminance, `perLux(distance)` giving the value per lux; otherwise its power in
 /// lumens over `spread` (the cone's solid angle for a sphere, pi times the area for a flat
-/// emitter), so it emits that power whatever its colour or cone.
+/// emitter), so it emits that power whatever its colour, cone or focus.
 ///
 /// References:
 /// - NVIDIA, Omniverse lighting, PhotometricAreaLightAPI,
@@ -905,7 +962,9 @@ std::vector<float> SunIrradianceOf(const Scene& scene, const Path& path,
         return BlackbodyIrradiance(bands, temperature > 0.0 ? temperature : 5772.0,
                                    sun.GetIrradiance());
     }
-    return RelativeSpectrum(sun, bands, M_PI * LightIntensity(sun));
+    // A white surface facing it reads its intensity: pi times it in lux. Normalized, as UsdLux's
+    // luminance over the disk's projected solid angle, the intensity is the illuminance.
+    return RelativeSpectrum(sun, bands, (sun.GetNormalize() ? 1.0 : M_PI) * LightIntensity(sun));
 }
 
 LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBands& bands) {
@@ -942,13 +1001,14 @@ LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBa
         throw std::invalid_argument("Light '" + path.String() + "' has a degenerate transform");
     }
     light.direction = glm::vec3(glm::normalize(axis));
+    const glm::dvec3 d = glm::normalize(axis);
+    const glm::dvec3 x = xAxis - glm::dot(xAxis, d) * d;
+    if (glm::length(x) == 0.0) {
+        throw std::invalid_argument("Light '" + path.String() + "' has a degenerate transform");
+    }
+    light.tangent = glm::vec3(glm::normalize(x));
+    SetFocus(light, emitter, bands);
     if (type != kSphereLight) {
-        const glm::dvec3 d = glm::normalize(axis);
-        const glm::dvec3 x = xAxis - glm::dot(xAxis, d) * d;
-        if (glm::length(x) == 0.0) {
-            throw std::invalid_argument("Light '" + path.String() + "' has a degenerate transform");
-        }
-        light.tangent = glm::vec3(glm::normalize(x));
         double area = 0.0;
         if (type == kRectLight) {
             const RectLight rect(scene, path);
@@ -966,6 +1026,8 @@ LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBa
         if (!(area > 0.0)) {
             throw std::invalid_argument("Light '" + path.String() + "' has no area");
         }
+        // A power spreads over the area times the focused hemisphere (pi unfocused).
+        const double spread = area * EmittedSolidAngle(EmissionShapeOf(emitter, 180.0, 0.0), true);
         const std::optional<std::vector<float>> pairs = SpectrumPairs(emitter);
         if (emitter.IsPhotometric()) {
             const glm::dvec2 size(light.size);
@@ -974,13 +1036,12 @@ LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBa
                 return type == kRectLight ? RectLuminancePerLux(size.x, size.y, distance)
                                           : DiskLuminancePerLux(radius, distance);
             };
-            light.spectrum = RelativeSpectrum(emitter, bands,
-                                              PhotometricAreaValue(emitter, M_PI * area, perLux));
-        } else {
             light.spectrum =
-                emitter.HasPower() || pairs
-                    ? LampSpectrum(emitter, bands, pairs ? &*pairs : nullptr, M_PI * area)
-                    : RelativeSpectrum(emitter, bands, LightIntensity(emitter));
+                RelativeSpectrum(emitter, bands, PhotometricAreaValue(emitter, spread, perLux));
+        } else if (emitter.HasPower() || pairs) {
+            light.spectrum = LampSpectrum(emitter, bands, pairs ? &*pairs : nullptr, spread);
+        } else {
+            light.spectrum = RelativeSpectrum(emitter, bands, LightIntensity(emitter, area));
         }
         return light;
     }
@@ -992,23 +1053,26 @@ LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBa
     if (light.radius < 0.0f) {
         throw std::invalid_argument("SphereLight '" + path.String() + "' has a negative radius");
     }
-    // A power, photometric or radiant, spreads over the cone's solid angle, so narrowing the cone
-    // concentrates the light rather than dimming it.
-    const double cone = ConeSolidAngle(light.coneAngle, light.coneSoftness);
+    // A power, photometric or radiant, spreads over the solid angle under the cone and focus, so
+    // narrowing either concentrates the light rather than dimming it.
+    const double spread =
+        EmittedSolidAngle(EmissionShapeOf(sphere, light.coneAngle, light.coneSoftness), false);
     if (sphere.IsPhotometric()) {
         const auto perLux = [](double distance) { return distance * distance; };
         light.spectrum =
-            RelativeSpectrum(sphere, bands, PhotometricAreaValue(sphere, cone, perLux));
+            RelativeSpectrum(sphere, bands, PhotometricAreaValue(sphere, spread, perLux));
         return light;
     }
     const std::optional<std::vector<float>> pairs = SpectrumPairs(sphere);
     if (sphere.HasPower() || pairs) {
-        light.spectrum = LampSpectrum(sphere, bands, pairs ? &*pairs : nullptr, cone);
+        light.spectrum = LampSpectrum(sphere, bands, pairs ? &*pairs : nullptr, spread);
         return light;
     }
     const double radius = light.radius;
     const double area = radius > 0.0 ? M_PI * radius * radius : 1.0;
-    light.spectrum = RelativeSpectrum(sphere, bands, LightIntensity(sphere) * area);
+    // Normalized, over its surface area, 4 pi r^2: a luminous intensity of a quarter of it.
+    light.spectrum = RelativeSpectrum(sphere, bands,
+                                      LightIntensity(sphere, 4.0 * M_PI * radius * radius) * area);
     return light;
 }
 

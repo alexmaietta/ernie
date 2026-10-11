@@ -365,6 +365,82 @@ TEST(LightParamsOf, PhotometricAreaLightsFollowOmniversesRules) {
     EXPECT_NEAR(ernie::LightParamsOf(scene, "/Lamp", {}).spectrum[0], 1.0 / (4.0 * M_PI), 1e-6);
 }
 
+TEST(LightParamsOf, NormalizedLightsDivideTheirIntensityByTheirSize) {
+    const ernie::SpectralBands bands{380.0, 780.0, 40};
+    Scene scene;
+    const auto luminous = [&](std::string_view path) {
+        return Luminous(ernie::LightParamsOf(scene, path, bands).spectrum, bands);
+    };
+    // A 2 m x 0.5 m panel of intensity 8: luminance 8, or 8 / 1 m^2 normalized; scaled up by 2,
+    // the normalized one keeps its power.
+    ernie::RectLight panel =
+        ernie::RectLight::Define(scene, "/Panel").SetIntensity(8.0).SetWidth(2.0).SetHeight(0.5);
+    EXPECT_NEAR(luminous("/Panel"), 8.0, 0.08);
+    panel.SetNormalize(true);
+    EXPECT_NEAR(luminous("/Panel"), 8.0, 0.08);
+    panel.SetTransform(glm::scale(glm::dmat4(1.0), glm::dvec3(2.0)));
+    EXPECT_NEAR(luminous("/Panel"), 2.0, 0.02) << "a quarter of the luminance on 4 times the area";
+
+    // A sphere of radius 0.5: luminous intensity 8 pi 0.25 = 2 pi, normalized over 4 pi 0.25.
+    ernie::SphereLight bulb =
+        ernie::SphereLight::Define(scene, "/Bulb").SetIntensity(8.0).SetRadius(0.5);
+    EXPECT_NEAR(luminous("/Bulb"), 2.0 * M_PI, 0.07);
+    bulb.SetNormalize(true);
+    EXPECT_NEAR(luminous("/Bulb"), 2.0, 0.02);
+
+    // A distant light's normalized intensity is its illuminance; un-normalized, pi times it.
+    ernie::DistantLight sun = ernie::DistantLight::Define(scene, "/Sun").SetIntensity(3.0);
+    EXPECT_NEAR(luminous("/Sun"), 3.0 * M_PI, 0.1);
+    sun.SetNormalize(true);
+    EXPECT_NEAR(luminous("/Sun"), 3.0, 0.03);
+
+    // Powers and photometric units are sizeless already.
+    panel.SetPhotometricPower(1000.0);
+    EXPECT_NEAR(luminous("/Panel"), 1000.0 / (4.0 * M_PI), 1.6) << "4 m^2 after the scale";
+}
+
+TEST(LightParamsOf, FocusedLightsKeepTheirPower) {
+    const ernie::SpectralBands bands{380.0, 780.0, 40};
+    Scene scene;
+    const auto luminous = [&](std::string_view path) {
+        return Luminous(ernie::LightParamsOf(scene, path, bands).spectrum, bands);
+    };
+
+    // |cos|^4 over the sphere integrates to 4 pi / 5: 1600 lumens give 5 times 1600 / 4 pi cd
+    // along the axis.
+    ernie::SphereLight bulb =
+        ernie::SphereLight::Define(scene, "/Bulb").SetPhotometricPower(1600.0).SetShapingFocus(4.0);
+    EXPECT_NEAR(luminous("/Bulb"), 5.0 * 1600.0 / (4.0 * M_PI),
+                0.015 * 5.0 * 1600.0 / (4.0 * M_PI));
+    const LightParams focused = ernie::LightParamsOf(scene, "/Bulb", bands);
+    EXPECT_EQ(focused.focus, 4.0f);
+    EXPECT_TRUE(focused.focusTint.empty()) << "black";
+
+    // A white tint undoes it; a grey one halfway.
+    bulb.SetShapingFocusTint({1.0, 1.0, 1.0});
+    EXPECT_NEAR(luminous("/Bulb"), 1600.0 / (4.0 * M_PI), 0.015 * 1600.0 / (4.0 * M_PI));
+    bulb.SetShapingFocusTint({0.5, 0.5, 0.5});
+    const LightParams grey = ernie::LightParamsOf(scene, "/Bulb", bands);
+    ASSERT_EQ(grey.focusTint.size(), 40u);
+    EXPECT_NEAR(grey.focusTint[20], 0.5f, 0.02f);
+    const double half = 1600.0 / (4.0 * M_PI * (0.5 + 0.5 / 5.0));
+    EXPECT_NEAR(luminous("/Bulb"), half, 0.015 * half);
+
+    // A panel's cos x cos^2 over the hemisphere integrates to pi / 2: 1000 lumens from 2 m^2
+    // give 1000 / pi nits along its axis.
+    ernie::RectLight panel = ernie::RectLight::Define(scene, "/Panel")
+                                 .SetWidth(2.0)
+                                 .SetHeight(1.0)
+                                 .SetPhotometricPower(1000.0)
+                                 .SetShapingFocus(2.0);
+    EXPECT_NEAR(luminous("/Panel"), 1000.0 / M_PI, 0.015 * 1000.0 / M_PI);
+    panel.SetPhotometricIlluminance(50.0).SetPhotometricIlluminanceDistance(3.0);
+    panel.ClearShapingFocus();
+    const double unfocused = luminous("/Panel");
+    panel.SetShapingFocus(2.0);
+    EXPECT_NEAR(luminous("/Panel"), unfocused, 1e-6 * unfocused) << "on its axis, focus is moot";
+}
+
 TEST(LightParamsOf, IlluminantsShapeTheSpectrum) {
     const ernie::SpectralBands bands{380.0, 780.0, 40};
     Scene scene;

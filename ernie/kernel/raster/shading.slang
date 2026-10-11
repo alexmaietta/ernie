@@ -111,13 +111,18 @@ struct LightGpu {
     // shadow view, shadow view count (0 without shadows, 1, or 6 for a cube).
     float4 cone;
     // x: world size of a shadow texel, at unit distance for perspective views; y: 1 for a dome's
-    // direction (`Light::domeDiffuse`), which lights with the model's diffuse response alone.
+    // direction (`Light::domeDiffuse`), which lights with the model's diffuse response alone; z:
+    // focus exponent (sphere, rect, disk; 0 unfocused).
     float4 shadow;
     // Rect and disk: half width along the light's +x and half height along its +y, as vectors.
     float4 extentX;
     float4 extentY;
-    // Spectral irradiance (distant, W m^-2 nm^-1) or intensity (sphere, W sr^-1 nm^-1) per band.
+    // Spectral irradiance (distant, W m^-2 nm^-1), intensity (sphere, W sr^-1 nm^-1) or
+    // radiance (rect, disk) per band: of a focused light the part its focus scales, |cos|^focus
+    // off its axis.
     float4 spectrum[16];
+    // A focused light's part its focus leaves alone: its emission times its focus tint.
+    float4 tinted[16];
 }
 
 struct MaterialGpu {
@@ -718,7 +723,9 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     let lightCount = unlit ? 0 : min(sh.size.w, kMaxLights);
     float3 lightDirections[kMaxLights];
     float lightScales[kMaxLights];
+    float lightFocus[kMaxLights];  // |cos|^focus off a focused light's axis, else 1
     for (uint k = 0; k < lightCount; ++k) {
+        lightFocus[k] = 1.0;
         if (((sh.view.x >> k) & 1u) == 0) {
             lightDirections[k] = float3(0.0);
             lightScales[k] = 0.0;
@@ -741,6 +748,14 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                 scale *= smoothstep(light.cone.x, max(light.cone.y, light.cone.x + 1e-6),
                                     dot(-toLight, light.axis.xyz));
             }
+        }
+        if (type >= 1 && light.shadow.z > 0.0) {
+            // Off the axis by the direction from the light's centre (UsdLux's focus): for an
+            // area light, as if it were small beside its distance.
+            let fromLight = world - light.position.xyz;
+            let distance = length(fromLight);
+            let direction = distance > 0.0 ? fromLight / distance : light.axis.xyz;
+            lightFocus[k] = pow(abs(dot(direction, light.axis.xyz)), light.shadow.z);
         }
         let nDotL = dot(n, toLight);
         if (nDotL <= 0.0 || scale <= 0.0) {
@@ -800,7 +815,9 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             }
             float3 lightSpectrum;
             for (uint j = 0; j < 3; ++j) {
-                lightSpectrum[j] = bandValue(lights[k].spectrum, min(first + j, bands - 1));
+                let band = min(first + j, bands - 1);
+                lightSpectrum[j] = bandValue(lights[k].spectrum, band) * lightFocus[k] +
+                                   bandValue(lights[k].tinted, band);
             }
             // A dome's direction stands for its diffuse light alone: the model's diffuse
             // response to surrounding light times cos(i), as a Lambertian radiance factor (the

@@ -83,9 +83,36 @@ TEST_F(RasterDelegateTest, LampsLightByTheInverseSquareLaw) {
     const float once = RadianceAt(delegate, LampScene(10.0), 0.0f, 0.0f);
     EXPECT_NEAR(once / twice, 4.0f, 0.1f);
 
+    // The 1000 W go into the cone: 4 pi over its solid angle brighter inside it.
     const Scene spot = LampScene(10.0, 10.0f);
-    EXPECT_NEAR(RadianceAt(delegate, spot, 0.0f, 0.0f), once, 0.02f * once) << "inside the cone";
+    const float concentrated =
+        once * static_cast<float>(2.0 / (1.0 - std::cos(glm::radians(10.0))));
+    EXPECT_NEAR(RadianceAt(delegate, spot, 0.0f, 0.0f), concentrated, 0.02f * concentrated)
+        << "inside the cone";
     EXPECT_EQ(RadianceAt(delegate, spot, 6.0f, 0.0f), 0.0f) << "outside a 10 degree cone";
+}
+
+TEST_F(RasterDelegateTest, FocusedLampsFallOffAsAPowerOfTheCosine) {
+    RasterDelegate delegate(*context_);
+    const float x = 6.0f;
+    const float plain = RadianceAt(delegate, LampScene(10.0), x, 0.0f);
+    const float below = RadianceAt(delegate, LampScene(10.0), 0.0f, 0.0f);
+    // On the floor E = I cos(i) / d^2 = I c^3 / h^2, c the cosine off the lamp's axis, so the
+    // ratio gives c^3 at the pixel sampled.
+    const float c3 = plain / below;
+
+    // |cos|^3 off the axis, its 1000 W kept: over the sphere |cos|^3 integrates to pi, so it is
+    // 4 times brighter along the axis.
+    Scene scene = LampScene(10.0);
+    ernie::SphereLight(scene, "/World/Lamp").SetShapingFocus(3.0);
+    EXPECT_NEAR(RadianceAt(delegate, scene, 0.0f, 0.0f), 4.0f * below, 0.03f * 4.0f * below)
+        << "along the axis";
+    const float off = 4.0f * plain * c3;
+    EXPECT_NEAR(RadianceAt(delegate, scene, x, 0.0f), off, 0.03f * off) << "off the axis";
+
+    // A white tint undoes the focus.
+    ernie::SphereLight(scene, "/World/Lamp").SetShapingFocusTint({1.0, 1.0, 1.0});
+    EXPECT_NEAR(RadianceAt(delegate, scene, x, 0.0f), plain, 0.03f * plain) << "white tint";
 }
 
 TEST_F(RasterDelegateTest, LampsCastShadowsFromSpotAndCubeMaps) {

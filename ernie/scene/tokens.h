@@ -199,12 +199,21 @@ inline constexpr std::string_view kSensorSeed = "ernie:sensor:seed";    ///< int
 inline constexpr std::string_view kIntensity = "inputs:intensity";
 inline constexpr std::string_view kExposure = "inputs:exposure";  ///< Stops; scales by 2^exposure.
 inline constexpr std::string_view kColor = "inputs:color";
+/// bool: divides `inputs:intensity` by the light's size (UsdLux's normalize): a sphere, rect or
+/// disk light's world surface area; a distant light's by its disk's projected solid angle, so its
+/// intensity becomes its illuminance at normal incidence. Domes, powers and photometric units
+/// ignore it.
+inline constexpr std::string_view kNormalize = "inputs:normalize";
 inline constexpr std::string_view kAngle = "inputs:angle";  ///< Degrees subtended.
 inline constexpr std::string_view kRadius = "inputs:radius";
 inline constexpr std::string_view kTreatAsPoint = "treatAsPoint";  ///< bool: radius 0.
 /// Degrees off the axis that a light reaches, and the fraction of that angle over which it fades.
 inline constexpr std::string_view kShapingConeAngle = "inputs:shaping:cone:angle";
 inline constexpr std::string_view kShapingConeSoftness = "inputs:shaping:cone:softness";
+/// float: a sphere, rect or disk light's emission falls off as |cos|^focus of the angle off its
+/// axis; color3f: the tint its falloff fades to instead of black (white undoes the focus).
+inline constexpr std::string_view kShapingFocus = "inputs:shaping:focus";
+inline constexpr std::string_view kShapingFocusTint = "inputs:shaping:focusTint";
 inline constexpr std::string_view kWidth = "inputs:width";
 inline constexpr std::string_view kHeight = "inputs:height";
 inline constexpr std::string_view kTextureFile = "inputs:texture:file";

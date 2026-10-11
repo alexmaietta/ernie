@@ -91,8 +91,9 @@ struct LightGpu {
     float extentX[4];
     float extentY[4];
     float spectrum[SpectralBands::kMaxBands];
+    float tinted[SpectralBands::kMaxBands];
 };
-static_assert(sizeof(LightGpu) == 352, "LightGpu must match shading.slang");
+static_assert(sizeof(LightGpu) == 608, "LightGpu must match shading.slang");
 
 struct MaterialGpu {
     std::uint32_t info[4];
@@ -970,7 +971,15 @@ void RasterRenderer::WriteLights(const FrameParams& params, const std::optional<
                 lightViews_.insert(lightViews_.end(), views.begin(), views.end());
             }
         }
-        std::copy(light.spectrum.begin(), light.spectrum.end(), entry.spectrum);
+        // A focused light's emission is spectrum x (1 - tint) x |cos|^focus + spectrum x tint.
+        entry.shadow[2] = distant ? 0.0f : std::max(light.focus, 0.0f);
+        for (std::size_t b = 0; b < light.spectrum.size(); ++b) {
+            const float tint = b < light.focusTint.size() && entry.shadow[2] > 0.0f
+                                   ? std::clamp(light.focusTint[b], 0.0f, 1.0f)
+                                   : 0.0f;
+            entry.spectrum[b] = light.spectrum[b] * (1.0f - tint);
+            entry.tinted[b] = light.spectrum[b] * tint;
+        }
         if (light.posedOnGpu) {
             // The light pass poses it and fits its views as `FitLightShadowViews` would.
             const auto kind = distant                                               ? 0u

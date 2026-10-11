@@ -188,6 +188,11 @@ struct LightParams {
     float radius = 0.0f;
     float coneAngle = 180.0f;   ///< Degrees off the axis that are lit; 180 lights every direction.
     float coneSoftness = 0.0f;  ///< Fraction of the cone, at its edge, over which light fades out.
+    /// Sphere, rect and disk (UsdLux's shaping focus): `spectrum` is the emission along the axis,
+    /// and off it the emission per band is spectrum x lerp(focusTint, 1, |cos|^focus), cos of the
+    /// angle between the axis and the direction from the light. An empty tint is black.
+    float focus = 0.0f;
+    std::vector<float> focusTint;
     bool shadows = true;
     /// A direction of a dome (`DomeLightMode::Directions`): it lights with the model's diffuse
     /// response to surrounding light (`IBrdf::environment`), as the dome's diffuse light would,
