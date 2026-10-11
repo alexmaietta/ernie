@@ -1112,6 +1112,7 @@ void MeshDrawable::SetItems(std::vector<MeshItem> items) {
     items_ = std::move(items);
     previous_ = std::move(previous);
     itemRanges_ = std::move(ranges);
+    ++layoutVersion_;
     itemPipelines_.clear();
     drawsDirty_ = true;
     UpdateTransforms();
@@ -1167,6 +1168,7 @@ void MeshDrawable::UpdateTransforms() {
 
 void MeshDrawable::RebuildGeometry() {
     ERNIE_ZONE("Mesh rebuild geometry");
+    ++layoutVersion_;
     std::vector<float> points;
     std::vector<float> normals;
     std::vector<float> colors;
@@ -1232,6 +1234,7 @@ void MeshDrawable::RebuildGeometry() {
 
 void MeshDrawable::RebuildInstances() {
     ERNIE_ZONE("Mesh rebuild instances");
+    ++layoutVersion_;
     std::vector<float> positions;
     std::vector<float> orientations;
     std::vector<float> scales;
@@ -1797,17 +1800,19 @@ std::optional<Bounds3> MeshDrawable::Bounds() const {
     return bounds;
 }
 
-std::optional<Bounds3> MeshDrawable::WorldBounds(std::int32_t world) const {
-    std::optional<Bounds3> bounds;
+std::map<std::int32_t, Bounds3> MeshDrawable::WorldsBounds() const {
+    std::map<std::int32_t, Bounds3> bounds;
     for (std::size_t i = 0; i < items_.size() && i < itemRanges_.size(); ++i) {
         for (const WorldRange& range : itemRanges_[i]) {
-            if (range.world != world || range.count == 0) {
+            if (range.count == 0) {
                 continue;
             }
             if (const std::optional<Bounds3> box = RangeBounds(i, range)) {
-                bounds = bounds ? Bounds3(glm::min(bounds->first, box->first),
-                                          glm::max(bounds->second, box->second))
-                                : *box;
+                const auto [it, added] = bounds.try_emplace(range.world, *box);
+                if (!added) {
+                    it->second = Bounds3(glm::min(it->second.first, box->first),
+                                         glm::max(it->second.second, box->second));
+                }
             }
         }
     }
@@ -1960,10 +1965,9 @@ void MeshDrawable::Cull(const FrameParams& params, std::span<const ShadowCascade
     // `pixelsPerUnit`: how many pixels (or shadow map texels) a world unit spans at w = 1.
     // Without `posed`, the view's pose is only an estimate (`FrameParams::posesOnGpu`): it tests
     // no bounds, and its cull view's planes and matrix come from the GPU (`RecordViewPoses`).
-    const auto list = [&](const glm::mat4& viewProjection, float pixelsPerUnit, bool pyramid,
-                          const ShadowCasters* seen, bool posed) {
-        const Frustum frustum = Frustum::FromMatrix(viewProjection);
-        const auto slot = static_cast<std::uint32_t>(views.size() / kCullViewStride);
+    // A view's cull block (cull.slang's 12 float4s): its planes, matrix, scale and pyramid.
+    const auto pushView = [&](const Frustum& frustum, const glm::mat4& viewProjection,
+                              float pixelsPerUnit, bool pyramid) {
         for (const glm::vec4& plane : frustum.planes) {
             views.push_back(plane / std::max(glm::length(glm::vec3(plane)), 1e-30f));
         }
@@ -1973,6 +1977,12 @@ void MeshDrawable::Cull(const FrameParams& params, std::span<const ShadowCascade
         views.emplace_back(pixelsPerUnit, params.meshLodError, 0.0f, 0.0f);
         views.emplace_back(pyramid ? pyramidWidth : 0.0f, pyramid ? pyramidHeight : 0.0f,
                            pyramid ? pyramidMips : 0.0f, 0.0f);
+    };
+    const auto list = [&](const glm::mat4& viewProjection, float pixelsPerUnit, bool pyramid,
+                          const ShadowCasters* seen, bool posed) {
+        const Frustum frustum = Frustum::FromMatrix(viewProjection);
+        const auto slot = static_cast<std::uint32_t>(views.size() / kCullViewStride);
+        pushView(frustum, viewProjection, pixelsPerUnit, pyramid);
         std::vector<VisibleRange> ranges;
         for (const auto [i, r] : candidates(seen)) {
             const WorldRange& range = itemRanges_[i][r];
@@ -2006,45 +2016,89 @@ void MeshDrawable::Cull(const FrameParams& params, std::span<const ShadowCascade
         }
         return ranges;
     };
-    viewDraws_.clear();
+    // With the views' poses on the GPU nothing here tests bounds on the CPU: the views' jobs,
+    // records and lists stay as they were while what they are made of stays, and only the
+    // views' cull blocks are written again.
+    std::vector<std::int32_t> viewWorlds(params.Views());
     for (std::size_t v = 0; v < params.Views(); ++v) {
-        viewJobStarts_.push_back(static_cast<std::uint32_t>(jobs.size()));
-        // A view sees what every world shares and its own world, or every world for -1.
-        const ShadowCasters seen{true, params.ViewWorld(v)};
-        const glm::mat4 viewProjection = params.View(v).ViewProjection();
-        // A unit at w = 1 spans the projection's y scale (the length of the matrix's y row) over
-        // half the image's height.
-        const float perUnit = glm::length(glm::vec3(viewProjection[0][1], viewProjection[1][1],
-                                                    viewProjection[2][1])) *
-                              0.5f * static_cast<float>(params.camera.height);
-        const std::size_t slot = views.size();
-        viewDraws_.push_back(
-            list(viewProjection, perUnit, occlusion_ != Occlusion::Off, &seen, !params.posesOnGpu));
-        if (params.camera.pushbroom) {
-            // Its depth pyramid is its strip's: instances project through the strip (cull.slang's
-            // `project`), within the envelope's planes.
-            const PushbroomStrip strip = params.Strip(v);
-            const glm::mat4 packed = strip.Packed();
-            const glm::vec4 intrinsics = strip.Intrinsics();
-            for (int column = 0; column < 4; ++column) {
-                views[slot + 6 + column] = packed[column];
-            }
-            views[slot + 10].z = intrinsics.x;
-            views[slot + 10].w = intrinsics.y;
-            views[slot + 11].w = intrinsics.z;
+        viewWorlds[v] = params.ViewWorld(v);
+    }
+    const bool cacheable = params.posesOnGpu && !params.camera.pushbroom;
+    const bool reuse =
+        cacheable && viewLayout_.valid && viewLayout_.layoutVersion == layoutVersion_ &&
+        viewLayout_.idOffsets == itemIdOffsets_ && viewLayout_.worlds == viewWorlds &&
+        viewLayout_.culling == culling_ && viewLayout_.occlusion == occlusion_;
+    if (reuse) {
+        jobs = viewLayout_.jobs;
+        records = viewLayout_.records;
+        cullDrawCounts_ = viewLayout_.drawCounts;
+        visible = viewLayout_.visible;
+        draws = viewLayout_.draws;
+        viewJobStarts_ = viewLayout_.jobStarts;
+        for (std::size_t v = 0; v < params.Views(); ++v) {
+            const glm::mat4 viewProjection = params.View(v).ViewProjection();
+            const float perUnit = glm::length(glm::vec3(viewProjection[0][1], viewProjection[1][1],
+                                                        viewProjection[2][1])) *
+                                  0.5f * static_cast<float>(params.camera.height);
+            pushView(Frustum::FromMatrix(viewProjection), viewProjection, perUnit,
+                     occlusion_ != Occlusion::Off);
         }
     }
-    viewJobStarts_.push_back(static_cast<std::uint32_t>(jobs.size()));
-    // Two-pass occlusion culling draws each view job twice; its second draws follow all the
-    // first ones, in the same order, so they batch as the first ones do.
-    if (occlusion_ == Occlusion::TwoPass) {
-        for (std::uint32_t j = 0; j < viewJobStarts_.back(); ++j) {
-            GpuCullJob& job = jobs[j];
-            job.output[2] = visible;
-            job.output[3] = draws;
-            addRecords(job.range[0], visible, job.range[2]);
-            visible += job.range[2] * cullDrawCounts_[j];
-            draws += cullDrawCounts_[j];
+    if (!reuse) {
+        viewDraws_.clear();
+        for (std::size_t v = 0; v < params.Views(); ++v) {
+            viewJobStarts_.push_back(static_cast<std::uint32_t>(jobs.size()));
+            // A view sees what every world shares and its own world, or every world for -1.
+            const ShadowCasters seen{true, params.ViewWorld(v)};
+            const glm::mat4 viewProjection = params.View(v).ViewProjection();
+            // A unit at w = 1 spans the projection's y scale (the length of the matrix's y row)
+            // over half the image's height.
+            const float perUnit = glm::length(glm::vec3(viewProjection[0][1], viewProjection[1][1],
+                                                        viewProjection[2][1])) *
+                                  0.5f * static_cast<float>(params.camera.height);
+            const std::size_t slot = views.size();
+            viewDraws_.push_back(list(viewProjection, perUnit, occlusion_ != Occlusion::Off, &seen,
+                                      !params.posesOnGpu));
+            if (params.camera.pushbroom) {
+                // Its depth pyramid is its strip's: instances project through the strip
+                // (cull.slang's `project`), within the envelope's planes.
+                const PushbroomStrip strip = params.Strip(v);
+                const glm::mat4 packed = strip.Packed();
+                const glm::vec4 intrinsics = strip.Intrinsics();
+                for (int column = 0; column < 4; ++column) {
+                    views[slot + 6 + column] = packed[column];
+                }
+                views[slot + 10].z = intrinsics.x;
+                views[slot + 10].w = intrinsics.y;
+                views[slot + 11].w = intrinsics.z;
+            }
+        }
+        viewJobStarts_.push_back(static_cast<std::uint32_t>(jobs.size()));
+        // Two-pass occlusion culling draws each view job twice; its second draws follow all the
+        // first ones, in the same order, so they batch as the first ones do.
+        if (occlusion_ == Occlusion::TwoPass) {
+            for (std::uint32_t j = 0; j < viewJobStarts_.back(); ++j) {
+                GpuCullJob& job = jobs[j];
+                job.output[2] = visible;
+                job.output[3] = draws;
+                addRecords(job.range[0], visible, job.range[2]);
+                visible += job.range[2] * cullDrawCounts_[j];
+                draws += cullDrawCounts_[j];
+            }
+        }
+        viewLayout_.valid = cacheable;
+        if (cacheable) {
+            viewLayout_.layoutVersion = layoutVersion_;
+            viewLayout_.idOffsets = itemIdOffsets_;
+            viewLayout_.worlds = viewWorlds;
+            viewLayout_.culling = culling_;
+            viewLayout_.occlusion = occlusion_;
+            viewLayout_.jobs = jobs;
+            viewLayout_.records = records;
+            viewLayout_.drawCounts = cullDrawCounts_;
+            viewLayout_.visible = visible;
+            viewLayout_.draws = draws;
+            viewLayout_.jobStarts = viewJobStarts_;
         }
     }
     shadowDraws_.clear();
@@ -2055,10 +2109,15 @@ void MeshDrawable::Cull(const FrameParams& params, std::span<const ShadowCascade
             gpuShadowSlots_.emplace_back(
                 cascade.gpuMatrix, static_cast<std::uint32_t>(views.size() / kCullViewStride));
         }
-        // Shadow maps: one texel spans `texelWorldSize` (at w = 1 for perspective views).
+        // Shadow maps: one texel spans `texelWorldSize` (at w = 1 for perspective views). A map
+        // of one world's casters looks at its world's and the shared ones only.
+        std::optional<ShadowCasters> seen;
+        if (cascade.world) {
+            seen = ShadowCasters{true, *cascade.world};
+        }
         shadowDraws_.push_back(list(cascade.lightViewProjection,
-                                    1.0f / std::max(cascade.texelWorldSize, 1e-30f), false, nullptr,
-                                    !cascade.gpuFitted));
+                                    1.0f / std::max(cascade.texelWorldSize, 1e-30f), false,
+                                    seen ? &*seen : nullptr, !cascade.gpuFitted));
     }
     if (!gpuShadowSlots_.empty()) {
         Reserve(context_, gpuShadowSlotBuffer_,

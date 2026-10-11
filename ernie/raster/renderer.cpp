@@ -1140,6 +1140,19 @@ void RasterRenderer::PlanBatchShadows(const FrameParams& params, const Bounds3& 
     const std::uint32_t maxLayers = context_.Limits().maxImageArrayLayers;
     std::map<std::int32_t, std::uint32_t> layerOf;
     std::map<std::int32_t, std::uint32_t> cascadeOf;
+    // Every world's bounds at once, over the drawables' geometry.
+    std::map<std::int32_t, Bounds3> worldBounds;
+    if (shadows.worldFit == WorldShadowFit::World) {
+        for (const RasterDrawable* drawable : drawables) {
+            for (const auto& [world, box] : drawable->WorldsBounds()) {
+                const auto [it, added] = worldBounds.try_emplace(world, box);
+                if (!added) {
+                    it->second = Bounds3(glm::min(it->second.first, box.first),
+                                         glm::max(it->second.second, box.second));
+                }
+            }
+        }
+    }
     for (const std::int32_t world : worlds) {
         if (shadowPasses_.size() == maxLayers) {
             break;  // Further worlds get the shared casters' shadows only.
@@ -1148,12 +1161,8 @@ void RasterRenderer::PlanBatchShadows(const FrameParams& params, const Bounds3& 
         layerOf[world] = layer;
         std::optional<Bounds3> own;
         if (shadows.worldFit == WorldShadowFit::World && world != -1) {
-            for (const RasterDrawable* drawable : drawables) {
-                if (const std::optional<Bounds3> box = drawable->WorldBounds(world)) {
-                    own = own ? Bounds3(glm::min(own->first, box->first),
-                                        glm::max(own->second, box->second))
-                              : *box;
-                }
+            if (const auto found = worldBounds.find(world); found != worldBounds.end()) {
+                own = found->second;
             }
         }
         if (!own) {
@@ -1163,6 +1172,7 @@ void RasterRenderer::PlanBatchShadows(const FrameParams& params, const Bounds3& 
         const glm::vec3 margin(shadows.worldMargin);
         const auto cascade = static_cast<std::uint32_t>(cascades_.size());
         cascades_.push_back(fit(own->first - margin, own->second + margin));
+        cascades_.back().world = world;
         cascadeOf[world] = cascade;
         shadowPasses_.push_back({layer, cascade, ShadowCasters{true, world}, false});
     }

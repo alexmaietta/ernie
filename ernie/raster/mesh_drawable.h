@@ -328,7 +328,7 @@ class MeshDrawable : public RasterDrawable {
     }
 
     /// World bounds of the current draws (and runs of instances) in world `world`.
-    std::optional<Bounds3> WorldBounds(std::int32_t world) const override;
+    std::map<std::int32_t, Bounds3> WorldsBounds() const override;
 
     /// Uploads changed geometry and the draws of the next frame.
     /// @throws std::invalid_argument if a material's colour pipeline fails to compile.
@@ -703,8 +703,30 @@ class MeshDrawable : public RasterDrawable {
     std::unique_ptr<GpuBuffer> cullViewBuffer_;
     std::unique_ptr<GpuBuffer> cullLevelBuffer_;
     std::vector<std::uint32_t> cullDrawCounts_;  ///< Per job, its indirect draws (levels).
-    std::unique_ptr<GpuBuffer> visibleIds_;      ///< The jobs' visible instance ids, compacted.
-    std::unique_ptr<GpuBuffer> cullCommands_;    ///< The jobs' indirect draws.
+    /// Counts changes to what the cull lists are made of: the items, their ranges, instances and
+    /// levels (`SetItems`, `RebuildInstances`, `RebuildGeometry`).
+    std::uint64_t layoutVersion_ = 0;
+    /// The views' part of the last cull lists, kept while nothing they depend on changes: with
+    /// the views' poses on the GPU no bounds are tested on the CPU, so a batch of thousands of
+    /// views makes them once rather than every frame (`Cull`).
+    struct ViewCullLayout {
+        bool valid = false;
+        std::uint64_t layoutVersion = 0;
+        std::vector<std::uint32_t> idOffsets;
+        std::vector<std::int32_t> worlds;
+        Culling culling = Culling::Off;
+        Occlusion occlusion = Occlusion::Off;
+        std::vector<GpuCullJob> jobs;
+        std::vector<glm::uvec4> records;
+        std::vector<std::uint32_t> drawCounts;
+        std::uint32_t visible = 0;
+        std::uint32_t draws = 0;
+        std::vector<std::vector<VisibleRange>> viewDraws;
+        std::vector<std::uint32_t> jobStarts;
+    };
+    ViewCullLayout viewLayout_;
+    std::unique_ptr<GpuBuffer> visibleIds_;    ///< The jobs' visible instance ids, compacted.
+    std::unique_ptr<GpuBuffer> cullCommands_;  ///< The jobs' indirect draws.
     std::unique_ptr<GpuBuffer> draws_;
 };
 

@@ -13,6 +13,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <span>
 #include <utility>
@@ -95,10 +96,11 @@ class RasterDrawable {
         return false;
     }
 
-    /// World bounds of the drawable's geometry in world `world` (`tokens::kWorld`, not the
-    /// shared -1), for fitting that world's shadow map; none if it has none there.
-    virtual std::optional<Bounds3> WorldBounds(std::int32_t /*world*/) const {
-        return std::nullopt;
+    /// World bounds of the drawable's geometry in each world it has some in (`tokens::kWorld`,
+    /// the shared -1 too), for fitting the worlds' shadow maps; in one pass, as a batch may have
+    /// thousands of worlds.
+    virtual std::map<std::int32_t, Bounds3> WorldsBounds() const {
+        return {};
     }
 
     /// The height (relative to the origin) of an unbounded floor the drawable draws, such as a

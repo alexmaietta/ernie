@@ -496,16 +496,18 @@ std::optional<Bounds3> PointsDrawable::Bounds() const {
     return bounds;
 }
 
-std::optional<Bounds3> PointsDrawable::WorldBounds(std::int32_t world) const {
-    std::optional<Bounds3> bounds;
+std::map<std::int32_t, Bounds3> PointsDrawable::WorldsBounds() const {
+    std::map<std::int32_t, Bounds3> bounds;
     for (std::size_t i = 0; i < items_.size(); ++i) {
-        if (items_[i].world != world || clouds_.at(items_[i].points).count == 0) {
+        if (clouds_.at(items_[i].points).count == 0) {
             continue;
         }
         const Bounds3 box = ItemBounds(i);
-        bounds = bounds ? Bounds3{glm::min(bounds->first, box.first),
-                                  glm::max(bounds->second, box.second)}
-                        : box;
+        const auto [it, added] = bounds.try_emplace(items_[i].world, box);
+        if (!added) {
+            it->second = Bounds3{glm::min(it->second.first, box.first),
+                                 glm::max(it->second.second, box.second)};
+        }
     }
     return bounds;
 }

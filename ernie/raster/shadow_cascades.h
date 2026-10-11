@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 
 #include <cstdint>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -23,6 +24,9 @@ struct ShadowCascade {
     /// `gpuMatrix` of `RasterRenderer::LightViewMatrices`.
     bool gpuFitted = false;
     std::uint32_t gpuMatrix = 0;
+    /// A batch's map fitted to one world (`WorldShadowFit::World`): the world whose casters it
+    /// draws besides the shared ones, so passes consider only theirs; none for every world's.
+    std::optional<std::int32_t> world;
 };
 
 /// View-space split depths from `nearPlane` to `farPlane` with the practical split scheme, which

@@ -140,7 +140,7 @@ class PointsDrawable : public RasterDrawable {
         origin_ = origin;
     }
     std::optional<Bounds3> Bounds() const override;
-    std::optional<Bounds3> WorldBounds(std::int32_t world) const override;
+    std::map<std::int32_t, Bounds3> WorldsBounds() const override;
     void Prepare(const FrameParams& params, std::span<const ShadowCascade> cascades) override;
     /// Poses the items under instances (`PointsItem::anchorInstancer`) in their draws.
     void RecordPrepass(VkCommandBuffer commands) const override;
