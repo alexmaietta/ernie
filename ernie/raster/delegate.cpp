@@ -1973,13 +1973,16 @@ void RasterDelegate::UpdatePrims(const Scene& scene, const RenderPrims& prims, V
         ground_.SetParams(ground);
     }
     // The highlighted prims and everything under them, as the prim ids the frame draws.
+    // Each prefix's prims follow it in path order: only theirs are visited.
     std::vector<std::uint32_t> highlighted;
-    for (const auto& [path, primId] : primIds_) {
-        if (std::any_of(highlight_.begin(), highlight_.end(),
-                        [&path](const Path& prefix) { return path.HasPrefix(prefix); })) {
-            highlighted.push_back(primId);
+    for (const Path& prefix : highlight_) {
+        for (auto it = primIds_.lower_bound(prefix);
+             it != primIds_.end() && it->first.HasPrefix(prefix); ++it) {
+            highlighted.push_back(it->second);
         }
     }
+    std::sort(highlighted.begin(), highlighted.end());
+    highlighted.erase(std::unique(highlighted.begin(), highlighted.end()), highlighted.end());
     renderer_.SetHighlight(highlighted, highlightColour_);
     RasterDrawable* drawables[] = {&terrain_, &planet_, &meshes_, &ground_, &points_};
     if (overlays) {

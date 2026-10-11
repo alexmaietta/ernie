@@ -1399,9 +1399,12 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
 
     {
         ERNIE_ZONE("Frame uniforms");
+        // Every view's in one upload: the array frame.slang reads (`kUniformsStride` apart).
+        static_assert(kUniformsStride == sizeof(Uniforms), "Views' uniforms are an array");
+        std::vector<Uniforms> viewUniforms(views_);
         for (std::uint32_t v = 0; v < views_; ++v) {
             const CameraView viewOf = raster.View(v);
-            Uniforms uniforms{};
+            Uniforms& uniforms = viewUniforms[v];
             // A pushbroom projects through its strip in place of a view-projection
             // (`projectWorld`).
             if (params.camera.pushbroom) {
@@ -1454,8 +1457,8 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
                                        : params.minimal == MinimalMode::Textured ? 2u
                                                                                  : 0u;
             uniforms.minimal[3] = static_cast<float>(mode | (params.sun ? 0u : 4u));
-            uploads_.Write(uniforms_, std::as_bytes(std::span(&uniforms, 1)), v * kUniformsStride);
         }
+        uploads_.Write(uniforms_, std::as_bytes(std::span(viewUniforms)));
     }
 
     ShadowUniforms shadowUniforms{};
@@ -1782,6 +1785,9 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
         shading.poisson[2 * i] = poisson_[i].x;
         shading.poisson[2 * i + 1] = poisson_[i].y;
     }
+    // Every view's in one upload, `kShadingStride` apart.
+    std::vector<ShadingUniforms> viewShading;
+    viewShading.reserve(views_);
     for (std::uint32_t v = 0; v < views_; ++v) {
         const CameraView view = params.View(v);
         if (params.camera.pushbroom) {
@@ -1805,8 +1811,9 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
                 shading.view[0] |= 1u << k;
             }
         }
-        uploads_.Write(shadingUniforms_, std::as_bytes(std::span(&shading, 1)), v * kShadingStride);
+        viewShading.push_back(shading);
     }
+    uploads_.Write(shadingUniforms_, std::as_bytes(std::span(viewShading)));
 }
 
 void RasterRenderer::WriteSensor(const FrameParams& params, const FrameParams& raster) {

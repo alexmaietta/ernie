@@ -150,12 +150,13 @@ void GroundDrawable::Prepare(const FrameParams& params, std::span<const ShadowCa
         vkDeviceWaitIdle(renderer_.Context().Device());
         uniforms_ = GpuBuffer(renderer_.Context(), bytes, kUniformsUsage, BufferMemory::Device);
     }
-    for (std::size_t v = 0; v < params.Views(); ++v) {
+    // Every view's in one upload, as the array ground.slang reads.
+    std::vector<GroundUniforms> views(params.Views(), uniforms);
+    for (std::size_t v = 0; v < views.size(); ++v) {
         const glm::mat4 inverse = glm::inverse(params.View(v).ViewProjection());
-        std::memcpy(uniforms.invViewProj, glm::value_ptr(inverse), sizeof(uniforms.invViewProj));
-        renderer_.Uploads().Write(uniforms_, std::as_bytes(std::span(&uniforms, 1)),
-                                  v * kUniformsStride);
+        std::memcpy(views[v].invViewProj, glm::value_ptr(inverse), sizeof(views[v].invViewProj));
     }
+    renderer_.Uploads().Write(uniforms_, std::as_bytes(std::span(views)));
     prepared_ = true;
 }
 
