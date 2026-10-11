@@ -334,19 +334,19 @@ std::optional<Value> Widget(Viewer& viewer, const PropertyField& field, const Va
         glm::dvec3 value = Vec3Of(shown);
         const double largest = std::max({std::abs(value.x), std::abs(value.y), std::abs(value.z)});
         if (ImGui::DragScalarN("##v", ImGuiDataType_Double, &value[0], 3,
-                               static_cast<float>(std::max(largest, 1.0) / 200.0), nullptr,
-                               nullptr, "%.4g")) {
+                               static_cast<float>(std::max(largest, 1.0) / 200.0), nullptr, nullptr,
+                               "%.4g")) {
             return value;
         }
         break;
     }
     case Kind::Vec4: {
         glm::dvec4 value = Vec4Of(shown);
-        const double largest = std::max({std::abs(value.x), std::abs(value.y), std::abs(value.z),
-                                         std::abs(value.w)});
+        const double largest =
+            std::max({std::abs(value.x), std::abs(value.y), std::abs(value.z), std::abs(value.w)});
         if (ImGui::DragScalarN("##v", ImGuiDataType_Double, &value[0], 4,
-                               static_cast<float>(std::max(largest, 1.0) / 200.0), nullptr,
-                               nullptr, "%.4g")) {
+                               static_cast<float>(std::max(largest, 1.0) / 200.0), nullptr, nullptr,
+                               "%.4g")) {
             return value;
         }
         break;
@@ -379,8 +379,8 @@ std::optional<Value> Widget(Viewer& viewer, const PropertyField& field, const Va
             ImGui::SetNextItemWidth(-1.0f);
             std::array<double, 4> values{matrix[0][row], matrix[1][row], matrix[2][row],
                                          matrix[3][row]};
-            if (ImGui::DragScalarN("##row", ImGuiDataType_Double, values.data(), 4, 0.01f,
-                                   nullptr, nullptr, "%.4g")) {
+            if (ImGui::DragScalarN("##row", ImGuiDataType_Double, values.data(), 4, 0.01f, nullptr,
+                                   nullptr, "%.4g")) {
                 for (int column = 0; column < 4; ++column) {
                     matrix[column][row] = values[static_cast<std::size_t>(column)];
                 }
@@ -507,10 +507,10 @@ std::string DrawPropertyFields(Viewer& viewer, const Path& path,
         ImGui::PushID(field.attribute.c_str());
         // An array written in place of the value (per-vertex colours) is shown, not edited, so
         // an edit cannot replace it unseen; a curve edits a flat one itself.
-        const Tensor* array = scene.Get(path, field.attribute) == nullptr &&
-                                      field.kind != PropertyField::Kind::Curve
-                                  ? scene.Read(path, field.attribute)
-                                  : nullptr;
+        const Tensor* array =
+            scene.Get(path, field.attribute) == nullptr && field.kind != PropertyField::Kind::Curve
+                ? scene.Read(path, field.attribute)
+                : nullptr;
         const bool authored = scene.Get(path, field.attribute) != nullptr || array != nullptr;
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);

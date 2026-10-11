@@ -2052,12 +2052,9 @@ void RasterRenderer::EnsureViewBuffers(std::uint32_t views) {
 }
 
 RasterFrame RasterRenderer::Frame(std::uint32_t view) const {
-    return {DescriptorResource::Of(uniforms_),
-            view,
-            DescriptorResource::Of(shadowUniforms_),
-            DescriptorResource::Of(shadowMaps_->View()),
-            DescriptorResource::Of(shadowSampler_),
-            DescriptorResource::Of(clampSampler_)};
+    return {DescriptorResource::Of(uniforms_),       view,
+            DescriptorResource::Of(shadowUniforms_), DescriptorResource::Of(shadowMaps_->View()),
+            DescriptorResource::Of(shadowSampler_),  DescriptorResource::Of(clampSampler_)};
 }
 
 bool RasterRenderer::CanPresent(std::string_view name) {

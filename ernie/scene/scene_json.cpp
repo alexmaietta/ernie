@@ -313,7 +313,8 @@ void SetKey(Scene& scene, const Path& path, const PrimTypeDef* type, const std::
         if (!transformKey && def == nullptr) {
             whole = rank >= 2 && array->Shape() != std::vector<std::int64_t>{4, 4};
         } else if (!transformKey) {
-            whole = def->kind == AttributeKind::Tensor || (def->meta.array && rank > ValueDepth(*def));
+            whole =
+                def->kind == AttributeKind::Tensor || (def->meta.array && rank > ValueDepth(*def));
         }
         if (whole) {
             scene.Write(path, name, *array);  // Shared, not copied, as Scene::Write keeps it.
@@ -411,8 +412,8 @@ void LoadPrim(Scene& scene, const Path& path, const Json& body, std::span<const 
         if (IsArrayRef(value)) {
             const Json& index = value["$array"];
             if (!index.is_number_unsigned() || index.get<std::size_t>() >= arrays.size()) {
-                fail(key, "\"$array\" is the index of one of the " +
-                              std::to_string(arrays.size()) + " arrays given with the JSON");
+                fail(key, "\"$array\" is the index of one of the " + std::to_string(arrays.size()) +
+                              " arrays given with the JSON");
             }
             array = &arrays[index.get<std::size_t>()];
         }

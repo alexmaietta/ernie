@@ -87,8 +87,8 @@ void LoadSceneFile(Scene& scene, const std::filesystem::path& path);
 /// key per line, arrays of numbers or strings on one line, nested arrays a row per line.
 /// @throws std::invalid_argument naming the prim and the attribute for a GPU tensor, a NaN or
 /// infinite number, an attribute whose name `LoadScene` would read as something else (`type`, a
-/// transform key such as `scale`, or another declared attribute's Python name), or a child named as an
-/// attribute of its parent.
+/// transform key such as `scale`, or another declared attribute's Python name), or a child named as
+/// an attribute of its parent.
 std::string SaveScene(const Scene& scene);
 
 /// Writes `SaveScene(scene)` to the file at `path`, replacing it.

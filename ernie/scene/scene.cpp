@@ -592,8 +592,7 @@ std::vector<Change> Scene::Changes(ChangeCursor& cursor) const {
         }
     }
     // Only the prims stamped since the cursor, by `stamped_`.
-    for (auto it = stamped_.lower_bound({cursor.version + 1, Path()}); it != stamped_.end();
-         ++it) {
+    for (auto it = stamped_.lower_bound({cursor.version + 1, Path()}); it != stamped_.end(); ++it) {
         const Path& path = it->second;
         if (path.IsRoot()) {
             continue;

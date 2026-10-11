@@ -173,8 +173,7 @@ void GroundDrawable::RecordColor(VkCommandBuffer commands, const RasterFrame& fr
     RecordColorViews(commands, std::span(&frame, 1), view, phase);
 }
 
-void GroundDrawable::RecordColorViews(VkCommandBuffer commands,
-                                      std::span<const RasterFrame> frames,
+void GroundDrawable::RecordColorViews(VkCommandBuffer commands, std::span<const RasterFrame> frames,
                                       std::size_t /*first*/, DrawPhase phase) const {
     if (!prepared_ || phase == DrawPhase::Occludees || frames.empty()) {
         return;
