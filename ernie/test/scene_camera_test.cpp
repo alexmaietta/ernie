@@ -137,7 +137,9 @@ TEST(Camera, FisheyeFieldIsLimited) {
     camera.focalLengthMm = camera.verticalApertureMm / 3.0;  // corners at 2.1 radians
     EXPECT_NO_THROW(camera.Check()) << "121.5 degrees off axis, on cube faces";
     camera.focalLengthMm = camera.verticalApertureMm / 4.0;  // corners at 2.8 radians
-    EXPECT_THROW(camera.Check(), std::invalid_argument) << "past the faces' 125 degrees";
+    EXPECT_NO_THROW(camera.Check()) << "162 degrees off axis, on all six faces";
+    camera.focalLengthMm = camera.verticalApertureMm / 5.0;  // corners at 3.5 radians
+    EXPECT_THROW(camera.Check(), std::invalid_argument) << "past 180 degrees";
     camera.SetVerticalFov(1.0);
     camera.lens.k1 = 0.1;
     EXPECT_THROW(camera.Check(), std::invalid_argument) << "no Brown-Conrady terms on a fisheye";

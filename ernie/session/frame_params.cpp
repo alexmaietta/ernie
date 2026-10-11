@@ -186,9 +186,10 @@ glm::dvec3 FrameParams::FaceIntrinsics(std::uint32_t width, std::uint32_t height
 }
 
 FrameParams FrameParams::Faces(int faces) const {
-    if (faces != 1 && faces != kCubeFaces) {
-        throw std::invalid_argument("A frame renders on 1 or " + std::to_string(kCubeFaces) +
-                                    " cube faces, not " + std::to_string(faces));
+    if (faces != 1 && faces != kCubeFaces && faces != kAllCubeFaces) {
+        throw std::invalid_argument("A frame renders on 1, " + std::to_string(kCubeFaces) + " or " +
+                                    std::to_string(kAllCubeFaces) + " cube faces, not " +
+                                    std::to_string(faces));
     }
     FrameParams result = *this;
     if (faces == 1) {

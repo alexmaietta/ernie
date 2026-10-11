@@ -1152,7 +1152,7 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
     // A wide fisheye draws each view on cube faces (`FrameParams::Faces`): the raster passes see
     // `raster`, its views the faces' and its camera theirs; the sensor keeps `params`' camera,
     // following its lens's rays onto them.
-    faces_ = NeedsCubeFaces(frame.camera) ? static_cast<std::uint32_t>(kCubeFaces) : 1u;
+    faces_ = static_cast<std::uint32_t>(CubeFacesOf(frame.camera));
     if (faces_ > 1 && frame.camera.rollingShutter > 0.0) {
         // Motion blur weights sub-frames by the raster's rows, which a face's are not.
         throw std::invalid_argument("A camera rendered on cube faces has no rolling shutter yet");

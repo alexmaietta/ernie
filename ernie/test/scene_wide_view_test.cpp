@@ -12,14 +12,15 @@
 namespace {
 
 constexpr ernie::CubeFace kFaces[] = {ernie::CubeFace::Front, ernie::CubeFace::Right,
-                                      ernie::CubeFace::Left, ernie::CubeFace::Up,
-                                      ernie::CubeFace::Down};
+                                      ernie::CubeFace::Left,  ernie::CubeFace::Up,
+                                      ernie::CubeFace::Down,  ernie::CubeFace::Back};
 
 }  // namespace
 
 TEST(CubeFaces, AreRotationsLookingAlongTheCamerasAxes) {
-    const glm::dvec3 looks[] = {{0, 0, -1}, {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}};
-    for (int f = 0; f < ernie::kCubeFaces; ++f) {
+    const glm::dvec3 looks[] = {{0, 0, -1}, {1, 0, 0},  {-1, 0, 0},
+                                {0, 1, 0},  {0, -1, 0}, {0, 0, 1}};
+    for (int f = 0; f < ernie::kAllCubeFaces; ++f) {
         const glm::dmat3 axes = ernie::CubeFaceAxes(kFaces[f]);
         EXPECT_NEAR(glm::determinant(axes), 1.0, 1e-12) << f;
         const glm::dmat3 identity = glm::transpose(axes) * axes;
@@ -29,8 +30,9 @@ TEST(CubeFaces, AreRotationsLookingAlongTheCamerasAxes) {
             }
         }
         EXPECT_NEAR(glm::distance(-axes[2], looks[f]), 0.0, 1e-12) << "face " << f;
-        EXPECT_EQ(ernie::CubeFaceOf(looks[f]), kFaces[f]);
+        EXPECT_EQ(ernie::CubeFaceOf(looks[f], ernie::kAllCubeFaces), kFaces[f]);
     }
+    EXPECT_NE(ernie::CubeFaceOf(looks[5]), ernie::CubeFace::Back) << "only with all six";
 }
 
 TEST(CubeFaces, CoverEveryRayWithin125DegreesOfTheAxis) {
@@ -54,11 +56,46 @@ TEST(CubeFaces, CoverEveryRayWithin125DegreesOfTheAxis) {
         ASSERT_NEAR(glm::distance(ernie::CubeFaceRay(face, plane), ray), 0.0, 1e-12);
         ++checked;
     }
-    // Past 125.3 degrees along a diagonal, the back face would be needed.
+    // Past 125.3 degrees along a diagonal, the back face is needed.
     const glm::dvec3 behind = glm::normalize(glm::dvec3(
         std::sin(2.25) / std::sqrt(2.0), std::sin(2.25) / std::sqrt(2.0), -std::cos(2.25)));
     const glm::dvec2 plane = ernie::CubeFacePlane(ernie::CubeFaceOf(behind), behind);
     EXPECT_GT(std::max(std::abs(plane.x), std::abs(plane.y)), 1.0);
+    EXPECT_EQ(ernie::CubeFaceOf(behind, ernie::kAllCubeFaces), ernie::CubeFace::Back);
+    EXPECT_NEAR(std::acos(-glm::normalize(glm::dvec3(1.0, 1.0, 1.0)).z), ernie::kFiveFacesAngle,
+                1e-12)
+        << "where the back face's pyramid reaches nearest the axis";
+}
+
+TEST(CubeFaces, AllSixCoverEveryRay) {
+    std::mt19937 random(11);
+    std::uniform_real_distribution<double> unit(-1.0, 1.0);
+    for (int checked = 0; checked < 20000;) {
+        glm::dvec3 ray(unit(random), unit(random), unit(random));
+        if (glm::length(ray) > 1.0 || glm::length(ray) < 1e-3) {
+            continue;
+        }
+        ray = glm::normalize(ray);
+        const ernie::CubeFace face = ernie::CubeFaceOf(ray, ernie::kAllCubeFaces);
+        const glm::dvec2 plane = ernie::CubeFacePlane(face, ray);
+        ASSERT_LE(std::abs(plane.x), 1.0 + 1e-12);
+        ASSERT_LE(std::abs(plane.y), 1.0 + 1e-12);
+        ASSERT_NEAR(glm::distance(ernie::CubeFaceRay(face, plane), ray), 0.0, 1e-12);
+        ++checked;
+    }
+}
+
+TEST(CubeFaces, FieldsPastTheFiveFacesTakeTheBack) {
+    ernie::CameraParams camera;
+    camera.width = 100;
+    camera.height = 100;
+    camera.lens.projection = ernie::LensProjection::Fisheye;
+    camera.SetVerticalFov(1.0);
+    EXPECT_EQ(ernie::CubeFacesOf(camera), 1);
+    camera.focalLengthMm = camera.verticalApertureMm / 3.0;  // corners at 2.12 radians
+    EXPECT_EQ(ernie::CubeFacesOf(camera), ernie::kCubeFaces);
+    camera.focalLengthMm = camera.verticalApertureMm / 4.0;  // corners at 2.83 radians
+    EXPECT_EQ(ernie::CubeFacesOf(camera), ernie::kAllCubeFaces);
     // A face of 512 pixels with a margin of 2 reaches 2 pixels past 45 degrees.
     const double extent = ernie::CubeFaceExtent(512.0, 2.0);
     EXPECT_NEAR((extent - 1.0) * 512.0 / (2.0 * extent), 2.0, 1e-12);

@@ -33,14 +33,16 @@ glm::dmat3 CubeFaceAxes(CubeFace face) {
         return glm::dmat3(glm::dvec3(1, 0, 0), glm::dvec3(0, 0, 1), glm::dvec3(0, -1, 0));
     case CubeFace::Down:  // looks along -y
         return glm::dmat3(glm::dvec3(1, 0, 0), glm::dvec3(0, 0, -1), glm::dvec3(0, 1, 0));
+    case CubeFace::Back:  // looks along +z, turned about y
+        return glm::dmat3(glm::dvec3(-1, 0, 0), glm::dvec3(0, 1, 0), glm::dvec3(0, 0, -1));
     }
     return glm::dmat3(1.0);
 }
 
-CubeFace CubeFaceOf(const glm::dvec3& ray) {
-    const double forward[kCubeFaces] = {-ray.z, ray.x, -ray.x, ray.y, -ray.y};
+CubeFace CubeFaceOf(const glm::dvec3& ray, int faces) {
+    const double forward[kAllCubeFaces] = {-ray.z, ray.x, -ray.x, ray.y, -ray.y, ray.z};
     int best = 0;
-    for (int face = 1; face < kCubeFaces; ++face) {
+    for (int face = 1; face < std::min(faces, kAllCubeFaces); ++face) {
         if (forward[face] > forward[best]) {
             best = face;
         }
@@ -108,6 +110,14 @@ bool NeedsCubeFaces(const CameraParams& camera) {
         camera.lens.projection == LensProjection::Fisheye || camera.lens.rays != nullptr;
     return wideLens && !camera.orthographic && !camera.pushbroom &&
            MaxFieldAngle(camera) > kMaxSingleViewAngle;
+}
+
+int CubeFacesOf(const CameraParams& camera) {
+    if (!NeedsCubeFaces(camera)) {
+        return 1;
+    }
+    constexpr double kDegree = 0.017453292519943295;
+    return MaxFieldAngle(camera) <= kFiveFacesAngle - kDegree ? kCubeFaces : kAllCubeFaces;
 }
 
 }  // namespace ernie

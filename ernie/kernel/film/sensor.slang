@@ -471,7 +471,7 @@ RasterTap rasterTapAt(SensorUniforms cam, float2 position, int view) {
         tap.ray = lensRayOf(tap.distorted, cam.distortion, cam.lens.x);
     }
     if (kLensCube) {
-        let face = cubeFaceOf(tap.ray);
+        let face = cubeFaceOf(tap.ray, int(cam.faces.x));
         let plane = cubeFacePlane(face, tap.ray);
         tap.raster = float2(cam.faces.z + plane.x * cam.faces.y,
                             cam.faces.w - plane.y * cam.faces.y) - 0.5;

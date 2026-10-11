@@ -805,6 +805,55 @@ TEST_F(RasterDelegateTest, AFisheyeWiderThan180DegreesSeesPastItsHorizonOnCubeFa
     EXPECT_LT(glm::distance(cubeSum / double(cubeHits), expected), 1.5);
 }
 
+TEST_F(RasterDelegateTest, AFisheyeSeesBehindItselfOnTheBackFace) {
+    // An equidistant fisheye 5 m over flat ground looking straight down, its corners 160 degrees
+    // off axis (a 320 degree field), drawn on all six cube faces: a cube 150 degrees off axis,
+    // behind the camera, lands where the lens puts it, the ground still below.
+    Scene scene = FlatScene();
+    scene.Set("/World/Camera", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, 5.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}));
+    const double corner = std::sqrt(2.0) * 0.5 * kVarSize;
+    const double focalPixels = corner / (160.0 * M_PI / 180.0);
+    const double aperture = 20.0;
+    ernie::Camera(scene, "/World/Camera")
+        .SetLensProjection(tokens::kFisheye)
+        .SetVerticalAperture(aperture)
+        .SetHorizontalAperture(aperture)
+        .SetFocalLength(aperture * focalPixels / kVarSize);
+    const double theta = 150.0 * M_PI / 180.0;
+    const glm::dvec3 towards(std::sin(theta) / std::sqrt(2.0), std::sin(theta) / std::sqrt(2.0),
+                             -std::cos(theta));
+    ernie::Cube::Define(scene, "/World/Cube").SetSize(3.0);
+    scene.Set("/World/Cube", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 5.0) + 12.0 * towards));
+    const ernie::CameraParams camera =
+        ernie::CameraParamsOf(scene, "/World/Camera", kVarSize, kVarSize);
+    ASSERT_EQ(ernie::CubeFacesOf(camera), ernie::kAllCubeFaces);
+    ASSERT_EQ(ernie::CubeFaceOf(towards, ernie::kAllCubeFaces), ernie::CubeFace::Back)
+        << "the cube's direction in the camera's frame, the world's here";
+    RasterDelegate delegate(*context_);
+    ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+    const auto vars = MapVars(outputs);
+    const glm::dvec2 centre = camera.PrincipalPoint();
+    const double f = camera.FocalLengthPixels();
+    glm::dvec2 cubeSum(0.0);
+    int cubeHits = 0;
+    for (std::size_t row = 0; row < kVarSize; ++row) {
+        for (std::size_t col = 0; col < kVarSize; ++col) {
+            const Path prim = delegate.PrimPath(At<std::uint32_t>(vars.at("PrimId"), row, col));
+            if (prim == Path("/World/Cube")) {
+                cubeSum += glm::dvec2(col + 0.5, row + 0.5);
+                ++cubeHits;
+            }
+        }
+    }
+    EXPECT_EQ(delegate.PrimPath(At<std::uint32_t>(vars.at("PrimId"), kVarSize / 2, kVarSize / 2)),
+              Path("/World/Terrain"));
+    ASSERT_GT(cubeHits, 0) << "the cube behind the camera";
+    const glm::dvec2 expected = centre + theta * f * glm::dvec2(1.0, -1.0) / std::sqrt(2.0);
+    EXPECT_LT(glm::distance(cubeSum / double(cubeHits), expected), 1.5);
+}
+
 TEST_F(RasterDelegateTest, CahvoreCamerasSeeThroughTheirRayTablesExactly) {
     // Perseverance's Navcam (58 degrees off axis, one pinhole raster) and Hazcam (79, cube
     // faces), scaled to a quarter of their 5120 x 3840 (H and V scaled, image coordinates with

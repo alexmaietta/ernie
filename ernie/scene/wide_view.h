@@ -31,19 +31,27 @@ namespace ernie {
 /// fisheye's radius gives, which may pass 90 degrees.
 glm::dvec3 LensRay(const LensModel& lens, glm::dvec2 distorted);
 
-/// The faces of a wide camera's views: forward along the camera's -z, then its +x, -x, +y and
-/// -y. Five leave out only the back face's pyramid, so they cover every ray within 125.3 degrees
-/// of the axis (135 along the side faces' middles), any fisheye up to a 250 degree field.
-enum class CubeFace { Front = 0, Right = 1, Left = 2, Up = 3, Down = 4 };
+/// The faces of a wide camera's views: forward along the camera's -z, then its +x, -x, +y, -y
+/// and +z (back). The first five leave out only the back face's pyramid, so they cover every ray
+/// within 125.3 degrees of the axis (135 along the side faces' middles), any fisheye up to a 250
+/// degree field; the sixth covers the rest of the sphere.
+enum class CubeFace { Front = 0, Right = 1, Left = 2, Up = 3, Down = 4, Back = 5 };
 inline constexpr int kCubeFaces = 5;
+inline constexpr int kAllCubeFaces = 6;
+
+/// The field angle (radians) the first five faces cover in every direction: 90 degrees plus
+/// atan(1 / sqrt 2), where the back face's pyramid reaches nearest the axis, along the side
+/// faces' diagonals.
+inline constexpr double kFiveFacesAngle = 2.1862760354652844;
 
 /// Face `face`'s axes in the camera's frame (columns x, y, z): a camera on them looks down their
 /// -z, as the camera itself does on the front face. Proper rotations.
 glm::dmat3 CubeFaceAxes(CubeFace face);
 
-/// The face whose view direction lies nearest unit ray `ray` (in the camera's frame): the
-/// largest of -z, x, -x, y and -y.
-CubeFace CubeFaceOf(const glm::dvec3& ray);
+/// The face, of the first `faces` (`kCubeFaces` or `kAllCubeFaces`), whose view direction lies
+/// nearest unit ray `ray` (in the camera's frame): the largest of -z, x, -x, y, -y and, with the
+/// back face, z.
+CubeFace CubeFaceOf(const glm::dvec3& ray, int faces = kCubeFaces);
 
 /// Where `ray` crosses face `face`'s image plane at unit distance: its tangent-plane coordinates
 /// (x right, y up on the face), in [-1, 1] across the face's 90 degrees.
@@ -60,6 +68,11 @@ double CubeFaceExtent(double facePixels, double marginPixels = 2.0);
 /// reaches past `kMaxSingleViewAngle` off axis somewhere in its image, where one pinhole raster
 /// image would spread its pixels too thin at the centre.
 bool NeedsCubeFaces(const CameraParams& camera);
+
+/// How many cube faces `camera`'s views render on: 1 when it needs none (`NeedsCubeFaces`), the
+/// first five (`kCubeFaces`) while its field stays within `kFiveFacesAngle` (less a degree, for
+/// the faces' bilinear taps), else all six.
+int CubeFacesOf(const CameraParams& camera);
 
 /// The field angle (radians) past which a fisheye renders on cube faces: 60 degrees, where a
 /// single raster image's centre is already twice as coarse as its sensor's (tan 60 / (pi / 3)).

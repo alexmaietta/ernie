@@ -2333,10 +2333,10 @@ StepOperation RasterDelegate::StepAsync(const Scene& scene, std::span<const Path
         // A wide fisheye draws its views on cube faces, each a layer of the raster images. Its
         // lens alone decides, not its pose (which may be on the GPU).
         const std::uint32_t faces =
-            minimal == MinimalMode::Off &&
-                    NeedsCubeFaces(CameraParamsOf(scene, cameras.front(), spec.resolution.width,
-                                                  spec.resolution.height, glm::dmat4(1.0)))
-                ? static_cast<std::uint32_t>(kCubeFaces)
+            minimal == MinimalMode::Off
+                ? static_cast<std::uint32_t>(
+                      CubeFacesOf(CameraParamsOf(scene, cameras.front(), spec.resolution.width,
+                                                 spec.resolution.height, glm::dmat4(1.0))))
                 : 1u;
         std::shared_ptr<ProductFrame> frame =
             AcquireFrame(spec.product, spec.resolution, bands, views, batched, vars, aovs, faces,

@@ -39,7 +39,7 @@ void main(uint3 id : SV_DispatchThreadID) {
     let sensor = cases[id.x].xy;
     let fisheye = Fisheye.rayOf(sensor, params[0], 0.0);
     let brown = BrownConrady.rayOf(0.25 * sensor, params[1], params[2].x);
-    let face = cubeFaceOf(fisheye);
+    let face = cubeFaceOf(fisheye, 6);
     let plane = cubeFacePlane(face, fisheye);
     results[3 * id.x] = float4(fisheye, 0.0);
     results[3 * id.x + 1] = float4(brown, 0.0);
@@ -55,7 +55,8 @@ class LensRaysGpuTest : public ernie::testing::VulkanTest {
 }  // namespace
 
 TEST_F(LensRaysGpuTest, TheSensorKernelsRaysAndFacesMatchTheCpus) {
-    // A fisheye reaching 120 degrees off axis, and a barrel-distorted perspective lens.
+    // A fisheye reaching 150 degrees off axis, onto all six faces, and a barrel-distorted
+    // perspective lens.
     ernie::LensModel fisheye;
     fisheye.projection = ernie::LensProjection::Fisheye;
     fisheye.fisheye = {0.02, -0.004, 0.0, 0.0};
@@ -71,7 +72,7 @@ TEST_F(LensRaysGpuTest, TheSensorKernelsRaysAndFacesMatchTheCpus) {
     while (points.size() < 512) {
         const glm::dvec2 p(unit(random), unit(random));
         if (glm::length(p) <= 1.0) {
-            points.push_back(2.0 * p);  // fisheye radii to 2: field angles near 115 degrees
+            points.push_back(2.5 * p);  // fisheye radii to 2.5: field angles to 150 degrees
         }
     }
     for (const glm::dvec2 p : points) {
@@ -110,6 +111,7 @@ TEST_F(LensRaysGpuTest, TheSensorKernelsRaysAndFacesMatchTheCpus) {
     });
     std::vector<float> raw(points.size() * 12);
     resultBuffer.Read(std::as_writable_bytes(std::span(raw)));
+    int backs = 0;
     for (std::size_t i = 0; i < points.size(); ++i) {
         const float* r = &raw[12 * i];
         const glm::dvec3 fisheyeRay = ernie::LensRay(fisheye, points[i]);
@@ -118,16 +120,18 @@ TEST_F(LensRaysGpuTest, TheSensorKernelsRaysAndFacesMatchTheCpus) {
         const glm::dvec3 brownRay = ernie::LensRay(brown, 0.25 * points[i]);
         EXPECT_NEAR(glm::distance(glm::dvec3(r[4], r[5], r[6]), brownRay), 0.0, 1e-5) << i;
         // The face, but for rays all but on a seam, where float and double may pick either.
-        std::array<double, 5> forward = {-fisheyeRay.z, fisheyeRay.x, -fisheyeRay.x, fisheyeRay.y,
-                                         -fisheyeRay.y};
+        std::array<double, 6> forward = {-fisheyeRay.z, fisheyeRay.x,  -fisheyeRay.x,
+                                         fisheyeRay.y,  -fisheyeRay.y, fisheyeRay.z};
         std::sort(forward.begin(), forward.end());
-        if (forward[4] - forward[3] < 1e-4) {
+        if (forward[5] - forward[4] < 1e-4) {
             continue;
         }
-        const ernie::CubeFace face = ernie::CubeFaceOf(fisheyeRay);
+        const ernie::CubeFace face = ernie::CubeFaceOf(fisheyeRay, ernie::kAllCubeFaces);
+        backs += face == ernie::CubeFace::Back ? 1 : 0;
         const glm::dvec2 plane = ernie::CubeFacePlane(face, fisheyeRay);
         EXPECT_EQ(static_cast<int>(r[8]), static_cast<int>(face)) << i;
         EXPECT_NEAR(r[9], plane.x, 1e-4) << i;
         EXPECT_NEAR(r[10], plane.y, 1e-4) << i;
     }
+    EXPECT_GT(backs, 0) << "some rays leave through the back face";
 }

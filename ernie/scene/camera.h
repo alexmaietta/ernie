@@ -110,10 +110,10 @@ struct LensModel {
     /// blurs each band by. Empty for none.
     Spectrum chromaticFocusMm;
 
-    /// The largest field angle a fisheye may see, in radians (125 degrees off axis, a 250 degree
+    /// The largest field angle a fisheye may see, in radians (180 degrees off axis, a 360 degree
     /// field): one fisheye reaching past 60 degrees renders on cube faces (wide_view.h), which
-    /// cover every ray within 125.3 degrees of the axis.
-    static constexpr double kMaxFisheyeFieldAngle = 2.1816615649929116;
+    /// with the back face cover every ray.
+    static constexpr double kMaxFisheyeFieldAngle = 3.141592653589793;
 
     /// Whether the lens is a pinhole: perspective without distortion.
     bool IsPinhole() const {
