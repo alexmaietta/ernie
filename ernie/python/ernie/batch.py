@@ -7,14 +7,22 @@ every step hands back the observations as GPU arrays.
     from ernie.batch import BatchCamera
 
     renderer = ernie.Renderer()
-    scene = ...  # environments cloned under Xforms with world=0, 1, ... (see Scene.clone)
-    camera = BatchCamera(renderer, scene, "/World/Camera", views=4096, resolution=(64, 64),
-                         render_vars=("LdrColor", "DistanceToCamera"))
+    # environments cloned under Xforms with world=0, 1, ...
+    # (see Scene.clone)
+    scene = ...
+    camera = BatchCamera(
+        renderer, scene, "/World/Camera", views=4096,
+        resolution=(64, 64),
+        render_vars=("LdrColor", "DistanceToCamera"),
+    )
     camera.set_worlds(numpy.arange(4096, dtype=numpy.int32))
+    stream = torch.cuda.current_stream().cuda_stream
     for step in range(steps):
-        poses = simulator.camera_poses()            # (4096, 4, 4) float32, e.g. a CUDA tensor
-        observations = camera.step(poses, stream=torch.cuda.current_stream().cuda_stream)
-        rgb = torch.from_dlpack(observations["LdrColor"])[..., :3]  # (4096, 64, 64, 3) uint8
+        # (4096, 4, 4) float32, e.g. a CUDA tensor
+        poses = simulator.camera_poses()
+        observations = camera.step(poses, stream=stream)
+        # (4096, 64, 64, 3) uint8
+        rgb = torch.from_dlpack(observations["LdrColor"])[..., :3]
 
 Nothing waits on the host: poses written as a contiguous float32 CUDA
 array stay on the GPU (`tokens.POSES_DEVICE`), the render is submitted
@@ -224,5 +232,6 @@ class BatchCamera:
             and int(shape[0]) != self.views
         ):
             raise ValueError(
-                f"{what} must have {self.views} rows, one per view, not {shape[0]}"
+                f"{what} must have {self.views} rows, one per view, "
+                f"not {shape[0]}"
             )

@@ -64,10 +64,13 @@ nanobind_add_stub(
     ${ernie_stubs}
     MARKER_FILE
     "${ernie_package_dir}/py.typed"
+    PATTERN_FILE
+    "${CMAKE_CURRENT_SOURCE_DIR}/stub_patterns.txt"
     PYTHON_PATH
     "${CMAKE_BINARY_DIR}/python"
     DEPENDS
-    _ernie)
+    _ernie
+    ernie/schema.py)
 configure_file(ernie/__init__.py "${ernie_package_dir}/__init__.py"
                COPYONLY)
 configure_file(ernie/app.py "${ernie_package_dir}/app.py" COPYONLY)

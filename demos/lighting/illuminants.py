@@ -1,26 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""One spot light, four illuminants (physical:illuminant), after the
-Omniverse RTX physical lighting page's illuminant figure: "white",
-"illuminant D" at 4000 K, "blackbody" at 2000 K and a "custom"
-fluorescent spectrum, each at the same 1600 lumens
-(photometric:power), lighting a checkered wall with a colour chart and
-two spheres in a dark room. The Python twin of illuminants.cpp.
-
-    python -m ernie.demos lighting/illuminants [--viewer null --output illuminants.png]
-
-The lumens stay the same, so each image has about the same brightness;
-the illuminant changes only the colour of the light, and how the
-chart's patches render under it. The page's custom illuminant is CIE
-F5; here the custom spectrum is fluorescent-like rather than F5
-itself: mercury emission lines at 405, 436, 546 and 578 nm over a
-broad halophosphate band.
-
-References:
-- NVIDIA, "Omniverse RTX Renderer: Lighting, Physical Lighting",
-  https://docs.omniverse.nvidia.com/materials-and-rendering/latest/lighting.html
-- D. Pascale, "RGB coordinates of the Macbeth ColorChecker",
-  BabelColor, 2006 (the patches' sRGB values).
-"""
+"""One spot light at 1600 lumens under four illuminants (white, D 4000
+K, blackbody 2000 K and a fluorescent spectrum), lighting a colour
+chart: the same brightness, different colours."""
 
 import numpy as np
 
@@ -33,6 +14,16 @@ from ernie.demo import (
     srgb_to_linear,
     write_png,
 )
+
+# After the Omniverse RTX physical lighting page's illuminant figure,
+# whose custom illuminant is CIE F5; here a fluorescent-like spectrum
+# stands in for it.
+#
+# References:
+# - NVIDIA, "Omniverse RTX Renderer: Lighting, Physical Lighting",
+#   https://docs.omniverse.nvidia.com/materials-and-rendering/latest/lighting.html
+# - D. Pascale, "RGB coordinates of the Macbeth ColorChecker",
+#   BabelColor, 2006.
 
 # The ColorChecker's 24 patches in sRGB, row by row from dark skin to
 # black.

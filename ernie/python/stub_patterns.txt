@@ -1,0 +1,9 @@
+# nanobind stubgen patterns (-p): signatures for what ernie.schema
+# puts on the extension's classes at import, which stubgen would
+# otherwise emit as a stray module-level import.
+
+\.Scene\.define$:
+    define: ernie.schema.DefineAt
+
+\.Prim\.define$:
+    define: ernie.schema.DefineAt

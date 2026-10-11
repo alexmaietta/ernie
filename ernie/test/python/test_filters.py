@@ -9,7 +9,9 @@ GAIN = """
 import sensor;
 struct Gain : IPixelFilter {
     struct Params { float scale; }
-    static void apply(inout SensorPixel value, PixelContext pixel, Params params) {
+    static void apply(
+        inout SensorPixel value, PixelContext pixel, Params params
+    ) {
         value.rgb *= params.scale;
     }
 }
@@ -84,9 +86,10 @@ SHIFT = """
 import sensor;
 struct Shift : ISpatialPixelFilter {
     struct Params { float dx; }
-    static void apply(inout SensorPixel value, PixelContext pixel, SpatialImage input,
-                      Params params) {
-        value.rgb = input.values(pixel, int2(pixel.id.xy) - int2(int(params.dx), 0)).xyz;
+    static void apply(inout SensorPixel value, PixelContext pixel,
+                      SpatialImage input, Params params) {
+        int2 shifted = int2(pixel.id.xy) - int2(int(params.dx), 0);
+        value.rgb = input.values(pixel, shifted).xyz;
     }
 }
 """

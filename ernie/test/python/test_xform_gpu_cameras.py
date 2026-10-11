@@ -5,7 +5,11 @@ same links posed on the CPU."""
 
 import numpy as np
 import pytest
-from test_xform_gpu import assert_same_image, cuda_renderer, quats  # noqa: F401
+from test_xform_gpu import (  # noqa: F401
+    assert_same_image,
+    cuda_renderer,
+    quats,
+)
 
 import ernie
 from ernie import tokens

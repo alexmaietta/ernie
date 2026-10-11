@@ -89,13 +89,30 @@ def main(output):
         "# Generated from the prim type registry by ernie/python/stub_schema.py; do not edit.",
         "import os",
         "from collections.abc import Sequence",
-        "from typing import Any, ClassVar, Self",
+        "from typing import Any, ClassVar, Protocol, Self, overload",
         "",
         "from ._ernie import AttributeDef, Path, Prim, PrimType, Quat, Scene",
         "",
         f"__all__ = {['AttributeName', 'Schema', 'typed', 'load_scene', *[t.name for t in ernie.prim_types()]]!r}",
         "",
         "classes: dict[str, type[Schema]]",
+        "",
+        "class DefineAt(Protocol):",
+        '    """`define` on a Scene, Prim or typed prim: the prim at `path` (below it, for a prim)."""',
+        "    @overload",
+        "    def __call__[S: Schema](self, path: str | Path, type: type[S], /, **attributes: Any) -> S: ...",
+        "    @overload",
+        "    def __call__(self, path: str | Path, type: str, /, **attributes: Any) -> Prim: ...",
+        "",
+        "class _Define[F]:",
+        '    """`define` on a typed prim class (F, a prim of its type) or on a typed prim (a child)."""',
+        "    @overload",
+        "    def __get__(self, instance: None, owner: Any, /) -> F: ...",
+        "    @overload",
+        "    def __get__(self, instance: Schema, owner: Any, /) -> DefineAt: ...",
+        "",
+        "class _SchemaDefine(Protocol):",
+        "    def __call__(self, parent: Scene | Prim | Schema, path: str | Path, **attributes: Any) -> Schema: ...",
         "",
         "class AttributeName(str):",
         *_doc(ernie.schema.AttributeName.__doc__ or "", "    "),
@@ -107,8 +124,7 @@ def main(output):
         "    prim: Prim",
         "    prim_type: ClassVar[PrimType]",
         "    def __init__(self, prim: Prim) -> None: ...",
-        "    @classmethod",
-        "    def define(cls, parent: Scene | Prim | Schema, path: str | Path, **attributes: Any) -> Self: ...",
+        "    define: ClassVar[_Define[_SchemaDefine]]",
         "    @classmethod",
         "    def at(cls, parent: Scene | Prim | Schema, path: str | Path) -> Self: ...",
         "    @classmethod",
@@ -131,6 +147,14 @@ def main(output):
             if prim_type.base is not None
             else "Schema"
         )
+        keywords = ", ".join(_keywords(prim_type))
+        if not prim_type.abstract:
+            # Its class's define, with its attributes as keywords.
+            lines.append(f"class _{prim_type.name}Define(Protocol):")
+            lines.append(
+                f"    def __call__(self, parent: Scene | Prim | Schema, path: str | Path, *, {keywords}) -> {prim_type.name}: ..."
+            )
+            lines.append("")
         lines.append(f"class {prim_type.name}({base}):")
         lines += _doc(prim_type.doc, "    ")
         for attribute in prim_type.attributes:
@@ -155,11 +179,9 @@ def main(output):
                 f"    {attribute.py_name}: {_TYPES[attribute.kind]}{array}"
             )
             lines += _doc(_attribute_doc(attribute), "    ")
-        keywords = ", ".join(_keywords(prim_type))
         if not prim_type.abstract:
-            lines.append("    @classmethod")
             lines.append(
-                f"    def define(cls, parent: Scene | Prim | Schema, path: str | Path, *, {keywords}) -> Self: ..."
+                f"    define: ClassVar[_Define[_{prim_type.name}Define]]"
             )
         lines.append(
             f"    def set(self, *attribute: Any, {keywords}) -> Self: ..."

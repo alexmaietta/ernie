@@ -4,11 +4,16 @@ ernie`: the native `ernie` program the package ships beside this file
 (the same program as the C++ build's), which this replaces itself
 with.
 
-    ernie                               the viewer on the default scene, with the Demos panel
-    ernie scene.json                    the viewer on a scene file (ernie.save_scene's JSON)
-    ernie scene.json --output out.png   renders the scene file to a PNG
-    ernie --demo lighting/illuminants   the viewer with one of the C++ demos running
-    ernie --list                        the C++ demos' names
+    ernie
+        the viewer on the default scene, with the Demos panel
+    ernie scene.json
+        the viewer on a scene file (ernie.save_scene's JSON)
+    ernie scene.json --output out.png
+        renders the scene file to a PNG
+    ernie --demo lighting/illuminants
+        the viewer with one of the C++ demos running
+    ernie --list
+        the C++ demos' names
 
 The Python demos run with `python -m ernie.demos`.
 """

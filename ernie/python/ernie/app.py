@@ -3,7 +3,8 @@ from . import _ernie
 
 if not hasattr(_ernie, "app"):
     raise ImportError(
-        "This build of Ernie has no app; configure it with -DERNIE_BUILD_APP=ON"
+        "This build of Ernie has no app; configure it with "
+        "-DERNIE_BUILD_APP=ON"
     )
 
 Demo = _ernie.app.Demo

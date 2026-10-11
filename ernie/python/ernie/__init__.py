@@ -11,9 +11,19 @@ name, write bulk data as arrays from any DLPack-capable framework
     from ernie import tokens
 
     scene = ernie.Scene()
-    scene.define("/World/Terrain", ernie.Terrain, heights=heights, cell_size=2.0)
-    camera = scene.define("/World/Camera", ernie.Camera, focal_length=35.0)
-    camera.set(tokens.TRANSFORM, ernie.look_at_transform((0, -500, 300), (0, 0, 0)))
+    scene.define(
+        "/World/Terrain",
+        ernie.Terrain,
+        heights=heights,
+        cell_size=2.0,
+    )
+    camera = scene.define(
+        "/World/Camera", ernie.Camera, focal_length=35.0
+    )
+    camera.set(
+        tokens.TRANSFORM,
+        ernie.look_at_transform((0, -500, 300), (0, 0, 0)),
+    )
     image = ernie.Renderer().render(scene)  # uint8 (rows, cols, 4)
 
 `ernie.Camera.at(scene, path)` types an existing prim, and
@@ -45,7 +55,8 @@ on the GPU after the work that produced them.
 Rendering is by steps: renderer.step(scene,
 render_products={"/Render/Camera"}) returns the outputs by product,
 and
-product.frames[0].render_vars["/Render/Camera/LdrColor"].map(device=...)
+product.frames[0].render_vars["/Render/Camera/LdrColor"]
+.map(device=...)
 delivers each output to Device.CPU, Device.CUDA (linear, filled on the
 GPU) or Device.CUDA_ARRAY (the rendered image itself, no copy);
 unmap() hands a CUDA_ARRAY back. step_async() returns an Operation to
@@ -120,7 +131,9 @@ from ._ernie import (
     synthetic_stars,
     tokens,
 )
-from .schema import *  # noqa: F403  the typed prim classes, such as SphereLight
+
+# The typed prim classes, such as SphereLight.
+from .schema import *  # noqa: F403
 
 __all__ = [
     "AttributeDef",

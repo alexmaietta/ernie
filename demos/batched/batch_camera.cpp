@@ -1,30 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// Benchmarks batched cameras for reinforcement learning: one
-// environment ("world") per view, each a clone of the first, with
-// camera poses that change every step on the GPU, and reports the
-// time per step and views rendered per second. The C++ twin of
-// batch_camera.py.
-//
-//     ernie --demo batched/batch_camera [--views 1024] [--bands 3]
-//     [--minimal texturedDiffuse]
-//         [--viewer null] [--sweep] [--output views.png]
-//
-// Each environment holds a few boxes and spheres over a shared ground
-// under a sun with shadows. The views orbit their environment, a
-// step's poses arrive as a CUDA array, and the observations stay on
-// the GPU (a step mapped with MapDevice::Gpu), the way a training
-// loop consumes them. Spectral bands (ernie:spectralBands) set most
-// of the shading and sensor cost; RGB observations need few.
-// --minimal draws with minimal shading (ernie:minimal:mode) instead:
-// one forward pass straight into the observations, with no spectral
-// shading or sensor filters; "none" renders black colour and
-// distances alone.
-//
-// Each frame is one batch step, timed after a few steps' warm-up;
-// --sweep first times 256, 1024 and 4096 views at 3 and 16 bands,
-// each in a scene of its own. The environments are clones at the
-// origin, so the viewer shows them as one. --output writes 16 views
-// of the last step, spread round the orbit, as a contact sheet.
+// Benchmarks a batched camera rendering one view per cloned
+// environment, with GPU poses and observations kept on the GPU, as a
+// reinforcement learning loop does.
 
 #include "ernie/app/demo.h"
 #include "ernie/device/compute_interop.h"

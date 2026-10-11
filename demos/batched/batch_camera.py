@@ -1,29 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Benchmarks batched cameras for reinforcement learning: one
-environment ("world") per view, each a clone of the first, with camera
-poses that change every step on the GPU, and reports the time per step
-and views rendered per second.
-
-    python -m ernie.demos batched/batch_camera [--views 1024] [--bands 3]
-        [--minimal texturedDiffuse] [--viewer null] [--sweep] [--output views.png]
-
-Each environment holds a few boxes and spheres over a shared ground
-under a sun with shadows. The views orbit their environment, a step's
-poses arrive as a CUDA array, and the observations stay on the GPU
-(`BatchCamera.step`), the way a training loop consumes them with
-torch.from_dlpack. Spectral bands (`tokens.SPECTRAL_BANDS`) set most
-of the shading and sensor cost; RGB observations need few. `--minimal`
-draws with minimal shading (`tokens.MINIMAL_MODE`) instead: one
-forward pass straight into the observations, with no spectral shading
-or sensor filters; "none" renders black colour and distances alone.
-
-Each frame is one batch step, timed after a few steps' warm-up;
-`--sweep` first times 256, 1024 and 4096 views at 3 and 16 bands, each
-in a scene of its own. The environments are clones at the origin, so
-the viewer shows them as one. `--output` writes 16 views of the last
-step, spread round the orbit, as a contact sheet. The Python twin of
-batch_camera.cpp.
-"""
+"""Benchmarks a batched camera rendering one view per cloned
+environment, with GPU poses and observations kept on the GPU, as a
+reinforcement learning loop does."""
 
 import time
 
@@ -101,7 +79,8 @@ MINIMAL_MODES = ("off", "none", "constantDiffuse", "texturedDiffuse")
 
 def batch_camera(renderer, scene, views, minimal):
     """The batch camera, with minimal shading unless `minimal` is
-    "off"; minimal "none" renders distances besides its black colour."""
+    "off"; minimal "none" renders distances besides its black
+    colour."""
     render_vars = (
         ("LdrColor", "DistanceToCamera")
         if minimal == "none"
@@ -131,9 +110,9 @@ def benchmark(renderer, views, bands, minimal="off"):
     for p in poses[:WARMUP]:
         camera.step(p)
     start = time.perf_counter()
-    observations = None
-    for p in poses:
-        observations = camera.step(p)
+    for p in poses[:-1]:
+        camera.step(p)
+    observations = camera.step(poses[-1])
     renderer.cuda_download(
         observations["LdrColor"]
     )  # the last step has finished
@@ -173,13 +152,14 @@ class Demo(ernie.demo.Demo):
             "--minimal",
             choices=MINIMAL_MODES,
             default="off",
-            help="minimal shading (ernie:minimal:mode) for throughput",
+            help="minimal shading (ernie:minimal:mode), for "
+            "throughput",
         )
         parser.add_argument(
             "--sweep",
             action="store_true",
-            help="first time 256, 1024 and 4096 views at 3 and 16 bands, then "
-            "with each minimal shading mode",
+            help="first time 256, 1024 and 4096 views at 3 and 16 "
+            "bands, then with each minimal shading mode",
         )
         return parser
 
@@ -189,7 +169,8 @@ class Demo(ernie.demo.Demo):
         if not renderer.cuda_available:
             raise RuntimeError("This demo needs CUDA interop")
         print(
-            f"{renderer.device_name}, {SIZE} x {SIZE} LdrColor observations"
+            f"{renderer.device_name}, {SIZE} x {SIZE} LdrColor "
+            "observations"
         )
         if args.sweep:
             for bands in (3, 16):
@@ -246,13 +227,15 @@ class Demo(ernie.demo.Demo):
     def images(self):
         """The last step's views, uint8 (views, SIZE, SIZE, 4),
         waiting for the render."""
+        assert self.observations is not None, "no step yet"
         return np.asarray(
             self.renderer.cuda_download(self.observations["LdrColor"])
         )
 
     def print_rate(self, views, bands, per_step, note=""):
         print(
-            f"{views:6d} views, {bands:2d} bands: {per_step * 1e3:7.2f} ms per step, "
+            f"{views:6d} views, {bands:2d} bands: "
+            f"{per_step * 1e3:7.2f} ms per step, "
             f"{views / per_step:10,.0f} views per second{note}"
         )
 
@@ -260,7 +243,7 @@ class Demo(ernie.demo.Demo):
         """Prints the time per step since the warm-up, once the last
         step has finished; before the output and the test, so that
         their downloads are not counted."""
-        if self.observations is None or not self.timed_steps:
+        if self.timer_start is None or not self.timed_steps:
             return
         self.images()  # the last step has finished
         per_step = (
@@ -302,6 +285,7 @@ class Demo(ernie.demo.Demo):
             assert (images == 0).all(), (
                 "minimal none renders no colour"
             )
+            assert self.observations is not None
             images = np.asarray(
                 self.renderer.cuda_download(
                     self.observations["DistanceToCamera"]

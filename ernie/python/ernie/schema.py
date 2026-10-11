@@ -9,12 +9,23 @@ and converted to it when set::
     import ernie
 
     scene = ernie.Scene()
-    sun = scene.define("/World/Sun", ernie.DistantLight, angle=0.53, irradiance=1361.0)
-    lamp = scene.define("/World/Lamp", ernie.SphereLight, radius=0.1, translate=(0, 0, 2))
+    sun = scene.define(
+        "/World/Sun",
+        ernie.DistantLight,
+        angle=0.53,
+        irradiance=1361.0,
+    )
+    lamp = scene.define(
+        "/World/Lamp",
+        ernie.SphereLight,
+        radius=0.1,
+        translate=(0, 0, 2),
+    )
     lamp.intensity = 40.0
     lamp.radius                      # 0.1
     lamp.color_temperature           # 6500.0, the default
-    ernie.SphereLight.radius.doc     # on the class, a property is its AttributeDef
+    # on the class, a property is its AttributeDef
+    ernie.SphereLight.radius.doc
 
 ``scene.define(path, cls, **attributes)`` and ``prim.define(relative,
 cls, **attributes)`` return an instance of ``cls``; with a type name
@@ -35,7 +46,8 @@ class::
 
     sun = ernie.DistantLight.at(scene, "/World/Sun")
     surface = ernie.Shader.at(material, "Surface")
-    ernie.typed(scene.get_prim("/World/Lamp"))   # SphereLight('/World/Lamp')
+    # SphereLight('/World/Lamp')
+    ernie.typed(scene.get_prim("/World/Lamp"))
 """
 
 from __future__ import annotations
@@ -190,7 +202,8 @@ def _define_type(
     relative to a prim, and sets ``attributes``."""
     if cls.prim_type.abstract:
         raise TypeError(
-            f"{cls.__name__} is abstract; define one of the types derived from it"
+            f"{cls.__name__} is abstract; define one of the types "
+            "derived from it"
         )
     if isinstance(parent, Schema):
         parent = parent.prim
@@ -225,13 +238,15 @@ class Schema:
     def __init__(self, prim: Prim) -> None:
         if not isinstance(prim, Prim) or not prim.valid:
             raise ValueError(
-                f"{type(self).__name__} needs a valid Prim, not {prim!r}"
+                f"{type(self).__name__} needs a valid Prim, "
+                f"not {prim!r}"
             )
         found = find_prim_type(prim.type)
         if found is None or not found.is_a(self.prim_type.name):
             what = f"a {prim.type}" if prim.type else "untyped"
             raise TypeError(
-                f"'{prim.path}' is {what}, not a {self.prim_type.name}"
+                f"'{prim.path}' is {what}, "
+                f"not a {self.prim_type.name}"
             )
         object.__setattr__(self, "prim", prim)
 
@@ -253,7 +268,8 @@ class Schema:
             parent = parent.prim
         if not isinstance(parent, (Scene, Prim)):
             raise TypeError(
-                f"{cls.__name__}.at looks in a Scene or below a prim, not {parent!r}"
+                f"{cls.__name__}.at looks in a Scene or below a "
+                f"prim, not {parent!r}"
             )
         prim = parent.get_prim(path)
         if prim is None:
@@ -447,8 +463,9 @@ def _define(
         cls = classes.get(type)
         if cls is None:
             raise TypeError(
-                f"{type!r} is not a registered prim type, so it takes no keyword attributes; set "
-                "them with .set(token, value)"
+                f"{type!r} is not a registered prim type, so it "
+                "takes no keyword attributes; set them with "
+                ".set(token, value)"
             )
         cls(prim).set(**attributes)
     return prim
@@ -471,9 +488,11 @@ def load_scene(description: Any, scene: Scene | None = None) -> Scene:
 
         ernie.load_scene({
             "/World": {"type": "Xform",
-                "Rock": {"type": "Sphere", "radius": 0.5, "translate": [0, 0, 1]},
+                "Rock": {"type": "Sphere", "radius": 0.5,
+                    "translate": [0, 0, 1]},
                 "Sun": {"type": "DistantLight", "angle": 0.53}},
-            "/Render/Settings": {"type": "RenderSettings", "resolution": [640, 480]},
+            "/Render/Settings": {"type": "RenderSettings",
+                "resolution": [640, 480]},
         })
 
     C++ loads it (``LoadScene``), so both read a description the same
@@ -507,7 +526,8 @@ def load_scene(description: Any, scene: Scene | None = None) -> Scene:
         return scene
     if not isinstance(description, dict):
         raise TypeError(
-            f"A scene description is a dict of prim paths, not {type(description).__name__}"
+            "A scene description is a dict of prim paths, not "
+            f"{type(description).__name__}"
         )
     # Arrays go to C++ beside the text, not through it: {"$array": i}
     # stands for arrays[i].
@@ -530,7 +550,8 @@ def load_scene(description: Any, scene: Scene | None = None) -> Scene:
             arrays.append(value)
             return {"$array": len(arrays) - 1}
         raise TypeError(
-            f"A scene description has no value of type {type(value).__name__}"
+            "A scene description has no value of type "
+            f"{type(value).__name__}"
         )
 
     _load_scene_text(
@@ -542,9 +563,9 @@ def load_scene(description: Any, scene: Scene | None = None) -> Scene:
 __all__ += ["load_scene"]
 
 _define.__doc__ = (
-    "Defines the prim at `path` with `type`, a type name or a typed prim class "
-    "(ernie.SphereLight), and sets `attributes` by Python name; returns the Prim, or an instance "
-    "of the class."
+    "Defines the prim at `path` with `type`, a type name or a typed "
+    "prim class (ernie.SphereLight), and sets `attributes` by Python "
+    "name; returns the Prim, or an instance of the class."
 )
 Scene.define = _define
 Prim.define = _define

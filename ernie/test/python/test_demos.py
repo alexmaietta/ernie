@@ -131,7 +131,8 @@ def test_every_demo_has_a_twin_in_the_other_language():
     }
     cpp = set(cpp_demos())
     assert python == cpp, (
-        f"Python only: {sorted(python - cpp)}; C++ only: {sorted(cpp - python)}"
+        f"Python only: {sorted(python - cpp)}; "
+        f"C++ only: {sorted(cpp - python)}"
     )
 
 

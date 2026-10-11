@@ -10,7 +10,8 @@ from ernie.batch import BatchCamera
 def noiseless(scene):
     """The terrain scene without sensor noise or sun shadows, so a
     batch's views render as single views of the same poses do (a batch
-    fits its sun shadows to the scene, a single view to its frustum)."""
+    fits its sun shadows to the scene, a single view to its
+    frustum)."""
     ernie.Camera.at(scene, "/World/Camera").sensor_noise = False
     ernie.DistantLight.at(scene, "/World/Sun").shadow_enable = False
     return scene

@@ -17,13 +17,18 @@ scene renders through it::
     class Demo(ernie.demo.Demo):
         def __init__(self, viewer, args):
             super().__init__(viewer, args)
-            self.ball = self.scene.define("/World/Ball", ernie.Sphere, radius=0.5)
+            self.ball = self.scene.define(
+                "/World/Ball", ernie.Sphere, radius=0.5
+            )
             self.scene.define("/World/Sun", ernie.DistantLight)
             self.scene.define("/World/Camera", ernie.Camera).set(
-                tokens.TRANSFORM, ernie.look_at_transform((0, -5, 2), (0, 0, 0)))
+                tokens.TRANSFORM,
+                ernie.look_at_transform((0, -5, 2), (0, 0, 0)),
+            )
 
         def step(self):
-            self.ball.set(translate=(0, 0, self.time))  # moved by self.frame_dt each step
+            # moved by self.frame_dt each step
+            self.ball.set(translate=(0, 0, self.time))
 
         def test_final(self):
             assert self.render_image()[..., :3].any()
@@ -79,7 +84,8 @@ from . import _ernie
 
 if not hasattr(_ernie, "app"):
     raise ImportError(
-        "This build of Ernie has no app; configure it with -DERNIE_BUILD_APP=ON"
+        "This build of Ernie has no app; configure it with "
+        "-DERNIE_BUILD_APP=ON"
     )
 
 _app = _ernie.app
@@ -225,8 +231,8 @@ def create_parser(demo_class=Demo):
         nargs="?",
         const=None,
         metavar="SECONDS",
-        help="report frames per second, rendering with --viewer null; stop "
-        "after SECONDS, if given, or --num-frames",
+        help="report frames per second, rendering with --viewer "
+        "null; stop after SECONDS, if given, or --num-frames",
     )
     parser.add_argument(
         "--test",
@@ -298,7 +304,8 @@ def init(parser=None, title="Ernie demos"):
     """Parses the command line and opens the viewer it asks for:
     `(viewer, args)`, with viewer an `ernie.app.Viewer` on a new
     Scene, or None under `--viewer null` and `--benchmark`. The runner
-    (`ernie.app.DemoRunner`) rides along in the arguments for `run`."""
+    (`ernie.app.DemoRunner`) rides along in the arguments for
+    `run`."""
     parser = parser or create_parser()
     args = parser.parse_args()
     if args.benchmark is not False:
@@ -417,12 +424,16 @@ def discover_demos(root):
 
 def load_demo_class(path):
     """Imports the demo file at `path` afresh (its directory first on
-    sys.path, for the helpers beside it) and returns its Demo class."""
+    sys.path, for the helpers beside it) and returns its Demo
+    class."""
     directory = os.path.dirname(os.path.abspath(path))
     if directory not in sys.path:
         sys.path.insert(0, directory)
-    name = f"ernie_demo_{os.path.basename(directory)}_{os.path.splitext(os.path.basename(path))[0]}"
+    stem = os.path.splitext(os.path.basename(path))[0]
+    name = f"ernie_demo_{os.path.basename(directory)}_{stem}"
     spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"{path} is not a Python file")
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
     spec.loader.exec_module(module)

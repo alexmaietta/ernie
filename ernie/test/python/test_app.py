@@ -231,7 +231,9 @@ def test_clicks_pick_prims_and_edits_undo(viewer):
     assert viewer.pick(10000, 10000) == ernie.Path()
 
     viewer.selection = [ernie.Path("/World/Cube")]
-    viewer.step()  # draws the Stage and Properties panels and the selection's outline
+    # draws the Stage and Properties panels and the selection's
+    # outline
+    viewer.step()
     assert "__selection" in viewer.scene.overlay_names()
 
     viewer.edit("/World/Cube", tokens.SIZE, 3.0)

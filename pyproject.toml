@@ -61,6 +61,8 @@ dev = ["ruff>=0.17", "mypy>=2.4", "pre-commit>=4"]
 line-length = 70
 target-version = "py312"
 extend-exclude = ["third_party", "build", "dist", "site", ".venv"]
+# Python only: Markdown's code blocks stay as written.
+include = ["*.py", "*.pyi"]
 
 [tool.ruff.lint]
 # pycodestyle errors, pyflakes, warnings, imports, pyupgrade, bugbear.

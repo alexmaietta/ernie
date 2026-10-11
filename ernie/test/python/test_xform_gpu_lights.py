@@ -4,7 +4,11 @@ planned on the CPU from their links' rows copied back, rendered
 against the same links posed on the CPU."""
 
 import numpy as np
-from test_xform_gpu import assert_same_image, cuda_renderer, quats  # noqa: F401
+from test_xform_gpu import (  # noqa: F401
+    assert_same_image,
+    cuda_renderer,
+    quats,
+)
 
 import ernie
 from ernie import tokens
