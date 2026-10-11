@@ -276,13 +276,14 @@ double EmittedSolidAngle(const EmissionShape& shape, bool flat,
 }
 
 /// The IES profile of `light` (`inputs:shaping:ies:file`) on `LightParams::profile`'s grid, its
-/// vertical angle scaled by `inputs:shaping:ies:angleScale` as UsdLux's ShapingAPI does; empty
-/// without a file. Files are read once each, and again when they change.
+/// vertical angle scaled by `inputs:shaping:ies:angleScale` as UsdLux's ShapingAPI does, times
+/// its tilt factor for the light's tilt in `world` (`IesTilt`); empty without a file. Files are
+/// read once each, and again when they change.
 /// @throws std::runtime_error or std::invalid_argument for a file that cannot be read.
 ///
 /// References:
 /// - Pixar, UsdLux ShapingAPI, https://openusd.org/dev/user_guides/schemas/usdLux/ShapingAPI.html
-std::vector<float> ProfileOf(const BoundableLight& light) {
+std::vector<float> ProfileOf(const BoundableLight& light, const glm::dmat4& world) {
     const std::string file = light.GetShapingIesFile();
     if (file.empty()) {
         return {};
@@ -304,6 +305,9 @@ std::vector<float> ProfileOf(const BoundableLight& light) {
         profile = entry.profile;
     }
     const double scale = light.GetShapingIesAngleScale();
+    const double tilt = profile->tilt.Factor(profile->tilt.AngleOf(
+        glm::normalize(glm::dvec3(world[0])), glm::normalize(glm::dvec3(world[1])),
+        glm::normalize(glm::dvec3(world[2]))));
     constexpr int rows = LightParams::kProfileRows;
     constexpr int columns = LightParams::kProfileColumns;
     std::vector<float> grid(static_cast<std::size_t>(rows * columns));
@@ -314,7 +318,7 @@ std::vector<float> ProfileOf(const BoundableLight& light) {
                                          : theta;
         for (int j = 0; j < columns; ++j) {
             grid[static_cast<std::size_t>(i * columns + j)] =
-                static_cast<float>(profile->Sample(ies, 360.0 * j / columns));
+                static_cast<float>(tilt * profile->Sample(ies, 360.0 * j / columns));
         }
     }
     return grid;
@@ -1129,7 +1133,7 @@ LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBa
     }
     light.tangent = glm::vec3(glm::normalize(x));
     SetFocus(light, emitter, bands);
-    light.profile = ProfileOf(emitter);
+    light.profile = ProfileOf(emitter, world);
     if (type == kCylinderLight) {
         // Lambertian over its side, 2 pi r l: unshaped, a power over pi times that, and shaped
         // by its focus and profile about its -z axis as the other lights are. An illuminance on

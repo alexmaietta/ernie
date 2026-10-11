@@ -425,6 +425,33 @@ std::filesystem::path WriteTemporary(const std::string& name, const char* text) 
 
 }  // namespace
 
+TEST(LightParamsOf, IesTiltDataScaleATiltedLuminaire) {
+    // A vertical lamp losing a fifth of its output at 45 degrees.
+    const std::filesystem::path file = WriteTemporary("tilted", R"(IESNA:LM-63-2002
+TILT=INCLUDE
+1
+3
+0 45 90
+1 0.8 0.5
+1 -1 1 2 1 1 2 0 0 0
+1 1 10
+0 90
+0
+100 0
+)");
+    const ernie::SpectralBands bands{380.0, 780.0, 40};
+    Scene scene;
+    ernie::SphereLight lamp = ernie::SphereLight::Define(scene, "/Lamp")
+                                  .SetTreatAsPoint(true)
+                                  .SetShapingIesFile(file.string());
+    EXPECT_FLOAT_EQ(ernie::LightParamsOf(scene, "/Lamp", bands).profile[0], 100.0f)
+        << "hanging straight down";
+    lamp.SetTransform(glm::rotate(glm::dmat4(1.0), glm::radians(45.0), glm::dvec3(1, 0, 0)));
+    EXPECT_NEAR(ernie::LightParamsOf(scene, "/Lamp", bands).profile[0], 80.0f, 1e-4f)
+        << "tilted 45 degrees";
+    std::filesystem::remove(file);
+}
+
 TEST(LightParamsOf, IesProfilesShapeLightsInEveryUnit) {
     const ernie::SpectralBands bands{380.0, 780.0, 40};
     const std::filesystem::path file = WriteTemporary("downlight", kDownlight);
