@@ -108,6 +108,11 @@ class RenderDelegate {
             model.id);
     }
 
+    /// Whether light pattern `id` is registered, built in or added.
+    virtual bool HasLightPattern(std::string_view id) const {
+        return false;
+    }
+
     /// The custom sensor filters registered so far.
     virtual const SensorFilterRegistry& SensorFilters() const = 0;
 

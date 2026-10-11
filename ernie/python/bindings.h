@@ -5,8 +5,11 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
 
+#include "ernie/scene/light_pattern.h"
 #include "ernie/scene/value.h"
 #include "ernie/util/tensor.h"
+
+#include <string>
 
 namespace ernie::python {
 
@@ -61,6 +64,15 @@ bool IsPrimPath(nb::handle object) noexcept;
 /// @throws nb::type_error for anything else; std::invalid_argument
 /// for a str that is no path.
 Path PathFromPython(nb::handle object);
+
+/// A light pattern from `add_light_pattern`'s arguments: `params` as
+/// {name: default} in order, a list of {"name", "default",
+/// "description"}, or None.
+LightPatternModel LightPatternFromPython(
+    const std::string& id, const std::string& typeName,
+    const std::string& slang, nb::handle params, double extent,
+    bool normalized, const std::string& name,
+    const std::string& description);
 
 /// A prim path argument, as `PathFromPython` reads it: bind
 /// `PrimPath` where a function takes a prim's path, and use it as a

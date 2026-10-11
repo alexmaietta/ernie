@@ -91,6 +91,9 @@ class RasterDelegate : public RenderDelegate {
     const BrdfRegistry& Brdfs() const override;
     void AddSensorFilter(SensorFilterModel model) override;
     void AddLightPattern(LightPatternModel model) override;
+    bool HasLightPattern(std::string_view id) const override {
+        return renderer_.LightPatterns().Find(id) != nullptr;
+    }
     const SensorFilterRegistry& SensorFilters() const override {
         return renderer_.SensorFilters();
     }

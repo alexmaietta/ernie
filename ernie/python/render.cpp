@@ -162,6 +162,41 @@ ComputeInterop& RequireCuda(Renderer& r) {
 
 }  // namespace
 
+LightPatternModel LightPatternFromPython(
+    const std::string& id, const std::string& typeName,
+    const std::string& slang, nb::handle params, double extent,
+    bool normalized, const std::string& name,
+    const std::string& description) {
+    LightPatternModel model;
+    model.id = id;
+    model.typeName = typeName;
+    model.slang = slang;
+    model.extent = extent;
+    model.normalized = normalized;
+    model.name = name.empty() ? id : name;
+    model.description = description;
+    if (nb::isinstance<nb::dict>(params)) {
+        for (const auto& [key, value] : nb::cast<nb::dict>(params)) {
+            model.params.push_back({nb::cast<std::string>(key),
+                                    nb::cast<float>(value),
+                                    {}});
+        }
+    } else if (!params.is_none()) {
+        for (const nb::handle entry : params) {
+            const nb::dict param = nb::cast<nb::dict>(entry);
+            model.params.push_back(
+                {nb::cast<std::string>(param["name"]),
+                 param.contains("default")
+                     ? nb::cast<float>(param["default"])
+                     : 0.0f,
+                 param.contains("description")
+                     ? nb::cast<std::string>(param["description"])
+                     : std::string()});
+        }
+    }
+    return model;
+}
+
 void BindRender(nb::module_& m) {
     nb::class_<CudaArray>(
         m, "CudaArray",
@@ -514,45 +549,23 @@ void BindRender(nb::module_& m) {
             "fails to compile, with the "
             "compiler's diagnostics.")
         .def(
+            "has_light_pattern",
+            [](Renderer& r, const std::string& id) {
+                return r.Delegate().HasLightPattern(id);
+            },
+            nb::arg("id"),
+            "Whether light pattern `id` is registered, built in or "
+            "added.")
+        .def(
             "add_light_pattern",
             [](Renderer& r, const std::string& id,
                const std::string& typeName, const std::string& slang,
                nb::object params, double extent, bool normalized,
                const std::string& name,
                const std::string& description) {
-                LightPatternModel model;
-                model.id = id;
-                model.typeName = typeName;
-                model.slang = slang;
-                model.extent = extent;
-                model.normalized = normalized;
-                model.name = name.empty() ? id : name;
-                model.description = description;
-                // Parameters as {name: default} in order, or
-                // [{"name", "default", "description"}].
-                if (nb::isinstance<nb::dict>(params)) {
-                    for (const auto& [key, value] :
-                         nb::cast<nb::dict>(params)) {
-                        model.params.push_back(
-                            {nb::cast<std::string>(key),
-                             nb::cast<float>(value),
-                             {}});
-                    }
-                } else if (!params.is_none()) {
-                    for (const nb::handle entry : params) {
-                        const nb::dict param =
-                            nb::cast<nb::dict>(entry);
-                        model.params.push_back(
-                            {nb::cast<std::string>(param["name"]),
-                             param.contains("default")
-                                 ? nb::cast<float>(param["default"])
-                                 : 0.0f,
-                             param.contains("description")
-                                 ? nb::cast<std::string>(
-                                       param["description"])
-                                 : std::string()});
-                    }
-                }
+                LightPatternModel model = LightPatternFromPython(
+                    id, typeName, slang, params, extent, normalized,
+                    name, description);
                 nb::gil_scoped_release release;
                 r.Delegate().AddLightPattern(std::move(model));
             },

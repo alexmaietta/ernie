@@ -412,6 +412,31 @@ void BindApp(nb::module_& parent) {
         .def("sync", &Viewer::Sync,
              "Syncs the scene into the renderer now; raises "
              "ValueError for data it cannot use.")
+        .def(
+            "add_light_pattern",
+            [](Viewer& viewer, const std::string& id,
+               const std::string& typeName, const std::string& slang,
+               nb::object params, double extent, bool normalized,
+               const std::string& name,
+               const std::string& description) {
+                viewer.Delegate().AddLightPattern(
+                    LightPatternFromPython(id, typeName, slang,
+                                           params, extent, normalized,
+                                           name, description));
+            },
+            nb::arg("id"), nb::arg("type_name"), nb::arg("slang"),
+            nb::arg("params").none() = nb::none(),
+            nb::arg("extent") = 1.0, nb::arg("normalized") = false,
+            nb::arg("name") = "", nb::arg("description") = "",
+            "Registers a laser pattern with the viewport's renderer, "
+            "as Renderer.add_light_pattern does.")
+        .def(
+            "has_light_pattern",
+            [](Viewer& viewer, const std::string& id) {
+                return viewer.Delegate().HasLightPattern(id);
+            },
+            nb::arg("id"),
+            "Whether the viewport's renderer has light pattern `id`.")
         .def("reset_session", &Viewer::ResetSession,
              "Starts over on the scene's present content once it has "
              "been replaced, as "
@@ -522,7 +547,7 @@ void BindApp(nb::module_& parent) {
                     : level == "warning" ? LogLevel::Warning
                     : level == "info"    ? LogLevel::Info
                                          : throw nb::value_error(
-                                               "level must be \"info\", "
+                                            "level must be \"info\", "
                                                "\"warning\" or "
                                                "\"error\"");
                 viewer.Log(parsed, std::move(text));

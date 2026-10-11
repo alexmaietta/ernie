@@ -168,6 +168,13 @@ Planned future examples.
 - Illuminants across the same scene
 - Laser lines competing with sunlight
 
+**Lasers**
+
+- Lasers from 405 to 940 nm seen by RGB, narrowband, NIR and wideband cameras (`lasers/wavelengths`)
+- A projector's patterns: spot, line, grid, dots, fringes and rings written in Slang (`lasers/patterns`)
+- A pulsed line laser against long, in-step and between-pulse exposures (`lasers/pulsed`)
+- Gray-code structured light decoded to projector columns (`lasers/structured_light`)
+
 **Star Field**
 
 - Hipparcos star catalog
