@@ -660,9 +660,11 @@ bool gbufferPoint(int2 pixel, uint layer, out float3 world) {
 }
 
 // Pixel `pixel`'s footprint on its surface at `world`: the steps in world units to its
-// neighbours' surface points across (xyz of the first) and down (of the second), either side;
-// zero where no neighbour has a surface. They grow with distance and with how obliquely the
-// surface is seen.
+// neighbours' surface points across (xyz of the first) and down (of the second), to the nearer
+// of the two either side, so at an edge the neighbour on the pixel's own surface counts rather
+// than one on a surface far behind it (whose step, metres long, would spread a laser's beam over
+// the pixel and light the edge); zero where no neighbour has a surface. They grow with distance
+// and with how obliquely the surface is seen.
 //
 // References:
 // - H. Igehy, "Tracing Ray Differentials", SIGGRAPH 1999.
@@ -670,9 +672,17 @@ float3x2 pixelFootprint(int2 pixel, uint layer, float3 world) {
     float3 steps[2] = {float3(0.0), float3(0.0)};
     for (uint axis = 0; axis < 2; ++axis) {
         let step = axis == 0 ? int2(1, 0) : int2(0, 1);
-        float3 next;
-        if (gbufferPoint(pixel + step, layer, next) || gbufferPoint(pixel - step, layer, next)) {
-            steps[axis] = next - world;
+        float3 after;
+        float3 before;
+        let hasAfter = gbufferPoint(pixel + step, layer, after);
+        let hasBefore = gbufferPoint(pixel - step, layer, before);
+        if (hasAfter && hasBefore) {
+            steps[axis] = length(after - world) <= length(before - world) ? after - world
+                                                                          : world - before;
+        } else if (hasAfter) {
+            steps[axis] = after - world;
+        } else if (hasBefore) {
+            steps[axis] = world - before;
         }
     }
     return float3x2(steps[0].x, steps[1].x, steps[0].y, steps[1].y, steps[0].z, steps[1].z);
