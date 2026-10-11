@@ -60,7 +60,7 @@ double ParseNumber(const std::string& option, const std::string& text) {
 bool IsNumber(const std::string& text) {
     try {
         std::size_t used = 0;
-        std::stod(text, &used);
+        static_cast<void>(std::stod(text, &used));  // only whether it parses whole
         return used == text.size();
     } catch (const std::exception&) {
         return false;

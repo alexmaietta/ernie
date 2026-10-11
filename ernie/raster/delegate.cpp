@@ -81,7 +81,7 @@ Image TextureImageOf(const Scene& scene, const TextureReader& reader) {
         }
         return ImageOfTensor(*tensor, EncodingOf(reader));
     }
-    return LoadImage(reader.file, EncodingOf(reader));
+    return LoadImageFile(reader.file, EncodingOf(reader));
 }
 
 std::invalid_argument UploadError(const Path& path, std::string_view attribute,

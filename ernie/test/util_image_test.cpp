@@ -21,7 +21,7 @@ using ernie::EncodeSlopeDeviation;
 using ernie::Image;
 using ernie::ImageEncoding;
 using ernie::LinearToSrgb;
-using ernie::LoadImage;
+using ernie::LoadImageFile;
 using ernie::MipChain;
 using ernie::MipFilter;
 using ernie::SrgbToLinear;
@@ -148,27 +148,27 @@ TEST_F(ImageFiles, LoadsEightBitPngWithEitherEncoding) {
     const auto path = dir_ / "colour.png";
     ASSERT_NE(stbi_write_png(path.string().c_str(), 2, 1, 4, rgba.data(), 8), 0);
 
-    const Image linear = LoadImage(path, ImageEncoding::Linear);
+    const Image linear = LoadImageFile(path, ImageEncoding::Linear);
     ASSERT_EQ(linear.width, 2u);
     ASSERT_EQ(linear.height, 1u);
     EXPECT_NEAR(linear.At(0, 0).r, 128.0f / 255.0f, 1e-6f);
     EXPECT_NEAR(linear.At(1, 0).a, 128.0f / 255.0f, 1e-6f);
-    const Image srgb = LoadImage(path, ImageEncoding::Srgb);
+    const Image srgb = LoadImageFile(path, ImageEncoding::Srgb);
     EXPECT_NEAR(srgb.At(0, 0).r, SrgbToLinear(128.0f / 255.0f), 1e-6f);
     EXPECT_NEAR(srgb.At(1, 0).a, 128.0f / 255.0f, 1e-6f) << "alpha stays linear";
 
     const std::array<std::uint8_t, 2> grey = {0, 200};
     const auto greyPath = dir_ / "GREY.PNG";
     ASSERT_NE(stbi_write_png(greyPath.string().c_str(), 2, 1, 1, grey.data(), 2), 0);
-    const Image expanded = LoadImage(greyPath, ImageEncoding::Linear);
+    const Image expanded = LoadImageFile(greyPath, ImageEncoding::Linear);
     EXPECT_NEAR(expanded.At(1, 0).g, 200.0f / 255.0f, 1e-6f);
     EXPECT_FLOAT_EQ(expanded.At(1, 0).a, 1.0f);
 }
 
 TEST_F(ImageFiles, LoadsSixteenBitPng) {
     const Image image =
-        LoadImage(std::filesystem::path(ERNIE_TEST_FIXTURES) / "images" / "grey16.png",
-                  ImageEncoding::Linear);
+        LoadImageFile(std::filesystem::path(ERNIE_TEST_FIXTURES) / "images" / "grey16.png",
+                      ImageEncoding::Linear);
     ASSERT_EQ(image.width, 2u);
     EXPECT_FLOAT_EQ(image.At(0, 0).r, 0.0f);
     EXPECT_FLOAT_EQ(image.At(1, 0).b, 1.0f);
@@ -184,7 +184,7 @@ TEST_F(ImageFiles, LoadsJpeg) {
     }());
     const auto path = dir_ / "flat.jpg";
     ASSERT_NE(stbi_write_jpg(path.string().c_str(), 4, 4, 3, grey.data(), 95), 0);
-    const Image image = LoadImage(path, ImageEncoding::Linear);
+    const Image image = LoadImageFile(path, ImageEncoding::Linear);
     EXPECT_EQ(image.width, 4u);
     EXPECT_NEAR(image.At(2, 2).r, 100.0f / 255.0f, 3.0f / 255.0f);
 }
@@ -206,7 +206,7 @@ TEST_F(ImageFiles, LoadsFloatExrAsLinear) {
     const std::vector<Imf::Rgba> rgba = {{0.25f, 2.0f, -0.5f, 1.0f}, {0.0f, 0.125f, 10.0f, 0.5f}};
     const auto path = dir_ / "data.exr";
     WriteExr(path, rgba, 2, 1, Imf::ZIP_COMPRESSION);
-    const Image image = LoadImage(path, ImageEncoding::Srgb);
+    const Image image = LoadImageFile(path, ImageEncoding::Srgb);
     ASSERT_EQ(image.width, 2u);
     EXPECT_FLOAT_EQ(image.At(0, 0).r, 0.25f) << "EXR ignores the sRGB encoding";
     EXPECT_FLOAT_EQ(image.At(0, 0).g, 2.0f);
@@ -231,7 +231,7 @@ TEST_F(ImageFiles, LoadsExrInLossyAndLosslessCompressions) {
           std::pair(Imf::DWAB_COMPRESSION, 0.02f)}) {
         const auto path = dir_ / ("gradient" + std::to_string(compression) + ".exr");
         WriteExr(path, rgba, kSize, kSize, compression);
-        const Image image = LoadImage(path, ImageEncoding::Linear);
+        const Image image = LoadImageFile(path, ImageEncoding::Linear);
         ASSERT_EQ(image.width, static_cast<std::uint32_t>(kSize));
         EXPECT_NEAR(image.At(40, 10).r, 40.0f / kSize, tolerance + 1e-3f) << compression;
         EXPECT_NEAR(image.At(40, 10).g, 10.0f / kSize, tolerance + 1e-3f) << compression;
@@ -240,10 +240,10 @@ TEST_F(ImageFiles, LoadsExrInLossyAndLosslessCompressions) {
 }
 
 TEST_F(ImageFiles, ReportsMissingCorruptAndUnsupportedFiles) {
-    EXPECT_THROW(LoadImage(dir_ / "missing.png", ImageEncoding::Linear), std::runtime_error);
-    EXPECT_THROW(LoadImage(dir_ / "missing.exr", ImageEncoding::Linear), std::runtime_error);
+    EXPECT_THROW(LoadImageFile(dir_ / "missing.png", ImageEncoding::Linear), std::runtime_error);
+    EXPECT_THROW(LoadImageFile(dir_ / "missing.exr", ImageEncoding::Linear), std::runtime_error);
     std::ofstream(dir_ / "corrupt.png") << "not a png";
-    EXPECT_THROW(LoadImage(dir_ / "corrupt.png", ImageEncoding::Linear), std::runtime_error);
+    EXPECT_THROW(LoadImageFile(dir_ / "corrupt.png", ImageEncoding::Linear), std::runtime_error);
     std::ofstream(dir_ / "texture.tga") << "tga";
-    EXPECT_THROW(LoadImage(dir_ / "texture.tga", ImageEncoding::Linear), std::runtime_error);
+    EXPECT_THROW(LoadImageFile(dir_ / "texture.tga", ImageEncoding::Linear), std::runtime_error);
 }

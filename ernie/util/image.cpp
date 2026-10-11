@@ -95,7 +95,7 @@ glm::vec4 Image::Mean() const {
     return pixels.empty() ? glm::vec4(0.0f) : glm::vec4(sum / static_cast<double>(pixels.size()));
 }
 
-Image LoadImage(const std::filesystem::path& path, ImageEncoding encoding) {
+Image LoadImageFile(const std::filesystem::path& path, ImageEncoding encoding) {
     const std::string extension = Lowercase(path.extension().string());
     if (extension == ".exr") {
         return LoadExr(path);

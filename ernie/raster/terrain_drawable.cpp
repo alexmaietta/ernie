@@ -217,8 +217,9 @@ void TerrainDrawable::ReservePatches(std::size_t count) {
         return;
     }
     const std::size_t capacity =
-        std::max(count, patchBuffer_ != nullptr ? 2 * patchBuffer_->Size() / sizeof(LodPatch)
-                                                : std::size_t{0});
+        std::max(count, patchBuffer_ != nullptr
+                            ? static_cast<std::size_t>(2 * patchBuffer_->Size() / sizeof(LodPatch))
+                            : std::size_t{0});
     vkDeviceWaitIdle(renderer_.Context().Device());
     patchBuffer_ =
         std::make_unique<GpuBuffer>(renderer_.Context(), capacity * sizeof(LodPatch),

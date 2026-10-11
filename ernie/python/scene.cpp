@@ -1491,7 +1491,8 @@ void BindScene(nb::module_& m) {
     m.def(
         "load_image",
         [](const std::filesystem::path& path, bool srgb) {
-            const Image image = LoadImage(path, srgb ? ImageEncoding::Srgb : ImageEncoding::Linear);
+            const Image image =
+                LoadImageFile(path, srgb ? ImageEncoding::Srgb : ImageEncoding::Linear);
             const auto* values = reinterpret_cast<const float*>(image.pixels.data());
             return ArrayFromTensor(Tensor::Copy<float>(std::span(values, image.pixels.size() * 4),
                                                        {static_cast<std::int64_t>(image.height),

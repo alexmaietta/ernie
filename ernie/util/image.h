@@ -66,7 +66,7 @@ struct Image {
 /// compression, including the lossy DWAA and DWAB that texture libraries ship.
 /// @throws std::runtime_error if the file cannot be read or decoded, or its extension is not
 /// .png, .jpg, .jpeg or .exr.
-Image LoadImage(const std::filesystem::path& path, ImageEncoding encoding);
+Image LoadImageFile(const std::filesystem::path& path, ImageEncoding encoding);
 
 /// IEC 61966-2-1 sRGB transfer function for one channel in [0, 1]: decode to linear and encode.
 float SrgbToLinear(float value);
