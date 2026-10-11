@@ -2,14 +2,12 @@
 """A 532 nm projector over a table through each of its patterns, one
 of them written in Slang at run time."""
 
-from pathlib import Path
-
 import numpy as np
 
 import ernie
 import ernie.demo
 from ernie import tokens
-from ernie.demo import cache_dir, side_by_side, write_png
+from ernie.demo import side_by_side, write_png
 
 PATTERNS = ["spot", "line", "grid", "dots", "fringes", "rings"]
 
@@ -53,19 +51,11 @@ def add_rings(target):
 
 
 def fringes(periods):
-    """A PNG of vertical sinusoidal fringes, `periods` across 256 x 16
-    texels, written to the demos' cache; returns its path."""
+    """Vertical sinusoidal fringes, `periods` across a (rows, cols)
+    array of 256 x 16 texels."""
     cols = (np.arange(256) + 0.5) / 256
-    row = np.rint(
-        255 * (0.5 + 0.5 * np.cos(2 * np.pi * periods * cols))
-    )
-    image = np.repeat(
-        np.tile(row.astype(np.uint8), (16, 1))[:, :, None], 3, axis=2
-    )
-    path = Path(cache_dir()) / "laser_fringes.png"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    write_png(path, image)
-    return path
+    row = 0.5 + 0.5 * np.cos(2 * np.pi * periods * cols)
+    return np.tile(row.astype(np.float32), (16, 1))
 
 
 def lit_by(image, dark):
@@ -117,7 +107,7 @@ class Demo(ernie.demo.Demo):
             ernie.Sphere,
             radius=0.25,
             display_color=(0.8,) * 3,
-            translate=(0.45, 0.2, 0.25),
+            translate=(0.6, 0.2, 0.25),
         )
         # A dim room light.
         world.define(
@@ -208,7 +198,7 @@ class Demo(ernie.demo.Demo):
             # Fringes from an image, as a phase-shift projector's.
             laser.set(
                 pattern="image",
-                pattern_image=str(self.fringes),
+                pattern_image_array=self.fringes,
                 pattern_field_of_view=field,
             )
         elif index == 5:

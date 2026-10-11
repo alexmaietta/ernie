@@ -36,31 +36,23 @@ constexpr double kPeriod = 1.0 / 15.0;  // s each plane shows
 constexpr double kExposure = 1.0 / 60.0;
 
 /// The Gray code's bit planes, most significant first, stacked top to
-/// bottom in one image of `kColumns` x 4 texels each; returns its
-/// path in the demos' cache.
-std::filesystem::path GrayCode() {
+/// bottom in one (rows, cols) array of `kColumns` x 4 texels each.
+Tensor GrayCode() {
     constexpr std::int64_t kRows = 4;
     Tensor image =
-        Tensor::Zeros(DType::UInt8, {kBits * kRows, kColumns, 3});
-    auto* data = static_cast<std::uint8_t*>(image.Data());
+        Tensor::Zeros(DType::Float32, {kBits * kRows, kColumns});
+    auto* data = static_cast<float*>(image.Data());
     for (int plane = 0; plane < kBits; ++plane) {
         for (int col = 0; col < kColumns; ++col) {
             const int gray = col ^ (col >> 1);
             const bool on = ((gray >> (kBits - 1 - plane)) & 1) != 0;
             for (std::int64_t row = 0; row < kRows; ++row) {
-                for (int k = 0; k < 3; ++k) {
-                    data[((plane * kRows + row) * kColumns + col) *
-                             3 +
-                         k] = on ? 255 : 0;
-                }
+                data[(plane * kRows + row) * kColumns + col] =
+                    on ? 1.0f : 0.0f;
             }
         }
     }
-    const std::filesystem::path path =
-        demos::CacheDir() / "laser_gray_code.png";
-    std::filesystem::create_directories(path.parent_path());
-    app::WritePng(path, image);
-    return path;
+    return image;
 }
 
 void Box(Scene& scene, const Path& path, glm::dvec3 centre,
@@ -98,7 +90,7 @@ class StructuredLightDemo : public app::Demo {
             .SetPower(0.04)
             .SetWaistRadius(glm::dvec2(0.001))
             .SetPattern("image")
-            .SetPatternImage(GrayCode().string())
+            .SetPatternImageArray(GrayCode())
             .SetPatternFieldOfView({50.0, 40.0})
             .SetSequenceCount(kBits)
             .SetSequencePeriod(kPeriod)

@@ -59,29 +59,22 @@ LightPatternModel Rings() {
     return model;
 }
 
-/// A PNG of vertical sinusoidal fringes, `periods` across 256 x 16
-/// texels, written to the demos' cache; returns its path.
-std::filesystem::path Fringes(int periods) {
+/// Vertical sinusoidal fringes, `periods` across a (rows, cols) array
+/// of 256 x 16 texels.
+Tensor Fringes(int periods) {
     constexpr std::int64_t kCols = 256;
     constexpr std::int64_t kRows = 16;
-    Tensor image = Tensor::Zeros(DType::UInt8, {kRows, kCols, 3});
-    auto* data = static_cast<std::uint8_t*>(image.Data());
+    Tensor image = Tensor::Zeros(DType::Float32, {kRows, kCols});
+    auto* data = static_cast<float*>(image.Data());
     for (std::int64_t row = 0; row < kRows; ++row) {
         for (std::int64_t col = 0; col < kCols; ++col) {
             const double phase =
                 2.0 * M_PI * periods * (col + 0.5) / kCols;
-            const auto value = static_cast<std::uint8_t>(
-                std::lround(255.0 * (0.5 + 0.5 * std::cos(phase))));
-            for (int k = 0; k < 3; ++k) {
-                data[(row * kCols + col) * 3 + k] = value;
-            }
+            data[row * kCols + col] =
+                static_cast<float>(0.5 + 0.5 * std::cos(phase));
         }
     }
-    const std::filesystem::path path =
-        demos::CacheDir() / "laser_fringes.png";
-    std::filesystem::create_directories(path.parent_path());
-    app::WritePng(path, image);
-    return path;
+    return image;
 }
 
 void Box(Scene& scene, const Path& path, glm::dvec3 centre,
@@ -95,7 +88,6 @@ class PatternsDemo : public app::Demo {
     PatternsDemo(app::Viewer* viewer, const app::DemoOptions& options)
         : Demo(viewer, options) {
         numFrames = 1;
-        fringes_ = Fringes(12);
         // The custom pattern, with whichever renderers draw the
         // scene.
         if (!GetRenderer().Delegate().HasLightPattern("rings")) {
@@ -119,7 +111,7 @@ class PatternsDemo : public app::Demo {
             .SetRadius(0.25)
             .SetDisplayColor(glm::dvec3(0.8));
         SetXform(scene, "/World/Ball",
-                 {.translate = glm::dvec3(0.45, 0.2, 0.25)});
+                 {.translate = glm::dvec3(0.6, 0.2, 0.25)});
         // A dim room light.
         SphereLight::Define(scene, "/World/Lamp")
             .SetRadius(0.1)
@@ -224,7 +216,7 @@ class PatternsDemo : public app::Demo {
         case 4:  // fringes from an image, as a phase-shift
                  // projector's
             laser.SetPattern("image")
-                .SetPatternImage(fringes_.string())
+                .SetPatternImageArray(fringes_)
                 .SetPatternFieldOfView(field);
             break;
         case 5:  // rings, a pattern registered at run time
@@ -289,7 +281,7 @@ class PatternsDemo : public app::Demo {
                     static_cast<double>(bottom - top + 1)};
     }
 
-    std::filesystem::path fringes_;
+    Tensor fringes_ = Fringes(12);
     std::size_t index_ = 0;
 };
 

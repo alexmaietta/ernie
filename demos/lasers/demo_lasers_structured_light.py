@@ -9,14 +9,12 @@ References:
   space-encoded projected beam systems", CGIP 18(1), 1982.
 """
 
-from pathlib import Path
-
 import numpy as np
 
 import ernie
 import ernie.demo
 from ernie import tokens
-from ernie.demo import cache_dir, side_by_side, write_png
+from ernie.demo import side_by_side, write_png
 
 BITS = 6
 COLUMNS = 1 << BITS
@@ -26,21 +24,14 @@ EXPOSURE = 1.0 / 60.0
 
 def gray_code():
     """The Gray code's bit planes, most significant first, stacked top
-    to bottom in one image of COLUMNS x 4 texels each; returns its path
-    in the demos' cache."""
+    to bottom in one (rows, cols) array of COLUMNS x 4 texels each."""
     columns = np.arange(COLUMNS)
     gray = columns ^ (columns >> 1)
     planes = [
-        np.tile(((gray >> (BITS - 1 - plane)) & 1) * 255, (4, 1))
+        np.tile((gray >> (BITS - 1 - plane)) & 1, (4, 1))
         for plane in range(BITS)
     ]
-    image = np.repeat(
-        np.concatenate(planes).astype(np.uint8)[:, :, None], 3, axis=2
-    )
-    path = Path(cache_dir()) / "laser_gray_code.png"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    write_png(path, image)
-    return path
+    return np.concatenate(planes).astype(np.float32)
 
 
 def decoded(planes):
@@ -112,7 +103,7 @@ class Demo(ernie.demo.Demo):
             power=0.04,
             waist_radius=(0.001, 0.001),
             pattern="image",
-            pattern_image=str(gray_code()),
+            pattern_image_array=gray_code(),
             pattern_field_of_view=(50.0, 40.0),
             sequence_count=BITS,
             sequence_period=PERIOD,
