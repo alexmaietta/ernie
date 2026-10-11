@@ -304,6 +304,15 @@ struct LightParams {
         /// `ernie:laser:pattern:image` (null without one).
         std::vector<float> patternData;
         std::shared_ptr<const LightPatternImage> patternImage;
+        /// The image as a float32 (rows, cols) array on the GPU
+        /// (`ernie:laser:pattern:imageArray`), which the renderer
+        /// reads in place when it is its own memory
+        /// (`RenderDelegate::MapArray`), the stream it was written
+        /// on, and the laser's path, which keys its memory; empty for
+        /// an image on the host (`patternImage`).
+        Tensor patternArray;
+        std::uintptr_t patternArrayStream = 1;
+        std::string patternArrayKey;
         float wavelength = 0.0f;  ///< nm, the line's centre.
         /// Its timing on the sensor clock, seconds: pulses
         /// `pulseWidth` long at `pulseRate` per second from

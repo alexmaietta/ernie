@@ -474,6 +474,44 @@ class RasterRenderer {
     const std::shared_ptr<GpuBuffer>&
     EnsurePoseBuffer(std::uint32_t views);
 
+    /// Where laser `key`'s pattern image array lies in
+    /// `PatternArrays`, from float `offset`: `width` x `height`
+    /// texels, rows top to bottom, then its mip levels.
+    struct PatternArrayRegion {
+        std::size_t offset = 0;
+        std::uint32_t width = 0;
+        std::uint32_t height = 0;
+    };
+
+    /// Laser `key`'s region for a `width` x `height` image, made (or
+    /// made again, at another size) as needed. Growing the buffer
+    /// waits for the device to idle and moves every region; a view of
+    /// the previous buffer keeps it alive, so its values can still be
+    /// copied.
+    PatternArrayRegion EnsurePatternArray(const std::string& key,
+                                          std::uint32_t width,
+                                          std::uint32_t height);
+
+    /// The buffer of the lasers' pattern image arrays (and their
+    /// other pattern data), shared with the compute device once a
+    /// laser's image is an array there (`ComputeInterop::View`).
+    const std::shared_ptr<GpuBuffer>& PatternArrays() const {
+        return patternData_;
+    }
+
+    /// A GPU array the last `Update` draws as a laser's pattern
+    /// image, to read into its region from byte `offset` before the
+    /// frame is submitted: copied (`ComputeInterop::CopyToBuffer`),
+    /// or written there in place already (`MapArray`), on `stream`.
+    struct PatternArrayWrite {
+        Tensor array;
+        std::uintptr_t stream = 1;
+        VkDeviceSize offset = 0;
+    };
+    const std::vector<PatternArrayWrite>& PatternArrayWrites() const {
+        return patternArrayWrites_;
+    }
+
     /// The poses of the last `Update`'s lights posed on the GPU
     /// (`Light::posedOnGpu`), row-major 4x4 float32 per light in
     /// their order, relative to the frame's origin: written in the
@@ -974,9 +1012,19 @@ class RasterRenderer {
     PipelineLayout patternLayout_;
     std::unique_ptr<ComputePipeline> patternPipeline_;
     /// The lasers' pattern data and images (shading.slang's
-    /// lightPatternData), grown as they need, and what it holds:
-    /// per laser its data and image, so unchanged ones upload once.
-    std::unique_ptr<GpuBuffer> patternData_;
+    /// lightPatternData), grown as they need: first the regions of
+    /// images written as GPU arrays (`patternArrayRegions_`), shared
+    /// with the compute device once there are any, then from
+    /// `patternDataBase_` what the host writes, which uploads again
+    /// only when it changes (`patternDataHeld_`, per laser its data
+    /// and image) or moves.
+    std::shared_ptr<GpuBuffer> patternData_;
+    std::size_t patternDataBase_ = 0;
+    std::size_t patternHostFloats_ = 0;
+    /// `patternData_` to hold `floats`, shared with the compute
+    /// device once there are pattern arrays; a new buffer waits for
+    /// the device to idle and has the host's part upload again.
+    void EnsurePatternData(std::size_t floats);
     std::vector<std::pair<std::vector<float>,
                           std::shared_ptr<const LightPatternImage>>>
         patternDataHeld_;
@@ -985,6 +1033,21 @@ class RasterRenderer {
     /// view's span of the sensor clock (shading.slang's
     /// lightTiming), grown as the views need.
     std::unique_ptr<GpuBuffer> lightTiming_;
+    /// Per laser with its pattern image a GPU array, its region at
+    /// the start of `patternData_` (texels then mip levels), which
+    /// applications may write in place; the floats the regions take.
+    std::map<std::string, PatternArrayRegion> patternArrayRegions_;
+    std::size_t patternArrayFloats_ = 0;
+    /// The frame's arrays to read into their regions
+    /// (`PatternArrayWrites`), and the regions whose mip levels the
+    /// frame builds (`RecordPatternMips`).
+    std::vector<PatternArrayWrite> patternArrayWrites_;
+    std::vector<PatternArrayRegion> patternMipRegions_;
+    PipelineLayout patternMipLayout_;
+    std::unique_ptr<ComputePipeline> patternMipPipeline_;
+    /// Records the building of the frame's pattern arrays' mip levels
+    /// from the texels written to them.
+    void RecordPatternMips(VkCommandBuffer commands) const;
     /// Records the integration of the frame's light patterns.
     void RecordPatternNorms(VkCommandBuffer commands) const;
     /// Writes `lightTiming_` for `params`' lasers over `views` shaded

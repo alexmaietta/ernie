@@ -2,6 +2,7 @@
 #pragma once
 
 #include "ernie/util/shader_source.h"
+#include "ernie/util/tensor.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -157,5 +158,11 @@ struct LightPatternImage {
 /// std::invalid_argument if it is larger than 65535 on a side.
 LightPatternImage
 LoadLightPatternImage(const std::filesystem::path& path);
+
+/// A float32 (rows, cols) host array of a pattern's relative power,
+/// rows top to bottom, as a `LightPatternImage` with its mip levels.
+/// @throws std::invalid_argument for another type, rank or device,
+/// or more than 65535 on a side.
+LightPatternImage LightPatternImageOf(const Tensor& array);
 
 }  // namespace ernie

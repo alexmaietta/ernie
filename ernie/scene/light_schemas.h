@@ -267,6 +267,11 @@
                               .doc = "The image pattern's relative power (linear), top towards "   \
                                      "+y; custom patterns read it too.",                           \
                               .group = "Pattern", .asset = true}))                                 \
+    X(::ernie::Tensor, PatternImageArray, ::ernie::tokens::kLaserPatternImageArray, nullptr,       \
+      (::ernie::AttributeMeta{.label = "Pattern image array",                                      \
+                              .doc = "float32 (rows, cols) pattern image in place of the file, "   \
+                                     "on the host or the GPU (mapped, read in place).",            \
+                              .group = "Pattern"}))                                                \
     X(glm::dvec2, PatternFieldOfView, ::ernie::tokens::kLaserPatternFieldOfView,                   \
       glm::dvec2(40.0, 30.0),                                                                      \
       (::ernie::AttributeMeta{.label = "Field of view",                                            \

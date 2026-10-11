@@ -1441,6 +1441,30 @@ PatternImageOf(const std::string& file) {
     return entry.image;
 }
 
+/// The LaserLight at `path`'s pattern image array `array` on the host
+/// (`LightPatternImageOf`), built again only when it is written
+/// again.
+std::shared_ptr<const LightPatternImage>
+PatternImageOfArray(const Scene& scene, const Path& path,
+                    const Tensor& array) {
+    struct Cached {
+        std::uint64_t version = 0;
+        std::shared_ptr<const LightPatternImage> image;
+    };
+    static std::mutex mutex;
+    static std::map<std::pair<std::uint64_t, std::string>, Cached>
+        cache;
+    const std::uint64_t version =
+        scene.AttributeVersion(path, tokens::kLaserPatternImageArray);
+    const std::lock_guard lock(mutex);
+    Cached& entry = cache[{scene.Id(), path.String()}];
+    if (entry.image == nullptr || entry.version != version) {
+        entry = {version, std::make_shared<const LightPatternImage>(
+                              LightPatternImageOf(array))};
+    }
+    return entry.image;
+}
+
 /// The LaserLight at `path` under transform `world` as a light: its
 /// beam from the waist, divergence and power it gives (`LaserLight`),
 /// its power through its aperture, and a shadow view along its beam.
@@ -1506,6 +1530,33 @@ LightParams LaserParamsOf(const Scene& scene, const Path& path,
     beam.zeroOrder = static_cast<float>(laser.GetZeroOrder());
     beam.patternData = laser.GetPatternData();
     beam.patternImage = PatternImageOf(laser.GetPatternImage());
+    // An image written as an array replaces the file's: on the GPU
+    // the renderer reads it there, on the host it is built once a
+    // change.
+    if (const Tensor* array =
+            scene.Read(path, tokens::kLaserPatternImageArray)) {
+        if (IsGpu(array->Location().kind)) {
+            if (array->Type() != DType::Float32 ||
+                array->Rank() != 2 || !array->IsContiguous() ||
+                array->Shape()[0] < 1 || array->Shape()[1] < 1 ||
+                array->Shape()[0] > 0xffff ||
+                array->Shape()[1] > 0xffff) {
+                throw std::invalid_argument(
+                    "LaserLight '" + path.String() +
+                    "' needs its pattern image array as a contiguous "
+                    "float32 (rows, cols) array, at most 65535 on a "
+                    "side");
+            }
+            beam.patternImage = nullptr;
+            beam.patternArray = *array;
+            beam.patternArrayStream = scene.WriteStream(
+                path, tokens::kLaserPatternImageArray);
+            beam.patternArrayKey = path.String();
+        } else {
+            beam.patternImage =
+                PatternImageOfArray(scene, path, *array);
+        }
+    }
     const glm::dvec2 spread = 2.0 * laser.Divergence();
     double extent = 0.0;  // half-angle, radians
     if (beam.pattern == tokens::kLine) {
@@ -1577,7 +1628,8 @@ LightParams LaserParamsOf(const Scene& scene, const Path& path,
         if (!(fov.x > 0.0) || !(fov.y > 0.0) ||
             !(fov.x < glm::radians(170.0)) ||
             !(fov.y < glm::radians(170.0)) ||
-            beam.patternImage == nullptr) {
+            (beam.patternImage == nullptr &&
+             beam.patternArray.Empty())) {
             throw std::invalid_argument(
                 "LaserLight '" + path.String() +
                 "' needs a pattern image and a field of view above 0 "

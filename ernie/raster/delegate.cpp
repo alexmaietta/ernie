@@ -1834,14 +1834,40 @@ Tensor RasterDelegate::MapArray(Scene& scene, const Path& path,
         if (view.Data() != written->Data()) {
             compute.Copy(*written, view, stream);
         }
+    } else if (type == kLaserLight &&
+               attribute == kLaserPatternImageArray) {
+        // The laser's region of the pattern arrays the shaders read;
+        // a frame finds the image there and copies nothing.
+        const Tensor* written = scene.Read(path, attribute);
+        if (written == nullptr || written->Type() != DType::Float32 ||
+            written->Rank() != 2 ||
+            !IsGpu(written->Location().kind)) {
+            throw std::invalid_argument(
+                "Cannot map the pattern image of '" + path.String() +
+                "': write it first as a float32 (rows, cols) GPU "
+                "array");
+        }
+        ComputeInterop& compute = RequireCompute();
+        const std::vector<std::int64_t> shape = written->Shape();
+        const RasterRenderer::PatternArrayRegion region =
+            renderer_.EnsurePatternArray(
+                path.String(), static_cast<std::uint32_t>(shape[1]),
+                static_cast<std::uint32_t>(shape[0]));
+        view = compute.View(renderer_.PatternArrays(), DType::Float32,
+                            shape, region.offset * sizeof(float));
+        // Nothing writes it until the frames already submitted have
+        // read it; it starts as the image written.
+        compute.WaitForVulkan(stream);
+        if (view.Data() != written->Data()) {
+            compute.Copy(*written, view, stream);
+        }
     } else {
         throw std::invalid_argument(
             "Cannot map " + std::string(attribute) + " of '" +
             path.String() +
             "': only a Mesh's points, a PointInstancer's "
-            "arrays, a Points prim's points, the Terrain's heights "
-            "and a "
-            "Camera's poses map");
+            "arrays, a Points prim's points, the Terrain's heights, "
+            "a Camera's poses and a LaserLight's pattern image map");
     }
     scene.Write(path, attribute, view, stream);
     return view;
@@ -2254,7 +2280,34 @@ void RasterDelegate::Update(const Scene& scene, const Path& settings,
                 NextFrame(scene, prims.settings, prims.settings),
                 prims.settings, filters, {}, {},
                 ViewHeldVars(viewAovs_.size(), viewMotion_));
+    ReadPatternArrays();
     SettleMotion();
+}
+
+void RasterDelegate::ReadPatternArrays() {
+    const std::vector<RasterRenderer::PatternArrayWrite>& writes =
+        renderer_.PatternArrayWrites();
+    if (writes.empty()) {
+        return;
+    }
+    // Into their regions on the writers' streams, after the frames
+    // already submitted; the frame waits for them (`SubmitWaits`).
+    ComputeInterop& compute = RequireCompute();
+    const std::shared_ptr<GpuBuffer>& arrays =
+        renderer_.PatternArrays();
+    for (const RasterRenderer::PatternArrayWrite& write : writes) {
+        const Tensor region =
+            compute.View(arrays, DType::Float32, write.array.Shape(),
+                         write.offset);
+        if (write.array.Data() == region.Data()) {
+            // Written in place (`MapArray`): only the writes to wait
+            // for.
+            compute.SignalVulkan(write.stream);
+        } else {
+            compute.CopyToBuffer(write.array, *arrays, write.offset,
+                                 write.stream);
+        }
+    }
 }
 
 void RasterDelegate::SettleMotion() {
@@ -2985,6 +3038,7 @@ RasterDelegate::StepAsync(const Scene& scene,
                     std::move(worlds), std::move(vars), posesParent,
                     spec.overlays, std::move(chains), minimal,
                     spec.minimalColor);
+        ReadPatternArrays();
         if (gpuPoses != nullptr) {
             // Once no submission reads the pose buffer (`UpdatePrims`
             // waits), on the writer's stream; the submission waits

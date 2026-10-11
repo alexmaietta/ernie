@@ -154,6 +154,62 @@ constexpr DescriptorBinding kPatternBindings[] = {
      VK_SHADER_STAGE_COMPUTE_BIT},
 };
 
+constexpr DescriptorBinding kPatternMipBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+};
+
+/// One mip level of a pattern image array (`patternMipMain`): the
+/// level above's first texel and size, and this level's.
+struct PatternMipStep {
+    std::uint32_t source[4];  ///< Offset, width, height.
+    std::uint32_t target[4];  ///< Offset, width, height.
+};
+
+/// Builds mip level `step.target` of a pattern image array from the
+/// level above it in place, each texel the mean of the 2 x 2 above
+/// it, clamped at odd edges as `MipChain` does.
+constexpr const char* kPatternMipSlang = R"(
+struct PatternMipStep {
+    uint4 source;
+    uint4 target;
+}
+[[vk::binding(0, 0)]] RWStructuredBuffer<float> texels;
+[[vk::push_constant]] ConstantBuffer<PatternMipStep> step;
+
+[shader("compute")]
+[numthreads(16, 16, 1)]
+void patternMipMain(uint3 id : SV_DispatchThreadID) {
+    if (id.x >= step.target.y || id.y >= step.target.z) {
+        return;
+    }
+    let width = step.source.y;
+    let last = uint2(width, step.source.z) - 1;
+    let x0 = min(2 * id.x, last.x);
+    let x1 = min(2 * id.x + 1, last.x);
+    let y0 = min(2 * id.y, last.y);
+    let y1 = min(2 * id.y + 1, last.y);
+    let from = step.source.x;
+    texels[step.target.x + id.y * step.target.y + id.x] =
+        0.25 * (texels[from + y0 * width + x0] + texels[from + y0 * width + x1] +
+                texels[from + y1 * width + x0] + texels[from + y1 * width + x1]);
+}
+)";
+
+/// Texels of a `width` x `height` image and every mip level below it,
+/// each `max(1, size >> n)` on a side down to 1 x 1.
+std::size_t MipTexels(std::uint32_t width, std::uint32_t height) {
+    std::size_t total = 0;
+    while (true) {
+        total += static_cast<std::size_t>(width) * height;
+        if (width == 1 && height == 1) {
+            return total;
+        }
+        width = std::max(width / 2, 1u);
+        height = std::max(height / 2, 1u);
+    }
+}
+
 /// Integrates each job's pattern over its extent on a grid of 256 x
 /// 256 cells, averaged over its sequence's frames (`info.z`), a
 /// workgroup per job, into `norms` at its slot.
@@ -1010,12 +1066,14 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                    BufferMemory::Device),
       patternLayout_(context, kPatternBindings, 0),
-      patternData_(std::make_unique<GpuBuffer>(
+      patternData_(std::make_shared<GpuBuffer>(
           context, sizeof(float), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
           BufferMemory::Device)),
       lightTiming_(std::make_unique<GpuBuffer>(
           context, sizeof(glm::vec2),
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device)),
+      patternMipLayout_(context, kPatternMipBindings,
+                        sizeof(PatternMipStep)),
       lightViewMatrices_(
           context, kMaxLightShadowViews * sizeof(glm::mat4),
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device),
@@ -1239,6 +1297,94 @@ void RasterRenderer::AddLightPattern(LightPatternModel model) {
     skyPipelines_ = {};
     occlusionPipeline_.reset();
     occlusionFilterPipeline_.reset();
+}
+
+RasterRenderer::PatternArrayRegion
+RasterRenderer::EnsurePatternArray(const std::string& key,
+                                   std::uint32_t width,
+                                   std::uint32_t height) {
+    const auto found = patternArrayRegions_.find(key);
+    if (found != patternArrayRegions_.end() &&
+        found->second.width == width &&
+        found->second.height == height) {
+        return found->second;
+    }
+    // Regions only ever append, so the frame's offsets already
+    // written stay where they are; one at another size leaves its old
+    // space.
+    const PatternArrayRegion region{patternArrayFloats_, width,
+                                    height};
+    patternArrayFloats_ += MipTexels(width, height);
+    patternArrayRegions_[key] = region;
+    EnsurePatternData(patternArrayFloats_ + patternHostFloats_);
+    return region;
+}
+
+void RasterRenderer::EnsurePatternData(std::size_t floats) {
+    const VkDeviceSize bytes =
+        std::max<std::size_t>(floats, 1) * sizeof(float);
+    const BufferMemory memory = patternArrayFloats_ > 0
+                                    ? BufferMemory::Shared
+                                    : BufferMemory::Device;
+    if (patternData_->Size() >= bytes &&
+        patternData_->Memory() == memory) {
+        return;
+    }
+    // A view of the old buffer (`MapArray`) keeps it alive, and its
+    // values are copied from it; the host's part uploads again.
+    vkDeviceWaitIdle(context_.Device());
+    patternData_ = std::make_shared<GpuBuffer>(
+        context_, std::max(bytes, 2 * patternData_->Size()),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, memory);
+    patternDataHeld_.clear();
+}
+
+void RasterRenderer::RecordPatternMips(
+    VkCommandBuffer commands) const {
+    if (patternMipRegions_.empty()) {
+        return;
+    }
+    ERNIE_GPU_ZONE(context_, commands, "Light pattern arrays");
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                      patternMipPipeline_->Handle());
+    const DescriptorResource resources[] = {
+        DescriptorResource::Of(*patternData_)};
+    patternMipLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                           resources);
+    // Each level from the one above, regions side by side.
+    bool more = true;
+    for (std::uint32_t level = 1; more; ++level) {
+        more = false;
+        for (const PatternArrayRegion& region : patternMipRegions_) {
+            std::uint32_t width = region.width;
+            std::uint32_t height = region.height;
+            std::size_t offset = region.offset;
+            for (std::uint32_t i = 1; i < level; ++i) {
+                offset += static_cast<std::size_t>(width) * height;
+                width = std::max(width / 2, 1u);
+                height = std::max(height / 2, 1u);
+            }
+            if (width == 1 && height == 1) {
+                continue;
+            }
+            more = true;
+            const PatternMipStep step{
+                {static_cast<std::uint32_t>(offset), width, height,
+                 0},
+                {static_cast<std::uint32_t>(
+                     offset +
+                     static_cast<std::size_t>(width) * height),
+                 std::max(width / 2, 1u), std::max(height / 2, 1u),
+                 0}};
+            patternMipLayout_.PushConstants(commands, &step,
+                                            sizeof(step));
+            vkCmdDispatch(commands, (step.target[1] + 15) / 16,
+                          (step.target[2] + 15) / 16, 1);
+        }
+        if (more) {
+            ShaderBarrier(commands);
+        }
+    }
 }
 
 void RasterRenderer::WriteLightTiming(const FrameParams& frame,
@@ -1555,6 +1701,20 @@ void RasterRenderer::WriteLights(
         lightRecords;  ///< The light pass's, for lights posed on the
                        ///< GPU.
     std::vector<PatternJob> patternJobs;
+    patternArrayWrites_.clear();
+    patternMipRegions_.clear();
+    // The regions of images written as GPU arrays first, so the
+    // host's part of `patternData_` starts after them all.
+    for (const LightParams& light : params.lights) {
+        const Tensor& array = light.beam.patternArray;
+        if (light.type == LightType::Laser && !array.Empty()) {
+            EnsurePatternArray(
+                light.beam.patternArrayKey,
+                static_cast<std::uint32_t>(array.Shape()[1]),
+                static_cast<std::uint32_t>(array.Shape()[0]));
+        }
+    }
+    const std::size_t base = patternArrayFloats_;
     // Per light slot, its pattern's integral where known (1 for a
     // normalized pattern); the pattern pass writes the others.
     std::vector<float> patternNorms(params.lights.size(), 1.0f);
@@ -1736,7 +1896,7 @@ void RasterRenderer::WriteLights(
             entry.patternExtent[0] = beam.extent.x;
             entry.patternExtent[1] = beam.extent.y;
             entry.patternLayout[0] =
-                static_cast<std::uint32_t>(patternData.size());
+                static_cast<std::uint32_t>(base + patternData.size());
             entry.patternLayout[1] =
                 static_cast<std::uint32_t>(beam.patternData.size());
             patternData.insert(patternData.end(),
@@ -1744,13 +1904,30 @@ void RasterRenderer::WriteLights(
                                beam.patternData.end());
             if (const LightPatternImage* image =
                     beam.patternImage.get()) {
-                entry.patternLayout[2] =
-                    static_cast<std::uint32_t>(patternData.size());
+                entry.patternLayout[2] = static_cast<std::uint32_t>(
+                    base + patternData.size());
                 entry.patternLayout[3] =
                     image->width | (image->height << 16);
                 patternData.insert(patternData.end(),
                                    image->texels.begin(),
                                    image->texels.end());
+            } else if (!beam.patternArray.Empty()) {
+                // An array on the GPU: in its region of
+                // `patternData_`, read there before the frame is
+                // submitted, its mip levels built on the GPU.
+                const auto width = static_cast<std::uint32_t>(
+                    beam.patternArray.Shape()[1]);
+                const auto height = static_cast<std::uint32_t>(
+                    beam.patternArray.Shape()[0]);
+                const PatternArrayRegion region = EnsurePatternArray(
+                    beam.patternArrayKey, width, height);
+                entry.patternLayout[2] =
+                    static_cast<std::uint32_t>(region.offset);
+                entry.patternLayout[3] = width | (height << 16);
+                patternArrayWrites_.push_back(
+                    {beam.patternArray, beam.patternArrayStream,
+                     region.offset * sizeof(float)});
+                patternMipRegions_.push_back(region);
             }
             patternDataHeld.emplace_back(beam.patternData,
                                          beam.patternImage);
@@ -1804,19 +1981,27 @@ void RasterRenderer::WriteLights(
         uploads_.Write(patternNorms_,
                        std::as_bytes(std::span(patternNorms)));
     }
-    // The pattern data and images, when they change.
-    if (patternDataHeld != patternDataHeld_ && !patternData.empty()) {
-        const VkDeviceSize bytes = patternData.size() * sizeof(float);
-        if (patternData_->Size() < bytes) {
-            vkDeviceWaitIdle(context_.Device());
-            patternData_ = std::make_unique<GpuBuffer>(
-                context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                BufferMemory::Device);
-        }
+    // The host's pattern data and images after the arrays' regions,
+    // when they change or move.
+    patternHostFloats_ = patternData.size();
+    EnsurePatternData(base + patternData.size());
+    if ((patternDataHeld != patternDataHeld_ ||
+         base != patternDataBase_) &&
+        !patternData.empty()) {
         uploads_.Write(*patternData_,
-                       std::as_bytes(std::span(patternData)));
+                       std::as_bytes(std::span(patternData)),
+                       base * sizeof(float));
     }
+    patternDataBase_ = base;
     patternDataHeld_ = std::move(patternDataHeld);
+    if (!patternMipRegions_.empty() &&
+        patternMipPipeline_ == nullptr) {
+        const std::vector<ShaderModuleSource> modules{
+            {"pattern_mips", kPatternMipSlang}};
+        patternMipPipeline_ = std::make_unique<ComputePipeline>(
+            context_, patternMipLayout_,
+            compiler_.CompileSpirv(modules, "patternMipMain"));
+    }
     patternJobCount_ = static_cast<std::uint32_t>(patternJobs.size());
     if (!patternJobs.empty()) {
         uploads_.Write(patternJobs_,
@@ -3414,7 +3599,12 @@ void RasterRenderer::RecordShadows(
         for (const RasterDrawable* drawable : drawables) {
             drawable->RecordPrepass(commands);
         }
-        // The custom light patterns' integrals, which shading reads.
+        // The pattern arrays' mip levels, then the light patterns'
+        // integrals, which shading reads.
+        RecordPatternMips(commands);
+        if (!patternMipRegions_.empty()) {
+            ShaderBarrier(commands);
+        }
         RecordPatternNorms(commands);
         ShaderBarrier(commands);
     }

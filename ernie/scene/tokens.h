@@ -434,6 +434,12 @@ inline constexpr std::string_view kLaserPatternData =
 /// (`p.image(uv, footprint)`).
 inline constexpr std::string_view kLaserPatternImage =
     "ernie:laser:pattern:image";
+/// Tensor float32 (rows, cols): the pattern image as an array, rows
+/// top to bottom, in place of `pattern:image`'s file: on the host, or
+/// on the GPU, where the renderer reads it in place when mapped
+/// (`RenderDelegate::MapArray`), so procedural patterns need no copy.
+inline constexpr std::string_view kLaserPatternImageArray =
+    "ernie:laser:pattern:imageArray";
 /// double2: the full angles, degrees, that "image" spreads its image
 /// over along x and y.
 inline constexpr std::string_view kLaserPatternFieldOfView =

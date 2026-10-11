@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include "ernie/device/compute_interop.h"
 #include "ernie/device/offscreen_target.h"
 #include "ernie/geometry/primitives.h"
 #include "ernie/raster/delegate.h"
@@ -739,6 +740,76 @@ public struct ListedDots : ILightPattern {
     const auto [row, col] = PixelOf(scene, 0.0f, 2.0f);
     EXPECT_EQ(band[row * kVarSize + col], 0.0f) << "past its edge";
     std::filesystem::remove(file);
+}
+
+TEST_F(RasterDelegateTest,
+       LaserPatternImagesAsArraysOnTheHostOrInPlace) {
+    RasterDelegate delegate(*context_);
+    double bandWidth = 0.0;
+    Scene scene = LaserScene(0.001, &bandWidth);
+    const auto [r0, left] = PixelOf(scene, -10.0f, 0.0f);
+    const auto [r1, right] = PixelOf(scene, 10.0f, 0.0f);
+    const double pixel = (PixelCentre(scene, 10.0f, 0.0f).x -
+                          PixelCentre(scene, -10.0f, 0.0f).x) /
+                         static_cast<double>(right - left);
+    const double unit = 0.5 / M_PI / bandWidth;
+    const auto at = [&](const std::vector<float>& band, float x) {
+        const auto [row, col] = PixelOf(scene, x, 0.0f);
+        return band[row * kVarSize + col] / unit;
+    };
+    // An image 4 m x 2 m across the floor 10 m down, written as an
+    // array: a quarter of its power in its left half, the rest in its
+    // right, as the same image from a file gives.
+    const auto halves = [](float leftHalf, float rightHalf) {
+        std::vector<float> values(32);
+        for (std::size_t i = 0; i < values.size(); ++i) {
+            values[i] = i % 8 < 4 ? leftHalf : rightHalf;
+        }
+        return Tensor::Copy<float>(values, {4, 8});
+    };
+    ernie::LaserLight(scene, "/World/Laser")
+        .SetPattern("image")
+        .SetPatternFieldOfView(
+            glm::degrees(2.0 * glm::atan(glm::dvec2(0.2, 0.1))))
+        .SetEfficiency(0.8);
+    scene.Write("/World/Laser", tokens::kLaserPatternImageArray,
+                halves(0.2f, 0.6f));
+    const std::vector<float> host = Band8(delegate, scene);
+    EXPECT_NEAR(at(host, -1.0f), 0.05, 0.0015);
+    EXPECT_NEAR(at(host, 1.0f), 0.15, 0.0045);
+    double total = 0.0;
+    for (const float value : host) {
+        total += value * pixel * pixel;
+    }
+    EXPECT_NEAR(total / unit, 0.8, 0.04);
+
+    std::string why;
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
+    if (cuda == nullptr) {
+        GTEST_SKIP() << "No CUDA interop: " << why;
+    }
+    // On the GPU, copied into the renderer's memory: the same light.
+    scene.Write("/World/Laser", tokens::kLaserPatternImageArray,
+                cuda->Upload(halves(0.2f, 0.6f)));
+    const std::vector<float> copied = Band8(delegate, scene);
+    for (std::size_t i = 0; i < host.size(); ++i) {
+        ASSERT_NEAR(copied[i], host[i], 1e-3f * unit)
+            << "texel " << i;
+    }
+    // Mapped: the renderer's own memory, written in place with the
+    // halves swapped, and drawn with no copy.
+    const Tensor mapped = delegate.MapArray(
+        scene, "/World/Laser", tokens::kLaserPatternImageArray);
+    EXPECT_EQ(mapped.Location().kind, ernie::DeviceKind::Cuda);
+    EXPECT_EQ(
+        scene.Read("/World/Laser", tokens::kLaserPatternImageArray)
+            ->Data(),
+        mapped.Data());
+    cuda->Copy(cuda->Upload(halves(0.6f, 0.2f)), mapped);
+    scene.Unmap("/World/Laser", tokens::kLaserPatternImageArray);
+    const std::vector<float> swapped = Band8(delegate, scene);
+    EXPECT_NEAR(at(swapped, -1.0f), 0.15, 0.0045);
+    EXPECT_NEAR(at(swapped, 1.0f), 0.05, 0.0015);
 }
 
 TEST_F(RasterDelegateTest, LaserDotsAreSeededAndKeepTheirPower) {

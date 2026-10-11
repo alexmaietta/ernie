@@ -27,7 +27,9 @@ constexpr const char* kLightPatternSlang = R"(
 // A laser's pattern (ernie/scene/light_pattern.h): what a pattern is evaluated at, its parameters
 // with the laser's data and image, the interface it implements, and helpers for patterns.
 
-// Every laser's pattern data and image texels, at the offsets its LightPatternParams hold.
+// Every laser's pattern data and image texels, at the offsets its LightPatternParams hold: first
+// the images written as arrays on the GPU, which applications may write in place, and their mip
+// levels, then what the host writes each frame.
 [[vk::binding(29, 0)]] StructuredBuffer<float> lightPatternData;
 
 // Where a pattern is evaluated: t = (x / z, y / z) on the tangent plane, a pixel's footprint
@@ -83,6 +85,10 @@ public struct LightPatternParams {
         return lerp(imageLevel(below, uv), imageLevel(above, uv), level - float(below));
     }
 
+    float texel(uint index) {
+        return lightPatternData[index];
+    }
+
     float imageLevel(uint level, float2 uv) {
         var offset = layout.z;
         var size = imageSize();
@@ -96,10 +102,10 @@ public struct LightPatternParams {
         let last = int2(size) - 1;
         let low = uint2(clamp(int2(corner), int2(0), last));
         let high = uint2(clamp(int2(corner) + 1, int2(0), last));
-        let top = lerp(lightPatternData[offset + low.y * size.x + low.x],
-                       lightPatternData[offset + low.y * size.x + high.x], f.x);
-        let bottom = lerp(lightPatternData[offset + high.y * size.x + low.x],
-                          lightPatternData[offset + high.y * size.x + high.x], f.x);
+        let top = lerp(texel(offset + low.y * size.x + low.x),
+                       texel(offset + low.y * size.x + high.x), f.x);
+        let bottom = lerp(texel(offset + high.y * size.x + low.x),
+                          texel(offset + high.y * size.x + high.x), f.x);
         return lerp(top, bottom, f.y);
     }
 }
@@ -453,6 +459,33 @@ LoadLightPatternImage(const std::filesystem::path& path) {
         for (const glm::vec4& texel : level.pixels) {
             pattern.texels.push_back((texel.r + texel.g + texel.b) /
                                      3.0f);
+        }
+    }
+    return pattern;
+}
+
+LightPatternImage LightPatternImageOf(const Tensor& array) {
+    if (IsGpu(array.Location().kind) ||
+        array.Type() != DType::Float32 || array.Rank() != 2 ||
+        array.Shape()[0] < 1 || array.Shape()[1] < 1 ||
+        array.Shape()[0] > 0xffff || array.Shape()[1] > 0xffff) {
+        throw std::invalid_argument(
+            "A light pattern image array is a float32 (rows, cols) "
+            "array on the host, at most 65535 on a side");
+    }
+    const Tensor values = array.Contiguous();
+    Image image(static_cast<std::uint32_t>(array.Shape()[1]),
+                static_cast<std::uint32_t>(array.Shape()[0]));
+    const float* data = values.As<float>();
+    for (std::size_t i = 0; i < image.pixels.size(); ++i) {
+        image.pixels[i] = glm::vec4(glm::vec3(data[i]), 1.0f);
+    }
+    LightPatternImage pattern;
+    pattern.width = image.width;
+    pattern.height = image.height;
+    for (const Image& level : MipChain(image, MipFilter::Average)) {
+        for (const glm::vec4& texel : level.pixels) {
+            pattern.texels.push_back(texel.r);
         }
     }
     return pattern;

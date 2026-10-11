@@ -385,6 +385,11 @@ class RasterDelegate : public RenderDelegate {
     std::vector<MeshItem> Items(const Scene& scene) const;
 
     ComputeInterop& RequireCompute();
+    /// Reads the frame's lasers' pattern image arrays on the GPU into
+    /// the renderer's (`RasterRenderer::PatternArrayWrites`): those
+    /// written there in place (`MapArray`) only waited for, others
+    /// copied there.
+    void ReadPatternArrays();
     /// Ends a step's motion once all of it is prepared
     /// (`MeshDrawable::SettleMotion`).
     void SettleMotion();
