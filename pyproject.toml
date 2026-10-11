@@ -147,6 +147,11 @@ test-extras = ["test"]
 test-command = "python -m pytest -q -p no:cacheprovider {project}/ernie/test/python/test_scene.py"
 test-skip = "*-manylinux_* *-win_amd64"
 
+[tool.cibuildwheel.windows]
+# Slang's DLLs are installed beside the module already, where Windows
+# finds them; delvewheel bundles the rest (the MSVC runtime).
+repair-wheel-command = "delvewheel repair --ignore-existing -w {dest_dir} {wheel}"
+
 [tool.cibuildwheel.macos]
 archs = ["arm64"]
 # Slang's runtime and MoltenVK are installed beside the module (rpath @loader_path), so delocate
