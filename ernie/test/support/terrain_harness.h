@@ -9,15 +9,18 @@
 
 namespace ernie::testing {
 
-/// Everything one terrain frame needs, gathered as the terrain tests set it up.
+/// Everything one terrain frame needs, gathered as the terrain tests
+/// set it up.
 struct TerrainDrawParams {
     /// The terrain's material settings plus the frame's exposure.
     struct Surface : MaterialSettings {
         float exposure = 1.0f;
     };
 
-    CameraParams camera;        ///< Its width and height are replaced by `extent`.
-    VkExtent2D extent{64, 64};  ///< Image size, which `Record`'s target must have.
+    CameraParams
+        camera;  ///< Its width and height are replaced by `extent`.
+    VkExtent2D extent{
+        64, 64};  ///< Image size, which `Record`'s target must have.
     glm::vec3 sunDirection{0.0f, 0.0f, 1.0f};
     float ambient = 0.15f;
     float exaggeration = 1.0f;
@@ -28,14 +31,17 @@ struct TerrainDrawParams {
     Surface surface;
 };
 
-/// A `RasterRenderer` drawing one `TerrainDrawable` with the default material, driven the way
-/// `RasterDelegate` drives them, behind the calls the terrain tests make.
+/// A `RasterRenderer` drawing one `TerrainDrawable` with the default
+/// material, driven the way `RasterDelegate` drives them, behind the
+/// calls the terrain tests make.
 class TerrainRenderer {
   public:
-    explicit TerrainRenderer(const VulkanContext& context, VkFormat colorFormat,
-                             VkFormat depthFormat = VK_FORMAT_D32_SFLOAT,
-                             BrdfRegistry brdfs = BrdfRegistry::WithBuiltins())
-        : context_(context), renderer_(context, colorFormat, std::move(brdfs)),
+    explicit TerrainRenderer(
+        const VulkanContext& context, VkFormat colorFormat,
+        VkFormat depthFormat = VK_FORMAT_D32_SFLOAT,
+        BrdfRegistry brdfs = BrdfRegistry::WithBuiltins())
+        : context_(context),
+          renderer_(context, colorFormat, std::move(brdfs)),
           terrain_(renderer_) {
         static_cast<void>(depthFormat);
     }
@@ -57,9 +63,11 @@ class TerrainRenderer {
     }
 
     void Update(const TerrainDrawParams& params) {
-        renderer_.SetMaterial(RasterRenderer::kDefaultMaterial, params.surface);
-        terrain_.SetParams(
-            {params.exaggeration, params.colorMode, params.lod, RasterRenderer::kDefaultMaterial});
+        renderer_.SetMaterial(RasterRenderer::kDefaultMaterial,
+                              params.surface);
+        terrain_.SetParams({params.exaggeration, params.colorMode,
+                            params.lod,
+                            RasterRenderer::kDefaultMaterial});
         FrameParams frame;
         frame.camera = params.camera;
         frame.camera.width = params.extent.width;
@@ -74,12 +82,15 @@ class TerrainRenderer {
     }
 
     /// Renders the frame and draws its LdrColor into `target.color`.
-    void Record(VkCommandBuffer commands, const RenderingTarget& target) {
-        if (targets_ == nullptr || targets_->Extent().width != target.extent.width ||
+    void Record(VkCommandBuffer commands,
+                const RenderingTarget& target) {
+        if (targets_ == nullptr ||
+            targets_->Extent().width != target.extent.width ||
             targets_->Extent().height != target.extent.height ||
             targets_->Bands() != renderer_.Bands().count) {
-            targets_ = std::make_unique<RenderTargets>(context_, target.extent,
-                                                       renderer_.Bands().count, false);
+            targets_ = std::make_unique<RenderTargets>(
+                context_, target.extent, renderer_.Bands().count,
+                false);
         }
         const RasterDrawable* drawables[] = {&terrain_};
         renderer_.Record(commands, *targets_, drawables, &target);

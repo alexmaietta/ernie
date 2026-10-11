@@ -8,9 +8,10 @@
 
 #include <vector>
 
-/// Ernie's Terrain (a heightfield, or a whole planet of cube faces) and StarField (stars from a
-/// catalogue at infinity), as reflected schemas (`prim_type.h`). Each declaration's fallback is the
-/// value Ernie renders an unset attribute with.
+/// Ernie's Terrain (a heightfield, or a whole planet of cube faces)
+/// and StarField (stars from a catalogue at infinity), as reflected
+/// schemas (`prim_type.h`). Each declaration's fallback is the value
+/// Ernie renders an unset attribute with.
 
 // clang-format off
 #define ERNIE_TERRAIN_ATTRIBUTES(X)                                                                \
@@ -76,22 +77,27 @@
 
 namespace ernie {
 
-/// A north-up heightfield (x east, y north, z up) drawn with its bound material, or, with a planet
-/// radius, a whole planet of six cube faces (`CubeSphereLod`). Renders draw the first visible one.
+/// A north-up heightfield (x east, y north, z up) drawn with its
+/// bound material, or, with a planet radius, a whole planet of six
+/// cube faces (`CubeSphereLod`). Renders draw the first visible one.
 ///
-/// The cells that changed with the last write of heights on a GPU, `ernie:heights:dirty` (four
-/// numbers), are read generically: the registry has no four-vector type.
+/// The cells that changed with the last write of heights on a GPU,
+/// `ernie:heights:dirty` (four numbers), are read generically: the
+/// registry has no four-vector type.
 class Terrain : public Gprim {
     ERNIE_SCHEMA_BODY(Terrain, Gprim, ERNIE_TERRAIN_ALL)
     ERNIE_SCHEMA_DEFINE(Terrain)
 };
 
-/// Stars from a catalogue as points of light at infinity, behind everything else, each with a
-/// black-body spectrum. The prim's transform takes the catalogue's frame (J2000 equatorial, x
-/// towards right ascension 0, z the north celestial pole) into the world; a star's illuminance is
-/// the zero point times 10^(-0.4 magnitude) times 2^exposure. Renders draw the first visible one.
+/// Stars from a catalogue as points of light at infinity, behind
+/// everything else, each with a black-body spectrum. The prim's
+/// transform takes the catalogue's frame (J2000 equatorial, x towards
+/// right ascension 0, z the north celestial pole) into the world; a
+/// star's illuminance is the zero point times 10^(-0.4 magnitude)
+/// times 2^exposure. Renders draw the first visible one.
 ///
-/// The star arrays are written as tensors; `StarsOf` also reads them as float array values.
+/// The star arrays are written as tensors; `StarsOf` also reads them
+/// as float array values.
 class StarField : public Imageable {
     ERNIE_SCHEMA_BODY(StarField, Imageable, ERNIE_STAR_FIELD_ALL)
     ERNIE_SCHEMA_DEFINE(StarField)

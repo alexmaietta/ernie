@@ -8,14 +8,17 @@
 #include <string>
 #include <vector>
 
-/// UsdLux's lights as reflected schemas (`prim_type.h`), with Ernie's physical and Omniverse's
-/// photometric inputs, following UsdLux's hierarchy: every light is a `Light`; sphere, rect and
-/// disk lights are `BoundableLightBase` (area lights, with a power), distant and dome lights
-/// `NonboundableLightBase` (lights at infinity, with an illuminance). Each declaration's fallback
-/// is the value Ernie renders an unset attribute with.
+/// UsdLux's lights as reflected schemas (`prim_type.h`), with Ernie's
+/// physical and Omniverse's photometric inputs, following UsdLux's
+/// hierarchy: every light is a `Light`; sphere, rect and disk lights
+/// are `BoundableLightBase` (area lights, with a power), distant and
+/// dome lights `NonboundableLightBase` (lights at infinity, with an
+/// illuminance). Each declaration's fallback is the value Ernie
+/// renders an unset attribute with.
 ///
 /// References:
-/// - Pixar, UsdLux, https://openusd.org/release/api/usd_lux_page_front.html
+/// - Pixar, UsdLux,
+/// https://openusd.org/release/api/usd_lux_page_front.html
 /// - NVIDIA, Omniverse lighting, photometric units,
 ///   https://docs.omniverse.nvidia.com/materials-and-rendering/latest/lighting.html
 
@@ -188,39 +191,51 @@
 
 namespace ernie {
 
-/// Any light: UsdLux's LightAPI inputs, its spectrum's shape and Ernie's physical spectrum.
+/// Any light: UsdLux's LightAPI inputs, its spectrum's shape and
+/// Ernie's physical spectrum.
 class Light : public Imageable {
     ERNIE_SCHEMA_BODY(Light, Imageable, ERNIE_LIGHT_ALL)
 
-    /// Whether the light gives its brightness in photometric units: it has a `photometric:` value.
+    /// Whether the light gives its brightness in photometric units:
+    /// it has a `photometric:` value.
     bool IsPhotometric() const;
 };
 
-/// An area light (sphere, rect, disk): a radiant power, or a photometric power or illuminance.
+/// An area light (sphere, rect, disk): a radiant power, or a
+/// photometric power or illuminance.
 class BoundableLight : public Light {
-    ERNIE_SCHEMA_BODY(BoundableLight, Light, ERNIE_BOUNDABLE_LIGHT_ALL)
+    ERNIE_SCHEMA_BODY(BoundableLight, Light,
+                      ERNIE_BOUNDABLE_LIGHT_ALL)
 };
 
-/// A light at infinity (distant, dome), whose photometric brightness is an illuminance.
+/// A light at infinity (distant, dome), whose photometric brightness
+/// is an illuminance.
 class NonboundableLight : public Light {
-    ERNIE_SCHEMA_BODY(NonboundableLight, Light, ERNIE_NONBOUNDABLE_LIGHT_ALL)
+    ERNIE_SCHEMA_BODY(NonboundableLight, Light,
+                      ERNIE_NONBOUNDABLE_LIGHT_ALL)
 };
 
-/// A light at infinity shining along the -z axis of its transform, such as the Sun.
+/// A light at infinity shining along the -z axis of its transform,
+/// such as the Sun.
 class DistantLight : public NonboundableLight {
-    ERNIE_SCHEMA_BODY(DistantLight, NonboundableLight, ERNIE_DISTANT_LIGHT_ALL)
+    ERNIE_SCHEMA_BODY(DistantLight, NonboundableLight,
+                      ERNIE_DISTANT_LIGHT_ALL)
     ERNIE_SCHEMA_DEFINE(DistantLight)
 };
 
-/// Light from every direction, optionally from a latitude-longitude map.
+/// Light from every direction, optionally from a latitude-longitude
+/// map.
 class DomeLight : public NonboundableLight {
-    ERNIE_SCHEMA_BODY(DomeLight, NonboundableLight, ERNIE_DOME_LIGHT_ALL)
+    ERNIE_SCHEMA_BODY(DomeLight, NonboundableLight,
+                      ERNIE_DOME_LIGHT_ALL)
     ERNIE_SCHEMA_DEFINE(DomeLight)
 };
 
-/// A sphere (or point) light, optionally shaped to a cone around its -z axis.
+/// A sphere (or point) light, optionally shaped to a cone around its
+/// -z axis.
 class SphereLight : public BoundableLight {
-    ERNIE_SCHEMA_BODY(SphereLight, BoundableLight, ERNIE_SPHERE_LIGHT_ALL)
+    ERNIE_SCHEMA_BODY(SphereLight, BoundableLight,
+                      ERNIE_SPHERE_LIGHT_ALL)
     ERNIE_SCHEMA_DEFINE(SphereLight)
 };
 
@@ -236,9 +251,11 @@ class DiskLight : public BoundableLight {
     ERNIE_SCHEMA_DEFINE(DiskLight)
 };
 
-/// A cylinder along its x axis emitting from its side as a Lambertian emitter, not its caps.
+/// A cylinder along its x axis emitting from its side as a Lambertian
+/// emitter, not its caps.
 class CylinderLight : public BoundableLight {
-    ERNIE_SCHEMA_BODY(CylinderLight, BoundableLight, ERNIE_CYLINDER_LIGHT_ALL)
+    ERNIE_SCHEMA_BODY(CylinderLight, BoundableLight,
+                      ERNIE_CYLINDER_LIGHT_ALL)
     ERNIE_SCHEMA_DEFINE(CylinderLight)
 };
 

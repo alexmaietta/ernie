@@ -43,49 +43,64 @@ namespace tokens = ernie::tokens;
 
 namespace {
 
-/// The camera transforms of a batch: around the terrain at `count` headings, 0.8 rad up.
+/// The camera transforms of a batch: around the terrain at `count`
+/// headings, 0.8 rad up.
 std::vector<glm::dmat4> BatchPoses(std::size_t count) {
     std::vector<glm::dmat4> poses;
     for (std::size_t i = 0; i < count; ++i) {
         const double heading = 0.7 * static_cast<double>(i);
-        const glm::dvec3 eye(60.0 * std::cos(heading), 60.0 * std::sin(heading), 50.0);
-        poses.push_back(ernie::LookAtTransform(eye, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}));
+        const glm::dvec3 eye(60.0 * std::cos(heading),
+                             60.0 * std::sin(heading), 50.0);
+        poses.push_back(ernie::LookAtTransform(eye, {0.0, 0.0, 0.0},
+                                               {0.0, 0.0, 1.0}));
     }
     return poses;
 }
 
-/// A rolling terrain with a quad on it, lit by a sun without shadows and seen by noiseless
-/// cameras: batches and single views then render the same images.
+/// A rolling terrain with a quad on it, lit by a sun without shadows
+/// and seen by noiseless cameras: batches and single views then
+/// render the same images.
 Scene BatchScene() {
     Scene scene = TerrainScene(RollingTerrain(33, 33, 2.0));
     ernie::DistantLight(scene, "/World/Sun").SetShadowEnable(false);
     DefineQuad(scene, "/World/Quad", 6.0f);
-    scene.Set("/World/Quad", tokens::kTransform,
-              glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 8.0)));
-    ernie::RenderVar::Define(scene, "/Render/Vars/Color").SetSourceName(tokens::kLdrColor);
-    ernie::RenderVar::Define(scene, "/Render/Vars/Distance").SetSourceName("DistanceToCamera");
-    ernie::RenderVar::Define(scene, "/Render/Vars/Spectral").SetSourceName("SpectralRadiance");
+    scene.Set(
+        "/World/Quad", tokens::kTransform,
+        glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 8.0)));
+    ernie::RenderVar::Define(scene, "/Render/Vars/Color")
+        .SetSourceName(tokens::kLdrColor);
+    ernie::RenderVar::Define(scene, "/Render/Vars/Distance")
+        .SetSourceName("DistanceToCamera");
+    ernie::RenderVar::Define(scene, "/Render/Vars/Spectral")
+        .SetSourceName("SpectralRadiance");
     return scene;
 }
 
-void DefineBatchCamera(Scene& scene, const Path& path, const glm::dmat4& pose) {
+void DefineBatchCamera(Scene& scene, const Path& path,
+                       const glm::dmat4& pose) {
     ernie::Camera::Define(scene, path).SetSensorNoise(false);
     scene.Set(path, tokens::kTransform, pose);
 }
 
-/// A product of `cameras`, one camera's path or a batch's list of them.
-void DefineProduct(Scene& scene, const Path& path, const ernie::Value& cameras,
+/// A product of `cameras`, one camera's path or a batch's list of
+/// them.
+void DefineProduct(Scene& scene, const Path& path,
+                   const ernie::Value& cameras,
                    std::uint32_t size = kSize) {
-    ernie::RenderProduct::Define(scene, path).SetResolution(glm::dvec2(size, size));
+    ernie::RenderProduct::Define(scene, path)
+        .SetResolution(glm::dvec2(size, size));
     scene.Set(path, tokens::kCameraRel, cameras);
-    scene.Set(
-        path, tokens::kOrderedVars,
-        std::vector<Path>{"/Render/Vars/Color", "/Render/Vars/Distance", "/Render/Vars/Spectral"});
+    scene.Set(path, tokens::kOrderedVars,
+              std::vector<Path>{"/Render/Vars/Color",
+                                "/Render/Vars/Distance",
+                                "/Render/Vars/Spectral"});
 }
 
 /// The bytes of view `view` of a batched CPU tensor.
-std::vector<std::uint8_t> ViewBytes(const Tensor& batch, std::size_t view) {
-    const auto bytes = static_cast<std::size_t>(batch.Elements() / batch.Shape()[0]) *
+std::vector<std::uint8_t> ViewBytes(const Tensor& batch,
+                                    std::size_t view) {
+    const auto bytes = static_cast<std::size_t>(batch.Elements() /
+                                                batch.Shape()[0]) *
                        (batch.Type() == DType::UInt8 ? 1 : 4);
     const auto* data = static_cast<const std::uint8_t*>(batch.Data());
     return {data + view * bytes, data + (view + 1) * bytes};
@@ -93,42 +108,55 @@ std::vector<std::uint8_t> ViewBytes(const Tensor& batch, std::size_t view) {
 
 }  // namespace
 
-TEST_F(RasterDelegateTest, ABatchOfCamerasRendersAsThoseCamerasDoAlone) {
+TEST_F(RasterDelegateTest,
+       ABatchOfCamerasRendersAsThoseCamerasDoAlone) {
     Scene scene = BatchScene();
     const std::vector<glm::dmat4> poses = BatchPoses(3);
     std::vector<Path> cameras;
     for (std::size_t i = 0; i < poses.size(); ++i) {
         cameras.emplace_back("/World/Cam" + std::to_string(i));
         DefineBatchCamera(scene, cameras.back(), poses[i]);
-        DefineProduct(scene, Path("/Render/Single" + std::to_string(i)), cameras.back());
+        DefineProduct(scene,
+                      Path("/Render/Single" + std::to_string(i)),
+                      cameras.back());
     }
     DefineProduct(scene, "/Render/Batch", cameras);
     RasterDelegate delegate(*context_);
     const Path batchOnly[] = {"/Render/Batch"};
-    ernie::RenderProductSetOutputs batch = delegate.Step(scene, batchOnly);
+    ernie::RenderProductSetOutputs batch =
+        delegate.Step(scene, batchOnly);
     ernie::RenderProductOutput& output = batch.at("/Render/Batch");
     EXPECT_EQ(output.vars.at("LdrColor").Views(), 3u);
-    EXPECT_EQ(output.vars.at("LdrColor").Shape(), (std::vector<std::int64_t>{3, kSize, kSize, 4}));
+    EXPECT_EQ(output.vars.at("LdrColor").Shape(),
+              (std::vector<std::int64_t>{3, kSize, kSize, 4}));
     EXPECT_EQ(output.vars.at("DistanceToCamera").Shape(),
               (std::vector<std::int64_t>{3, kSize, kSize}));
     EXPECT_EQ(output.vars.at("SpectralRadiance").Shape(),
               (std::vector<std::int64_t>{3, 16, kSize, kSize}));
     std::map<std::string, Tensor> batched;
-    for (const std::string name : {"LdrColor", "DistanceToCamera", "SpectralRadiance"}) {
-        batched[name] = output.vars.at(name).Map(ernie::MapDevice::Cpu).tensor;
+    for (const std::string name :
+         {"LdrColor", "DistanceToCamera", "SpectralRadiance"}) {
+        batched[name] =
+            output.vars.at(name).Map(ernie::MapDevice::Cpu).tensor;
     }
-    EXPECT_NE(ViewBytes(batched["LdrColor"], 0), ViewBytes(batched["LdrColor"], 1))
+    EXPECT_NE(ViewBytes(batched["LdrColor"], 0),
+              ViewBytes(batched["LdrColor"], 1))
         << "the views see different things";
 
     for (std::size_t i = 0; i < poses.size(); ++i) {
         const Path single("/Render/Single" + std::to_string(i));
         const Path one[] = {single};
-        ernie::RenderProductSetOutputs alone = delegate.Step(scene, one);
-        for (const std::string name : {"LdrColor", "DistanceToCamera", "SpectralRadiance"}) {
-            ernie::RenderVarOutput& var = alone.at(single).vars.at(name);
+        ernie::RenderProductSetOutputs alone =
+            delegate.Step(scene, one);
+        for (const std::string name :
+             {"LdrColor", "DistanceToCamera", "SpectralRadiance"}) {
+            ernie::RenderVarOutput& var =
+                alone.at(single).vars.at(name);
             EXPECT_EQ(var.Views(), 1u);
-            const Tensor image = var.Map(ernie::MapDevice::Cpu).tensor;
-            EXPECT_EQ(ViewBytes(batched[name], i), Bytes(image)) << name << " of view " << i;
+            const Tensor image =
+                var.Map(ernie::MapDevice::Cpu).tensor;
+            EXPECT_EQ(ViewBytes(batched[name], i), Bytes(image))
+                << name << " of view " << i;
         }
     }
 }
@@ -136,7 +164,8 @@ TEST_F(RasterDelegateTest, ABatchOfCamerasRendersAsThoseCamerasDoAlone) {
 TEST_F(RasterDelegateTest, PosesRenderABatchThroughOneCamera) {
     Scene scene = BatchScene();
     const std::vector<glm::dmat4> poses = BatchPoses(4);
-    // Math convention, row-major: element (row, col) of pose i at [i][row][col].
+    // Math convention, row-major: element (row, col) of pose i at
+    // [i][row][col].
     std::vector<double> values;
     for (const glm::dmat4& pose : poses) {
         for (int row = 0; row < 4; ++row) {
@@ -146,10 +175,13 @@ TEST_F(RasterDelegateTest, PosesRenderABatchThroughOneCamera) {
         }
     }
     scene.Define("/World/Envs", tokens::kXform)
-        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(5.0, 0.0, 0.0)));
+        .Set(tokens::kTransform,
+             glm::translate(glm::dmat4(1.0),
+                            glm::dvec3(5.0, 0.0, 0.0)));
     DefineBatchCamera(scene, "/World/Envs/Cam", glm::dmat4(1.0));
     ernie::Camera(scene, "/World/Envs/Cam")
-        .SetPoses(Tensor::Copy<double>(values, {static_cast<std::int64_t>(poses.size()), 4, 4}));
+        .SetPoses(Tensor::Copy<double>(
+            values, {static_cast<std::int64_t>(poses.size()), 4, 4}));
     DefineProduct(scene, "/Render/Batch", Path("/World/Envs/Cam"));
     DefineBatchCamera(scene, "/World/Check", glm::dmat4(1.0));
     DefineProduct(scene, "/Render/Check", Path("/World/Check"));
@@ -161,12 +193,15 @@ TEST_F(RasterDelegateTest, PosesRenderABatchThroughOneCamera) {
                              .vars.at("LdrColor")
                              .Map(ernie::MapDevice::Cpu)
                              .tensor;
-    ASSERT_EQ(batch.Shape(), (std::vector<std::int64_t>{4, kSize, kSize, 4}));
+    ASSERT_EQ(batch.Shape(),
+              (std::vector<std::int64_t>{4, kSize, kSize, 4}));
     const Path checkOnly[] = {"/Render/Check"};
     for (std::size_t i = 0; i < poses.size(); ++i) {
         // Poses are local to the camera's parent.
         scene.Set("/World/Check", tokens::kTransform,
-                  glm::translate(glm::dmat4(1.0), glm::dvec3(5.0, 0.0, 0.0)) * poses[i]);
+                  glm::translate(glm::dmat4(1.0),
+                                 glm::dvec3(5.0, 0.0, 0.0)) *
+                      poses[i]);
         const Tensor alone = delegate.Step(scene, checkOnly)
                                  .at("/Render/Check")
                                  .vars.at("LdrColor")
@@ -176,9 +211,11 @@ TEST_F(RasterDelegateTest, PosesRenderABatchThroughOneCamera) {
     }
 }
 
-TEST_F(RasterDelegateTest, BatchesLargerThanAnImageArrayRenderInChunks) {
+TEST_F(RasterDelegateTest,
+       BatchesLargerThanAnImageArrayRenderInChunks) {
     Scene scene = BatchScene();
-    const std::uint32_t views = ernie::RenderTargets::MaxViews(*context_, 16) + 2;
+    const std::uint32_t views =
+        ernie::RenderTargets::MaxViews(*context_, 16) + 2;
     std::vector<double> values;
     const glm::dmat4 pose = BatchPoses(1).front();
     for (std::uint32_t i = 0; i < views; ++i) {
@@ -190,20 +227,29 @@ TEST_F(RasterDelegateTest, BatchesLargerThanAnImageArrayRenderInChunks) {
     }
     DefineBatchCamera(scene, "/World/Cam", glm::dmat4(1.0));
     ernie::Camera(scene, "/World/Cam")
-        .SetPoses(Tensor::Copy<double>(values, {static_cast<std::int64_t>(views), 4, 4}));
+        .SetPoses(Tensor::Copy<double>(
+            values, {static_cast<std::int64_t>(views), 4, 4}));
     DefineProduct(scene, "/Render/Batch", Path("/World/Cam"), 4);
     RasterDelegate delegate(*context_);
     const Path batchOnly[] = {"/Render/Batch"};
-    ernie::RenderProductSetOutputs outputs = delegate.Step(scene, batchOnly);
-    const Tensor batch =
-        outputs.at("/Render/Batch").vars.at("LdrColor").Map(ernie::MapDevice::Cpu).tensor;
-    ASSERT_EQ(batch.Shape(), (std::vector<std::int64_t>{views, 4, 4, 4}));
+    ernie::RenderProductSetOutputs outputs =
+        delegate.Step(scene, batchOnly);
+    const Tensor batch = outputs.at("/Render/Batch")
+                             .vars.at("LdrColor")
+                             .Map(ernie::MapDevice::Cpu)
+                             .tensor;
+    ASSERT_EQ(batch.Shape(),
+              (std::vector<std::int64_t>{views, 4, 4, 4}));
     const std::vector<std::uint8_t> first = ViewBytes(batch, 0);
     EXPECT_NE(first, std::vector<std::uint8_t>(first.size(), 0));
-    EXPECT_EQ(ViewBytes(batch, views - 1), first) << "the last chunk renders too";
-    const Tensor spectral =
-        outputs.at("/Render/Batch").vars.at("SpectralRadiance").Map(ernie::MapDevice::Cpu).tensor;
-    EXPECT_EQ(spectral.Shape(), (std::vector<std::int64_t>{views, 16, 4, 4}));
+    EXPECT_EQ(ViewBytes(batch, views - 1), first)
+        << "the last chunk renders too";
+    const Tensor spectral = outputs.at("/Render/Batch")
+                                .vars.at("SpectralRadiance")
+                                .Map(ernie::MapDevice::Cpu)
+                                .tensor;
+    EXPECT_EQ(spectral.Shape(),
+              (std::vector<std::int64_t>{views, 16, 4, 4}));
 }
 
 TEST(ViewPosesOf, RejectsCamerasThatCannotShareABatch) {
@@ -213,37 +259,46 @@ TEST(ViewPosesOf, RejectsCamerasThatCannotShareABatch) {
     ernie::Camera::Define(scene, "/C");
     ernie::Xform::Define(scene, "/NotACamera");
     const Path one[] = {"/A"};
-    EXPECT_TRUE(ernie::ViewPosesOf(scene, one, 8, 8).empty()) << "a single view";
+    EXPECT_TRUE(ernie::ViewPosesOf(scene, one, 8, 8).empty())
+        << "a single view";
     const Path same[] = {"/A", "/C"};
     EXPECT_EQ(ernie::ViewPosesOf(scene, same, 8, 8).size(), 2u);
     const Path lenses[] = {"/A", "/B"};
-    EXPECT_THROW(ernie::ViewPosesOf(scene, lenses, 8, 8), std::invalid_argument);
+    EXPECT_THROW(ernie::ViewPosesOf(scene, lenses, 8, 8),
+                 std::invalid_argument);
     const Path xform[] = {"/A", "/NotACamera"};
-    EXPECT_THROW(ernie::ViewPosesOf(scene, xform, 8, 8), std::invalid_argument);
+    EXPECT_THROW(ernie::ViewPosesOf(scene, xform, 8, 8),
+                 std::invalid_argument);
     const std::array<float, 12> flat{};
-    ernie::Camera(scene, "/A").SetPoses(Tensor::Copy<float>(flat, {3, 4}));
-    EXPECT_THROW(ernie::ViewPosesOf(scene, one, 8, 8), std::invalid_argument);
+    ernie::Camera(scene, "/A")
+        .SetPoses(Tensor::Copy<float>(flat, {3, 4}));
+    EXPECT_THROW(ernie::ViewPosesOf(scene, one, 8, 8),
+                 std::invalid_argument);
 }
 
 TEST_F(RasterDelegateTest, SyncingAloneGivesTheMeshesBounds) {
     Scene scene = MeshScene();
     RasterDelegate delegate(*context_);
     delegate.Sync(scene);
-    const std::optional<ernie::Bounds3> bounds = delegate.SceneBounds();
-    ASSERT_TRUE(bounds.has_value()) << "viewers frame the scene right after syncing it";
+    const std::optional<ernie::Bounds3> bounds =
+        delegate.SceneBounds();
+    ASSERT_TRUE(bounds.has_value())
+        << "viewers frame the scene right after syncing it";
     EXPECT_LT(bounds->first.x, -12.0f) << "the quad at x = -12";
     EXPECT_GT(bounds->second.x, 12.0f) << "the rocks at x = 12";
 }
 
 namespace {
 
-/// Two worlds overlapping at the origin, seen from above by a camera whose two poses are the
-/// same view of world 0 and of world 1: world 0 a small red quad, world 1 a large green one, each
-/// once as a mesh and once as an instance of one instancer whose instances are in both worlds.
+/// Two worlds overlapping at the origin, seen from above by a camera
+/// whose two poses are the same view of world 0 and of world 1: world
+/// 0 a small red quad, world 1 a large green one, each once as a mesh
+/// and once as an instance of one instancer whose instances are in
+/// both worlds.
 Scene WorldsScene(bool instanced) {
     Scene scene;
-    const glm::dmat4 above =
-        ernie::LookAtTransform({0.0, 0.0, 60.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
+    const glm::dmat4 above = ernie::LookAtTransform(
+        {0.0, 0.0, 60.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
     std::vector<double> poses;
     for (int view = 0; view < 2; ++view) {
         for (int row = 0; row < 4; ++row) {
@@ -255,41 +310,54 @@ Scene WorldsScene(bool instanced) {
     ernie::Camera::Define(scene, "/World/Camera")
         .SetSensorNoise(false)
         .SetPoses(Tensor::Copy<double>(poses, {2, 4, 4}))
-        .SetWorlds(Tensor::Copy<std::int32_t>(std::vector<std::int32_t>{0, 1}, {2}));
+        .SetWorlds(Tensor::Copy<std::int32_t>(
+            std::vector<std::int32_t>{0, 1}, {2}));
     scene.Define("/World/Sun", tokens::kDistantLight)
-        .Set(tokens::kTransform, ernie::DistantLightTransform({0.0, 0.0, 1.0}));
-    ernie::Material::Define(scene, "/Looks/Red").SetAlbedo(glm::dvec3(1.0, 0.0, 0.0));
-    ernie::Material::Define(scene, "/Looks/Green").SetAlbedo(glm::dvec3(0.0, 1.0, 0.0));
+        .Set(tokens::kTransform,
+             ernie::DistantLightTransform({0.0, 0.0, 1.0}));
+    ernie::Material::Define(scene, "/Looks/Red")
+        .SetAlbedo(glm::dvec3(1.0, 0.0, 0.0));
+    ernie::Material::Define(scene, "/Looks/Green")
+        .SetAlbedo(glm::dvec3(0.0, 1.0, 0.0));
     if (instanced) {
-        // Instance 0 in world 1 (big, green), instance 1 in world 0 (small, red): unsorted.
+        // Instance 0 in world 1 (big, green), instance 1 in world 0
+        // (small, red): unsorted.
         const std::array<float, 6> positions{0, 0, 0, 0, 0, 0};
         const std::array<float, 6> scales{3, 3, 1, 1, 1, 1};
         const std::array<std::int32_t, 2> protoIndices{1, 0};
         ernie::PointInstancer::Define(scene, "/World/Quads")
             .SetPositions(Tensor::Copy<float>(positions, {2, 3}))
             .SetScales(Tensor::Copy<float>(scales, {2, 3}))
-            .SetProtoIndices(Tensor::Copy<std::int32_t>(protoIndices, {2}));
+            .SetProtoIndices(
+                Tensor::Copy<std::int32_t>(protoIndices, {2}));
         scene.Write("/World/Quads", tokens::kWorlds,
-                    Tensor::Copy<std::int32_t>(std::vector<std::int32_t>{1, 0}, {2}));
+                    Tensor::Copy<std::int32_t>(
+                        std::vector<std::int32_t>{1, 0}, {2}));
         scene.Set("/World/Quads", tokens::kPrototypes,
-                  std::vector<Path>{"/World/Quads/Red", "/World/Quads/Green"});
+                  std::vector<Path>{"/World/Quads/Red",
+                                    "/World/Quads/Green"});
         DefineQuad(scene, "/World/Quads/Red", 2.0f);
         DefineQuad(scene, "/World/Quads/Green", 2.0f);
-        ernie::Mesh(scene, "/World/Quads/Red").SetMaterialBinding("/Looks/Red");
-        ernie::Mesh(scene, "/World/Quads/Green").SetMaterialBinding("/Looks/Green");
+        ernie::Mesh(scene, "/World/Quads/Red")
+            .SetMaterialBinding("/Looks/Red");
+        ernie::Mesh(scene, "/World/Quads/Green")
+            .SetMaterialBinding("/Looks/Green");
     } else {
         ernie::Xform::Define(scene, "/Envs/Env0").SetWorld(0);
         DefineQuad(scene, "/Envs/Env0/Quad", 2.0f);
-        ernie::Mesh(scene, "/Envs/Env0/Quad").SetMaterialBinding("/Looks/Red");
+        ernie::Mesh(scene, "/Envs/Env0/Quad")
+            .SetMaterialBinding("/Looks/Red");
         scene.Clone("/Envs/Env0", "/Envs/Env1");
         ernie::Xform(scene, "/Envs/Env1").SetWorld(1);
         DefineQuad(scene, "/Envs/Env1/Quad", 6.0f);
-        ernie::Mesh(scene, "/Envs/Env1/Quad").SetMaterialBinding("/Looks/Green");
+        ernie::Mesh(scene, "/Envs/Env1/Quad")
+            .SetMaterialBinding("/Looks/Green");
     }
     ernie::RenderProduct::Define(scene, "/Render/Batch")
         .SetCamera("/World/Camera")
         .SetResolution(glm::dvec2(kSize, kSize));
-    ernie::RenderSettings::Define(scene, "/Render/Settings").SetAmbient(0.0);
+    ernie::RenderSettings::Define(scene, "/Render/Settings")
+        .SetAmbient(0.0);
     return scene;
 }
 
@@ -305,26 +373,36 @@ TEST_F(RasterDelegateTest, EachViewOfABatchSeesOnlyItsOwnWorld) {
                                   .vars.at("LdrColor")
                                   .Map(ernie::MapDevice::Cpu)
                                   .tensor;
-        ASSERT_EQ(images.Shape(), (std::vector<std::int64_t>{2, kSize, kSize, 4}));
-        const auto texel = [&](std::size_t view, std::size_t row, std::size_t col) {
-            return images.As<std::uint8_t>() + ((view * kSize + row) * kSize + col) * 4;
+        ASSERT_EQ(images.Shape(),
+                  (std::vector<std::int64_t>{2, kSize, kSize, 4}));
+        const auto texel = [&](std::size_t view, std::size_t row,
+                               std::size_t col) {
+            return images.As<std::uint8_t>() +
+                   ((view * kSize + row) * kSize + col) * 4;
         };
         const std::size_t centre = kSize / 2;
-        const std::size_t edge = kSize / 2 + kSize / 8;  // inside only the big quad
+        const std::size_t edge =
+            kSize / 2 + kSize / 8;  // inside only the big quad
         EXPECT_GT(texel(0, centre, centre)[0], 100)
             << "world 0's red quad, instanced " << instanced;
-        EXPECT_LT(texel(0, centre, centre)[1], 50) << "not world 1's green one";
-        EXPECT_EQ(texel(0, edge, edge)[1], 0) << "world 1 is not drawn in view 0";
-        EXPECT_GT(texel(1, centre, centre)[1], 100) << "world 1's green quad";
-        EXPECT_LT(texel(1, centre, centre)[0], 50) << "not world 0's red one";
-        EXPECT_GT(texel(1, edge, edge)[1], 100) << "the green quad is the big one";
+        EXPECT_LT(texel(0, centre, centre)[1], 50)
+            << "not world 1's green one";
+        EXPECT_EQ(texel(0, edge, edge)[1], 0)
+            << "world 1 is not drawn in view 0";
+        EXPECT_GT(texel(1, centre, centre)[1], 100)
+            << "world 1's green quad";
+        EXPECT_LT(texel(1, centre, centre)[0], 50)
+            << "not world 0's red one";
+        EXPECT_GT(texel(1, edge, edge)[1], 100)
+            << "the green quad is the big one";
     }
 }
 
 TEST(Renderer, RendersAScenesProductsWithoutAnyGraphicsSetup) {
     std::unique_ptr<ernie::Renderer> renderer;
     try {
-        renderer = std::make_unique<ernie::Renderer>(ernie::RendererOptions{.validation = true});
+        renderer = std::make_unique<ernie::Renderer>(
+            ernie::RendererOptions{.validation = true});
     } catch (const std::runtime_error& error) {
         GTEST_SKIP() << "No Vulkan device: " << error.what();
     }
@@ -332,9 +410,11 @@ TEST(Renderer, RendersAScenesProductsWithoutAnyGraphicsSetup) {
     EXPECT_FALSE(renderer->DeviceName().empty());
     Scene scene = MeshScene();
     const Tensor image = renderer->Render(scene);
-    EXPECT_EQ(image.Shape(), (std::vector<std::int64_t>{kSize, kSize, 4}));
+    EXPECT_EQ(image.Shape(),
+              (std::vector<std::int64_t>{kSize, kSize, 4}));
     EXPECT_TRUE(renderer->TakeValidationMessages().empty());
-    EXPECT_THROW(ernie::Renderer({.backend = "nope"}), std::invalid_argument);
+    EXPECT_THROW(ernie::Renderer({.backend = "nope"}),
+                 std::invalid_argument);
 }
 
 TEST_F(RasterDelegateTest, ProductsHoldOnlyTheVarsTheyAskFor) {
@@ -355,24 +435,31 @@ TEST_F(RasterDelegateTest, ProductsHoldOnlyTheVarsTheyAskFor) {
                             .tensor;
     RasterDelegate depthAlone(*context_);
     const Path depthOnly[] = {"/Render/DepthOnly"};
-    ernie::RenderProductSetOutputs outputs = depthAlone.Step(scene, depthOnly);
+    ernie::RenderProductSetOutputs outputs =
+        depthAlone.Step(scene, depthOnly);
     const Tensor depth = outputs.at("/Render/DepthOnly")
                              .vars.at("DistanceToCamera")
                              .Map(ernie::MapDevice::Cpu)
                              .tensor;
-    EXPECT_EQ(Bytes(depth), Bytes(full)) << "the same distances without the colour filters";
-    EXPECT_EQ(outputs.at("/Render/DepthOnly").vars.count("LdrColor"), 0u);
-    const std::uint64_t spectral = std::uint64_t{kSize} * kSize * 16 * sizeof(float);
-    EXPECT_GT(everything.Stats().gpuBytes, depthAlone.Stats().gpuBytes + spectral)
-        << "the depth-only frame holds no SpectralRadiance or colour vars";
+    EXPECT_EQ(Bytes(depth), Bytes(full))
+        << "the same distances without the colour filters";
+    EXPECT_EQ(outputs.at("/Render/DepthOnly").vars.count("LdrColor"),
+              0u);
+    const std::uint64_t spectral =
+        std::uint64_t{kSize} * kSize * 16 * sizeof(float);
+    EXPECT_GT(everything.Stats().gpuBytes,
+              depthAlone.Stats().gpuBytes + spectral)
+        << "the depth-only frame holds no SpectralRadiance or colour "
+           "vars";
 }
 
 TEST_F(RasterDelegateTest, EachWorldOfABatchCastsItsOwnShadows) {
-    // The sun 45 degrees up towards +x; world 0's quad 10 m up at x = 10 shadows the shared
-    // ground at the origin, the centre of every view.
+    // The sun 45 degrees up towards +x; world 0's quad 10 m up at x =
+    // 10 shadows the shared ground at the origin, the centre of every
+    // view.
     Scene scene;
-    const glm::dmat4 above =
-        ernie::LookAtTransform({0.0, 0.0, 60.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
+    const glm::dmat4 above = ernie::LookAtTransform(
+        {0.0, 0.0, 60.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
     std::vector<double> poses;
     for (int view = 0; view < 3; ++view) {
         for (int row = 0; row < 4; ++row) {
@@ -384,19 +471,24 @@ TEST_F(RasterDelegateTest, EachWorldOfABatchCastsItsOwnShadows) {
     ernie::Camera::Define(scene, "/World/Camera")
         .SetSensorNoise(false)
         .SetPoses(Tensor::Copy<double>(poses, {3, 4, 4}))
-        .SetWorlds(Tensor::Copy<std::int32_t>(std::vector<std::int32_t>{0, 1, -1}, {3}));
+        .SetWorlds(Tensor::Copy<std::int32_t>(
+            std::vector<std::int32_t>{0, 1, -1}, {3}));
     scene.Define("/World/Sun", tokens::kDistantLight)
-        .Set(tokens::kTransform, ernie::DistantLightTransform({1.0, 0.0, 1.0}));
-    DefineQuad(scene, "/World/Floor", 20.0f);  // shared, and bounded for the sun's map
+        .Set(tokens::kTransform,
+             ernie::DistantLightTransform({1.0, 0.0, 1.0}));
+    DefineQuad(scene, "/World/Floor",
+               20.0f);  // shared, and bounded for the sun's map
     ernie::Xform::Define(scene, "/Envs/Env0").SetWorld(0);
     DefineQuad(scene, "/Envs/Env0/Roof", 3.0f);
-    scene.Set("/Envs/Env0/Roof", tokens::kTransform,
-              glm::translate(glm::dmat4(1.0), glm::dvec3(10.0, 0.0, 10.0)));
+    scene.Set(
+        "/Envs/Env0/Roof", tokens::kTransform,
+        glm::translate(glm::dmat4(1.0), glm::dvec3(10.0, 0.0, 10.0)));
     ernie::Xform::Define(scene, "/Envs/Env1").SetWorld(1);
     ernie::RenderProduct::Define(scene, "/Render/Batch")
         .SetCamera("/World/Camera")
         .SetResolution(glm::dvec2(kSize, kSize));
-    ernie::RenderSettings::Define(scene, "/Render/Settings").SetAmbient(0.1);
+    ernie::RenderSettings::Define(scene, "/Render/Settings")
+        .SetAmbient(0.1);
 
     RasterDelegate delegate(*context_);
     const Path batchOnly[] = {"/Render/Batch"};
@@ -407,22 +499,26 @@ TEST_F(RasterDelegateTest, EachWorldOfABatchCastsItsOwnShadows) {
                               .tensor;
     const auto centre = [&](std::size_t view) {
         const std::uint8_t* texel =
-            images.As<std::uint8_t>() + ((view * kSize + kSize / 2) * kSize + kSize / 2) * 4;
+            images.As<std::uint8_t>() +
+            ((view * kSize + kSize / 2) * kSize + kSize / 2) * 4;
         return texel[0] + texel[1] + texel[2];
     };
-    EXPECT_LT(centre(0), centre(1) / 2) << "world 0's roof shades the ground in its view";
-    EXPECT_LT(centre(2), centre(1) / 2) << "a view of every world sees every world's shadows";
-    EXPECT_GT(centre(1), 100) << "world 1 has no roof, so its ground is lit";
+    EXPECT_LT(centre(0), centre(1) / 2)
+        << "world 0's roof shades the ground in its view";
+    EXPECT_LT(centre(2), centre(1) / 2)
+        << "a view of every world sees every world's shadows";
+    EXPECT_GT(centre(1), 100)
+        << "world 1 has no roof, so its ground is lit";
 }
 
 namespace {
 
-/// A batch of three identical views from above of a shared floor: of world 0, world 1 and every
-/// world.
+/// A batch of three identical views from above of a shared floor: of
+/// world 0, world 1 and every world.
 Scene ThreeViewsOfAFloor() {
     Scene scene;
-    const glm::dmat4 above =
-        ernie::LookAtTransform({0.0, 0.0, 60.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
+    const glm::dmat4 above = ernie::LookAtTransform(
+        {0.0, 0.0, 60.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
     std::vector<double> poses;
     for (int view = 0; view < 3; ++view) {
         for (int row = 0; row < 4; ++row) {
@@ -434,7 +530,8 @@ Scene ThreeViewsOfAFloor() {
     ernie::Camera::Define(scene, "/World/Camera")
         .SetSensorNoise(false)
         .SetPoses(Tensor::Copy<double>(poses, {3, 4, 4}))
-        .SetWorlds(Tensor::Copy<std::int32_t>(std::vector<std::int32_t>{0, 1, -1}, {3}));
+        .SetWorlds(Tensor::Copy<std::int32_t>(
+            std::vector<std::int32_t>{0, 1, -1}, {3}));
     DefineQuad(scene, "/World/Floor", 20.0f);
     ernie::RenderProduct::Define(scene, "/Render/Batch")
         .SetCamera("/World/Camera")
@@ -444,7 +541,8 @@ Scene ThreeViewsOfAFloor() {
 
 int CentreOf(const Tensor& images, std::size_t view) {
     const std::uint8_t* texel =
-        images.As<std::uint8_t>() + ((view * kSize + kSize / 2) * kSize + kSize / 2) * 4;
+        images.As<std::uint8_t>() +
+        ((view * kSize + kSize / 2) * kSize + kSize / 2) * 4;
     return texel[0] + texel[1] + texel[2];
 }
 
@@ -453,9 +551,11 @@ int CentreOf(const Tensor& images, std::size_t view) {
 TEST_F(RasterDelegateTest, LightsShineOnlyInTheirWorld) {
     Scene scene = ThreeViewsOfAFloor();
     ernie::Xform::Define(scene, "/Envs/Env0").SetWorld(0);
-    ernie::SphereLight::Define(scene, "/Envs/Env0/Lamp").SetIntensity(50.0);
-    scene.Set("/Envs/Env0/Lamp", tokens::kTransform,
-              glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 5.0)));
+    ernie::SphereLight::Define(scene, "/Envs/Env0/Lamp")
+        .SetIntensity(50.0);
+    scene.Set(
+        "/Envs/Env0/Lamp", tokens::kTransform,
+        glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 5.0)));
     RasterDelegate delegate(*context_);
     const Path batchOnly[] = {"/Render/Batch"};
     const Tensor images = delegate.Step(scene, batchOnly)
@@ -463,12 +563,15 @@ TEST_F(RasterDelegateTest, LightsShineOnlyInTheirWorld) {
                               .vars.at("LdrColor")
                               .Map(ernie::MapDevice::Cpu)
                               .tensor;
-    EXPECT_GT(CentreOf(images, 0), 100) << "world 0's lamp lights its view";
+    EXPECT_GT(CentreOf(images, 0), 100)
+        << "world 0's lamp lights its view";
     EXPECT_EQ(CentreOf(images, 1), 0) << "world 1 has no light";
-    EXPECT_EQ(CentreOf(images, 2), CentreOf(images, 0)) << "a view of every world sees it";
+    EXPECT_EQ(CentreOf(images, 2), CentreOf(images, 0))
+        << "a view of every world sees it";
 }
 
-TEST_F(RasterDelegateTest, PosesWrittenAsCudaArraysRenderAsHostPoses) {
+TEST_F(RasterDelegateTest,
+       PosesWrittenAsCudaArraysRenderAsHostPoses) {
     RasterDelegate delegate(*context_);
     std::string why;
     ernie::ComputeInterop* cuda = delegate.Compute(&why);
@@ -477,7 +580,8 @@ TEST_F(RasterDelegateTest, PosesWrittenAsCudaArraysRenderAsHostPoses) {
     }
     Scene scene = ThreeViewsOfAFloor();
     scene.Define("/World/Sun", tokens::kDistantLight)
-        .Set(tokens::kTransform, ernie::DistantLightTransform({0.3, 0.2, 1.0}));
+        .Set(tokens::kTransform,
+             ernie::DistantLightTransform({0.3, 0.2, 1.0}));
     const Path batchOnly[] = {"/Render/Batch"};
     const auto render = [&] {
         return delegate.Step(scene, batchOnly)
@@ -492,7 +596,8 @@ TEST_F(RasterDelegateTest, PosesWrittenAsCudaArraysRenderAsHostPoses) {
     EXPECT_EQ(Bytes(render()), Bytes(host));
 }
 
-TEST_F(RasterDelegateTest, CudaWritesOnSeveralStreamsSignalVulkanInOrder) {
+TEST_F(RasterDelegateTest,
+       CudaWritesOnSeveralStreamsSignalVulkanInOrder) {
     RasterDelegate delegate(*context_);
     std::string why;
     ernie::ComputeInterop* cuda = delegate.Compute(&why);
@@ -501,19 +606,26 @@ TEST_F(RasterDelegateTest, CudaWritesOnSeveralStreamsSignalVulkanInOrder) {
     }
     Scene scene = MeshScene();
     scene.Set("/World/Rocks", tokens::kExtent,
-              std::vector<float>{-14.0f, -14.0f, -1.0f, 14.0f, 14.0f, 1.0f});
+              std::vector<float>{-14.0f, -14.0f, -1.0f, 14.0f, 14.0f,
+                                 1.0f});
     const std::array<float, 9> start{12, -10, 0, 12, 0, 0, 12, 10, 0};
-    const std::array<float, 12> quad{-2, -2, 0, 2, -2, 0, 2, 2, 0, -2, 2, 0};  // local, at x = -12
+    const std::array<float, 12> quad{
+        -2, -2, 0, 2, -2, 0, 2, 2, 0, -2, 2, 0};  // local, at x = -12
     constexpr std::uintptr_t kPerThread = 2;
     for (int step = 0; step < 3; ++step) {
-        // Two arrays written on two streams in one step: their copies signal Vulkan in order.
+        // Two arrays written on two streams in one step: their copies
+        // signal Vulkan in order.
         scene.Write("/World/Rocks", tokens::kPositions,
-                    cuda->Upload(Tensor::Copy<float>(start, {3, 3})), 1);
-        scene.Write("/World/Quad", tokens::kPoints, cuda->Upload(Tensor::Copy<float>(quad, {4, 3})),
+                    cuda->Upload(Tensor::Copy<float>(start, {3, 3})),
+                    1);
+        scene.Write("/World/Quad", tokens::kPoints,
+                    cuda->Upload(Tensor::Copy<float>(quad, {4, 3})),
                     kPerThread);
         const Tensor image = delegate.Render(scene);
-        EXPECT_GT(TexelAt(scene, image, {12, -10, 0})[1], 200) << "step " << step;
-        EXPECT_GT(TexelAt(scene, image, {-12, 0, 0})[0], 200) << "step " << step;
+        EXPECT_GT(TexelAt(scene, image, {12, -10, 0})[1], 200)
+            << "step " << step;
+        EXPECT_GT(TexelAt(scene, image, {-12, 0, 0})[0], 200)
+            << "step " << step;
     }
 }
 
@@ -530,22 +642,25 @@ TEST(CudaInterop, TensorsMayOutliveTheirDelegateAndDevice) {
     if (cuda == nullptr) {
         GTEST_SKIP() << "No CUDA interop: " << why;
     }
-    Tensor uploaded = cuda->Upload(Tensor::Copy<float>(std::vector<float>{1, 2, 3}, {3}));
+    Tensor uploaded = cuda->Upload(
+        Tensor::Copy<float>(std::vector<float>{1, 2, 3}, {3}));
     delegate.reset();
     context.reset();
-    uploaded = Tensor();  // frees its CUDA memory without touching the destroyed device
+    uploaded = Tensor();  // frees its CUDA memory without touching
+                          // the destroyed device
     SUCCEED();
 }
 
 namespace {
 
-/// Three views from above of a shared floor at the origin, of world 0, world 1 and every world,
-/// with world 0's roof shading the floor's centre under a sun 45 degrees up towards +x. With
+/// Three views from above of a shared floor at the origin, of world
+/// 0, world 1 and every world, with world 0's roof shading the
+/// floor's centre under a sun 45 degrees up towards +x. With
 /// `farWorld`, world 1 has a box 2 km away that stretches the scene.
 Scene RoofScene(bool farWorld) {
     Scene scene;
-    const glm::dmat4 above =
-        ernie::LookAtTransform({0.0, 0.0, 60.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
+    const glm::dmat4 above = ernie::LookAtTransform(
+        {0.0, 0.0, 60.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
     std::vector<double> poses;
     for (int view = 0; view < 3; ++view) {
         for (int row = 0; row < 4; ++row) {
@@ -557,30 +672,36 @@ Scene RoofScene(bool farWorld) {
     ernie::Camera::Define(scene, "/World/Camera")
         .SetSensorNoise(false)
         .SetPoses(Tensor::Copy<double>(poses, {3, 4, 4}))
-        .SetWorlds(Tensor::Copy<std::int32_t>(std::vector<std::int32_t>{0, 1, -1}, {3}));
+        .SetWorlds(Tensor::Copy<std::int32_t>(
+            std::vector<std::int32_t>{0, 1, -1}, {3}));
     scene.Define("/World/Sun", tokens::kDistantLight)
-        .Set(tokens::kTransform, ernie::DistantLightTransform({1.0, 0.0, 1.0}));
+        .Set(tokens::kTransform,
+             ernie::DistantLightTransform({1.0, 0.0, 1.0}));
     DefineQuad(scene, "/World/Floor", 20.0f);
     ernie::Xform::Define(scene, "/Envs/Env0").SetWorld(0);
     DefineQuad(scene, "/Envs/Env0/Roof", 3.0f);
-    scene.Set("/Envs/Env0/Roof", tokens::kTransform,
-              glm::translate(glm::dmat4(1.0), glm::dvec3(10.0, 0.0, 10.0)));
+    scene.Set(
+        "/Envs/Env0/Roof", tokens::kTransform,
+        glm::translate(glm::dmat4(1.0), glm::dvec3(10.0, 0.0, 10.0)));
     ernie::Xform::Define(scene, "/Envs/Env1").SetWorld(1);
     if (farWorld) {
         DefineQuad(scene, "/Envs/Env1/Far", 3.0f);
         scene.Set("/Envs/Env1/Far", tokens::kTransform,
-                  glm::translate(glm::dmat4(1.0), glm::dvec3(2000.0, 0.0, 0.0)));
+                  glm::translate(glm::dmat4(1.0),
+                                 glm::dvec3(2000.0, 0.0, 0.0)));
     }
     ernie::RenderProduct::Define(scene, "/Render/Batch")
         .SetCamera("/World/Camera")
         .SetResolution(glm::dvec2(kSize, kSize));
-    ernie::RenderSettings::Define(scene, "/Render/Settings").SetAmbient(0.1);
+    ernie::RenderSettings::Define(scene, "/Render/Settings")
+        .SetAmbient(0.1);
     return scene;
 }
 
 }  // namespace
 
-TEST_F(RasterDelegateTest, WorldShadowOptionsChooseWhatCastsIntoEachWorld) {
+TEST_F(RasterDelegateTest,
+       WorldShadowOptionsChooseWhatCastsIntoEachWorld) {
     Scene scene = RoofScene(false);
     RasterDelegate delegate(*context_);
     const Path batchOnly[] = {"/Render/Batch"};
@@ -593,25 +714,30 @@ TEST_F(RasterDelegateTest, WorldShadowOptionsChooseWhatCastsIntoEachWorld) {
         std::array<int, 3> sums{};
         for (std::size_t view = 0; view < 3; ++view) {
             const std::uint8_t* texel =
-                images.As<std::uint8_t>() + ((view * kSize + kSize / 2) * kSize + kSize / 2) * 4;
+                images.As<std::uint8_t>() +
+                ((view * kSize + kSize / 2) * kSize + kSize / 2) * 4;
             sums[view] = texel[0] + texel[1] + texel[2];
         }
         return sums;
     };
     const std::array<int, 3> separate = centres();
-    EXPECT_LT(separate[0], separate[1] / 2) << "separate: world 0's roof shades its view";
+    EXPECT_LT(separate[0], separate[1] / 2)
+        << "separate: world 0's roof shades its view";
 
     ernie::RenderSettings settings(scene, "/Render/Settings");
     settings.SetShadowWorlds(tokens::kShared);
     const std::array<int, 3> shared = centres();
-    EXPECT_EQ(shared[0], shared[1]) << "shared: worlds' own geometry casts nothing";
+    EXPECT_EQ(shared[0], shared[1])
+        << "shared: worlds' own geometry casts nothing";
 
     settings.SetShadowWorlds(tokens::kMerged);
     const std::array<int, 3> merged = centres();
-    EXPECT_LT(merged[1], shared[1] / 2) << "merged: every world's casters shade every view";
+    EXPECT_LT(merged[1], shared[1] / 2)
+        << "merged: every world's casters shade every view";
 }
 
-TEST_F(RasterDelegateTest, WorldFittedShadowMapsKeepSmallShadowsInLargeScenes) {
+TEST_F(RasterDelegateTest,
+       WorldFittedShadowMapsKeepSmallShadowsInLargeScenes) {
     Scene scene = RoofScene(true);
     ernie::RenderSettings settings(scene, "/Render/Settings");
     settings.SetShadowWorldResolution(64);
@@ -624,14 +750,16 @@ TEST_F(RasterDelegateTest, WorldFittedShadowMapsKeepSmallShadowsInLargeScenes) {
                                   .Map(ernie::MapDevice::Cpu)
                                   .tensor;
         const std::uint8_t* texel =
-            images.As<std::uint8_t>() + ((kSize / 2) * kSize + kSize / 2) * 4;  // view 0
+            images.As<std::uint8_t>() +
+            ((kSize / 2) * kSize + kSize / 2) * 4;  // view 0
         return texel[0] + texel[1] + texel[2];
     };
     const int sceneFit = centre();
     settings.SetShadowWorldFit(tokens::kWorldFit);
     const int worldFit = centre();
     EXPECT_LT(worldFit, sceneFit / 2)
-        << "a 64-texel map over 2 km misses the roof's shadow; one fitted to world 0 keeps it";
+        << "a 64-texel map over 2 km misses the roof's shadow; one "
+           "fitted to world 0 keeps it";
 }
 
 TEST(ShadowSettings, SizesWorldMapsToTheImageByDefault) {
@@ -645,39 +773,49 @@ TEST(ShadowSettings, SizesWorldMapsToTheImageByDefault) {
 
 TEST(FrameParamsOf, RejectsUnknownWorldShadowOptions) {
     Scene scene = RoofScene(false);
-    const ernie::RenderPrims prims = ernie::ResolveRenderPrims(scene, "/Render/Settings");
+    const ernie::RenderPrims prims =
+        ernie::ResolveRenderPrims(scene, "/Render/Settings");
     ernie::RenderSettings settings(scene, "/Render/Settings");
     settings.SetShadowWorlds("some");
-    EXPECT_THROW(ernie::FrameParamsOf(scene, prims, 8, 8), std::invalid_argument);
-    settings.SetShadowWorlds(tokens::kShared).SetShadowWorldFit("tight");
-    EXPECT_THROW(ernie::FrameParamsOf(scene, prims, 8, 8), std::invalid_argument);
+    EXPECT_THROW(ernie::FrameParamsOf(scene, prims, 8, 8),
+                 std::invalid_argument);
+    settings.SetShadowWorlds(tokens::kShared)
+        .SetShadowWorldFit("tight");
+    EXPECT_THROW(ernie::FrameParamsOf(scene, prims, 8, 8),
+                 std::invalid_argument);
 }
 
 namespace {
 
-/// CullingScene seen by a batch of `views` noiseless views from above along the row, under a
-/// moved parent, over a ground plane below the meshes; shadows on.
+/// CullingScene seen by a batch of `views` noiseless views from above
+/// along the row, under a moved parent, over a ground plane below the
+/// meshes; shadows on.
 Scene PosedRowScene(std::size_t views) {
     Scene scene = CullingScene();
-    ernie::GroundPlane::Define(scene, "/World/Ground").SetHeight(-1.0);
+    ernie::GroundPlane::Define(scene, "/World/Ground")
+        .SetHeight(-1.0);
     scene.Define("/World/Rig", tokens::kXform)
-        .Set(tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(3.0, -4.0, 0.0)));
+        .Set(tokens::kTransform,
+             glm::translate(glm::dmat4(1.0),
+                            glm::dvec3(3.0, -4.0, 0.0)));
     std::vector<float> poses;
     for (std::size_t v = 0; v < views; ++v) {
         const double x = -36.0 + 24.0 * static_cast<double>(v);
-        const glm::dmat4 pose =
-            ernie::LookAtTransform({x, -16.0, 40.0}, {x + 4.0, -16.0, 0.0}, {0.0, 1.0, 0.0});
+        const glm::dmat4 pose = ernie::LookAtTransform(
+            {x, -16.0, 40.0}, {x + 4.0, -16.0, 0.0}, {0.0, 1.0, 0.0});
         for (int row = 0; row < 4; ++row) {
             for (int col = 0; col < 4; ++col) {
                 poses.push_back(static_cast<float>(pose[col][row]));
             }
         }
     }
-    // No transform of its own: estimates from it look away from everything.
+    // No transform of its own: estimates from it look away from
+    // everything.
     ernie::Camera::Define(scene, "/World/Rig/Camera")
         .SetFocalLength(18.0)
         .SetSensorNoise(false)
-        .SetPoses(Tensor::Copy<float>(poses, {static_cast<std::int64_t>(views), 4, 4}));
+        .SetPoses(Tensor::Copy<float>(
+            poses, {static_cast<std::int64_t>(views), 4, 4}));
     ernie::RenderProduct::Define(scene, "/Render/Posed")
         .SetCamera("/World/Rig/Camera")
         .SetResolution(glm::dvec2(kSize, kSize));
@@ -688,9 +826,11 @@ Scene PosedRowScene(std::size_t views) {
 
 TEST(GpuPosesOf, KeepsContiguousFloat32CudaPosesOnTheGpu) {
     Scene scene = PosedRowScene(2);
-    EXPECT_EQ(ernie::GpuPosesOf(scene, "/World/Rig/Camera"), nullptr) << "host poses";
-    EXPECT_EQ(ernie::PosesParentOf(scene, "/World/Rig/Camera"),
-              glm::translate(glm::dmat4(1.0), glm::dvec3(3.0, -4.0, 0.0)));
+    EXPECT_EQ(ernie::GpuPosesOf(scene, "/World/Rig/Camera"), nullptr)
+        << "host poses";
+    EXPECT_EQ(
+        ernie::PosesParentOf(scene, "/World/Rig/Camera"),
+        glm::translate(glm::dmat4(1.0), glm::dvec3(3.0, -4.0, 0.0)));
 }
 
 TEST_F(RasterDelegateTest, PosesOnTheGpuRenderAsPosesOnTheHost) {
@@ -710,15 +850,19 @@ TEST_F(RasterDelegateTest, PosesOnTheGpuRenderAsPosesOnTheHost) {
     };
     for (const std::size_t views : {std::size_t{1}, std::size_t{4}}) {
         Scene scene = PosedRowScene(views);
-        // A single host-posed view fits shadow cascades to its frustum; posed on the GPU, it
-        // takes a batch's map fitted to the scene, so its shadows differ in resolution.
-        ernie::DistantLight(scene, "/World/Sun").SetShadowEnable(views > 1);
+        // A single host-posed view fits shadow cascades to its
+        // frustum; posed on the GPU, it takes a batch's map fitted to
+        // the scene, so its shadows differ in resolution.
+        ernie::DistantLight(scene, "/World/Sun")
+            .SetShadowEnable(views > 1);
         const std::vector<std::uint8_t> host = render(scene);
         ernie::Camera camera(scene, "/World/Rig/Camera");
         camera.SetPoses(cuda->Upload(*camera.GetPoses()));
-        ASSERT_NE(ernie::GpuPosesOf(scene, "/World/Rig/Camera"), nullptr);
-        // The first step estimates the poses from the camera's own transform, the second from
-        // the first's; neither may change what the views see.
+        ASSERT_NE(ernie::GpuPosesOf(scene, "/World/Rig/Camera"),
+                  nullptr);
+        // The first step estimates the poses from the camera's own
+        // transform, the second from the first's; neither may change
+        // what the views see.
         for (int step = 0; step < 2; ++step) {
             const std::vector<std::uint8_t> gpu = render(scene);
             EXPECT_LE(BytesDiffering(gpu, host), host.size() / 200)
@@ -726,7 +870,8 @@ TEST_F(RasterDelegateTest, PosesOnTheGpuRenderAsPosesOnTheHost) {
         }
         // Downloading them renders the host's poses exactly.
         camera.SetPosesDevice(tokens::kHost);
-        EXPECT_EQ(ernie::GpuPosesOf(scene, "/World/Rig/Camera"), nullptr);
+        EXPECT_EQ(ernie::GpuPosesOf(scene, "/World/Rig/Camera"),
+                  nullptr);
         EXPECT_EQ(render(scene), host) << views << " views";
         camera.SetPosesDevice("magic");
         EXPECT_THROW(render(scene), std::invalid_argument);
@@ -734,8 +879,9 @@ TEST_F(RasterDelegateTest, PosesOnTheGpuRenderAsPosesOnTheHost) {
 }
 
 TEST_F(RasterDelegateTest, CubeFacedViewsPoseOnTheGpuAsOnTheHost) {
-    // Fisheyes whose corners reach 100 and 150 degrees off axis, on five and on all six cube
-    // faces: the GPU turns each view's pose onto its faces as the host does.
+    // Fisheyes whose corners reach 100 and 150 degrees off axis, on
+    // five and on all six cube faces: the GPU turns each view's pose
+    // onto its faces as the host does.
     RasterDelegate delegate(*context_);
     std::string why;
     ernie::ComputeInterop* cuda = delegate.Compute(&why);
@@ -757,13 +903,16 @@ TEST_F(RasterDelegateTest, CubeFacedViewsPoseOnTheGpuAsOnTheHost) {
         camera.SetLensProjection(tokens::kFisheye)
             .SetVerticalAperture(20.0)
             .SetHorizontalAperture(20.0)
-            .SetFocalLength(20.0 * corner / (degrees * M_PI / 180.0) / kSize);
-        const int faces =
-            ernie::CubeFacesOf(ernie::CameraParamsOf(scene, "/World/Rig/Camera", kSize, kSize));
-        EXPECT_EQ(faces, degrees < 120.0 ? ernie::kCubeFaces : ernie::kAllCubeFaces);
+            .SetFocalLength(20.0 * corner / (degrees * M_PI / 180.0) /
+                            kSize);
+        const int faces = ernie::CubeFacesOf(ernie::CameraParamsOf(
+            scene, "/World/Rig/Camera", kSize, kSize));
+        EXPECT_EQ(faces, degrees < 120.0 ? ernie::kCubeFaces
+                                         : ernie::kAllCubeFaces);
         const std::vector<std::uint8_t> host = render(scene);
         camera.SetPoses(cuda->Upload(*camera.GetPoses()));
-        ASSERT_NE(ernie::GpuPosesOf(scene, "/World/Rig/Camera"), nullptr);
+        ASSERT_NE(ernie::GpuPosesOf(scene, "/World/Rig/Camera"),
+                  nullptr);
         for (int step = 0; step < 2; ++step) {
             const std::vector<std::uint8_t> gpu = render(scene);
             EXPECT_LE(BytesDiffering(gpu, host), host.size() / 200)
@@ -772,7 +921,8 @@ TEST_F(RasterDelegateTest, CubeFacedViewsPoseOnTheGpuAsOnTheHost) {
     }
 }
 
-TEST_F(RasterDelegateTest, GpuPosedViewsCullInstancesAgainstTheirOwnFrusta) {
+TEST_F(RasterDelegateTest,
+       GpuPosedViewsCullInstancesAgainstTheirOwnFrusta) {
     RasterDelegate delegate(*context_);
     std::string why;
     ernie::ComputeInterop* cuda = delegate.Compute(&why);
@@ -781,12 +931,14 @@ TEST_F(RasterDelegateTest, GpuPosedViewsCullInstancesAgainstTheirOwnFrusta) {
     }
     Scene scene = PosedRowScene(4);
     const Path posedOnly[] = {"/Render/Posed"};
-    // Every view's and shadow view's instances kept, summed: the GPU poses test every range,
-    // the host's only those in view, which keep none of their instances otherwise.
+    // Every view's and shadow view's instances kept, summed: the GPU
+    // poses test every range, the host's only those in view, which
+    // keep none of their instances otherwise.
     const auto kept = [&] {
         delegate.Step(scene, posedOnly);
         std::uint32_t sum = 0;
-        for (const std::uint32_t count : delegate.Meshes().CulledInstanceCounts()) {
+        for (const std::uint32_t count :
+             delegate.Meshes().CulledInstanceCounts()) {
             sum += count;
         }
         return sum;
@@ -796,16 +948,19 @@ TEST_F(RasterDelegateTest, GpuPosedViewsCullInstancesAgainstTheirOwnFrusta) {
     ASSERT_LT(host, 41u * 4u) << "the views see only part of the row";
     ernie::Camera camera(scene, "/World/Rig/Camera");
     camera.SetPoses(cuda->Upload(*camera.GetPoses()));
-    EXPECT_EQ(kept(), host) << "the GPU poses' frusta keep exactly the host poses' instances";
+    EXPECT_EQ(kept(), host) << "the GPU poses' frusta keep exactly "
+                               "the host poses' instances";
 }
 
 namespace {
 
-/// LdrColor of every step of `scene` after `change(scene, step)`, all submitted before any is
-/// fetched (`pipelined`), or each fetched before the next.
-std::vector<std::vector<std::uint8_t>> Steps(RasterDelegate& delegate, Scene& scene,
-                                             const std::function<void(Scene&, int)>& change,
-                                             int steps, bool pipelined) {
+/// LdrColor of every step of `scene` after `change(scene, step)`, all
+/// submitted before any is fetched (`pipelined`), or each fetched
+/// before the next.
+std::vector<std::vector<std::uint8_t>>
+Steps(RasterDelegate& delegate, Scene& scene,
+      const std::function<void(Scene&, int)>& change, int steps,
+      bool pipelined) {
     const Path product[] = {"/Render/Posed"};
     std::vector<ernie::StepOperation> operations;
     std::vector<std::vector<std::uint8_t>> images;
@@ -840,36 +995,44 @@ constexpr std::size_t kFourViews = 4;
 /// PosedRowScene with a few more views and pixels.
 Scene PosedRowSceneOfFour() {
     Scene scene = PosedRowScene(kFourViews);
-    ernie::RenderProduct(scene, "/Render/Posed").SetResolution(glm::dvec2(96, 96));
+    ernie::RenderProduct(scene, "/Render/Posed")
+        .SetResolution(glm::dvec2(96, 96));
     return scene;
 }
 
 }  // namespace
 
 TEST_F(RasterDelegateTest, StepsInFlightRenderAsStepsOneAtATime) {
-    // Every step moves the row and the views; later steps are prepared while earlier ones still
-    // render, so their host data must not reach the frames in flight.
+    // Every step moves the row and the views; later steps are
+    // prepared while earlier ones still render, so their host data
+    // must not reach the frames in flight.
     const auto change = [](Scene& scene, int step) {
         std::vector<float> positions;
         for (int i = -20; i <= 20; ++i) {
-            positions.insert(positions.end(),
-                             {5.0f * static_cast<float>(i) + 1.5f * static_cast<float>(step),
-                              -20.0f + 2.0f * static_cast<float>(step % 3), 0.0f});
+            positions.insert(
+                positions.end(),
+                {5.0f * static_cast<float>(i) +
+                     1.5f * static_cast<float>(step),
+                 -20.0f + 2.0f * static_cast<float>(step % 3), 0.0f});
         }
         ernie::PointInstancer(scene, "/World/Row")
             .SetPositions(Tensor::Copy<float>(positions, {41, 3}));
         scene.Set("/World/Rig", tokens::kTransform,
-                  glm::translate(glm::dmat4(1.0), glm::dvec3(2.0 * step, -4.0, 0.0)));
+                  glm::translate(glm::dmat4(1.0),
+                                 glm::dvec3(2.0 * step, -4.0, 0.0)));
     };
     constexpr int kSteps = 6;
     Scene oneAtATime = PosedRowSceneOfFour();
     RasterDelegate reference(*context_);
-    const auto expected = Steps(reference, oneAtATime, change, kSteps, false);
-    ASSERT_NE(expected.front(), expected.back()) << "the steps differ";
+    const auto expected =
+        Steps(reference, oneAtATime, change, kSteps, false);
+    ASSERT_NE(expected.front(), expected.back())
+        << "the steps differ";
 
     RasterDelegate delegate(*context_);
     Scene pipelined = PosedRowSceneOfFour();
-    const auto images = Steps(delegate, pipelined, change, kSteps, true);
+    const auto images =
+        Steps(delegate, pipelined, change, kSteps, true);
     for (int step = 0; step < kSteps; ++step) {
         EXPECT_EQ(images[step], expected[step]) << "step " << step;
     }
@@ -880,18 +1043,21 @@ TEST_F(RasterDelegateTest, StepsInFlightRenderAsStepsOneAtATime) {
     if (cuda == nullptr) {
         GTEST_SKIP() << "No CUDA interop: " << why;
     }
-    // Every step's poses on the GPU up front: uploading or reading them back during the steps
-    // would wait for the work queued before. Each step's views turn a little further.
-    const Tensor firstPoses = *PosedRowSceneOfFour().Read("/World/Rig/Camera", tokens::kPoses);
+    // Every step's poses on the GPU up front: uploading or reading
+    // them back during the steps would wait for the work queued
+    // before. Each step's views turn a little further.
+    const Tensor firstPoses = *PosedRowSceneOfFour().Read(
+        "/World/Rig/Camera", tokens::kPoses);
     std::vector<Tensor> posesOfStep;
     for (int step = 0; step < kSteps; ++step) {
         std::vector<float> turned(firstPoses.As<float>(),
-                                  firstPoses.As<float>() + firstPoses.Elements());
+                                  firstPoses.As<float>() +
+                                      firstPoses.Elements());
         for (std::size_t v = 0; v < kFourViews; ++v) {
             turned[v * 16 + 3] += 0.5f * static_cast<float>(step);
         }
-        posesOfStep.push_back(cuda->Upload(
-            Tensor::Copy<float>(turned, {static_cast<std::int64_t>(kFourViews), 4, 4})));
+        posesOfStep.push_back(cuda->Upload(Tensor::Copy<float>(
+            turned, {static_cast<std::int64_t>(kFourViews), 4, 4})));
     }
     const auto onGpu = [&](Scene& scene, int step) {
         change(scene, step);
@@ -900,12 +1066,16 @@ TEST_F(RasterDelegateTest, StepsInFlightRenderAsStepsOneAtATime) {
     };
     Scene gpuOneAtATime = PosedRowSceneOfFour();
     Scene gpuPipelined = PosedRowSceneOfFour();
-    const auto gpuExpected = Steps(reference, gpuOneAtATime, onGpu, kSteps, false);
-    // Long CUDA work queued before the first step's poses holds every frame back on the GPU, as
-    // a simulator's would, while the host prepares the later steps as far ahead as it may.
+    const auto gpuExpected =
+        Steps(reference, gpuOneAtATime, onGpu, kSteps, false);
+    // Long CUDA work queued before the first step's poses holds every
+    // frame back on the GPU, as a simulator's would, while the host
+    // prepares the later steps as far ahead as it may.
     const std::vector<float> zeros(std::size_t{1} << 26);  // 256 MiB
-    const Tensor busy = cuda->Upload(Tensor::Copy<float>(zeros, {1 << 26}));
-    const Tensor busyCopy = cuda->Upload(Tensor::Copy<float>(zeros, {1 << 26}));
+    const Tensor busy =
+        cuda->Upload(Tensor::Copy<float>(zeros, {1 << 26}));
+    const Tensor busyCopy =
+        cuda->Upload(Tensor::Copy<float>(zeros, {1 << 26}));
     const auto stalled = [&](Scene& scene, int step) {
         if (step == 0) {
             for (int i = 0; i < 30; ++i) {
@@ -914,8 +1084,10 @@ TEST_F(RasterDelegateTest, StepsInFlightRenderAsStepsOneAtATime) {
         }
         onGpu(scene, step);
     };
-    const auto gpuImages = Steps(delegate, gpuPipelined, stalled, kSteps, true);
+    const auto gpuImages =
+        Steps(delegate, gpuPipelined, stalled, kSteps, true);
     for (int step = 0; step < kSteps; ++step) {
-        EXPECT_EQ(gpuImages[step], gpuExpected[step]) << "GPU poses, step " << step;
+        EXPECT_EQ(gpuImages[step], gpuExpected[step])
+            << "GPU poses, step " << step;
     }
 }

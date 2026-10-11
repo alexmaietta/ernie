@@ -1,11 +1,13 @@
 set(ERNIE_DEP_VERSION_glfw
     3.4
-    CACHE STRING "Tag of GLFW to fetch when no system GLFW >= 3.4 is found.")
+    CACHE STRING
+          "Tag of GLFW to fetch when no system GLFW >= 3.4 is found.")
 mark_as_advanced(ERNIE_DEP_VERSION_glfw)
 
-option(ERNIE_USE_SYSTEM_GLFW
-       "Use an installed GLFW >= 3.4 if found; turn off for packages so GLFW is linked statically"
-       ON)
+option(
+    ERNIE_USE_SYSTEM_GLFW
+    "Use an installed GLFW >= 3.4 if found; turn off for packages so GLFW is linked statically"
+    ON)
 
 if(ERNIE_USE_SYSTEM_GLFW)
     find_package(glfw3 3.4 QUIET)

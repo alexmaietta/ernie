@@ -18,7 +18,8 @@ VkImageAspectFlags AspectOf(VkFormat format) {
         return VK_IMAGE_ASPECT_DEPTH_BIT;
     case VK_FORMAT_D24_UNORM_S8_UINT:
     case VK_FORMAT_D32_SFLOAT_S8_UINT:
-        return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+        return VK_IMAGE_ASPECT_DEPTH_BIT |
+               VK_IMAGE_ASPECT_STENCIL_BIT;
     default:
         return VK_IMAGE_ASPECT_COLOR_BIT;
     }
@@ -47,10 +48,12 @@ std::uint32_t GpuImage::TexelBytes(VkFormat format) {
     }
 }
 
-GpuImage::GpuImage(const VulkanContext& context, const ImageDesc& desc)
+GpuImage::GpuImage(const VulkanContext& context,
+                   const ImageDesc& desc)
     : context_(&context), desc_(desc) {
     if (desc.groupLayers > 0 && desc.layers % desc.groupLayers != 0) {
-        throw std::invalid_argument("An image's layers must be a whole number of groups");
+        throw std::invalid_argument(
+            "An image's layers must be a whole number of groups");
     }
     VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
     info.imageType = VK_IMAGE_TYPE_2D;
@@ -60,81 +63,106 @@ GpuImage::GpuImage(const VulkanContext& context, const ImageDesc& desc)
     info.arrayLayers = desc.layers;
     info.samples = VK_SAMPLE_COUNT_1_BIT;
     info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    info.usage = desc.usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    info.usage = desc.usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     if (desc.shared) {
         if (!context.SupportsExternalMemory()) {
-            throw std::runtime_error("The Vulkan device cannot export image memory");
+            throw std::runtime_error(
+                "The Vulkan device cannot export image memory");
         }
         VkExternalMemoryImageCreateInfo external{
             VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO};
         external.handleTypes = kExternalMemoryHandleType;
         info.pNext = &external;
-        CheckVk(vkCreateImage(context.Device(), &info, nullptr, &image_), "vkCreateImage");
+        CheckVk(
+            vkCreateImage(context.Device(), &info, nullptr, &image_),
+            "vkCreateImage");
         VkMemoryRequirements requirements{};
-        vkGetImageMemoryRequirements(context.Device(), image_, &requirements);
-        VkMemoryDedicatedAllocateInfo dedicated{VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO};
+        vkGetImageMemoryRequirements(context.Device(), image_,
+                                     &requirements);
+        VkMemoryDedicatedAllocateInfo dedicated{
+            VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO};
         dedicated.image = image_;
-        VkExportMemoryAllocateInfo exported{VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO};
+        VkExportMemoryAllocateInfo exported{
+            VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO};
         exported.handleTypes = kExternalMemoryHandleType;
         exported.pNext = &dedicated;
-        VkMemoryAllocateInfo allocate{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+        VkMemoryAllocateInfo allocate{
+            VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
         allocate.pNext = &exported;
         allocate.allocationSize = requirements.size;
-        allocate.memoryTypeIndex = context.DeviceLocalMemoryType(requirements.memoryTypeBits);
-        const VkResult result =
-            vkAllocateMemory(context.Device(), &allocate, nullptr, &sharedMemory_);
+        allocate.memoryTypeIndex = context.DeviceLocalMemoryType(
+            requirements.memoryTypeBits);
+        const VkResult result = vkAllocateMemory(
+            context.Device(), &allocate, nullptr, &sharedMemory_);
         if (result != VK_SUCCESS) {
             vkDestroyImage(context.Device(), image_, nullptr);
             image_ = VK_NULL_HANDLE;
             CheckVk(result, "vkAllocateMemory");
         }
-        CheckVk(vkBindImageMemory(context.Device(), image_, sharedMemory_, 0), "vkBindImageMemory");
+        CheckVk(vkBindImageMemory(context.Device(), image_,
+                                  sharedMemory_, 0),
+                "vkBindImageMemory");
         bytes_ = requirements.size;
     } else {
         VmaAllocationCreateInfo allocation{};
         allocation.usage = VMA_MEMORY_USAGE_AUTO;
         VmaAllocationInfo result{};
-        CheckVk(
-            vmaCreateImage(context.Allocator(), &info, &allocation, &image_, &allocation_, &result),
-            "vmaCreateImage");
+        CheckVk(vmaCreateImage(context.Allocator(), &info,
+                               &allocation, &image_, &allocation_,
+                               &result),
+                "vmaCreateImage");
         bytes_ = result.size;
     }
 
-    VkImageViewCreateInfo view{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+    VkImageViewCreateInfo view{
+        VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
     view.image = image_;
     const bool array = desc.layers > 1 || desc.array;
-    view.viewType = array ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+    view.viewType =
+        array ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
     view.format = desc.format;
-    view.subresourceRange = {AspectOf(desc.format), 0, desc.mips, 0, desc.layers};
-    CheckVk(vkCreateImageView(context.Device(), &view, nullptr, &view_), "vkCreateImageView");
+    view.subresourceRange = {AspectOf(desc.format), 0, desc.mips, 0,
+                             desc.layers};
+    CheckVk(
+        vkCreateImageView(context.Device(), &view, nullptr, &view_),
+        "vkCreateImageView");
     if (array) {
         for (std::uint32_t layer = 0; layer < desc.layers; ++layer) {
             view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-            view.subresourceRange = {AspectOf(desc.format), 0, 1, layer, 1};
+            view.subresourceRange = {AspectOf(desc.format), 0, 1,
+                                     layer, 1};
             VkImageView layerView = VK_NULL_HANDLE;
-            CheckVk(vkCreateImageView(context.Device(), &view, nullptr, &layerView),
+            CheckVk(vkCreateImageView(context.Device(), &view,
+                                      nullptr, &layerView),
                     "vkCreateImageView");
             layerViews_.push_back(layerView);
         }
     }
     if (desc.mips > 1) {
         for (std::uint32_t mip = 0; mip < desc.mips; ++mip) {
-            view.viewType = array ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
-            view.subresourceRange = {AspectOf(desc.format), mip, 1, 0, desc.layers};
+            view.viewType = array ? VK_IMAGE_VIEW_TYPE_2D_ARRAY
+                                  : VK_IMAGE_VIEW_TYPE_2D;
+            view.subresourceRange = {AspectOf(desc.format), mip, 1, 0,
+                                     desc.layers};
             VkImageView mipView = VK_NULL_HANDLE;
-            CheckVk(vkCreateImageView(context.Device(), &view, nullptr, &mipView),
+            CheckVk(vkCreateImageView(context.Device(), &view,
+                                      nullptr, &mipView),
                     "vkCreateImageView");
             mipViews_.push_back(mipView);
         }
     }
     const std::uint32_t group = desc.groupLayers;
     if (desc.layers > 1 && group > 0 && group < desc.layers) {
-        for (std::uint32_t first = 0; first < desc.layers; first += group) {
+        for (std::uint32_t first = 0; first < desc.layers;
+             first += group) {
             view.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-            view.subresourceRange = {AspectOf(desc.format), 0, 1, first, group};
+            view.subresourceRange = {AspectOf(desc.format), 0, 1,
+                                     first, group};
             VkImageView groupView = VK_NULL_HANDLE;
-            CheckVk(vkCreateImageView(context.Device(), &view, nullptr, &groupView),
+            CheckVk(vkCreateImageView(context.Device(), &view,
+                                      nullptr, &groupView),
                     "vkCreateImageView");
             groupViews_.push_back(groupView);
         }
@@ -149,10 +177,14 @@ GpuImage::GpuImage(GpuImage&& other) noexcept
     : context_(other.context_), desc_(other.desc_),
       image_(std::exchange(other.image_, VK_NULL_HANDLE)),
       allocation_(std::exchange(other.allocation_, VK_NULL_HANDLE)),
-      sharedMemory_(std::exchange(other.sharedMemory_, VK_NULL_HANDLE)),
-      attached_(std::move(other.attached_)), view_(std::exchange(other.view_, VK_NULL_HANDLE)),
-      layerViews_(std::move(other.layerViews_)), groupViews_(std::move(other.groupViews_)),
-      mipViews_(std::move(other.mipViews_)), layout_(other.layout_), bytes_(other.bytes_) {}
+      sharedMemory_(
+          std::exchange(other.sharedMemory_, VK_NULL_HANDLE)),
+      attached_(std::move(other.attached_)),
+      view_(std::exchange(other.view_, VK_NULL_HANDLE)),
+      layerViews_(std::move(other.layerViews_)),
+      groupViews_(std::move(other.groupViews_)),
+      mipViews_(std::move(other.mipViews_)), layout_(other.layout_),
+      bytes_(other.bytes_) {}
 
 GpuImage& GpuImage::operator=(GpuImage&& other) noexcept {
     if (this != &other) {
@@ -160,8 +192,10 @@ GpuImage& GpuImage::operator=(GpuImage&& other) noexcept {
         context_ = other.context_;
         desc_ = other.desc_;
         image_ = std::exchange(other.image_, VK_NULL_HANDLE);
-        allocation_ = std::exchange(other.allocation_, VK_NULL_HANDLE);
-        sharedMemory_ = std::exchange(other.sharedMemory_, VK_NULL_HANDLE);
+        allocation_ =
+            std::exchange(other.allocation_, VK_NULL_HANDLE);
+        sharedMemory_ =
+            std::exchange(other.sharedMemory_, VK_NULL_HANDLE);
         attached_ = std::move(other.attached_);
         view_ = std::exchange(other.view_, VK_NULL_HANDLE);
         layerViews_ = std::move(other.layerViews_);
@@ -204,21 +238,24 @@ void GpuImage::Release() {
 
 ExternalHandle GpuImage::ExportHandle() const {
     if (sharedMemory_ == VK_NULL_HANDLE) {
-        throw std::logic_error("Only shared images export their memory");
+        throw std::logic_error(
+            "Only shared images export their memory");
     }
     return context_->ExportMemory(sharedMemory_);
 }
 
 VkImageView GpuImage::LayerView(std::uint32_t layer) const {
     if (layer >= desc_.layers) {
-        throw std::out_of_range("GpuImage::LayerView past the last layer");
+        throw std::out_of_range(
+            "GpuImage::LayerView past the last layer");
     }
     return layerViews_.empty() ? view_ : layerViews_[layer];
 }
 
 VkImageView GpuImage::MipView(std::uint32_t mip) const {
     if (mip >= desc_.mips) {
-        throw std::out_of_range("GpuImage::MipView past the last mip");
+        throw std::out_of_range(
+            "GpuImage::MipView past the last mip");
     }
     return mipViews_.empty() ? view_ : mipViews_[mip];
 }
@@ -226,25 +263,32 @@ VkImageView GpuImage::MipView(std::uint32_t mip) const {
 VkImageView GpuImage::GroupView(std::uint32_t group) const {
     if (groupViews_.empty()) {
         if (group != 0) {
-            throw std::out_of_range("GpuImage::GroupView past the last group");
+            throw std::out_of_range(
+                "GpuImage::GroupView past the last group");
         }
         return view_;
     }
     if (group >= groupViews_.size()) {
-        throw std::out_of_range("GpuImage::GroupView past the last group");
+        throw std::out_of_range(
+            "GpuImage::GroupView past the last group");
     }
     return groupViews_[group];
 }
 
-void GpuImage::Transition(VkCommandBuffer commands, VkImageLayout layout) {
-    TransitionImage(commands, image_, AspectOf(desc_.format), layout_, layout);
+void GpuImage::Transition(VkCommandBuffer commands,
+                          VkImageLayout layout) {
+    TransitionImage(commands, image_, AspectOf(desc_.format), layout_,
+                    layout);
     layout_ = layout;
 }
 
-void GpuImage::Upload(std::span<const std::span<const std::byte>> mipData) {
+void GpuImage::Upload(
+    std::span<const std::span<const std::byte>> mipData) {
     const std::uint32_t mips = desc_.mips;
-    if (mipData.size() != mips && mipData.size() != std::size_t{mips} * desc_.layers) {
-        throw std::invalid_argument("GpuImage::Upload needs data for every mip");
+    if (mipData.size() != mips &&
+        mipData.size() != std::size_t{mips} * desc_.layers) {
+        throw std::invalid_argument(
+            "GpuImage::Upload needs data for every mip");
     }
     const std::uint32_t texel = TexelBytes(desc_.format);
     std::vector<VkBufferImageCopy> regions;
@@ -254,12 +298,15 @@ void GpuImage::Upload(std::span<const std::span<const std::byte>> mipData) {
         const auto layer = static_cast<std::uint32_t>(i / mips);
         const std::uint32_t w = std::max(1u, desc_.width >> mip);
         const std::uint32_t h = std::max(1u, desc_.height >> mip);
-        if (mipData[i].size() != static_cast<std::size_t>(w) * h * texel) {
-            throw std::invalid_argument("GpuImage::Upload got the wrong size for a mip");
+        if (mipData[i].size() !=
+            static_cast<std::size_t>(w) * h * texel) {
+            throw std::invalid_argument(
+                "GpuImage::Upload got the wrong size for a mip");
         }
         VkBufferImageCopy region{};
         region.bufferOffset = total;
-        region.imageSubresource = {AspectOf(desc_.format), mip, layer, 1};
+        region.imageSubresource = {AspectOf(desc_.format), mip, layer,
+                                   1};
         region.imageExtent = {w, h, 1};
         regions.push_back(region);
         total += mipData[i].size();
@@ -270,14 +317,19 @@ void GpuImage::Upload(std::span<const std::span<const std::byte>> mipData) {
     }
     context_->Submit([&](VkCommandBuffer commands) {
         Transition(commands, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        vkCmdCopyBufferToImage(commands, staging.Handle(), image_,
-                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                               static_cast<std::uint32_t>(regions.size()), regions.data());
-        Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        vkCmdCopyBufferToImage(
+            commands, staging.Handle(), image_,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            static_cast<std::uint32_t>(regions.size()),
+            regions.data());
+        Transition(commands,
+                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     });
 }
 
-Sampler::Sampler(const VulkanContext& context, const SamplerDesc& desc) : context_(context) {
+Sampler::Sampler(const VulkanContext& context,
+                 const SamplerDesc& desc)
+    : context_(context) {
     VkSamplerCreateInfo info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
     info.magFilter = desc.filter;
     info.minFilter = desc.filter;
@@ -288,7 +340,8 @@ Sampler::Sampler(const VulkanContext& context, const SamplerDesc& desc) : contex
     info.borderColor = desc.borderColor;
     info.maxLod = VK_LOD_CLAMP_NONE;
     const float limit = context.Limits().maxSamplerAnisotropy;
-    if (desc.maxAnisotropy > 1.0f && context.SupportsAnisotropy() && limit > 1.0f) {
+    if (desc.maxAnisotropy > 1.0f && context.SupportsAnisotropy() &&
+        limit > 1.0f) {
         info.anisotropyEnable = VK_TRUE;
         info.maxAnisotropy = std::min(desc.maxAnisotropy, limit);
     }
@@ -296,7 +349,9 @@ Sampler::Sampler(const VulkanContext& context, const SamplerDesc& desc) : contex
         info.compareEnable = VK_TRUE;
         info.compareOp = VK_COMPARE_OP_LESS;
     }
-    CheckVk(vkCreateSampler(context.Device(), &info, nullptr, &sampler_), "vkCreateSampler");
+    CheckVk(
+        vkCreateSampler(context.Device(), &info, nullptr, &sampler_),
+        "vkCreateSampler");
 }
 
 Sampler::~Sampler() {

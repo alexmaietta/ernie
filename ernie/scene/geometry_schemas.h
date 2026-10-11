@@ -7,16 +7,21 @@
 
 #include <vector>
 
-/// Geometry as reflected schemas (`prim_type.h`): UsdGeom's implicit shapes (Cube, Sphere, and
-/// along an axis Cylinder, Cone, Capsule and Plane), its point-based Mesh and Points, the
-/// PointInstancer and UsdVol's Volume, and Ernie's GroundPlane. Each declaration's fallback is the
-/// value Ernie draws an unset attribute with (UsdGeom's own). Bulk arrays (points, topology,
-/// instance transforms) are tensors, written with `Scene::Write`; primvars other than the display
-/// colour are an open namespace (`primvars:<name>`), read by name.
+/// Geometry as reflected schemas (`prim_type.h`): UsdGeom's implicit
+/// shapes (Cube, Sphere, and along an axis Cylinder, Cone, Capsule
+/// and Plane), its point-based Mesh and Points, the PointInstancer
+/// and UsdVol's Volume, and Ernie's GroundPlane. Each declaration's
+/// fallback is the value Ernie draws an unset attribute with
+/// (UsdGeom's own). Bulk arrays (points, topology, instance
+/// transforms) are tensors, written with `Scene::Write`; primvars
+/// other than the display colour are an open namespace
+/// (`primvars:<name>`), read by name.
 ///
 /// References:
-/// - Pixar, UsdGeom, https://openusd.org/release/api/usd_geom_page_front.html
-/// - Pixar, UsdVol, https://openusd.org/release/api/usd_vol_page_front.html
+/// - Pixar, UsdGeom,
+/// https://openusd.org/release/api/usd_geom_page_front.html
+/// - Pixar, UsdVol,
+/// https://openusd.org/release/api/usd_vol_page_front.html
 
 // clang-format off
 #define ERNIE_GEOM_SHAPE_RANGE .group = "Shape", .min = 0.0, .max = 1000.0
@@ -157,8 +162,9 @@ class Sphere : public Gprim {
     ERNIE_SCHEMA_DEFINE(Sphere)
 };
 
-/// An implicit shape centred on its origin along one of its axes: a cylinder, cone, capsule or
-/// plane. Not a UsdGeom type: the base of those that have an `axis`.
+/// An implicit shape centred on its origin along one of its axes: a
+/// cylinder, cone, capsule or plane. Not a UsdGeom type: the base of
+/// those that have an `axis`.
 class AxisShape : public Gprim {
     ERNIE_SCHEMA_BODY(AxisShape, Gprim, ERNIE_AXIS_SHAPE_ALL)
 };
@@ -198,16 +204,18 @@ class Mesh : public PointBased {
     ERNIE_SCHEMA_DEFINE(Mesh)
 };
 
-/// Points drawn as spheres `widths` across, coloured by their display colour.
+/// Points drawn as spheres `widths` across, coloured by their display
+/// colour.
 class Points : public PointBased {
     ERNIE_SCHEMA_BODY(Points, PointBased, ERNIE_POINTS_ALL)
     ERNIE_SCHEMA_DEFINE(Points)
 };
 
-/// Instances of its prototypes (the `prototypes` relationship's targets) at rows of positions,
-/// orientations and scales.
+/// Instances of its prototypes (the `prototypes` relationship's
+/// targets) at rows of positions, orientations and scales.
 class PointInstancer : public Boundable {
-    ERNIE_SCHEMA_BODY(PointInstancer, Boundable, ERNIE_POINT_INSTANCER_ALL)
+    ERNIE_SCHEMA_BODY(PointInstancer, Boundable,
+                      ERNIE_POINT_INSTANCER_ALL)
     ERNIE_SCHEMA_DEFINE(PointInstancer)
 };
 
@@ -217,8 +225,9 @@ class Volume : public Gprim {
     ERNIE_SCHEMA_DEFINE(Volume)
 };
 
-/// Ernie: an infinite horizontal floor facing +z at a world height, drawn with its material,
-/// optionally as a checkerboard. Its height is in world space; it has no transform.
+/// Ernie: an infinite horizontal floor facing +z at a world height,
+/// drawn with its material, optionally as a checkerboard. Its height
+/// is in world space; it has no transform.
 class GroundPlane : public Imageable {
     ERNIE_SCHEMA_BODY(GroundPlane, Imageable, ERNIE_GROUND_PLANE_ALL)
     ERNIE_SCHEMA_DEFINE(GroundPlane)

@@ -17,7 +17,8 @@ namespace tokens = ernie::tokens;
 
 namespace {
 
-void ExpectNear(const glm::dvec3& a, const glm::dvec3& b, double tolerance = 1e-9) {
+void ExpectNear(const glm::dvec3& a, const glm::dvec3& b,
+                double tolerance = 1e-9) {
     EXPECT_NEAR(a.x, b.x, tolerance);
     EXPECT_NEAR(a.y, b.y, tolerance);
     EXPECT_NEAR(a.z, b.z, tolerance);
@@ -50,74 +51,111 @@ TEST(Schema, ReadersAcceptEveryNumericType) {
     EXPECT_TRUE(ernie::GetBool(scene, "/P", "i", false));
     EXPECT_FALSE(ernie::GetBool(scene, "/P", "token", false));
     EXPECT_FALSE(ernie::GetBool(scene, "/P", "missing", false));
-    EXPECT_EQ(ernie::GetVec2(scene, "/P", "v2", {}), glm::dvec2(1.0, 2.0));
-    EXPECT_EQ(ernie::GetVec2(scene, "/P", "dv2", {}), glm::dvec2(3.0, 4.0));
-    EXPECT_EQ(ernie::GetVec2(scene, "/P", "iv2", {}), glm::dvec2(5.0, 6.0));
-    EXPECT_EQ(ernie::GetVec2(scene, "/P", "f", {7.0, 8.0}), glm::dvec2(7.0, 8.0));
-    EXPECT_EQ(ernie::GetVec2(scene, "/P", "missing", {7.0, 8.0}), glm::dvec2(7.0, 8.0));
-    EXPECT_EQ(ernie::GetVec3(scene, "/P", "v3", {}), glm::dvec3(1.0, 2.0, 3.0));
-    EXPECT_EQ(ernie::GetVec3(scene, "/P", "dv3", {}), glm::dvec3(4.0, 5.0, 6.0));
-    EXPECT_EQ(ernie::GetVec3(scene, "/P", "f", glm::dvec3(1.0)), glm::dvec3(1.0));
-    EXPECT_EQ(ernie::GetVec3(scene, "/P", "missing", glm::dvec3(1.0)), glm::dvec3(1.0));
-    // Float arrays also read from the vectors short Python lists become.
-    EXPECT_EQ(ernie::GetFloats(scene, "/P", "list"), (std::vector<float>{1, 2, 3, 4, 5}));
-    EXPECT_EQ(ernie::GetFloats(scene, "/P", "v4"), (std::vector<float>{1, 2, 3, 4}));
-    EXPECT_EQ(ernie::GetFloats(scene, "/P", "dv3"), (std::vector<float>{4, 5, 6}));
-    EXPECT_EQ(ernie::GetFloats(scene, "/P", "iv2"), (std::vector<float>{5, 6}));
-    EXPECT_EQ(ernie::GetFloats(scene, "/P", "d"), (std::vector<float>{2.5f}));
+    EXPECT_EQ(ernie::GetVec2(scene, "/P", "v2", {}),
+              glm::dvec2(1.0, 2.0));
+    EXPECT_EQ(ernie::GetVec2(scene, "/P", "dv2", {}),
+              glm::dvec2(3.0, 4.0));
+    EXPECT_EQ(ernie::GetVec2(scene, "/P", "iv2", {}),
+              glm::dvec2(5.0, 6.0));
+    EXPECT_EQ(ernie::GetVec2(scene, "/P", "f", {7.0, 8.0}),
+              glm::dvec2(7.0, 8.0));
+    EXPECT_EQ(ernie::GetVec2(scene, "/P", "missing", {7.0, 8.0}),
+              glm::dvec2(7.0, 8.0));
+    EXPECT_EQ(ernie::GetVec3(scene, "/P", "v3", {}),
+              glm::dvec3(1.0, 2.0, 3.0));
+    EXPECT_EQ(ernie::GetVec3(scene, "/P", "dv3", {}),
+              glm::dvec3(4.0, 5.0, 6.0));
+    EXPECT_EQ(ernie::GetVec3(scene, "/P", "f", glm::dvec3(1.0)),
+              glm::dvec3(1.0));
+    EXPECT_EQ(ernie::GetVec3(scene, "/P", "missing", glm::dvec3(1.0)),
+              glm::dvec3(1.0));
+    // Float arrays also read from the vectors short Python lists
+    // become.
+    EXPECT_EQ(ernie::GetFloats(scene, "/P", "list"),
+              (std::vector<float>{1, 2, 3, 4, 5}));
+    EXPECT_EQ(ernie::GetFloats(scene, "/P", "v4"),
+              (std::vector<float>{1, 2, 3, 4}));
+    EXPECT_EQ(ernie::GetFloats(scene, "/P", "dv3"),
+              (std::vector<float>{4, 5, 6}));
+    EXPECT_EQ(ernie::GetFloats(scene, "/P", "iv2"),
+              (std::vector<float>{5, 6}));
+    EXPECT_EQ(ernie::GetFloats(scene, "/P", "d"),
+              (std::vector<float>{2.5f}));
     EXPECT_FALSE(ernie::GetFloats(scene, "/P", "token"));
     EXPECT_FALSE(ernie::GetFloats(scene, "/P", "missing"));
     EXPECT_EQ(ernie::GetToken(scene, "/P", "token", ""), "lambert");
     EXPECT_EQ(ernie::GetToken(scene, "/P", "f", "x"), "x");
-    EXPECT_EQ(ernie::GetTarget(scene, "/P", "target"), Path("/Looks/Rock"));
+    EXPECT_EQ(ernie::GetTarget(scene, "/P", "target"),
+              Path("/Looks/Rock"));
     EXPECT_TRUE(ernie::GetTarget(scene, "/P", "token").IsEmpty());
 }
 
 TEST(Schema, ConnectionsRoundTripAsUsdPropertyPaths) {
     Scene scene;
     scene.Define("/Looks/M", ernie::tokens::kMaterial);
-    EXPECT_FALSE(ernie::GetConnection(scene, "/Looks/M", "outputs:surface").has_value());
-    ernie::Connect(scene, "/Looks/M", "outputs:surface", "/Looks/M/Preview", "outputs:surface");
-    EXPECT_EQ(scene.Get<std::string>("/Looks/M", "outputs:surface.connect", ""),
+    EXPECT_FALSE(
+        ernie::GetConnection(scene, "/Looks/M", "outputs:surface")
+            .has_value());
+    ernie::Connect(scene, "/Looks/M", "outputs:surface",
+                   "/Looks/M/Preview", "outputs:surface");
+    EXPECT_EQ(scene.Get<std::string>("/Looks/M",
+                                     "outputs:surface.connect", ""),
               "/Looks/M/Preview.outputs:surface")
         << "the text a USD layer holds";
-    const auto connection = ernie::GetConnection(scene, "/Looks/M", "outputs:surface");
+    const auto connection =
+        ernie::GetConnection(scene, "/Looks/M", "outputs:surface");
     ASSERT_TRUE(connection.has_value());
     EXPECT_EQ(connection->prim, Path("/Looks/M/Preview"));
     EXPECT_EQ(connection->output, "outputs:surface");
 
-    for (const char* bad : {"/Looks/M/Preview", "/Looks/M/Preview.", "Looks.outputs:rgb"}) {
-        scene.Set("/Looks/M", "outputs:surface.connect", std::string(bad));
-        EXPECT_THROW(ernie::GetConnection(scene, "/Looks/M", "outputs:surface"),
+    for (const char* bad : {"/Looks/M/Preview", "/Looks/M/Preview.",
+                            "Looks.outputs:rgb"}) {
+        scene.Set("/Looks/M", "outputs:surface.connect",
+                  std::string(bad));
+        EXPECT_THROW(ernie::GetConnection(scene, "/Looks/M",
+                                          "outputs:surface"),
                      std::invalid_argument)
             << bad;
     }
 }
 
 TEST(Schema, LookAtTransformPointsTheCameraMinusZAtTheTarget) {
-    const glm::dmat4 transform =
-        ernie::LookAtTransform({0.0, -10.0, 5.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
+    const glm::dmat4 transform = ernie::LookAtTransform(
+        {0.0, -10.0, 5.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
     ExpectNear(glm::dvec3(transform[3]), {0.0, -10.0, 5.0});
-    ExpectNear(-glm::dvec3(transform[2]), glm::normalize(glm::dvec3(0.0, 10.0, -5.0)));
-    EXPECT_GT(transform[1].z, 0.0) << "camera up leans towards world up";
-    EXPECT_NEAR(glm::determinant(transform), 1.0, 1e-12) << "right-handed rotation";
-    EXPECT_THROW(ernie::LookAtTransform({1, 2, 3}, {1, 2, 3}, {0, 0, 1}), std::invalid_argument);
-    EXPECT_THROW(ernie::LookAtTransform({0, 0, 5}, {0, 0, 0}, {0, 0, 1}), std::invalid_argument);
+    ExpectNear(-glm::dvec3(transform[2]),
+               glm::normalize(glm::dvec3(0.0, 10.0, -5.0)));
+    EXPECT_GT(transform[1].z, 0.0)
+        << "camera up leans towards world up";
+    EXPECT_NEAR(glm::determinant(transform), 1.0, 1e-12)
+        << "right-handed rotation";
+    EXPECT_THROW(
+        ernie::LookAtTransform({1, 2, 3}, {1, 2, 3}, {0, 0, 1}),
+        std::invalid_argument);
+    EXPECT_THROW(
+        ernie::LookAtTransform({0, 0, 5}, {0, 0, 0}, {0, 0, 1}),
+        std::invalid_argument);
 }
 
 TEST(Schema, DistantLightTransformRoundTripsTheDirection) {
     Scene scene;
     for (const glm::dvec3 towards :
-         {glm::dvec3(1.0, 2.0, 3.0), glm::dvec3(0.0, 0.0, 1.0), glm::dvec3(0.0, 0.1, -1.0)}) {
-        const glm::dmat4 transform = ernie::DistantLightTransform(towards);
+         {glm::dvec3(1.0, 2.0, 3.0), glm::dvec3(0.0, 0.0, 1.0),
+          glm::dvec3(0.0, 0.1, -1.0)}) {
+        const glm::dmat4 transform =
+            ernie::DistantLightTransform(towards);
         EXPECT_NEAR(glm::determinant(transform), 1.0, 1e-12);
-        scene.Define("/Sun", tokens::kDistantLight).Set(tokens::kTransform, transform);
-        ExpectNear(ernie::TowardsLight(scene, "/Sun"), glm::normalize(towards));
+        scene.Define("/Sun", tokens::kDistantLight)
+            .Set(tokens::kTransform, transform);
+        ExpectNear(ernie::TowardsLight(scene, "/Sun"),
+                   glm::normalize(towards));
     }
-    EXPECT_THROW(ernie::DistantLightTransform(glm::dvec3(0.0)), std::invalid_argument);
+    EXPECT_THROW(ernie::DistantLightTransform(glm::dvec3(0.0)),
+                 std::invalid_argument);
 }
 
-TEST(Schema, CamerasAuthoredFromAnOrbitControllerReadBackTheSameView) {
+TEST(Schema,
+     CamerasAuthoredFromAnOrbitControllerReadBackTheSameView) {
     OrbitController orbit;
     orbit.target = {10.0f, 20.0f, 3.0f};
     orbit.yaw = 0.7f;
@@ -128,7 +166,8 @@ TEST(Schema, CamerasAuthoredFromAnOrbitControllerReadBackTheSameView) {
     const ernie::CameraParams camera = orbit.MakeCamera(30, 20);
     ernie::SetCamera(scene, "/Camera", camera);
     const ernie::CameraView expected = camera.RasterView();
-    const ernie::CameraView view = ernie::CameraParamsOf(scene, "/Camera", 30, 20).RasterView();
+    const ernie::CameraView view =
+        ernie::CameraParamsOf(scene, "/Camera", 30, 20).RasterView();
     EXPECT_NEAR(view.verticalFov, 0.9f, 1e-6f);
     EXPECT_NEAR(view.nearPlane, orbit.NearPlane(), 1e-4f);
     EXPECT_NEAR(view.farPlane, orbit.FarPlane(), 1e-1f);
@@ -148,36 +187,50 @@ TEST(Schema, CamerasAuthoredFromAnOrbitControllerReadBackTheSameView) {
 TEST(Schema, CameraOfUsesUsdDefaultsAndRejectsBadCameras) {
     Scene scene;
     ernie::Camera camera = ernie::Camera::Define(scene, "/Camera");
-    const ernie::CameraView view = ernie::CameraParamsOf(scene, "/Camera", 8, 8).RasterView();
-    EXPECT_NEAR(view.verticalFov, 2.0 * std::atan(15.2908 / 100.0), 1e-6);
+    const ernie::CameraView view =
+        ernie::CameraParamsOf(scene, "/Camera", 8, 8).RasterView();
+    EXPECT_NEAR(view.verticalFov, 2.0 * std::atan(15.2908 / 100.0),
+                1e-6);
     EXPECT_FLOAT_EQ(view.nearPlane, 1.0f);
     EXPECT_FLOAT_EQ(view.farPlane, 1e6f);
     EXPECT_EQ(view.forward, glm::vec3(0.0f, 0.0f, -1.0f));
 
     ernie::Xform::Define(scene, "/Xform");
-    EXPECT_THROW(ernie::CameraParamsOf(scene, "/Xform", 8, 8), std::invalid_argument);
-    EXPECT_THROW(ernie::CameraParamsOf(scene, "/Missing", 8, 8), std::invalid_argument);
+    EXPECT_THROW(ernie::CameraParamsOf(scene, "/Xform", 8, 8),
+                 std::invalid_argument);
+    EXPECT_THROW(ernie::CameraParamsOf(scene, "/Missing", 8, 8),
+                 std::invalid_argument);
     camera.SetFocalLength(0.0);
-    EXPECT_THROW(ernie::CameraParamsOf(scene, "/Camera", 8, 8), std::invalid_argument);
+    EXPECT_THROW(ernie::CameraParamsOf(scene, "/Camera", 8, 8),
+                 std::invalid_argument);
     camera.SetFocalLength(35.0).SetClippingRange({5.0, 1.0});
-    EXPECT_THROW(ernie::CameraParamsOf(scene, "/Camera", 8, 8), std::invalid_argument);
+    EXPECT_THROW(ernie::CameraParamsOf(scene, "/Camera", 8, 8),
+                 std::invalid_argument);
     camera.SetClippingRange({1.0, 5.0}).SetProjection("panoramic");
-    EXPECT_THROW(ernie::CameraParamsOf(scene, "/Camera", 8, 8), std::invalid_argument);
+    EXPECT_THROW(ernie::CameraParamsOf(scene, "/Camera", 8, 8),
+                 std::invalid_argument);
 }
 
 TEST(Scene, AttributeVersionsTrackEachAttribute) {
     Scene scene;
     scene.Define("/T", tokens::kTerrain);
     EXPECT_EQ(scene.AttributeVersion("/T", tokens::kHeights), 0u);
-    EXPECT_EQ(scene.AttributeVersion("/Missing", tokens::kHeights), 0u);
-    scene.Write("/T", tokens::kHeights, ernie::Tensor::Zeros(ernie::DType::Float32, {2, 2}));
-    const std::uint64_t heights = scene.AttributeVersion("/T", tokens::kHeights);
+    EXPECT_EQ(scene.AttributeVersion("/Missing", tokens::kHeights),
+              0u);
+    scene.Write("/T", tokens::kHeights,
+                ernie::Tensor::Zeros(ernie::DType::Float32, {2, 2}));
+    const std::uint64_t heights =
+        scene.AttributeVersion("/T", tokens::kHeights);
     EXPECT_GT(heights, 0u);
     scene.Set("/T", tokens::kExaggeration, 2.0f);
-    EXPECT_EQ(scene.AttributeVersion("/T", tokens::kHeights), heights);
-    EXPECT_GT(scene.AttributeVersion("/T", tokens::kExaggeration), heights);
+    EXPECT_EQ(scene.AttributeVersion("/T", tokens::kHeights),
+              heights);
+    EXPECT_GT(scene.AttributeVersion("/T", tokens::kExaggeration),
+              heights);
     scene.Clear("/T", tokens::kHeights);
-    EXPECT_GT(scene.AttributeVersion("/T", tokens::kHeights), heights);
+    EXPECT_GT(scene.AttributeVersion("/T", tokens::kHeights),
+              heights);
     scene.Define("/T", tokens::kMesh);
-    EXPECT_EQ(scene.AttributeVersion("/T", tokens::kExaggeration), 0u) << "retype drops them";
+    EXPECT_EQ(scene.AttributeVersion("/T", tokens::kExaggeration), 0u)
+        << "retype drops them";
 }

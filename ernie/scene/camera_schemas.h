@@ -11,13 +11,15 @@
 #include <string_view>
 #include <vector>
 
-/// UsdGeom's Camera as a reflected schema (`prim_type.h`), with Ernie's lens, exposure, shutter,
-/// scan, spectral and sensor attributes and its batch of view poses. Each declaration's fallback
-/// is the value `CameraParamsOf` resolves an unset attribute to: a default-constructed
-/// `CameraParams`'s.
+/// UsdGeom's Camera as a reflected schema (`prim_type.h`), with
+/// Ernie's lens, exposure, shutter, scan, spectral and sensor
+/// attributes and its batch of view poses. Each declaration's
+/// fallback is the value `CameraParamsOf` resolves an unset attribute
+/// to: a default-constructed `CameraParams`'s.
 ///
 /// References:
-/// - Pixar, "UsdGeomCamera", https://openusd.org/release/api/class_usd_geom_camera.html
+/// - Pixar, "UsdGeomCamera",
+/// https://openusd.org/release/api/class_usd_geom_camera.html
 
 // clang-format off
 #define ERNIE_CAMERA_ATTRIBUTES(X)                                                                 \
@@ -199,16 +201,19 @@
 
 namespace ernie {
 
-/// A camera looking down its -z axis with +y up: UsdGeomCamera's projection, apertures, clipping,
-/// exposure and shutter, and Ernie's lens, scan, spectral sampling, sensor and view poses.
+/// A camera looking down its -z axis with +y up: UsdGeomCamera's
+/// projection, apertures, clipping, exposure and shutter, and Ernie's
+/// lens, scan, spectral sampling, sensor and view poses.
 /// `CameraParamsOf` resolves it for a frame.
 class Camera : public Imageable {
     ERNIE_SCHEMA_BODY(Camera, Imageable, ERNIE_CAMERA_ALL)
     ERNIE_SCHEMA_DEFINE(Camera)
 
-    /// The quantum efficiency (nm, value) pairs of the sensor channel `channel` ("r", "g", "b" or
-    /// "mono"), or none when unset or for another channel name.
-    std::optional<std::vector<float>> GetSensorQe(std::string_view channel) const;
+    /// The quantum efficiency (nm, value) pairs of the sensor channel
+    /// `channel` ("r", "g", "b" or "mono"), or none when unset or for
+    /// another channel name.
+    std::optional<std::vector<float>>
+    GetSensorQe(std::string_view channel) const;
 };
 
 /// This file's types' registry entries, bases first (`PrimTypes`).

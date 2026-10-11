@@ -93,15 +93,21 @@ if(TARGET _ernie)
         RESULT_VARIABLE ernie_python_test_deps_missing
         OUTPUT_QUIET ERROR_QUIET)
     if(ernie_python_test_deps_missing)
-        message(WARNING "pytest or numpy not found for ${Python_EXECUTABLE}; skipping Ernie's "
-                        "Python tests")
+        message(
+            WARNING
+                "pytest or numpy not found for ${Python_EXECUTABLE}; skipping Ernie's "
+                "Python tests")
     else()
-        add_test(NAME ernie.python.pytest
-                 COMMAND "${Python_EXECUTABLE}" -m pytest -q -p no:cacheprovider
-                         "${CMAKE_CURRENT_SOURCE_DIR}/python")
+        add_test(
+            NAME ernie.python.pytest
+            COMMAND
+                "${Python_EXECUTABLE}" -m pytest -q -p
+                no:cacheprovider "${CMAKE_CURRENT_SOURCE_DIR}/python")
         set_tests_properties(
-            ernie.python.pytest PROPERTIES ENVIRONMENT "PYTHONPATH=${CMAKE_BINARY_DIR}/python"
-                                           LABELS "gpu;python")
+            ernie.python.pytest
+            PROPERTIES ENVIRONMENT
+                       "PYTHONPATH=${CMAKE_BINARY_DIR}/python" LABELS
+                       "gpu;python")
     endif()
 endif()
 
@@ -111,9 +117,12 @@ if(ERNIE_INSTALL)
         NAME ernie.install.consumer
         COMMAND
             "${CMAKE_COMMAND}" "-DBUILD_DIR=${CMAKE_BINARY_DIR}"
-            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/install_test" "-DGENERATOR=${CMAKE_GENERATOR}"
-            "-DCONFIG=$<CONFIG>" -P "${CMAKE_CURRENT_SOURCE_DIR}/install/run_install_test.cmake")
-    set_tests_properties(ernie.install.consumer PROPERTIES LABELS install)
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/install_test"
+            "-DGENERATOR=${CMAKE_GENERATOR}" "-DCONFIG=$<CONFIG>" -P
+            "${CMAKE_CURRENT_SOURCE_DIR}/install/run_install_test.cmake"
+    )
+    set_tests_properties(ernie.install.consumer PROPERTIES LABELS
+                                                           install)
 endif()
 
 if(TARGET ernie_app)

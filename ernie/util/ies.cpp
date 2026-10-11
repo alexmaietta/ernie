@@ -15,14 +15,20 @@ namespace ernie {
 
 namespace {
 
-/// Index of the interval of increasing `angles` holding `x` and the fraction across it.
-std::pair<std::size_t, double> Bracket(const std::vector<double>& angles, double x) {
-    const auto upper = std::upper_bound(angles.begin(), angles.end(), x);
+/// Index of the interval of increasing `angles` holding `x` and the
+/// fraction across it.
+std::pair<std::size_t, double>
+Bracket(const std::vector<double>& angles, double x) {
+    const auto upper =
+        std::upper_bound(angles.begin(), angles.end(), x);
     const std::size_t i = std::min<std::size_t>(
-        static_cast<std::size_t>(std::max<std::ptrdiff_t>(upper - angles.begin() - 1, 0)),
+        static_cast<std::size_t>(
+            std::max<std::ptrdiff_t>(upper - angles.begin() - 1, 0)),
         angles.size() - 2);
     const double span = angles[i + 1] - angles[i];
-    return {i, span > 0.0 ? std::clamp((x - angles[i]) / span, 0.0, 1.0) : 0.0};
+    return {i, span > 0.0
+                   ? std::clamp((x - angles[i]) / span, 0.0, 1.0)
+                   : 0.0};
 }
 
 bool Near(double a, double b) {
@@ -48,7 +54,8 @@ class Numbers {
     std::size_t Count() {
         const double value = Next();
         if (!(value >= 0.0) || value != std::floor(value)) {
-            throw std::invalid_argument("IES LM-63 file has a bad count");
+            throw std::invalid_argument(
+                "IES LM-63 file has a bad count");
         }
         return static_cast<std::size_t>(value);
     }
@@ -57,7 +64,8 @@ class Numbers {
     std::istringstream stream_;
 };
 
-/// Tilt data: the lamp-to-luminaire geometry, the number of pairs, the angles, the factors.
+/// Tilt data: the lamp-to-luminaire geometry, the number of pairs,
+/// the angles, the factors.
 IesTilt ReadTilt(Numbers& numbers) {
     IesTilt tilt;
     tilt.geometry = static_cast<int>(numbers.Next());
@@ -72,22 +80,28 @@ IesTilt ReadTilt(Numbers& numbers) {
     }
     if (tilt.geometry < 1 || tilt.geometry > 3 || pairs == 0 ||
         !std::is_sorted(tilt.angles.begin(), tilt.angles.end())) {
-        throw std::invalid_argument("IES LM-63 file has bad tilt data");
+        throw std::invalid_argument(
+            "IES LM-63 file has bad tilt data");
     }
     return tilt;
 }
 
 }  // namespace
 
-double IesTilt::AngleOf(const glm::dvec3& x, const glm::dvec3& y, const glm::dvec3& z) const {
-    const auto degrees = [](double radians) { return radians * 180.0 / M_PI; };
+double IesTilt::AngleOf(const glm::dvec3& x, const glm::dvec3& y,
+                        const glm::dvec3& z) const {
+    const auto degrees = [](double radians) {
+        return radians * 180.0 / M_PI;
+    };
     switch (geometry) {
     case 1:
         return degrees(std::acos(std::clamp(z.z, -1.0, 1.0)));
     case 2:
-        return degrees(std::asin(std::clamp(std::abs(x.z), 0.0, 1.0)));
+        return degrees(
+            std::asin(std::clamp(std::abs(x.z), 0.0, 1.0)));
     case 3:
-        return degrees(std::asin(std::clamp(std::abs(y.z), 0.0, 1.0)));
+        return degrees(
+            std::asin(std::clamp(std::abs(y.z), 0.0, 1.0)));
     default:
         return 0.0;
     }
@@ -98,7 +112,8 @@ double IesTilt::Factor(double degrees) const {
         return 1.0;
     }
     if (angles.back() <= 90.0 + 1e-9 && degrees > 90.0) {
-        degrees = 180.0 - degrees;  // data to 90 degrees mirrors about it
+        degrees =
+            180.0 - degrees;  // data to 90 degrees mirrors about it
     }
     if (degrees <= angles.front()) {
         return factors.front();
@@ -114,16 +129,21 @@ double IesProfile::Sample(double theta, double phi) const {
     if (type == IesType::C) {
         return Table(theta, phi);
     }
-    // The direction in the luminaire's frame, then the file's angles for it.
+    // The direction in the luminaire's frame, then the file's angles
+    // for it.
     const double t = theta * M_PI / 180.0;
     const double p = phi * M_PI / 180.0;
-    const glm::dvec3 e(std::sin(t) * std::cos(p), std::sin(t) * std::sin(p), -std::cos(t));
-    const auto degrees = [](double radians) { return radians * 180.0 / M_PI; };
+    const glm::dvec3 e(std::sin(t) * std::cos(p),
+                       std::sin(t) * std::sin(p), -std::cos(t));
+    const auto degrees = [](double radians) {
+        return radians * 180.0 / M_PI;
+    };
     if (type == IesType::B) {
         return Table(degrees(std::atan2(e.x, -e.z)),
                      degrees(std::asin(std::clamp(-e.y, -1.0, 1.0))));
     }
-    return Table(degrees(std::atan2(e.y, -e.z)), degrees(std::asin(std::clamp(e.x, -1.0, 1.0))));
+    return Table(degrees(std::atan2(e.y, -e.z)),
+                 degrees(std::asin(std::clamp(e.x, -1.0, 1.0))));
 }
 
 double IesProfile::Table(double v, double h) const {
@@ -131,11 +151,12 @@ double IesProfile::Table(double v, double h) const {
         return 0.0;
     }
     if (type != IesType::C) {
-        // Types A and B give one side of a symmetric luminaire from 0 degrees.
+        // Types A and B give one side of a symmetric luminaire from 0
+        // degrees.
         v = Near(vertical.front(), 0.0) ? std::abs(v) : v;
         h = Near(horizontal.front(), 0.0) ? std::abs(h) : h;
-        if (horizontal.size() > 1 &&
-            (h < horizontal.front() - 1e-9 || h > horizontal.back() + 1e-9)) {
+        if (horizontal.size() > 1 && (h < horizontal.front() - 1e-9 ||
+                                      h > horizontal.back() + 1e-9)) {
             return 0.0;
         }
     }
@@ -148,7 +169,8 @@ double IesProfile::Table(double v, double h) const {
             return candela[plane];
         }
         const auto [i, t] = Bracket(vertical, v);
-        return (1.0 - t) * candela[plane * columns + i] + t * candela[plane * columns + i + 1];
+        return (1.0 - t) * candela[plane * columns + i] +
+               t * candela[plane * columns + i + 1];
     };
     if (horizontal.size() == 1) {
         return row(0);  // rotationally symmetric, or one plane
@@ -169,9 +191,12 @@ double IesProfile::Table(double v, double h) const {
         phi = phi > 180.0 ? 360.0 - phi : phi;  // quadrants
         phi = phi > 90.0 ? 180.0 - phi : phi;
     } else if (Near(first, 0.0) && Near(last, 180.0)) {
-        phi = phi > 180.0 ? 360.0 - phi : phi;  // halves about the 0-180 plane
+        phi = phi > 180.0 ? 360.0 - phi
+                          : phi;  // halves about the 0-180 plane
     } else if (Near(first, 90.0) && Near(last, 270.0)) {
-        phi = phi < 90.0 ? 180.0 - phi : phi > 270.0 ? 540.0 - phi : phi;  // about 90-270
+        phi = phi < 90.0    ? 180.0 - phi
+              : phi > 270.0 ? 540.0 - phi
+                            : phi;  // about 90-270
     } else if (phi > last) {
         // Whole: between the last plane and the first, around again.
         const double span = first + 360.0 - last;
@@ -206,10 +231,12 @@ double IesProfile::Flux() const {
 
 namespace {
 
-std::string ReadText(const std::filesystem::path& path, std::string_view what) {
+std::string ReadText(const std::filesystem::path& path,
+                     std::string_view what) {
     std::ifstream file(path, std::ios::binary);
     if (!file) {
-        throw std::runtime_error("Cannot read " + std::string(what) + " '" + path.string() + "'");
+        throw std::runtime_error("Cannot read " + std::string(what) +
+                                 " '" + path.string() + "'");
     }
     std::ostringstream text;
     text << file.rdbuf();
@@ -218,7 +245,8 @@ std::string ReadText(const std::filesystem::path& path, std::string_view what) {
 
 }  // namespace
 
-IesProfile ParseIes(std::string_view text, const std::filesystem::path& directory) {
+IesProfile ParseIes(std::string_view text,
+                    const std::filesystem::path& directory) {
     std::istringstream lines{std::string(text)};
     std::string line;
     bool found = false;
@@ -232,20 +260,30 @@ IesProfile ParseIes(std::string_view text, const std::filesystem::path& director
         }
     }
     if (!found) {
-        throw std::invalid_argument("Not an IES LM-63 file: no TILT= line");
+        throw std::invalid_argument(
+            "Not an IES LM-63 file: no TILT= line");
     }
-    const auto blank = [](unsigned char c) { return std::isspace(c) != 0; };
-    tiltValue.erase(std::find_if_not(tiltValue.rbegin(), tiltValue.rend(), blank).base(),
-                    tiltValue.end());
-    tiltValue.erase(tiltValue.begin(), std::find_if_not(tiltValue.begin(), tiltValue.end(), blank));
-    // The rest is numbers, separated by blanks, line breaks or commas.
+    const auto blank = [](unsigned char c) {
+        return std::isspace(c) != 0;
+    };
+    tiltValue.erase(
+        std::find_if_not(tiltValue.rbegin(), tiltValue.rend(), blank)
+            .base(),
+        tiltValue.end());
+    tiltValue.erase(
+        tiltValue.begin(),
+        std::find_if_not(tiltValue.begin(), tiltValue.end(), blank));
+    // The rest is numbers, separated by blanks, line breaks or
+    // commas.
     Numbers numbers(
-        std::string((std::istreambuf_iterator<char>(lines)), std::istreambuf_iterator<char>()));
+        std::string((std::istreambuf_iterator<char>(lines)),
+                    std::istreambuf_iterator<char>()));
     IesProfile profile;
     if (tiltValue == "INCLUDE") {
         profile.tilt = ReadTilt(numbers);
     } else if (tiltValue != "NONE" && !tiltValue.empty()) {
-        Numbers file(ReadText(directory / tiltValue, "IES tilt file"));
+        Numbers file(
+            ReadText(directory / tiltValue, "IES tilt file"));
         profile.tilt = ReadTilt(file);
     }
     numbers.Next();  // number of lamps
@@ -259,10 +297,12 @@ IesProfile ParseIes(std::string_view text, const std::filesystem::path& director
     numbers.Next();  // length
     numbers.Next();  // height
     const double ballast = numbers.Next();
-    numbers.Next();  // file generation type (formerly the ballast-lamp factor)
+    numbers.Next();  // file generation type (formerly the
+                     // ballast-lamp factor)
     numbers.Next();  // input watts
     if (type != 1.0 && type != 2.0 && type != 3.0) {
-        throw std::invalid_argument("IES photometric type must be 1 (C), 2 (B) or 3 (A)");
+        throw std::invalid_argument(
+            "IES photometric type must be 1 (C), 2 (B) or 3 (A)");
     }
     profile.type = static_cast<IesType>(static_cast<int>(type));
     if (verticals == 0 || horizontals == 0) {
@@ -278,18 +318,23 @@ IesProfile ParseIes(std::string_view text, const std::filesystem::path& director
     }
     const auto increasing = [](const std::vector<double>& angles) {
         return std::is_sorted(angles.begin(), angles.end()) &&
-               std::adjacent_find(angles.begin(), angles.end()) == angles.end();
+               std::adjacent_find(angles.begin(), angles.end()) ==
+                   angles.end();
     };
-    // Type C's vertical angles run from the nadir to the zenith; types A and B's both run from
-    // -90 to 90 degrees about the beam's axis.
+    // Type C's vertical angles run from the nadir to the zenith;
+    // types A and B's both run from -90 to 90 degrees about the
+    // beam's axis.
     const bool c = profile.type == IesType::C;
     const double low = c ? 0.0 : -90.0;
     const double high = c ? 180.0 : 90.0;
-    if (!increasing(profile.vertical) || !increasing(profile.horizontal) ||
-        profile.vertical.front() < low - 1e-9 || profile.vertical.back() > high + 1e-9 ||
-        (!c &&
-         (profile.horizontal.front() < -90.0 - 1e-9 || profile.horizontal.back() > 90.0 + 1e-9))) {
-        throw std::invalid_argument("IES LM-63 file's angles are out of order or range");
+    if (!increasing(profile.vertical) ||
+        !increasing(profile.horizontal) ||
+        profile.vertical.front() < low - 1e-9 ||
+        profile.vertical.back() > high + 1e-9 ||
+        (!c && (profile.horizontal.front() < -90.0 - 1e-9 ||
+                profile.horizontal.back() > 90.0 + 1e-9))) {
+        throw std::invalid_argument(
+            "IES LM-63 file's angles are out of order or range");
     }
     profile.candela.resize(verticals * horizontals);
     for (double& value : profile.candela) {

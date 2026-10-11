@@ -14,12 +14,22 @@
 namespace ernie {
 
 /// Element types Ernie exchanges.
-enum class DType : std::uint8_t { UInt8, UInt16, UInt32, Int32, Int64, Float16, Float32, Float64 };
+enum class DType : std::uint8_t {
+    UInt8,
+    UInt16,
+    UInt32,
+    Int32,
+    Int64,
+    Float16,
+    Float32,
+    Float64
+};
 
 /// Bytes per element of `type`.
 std::size_t SizeOf(DType type);
 
-/// Where a tensor's memory lives: host memory, or the memory of a CUDA or ROCm (HIP) device.
+/// Where a tensor's memory lives: host memory, or the memory of a
+/// CUDA or ROCm (HIP) device.
 enum class DeviceKind : std::uint8_t { Cpu, Cuda, Rocm };
 
 /// True for the memory of a GPU compute device (CUDA or ROCm).
@@ -34,22 +44,24 @@ struct Device {
     bool operator==(const Device&) const = default;
 };
 
-/// A strided n-dimensional view of typed memory with an optional owner that keeps it alive: Ernie's
-/// end of DLPack.
+/// A strided n-dimensional view of typed memory with an optional
+/// owner that keeps it alive: Ernie's end of DLPack.
 ///
-/// Shapes and strides are in elements, as in DLPack; empty strides mean row-major contiguous.
-/// Copies share the memory and its owner. `FromDlpack` adopts a producer's tensor without copying
-/// and calls its deleter when the last `Tensor` referencing it is gone; `ToDlpack` hands memory to
-/// a consumer the same way.
+/// Shapes and strides are in elements, as in DLPack; empty strides
+/// mean row-major contiguous. Copies share the memory and its owner.
+/// `FromDlpack` adopts a producer's tensor without copying and calls
+/// its deleter when the last `Tensor` referencing it is gone;
+/// `ToDlpack` hands memory to a consumer the same way.
 ///
 /// Reference: DLPack, https://dmlc.github.io/dlpack/latest/
 class Tensor {
   public:
     Tensor() = default;
 
-    /// A view of `data`; `owner`, if given, is kept alive as long as any copy of the view.
-    /// @throws std::invalid_argument if a dimension is negative or strides do not match the
-    /// shape's rank.
+    /// A view of `data`; `owner`, if given, is kept alive as long as
+    /// any copy of the view.
+    /// @throws std::invalid_argument if a dimension is negative or
+    /// strides do not match the shape's rank.
     Tensor(void* data, DType type, std::vector<std::int64_t> shape,
            std::vector<std::int64_t> strides = {}, Device device = {},
            std::shared_ptr<const void> owner = {});
@@ -58,17 +70,21 @@ class Tensor {
     static Tensor Zeros(DType type, std::vector<std::int64_t> shape);
 
     /// An owning, contiguous CPU copy of `values` with `shape`.
-    /// @throws std::invalid_argument if the shape's element count differs from `values.size()`.
+    /// @throws std::invalid_argument if the shape's element count
+    /// differs from `values.size()`.
     template <typename T>
-    static Tensor Copy(std::span<const T> values, std::vector<std::int64_t> shape);
+    static Tensor Copy(std::span<const T> values,
+                       std::vector<std::int64_t> shape);
 
-    /// Adopts a DLPack tensor; its deleter runs when the last `Tensor` referencing it is gone.
-    /// @throws std::invalid_argument for an unsupported data type, lanes or device; the producer's
-    /// deleter still runs.
+    /// Adopts a DLPack tensor; its deleter runs when the last
+    /// `Tensor` referencing it is gone.
+    /// @throws std::invalid_argument for an unsupported data type,
+    /// lanes or device; the producer's deleter still runs.
     static Tensor FromDlpack(DLManagedTensorVersioned* managed);
     static Tensor FromDlpack(DLManagedTensor* managed);
 
-    /// Exports this tensor; the result keeps the memory alive until the consumer calls its deleter.
+    /// Exports this tensor; the result keeps the memory alive until
+    /// the consumer calls its deleter.
     DLManagedTensorVersioned* ToDlpack() const;
 
     bool Empty() const {
@@ -102,19 +118,23 @@ class Tensor {
 
     std::int64_t Elements() const;
 
-    /// A view of entry `index` along the first dimension, sharing this tensor's memory and owner.
-    /// @throws std::out_of_range if the tensor has no dimensions or `index` is out of range.
+    /// A view of entry `index` along the first dimension, sharing
+    /// this tensor's memory and owner.
+    /// @throws std::out_of_range if the tensor has no dimensions or
+    /// `index` is out of range.
     Tensor Row(std::int64_t index) const;
 
     bool IsContiguous() const;
 
-    /// A contiguous, owning CPU copy, or this tensor itself when it already is contiguous on the
+    /// A contiguous, owning CPU copy, or this tensor itself when it
+    /// already is contiguous on the CPU.
+    /// @throws std::invalid_argument for a tensor that is not on the
     /// CPU.
-    /// @throws std::invalid_argument for a tensor that is not on the CPU.
     Tensor Contiguous() const;
 
     /// Typed pointer to the first element.
-    /// @throws std::invalid_argument if `T` does not match the element type.
+    /// @throws std::invalid_argument if `T` does not match the
+    /// element type.
     template <typename T> T* As() const;
 
   private:
@@ -152,10 +172,13 @@ template <> constexpr DType DTypeOf<double>() {
 }
 
 template <typename T>
-Tensor Tensor::Copy(std::span<const T> values, std::vector<std::int64_t> shape) {
+Tensor Tensor::Copy(std::span<const T> values,
+                    std::vector<std::int64_t> shape) {
     Tensor tensor = Zeros(DTypeOf<T>(), std::move(shape));
-    if (static_cast<std::size_t>(tensor.Elements()) != values.size()) {
-        throw std::invalid_argument("Tensor::Copy shape does not match the number of values");
+    if (static_cast<std::size_t>(tensor.Elements()) !=
+        values.size()) {
+        throw std::invalid_argument(
+            "Tensor::Copy shape does not match the number of values");
     }
     std::copy(values.begin(), values.end(), tensor.As<T>());
     return tensor;
@@ -163,7 +186,8 @@ Tensor Tensor::Copy(std::span<const T> values, std::vector<std::int64_t> shape) 
 
 template <typename T> T* Tensor::As() const {
     if (DTypeOf<T>() != type_) {
-        throw std::invalid_argument("Tensor::As with the wrong element type");
+        throw std::invalid_argument(
+            "Tensor::As with the wrong element type");
     }
     return static_cast<T*>(data_);
 }

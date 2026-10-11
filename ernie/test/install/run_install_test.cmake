@@ -8,7 +8,9 @@ cmake_minimum_required(VERSION 3.24)
 
 foreach(variable BUILD_DIR WORK_DIR GENERATOR)
     if(NOT DEFINED ${variable})
-        message(FATAL_ERROR "run_install_test.cmake needs -D${variable}=...")
+        message(
+            FATAL_ERROR
+                "run_install_test.cmake needs -D${variable}=...")
     endif()
 endforeach()
 if(NOT CONFIG)
@@ -61,7 +63,8 @@ run("${CMAKE_COMMAND}"
     "-DCMAKE_BUILD_TYPE=${CONFIG}"
     "-DCMAKE_PREFIX_PATH=${prefix}"
     "-DREADME_CPP=${WORK_DIR}/readme_example.cpp")
-run("${CMAKE_COMMAND}" --build "${consumer_build}" --config "${CONFIG}")
+run("${CMAKE_COMMAND}" --build "${consumer_build}" --config
+    "${CONFIG}")
 
 # Both render when there is a GPU and only report it otherwise; the README's example throws
 # without one, so it runs only when the consumer found a renderer.

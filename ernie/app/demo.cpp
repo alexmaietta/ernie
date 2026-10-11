@@ -41,11 +41,16 @@ constexpr std::string_view kHelp =
 
 std::string FormatFps(double fps) {
     char text[32];
-    std::snprintf(text, sizeof(text), fps >= 10.0 ? "%.1f" : fps >= 1.0 ? "%.2f" : "%.3f", fps);
+    std::snprintf(text, sizeof(text),
+                  fps >= 10.0  ? "%.1f"
+                  : fps >= 1.0 ? "%.2f"
+                               : "%.3f",
+                  fps);
     return text;
 }
 
-double ParseNumber(const std::string& option, const std::string& text) {
+double ParseNumber(const std::string& option,
+                   const std::string& text) {
     std::size_t used = 0;
     double value = 0.0;
     try {
@@ -54,7 +59,8 @@ double ParseNumber(const std::string& option, const std::string& text) {
         used = 0;
     }
     if (used != text.size() || text.empty()) {
-        throw std::invalid_argument(option + " needs a number, not '" + text + "'");
+        throw std::invalid_argument(
+            option + " needs a number, not '" + text + "'");
     }
     return value;
 }
@@ -62,7 +68,8 @@ double ParseNumber(const std::string& option, const std::string& text) {
 bool IsNumber(const std::string& text) {
     try {
         std::size_t used = 0;
-        static_cast<void>(std::stod(text, &used));  // only whether it parses whole
+        static_cast<void>(
+            std::stod(text, &used));  // only whether it parses whole
         return used == text.size();
     } catch (const std::exception&) {
         return false;
@@ -76,7 +83,8 @@ DemoOptions ParseDemoOptions(std::span<const std::string> args) {
     for (std::size_t i = 0; i < args.size(); ++i) {
         std::string arg = args[i];
         std::optional<std::string> inlineValue;
-        if (const std::size_t equals = arg.find('='); arg.starts_with("--") && equals != arg.npos) {
+        if (const std::size_t equals = arg.find('=');
+            arg.starts_with("--") && equals != arg.npos) {
             inlineValue = arg.substr(equals + 1);
             arg.resize(equals);
         }
@@ -89,7 +97,8 @@ DemoOptions ParseDemoOptions(std::span<const std::string> args) {
             }
             return args[++i];
         };
-        // Flags with --no- forms, as argparse's BooleanOptionalAction.
+        // Flags with --no- forms, as argparse's
+        // BooleanOptionalAction.
         const auto flag = [&](std::string_view name, bool& field) {
             if (arg == "--" + std::string(name)) {
                 field = true;
@@ -108,21 +117,28 @@ DemoOptions ParseDemoOptions(std::span<const std::string> args) {
         } else if (arg == "--viewer") {
             const std::string mode = value();
             if (mode != "window" && mode != "null") {
-                throw std::invalid_argument("--viewer is 'window' or 'null', not '" + mode + "'");
+                throw std::invalid_argument(
+                    "--viewer is 'window' or 'null', not '" + mode +
+                    "'");
             }
             options.viewer = mode == "window";
         } else if (arg == "--num-frames") {
             const double frames = ParseNumber(arg, value());
-            if (frames < 0.0 || frames != static_cast<double>(static_cast<std::uint64_t>(frames))) {
-                throw std::invalid_argument("--num-frames needs a whole number of frames");
+            if (frames < 0.0 ||
+                frames != static_cast<double>(
+                              static_cast<std::uint64_t>(frames))) {
+                throw std::invalid_argument(
+                    "--num-frames needs a whole number of frames");
             }
             options.numFrames = static_cast<std::uint64_t>(frames);
         } else if (arg == "--benchmark") {
             options.benchmark = true;
             if (inlineValue) {
-                options.benchmarkSeconds = ParseNumber(arg, *inlineValue);
+                options.benchmarkSeconds =
+                    ParseNumber(arg, *inlineValue);
             } else if (i + 1 < args.size() && IsNumber(args[i + 1])) {
-                options.benchmarkSeconds = ParseNumber(arg, args[++i]);
+                options.benchmarkSeconds =
+                    ParseNumber(arg, args[++i]);
             }
         } else if (arg == "--output") {
             options.output = value();
@@ -132,8 +148,10 @@ DemoOptions ParseDemoOptions(std::span<const std::string> args) {
             options.renderer = value();
         } else if (arg == "--demo") {
             options.demo = value();
-        } else if (!flag("headless", options.headless) && !flag("test", options.test) &&
-                   !flag("paused", options.paused) && !flag("validation", options.validation) &&
+        } else if (!flag("headless", options.headless) &&
+                   !flag("test", options.test) &&
+                   !flag("paused", options.paused) &&
+                   !flag("validation", options.validation) &&
                    !flag("vsync", options.vsync)) {
             options.extra.push_back(args[i]);
         }
@@ -148,7 +166,8 @@ std::string_view DemoOptionsHelp() {
     return kHelp;
 }
 
-Demo::Demo(Viewer* viewer, const DemoOptions& options) : viewer_(viewer), options_(options) {
+Demo::Demo(Viewer* viewer, const DemoOptions& options)
+    : viewer_(viewer), options_(options) {
     if (viewer_ == nullptr) {
         ownScene_ = std::make_shared<Scene>();
     }
@@ -175,17 +194,20 @@ void Demo::SaveOutput(const std::filesystem::path& path) {
     WritePng(path, RenderImage());
 }
 
-void WritePng(const std::filesystem::path& path, const Tensor& image) {
+void WritePng(const std::filesystem::path& path,
+              const Tensor& image) {
     const std::vector<std::int64_t>& shape = image.Shape();
-    if (shape.size() != 3 || (shape[2] != 3 && shape[2] != 4) || image.Type() != DType::UInt8 ||
+    if (shape.size() != 3 || (shape[2] != 3 && shape[2] != 4) ||
+        image.Type() != DType::UInt8 ||
         image.Location().kind != DeviceKind::Cpu) {
-        throw std::invalid_argument("WritePng takes a uint8 (rows, cols, 3 or 4) CPU image");
+        throw std::invalid_argument(
+            "WritePng takes a uint8 (rows, cols, 3 or 4) CPU image");
     }
     const int rows = static_cast<int>(shape[0]);
     const int cols = static_cast<int>(shape[1]);
     const int channels = static_cast<int>(shape[2]);
-    if (stbi_write_png(path.string().c_str(), cols, rows, channels, image.Data(),
-                       cols * channels) == 0) {
+    if (stbi_write_png(path.string().c_str(), cols, rows, channels,
+                       image.Data(), cols * channels) == 0) {
         throw std::runtime_error("Cannot write " + path.string());
     }
 }
@@ -208,7 +230,8 @@ WidgetPanel& Demo::Widgets() {
 
 std::shared_ptr<WidgetPanel> Demo::SharedWidgets() {
     if (!widgets_) {
-        widgets_ = std::make_shared<WidgetPanel>("Options", Dock::Floating);
+        widgets_ =
+            std::make_shared<WidgetPanel>("Options", Dock::Floating);
     }
     return widgets_;
 }
@@ -251,8 +274,8 @@ Renderer& Demo::GetRenderer() {
 
 std::shared_ptr<Renderer> Demo::SharedRenderer() {
     if (!renderer_) {
-        renderer_ = std::make_shared<Renderer>(
-            RendererOptions{options_.renderer, options_.device, options_.validation});
+        renderer_ = std::make_shared<Renderer>(RendererOptions{
+            options_.renderer, options_.device, options_.validation});
     }
     return renderer_;
 }
@@ -297,13 +320,16 @@ DemoRegistration::DemoRegistration(DemoInfo info) {
 
 std::vector<DemoInfo> RegisteredDemos() {
     std::vector<DemoInfo> demos = Registry();
-    std::sort(demos.begin(), demos.end(), [](const DemoInfo& a, const DemoInfo& b) {
-        return std::tie(a.category, a.name) < std::tie(b.category, b.name);
-    });
+    std::sort(demos.begin(), demos.end(),
+              [](const DemoInfo& a, const DemoInfo& b) {
+                  return std::tie(a.category, a.name) <
+                         std::tie(b.category, b.name);
+              });
     return demos;
 }
 
-std::optional<std::size_t> FindDemo(std::span<const DemoInfo> demos, std::string_view id) {
+std::optional<std::size_t> FindDemo(std::span<const DemoInfo> demos,
+                                    std::string_view id) {
     std::string wanted(id);
     std::replace(wanted.begin(), wanted.end(), ' ', '_');
     for (std::size_t i = 0; i < demos.size(); ++i) {
@@ -325,7 +351,8 @@ struct DemoRunner::State {
     /// The scope the running demo registers in.
     std::uint64_t scope = 0;
 
-    // What the viewport showed before any demo, restored when the Demos panel switches.
+    // What the viewport showed before any demo, restored when the
+    // Demos panel switches.
     ViewportDisplay display;
     Viewer::Exposure exposure = Viewer::Exposure::Default;
     double compensation = 0.0;
@@ -334,7 +361,8 @@ struct DemoRunner::State {
     Viewer::Gizmo gizmo = Viewer::Gizmo::None;
     bool gizmoLocal = false;
 
-    // The Demos panel, the demo it shows, and what it asked for during the last frame.
+    // The Demos panel, the demo it shows, and what it asked for
+    // during the last frame.
     Panel* panel = nullptr;
     Demo* running = nullptr;
     std::string about;  ///< The running demo's description.
@@ -356,7 +384,8 @@ struct DemoRunner::State {
     void Announce(Demo& demo) {
         running = &demo;
         about = DescriptionOf(demo);
-        viewer->Log(LogLevel::Info, "Demo: " + (about.empty() ? "untitled" : about));
+        viewer->Log(LogLevel::Info,
+                    "Demo: " + (about.empty() ? "untitled" : about));
     }
 
     std::string DescriptionOf(Demo& demo) const {
@@ -370,31 +399,39 @@ struct DemoRunner::State {
     void AddPanel() {
         const std::uint64_t previous = viewer->Scope();
         viewer->SetScope(0);
-        // In the bottom dock with the Log and Stats, the Log staying in front.
-        panel = &viewer->AddPanel("Demos", Dock::Bottom, [this](Viewer& v) { DrawPanel(v); });
+        // In the bottom dock with the Log and Stats, the Log staying
+        // in front.
+        panel =
+            &viewer->AddPanel("Demos", Dock::Bottom,
+                              [this](Viewer& v) { DrawPanel(v); });
         if (viewer->FindPanel("Log") != nullptr) {
             viewer->FocusPanel("Log");
         }
         viewer->SetScope(previous);
     }
 
-    /// The Demos panel, after Newton's example browser: a menu of the demos with a node per
-    /// category, the running demo's controls and description, and its own options.
+    /// The Demos panel, after Newton's example browser: a menu of the
+    /// demos with a node per category, the running demo's controls
+    /// and description, and its own options.
     void DrawPanel(Viewer& v) {
-        // A collapsing header per category, the catalogue listing each category's demos
-        // together; the running demo's opens first.
+        // A collapsing header per category, the catalogue listing
+        // each category's demos together; the running demo's opens
+        // first.
         for (std::size_t first = 0; first < catalog.size();) {
             const std::string& category = catalog[first].category;
             std::size_t end = first;
-            while (end < catalog.size() && catalog[end].category == category) {
+            while (end < catalog.size() &&
+                   catalog[end].category == category) {
                 ++end;
             }
-            ImGui::SetNextItemOpen(current >= first && current < end, ImGuiCond_Appearing);
+            ImGui::SetNextItemOpen(current >= first && current < end,
+                                   ImGuiCond_Appearing);
             if (ImGui::CollapsingHeader(category.c_str())) {
                 ImGui::Indent();
                 for (std::size_t i = first; i < end; ++i) {
                     if (ImGui::Selectable(catalog[i].name.c_str(),
-                                          i == current && running != nullptr)) {
+                                          i == current &&
+                                              running != nullptr)) {
                         switchTo = i;
                     }
                 }
@@ -402,7 +439,8 @@ struct DemoRunner::State {
             }
             first = end;
         }
-        ImGui::SeparatorText(running != nullptr && current < catalog.size()
+        ImGui::SeparatorText(running != nullptr &&
+                                     current < catalog.size()
                                  ? catalog[current].Label().c_str()
                                  : "No demo");
         ImGui::Checkbox("Paused", &paused);
@@ -418,8 +456,10 @@ struct DemoRunner::State {
             return;
         }
         ImGui::SameLine();
-        ImGui::TextDisabled("frame %llu, %.2f s", static_cast<unsigned long long>(running->frame),
-                            running->time);
+        ImGui::TextDisabled(
+            "frame %llu, %.2f s",
+            static_cast<unsigned long long>(running->frame),
+            running->time);
         if (!about.empty()) {
             ImGui::TextWrapped("%s", about.c_str());
         }
@@ -430,13 +470,16 @@ struct DemoRunner::State {
         ImGui::PopID();
     }
 
-    /// Replaces `old` with a new build of the catalogue's demo `index`; null, with the error in
-    /// the log, if it cannot be built.
-    std::shared_ptr<Demo> Load(std::shared_ptr<Demo> old, std::size_t index) {
+    /// Replaces `old` with a new build of the catalogue's demo
+    /// `index`; null, with the error in the log, if it cannot be
+    /// built.
+    std::shared_ptr<Demo> Load(std::shared_ptr<Demo> old,
+                               std::size_t index) {
         running = nullptr;
         if (old) {
             old->Close();
-            // Its widgets' callbacks may hold it (in Python, a cycle through C++).
+            // Its widgets' callbacks may hold it (in Python, a cycle
+            // through C++).
             old->Widgets().Clear();
         }
         viewer->RemoveScope(scope);
@@ -448,15 +491,19 @@ struct DemoRunner::State {
         DemoOptions demoOptions = options;
         demoOptions.extra.clear();
         try {
-            std::shared_ptr<Demo> demo = catalog.at(index).create(viewer.get(), demoOptions);
+            std::shared_ptr<Demo> demo =
+                catalog.at(index).create(viewer.get(), demoOptions);
             viewer->ResetSession();
             current = index;
             Announce(*demo);
             return demo;
         } catch (const std::exception& error) {
             viewer->Log(LogLevel::Error,
-                        "Could not load " + catalog.at(index).Label() + ": " + error.what());
-            std::fprintf(stderr, "Could not load %s: %s\n", catalog.at(index).Label().c_str(),
+                        "Could not load " +
+                            catalog.at(index).Label() + ": " +
+                            error.what());
+            std::fprintf(stderr, "Could not load %s: %s\n",
+                         catalog.at(index).Label().c_str(),
                          error.what());
             viewer->RemoveScope(scope);
             viewer->ClearScene();
@@ -466,8 +513,8 @@ struct DemoRunner::State {
         }
     }
 
-    /// Removes the running demo's registrations and the panel, which hold the demo (and in
-    /// Python, through it the viewer).
+    /// Removes the running demo's registrations and the panel, which
+    /// hold the demo (and in Python, through it the viewer).
     void Release() {
         running = nullptr;
         if (!viewer) {
@@ -524,9 +571,11 @@ const DemoOptions& DemoRunner::Options() const {
     return state_->options;
 }
 
-void DemoRunner::SetCatalog(std::vector<DemoInfo> demos, std::size_t current) {
+void DemoRunner::SetCatalog(std::vector<DemoInfo> demos,
+                            std::size_t current) {
     if (!demos.empty() && current >= demos.size()) {
-        throw std::out_of_range("The current demo is not in the catalogue");
+        throw std::out_of_range(
+            "The current demo is not in the catalogue");
     }
     state_->catalog = std::move(demos);
     state_->current = current;
@@ -545,10 +594,12 @@ std::shared_ptr<Demo> DemoRunner::Create(std::size_t index) {
 void DemoRunner::RequestSwitch(std::size_t index) {
     State& s = *state_;
     if (!s.viewer) {
-        throw std::logic_error("Only a runner with a viewer switches demos");
+        throw std::logic_error(
+            "Only a runner with a viewer switches demos");
     }
     if (index >= s.catalog.size()) {
-        throw std::out_of_range("No demo " + std::to_string(index) + " in the catalogue");
+        throw std::out_of_range("No demo " + std::to_string(index) +
+                                " in the catalogue");
     }
     s.switchTo = index;
 }
@@ -556,7 +607,8 @@ void DemoRunner::RequestSwitch(std::size_t index) {
 void DemoRunner::RequestReset() {
     State& s = *state_;
     if (!s.viewer || s.catalog.empty()) {
-        throw std::logic_error("Only a runner with a viewer and a catalogue resets demos");
+        throw std::logic_error("Only a runner with a viewer and a "
+                               "catalogue resets demos");
     }
     s.resetRequested = true;
 }
@@ -572,8 +624,9 @@ std::shared_ptr<Demo> DemoRunner::Run(std::shared_ptr<Demo> demo) {
     try {
         if (viewer != nullptr) {
             viewer->ResetSession();
-            // The Demos panel, also in a hidden viewer, whose window captures show it; not in
-            // test runs, which check one demo.
+            // The Demos panel, also in a hidden viewer, whose window
+            // captures show it; not in test runs, which check one
+            // demo.
             if (!o.test) {
                 s.AddPanel();
             }
@@ -585,7 +638,8 @@ std::shared_ptr<Demo> DemoRunner::Run(std::shared_ptr<Demo> demo) {
         Clock::time_point last = Clock::now();
         while (viewer == nullptr || viewer->IsOpen()) {
             if (s.switchTo || s.resetRequested) {
-                const std::size_t index = s.switchTo.value_or(s.current);
+                const std::size_t index =
+                    s.switchTo.value_or(s.current);
                 s.switchTo.reset();
                 s.resetRequested = false;
                 demo = s.Load(std::move(demo), index);
@@ -595,17 +649,21 @@ std::shared_ptr<Demo> DemoRunner::Run(std::shared_ptr<Demo> demo) {
                 continue;
             }
             const std::optional<std::uint64_t> limit =
-                o.numFrames ? o.numFrames
-                            : (o.Windowed() ? std::nullopt
-                                            : std::optional<std::uint64_t>(demo->NumFrames()));
+                o.numFrames
+                    ? o.numFrames
+                    : (o.Windowed() ? std::nullopt
+                                    : std::optional<std::uint64_t>(
+                                          demo->NumFrames()));
             if (limit && demo->frame >= *limit) {
                 break;
             }
             const Clock::time_point now = Clock::now();
-            demo->frameDt = o.Windowed()
-                                ? std::min(std::chrono::duration<double>(now - last).count(),
-                                           demo->MaxFrameDt())
-                                : demo->FixedDt();
+            demo->frameDt =
+                o.Windowed() ? std::min(std::chrono::duration<double>(
+                                            now - last)
+                                            .count(),
+                                        demo->MaxFrameDt())
+                             : demo->FixedDt();
             last = now;
             bool stepping = !s.paused;
             if (s.paused && s.singleStep) {
@@ -629,8 +687,9 @@ std::shared_ptr<Demo> DemoRunner::Run(std::shared_ptr<Demo> demo) {
                 } else if (timerStart) {
                     ++timedFrames;
                     if (o.benchmarkSeconds &&
-                        std::chrono::duration<double>(Clock::now() - *timerStart).count() >=
-                            *o.benchmarkSeconds) {
+                        std::chrono::duration<double>(Clock::now() -
+                                                      *timerStart)
+                                .count() >= *o.benchmarkSeconds) {
                         break;
                     }
                 }
@@ -645,27 +704,35 @@ std::shared_ptr<Demo> DemoRunner::Run(std::shared_ptr<Demo> demo) {
             demo->TestFinal();
             if (demo->Untested()) {
                 throw std::logic_error(
-                    "The demo has no checks: override TestFinal or TestPostStep (test_final or "
+                    "The demo has no checks: override TestFinal or "
+                    "TestPostStep (test_final or "
                     "test_post_step in Python)");
             }
         }
         if (o.benchmark) {
             if (!timerStart) {
-                std::printf("Benchmark: too few frames to time (warm-up is %llu)\n",
-                            static_cast<unsigned long long>(kBenchmarkWarmup));
+                std::printf("Benchmark: too few frames to time "
+                            "(warm-up is %llu)\n",
+                            static_cast<unsigned long long>(
+                                kBenchmarkWarmup));
             } else {
-                const double elapsed =
-                    std::chrono::duration<double>(Clock::now() - *timerStart).count();
+                const double elapsed = std::chrono::duration<double>(
+                                           Clock::now() - *timerStart)
+                                           .count();
                 std::printf(
                     "Benchmark: %s FPS (%llu frames in %.2f s)\n",
-                    FormatFps(static_cast<double>(timedFrames) / std::max(elapsed, 1e-9)).c_str(),
-                    static_cast<unsigned long long>(timedFrames), elapsed);
+                    FormatFps(static_cast<double>(timedFrames) /
+                              std::max(elapsed, 1e-9))
+                        .c_str(),
+                    static_cast<unsigned long long>(timedFrames),
+                    elapsed);
             }
         }
         std::fflush(stdout);
         if (demo) {
             demo->Close();
-            // Its widgets' callbacks may hold it (in Python, a cycle through C++).
+            // Its widgets' callbacks may hold it (in Python, a cycle
+            // through C++).
             demo->Widgets().Clear();
         }
     } catch (...) {
@@ -682,29 +749,37 @@ std::shared_ptr<Demo> DemoRunner::Run(std::shared_ptr<Demo> demo) {
     return demo;
 }
 
-int DemoMain(int argc, char** argv, std::vector<DemoInfo> demos, std::size_t start) {
+int DemoMain(int argc, char** argv, std::vector<DemoInfo> demos,
+             std::size_t start) {
     const std::string program =
-        argc > 0 ? std::filesystem::path(argv[0]).filename().string() : std::string("demo");
+        argc > 0 ? std::filesystem::path(argv[0]).filename().string()
+                 : std::string("demo");
     DemoOptions options;
     try {
-        options = ParseDemoOptions(std::vector<std::string>(argv + std::min(argc, 1), argv + argc));
+        options = ParseDemoOptions(std::vector<std::string>(
+            argv + std::min(argc, 1), argv + argc));
     } catch (const std::invalid_argument& error) {
-        std::fprintf(stderr, "%s: %s\n\nUsage: %s [options]\n\n%s", program.c_str(), error.what(),
-                     program.c_str(), std::string(kHelp).c_str());
+        std::fprintf(stderr, "%s: %s\n\nUsage: %s [options]\n\n%s",
+                     program.c_str(), error.what(), program.c_str(),
+                     std::string(kHelp).c_str());
         return 2;
     }
     if (!options.demo.empty()) {
-        const std::optional<std::size_t> found = FindDemo(demos, options.demo);
+        const std::optional<std::size_t> found =
+            FindDemo(demos, options.demo);
         if (!found) {
-            std::fprintf(stderr, "%s: no demo named '%s' (--list lists them)\n", program.c_str(),
-                         options.demo.c_str());
+            std::fprintf(
+                stderr,
+                "%s: no demo named '%s' (--list lists them)\n",
+                program.c_str(), options.demo.c_str());
             return 2;
         }
         start = *found;
     }
     if (options.help) {
         std::printf("Usage: %s [options]\n\n", program.c_str());
-        if (start < demos.size() && !demos[start].description.empty()) {
+        if (start < demos.size() &&
+            !demos[start].description.empty()) {
             std::printf("%s\n\n", demos[start].description.c_str());
         }
         std::printf("Options:\n%s", std::string(kHelp).c_str());
@@ -725,7 +800,8 @@ int DemoMain(int argc, char** argv, std::vector<DemoInfo> demos, std::size_t sta
         runner.SetCatalog(std::move(demos), start);
         runner.Run(runner.Create(start));
     } catch (const std::exception& error) {
-        std::fprintf(stderr, "%s: %s\n", program.c_str(), error.what());
+        std::fprintf(stderr, "%s: %s\n", program.c_str(),
+                     error.what());
         return 1;
     }
     return 0;

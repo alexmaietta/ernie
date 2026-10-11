@@ -13,7 +13,9 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(implot)
 
-add_library(ernie_implot STATIC "${implot_SOURCE_DIR}/implot.cpp"
-                                "${implot_SOURCE_DIR}/implot_items.cpp")
-target_include_directories(ernie_implot SYSTEM PUBLIC "${implot_SOURCE_DIR}")
+add_library(
+    ernie_implot STATIC "${implot_SOURCE_DIR}/implot.cpp"
+                        "${implot_SOURCE_DIR}/implot_items.cpp")
+target_include_directories(ernie_implot SYSTEM
+                           PUBLIC "${implot_SOURCE_DIR}")
 target_link_libraries(ernie_implot PUBLIC dear_imgui)

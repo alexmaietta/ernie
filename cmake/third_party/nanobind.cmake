@@ -3,10 +3,15 @@
 if(NOT COMMAND nanobind_add_module)
     set(ERNIE_DEP_VERSION_nanobind
         v3.1.0
-        CACHE STRING "Tag of nanobind to fetch when it is not installed for the target Python.")
+        CACHE
+            STRING
+            "Tag of nanobind to fetch when it is not installed for the target Python."
+    )
     mark_as_advanced(ERNIE_DEP_VERSION_nanobind)
-    find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module
-                                                 ${SKBUILD_SABI_COMPONENT})
+    find_package(
+        Python 3.10 REQUIRED
+        COMPONENTS Interpreter Development.Module
+                   ${SKBUILD_SABI_COMPONENT})
     execute_process(
         COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
         OUTPUT_VARIABLE nanobind_ROOT

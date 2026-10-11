@@ -14,7 +14,8 @@ using namespace ernie::app;
 
 TEST(ThemeTest, DarkThemeHasDarkOpaquePanelsAndBrighterText) {
     const Theme theme = DarkTheme();
-    for (const glm::vec4& colour : {theme.background, theme.panel, theme.header, theme.field}) {
+    for (const glm::vec4& colour :
+         {theme.background, theme.panel, theme.header, theme.field}) {
         EXPECT_FLOAT_EQ(colour.a, 1.0f);
         EXPECT_LT(colour.r + colour.g + colour.b, 1.0f);
     }
@@ -40,7 +41,8 @@ TEST(ThemeTest, ApplyThemeWritesColoursAndScalesMetrics) {
     EXPECT_FLOAT_EQ(style.Colors[ImGuiCol_WindowBg].x, theme.panel.r);
     EXPECT_FLOAT_EQ(style.Colors[ImGuiCol_CheckMark].z, 0.3f);
     EXPECT_FLOAT_EQ(style.Colors[ImGuiCol_Text].y, theme.text.g);
-    EXPECT_FLOAT_EQ(style.FramePadding.x, theme.framePadding.x * 2.0f);
+    EXPECT_FLOAT_EQ(style.FramePadding.x,
+                    theme.framePadding.x * 2.0f);
     EXPECT_FLOAT_EQ(style.FrameRounding, theme.rounding * 2.0f);
     EXPECT_FLOAT_EQ(style.FontSizeBase, theme.fontSize);
     EXPECT_FLOAT_EQ(style.FontScaleDpi, 2.0f);
@@ -53,7 +55,8 @@ TEST(ThemeTest, ApplyThemeResetsEarlierStyleChanges) {
     EXPECT_FLOAT_EQ(style.Alpha, 1.0f);
 }
 
-TEST(ThemeTest, ViewerOptionsDefaultToAVisibleWindowWithTheDarkTheme) {
+TEST(ThemeTest,
+     ViewerOptionsDefaultToAVisibleWindowWithTheDarkTheme) {
     const ViewerOptions options;
     EXPECT_FALSE(options.hidden);
     EXPECT_TRUE(options.layout.empty());

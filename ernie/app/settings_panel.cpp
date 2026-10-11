@@ -51,13 +51,16 @@ class SettingsPanel final : public Panel {
   private:
     /// The viewer's own settings, which change only the viewport.
     static void DrawViewer(Viewer& viewer) {
-        if (!ImGui::BeginTable("##viewer", 2, ImGuiTableFlags_SizingFixedFit)) {
+        if (!ImGui::BeginTable("##viewer", 2,
+                               ImGuiTableFlags_SizingFixedFit)) {
             return;
         }
-        ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthFixed,
-                                viewer.GetTheme().propertyLabelWidth * ImGui::GetFontSize() /
-                                    viewer.GetTheme().fontSize);
-        ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn(
+            "name", ImGuiTableColumnFlags_WidthFixed,
+            viewer.GetTheme().propertyLabelWidth *
+                ImGui::GetFontSize() / viewer.GetTheme().fontSize);
+        ImGui::TableSetupColumn("value",
+                                ImGuiTableColumnFlags_WidthStretch);
         const auto row = [](const char* label) {
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
@@ -67,9 +70,11 @@ class SettingsPanel final : public Panel {
             ImGui::SetNextItemWidth(-1.0f);
         };
         row("Renderer");
-        if (ImGui::BeginCombo("##renderer", viewer.Renderer().c_str())) {
+        if (ImGui::BeginCombo("##renderer",
+                              viewer.Renderer().c_str())) {
             for (const std::string& name : Viewer::Renderers()) {
-                if (ImGui::Selectable(name.c_str(), name == viewer.Renderer()) &&
+                if (ImGui::Selectable(name.c_str(),
+                                      name == viewer.Renderer()) &&
                     name != viewer.Renderer()) {
                     try {
                         viewer.SetRenderer(name);
@@ -82,34 +87,45 @@ class SettingsPanel final : public Panel {
         }
         row("Shows");
         if (ImGui::BeginCombo("##var", viewer.ViewVar().c_str())) {
-            for (const std::string& name : viewer.Delegate().ViewVars()) {
-                if (ImGui::Selectable(name.c_str(), name == viewer.ViewVar())) {
+            for (const std::string& name :
+                 viewer.Delegate().ViewVars()) {
+                if (ImGui::Selectable(name.c_str(),
+                                      name == viewer.ViewVar())) {
                     viewer.SetViewVar(name);
                 }
             }
             ImGui::EndCombo();
         }
         row("Lighting");
-        if (ImGui::BeginCombo("##lighting", LightingName(viewer.GetLighting()))) {
-            for (const Lighting mode : {Lighting::Stage, Lighting::Camera, Lighting::Default}) {
-                if (ImGui::Selectable(LightingName(mode), mode == viewer.GetLighting())) {
+        if (ImGui::BeginCombo("##lighting",
+                              LightingName(viewer.GetLighting()))) {
+            for (const Lighting mode :
+                 {Lighting::Stage, Lighting::Camera,
+                  Lighting::Default}) {
+                if (ImGui::Selectable(LightingName(mode),
+                                      mode == viewer.GetLighting())) {
                     viewer.SetLighting(mode);
                 }
             }
             ImGui::EndCombo();
         }
         row("Wireframe");
-        const std::optional<Wireframe> wireframe = viewer.GetWireframe();
+        const std::optional<Wireframe> wireframe =
+            viewer.GetWireframe();
         const char* wireNames[] = {"Off", "Overlay", "Hidden line"};
         const char* wireLabel =
-            wireframe ? wireNames[static_cast<std::size_t>(*wireframe)] : "From settings";
+            wireframe
+                ? wireNames[static_cast<std::size_t>(*wireframe)]
+                : "From settings";
         if (ImGui::BeginCombo("##wireframe", wireLabel)) {
             if (ImGui::Selectable("From settings", !wireframe)) {
                 viewer.SetWireframe(std::nullopt);
             }
             for (std::uint32_t mode = 0; mode < 3; ++mode) {
-                if (ImGui::Selectable(wireNames[mode], wireframe && static_cast<std::uint32_t>(
-                                                                        *wireframe) == mode)) {
+                if (ImGui::Selectable(wireNames[mode],
+                                      wireframe &&
+                                          static_cast<std::uint32_t>(
+                                              *wireframe) == mode)) {
                     viewer.SetWireframe(static_cast<Wireframe>(mode));
                 }
             }
@@ -123,19 +139,24 @@ class SettingsPanel final : public Panel {
         row("Auto exposure");
         bool automatic = viewer.AutoExposing();
         if (ImGui::Checkbox("##autoExposure", &automatic)) {
-            viewer.SetExposure(automatic ? Viewer::Exposure::Auto : Viewer::Exposure::Camera);
+            viewer.SetExposure(automatic ? Viewer::Exposure::Auto
+                                         : Viewer::Exposure::Camera);
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Key the scene's metered luminance to middle grey; off, the camera's "
+            ImGui::SetTooltip("Key the scene's metered luminance to "
+                              "middle grey; off, the camera's "
                               "own exposure applies");
         }
         row("Exposure comp.");
-        float stops = static_cast<float>(viewer.ExposureCompensation());
-        if (ImGui::SliderFloat("##compensation", &stops, -6.0f, 6.0f, "%+.1f EV")) {
+        float stops =
+            static_cast<float>(viewer.ExposureCompensation());
+        if (ImGui::SliderFloat("##compensation", &stops, -6.0f, 6.0f,
+                               "%+.1f EV")) {
             viewer.SetExposureCompensation(stops);
         }
         row("Gizmo");
-        const char* gizmoNames[] = {"None", "Translate", "Rotate", "Scale"};
+        const char* gizmoNames[] = {"None", "Translate", "Rotate",
+                                    "Scale"};
         int gizmo = static_cast<int>(viewer.GetGizmo());
         if (ImGui::Combo("##gizmo", &gizmo, gizmoNames, 4)) {
             viewer.SetGizmo(static_cast<Viewer::Gizmo>(gizmo));
@@ -159,14 +180,16 @@ class SettingsPanel final : public Panel {
     void DrawRender(Viewer& viewer) {
         Scene& scene = viewer.GetScene();
         std::vector<Path> choices;
-        for (const Path& path : scene.Prims(tokens::kRenderSettings)) {
+        for (const Path& path :
+             scene.Prims(tokens::kRenderSettings)) {
             if (!IsSessionPath(path)) {
                 choices.push_back(path);
             }
         }
         const Path& settings = viewer.Settings();
         if (choices.empty() || settings.IsEmpty()) {
-            ImGui::TextWrapped("The scene has no RenderSettings: the viewport uses Ernie's "
+            ImGui::TextWrapped("The scene has no RenderSettings: the "
+                               "viewport uses Ernie's "
                                "fallbacks.");
             if (ImGui::Button("Create /Render/Settings")) {
                 const Path path("/Render/Settings");
@@ -178,18 +201,21 @@ class SettingsPanel final : public Panel {
             return;
         }
         ImGui::SetNextItemWidth(-1.0f);
-        if (ImGui::BeginCombo("##settings", settings.String().c_str())) {
+        if (ImGui::BeginCombo("##settings",
+                              settings.String().c_str())) {
             for (const Path& path : choices) {
-                if (ImGui::Selectable(path.String().c_str(), path == settings)) {
+                if (ImGui::Selectable(path.String().c_str(),
+                                      path == settings)) {
                     viewer.SetSettings(path);
                 }
             }
             ImGui::EndCombo();
         }
-        const std::string error =
-            DrawPropertySections(viewer, settings, schema_, PropertyLabelWidth(viewer));
+        const std::string error = DrawPropertySections(
+            viewer, settings, schema_, PropertyLabelWidth(viewer));
         if (!error.empty()) {
-            ImGui::TextColored(ImVec4(0.89f, 0.34f, 0.32f, 1.0f), "%s", error.c_str());
+            ImGui::TextColored(ImVec4(0.89f, 0.34f, 0.32f, 1.0f),
+                               "%s", error.c_str());
         }
     }
 

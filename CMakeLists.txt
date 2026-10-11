@@ -23,21 +23,29 @@ set(ERNIE_VERSION "${PROJECT_VERSION}${ERNIE_VERSION_SUFFIX}")
 
 option(ERNIE_BUILD_TESTS "Build Ernie's tests" OFF)
 option(ERNIE_BUILD_PYTHON "Build Ernie's Python module" OFF)
-option(ERNIE_BUILD_DEMOS "Build a program for each of Ernie's C++ demos" OFF)
-option(ERNIE_BUILD_APP
-       "Build Ernie's app, the GUI viewer (GLFW, Dear ImGui, ImPlot, ImGuizmo, fonts)" OFF)
-option(ERNIE_TRACY "Instrument Ernie for the Tracy profiler (CPU and Vulkan GPU zones, on demand)"
-       OFF)
+option(ERNIE_BUILD_DEMOS
+       "Build a program for each of Ernie's C++ demos" OFF)
+option(
+    ERNIE_BUILD_APP
+    "Build Ernie's app, the GUI viewer (GLFW, Dear ImGui, ImPlot, ImGuizmo, fonts)"
+    OFF)
+option(
+    ERNIE_TRACY
+    "Instrument Ernie for the Tracy profiler (CPU and Vulkan GPU zones, on demand)"
+    OFF)
 option(ERNIE_CCACHE "Compile through ccache when it is installed" ON)
 # libernie and the install rules need CMake 3.24's whole-archive linking; Windows needs export
 # annotations first.
-option(ERNIE_INSTALL "Build libernie, the shared library, and Ernie's install rules and packages"
-       OFF)
+option(
+    ERNIE_INSTALL
+    "Build libernie, the shared library, and Ernie's install rules and packages"
+    OFF)
 if(ERNIE_INSTALL AND CMAKE_VERSION VERSION_LESS 3.24)
     message(FATAL_ERROR "ERNIE_INSTALL needs CMake 3.24 or later")
 endif()
 if(ERNIE_INSTALL AND WIN32)
-    message(FATAL_ERROR "ERNIE_INSTALL is not supported on Windows yet")
+    message(
+        FATAL_ERROR "ERNIE_INSTALL is not supported on Windows yet")
 endif()
 
 set(ERNIE_SOURCE_DIR
@@ -46,7 +54,8 @@ set(ERNIE_SOURCE_DIR
 
 # An optimised build with debug info unless a build type is given: Ernie's CPU side (frame setup,
 # culling lists, scene sync) is many times slower without optimisation.
-get_property(ernie_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+get_property(ernie_multi_config GLOBAL
+             PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(PROJECT_IS_TOP_LEVEL
    AND NOT ernie_multi_config
    AND NOT CMAKE_BUILD_TYPE)
@@ -99,16 +108,20 @@ include(cmake/third_party/json.cmake)
 # Warning and coverage flags: TerrainGen's when built inside it, Ernie's own otherwise.
 add_library(ernie_build_options INTERFACE)
 if(TARGET terraingen_warnings)
-    target_link_libraries(ernie_build_options INTERFACE terraingen_warnings terraingen_coverage)
+    target_link_libraries(
+        ernie_build_options INTERFACE terraingen_warnings
+                                      terraingen_coverage)
 elseif(MSVC)
     # Standard conformance (two-phase lookup, __cplusplus as the real standard), UTF-8 sources, and
     # room for large objects (the templated bindings and schemas).
-    target_compile_options(ernie_build_options INTERFACE /W4 /permissive- /Zc:__cplusplus /utf-8
-                                                         /bigobj)
+    target_compile_options(
+        ernie_build_options INTERFACE /W4 /permissive-
+                                      /Zc:__cplusplus /utf-8 /bigobj)
     # M_PI and the other math constants, which MSVC's <cmath> declares only on request; and
     # <windows.h> lean and without min and max macros, wherever it comes in.
-    target_compile_definitions(ernie_build_options INTERFACE _USE_MATH_DEFINES WIN32_LEAN_AND_MEAN
-                                                             NOMINMAX)
+    target_compile_definitions(
+        ernie_build_options INTERFACE _USE_MATH_DEFINES
+                                      WIN32_LEAN_AND_MEAN NOMINMAX)
 else()
     target_compile_options(
         ernie_build_options

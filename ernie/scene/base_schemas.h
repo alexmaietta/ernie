@@ -4,10 +4,12 @@
 #include "ernie/scene/prim_type.h"
 #include "ernie/scene/tokens.h"
 
-/// The bases every prim type derives from, as reflected schemas (`prim_type.h`): `Imageable`
-/// (what every prim has: visibility and its batch world), `Boundable` (what has bounds: an
-/// extent), `Gprim` (geometry: a display colour and a material), and the plain grouping prims
-/// `Xform` and `Scope`. Transforms are xformOps, set and read through `xform.h`.
+/// The bases every prim type derives from, as reflected schemas
+/// (`prim_type.h`): `Imageable` (what every prim has: visibility and
+/// its batch world), `Boundable` (what has bounds: an extent),
+/// `Gprim` (geometry: a display colour and a material), and the plain
+/// grouping prims `Xform` and `Scope`. Transforms are xformOps, set
+/// and read through `xform.h`.
 ///
 /// References:
 /// - Pixar, UsdGeom (Imageable, Boundable, Xform, Scope, Gprim),
@@ -59,7 +61,8 @@ namespace ernie {
 
 /// What every prim has: visibility and the world it is in.
 class Imageable : public SchemaView {
-    ERNIE_SCHEMA_BODY(Imageable, SchemaView, ERNIE_IMAGEABLE_ATTRIBUTES)
+    ERNIE_SCHEMA_BODY(Imageable, SchemaView,
+                      ERNIE_IMAGEABLE_ATTRIBUTES)
 };
 
 /// A transform grouping its children.
@@ -74,7 +77,8 @@ class Scope : public Imageable {
     ERNIE_SCHEMA_DEFINE(Scope)
 };
 
-/// What has local bounds: geometry and instancers, with an optional authored extent.
+/// What has local bounds: geometry and instancers, with an optional
+/// authored extent.
 class Boundable : public Imageable {
     ERNIE_SCHEMA_BODY(Boundable, Imageable, ERNIE_BOUNDABLE_ALL)
 };

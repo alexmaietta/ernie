@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// Uses the installed headers and libernie the way an application does: a scene, the render
-// backends, a Renderer when a GPU is there, and a viewer panel drawn with Dear ImGui when the app
-// is installed. Building it checks that the headers are complete and the symbols exported.
+// Uses the installed headers and libernie the way an application
+// does: a scene, the render backends, a Renderer when a GPU is there,
+// and a viewer panel drawn with Dear ImGui when the app is installed.
+// Building it checks that the headers are complete and the symbols
+// exported.
 
 #include "ernie/scene/scene.h"
 #include "ernie/scene/tokens.h"
@@ -33,7 +35,8 @@ class HelloPanel final : public ernie::app::Panel {
 
 int main() {
     ernie::Scene scene;
-    scene.Define("/World/Cube", ernie::tokens::kCube).Set(ernie::tokens::kSize, 2.0);
+    scene.Define("/World/Cube", ernie::tokens::kCube)
+        .Set(ernie::tokens::kSize, 2.0);
     if (!scene.Has("/World/Cube")) {
         std::fprintf(stderr, "the scene lost its cube\n");
         return 1;
@@ -45,14 +48,17 @@ int main() {
     }
 
 #if __has_include("ernie/app/panel.h")
-    const std::unique_ptr<ernie::app::Panel> panel = std::make_unique<HelloPanel>();
+    const std::unique_ptr<ernie::app::Panel> panel =
+        std::make_unique<HelloPanel>();
     std::printf("panel: %s\n", panel->Title().c_str());
 #endif
 
-    // Without a GPU (or a Vulkan driver) there is nothing more to check here.
+    // Without a GPU (or a Vulkan driver) there is nothing more to
+    // check here.
     try {
         const ernie::Renderer renderer;
-        std::printf("renderer: %s on %s\n", renderer.Info().name.c_str(),
+        std::printf("renderer: %s on %s\n",
+                    renderer.Info().name.c_str(),
                     renderer.DeviceName().c_str());
     } catch (const std::exception& error) {
         std::printf("no renderer: %s\n", error.what());

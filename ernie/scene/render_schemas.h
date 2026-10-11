@@ -9,20 +9,27 @@
 #include <string>
 #include <vector>
 
-/// Render prims as reflected schemas (`prim_type.h`), following UsdRender: `RenderSettings` (the
-/// rasterizer's options under `ernie:`) and `RenderProduct` share `RenderSettingsBase` (camera,
-/// resolution and what a product may override of its settings), a `RenderVar` names an output,
-/// and Ernie's `SensorFilter` is one step of a product's or var's sensor chain. Each declaration's
-/// fallback is the value Ernie renders an unset attribute with, the default of the `FrameParams`,
-/// `ShadowSettings` or `LodSettings` field it sets.
+/// Render prims as reflected schemas (`prim_type.h`), following
+/// UsdRender: `RenderSettings` (the rasterizer's options under
+/// `ernie:`) and `RenderProduct` share `RenderSettingsBase` (camera,
+/// resolution and what a product may override of its settings), a
+/// `RenderVar` names an output, and Ernie's `SensorFilter` is one
+/// step of a product's or var's sensor chain. Each declaration's
+/// fallback is the value Ernie renders an unset attribute with, the
+/// default of the `FrameParams`, `ShadowSettings` or `LodSettings`
+/// field it sets.
 ///
-/// The relationships (`camera`, `products`, `ernie:lights`, `orderedVars`, `ernie:filters`) are
-/// lists of targets; `camera` is one target, or on a product a batch of cameras. Not declared: a
-/// SensorFilter's `inputs:*`, which its filter type's model (`SensorFilterRegistry`) defines.
+/// The relationships (`camera`, `products`, `ernie:lights`,
+/// `orderedVars`, `ernie:filters`) are lists of targets; `camera` is
+/// one target, or on a product a batch of cameras. Not declared: a
+/// SensorFilter's `inputs:*`, which its filter type's model
+/// (`SensorFilterRegistry`) defines.
 ///
 /// References:
-/// - Pixar, UsdRender, https://openusd.org/release/api/usd_render_page_front.html
-/// - NVIDIA, "RTX - Minimal Mode", Omniverse Materials and Rendering documentation,
+/// - Pixar, UsdRender,
+/// https://openusd.org/release/api/usd_render_page_front.html
+/// - NVIDIA, "RTX - Minimal Mode", Omniverse Materials and Rendering
+/// documentation,
 ///   https://docs.omniverse.nvidia.com/materials-and-rendering/latest/rtx-renderer_minimal.html
 
 // clang-format off
@@ -231,41 +238,53 @@
 
 namespace ernie {
 
-/// What render settings and products share (UsdRender's RenderSettingsBase): the camera, the
-/// resolution, and what a product sets in place of its settings' (overlays, minimal shading).
+/// What render settings and products share (UsdRender's
+/// RenderSettingsBase): the camera, the resolution, and what a
+/// product sets in place of its settings' (overlays, minimal
+/// shading).
 class RenderSettingsBase : public Imageable {
-    ERNIE_SCHEMA_BODY(RenderSettingsBase, Imageable, ERNIE_RENDER_SETTINGS_BASE_ALL)
+    ERNIE_SCHEMA_BODY(RenderSettingsBase, Imageable,
+                      ERNIE_RENDER_SETTINGS_BASE_ALL)
 };
 
-/// A render's settings: its camera, resolution and products, and the rasterizer's options.
+/// A render's settings: its camera, resolution and products, and the
+/// rasterizer's options.
 class RenderSettings : public RenderSettingsBase {
-    ERNIE_SCHEMA_BODY(RenderSettings, RenderSettingsBase, ERNIE_RENDER_SETTINGS_ALL)
+    ERNIE_SCHEMA_BODY(RenderSettings, RenderSettingsBase,
+                      ERNIE_RENDER_SETTINGS_ALL)
     ERNIE_SCHEMA_DEFINE(RenderSettings)
 
-    /// A view of the RenderSettings prim at `path` or, for the empty path or one naming no prim,
-    /// of a prim with nothing authored, read-only, whose reads give the declared fallbacks: the
+    /// A view of the RenderSettings prim at `path` or, for the empty
+    /// path or one naming no prim, of a prim with nothing authored,
+    /// read-only, whose reads give the declared fallbacks: the
     /// settings of a render without a RenderSettings prim.
-    /// @throws std::invalid_argument if `path` names a prim of another type.
-    static RenderSettings OrFallbacks(const Scene& scene, const Path& path);
+    /// @throws std::invalid_argument if `path` names a prim of
+    /// another type.
+    static RenderSettings OrFallbacks(const Scene& scene,
+                                      const Path& path);
 };
 
-/// One image a render writes: its camera (or a batch of cameras), resolution, render vars and
-/// sensor filter chain.
+/// One image a render writes: its camera (or a batch of cameras),
+/// resolution, render vars and sensor filter chain.
 class RenderProduct : public RenderSettingsBase {
-    ERNIE_SCHEMA_BODY(RenderProduct, RenderSettingsBase, ERNIE_RENDER_PRODUCT_ALL)
+    ERNIE_SCHEMA_BODY(RenderProduct, RenderSettingsBase,
+                      ERNIE_RENDER_PRODUCT_ALL)
     ERNIE_SCHEMA_DEFINE(RenderProduct)
 };
 
-/// An output of a render product, named by its source, optionally with its own sensor chain.
+/// An output of a render product, named by its source, optionally
+/// with its own sensor chain.
 class RenderVar : public Imageable {
     ERNIE_SCHEMA_BODY(RenderVar, Imageable, ERNIE_RENDER_VAR_ALL)
     ERNIE_SCHEMA_DEFINE(RenderVar)
 };
 
-/// A SensorFilter prim (Ernie), one step of a sensor filter chain: a filter type and its
-/// `inputs:*` parameters. Named apart from the built-in filters' enum, `SensorFilter`.
+/// A SensorFilter prim (Ernie), one step of a sensor filter chain: a
+/// filter type and its `inputs:*` parameters. Named apart from the
+/// built-in filters' enum, `SensorFilter`.
 class SensorFilterPrim : public Imageable {
-    ERNIE_SCHEMA_BODY(SensorFilterPrim, Imageable, ERNIE_SENSOR_FILTER_ALL)
+    ERNIE_SCHEMA_BODY(SensorFilterPrim, Imageable,
+                      ERNIE_SENSOR_FILTER_ALL)
     ERNIE_SCHEMA_DEFINE(SensorFilterPrim)
 };
 

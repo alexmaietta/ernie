@@ -39,13 +39,16 @@ DType DTypeOf(nb::dlpack::dtype type) {
             return DType::Float64;
         }
     }
-    throw std::invalid_argument("Unsupported array element type (code " +
-                                std::to_string(type.code) + ", " + std::to_string(type.bits) +
-                                " bits); use uint8, uint16, uint32, int32, int64 or float16/32/64");
+    throw std::invalid_argument(
+        "Unsupported array element type (code " +
+        std::to_string(type.code) + ", " + std::to_string(type.bits) +
+        " bits); use uint8, uint16, uint32, int32, int64 or "
+        "float16/32/64");
 }
 
-/// Owns a reference to a Python array; dropping it takes the GIL, since the last `Tensor` copy may
-/// go away in C++ code that released it.
+/// Owns a reference to a Python array; dropping it takes the GIL,
+/// since the last `Tensor` copy may go away in C++ code that released
+/// it.
 struct ArrayOwner {
     AnyArray array;
 
@@ -72,7 +75,9 @@ nb::dlpack::dtype DlpackOf(DType type) {
     case DType::Int64:
         return nb::dtype<std::int64_t>();
     case DType::Float16:
-        return {static_cast<std::uint8_t>(nb::dlpack::dtype_code::Float), 16, 1};
+        return {
+            static_cast<std::uint8_t>(nb::dlpack::dtype_code::Float),
+            16, 1};
     case DType::Float32:
         return nb::dtype<float>();
     case DType::Float64:
@@ -101,7 +106,8 @@ Tensor TensorFromArray(const AnyArray& array) {
         device = {DeviceKind::Rocm, array.device_id()};
     } else if (array.device_type() != nb::device::cpu::value &&
                array.device_type() != nb::device::cuda_host::value) {
-        throw std::invalid_argument("Arrays must live on the CPU or a CUDA or ROCm device");
+        throw std::invalid_argument(
+            "Arrays must live on the CPU or a CUDA or ROCm device");
     }
     std::vector<std::int64_t> shape(array.ndim());
     std::vector<std::int64_t> strides(array.ndim());
@@ -111,30 +117,37 @@ Tensor TensorFromArray(const AnyArray& array) {
     }
     auto owner = std::make_shared<ArrayOwner>();
     owner->array = array;
-    return Tensor(const_cast<void*>(array.data()), type, std::move(shape), std::move(strides),
-                  device, std::move(owner));
+    return Tensor(const_cast<void*>(array.data()), type,
+                  std::move(shape), std::move(strides), device,
+                  std::move(owner));
 }
 
 nb::object ArrayFromTensor(const Tensor& tensor, bool writable) {
     auto* kept = new Tensor(tensor);
-    nb::capsule owner(kept, [](void* p) noexcept { delete static_cast<Tensor*>(p); });
-    std::vector<std::size_t> shape(tensor.Shape().begin(), tensor.Shape().end());
+    nb::capsule owner(kept, [](void* p) noexcept {
+        delete static_cast<Tensor*>(p);
+    });
+    std::vector<std::size_t> shape(tensor.Shape().begin(),
+                                   tensor.Shape().end());
     const std::vector<std::int64_t>& strides = tensor.Strides();
     const bool gpu = IsGpu(tensor.Location().kind);
     const int deviceType = DlpackDeviceType(tensor.Location().kind);
     const int deviceId = gpu ? tensor.Location().id : 0;
     const auto view = [&]<typename Framework, typename... Flags>() {
-        nb::ndarray<Framework, Flags...> array(tensor.Data(), shape.size(), shape.data(), owner,
-                                               strides.data(), DlpackOf(tensor.Type()), deviceType,
-                                               deviceId);
+        nb::ndarray<Framework, Flags...> array(
+            tensor.Data(), shape.size(), shape.data(), owner,
+            strides.data(), DlpackOf(tensor.Type()), deviceType,
+            deviceId);
         return nb::cast(array, nb::rv_policy::reference);
     };
     if (!gpu) {
-        return writable ? view.template operator()<nb::numpy>()
-                        : view.template operator()<nb::numpy, nb::ro>();
+        return writable
+                   ? view.template operator()<nb::numpy>()
+                   : view.template operator()<nb::numpy, nb::ro>();
     }
-    return writable ? view.template operator()<nb::array_api>()
-                    : view.template operator()<nb::array_api, nb::ro>();
+    return writable
+               ? view.template operator()<nb::array_api>()
+               : view.template operator()<nb::array_api, nb::ro>();
 }
 
 namespace {
@@ -154,7 +167,8 @@ struct PythonReference {
 }  // namespace
 
 Tensor KeepingAlive(const Tensor& tensor, nb::handle keep) {
-    // The tensor goes before the reference, so what it keeps alive outlives it.
+    // The tensor goes before the reference, so what it keeps alive
+    // outlives it.
     struct Owner {
         PythonReference keep;
         Tensor tensor;
@@ -162,7 +176,8 @@ Tensor KeepingAlive(const Tensor& tensor, nb::handle keep) {
     auto owner = std::make_shared<Owner>();
     owner->keep.object = nb::borrow(keep);
     owner->tensor = tensor;
-    return Tensor(tensor.Data(), tensor.Type(), tensor.Shape(), tensor.Strides(), tensor.Location(),
+    return Tensor(tensor.Data(), tensor.Type(), tensor.Shape(),
+                  tensor.Strides(), tensor.Location(),
                   std::move(owner));
 }
 
@@ -178,9 +193,13 @@ std::uintptr_t StreamOf(nb::handle stream) {
 
 void BindTensor(nb::module_& m) {
     m.def(
-        "_roundtrip", [](const AnyArray& array) { return ArrayFromTensor(TensorFromArray(array)); },
+        "_roundtrip",
+        [](const AnyArray& array) {
+            return ArrayFromTensor(TensorFromArray(array));
+        },
         nb::arg("array"),
-        "Adopts `array` as an Ernie tensor and returns a read-only view of it; for testing "
+        "Adopts `array` as an Ernie tensor and returns a read-only "
+        "view of it; for testing "
         "interop.");
 }
 

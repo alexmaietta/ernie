@@ -9,8 +9,11 @@ include(FetchContent)
 
 FetchContent_Declare(
     nlohmann_json
-    URL https://github.com/nlohmann/json/releases/download/${ERNIE_DEP_VERSION_json}/include.zip)
+    URL https://github.com/nlohmann/json/releases/download/${ERNIE_DEP_VERSION_json}/include.zip
+)
 FetchContent_MakeAvailable(nlohmann_json)
 
 add_library(ernie_json INTERFACE)
-target_include_directories(ernie_json SYSTEM INTERFACE "${nlohmann_json_SOURCE_DIR}/single_include")
+target_include_directories(
+    ernie_json SYSTEM
+    INTERFACE "${nlohmann_json_SOURCE_DIR}/single_include")

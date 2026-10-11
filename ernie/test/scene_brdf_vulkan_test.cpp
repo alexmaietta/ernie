@@ -34,8 +34,8 @@ using ernie::testing::PreviewSurfaceReference;
 
 namespace {
 
-/// Evaluates a model for every case: geometry is (mu0, mu, cos g, cos psi), albedo in rgb, the
-/// unresolved slope variance in a.
+/// Evaluates a model for every case: geometry is (mu0, mu, cos g, cos
+/// psi), albedo in rgb, the unresolved slope variance in a.
 constexpr char kHarness[] = R"(import brdf;
 import MODULE;
 
@@ -72,64 +72,85 @@ void main(uint3 id : SV_DispatchThreadID) {
 
 class BrdfVulkanTest : public ernie::testing::VulkanTest {
   protected:
-    /// Evaluates `id`'s `radianceFactor` on the GPU for every geometry, with unresolved slopes of
-    /// per-axis variance `slopeVariance`.
-    std::vector<glm::dvec3> Evaluate(const std::string& id, const std::vector<float>& values,
-                                     const std::vector<Geometry>& cases,
-                                     double slopeVariance = 0.0) {
+    /// Evaluates `id`'s `radianceFactor` on the GPU for every
+    /// geometry, with unresolved slopes of per-axis variance
+    /// `slopeVariance`.
+    std::vector<glm::dvec3>
+    Evaluate(const std::string& id, const std::vector<float>& values,
+             const std::vector<Geometry>& cases,
+             double slopeVariance = 0.0) {
         const BrdfModel* model = registry_.Find(id);
         if (model == nullptr) {
             throw std::invalid_argument(id);
         }
         std::string harness = kHarness;
-        harness.replace(harness.find("MODULE"), 6, ernie::BrdfModuleName(*model));
+        harness.replace(harness.find("MODULE"), 6,
+                        ernie::BrdfModuleName(*model));
         harness.replace(harness.find("TYPE"), 4, model->typeName);
-        std::vector<ShaderModuleSource> modules = ernie::BrdfModules(*model);
+        std::vector<ShaderModuleSource> modules =
+            ernie::BrdfModules(*model);
         modules.push_back({"harness", harness});
-        const ComputePipeline pipeline(*context_, compiler_.CompileSpirv(modules, "main"), 3);
+        const ComputePipeline pipeline(
+            *context_, compiler_.CompileSpirv(modules, "main"), 3);
 
         std::vector<float> packedCases;
         for (const Geometry& g : cases) {
-            for (const double v : {g.mu0, g.mu, g.cosG, g.cosPsi, g.albedo.r, g.albedo.g,
-                                   g.albedo.b, slopeVariance}) {
+            for (const double v :
+                 {g.mu0, g.mu, g.cosG, g.cosPsi, g.albedo.r,
+                  g.albedo.g, g.albedo.b, slopeVariance}) {
                 packedCases.push_back(static_cast<float>(v));
             }
         }
         std::vector<float> packedParams(16, 0.0f);
         std::copy(values.begin(), values.end(), packedParams.begin());
-        GpuBuffer caseBuffer(*context_, packedCases.size() * sizeof(float),
-                             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
-        GpuBuffer paramBuffer(*context_, packedParams.size() * sizeof(float),
-                              VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
-        GpuBuffer resultBuffer(*context_, cases.size() * 4 * sizeof(float),
-                               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Readback);
+        GpuBuffer caseBuffer(
+            *context_, packedCases.size() * sizeof(float),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+        GpuBuffer paramBuffer(
+            *context_, packedParams.size() * sizeof(float),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+        GpuBuffer resultBuffer(*context_,
+                               cases.size() * 4 * sizeof(float),
+                               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                               BufferMemory::Readback);
         caseBuffer.Write(std::as_bytes(std::span(packedCases)));
         paramBuffer.Write(std::as_bytes(std::span(packedParams)));
-        const std::array<const GpuBuffer*, 3> buffers = {&caseBuffer, &paramBuffer, &resultBuffer};
+        const std::array<const GpuBuffer*, 3> buffers = {
+            &caseBuffer, &paramBuffer, &resultBuffer};
         context_->Submit([&](VkCommandBuffer commands) {
-            pipeline.Dispatch(commands, buffers,
-                              static_cast<std::uint32_t>((cases.size() + 63) / 64));
+            pipeline.Dispatch(
+                commands, buffers,
+                static_cast<std::uint32_t>((cases.size() + 63) / 64));
         });
         std::vector<float> raw(cases.size() * 4);
         resultBuffer.Read(std::as_writable_bytes(std::span(raw)));
         std::vector<glm::dvec3> results;
         for (std::size_t c = 0; c < cases.size(); ++c) {
-            results.emplace_back(raw[4 * c], raw[4 * c + 1], raw[4 * c + 2]);
+            results.emplace_back(raw[4 * c], raw[4 * c + 1],
+                                 raw[4 * c + 2]);
         }
         return results;
     }
 
-    /// Compares GPU results with a per-channel reference within a relative tolerance.
-    void ExpectMatches(const std::string& id, const std::vector<float>& params,
-                       const std::function<double(const Geometry&, double albedo)>& reference,
-                       double tolerance = 2e-4) {
+    /// Compares GPU results with a per-channel reference within a
+    /// relative tolerance.
+    void ExpectMatches(
+        const std::string& id, const std::vector<float>& params,
+        const std::function<double(const Geometry&, double albedo)>&
+            reference,
+        double tolerance = 2e-4) {
         const std::vector<Geometry> cases = GeometryGrid();
-        const std::vector<glm::dvec3> gpu = Evaluate(id, params, cases);
+        const std::vector<glm::dvec3> gpu =
+            Evaluate(id, params, cases);
         for (std::size_t c = 0; c < cases.size(); ++c) {
             for (int ch = 0; ch < 3; ++ch) {
-                const double expected = reference(cases[c], cases[c].albedo[ch]);
-                EXPECT_NEAR(gpu[c][ch], expected, tolerance * std::max(1.0, std::abs(expected)))
-                    << id << " case " << c << " channel " << ch << " mu0 " << cases[c].mu0 << " mu "
+                const double expected =
+                    reference(cases[c], cases[c].albedo[ch]);
+                EXPECT_NEAR(gpu[c][ch], expected,
+                            tolerance *
+                                std::max(1.0, std::abs(expected)))
+                    << id << " case " << c << " channel " << ch
+                    << " mu0 " << cases[c].mu0 << " mu "
                     << cases[c].mu << " cos_psi " << cases[c].cosPsi;
             }
         }
@@ -142,40 +163,57 @@ class BrdfVulkanTest : public ernie::testing::VulkanTest {
 }  // namespace
 
 TEST_F(BrdfVulkanTest, LambertIsAlbedoTimesCosineIncidence) {
-    ExpectMatches("lambert", {}, [](const Geometry& g, double a) { return a * g.mu0; });
+    ExpectMatches("lambert", {}, [](const Geometry& g, double a) {
+        return a * g.mu0;
+    });
 }
 
 TEST_F(BrdfVulkanTest, LommelSeeligerMatchesItsClosedForm) {
     for (const float xi : {0.0f, -0.4f, 0.3f}) {
-        ExpectMatches("lommel_seeliger", {xi}, [xi](const Geometry& g, double w) {
-            return w / 4.0 * g.mu0 / (g.mu0 + g.mu) * HenyeyGreenstein(xi, g.cosG);
-        });
+        ExpectMatches("lommel_seeliger", {xi},
+                      [xi](const Geometry& g, double w) {
+                          return w / 4.0 * g.mu0 / (g.mu0 + g.mu) *
+                                 HenyeyGreenstein(xi, g.cosG);
+                      });
     }
 }
 
-TEST_F(BrdfVulkanTest, LunarLambertBlendsLommelSeeligerAndLambertByPhase) {
-    const std::vector<float> params = {-0.019f, 0.000242f, -0.00000146f};
+TEST_F(BrdfVulkanTest,
+       LunarLambertBlendsLommelSeeligerAndLambertByPhase) {
+    const std::vector<float> params = {-0.019f, 0.000242f,
+                                       -0.00000146f};
     const std::vector<double> c(params.begin(), params.end());
-    ExpectMatches("lunar_lambert", params, [&c](const Geometry& g, double a) {
-        const double phase = std::acos(std::clamp(g.cosG, -1.0, 1.0)) * 180.0 / kPi;
-        const double l = 1.0 + c[0] * phase + c[1] * phase * phase + c[2] * phase * phase * phase;
-        return a * (2.0 * l * g.mu0 / (g.mu0 + g.mu) + (1.0 - l) * g.mu0);
-    });
+    ExpectMatches("lunar_lambert", params,
+                  [&c](const Geometry& g, double a) {
+                      const double phase =
+                          std::acos(std::clamp(g.cosG, -1.0, 1.0)) *
+                          180.0 / kPi;
+                      const double l = 1.0 + c[0] * phase +
+                                       c[1] * phase * phase +
+                                       c[2] * phase * phase * phase;
+                      return a * (2.0 * l * g.mu0 / (g.mu0 + g.mu) +
+                                  (1.0 - l) * g.mu0);
+                  });
 }
 
-TEST_F(BrdfVulkanTest, OrenNayarMatchesTheQualitativeModelAndReducesToLambert) {
+TEST_F(BrdfVulkanTest,
+       OrenNayarMatchesTheQualitativeModelAndReducesToLambert) {
     const double sigma = 25.0 * kPi / 180.0;
-    ExpectMatches("oren_nayar", {25.0f}, [sigma](const Geometry& g, double rho) {
-        const double s2 = sigma * sigma;
-        const double a = 1.0 - 0.5 * s2 / (s2 + 0.33);
-        const double b = 0.45 * s2 / (s2 + 0.09);
-        const double i = std::acos(g.mu0);
-        const double e = std::acos(g.mu);
-        return rho * g.mu0 *
-               (a +
-                b * std::max(0.0, g.cosPsi) * std::sin(std::max(i, e)) * std::tan(std::min(i, e)));
-    });
-    ExpectMatches("oren_nayar", {0.0f}, [](const Geometry& g, double rho) { return rho * g.mu0; });
+    ExpectMatches("oren_nayar", {25.0f},
+                  [sigma](const Geometry& g, double rho) {
+                      const double s2 = sigma * sigma;
+                      const double a = 1.0 - 0.5 * s2 / (s2 + 0.33);
+                      const double b = 0.45 * s2 / (s2 + 0.09);
+                      const double i = std::acos(g.mu0);
+                      const double e = std::acos(g.mu);
+                      return rho * g.mu0 *
+                             (a + b * std::max(0.0, g.cosPsi) *
+                                      std::sin(std::max(i, e)) *
+                                      std::tan(std::min(i, e)));
+                  });
+    ExpectMatches(
+        "oren_nayar", {0.0f},
+        [](const Geometry& g, double rho) { return rho * g.mu0; });
 }
 
 TEST_F(BrdfVulkanTest, HapkeMatchesTheReferenceImplementation) {
@@ -186,50 +224,71 @@ TEST_F(BrdfVulkanTest, HapkeMatchesTheReferenceImplementation) {
     for (const auto& params : parameterSets) {
         ExpectMatches(
             "hapke", params,
-            [&params](const Geometry& g, double w) { return HapkeReference(g, w, params); }, 1e-3);
+            [&params](const Geometry& g, double w) {
+                return HapkeReference(g, w, params);
+            },
+            1e-3);
     }
 }
 
 TEST_F(BrdfVulkanTest, UnresolvedSlopesWidenTheModelsRoughness) {
-    // Slopes of per-axis variance v shade as Hapke's theta-bar widened to
-    // atan(sqrt(tan^2 theta-bar + 2 v / pi)), and as Oren-Nayar's sigma widened by atan(sqrt(v)).
+    // Slopes of per-axis variance v shade as Hapke's theta-bar
+    // widened to atan(sqrt(tan^2 theta-bar + 2 v / pi)), and as
+    // Oren-Nayar's sigma widened by atan(sqrt(v)).
     const std::vector<Geometry> cases = GeometryGrid();
     const double variance = 0.05;
-    std::vector<float> hapke = BrdfRegistry::WithBuiltins().Find("hapke")->Defaults();
-    const std::vector<glm::dvec3> rough = Evaluate("hapke", hapke, cases, variance);
+    std::vector<float> hapke =
+        BrdfRegistry::WithBuiltins().Find("hapke")->Defaults();
+    const std::vector<glm::dvec3> rough =
+        Evaluate("hapke", hapke, cases, variance);
     const double tanT = std::tan(hapke[4] * kPi / 180.0);
-    hapke[4] =
-        static_cast<float>(std::atan(std::sqrt(tanT * tanT + 2.0 * variance / kPi)) * 180.0 / kPi);
-    const std::vector<glm::dvec3> widened = Evaluate("hapke", hapke, cases);
-    const std::vector<glm::dvec3> smooth =
-        Evaluate("hapke", BrdfRegistry::WithBuiltins().Find("hapke")->Defaults(), cases);
+    hapke[4] = static_cast<float>(
+        std::atan(std::sqrt(tanT * tanT + 2.0 * variance / kPi)) *
+        180.0 / kPi);
+    const std::vector<glm::dvec3> widened =
+        Evaluate("hapke", hapke, cases);
+    const std::vector<glm::dvec3> smooth = Evaluate(
+        "hapke",
+        BrdfRegistry::WithBuiltins().Find("hapke")->Defaults(),
+        cases);
     double changed = 0.0;
     for (std::size_t c = 0; c < cases.size(); ++c) {
         for (int ch = 0; ch < 3; ++ch) {
-            EXPECT_NEAR(rough[c][ch], widened[c][ch], 1e-4 * std::max(1.0, widened[c][ch]))
+            EXPECT_NEAR(rough[c][ch], widened[c][ch],
+                        1e-4 * std::max(1.0, widened[c][ch]))
                 << "case " << c;
-            changed = std::max(changed, std::abs(rough[c][ch] - smooth[c][ch]));
+            changed = std::max(
+                changed, std::abs(rough[c][ch] - smooth[c][ch]));
         }
     }
     EXPECT_GT(changed, 1e-3) << "the variance makes a difference";
 
-    const double unresolved = std::atan(std::sqrt(variance)) * 180.0 / kPi;
-    const std::vector<glm::dvec3> orenNayar = Evaluate("oren_nayar", {0.0f}, cases, variance);
-    const std::vector<glm::dvec3> orenNayarWidened =
-        Evaluate("oren_nayar", {static_cast<float>(unresolved)}, cases);
+    const double unresolved =
+        std::atan(std::sqrt(variance)) * 180.0 / kPi;
+    const std::vector<glm::dvec3> orenNayar =
+        Evaluate("oren_nayar", {0.0f}, cases, variance);
+    const std::vector<glm::dvec3> orenNayarWidened = Evaluate(
+        "oren_nayar", {static_cast<float>(unresolved)}, cases);
     for (std::size_t c = 0; c < cases.size(); ++c) {
-        EXPECT_NEAR(orenNayar[c].r, orenNayarWidened[c].r, 1e-4) << "case " << c;
+        EXPECT_NEAR(orenNayar[c].r, orenNayarWidened[c].r, 1e-4)
+            << "case " << c;
     }
-    const std::vector<glm::dvec3> lambert = Evaluate("lambert", {}, cases, variance);
+    const std::vector<glm::dvec3> lambert =
+        Evaluate("lambert", {}, cases, variance);
     for (std::size_t c = 0; c < cases.size(); ++c) {
-        EXPECT_NEAR(lambert[c].r, cases[c].albedo.r * cases[c].mu0, 1e-5) << "Lambert ignores it";
+        EXPECT_NEAR(lambert[c].r, cases[c].albedo.r * cases[c].mu0,
+                    1e-5)
+            << "Lambert ignores it";
     }
 }
 
 TEST_F(BrdfVulkanTest, PreviewSurfaceMatchesTheGltfReferenceBrdf) {
-    // Dielectric, metal, the specular workflow and a clearcoat, against the vector-form reference.
+    // Dielectric, metal, the specular workflow and a clearcoat,
+    // against the vector-form reference.
     const std::vector<std::vector<float>> parameterSets = {
-        BrdfRegistry::WithBuiltins().Find("preview_surface")->Defaults(),
+        BrdfRegistry::WithBuiltins()
+            .Find("preview_surface")
+            ->Defaults(),
         {0.3f, 1.0f, 1.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.01f},
         {0.8f, 0.4f, 2.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.01f},
         {0.5f, 0.0f, 1.5f, 1.0f, 0.2f, 0.5f, 0.8f, 0.0f, 0.01f},
@@ -244,50 +303,66 @@ TEST_F(BrdfVulkanTest, PreviewSurfaceMatchesTheGltfReferenceBrdf) {
     }
     // Unresolved slopes widen the lobe as alpha^2 + 2 variance.
     const std::vector<Geometry> cases = GeometryGrid();
-    const std::vector<float> params = {0.3f, 1.0f, 1.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.01f};
-    const std::vector<glm::dvec3> rough = Evaluate("preview_surface", params, cases, 0.02);
+    const std::vector<float> params = {0.3f, 1.0f, 1.5f, 0.0f, 0.0f,
+                                       0.0f, 0.0f, 0.0f, 0.01f};
+    const std::vector<glm::dvec3> rough =
+        Evaluate("preview_surface", params, cases, 0.02);
     for (std::size_t c = 0; c < cases.size(); ++c) {
-        const double expected = PreviewSurfaceReference(cases[c], cases[c].albedo.g, params, 0.02);
-        EXPECT_NEAR(rough[c].g, expected, 1e-3 * std::max(1.0, expected)) << "case " << c;
+        const double expected = PreviewSurfaceReference(
+            cases[c], cases[c].albedo.g, params, 0.02);
+        EXPECT_NEAR(rough[c].g, expected,
+                    1e-3 * std::max(1.0, expected))
+            << "case " << c;
     }
 }
 
-TEST_F(BrdfVulkanTest, HapkeHFunctionIsWithinOnePercentOfChandrasekhar) {
-    // Isotropic, conservative scattering (w = 1) without opposition effect, roughness or porosity
-    // reduces Hapke to I/F = H(mu0) H(mu) / 8 at normal incidence and emission. Chandrasekhar's
+TEST_F(BrdfVulkanTest,
+       HapkeHFunctionIsWithinOnePercentOfChandrasekhar) {
+    // Isotropic, conservative scattering (w = 1) without opposition
+    // effect, roughness or porosity reduces Hapke to I/F = H(mu0)
+    // H(mu) / 8 at normal incidence and emission. Chandrasekhar's
     // exact H(1) for w = 1 is 2.90781.
-    const std::vector<glm::dvec3> result = Evaluate("hapke", {0.0f, 0.0f, 0.0f, 0.07f, 0.0f, 0.0f},
-                                                    {{1.0, 1.0, 1.0, 1.0, glm::dvec3(1.0)}});
+    const std::vector<glm::dvec3> result =
+        Evaluate("hapke", {0.0f, 0.0f, 0.0f, 0.07f, 0.0f, 0.0f},
+                 {{1.0, 1.0, 1.0, 1.0, glm::dvec3(1.0)}});
     const double h = std::sqrt(8.0 * result[0].r);
     EXPECT_NEAR(h, 2.90781, 0.01 * 2.90781);
 }
 
 TEST_F(BrdfVulkanTest, SmoothModelsAreReciprocal) {
-    // Without macroscopic roughness, the bidirectional reflectance (I/F / mu0) is symmetric under
-    // exchanging incidence and emission.
+    // Without macroscopic roughness, the bidirectional reflectance
+    // (I/F / mu0) is symmetric under exchanging incidence and
+    // emission.
     std::vector<Geometry> forward = GeometryGrid();
     std::vector<Geometry> swapped = forward;
     for (Geometry& g : swapped) {
         std::swap(g.mu0, g.mu);
     }
-    const std::vector<std::pair<std::string, std::vector<float>>> models = {
-        {"lommel_seeliger", {0.2f}},
-        {"hapke", {0.25f, 0.5f, 1.0f, 0.07f, 0.0f, 0.3f}},
-        {"preview_surface", {0.4f, 0.5f, 1.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.5f, 0.3f}}};
+    const std::vector<std::pair<std::string, std::vector<float>>>
+        models = {
+            {"lommel_seeliger", {0.2f}},
+            {"hapke", {0.25f, 0.5f, 1.0f, 0.07f, 0.0f, 0.3f}},
+            {"preview_surface",
+             {0.4f, 0.5f, 1.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.5f, 0.3f}}};
     for (const auto& [id, params] : models) {
-        const std::vector<glm::dvec3> a = Evaluate(id, params, forward);
-        const std::vector<glm::dvec3> b = Evaluate(id, params, swapped);
+        const std::vector<glm::dvec3> a =
+            Evaluate(id, params, forward);
+        const std::vector<glm::dvec3> b =
+            Evaluate(id, params, swapped);
         for (std::size_t c = 0; c < forward.size(); ++c) {
             const double ra = a[c].g / forward[c].mu0;
             const double rb = b[c].g / swapped[c].mu0;
-            EXPECT_NEAR(ra, rb, 1e-4 * std::max(1.0, ra)) << id << " case " << c;
+            EXPECT_NEAR(ra, rb, 1e-4 * std::max(1.0, ra))
+                << id << " case " << c;
         }
     }
 }
 
-TEST_F(BrdfVulkanTest, LunarLambertWithConstantUnitWeightIsLommelSeeliger) {
+TEST_F(BrdfVulkanTest,
+       LunarLambertWithConstantUnitWeightIsLommelSeeliger) {
     const std::vector<Geometry> cases = GeometryGrid();
-    const auto lunar = Evaluate("lunar_lambert", {0.0f, 0.0f, 0.0f}, cases);
+    const auto lunar =
+        Evaluate("lunar_lambert", {0.0f, 0.0f, 0.0f}, cases);
     const auto ls = Evaluate("lommel_seeliger", {0.0f}, cases);
     for (std::size_t c = 0; c < cases.size(); ++c) {
         EXPECT_NEAR(lunar[c].b, 8.0 * ls[c].b, 1e-5) << "case " << c;
@@ -296,10 +371,12 @@ TEST_F(BrdfVulkanTest, LunarLambertWithConstantUnitWeightIsLommelSeeliger) {
 
 namespace {
 
-/// Checks the sampling helpers for every case of (normal, light, view): the mean `sampleBrdf`
-/// weight over a stratified grid, a uniform-hemisphere quadrature of `evaluateBrdf` over the same
-/// integral, the worst disagreement of a sample's pdf with `brdfPdf` and of its direction and the
-/// basis with unit length and orthogonality, and `brdfInputOf` of the case's light and view.
+/// Checks the sampling helpers for every case of (normal, light,
+/// view): the mean `sampleBrdf` weight over a stratified grid, a
+/// uniform-hemisphere quadrature of `evaluateBrdf` over the same
+/// integral, the worst disagreement of a sample's pdf with `brdfPdf`
+/// and of its direction and the basis with unit length and
+/// orthogonality, and `brdfInputOf` of the case's light and view.
 constexpr char kSamplingHarness[] = R"(import brdf;
 import MODULE;
 
@@ -394,67 +471,90 @@ struct SamplingResult {
     glm::dvec3 evaluated;
 };
 
-/// Normals in every octant and both poles (the basis's sign switch), with lights and views above,
-/// grazing and below the horizon.
+/// Normals in every octant and both poles (the basis's sign switch),
+/// with lights and views above, grazing and below the horizon.
 std::vector<SamplingCase> SamplingCases() {
-    const std::vector<glm::dvec3> normals = {
-        {0.0, 0.0, 1.0}, {0.0, 0.0, -1.0}, {1.0, 0.0, 0.0}, {0.3, -0.5, 0.8}, {-0.6, 0.2, -0.7}};
+    const std::vector<glm::dvec3> normals = {{0.0, 0.0, 1.0},
+                                             {0.0, 0.0, -1.0},
+                                             {1.0, 0.0, 0.0},
+                                             {0.3, -0.5, 0.8},
+                                             {-0.6, 0.2, -0.7}};
     std::vector<SamplingCase> cases;
     for (const glm::dvec3& raw : normals) {
         const glm::dvec3 n = glm::normalize(raw);
-        const glm::dvec3 helper =
-            std::abs(n.x) < 0.9 ? glm::dvec3(1.0, 0.0, 0.0) : glm::dvec3(0.0, 1.0, 0.0);
+        const glm::dvec3 helper = std::abs(n.x) < 0.9
+                                      ? glm::dvec3(1.0, 0.0, 0.0)
+                                      : glm::dvec3(0.0, 1.0, 0.0);
         const glm::dvec3 t = glm::normalize(glm::cross(helper, n));
         const glm::dvec3 b = glm::cross(n, t);
         const auto direction = [&](double zenith, double azimuth) {
             const double z = zenith * kPi / 180.0;
             const double a = azimuth * kPi / 180.0;
-            return std::sin(z) * (std::cos(a) * t + std::sin(a) * b) + std::cos(z) * n;
+            return std::sin(z) * (std::cos(a) * t + std::sin(a) * b) +
+                   std::cos(z) * n;
         };
-        cases.push_back({n, direction(30.0, 0.0), direction(0.0, 0.0)});
-        cases.push_back({n, direction(60.0, 20.0), direction(45.0, 200.0)});
-        cases.push_back({n, direction(75.0, 90.0), direction(70.0, 90.0)});
-        cases.push_back({n, direction(120.0, 0.0), direction(10.0, 0.0)});
+        cases.push_back(
+            {n, direction(30.0, 0.0), direction(0.0, 0.0)});
+        cases.push_back(
+            {n, direction(60.0, 20.0), direction(45.0, 200.0)});
+        cases.push_back(
+            {n, direction(75.0, 90.0), direction(70.0, 90.0)});
+        cases.push_back(
+            {n, direction(120.0, 0.0), direction(10.0, 0.0)});
     }
     return cases;
 }
 
 class BrdfSamplingTest : public BrdfVulkanTest {
   protected:
-    std::vector<SamplingResult> Sample(const std::string& id, const std::vector<float>& values,
-                                       const std::vector<SamplingCase>& cases, glm::dvec3 albedo) {
+    std::vector<SamplingResult>
+    Sample(const std::string& id, const std::vector<float>& values,
+           const std::vector<SamplingCase>& cases,
+           glm::dvec3 albedo) {
         const BrdfModel* model = registry_.Find(id);
         if (model == nullptr) {
             throw std::invalid_argument(id);
         }
         std::string harness = kSamplingHarness;
-        harness.replace(harness.find("MODULE"), 6, ernie::BrdfModuleName(*model));
+        harness.replace(harness.find("MODULE"), 6,
+                        ernie::BrdfModuleName(*model));
         harness.replace(harness.find("TYPE"), 4, model->typeName);
-        std::vector<ShaderModuleSource> modules = ernie::BrdfModules(*model);
+        std::vector<ShaderModuleSource> modules =
+            ernie::BrdfModules(*model);
         modules.push_back({"sampling_harness", harness});
-        const ComputePipeline pipeline(*context_, compiler_.CompileSpirv(modules, "main"), 3);
+        const ComputePipeline pipeline(
+            *context_, compiler_.CompileSpirv(modules, "main"), 3);
 
         std::vector<float> packed;
         for (const SamplingCase& c : cases) {
-            for (const glm::dvec3& v : {c.normal, c.light, c.view, albedo}) {
-                packed.insert(packed.end(), {static_cast<float>(v.x), static_cast<float>(v.y),
-                                             static_cast<float>(v.z), 0.0f});
+            for (const glm::dvec3& v :
+                 {c.normal, c.light, c.view, albedo}) {
+                packed.insert(packed.end(),
+                              {static_cast<float>(v.x),
+                               static_cast<float>(v.y),
+                               static_cast<float>(v.z), 0.0f});
             }
         }
         std::vector<float> packedParams(16, 0.0f);
         std::copy(values.begin(), values.end(), packedParams.begin());
         GpuBuffer caseBuffer(*context_, packed.size() * sizeof(float),
-                             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
-        GpuBuffer paramBuffer(*context_, packedParams.size() * sizeof(float),
-                              VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
-        GpuBuffer resultBuffer(*context_, cases.size() * 5 * 4 * sizeof(float),
-                               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Readback);
+                             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                             BufferMemory::Device);
+        GpuBuffer paramBuffer(
+            *context_, packedParams.size() * sizeof(float),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+        GpuBuffer resultBuffer(*context_,
+                               cases.size() * 5 * 4 * sizeof(float),
+                               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                               BufferMemory::Readback);
         caseBuffer.Write(std::as_bytes(std::span(packed)));
         paramBuffer.Write(std::as_bytes(std::span(packedParams)));
-        const std::array<const GpuBuffer*, 3> buffers = {&caseBuffer, &paramBuffer, &resultBuffer};
+        const std::array<const GpuBuffer*, 3> buffers = {
+            &caseBuffer, &paramBuffer, &resultBuffer};
         context_->Submit([&](VkCommandBuffer commands) {
-            pipeline.Dispatch(commands, buffers,
-                              static_cast<std::uint32_t>((cases.size() + 63) / 64));
+            pipeline.Dispatch(
+                commands, buffers,
+                static_cast<std::uint32_t>((cases.size() + 63) / 64));
         });
         std::vector<float> raw(cases.size() * 5 * 4);
         resultBuffer.Read(std::as_writable_bytes(std::span(raw)));
@@ -476,14 +576,18 @@ class BrdfSamplingTest : public BrdfVulkanTest {
 
 }  // namespace
 
-TEST_F(BrdfSamplingTest, LambertSampleWeightsAreTheAlbedoAndIntegrateToIt) {
+TEST_F(BrdfSamplingTest,
+       LambertSampleWeightsAreTheAlbedoAndIntegrateToIt) {
     const glm::dvec3 albedo(0.12, 0.35, 0.8);
     const std::vector<SamplingCase> cases = SamplingCases();
-    const std::vector<SamplingResult> results = Sample("lambert", {}, cases, albedo);
+    const std::vector<SamplingResult> results =
+        Sample("lambert", {}, cases, albedo);
     for (std::size_t c = 0; c < cases.size(); ++c) {
         for (int ch = 0; ch < 3; ++ch) {
-            EXPECT_NEAR(results[c].sampled[ch], albedo[ch], 1e-4) << "case " << c;
-            EXPECT_NEAR(results[c].quadrature[ch], albedo[ch], 1e-3) << "case " << c;
+            EXPECT_NEAR(results[c].sampled[ch], albedo[ch], 1e-4)
+                << "case " << c;
+            EXPECT_NEAR(results[c].quadrature[ch], albedo[ch], 1e-3)
+                << "case " << c;
         }
     }
 }
@@ -500,12 +604,15 @@ TEST_F(BrdfSamplingTest, SamplesAreUnitAboveTheHorizonWithTheirPdf) {
     }
 }
 
-TEST_F(BrdfSamplingTest, ImportanceSamplingMatchesHemisphereQuadrature) {
-    const std::vector<std::pair<std::string, std::vector<float>>> models = {
-        {"lommel_seeliger", {-0.3f}},
-        {"lunar_lambert", {-0.019f, 0.000242f, -0.00000146f}},
-        {"oren_nayar", {25.0f}},
-        {"hapke", BrdfRegistry::WithBuiltins().Find("hapke")->Defaults()}};
+TEST_F(BrdfSamplingTest,
+       ImportanceSamplingMatchesHemisphereQuadrature) {
+    const std::vector<std::pair<std::string, std::vector<float>>>
+        models = {
+            {"lommel_seeliger", {-0.3f}},
+            {"lunar_lambert", {-0.019f, 0.000242f, -0.00000146f}},
+            {"oren_nayar", {25.0f}},
+            {"hapke",
+             BrdfRegistry::WithBuiltins().Find("hapke")->Defaults()}};
     const std::vector<SamplingCase> cases = SamplingCases();
     for (const auto& [id, params] : models) {
         const std::vector<SamplingResult> results =
@@ -514,7 +621,8 @@ TEST_F(BrdfSamplingTest, ImportanceSamplingMatchesHemisphereQuadrature) {
             for (int ch = 0; ch < 3; ++ch) {
                 const double expected = results[c].quadrature[ch];
                 EXPECT_GT(expected, 0.0) << id << " case " << c;
-                EXPECT_NEAR(results[c].sampled[ch], expected, 0.01 * expected)
+                EXPECT_NEAR(results[c].sampled[ch], expected,
+                            0.01 * expected)
                     << id << " case " << c << " channel " << ch;
             }
         }
@@ -524,22 +632,29 @@ TEST_F(BrdfSamplingTest, ImportanceSamplingMatchesHemisphereQuadrature) {
 TEST_F(BrdfSamplingTest, InputAndEvaluationFollowTheCaseGeometry) {
     const glm::dvec3 albedo(0.12, 0.35, 0.8);
     const std::vector<SamplingCase> cases = SamplingCases();
-    const std::vector<SamplingResult> results = Sample("lambert", {}, cases, albedo);
+    const std::vector<SamplingResult> results =
+        Sample("lambert", {}, cases, albedo);
     for (std::size_t c = 0; c < cases.size(); ++c) {
         const SamplingCase& k = cases[c];
         const double mu0 = glm::dot(k.normal, k.light);
         const double mu = glm::dot(k.normal, k.view);
         const glm::dvec3 lPlane = k.light - k.normal * mu0;
         const glm::dvec3 vPlane = k.view - k.normal * mu;
-        const double cosPsi = glm::length(lPlane) > 1e-5 && glm::length(vPlane) > 1e-5
-                                  ? glm::dot(glm::normalize(lPlane), glm::normalize(vPlane))
-                                  : 1.0;
+        const double cosPsi =
+            glm::length(lPlane) > 1e-5 && glm::length(vPlane) > 1e-5
+                ? glm::dot(glm::normalize(lPlane),
+                           glm::normalize(vPlane))
+                : 1.0;
         EXPECT_NEAR(results[c].input.x, mu0, 1e-5) << "case " << c;
-        EXPECT_NEAR(results[c].input.y, std::max(mu, 1e-3), 1e-5) << "case " << c;
-        EXPECT_NEAR(results[c].input.z, glm::dot(k.light, k.view), 1e-5) << "case " << c;
+        EXPECT_NEAR(results[c].input.y, std::max(mu, 1e-3), 1e-5)
+            << "case " << c;
+        EXPECT_NEAR(results[c].input.z, glm::dot(k.light, k.view),
+                    1e-5)
+            << "case " << c;
         EXPECT_NEAR(results[c].input.w, cosPsi, 1e-5) << "case " << c;
         for (int ch = 0; ch < 3; ++ch) {
-            EXPECT_NEAR(results[c].evaluated[ch], albedo[ch] * std::max(mu0, 0.0) / kPi, 1e-6)
+            EXPECT_NEAR(results[c].evaluated[ch],
+                        albedo[ch] * std::max(mu0, 0.0) / kPi, 1e-6)
                 << "case " << c;
         }
     }

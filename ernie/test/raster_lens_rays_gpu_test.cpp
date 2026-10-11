@@ -18,8 +18,9 @@
 
 namespace {
 
-// For each case (sensor x, y): the fisheye's and Brown-Conrady's rays (lens.slang), and the
-// fisheye ray's cube face and its plane coordinates (cube_faces.slang).
+// For each case (sensor x, y): the fisheye's and Brown-Conrady's rays
+// (lens.slang), and the fisheye ray's cube face and its plane
+// coordinates (cube_faces.slang).
 constexpr char kHarness[] = R"(import lens;
 import cube_faces;
 
@@ -55,8 +56,8 @@ class LensRaysGpuTest : public ernie::testing::VulkanTest {
 }  // namespace
 
 TEST_F(LensRaysGpuTest, TheSensorKernelsRaysAndFacesMatchTheCpus) {
-    // A fisheye reaching 150 degrees off axis, onto all six faces, and a barrel-distorted
-    // perspective lens.
+    // A fisheye reaching 150 degrees off axis, onto all six faces,
+    // and a barrel-distorted perspective lens.
     ernie::LensModel fisheye;
     fisheye.projection = ernie::LensProjection::Fisheye;
     fisheye.fisheye = {0.02, -0.004, 0.0, 0.0};
@@ -72,11 +73,13 @@ TEST_F(LensRaysGpuTest, TheSensorKernelsRaysAndFacesMatchTheCpus) {
     while (points.size() < 512) {
         const glm::dvec2 p(unit(random), unit(random));
         if (glm::length(p) <= 1.0) {
-            points.push_back(2.5 * p);  // fisheye radii to 2.5: field angles to 150 degrees
+            points.push_back(2.5 * p);  // fisheye radii to 2.5: field
+                                        // angles to 150 degrees
         }
     }
     for (const glm::dvec2 p : points) {
-        cases.insert(cases.end(), {float(p.x), float(p.y), 0.0f, 0.0f});
+        cases.insert(cases.end(),
+                     {float(p.x), float(p.y), 0.0f, 0.0f});
     }
     const std::vector<float> params = {float(fisheye.fisheye[0]),
                                        float(fisheye.fisheye[1]),
@@ -94,42 +97,64 @@ TEST_F(LensRaysGpuTest, TheSensorKernelsRaysAndFacesMatchTheCpus) {
         {"lens", ernie::shaders::kLensSlang},
         {"cube_faces", ernie::shaders::kCubeFacesSlang},
         {"harness", kHarness}};
-    const ernie::ComputePipeline pipeline(*context_, compiler_.CompileSpirv(modules, "main"), 3);
-    ernie::GpuBuffer caseBuffer(*context_, cases.size() * sizeof(float),
-                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, ernie::BufferMemory::Device);
-    ernie::GpuBuffer paramBuffer(*context_, params.size() * sizeof(float),
-                                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, ernie::BufferMemory::Device);
-    ernie::GpuBuffer resultBuffer(*context_, points.size() * 12 * sizeof(float),
+    const ernie::ComputePipeline pipeline(
+        *context_, compiler_.CompileSpirv(modules, "main"), 3);
+    ernie::GpuBuffer caseBuffer(*context_,
+                                cases.size() * sizeof(float),
+                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                ernie::BufferMemory::Device);
+    ernie::GpuBuffer paramBuffer(*context_,
+                                 params.size() * sizeof(float),
+                                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                 ernie::BufferMemory::Device);
+    ernie::GpuBuffer resultBuffer(*context_,
+                                  points.size() * 12 * sizeof(float),
                                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                   ernie::BufferMemory::Readback);
     caseBuffer.Write(std::as_bytes(std::span(cases)));
     paramBuffer.Write(std::as_bytes(std::span(params)));
-    const std::array<const ernie::GpuBuffer*, 3> buffers = {&caseBuffer, &paramBuffer,
-                                                            &resultBuffer};
+    const std::array<const ernie::GpuBuffer*, 3> buffers = {
+        &caseBuffer, &paramBuffer, &resultBuffer};
     context_->Submit([&](VkCommandBuffer commands) {
-        pipeline.Dispatch(commands, buffers, static_cast<std::uint32_t>((points.size() + 63) / 64));
+        pipeline.Dispatch(
+            commands, buffers,
+            static_cast<std::uint32_t>((points.size() + 63) / 64));
     });
     std::vector<float> raw(points.size() * 12);
     resultBuffer.Read(std::as_writable_bytes(std::span(raw)));
     int backs = 0;
     for (std::size_t i = 0; i < points.size(); ++i) {
         const float* r = &raw[12 * i];
-        const glm::dvec3 fisheyeRay = ernie::LensRay(fisheye, points[i]);
-        EXPECT_NEAR(glm::distance(glm::dvec3(r[0], r[1], r[2]), fisheyeRay), 0.0, 1e-5) << i;
-        // Brown-Conrady over a perspective lens's moderate field, radii to 0.5.
-        const glm::dvec3 brownRay = ernie::LensRay(brown, 0.25 * points[i]);
-        EXPECT_NEAR(glm::distance(glm::dvec3(r[4], r[5], r[6]), brownRay), 0.0, 1e-5) << i;
-        // The face, but for rays all but on a seam, where float and double may pick either.
-        std::array<double, 6> forward = {-fisheyeRay.z, fisheyeRay.x,  -fisheyeRay.x,
-                                         fisheyeRay.y,  -fisheyeRay.y, fisheyeRay.z};
+        const glm::dvec3 fisheyeRay =
+            ernie::LensRay(fisheye, points[i]);
+        EXPECT_NEAR(
+            glm::distance(glm::dvec3(r[0], r[1], r[2]), fisheyeRay),
+            0.0, 1e-5)
+            << i;
+        // Brown-Conrady over a perspective lens's moderate field,
+        // radii to 0.5.
+        const glm::dvec3 brownRay =
+            ernie::LensRay(brown, 0.25 * points[i]);
+        EXPECT_NEAR(
+            glm::distance(glm::dvec3(r[4], r[5], r[6]), brownRay),
+            0.0, 1e-5)
+            << i;
+        // The face, but for rays all but on a seam, where float and
+        // double may pick either.
+        std::array<double, 6> forward = {-fisheyeRay.z, fisheyeRay.x,
+                                         -fisheyeRay.x, fisheyeRay.y,
+                                         -fisheyeRay.y, fisheyeRay.z};
         std::sort(forward.begin(), forward.end());
         if (forward[5] - forward[4] < 1e-4) {
             continue;
         }
-        const ernie::CubeFace face = ernie::CubeFaceOf(fisheyeRay, ernie::kAllCubeFaces);
+        const ernie::CubeFace face =
+            ernie::CubeFaceOf(fisheyeRay, ernie::kAllCubeFaces);
         backs += face == ernie::CubeFace::Back ? 1 : 0;
-        const glm::dvec2 plane = ernie::CubeFacePlane(face, fisheyeRay);
-        EXPECT_EQ(static_cast<int>(r[8]), static_cast<int>(face)) << i;
+        const glm::dvec2 plane =
+            ernie::CubeFacePlane(face, fisheyeRay);
+        EXPECT_EQ(static_cast<int>(r[8]), static_cast<int>(face))
+            << i;
         EXPECT_NEAR(r[9], plane.x, 1e-4) << i;
         EXPECT_NEAR(r[10], plane.y, 1e-4) << i;
     }

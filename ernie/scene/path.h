@@ -9,20 +9,23 @@
 
 namespace ernie {
 
-/// Absolute path naming a prim in a `Scene`, as in USD: `/` is the root and `/World/Sun` is the
-/// child `Sun` of `/World`.
+/// Absolute path naming a prim in a `Scene`, as in USD: `/` is the
+/// root and `/World/Sun` is the child `Sun` of `/World`.
 ///
-/// Names are identifiers: a letter or underscore followed by letters, digits and underscores. A
-/// default-constructed path is empty and names nothing. Paths order by their text, so a prim's
-/// descendants follow it contiguously.
+/// Names are identifiers: a letter or underscore followed by letters,
+/// digits and underscores. A default-constructed path is empty and
+/// names nothing. Paths order by their text, so a prim's descendants
+/// follow it contiguously.
 ///
-/// Reference: Pixar, "SdfPath", https://openusd.org/release/api/class_sdf_path.html
+/// Reference: Pixar, "SdfPath",
+/// https://openusd.org/release/api/class_sdf_path.html
 class Path {
   public:
     Path() = default;
 
     /// Parses `text`.
-    /// @throws std::invalid_argument if `text` is not an absolute path of valid names.
+    /// @throws std::invalid_argument if `text` is not an absolute
+    /// path of valid names.
     Path(std::string_view text);
     Path(const char* text) : Path(std::string_view(text)) {}
     Path(const std::string& text) : Path(std::string_view(text)) {}
@@ -44,14 +47,17 @@ class Path {
         return text_ == "/";
     }
 
-    /// The last name, or an empty view for the root and the empty path.
+    /// The last name, or an empty view for the root and the empty
+    /// path.
     std::string_view Name() const;
 
-    /// The parent path; the root and the empty path have an empty parent.
+    /// The parent path; the root and the empty path have an empty
+    /// parent.
     Path Parent() const;
 
     /// The child `name` of this path.
-    /// @throws std::invalid_argument if this path is empty or `name` is not a valid name.
+    /// @throws std::invalid_argument if this path is empty or `name`
+    /// is not a valid name.
     Path Child(std::string_view name) const;
 
     /// Whether this path is `ancestor` or lies below it.

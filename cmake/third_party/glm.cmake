@@ -17,5 +17,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(glm)
 
 add_library(ernie_glm INTERFACE)
-target_include_directories(ernie_glm SYSTEM INTERFACE "${glm_SOURCE_DIR}")
-target_compile_definitions(ernie_glm INTERFACE GLM_FORCE_DEPTH_ZERO_TO_ONE)
+target_include_directories(ernie_glm SYSTEM
+                           INTERFACE "${glm_SOURCE_DIR}")
+target_compile_definitions(ernie_glm
+                           INTERFACE GLM_FORCE_DEPTH_ZERO_TO_ONE)

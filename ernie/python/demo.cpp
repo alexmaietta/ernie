@@ -23,9 +23,10 @@ namespace {
 
 using app::Demo;
 
-/// `demo` as Python sees it: the Python object it is, for a demo made in Python, rather than
-/// nanobind's cast of the shared_ptr, which would keep that object alive from itself (the
-/// shared_ptr of a Python object holds a reference to it).
+/// `demo` as Python sees it: the Python object it is, for a demo made
+/// in Python, rather than nanobind's cast of the shared_ptr, which
+/// would keep that object alive from itself (the shared_ptr of a
+/// Python object holds a reference to it).
 nb::object DemoObject(const std::shared_ptr<app::Demo>& demo) {
     if (!demo) {
         return nb::none();
@@ -37,8 +38,9 @@ using app::DemoInfo;
 using app::DemoOptions;
 using app::DemoRunner;
 
-/// A Python subclass of Demo: its methods override the virtuals, and its class attributes
-/// (num_frames, fixed_dt, max_frame_dt) the settings, as a Python demo declares them.
+/// A Python subclass of Demo: its methods override the virtuals, and
+/// its class attributes (num_frames, fixed_dt, max_frame_dt) the
+/// settings, as a Python demo declares them.
 class PyDemo : public Demo {
   public:
     NB_TRAMPOLINE(Demo);
@@ -75,10 +77,13 @@ class PyDemo : public Demo {
     }
 
   private:
-    /// The Python attribute `name` of the demo, or `fallback` when it has none.
-    template <typename T> T Attribute(const char* name, T fallback) const {
+    /// The Python attribute `name` of the demo, or `fallback` when it
+    /// has none.
+    template <typename T>
+    T Attribute(const char* name, T fallback) const {
         nb::gil_scoped_acquire gil;
-        nb::object value = nb::getattr(nb_trampoline.base(), name, nb::none());
+        nb::object value =
+            nb::getattr(nb_trampoline.base(), name, nb::none());
         return value.is_none() ? fallback : nb::cast<T>(value);
     }
 };
@@ -87,141 +92,209 @@ class PyDemo : public Demo {
 
 void BindDemo(nb::module_& m) {
     nb::class_<DemoOptions>(m, "DemoOptions",
-                            "The options every demo takes (parse_demo_options), as Newton's "
+                            "The options every demo takes "
+                            "(parse_demo_options), as Newton's "
                             "examples share theirs.")
         .def(nb::init<>())
         .def_rw("viewer", &DemoOptions::viewer,
-                "Shows the viewer (--viewer window); False renders without one (--viewer null).")
-        .def_rw("headless", &DemoOptions::headless, "The viewer without a window.")
-        .def_rw("num_frames", &DemoOptions::numFrames, nb::arg("value").none(),
-                "Frames to run, or None: a window runs until closed, the other modes the demo's "
+                "Shows the viewer (--viewer window); False renders "
+                "without one (--viewer null).")
+        .def_rw("headless", &DemoOptions::headless,
+                "The viewer without a window.")
+        .def_rw("num_frames", &DemoOptions::numFrames,
+                nb::arg("value").none(),
+                "Frames to run, or None: a window runs until closed, "
+                "the other modes the demo's "
                 "num_frames.")
         .def_rw("benchmark", &DemoOptions::benchmark,
-                "Reports frames per second after a warm-up, without a viewer.")
-        .def_rw("benchmark_seconds", &DemoOptions::benchmarkSeconds, nb::arg("value").none(),
+                "Reports frames per second after a warm-up, without "
+                "a viewer.")
+        .def_rw("benchmark_seconds", &DemoOptions::benchmarkSeconds,
+                nb::arg("value").none(),
                 "Stops a benchmark after this many seconds, or None.")
-        .def_rw("test", &DemoOptions::test, "Runs test_post_step and test_final.")
-        .def_rw("output", &DemoOptions::output, "Where to write the last frame as PNG, or ''.")
+        .def_rw("test", &DemoOptions::test,
+                "Runs test_post_step and test_final.")
+        .def_rw("output", &DemoOptions::output,
+                "Where to write the last frame as PNG, or ''.")
         .def_rw("paused", &DemoOptions::paused)
-        .def_rw("device", &DemoOptions::device, "GPU to prefer, by part of its name.")
+        .def_rw("device", &DemoOptions::device,
+                "GPU to prefer, by part of its name.")
         .def_rw("renderer", &DemoOptions::renderer, "Render backend.")
         .def_rw("validation", &DemoOptions::validation)
         .def_rw("vsync", &DemoOptions::vsync)
-        .def_rw("demo", &DemoOptions::demo, "The demo to start with (--demo NAME), or ''.")
+        .def_rw("demo", &DemoOptions::demo,
+                "The demo to start with (--demo NAME), or ''.")
         .def_rw("extra", &DemoOptions::extra,
-                "The arguments that are none of the shared options, for the demo's own.")
-        .def_prop_ro("windowed", &DemoOptions::Windowed, "A viewer with a window.");
+                "The arguments that are none of the shared options, "
+                "for the demo's own.")
+        .def_prop_ro("windowed", &DemoOptions::Windowed,
+                     "A viewer with a window.");
     m.def(
         "main",
-        [](const std::vector<std::string>& args, const std::string& version) {
+        [](const std::vector<std::string>& args,
+           const std::string& version) {
             return app::ErnieMain(args, version);
         },
         nb::arg("args"), nb::arg("version"),
-        "The `ernie` program (ernie.cli): the viewer on a scene file or the default scene with "
-        "a Demos panel of Ernie's C++ demos, or a render without a window; args without the "
+        "The `ernie` program (ernie.cli): the viewer on a scene file "
+        "or the default scene with "
+        "a Demos panel of Ernie's C++ demos, or a render without a "
+        "window; args without the "
         "program name. Returns the exit status.");
     m.def("registered_demos", &app::RegisteredDemos,
-          "The C++ demos compiled in (ERNIE_REGISTER_DEMO), by category and name.");
+          "The C++ demos compiled in (ERNIE_REGISTER_DEMO), by "
+          "category and name.");
     m.def(
         "parse_demo_options",
-        [](const std::vector<std::string>& args) { return app::ParseDemoOptions(args); },
+        [](const std::vector<std::string>& args) {
+            return app::ParseDemoOptions(args);
+        },
         nb::arg("args"),
-        "Parses the shared demo options from a command line without the program name, leaving "
+        "Parses the shared demo options from a command line without "
+        "the program name, leaving "
         "the others in extra; raises ValueError for a bad value.");
 
     nb::class_<Demo, PyDemo>(
         m, "Demo",
-        "A demo: a scene built in __init__, advanced by step, drawn by render and checked by "
-        "test_final, run by DemoRunner in a window, headless or without a viewer. Subclass "
-        "ernie.demo.Demo in Python, which adds argparse options and NumPy images.")
-        .def(nb::init<app::Viewer*, const DemoOptions&>(), nb::arg("viewer").none(),
-             nb::arg("options"), nb::keep_alive<1, 2>())
-        .def("step", &Demo::Step, "Advances the scene by frame_dt; nothing by default.")
+        "A demo: a scene built in __init__, advanced by step, drawn "
+        "by render and checked by "
+        "test_final, run by DemoRunner in a window, headless or "
+        "without a viewer. Subclass "
+        "ernie.demo.Demo in Python, which adds argparse options and "
+        "NumPy images.")
+        .def(nb::init<app::Viewer*, const DemoOptions&>(),
+             nb::arg("viewer").none(), nb::arg("options"),
+             nb::keep_alive<1, 2>())
+        .def("step", &Demo::Step,
+             "Advances the scene by frame_dt; nothing by default.")
         .def("render", &Demo::Render,
-             "Draws a frame: the viewer's next, or without one the scene through renderer.")
+             "Draws a frame: the viewer's next, or without one the "
+             "scene through renderer.")
         .def("save_output", &Demo::SaveOutput, nb::arg("path"),
-             "Writes --output: the viewport's next frame, or the scene's LdrColor as PNG.")
-        .def("test_post_step", &Demo::TestPostStep, "Checks after every step under --test.")
-        .def("test_final", &Demo::TestFinal, "Checks at the end of a --test run.")
-        .def("close", &Demo::Close, "Releases what the demo holds, when it ends or is replaced.")
-        .def("description", &Demo::Description, "One line on what the demo shows.")
-        // Tied to its owner, the viewer (whose owner is the runner) or the demo's own shared
-        // scene, not to the demo: prims keep their scene alive, and the demo keeps its prims.
+             "Writes --output: the viewport's next frame, or the "
+             "scene's LdrColor as PNG.")
+        .def("test_post_step", &Demo::TestPostStep,
+             "Checks after every step under --test.")
+        .def("test_final", &Demo::TestFinal,
+             "Checks at the end of a --test run.")
+        .def("close", &Demo::Close,
+             "Releases what the demo holds, when it ends or is "
+             "replaced.")
+        .def("description", &Demo::Description,
+             "One line on what the demo shows.")
+        // Tied to its owner, the viewer (whose owner is the runner)
+        // or the demo's own shared scene, not to the demo: prims keep
+        // their scene alive, and the demo keeps its prims.
         .def_prop_ro(
             "scene",
             [](Demo& demo) -> nb::object {
                 if (app::Viewer* viewer = demo.GetViewer()) {
                     nb::object owner = nb::find(viewer);
-                    return nb::cast(&viewer->GetScene(), nb::rv_policy::reference_internal,
-                                    owner.is_valid() ? owner : nb::find(&demo));
+                    return nb::cast(
+                        &viewer->GetScene(),
+                        nb::rv_policy::reference_internal,
+                        owner.is_valid() ? owner : nb::find(&demo));
                 }
                 return nb::cast(demo.OwnScene());
             },
-            "The scene to build into: the viewer's, or the demo's own without one.")
-        // Shared, not tied to the demo: images and batch cameras keep the renderer alive, and
-        // the demo keeps those, which would make a cycle through C++ that Python cannot collect.
+            "The scene to build into: the viewer's, or the demo's "
+            "own without one.")
+        // Shared, not tied to the demo: images and batch cameras keep
+        // the renderer alive, and the demo keeps those, which would
+        // make a cycle through C++ that Python cannot collect.
         .def_prop_ro("renderer", &Demo::SharedRenderer,
-                     "A Renderer of the demo's own, opened on first use with the run's device, "
+                     "A Renderer of the demo's own, opened on first "
+                     "use with the run's device, "
                      "backend and validation.")
         .def_prop_ro("widgets", &Demo::SharedWidgets,
-                     "The demo's controls in the Demos panel's Options section: a WidgetPanel "
-                     "to add sliders, checkboxes and combos to, with or without a viewer.")
-        .def_prop_ro("options", &Demo::Options, "The run's shared options.")
+                     "The demo's controls in the Demos panel's "
+                     "Options section: a WidgetPanel "
+                     "to add sliders, checkboxes and combos to, with "
+                     "or without a viewer.")
+        .def_prop_ro("options", &Demo::Options,
+                     "The run's shared options.")
         .def_rw("frame", &Demo::frame, "Steps taken so far.")
-        .def_rw("time", &Demo::time, "Demo seconds at the start of this step.")
+        .def_rw("time", &Demo::time,
+                "Demo seconds at the start of this step.")
         .def_rw("frame_dt", &Demo::frameDt,
-                "Seconds this step advances: in a window the time since the last frame (at most "
+                "Seconds this step advances: in a window the time "
+                "since the last frame (at most "
                 "max_frame_dt), else fixed_dt.");
 
-    nb::class_<DemoInfo>(m, "DemoInfo", "A demo the runner can build, for the Demos panel.")
+    nb::class_<DemoInfo>(
+        m, "DemoInfo",
+        "A demo the runner can build, for the Demos panel.")
         .def(
             "__init__",
-            [](DemoInfo* self, std::string category, std::string name, std::string description,
-               std::function<std::shared_ptr<Demo>(app::Viewer*, const DemoOptions&)> create) {
-                new (self) DemoInfo{std::move(category), std::move(name), std::move(description),
-                                    std::move(create)};
+            [](DemoInfo* self, std::string category, std::string name,
+               std::string description,
+               std::function<std::shared_ptr<Demo>(
+                   app::Viewer*, const DemoOptions&)>
+                   create) {
+                new (self) DemoInfo{
+                    std::move(category), std::move(name),
+                    std::move(description), std::move(create)};
             },
-            nb::arg("category"), nb::arg("name"), nb::arg("description"), nb::arg("create"),
-            "create(viewer, options) builds the demo; viewer is None without one.")
+            nb::arg("category"), nb::arg("name"),
+            nb::arg("description"), nb::arg("create"),
+            "create(viewer, options) builds the demo; viewer is None "
+            "without one.")
         .def_ro("category", &DemoInfo::category)
         .def_ro("name", &DemoInfo::name)
         .def_ro("description", &DemoInfo::description)
-        .def_prop_ro("label", &DemoInfo::Label, "\"category: name\", as the panel lists it.")
+        .def_prop_ro("label", &DemoInfo::Label,
+                     "\"category: name\", as the panel lists it.")
         .def_prop_ro("id", &DemoInfo::Id,
-                     "\"category/name\", as `ernie --demo` and `--list` name it.");
+                     "\"category/name\", as `ernie --demo` and "
+                     "`--list` name it.");
 
     nb::class_<DemoRunner>(
         m, "DemoRunner",
-        "Runs demos as Newton's examples run: in a window, headless or without a viewer, writing "
-        "--output, running --test checks and reporting --benchmark; in a window a Demos panel "
+        "Runs demos as Newton's examples run: in a window, headless "
+        "or without a viewer, writing "
+        "--output, running --test checks and reporting --benchmark; "
+        "in a window a Demos panel "
         "switches between the catalogue's demos.")
-        .def(nb::init<DemoOptions, const std::string&>(), nb::arg("options"),
-             nb::arg("title") = "Ernie demos",
-             "Opens the viewer the options ask for (none for --viewer null or --benchmark); demos "
+        .def(nb::init<DemoOptions, const std::string&>(),
+             nb::arg("options"), nb::arg("title") = "Ernie demos",
+             "Opens the viewer the options ask for (none for "
+             "--viewer null or --benchmark); demos "
              "built from now on register in a scope of their own.")
-        .def_prop_ro("viewer", &DemoRunner::GetViewer, nb::rv_policy::reference_internal,
+        .def_prop_ro("viewer", &DemoRunner::GetViewer,
+                     nb::rv_policy::reference_internal,
                      "The viewer, or None without one.")
         .def_prop_ro("options", &DemoRunner::Options)
-        .def("set_catalog", &DemoRunner::SetCatalog, nb::arg("demos"), nb::arg("current") = 0,
-             "The demos the Demos panel lists, and which of them runs first.")
+        .def("set_catalog", &DemoRunner::SetCatalog, nb::arg("demos"),
+             nb::arg("current") = 0,
+             "The demos the Demos panel lists, and which of them "
+             "runs first.")
         .def(
             "create",
-            [](DemoRunner& runner, std::size_t index) { return DemoObject(runner.Create(index)); },
-            nb::arg("index"), "Builds the catalogue's demo index for this runner.")
-        .def("request_switch", &DemoRunner::RequestSwitch, nb::arg("index"),
-             "Switches to the catalogue's demo index before the next frame, as the Demos panel's "
+            [](DemoRunner& runner, std::size_t index) {
+                return DemoObject(runner.Create(index));
+            },
+            nb::arg("index"),
+            "Builds the catalogue's demo index for this runner.")
+        .def("request_switch", &DemoRunner::RequestSwitch,
+             nb::arg("index"),
+             "Switches to the catalogue's demo index before the next "
+             "frame, as the Demos panel's "
              "menu does. With a viewer only.")
         .def("request_reset", &DemoRunner::RequestReset,
-             "Builds the running demo afresh before the next frame, as the panel's Reset does.")
+             "Builds the running demo afresh before the next frame, "
+             "as the panel's Reset does.")
         .def(
             "run",
             [](DemoRunner& runner, std::shared_ptr<Demo> demo) {
                 return DemoObject(runner.Run(std::move(demo)));
             },
             nb::arg("demo"),
-            "Runs demo until its window closes or it has run its frames, then writes --output, "
-            "runs test_final and reports the benchmark; returns the demo running at the end "
-            "(the Demos panel may have switched), or None. Closes the viewer.");
+            "Runs demo until its window closes or it has run its "
+            "frames, then writes --output, "
+            "runs test_final and reports the benchmark; returns the "
+            "demo running at the end "
+            "(the Demos panel may have switched), or None. Closes "
+            "the viewer.");
 }
 
 }  // namespace ernie::python

@@ -11,13 +11,18 @@
 
 namespace ernie {
 
-glm::dmat4 InterpolatePose(const glm::dmat4& from, const glm::dmat4& to, double s) {
-    // Rotation and scale apart, so the rotations slerp and the scales lerp.
-    const auto split = [](const glm::dmat4& pose, glm::dquat& rotation, glm::dvec3& scale) {
+glm::dmat4 InterpolatePose(const glm::dmat4& from,
+                           const glm::dmat4& to, double s) {
+    // Rotation and scale apart, so the rotations slerp and the scales
+    // lerp.
+    const auto split = [](const glm::dmat4& pose,
+                          glm::dquat& rotation, glm::dvec3& scale) {
         const glm::dmat3 linear(pose);
-        scale = {glm::length(linear[0]), glm::length(linear[1]), glm::length(linear[2])};
-        rotation = glm::quat_cast(
-            glm::dmat3(linear[0] / scale.x, linear[1] / scale.y, linear[2] / scale.z));
+        scale = {glm::length(linear[0]), glm::length(linear[1]),
+                 glm::length(linear[2])};
+        rotation = glm::quat_cast(glm::dmat3(linear[0] / scale.x,
+                                             linear[1] / scale.y,
+                                             linear[2] / scale.z));
     };
     glm::dquat a;
     glm::dquat b;
@@ -29,12 +34,15 @@ glm::dmat4 InterpolatePose(const glm::dmat4& from, const glm::dmat4& to, double 
     if (glm::dot(a, b) < 0.0) {
         b = -b;
     }
-    const double angle = std::acos(std::clamp(glm::dot(a, b), -1.0, 1.0));
+    const double angle =
+        std::acos(std::clamp(glm::dot(a, b), -1.0, 1.0));
     glm::dquat rotation;
     if (angle < 1e-9) {
         rotation = a;
     } else {
-        rotation = (std::sin((1.0 - s) * angle) * a + std::sin(s * angle) * b) / std::sin(angle);
+        rotation = (std::sin((1.0 - s) * angle) * a +
+                    std::sin(s * angle) * b) /
+                   std::sin(angle);
     }
     const glm::dmat3 r = glm::mat3_cast(glm::normalize(rotation));
     const glm::dvec3 scale = glm::mix(scaleA, scaleB, s);
@@ -42,7 +50,8 @@ glm::dmat4 InterpolatePose(const glm::dmat4& from, const glm::dmat4& to, double 
     pose[0] = glm::dvec4(r[0] * scale.x, 0.0);
     pose[1] = glm::dvec4(r[1] * scale.y, 0.0);
     pose[2] = glm::dvec4(r[2] * scale.z, 0.0);
-    pose[3] = glm::dvec4(glm::mix(glm::dvec3(from[3]), glm::dvec3(to[3]), s), 1.0);
+    pose[3] = glm::dvec4(
+        glm::mix(glm::dvec3(from[3]), glm::dvec3(to[3]), s), 1.0);
     return pose;
 }
 
@@ -50,9 +59,10 @@ namespace {
 
 /// The rotation of camera-to-world `pose`, its scale left out.
 glm::dquat RotationOf(const glm::dmat4& pose) {
-    return glm::normalize(glm::quat_cast(glm::dmat3(glm::normalize(glm::dvec3(pose[0])),
-                                                    glm::normalize(glm::dvec3(pose[1])),
-                                                    glm::normalize(glm::dvec3(pose[2])))));
+    return glm::normalize(glm::quat_cast(
+        glm::dmat3(glm::normalize(glm::dvec3(pose[0])),
+                   glm::normalize(glm::dvec3(pose[1])),
+                   glm::normalize(glm::dvec3(pose[2])))));
 }
 
 }  // namespace
@@ -61,42 +71,55 @@ glm::mat4 PushbroomStrip::Packed() const {
     glm::mat4 packed;
     packed[0] = glm::vec4(from, nearPlane);
     packed[1] = glm::vec4(to, farPlane);
-    packed[2] = glm::vec4(fromRotation.x, fromRotation.y, fromRotation.z, fromRotation.w);
-    packed[3] = glm::vec4(toRotation.x, toRotation.y, toRotation.z, toRotation.w);
+    packed[2] = glm::vec4(fromRotation.x, fromRotation.y,
+                          fromRotation.z, fromRotation.w);
+    packed[3] = glm::vec4(toRotation.x, toRotation.y, toRotation.z,
+                          toRotation.w);
     return packed;
 }
 
-CameraView PushbroomEnvelope(const CameraParams& camera, const glm::dmat4& from,
+CameraView PushbroomEnvelope(const CameraParams& camera,
+                             const glm::dmat4& from,
                              const glm::dmat4& to) {
     const glm::dmat4 middle = InterpolatePose(from, to, 0.5);
     const glm::dmat3 rotation = glm::mat3_cast(RotationOf(middle));
     const glm::dvec3 forward = -rotation[2];
-    const double length = glm::length(glm::dvec3(to[3]) - glm::dvec3(from[3]));
+    const double length =
+        glm::length(glm::dvec3(to[3]) - glm::dvec3(from[3]));
     glm::dmat4 eyePose(rotation);
-    eyePose[3] = glm::dvec4(glm::dvec3(middle[3]) - forward * length, 1.0);
+    eyePose[3] =
+        glm::dvec4(glm::dvec3(middle[3]) - forward * length, 1.0);
     const glm::dmat4 toEye = glm::inverse(eyePose);
 
-    // The detector line's ends at the clipping planes, from poses along the strip: the rays
-    // between them are straight, and their image coordinates from the eye monotonic along them.
+    // The detector line's ends at the clipping planes, from poses
+    // along the strip: the rays between them are straight, and their
+    // image coordinates from the eye monotonic along them.
     const double f = camera.FocalLengthPixels();
     const double cx = camera.PrincipalPoint().x;
     const double line = camera.lineOffsetMm / camera.focalLengthMm;
-    // The rays of the line's end pixels, through the lens's distortion.
-    const double edges[] = {camera.lens.Undistort({-cx / f, line}).x,
-                            camera.lens.Undistort({(camera.width - cx) / f, line}).x};
+    // The rays of the line's end pixels, through the lens's
+    // distortion.
+    const double edges[] = {
+        camera.lens.Undistort({-cx / f, line}).x,
+        camera.lens.Undistort({(camera.width - cx) / f, line}).x};
     double tanX = 0.0;
     double tanY = 0.0;
     double nearest = std::numeric_limits<double>::max();
     double farthest = 0.0;
     constexpr int kSamples = 16;
     for (int i = 0; i <= kSamples; ++i) {
-        const glm::dmat4 sample = InterpolatePose(from, to, double(i) / kSamples);
+        const glm::dmat4 sample =
+            InterpolatePose(from, to, double(i) / kSamples);
         const glm::dmat4 pose(glm::mat3_cast(RotationOf(sample)));
         const glm::dvec3 position(sample[3]);
         for (const double x : edges) {
-            for (const double depth : {camera.nearPlane, camera.farPlane}) {
+            for (const double depth :
+                 {camera.nearPlane, camera.farPlane}) {
                 const glm::dvec3 world =
-                    position + glm::dvec3(pose * glm::dvec4(x * depth, line * depth, -depth, 0.0));
+                    position +
+                    glm::dvec3(pose * glm::dvec4(x * depth,
+                                                 line * depth, -depth,
+                                                 0.0));
                 const glm::dvec3 p(toEye * glm::dvec4(world, 1.0));
                 const double z = std::max(-p.z, 1e-6);
                 nearest = std::min(nearest, z);
@@ -106,7 +129,8 @@ CameraView PushbroomEnvelope(const CameraParams& camera, const glm::dmat4& from,
             }
         }
     }
-    // Padding for the rays between samples, and a sliver of height for a still camera.
+    // Padding for the rays between samples, and a sliver of height
+    // for a still camera.
     tanX *= 1.02;
     tanY = std::max(tanY * 1.02, 1e-4);
     CameraView view;
@@ -117,20 +141,23 @@ CameraView PushbroomEnvelope(const CameraParams& camera, const glm::dmat4& from,
     view.eye = glm::vec3(eyePose[3]);
     view.forward = glm::vec3(forward);
     view.view = glm::mat4(toEye);
-    view.projection =
-        glm::perspectiveRH_ZO(view.verticalFov, view.aspect, view.nearPlane, view.farPlane);
+    view.projection = glm::perspectiveRH_ZO(
+        view.verticalFov, view.aspect, view.nearPlane, view.farPlane);
     return view;
 }
 
 glm::dmat4 FrameParams::PreviousPose(std::size_t view) const {
-    glm::dmat4 pose = previousPoses.empty() ? (poses.empty() ? camera.transform : poses.at(view))
-                                            : previousPoses.at(view);
+    glm::dmat4 pose =
+        previousPoses.empty()
+            ? (poses.empty() ? camera.transform : poses.at(view))
+            : previousPoses.at(view);
     pose[3] -= glm::dvec4(origin, 0.0);
     return pose;
 }
 
 PushbroomStrip FrameParams::Strip(std::size_t view) const {
-    glm::dmat4 pose = poses.empty() ? camera.transform : poses.at(view);
+    glm::dmat4 pose =
+        poses.empty() ? camera.transform : poses.at(view);
     pose[3] -= glm::dvec4(origin, 0.0);
     const glm::dmat4 from = PreviousPose(view);
     const glm::dquat a = RotationOf(from);
@@ -146,11 +173,15 @@ PushbroomStrip FrameParams::Strip(std::size_t view) const {
     strip.nearPlane = static_cast<float>(camera.nearPlane);
     strip.farPlane = static_cast<float>(camera.farPlane);
     const double width = camera.width;
-    // The raster image is drawn with the focal length over the overscan, so the undistorted
-    // line's ends stay in it (the lens head resamples it through the distortion).
-    strip.scale = static_cast<float>(2.0 * camera.FocalLengthPixels() / overscan / width);
-    strip.shift = static_cast<float>(2.0 * camera.PrincipalPoint().x / width - 1.0);
-    strip.line = static_cast<float>(camera.lineOffsetMm / camera.focalLengthMm);
+    // The raster image is drawn with the focal length over the
+    // overscan, so the undistorted line's ends stay in it (the lens
+    // head resamples it through the distortion).
+    strip.scale = static_cast<float>(
+        2.0 * camera.FocalLengthPixels() / overscan / width);
+    strip.shift = static_cast<float>(
+        2.0 * camera.PrincipalPoint().x / width - 1.0);
+    strip.line = static_cast<float>(camera.lineOffsetMm /
+                                    camera.focalLengthMm);
     return strip;
 }
 
@@ -162,7 +193,8 @@ FrameParams FrameParams::Subframes() const {
     }
     const std::size_t views = Views();
     if (!previousPoses.empty() && previousPoses.size() != views) {
-        throw std::invalid_argument("A frame's previous poses need one per view");
+        throw std::invalid_argument(
+            "A frame's previous poses need one per view");
     }
     result.poses.clear();
     result.worlds.clear();
@@ -170,16 +202,20 @@ FrameParams FrameParams::Subframes() const {
         // The last frame is at time -1, this one at 0.
         const double s = 1.0 + camera.SubframeTime(k);
         for (std::size_t v = 0; v < views; ++v) {
-            const glm::dmat4& pose = poses.empty() ? camera.transform : poses[v];
+            const glm::dmat4& pose =
+                poses.empty() ? camera.transform : poses[v];
             result.poses.push_back(
-                previousPoses.empty() ? pose : InterpolatePose(previousPoses[v], pose, s));
+                previousPoses.empty()
+                    ? pose
+                    : InterpolatePose(previousPoses[v], pose, s));
             result.worlds.push_back(ViewWorld(v));
         }
     }
     return result;
 }
 
-glm::dvec3 FrameParams::FaceIntrinsics(std::uint32_t width, std::uint32_t height) {
+glm::dvec3 FrameParams::FaceIntrinsics(std::uint32_t width,
+                                       std::uint32_t height) {
     const double side = std::min(width, height);
     const double focal = 0.5 * side / CubeFaceExtent(side);
     return {focal, 0.5 * width, 0.5 * height};
@@ -187,21 +223,25 @@ glm::dvec3 FrameParams::FaceIntrinsics(std::uint32_t width, std::uint32_t height
 
 FrameParams FrameParams::Faces(int faces) const {
     if (faces != 1 && faces != kCubeFaces && faces != kAllCubeFaces) {
-        throw std::invalid_argument("A frame renders on 1, " + std::to_string(kCubeFaces) + " or " +
-                                    std::to_string(kAllCubeFaces) + " cube faces, not " +
-                                    std::to_string(faces));
+        throw std::invalid_argument(
+            "A frame renders on 1, " + std::to_string(kCubeFaces) +
+            " or " + std::to_string(kAllCubeFaces) +
+            " cube faces, not " + std::to_string(faces));
     }
     FrameParams result = *this;
     if (faces == 1) {
         return result;
     }
-    // The faces' camera: a centred pinhole, its focal length in pixels the face's.
+    // The faces' camera: a centred pinhole, its focal length in
+    // pixels the face's.
     CameraParams& face = result.camera;
     face.lens = LensModel{};
     face.lens.transmission = camera.lens.transmission;
     face.lens.vignetting = camera.lens.vignetting;
-    const glm::dvec3 intrinsics = FaceIntrinsics(camera.width, camera.height);
-    face.focalLengthMm = intrinsics.x * camera.verticalApertureMm / camera.height;
+    const glm::dvec3 intrinsics =
+        FaceIntrinsics(camera.width, camera.height);
+    face.focalLengthMm =
+        intrinsics.x * camera.verticalApertureMm / camera.height;
     face.horizontalApertureOffsetMm = 0.0;
     face.verticalApertureOffsetMm = 0.0;
     result.overscan = 1.0;
@@ -210,13 +250,17 @@ FrameParams FrameParams::Faces(int faces) const {
     result.worlds.clear();
     result.previousPoses.clear();
     for (std::size_t v = 0; v < views; ++v) {
-        const glm::dmat4& pose = poses.empty() ? camera.transform : poses[v];
+        const glm::dmat4& pose =
+            poses.empty() ? camera.transform : poses[v];
         for (int f = 0; f < faces; ++f) {
-            const glm::dmat4 turn(CubeFaceAxes(static_cast<CubeFace>(f)));
+            const glm::dmat4 turn(
+                CubeFaceAxes(static_cast<CubeFace>(f)));
             result.poses.push_back(pose * turn);
-            // A sub-frame's view (`Subframes`) has its output view's last pose.
+            // A sub-frame's view (`Subframes`) has its output view's
+            // last pose.
             if (!previousPoses.empty()) {
-                result.previousPoses.push_back(previousPoses[v % previousPoses.size()] * turn);
+                result.previousPoses.push_back(
+                    previousPoses[v % previousPoses.size()] * turn);
             }
             result.worlds.push_back(ViewWorld(v));
         }

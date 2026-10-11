@@ -12,7 +12,8 @@ using ernie::StreamOf;
 
 static_assert(StreamOf("") == 2166136261u, "FNV-1a offset basis");
 static_assert(StreamOf("a") == 0xe40c292cu, "FNV-1a of a");
-static_assert(FrameSeed(1, 2, 3) == FrameSeed(1, 2, 3), "usable at compile time");
+static_assert(FrameSeed(1, 2, 3) == FrameSeed(1, 2, 3),
+              "usable at compile time");
 
 TEST(SamplingTest, Pcg3dMixesEveryInputWord) {
     const glm::uvec3 base = Pcg3d(glm::uvec3(0u));
@@ -21,7 +22,8 @@ TEST(SamplingTest, Pcg3dMixesEveryInputWord) {
         input[word] = 1u;
         const glm::uvec3 h = Pcg3d(input);
         for (int out = 0; out < 3; ++out) {
-            EXPECT_NE(h[out], base[out]) << "input " << word << " output " << out;
+            EXPECT_NE(h[out], base[out])
+                << "input " << word << " output " << out;
         }
     }
 }
@@ -46,5 +48,6 @@ TEST(SamplingTest, FrameSeedsAreDistinctAcrossSeedsStreamsAndFrames) {
 }
 
 TEST(SamplingTest, FrameSeedUsesTheHighWordOfTheFrame) {
-    EXPECT_NE(FrameSeed(0, 0, 1), FrameSeed(0, 0, (std::uint64_t{1} << 32u) + 1u));
+    EXPECT_NE(FrameSeed(0, 0, 1),
+              FrameSeed(0, 0, (std::uint64_t{1} << 32u) + 1u));
 }

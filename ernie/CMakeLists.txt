@@ -13,10 +13,12 @@
 
 # ernie_add_library(<target> SOURCES ... [PUBLIC ...] [PRIVATE ...]): a static module library.
 function(ernie_add_library target)
-    cmake_parse_arguments(PARSE_ARGV 1 ARG "" "" "SOURCES;PUBLIC;PRIVATE")
+    cmake_parse_arguments(PARSE_ARGV 1 ARG "" ""
+                          "SOURCES;PUBLIC;PRIVATE")
     add_library(${target} STATIC ${ARG_SOURCES})
-    target_include_directories(${target} PUBLIC "${PROJECT_SOURCE_DIR}"
-                                                "${PROJECT_BINARY_DIR}/generated")
+    target_include_directories(
+        ${target} PUBLIC "${PROJECT_SOURCE_DIR}"
+                         "${PROJECT_BINARY_DIR}/generated")
     target_compile_features(${target} PUBLIC cxx_std_20)
     target_link_libraries(
         ${target}
@@ -35,8 +37,8 @@ add_subdirectory(session)
 add_subdirectory(raster)
 
 # The backends `CreateRenderDelegate` can make, and `Renderer`, which creates one on a GPU.
-ernie_add_library(ernie_backends SOURCES session/backends.cpp session/renderer.cpp PUBLIC
-                  ernie_raster)
+ernie_add_library(ernie_backends SOURCES session/backends.cpp
+                  session/renderer.cpp PUBLIC ernie_raster)
 
 add_library(ernie INTERFACE)
 target_link_libraries(ernie INTERFACE ernie_backends)
@@ -46,7 +48,8 @@ add_library(Ernie::ernie ALIAS ernie)
 # need no windowing or UI libraries.
 if(ERNIE_BUILD_APP)
     include("${PROJECT_SOURCE_DIR}/cmake/third_party/glfw.cmake")
-    include("${PROJECT_SOURCE_DIR}/cmake/third_party/dear_imgui.cmake")
+    include(
+        "${PROJECT_SOURCE_DIR}/cmake/third_party/dear_imgui.cmake")
     include("${PROJECT_SOURCE_DIR}/cmake/third_party/implot.cmake")
     include("${PROJECT_SOURCE_DIR}/cmake/third_party/imguizmo.cmake")
     include("${PROJECT_SOURCE_DIR}/cmake/third_party/gui_fonts.cmake")

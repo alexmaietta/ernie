@@ -14,4 +14,6 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(vulkan_headers)
 
 add_library(ernie_vulkan_headers INTERFACE)
-target_include_directories(ernie_vulkan_headers SYSTEM INTERFACE "${vulkan_headers_SOURCE_DIR}/include")
+target_include_directories(
+    ernie_vulkan_headers SYSTEM
+    INTERFACE "${vulkan_headers_SOURCE_DIR}/include")

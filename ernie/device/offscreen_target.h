@@ -11,15 +11,19 @@
 
 namespace ernie {
 
-/// A colour and depth target for headless rendering, with readback of the colour image.
+/// A colour and depth target for headless rendering, with readback of
+/// the colour image.
 class OffscreenTarget {
   public:
     /// @throws std::runtime_error if the images cannot be created.
-    /// A `shared` target allocates its colour image exportable, for CUDA or HIP to read in place
+    /// A `shared` target allocates its colour image exportable, for
+    /// CUDA or HIP to read in place
     /// (`ComputeInterop::MapImage`).
-    OffscreenTarget(const VulkanContext& context, std::uint32_t width, std::uint32_t height,
+    OffscreenTarget(const VulkanContext& context, std::uint32_t width,
+                    std::uint32_t height,
                     VkFormat colorFormat = VK_FORMAT_R8G8B8A8_UNORM,
-                    VkFormat depthFormat = VK_FORMAT_D32_SFLOAT, bool shared = false);
+                    VkFormat depthFormat = VK_FORMAT_D32_SFLOAT,
+                    bool shared = false);
 
     GpuImage& Color() {
         return color_;
@@ -37,25 +41,31 @@ class OffscreenTarget {
         return depth_.Desc().format;
     }
 
-    /// Records the transitions that make both images attachments, and returns the attachments for
-    /// `BeginRendering`, clearing to `clear`.
-    RenderingTarget Prepare(VkCommandBuffer commands, VkClearColorValue clear = {});
+    /// Records the transitions that make both images attachments, and
+    /// returns the attachments for `BeginRendering`, clearing to
+    /// `clear`.
+    RenderingTarget Prepare(VkCommandBuffer commands,
+                            VkClearColorValue clear = {});
 
-    /// Colour texels, rows top to bottom, tightly packed; for 8-bit formats four bytes per texel.
-    /// Waits for submitted work through `VulkanContext::Submit`.
+    /// Colour texels, rows top to bottom, tightly packed; for 8-bit
+    /// formats four bytes per texel. Waits for submitted work through
+    /// `VulkanContext::Submit`.
     std::vector<std::uint8_t> ReadColor();
 
     /// Bytes of the colour image tightly packed.
     VkDeviceSize ColorBytes() const;
 
-    /// Records a copy of the colour texels, laid out as `ReadColor` returns them, into the start of
-    /// `buffer`, after the rendering recorded before it.
-    /// @throws std::invalid_argument if the buffer is smaller than `ColorBytes`.
+    /// Records a copy of the colour texels, laid out as `ReadColor`
+    /// returns them, into the start of `buffer`, after the rendering
+    /// recorded before it.
+    /// @throws std::invalid_argument if the buffer is smaller than
+    /// `ColorBytes`.
     void RecordCopyColor(VkCommandBuffer commands, GpuBuffer& buffer);
 
-    /// Copies the colour texels, laid out as `ReadColor` returns them, into the start of `buffer`
-    /// and waits for the copy.
-    /// @throws std::invalid_argument if the buffer is smaller than `ColorBytes`.
+    /// Copies the colour texels, laid out as `ReadColor` returns
+    /// them, into the start of `buffer` and waits for the copy.
+    /// @throws std::invalid_argument if the buffer is smaller than
+    /// `ColorBytes`.
     void CopyColor(GpuBuffer& buffer);
 
   private:

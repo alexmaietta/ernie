@@ -41,7 +41,8 @@ Theme LightTheme() {
     return theme;
 }
 
-void ApplyTheme(const Theme& theme, float contentScale, ImGuiStyle& style) {
+void ApplyTheme(const Theme& theme, float contentScale,
+                ImGuiStyle& style) {
     style = ImGuiStyle();
     style.WindowPadding = {8.0f, 6.0f};
     style.FramePadding = ToImVec2(theme.framePadding);
@@ -99,8 +100,9 @@ void ApplyTheme(const Theme& theme, float contentScale, ImGuiStyle& style) {
     set(ImGuiCol_Button, theme.field);
     set(ImGuiCol_ButtonHovered, theme.fieldHovered);
     set(ImGuiCol_ButtonActive, accentDim);
-    // Headers: section bars (drawn with `header` by the panels), and selected rows of trees and
-    // lists, which take the selection colour.
+    // Headers: section bars (drawn with `header` by the panels), and
+    // selected rows of trees and lists, which take the selection
+    // colour.
     set(ImGuiCol_Header, theme.selection);
     set(ImGuiCol_HeaderHovered, WithAlpha(theme.fieldHovered, 0.8f));
     set(ImGuiCol_HeaderActive, WithAlpha(theme.selection, 0.9f));
@@ -111,14 +113,16 @@ void ApplyTheme(const Theme& theme, float contentScale, ImGuiStyle& style) {
     set(ImGuiCol_ResizeGripHovered, accentDim);
     set(ImGuiCol_ResizeGripActive, theme.accent);
     set(ImGuiCol_InputTextCursor, theme.text);
-    // Tabs as Kit draws them: dim on the dark bar, the shown one in the panel's colour.
+    // Tabs as Kit draws them: dim on the dark bar, the shown one in
+    // the panel's colour.
     set(ImGuiCol_Tab, theme.background);
     set(ImGuiCol_TabHovered, theme.fieldHovered);
     set(ImGuiCol_TabSelected, theme.panel);
     set(ImGuiCol_TabSelectedOverline, theme.accent);
     set(ImGuiCol_TabDimmed, theme.background);
     set(ImGuiCol_TabDimmedSelected, theme.panel);
-    set(ImGuiCol_TabDimmedSelectedOverline, WithAlpha(theme.accent, 0.0f));
+    set(ImGuiCol_TabDimmedSelectedOverline,
+        WithAlpha(theme.accent, 0.0f));
     set(ImGuiCol_DockingPreview, accentDim);
     set(ImGuiCol_DockingEmptyBg, theme.background);
     set(ImGuiCol_PlotLines, theme.accent);
@@ -138,7 +142,8 @@ void ApplyTheme(const Theme& theme, float contentScale, ImGuiStyle& style) {
     set(ImGuiCol_UnsavedMarker, theme.warning);
     set(ImGuiCol_NavCursor, theme.accent);
     set(ImGuiCol_NavWindowingHighlight, theme.accent);
-    set(ImGuiCol_NavWindowingDimBg, WithAlpha(theme.background, 0.6f));
+    set(ImGuiCol_NavWindowingDimBg,
+        WithAlpha(theme.background, 0.6f));
     set(ImGuiCol_ModalWindowDimBg, WithAlpha(theme.background, 0.6f));
 
     style.ScaleAllSizes(contentScale);

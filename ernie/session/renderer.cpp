@@ -9,7 +9,8 @@ namespace ernie {
 
 namespace {
 
-std::unique_ptr<VulkanContext> CreateContext(const RendererOptions& options) {
+std::unique_ptr<VulkanContext>
+CreateContext(const RendererOptions& options) {
     VulkanContextOptions context;
     context.validation = options.validation;
     context.preferredDevice = options.device;
@@ -46,17 +47,20 @@ std::string Renderer::DeviceName() const {
     return context_->DeviceName();
 }
 
-RenderProductSetOutputs Renderer::Step(const Scene& scene, std::span<const Path> products,
+RenderProductSetOutputs Renderer::Step(const Scene& scene,
+                                       std::span<const Path> products,
                                        const Path& settings) {
     return delegate_->Step(scene, products, settings);
 }
 
-StepOperation Renderer::StepAsync(const Scene& scene, std::span<const Path> products,
+StepOperation Renderer::StepAsync(const Scene& scene,
+                                  std::span<const Path> products,
                                   const Path& settings) {
     return delegate_->StepAsync(scene, products, settings);
 }
 
-Tensor Renderer::Render(const Scene& scene, const Path& settings, Device device) {
+Tensor Renderer::Render(const Scene& scene, const Path& settings,
+                        Device device) {
     return delegate_->Render(scene, settings, device);
 }
 

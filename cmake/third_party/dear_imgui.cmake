@@ -1,6 +1,9 @@
 set(ERNIE_DEP_VERSION_dear_imgui
     v1.92.9b-docking
-    CACHE STRING "Tag of Dear ImGui to fetch (a docking-branch tag, for dockable panels).")
+    CACHE
+        STRING
+        "Tag of Dear ImGui to fetch (a docking-branch tag, for dockable panels)."
+)
 mark_as_advanced(ERNIE_DEP_VERSION_dear_imgui)
 
 include(FetchContent)

@@ -13,7 +13,8 @@ set(CPACK_PACKAGE_VENDOR "Ernie")
 set(CPACK_PACKAGE_CONTACT "Alex Maietta <maiettaalex@gmail.com>")
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/alexmaietta/ernie")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
-    "Spectral Vulkan renderer for natural and interplanetary environments")
+    "Spectral Vulkan renderer for natural and interplanetary environments"
+)
 set(CPACK_PACKAGE_DESCRIPTION
     "Ernie is a physically based, spectral, real-time renderer for planetary scenes: terrain, star \
 fields, sunlight and camera sensors described in physical units, rendered in batches on any \
@@ -59,7 +60,8 @@ set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
 set(CPACK_DEB_COMPONENT_INSTALL ON)
 set(CPACK_RPM_COMPONENT_INSTALL ON)
 set(CPACK_COMPONENTS_GROUPING ALL_COMPONENTS_IN_ONE)
-set(CPACK_PROJECT_CONFIG_FILE "${PROJECT_SOURCE_DIR}/cmake/ErnieCPackOptions.cmake")
+set(CPACK_PROJECT_CONFIG_FILE
+    "${PROJECT_SOURCE_DIR}/cmake/ErnieCPackOptions.cmake")
 
 # What GLFW loads for the viewer's windows: X11, and Wayland when the session has it (falling back
 # to X11 without). Only the viewer and applications that open windows need them.
@@ -80,8 +82,8 @@ find_program(ERNIE_DPKG_SHLIBDEPS dpkg-shlibdeps)
 mark_as_advanced(ERNIE_DPKG_SHLIBDEPS)
 if(ERNIE_DPKG_SHLIBDEPS)
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
-    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS_PRIVATE_DIRS "${PROJECT_BINARY_DIR}/lib"
-                                                    "${ERNIE_SLANG_RUNTIME_DIR}")
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS_PRIVATE_DIRS
+        "${PROJECT_BINARY_DIR}/lib" "${ERNIE_SLANG_RUNTIME_DIR}")
 else()
     # Built where dpkg-shlibdeps is missing (the manylinux container): the build host's glibc, and
     # the libstdc++ of GCC 11 that Slang's prebuilt library needs (GLIBCXX_3.4.29).
@@ -90,8 +92,11 @@ else()
         OUTPUT_VARIABLE ernie_glibc
         OUTPUT_STRIP_TRAILING_WHITESPACE)
     string(REGEX MATCH "[0-9]+\\.[0-9]+" ernie_glibc "${ernie_glibc}")
-    string(APPEND CPACK_DEBIAN_PACKAGE_DEPENDS
-           ", libc6 (>= ${ernie_glibc}), libstdc++6 (>= 11), libgcc-s1 (>= 3.4)")
+    string(
+        APPEND
+        CPACK_DEBIAN_PACKAGE_DEPENDS
+        ", libc6 (>= ${ernie_glibc}), libstdc++6 (>= 11), libgcc-s1 (>= 3.4)"
+    )
 endif()
 # Recommended rather than required, so headless servers can leave the window libraries out
 # (`apt install --no-install-recommends`).
@@ -107,11 +112,14 @@ set(CPACK_RPM_PACKAGE_GROUP "Applications/Graphics")
 # CPack's RPMs have no weak "Recommends", so the X11 client libraries (small, and no X server) are
 # required; Wayland's and Mesa's drivers are suggested.
 set(CPACK_RPM_PACKAGE_REQUIRES
-    "vulkan-loader, libX11, libXcursor, libXrandr, libXinerama, libXi, libXext, libxkbcommon")
-set(CPACK_RPM_PACKAGE_SUGGESTS "mesa-vulkan-drivers, libwayland-client, libwayland-cursor")
+    "vulkan-loader, libX11, libXcursor, libXrandr, libXinerama, libXi, libXext, libxkbcommon"
+)
+set(CPACK_RPM_PACKAGE_SUGGESTS
+    "mesa-vulkan-drivers, libwayland-client, libwayland-cursor")
 # Directories that the system's own packages own.
 set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
-    "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/cmake" "${CMAKE_INSTALL_PREFIX}/share/doc")
+    "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/cmake"
+    "${CMAKE_INSTALL_PREFIX}/share/doc")
 
 include(CPack)
 

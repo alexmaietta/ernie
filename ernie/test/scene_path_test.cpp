@@ -11,7 +11,8 @@ TEST(Path, ParsesAbsolutePathsOfIdentifiers) {
     EXPECT_EQ(Path("/World/Sun_2").String(), "/World/Sun_2");
     EXPECT_TRUE(Path("/").IsRoot());
     EXPECT_TRUE(Path().IsEmpty());
-    for (const char* bad : {"", "World", "/World/", "//a", "/2a", "/a b", "/a-b", "/a/./b"}) {
+    for (const char* bad : {"", "World", "/World/", "//a", "/2a",
+                            "/a b", "/a-b", "/a/./b"}) {
         EXPECT_THROW(Path{bad}, std::invalid_argument) << bad;
     }
     EXPECT_TRUE(Path::IsValidName("_x9"));
@@ -45,6 +46,7 @@ TEST(Path, OrdersDescendantsRightAfterTheirAncestorAndHashes) {
     EXPECT_LT(Path("/a"), Path("/a/b"));
     EXPECT_LT(Path("/a/z"), Path("/a0"));
     EXPECT_LT(Path("/a/z"), Path("/a_"));
-    const std::unordered_set<Path> set{Path("/a"), Path("/a"), Path("/b")};
+    const std::unordered_set<Path> set{Path("/a"), Path("/a"),
+                                       Path("/b")};
     EXPECT_EQ(set.size(), 2u);
 }

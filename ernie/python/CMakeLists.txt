@@ -18,21 +18,26 @@ if(TARGET ernie_app)
     target_compile_definitions(_ernie PRIVATE ERNIE_HAS_APP)
 endif()
 target_compile_features(_ernie PRIVATE cxx_std_20)
-target_include_directories(_ernie SYSTEM PRIVATE "${NB_DIR}/include" ${Python_INCLUDE_DIRS})
+target_include_directories(
+    _ernie SYSTEM PRIVATE "${NB_DIR}/include" ${Python_INCLUDE_DIRS})
 foreach(nanobind_library nanobind-static nanobind-static-abi3)
     if(TARGET ${nanobind_library})
-        set_target_properties(${nanobind_library} PROPERTIES COMPILE_WARNING_AS_ERROR OFF)
+        set_target_properties(${nanobind_library}
+                              PROPERTIES COMPILE_WARNING_AS_ERROR OFF)
     endif()
 endforeach()
-set_target_properties(_ernie PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${ernie_package_dir}")
+set_target_properties(_ernie PROPERTIES LIBRARY_OUTPUT_DIRECTORY
+                                        "${ernie_package_dir}")
 # Windows has no rpath: the module finds Slang's DLLs beside it, so the build's package imports
 # (and its stubs generate).
 if(WIN32)
-    file(COPY ${ERNIE_SLANG_RUNTIME} DESTINATION "${ernie_package_dir}")
+    file(COPY ${ERNIE_SLANG_RUNTIME}
+         DESTINATION "${ernie_package_dir}")
 endif()
 # Type stubs beside the module, for IDEs, type checkers and the Python API docs: _ernie/ holds a
 # .pyi per module (the extension still imports first), and py.typed marks the package as typed.
-set(ernie_stubs "${ernie_package_dir}/_ernie/__init__.pyi" "${ernie_package_dir}/_ernie/tokens.pyi")
+set(ernie_stubs "${ernie_package_dir}/_ernie/__init__.pyi"
+                "${ernie_package_dir}/_ernie/tokens.pyi")
 if(TARGET ernie_app)
     list(APPEND ernie_stubs "${ernie_package_dir}/_ernie/app.pyi")
 endif()
@@ -51,42 +56,54 @@ nanobind_add_stub(
     "${CMAKE_BINARY_DIR}/python"
     DEPENDS
     _ernie)
-configure_file(ernie/__init__.py "${ernie_package_dir}/__init__.py" COPYONLY)
+configure_file(ernie/__init__.py "${ernie_package_dir}/__init__.py"
+               COPYONLY)
 configure_file(ernie/app.py "${ernie_package_dir}/app.py" COPYONLY)
-configure_file(ernie/batch.py "${ernie_package_dir}/batch.py" COPYONLY)
+configure_file(ernie/batch.py "${ernie_package_dir}/batch.py"
+               COPYONLY)
 configure_file(ernie/demo.py "${ernie_package_dir}/demo.py" COPYONLY)
-configure_file(ernie/schema.py "${ernie_package_dir}/schema.py" COPYONLY)
-configure_file(ernie/__main__.py "${ernie_package_dir}/__main__.py" COPYONLY)
+configure_file(ernie/schema.py "${ernie_package_dir}/schema.py"
+               COPYONLY)
+configure_file(ernie/__main__.py "${ernie_package_dir}/__main__.py"
+               COPYONLY)
 # ernie.demos: the Python demos (demos/<category>/<name>.py) and the ISDs they read, run by
 # `python -m ernie.demos`.
 file(
     GLOB ernie_demo_sources CONFIGURE_DEPENDS
     RELATIVE "${PROJECT_SOURCE_DIR}/demos"
     "${PROJECT_SOURCE_DIR}/demos/*/*.py")
-set(ernie_demo_data "${PROJECT_SOURCE_DIR}/ernie/test/fixtures/isd/toughLroNacLineScan.json"
-                    "${PROJECT_SOURCE_DIR}/ernie/test/fixtures/isd/lroWacPushFrame.json")
+set(ernie_demo_data
+    "${PROJECT_SOURCE_DIR}/ernie/test/fixtures/isd/toughLroNacLineScan.json"
+    "${PROJECT_SOURCE_DIR}/ernie/test/fixtures/isd/lroWacPushFrame.json"
+)
 foreach(source ernie/demos/__init__.py ernie/demos/__main__.py)
     get_filename_component(name "${source}" NAME)
-    configure_file("${source}" "${ernie_package_dir}/demos/${name}" COPYONLY)
+    configure_file("${source}" "${ernie_package_dir}/demos/${name}"
+                   COPYONLY)
 endforeach()
 foreach(source ${ernie_demo_sources})
-    configure_file("${PROJECT_SOURCE_DIR}/demos/${source}" "${ernie_package_dir}/demos/${source}"
-                   COPYONLY)
+    configure_file("${PROJECT_SOURCE_DIR}/demos/${source}"
+                   "${ernie_package_dir}/demos/${source}" COPYONLY)
 endforeach()
 foreach(source ${ernie_demo_data})
     get_filename_component(name "${source}" NAME)
-    configure_file("${source}" "${ernie_package_dir}/demos/data/${name}" COPYONLY)
+    configure_file("${source}"
+                   "${ernie_package_dir}/demos/data/${name}" COPYONLY)
 endforeach()
 # Stubs of the typed prim classes, which ernie.schema builds from the prim type registry at import
 # where nanobind's stubgen cannot see them; -P keeps this directory's ernie/ off the path.
 add_custom_command(
     OUTPUT "${ernie_package_dir}/schema.pyi"
-    COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${CMAKE_BINARY_DIR}/python" ${Python_EXECUTABLE} -P
-            "${CMAKE_CURRENT_SOURCE_DIR}/stub_schema.py" "${ernie_package_dir}/schema.pyi"
+    COMMAND
+        ${CMAKE_COMMAND} -E env
+        "PYTHONPATH=${CMAKE_BINARY_DIR}/python" ${Python_EXECUTABLE}
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/stub_schema.py"
+        "${ernie_package_dir}/schema.pyi"
     DEPENDS _ernie stub_schema.py ernie/schema.py ernie/__init__.py
     COMMENT "Generating the typed prim classes' stubs"
     VERBATIM)
-add_custom_target(_ernie_schema_stub ALL DEPENDS "${ernie_package_dir}/schema.pyi")
+add_custom_target(_ernie_schema_stub ALL
+                  DEPENDS "${ernie_package_dir}/schema.pyi")
 # A wheel (pyproject.toml, scikit-build-core): the package, with Slang's compiler and the glslang
 # library it loads at run time beside the module, found through $ORIGIN; the `python` component
 # only, not dependencies' own install rules.
@@ -126,9 +143,11 @@ if(SKBUILD)
     # anyway); on macOS MoltenVK too, which Ernie loads from beside its module without a Vulkan
     # loader installed.
     if(APPLE)
-        set_target_properties(_ernie PROPERTIES INSTALL_RPATH "@loader_path")
+        set_target_properties(_ernie PROPERTIES INSTALL_RPATH
+                                                "@loader_path")
     else()
-        set_target_properties(_ernie PROPERTIES INSTALL_RPATH "$ORIGIN")
+        set_target_properties(_ernie PROPERTIES INSTALL_RPATH
+                                                "$ORIGIN")
     endif()
     include("${PROJECT_SOURCE_DIR}/cmake/ErnieLicenses.cmake")
     ernie_install_licenses(ernie/licenses python)
@@ -146,10 +165,13 @@ if(SKBUILD)
     # there, as Windows does beside it): the `ernie` command (ernie/__main__.py) runs it.
     if(TARGET ernie_viewer)
         if(APPLE)
-            set_target_properties(ernie_viewer PROPERTIES INSTALL_RPATH "@loader_path")
+            set_target_properties(
+                ernie_viewer PROPERTIES INSTALL_RPATH "@loader_path")
         else()
-            set_target_properties(ernie_viewer PROPERTIES INSTALL_RPATH "$ORIGIN")
+            set_target_properties(ernie_viewer
+                                  PROPERTIES INSTALL_RPATH "$ORIGIN")
         endif()
-        install(TARGETS ernie_viewer RUNTIME DESTINATION ernie COMPONENT python)
+        install(TARGETS ernie_viewer RUNTIME DESTINATION ernie
+                                             COMPONENT python)
     endif()
 endif()

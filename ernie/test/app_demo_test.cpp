@@ -10,7 +10,8 @@
 using namespace ernie::app;
 
 TEST(DemoOptions, DefaultsToAWindowRunningUntilClosed) {
-    const DemoOptions options = ParseDemoOptions(std::vector<std::string>{});
+    const DemoOptions options =
+        ParseDemoOptions(std::vector<std::string>{});
     EXPECT_TRUE(options.viewer);
     EXPECT_FALSE(options.headless);
     EXPECT_TRUE(options.Windowed());
@@ -20,9 +21,12 @@ TEST(DemoOptions, DefaultsToAWindowRunningUntilClosed) {
 }
 
 TEST(DemoOptions, ParsesTheSharedOptionsAndKeepsTheRest) {
-    const DemoOptions options = ParseDemoOptions(std::vector<std::string>{
-        "--viewer", "null", "--num-frames=7", "--test", "--output", "out.png", "--rate", "3",
-        "--device", "NVIDIA", "--validation", "--no-validation", "--headless"});
+    const DemoOptions options =
+        ParseDemoOptions(std::vector<std::string>{
+            "--viewer", "null", "--num-frames=7", "--test",
+            "--output", "out.png", "--rate", "3", "--device",
+            "NVIDIA", "--validation", "--no-validation",
+            "--headless"});
     EXPECT_FALSE(options.viewer);
     EXPECT_TRUE(options.headless);
     EXPECT_EQ(options.numFrames, 7u);
@@ -30,25 +34,32 @@ TEST(DemoOptions, ParsesTheSharedOptionsAndKeepsTheRest) {
     EXPECT_EQ(options.output, "out.png");
     EXPECT_EQ(options.device, "NVIDIA");
     EXPECT_FALSE(options.validation);
-    EXPECT_EQ(options.extra, (std::vector<std::string>{"--rate", "3"}));
+    EXPECT_EQ(options.extra,
+              (std::vector<std::string>{"--rate", "3"}));
 }
 
 TEST(DemoOptions, BenchmarkTakesOptionalSecondsAndDropsTheViewer) {
-    DemoOptions options = ParseDemoOptions(std::vector<std::string>{"--benchmark", "--test"});
+    DemoOptions options = ParseDemoOptions(
+        std::vector<std::string>{"--benchmark", "--test"});
     EXPECT_TRUE(options.benchmark);
     EXPECT_FALSE(options.benchmarkSeconds);
     EXPECT_FALSE(options.viewer);
     EXPECT_TRUE(options.test);
-    options = ParseDemoOptions(std::vector<std::string>{"--benchmark", "2.5"});
+    options = ParseDemoOptions(
+        std::vector<std::string>{"--benchmark", "2.5"});
     EXPECT_EQ(options.benchmarkSeconds, 2.5);
 }
 
 TEST(DemoOptions, RejectsBadValues) {
-    EXPECT_THROW(ParseDemoOptions(std::vector<std::string>{"--viewer", "gl"}),
+    EXPECT_THROW(
+        ParseDemoOptions(std::vector<std::string>{"--viewer", "gl"}),
+        std::invalid_argument);
+    EXPECT_THROW(ParseDemoOptions(std::vector<std::string>{
+                     "--num-frames", "many"}),
                  std::invalid_argument);
-    EXPECT_THROW(ParseDemoOptions(std::vector<std::string>{"--num-frames", "many"}),
-                 std::invalid_argument);
-    EXPECT_THROW(ParseDemoOptions(std::vector<std::string>{"--output"}), std::invalid_argument);
+    EXPECT_THROW(
+        ParseDemoOptions(std::vector<std::string>{"--output"}),
+        std::invalid_argument);
 }
 
 TEST(DemoInfo, LabelsByCategoryAndName) {

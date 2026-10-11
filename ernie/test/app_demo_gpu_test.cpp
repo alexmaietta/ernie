@@ -19,10 +19,12 @@ namespace {
 using namespace ernie;
 using namespace ernie::app;
 
-/// A cube named `name` under a sun, seen by a camera; counts its steps and checks.
+/// A cube named `name` under a sun, seen by a camera; counts its
+/// steps and checks.
 class CubeDemo : public Demo {
   public:
-    CubeDemo(Viewer* viewer, const DemoOptions& options, std::string name = "Cube")
+    CubeDemo(Viewer* viewer, const DemoOptions& options,
+             std::string name = "Cube")
         : Demo(viewer, options), name_(std::move(name)) {
         numFrames = 3;
         Scene& scene = GetScene();
@@ -30,7 +32,8 @@ class CubeDemo : public Demo {
         DistantLight::Define(scene, "/World/Sun")
             .SetTransform(DistantLightTransform({0.4, -0.6, 0.7}));
         Camera::Define(scene, "/World/Camera")
-            .SetTransform(LookAtTransform({0.0, -8.0, 3.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}));
+            .SetTransform(LookAtTransform(
+                {0.0, -8.0, 3.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}));
     }
 
     void Step() override {
@@ -68,15 +71,19 @@ class DemoTest : public ::testing::Test {
         }
     }
 
-    static DemoOptions Options(std::initializer_list<std::string> args) {
-        DemoOptions options = ParseDemoOptions(std::vector<std::string>(args));
+    static DemoOptions
+    Options(std::initializer_list<std::string> args) {
+        DemoOptions options =
+            ParseDemoOptions(std::vector<std::string>(args));
         options.validation = true;
         return options;
     }
 
     static std::filesystem::path TempFile(const std::string& name) {
         return std::filesystem::temp_directory_path() /
-               ("ernie_demo_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()) +
+               ("ernie_demo_" +
+                std::to_string(::testing::UnitTest::GetInstance()
+                                   ->random_seed()) +
                 "_" + name);
     }
 };
@@ -98,22 +105,25 @@ TEST_F(DemoTest, RunsWithoutAViewerForItsFramesAndChecks) {
 }
 
 TEST_F(DemoTest, NumFramesOverridesTheDemosOwnCount) {
-    DemoRunner runner(Options({"--viewer", "null", "--num-frames", "5"}));
+    DemoRunner runner(
+        Options({"--viewer", "null", "--num-frames", "5"}));
     auto demo = std::make_shared<CubeDemo>(nullptr, runner.Options());
     runner.Run(demo);
     EXPECT_EQ(demo->steps, 5);
 }
 
 TEST_F(DemoTest, ATestRunOfADemoWithoutChecksFails) {
-    DemoRunner runner(Options({"--viewer", "null", "--test", "--num-frames", "1"}));
-    EXPECT_THROW(runner.Run(std::make_shared<UncheckedDemo>(nullptr, runner.Options())),
+    DemoRunner runner(
+        Options({"--viewer", "null", "--test", "--num-frames", "1"}));
+    EXPECT_THROW(runner.Run(std::make_shared<UncheckedDemo>(
+                     nullptr, runner.Options())),
                  std::logic_error);
 }
 
 TEST_F(DemoTest, WritesTheOutputWithoutAViewer) {
     const std::filesystem::path path = TempFile("output.png");
-    DemoRunner runner(
-        Options({"--viewer", "null", "--num-frames", "1", "--output", path.string()}));
+    DemoRunner runner(Options({"--viewer", "null", "--num-frames",
+                               "1", "--output", path.string()}));
     runner.Run(std::make_shared<CubeDemo>(nullptr, runner.Options()));
     EXPECT_GT(std::filesystem::file_size(path), 100u);
     std::filesystem::remove(path);
@@ -130,31 +140,35 @@ TEST_F(DemoTest, BuildsIntoTheViewersSceneHeadless) {
     EXPECT_TRUE(demo->GetScene().Has("/World/Cube"));
 }
 
-TEST_F(DemoTest, SwitchingRemovesWhatTheLastDemoAddedAndBuildsTheNext) {
+TEST_F(DemoTest,
+       SwitchingRemovesWhatTheLastDemoAddedAndBuildsTheNext) {
     DemoRunner runner(Options({"--headless", "--num-frames", "2"}));
     Viewer& viewer = *runner.GetViewer();
     const ViewportDisplay display = viewer.GetViewportDisplay();
     const auto make = [&runner](std::string name, bool switches) {
-        return DemoInfo{"test", name, "",
-                        [&runner, name, switches](Viewer* v, const DemoOptions& o) {
-                            auto demo = std::make_shared<CubeDemo>(v, o, name);
-                            v->AddPanel(name + " panel", Dock::Right, [](Viewer&) {});
-                            v->OnFrame([](Viewer&, const FrameInfo&) {});
-                            v->AddViewportToggle(name + " toggle");
-                            v->AddMenuItem("Demo", name, [](Viewer&) {});
-                            v->SetLighting(Lighting::Camera);
-                            ViewportDisplay hidden = v->GetViewportDisplay();
-                            hidden.grid = false;
-                            v->SetViewportDisplay(hidden);
-                            if (switches) {
-                                demo->onStep = [&runner](CubeDemo& self) {
-                                    if (self.frame == 1) {
-                                        runner.RequestSwitch(1);
-                                    }
-                                };
-                            }
-                            return demo;
-                        }};
+        return DemoInfo{
+            "test", name, "",
+            [&runner, name, switches](Viewer* v,
+                                      const DemoOptions& o) {
+                auto demo = std::make_shared<CubeDemo>(v, o, name);
+                v->AddPanel(name + " panel", Dock::Right,
+                            [](Viewer&) {});
+                v->OnFrame([](Viewer&, const FrameInfo&) {});
+                v->AddViewportToggle(name + " toggle");
+                v->AddMenuItem("Demo", name, [](Viewer&) {});
+                v->SetLighting(Lighting::Camera);
+                ViewportDisplay hidden = v->GetViewportDisplay();
+                hidden.grid = false;
+                v->SetViewportDisplay(hidden);
+                if (switches) {
+                    demo->onStep = [&runner](CubeDemo& self) {
+                        if (self.frame == 1) {
+                            runner.RequestSwitch(1);
+                        }
+                    };
+                }
+                return demo;
+            }};
     };
     runner.SetCatalog({make("A", true), make("B", false)});
     const std::shared_ptr<Demo> first = runner.Create(0);
@@ -170,8 +184,8 @@ TEST_F(DemoTest, SwitchingRemovesWhatTheLastDemoAddedAndBuildsTheNext) {
     EXPECT_EQ(viewer.FindPanel("A panel"), nullptr);
     // B's registrations go when the run ends, as they hold B.
     EXPECT_EQ(viewer.FindPanel("B panel"), nullptr);
-    // B's lighting was its own choice, kept over the session's reset; the display was restored
-    // before B hid the grid again.
+    // B's lighting was its own choice, kept over the session's reset;
+    // the display was restored before B hid the grid again.
     EXPECT_EQ(viewer.GetLighting(), Lighting::Camera);
     EXPECT_FALSE(viewer.GetViewportDisplay().grid);
     EXPECT_TRUE(display.grid);
@@ -189,9 +203,11 @@ TEST_F(DemoTest, ViewerScopesRemoveWhatWasAddedInThem) {
     const std::uint64_t scope = viewer.NewScope();
     EXPECT_EQ(viewer.Scope(), 0u);
     viewer.SetScope(scope);
-    viewer.OnFrame([&calls](Viewer&, const FrameInfo&) { calls += 10; });
+    viewer.OnFrame(
+        [&calls](Viewer&, const FrameInfo&) { calls += 10; });
     viewer.AddPanel("Scoped", Dock::Left, [](Viewer&) {});
-    const std::uint64_t hud = viewer.AddHudItem("Scoped", [](Viewer&) { return "x"; });
+    const std::uint64_t hud =
+        viewer.AddHudItem("Scoped", [](Viewer&) { return "x"; });
     viewer.SetScope(0);
     viewer.Step();
     EXPECT_EQ(calls, 11);
@@ -203,7 +219,8 @@ TEST_F(DemoTest, ViewerScopesRemoveWhatWasAddedInThem) {
     EXPECT_THROW(viewer.RemoveScope(0), std::invalid_argument);
 }
 
-TEST_F(DemoTest, ResetSessionKeepsTheCameraChosenSinceTheSceneWasCleared) {
+TEST_F(DemoTest,
+       ResetSessionKeepsTheCameraChosenSinceTheSceneWasCleared) {
     Scene scene;
     ViewerOptions options;
     options.hidden = true;
@@ -215,7 +232,8 @@ TEST_F(DemoTest, ResetSessionKeepsTheCameraChosenSinceTheSceneWasCleared) {
     viewer.SetActiveCamera("/World/Camera");
     viewer.ResetSession();
     EXPECT_EQ(viewer.ActiveCamera(), Path("/World/Camera"));
-    EXPECT_EQ(viewer.GetLighting(), Lighting::Default);  // no lights, none chosen
+    EXPECT_EQ(viewer.GetLighting(),
+              Lighting::Default);  // no lights, none chosen
     viewer.ClearScene();
     EXPECT_FALSE(scene.Has("/World/Cube"));
     EXPECT_TRUE(scene.Has(Viewer::PerspectiveCamera()));

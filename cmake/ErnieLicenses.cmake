@@ -25,7 +25,10 @@ function(ernie_install_licenses destination component)
             endif()
         endforeach()
         if(NOT found)
-            message(WARNING "Ernie: no license file found for ${name} (${ARGN})")
+            message(
+                WARNING
+                    "Ernie: no license file found for ${name} (${ARGN})"
+            )
         endif()
     endmacro()
 
@@ -59,18 +62,23 @@ function(ernie_install_licenses destination component)
     license(dlpack "${PROJECT_SOURCE_DIR}/third_party/dlpack/LICENSE")
     license(stb "${PROJECT_SOURCE_DIR}/third_party/stb/LICENSE")
     # Not a dependency: the source Ernie's CAHVORE rays follow (third_party/README.md, Derived).
-    license(cameramodelutilsjs "${PROJECT_SOURCE_DIR}/third_party/cameramodelutilsjs/LICENSE")
+    license(
+        cameramodelutilsjs
+        "${PROJECT_SOURCE_DIR}/third_party/cameramodelutilsjs/LICENSE"
+    )
     license(openexr "${openexr_SOURCE_DIR}/LICENSE.md")
     license(imath "${imath_SOURCE_DIR}/LICENSE.md")
     # Vendored by OpenEXR and built into it (openexr.cmake).
-    license(libdeflate "${openexr_SOURCE_DIR}/external/deflate/COPYING")
+    license(libdeflate
+            "${openexr_SOURCE_DIR}/external/deflate/COPYING")
     license(zstd "${openexr_SOURCE_DIR}/external/zstd/LICENSE")
     license(openjph "${openexr_SOURCE_DIR}/external/OpenJPH/LICENSE")
     license(meshoptimizer "${meshoptimizer_SOURCE_DIR}/LICENSE.md")
     license(nlohmann-json "${nlohmann_json_SOURCE_DIR}/LICENSE.MIT")
     if(APPLE)
         FetchContent_GetProperties(moltenvk)
-        license(moltenvk "${moltenvk_SOURCE_DIR}/LICENSE" "${moltenvk_SOURCE_DIR}/MoltenVK/LICENSE")
+        license(moltenvk "${moltenvk_SOURCE_DIR}/LICENSE"
+                "${moltenvk_SOURCE_DIR}/MoltenVK/LICENSE")
     endif()
     if(ERNIE_TRACY)
         license(tracy "${tracy_SOURCE_DIR}/LICENSE")
@@ -91,8 +99,10 @@ function(ernie_install_licenses destination component)
         license(dear-imgui "${dear_imgui_SOURCE_DIR}/LICENSE.txt")
         license(implot "${implot_SOURCE_DIR}/LICENSE")
         license(imguizmo "${imguizmo_SOURCE_DIR}/LICENSE")
-        license(inter-font "${ernie_font_inter_license_SOURCE_DIR}/LICENSE.txt")
-        license(lucide-font "${ernie_font_lucide_license_SOURCE_DIR}/LICENSE")
+        license(inter-font
+                "${ernie_font_inter_license_SOURCE_DIR}/LICENSE.txt")
+        license(lucide-font
+                "${ernie_font_lucide_license_SOURCE_DIR}/LICENSE")
         # A system GLFW is a dependency rather than built in.
         if(glfw_SOURCE_DIR)
             license(glfw "${glfw_SOURCE_DIR}/LICENSE.md")

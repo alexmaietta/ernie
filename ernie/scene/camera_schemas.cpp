@@ -3,13 +3,17 @@
 
 namespace ernie {
 
-ERNIE_DEFINE_SCHEMA(Camera, tokens::kCamera, &Imageable::Definition(), false,
-                    "A camera looking down its -z axis: UsdGeomCamera's projection, apertures, "
-                    "exposure and shutter, and Ernie's lens, scan, spectral sampling, sensor and "
+ERNIE_DEFINE_SCHEMA(Camera, tokens::kCamera, &Imageable::Definition(),
+                    false,
+                    "A camera looking down its -z axis: "
+                    "UsdGeomCamera's projection, apertures, "
+                    "exposure and shutter, and Ernie's lens, scan, "
+                    "spectral sampling, sensor and "
                     "view poses.",
                     ERNIE_CAMERA_ATTRIBUTES)
 
-std::optional<std::vector<float>> Camera::GetSensorQe(std::string_view channel) const {
+std::optional<std::vector<float>>
+Camera::GetSensorQe(std::string_view channel) const {
     const auto authored = [](bool has, std::vector<float> pairs) {
         return has ? std::optional(std::move(pairs)) : std::nullopt;
     };

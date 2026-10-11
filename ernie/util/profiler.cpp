@@ -39,9 +39,10 @@ bool Enabled() {
 }
 
 std::uint64_t Now() {
-    return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                          std::chrono::steady_clock::now().time_since_epoch())
-                                          .count());
+    return static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch())
+            .count());
 }
 
 void BeginFrame() {
@@ -55,7 +56,8 @@ void BeginFrame() {
             s.frames.pop_front();
         }
     }
-    const std::uint64_t next = s.frames.empty() ? 0 : s.frames.back().index + 1;
+    const std::uint64_t next =
+        s.frames.empty() ? 0 : s.frames.back().index + 1;
     s.current = Frame{};
     s.current.index = next;
     s.current.start = now;
@@ -100,7 +102,8 @@ std::uint32_t ThreadIndex() {
     thread_local const std::uint32_t index = [] {
         State& s = Global();
         std::lock_guard lock(s.mutex);
-        s.threadNames.push_back("Thread " + std::to_string(s.threadNames.size()));
+        s.threadNames.push_back("Thread " +
+                                std::to_string(s.threadNames.size()));
         return static_cast<std::uint32_t>(s.threadNames.size() - 1);
     }();
     return index;

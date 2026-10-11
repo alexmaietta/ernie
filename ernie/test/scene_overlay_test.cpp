@@ -30,7 +30,8 @@ TEST(Overlay, ShapesBecomeSegmentsTrianglesAndSprites) {
     overlay.Clear().Box({-1, -1, -1}, {1, 1, 1});
     EXPECT_EQ(overlay.Segments().size(), 12u);
 
-    const glm::dmat4 moved = glm::translate(glm::dmat4(1.0), glm::dvec3(10.0, 0.0, 0.0));
+    const glm::dmat4 moved =
+        glm::translate(glm::dmat4(1.0), glm::dvec3(10.0, 0.0, 0.0));
     overlay.Clear().Box({0, 0, 0}, {1, 1, 1}, {}, moved);
     for (const auto& segment : overlay.Segments()) {
         EXPECT_GE(segment.a.x, 10.0);
@@ -45,7 +46,8 @@ TEST(Overlay, ShapesBecomeSegmentsTrianglesAndSprites) {
 
     overlay.Clear().Arrow({0, 0, 0}, {0, 0, 10});
     EXPECT_EQ(overlay.Segments().size(), 1u);
-    EXPECT_NEAR(overlay.Segments()[0].b.z, 8.0, 1e-9) << "the shaft stops at the head";
+    EXPECT_NEAR(overlay.Segments()[0].b.z, 8.0, 1e-9)
+        << "the shaft stops at the head";
     EXPECT_EQ(overlay.Fills().size(), 16u);
 
     overlay.Clear().Axes(glm::dmat4(1.0), 2.0);
@@ -55,29 +57,37 @@ TEST(Overlay, ShapesBecomeSegmentsTrianglesAndSprites) {
 
 TEST(Overlay, WireMeshesDrawSharedEdgesOnce) {
     Overlay overlay;
-    const std::array<glm::dvec3, 4> points{glm::dvec3(0, 0, 0), glm::dvec3(1, 0, 0),
-                                           glm::dvec3(1, 1, 0), glm::dvec3(0, 1, 0)};
+    const std::array<glm::dvec3, 4> points{
+        glm::dvec3(0, 0, 0), glm::dvec3(1, 0, 0), glm::dvec3(1, 1, 0),
+        glm::dvec3(0, 1, 0)};
     const std::array<std::uint32_t, 6> quad{0, 1, 2, 0, 2, 3};
     overlay.WireMesh(points, quad);
     EXPECT_EQ(overlay.Segments().size(), 5u);
     overlay.Triangles(points, quad);
     EXPECT_EQ(overlay.Fills().size(), 2u);
     const std::array<std::uint32_t, 3> bad{0, 1, 7};
-    EXPECT_THROW(overlay.WireMesh(points, bad), std::invalid_argument);
-    EXPECT_THROW(overlay.Triangles(points, std::span(quad).first(4)), std::invalid_argument);
+    EXPECT_THROW(overlay.WireMesh(points, bad),
+                 std::invalid_argument);
+    EXPECT_THROW(overlay.Triangles(points, std::span(quad).first(4)),
+                 std::invalid_argument);
 }
 
 TEST(Overlay, BulkLinesAndMarkersTakeColoursPerItem) {
     Overlay overlay;
-    const std::vector<glm::dvec3> endpoints{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
+    const std::vector<glm::dvec3> endpoints{
+        {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
     const std::vector<glm::vec4> colors{{1, 0, 0, 1}, {0, 1, 0, 1}};
     overlay.Lines(endpoints, {}, colors);
     ASSERT_EQ(overlay.Segments().size(), 2u);
     EXPECT_EQ(overlay.Segments()[1].item.color, colors[1]);
-    EXPECT_THROW(overlay.Lines(std::span(endpoints).first(3)), std::invalid_argument);
-    EXPECT_THROW(overlay.Lines(endpoints, {}, std::span(colors).first(1)), std::invalid_argument);
+    EXPECT_THROW(overlay.Lines(std::span(endpoints).first(3)),
+                 std::invalid_argument);
+    EXPECT_THROW(
+        overlay.Lines(endpoints, {}, std::span(colors).first(1)),
+        std::invalid_argument);
 
-    overlay.Markers(std::span(endpoints).first(2), {}, MarkerShape::Cross, colors);
+    overlay.Markers(std::span(endpoints).first(2), {},
+                    MarkerShape::Cross, colors);
     ASSERT_EQ(overlay.Sprites().size(), 2u);
     EXPECT_EQ(overlay.Sprites()[0].shape, MarkerShape::Cross);
     EXPECT_EQ(overlay.Sprites()[0].rect, glm::vec4(-6, -6, 6, 6));
@@ -88,7 +98,8 @@ TEST(Overlay, LabelsBecomeTextQuadsOverABackingBox) {
     OverlayStyle style;
     overlay.Label({0, 0, 0}, "Hi", style);
     ASSERT_GT(overlay.Sprites().size(), 3u);
-    EXPECT_EQ(overlay.Sprites()[0].item.color, style.background) << "the backing first";
+    EXPECT_EQ(overlay.Sprites()[0].item.color, style.background)
+        << "the backing first";
     for (const auto& sprite : overlay.Sprites()) {
         EXPECT_GT(sprite.rect.x, 0.0f) << "right of the point";
         EXPECT_LT(sprite.rect.w, 0.0f) << "above it";
@@ -120,7 +131,8 @@ TEST(Scene, HoldsNamedOverlays) {
     scene.GetOverlay("contacts");
     ASSERT_NE(scene.FindOverlay("debug"), nullptr);
     EXPECT_EQ(scene.FindOverlay("debug")->Segments().size(), 1u);
-    EXPECT_EQ(scene.OverlayNames(), (std::vector<std::string>{"contacts", "debug"}));
+    EXPECT_EQ(scene.OverlayNames(),
+              (std::vector<std::string>{"contacts", "debug"}));
     const std::uint64_t version = scene.Version();
     scene.GetOverlay("debug").Clear();
     EXPECT_EQ(scene.Version(), version) << "overlays are not prims";
@@ -131,7 +143,9 @@ TEST(Scene, HoldsNamedOverlays) {
 TEST(SelectOverlays, TakesAllOrNamesInOrder) {
     const std::vector<std::string> available{"a", "b", "c"};
     EXPECT_EQ(ernie::SelectOverlays("*", available), available);
-    EXPECT_EQ(ernie::SelectOverlays("c, a", available), (std::vector<std::string>{"a", "c"}));
-    EXPECT_EQ(ernie::SelectOverlays("b missing", available), (std::vector<std::string>{"b"}));
+    EXPECT_EQ(ernie::SelectOverlays("c, a", available),
+              (std::vector<std::string>{"a", "c"}));
+    EXPECT_EQ(ernie::SelectOverlays("b missing", available),
+              (std::vector<std::string>{"b"}));
     EXPECT_TRUE(ernie::SelectOverlays("", available).empty());
 }

@@ -20,20 +20,25 @@ struct ImageDesc {
     std::uint32_t mips = 1;
     VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
     VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    /// Allocate in a dedicated allocation exportable as a POSIX file descriptor, for CUDA to read
-    /// the image in place (`VulkanContext::SupportsExternalMemory`).
+    /// Allocate in a dedicated allocation exportable as a POSIX file
+    /// descriptor, for CUDA to read the image in place
+    /// (`VulkanContext::SupportsExternalMemory`).
     bool shared = false;
-    /// View the image as a 2D array even with one layer, for shaders that declare an array.
+    /// View the image as a 2D array even with one layer, for shaders
+    /// that declare an array.
     bool array = false;
-    /// With several layers, also view them in consecutive groups of this many as 2D arrays
-    /// (`GroupView`), such as one view's spectral bands in a batch of views; 0 for none.
+    /// With several layers, also view them in consecutive groups of
+    /// this many as 2D arrays
+    /// (`GroupView`), such as one view's spectral bands in a batch of
+    /// views; 0 for none.
     std::uint32_t groupLayers = 0;
 };
 
-/// A device-local Vulkan image with a view of all its mips and layers, allocated through VMA.
+/// A device-local Vulkan image with a view of all its mips and
+/// layers, allocated through VMA.
 ///
-/// The image tracks one layout for all its subresources; `Transition` records the barrier that
-/// moves it to a new one.
+/// The image tracks one layout for all its subresources; `Transition`
+/// records the barrier that moves it to a new one.
 class GpuImage {
   public:
     /// @throws std::runtime_error if allocation fails.
@@ -48,22 +53,26 @@ class GpuImage {
         return image_;
     }
 
-    /// View of every mip and layer (`VK_IMAGE_VIEW_TYPE_2D_ARRAY` when there are several layers).
+    /// View of every mip and layer (`VK_IMAGE_VIEW_TYPE_2D_ARRAY`
+    /// when there are several layers).
     VkImageView View() const {
         return view_;
     }
 
-    /// View of one layer's first mip, e.g. to render into one cascade of a shadow map.
+    /// View of one layer's first mip, e.g. to render into one cascade
+    /// of a shadow map.
     /// @throws std::out_of_range for a layer the image does not have.
     VkImageView LayerView(std::uint32_t layer) const;
 
-    /// View of mip `mip` alone, of every layer as a 2D array for array images, such as one level
-    /// of a depth pyramid of a batch of views; a 2D view of it otherwise.
+    /// View of mip `mip` alone, of every layer as a 2D array for
+    /// array images, such as one level of a depth pyramid of a batch
+    /// of views; a 2D view of it otherwise.
     /// @throws std::out_of_range for a mip the image does not have.
     VkImageView MipView(std::uint32_t mip) const;
 
-    /// View of layer group `group` (`ImageDesc::groupLayers` layers from `group` times that) as a
-    /// 2D array; with a single group, the view of every layer.
+    /// View of layer group `group` (`ImageDesc::groupLayers` layers
+    /// from `group` times that) as a 2D array; with a single group,
+    /// the view of every layer.
     /// @throws std::out_of_range for a group the image does not have.
     VkImageView GroupView(std::uint32_t group) const;
 
@@ -80,28 +89,36 @@ class GpuImage {
         return bytes_;
     }
 
-    /// Records a barrier moving every subresource to `layout`; waits for and makes visible all
-    /// earlier work, which is simple rather than minimal.
+    /// Records a barrier moving every subresource to `layout`; waits
+    /// for and makes visible all earlier work, which is simple rather
+    /// than minimal.
     void Transition(VkCommandBuffer commands, VkImageLayout layout);
 
-    /// Uploads tightly packed texels for each mip of layer 0 (`mipData[m]` holds mip `m`), or of
-    /// every layer in turn (`mipData[l * mips + m]` holds mip `m` of layer `l`), and leaves the
-    /// image ready for sampling in fragment and compute shaders.
-    /// @throws std::invalid_argument if the number of mips or a mip's size does not match.
+    /// Uploads tightly packed texels for each mip of layer 0
+    /// (`mipData[m]` holds mip `m`), or of every layer in turn
+    /// (`mipData[l * mips + m]` holds mip `m` of layer `l`), and
+    /// leaves the image ready for sampling in fragment and compute
+    /// shaders.
+    /// @throws std::invalid_argument if the number of mips or a mip's
+    /// size does not match.
     void Upload(std::span<const std::span<const std::byte>> mipData);
 
-    /// For shared images, a new handle to the image's memory (a file descriptor, or a Win32 handle
-    /// on Windows), owned by the caller until it imports it elsewhere (`CloseExternalHandle`).
-    /// @throws std::logic_error for other images, or std::runtime_error if export fails.
+    /// For shared images, a new handle to the image's memory (a file
+    /// descriptor, or a Win32 handle on Windows), owned by the caller
+    /// until it imports it elsewhere (`CloseExternalHandle`).
+    /// @throws std::logic_error for other images, or
+    /// std::runtime_error if export fails.
     ExternalHandle ExportHandle() const;
 
-    /// For shared images, the size of the image's dedicated memory allocation.
+    /// For shared images, the size of the image's dedicated memory
+    /// allocation.
     VkDeviceSize AllocationSize() const {
         return sharedMemory_ != VK_NULL_HANDLE ? bytes_ : 0;
     }
 
-    /// Keeps `object`, such as a CUDA import of the image's memory, until the image is destroyed,
-    /// releasing it before the memory is freed.
+    /// Keeps `object`, such as a CUDA import of the image's memory,
+    /// until the image is destroyed, releasing it before the memory
+    /// is freed.
     void Attach(std::shared_ptr<void> object) {
         attached_ = std::move(object);
     }
@@ -131,20 +148,28 @@ class GpuImage {
     VkDeviceSize bytes_ = 0;
 };
 
-/// Aspect of an image format: depth for depth formats, colour otherwise.
+/// Aspect of an image format: depth for depth formats, colour
+/// otherwise.
 VkImageAspectFlags AspectOf(VkFormat format);
 
 /// Sampler filtering and addressing.
 struct SamplerDesc {
     VkFilter filter = VK_FILTER_LINEAR;
     VkSamplerMipmapMode mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    float maxAnisotropy = 1.0f;  ///< Above 1 enables anisotropic filtering where supported.
-    bool compare = false;        ///< Depth comparison (`VK_COMPARE_OP_LESS`) for shadow maps.
-    /// Addressing along v (and w) when it differs from `addressMode`'s along u.
+    VkSamplerAddressMode addressMode =
+        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    float maxAnisotropy = 1.0f;  ///< Above 1 enables anisotropic
+                                 ///< filtering where supported.
+    bool compare =
+        false;  ///< Depth comparison (`VK_COMPARE_OP_LESS`) for
+                ///< shadow maps.
+    /// Addressing along v (and w) when it differs from
+    /// `addressMode`'s along u.
     std::optional<VkSamplerAddressMode> addressModeV;
-    /// What `VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER` reads outside the image.
-    VkBorderColor borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+    /// What `VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER` reads outside
+    /// the image.
+    VkBorderColor borderColor =
+        VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
 };
 
 /// An owned `VkSampler`.

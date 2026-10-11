@@ -30,7 +30,8 @@ set(BUILD_SHARED_LIBS OFF)
 
 FetchContent_Declare(
     openexr
-    GIT_REPOSITORY https://github.com/AcademySoftwareFoundation/openexr.git
+    GIT_REPOSITORY
+        https://github.com/AcademySoftwareFoundation/openexr.git
     GIT_TAG ${ERNIE_DEP_VERSION_openexr}
     GIT_SHALLOW TRUE)
 # Its own tests stay out of Ernie's ctest.

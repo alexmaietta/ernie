@@ -32,12 +32,16 @@ namespace {
 
 class ImageFiles : public testing::Test {
   protected:
-    // A directory of the test's own: ctest runs the tests as processes side by side, and gtest's
-    // random seed comes from the clock, so tests started together would share one by the seed.
+    // A directory of the test's own: ctest runs the tests as
+    // processes side by side, and gtest's random seed comes from the
+    // clock, so tests started together would share one by the seed.
     void SetUp() override {
-        const std::string test = ::testing::UnitTest::GetInstance()->current_test_info()->name();
+        const std::string test = ::testing::UnitTest::GetInstance()
+                                     ->current_test_info()
+                                     ->name();
         dir_ = std::filesystem::temp_directory_path() /
-               ("ernie_image_test_" + test + "_" + std::to_string(std::random_device{}()));
+               ("ernie_image_test_" + test + "_" +
+                std::to_string(std::random_device{}()));
         std::filesystem::create_directories(dir_);
     }
 
@@ -64,10 +68,12 @@ TEST(MipChain, HalvesDownToOneTexelAndAveragesBlocks) {
     Image image(5, 2);
     for (std::uint32_t y = 0; y < 2; ++y) {
         for (std::uint32_t x = 0; x < 5; ++x) {
-            image.At(x, y) = glm::vec4(static_cast<float>(x + 10 * y));
+            image.At(x, y) =
+                glm::vec4(static_cast<float>(x + 10 * y));
         }
     }
-    const std::vector<Image> mips = MipChain(image, MipFilter::Average);
+    const std::vector<Image> mips =
+        MipChain(image, MipFilter::Average);
     ASSERT_EQ(mips.size(), 3u);
     EXPECT_EQ(mips[1].width, 2u);
     EXPECT_EQ(mips[1].height, 1u);
@@ -93,35 +99,47 @@ TEST(MipChain, UnitVectorFilterRenormalisesNormals) {
     Image opposite(2, 1);
     opposite.At(0, 0) = glm::vec4(1.0f, 0.5f, 0.5f, 1.0f);
     opposite.At(1, 0) = glm::vec4(0.0f, 0.5f, 0.5f, 1.0f);
-    const glm::vec4 flat = MipChain(opposite, MipFilter::UnitVector).back().At(0, 0);
-    EXPECT_FLOAT_EQ(flat.b, 1.0f) << "degenerate averages fall back to straight up";
+    const glm::vec4 flat =
+        MipChain(opposite, MipFilter::UnitVector).back().At(0, 0);
+    EXPECT_FLOAT_EQ(flat.b, 1.0f)
+        << "degenerate averages fall back to straight up";
 }
 
 TEST(MipChain, NormalSlopesKeepTheSlopesAveragingHides) {
-    // Slopes of +0.5 and -0.5 along x: flat on average, deviating by 0.5 along x and 0 along y,
-    // so sqrt(0.125) per axis.
+    // Slopes of +0.5 and -0.5 along x: flat on average, deviating by
+    // 0.5 along x and 0 along y, so sqrt(0.125) per axis.
     const auto tilted = [](float slope) {
-        const glm::vec3 n = glm::normalize(glm::vec3(-slope, 0.0f, 1.0f));
+        const glm::vec3 n =
+            glm::normalize(glm::vec3(-slope, 0.0f, 1.0f));
         return glm::vec4(0.5f * n + 0.5f, 1.0f);
     };
     Image normals(2, 2);
     normals.At(0, 0) = normals.At(1, 1) = tilted(0.5f);
     normals.At(1, 0) = normals.At(0, 1) = tilted(-0.5f);
-    const std::vector<Image> mips = MipChain(normals, MipFilter::NormalSlopes);
-    EXPECT_EQ(mips[0].At(0, 0).a, 0.0f) << "level 0's texels are points";
+    const std::vector<Image> mips =
+        MipChain(normals, MipFilter::NormalSlopes);
+    EXPECT_EQ(mips[0].At(0, 0).a, 0.0f)
+        << "level 0's texels are points";
     const glm::vec4 top = mips.back().At(0, 0);
     EXPECT_NEAR(top.b, 1.0f, 1e-6f) << "flat on average";
-    EXPECT_NEAR(DecodeSlopeDeviation(top.a), std::sqrt(0.125f), 1e-5f);
+    EXPECT_NEAR(DecodeSlopeDeviation(top.a), std::sqrt(0.125f),
+                1e-5f);
 
-    // Deviations within texels carry up a level, and add to those between them.
+    // Deviations within texels carry up a level, and add to those
+    // between them.
     Image twice(4, 2);
     for (std::uint32_t x = 0; x < 4; ++x) {
         twice.At(x, 0) = tilted(x % 2 == 0 ? 0.5f : -0.5f);
         twice.At(x, 1) = tilted(x % 2 == 0 ? -0.5f : 0.5f);
     }
-    EXPECT_NEAR(DecodeSlopeDeviation(MipChain(twice, MipFilter::NormalSlopes).back().At(0, 0).a),
-                std::sqrt(0.125f), 1e-5f);
-    EXPECT_NEAR(DecodeSlopeDeviation(EncodeSlopeDeviation(3.0f)), 3.0f, 1e-5f);
+    EXPECT_NEAR(
+        DecodeSlopeDeviation(MipChain(twice, MipFilter::NormalSlopes)
+                                 .back()
+                                 .At(0, 0)
+                                 .a),
+        std::sqrt(0.125f), 1e-5f);
+    EXPECT_NEAR(DecodeSlopeDeviation(EncodeSlopeDeviation(3.0f)),
+                3.0f, 1e-5f);
 }
 
 TEST(ImageMean, AveragesEveryPixel) {
@@ -135,7 +153,8 @@ TEST(ImageMean, AveragesEveryPixel) {
 
 TEST(ToRgba8, QuantisesWithOrWithoutTheSrgbCurve) {
     Image image(2, 1);
-    image.At(0, 0) = glm::vec4(SrgbToLinear(128.0f / 255.0f), 1.5f, -1.0f, 0.5f);
+    image.At(0, 0) =
+        glm::vec4(SrgbToLinear(128.0f / 255.0f), 1.5f, -1.0f, 0.5f);
     image.At(1, 0) = glm::vec4(1.0f);
     const auto srgb = ToRgba8(image, ImageEncoding::Srgb);
     EXPECT_EQ(srgb[0], 128);
@@ -147,9 +166,12 @@ TEST(ToRgba8, QuantisesWithOrWithoutTheSrgbCurve) {
 }
 
 TEST_F(ImageFiles, LoadsEightBitPngWithEitherEncoding) {
-    const std::array<std::uint8_t, 8> rgba = {128, 0, 255, 255, 64, 32, 16, 128};
+    const std::array<std::uint8_t, 8> rgba = {128, 0,  255, 255,
+                                              64,  32, 16,  128};
     const auto path = dir_ / "colour.png";
-    ASSERT_NE(stbi_write_png(path.string().c_str(), 2, 1, 4, rgba.data(), 8), 0);
+    ASSERT_NE(stbi_write_png(path.string().c_str(), 2, 1, 4,
+                             rgba.data(), 8),
+              0);
 
     const Image linear = LoadImageFile(path, ImageEncoding::Linear);
     ASSERT_EQ(linear.width, 2u);
@@ -157,26 +179,33 @@ TEST_F(ImageFiles, LoadsEightBitPngWithEitherEncoding) {
     EXPECT_NEAR(linear.At(0, 0).r, 128.0f / 255.0f, 1e-6f);
     EXPECT_NEAR(linear.At(1, 0).a, 128.0f / 255.0f, 1e-6f);
     const Image srgb = LoadImageFile(path, ImageEncoding::Srgb);
-    EXPECT_NEAR(srgb.At(0, 0).r, SrgbToLinear(128.0f / 255.0f), 1e-6f);
-    EXPECT_NEAR(srgb.At(1, 0).a, 128.0f / 255.0f, 1e-6f) << "alpha stays linear";
+    EXPECT_NEAR(srgb.At(0, 0).r, SrgbToLinear(128.0f / 255.0f),
+                1e-6f);
+    EXPECT_NEAR(srgb.At(1, 0).a, 128.0f / 255.0f, 1e-6f)
+        << "alpha stays linear";
 
     const std::array<std::uint8_t, 2> grey = {0, 200};
     const auto greyPath = dir_ / "GREY.PNG";
-    ASSERT_NE(stbi_write_png(greyPath.string().c_str(), 2, 1, 1, grey.data(), 2), 0);
-    const Image expanded = LoadImageFile(greyPath, ImageEncoding::Linear);
+    ASSERT_NE(stbi_write_png(greyPath.string().c_str(), 2, 1, 1,
+                             grey.data(), 2),
+              0);
+    const Image expanded =
+        LoadImageFile(greyPath, ImageEncoding::Linear);
     EXPECT_NEAR(expanded.At(1, 0).g, 200.0f / 255.0f, 1e-6f);
     EXPECT_FLOAT_EQ(expanded.At(1, 0).a, 1.0f);
 }
 
 TEST_F(ImageFiles, LoadsSixteenBitPng) {
     const Image image =
-        LoadImageFile(std::filesystem::path(ERNIE_TEST_FIXTURES) / "images" / "grey16.png",
+        LoadImageFile(std::filesystem::path(ERNIE_TEST_FIXTURES) /
+                          "images" / "grey16.png",
                       ImageEncoding::Linear);
     ASSERT_EQ(image.width, 2u);
     EXPECT_FLOAT_EQ(image.At(0, 0).r, 0.0f);
     EXPECT_FLOAT_EQ(image.At(1, 0).b, 1.0f);
     EXPECT_NEAR(image.At(0, 1).r, 32768.0f / 65535.0f, 1e-7f);
-    EXPECT_NEAR(image.At(1, 1).r, 1000.0f / 65535.0f, 1e-7f) << "16-bit precision kept";
+    EXPECT_NEAR(image.At(1, 1).r, 1000.0f / 65535.0f, 1e-7f)
+        << "16-bit precision kept";
 }
 
 TEST_F(ImageFiles, LoadsJpeg) {
@@ -186,7 +215,9 @@ TEST_F(ImageFiles, LoadsJpeg) {
         return a;
     }());
     const auto path = dir_ / "flat.jpg";
-    ASSERT_NE(stbi_write_jpg(path.string().c_str(), 4, 4, 3, grey.data(), 95), 0);
+    ASSERT_NE(stbi_write_jpg(path.string().c_str(), 4, 4, 3,
+                             grey.data(), 95),
+              0);
     const Image image = LoadImageFile(path, ImageEncoding::Linear);
     EXPECT_EQ(image.width, 4u);
     EXPECT_NEAR(image.At(2, 2).r, 100.0f / 255.0f, 3.0f / 255.0f);
@@ -194,24 +225,30 @@ TEST_F(ImageFiles, LoadsJpeg) {
 
 namespace {
 
-/// Writes `rgba` (width x height, row by row) as a half-float EXR with `compression`.
-void WriteExr(const std::filesystem::path& path, const std::vector<Imf::Rgba>& rgba, int width,
+/// Writes `rgba` (width x height, row by row) as a half-float EXR
+/// with `compression`.
+void WriteExr(const std::filesystem::path& path,
+              const std::vector<Imf::Rgba>& rgba, int width,
               int height, Imf::Compression compression) {
-    Imf::RgbaOutputFile file(path.string().c_str(), width, height, Imf::WRITE_RGBA, 1.0f,
-                             Imath::V2f(0.0f, 0.0f), 1.0f, Imf::INCREASING_Y, compression);
-    file.setFrameBuffer(rgba.data(), 1, static_cast<std::size_t>(width));
+    Imf::RgbaOutputFile file(
+        path.string().c_str(), width, height, Imf::WRITE_RGBA, 1.0f,
+        Imath::V2f(0.0f, 0.0f), 1.0f, Imf::INCREASING_Y, compression);
+    file.setFrameBuffer(rgba.data(), 1,
+                        static_cast<std::size_t>(width));
     file.writePixels(height);
 }
 
 }  // namespace
 
 TEST_F(ImageFiles, LoadsFloatExrAsLinear) {
-    const std::vector<Imf::Rgba> rgba = {{0.25f, 2.0f, -0.5f, 1.0f}, {0.0f, 0.125f, 10.0f, 0.5f}};
+    const std::vector<Imf::Rgba> rgba = {{0.25f, 2.0f, -0.5f, 1.0f},
+                                         {0.0f, 0.125f, 10.0f, 0.5f}};
     const auto path = dir_ / "data.exr";
     WriteExr(path, rgba, 2, 1, Imf::ZIP_COMPRESSION);
     const Image image = LoadImageFile(path, ImageEncoding::Srgb);
     ASSERT_EQ(image.width, 2u);
-    EXPECT_FLOAT_EQ(image.At(0, 0).r, 0.25f) << "EXR ignores the sRGB encoding";
+    EXPECT_FLOAT_EQ(image.At(0, 0).r, 0.25f)
+        << "EXR ignores the sRGB encoding";
     EXPECT_FLOAT_EQ(image.At(0, 0).g, 2.0f);
     EXPECT_FLOAT_EQ(image.At(0, 0).b, -0.5f);
     EXPECT_FLOAT_EQ(image.At(1, 0).b, 10.0f);
@@ -219,34 +256,52 @@ TEST_F(ImageFiles, LoadsFloatExrAsLinear) {
 }
 
 TEST_F(ImageFiles, LoadsExrInLossyAndLosslessCompressions) {
-    // A smooth gradient, which the lossy DWA codecs keep closely; Poly Haven's normal maps are
-    // DWAA.
+    // A smooth gradient, which the lossy DWA codecs keep closely;
+    // Poly Haven's normal maps are DWAA.
     constexpr int kSize = 64;
     std::vector<Imf::Rgba> rgba;
     for (int y = 0; y < kSize; ++y) {
         for (int x = 0; x < kSize; ++x) {
-            rgba.emplace_back(static_cast<float>(x) / kSize, static_cast<float>(y) / kSize, 0.5f,
+            rgba.emplace_back(static_cast<float>(x) / kSize,
+                              static_cast<float>(y) / kSize, 0.5f,
                               1.0f);
         }
     }
     for (const auto [compression, tolerance] :
-         {std::pair(Imf::PIZ_COMPRESSION, 0.0f), std::pair(Imf::DWAA_COMPRESSION, 0.02f),
+         {std::pair(Imf::PIZ_COMPRESSION, 0.0f),
+          std::pair(Imf::DWAA_COMPRESSION, 0.02f),
           std::pair(Imf::DWAB_COMPRESSION, 0.02f)}) {
-        const auto path = dir_ / ("gradient" + std::to_string(compression) + ".exr");
+        const auto path =
+            dir_ /
+            ("gradient" + std::to_string(compression) + ".exr");
         WriteExr(path, rgba, kSize, kSize, compression);
-        const Image image = LoadImageFile(path, ImageEncoding::Linear);
+        const Image image =
+            LoadImageFile(path, ImageEncoding::Linear);
         ASSERT_EQ(image.width, static_cast<std::uint32_t>(kSize));
-        EXPECT_NEAR(image.At(40, 10).r, 40.0f / kSize, tolerance + 1e-3f) << compression;
-        EXPECT_NEAR(image.At(40, 10).g, 10.0f / kSize, tolerance + 1e-3f) << compression;
-        EXPECT_NEAR(image.At(40, 10).b, 0.5f, tolerance + 1e-3f) << compression;
+        EXPECT_NEAR(image.At(40, 10).r, 40.0f / kSize,
+                    tolerance + 1e-3f)
+            << compression;
+        EXPECT_NEAR(image.At(40, 10).g, 10.0f / kSize,
+                    tolerance + 1e-3f)
+            << compression;
+        EXPECT_NEAR(image.At(40, 10).b, 0.5f, tolerance + 1e-3f)
+            << compression;
     }
 }
 
 TEST_F(ImageFiles, ReportsMissingCorruptAndUnsupportedFiles) {
-    EXPECT_THROW(LoadImageFile(dir_ / "missing.png", ImageEncoding::Linear), std::runtime_error);
-    EXPECT_THROW(LoadImageFile(dir_ / "missing.exr", ImageEncoding::Linear), std::runtime_error);
+    EXPECT_THROW(
+        LoadImageFile(dir_ / "missing.png", ImageEncoding::Linear),
+        std::runtime_error);
+    EXPECT_THROW(
+        LoadImageFile(dir_ / "missing.exr", ImageEncoding::Linear),
+        std::runtime_error);
     std::ofstream(dir_ / "corrupt.png") << "not a png";
-    EXPECT_THROW(LoadImageFile(dir_ / "corrupt.png", ImageEncoding::Linear), std::runtime_error);
+    EXPECT_THROW(
+        LoadImageFile(dir_ / "corrupt.png", ImageEncoding::Linear),
+        std::runtime_error);
     std::ofstream(dir_ / "texture.tga") << "tga";
-    EXPECT_THROW(LoadImageFile(dir_ / "texture.tga", ImageEncoding::Linear), std::runtime_error);
+    EXPECT_THROW(
+        LoadImageFile(dir_ / "texture.tga", ImageEncoding::Linear),
+        std::runtime_error);
 }

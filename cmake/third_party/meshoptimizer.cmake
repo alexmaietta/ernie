@@ -15,8 +15,9 @@ FetchContent_Declare(
     GIT_TAG ${ERNIE_DEP_VERSION_meshoptimizer}
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(meshoptimizer)
-set_target_properties(meshoptimizer PROPERTIES POSITION_INDEPENDENT_CODE ON
-                                               COMPILE_WARNING_AS_ERROR OFF)
+set_target_properties(
+    meshoptimizer PROPERTIES POSITION_INDEPENDENT_CODE ON
+                             COMPILE_WARNING_AS_ERROR OFF)
 
 add_library(ernie_meshoptimizer INTERFACE)
 target_link_libraries(ernie_meshoptimizer INTERFACE meshoptimizer)

@@ -17,7 +17,8 @@ namespace {
 
 constexpr std::uint32_t kSpirvMagic = 0x07230203;
 
-/// A compute shader evaluating `model`, the way hosts compose reflectance models.
+/// A compute shader evaluating `model`, the way hosts compose
+/// reflectance models.
 std::vector<ShaderModuleSource> ProbeModules(const BrdfModel& model) {
     std::string probe = R"(import brdf;
 import MODULE;
@@ -37,9 +38,11 @@ void main() {
     results[0] = float4(m.radianceFactor(s, p), 1.0);
 }
 )";
-    probe.replace(probe.find("MODULE"), 6, ernie::BrdfModuleName(model));
+    probe.replace(probe.find("MODULE"), 6,
+                  ernie::BrdfModuleName(model));
     probe.replace(probe.find("TYPE"), 4, model.typeName);
-    std::vector<ShaderModuleSource> modules = ernie::BrdfModules(model);
+    std::vector<ShaderModuleSource> modules =
+        ernie::BrdfModules(model);
     modules.push_back({"probe", probe});
     return modules;
 }
@@ -51,11 +54,15 @@ TEST(ShaderCompiler, CompilesEveryBuiltinModelToSpirvAndWgsl) {
     const BrdfRegistry registry = BrdfRegistry::WithBuiltins();
     for (const BrdfModel& model : registry.Models()) {
         const auto modules = ProbeModules(model);
-        const std::vector<std::uint32_t> spirv = compiler.CompileSpirv(modules, "main");
+        const std::vector<std::uint32_t> spirv =
+            compiler.CompileSpirv(modules, "main");
         ASSERT_GT(spirv.size(), 5u) << model.id;
         EXPECT_EQ(spirv[0], kSpirvMagic) << model.id;
-        const std::string wgsl = compiler.CompileWgsl(modules, "main");
-        EXPECT_NE(wgsl.find("@compute"), std::string::npos) << model.id << "\n" << wgsl;
+        const std::string wgsl =
+            compiler.CompileWgsl(modules, "main");
+        EXPECT_NE(wgsl.find("@compute"), std::string::npos)
+            << model.id << "\n"
+            << wgsl;
     }
 }
 
@@ -68,30 +75,40 @@ TEST(ShaderCompiler, ReportsErrorsWithSlangDiagnostics) {
         ADD_FAILURE() << "compiled a broken module";
     } catch (const std::invalid_argument& error) {
         const std::string message = error.what();
-        EXPECT_NE(message.find("broken failed to compile"), std::string::npos) << message;
-        EXPECT_NE(message.find("undefined_symbol"), std::string::npos) << message;
+        EXPECT_NE(message.find("broken failed to compile"),
+                  std::string::npos)
+            << message;
+        EXPECT_NE(message.find("undefined_symbol"), std::string::npos)
+            << message;
     }
 
     const std::vector<ShaderModuleSource> noEntry = {
         {"plain", "float twice(float x) { return 2 * x; }"}};
-    EXPECT_THROW(compiler.CompileSpirv(noEntry, "main"), std::invalid_argument);
-    EXPECT_THROW(compiler.CompileWgsl({}, "main"), std::invalid_argument);
+    EXPECT_THROW(compiler.CompileSpirv(noEntry, "main"),
+                 std::invalid_argument);
+    EXPECT_THROW(compiler.CompileWgsl({}, "main"),
+                 std::invalid_argument);
 }
 
 TEST(ShaderCompiler, CompilesCustomModelsAgainstTheSharedModule) {
     BrdfModel custom;
     custom.id = "half_lambert";
     custom.typeName = "HalfLambert";
-    custom.slang = "import brdf;\n"
-                   "public struct HalfLambert : IBrdf {\n"
-                   "    public float3 radianceFactor(BrdfInput s, BrdfParams p) {\n"
-                   "        return 0.5 * s.albedo * s.mu0 * p.get(0);\n"
-                   "    }\n"
-                   "}\n";
+    custom.slang =
+        "import brdf;\n"
+        "public struct HalfLambert : IBrdf {\n"
+        "    public float3 radianceFactor(BrdfInput s, BrdfParams p) "
+        "{\n"
+        "        return 0.5 * s.albedo * s.mu0 * p.get(0);\n"
+        "    }\n"
+        "}\n";
     const ShaderCompiler compiler;
-    EXPECT_EQ(compiler.CompileSpirv(ProbeModules(custom), "main")[0], kSpirvMagic);
+    EXPECT_EQ(compiler.CompileSpirv(ProbeModules(custom), "main")[0],
+              kSpirvMagic);
 
-    custom.slang = "import brdf;\npublic struct HalfLambert : IBrdf {}\n";
-    EXPECT_THROW(compiler.CompileSpirv(ProbeModules(custom), "main"), std::invalid_argument)
+    custom.slang =
+        "import brdf;\npublic struct HalfLambert : IBrdf {}\n";
+    EXPECT_THROW(compiler.CompileSpirv(ProbeModules(custom), "main"),
+                 std::invalid_argument)
         << "missing interface method";
 }

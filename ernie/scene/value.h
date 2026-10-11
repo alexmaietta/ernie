@@ -14,19 +14,25 @@
 
 namespace ernie {
 
-/// A scene attribute value: one of the scalar, vector, matrix, token, relationship and small-array
-/// types Ernie's schemas use. Bulk per-element data goes in a `Tensor` instead.
+/// A scene attribute value: one of the scalar, vector, matrix, token,
+/// relationship and small-array types Ernie's schemas use. Bulk
+/// per-element data goes in a `Tensor` instead.
 ///
-/// Strings serve both as USD tokens (`"invisible"`, `"lambert"`) and asset paths, and string lists
-/// as token arrays such as `xformOpOrder`; `Path` values are relationship targets such as
-/// `material:binding`, and path lists relationships with several targets such as a
-/// PointInstancer's `prototypes`. Quaternions are rotations such as `xformOp:orient`.
+/// Strings serve both as USD tokens (`"invisible"`, `"lambert"`) and
+/// asset paths, and string lists as token arrays such as
+/// `xformOpOrder`; `Path` values are relationship targets such as
+/// `material:binding`, and path lists relationships with several
+/// targets such as a PointInstancer's `prototypes`. Quaternions are
+/// rotations such as `xformOp:orient`.
 class Value {
   public:
-    using Data = std::variant<std::monostate, bool, int, float, double, glm::ivec2, glm::vec2,
-                              glm::vec3, glm::vec4, glm::dvec2, glm::dvec3, glm::dvec4, glm::dmat4,
-                              glm::dquat, std::string, Path, std::vector<float>, std::vector<Path>,
-                              std::vector<std::string>>;
+    using Data =
+        std::variant<std::monostate, bool, int, float, double,
+                     glm::ivec2, glm::vec2, glm::vec3, glm::vec4,
+                     glm::dvec2, glm::dvec3, glm::dvec4, glm::dmat4,
+                     glm::dquat, std::string, Path,
+                     std::vector<float>, std::vector<Path>,
+                     std::vector<std::string>>;
 
     Value() = default;
     Value(bool value) : data_(value) {}

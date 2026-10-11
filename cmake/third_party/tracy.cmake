@@ -32,8 +32,9 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE
     ${tracy_exclude_from_all})
 FetchContent_MakeAvailable(tracy)
-set_target_properties(TracyClient PROPERTIES POSITION_INDEPENDENT_CODE ON
-                                             COMPILE_WARNING_AS_ERROR OFF)
+set_target_properties(
+    TracyClient PROPERTIES POSITION_INDEPENDENT_CODE ON
+                           COMPILE_WARNING_AS_ERROR OFF)
 
 target_link_libraries(ernie_tracy INTERFACE Tracy::TracyClient)
 target_compile_definitions(ernie_tracy INTERFACE ERNIE_TRACY=1)

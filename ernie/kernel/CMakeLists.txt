@@ -74,13 +74,18 @@ foreach(entry ${ernie_shaders})
     list(APPEND shader_files "${CMAKE_CURRENT_SOURCE_DIR}/${shader}")
 endforeach()
 
-set(embedded "${PROJECT_BINARY_DIR}/generated/ernie/kernel/embedded_shaders.cpp")
+set(embedded
+    "${PROJECT_BINARY_DIR}/generated/ernie/kernel/embedded_shaders.cpp"
+)
 list(JOIN ernie_shaders "," shaders_arg)
 add_custom_command(
     OUTPUT "${embedded}"
-    COMMAND "${CMAKE_COMMAND}" -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DOUTPUT=${embedded}
-            "-DSHADERS=${shaders_arg}" -P "${PROJECT_SOURCE_DIR}/cmake/EmbedShaders.cmake"
-    DEPENDS ${shader_files} "${PROJECT_SOURCE_DIR}/cmake/EmbedShaders.cmake"
+    COMMAND
+        "${CMAKE_COMMAND}" -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -DOUTPUT=${embedded} "-DSHADERS=${shaders_arg}" -P
+        "${PROJECT_SOURCE_DIR}/cmake/EmbedShaders.cmake"
+    DEPENDS ${shader_files}
+            "${PROJECT_SOURCE_DIR}/cmake/EmbedShaders.cmake"
     COMMENT "Embedding Ernie's shaders"
     VERBATIM)
 

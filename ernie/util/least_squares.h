@@ -8,15 +8,19 @@
 
 namespace ernie {
 
-/// The least-squares solution of the first `n` equations of normal system `normal` x = `right`
-/// (the rest ignored), scaled by its diagonal (Jacobi) for conditioning and solved by Gaussian
-/// elimination with partial pivoting; all zeros where the system is singular.
+/// The least-squares solution of the first `n` equations of normal
+/// system `normal` x = `right` (the rest ignored), scaled by its
+/// diagonal (Jacobi) for conditioning and solved by Gaussian
+/// elimination with partial pivoting; all zeros where the system is
+/// singular.
 template <std::size_t N>
-std::array<double, N> SolveNormal(std::array<std::array<double, N>, N> normal,
-                                  std::array<double, N> right, std::size_t n) {
+std::array<double, N>
+SolveNormal(std::array<std::array<double, N>, N> normal,
+            std::array<double, N> right, std::size_t n) {
     std::array<double, N> scale{};
     for (std::size_t i = 0; i < n; ++i) {
-        scale[i] = normal[i][i] > 0.0 ? 1.0 / std::sqrt(normal[i][i]) : 0.0;
+        scale[i] =
+            normal[i][i] > 0.0 ? 1.0 / std::sqrt(normal[i][i]) : 0.0;
     }
     for (std::size_t i = 0; i < n; ++i) {
         for (std::size_t j = 0; j < n; ++j) {
@@ -58,13 +62,15 @@ std::array<double, N> SolveNormal(std::array<std::array<double, N>, N> normal,
     return x;
 }
 
-/// Accumulates the normal equations of a linear least-squares fit, row by row.
+/// Accumulates the normal equations of a linear least-squares fit,
+/// row by row.
 template <std::size_t N> struct NormalEquations {
     std::array<std::array<double, N>, N> normal{};
     std::array<double, N> right{};
 
     /// Adds equation `row` . x = `value` over the first `n` unknowns.
-    void Add(const std::array<double, N>& row, double value, std::size_t n = N) {
+    void Add(const std::array<double, N>& row, double value,
+             std::size_t n = N) {
         for (std::size_t i = 0; i < n; ++i) {
             for (std::size_t j = 0; j < n; ++j) {
                 normal[i][j] += row[i] * row[j];

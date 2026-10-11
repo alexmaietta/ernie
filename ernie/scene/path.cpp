@@ -9,7 +9,8 @@ namespace ernie {
 namespace {
 
 bool IsNameStart(char c) {
-    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_';
+    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+           c == '_';
 }
 
 bool IsNameChar(char c) {
@@ -32,14 +33,17 @@ bool Path::IsValidName(std::string_view name) {
 
 Path::Path(std::string_view text) {
     if (text.empty() || text.front() != '/') {
-        throw std::invalid_argument("Prim path '" + std::string(text) + "' is not absolute");
+        throw std::invalid_argument(
+            "Prim path '" + std::string(text) + "' is not absolute");
     }
     if (text.size() > 1) {
         std::size_t start = 1;
         while (start <= text.size()) {
-            const std::size_t end = std::min(text.find('/', start), text.size());
+            const std::size_t end =
+                std::min(text.find('/', start), text.size());
             if (!IsValidName(text.substr(start, end - start))) {
-                throw std::invalid_argument("Prim path '" + std::string(text) +
+                throw std::invalid_argument("Prim path '" +
+                                            std::string(text) +
                                             "' has an invalid name");
             }
             start = end + 1;
@@ -64,15 +68,20 @@ Path Path::Parent() const {
         return {};
     }
     const std::size_t slash = text_.rfind('/');
-    return slash == 0 ? Root() : Path(std::string_view(text_).substr(0, slash));
+    return slash == 0
+               ? Root()
+               : Path(std::string_view(text_).substr(0, slash));
 }
 
 Path Path::Child(std::string_view name) const {
     if (IsEmpty() || !IsValidName(name)) {
-        throw std::invalid_argument("Cannot append '" + std::string(name) + "' to '" + text_ + "'");
+        throw std::invalid_argument("Cannot append '" +
+                                    std::string(name) + "' to '" +
+                                    text_ + "'");
     }
     Path child;
-    child.text_ = IsRoot() ? "/" + std::string(name) : text_ + "/" + std::string(name);
+    child.text_ = IsRoot() ? "/" + std::string(name)
+                           : text_ + "/" + std::string(name);
     return child;
 }
 
@@ -84,7 +93,8 @@ bool Path::HasPrefix(const Path& ancestor) const {
         return true;
     }
     return text_.starts_with(ancestor.text_) &&
-           (text_.size() == ancestor.text_.size() || text_[ancestor.text_.size()] == '/');
+           (text_.size() == ancestor.text_.size() ||
+            text_[ancestor.text_.size()] == '/');
 }
 
 }  // namespace ernie

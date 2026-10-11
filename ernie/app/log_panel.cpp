@@ -23,7 +23,8 @@ class LogPanel final : public Panel {
         ImGui::Checkbox("Errors", &show_[2]);
         ImGui::SameLine();
         ImGui::SetNextItemWidth(200.0f);
-        ImGui::InputTextWithHint("##filter", "Filter", filter_, sizeof(filter_));
+        ImGui::InputTextWithHint("##filter", "Filter", filter_,
+                                 sizeof(filter_));
         ImGui::SameLine();
         if (ImGui::Button("Clear")) {
             viewer.ClearLog();
@@ -31,15 +32,19 @@ class LogPanel final : public Panel {
         ImGui::SameLine();
         const bool copy = ImGui::Button("Copy");
         std::string copied;
-        if (ImGui::BeginChild("##log", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders)) {
+        if (ImGui::BeginChild("##log", ImVec2(0.0f, 0.0f),
+                              ImGuiChildFlags_Borders)) {
             const std::string_view filter(filter_);
-            const ImVec4 colors[] = {ImGui::GetStyleColorVec4(ImGuiCol_Text),
-                                     ImVec4(0.91f, 0.70f, 0.24f, 1.0f),
-                                     ImVec4(0.89f, 0.34f, 0.32f, 1.0f)};
+            const ImVec4 colors[] = {
+                ImGui::GetStyleColorVec4(ImGuiCol_Text),
+                ImVec4(0.91f, 0.70f, 0.24f, 1.0f),
+                ImVec4(0.89f, 0.34f, 0.32f, 1.0f)};
             for (const LogEntry& entry : viewer.LogEntries()) {
-                const auto level = static_cast<std::size_t>(entry.level);
+                const auto level =
+                    static_cast<std::size_t>(entry.level);
                 if (!show_[level] ||
-                    (!filter.empty() && entry.text.find(filter) == std::string::npos)) {
+                    (!filter.empty() &&
+                     entry.text.find(filter) == std::string::npos)) {
                     continue;
                 }
                 ImGui::TextDisabled("%8.2f", entry.time);
@@ -52,7 +57,8 @@ class LogPanel final : public Panel {
                 }
             }
             // Follow new messages while scrolled to the end.
-            if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 1.0f) {
+            if (ImGui::GetScrollY() >=
+                ImGui::GetScrollMaxY() - 1.0f) {
                 ImGui::SetScrollHereY(1.0f);
             }
         }

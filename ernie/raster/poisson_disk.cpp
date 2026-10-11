@@ -19,22 +19,26 @@ float UnitFloat(std::uint32_t hash) {
 
 }  // namespace
 
-std::vector<glm::vec2> PoissonDisk(std::size_t count, std::uint32_t seed,
+std::vector<glm::vec2> PoissonDisk(std::size_t count,
+                                   std::uint32_t seed,
                                    std::size_t candidatesPerPoint) {
     std::vector<glm::vec2> points;
     points.reserve(count);
     std::uint32_t counter = 0;
     const auto candidate = [&] {
-        const glm::uvec3 h = Pcg3d(glm::uvec3(seed, counter++, 0x9E3779B9u));
+        const glm::uvec3 h =
+            Pcg3d(glm::uvec3(seed, counter++, 0x9E3779B9u));
         const float radius = std::sqrt(UnitFloat(h.x));
         const float angle = 6.28318530718f * UnitFloat(h.y);
-        return glm::vec2(radius * std::cos(angle), radius * std::sin(angle));
+        return glm::vec2(radius * std::cos(angle),
+                         radius * std::sin(angle));
     };
 
     for (std::size_t i = 0; i < count; ++i) {
         glm::vec2 best = candidate();
         float bestDistance = -1.0f;
-        const std::size_t tries = points.empty() ? 1 : candidatesPerPoint * points.size();
+        const std::size_t tries =
+            points.empty() ? 1 : candidatesPerPoint * points.size();
         for (std::size_t c = 0; c < tries; ++c) {
             const glm::vec2 p = c == 0 ? best : candidate();
             float nearest = std::numeric_limits<float>::max();

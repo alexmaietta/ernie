@@ -8,20 +8,27 @@
 #include <string>
 #include <vector>
 
-/// Materials as reflected schemas (`prim_type.h`): UsdShade's Material, with Ernie's own surface
-/// inputs (a BRDF model, an albedo, an albedo map and detail textures), and Shader, the nodes of a
-/// UsdShade network (UsdPreviewSurface, UsdUVTexture, UsdPrimvarReader_float2, UsdTransform2d) by
-/// `info:id`. Each declaration's fallback is the value Ernie shades an unset input with
-/// (`MaterialSettings`, `DetailSettings`, `TextureReader`, the `preview_surface` model's defaults).
+/// Materials as reflected schemas (`prim_type.h`): UsdShade's
+/// Material, with Ernie's own surface inputs (a BRDF model, an
+/// albedo, an albedo map and detail textures), and Shader, the nodes
+/// of a UsdShade network (UsdPreviewSurface, UsdUVTexture,
+/// UsdPrimvarReader_float2, UsdTransform2d) by `info:id`. Each
+/// declaration's fallback is the value Ernie shades an unset input
+/// with
+/// (`MaterialSettings`, `DetailSettings`, `TextureReader`, the
+/// `preview_surface` model's defaults).
 ///
-/// Not declared, and read generically: a BRDF's own parameters (`inputs:<param>` per model in the
-/// `BrdfRegistry`, an open namespace), connections (`<input>.connect`, through `GetConnection`),
-/// and `inputs:scale`, which is UsdUVTexture's 4-vector scale and UsdTransform2d's 2-vector one
-/// under one name on the one Shader type: a declaration of either type would author the other
-/// Shader's scale as the wrong USD type.
+/// Not declared, and read generically: a BRDF's own parameters
+/// (`inputs:<param>` per model in the `BrdfRegistry`, an open
+/// namespace), connections (`<input>.connect`, through
+/// `GetConnection`), and `inputs:scale`, which is UsdUVTexture's
+/// 4-vector scale and UsdTransform2d's 2-vector one under one name on
+/// the one Shader type: a declaration of either type would author the
+/// other Shader's scale as the wrong USD type.
 ///
 /// References:
-/// - Pixar, UsdShade, https://openusd.org/release/api/usd_shade_page_front.html
+/// - Pixar, UsdShade,
+/// https://openusd.org/release/api/usd_shade_page_front.html
 /// - Pixar, "UsdPreviewSurface Specification",
 ///   https://openusd.org/release/spec_usdpreviewsurface.html
 
@@ -174,15 +181,17 @@
 
 namespace ernie {
 
-/// How a surface reflects light: Ernie's own inputs, or a UsdPreviewSurface its
-/// `outputs:surface` connects to. A BRDF's parameters are `inputs:<param>` of its model.
+/// How a surface reflects light: Ernie's own inputs, or a
+/// UsdPreviewSurface its `outputs:surface` connects to. A BRDF's
+/// parameters are `inputs:<param>` of its model.
 class Material : public Imageable {
     ERNIE_SCHEMA_BODY(Material, Imageable, ERNIE_MATERIAL_ALL)
     ERNIE_SCHEMA_DEFINE(Material)
 };
 
-/// A node of a material's network, of the type `info:id` names, its inputs constants or
-/// connections (`<input>.connect`) to other shaders' outputs.
+/// A node of a material's network, of the type `info:id` names, its
+/// inputs constants or connections (`<input>.connect`) to other
+/// shaders' outputs.
 class Shader : public Imageable {
     ERNIE_SCHEMA_BODY(Shader, Imageable, ERNIE_SHADER_ALL)
     ERNIE_SCHEMA_DEFINE(Shader)

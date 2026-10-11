@@ -36,8 +36,9 @@ namespace tokens = ernie::tokens;
 
 namespace {
 
-/// Custom filters: a gain on linear colour (`scale`, 2 by default) and a flat transmission on
-/// every band (`transmission`, 1 by default).
+/// Custom filters: a gain on linear colour (`scale`, 2 by default)
+/// and a flat transmission on every band (`transmission`, 1 by
+/// default).
 ernie::SensorFilterModel GainFilter() {
     ernie::SensorFilterModel model;
     model.id = "gain";
@@ -72,15 +73,19 @@ struct Transmission : IBandFilter {
     return model;
 }
 
-/// HdrColor of MeshScene's camera through SensorFilter prims of `types`, each with `inputs`.
-std::vector<float> HdrThrough(RasterDelegate& delegate, Scene& scene,
-                              const std::vector<std::string>& types,
-                              const std::map<std::string, float>& inputs = {}) {
+/// HdrColor of MeshScene's camera through SensorFilter prims of
+/// `types`, each with `inputs`.
+std::vector<float>
+HdrThrough(RasterDelegate& delegate, Scene& scene,
+           const std::vector<std::string>& types,
+           const std::map<std::string, float>& inputs = {}) {
     std::vector<Path> filters;
     for (std::size_t i = 0; i < types.size(); ++i) {
         const Path path("/Render/Filters/F" + std::to_string(i));
-        scene.Remove(path);  // a fresh prim: no inputs left from an earlier chain
-        ernie::SensorFilterPrim::Define(scene, path).SetFilterType(types[i]);
+        scene.Remove(path);  // a fresh prim: no inputs left from an
+                             // earlier chain
+        ernie::SensorFilterPrim::Define(scene, path)
+            .SetFilterType(types[i]);
         for (const auto& [name, value] : inputs) {
             if (types[i] != "cie") {
                 scene.Set(path, "inputs:" + name, value);
@@ -88,11 +93,13 @@ std::vector<float> HdrThrough(RasterDelegate& delegate, Scene& scene,
         }
         filters.push_back(path);
     }
-    ernie::RenderVar::Define(scene, "/Render/Vars/Hdr").SetSourceName("HdrColor");
+    ernie::RenderVar::Define(scene, "/Render/Vars/Hdr")
+        .SetSourceName("HdrColor");
     ernie::RenderProduct::Define(scene, "/Render/Hdr")
         .SetCamera("/World/Camera")
         .SetResolution(glm::dvec2(kSize, kSize));
-    scene.Set("/Render/Hdr", tokens::kOrderedVars, std::vector<Path>{"/Render/Vars/Hdr"});
+    scene.Set("/Render/Hdr", tokens::kOrderedVars,
+              std::vector<Path>{"/Render/Vars/Hdr"});
     scene.Set("/Render/Hdr", tokens::kFilters, filters);
     const Path product[] = {"/Render/Hdr"};
     const Tensor hdr = delegate.Step(scene, product)
@@ -120,21 +127,29 @@ TEST_F(RasterDelegateTest, CustomSensorFiltersRunInTheirChains) {
     delegate.AddSensorFilter(GainFilter());
     delegate.AddSensorFilter(TransmissionFilter());
     Scene scene = MeshScene();
-    const std::vector<float> base = HdrThrough(delegate, scene, {"cie"});
+    const std::vector<float> base =
+        HdrThrough(delegate, scene, {"cie"});
     ASSERT_GT(*std::max_element(base.begin(), base.end()), 0.0f);
 
-    EXPECT_EQ(HdrThrough(delegate, scene, {"cie", "gain"}), Scaled(base, 2.0f))
+    EXPECT_EQ(HdrThrough(delegate, scene, {"cie", "gain"}),
+              Scaled(base, 2.0f))
         << "the default scale";
-    EXPECT_EQ(HdrThrough(delegate, scene, {"cie", "gain"}, {{"scale", 3.0f}}), Scaled(base, 3.0f))
+    EXPECT_EQ(HdrThrough(delegate, scene, {"cie", "gain"},
+                         {{"scale", 3.0f}}),
+              Scaled(base, 3.0f))
         << "inputs:scale";
-    // A power of two scales every band's product and their sum exactly.
-    EXPECT_EQ(HdrThrough(delegate, scene, {"transmission", "cie"}, {{"transmission", 0.25f}}),
+    // A power of two scales every band's product and their sum
+    // exactly.
+    EXPECT_EQ(HdrThrough(delegate, scene, {"transmission", "cie"},
+                         {{"transmission", 0.25f}}),
               Scaled(base, 0.25f));
-    EXPECT_THROW(HdrThrough(delegate, scene, {"gain", "cie"}), std::invalid_argument)
+    EXPECT_THROW(HdrThrough(delegate, scene, {"gain", "cie"}),
+                 std::invalid_argument)
         << "gain before there is colour";
 }
 
-TEST_F(RasterDelegateTest, CustomSensorFiltersThatFailToCompileAreNotRegistered) {
+TEST_F(RasterDelegateTest,
+       CustomSensorFiltersThatFailToCompileAreNotRegistered) {
     RasterDelegate delegate(*context_);
     ernie::SensorFilterModel broken = GainFilter();
     broken.slang = R"(import sensor;
@@ -148,21 +163,24 @@ struct Gain : IPixelFilter {
         delegate.AddSensorFilter(broken);
         ADD_FAILURE() << "a broken filter registered";
     } catch (const std::invalid_argument& error) {
-        EXPECT_NE(std::string(error.what()).find("undefinedThing"), std::string::npos)
+        EXPECT_NE(std::string(error.what()).find("undefinedThing"),
+                  std::string::npos)
             << "the compiler's diagnostics: " << error.what();
     }
     EXPECT_EQ(delegate.SensorFilters().Find("gain"), nullptr);
     Scene scene = MeshScene();
-    EXPECT_THROW(HdrThrough(delegate, scene, {"cie", "gain"}), std::invalid_argument)
+    EXPECT_THROW(HdrThrough(delegate, scene, {"cie", "gain"}),
+                 std::invalid_argument)
         << "an unknown filter type";
     delegate.AddSensorFilter(GainFilter());
-    EXPECT_NO_THROW(HdrThrough(delegate, scene, {"cie", "gain"})) << "the fixed filter registers";
+    EXPECT_NO_THROW(HdrThrough(delegate, scene, {"cie", "gain"}))
+        << "the fixed filter registers";
 }
 
 namespace {
 
-/// Spatial filters: linear colour from the pixel `dx` to the left, and each band from the pixel
-/// itself.
+/// Spatial filters: linear colour from the pixel `dx` to the left,
+/// and each band from the pixel itself.
 ernie::SensorFilterModel ShiftFilter() {
     ernie::SensorFilterModel model;
     model.id = "shift";
@@ -197,16 +215,22 @@ struct CopySpectrum : ISpatialBandFilter {
     return model;
 }
 
-/// `hdr` (kSize x kSize RGBA rows) with each pixel taken from `dx` to its left, clamped.
-std::vector<float> ShiftedRight(const std::vector<float>& hdr, int dx) {
+/// `hdr` (kSize x kSize RGBA rows) with each pixel taken from `dx` to
+/// its left, clamped.
+std::vector<float> ShiftedRight(const std::vector<float>& hdr,
+                                int dx) {
     std::vector<float> shifted(hdr.size());
     for (int y = 0; y < static_cast<int>(kSize); ++y) {
         for (int x = 0; x < static_cast<int>(kSize); ++x) {
             const int from = std::max(x - dx, 0);
             for (int c = 0; c < 4; ++c) {
-                shifted[(static_cast<std::size_t>(y) * kSize + static_cast<std::size_t>(x)) * 4 +
+                shifted[(static_cast<std::size_t>(y) * kSize +
+                         static_cast<std::size_t>(x)) *
+                            4 +
                         static_cast<std::size_t>(c)] =
-                    hdr[(static_cast<std::size_t>(y) * kSize + static_cast<std::size_t>(from)) * 4 +
+                    hdr[(static_cast<std::size_t>(y) * kSize +
+                         static_cast<std::size_t>(from)) *
+                            4 +
                         static_cast<std::size_t>(c)];
             }
         }
@@ -216,17 +240,24 @@ std::vector<float> ShiftedRight(const std::vector<float>& hdr, int dx) {
 
 }  // namespace
 
-TEST_F(RasterDelegateTest, SpatialSensorFiltersReadThePixelsAroundTheirOwn) {
+TEST_F(RasterDelegateTest,
+       SpatialSensorFiltersReadThePixelsAroundTheirOwn) {
     RasterDelegate delegate(*context_);
     delegate.AddSensorFilter(ShiftFilter());
     delegate.AddSensorFilter(CopySpectrumFilter());
     Scene scene = MeshScene();
-    const std::vector<float> base = HdrThrough(delegate, scene, {"cie"});
+    const std::vector<float> base =
+        HdrThrough(delegate, scene, {"cie"});
 
-    EXPECT_EQ(HdrThrough(delegate, scene, {"cie", "shift"}), ShiftedRight(base, 1));
-    EXPECT_EQ(HdrThrough(delegate, scene, {"cie", "shift"}, {{"dx", 3.0f}}), ShiftedRight(base, 3));
-    EXPECT_EQ(HdrThrough(delegate, scene, {"cie", "shift", "shift"}), ShiftedRight(base, 2))
+    EXPECT_EQ(HdrThrough(delegate, scene, {"cie", "shift"}),
+              ShiftedRight(base, 1));
+    EXPECT_EQ(
+        HdrThrough(delegate, scene, {"cie", "shift"}, {{"dx", 3.0f}}),
+        ShiftedRight(base, 3));
+    EXPECT_EQ(HdrThrough(delegate, scene, {"cie", "shift", "shift"}),
+              ShiftedRight(base, 2))
         << "two in a row: three kernels, the images alternating";
-    EXPECT_EQ(HdrThrough(delegate, scene, {"copySpectrum", "cie"}), base)
+    EXPECT_EQ(HdrThrough(delegate, scene, {"copySpectrum", "cie"}),
+              base)
         << "the spectrum passes between kernels exactly";
 }

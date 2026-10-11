@@ -14,6 +14,8 @@ FetchContent_Declare(
     SOURCE_SUBDIR no-build)
 FetchContent_MakeAvailable(imguizmo)
 
-add_library(ernie_imguizmo STATIC "${imguizmo_SOURCE_DIR}/src/ImGuizmo.cpp")
-target_include_directories(ernie_imguizmo SYSTEM PUBLIC "${imguizmo_SOURCE_DIR}/src")
+add_library(ernie_imguizmo STATIC
+            "${imguizmo_SOURCE_DIR}/src/ImGuizmo.cpp")
+target_include_directories(ernie_imguizmo SYSTEM
+                           PUBLIC "${imguizmo_SOURCE_DIR}/src")
 target_link_libraries(ernie_imguizmo PUBLIC dear_imgui)

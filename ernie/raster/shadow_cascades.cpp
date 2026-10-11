@@ -12,7 +12,9 @@ namespace ernie {
 
 namespace {
 
-std::array<glm::vec3, 8> SliceCorners(const CameraView& camera, float nearDepth, float farDepth) {
+std::array<glm::vec3, 8> SliceCorners(const CameraView& camera,
+                                      float nearDepth,
+                                      float farDepth) {
     const glm::mat4 cameraToWorld = glm::inverse(camera.view);
     std::array<glm::vec3, 8> corners{};
     if (camera.IsOrthographic()) {
@@ -21,9 +23,11 @@ std::array<glm::vec3, 8> SliceCorners(const CameraView& camera, float nearDepth,
         for (int i = 0; i < 8; ++i) {
             const float depth = (i & 4) ? farDepth : nearDepth;
             const glm::vec4 edge =
-                toView * glm::vec4(i & 1 ? 1.0f : -1.0f, i & 2 ? 1.0f : -1.0f, 0.0f, 1.0f);
+                toView * glm::vec4(i & 1 ? 1.0f : -1.0f,
+                                   i & 2 ? 1.0f : -1.0f, 0.0f, 1.0f);
             corners[static_cast<std::size_t>(i)] =
-                glm::vec3(cameraToWorld * glm::vec4(edge.x, edge.y, -depth, 1.0f));
+                glm::vec3(cameraToWorld *
+                          glm::vec4(edge.x, edge.y, -depth, 1.0f));
         }
         return corners;
     }
@@ -32,29 +36,38 @@ std::array<glm::vec3, 8> SliceCorners(const CameraView& camera, float nearDepth,
     for (int i = 0; i < 8; ++i) {
         const float depth = (i & 4) ? farDepth : nearDepth;
         const glm::vec4 inView((i & 1 ? 1.0f : -1.0f) * tanX * depth,
-                               (i & 2 ? 1.0f : -1.0f) * tanY * depth, -depth, 1.0f);
-        corners[static_cast<std::size_t>(i)] = glm::vec3(cameraToWorld * inView);
+                               (i & 2 ? 1.0f : -1.0f) * tanY * depth,
+                               -depth, 1.0f);
+        corners[static_cast<std::size_t>(i)] =
+            glm::vec3(cameraToWorld * inView);
     }
     return corners;
 }
 
 }  // namespace
 
-std::vector<float> PracticalSplits(float nearPlane, float farPlane, int count, float lambda) {
+std::vector<float> PracticalSplits(float nearPlane, float farPlane,
+                                   int count, float lambda) {
     std::vector<float> splits(static_cast<std::size_t>(count) + 1);
     for (int i = 0; i <= count; ++i) {
-        const float fraction = static_cast<float>(i) / static_cast<float>(count);
-        const float logarithmic = nearPlane * std::pow(farPlane / nearPlane, fraction);
-        const float uniform = nearPlane + (farPlane - nearPlane) * fraction;
-        splits[static_cast<std::size_t>(i)] = lambda * logarithmic + (1.0f - lambda) * uniform;
+        const float fraction =
+            static_cast<float>(i) / static_cast<float>(count);
+        const float logarithmic =
+            nearPlane * std::pow(farPlane / nearPlane, fraction);
+        const float uniform =
+            nearPlane + (farPlane - nearPlane) * fraction;
+        splits[static_cast<std::size_t>(i)] =
+            lambda * logarithmic + (1.0f - lambda) * uniform;
     }
     splits.front() = nearPlane;
     splits.back() = farPlane;
     return splits;
 }
 
-std::pair<glm::vec3, glm::vec3> WithShadows(const glm::vec3& low, const glm::vec3& high,
-                                            const glm::vec3& toSun, float maxLength) {
+std::pair<glm::vec3, glm::vec3> WithShadows(const glm::vec3& low,
+                                            const glm::vec3& high,
+                                            const glm::vec3& toSun,
+                                            float maxLength) {
     if (!(toSun.z > 1e-3f)) {
         return {low, high};
     }
@@ -62,9 +75,11 @@ std::pair<glm::vec3, glm::vec3> WithShadows(const glm::vec3& low, const glm::vec
     glm::vec3 grownLow = low;
     glm::vec3 grownHigh = high;
     for (int i = 0; i < 8; ++i) {
-        const glm::vec3 corner((i & 1) ? high.x : low.x, (i & 2) ? high.y : low.y,
+        const glm::vec3 corner((i & 1) ? high.x : low.x,
+                               (i & 2) ? high.y : low.y,
                                (i & 4) ? high.z : low.z);
-        const float along = std::min((corner.z - low.z) / toSun.z, reach);
+        const float along =
+            std::min((corner.z - low.z) / toSun.z, reach);
         const glm::vec3 landing = corner - toSun * along;
         grownLow = glm::min(grownLow, landing);
         grownHigh = glm::max(grownHigh, landing);
@@ -72,18 +87,22 @@ std::pair<glm::vec3, glm::vec3> WithShadows(const glm::vec3& low, const glm::vec
     return {grownLow, grownHigh};
 }
 
-std::vector<ShadowCascade> FitCascades(const CameraView& camera, float shadowDistance,
-                                       const glm::vec3& toSun, const glm::vec3& sceneMin,
-                                       const glm::vec3& sceneMax, int count, float lambda,
-                                       std::uint32_t resolution, float splitNear, float around) {
-    const glm::vec3 up =
-        std::fabs(toSun.z) > 0.99f ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(0.0f, 0.0f, 1.0f);
-    const glm::mat4 lightView = glm::lookAtRH(toSun, glm::vec3(0.0f), up);
+std::vector<ShadowCascade>
+FitCascades(const CameraView& camera, float shadowDistance,
+            const glm::vec3& toSun, const glm::vec3& sceneMin,
+            const glm::vec3& sceneMax, int count, float lambda,
+            std::uint32_t resolution, float splitNear, float around) {
+    const glm::vec3 up = std::fabs(toSun.z) > 0.99f
+                             ? glm::vec3(0.0f, 1.0f, 0.0f)
+                             : glm::vec3(0.0f, 0.0f, 1.0f);
+    const glm::mat4 lightView =
+        glm::lookAtRH(toSun, glm::vec3(0.0f), up);
 
     float sceneNear = std::numeric_limits<float>::max();
     float sceneFar = std::numeric_limits<float>::lowest();
     for (int i = 0; i < 8; ++i) {
-        const glm::vec3 corner((i & 1) ? sceneMax.x : sceneMin.x, (i & 2) ? sceneMax.y : sceneMin.y,
+        const glm::vec3 corner((i & 1) ? sceneMax.x : sceneMin.x,
+                               (i & 2) ? sceneMax.y : sceneMin.y,
                                (i & 4) ? sceneMax.z : sceneMin.z);
         const float z = (lightView * glm::vec4(corner, 1.0f)).z;
         sceneNear = std::min(sceneNear, -z);
@@ -93,8 +112,9 @@ std::vector<ShadowCascade> FitCascades(const CameraView& camera, float shadowDis
 
     const float res = static_cast<float>(resolution);
     const float start = std::max(splitNear, camera.nearPlane);
-    const std::vector<float> splits =
-        PracticalSplits(start, std::max(shadowDistance, start * 1.001f), count, lambda);
+    const std::vector<float> splits = PracticalSplits(
+        start, std::max(shadowDistance, start * 1.001f), count,
+        lambda);
     std::vector<ShadowCascade> cascades;
     for (int c = 0; c < count; ++c) {
         ShadowCascade cascade;
@@ -104,26 +124,30 @@ std::vector<ShadowCascade> FitCascades(const CameraView& camera, float shadowDis
         float radius = 0.0f;
         if (around > 0.0f) {
             center = camera.eye;
-            radius = cascade.splitFar * std::sqrt(1.0f + 2.0f * around * around);
+            radius = cascade.splitFar *
+                     std::sqrt(1.0f + 2.0f * around * around);
         } else {
-            const auto corners = SliceCorners(camera, cascade.splitNear, cascade.splitFar);
+            const auto corners = SliceCorners(
+                camera, cascade.splitNear, cascade.splitFar);
             for (const glm::vec3& corner : corners) {
                 center += corner / 8.0f;
             }
             for (const glm::vec3& corner : corners) {
-                radius = std::max(radius, glm::length(corner - center));
+                radius =
+                    std::max(radius, glm::length(corner - center));
             }
         }
         radius = std::ceil(radius * 16.0f) / 16.0f;
         radius *= res / (res - 2.0f);
         const float texel = 2.0f * radius / res;
 
-        const glm::vec3 centerInLight = glm::vec3(lightView * glm::vec4(center, 1.0f));
+        const glm::vec3 centerInLight =
+            glm::vec3(lightView * glm::vec4(center, 1.0f));
         const float x = std::floor(centerInLight.x / texel) * texel;
         const float y = std::floor(centerInLight.y / texel) * texel;
-        const glm::mat4 projection =
-            glm::orthoRH_ZO(x - radius, x + radius, y - radius, y + radius,
-                            sceneNear - depthPadding, sceneFar + depthPadding);
+        const glm::mat4 projection = glm::orthoRH_ZO(
+            x - radius, x + radius, y - radius, y + radius,
+            sceneNear - depthPadding, sceneFar + depthPadding);
         cascade.lightViewProjection = projection * lightView;
         cascade.texelWorldSize = texel;
         cascades.push_back(cascade);

@@ -15,7 +15,8 @@ float MinimumSpacing(const std::vector<glm::vec2>& points) {
     float spacing = std::numeric_limits<float>::max();
     for (std::size_t i = 0; i < points.size(); ++i) {
         for (std::size_t j = i + 1; j < points.size(); ++j) {
-            spacing = std::fmin(spacing, glm::length(points[i] - points[j]));
+            spacing = std::fmin(spacing,
+                                glm::length(points[i] - points[j]));
         }
     }
     return spacing;
@@ -39,7 +40,8 @@ TEST(PoissonDisk, IsDeterministicPerSeed) {
 
 TEST(PoissonDisk, KeepsPointsWellSeparated) {
     for (const std::uint32_t seed : {0u, 1u, 2u, 3u}) {
-        EXPECT_GT(MinimumSpacing(PoissonDisk(16, seed)), 0.3f) << "seed " << seed;
+        EXPECT_GT(MinimumSpacing(PoissonDisk(16, seed)), 0.3f)
+            << "seed " << seed;
     }
 }
 
