@@ -56,7 +56,6 @@ configure_file(ernie/app.py "${ernie_package_dir}/app.py" COPYONLY)
 configure_file(ernie/batch.py "${ernie_package_dir}/batch.py" COPYONLY)
 configure_file(ernie/demo.py "${ernie_package_dir}/demo.py" COPYONLY)
 configure_file(ernie/schema.py "${ernie_package_dir}/schema.py" COPYONLY)
-configure_file(ernie/cli.py "${ernie_package_dir}/cli.py" COPYONLY)
 configure_file(ernie/__main__.py "${ernie_package_dir}/__main__.py" COPYONLY)
 # ernie.demos: the Python demos (demos/<category>/<name>.py) and the ISDs they read, run by
 # `python -m ernie.demos`.
@@ -99,7 +98,6 @@ if(SKBUILD)
               ernie/batch.py
               ernie/demo.py
               ernie/schema.py
-              ernie/cli.py
               ernie/__main__.py
               "${ernie_package_dir}/schema.pyi"
               "${ernie_package_dir}/py.typed"
@@ -143,5 +141,15 @@ if(SKBUILD)
             FILES "${ERNIE_MOLTENVK_LIBRARY}"
             DESTINATION ernie
             COMPONENT python)
+    endif()
+    # The native `ernie` program, beside the module and Slang's runtime (its rpath finds them
+    # there, as Windows does beside it): the `ernie` command (ernie/__main__.py) runs it.
+    if(TARGET ernie_viewer)
+        if(APPLE)
+            set_target_properties(ernie_viewer PROPERTIES INSTALL_RPATH "@loader_path")
+        else()
+            set_target_properties(ernie_viewer PROPERTIES INSTALL_RPATH "$ORIGIN")
+        endif()
+        install(TARGETS ernie_viewer RUNTIME DESTINATION ernie COMPONENT python)
     endif()
 endif()
