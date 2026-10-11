@@ -294,6 +294,10 @@ jobs:
         run: >
           perl -pi -e 's/set\(ERNIE_VERSION_SUFFIX ""/set(ERNIE_VERSION_SUFFIX "${{ needs.version.outputs.suffix }}"/'
           CMakeLists.txt
+      # MSVC on the path for the workflow's Ninja generator: without it CMake finds the runner's
+      # MinGW GCC (Strawberry Perl's) instead.
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
       - uses: pypa/cibuildwheel@v4.3.0
         with:
           output-dir: wheelhouse

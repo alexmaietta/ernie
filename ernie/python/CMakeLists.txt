@@ -34,6 +34,18 @@ if(WIN32)
     file(COPY ${ERNIE_SLANG_RUNTIME}
          DESTINATION "${ernie_package_dir}")
 endif()
+# The native `ernie` program beside the build's package too, as in the
+# wheel, so the `ernie` command (ernie/__main__.py) runs from a build.
+if(TARGET ernie_viewer)
+    set(ernie_program
+        "${ernie_package_dir}/ernie${CMAKE_EXECUTABLE_SUFFIX}")
+    add_custom_command(
+        OUTPUT "${ernie_program}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:ernie_viewer> "${ernie_program}"
+        DEPENDS ernie_viewer)
+    add_custom_target(_ernie_program ALL DEPENDS "${ernie_program}")
+endif()
 # Type stubs beside the module, for IDEs, type checkers and the Python API docs: _ernie/ holds a
 # .pyi per module (the extension still imports first), and py.typed marks the package as typed.
 set(ernie_stubs "${ernie_package_dir}/_ernie/__init__.pyi"

@@ -117,8 +117,10 @@ environment = { MACOSX_DEPLOYMENT_TARGET = "13.3" }
 # The viewer's window system headers to build; Mesa's lavapipe to test (x86_64 only, see
 # test-skip).
 before-all = "dnf install -y -q --enablerepo=crb libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel libXext-devel wayland-devel wayland-protocols-devel libxkbcommon-devel && dnf install -y -q --setopt=strict=0 mesa-vulkan-drivers vulkan-loader"
-# Slang's runtime is already in the wheel beside the module, found through $ORIGIN.
-repair-wheel-command = "auditwheel repair --exclude 'libslang-*' -w {dest_dir} {wheel}"
+# Slang's runtime is already in the wheel beside the module, found through $ORIGIN. The native
+# `ernie` program links AlmaLinux 9's crt1.o, marked as needing x86-64-v2 (SSE4.2, CPUs since
+# 2009), which auditwheel would refuse; Ernie needs no more than baseline x86-64 itself.
+repair-wheel-command = "auditwheel repair --disable-isa-ext-check --exclude 'libslang-*' -w {dest_dir} {wheel}"
 # Builds in the container's own directory: a local run copies the checkout in, and a build/wheel
 # tree configured on the host would be refused there.
 environment = { SKBUILD_BUILD_DIR = "/tmp/ernie-wheel" }
