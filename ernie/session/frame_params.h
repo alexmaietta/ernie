@@ -193,6 +193,14 @@ struct LightParams {
     /// angle between the axis and the direction from the light. An empty tint is black.
     float focus = 0.0f;
     std::vector<float> focusTint;
+    /// Sphere, rect and disk with an IES profile: its candela, `kProfileRows` rows of
+    /// `kProfileColumns`, row i at i x 180 / (kProfileRows - 1) degrees off the axis (its angle
+    /// scale applied) and column j at j x 360 / kProfileColumns degrees around it from the light's
+    /// +x towards +y; the emission per band is spectrum x the profile, interpolated, besides cone
+    /// and focus. Empty without one.
+    std::vector<float> profile;
+    static constexpr int kProfileRows = 129;
+    static constexpr int kProfileColumns = 64;
     bool shadows = true;
     /// A direction of a dome (`DomeLightMode::Directions`): it lights with the model's diffuse
     /// response to surrounding light (`IBrdf::environment`), as the dome's diffuse light would,

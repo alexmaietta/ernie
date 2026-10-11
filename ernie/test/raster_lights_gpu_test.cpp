@@ -14,6 +14,7 @@
 #include "ernie/session/renderer.h"
 #include "ernie/session/resolve.h"
 #include "ernie/util/astronomy.h"
+#include "ernie/util/ies.h"
 #include "support/delegate_scenes.h"
 #include "support/test_raster.h"
 #include "support/vulkan_fixture.h"
@@ -25,6 +26,8 @@
 #include <array>
 #include <cmath>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <map>
 #include <memory>
@@ -90,6 +93,68 @@ TEST_F(RasterDelegateTest, LampsLightByTheInverseSquareLaw) {
     EXPECT_NEAR(RadianceAt(delegate, spot, 0.0f, 0.0f), concentrated, 0.02f * concentrated)
         << "inside the cone";
     EXPECT_EQ(RadianceAt(delegate, spot, 6.0f, 0.0f), 0.0f) << "outside a 10 degree cone";
+}
+
+TEST_F(RasterDelegateTest, IesProfilesShapeLamps) {
+    // Every 15 degrees: 100 cd x cos within 30 degrees of the 0 degree plane (the lamp's +x,
+    // world +x here) and (1 + 2 sin) times that within 30 of the 90 degree plane (+y), mirrored
+    // by quadrant symmetry, so the coarse pixels' bearings matter little; the planes agree at
+    // the nadir.
+    const char* text = R"(IESNA:LM-63-2002
+TILT=NONE
+1 -1 1 7 4 1 2 0 0 0
+1 1 10
+0 15 30 45 60 75 90
+0 30 60 90
+100 96.592583 86.602540 70.710678 50 25.881905 0
+100 96.592583 86.602540 70.710678 50 25.881905 0
+100 146.592583 173.205081 170.710678 136.602540 75.881905 0
+100 146.592583 173.205081 170.710678 136.602540 75.881905 0
+)";
+    // The reference: 100 cd every way, so each pixel's ratio to it is the profile there over 100.
+    const char* uniform = R"(IESNA:LM-63-2002
+TILT=NONE
+1 -1 1 2 1 1 2 0 0 0
+1 1 10
+0 180
+0
+100 100
+)";
+    const std::filesystem::path directory = std::filesystem::temp_directory_path();
+    const std::filesystem::path file = directory / "ernie_raster_lights_quadrant.ies";
+    const std::filesystem::path flat = directory / "ernie_raster_lights_uniform.ies";
+    std::ofstream(file) << text;
+    std::ofstream(flat) << uniform;
+    const ernie::IesProfile profile = ernie::ParseIes(text);
+
+    RasterDelegate delegate(*context_);
+    const float x = 6.0f;
+    // Each pixel's angle off the lamp's axis, from the unshaped lamp: E ~ cos^3.
+    const float below = RadianceAt(delegate, LampScene(10.0), 0.0f, 0.0f);
+    const auto angle = [&](float px, float py) {
+        const double c3 = RadianceAt(delegate, LampScene(10.0), px, py) / below;
+        return glm::degrees(std::acos(std::cbrt(c3)));
+    };
+    // Relative units: the candela times the intensity.
+    const auto shaped = [&](const std::filesystem::path& ies) {
+        Scene scene = LampScene(10.0);
+        ernie::SphereLight(scene, "/World/Lamp")
+            .ClearPower()
+            .SetIntensity(1.0)
+            .SetShapingIesFile(ies.string());
+        return scene;
+    };
+    const Scene quadrant = shaped(file);
+    const Scene reference = shaped(flat);
+    const auto ratio = [&](float px, float py) {
+        return RadianceAt(delegate, quadrant, px, py) / RadianceAt(delegate, reference, px, py);
+    };
+    const double onX = profile.Sample(angle(x, 0.0f), 0.0) / 100.0;
+    EXPECT_NEAR(ratio(x, 0.0f), onX, 0.02 * onX) << "the 0 degree plane";
+    const double onY = profile.Sample(angle(0.0f, x), 90.0) / 100.0;
+    EXPECT_NEAR(ratio(0.0f, x), onY, 0.02 * onY) << "the 90 degree plane, brighter";
+    std::filesystem::remove(file);
+    std::filesystem::remove(flat);
 }
 
 TEST_F(RasterDelegateTest, FocusedLampsFallOffAsAPowerOfTheCosine) {

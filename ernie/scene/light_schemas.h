@@ -80,6 +80,20 @@
       (::ernie::AttributeMeta{.label = "Focus tint",                                               \
                               .doc = "Linear RGB the focus falloff fades to; white undoes it.",    \
                               .group = "Shape", .color = true}))                                   \
+    X(std::string, ShapingIesFile, ::ernie::tokens::kShapingIesFile, "",                           \
+      (::ernie::AttributeMeta{.label = "IES profile",                                              \
+                              .doc = "An IES LM-63 file shaping the light, its nadir along -z.",   \
+                              .group = "Shape", .asset = true}))                                   \
+    X(double, ShapingIesAngleScale, ::ernie::tokens::kShapingIesAngleScale, 0.0,                   \
+      (::ernie::AttributeMeta{.label = "IES angle scale",                                          \
+                              .doc = "Scales the profile's vertical angle about the nadir (above " \
+                                     "0) or zenith (below 0); 0 leaves it.",                       \
+                              .group = "Shape", .min = -10.0, .max = 10.0}))                       \
+    X(bool, ShapingIesNormalize, ::ernie::tokens::kShapingIesNormalize, false,                     \
+      (::ernie::AttributeMeta{.label = "IES normalize",                                            \
+                              .doc = "Keeps the light's power as without the profile; otherwise " \
+                                     "its candela multiply the intensity.",                        \
+                              .group = "Shape"}))                                                  \
     X(double, PhotometricPower, ::ernie::tokens::kPhotometricPower, 1600.0,                        \
       (::ernie::AttributeMeta{.label = "Power",                                                    \
                               .doc = "Luminous flux in lumens, whatever the colour or cone."       \

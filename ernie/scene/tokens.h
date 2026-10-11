@@ -214,6 +214,13 @@ inline constexpr std::string_view kShapingConeSoftness = "inputs:shaping:cone:so
 /// axis; color3f: the tint its falloff fades to instead of black (white undoes the focus).
 inline constexpr std::string_view kShapingFocus = "inputs:shaping:focus";
 inline constexpr std::string_view kShapingFocusTint = "inputs:shaping:focusTint";
+/// asset: an IES LM-63 profile (`IesProfile`) shaping a sphere, rect or disk light, its nadir
+/// along the light's -z axis and its 0 degree plane through +x. float: scales its vertical angle
+/// about the nadir (above 0) or the zenith (below 0); 0 leaves it. bool: normalize keeps the
+/// light's power as without the profile; otherwise its candela multiply the intensity.
+inline constexpr std::string_view kShapingIesFile = "inputs:shaping:ies:file";
+inline constexpr std::string_view kShapingIesAngleScale = "inputs:shaping:ies:angleScale";
+inline constexpr std::string_view kShapingIesNormalize = "inputs:shaping:ies:normalize";
 inline constexpr std::string_view kWidth = "inputs:width";
 inline constexpr std::string_view kHeight = "inputs:height";
 inline constexpr std::string_view kTextureFile = "inputs:texture:file";

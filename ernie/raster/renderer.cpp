@@ -95,6 +95,10 @@ struct LightGpu {
 };
 static_assert(sizeof(LightGpu) == 608, "LightGpu must match shading.slang");
 
+/// One light's IES profile on the GPU (shading.slang's kProfileRows x kProfileColumns floats).
+constexpr VkDeviceSize kProfileBytes =
+    LightParams::kProfileRows * LightParams::kProfileColumns * sizeof(float);
+
 struct MaterialGpu {
     std::uint32_t info[4];
     float params[BrdfRegistry::kMaxParams];
@@ -178,6 +182,7 @@ constexpr DescriptorBinding kShadingBindings[] = {
     {17, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {18, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {19, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {20, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
 /// shading.slang's ShadingConstants: the dispatch's model and first view, and the terrain horizon
@@ -595,6 +600,8 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
       sensorUniforms_(context, kSensorStride, kViewUniformUsage, BufferMemory::Device),
       lightTable_(context, kMaxLights * sizeof(LightGpu), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                   BufferMemory::Device),
+      lightProfiles_(context, kMaxLights * kProfileBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                     BufferMemory::Device),
       lightViewMatrices_(context, kMaxLightShadowViews * sizeof(glm::mat4),
                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device),
       lightShadowBlocks_(context, kMaxLightShadowViews * kLightShadowBlockStride, kViewUniformUsage,
@@ -973,6 +980,12 @@ void RasterRenderer::WriteLights(const FrameParams& params, const std::optional<
         }
         // A focused light's emission is spectrum x (1 - tint) x |cos|^focus + spectrum x tint.
         entry.shadow[2] = distant ? 0.0f : std::max(light.focus, 0.0f);
+        // Its IES profile, in its slot of the profile buffer: the slot plus 1, 0 without.
+        if (!distant && light.profile.size() == kProfileBytes / sizeof(float)) {
+            uploads_.Write(lightProfiles_, std::as_bytes(std::span(light.profile)),
+                           i * kProfileBytes);
+            entry.shadow[3] = static_cast<float>(i + 1);
+        }
         for (std::size_t b = 0; b < light.spectrum.size(); ++b) {
             const float tint = b < light.focusTint.size() && entry.shadow[2] > 0.0f
                                    ? std::clamp(light.focusTint[b], 0.0f, 1.0f)
@@ -2634,7 +2647,8 @@ void RasterRenderer::Shade(VkCommandBuffer commands, RenderTargets& targets,
             sampled(domeLighting_ != nullptr ? *domeLighting_ : *domeMap_),
             general(occlusion_[0] != nullptr ? *occlusion_[0] : *noOcclusion_),
             general(occlusion_[1] != nullptr ? *occlusion_[1] : *noOcclusion_),
-            sampled(terrainHorizon_.image != nullptr ? *terrainHorizon_.image : *noHorizon_)};
+            sampled(terrainHorizon_.image != nullptr ? *terrainHorizon_.image : *noHorizon_),
+            DescriptorResource::Of(lightProfiles_)};
         // The dispatch's model and first view, and the terrain horizon (none without its image).
         const auto constantsFor = [&](std::uint32_t model) {
             ShadingConstants constants{};
@@ -2920,7 +2934,8 @@ void RasterRenderer::SetHighlight(std::span<const std::uint32_t> primIds, glm::v
 std::uint64_t RasterRenderer::GpuBytes() const {
     std::uint64_t bytes =
         uniforms_.Size() + shadowUniforms_.Size() + shadowMaps_->Bytes() +
-        lightShadowMaps_->Bytes() + lightTable_.Size() + lightViewMatrices_.Size() +
+        lightShadowMaps_->Bytes() + lightTable_.Size() + lightProfiles_.Size() +
+        lightViewMatrices_.Size() +
         sigmoidTable_.Bytes() + shadingUniforms_.Size() + sensorUniforms_.Size() +
         (materialTable_ != nullptr ? materialTable_->Size() : 0) + overlays_->GpuBytes() +
         domeMap_->Bytes() + (domeLighting_ != nullptr ? domeLighting_->Bytes() : 0) +

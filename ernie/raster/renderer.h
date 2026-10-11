@@ -623,6 +623,9 @@ class RasterRenderer {
     GpuBuffer shadingUniforms_;
     GpuBuffer sensorUniforms_;
     GpuBuffer lightTable_;
+    /// Per light slot, its IES profile's candela (`LightParams::profile`), where `LightGpu`'s
+    /// shadow.w points.
+    GpuBuffer lightProfiles_;
     GpuBuffer lightViewMatrices_;
     /// Per light shadow view, a Shadows block (frame.slang) whose first matrix its shadow pass
     /// draws with (`RasterFrame::shadowFromFrame`), `kLightShadowBlockStride` apart.

@@ -112,7 +112,8 @@ struct LightGpu {
     float4 cone;
     // x: world size of a shadow texel, at unit distance for perspective views; y: 1 for a dome's
     // direction (`Light::domeDiffuse`), which lights with the model's diffuse response alone; z:
-    // focus exponent (sphere, rect, disk; 0 unfocused).
+    // focus exponent (sphere, rect, disk; 0 unfocused); w: its IES profile's slot in
+    // `lightProfiles` plus 1, 0 without.
     float4 shadow;
     // Rect and disk: half width along the light's +x and half height along its +y, as vectors.
     float4 extentX;
@@ -163,6 +164,32 @@ struct ShadingConstants {
 [[vk::binding(10, 0)]] Texture2DArray<float> lightShadowMaps;
 [[vk::binding(11, 0)]] SamplerComparisonState lightShadowSampler;
 [[vk::binding(12, 0)]] StructuredBuffer<float4x4> lightViews;
+// Lights' IES profiles (`LightParams::profile`): per slot kProfileRows rows from the light's axis
+// (0) to opposite it (180 degrees), of kProfileColumns columns around it from its +x towards +y.
+[[vk::binding(20, 0)]] StructuredBuffer<float> lightProfiles;
+static const uint kProfileRows = 129;
+static const uint kProfileColumns = 64;
+
+// A light's IES profile towards unit `direction` from it, bilinear: candela.
+float lightProfile(LightGpu light, float3 direction) {
+    let base = (uint(light.shadow.w) - 1) * kProfileRows * kProfileColumns;
+    let x = normalize(light.extentX.xyz);
+    let y = cross(x, light.axis.xyz);
+    let theta = acos(clamp(dot(direction, light.axis.xyz), -1.0, 1.0));
+    var phi = atan2(dot(direction, y), dot(direction, x));
+    phi = phi < 0.0 ? phi + 2.0 * PI : phi;
+    let r = theta / PI * float(kProfileRows - 1);
+    let c = phi / (2.0 * PI) * float(kProfileColumns);
+    let r0 = min(uint(r), kProfileRows - 2);
+    let c0 = uint(c) % kProfileColumns;
+    let c1 = (c0 + 1) % kProfileColumns;
+    let tr = saturate(r - float(r0));
+    let tc = frac(c);
+    let row0 = base + r0 * kProfileColumns;
+    let row1 = row0 + kProfileColumns;
+    return lerp(lerp(lightProfiles[row0 + c0], lightProfiles[row0 + c1], tc),
+                lerp(lightProfiles[row1 + c0], lightProfiles[row1 + c1], tc), tr);
+}
 // The dome's latitude-longitude RGB map with its mips (rows from +z down, columns from +x
 // through +y), its stars (right ascension and declination in radians, temperature in kelvin,
 // spectral irradiance at 555 nm) sorted by grid cell, and each cell's first star and count.
@@ -749,13 +776,18 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                                     dot(-toLight, light.axis.xyz));
             }
         }
-        if (type >= 1 && light.shadow.z > 0.0) {
-            // Off the axis by the direction from the light's centre (UsdLux's focus): for an
-            // area light, as if it were small beside its distance.
+        if (type >= 1 && (light.shadow.z > 0.0 || light.shadow.w > 0.0)) {
+            // Shaped by the direction from the light's centre (UsdLux's focus and IES profile):
+            // for an area light, as if it were small beside its distance.
             let fromLight = world - light.position.xyz;
             let distance = length(fromLight);
             let direction = distance > 0.0 ? fromLight / distance : light.axis.xyz;
-            lightFocus[k] = pow(abs(dot(direction, light.axis.xyz)), light.shadow.z);
+            if (light.shadow.z > 0.0) {
+                lightFocus[k] = pow(abs(dot(direction, light.axis.xyz)), light.shadow.z);
+            }
+            if (light.shadow.w > 0.0) {
+                scale *= lightProfile(light, direction);
+            }
         }
         let nDotL = dot(n, toLight);
         if (nDotL <= 0.0 || scale <= 0.0) {

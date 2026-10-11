@@ -6,6 +6,7 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/session/resolve.h"
 #include "ernie/util/astronomy.h"
+#include "ernie/util/ies.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
@@ -13,7 +14,10 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 using ernie::LightParams;
@@ -397,6 +401,66 @@ TEST(LightParamsOf, NormalizedLightsDivideTheirIntensityByTheirSize) {
     // Powers and photometric units are sizeless already.
     panel.SetPhotometricPower(1000.0);
     EXPECT_NEAR(luminous("/Panel"), 1000.0 / (4.0 * M_PI), 1.6) << "4 m^2 after the scale";
+}
+
+namespace {
+
+/// A downlight's IES profile: 100 cd at the nadir falling as cos to 0 at 90 degrees, every 15.
+constexpr const char* kDownlight = R"(IESNA:LM-63-2002
+TILT=NONE
+1 -1 1 7 1 1 2 0 0 0
+1 1 10
+0 15 30 45 60 75 90
+0
+100 96.592583 86.602540 70.710678 50 25.881905 0
+)";
+
+/// `text` in a file of the temporary directory named after `name`.
+std::filesystem::path WriteTemporary(const std::string& name, const char* text) {
+    const std::filesystem::path path =
+        std::filesystem::temp_directory_path() / ("ernie_session_lights_" + name + ".ies");
+    std::ofstream(path) << text;
+    return path;
+}
+
+}  // namespace
+
+TEST(LightParamsOf, IesProfilesShapeLightsInEveryUnit) {
+    const ernie::SpectralBands bands{380.0, 780.0, 40};
+    const std::filesystem::path file = WriteTemporary("downlight", kDownlight);
+    const double flux = ernie::ReadIes(file).Flux();
+    Scene scene;
+    const auto luminous = [&](std::string_view path) {
+        return Luminous(ernie::LightParamsOf(scene, path, bands).spectrum, bands);
+    };
+    ernie::SphereLight lamp = ernie::SphereLight::Define(scene, "/Lamp")
+                                  .SetTreatAsPoint(true)
+                                  .SetIntensity(2.0)
+                                  .SetShapingIesFile(file.string());
+    const LightParams params = ernie::LightParamsOf(scene, "/Lamp", bands);
+    constexpr int columns = LightParams::kProfileColumns;
+    ASSERT_EQ(params.profile.size(), static_cast<std::size_t>(LightParams::kProfileRows * columns));
+    EXPECT_FLOAT_EQ(params.profile[0], 100.0f) << "along the axis";
+    EXPECT_NEAR(params.profile[32 * columns + 5], 70.710678f, 1e-4f) << "45 degrees off it";
+    EXPECT_EQ(params.profile[100 * columns], 0.0f) << "behind it";
+
+    // Its candela times the intensity; normalized, the flux of 2 cd in every direction.
+    EXPECT_NEAR(luminous("/Lamp"), 2.0, 0.02);
+    lamp.SetShapingIesNormalize(true);
+    EXPECT_NEAR(luminous("/Lamp"), 2.0 * 4.0 * M_PI / flux, 0.01 * 2.0 * 4.0 * M_PI / flux);
+    // In photometric units, 1000 lumens in all; or 50 lux at 2 m along the axis.
+    lamp.SetPhotometricPower(1000.0);
+    EXPECT_NEAR(luminous("/Lamp"), 1000.0 / flux, 0.01 * 1000.0 / flux);
+    lamp.SetPhotometricIlluminance(50.0).SetPhotometricIlluminanceDistance(2.0);
+    EXPECT_NEAR(luminous("/Lamp"), 50.0 * 4.0 / 100.0, 0.02);
+
+    // An angle scale of 0.5 squeezes the profile into half the angle: 22.5 degrees (row 16)
+    // reads its 45, and 45 degrees its 90.
+    lamp.SetShapingIesAngleScale(0.5);
+    const std::vector<float> squeezed = ernie::LightParamsOf(scene, "/Lamp", bands).profile;
+    EXPECT_NEAR(squeezed[16 * columns], 70.710678f, 1e-3f);
+    EXPECT_NEAR(squeezed[32 * columns], 0.0f, 1e-3f);
+    std::filesystem::remove(file);
 }
 
 TEST(LightParamsOf, FocusedLightsKeepTheirPower) {

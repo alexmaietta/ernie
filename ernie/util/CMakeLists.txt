@@ -3,6 +3,7 @@ ernie_add_library(
     ernie_util
     SOURCES
     astronomy.cpp
+    ies.cpp
     image.cpp
     profiler.cpp
     spectrum.cpp

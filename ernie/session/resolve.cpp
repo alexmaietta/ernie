@@ -13,15 +13,19 @@
 #include "ernie/scene/wide_view.h"
 #include "ernie/scene/xform.h"
 #include "ernie/util/astronomy.h"
+#include "ernie/util/ies.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <filesystem>
 #include <functional>
 #include <limits>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -237,20 +241,89 @@ struct EmissionShape {
     }
 };
 
+/// A light's IES profile grid (`LightParams::profile`) averaged around its axis at cosine `c`
+/// off it, linear between rows.
+double ProfileRing(const std::vector<float>& profile, double c) {
+    constexpr int rows = LightParams::kProfileRows;
+    constexpr int columns = LightParams::kProfileColumns;
+    const double at = std::acos(std::clamp(c, -1.0, 1.0)) / M_PI * (rows - 1);
+    const int row = std::min(static_cast<int>(at), rows - 2);
+    const double t = at - row;
+    double sum = 0.0;
+    for (int j = 0; j < columns; ++j) {
+        sum += (1.0 - t) * profile[static_cast<std::size_t>(row * columns + j)] +
+               t * profile[static_cast<std::size_t>((row + 1) * columns + j)];
+    }
+    return sum / columns;
+}
+
 /// The solid angle a light spreads its power over, so that a power gives the same flux whatever
 /// its shape: for a sphere the integral of `shape` over the sphere (4 pi unshaped), for a flat
 /// Lambertian emitter of its cosine-weighted value over the hemisphere it faces (pi unshaped),
-/// per unit area. A focus tint counts by its luminance.
-double EmittedSolidAngle(const EmissionShape& shape, bool flat) {
+/// per unit area; times its IES `profile` when not empty (in cd sr then). A focus tint counts by
+/// its luminance.
+double EmittedSolidAngle(const EmissionShape& shape, bool flat,
+                         const std::vector<float>& profile = {}) {
     constexpr int kSteps = 8192;
     const double low = flat ? 0.0 : -1.0;
     const double step = (1.0 - low) / kSteps;
     double sum = 0.0;
     for (int i = 0; i < kSteps; ++i) {
         const double c = low + (i + 0.5) * step;
-        sum += (flat ? c : 1.0) * shape(c);
+        sum += (flat ? c : 1.0) * shape(c) * (profile.empty() ? 1.0 : ProfileRing(profile, c));
     }
     return std::max(2.0 * M_PI * sum * step, 1e-9);
+}
+
+/// The IES profile of `light` (`inputs:shaping:ies:file`) on `LightParams::profile`'s grid, its
+/// vertical angle scaled by `inputs:shaping:ies:angleScale` as UsdLux's ShapingAPI does; empty
+/// without a file. Files are read once each, and again when they change.
+/// @throws std::runtime_error or std::invalid_argument for a file that cannot be read.
+///
+/// References:
+/// - Pixar, UsdLux ShapingAPI, https://openusd.org/dev/user_guides/schemas/usdLux/ShapingAPI.html
+std::vector<float> ProfileOf(const BoundableLight& light) {
+    const std::string file = light.GetShapingIesFile();
+    if (file.empty()) {
+        return {};
+    }
+    struct Cached {
+        std::filesystem::file_time_type written;
+        std::shared_ptr<const IesProfile> profile;
+    };
+    static std::mutex mutex;
+    static std::map<std::string, Cached> cache;
+    const std::filesystem::file_time_type written = std::filesystem::last_write_time(file);
+    std::shared_ptr<const IesProfile> profile;
+    {
+        const std::lock_guard lock(mutex);
+        Cached& entry = cache[file];
+        if (entry.profile == nullptr || entry.written != written) {
+            entry = {written, std::make_shared<const IesProfile>(ReadIes(file))};
+        }
+        profile = entry.profile;
+    }
+    const double scale = light.GetShapingIesAngleScale();
+    constexpr int rows = LightParams::kProfileRows;
+    constexpr int columns = LightParams::kProfileColumns;
+    std::vector<float> grid(static_cast<std::size_t>(rows * columns));
+    for (int i = 0; i < rows; ++i) {
+        const double theta = 180.0 * i / (rows - 1);
+        const double ies = scale > 0.0   ? theta / scale
+                           : scale < 0.0 ? (theta - 180.0) / -scale + 180.0
+                                         : theta;
+        for (int j = 0; j < columns; ++j) {
+            grid[static_cast<std::size_t>(i * columns + j)] =
+                static_cast<float>(profile->Sample(ies, 360.0 * j / columns));
+        }
+    }
+    return grid;
+}
+
+/// The profile along a light's axis (its nadir), else its brightest, for an illuminance there.
+double ProfileAxis(const std::vector<float>& profile) {
+    const double axis = ProfileRing(profile, 1.0);
+    return axis > 0.0 ? axis : std::max(*std::max_element(profile.begin(), profile.end()), 1e-9f);
 }
 
 /// The shape of a sphere, rect or disk light's emission (`EmissionShape`), with `coneAngle` and
@@ -1008,6 +1081,7 @@ LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBa
     }
     light.tangent = glm::vec3(glm::normalize(x));
     SetFocus(light, emitter, bands);
+    light.profile = ProfileOf(emitter);
     if (type != kSphereLight) {
         double area = 0.0;
         if (type == kRectLight) {
@@ -1026,22 +1100,34 @@ LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBa
         if (!(area > 0.0)) {
             throw std::invalid_argument("Light '" + path.String() + "' has no area");
         }
-        // A power spreads over the area times the focused hemisphere (pi unfocused).
-        const double spread = area * EmittedSolidAngle(EmissionShapeOf(emitter, 180.0, 0.0), true);
+        // A power spreads over the area times the focused (and profiled) hemisphere, pi plain.
+        const EmissionShape shape = EmissionShapeOf(emitter, 180.0, 0.0);
+        const double plain = area * EmittedSolidAngle(shape, true);
+        const double spread =
+            light.profile.empty() ? plain : area * EmittedSolidAngle(shape, true, light.profile);
+        const double axis = light.profile.empty() ? 1.0 : ProfileAxis(light.profile);
         const std::optional<std::vector<float>> pairs = SpectrumPairs(emitter);
         if (emitter.IsPhotometric()) {
             const glm::dvec2 size(light.size);
             const double radius = light.radius;
             const auto perLux = [&](double distance) {
-                return type == kRectLight ? RectLuminancePerLux(size.x, size.y, distance)
-                                          : DiskLuminancePerLux(radius, distance);
+                return (type == kRectLight ? RectLuminancePerLux(size.x, size.y, distance)
+                                           : DiskLuminancePerLux(radius, distance)) /
+                       axis;
             };
             light.spectrum =
                 RelativeSpectrum(emitter, bands, PhotometricAreaValue(emitter, spread, perLux));
         } else if (emitter.HasPower() || pairs) {
             light.spectrum = LampSpectrum(emitter, bands, pairs ? &*pairs : nullptr, spread);
         } else {
-            light.spectrum = RelativeSpectrum(emitter, bands, LightIntensity(emitter, area));
+            // With a profile, its candela times the intensity over the area (a luminance per
+            // candela), or normalized the luminance keeping the light's flux.
+            const double luminance = LightIntensity(emitter, area);
+            light.spectrum = RelativeSpectrum(emitter, bands,
+                                              light.profile.empty() ? luminance
+                                              : emitter.GetShapingIesNormalize()
+                                                  ? luminance * plain / spread
+                                                  : LightIntensity(emitter) / area);
         }
         return light;
     }
@@ -1053,12 +1139,15 @@ LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBa
     if (light.radius < 0.0f) {
         throw std::invalid_argument("SphereLight '" + path.String() + "' has a negative radius");
     }
-    // A power, photometric or radiant, spreads over the solid angle under the cone and focus, so
-    // narrowing either concentrates the light rather than dimming it.
+    // A power, photometric or radiant, spreads over the solid angle under the cone, focus and
+    // profile, so narrowing any concentrates the light rather than dimming it.
+    const EmissionShape shape = EmissionShapeOf(sphere, light.coneAngle, light.coneSoftness);
+    const double plain = EmittedSolidAngle(shape, false);
     const double spread =
-        EmittedSolidAngle(EmissionShapeOf(sphere, light.coneAngle, light.coneSoftness), false);
+        light.profile.empty() ? plain : EmittedSolidAngle(shape, false, light.profile);
     if (sphere.IsPhotometric()) {
-        const auto perLux = [](double distance) { return distance * distance; };
+        const double axis = light.profile.empty() ? 1.0 : ProfileAxis(light.profile);
+        const auto perLux = [&](double distance) { return distance * distance / axis; };
         light.spectrum =
             RelativeSpectrum(sphere, bands, PhotometricAreaValue(sphere, spread, perLux));
         return light;
@@ -1071,8 +1160,13 @@ LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBa
     const double radius = light.radius;
     const double area = radius > 0.0 ? M_PI * radius * radius : 1.0;
     // Normalized, over its surface area, 4 pi r^2: a luminous intensity of a quarter of it.
+    const double intensity = LightIntensity(sphere, 4.0 * M_PI * radius * radius) * area;
+    // With a profile, its candela times the intensity, or normalized the luminous intensity per
+    // candela keeping the light's flux.
     light.spectrum = RelativeSpectrum(sphere, bands,
-                                      LightIntensity(sphere, 4.0 * M_PI * radius * radius) * area);
+                                      light.profile.empty()             ? intensity
+                                      : sphere.GetShapingIesNormalize() ? intensity * plain / spread
+                                                                        : LightIntensity(sphere));
     return light;
 }
 
