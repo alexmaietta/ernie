@@ -22,6 +22,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -283,6 +284,10 @@ class RasterRenderer {
         bool forwardDepth = false;      ///< The fourth is the eye's depth along forward.
         std::uint32_t planes = kNone;   ///< Six normalised frustum planes (`Frustum`).
         std::uint32_t pose = kNone;     ///< The camera-to-world matrix.
+        /// Whether the blocks are one per output view, posed and projected as the camera (the
+        /// sensor's), rather than one per raster view: a cube camera's per view and face, each
+        /// turned onto its face and projected as the faces are.
+        bool outputViews = false;
     };
 
     /// Records the patching of every view's `fields` in `blocks` (a storage buffer of a block per
@@ -435,6 +440,10 @@ class RasterRenderer {
     void CreateLightShadowMaps(std::uint32_t resolution, std::uint32_t layers);
     void WriteLights(const FrameParams& params, const std::optional<Bounds3>& bounds);
     const ComputePipeline& ShadingPipeline(std::size_t model, bool pushbroom = false);
+    /// Sensor.slang's entry point `entry`, which reads only its lens, for lens kernel source `lens`
+    /// (`SensorPlan::LensSource`) in `layout`, compiled when first wanted.
+    const ComputePipeline& LensPipeline(const std::string& lens, const std::string& entry,
+                                        const PipelineLayout& layout);
     /// Compiles the sky pass for a frame camera, or a pushbroom, unless it has.
     void SkyPipeline(bool pushbroom);
     /// Compiles `plan`'s fused sensor kernels, one per segment, unless already compiled.
@@ -445,8 +454,9 @@ class RasterRenderer {
     /// views the raster passes draw (a cube camera's faces).
     void WriteSensor(const FrameParams& params, const FrameParams& raster);
     void EnsureViewBuffers(std::uint32_t views);
-    /// Writes views.slang's camera and sizes the pose buffers for a frame posed on the GPU.
-    void WritePoseCamera(const FrameParams& params);
+    /// Writes views.slang's camera (and `raster`'s faces' projection) and sizes the pose buffers
+    /// for a frame posed on the GPU.
+    void WritePoseCamera(const FrameParams& params, const FrameParams& raster);
     /// Records the light pass (light_views.slang) for the lights posed on the GPU, after the
     /// prepass wrote their poses: their light table entries and shadow views, then every
     /// drawable's `RecordShadowViews`, each followed by a barrier. Nothing without such lights.
@@ -473,7 +483,8 @@ class RasterRenderer {
     /// weighted for its share of its exposure; the last leaves the sum in the raster radiance.
     void Accumulate(VkCommandBuffer commands, RenderTargets& targets, std::uint32_t subframe) const;
     /// Writes each internal view's MotionUniforms for a frame holding the MotionVector var: the
-    /// last frame's view-projection from `frame`'s `PreviousPose`, and makes the camera pass.
+    /// last frame's view-projection from `frame`'s `PreviousPose` (a cube camera's faces'), and
+    /// makes the camera pass.
     void WriteMotion(const FrameParams& params, const FrameParams& frame);
     /// Records the MotionVector var's passes for output views `firstView` on, after their last
     /// sub-frame: the camera's motion for every pixel (motion_vectors.slang), then each
@@ -503,6 +514,13 @@ class RasterRenderer {
     /// Records the overlays over views `firstView` on of `targets`' LdrColor.
     void RecordOverlays(VkCommandBuffer commands, RenderTargets& targets,
                         std::uint32_t firstView) const;
+    /// Records the map of a cube camera's faces' sensor rows (`faceRows_`), for its rolling
+    /// shutter.
+    void RecordFaceRows(VkCommandBuffer commands, std::uint32_t firstView) const;
+    /// `RecordOverlays` for a camera rendered on cube faces: drawn on its faces, then resampled
+    /// through its lens onto `color`.
+    void RecordFaceOverlays(VkCommandBuffer commands, RenderTargets& targets,
+                            std::uint32_t firstView, GpuImage& color) const;
     /// The overlay pass's target for view `view`, reading `targets`' depth layer `layer`.
     OverlayPass::Target OverlayTarget(RenderTargets& targets, std::uint32_t view,
                                       std::uint32_t layer) const;
@@ -549,6 +567,11 @@ class RasterRenderer {
     /// The shutter for motion.slang: the first sub-frame's time and the spacing, the shutter's
     /// opening and closing and the rolling readout, in frames.
     std::array<float, 5> shutter_{};
+    /// Whether the last `Update`'s camera rolls its shutter over cube faces, whose texels then
+    /// take their sensor rows' times (`faceRows_`).
+    bool RollsFaces() const {
+        return faces_ > 1 && subframes_ > 1 && shutter_[4] > 0.0f;
+    }
     /// Whether the last `Update`'s views take their poses from `poseBuffer_`, and the views of
     /// `poseHistory_` (the poses it last rendered) then.
     bool posesOnGpu_ = false;
@@ -674,6 +697,22 @@ class RasterRenderer {
     std::vector<SensorFilter> filters_;
     VkExtent2D extent_{0, 0};
     std::unique_ptr<OverlayPass> overlays_;
+    /// A cube camera's overlays: each face's drawn over black and over white (a layer per view
+    /// and face), then resampled through the lens onto LdrColor (sensor.slang's
+    /// `overlayLensMain`, a pipeline per lens kernel); made when first drawn.
+    mutable std::array<std::unique_ptr<GpuImage>, 2> faceOverlays_;
+    std::unique_ptr<PipelineLayout> overlayLensLayout_;
+    /// A cube camera with a rolling shutter: its faces' sensor rows (sensor.slang's
+    /// `faceRowsMain`), which motion.slang times their texels by, made when first wanted; a
+    /// placeholder for other cameras.
+    mutable std::unique_ptr<GpuImage> faceRows_;
+    std::unique_ptr<GpuImage> noFaceRows_;
+    std::unique_ptr<PipelineLayout> faceRowsLayout_;
+    /// `LensPipeline`'s, by entry point and lens kernel source.
+    std::map<std::string, std::unique_ptr<ComputePipeline>, std::less<>> lensPipelines_;
+    /// The lens kernel source (`SensorPlan::LensSource`) of the last `Update`'s cube camera, for
+    /// its overlays and faces' rows; empty for others.
+    std::string faceLens_;
 
     /// Sample distribution shadow maps (`ShadowFit::Visible`): each `FrameUploads` slot's
     /// frame measures its view's visible depth range into its buffer (`RecordDepthRange`), which

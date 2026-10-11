@@ -134,15 +134,18 @@ VertexOutput segmentVertex(uint vertexIndex : SV_VertexID) {
     let corner = kCorners[vertexIndex % 6];
     var p0 = project(segment.a.xyz);
     var p1 = project(segment.b.xyz);
-    // Clipped to just in front of the eye, so segments passing behind it keep their visible part.
-    const float kNear = 1e-5;
-    if (p0.w < kNear && p1.w < kNear) {
+    // Clipped at the near plane (w is the view depth), so segments passing behind the eye keep
+    // their visible part; closer to the eye an end's w, which the clip computes from far-off
+    // ends, may round to or past 0.
+    // An orthographic view's w is 1 throughout.
+    let near = constants.view.w != 0 ? -1.0 : constants.viewport.z;
+    if (p0.w < near && p1.w < near) {
         return culled();
     }
-    if (p0.w < kNear) {
-        p0 = lerp(p0, p1, (kNear - p0.w) / (p1.w - p0.w));
-    } else if (p1.w < kNear) {
-        p1 = lerp(p1, p0, (kNear - p1.w) / (p0.w - p1.w));
+    if (p0.w < near) {
+        p0 = lerp(p0, p1, (near - p0.w) / (p1.w - p0.w));
+    } else if (p1.w < near) {
+        p1 = lerp(p1, p0, (near - p1.w) / (p0.w - p1.w));
     }
     let scale = pixelScale();
     let s0 = p0.xy / p0.w * scale;

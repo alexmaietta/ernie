@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/camera.h"
+#include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/overlay.h"
 #include "ernie/scene/render_schemas.h"
+#include "ernie/scene/tokens.h"
+#include "ernie/scene/wide_view.h"
 #include "support/delegate_scenes.h"
 
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -99,6 +104,52 @@ TEST_F(RasterDelegateTest, OverlaysMeetSurfacesByTheirDepthMode) {
     const auto [always, alwaysOutside] = through(OverlayDepth::Always);
     EXPECT_EQ(always, glm::ivec3(255));
     EXPECT_EQ(alwaysOutside, glm::ivec3(255));
+}
+
+TEST_F(RasterDelegateTest, OverlaysFollowACubeCamerasLens) {
+    // MeshScene through an equidistant fisheye reaching 100 degrees off axis, on cube faces: a
+    // line 60 below the camera from 68 degrees off axis on one side to 68 on the other, across
+    // the faces' seams, lands where the lens puts each of its points, bending as the lens does.
+    RasterDelegate delegate(*context_);
+    Scene scene = OverlayScene();
+    const double aperture = 20.0;
+    const double corner = std::sqrt(2.0) * 0.5 * kSize;
+    ernie::Camera(scene, "/World/Camera")
+        .SetLensProjection(ernie::tokens::kFisheye)
+        .SetVerticalAperture(aperture)
+        .SetHorizontalAperture(aperture)
+        .SetFocalLength(aperture * corner / (100.0 * M_PI / 180.0) / kSize);
+    const ernie::CameraParams camera = ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize);
+    ASSERT_EQ(ernie::CubeFacesOf(camera), ernie::kCubeFaces);
+    OverlayStyle style;
+    style.width = 3.0f;
+    style.depth = OverlayDepth::Always;
+    scene.GetOverlay("debug").Line({-150.0, -15.0, 0.0}, {150.0, -15.0, 0.0}, style);
+    const Tensor image = delegate.Render(scene);
+    // The camera looks down -z from 60 with +y up: its frame is the world's.
+    const double f = camera.FocalLengthPixels();
+    const glm::dvec2 centre = camera.PrincipalPoint();
+    const auto pixelOf = [&](glm::dvec3 p) {
+        const glm::dvec3 v = p - glm::dvec3(0.0, 0.0, 60.0);
+        const double theta = std::acos(-v.z / glm::length(v));
+        const glm::dvec2 across = glm::normalize(glm::dvec2(v.x, v.y));
+        return centre + theta * f * glm::dvec2(across.x, -across.y);
+    };
+    const auto texel = [&](glm::dvec2 pixel) {
+        const auto col = static_cast<std::size_t>(pixel.x);
+        const auto row = static_cast<std::size_t>(pixel.y);
+        return image.As<std::uint8_t>() + 4 * (row * kSize + col);
+    };
+    int lit = 0;
+    for (double x = -140.0; x <= 140.0; x += 10.0) {
+        const glm::dvec2 on = pixelOf({x, -15.0, 0.0});
+        EXPECT_GT(texel(on)[0], 200) << "x = " << x << " at " << on.x << ", " << on.y;
+        lit += texel(on)[0] > 200 ? 1 : 0;
+        // Its mirror image across the axis stays dark.
+        const glm::dvec2 off = pixelOf({x, 15.0, 0.0});
+        EXPECT_LT(texel(off)[0], 60) << "x = " << x;
+    }
+    EXPECT_GT(lit, 20);
 }
 
 TEST_F(RasterDelegateTest, OverlaysDrawMarkersLabelsAndShapes) {

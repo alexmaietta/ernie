@@ -195,9 +195,6 @@ FrameParams FrameParams::Faces(int faces) const {
     if (faces == 1) {
         return result;
     }
-    if (posesOnGpu) {
-        throw std::invalid_argument("A camera rendered on cube faces needs its poses on the host");
-    }
     // The faces' camera: a centred pinhole, its focal length in pixels the face's.
     CameraParams& face = result.camera;
     face.lens = LensModel{};
@@ -217,8 +214,9 @@ FrameParams FrameParams::Faces(int faces) const {
         for (int f = 0; f < faces; ++f) {
             const glm::dmat4 turn(CubeFaceAxes(static_cast<CubeFace>(f)));
             result.poses.push_back(pose * turn);
+            // A sub-frame's view (`Subframes`) has its output view's last pose.
             if (!previousPoses.empty()) {
-                result.previousPoses.push_back(previousPoses.at(v) * turn);
+                result.previousPoses.push_back(previousPoses[v % previousPoses.size()] * turn);
             }
             result.worlds.push_back(ViewWorld(v));
         }

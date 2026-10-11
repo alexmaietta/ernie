@@ -7,9 +7,14 @@
 // Matrices here are built row by row, so `m[r][c]` is row r, column c; buffers hold glm's
 // column-major order.
 //
-// Bindings: 0 the camera (parent-to-world, projection and its inverse, as glm columns), 1 the
-// poses (row-major 4x4, one per view; or with flag bit 1 seven numbers per view, a position and a
-// unit quaternion x, y, z, w), 2 the per-view blocks written.
+// A camera rendered on cube faces (cube_faces.slang) has a block per view and face for its raster
+// passes: block b is pose b / faces turned onto face b % faces, projected by the faces' own
+// projection.
+//
+// Bindings: 0 the camera (parent-to-world, projection and its inverse, then the cube faces'
+// projection and its inverse, as glm columns), 1 the poses (row-major 4x4, one per view; or with
+// flag bit 1 seven numbers per view, a position and a unit quaternion x, y, z, w), 2 the per-view
+// blocks written.
 //
 // References:
 // - G. Gribb and K. Hartmann, "Fast Extraction of Viewing Frustum Planes from the
@@ -26,9 +31,12 @@ struct ViewConstants {
     uint4 layout;
     // Byte offsets in a block: view-projection, its inverse, eye (xyz), forward (xyz).
     uint4 fields;
-    // Byte offsets in a block: six normalised frustum planes, camera-to-world pose.
+    // Byte offsets in a block: six normalised frustum planes, camera-to-world pose; then the cube
+    // faces per pose (0 or 1 for blocks of whole views), unused.
     uint4 more;
 }
+
+import cube_faces;
 
 [[vk::binding(0, 0)]] StructuredBuffer<float4> camera;
 [[vk::binding(1, 0)]] StructuredBuffer<float> poses;
@@ -104,10 +112,12 @@ void storeMatrix(uint address, float4x4 matrix) {
 [numthreads(64, 1, 1)]
 void viewsMain(uint3 id : SV_DispatchThreadID) {
     let layout = constants.layout;
-    let view = id.x;
-    if (view >= layout.x) {
+    let block = id.x;
+    if (block >= layout.x) {
         return;
     }
+    let faces = max(constants.more.z, 1u);
+    let view = block / faces;
     float4x4 local;
     if ((layout.w & 2u) != 0u) {
         // A position and a unit quaternion (x, y, z, w): the rotation's matrix, then the move.
@@ -130,29 +140,41 @@ void viewsMain(uint3 id : SV_DispatchThreadID) {
             local[r] = float4(poses[at], poses[at + 1], poses[at + 2], poses[at + 3]);
         }
     }
-    // Camera to world is the parent's world transform after the pose, as `ViewPosesOf`.
-    let pose = mul(cameraMatrix(0), local);
-    let viewProjection = mul(cameraMatrix(4), invert(pose));
+    // Camera to world is the parent's world transform after the pose, as `ViewPosesOf`; a face's
+    // turns it onto the face (`FrameParams::Faces`), whose axes are the rows of `cubeFaceToFace`.
+    var pose = mul(cameraMatrix(0), local);
+    var projection = 4u;
+    if (faces > 1) {
+        let axes = transpose(cubeFaceToFace(int(block % faces)));
+        float4x4 turn;
+        turn[0] = float4(axes[0], 0.0);
+        turn[1] = float4(axes[1], 0.0);
+        turn[2] = float4(axes[2], 0.0);
+        turn[3] = float4(0.0, 0.0, 0.0, 1.0);
+        pose = mul(pose, turn);
+        projection = 12u;
+    }
+    let viewProjection = mul(cameraMatrix(projection), invert(pose));
     let eye = float3(pose[0][3], pose[1][3], pose[2][3]);
     let forward = -normalize(float3(pose[0][2], pose[1][2], pose[2][2]));
 
-    let block = layout.z + view * layout.y;
+    let address = layout.z + block * layout.y;
     let fields = constants.fields;
     if (fields.x != kNone) {
-        storeMatrix(block + fields.x, viewProjection);
+        storeMatrix(address + fields.x, viewProjection);
     }
     if (fields.y != kNone) {
         // inverse(projection * view) = pose * inverse(projection).
-        storeMatrix(block + fields.y, mul(pose, cameraMatrix(8)));
+        storeMatrix(address + fields.y, mul(pose, cameraMatrix(projection + 4)));
     }
     if (fields.z != kNone) {
-        blocks.Store3(block + fields.z, asuint(eye));
+        blocks.Store3(address + fields.z, asuint(eye));
     }
     if (fields.w != kNone) {
         if ((layout.w & 1u) != 0u) {
-            blocks.Store4(block + fields.w, asuint(float4(forward, dot(eye, forward))));
+            blocks.Store4(address + fields.w, asuint(float4(forward, dot(eye, forward))));
         } else {
-            blocks.Store3(block + fields.w, asuint(forward));
+            blocks.Store3(address + fields.w, asuint(forward));
         }
     }
     let more = constants.more;
@@ -163,10 +185,10 @@ void viewsMain(uint3 id : SV_DispatchThreadID) {
         float4 planes[6] = {m[3] + m[0], m[3] - m[0], m[3] + m[1], m[3] - m[1], m[2], m[3] - m[2]};
         for (uint p = 0; p < 6; ++p) {
             let plane = planes[p] / max(length(planes[p].xyz), 1e-30);
-            blocks.Store4(block + more.x + 16 * p, asuint(plane));
+            blocks.Store4(address + more.x + 16 * p, asuint(plane));
         }
     }
     if (more.y != kNone) {
-        storeMatrix(block + more.y, pose);
+        storeMatrix(address + more.y, pose);
     }
 }

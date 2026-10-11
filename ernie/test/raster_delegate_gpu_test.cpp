@@ -2,6 +2,7 @@
 #include "ernie/device/offscreen_target.h"
 #include "ernie/geometry/primitives.h"
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/camera.h"
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/light_schemas.h"
@@ -11,6 +12,7 @@
 #include "ernie/scene/schema.h"
 #include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/scene/wide_view.h"
 #include "ernie/session/renderer.h"
 #include "support/delegate_scenes.h"
 #include "support/test_raster.h"
@@ -660,4 +662,33 @@ TEST_F(RasterDelegateTest, VisibleShadowFitsSpanOnlyTheDepthsTheViewSees) {
     EXPECT_EQ(delegate.Renderer().Cascades().front().splitNear, nearPlane);
     ernie::RenderSettings(scene, "/Render/Settings").SetShadowFit("nearest");
     EXPECT_THROW(delegate.Render(scene), std::invalid_argument);
+}
+
+TEST_F(RasterDelegateTest, VisibleShadowFitsSurroundACubeCamera) {
+    // MeshScene through an equidistant fisheye reaching 80 degrees off axis, on cube faces: its
+    // faces measure the depths they see, and its cascades, which surround the eye to hold every
+    // face, start near the meshes 60 below.
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    const double aperture = 20.0;
+    const double corner = std::sqrt(2.0) * 0.5 * kSize;
+    ernie::Camera(scene, "/World/Camera")
+        .SetLensProjection(tokens::kFisheye)
+        .SetVerticalAperture(aperture)
+        .SetHorizontalAperture(aperture)
+        .SetFocalLength(aperture * corner / (80.0 * M_PI / 180.0) / kSize);
+    ASSERT_EQ(ernie::CubeFacesOf(ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize)),
+              ernie::kCubeFaces);
+    delegate.Render(scene);
+    const std::vector<ernie::ShadowCascade> cascades = delegate.Renderer().Cascades();
+    ASSERT_FALSE(cascades.empty()) << "a cube camera's view has cascades of its own";
+    const float nearPlane = cascades.front().splitNear;
+    ernie::RenderSettings(scene, "/Render/Settings").SetShadowFit(tokens::kVisible);
+    for (int i = 0; i < 4; ++i) {
+        delegate.Render(scene);
+    }
+    const float fitted = delegate.Renderer().Cascades().front().splitNear;
+    EXPECT_GT(fitted, 50.0f);
+    EXPECT_LT(fitted, 60.0f);
+    EXPECT_GT(fitted, 10.0f * nearPlane);
 }

@@ -490,6 +490,36 @@ RasterTap rasterTapAt(SensorUniforms cam, float2 position, int view) {
     return tap;
 }
 
+// Motion `moved` in a cube face's pixels, of what sensor position `position` of view `view` sees,
+// in sensor pixels: through the inverse of the lens's local map from sensor to face pixels, its
+// steps one sensor pixel along x and y (back instead where a step crosses onto another face).
+// Zero where both cross.
+float2 faceMotionToSensor(SensorUniforms cam, float2 position, int view, float2 moved) {
+    let tap = rasterTapAt(cam, position, view);
+    float2 columns[2];
+    for (int axis = 0; axis < 2; ++axis) {
+        let step = axis == 0 ? float2(1.0, 0.0) : float2(0.0, 1.0);
+        var other = rasterTapAt(cam, position + step, view);
+        var sign = 1.0;
+        if (other.layer != tap.layer) {
+            other = rasterTapAt(cam, position - step, view);
+            sign = -1.0;
+        }
+        if (other.layer != tap.layer) {
+            return float2(0.0);
+        }
+        columns[axis] = sign * (other.raster - tap.raster);
+    }
+    // The map's matrix has columns d(face) / d(sensor x) and d(face) / d(sensor y).
+    let det = columns[0].x * columns[1].y - columns[1].x * columns[0].y;
+    if (abs(det) < 1e-12) {
+        return float2(0.0);
+    }
+    return float2(columns[1].y * moved.x - columns[1].x * moved.y,
+                  -columns[0].y * moved.x + columns[0].x * moved.y) /
+           det;
+}
+
 // The distances of what raster texel `nearest` of layer `layer` sees, at the end of tap `tap`.
 void distancesOf(SensorUniforms cam, RasterTap tap, int2 nearest, out float imagePlane,
                  out float camera) {
@@ -713,10 +743,13 @@ public struct Lens : ISpatialSource {
         }
         if ((holds & kHoldsMotionVector) != 0) {
             // Raster pixels to sensor pixels: the raster image is drawn `overscan` times wider,
-            // so a raster pixel spans `overscan` sensor pixels.
-            // A cube camera's is zero for now (its faces' motion is not mapped through the lens).
-            let raster = outside || kLensCube ? float2(0.0) : gRaster[uint3(nearest)].xy;
-            motionVector[id] = raster * pixel.uniforms().intrinsics.w;
+            // so a raster pixel spans `overscan` sensor pixels; a cube camera's face pixels
+            // through the lens's local map onto its face.
+            let raster = outside ? float2(0.0) : gRaster[uint3(nearest)].xy;
+            let cam = pixel.uniforms();
+            motionVector[id] = kLensCube
+                                   ? faceMotionToSensor(cam, float2(id.xy) + 0.5, int(id.z), raster)
+                                   : raster * cam.intrinsics.w;
         }
     }
 }
@@ -955,4 +988,84 @@ public void writeOutputs(SensorPixel value, PixelContext pixel, uint holds) {
     if ((holds & kHoldsLdrColor) != 0) {
         ldrColor[id] = value.display;
     }
+}
+
+// Overlays of a camera rendered on cube faces (`RasterRenderer::RecordOverlays`): each face's
+// drawn over black (32) and over white (33), a layer per view and face as the raster images,
+// and resampled through the lens onto LdrColor. Over black they give their colour, already
+// weighted by their opacity; the difference over white gives what of the image below shows
+// through, so LdrColor blends as when they draw onto it directly. A pass of its own, without a
+// sensor plan: bindings 0, 9 and 15 (for a lens of rays) as the sensor kernels', 32 and 33.
+[[vk::binding(32, 0)]] Texture2DArray<float4> overlayOverBlack;
+[[vk::binding(33, 0)]] Texture2DArray<float4> overlayOverWhite;
+
+float4 overlayAt(Texture2DArray<float4> image, float2 raster, int layer, float2 size) {
+    let p = clamp(raster, float2(0.0), size - 1.0);
+    let base = int2(floor(p));
+    let next = min(base + 1, int2(size) - 1);
+    let t = p - float2(base);
+    let top = lerp(image.Load(int4(base, layer, 0)), image.Load(int4(next.x, base.y, layer, 0)),
+                   t.x);
+    let bottom = lerp(image.Load(int4(base.x, next.y, layer, 0)),
+                      image.Load(int4(next, layer, 0)), t.x);
+    return lerp(top, bottom, t.y);
+}
+
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void overlayLensMain(uint3 id : SV_DispatchThreadID) {
+    let cam = sensorViews[pass.view.x + id.z];
+    if (id.x >= cam.size.x || id.y >= cam.size.y) {
+        return;
+    }
+    let size = float2(cam.size.xy);
+    let tap = rasterTapOf(cam, int2(id.xy), int(id.z));
+    if (any(tap.raster < float2(-0.5)) || any(tap.raster > size - 0.5)) {
+        return;
+    }
+    let black = overlayAt(overlayOverBlack, tap.raster, tap.layer, size).rgb;
+    let white = overlayAt(overlayOverWhite, tap.raster, tap.layer, size).rgb;
+    let through = saturate(dot(white - black, float3(1.0 / 3.0)));
+    let below = ldrColor[id];
+    ldrColor[id] = float4(black + through * below.rgb, below.a);
+}
+
+// A camera rendered on cube faces with a rolling shutter (`RasterRenderer::RecordFaceRows`):
+// each face texel's row of the sensor image, as the share of its height down to the row, for
+// motion.slang to time the texel by. The rows of the sensor pixels whose lens taps read the
+// texel, the least of them, as float bits (which order as uints for non-negative floats);
+// 0xFFFFFFFF where none reads it. A layer per face, the same for every view. Passes of their
+// own, as `overlayLensMain`: bindings 0 and 15 as the sensor kernels', 34.
+[[vk::image_format("r32ui")]] [[vk::binding(34, 0)]] RWTexture2DArray<uint> faceRows;
+
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void faceRowsClearMain(uint3 id : SV_DispatchThreadID) {
+    uint width;
+    uint height;
+    uint layers;
+    faceRows.GetDimensions(width, height, layers);
+    if (id.x < width && id.y < height) {
+        faceRows[id] = 0xFFFFFFFFu;
+    }
+}
+
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void faceRowsMain(uint3 id : SV_DispatchThreadID) {
+    let cam = sensorViews[pass.view.x];
+    if (id.x >= cam.size.x || id.y >= cam.size.y) {
+        return;
+    }
+    let size = float2(cam.size.xy);
+    let tap = rasterTapOf(cam, int2(id.xy), 0);
+    let row = asuint((float(id.y) + 0.5) / size.y);
+    let p = clamp(tap.raster, float2(0.0), size - 1.0);
+    let base = uint2(floor(p));
+    let next = min(base + 1, uint2(size) - 1);
+    uint previous;
+    InterlockedMin(faceRows[uint3(base, tap.layer)], row, previous);
+    InterlockedMin(faceRows[uint3(next.x, base.y, tap.layer)], row, previous);
+    InterlockedMin(faceRows[uint3(base.x, next.y, tap.layer)], row, previous);
+    InterlockedMin(faceRows[uint3(next, tap.layer)], row, previous);
 }

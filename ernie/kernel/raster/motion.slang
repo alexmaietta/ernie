@@ -10,8 +10,12 @@
 // each pixel's exposure that prims covered accumulates too, which the sensor blends the clear
 // colour by.
 //
+// A camera rendered on cube faces times each face texel by the sensor row its lens maps it to,
+// from a map of them (sensor.slang's `faceRowsMain`), not by its own row.
+//
 // Bindings: 0 the sub-frame's raster radiance (the sum after the last), 1 the sum so far, 2 the
-// sub-frame's ids (G-buffer 2), 3 the coverage (z of an RGBA32F image).
+// sub-frame's ids (G-buffer 2), 3 the coverage (z of an RGBA32F image), 4 a cube camera's faces'
+// sensor rows (a layer per face; a placeholder for other cameras).
 //
 // References:
 // - P. Haeberli and K. Akeley, "The Accumulation Buffer: Hardware Support for High-Quality
@@ -28,7 +32,8 @@ struct MotionConstants {
     // x: the first sub-frame's time, y: the spacing, z: the shutter's opening, w: its closing,
     // all in frames.
     float4 times;
-    // x: the rolling readout, in frames.
+    // x: the rolling readout, in frames; y: the cube faces whose rows `faceRows` holds, 0 for
+    // none.
     float4 rolling;
 }
 
@@ -39,6 +44,8 @@ static const uint kBackground = 0xFFFFFFFF;
 [[vk::binding(2, 0)]] Texture2DArray<uint4> ids;
 // The coverage is z of `RenderTargets::Raster`, whose xy are left as they are.
 [[vk::binding(3, 0)]] [[vk::image_format("rgba32f")]] RWTexture2DArray<float4> coverage;
+// Float bits of the share of the sensor's height down to the row; 0xFFFFFFFF for none.
+[[vk::binding(4, 0)]] [[vk::image_format("r32ui")]] RWTexture2DArray<uint> faceRows;
 [[vk::push_constant]] ConstantBuffer<MotionConstants> constants;
 
 // The integral of the hat max(0, 1 - |x|) from minus infinity to u.
@@ -80,7 +87,12 @@ void motionMain(uint3 id : SV_DispatchThreadID) {
     let bands = constants.frame.z;
     let view = id.z / bands;
     // The row's exposure, the top row's `rolling` frames before the bottom row's.
-    let row = (float(id.y) + 0.5) / float(height);
+    var row = (float(id.y) + 0.5) / float(height);
+    let faces = uint(constants.rolling.y);
+    if (faces > 1) {
+        let bits = faceRows[uint3(id.xy, view % faces)];
+        row = bits == 0xFFFFFFFFu ? 0.5 : asfloat(bits);
+    }
     let shift = -constants.rolling.x * (1.0 - row);
     let w = subframeWeight(k, constants.times.z + shift, constants.times.w + shift);
     let covered = ids.Load(int4(int2(id.xy), int(view), 0)).x != kBackground;

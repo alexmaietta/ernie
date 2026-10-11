@@ -75,7 +75,7 @@ std::pair<glm::vec3, glm::vec3> WithShadows(const glm::vec3& low, const glm::vec
 std::vector<ShadowCascade> FitCascades(const CameraView& camera, float shadowDistance,
                                        const glm::vec3& toSun, const glm::vec3& sceneMin,
                                        const glm::vec3& sceneMax, int count, float lambda,
-                                       std::uint32_t resolution, float splitNear) {
+                                       std::uint32_t resolution, float splitNear, float around) {
     const glm::vec3 up =
         std::fabs(toSun.z) > 0.99f ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(0.0f, 0.0f, 1.0f);
     const glm::mat4 lightView = glm::lookAtRH(toSun, glm::vec3(0.0f), up);
@@ -100,15 +100,19 @@ std::vector<ShadowCascade> FitCascades(const CameraView& camera, float shadowDis
         ShadowCascade cascade;
         cascade.splitNear = splits[static_cast<std::size_t>(c)];
         cascade.splitFar = splits[static_cast<std::size_t>(c) + 1];
-        const auto corners = SliceCorners(camera, cascade.splitNear, cascade.splitFar);
-
         glm::vec3 center(0.0f);
-        for (const glm::vec3& corner : corners) {
-            center += corner / 8.0f;
-        }
         float radius = 0.0f;
-        for (const glm::vec3& corner : corners) {
-            radius = std::max(radius, glm::length(corner - center));
+        if (around > 0.0f) {
+            center = camera.eye;
+            radius = cascade.splitFar * std::sqrt(1.0f + 2.0f * around * around);
+        } else {
+            const auto corners = SliceCorners(camera, cascade.splitNear, cascade.splitFar);
+            for (const glm::vec3& corner : corners) {
+                center += corner / 8.0f;
+            }
+            for (const glm::vec3& corner : corners) {
+                radius = std::max(radius, glm::length(corner - center));
+            }
         }
         radius = std::ceil(radius * 16.0f) / 16.0f;
         radius *= res / (res - 2.0f);

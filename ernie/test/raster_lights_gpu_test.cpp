@@ -2,6 +2,7 @@
 #include "ernie/device/offscreen_target.h"
 #include "ernie/geometry/primitives.h"
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/camera.h"
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/light_schemas.h"
@@ -11,6 +12,7 @@
 #include "ernie/scene/schema.h"
 #include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/scene/wide_view.h"
 #include "ernie/session/renderer.h"
 #include "ernie/session/resolve.h"
 #include "ernie/util/astronomy.h"
@@ -637,6 +639,32 @@ TEST_F(RasterDelegateTest, ARenderersFirstFrameHasItsLightsShadows) {
     RasterDelegate first(*context_);
     const std::vector<std::uint8_t> once = Bytes(first.Render(scene));
     EXPECT_EQ(Bytes(first.Render(scene)), once);
+}
+
+TEST_F(RasterDelegateTest, MeteringMeasuresWhatACubeCameraSees) {
+    // The grey floor under a 20000 lux sun straight above, Lambertian so 0.5 x 20000 / pi cd/m^2
+    // from every direction, through an equidistant fisheye reaching 80 degrees off axis on cube
+    // faces: metered as through a frame camera.
+    Scene scene = FlatScene();
+    scene.Remove("/World/Terrain");
+    ernie::GroundPlane::Define(scene, "/World/Floor").SetMaterialBinding("/Looks/Grey");
+    ernie::DistantLight(scene, "/World/Sun").SetPhotometricIlluminance(20000.0);
+    const double aperture = 20.0;
+    const double corner = std::sqrt(2.0) * 0.5 * kVarSize;
+    ernie::Camera(scene, "/World/Camera")
+        .SetLensProjection(tokens::kFisheye)
+        .SetVerticalAperture(aperture)
+        .SetHorizontalAperture(aperture)
+        .SetFocalLength(aperture * corner / (80.0 * M_PI / 180.0) / kVarSize);
+    ASSERT_EQ(ernie::CubeFacesOf(ernie::CameraParamsOf(scene, "/World/Camera", kVarSize, kVarSize)),
+              ernie::kCubeFaces);
+    ernie::RenderSettings(scene, "/Render/Settings").SetMeter(true);
+    RasterDelegate delegate(*context_);
+    for (int i = 0; i < 3; ++i) {
+        delegate.Render(scene);
+    }
+    ASSERT_TRUE(delegate.MeteredLuminance());
+    EXPECT_NEAR(std::log2(*delegate.MeteredLuminance()), std::log2(0.5 * 20000.0 / M_PI), 0.3);
 }
 
 TEST_F(RasterDelegateTest, MeteringMeasuresTheScenesLuminance) {

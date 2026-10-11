@@ -435,9 +435,10 @@ struct FrameParams {
     /// onto the face (`CubeFaceAxes`, its previous pose too) and seeing the view's world, and
     /// `camera` a centred pinhole of the same image whose square of 90 degrees plus a margin
     /// (`CubeFaceExtent`) spans the image's shorter side. The raster passes draw these; the
-    /// sensor follows the original camera's lens rays onto them. A copy for one face.
-    /// @throws std::invalid_argument for faces other than 1, `kCubeFaces` and `kAllCubeFaces`, or
-    /// with the poses on the GPU.
+    /// sensor follows the original camera's lens rays onto them. A copy for one face. With the
+    /// poses on the GPU, `poses` are their estimates, and the GPU turns the poses themselves
+    /// (views.slang).
+    /// @throws std::invalid_argument for faces other than 1, `kCubeFaces` and `kAllCubeFaces`.
     FrameParams Faces(int faces) const;
 
     /// The tangent-plane focal length, in raster pixels, and the principal point of a cube face

@@ -4,6 +4,9 @@
 // to its whole clipping range. Each wave reduces its pixels and one lane folds them into the
 // result with atomics; positive floats order as their bits do, so the result stays uint.
 //
+// A camera rendered on cube faces reduces its faces' layers, one per dispatch z, its depths
+// along each face's own axis as shading compares them.
+//
 // Bindings: 0 the views' depth ([0, 1]), 1 the result: [0] the nearest depth's bits,
 // cleared to the largest float, and [1] the farthest's, cleared to 0. Pixels without a surface
 // (depth 1) count for neither.
@@ -12,7 +15,7 @@
 // I3D 2011, 97-102. https://doi.org/10.1145/1944745.1944761
 
 struct DepthRangeConstants {
-    // xy: image size, z: the layer, w: 1 when the projection is orthographic (depth linear).
+    // xy: image size, z: the first layer, w: 1 when the projection is orthographic (depth linear).
     uint4 size;
     // x: near plane, y: far plane.
     float4 clip;
@@ -28,7 +31,7 @@ void depthRangeMain(uint3 id : SV_DispatchThreadID) {
     var nearest = 3.402823e38;
     var farthest = 0.0;
     if (all(id.xy < constants.size.xy)) {
-        let d = depth.Load(int4(int2(id.xy), int(constants.size.z), 0));
+        let d = depth.Load(int4(int2(id.xy), int(constants.size.z + id.z), 0));
         if (d < 1.0) {
             let near = constants.clip.x;
             let far = constants.clip.y;

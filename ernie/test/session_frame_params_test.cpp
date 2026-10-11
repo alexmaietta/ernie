@@ -183,6 +183,8 @@ TEST(FrameParams, CubeFacesTurnEachViewOntoItsFaces) {
     }
     EXPECT_EQ(frame.Faces(1).Views(), 2u);
     EXPECT_THROW(frame.Faces(3), std::invalid_argument);
+    EXPECT_EQ(frame.Faces(ernie::kAllCubeFaces).Views(), 2u * ernie::kAllCubeFaces);
+    // Posed on the GPU, the faces turn the host's estimates (views.slang turns the poses).
     frame.posesOnGpu = true;
-    EXPECT_THROW(frame.Faces(ernie::kCubeFaces), std::invalid_argument);
+    EXPECT_EQ(frame.Faces(ernie::kCubeFaces).Views(), 2u * ernie::kCubeFaces);
 }

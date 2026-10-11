@@ -57,9 +57,14 @@ std::pair<glm::vec3, glm::vec3> WithShadows(const glm::vec3& low, const glm::vec
 /// @param toSun Unit vector pointing towards the light.
 /// @param splitNear Where the first cascade starts, such as the nearest depth the view sees
 /// (sample distribution shadow maps); 0 for the camera's near plane.
+/// @param around For a camera rendered on cube faces (wide_view.h), the faces' extent (the
+/// tangent of their half field, `CubeFaceExtent`), 0 for others: each cascade then bounds every
+/// face's slice, which shading picks by the face's own view depth, with a sphere about the eye
+/// of radius the split's far depth along a face's corner ray.
 std::vector<ShadowCascade> FitCascades(const CameraView& camera, float shadowDistance,
                                        const glm::vec3& toSun, const glm::vec3& sceneMin,
                                        const glm::vec3& sceneMax, int count, float lambda,
-                                       std::uint32_t resolution, float splitNear = 0.0f);
+                                       std::uint32_t resolution, float splitNear = 0.0f,
+                                       float around = 0.0f);
 
 }  // namespace ernie

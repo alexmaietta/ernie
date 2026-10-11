@@ -3,6 +3,7 @@
 #include "ernie/geometry/primitives.h"
 #include "ernie/raster/delegate.h"
 #include "ernie/scene/base_schemas.h"
+#include "ernie/scene/camera.h"
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/light_schemas.h"
@@ -11,6 +12,7 @@
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/scene/wide_view.h"
 #include "ernie/session/renderer.h"
 #include "support/delegate_scenes.h"
 #include "support/test_raster.h"
@@ -728,6 +730,45 @@ TEST_F(RasterDelegateTest, PosesOnTheGpuRenderAsPosesOnTheHost) {
         EXPECT_EQ(render(scene), host) << views << " views";
         camera.SetPosesDevice("magic");
         EXPECT_THROW(render(scene), std::invalid_argument);
+    }
+}
+
+TEST_F(RasterDelegateTest, CubeFacedViewsPoseOnTheGpuAsOnTheHost) {
+    // Fisheyes whose corners reach 100 and 150 degrees off axis, on five and on all six cube
+    // faces: the GPU turns each view's pose onto its faces as the host does.
+    RasterDelegate delegate(*context_);
+    std::string why;
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
+    if (cuda == nullptr) {
+        GTEST_SKIP() << "No CUDA interop: " << why;
+    }
+    const Path posedOnly[] = {"/Render/Posed"};
+    const auto render = [&](const Scene& scene) {
+        return Bytes(delegate.Step(scene, posedOnly)
+                         .at("/Render/Posed")
+                         .vars.at("LdrColor")
+                         .Map(ernie::MapDevice::Cpu)
+                         .tensor);
+    };
+    for (const double degrees : {100.0, 150.0}) {
+        Scene scene = PosedRowScene(3);
+        ernie::Camera camera(scene, "/World/Rig/Camera");
+        const double corner = std::sqrt(2.0) * 0.5 * kSize;
+        camera.SetLensProjection(tokens::kFisheye)
+            .SetVerticalAperture(20.0)
+            .SetHorizontalAperture(20.0)
+            .SetFocalLength(20.0 * corner / (degrees * M_PI / 180.0) / kSize);
+        const int faces =
+            ernie::CubeFacesOf(ernie::CameraParamsOf(scene, "/World/Rig/Camera", kSize, kSize));
+        EXPECT_EQ(faces, degrees < 120.0 ? ernie::kCubeFaces : ernie::kAllCubeFaces);
+        const std::vector<std::uint8_t> host = render(scene);
+        camera.SetPoses(cuda->Upload(*camera.GetPoses()));
+        ASSERT_NE(ernie::GpuPosesOf(scene, "/World/Rig/Camera"), nullptr);
+        for (int step = 0; step < 2; ++step) {
+            const std::vector<std::uint8_t> gpu = render(scene);
+            EXPECT_LE(BytesDiffering(gpu, host), host.size() / 200)
+                << faces << " faces, step " << step;
+        }
     }
 }
 

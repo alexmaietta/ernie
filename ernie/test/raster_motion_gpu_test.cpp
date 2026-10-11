@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/compute_interop.h"
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/camera.h"
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/light_schemas.h"
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/scene/wide_view.h"
 #include "ernie/session/frame_params.h"
 #include "support/delegate_scenes.h"
 #include "support/vulkan_fixture.h"
@@ -77,6 +79,22 @@ float RelativeError(const std::vector<float>& a, const std::vector<float>& b) {
     return error / scale;
 }
 
+/// The mean difference between RGBA images `a` and `b`'s colours over the mean magnitude of
+/// `b`'s: for images whose edges legitimately differ, such as a fisheye's, where a pixel's taps
+/// blend its face's texels.
+double MeanRelativeError(const std::vector<float>& a, const std::vector<float>& b) {
+    double error = 0.0;
+    double scale = 1e-12;
+    for (std::size_t i = 0; i < a.size(); ++i) {
+        if (i % 4 == 3) {
+            continue;
+        }
+        error += std::abs(static_cast<double>(a[i]) - static_cast<double>(b[i]));
+        scale += std::abs(static_cast<double>(b[i]));
+    }
+    return error / scale;
+}
+
 void SetShutter(Scene& scene, double open, double close, int samples, double rolling = 0.0) {
     ernie::Camera(scene, "/World/Camera")
         .SetShutterOpen(open)
@@ -85,8 +103,19 @@ void SetShutter(Scene& scene, double open, double close, int samples, double rol
         .SetShutterRolling(rolling);
 }
 
-glm::dmat4 CameraAt(double x) {
-    return ernie::LookAtTransform({x, 0.0, 60.0}, {x, 0.0, 0.0}, {0.0, 1.0, 0.0});
+glm::dmat4 CameraAt(double x, double height = 60.0) {
+    return ernie::LookAtTransform({x, 0.0, height}, {x, 0.0, 0.0}, {0.0, 1.0, 0.0});
+}
+
+/// MotionScene's camera made an equidistant fisheye reaching 100 degrees off axis, on cube faces.
+void MakeWideFisheye(Scene& scene) {
+    const double aperture = 20.0;
+    const double corner = std::sqrt(2.0) * 0.5 * kSize;
+    ernie::Camera(scene, "/World/Camera")
+        .SetLensProjection(tokens::kFisheye)
+        .SetVerticalAperture(aperture)
+        .SetHorizontalAperture(aperture)
+        .SetFocalLength(aperture * corner / (100.0 * M_PI / 180.0) / kSize);
 }
 
 /// The weights a global shutter over the whole frame gives `count` sub-frames: the trapezoid
@@ -246,6 +275,47 @@ TEST_F(RasterDelegateTest, MotionVectorsFollowTheCameraAndWhatMoves) {
     EXPECT_LT(glm::length(at(slid, quadX, centre)), 1e-3f) << "the quad stood still";
 }
 
+TEST_F(RasterDelegateTest, CubeFacedFisheyesMotionVectorsFollowTheLens) {
+    // An equidistant fisheye reaching 100 degrees off axis, on cube faces, turning 3 degrees
+    // about its axis: what each pixel sees was, a frame ago, where turning it back about the
+    // principal point puts it, through the lens's own projection, whatever its depth.
+    RasterDelegate delegate(*context_);
+    Scene scene = MotionScene();
+    const Path var("/Render/Vars/MotionVector");
+    ernie::RenderVar::Define(scene, var).SetSourceName("MotionVector");
+    scene.Set("/Render/Out", tokens::kOrderedVars, std::vector<Path>{"/Render/Vars/HdrColor", var});
+    MakeWideFisheye(scene);
+    const ernie::CameraParams camera = ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize);
+    ASSERT_EQ(ernie::CubeFacesOf(camera), ernie::kCubeFaces);
+    const glm::dmat4 pose = CameraAt(0.0);
+    const double turn = 3.0 * M_PI / 180.0;
+    scene.Set("/World/Camera", tokens::kTransform, pose);
+    Step(delegate, scene, "MotionVector");
+    scene.Set("/World/Camera", tokens::kTransform,
+              pose * glm::rotate(glm::dmat4(1.0), turn, glm::dvec3(0.0, 0.0, 1.0)));
+    const std::vector<float> motion = Step(delegate, scene, "MotionVector");
+    const glm::dvec2 centre = camera.PrincipalPoint();
+    int checked = 0;
+    for (std::size_t y = 2; y < kSize; y += 5) {
+        for (std::size_t x = 2; x < kSize; x += 5) {
+            // In the camera's frame (y up), the scene's directions turned by `turn` a frame ago.
+            const glm::dvec2 p(static_cast<double>(x) + 0.5, static_cast<double>(y) + 0.5);
+            const glm::dvec2 q(p.x - centre.x, centre.y - p.y);
+            const glm::dvec2 was(q.x * std::cos(turn) - q.y * std::sin(turn),
+                                 q.x * std::sin(turn) + q.y * std::cos(turn));
+            const glm::dvec2 expected = p - glm::dvec2(centre.x + was.x, centre.y - was.y);
+            const glm::dvec2 got(motion[(y * kSize + x) * 2], motion[(y * kSize + x) * 2 + 1]);
+            // To a quarter of a pixel: each pixel takes its nearest face texel's motion, which
+            // varies most where the fisheye squeezes the faces most, near its corners.
+            EXPECT_LT(glm::distance(got, expected), 0.25)
+                << x << ", " << y << ": " << got.x << ", " << got.y << " for " << expected.x << ", "
+                << expected.y;
+            ++checked;
+        }
+    }
+    EXPECT_GT(checked, 30);
+}
+
 TEST_F(RasterDelegateTest, MovingCastersShadowEachSubframeFromWhereTheyAre) {
     RasterDelegate delegate(*context_);
     Scene scene = MotionScene();
@@ -364,6 +434,91 @@ TEST_F(RasterDelegateTest, RollingShutterExposesEachRowAtItsOwnTime) {
     }
     EXPECT_LT(worst / scale, 2e-3f);
     EXPECT_GT(RelativeError(rolled, sharp.back()), 0.1f) << "the top rows lag behind";
+}
+
+TEST_F(RasterDelegateTest, CubeFacedFisheyesBlurAsTheyMove) {
+    // An equidistant fisheye reaching 100 degrees off axis, on cube faces, 15 m over MotionScene
+    // and sliding 4 m: the shutter's weighting of sharp images at each sub-frame's pose, as a
+    // frame camera's. Compared on average: where a pixel's taps straddle an edge, a blurred
+    // frame blends its face texels' radiance where a sharp one takes the nearest's.
+    RasterDelegate delegate(*context_);
+    Scene scene = MotionScene();
+    MakeWideFisheye(scene);
+    const auto move = [&](double s) {
+        scene.Set("/World/Camera", tokens::kTransform, CameraAt(4.0 * s, 15.0));
+    };
+    constexpr int kSamples = 5;
+    SetShutter(scene, 0.0, 0.0, kSamples);
+    const std::vector<double> weights = TrapezoidWeights(kSamples);
+    std::vector<float> expected;
+    for (int k = 0; k < kSamples; ++k) {
+        move(k / double(kSamples - 1));
+        const std::vector<float> sharp = Step(delegate, scene, "HdrColor");
+        expected.resize(sharp.size(), 0.0f);
+        for (std::size_t i = 0; i < sharp.size(); ++i) {
+            expected[i] += static_cast<float>(weights[static_cast<std::size_t>(k)]) * sharp[i];
+        }
+    }
+    const std::vector<float> sharp = Step(delegate, scene, "HdrColor");
+    SetShutter(scene, -1.0, 0.0, kSamples);
+    move(0.0);
+    Step(delegate, scene, "HdrColor");
+    move(1.0);
+    const std::vector<float> blurred = Step(delegate, scene, "HdrColor");
+    // Standing still, a blurred frame's edges already differ from a sharp one's by about 6%.
+    EXPECT_LT(MeanRelativeError(blurred, expected), 0.1);
+    EXPECT_GT(MeanRelativeError(blurred, sharp), 0.5) << "blurred";
+    EXPECT_LT(MeanRelativeError(Step(delegate, scene, "HdrColor"), sharp), 0.08)
+        << "standing still once it stops";
+}
+
+TEST_F(RasterDelegateTest, RollingShutterTimesCubeFacesBySensorRows) {
+    // As above through an equidistant fisheye reaching 100 degrees off axis, on cube faces, 15 m
+    // over MotionScene and sliding 4 m: each sensor row still sees the scene at its own time,
+    // its faces' texels timed by the rows their lens maps them to.
+    RasterDelegate delegate(*context_);
+    Scene scene = MotionScene();
+    MakeWideFisheye(scene);
+    ASSERT_EQ(ernie::CubeFacesOf(ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize)),
+              ernie::kCubeFaces);
+    constexpr int kSamples = 9;
+    const glm::dmat4 from = CameraAt(0.0, 15.0);
+    const glm::dmat4 to = CameraAt(4.0, 15.0);
+    std::vector<std::vector<float>> sharp;
+    for (int k = 0; k < kSamples; ++k) {
+        scene.Set("/World/Camera", tokens::kTransform,
+                  ernie::InterpolatePose(from, to, k / double(kSamples - 1)));
+        sharp.push_back(Step(delegate, scene, "HdrColor"));
+    }
+    SetShutter(scene, 0.0, 0.0, kSamples, 1.0);
+    scene.Set("/World/Camera", tokens::kTransform, from);
+    Step(delegate, scene, "HdrColor");
+    scene.Set("/World/Camera", tokens::kTransform, to);
+    const std::vector<float> rolled = Step(delegate, scene, "HdrColor");
+    const double step = 1.0 / (kSamples - 1);
+    double error = 0.0;
+    double scale = 1e-12;
+    for (std::size_t y = 0; y < kSize; ++y) {
+        const double t = -(1.0 - (static_cast<double>(y) + 0.5) / kSize);
+        for (std::size_t x = 0; x < kSize; ++x) {
+            for (std::size_t c = 0; c < 3; ++c) {
+                const std::size_t i = (y * kSize + x) * 4 + c;
+                double value = 0.0;
+                for (int k = 0; k < kSamples; ++k) {
+                    const double w = std::max(0.0, 1.0 - std::abs(t - (-1.0 + k * step)) / step);
+                    value += w * static_cast<double>(sharp[static_cast<std::size_t>(k)][i]);
+                }
+                error += std::abs(static_cast<double>(rolled[i]) - value);
+                scale += std::abs(value);
+            }
+        }
+    }
+    // Mean errors, as for motion blur, whose edges already differ from sharp frames' by about
+    // 6%; rows timed as a frame camera's but upside down would be off by about 60%.
+    EXPECT_LT(error / scale, 0.1);
+    EXPECT_GT(MeanRelativeError(rolled, sharp.back()), 0.5) << "the top rows lag behind";
+    EXPECT_GT(MeanRelativeError(rolled, sharp[kSamples / 2]), 2.0 * error / scale)
+        << "and each row has its own time, not the middle one";
 }
 
 TEST_F(RasterDelegateTest, MotionBlurBlendsTheClearColourByCoverage) {

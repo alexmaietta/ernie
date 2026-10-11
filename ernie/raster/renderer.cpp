@@ -313,6 +313,16 @@ constexpr DescriptorBinding kHzbBindings[] = {
 
 /// motion.slang: the sub-frame's radiance, the sum, its ids and the coverage.
 /// motion_vectors.slang: the depth, the raster image written and the views' MotionUniforms.
+/// sensor.slang's `overlayLensMain`: the sensor's uniforms, LdrColor and parameters (a lens of
+/// rays' table), and a cube camera's faces' overlays over black and over white.
+constexpr DescriptorBinding kOverlayLensBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+    {9, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+    {15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+    {32, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+    {33, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+};
+
 constexpr DescriptorBinding kCameraMotionBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
     {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
@@ -333,6 +343,15 @@ constexpr DescriptorBinding kMotionBindings[] = {
     {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
     {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
     {3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+    {4, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
+};
+
+/// sensor.slang's `faceRowsClearMain` and `faceRowsMain`: the sensor's uniforms and parameters
+/// (a lens of rays' table), and a cube camera's faces' sensor rows.
+constexpr DescriptorBinding kFaceRowsBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+    {15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},
+    {34, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
 };
 
 /// views.slang: the camera, the poses and the per-view blocks it patches.
@@ -391,7 +410,7 @@ constexpr double kVisibleFitEyeShift = 0.1;
 constexpr float kVisibleFitTurn = 0.995f;
 
 /// views.slang's camera: parent-to-world, projection and its inverse.
-constexpr VkDeviceSize kPoseCameraBytes = 3 * sizeof(glm::mat4);
+constexpr VkDeviceSize kPoseCameraBytes = 5 * sizeof(glm::mat4);
 
 /// Per-view uniforms the CPU writes and views.slang may patch.
 constexpr VkBufferUsageFlags kViewUniformUsage =
@@ -649,8 +668,12 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
     noOcclusion_ =
         std::make_unique<GpuImage>(context_, ImageDesc{1, 1, 1, 1, VK_FORMAT_R16G16B16A16_SFLOAT,
                                                        VK_IMAGE_USAGE_STORAGE_BIT, false, true});
+    noFaceRows_ =
+        std::make_unique<GpuImage>(context_, ImageDesc{1, 1, 1, 1, VK_FORMAT_R32_UINT,
+                                                       VK_IMAGE_USAGE_STORAGE_BIT, false, true});
     context_.Submit([this](VkCommandBuffer commands) {
         noOcclusion_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+        noFaceRows_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
     });
     // Two layers of horizons at the nadir: nothing occludes.
     noHorizon_ =
@@ -672,7 +695,8 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
         context_, motionLayout_, compiler_.CompileSpirv(motionModules, "motionMain"));
     hzbPipeline_ = std::make_unique<ComputePipeline>(context_, hzbLayout_,
                                                      compiler_.CompileSpirv(hzbModules, "hzbMain"));
-    const std::vector<ShaderModuleSource> viewsModules{{"views", shaders::kViewsSlang}};
+    const std::vector<ShaderModuleSource> viewsModules{{"cube_faces", shaders::kCubeFacesSlang},
+                                                       {"views", shaders::kViewsSlang}};
     viewsPipeline_ = std::make_unique<ComputePipeline>(
         context_, viewsLayout_, compiler_.CompileSpirv(viewsModules, "viewsMain"));
     const std::vector<ShaderModuleSource> lightModules{{"light_views", shaders::kLightViewsSlang}};
@@ -1175,10 +1199,6 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
     // `raster`, its views the faces' and its camera theirs; the sensor keeps `params`' camera,
     // following its lens's rays onto them.
     faces_ = static_cast<std::uint32_t>(CubeFacesOf(frame.camera));
-    if (faces_ > 1 && frame.camera.rollingShutter > 0.0) {
-        // Motion blur weights sub-frames by the raster's rows, which a face's are not.
-        throw std::invalid_argument("A camera rendered on cube faces has no rolling shutter yet");
-    }
     std::optional<FrameParams> facesOf;
     if (faces_ > 1) {
         facesOf = params.Faces(static_cast<int>(faces_));
@@ -1246,11 +1266,14 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
     posesOnGpu_ = params.posesOnGpu;
     posesQuaternions_ = params.posesOnGpu && params.posesQuaternions;
     if (posesOnGpu_) {
-        WritePoseCamera(params);
+        WritePoseCamera(params, raster);
     }
-    // Views posed on the GPU are planned as a batch, whose shadows do not follow the views; so
-    // are a cube camera's faces, whose shadows then cover all of them.
-    const bool batch = outputViews_ > 1 || posesOnGpu_ || faces_ > 1;
+    // Views posed on the GPU are planned as a batch, whose shadows do not follow the views. A
+    // cube camera's faces are one view's: its cascades surround its eye, holding every face.
+    const bool batch = outputViews_ > 1 || posesOnGpu_;
+    const float around = faces_ > 1 ? static_cast<float>(CubeFaceExtent(
+                                          std::min(params.camera.width, params.camera.height)))
+                                    : 0.0f;
     const SensorModel& sensor = params.camera.sensor;
     presentRange_ = {static_cast<float>(params.camera.nearPlane),
                      static_cast<float>(params.camera.farPlane),
@@ -1318,11 +1341,14 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
             }
         }
         const auto [low, high] = WithShadows(casters, bounds->second, params.sunDirection);
+        // How far the casters reach along the view; a cube camera's faces look every way.
         float farthest = 0.0f;
         for (int i = 0; i < 8; ++i) {
             const glm::vec3 corner((i & 1) ? high.x : low.x, (i & 2) ? high.y : low.y,
                                    (i & 4) ? high.z : low.z);
-            farthest = std::max(farthest, glm::dot(corner - view.eye, view.forward));
+            farthest =
+                std::max(farthest, around > 0.0f ? glm::length(corner - view.eye)
+                                                 : glm::dot(corner - view.eye, view.forward));
         }
         // A margin keeps surfaces at exactly the farthest depth, such as flat ground under a
         // nadir camera, inside the last cascade.
@@ -1339,7 +1365,7 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
         }
         cascades_ = FitCascades(view, shadowDistance, params.sunDirection, low, high,
                                 std::clamp(shadows.cascades, 1, kMaxCascades), shadows.splitLambda,
-                                shadowResolution_, splitNear);
+                                shadowResolution_, splitNear, around);
         // A single view's cascades hold what it sees: the shared casters and its world's.
         for (std::uint32_t c = 0; c < cascades_.size(); ++c) {
             shadowPasses_.push_back({c, c, ShadowCasters{true, params.ViewWorld(0)}, false});
@@ -1514,6 +1540,26 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
     bands_ = params.camera.bands;
     extent_ = {params.camera.width, params.camera.height};
     overlays_->Prepare(overlays, params.origin, params.camera.pushbroom);
+    // A cube camera's overlays resample through its lens as the sensor does, and with a rolling
+    // shutter its faces' texels take the times of the sensor rows the lens maps them to.
+    faceLens_.clear();
+    if (faces_ > 1) {
+        faceLens_ = sensorPasses_.front().plan.LensSource();
+        if (!overlays_->Empty()) {
+            if (overlayLensLayout_ == nullptr) {
+                overlayLensLayout_ =
+                    std::make_unique<PipelineLayout>(context_, kOverlayLensBindings, 32);
+            }
+            LensPipeline(faceLens_, "overlayLensMain", *overlayLensLayout_);
+        }
+        if (RollsFaces()) {
+            if (faceRowsLayout_ == nullptr) {
+                faceRowsLayout_ = std::make_unique<PipelineLayout>(context_, kFaceRowsBindings, 32);
+            }
+            LensPipeline(faceLens_, "faceRowsClearMain", *faceRowsLayout_);
+            LensPipeline(faceLens_, "faceRowsMain", *faceRowsLayout_);
+        }
+    }
     viewWorlds_.assign(views_, -1);
     for (std::size_t v = 0; v < std::min<std::size_t>(raster.worlds.size(), views_); ++v) {
         viewWorlds_[v] = raster.worlds[v];
@@ -1537,12 +1583,11 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
     // The lights first: shading reads the size of the light shadow maps they make.
     WriteLights(params, bounds);
     WriteShading(raster);
-    // A cube camera's MotionVector is zero for now: its pixels' motion would come through the
-    // faces' projections.
-    motionVectors_ = faces_ == 1 && std::find(requiredVars_.begin(), requiredVars_.end(),
-                                              render_vars::kMotionVector) != requiredVars_.end();
+    // A cube camera's motion is its faces', which the sensor maps through the lens.
+    motionVectors_ = std::find(requiredVars_.begin(), requiredVars_.end(),
+                               render_vars::kMotionVector) != requiredVars_.end();
     if (motionVectors_) {
-        WriteMotion(params, frame);
+        WriteMotion(raster, faces_ > 1 ? frame.Faces(static_cast<int>(faces_)) : frame);
     }
     WriteSensor(params, raster);
 
@@ -1552,6 +1597,24 @@ void RasterRenderer::Update(const FrameParams& frame, std::span<RasterDrawable* 
         drawable->Prepare(raster, shadowViews_);
     }
     updated_ = true;
+}
+
+const ComputePipeline& RasterRenderer::LensPipeline(const std::string& lens,
+                                                    const std::string& entry,
+                                                    const PipelineLayout& layout) {
+    const std::string key = entry + "\n" + lens;
+    if (const auto it = lensPipelines_.find(key); it != lensPipelines_.end()) {
+        return *it->second;
+    }
+    // The sensor's module without a plan: the entry point needs only the lens.
+    const std::vector<ShaderModuleSource> modules{ProjectionModule(false),
+                                                  {"lens", shaders::kLensSlang},
+                                                  {"cube_faces", shaders::kCubeFacesSlang},
+                                                  {"lensProjection", lens},
+                                                  {"sensor", shaders::kSensorSlang}};
+    auto pipeline =
+        std::make_unique<ComputePipeline>(context_, layout, compiler_.CompileSpirv(modules, entry));
+    return *lensPipelines_.emplace(key, std::move(pipeline)).first->second;
 }
 
 const ComputePipeline& RasterRenderer::ShadingPipeline(std::size_t model, bool pushbroom) {
@@ -1916,10 +1979,10 @@ void RasterRenderer::WriteMotion(const FrameParams& params, const FrameParams& f
     std::vector<MotionUniforms> uniforms(views_);
     for (std::uint32_t v = 0; v < views_; ++v) {
         MotionUniforms& view = uniforms[v];
-        // The view's camera at the last frame, relative to this frame's origin; a pushbroom's
-        // motion is zero.
-        const CameraView before =
-            frame.camera.RasterView(frame.PreviousPose(v % outputViews_), frame.overscan);
+        // The view's camera at the last frame, relative to this frame's origin (a cube camera's
+        // face's, `frame` being its faces'); a pushbroom's motion is zero.
+        const CameraView before = frame.camera.RasterView(
+            frame.PreviousPose(v % (outputViews_ * faces_)), frame.overscan);
         CopyMatrix(view.previousViewProj, before.ViewProjection());
         CopyMatrix(view.inverseViewProj, glm::inverse(params.View(v).ViewProjection()));
         view.size[0] = static_cast<float>(extent_.width);
@@ -1942,9 +2005,12 @@ void RasterRenderer::RecordMotion(VkCommandBuffer commands, RenderTargets& targe
         DescriptorResource::Of(*motionUniforms_)};
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, cameraMotionPipeline_->Handle());
     cameraMotionLayout_->Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, camera);
-    const std::uint32_t constants[4] = {LastSubframeView(firstView), 0, 0, 0};
+    // Every raster layer: a cube camera's views' faces too.
+    const std::uint32_t first = LastSubframeView(firstView);
+    const std::uint32_t layers = targets.RasterLayers();
+    const std::uint32_t constants[4] = {first, 0, 0, 0};
     cameraMotionLayout_->PushConstants(commands, constants, sizeof(constants));
-    vkCmdDispatch(commands, Groups(extent_.width), Groups(extent_.height), targets.Views());
+    vkCmdDispatch(commands, Groups(extent_.width), Groups(extent_.height), layers);
     ShaderBarrier(commands);
 
     // Then what moved draws its own over it, where its surfaces are the G-buffer's.
@@ -1956,10 +2022,10 @@ void RasterRenderer::RecordMotion(VkCommandBuffer commands, RenderTargets& targe
     target.depth = targets.Depth().View();
     target.loadDepth = true;
     target.extent = extent_;
-    target.layers = targets.Views();
+    target.layers = layers;
     BeginRendering(commands, target);
-    for (std::uint32_t v = 0; v < targets.Views(); ++v) {
-        const std::uint32_t view = LastSubframeView(firstView + v);
+    for (std::uint32_t layer = 0; layer < layers; ++layer) {
+        const std::uint32_t view = first + layer;
         const DescriptorResource motion = DescriptorResource::Of(
             *motionUniforms_, VkDeviceSize{view} * sizeof(MotionUniforms), sizeof(MotionUniforms));
         for (const RasterDrawable* drawable : drawables) {
@@ -2014,11 +2080,13 @@ void RasterRenderer::Record(VkCommandBuffer commands, RenderTargets& targets,
         throw std::invalid_argument("The frame holds no render var '" + std::string(var) + "'");
     }
     RecordShadows(commands, drawables);
-    // With a present target the overlays go over what it shows, whichever var, not LdrColor.
-    RecordViews(commands, targets, drawables, 0, present == nullptr);
+    // With a present target the overlays go over what it shows, whichever var, not LdrColor; a
+    // cube camera's, which follow its lens, onto LdrColor when it shows that (and else not).
+    const bool lensOverlays = faces_ > 1 && present != nullptr && var == render_vars::kLdrColor;
+    RecordViews(commands, targets, drawables, 0, present == nullptr || lensOverlays);
     if (present != nullptr) {
         Present(commands, targets, *present, var);
-        if (!overlays_->Empty()) {
+        if (!overlays_->Empty() && faces_ == 1) {
             ERNIE_GPU_ZONE(context_, commands, "Overlays");
             targets.Depth().Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             OverlayPass::Target target = OverlayTarget(targets, LastSubframeView(0), 0);
@@ -2173,6 +2241,9 @@ void RasterRenderer::RecordViews(VkCommandBuffer commands, RenderTargets& target
     // blur their radiance sums into what each row's exposure sees, which the sensor filters.
     // A cube camera's views draw their faces, consecutive internal views and layers.
     const std::uint32_t layers = targets.RasterLayers();
+    if (RollsFaces()) {
+        RecordFaceRows(commands, firstView);
+    }
     for (std::uint32_t subframe = 0; subframe < subframes_; ++subframe) {
         const std::uint32_t first = (subframe * outputViews_ + firstView) * faces_;
         // Each sub-frame's shadows from its casters where they are at its time (the first's
@@ -2232,8 +2303,7 @@ void RasterRenderer::RecordViews(VkCommandBuffer commands, RenderTargets& target
     if (meter_ && firstView == 0) {
         RecordMeter(commands, targets);
     }
-    // Overlays draw through a pinhole view onto the sensor's image, which a cube camera's is not.
-    if (overlays && faces_ == 1) {
+    if (overlays) {
         RecordOverlays(commands, targets, firstView);
     }
 }
@@ -2325,7 +2395,8 @@ void RasterRenderer::RecordDepthRange(VkCommandBuffer commands, RenderTargets& t
     } constants{{extent_.width, extent_.height, 0, orthographic_ ? 1u : 0u},
                 {clipRange_[0], clipRange_[1], 0.0f, 0.0f}};
     depthRangeLayout_.PushConstants(commands, &constants, sizeof(constants));
-    vkCmdDispatch(commands, (extent_.width + 15) / 16, (extent_.height + 15) / 16, 1);
+    // A cube camera's view 0 is its faces' first layers.
+    vkCmdDispatch(commands, (extent_.width + 15) / 16, (extent_.height + 15) / 16, faces_);
     ShaderBarrier(commands);
 }
 
@@ -2441,6 +2512,10 @@ void RasterRenderer::RecordOverlays(VkCommandBuffer commands, RenderTargets& tar
     }
     ERNIE_GPU_ZONE(context_, commands, "Overlays");
     targets.Depth().Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    if (faces_ > 1) {
+        RecordFaceOverlays(commands, targets, firstView, *color);
+        return;
+    }
     color->Transition(commands, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     for (std::uint32_t v = 0; v < targets.Views(); ++v) {
         OverlayPass::Target target = OverlayTarget(targets, LastSubframeView(firstView + v), v);
@@ -2451,18 +2526,105 @@ void RasterRenderer::RecordOverlays(VkCommandBuffer commands, RenderTargets& tar
     color->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
 }
 
+void RasterRenderer::RecordFaceRows(VkCommandBuffer commands, std::uint32_t firstView) const {
+    ERNIE_GPU_ZONE(context_, commands, "Cube face rows");
+    if (faceRows_ == nullptr || faceRows_->Desc().width != extent_.width ||
+        faceRows_->Desc().height != extent_.height || faceRows_->Desc().layers != faces_) {
+        vkDeviceWaitIdle(context_.Device());
+        faceRows_ = std::make_unique<GpuImage>(
+            context_, ImageDesc{extent_.width, extent_.height, faces_, 1, VK_FORMAT_R32_UINT,
+                                VK_IMAGE_USAGE_STORAGE_BIT, false, true});
+    }
+    faceRows_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    const DescriptorResource resources[] = {
+        DescriptorResource::Of(sensorUniforms_),
+        DescriptorResource::Of(*sensorPasses_.front().params),
+        DescriptorResource::Of(faceRows_->View(), VK_IMAGE_LAYOUT_GENERAL)};
+    const std::uint32_t constants[8] = {
+        firstView,     0u,           0u, 0u, sensorPasses_.front().tableOffset, lensTable_[1],
+        lensTable_[2], lensTable_[3]};
+    // Cleared, then each sensor pixel's row scattered to the face texels its tap reads.
+    for (const char* entry : {"faceRowsClearMain", "faceRowsMain"}) {
+        const ComputePipeline& pipeline = *lensPipelines_.at(entry + ("\n" + faceLens_));
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline.Handle());
+        faceRowsLayout_->Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+        faceRowsLayout_->PushConstants(commands, constants, sizeof(constants));
+        vkCmdDispatch(commands, Groups(extent_.width), Groups(extent_.height),
+                      std::string_view(entry) == "faceRowsMain" ? 1u : faces_);
+        ShaderBarrier(commands);
+    }
+}
+
+void RasterRenderer::RecordFaceOverlays(VkCommandBuffer commands, RenderTargets& targets,
+                                        std::uint32_t firstView, GpuImage& color) const {
+    // Each face draws its overlays as a frame camera's view, over black and over white.
+    const std::uint32_t layers = targets.RasterLayers();
+    for (std::unique_ptr<GpuImage>& image : faceOverlays_) {
+        if (image == nullptr || image->Desc().width != extent_.width ||
+            image->Desc().height != extent_.height || image->Desc().layers != layers) {
+            vkDeviceWaitIdle(context_.Device());
+            image = std::make_unique<GpuImage>(
+                context_,
+                ImageDesc{extent_.width, extent_.height, layers, 1, VK_FORMAT_R8G8B8A8_UNORM,
+                          VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false,
+                          true});
+        }
+        image->Transition(commands, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    }
+    RenderingTarget clear;
+    clear.colors = {faceOverlays_[0]->View(), faceOverlays_[1]->View()};
+    clear.clearColors = {VkClearColorValue{{0.0f, 0.0f, 0.0f, 0.0f}},
+                         VkClearColorValue{{1.0f, 1.0f, 1.0f, 1.0f}}};
+    clear.extent = extent_;
+    clear.layers = layers;
+    BeginRendering(commands, clear);
+    vkCmdEndRendering(commands);
+    const std::uint32_t first = LastSubframeView(firstView);
+    for (std::uint32_t layer = 0; layer < layers; ++layer) {
+        for (const std::unique_ptr<GpuImage>& image : faceOverlays_) {
+            OverlayPass::Target target = OverlayTarget(targets, first + layer, layer);
+            target.color = image->LayerView(layer);
+            target.format = VK_FORMAT_R8G8B8A8_UNORM;
+            overlays_->Record(commands, target);
+        }
+    }
+    // Then resampled through the lens onto the sensor's image.
+    for (const std::unique_ptr<GpuImage>& image : faceOverlays_) {
+        image->Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
+    color.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    const ComputePipeline& pipeline = *lensPipelines_.at("overlayLensMain\n" + faceLens_);
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline.Handle());
+    const DescriptorResource resources[] = {
+        DescriptorResource::Of(sensorUniforms_),
+        DescriptorResource::Of(color.View(), VK_IMAGE_LAYOUT_GENERAL),
+        DescriptorResource::Of(*sensorPasses_.front().params),
+        DescriptorResource::Of(faceOverlays_[0]->View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+        DescriptorResource::Of(faceOverlays_[1]->View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)};
+    overlayLensLayout_->Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+    const std::uint32_t constants[8] = {
+        firstView,     0u,           0u, 0u, sensorPasses_.front().tableOffset, lensTable_[1],
+        lensTable_[2], lensTable_[3]};
+    overlayLensLayout_->PushConstants(commands, constants, sizeof(constants));
+    vkCmdDispatch(commands, Groups(extent_.width), Groups(extent_.height), targets.Views());
+    ShaderBarrier(commands);
+}
+
 void RasterRenderer::BeginFrame(std::uint32_t slot) {
     uploads_.Begin(slot);
 }
 
-void RasterRenderer::WritePoseCamera(const FrameParams& params) {
+void RasterRenderer::WritePoseCamera(const FrameParams& params, const FrameParams& raster) {
     const glm::mat4 projection = params.View().projection;
+    const glm::mat4 faceProjection = raster.View().projection;
     // Relative to the frame's origin, so the views' poses are too.
     const glm::mat4 camera[] = {params.Relative(params.posesParent), projection,
-                                glm::inverse(projection)};
+                                glm::inverse(projection), faceProjection,
+                                glm::inverse(faceProjection)};
     uploads_.Write(poseCamera_, std::as_bytes(std::span(camera)));
-    EnsurePoseBuffer(views_);
-    poseHistoryViews_[uploads_.Slot()] = views_;
+    // A pose per output view, a cube camera's faces turning them on the GPU.
+    EnsurePoseBuffer(outputViews_);
+    poseHistoryViews_[uploads_.Slot()] = outputViews_;
     poseHistoryOrigins_[uploads_.Slot()] = params.origin;
 }
 
@@ -2509,7 +2671,10 @@ void RasterRenderer::PatchViews(VkCommandBuffer commands, const GpuBuffer& block
                                             DescriptorResource::Of(*poseBuffer_),
                                             DescriptorResource::Of(blocks)};
     viewsLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
-    const std::uint32_t constants[12] = {views_,
+    // A block per output view, or per raster view: a cube camera's views and faces.
+    const std::uint32_t count = fields.outputViews ? outputViews_ : views_;
+    const std::uint32_t faces = fields.outputViews ? 1u : faces_;
+    const std::uint32_t constants[12] = {count,
                                          static_cast<std::uint32_t>(stride),
                                          static_cast<std::uint32_t>(first),
                                          (fields.forwardDepth ? 1u : 0u) |
@@ -2520,10 +2685,10 @@ void RasterRenderer::PatchViews(VkCommandBuffer commands, const GpuBuffer& block
                                          fields.forward,
                                          fields.planes,
                                          fields.pose,
-                                         0u,
+                                         faces,
                                          0u};
     viewsLayout_.PushConstants(commands, constants, sizeof(constants));
-    vkCmdDispatch(commands, (views_ + 63) / 64, 1, 1);
+    vkCmdDispatch(commands, (count + 63) / 64, 1, 1);
 }
 
 void RasterRenderer::RecordViewPoses(VkCommandBuffer commands,
@@ -2543,10 +2708,12 @@ void RasterRenderer::RecordViewPoses(VkCommandBuffer commands,
     sensor.inverseViewProjection = offsetof(SensorUniforms, invViewProj);
     sensor.eye = offsetof(SensorUniforms, eye);
     sensor.forward = offsetof(SensorUniforms, forward);
+    sensor.outputViews = true;
     PatchViews(commands, sensorUniforms_, 0, kSensorStride, sensor);
     // The poses rendered, for the CPU's estimates of the next frame's.
     ViewFields history;
     history.pose = 0;
+    history.outputViews = true;
     PatchViews(commands, *poseHistory_[uploads_.Slot()], 0, sizeof(glm::mat4), history);
     for (const RasterDrawable* drawable : drawables) {
         drawable->RecordViewPoses(commands);
@@ -2718,7 +2885,9 @@ void RasterRenderer::Accumulate(VkCommandBuffer commands, RenderTargets& targets
         DescriptorResource::Of(targets.RasterRadiance().View(), VK_IMAGE_LAYOUT_GENERAL),
         DescriptorResource::Of(sum.View(), VK_IMAGE_LAYOUT_GENERAL),
         DescriptorResource::Of(targets.GBuffer(2).View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
-        DescriptorResource::Of(coverage.View(), VK_IMAGE_LAYOUT_GENERAL)};
+        DescriptorResource::Of(coverage.View(), VK_IMAGE_LAYOUT_GENERAL),
+        DescriptorResource::Of(RollsFaces() ? faceRows_->View() : noFaceRows_->View(),
+                               VK_IMAGE_LAYOUT_GENERAL)};
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, motionPipeline_->Handle());
     motionLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
     struct {
@@ -2728,7 +2897,7 @@ void RasterRenderer::Accumulate(VkCommandBuffer commands, RenderTargets& targets
     } constants{
         {subframe, subframes_, static_cast<std::uint32_t>(bands_.count), sky_ != 0 ? 1u : 0u},
         {shutter_[0], shutter_[1], shutter_[2], shutter_[3]},
-        {shutter_[4], 0.0f, 0.0f, 0.0f}};
+        {shutter_[4], RollsFaces() ? static_cast<float>(faces_) : 0.0f, 0.0f, 0.0f}};
     motionLayout_.PushConstants(commands, &constants, sizeof(constants));
     vkCmdDispatch(commands, Groups(extent_.width), Groups(extent_.height),
                   targets.RasterLayers() * static_cast<std::uint32_t>(bands_.count));
