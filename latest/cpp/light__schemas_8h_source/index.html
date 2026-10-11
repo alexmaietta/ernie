@@ -243,12 +243,14 @@
       (::ernie::AttributeMeta{                                                                     \
           .label = &quot;Illuminant&quot;,                                                                   \
           .doc = &quot;The spectrum's shape: \&quot;white\&quot; (flat) or \&quot;blackbody\&quot;, both over 380 to 780 &quot;  \
-                 &quot;nm as Omniverse's, \&quot;illuminant D\&quot; (black body and D at the temperature), or &quot;  \
-                 &quot;\&quot;custom\&quot; (the custom illuminant's pairs). Unset: a black body if the &quot;         \
-                 &quot;temperature is used, else flat, over the whole range.&quot;,                          \
+                 &quot;nm as Omniverse's, \&quot;illuminant D\&quot; (black body and D at the temperature), &quot;     \
+                 &quot;\&quot;custom\&quot; (the custom illuminant's pairs), or \&quot;sun\&quot; (the measured TSIS-1 &quot;    \
+                 &quot;solar spectrum, 115 nm to 200 um). Unset: a black body if the temperature is &quot;   \
+                 &quot;used, else flat, over the whole range.&quot;,                                         \
           .group = &quot;Spectrum&quot;,                                                                     \
           .options = {::ernie::tokens::kWhite, ::ernie::tokens::kBlackbody,                        \
-                      ::ernie::tokens::kIlluminantD, ::ernie::tokens::kCustom}}))                  \
+                      ::ernie::tokens::kIlluminantD, ::ernie::tokens::kCustom,                     \
+                      ::ernie::tokens::kSun}}))                                                    \
     X(std::vector&lt;float&gt;, PhysicalCustomIlluminant, ::ernie::tokens::kPhysicalCustomIlluminant,    \
       std::vector&lt;float&gt;{},                                                                        \
       (::ernie::AttributeMeta{.doc = &quot;(nm, value) pairs, wavelengths increasing, of a \&quot;custom\&quot; &quot; \

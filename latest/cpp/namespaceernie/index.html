@@ -251,6 +251,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">namespace</td>
+<td style="text-align: left;"><a href="../namespaceernie_1_1solar__table/"><strong>solar_table</strong></a> <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">namespace</td>
 <td style="text-align: left;"><a href="../namespaceernie_1_1tokens/"><strong>tokens</strong></a> <br><a href="../classernie_1_1Prim/"><em><strong>Prim</strong></em></a> <em>type and attribute names, following UsdGeom, UsdLux, UsdShade and UsdRender where those schemas have the concept, with Ernie's own under</em><code>ernie:</code> <em>.</em></td>
 </tr>
 </tbody>
@@ -2046,6 +2050,10 @@
 <td style="text-align: left;"><a href="#function-snakecase"><strong>SnakeCase</strong></a> (std::string_view member) <br><em>"ColorTemperature" as "color_temperature".</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">const <a href="../classernie_1_1Spectrum/"><strong>Spectrum</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-solarspectralirradiance"><strong>SolarSpectralIrradiance</strong></a> () <br><em>The Sun's spectral irradiance at 1 au (W m^-2 nm^-1), from 115 nm to 200 um: the TSIS-1 Hybrid Solar Reference</em> <a href="../classernie_1_1Spectrum/"><em><strong>Spectrum</strong></em></a> <em>version 2 with its full spectrum extension, representative of the solar minimum between cycles 24 and 25, kept at 1 nm to 2730 nm and in bins 1% wide beyond (tools/solar_spectrum.py).</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::array&lt; double, N &gt;</td>
 <td style="text-align: left;"><a href="#function-solvenormal"><strong>SolveNormal</strong></a> (std::array&lt; std::array&lt; double, N &gt;, N &gt; normal, std::array&lt; double, N &gt; right, std::size_t n) <br><em>The least-squares solution of the first</em> <code>n</code> <em>equations of normal system</em><code>normal</code> <em>x =</em><code>right</code> <em>(the rest ignored), scaled by its diagonal (Jacobi) for conditioning and solved by Gaussian elimination with partial pivoting; all zeros where the system is singular.</em></td>
 </tr>
@@ -2100,6 +2108,10 @@
 <tr>
 <td style="text-align: right;">glm::dvec3</td>
 <td style="text-align: left;"><a href="#function-toxyz"><strong>ToXyz</strong></a> (const <a href="../structernie_1_1SpectralBands/"><strong>SpectralBands</strong></a> &amp; bands, std::span&lt; const float &gt; values) <br><em>CIE XYZ of band values (sum of value times</em> <code>CieWeights</code> <em>), without the luminous efficacy.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-totalsolarirradiance"><strong>TotalSolarIrradiance</strong></a> () <br><em>The integral of</em> <code>SolarSpectralIrradiance</code> <em>over all its wavelengths, the total solar irradiance at 1 au (W/m^2), about 1361.5.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::dvec3</td>
@@ -2169,6 +2181,7 @@
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
 <p>Spectral quantities for Ernie's spectral rendering: wavelengths in nanometres, spectral irradiance in W m^-2 nm^-1 and spectral radiance in W m^-2 sr^-1 nm^-1.</p>
+<p>The Sun's light above any atmosphere.</p>
 <p><a href="../classernie_1_1Light/"><strong>Light</strong></a> scattering by molecules and particles, for participating media such as atmospheres: Rayleigh scattering by gases, Mie scattering by spheres and particle size distributions, and tabulated absorption cross sections.</p>
 <p>A planet's atmosphere as constituents (gases, aerosols, absorbers) with physical optical properties and vertical density profiles, and its reduction to a camera's spectral bands.</p>
 <p>Deterministic random streams shared by every render backend.</p>
@@ -4807,6 +4820,21 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 </code></pre>
 <hr>
 
+<h3 id="function-solarspectralirradiance">function SolarSpectralIrradiance</h3>
+<p><em>The Sun's spectral irradiance at 1 au (W m^-2 nm^-1), from 115 nm to 200 um: the TSIS-1 Hybrid Solar Reference</em> <a href="../classernie_1_1Spectrum/"><em><strong>Spectrum</strong></em></a> <em>version 2 with its full spectrum extension, representative of the solar minimum between cycles 24 and 25, kept at 1 nm to 2730 nm and in bins 1% wide beyond (tools/solar_spectrum.py).</em></p>
+<pre><code class="language-C++">const Spectrum &amp; ernie::SolarSpectralIrradiance () 
+</code></pre>
+<p>Its uncertainty is 0.3% between 460 and 2365 nm and 1.3% elsewhere in 202-2730 nm. Licensed CC BY 4.0 by LASP, University of Colorado.</p>
+<p>References:
+* O. M. Coddington et al., "The TSIS-1 Hybrid Solar Reference
+  Spectrum", Geophysical Research Letters 48(12):e2020GL091709,
+  * <a href="https://doi.org/10.1029/2020GL091709">https://doi.org/10.1029/2020GL091709</a></p>
+<ul>
+<li>O. M. Coddington et al., "Version 2 of the TSIS-1 Hybrid Solar
+  Reference Spectrum and Extension to the Full Spectrum", Earth and Space Science 10(3):e2022EA002637, 2023. <a href="https://doi.org/10.1029/2022EA002637">https://doi.org/10.1029/2022EA002637</a> </li>
+</ul>
+<hr>
+
 <h3 id="function-solvenormal">function SolveNormal</h3>
 <p><em>The least-squares solution of the first</em> <code>n</code> <em>equations of normal system</em><code>normal</code> <em>x =</em><code>right</code> <em>(the rest ignored), scaled by its diagonal (Jacobi) for conditioning and solved by Gaussian elimination with partial pivoting; all zeros where the system is singular.</em></p>
 <pre><code class="language-C++">template&lt;std::size_t N&gt;
@@ -4966,6 +4994,12 @@ std::array&lt; double, N &gt; ernie::SolveNormal (
     const SpectralBands &amp; bands,
     std::span&lt; const float &gt; values
 ) 
+</code></pre>
+<hr>
+
+<h3 id="function-totalsolarirradiance">function TotalSolarIrradiance</h3>
+<p><em>The integral of</em> <code>SolarSpectralIrradiance</code> <em>over all its wavelengths, the total solar irradiance at 1 au (W/m^2), about 1361.5.</em></p>
+<pre><code class="language-C++">double ernie::TotalSolarIrradiance () 
 </code></pre>
 <hr>
 
