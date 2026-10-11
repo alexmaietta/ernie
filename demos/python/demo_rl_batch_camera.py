@@ -4,13 +4,15 @@ each a clone of the first, with camera poses that change every step on the GPU, 
 time per step and views rendered per second.
 
     PYTHONPATH=build/python python demos/python/demo_rl_batch_camera.py [--views 1024]
-        [--bands 3] [--viewer null] [--sweep] [--output views.png]
+        [--bands 3] [--minimal texturedDiffuse] [--viewer null] [--sweep] [--output views.png]
 
 Each environment holds a few boxes and spheres over a shared ground under a sun with shadows. The
 views orbit their environment, a step's poses arrive as a CUDA array, and the observations stay
 on the GPU (`BatchCamera.step`), the way a training loop consumes them with torch.from_dlpack.
 Spectral bands (`tokens.SPECTRAL_BANDS`) set most of the shading and sensor cost; RGB
-observations need few.
+observations need few. `--minimal` draws with minimal shading (`tokens.MINIMAL_MODE`) instead:
+one forward pass straight into the observations, with no spectral shading or sensor filters;
+"none" renders black colour and distances alone.
 
 Each frame is one batch step, timed after a few steps' warm-up; `--sweep` first times 256, 1024
 and 4096 views at 3 and 16 bands, each in a scene of its own. The environments are clones at the
@@ -60,10 +62,21 @@ def orbit(views, angle):
     return poses
 
 
-def benchmark(renderer, views, bands):
+MINIMAL_MODES = ("off", "none", "constantDiffuse", "texturedDiffuse")
+
+
+def batch_camera(renderer, scene, views, minimal):
+    """The batch camera, with minimal shading unless `minimal` is "off"; minimal "none" renders
+    distances besides its black colour."""
+    render_vars = ("LdrColor", "DistanceToCamera") if minimal == "none" else ("LdrColor",)
+    return BatchCamera(renderer, scene, "/World/Camera", views, resolution=(SIZE, SIZE),
+                       render_vars=render_vars, minimal=None if minimal == "off" else minimal)
+
+
+def benchmark(renderer, views, bands, minimal="off"):
     """Seconds per step of `views` views at `bands` bands, in a scene of their own."""
     scene = build_scene(ernie.Scene(), views, bands)
-    camera = BatchCamera(renderer, scene, "/World/Camera", views, resolution=(SIZE, SIZE))
+    camera = batch_camera(renderer, scene, views, minimal)
     camera.set_worlds(np.arange(views, dtype=np.int32))
     poses = [renderer.cuda_upload(orbit(views, 0.03 * s)) for s in range(STEPS)]
     for p in poses[:WARMUP]:
@@ -93,8 +106,11 @@ class Demo(ernie.demo.Demo):
         parser = super().create_parser()
         parser.add_argument("--views", type=int, default=1024, help="environments, one view each")
         parser.add_argument("--bands", type=int, default=3, help="spectral bands per view")
+        parser.add_argument("--minimal", choices=MINIMAL_MODES, default="off",
+                            help="minimal shading (ernie:minimal:mode) for throughput")
         parser.add_argument("--sweep", action="store_true",
-                            help="first time 256, 1024 and 4096 views at 3 and 16 bands")
+                            help="first time 256, 1024 and 4096 views at 3 and 16 bands, then "
+                                 "with each minimal shading mode")
         return parser
 
     def __init__(self, viewer, args):
@@ -107,10 +123,14 @@ class Demo(ernie.demo.Demo):
             for bands in (3, 16):
                 for views in (256, 1024, 4096):
                     self.print_rate(views, bands, benchmark(renderer, views, bands))
-        self.views, self.bands = args.views, args.bands
+            # Minimal shading has no spectral bands to speak of: one row per mode.
+            for minimal in MINIMAL_MODES[1:]:
+                for views in (256, 1024, 4096):
+                    self.print_rate(views, 3, benchmark(renderer, views, 3, minimal),
+                                    f", minimal {minimal}")
+        self.views, self.bands, self.minimal = args.views, args.bands, args.minimal
         build_scene(self.scene, self.views, self.bands)
-        self.camera = BatchCamera(renderer, self.scene, "/World/Camera", self.views,
-                                  resolution=(SIZE, SIZE))
+        self.camera = batch_camera(renderer, self.scene, self.views, self.minimal)
         self.camera.set_worlds(np.arange(self.views, dtype=np.int32))
         self.poses = [renderer.cuda_upload(orbit(self.views, 0.03 * s)) for s in range(STEPS)]
         self.observations = None
@@ -146,7 +166,8 @@ class Demo(ernie.demo.Demo):
             return
         self.images()  # the last step has finished
         per_step = (time.perf_counter() - self.timer_start) / self.timed_steps
-        note = "" if self.viewer is None else " (with the viewer drawing)"
+        note = "" if self.minimal == "off" else f", minimal {self.minimal}"
+        note += "" if self.viewer is None else " (with the viewer drawing)"
         self.print_rate(self.views, self.bands, per_step, note)
         self.timed_steps = 0
 
@@ -162,6 +183,14 @@ class Demo(ernie.demo.Demo):
         self.report()
         images = self.images()[..., :3]
         assert images.shape == (self.views, SIZE, SIZE, 3)
+        if self.minimal == "none":
+            # Black by design: the distances show the scene.
+            assert (images == 0).all(), "minimal none renders no colour"
+            images = np.asarray(
+                self.renderer.cuda_download(self.observations["DistanceToCamera"]))
+            # Tenths of a metre, as the colours' scale for the checks below.
+            images = np.where(np.isfinite(images), np.minimum(10.0 * images, 255.0), 0.0)
+            images = np.repeat(images[..., None], 3, axis=-1)
         assert images.std() > 1.0, "the views should not render flat"
         # Views from opposite headings see their environment from opposite sides.
         if self.views > 1:
