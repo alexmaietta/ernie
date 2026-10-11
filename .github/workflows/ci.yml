@@ -224,12 +224,12 @@ jobs:
           export VK_DRIVER_FILES
           ctest --test-dir build --output-on-failure -j4 --timeout 1800 -I ${{ matrix.part }},,3
 
-  # Windows (MSVC) and macOS (Apple Clang, MoltenVK) build only, through sccache: they do not block
-  # yet, until tests run where a software driver exists (Mesa's lavapipe for Windows).
+  # Windows (MSVC) and macOS (Apple Clang, MoltenVK) built through sccache, and their unit tests
+  # run: the CPU tests, as those runners have no Vulkan driver of their own (the wheel-test job
+  # renders on Windows through Mesa's lavapipe).
   build:
     name: build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -266,6 +266,8 @@ jobs:
           -DERNIE_BUILD_TESTS=ON -DERNIE_BUILD_DEMOS=ON -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
       - name: Build
         run: cmake --build build --parallel 4
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure -j4 --timeout 900 -L unit
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -275,10 +277,10 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-  # The release wheels: manylinux_2_34, one per architecture, each tested on lavapipe
-  # (configuration in pyproject.toml, [tool.cibuildwheel]).
-  # Windows (x86_64) and macOS (Apple silicon, MoltenVK bundled) wheels too, smoke-tested on the
-  # scene API: those runners have no Vulkan driver.
+  # The release wheels (pyproject.toml, [tool.cibuildwheel]): manylinux_2_34 for x86_64 and
+  # aarch64, Windows x86_64, and macOS on Apple silicon with MoltenVK bundled. The wheel-test job
+  # renders with the Linux and Windows wheels on lavapipe; the macOS wheel is tested on the scene
+  # API, as those runners have no Vulkan driver.
   wheel:
     name: wheel (${{ matrix.platform }})
     needs: version
@@ -548,11 +550,12 @@ jobs:
           cmake --build consumer
           VK_DRIVER_FILES=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n 1) consumer/consumer
 
-  # The wheels and sdist to PyPI as ernie-renderer once the tests pass: X.Y.Z.devN from pushes to
+  # The wheels and sdist to PyPI as ernie-renderer once the tests pass on every platform (Linux,
+  # Windows and macOS builds, and every wheel): X.Y.Z.devN from pushes to
   # main (pip installs them only with --pre), X.Y.Z from release tags. Trusted Publishing: PyPI
   # trusts ci.yml's jobs in the pypi environment (main and v* tags only), so no token is stored.
   publish:
-    needs: [test, wheel, wheel-test, sdist]
+    needs: [test, build, wheel, wheel-test, sdist]
     if: >
       github.event_name == 'push' &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
