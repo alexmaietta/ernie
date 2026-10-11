@@ -1,3 +1,5 @@
+[![CI](https://github.com/alexmaietta/ernie/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/alexmaietta/ernie/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/alexmaietta/ernie?include_prereleases&sort=semver&color=orange)](https://github.com/alexmaietta/ernie/releases) [![PyPI](https://img.shields.io/pypi/v/ernie-renderer?color=3775A9&logo=pypi&logoColor=white)](https://pypi.org/project/ernie-renderer/) [![Docs](https://img.shields.io/badge/docs-latest-8A2BE2)](https://alexmaietta.github.io/ernie/) [![License](https://img.shields.io/badge/license-BSD--3--Clause-2E8B57)](LICENSE)
+
 # Efficient Renderer for Natural and Interplanetary Environments (Ernie)
 
 Ernie is a physically accurate, real-time, spectral renderer for interplanetary environments, with C++ and Python APIs and a Hydra-like scene API. It is a Vulkan 1.3 rasterizer that runs on Linux today, with Windows and macOS on the way. Ernie is designed around physical quantities rather than artistic parameters: lights, materials and cameras are described the way they are measured, so a render can be compared against a real instrument. For reinforcement learning, Ernie renders batches of cameras in one step, shares data zero copy with any DLPack tensor (PyTorch, JAX, Warp, NumPy), and has a fast mode with simpler shading.
@@ -116,6 +118,7 @@ Planned future examples.
 **Cameras**
 
 - LRO NAC and WAC
+- Shadowcam
 - Mars2020 Navcam, Mastcam
 - LWIR, NIR, UV
 - Pinhole, fisheye, orthographic
@@ -127,6 +130,7 @@ Planned future examples.
 - Vignetting
 - Lens flare
 - Bloom
+- Narrowband filter viewing laser lines
 
 **Terrain**
 
@@ -142,6 +146,7 @@ Planned future examples.
 - Custom radiance curves to model Earthshine
 - Dome light shadows
 - Illuminants across the same scene
+- Laser lines competing with sunlight
 
 **Star Field**
 
