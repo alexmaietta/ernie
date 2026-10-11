@@ -2592,6 +2592,8 @@ void RasterRenderer::Update(
     // The lights first: shading reads the size of the light shadow
     // maps they make.
     WriteLights(params, bounds);
+    WriteLightTiming(frame, params,
+                     static_cast<std::uint32_t>(raster.Views()));
     WriteShading(raster);
     // A cube camera's motion is its faces', which the sensor maps
     // through the lens.
@@ -2857,7 +2859,8 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
          i < std::min(params.bodies.size(), FrameParams::kMaxBodies);
          ++i) {
         const BodyParams& body = params.bodies[i];
-        const glm::dvec3 centre = (body.centre - params.origin) * 1e-3;
+        const glm::dvec3 centre =
+            (body.centre - params.origin) * 1e-3;
         shading.bodies[i][0] = static_cast<float>(centre.x);
         shading.bodies[i][1] = static_cast<float>(centre.y);
         shading.bodies[i][2] = static_cast<float>(centre.z);
