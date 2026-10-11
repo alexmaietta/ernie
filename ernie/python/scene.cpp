@@ -1998,6 +1998,8 @@ void BindScene(nb::module_& m) {
         {"DISK_LIGHT", tokens::kDiskLight},
         {"CYLINDER_LIGHT", tokens::kCylinderLight},
         {"LASER_LIGHT", tokens::kLaserLight},
+        {"LASER_PATTERN_IMAGE_ARRAY",
+         tokens::kLaserPatternImageArray},
         {"DOME_LIGHT", tokens::kDomeLight},
         {"MATERIAL", tokens::kMaterial},
         {"TERRAIN", tokens::kTerrain},
