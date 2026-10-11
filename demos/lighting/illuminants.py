@@ -92,8 +92,10 @@ class Demo(ernie.demo.Demo):
                                  physical_custom_illuminant=fluorescent()).set(
             tokens.TRANSFORM,
             ernie.look_at_transform((-1.2, 0.6, 2.9), (-0.25, 1.0, 1.0), (0.0, 1.0, 0.0)))
+        # ISO 400, f/2, 1/125 s: the spot's lumens fill only its 40 degree cone, so the wall in
+        # it is bright; the cone's centre just clips.
         camera = world.define("Camera", ernie.Camera, focal_length=18.0, sensor_noise=False,
-                              exposure_time=1.0 / 15.0, exposure_iso=400.0,
+                              exposure_time=1.0 / 125.0, exposure_iso=400.0,
                               exposure_f_stop=2.0).set(
             tokens.TRANSFORM, ernie.look_at_transform((0.0, -2.6, 1.3), (0.0, 1.0, 1.2)))
         self.scene.define("/Render/Settings", ernie.RenderSettings, camera=camera,

@@ -131,10 +131,12 @@ class IlluminantsDemo : public app::Demo {
             .SetPhotometricPower(1600.0)
             .SetPhysicalCustomIlluminant(Fluorescent())
             .SetTransform(LookAtTransform({-1.2, 0.6, 2.9}, {-0.25, 1.0, 1.0}, {0.0, 1.0, 0.0}));
+        // ISO 400, f/2, 1/125 s: the spot's lumens fill only its 40 degree cone, so the wall in it
+        // is bright; the cone's centre just clips.
         Camera::Define(scene, "/World/Camera")
             .SetFocalLength(18.0)
             .SetSensorNoise(false)
-            .SetExposureTime(1.0 / 15.0)
+            .SetExposureTime(1.0 / 125.0)
             .SetExposureIso(400.0)
             .SetExposureFStop(2.0)
             .SetTransform(LookAtTransform({0.0, -2.6, 1.3}, {0.0, 1.0, 1.2}, {0.0, 0.0, 1.0}));

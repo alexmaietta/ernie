@@ -92,14 +92,12 @@ int ErnieMain(std::span<const std::string> args, std::string_view version) {
                     std::string(kUsage).c_str(), std::string(DemoOptionsHelp()).c_str());
         return 0;
     }
-    // The first argument that is no option is a scene file.
+    // Without --demo, a first argument that is no option is a scene file; the other arguments are
+    // the demo's own (such as --views 64).
     std::filesystem::path file;
-    for (auto it = options.extra.begin(); it != options.extra.end(); ++it) {
-        if (!it->starts_with("-")) {
-            file = *it;
-            options.extra.erase(it);
-            break;
-        }
+    if (options.demo.empty() && !options.extra.empty() && !options.extra.front().starts_with("-")) {
+        file = options.extra.front();
+        options.extra.erase(options.extra.begin());
     }
     std::vector<DemoInfo> demos = RegisteredDemos();
     if (options.list) {

@@ -18,7 +18,7 @@ DEMOS = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..
 PYTHON_ONLY = {"interop"}
 
 #: Python demos whose C++ twin is still to be written; empty once the demos are all ported.
-AWAITING_TWINS = {"batched/batch_camera"}
+AWAITING_TWINS = set()
 
 #: Smaller batches than the demos' benchmark sizes, which software Vulkan in CI renders slowly.
 SMALL_BATCHES = {

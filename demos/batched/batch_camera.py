@@ -17,7 +17,7 @@ one forward pass straight into the observations, with no spectral shading or sen
 Each frame is one batch step, timed after a few steps' warm-up; `--sweep` first times 256, 1024
 and 4096 views at 3 and 16 bands, each in a scene of its own. The environments are clones at the
 origin, so the viewer shows them as one. `--output` writes 16 views of the last step, spread round
-the orbit, as a contact sheet.
+the orbit, as a contact sheet. The Python twin of batch_camera.cpp.
 """
 
 import time
@@ -33,6 +33,17 @@ SIZE = 64
 STEPS = 60  # distinct poses, cycled
 WARMUP = 5  # steps before timing: uploads, pipelines, allocations
 
+# An environment's things, cubes and spheres in turn: their colours and where they stand, the
+# same in batch_camera.cpp.
+THINGS = [
+    ((0.700, 0.918, 0.821), (-1.649, -1.199)),
+    ((0.899, 0.204, 0.857), (1.782, -0.192)),
+    ((0.442, 0.423, 0.404), (-0.330, 0.027)),
+    ((0.643, 0.996, 0.834), (0.733, 2.934)),
+    ((0.372, 0.328, 0.690), (-2.736, -2.786)),
+    ((0.612, 0.573, 0.934), (0.775, 0.085)),
+]
+
 
 def build_scene(scene, worlds, bands):
     scene.define("/World/Ground", ernie.GroundPlane)
@@ -40,11 +51,9 @@ def build_scene(scene, worlds, bands):
         tokens.TRANSFORM, ernie.distant_light_transform((0.4, -0.6, 0.7))
     )
     env0 = scene.define("/Envs/Env0", ernie.Xform)
-    rng = np.random.default_rng(7)
-    for i in range(6):
+    for i, (colour, (x, y)) in enumerate(THINGS):
         shape = ernie.Cube if i % 2 == 0 else ernie.Sphere
-        env0.define(f"Thing{i}", shape, display_color=tuple(rng.uniform(0.2, 1.0, 3)),
-                    translate=(*rng.uniform(-3.0, 3.0, 2), 0.5))
+        env0.define(f"Thing{i}", shape, display_color=colour, translate=(x, y, 0.5))
     for world in range(worlds):
         env = env0 if world == 0 else ernie.Xform(scene.clone("/Envs/Env0", f"/Envs/Env{world}"))
         env.world = world
