@@ -120,6 +120,7 @@ if(TARGET ernie_app)
     ernie_add_test_suite(
         app
         SOURCES
+        app_demo_test.cpp
         app_file_dialog_test.cpp
         app_panel_test.cpp
         app_prim_schemas_test.cpp
@@ -131,6 +132,7 @@ if(TARGET ernie_app)
     ernie_add_test_suite(
         app_gpu
         SOURCES
+        app_demo_gpu_test.cpp
         app_viewer_gpu_test.cpp
         LIBRARIES
         ernie_app

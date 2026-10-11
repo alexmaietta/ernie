@@ -48,6 +48,7 @@
 #include <fstream>
 #include <iterator>
 #include <limits>
+#include <map>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -439,23 +440,37 @@ struct Viewer::State {
     }
 
     enum class Stage { Frame, Ui, PreRender, PostRender };
+    // Each registration keeps the scope it was added in (`Viewer::SetScope`).
     struct FrameCallback {
         std::uint64_t id;
         Stage stage;
         std::function<void(Viewer&, const FrameInfo&)> callback;
+        std::uint64_t scope = 0;
     };
     struct SelectionCallback {
         std::uint64_t id;
         std::function<void(Viewer&, std::span<const Path>)> callback;
+        std::uint64_t scope = 0;
     };
     struct MenuItem {
         std::string menu;
         std::string label;
         std::function<void(Viewer&)> action;
+        std::uint64_t scope = 0;
     };
     std::vector<FrameCallback> frameCallbacks;
     std::vector<SelectionCallback> selectionCallbacks;
     std::uint64_t nextCallback = 1;
+    /// The registration scope now (`Viewer::SetScope`), the next new one, and the scope of each
+    /// added panel by title.
+    std::uint64_t scope = 0;
+    std::uint64_t nextScope = 1;
+    std::map<std::string, std::uint64_t, std::less<>> panelScopes;
+    /// What the application chose since the scene was last cleared (`ClearScene`), which
+    /// `ResetSession` keeps.
+    bool cameraChosen = false;
+    bool lightingChosen = false;
+    bool settingsChosen = false;
     std::vector<std::unique_ptr<Panel>> panels;
     FileDialog fileDialog;
     /// The scene file last opened or saved, where File > Save Scene As starts.
@@ -475,18 +490,21 @@ struct Viewer::State {
         bool shown;
         std::string overlay;
         std::function<void(Viewer&, bool)> changed;
+        std::uint64_t scope = 0;
     };
     struct HudItem {
         std::uint64_t id;
         std::string label;
         std::function<std::string(Viewer&)> value;
         bool shown;
+        std::uint64_t scope = 0;
     };
     struct ViewportMenuItem {
         std::uint64_t id;
         std::string label;
         std::function<void(Viewer&)> action;
         std::function<bool(const Viewer&)> checked;
+        std::uint64_t scope = 0;
     };
     std::vector<ViewportToggle> viewportToggles;
     std::vector<HudItem> hudItems;
@@ -731,12 +749,18 @@ struct Viewer::State {
     void ResetSession() {
         SetSelection({});
         history.Reset();
-        settingsSource = FirstUserSettings();
-        orthographicView = -1;
-        activeCamera = PerspectiveCamera();
-        lighting = HasStageLights(scene) ? Lighting::Stage : Lighting::Default;
+        if (!settingsChosen || !scene.Has(settingsSource)) {
+            settingsSource = FirstUserSettings();
+        }
+        if (!lightingChosen) {
+            lighting = HasStageLights(scene) ? Lighting::Stage : Lighting::Default;
+        }
         delegate->Sync(scene);
-        FrameBounds(SceneBounds());
+        if (!cameraChosen || !scene.Has(activeCamera)) {
+            orthographicView = -1;
+            activeCamera = PerspectiveCamera();
+            FrameBounds(SceneBounds());
+        }
     }
 
     /// File > Open Scene or Save Scene As, once a file is chosen: logs what it did, or the error
@@ -2290,7 +2314,7 @@ struct Viewer::State {
     std::uint64_t AddCallback(Stage stage,
                               std::function<void(Viewer&, const FrameInfo&)> callback) {
         const std::uint64_t id = nextCallback++;
-        frameCallbacks.push_back({id, stage, std::move(callback)});
+        frameCallbacks.push_back({id, stage, std::move(callback), scope});
         return id;
     }
 
@@ -2542,7 +2566,7 @@ std::uint64_t Viewer::OnPostRender(std::function<void(Viewer&, const FrameInfo&)
 
 std::uint64_t Viewer::OnSelection(std::function<void(Viewer&, std::span<const Path>)> callback) {
     const std::uint64_t id = state_->nextCallback++;
-    state_->selectionCallbacks.push_back({id, std::move(callback)});
+    state_->selectionCallbacks.push_back({id, std::move(callback), state_->scope});
     return id;
 }
 
@@ -2604,21 +2628,66 @@ void Viewer::OpenScene(const std::filesystem::path& path) {
                 SessionRoot().String());
         }
     }
-    Scene& scene = state_->scene;
-    SetSelection({});
-    for (const Path& root : scene.Children(Path::Root())) {
-        if (root != SessionRoot()) {
-            scene.Remove(root);
-        }
-    }
-    for (const std::string& name : scene.OverlayNames()) {
-        if (!name.starts_with("__")) {
-            scene.RemoveOverlay(name);
-        }
-    }
-    LoadSceneFile(scene, path);
+    ClearScene();
+    LoadSceneFile(state_->scene, path);
     state_->scenePath = path;
     ResetSession();
+}
+
+void Viewer::ClearScene() {
+    State& s = *state_;
+    s.SetSelection({});
+    s.history.Reset();
+    for (const Path& root : s.scene.Children(Path::Root())) {
+        if (root != SessionRoot()) {
+            s.scene.Remove(root);
+        }
+    }
+    for (const std::string& name : s.scene.OverlayNames()) {
+        if (!name.starts_with("__")) {
+            s.scene.RemoveOverlay(name);
+        }
+    }
+    s.orthographicView = -1;
+    s.activeCamera = PerspectiveCamera();
+    s.settingsSource = {};
+    s.cameraChosen = s.lightingChosen = s.settingsChosen = false;
+}
+
+std::uint64_t Viewer::NewScope() {
+    return state_->nextScope++;
+}
+
+std::uint64_t Viewer::Scope() const {
+    return state_->scope;
+}
+
+void Viewer::SetScope(std::uint64_t scope) {
+    state_->scope = scope;
+}
+
+void Viewer::RemoveScope(std::uint64_t scope) {
+    if (scope == 0) {
+        throw std::invalid_argument("Scope 0 is the application's own and cannot be removed");
+    }
+    State& s = *state_;
+    const auto in = [scope](const auto& item) { return item.scope == scope; };
+    std::erase_if(s.frameCallbacks, in);
+    std::erase_if(s.selectionCallbacks, in);
+    std::erase_if(s.menuItems, in);
+    std::erase_if(s.viewportToggles, in);
+    std::erase_if(s.hudItems, in);
+    std::erase_if(s.viewportMenuItems, in);
+    s.hudTime = -kHudRefresh;
+    std::vector<std::string> titles;
+    for (const auto& [title, added] : s.panelScopes) {
+        if (added == scope) {
+            titles.push_back(title);
+        }
+    }
+    for (const std::string& title : titles) {
+        RemovePanel(title);
+    }
 }
 
 void Viewer::SaveScene(const std::filesystem::path& path) {
@@ -2669,6 +2738,7 @@ void Viewer::SetActiveCamera(Path camera) {
         throw std::invalid_argument("'" + camera.String() + "' is not a Camera prim");
     }
     state_->SetActive(camera);
+    state_->cameraChosen = true;
 }
 
 void Viewer::Frame(std::span<const Path> paths) {
@@ -3002,6 +3072,7 @@ Lighting Viewer::GetLighting() const {
 
 void Viewer::SetLighting(Lighting lighting) {
     state_->lighting = lighting;
+    state_->lightingChosen = true;
 }
 
 std::optional<Wireframe> Viewer::GetWireframe() const {
@@ -3023,6 +3094,7 @@ void Viewer::SetSettings(Path settings) {
         throw std::invalid_argument("'" + settings.String() + "' is not a RenderSettings prim");
     }
     state_->settingsSource = std::move(settings);
+    state_->settingsChosen = true;
 }
 
 void Viewer::Capture(const std::filesystem::path& path, std::string var) {
@@ -3062,6 +3134,7 @@ Panel& Viewer::AddPanel(std::unique_ptr<Panel> panel) {
         throw std::invalid_argument("'Viewport' is reserved");
     }
     const Dock dock = panel->GetDock();
+    state_->panelScopes[panel->Title()] = state_->scope;
     state_->panels.push_back(std::move(panel));
     if (!state_->userLayout && dock != Dock::Floating && !state_->dockNodes.contains(dock)) {
         state_->layoutReady = false;
@@ -3126,6 +3199,7 @@ void Viewer::RemovePanel(const std::string& title) {
     std::vector<std::string>& requests = state_->focusRequests;
     requests.erase(std::remove(requests.begin(), requests.end(), title), requests.end());
     state_->drawnPanels.erase(title);
+    state_->panelScopes.erase(title);
     panels.erase(found);
 }
 
@@ -3134,7 +3208,7 @@ void Viewer::AddMenuItem(const std::string& menu, const std::string& label,
     if (menu.empty() || label.empty()) {
         throw std::invalid_argument("Menu items need a menu and a label");
     }
-    state_->menuItems.push_back({menu, label, std::move(action)});
+    state_->menuItems.push_back({menu, label, std::move(action), state_->scope});
 }
 
 const ViewportDisplay& Viewer::GetViewportDisplay() const {
@@ -3154,7 +3228,7 @@ std::uint64_t Viewer::AddViewportToggle(std::string label, bool shown, std::stri
     State& s = *state_;
     const std::uint64_t id = s.nextCallback++;
     s.viewportToggles.push_back(
-        {id, std::move(label), shown, std::move(overlay), std::move(changed)});
+        {id, std::move(label), shown, std::move(overlay), std::move(changed), s.scope});
     return id;
 }
 
@@ -3195,7 +3269,7 @@ std::uint64_t Viewer::AddHudItem(std::string label, std::function<std::string(Vi
     }
     State& s = *state_;
     const std::uint64_t id = s.nextCallback++;
-    s.hudItems.push_back({id, std::move(label), std::move(value), shown});
+    s.hudItems.push_back({id, std::move(label), std::move(value), shown, s.scope});
     s.hudTime = -kHudRefresh;
     return id;
 }
@@ -3216,7 +3290,8 @@ std::uint64_t Viewer::AddViewportMenuItem(std::string label, std::function<void(
     }
     State& s = *state_;
     const std::uint64_t id = s.nextCallback++;
-    s.viewportMenuItems.push_back({id, std::move(label), std::move(action), std::move(checked)});
+    s.viewportMenuItems.push_back(
+        {id, std::move(label), std::move(action), std::move(checked), s.scope});
     return id;
 }
 

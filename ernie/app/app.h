@@ -21,6 +21,7 @@
 ///     viewer.OnPreRender([](ernie::app::Viewer& v, const ernie::app::FrameInfo& frame) { ... });
 ///     viewer.Run();
 
+#include "ernie/app/demo.h"
 #include "ernie/app/icons.h"
 #include "ernie/app/panel.h"
 #include "ernie/app/theme.h"

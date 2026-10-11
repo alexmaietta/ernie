@@ -285,15 +285,29 @@ void BindApp(nb::module_& parent) {
         .def("sync", &Viewer::Sync,
              "Syncs the scene into the renderer now; raises ValueError for data it cannot use.")
         .def("reset_session", &Viewer::ResetSession,
-             "Starts over on the scene's present content once it has been replaced, as the demo "
-             "browser does: clears the selection and undo history, picks the first "
-             "RenderSettings, frames the scene through perspective_camera and chooses the "
-             "lighting as on opening.")
+             "Starts over on the scene's present content once it has been replaced, as "
+             "open_scene and the demo runner do: clears the selection and undo history, and picks "
+             "the RenderSettings, the camera (perspective_camera, framing the scene) and the "
+             "lighting as on opening, except those set (settings, active_camera, lighting) since "
+             "clear_scene or opening.")
+        .def("clear_scene", &Viewer::ClearScene,
+             "Empties the stage for new content: removes every prim but the viewer's own and "
+             "every overlay but its own, clears the selection and undo history, and forgets the "
+             "settings, camera and lighting set. Call reset_session once the new content is in.")
+        .def("new_scope", &Viewer::NewScope,
+             "A registration scope not used before (see scope), without making it current.")
+        .def_prop_rw("scope", &Viewer::Scope, &Viewer::SetScope,
+                     "The registration scope: callbacks, panels, menu items and viewport items "
+                     "added belong to it, and remove_scope removes them all at once, as the demo "
+                     "runner does switching demos. 0, the default, is the application's own.")
+        .def("remove_scope", &Viewer::RemoveScope, nb::arg("scope"),
+             "Removes everything added in scope; built-in panels are only hidden.")
         .def("open_scene", &Viewer::OpenScene, nb::arg("path"),
              "Replaces the stage with the scene a JSON file describes (the format of "
              "ernie.load_scene and ernie.save_scene), as File > Open Scene does: removes every "
              "prim but the viewer's own and every overlay but its own, loads the file and starts "
-             "the session over (reset_session). A file that does not load raises ValueError and "
+             "the session over (clear_scene, then reset_session). A file that does not load "
+             "raises ValueError and "
              "leaves the stage as it was.")
         .def("save_scene", &Viewer::SaveScene, nb::arg("path"),
              "Writes the stage, every prim but the viewer's own, to path as JSON "
@@ -509,6 +523,8 @@ void BindApp(nb::module_& parent) {
         .def("save_layout", &Viewer::SaveLayout, nb::arg("path"))
         .def("load_layout", &Viewer::LoadLayout, nb::arg("path"))
         .def_prop_rw("theme", &Viewer::GetTheme, &Viewer::SetTheme);
+
+    BindDemo(m);
 }
 
 }  // namespace ernie::python

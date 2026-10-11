@@ -34,7 +34,6 @@ References:
 """
 
 import math
-import os
 
 import numpy as np
 
@@ -42,8 +41,9 @@ import ernie
 import ernie.demo
 from ernie import tokens
 
-ISD = os.path.join(os.path.dirname(__file__), "..", "..", "ernie", "test", "fixtures", "isd",
-                   "lroWacPushFrame.json")
+from demo_support import data_file
+
+ISD = data_file("lroWacPushFrame.json")
 FIRST_FRAMELET = 170  # 24 framelets about the image's middle
 FRAMELETS = 24
 CELL = 50.0  # metres per height

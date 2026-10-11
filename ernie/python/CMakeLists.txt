@@ -13,7 +13,7 @@ nanobind_add_module(
     tensor.cpp)
 target_link_libraries(_ernie PRIVATE ernie ernie_build_options)
 if(TARGET ernie_app)
-    target_sources(_ernie PRIVATE app.cpp)
+    target_sources(_ernie PRIVATE app.cpp demo.cpp)
     target_link_libraries(_ernie PRIVATE ernie_app)
     target_compile_definitions(_ernie PRIVATE ERNIE_HAS_APP)
 endif()
@@ -51,6 +51,18 @@ configure_file(ernie/app.py "${ernie_package_dir}/app.py" COPYONLY)
 configure_file(ernie/batch.py "${ernie_package_dir}/batch.py" COPYONLY)
 configure_file(ernie/demo.py "${ernie_package_dir}/demo.py" COPYONLY)
 configure_file(ernie/schema.py "${ernie_package_dir}/schema.py" COPYONLY)
+# ernie.demos: the Python demos and the ISDs they read, run by `python -m ernie.demos`.
+file(GLOB ernie_demo_sources CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/demos/python/*.py")
+set(ernie_demo_data "${PROJECT_SOURCE_DIR}/ernie/test/fixtures/isd/toughLroNacLineScan.json"
+                    "${PROJECT_SOURCE_DIR}/ernie/test/fixtures/isd/lroWacPushFrame.json")
+foreach(source ernie/demos/__init__.py ernie/demos/__main__.py ${ernie_demo_sources})
+    get_filename_component(name "${source}" NAME)
+    configure_file("${source}" "${ernie_package_dir}/demos/${name}" COPYONLY)
+endforeach()
+foreach(source ${ernie_demo_data})
+    get_filename_component(name "${source}" NAME)
+    configure_file("${source}" "${ernie_package_dir}/demos/data/${name}" COPYONLY)
+endforeach()
 # Stubs of the typed prim classes, which ernie.schema builds from the prim type registry at import
 # where nanobind's stubgen cannot see them; -P keeps this directory's ernie/ off the path.
 add_custom_command(
@@ -79,6 +91,14 @@ if(SKBUILD)
     install(
         FILES ${ernie_stubs}
         DESTINATION ernie/_ernie
+        COMPONENT python)
+    install(
+        FILES ernie/demos/__init__.py ernie/demos/__main__.py ${ernie_demo_sources}
+        DESTINATION ernie/demos
+        COMPONENT python)
+    install(
+        FILES ${ernie_demo_data}
+        DESTINATION ernie/demos/data
         COMPONENT python)
     set_target_properties(_ernie PROPERTIES INSTALL_RPATH "$ORIGIN")
     include("${PROJECT_SOURCE_DIR}/cmake/ErnieLicenses.cmake")

@@ -75,6 +75,9 @@ void BindRender(nb::module_& m);
 /// The `app` submodule; built only with Ernie's app (`ERNIE_HAS_APP`).
 void BindApp(nb::module_& m);
 
+/// The demo base class and runner, in the `app` submodule `m`.
+void BindDemo(nb::module_& m);
+
 }  // namespace ernie::python
 
 namespace nanobind::detail {

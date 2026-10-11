@@ -175,6 +175,19 @@ class Viewer {
     /// ids are ignored.
     void RemoveCallback(std::uint64_t id);
 
+    /// Registration scopes, for applications that host others' code, as the demo runner hosts
+    /// demos: what is added (callbacks, panels, menu items, viewport toggles, heads-up display
+    /// and viewport menu items) belongs to the scope current when it is added, and
+    /// `RemoveScope` removes all of it at once. Scope 0, current until `SetScope`, is the
+    /// application's own. `NewScope` returns a scope not used before, without making it current.
+    std::uint64_t NewScope();
+    std::uint64_t Scope() const;
+    void SetScope(std::uint64_t scope);
+
+    /// Removes everything added in `scope`; built-in panels are only hidden, as `RemovePanel`.
+    /// @throws std::invalid_argument for scope 0.
+    void RemoveScope(std::uint64_t scope);
+
     Scene& GetScene();
     VulkanContext& Context();
     const VulkanContext& Context() const;
@@ -203,18 +216,25 @@ class Viewer {
     /// @throws std::invalid_argument naming the prim and attribute of data the backend cannot use.
     void Sync();
 
-    /// Starts over on the scene's present content, once an application has replaced it (as the
-    /// demo browser switching demos does): clears the selection and undo history, picks the
-    /// first RenderSettings, looks through `PerspectiveCamera()` framing the scene and chooses
-    /// the lighting as on opening.
+    /// Starts over on the scene's present content, once an application has replaced it (as
+    /// `OpenScene` and the demo runner do): clears the selection and undo history, and picks the
+    /// RenderSettings, the camera (`PerspectiveCamera()`, framing the scene) and the lighting as
+    /// on opening, except those the application chose (`SetSettings`, `SetActiveCamera`,
+    /// `SetLighting`) since the scene was cleared (`ClearScene`) or the viewer opened.
     /// @throws std::invalid_argument as `Sync`.
     void ResetSession();
 
+    /// Empties the stage for new content: removes every prim but the viewer's own and every
+    /// overlay but the viewer's (named with a leading "__"), clears the selection and undo
+    /// history, and forgets the settings, camera and lighting the application chose. Call
+    /// `ResetSession` once the new content is in.
+    void ClearScene();
+
     /// Replaces the stage with the scene the JSON file at `path` describes (`LoadSceneFile`,
-    /// ernie/scene/scene_json.h), as File > Open Scene does: removes every prim but the viewer's
-    /// own and every overlay but the viewer's (named with a leading "__"), loads the file and
-    /// starts the session over (`ResetSession`). The file is checked first, by loading it into a
-    /// scene of its own, so a file that does not load leaves the stage as it was.
+    /// ernie/scene/scene_json.h), as File > Open Scene does: empties the stage (`ClearScene`),
+    /// loads the file and starts the session over (`ResetSession`). The file is checked first,
+    /// by loading it into a scene of its own, so a file that does not load leaves the stage as
+    /// it was.
     /// @throws std::invalid_argument for a file that cannot be read or does not load, or that
     /// describes prims under `SessionRoot()`; or as `ResetSession`.
     void OpenScene(const std::filesystem::path& path);

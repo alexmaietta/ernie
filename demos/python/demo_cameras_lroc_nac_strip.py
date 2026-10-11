@@ -30,7 +30,6 @@ References:
 """
 
 import math
-import os
 
 import numpy as np
 
@@ -38,8 +37,9 @@ import ernie
 import ernie.demo
 from ernie import tokens
 
-ISD = os.path.join(os.path.dirname(__file__), "..", "..", "ernie", "test", "fixtures", "isd",
-                   "toughLroNacLineScan.json")
+from demo_support import data_file
+
+ISD = data_file("toughLroNacLineScan.json")
 FIRST_LINE = 3968  # the image's middle 256 lines
 STRIP_LINES = 64
 STRIPS = 4

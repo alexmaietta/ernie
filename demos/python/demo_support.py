@@ -1,12 +1,26 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Small helpers the demos share: heatmaps, side by side, sRGB, and `write_png` (from ernie.demo).
+"""Small helpers the demos share: heatmaps, side by side, sRGB, data files, and `write_png` (from
+ernie.demo).
 
 Not a demo itself; the demos import it from this directory.
 """
 
+import os
+
 import numpy as np
 
 from ernie.demo import write_png  # noqa: F401 - shared with the demos that import it from here
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def data_file(name):
+    """The data file `name` the demos read, such as an ISD: in `data` beside the demos where they
+    are installed (`python -m ernie.demos`), else the repository's ISD test fixture."""
+    installed = os.path.join(HERE, "data", name)
+    if os.path.exists(installed):
+        return installed
+    return os.path.join(HERE, "..", "..", "ernie", "test", "fixtures", "isd", name)
 
 
 def heatmap(values, low, high):

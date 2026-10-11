@@ -43,8 +43,12 @@ examples run. The common options:
 - `--output PATH` writes the last frame (or what `save_output` makes) as PNG.
 - `--paused`, `--device`, `--renderer`, `--validation` and `--vsync`.
 
-In the viewer, a demo uses it as any application does (`add_panel`, `on_frame`, `active_camera`
-...); what it adds is removed, and what it sets is restored, when the Demos panel switches away.
+The base class and the loop are C++'s (`ernie.app.Demo`, `ernie.app.DemoRunner`; ernie/app/demo.h),
+which C++ demos derive from and run the same way; this module adds argparse options, NumPy images
+and the demos found beside a Python one. In the viewer, a demo uses it as any application does
+(`add_panel`, `on_frame`, `active_camera` ...); what it adds is removed (it registers in a scope
+of its own, `Viewer.scope`), and the viewport's display settings are restored, when the Demos
+panel switches away.
 
 References:
 - Newton's examples (`newton.examples`: `Example`, `create_parser`, `init`, `run` and the
@@ -52,34 +56,34 @@ References:
 """
 
 import argparse
-import gc
 import importlib.util
 import os
 import re
 import struct
 import sys
-import time
-import traceback
 import zlib
 
 import numpy as np
 
-from . import Path, Renderer, Scene
+from . import _ernie
+
+if not hasattr(_ernie, "app"):
+    raise ImportError("This build of Ernie has no app; configure it with -DERNIE_BUILD_APP=ON")
+
+_app = _ernie.app
 
 #: Arguments every demo shares, kept when the Demos panel switches demos.
 COMMON_ARGS = ("viewer", "headless", "device", "renderer", "validation", "vsync", "paused")
 
-#: Frames a benchmark runs before it starts timing.
-BENCHMARK_WARMUP = 5
 
-
-class Demo:
+class Demo(_app.Demo):
     """A demo: a scene built in `__init__`, advanced by `step`, rendered by `render`.
 
     Attributes:
         viewer: The viewer the demo shows in, or None under `--viewer null`.
         args: The parsed arguments (`create_parser`).
         scene: The Scene to build into: the viewer's, or a new one without a viewer.
+        renderer: An `ernie.Renderer` of the demo's own, opened on first use.
         frame: Steps taken so far.
         time: Demo seconds at the start of this step.
         frame_dt: Seconds this step advances: the time since the last frame in a window
@@ -94,18 +98,15 @@ class Demo:
     fixed_dt = 1.0 / 60.0
     #: Longest step in a window, so a stall does not throw the simulation.
     max_frame_dt = 1.0 / 30.0
-    #: Window title; the module's first docstring line when empty.
+    #: Window title; "Ernie demos" when empty.
     title = ""
 
     def __init__(self, viewer, args):
+        super().__init__(viewer, options_from_args(args))
         self.viewer = viewer
         self.args = args
-        self.scene = viewer.scene if viewer is not None else Scene()
-        self.frame = 0
-        self.time = 0.0
         self.frame_dt = self.fixed_dt
         self.image = None
-        self._renderer = None
 
     @classmethod
     def create_parser(cls):
@@ -115,20 +116,9 @@ class Demo:
     @classmethod
     def description(cls):
         """The first paragraph of the demo's module docstring, on one line."""
-        doc = sys.modules[cls.__module__].__doc__ or cls.__doc__ or ""
+        module = sys.modules.get(cls.__module__)
+        doc = (module.__doc__ if module else None) or cls.__doc__ or ""
         return " ".join(doc.strip().split("\n\n")[0].split())
-
-    @property
-    def renderer(self):
-        """An `ernie.Renderer` of the demo's own, opened on first use with the run's device,
-        backend and validation."""
-        if self._renderer is None:
-            self._renderer = Renderer(backend=self.args.renderer, validation=self.args.validation,
-                                      device=self.args.device or "")
-        return self._renderer
-
-    def step(self):
-        """Advances the scene by `frame_dt`; nothing for a still scene."""
 
     def render(self):
         """Draws a frame: through the viewer, or with `renderer` into `image` without one."""
@@ -159,9 +149,6 @@ class Demo:
         if self.viewer is not None:
             return self.viewer.map(path, attribute, stream=stream)
         return self.renderer.map(self.scene, path, attribute, stream=stream)
-
-    def close(self):
-        """Releases what the demo holds beyond the scene and viewer, before another replaces it."""
 
 
 def create_parser(demo_class=Demo):
@@ -199,97 +186,46 @@ def default_args(parser):
     return parser.parse_args([])
 
 
+def options_from_args(args):
+    """The `ernie.app.DemoOptions` the parsed arguments of `create_parser` describe."""
+    options = _app.DemoOptions()
+    options.viewer = args.viewer == "window" and args.benchmark is False
+    options.headless = args.headless
+    options.num_frames = args.num_frames
+    options.benchmark = args.benchmark is not False
+    options.benchmark_seconds = args.benchmark or None
+    options.test = args.test
+    options.output = args.output or ""
+    options.paused = args.paused
+    options.device = args.device or ""
+    options.renderer = args.renderer
+    options.validation = args.validation
+    options.vsync = args.vsync
+    return options
+
+
 def init(parser=None, title="Ernie demos"):
-    """Parses the command line and opens the viewer it asks for: `(viewer, args)`, with viewer a
-    `DemoViewer` over an `ernie.app.Viewer` on a new Scene, or None under `--viewer null`."""
+    """Parses the command line and opens the viewer it asks for: `(viewer, args)`, with viewer an
+    `ernie.app.Viewer` on a new Scene, or None under `--viewer null` and `--benchmark`. The
+    runner (`ernie.app.DemoRunner`) rides along in the arguments for `run`."""
     parser = parser or create_parser()
     args = parser.parse_args()
     if args.benchmark is not False:
         args.viewer = "null"
-    if args.viewer == "null":
-        return None, args
-    from .app import Viewer
-
-    viewer = Viewer(Scene(), title=title, hidden=args.headless, validation=args.validation,
-                    device=args.device or "", renderer=args.renderer, vsync=args.vsync)
-    return DemoViewer(viewer), args
+    args.runner = _app.DemoRunner(options_from_args(args), title)
+    return args.runner.viewer, args
 
 
 def run(demo, args):
     """Steps and renders `demo` until its window closes or it has run `--num-frames`, then writes
-    `--output`, runs its final test and reports the benchmark."""
-    viewer = demo.viewer
-    test_post_step = args.test and hasattr(demo, "test_post_step")
-    test_final = args.test and hasattr(demo, "test_final")
-    if args.test and not (test_post_step or test_final):
-        raise NotImplementedError(f"{type(demo).__name__} has no test_final or test_post_step")
-    num_frames = args.num_frames
-    if num_frames is None and (viewer is None or args.headless):
-        num_frames = demo.num_frames
-    benchmark = args.benchmark is not False
-    deadline = args.benchmark if benchmark else None
-
-    browser = None
-    if viewer is not None:
-        viewer._adopt(demo)
-        if not args.headless and not args.test:
-            browser = DemoBrowser(viewer, demo, args)
-
-    paused = args.paused and viewer is not None and not args.headless
-    timed_frames = 0
-    timer_start = None
-    last = time.perf_counter()
-    while viewer is None or viewer.is_open:
-        if browser is not None:
-            demo, paused = browser.update(demo, paused)
-            if demo is None:
-                viewer.step()
-                continue
-        if num_frames is not None and demo.frame >= num_frames:
-            break
-        now = time.perf_counter()
-        realtime = viewer is not None and not args.headless
-        demo.frame_dt = min(now - last, demo.max_frame_dt) if realtime else demo.fixed_dt
-        last = now
-        stepping = not paused or (browser is not None and browser.take_single_step())
-        if stepping:
-            demo.step()
-            if test_post_step:
-                demo.test_post_step()
-        demo.render()
-        if stepping:
-            demo.frame += 1
-            demo.time += demo.frame_dt
-        if benchmark:
-            if demo.frame == BENCHMARK_WARMUP:
-                timer_start = time.perf_counter()
-            elif timer_start is not None:
-                timed_frames += 1
-                if deadline is not None and time.perf_counter() - timer_start >= deadline:
-                    break
-
-    if args.output and demo is not None:
-        demo.save_output(args.output)
-        print(f"wrote {args.output}")
-    if test_final:
-        demo.test_final()
-    if benchmark:
-        if timer_start is None:
-            print(f"Benchmark: too few frames to time (warm-up is {BENCHMARK_WARMUP})")
-        else:
-            elapsed = time.perf_counter() - timer_start
-            print(f"Benchmark: {_format_fps(timed_frames / max(elapsed, 1e-9))} FPS "
-                  f"({timed_frames} frames in {elapsed:.2f} s)")
-    if demo is not None:
-        demo.close()
-    if viewer is not None:
-        viewer.close()
-        # The viewer holds the demo's callbacks and the panel's, which hold the demo and through
-        # it the viewer: a cycle through C++ that Python's collector cannot see.
-        viewer._release()
-        if browser is not None:
-            viewer.raw.remove_panel("Demos")
-    return demo
+    `--output`, runs its final test and reports the benchmark. In a window the Demos panel lists
+    the demo files beside this one. Returns the demo running at the end."""
+    runner = getattr(args, "runner", None)
+    if runner is None:
+        runner = args.runner = _app.DemoRunner(options_from_args(args))
+    if runner.viewer is not None:
+        runner.set_catalog(*catalog(type(demo), args))
+    return runner.run(demo)
 
 
 def main(demo_class):
@@ -299,161 +235,20 @@ def main(demo_class):
     return run(demo, args)
 
 
-class DemoViewer:
-    """An `ernie.app.Viewer` as a demo sees it: everything passes through to the viewer (`raw`),
-    while the panels, callbacks and viewport items a demo adds, and the viewer settings it
-    assigns, are noted, so that switching demos removes and restores them."""
-
-    _REGISTRATIONS = ("on_frame", "on_pre_render", "on_post_render", "on_selection",
-                      "add_viewport_toggle", "add_hud_item", "add_viewport_menu_item")
-    _RESTORED = ("viewport_display", "exposure", "exposure_compensation", "wireframe",
-                 "view_var", "lighting", "gizmo")
-
-    def __init__(self, viewer):
-        object.__setattr__(self, "raw", viewer)
-        object.__setattr__(self, "_defaults", {name: getattr(viewer, name)
-                                               for name in self._RESTORED})
-        object.__setattr__(self, "_callbacks", [])
-        object.__setattr__(self, "_items", [])
-        object.__setattr__(self, "_panels", [])
-        object.__setattr__(self, "_assigned", {})
-
-    def __getattr__(self, name):
-        attribute = getattr(self.raw, name)
-        if name in self._REGISTRATIONS:
-            noted = self._callbacks if name.startswith("on_") else self._items
-
-            def register(*args, **kwargs):
-                handle = attribute(*args, **kwargs)
-                noted.append(handle)
-                return handle
-
-            return register
-        if name == "add_panel":
-            def add_panel(title, *args, **kwargs):
-                panel = attribute(title, *args, **kwargs)
-                self._panels.append(title)
-                return panel
-
-            return add_panel
-        return attribute
-
-    def __setattr__(self, name, value):
-        setattr(self.raw, name, value)
-        self._assigned[name] = value
-
-    def _adopt(self, demo):
-        """Starts the session over on the demo's scene, then applies the viewer settings the demo
-        assigned while building it (its camera, say), which the reset would otherwise undo."""
-        self.raw.reset_session()
-        for name, value in self._assigned.items():
-            setattr(self.raw, name, value)
-        title = demo.title or type(demo).description() or type(demo).__name__
-        self.raw.log(f"Demo: {title}")
-
-    def _release(self):
-        """Removes what the last demo added and restores what it assigned."""
-        for handle in self._callbacks:
-            self.raw.remove_callback(handle)
-        for handle in self._items:
-            self.raw.remove_viewport_item(handle)
-        for title in self._panels:
-            self.raw.remove_panel(title)
-        self._callbacks.clear()
-        self._items.clear()
-        self._panels.clear()
-        self._assigned.clear()
-        for name, value in self._defaults.items():
-            setattr(self.raw, name, value)
-
-
-class DemoBrowser:
-    """The viewer's Demos panel: picks a demo among the `demo_*.py` files beside the running one,
-    and pauses, steps and resets it. Switching clears the scene of everything but the viewer's
-    own prims and overlays and builds the next demo into it."""
-
-    def __init__(self, viewer, demo, args):
-        from .app import Dock
-
-        self.viewer = viewer
-        self.args = args
-        self.entries = discover_demos(os.path.dirname(_module_file(type(demo))))
-        self.current = _module_file(type(demo))
-        self.current_class = type(demo)
-        self.switch_to = None
-        self.reset_requested = False
-        self.single_step = False
-        self.paused = None
-
-        panel = viewer.raw.add_panel("Demos", Dock.LEFT)
-        self.panel = panel
-        labels = [entry.label for entry in self.entries]
-        selected = next((i for i, entry in enumerate(self.entries)
-                         if os.path.samefile(entry.path, self.current)), 0)
-        if labels:
-            self.combo = panel.combo("Demo", labels, selected, on_change=self._choose)
-        else:
-            panel.text("No demos beside this one")
-        panel.separator()
-        self.pause_box = panel.checkbox("Paused", args.paused, on_change=self._pause)
-        panel.button("Step", lambda: setattr(self, "single_step", True))
-        panel.button("Reset", lambda: setattr(self, "reset_requested", True))
-        self.status = panel.text("")
-        panel.separator()
-        self.about = panel.text(type(demo).description())
-
-    def _choose(self, index):
-        self.switch_to = self.entries[index]
-
-    def _pause(self, paused):
-        self.paused = paused
-
-    def take_single_step(self):
-        stepping, self.single_step = self.single_step, False
-        return stepping
-
-    def update(self, demo, paused):
-        """Applies the panel's requests before a frame; returns the demo to run (None if loading
-        one failed) and whether it is paused."""
-        if self.paused is not None:
-            paused, self.paused = self.paused, None
-        if self.switch_to is not None:
-            entry, self.switch_to = self.switch_to, None
-            demo = self._load(demo, lambda: _load_demo_class(entry.path), entry.path)
-        elif self.reset_requested:
-            self.reset_requested = False
-            demo = self._load(demo, lambda: self.current_class, self.current)
-        if demo is not None:
-            self.panel.set(self.status, f"frame {demo.frame}, {demo.time:.2f} s"
-                           + ("  (paused)" if paused else ""))
-        return demo, paused
-
-    def _load(self, old, load_class, path):
-        viewer = self.viewer
-        if old is not None:
-            old.close()
-        viewer._release()
-        clear_scene(viewer.scene)
-        old = None
-        gc.collect()
-        try:
-            demo_class = load_class()
-            args = default_args(demo_class.create_parser())
-            for name in COMMON_ARGS:
-                setattr(args, name, getattr(self.args, name))
-            demo = demo_class(viewer, args)
-            viewer._adopt(demo)
-        except (Exception, SystemExit) as error:  # noqa: BLE001 - shown in the Log panel
-            viewer.raw.log(f"Could not load {os.path.basename(path)}: {error}", "error")
-            traceback.print_exc()
-            viewer._release()
-            clear_scene(viewer.scene)
-            viewer.raw.reset_session()
-            self.panel.set(self.about, "")
-            return None
-        self.current, self.current_class = path, demo_class
-        self.panel.set(self.about, demo_class.description())
-        return demo
+def catalog(demo_class, args):
+    """The Demos panel's entries for a run of `demo_class`, `(infos, current)`: the demo files
+    beside its module, or the class alone when it is not among them."""
+    path = _module_file(demo_class)
+    entries = discover_demos(os.path.dirname(path)) if path else []
+    current = next((i for i, entry in enumerate(entries)
+                    if os.path.exists(entry.path) and os.path.samefile(entry.path, path)), None)
+    infos = [_app.DemoInfo(entry.category, entry.name, "", _creator(entry.path, args))
+             for entry in entries]
+    if current is None:
+        infos.insert(0, _app.DemoInfo("this", demo_class.__name__, demo_class.description(),
+                                      _creator(demo_class, args)))
+        current = 0
+    return infos, current
 
 
 class DemoEntry:
@@ -484,18 +279,18 @@ def discover_demos(directory):
     return entries
 
 
-def clear_scene(scene):
-    """Removes every prim but the viewer's own (under /__session) and every overlay but the
-    viewer's own (named with a leading "__")."""
-    from .app import Viewer
-
-    session = Viewer.session_root
-    for child in scene.children(Path("/")):
-        if child != session:
-            scene.remove(child)
-    for name in scene.overlay_names():
-        if not name.startswith("__"):
-            scene.remove_overlay(name)
+def load_demo_class(path):
+    """Imports the demo file at `path` afresh (its directory first on sys.path, for the helpers
+    beside it) and returns its Demo class."""
+    directory = os.path.dirname(os.path.abspath(path))
+    if directory not in sys.path:
+        sys.path.insert(0, directory)
+    name = "ernie_demo_" + os.path.splitext(os.path.basename(path))[0]
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module.Demo
 
 
 def write_png(path, image):
@@ -517,39 +312,40 @@ def write_png(path, image):
                    chunk(b"IDAT", zlib.compress(raw, 6)) + chunk(b"IEND", b""))
 
 
+def _creator(source, args):
+    """create(viewer, options) for the Demos panel: builds the demo of the file (or class)
+    `source` with its parser's defaults and the run's shared arguments. It holds those values,
+    not `args`, which holds the runner that holds it."""
+    shared = {name: getattr(args, name) for name in COMMON_ARGS}
+
+    def create(viewer, options):
+        demo_class = load_demo_class(source) if isinstance(source, str) else source
+        demo_args = default_args(demo_class.create_parser())
+        for name, value in shared.items():
+            setattr(demo_args, name, value)
+        return demo_class(viewer, demo_args)
+
+    return create
+
+
 def _module_file(cls):
-    return os.path.abspath(sys.modules[cls.__module__].__file__)
-
-
-def _load_demo_class(path):
-    """Imports the demo file at `path` afresh (its directory first on sys.path, for the helpers
-    beside it) and returns its Demo class."""
-    directory = os.path.dirname(path)
-    if directory not in sys.path:
-        sys.path.insert(0, directory)
-    name = "ernie_demo_" + os.path.splitext(os.path.basename(path))[0]
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module.Demo
-
-
-def _format_fps(fps):
-    return f"{fps:.1f}" if fps >= 10 else f"{fps:.2f}" if fps >= 1 else f"{fps:.3f}"
+    module = sys.modules.get(cls.__module__)
+    path = getattr(module, "__file__", None)
+    return os.path.abspath(path) if path else None
 
 
 __all__ = [
     "COMMON_ARGS",
     "Demo",
-    "DemoBrowser",
-    "DemoViewer",
-    "clear_scene",
+    "DemoEntry",
+    "catalog",
     "create_parser",
     "default_args",
     "discover_demos",
     "init",
+    "load_demo_class",
     "main",
+    "options_from_args",
     "run",
     "write_png",
 ]
