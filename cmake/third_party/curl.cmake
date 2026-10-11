@@ -1,3 +1,6 @@
+# Included before the packaging (CMakeLists.txt) and by the demos.
+include_guard(GLOBAL)
+
 set(ERNIE_DEP_VERSION_curl
     curl-8_18_0
     CACHE STRING "Tag of curl to fetch when the system has no libcurl.")

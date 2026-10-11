@@ -97,6 +97,12 @@ else()
         CPACK_DEBIAN_PACKAGE_DEPENDS
         ", libc6 (>= ${ernie_glibc}), libstdc++6 (>= 11), libgcc-s1 (>= 3.4)"
     )
+    # The system's libcurl, which the demos link (curl.cmake): renamed
+    # libcurl4t64 in Debian 13 and Ubuntu 24.04.
+    if(TARGET ernie_curl AND CURL_FOUND)
+        string(APPEND CPACK_DEBIAN_PACKAGE_DEPENDS
+               ", libcurl4t64 | libcurl4")
+    endif()
 endif()
 # Recommended rather than required, so headless servers can leave the window libraries out
 # (`apt install --no-install-recommends`).

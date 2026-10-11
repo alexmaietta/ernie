@@ -483,7 +483,7 @@ jobs:
         run: |
           dnf install -y -q --enablerepo=crb libX11-devel libXrandr-devel libXinerama-devel \
             libXcursor-devel libXi-devel libXext-devel wayland-devel wayland-protocols-devel \
-            libxkbcommon-devel rpm-build
+            libxkbcommon-devel libcurl-devel rpm-build
           dnf install -y -q epel-release
           dnf install -y -q ccache
           command -v ninja >/dev/null || pipx install -q ninja
@@ -507,6 +507,9 @@ jobs:
             cpack --preset package-$kind
           done
           ccache --show-stats
+          # rpmbuild finds the libraries the binaries link, libcurl
+          # among them.
+          rpm -qpR build/package-rpm/packages/*.rpm | grep -F libcurl.so
           mkdir packages
           cp build/package-deb/packages/*.deb build/package-deb/packages/*.tar.gz \
             build/package-rpm/packages/*.rpm packages/
@@ -531,29 +534,42 @@ jobs:
         include:
           - image: ubuntu:22.04
             install: apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq
-            packages: ./packages/*.deb mesa-vulkan-drivers cmake g++ make
+            packages: ./packages/*.deb
+            tools: mesa-vulkan-drivers cmake g++ make
           - image: ubuntu:24.04
             install: apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq
-            packages: ./packages/*.deb mesa-vulkan-drivers cmake g++ make
+            packages: ./packages/*.deb
+            tools: mesa-vulkan-drivers cmake g++ make
           - image: debian:12
             install: apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq
-            packages: ./packages/*.deb mesa-vulkan-drivers cmake g++ make
+            packages: ./packages/*.deb
+            tools: mesa-vulkan-drivers cmake g++ make
           - image: rockylinux:9
             install: dnf install -y -q
-            packages: ./packages/*.rpm mesa-vulkan-drivers cmake gcc-c++ make
+            packages: ./packages/*.rpm
+            tools: mesa-vulkan-drivers cmake gcc-c++ make
           - image: fedora:latest
             install: dnf install -y -q
-            packages: ./packages/*.rpm mesa-vulkan-drivers cmake gcc-c++ make
+            packages: ./packages/*.rpm
+            tools: mesa-vulkan-drivers cmake gcc-c++ make
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           name: packages-linux-x86_64
           path: packages
+      # Ernie's packages alone first, so the program runs on what they
+      # pull in themselves (the build tools bring libcurl, for one).
       - name: Install the packages
         run: ${{ matrix.install }} ${{ matrix.packages }}
       - name: Run the viewer
-        run: ernie --version
+        run: |
+          if ldd "$(command -v ernie)" | grep "not found"; then
+            exit 1
+          fi
+          ernie --version
+      - name: Install the build tools
+        run: ${{ matrix.install }} ${{ matrix.tools }}
       - name: Build and run an application against them
         run: |
           cmake -S ernie/test/install -B consumer -DCMAKE_BUILD_TYPE=Release

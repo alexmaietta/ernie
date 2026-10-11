@@ -136,6 +136,12 @@ endif()
 
 add_subdirectory(ernie)
 
+# The demos' libcurl, found before the packaging so the packages can
+# depend on it.
+if(TARGET ernie_app)
+    include(cmake/third_party/curl.cmake)
+endif()
+
 if(ERNIE_INSTALL)
     include(cmake/ErnieInstall.cmake)
     include(cmake/ErniePackaging.cmake)
