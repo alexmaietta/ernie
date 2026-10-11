@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <set>
 #include <span>
 #include <string>
 #include <string_view>
@@ -361,6 +362,7 @@ class Scene {
         std::map<std::string, std::uint64_t, std::less<>> versions;
         std::array<std::uint64_t, kStampCount> stamps{};
         std::uint64_t ownTransform = 0;  ///< `OwnTransformVersion`.
+        std::uint64_t latest = 0;        ///< Its latest stamp, its key in `stamped_`.
     };
 
     PrimData& Find(const Path& path);
@@ -379,6 +381,10 @@ class Scene {
     std::map<Path, PrimData> prims_;
     std::uint64_t removals_ = 0;  ///< Counts `Remove`s, which invalidate resolved `PrimSet`s.
     std::map<Path, std::uint64_t> removed_;
+    /// Every prim by its latest stamp, so `Changes` visits only the prims stamped since a cursor;
+    /// and the prims of each type, so `Prims` of a type visits only those.
+    std::set<std::pair<std::uint64_t, Path>> stamped_;
+    std::map<std::string, std::set<Path>, std::less<>> byType_;
     std::map<std::string, Overlay, std::less<>> overlays_;
     std::uint64_t version_ = 0;
     UniqueId id_;

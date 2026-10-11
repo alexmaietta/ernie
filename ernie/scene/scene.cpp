@@ -154,11 +154,20 @@ void Scene::Stamp(const Path& path, PrimData& prim, Dirty bit) {
         return;  // nothing to record, and no stamp of its own
     }
     const std::size_t index = StampIndex(bit);
-    prim.stamps[index] = version_;
+    // Moved to its new place in `stamped_`, for `Changes`.
+    const auto restamp = [&](const Path& stamped, PrimData& data) {
+        data.stamps[index] = version_;
+        if (data.latest != version_) {
+            stamped_.erase({data.latest, stamped});
+            stamped_.emplace(version_, stamped);
+            data.latest = version_;
+        }
+    };
+    restamp(path, prim);
     if (bit == Dirty::Transform || bit == Dirty::Visibility) {
         for (auto it = prims_.upper_bound(path); it != prims_.end() && it->first.HasPrefix(path);
              ++it) {
-            it->second.stamps[index] = version_;
+            restamp(it->first, it->second);
         }
     }
 }
@@ -200,6 +209,12 @@ Prim Scene::Define(const Path& path, std::string_view type) {
             prim.versions.clear();
             removed_[path] = version_;
             Stamp(path, prim, Dirty::Added);
+        }
+        if (!prim.type.empty()) {
+            byType_[prim.type].erase(path);
+        }
+        if (!type.empty()) {
+            byType_[std::string(type)].insert(path);
         }
         prim.type = type;
         prim.schema = FindPrimType(type);
@@ -269,6 +284,10 @@ bool Scene::Remove(const Path& path) {
     auto last = first;
     while (last != prims_.end() && last->first.HasPrefix(path)) {
         removed_[last->first] = version_;
+        stamped_.erase({last->second.latest, last->first});
+        if (const auto typed = byType_.find(last->second.type); typed != byType_.end()) {
+            typed->second.erase(last->first);
+        }
         ++last;
     }
     prims_.erase(first, last);
@@ -300,6 +319,13 @@ std::vector<Path> Scene::Children(const Path& path) const {
 }
 
 std::vector<Path> Scene::Prims(std::string_view type) const {
+    if (!type.empty()) {
+        // By the index of each type's prims, in path order as the walk below gives them.
+        const auto typed = byType_.find(type);
+        return typed == byType_.end()
+                   ? std::vector<Path>{}
+                   : std::vector<Path>(typed->second.begin(), typed->second.end());
+    }
     std::vector<Path> paths;
     for (const auto& [path, prim] : prims_) {
         if (!path.IsRoot() && (type.empty() || prim.type == type)) {
@@ -568,10 +594,14 @@ std::vector<Change> Scene::Changes(ChangeCursor& cursor) const {
             changed[path] = Dirty::Removed;
         }
     }
-    for (const auto& [path, prim] : prims_) {
+    // Only the prims stamped since the cursor, by `stamped_`.
+    for (auto it = stamped_.lower_bound({cursor.version + 1, Path()}); it != stamped_.end();
+         ++it) {
+        const Path& path = it->second;
         if (path.IsRoot()) {
             continue;
         }
+        const PrimData& prim = prims_.at(path);
         Dirty bits = Dirty::None;
         if (prim.stamps[StampIndex(Dirty::Added)] > cursor.version) {
             bits = Dirty::Added;
