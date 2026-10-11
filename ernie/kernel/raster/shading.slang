@@ -149,7 +149,8 @@ struct ShadingConstants {
     uint4 horizonInfo;
     // The terrain's heights (`terrainHeights`): their cell size, the frame origin's height
     // (subtracted from the terrain's), the no-data value and 1 when there is one; their width
-    // and height.
+    // and height, and 1 when the horizon map holds the ground's horizon over what stands on the
+    // terrain (layers 2 kHorizonLevels on).
     float4 heightsGrid;
     uint4 heightsSize;
     // The heights above the ground the horizon map's levels see from, in height units.
@@ -614,7 +615,7 @@ bool aboveTerrain(float3 world, out float above) {
 // bracketing `above`, extrapolated past the highest), in four vertical slices whose horizons to
 // either side are the map's opposite azimuths, integrated as `occlusionSlice` does about the
 // vertical. They see the whole terrain, on screen or not, at the map's resolution.
-float4 terrainOcclusion(float3 world, float3 n, float above) {
+float4 terrainOcclusion(float3 world, float3 n, float above, bool onTerrain) {
     let grid = pass.horizonGrid;
     let cell = float2(world.x - grid.x, grid.y - world.y) / grid.z - 0.5;
     let base = int2(floor(cell));
@@ -624,8 +625,11 @@ float4 terrainOcclusion(float3 world, float3 n, float above) {
         lower += 1;
     }
     float4 first, second;
-    horizonAround(base, f, lower, first, second);
-    if (above > 0.0) {
+    // The terrain's own pixels see what stands on it too, when the map holds that horizon
+    // (terrain_horizon.slang's `horizonCastersMain`, the layers after the levels').
+    horizonAround(base, f, onTerrain && pass.heightsSize.z != 0 ? kHorizonLevels : lower, first,
+                  second);
+    if (!onTerrain && above > 0.0) {
         float4 upperFirst, upperSecond;
         horizonAround(base, f, lower + 1, upperFirst, upperSecond);
         let span = pass.horizonLevels[lower + 1] - pass.horizonLevels[lower];
@@ -691,7 +695,8 @@ void occlusionMain(uint3 id : SV_DispatchThreadID) {
         float above = 0.0;
         let onTerrain = gIds.Load(pixel).y == pass.horizonInfo.z;
         if (onTerrain || aboveTerrain(world, above)) {
-            let terrain = terrainOcclusion(world, n, onTerrain ? 0.0 : max(above, 0.0));
+            let terrain =
+                terrainOcclusion(world, n, onTerrain ? 0.0 : max(above, 0.0), onTerrain);
             if (terrain.w < occlusion.w) {
                 occlusion = terrain;
             }

@@ -690,6 +690,20 @@ BrdfCheckModules(const BrdfModel& model) {
 
 }  // namespace
 
+namespace {
+
+/// Whether frame `params` shadows its dome: the full or directions
+/// dome lighting mode, with a shadowing dome, screen-space (so not
+/// for pushbroom strips).
+bool DomeShadowedOf(const FrameParams& params) {
+    return params.dome && params.dome->shadow &&
+           (params.domeMode == DomeLightMode::Full ||
+            params.domeMode == DomeLightMode::Directions) &&
+           !params.camera.pushbroom;
+}
+
+}  // namespace
+
 std::vector<ShadowCascade> FitLightShadowViews(
     const LightParams& light, const glm::vec3& position,
     const glm::vec3& sceneMin, const glm::vec3& sceneMax,
@@ -1330,6 +1344,43 @@ void RasterRenderer::WriteLights(
     }
     if (!table.empty()) {
         uploads_.Write(lightTable_, std::as_bytes(std::span(table)));
+    }
+    // The casters' view over the terrain's grid, for its horizon map,
+    // while the dome is shadowed: orthographic straight down from
+    // above the scene, its x and y the world's.
+    const CastersView before = casters_;
+    casters_ = {};
+    if (terrainExtent_ && bounds && DomeShadowedOf(params) &&
+        lightViews_.size() < kMaxLightShadowViews) {
+        const glm::vec3 corner = params.Relative(
+            glm::dvec3(terrainExtent_->x, terrainExtent_->y, 0.0));
+        const auto width = static_cast<float>(terrainExtent_->z);
+        const auto height = static_cast<float>(terrainExtent_->w);
+        const float top = bounds->second.z + 1.0f;
+        const float span = top - bounds->first.z + 1.0f;
+        ShadowCascade view;
+        view.lightViewProjection =
+            glm::orthoRH_ZO(corner.x, corner.x + width,
+                            corner.y - height, corner.y, 0.0f, span) *
+            glm::lookAtRH(glm::vec3(0.0f, 0.0f, top),
+                          glm::vec3(0.0f, 0.0f, top - 1.0f),
+                          glm::vec3(0.0f, 1.0f, 0.0f));
+        view.texelWorldSize =
+            std::max(width, height) / static_cast<float>(resolution);
+        casters_.valid = true;
+        casters_.layer =
+            static_cast<std::uint32_t>(lightViews_.size());
+        casters_.shadowView = cascades_.size() + lightViews_.size();
+        casters_.resolution = resolution;
+        casters_.top = top;
+        casters_.span = span;
+        lightViews_.push_back(view);
+    }
+    if (casters_.valid != before.valid ||
+        casters_.layer != before.layer ||
+        casters_.resolution != before.resolution ||
+        casters_.top != before.top || casters_.span != before.span) {
+        castersChanged_ = true;
     }
     std::vector<glm::mat4> matrices;
     std::vector<std::byte> blocks(lightViews_.size() *
@@ -2257,11 +2308,7 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
     shading.sky[0] = sky_ | (params.dome ? kSkyLighting : 0u);
     // The dome lighting mode: shadowed (screen-space, so not for
     // pushbroom strips) and diffuse.
-    const bool domeShadowed =
-        params.dome && params.dome->shadow &&
-        (params.domeMode == DomeLightMode::Full ||
-         params.domeMode == DomeLightMode::Directions) &&
-        !params.camera.pushbroom;
+    const bool domeShadowed = DomeShadowedOf(params);
     shading.domeLighting[0] = domeShadowed ? 1.0f : 0.0f;
     domeShadowed_ = domeShadowed;
     if (domeShadowed && occlusionPipeline_ == nullptr) {
@@ -2783,6 +2830,16 @@ void RasterRenderer::RecordShadows(
     // The first sub-frame's (the frame's own without motion blur);
     // `RecordViews` the others'.
     RecordShadowMaps(commands, drawables, Frame(0));
+    {
+        ERNIE_GPU_ZONE(context_, commands, "After shadows");
+        // What reads the shadow maps before the views draw, such as
+        // the terrain's horizon over what stands on it.
+        for (const RasterDrawable* drawable : drawables) {
+            drawable->RecordAfterShadows(commands);
+        }
+        ShaderBarrier(commands);
+        castersChanged_ = false;
+    }
 }
 
 void RasterRenderer::RecordShadowMaps(

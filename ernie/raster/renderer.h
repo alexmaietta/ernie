@@ -219,6 +219,53 @@ class RasterRenderer {
         return domeShadowed_;
     }
 
+    /// The view straight down over a terrain's grid of what stands on
+    /// it, which the terrain's horizon map reads
+    /// (terrain_horizon.slang's `horizonCastersMain`): a light shadow
+    /// map layer, drawn with the light views while the dome is
+    /// shadowed and a terrain is set (`SetTerrainExtent`),
+    /// orthographic over the grid with depth 0 at `top` (relative to
+    /// the frame's origin) and 1 `span` below it. The terrain itself
+    /// does not draw into it.
+    struct CastersView {
+        bool valid = false;
+        std::uint32_t layer = 0;  ///< In `LightShadowMaps`.
+        std::size_t shadowView =
+            0;  ///< Its index among the drawables' shadow views.
+        std::uint32_t resolution = 0;  ///< Texels a side.
+        float top = 0.0f;
+        float span = 0.0f;
+    };
+    const CastersView& Casters() const {
+        return casters_;
+    }
+
+    /// The terrain's grid for the casters' view, absolute world x of
+    /// its west edge, y of its north edge, width and height; none
+    /// without a terrain.
+    void SetTerrainExtent(const std::optional<glm::dvec4>& extent) {
+        terrainExtent_ = extent;
+        castersChanged_ = true;
+    }
+
+    /// Notes that what casts shadows may have moved or changed (the
+    /// delegate calls it when the scene's geometry, transforms or
+    /// materials change), so the terrain's horizon over it is
+    /// recomputed; `CastersChanged` reads it until the frame's
+    /// shadows are recorded.
+    void MarkCastersChanged() {
+        castersChanged_ = true;
+    }
+    bool CastersChanged() const {
+        return castersChanged_;
+    }
+
+    /// The light shadow maps, a D32 2D array (one layer per light
+    /// view and the casters' view).
+    const GpuImage& LightShadowMaps() const {
+        return *lightShadowMaps_;
+    }
+
     /// A terrain's horizon map (terrain_horizon.slang) for the dome
     /// occlusion of its pixels: the image (two layers of four
     /// azimuths), where its texels lie relative to the frame's origin
@@ -701,6 +748,9 @@ class RasterRenderer {
     std::vector<ShadowCascade> lightViews_;
     std::vector<ShadowCascade> shadowViews_;
     std::unique_ptr<GpuImage> lightShadowMaps_;
+    CastersView casters_;
+    std::optional<glm::dvec4> terrainExtent_;
+    mutable bool castersChanged_ = true;
     std::uint32_t lightResolution_ = 0;
     std::vector<glm::vec2> poisson_;
     bool shadowsEnabled_ = false;

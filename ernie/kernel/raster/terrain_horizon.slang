@@ -17,6 +17,10 @@
 
 [[vk::binding(0, 0)]] Texture2D<float> heights;
 [[vk::image_format("rgba16f")]] [[vk::binding(1, 0)]] RWTexture2DArray<float4> horizon;
+// The light shadow maps, one layer of which (`HorizonConstants::skyInfo.x`) is the casters'
+// view: straight down over the terrain's grid, orthographic, its rows from the grid's north
+// edge, depth 0 at `sky.x` (relative to the frame's origin) and 1 `sky.y` below it.
+[[vk::binding(2, 0)]] Texture2DArray<float> sky;
 
 struct HorizonConstants {
     // Heights' width and height, the horizon grid's width and height.
@@ -26,6 +30,11 @@ struct HorizonConstants {
     float4 values;
     // The heights above the ground the levels see from, in height units (before exaggeration).
     float4 levels;
+    // The casters' view: its top and depth span (world units, relative to the frame's origin),
+    // the frame origin's height and the terrain's vertical exaggeration.
+    float4 sky;
+    // Its layer and resolution.
+    uint4 skyInfo;
 }
 [[vk::push_constant]] ConstantBuffer<HorizonConstants> c;
 
@@ -88,4 +97,71 @@ void horizonMain(uint3 id : SV_DispatchThreadID) {
         horizon[uint3(id.xy, 2 * level + 1)] =
             float4(tangents[4], tangents[5], tangents[6], tangents[7]);
     }
+}
+
+// The top of what casts shadows at cell `cell`, in height units (before exaggeration), from the
+// casters' view: the terrain and what stands on it, or false where nothing is.
+bool castersAt(float2 cell, out float height) {
+    height = 0.0;
+    let uv = (cell + 0.5) / float2(c.size.xy);
+    if (any(uv < 0.0) || any(uv >= 1.0)) {
+        return false;
+    }
+    let texel = int2(uv * float(c.skyInfo.y));
+    let depth = sky.Load(int4(texel, int(c.skyInfo.x), 0));
+    if (depth >= 1.0) {
+        return false;
+    }
+    height = (c.sky.x - depth * c.sky.y + c.sky.z) / c.sky.w;
+    return true;
+}
+
+// The ground-level horizon (as `horizonMain`'s level 0) over the terrain and what stands on it,
+// into layers 2 kLevels and 2 kLevels + 1, for the terrain's own pixels: so a lander or a
+// building hides the sky from the ground around it, on screen or not. Each texel's ground is
+// still the terrain's.
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void horizonCastersMain(uint3 id : SV_DispatchThreadID) {
+    if (id.x >= c.size.z || id.y >= c.size.w) {
+        return;
+    }
+    let scale = c.values.x;
+    let cell = c.values.y;
+    let centre = (float2(id.xy) + 0.5) * scale - 0.5;
+    float base;
+    if (!heightAt(centre, base)) {
+        horizon[uint3(id.xy, 2 * kLevels)] = float4(kNone);
+        horizon[uint3(id.xy, 2 * kLevels + 1)] = float4(kNone);
+        return;
+    }
+    let far = float(max(c.size.x, c.size.y));
+    let ratio = pow(far, 1.0 / float(kSteps - 1));
+    float tangents[8];
+    for (uint k = 0; k < 8; ++k) {
+        let azimuth = float(k) * 0.25 * 3.14159265;
+        let direction = float2(cos(azimuth), -sin(azimuth));
+        var highest = kNone;
+        var distance = 1.0;
+        for (uint step = 0; step < kSteps; ++step) {
+            let at = centre + direction * distance;
+            float height;
+            bool found = heightAt(at, height);
+            float top;
+            if (castersAt(at, top)) {
+                height = found ? max(height, top) : top;
+                found = true;
+            }
+            if (found) {
+                highest = max(highest, (height - base) / (distance * cell));
+            } else if (distance > 1.5 * far) {
+                break;
+            }
+            distance *= ratio;
+        }
+        tangents[k] = highest;
+    }
+    horizon[uint3(id.xy, 2 * kLevels)] = float4(tangents[0], tangents[1], tangents[2], tangents[3]);
+    horizon[uint3(id.xy, 2 * kLevels + 1)] =
+        float4(tangents[4], tangents[5], tangents[6], tangents[7]);
 }

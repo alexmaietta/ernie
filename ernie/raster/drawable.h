@@ -177,6 +177,13 @@ class RasterDrawable {
     virtual void
     RecordShadowViews(VkCommandBuffer /*commands*/) const {}
 
+    /// Records compute work that reads the frame's shadow maps before
+    /// its views draw, such as the terrain's horizon over what stands
+    /// on it (`RasterRenderer::Casters`); the renderer follows it
+    /// with a barrier. Nothing by default.
+    virtual void
+    RecordAfterShadows(VkCommandBuffer /*commands*/) const {}
+
     /// Records depth-only draws of `casters` for shadow view
     /// `cascade` (an index into the views given to `Prepare`) into
     /// the open rendering pass. Drawables without worlds draw only

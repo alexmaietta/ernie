@@ -779,8 +779,12 @@ TEST_F(RasterDelegateTest, TheFullDomeModeShadowsTheSunOfAnHdrSky) {
         << "the cube shadows the sun";
     EXPECT_GT(full.shade, 0.5f * full.sunny)
         << "the rest of the sky still lights the shadow";
-    EXPECT_NEAR(full.sunny, full.open, 0.02f * full.open)
-        << "unshadowed beside the cube";
+    // Beside the cube, 1.5 m from its face, the floor is out of the
+    // sun's shadow but the cube hides about a quarter of the sky
+    // (rising 76 degrees across +-63 degrees of azimuth), which gives
+    // two thirds of the light here: about 0.83 of the open floor's.
+    EXPECT_NEAR(full.sunny / full.open, 0.83f, 0.05f)
+        << "the cube hides some sky beside it";
     EXPECT_NEAR(full.open, approximate.open, 0.05f * approximate.open)
         << "the sun's light moved out of the map, not added";
 }
@@ -867,6 +871,54 @@ TEST_F(RasterDelegateTest,
         << "the cliff hides much of the sky";
     EXPECT_GT(fullFar, fullNear + 0.05f * approximateFar)
         << "less so farther from it";
+}
+
+TEST_F(RasterDelegateTest, WhatStandsOnTheTerrainHidesItsSky) {
+    // Flat terrain, 65 x 65 cells of 2 m, and a wall 40 m tall and 60
+    // m long standing on it at x = 24 to 30 m, outside the view,
+    // under a uniform dome. The full mode's horizon map over what
+    // stands on the terrain sees the wall: floor near it (x = 14)
+    // loses much of its sky, floor farther (x = -14) less; the
+    // approximate mode lights both alike.
+    Scene scene = FlatScene();
+    scene.Remove("/World/Sun");
+    ernie::Terrain(scene, "/World/Terrain")
+        .SetHeights(Tensor::Copy<float>(
+            std::vector<float>(65 * 65, 0.0f), {65, 65}));
+    ernie::Cube::Define(scene, "/World/Wall")
+        .SetSize(1.0)
+        .SetXform({.translate = glm::dvec3(27.0, 0.0, 20.0),
+                   .scale = glm::dvec3(6.0, 60.0, 40.0)});
+    ernie::DomeLight::Define(scene, "/World/Sky").SetIntensity(1.0);
+    RasterDelegate delegate(*context_);
+    const auto [nearRow, nearCol] = PixelOf(scene, 14.0f, 0.0f);
+    const auto [farRow, farCol] = PixelOf(scene, -14.0f, 0.0f);
+    const auto floor = [&] {
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const auto vars = MapVars(outputs);
+        return std::pair(
+            At<float>(vars.at("HdrColor"), nearRow, nearCol, 1),
+            At<float>(vars.at("HdrColor"), farRow, farCol, 1));
+    };
+    const auto [approximateNear, approximateFar] = floor();
+    EXPECT_NEAR(approximateNear, approximateFar,
+                0.02f * approximateFar);
+
+    ernie::RenderSettings::Define(scene, "/Render/Settings")
+        .SetDomeLightMode("full");
+    const auto [fullNear, fullFar] = floor();
+    EXPECT_LT(fullNear, 0.8f * approximateNear)
+        << "the wall hides much of the sky";
+    EXPECT_GT(fullFar, fullNear + 0.05f * approximateFar)
+        << "less so farther from it";
+
+    // Sunk below the ground, it no longer does.
+    ernie::Cube(scene, "/World/Wall")
+        .SetXform({.translate = glm::dvec3(27.0, 0.0, -100.0),
+                   .scale = glm::dvec3(6.0, 60.0, 40.0)});
+    const auto [movedNear, movedFar] = floor();
+    EXPECT_GT(movedNear, 0.95f * approximateNear)
+        << "the horizon follows what moves";
 }
 
 TEST_F(RasterDelegateTest,

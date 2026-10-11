@@ -241,6 +241,8 @@ class TerrainDrawable : public RasterDrawable {
     void Prepare(const FrameParams& params,
                  std::span<const ShadowCascade> cascades) override;
 
+    void RecordAfterShadows(VkCommandBuffer commands) const override;
+
     void RecordShadow(VkCommandBuffer commands,
                       const RasterFrame& frame, std::size_t cascade,
                       const glm::mat4& lightViewProjection,
@@ -356,13 +358,19 @@ class TerrainDrawable : public RasterDrawable {
     static constexpr std::uint32_t kMaxHorizon = 512;
     PipelineLayout horizonLayout_;
     std::unique_ptr<ComputePipeline> horizonPipeline_;
+    /// The ground-level horizon over what stands on the terrain too,
+    /// from the renderer's casters' view (`RasterRenderer::Casters`),
+    /// after the shadow maps: recomputed when the casters may have
+    /// changed (`RasterRenderer::CastersChanged`) or the heights did.
+    std::unique_ptr<ComputePipeline> horizonCastersPipeline_;
+    mutable bool castersStale_ = true;
     std::unique_ptr<GpuImage> horizon_;
     std::uint32_t horizonScale_ = 1;
     mutable bool horizonDirty_ = true;
     bool horizonWanted_ = false;
     std::optional<float> noData_;  ///< The heights' no-data value,
                                    ///< host or device ones.
-    /// Makes the horizon map and its pipeline for the current
+    /// Makes the horizon map and its pipelines for the current
     /// heights, when missing.
     void EnsureHorizon();
     /// The height above the ground horizon map level `level` sees
@@ -370,6 +378,12 @@ class TerrainDrawable : public RasterDrawable {
     float HorizonLevel(std::size_t level) const;
     /// Records the horizon map's computation from the heights image.
     void RecordHorizon(VkCommandBuffer commands) const;
+    /// Records one of the horizon map's passes, `pipeline`
+    /// (terrain_horizon.slang).
+    void RecordHorizonPass(VkCommandBuffer commands,
+                           const ComputePipeline& pipeline) const;
+    /// Tells the renderer the grid's extent, for its casters' view.
+    void SetCastersExtent();
 };
 
 }  // namespace ernie

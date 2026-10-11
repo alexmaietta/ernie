@@ -122,6 +122,8 @@ constexpr DescriptorBinding kHorizonBindings[] = {
      VK_SHADER_STAGE_COMPUTE_BIT},
     {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
      VK_SHADER_STAGE_COMPUTE_BIT},
+    {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+     VK_SHADER_STAGE_COMPUTE_BIT},
 };
 
 /// terrain_horizon.slang's constants.
@@ -129,6 +131,8 @@ struct HorizonConstants {
     std::uint32_t size[4];
     float values[4];
     float levels[4];
+    float sky[4];
+    std::uint32_t skyInfo[4];
 };
 
 /// The heights above the ground the horizon map's levels see from, in
@@ -136,6 +140,12 @@ struct HorizonConstants {
 /// (terrain_horizon.slang).
 constexpr std::array<float, 4> kHorizonLevelCells{0.0f, 2.0f, 8.0f,
                                                   32.0f};
+
+/// The horizon map's layers: two per level, then two for the
+/// ground-level horizon over what stands on the terrain
+/// (`horizonCastersMain`).
+constexpr auto kHorizonLayers =
+    static_cast<std::uint32_t>(2 * kHorizonLevelCells.size() + 2);
 
 /// terrain_update.slang's constants.
 struct UpdateConstants {
@@ -286,6 +296,13 @@ void TerrainDrawable::ClearHeightfield() {
     readbackPending_ = {};
     horizon_.reset();
     horizonDirty_ = true;
+    renderer_.SetTerrainExtent(std::nullopt);
+}
+
+void TerrainDrawable::SetCastersExtent() {
+    renderer_.SetTerrainExtent(glm::dvec4(
+        originX_, originY_, static_cast<double>(width_) * pixelSize_,
+        static_cast<double>(height_) * pixelSize_));
 }
 
 void TerrainDrawable::SetHeightfield(const RasterView& raster) {
@@ -320,6 +337,7 @@ void TerrainDrawable::SetHeightfield(const RasterView& raster) {
     originX_ = raster.originX;
     originY_ = raster.originY;
     pixelSize_ = raster.cellSize;
+    SetCastersExtent();
     float lowest = std::numeric_limits<float>::infinity();
     float highest = -std::numeric_limits<float>::infinity();
     for (std::size_t row = 0; row < height_; ++row) {
@@ -474,6 +492,7 @@ void TerrainDrawable::SetHeightfield(const DeviceHeightfield& field) {
     originX_ = field.originX;
     originY_ = field.originY;
     pixelSize_ = field.cellSize;
+    SetCastersExtent();
     if (!reshape && !mappedHeights_.Empty() &&
         tensor.Data() == mappedHeights_.Data()) {
         // Written in place through `MapHeights`: the frame waits for
@@ -556,6 +575,10 @@ void TerrainDrawable::EnsureHorizon() {
             renderer_.Context(), horizonLayout_,
             renderer_.Compiler().CompileSpirv(modules,
                                               "horizonMain"));
+        horizonCastersPipeline_ = std::make_unique<ComputePipeline>(
+            renderer_.Context(), horizonLayout_,
+            renderer_.Compiler().CompileSpirv(modules,
+                                              "horizonCastersMain"));
     }
     if (horizon_ == nullptr) {
         const auto longest =
@@ -567,10 +590,8 @@ void TerrainDrawable::EnsureHorizon() {
             (height_ + horizonScale_ - 1) / horizonScale_);
         horizon_ = std::make_unique<GpuImage>(
             renderer_.Context(),
-            ImageDesc{width, height,
-                      static_cast<std::uint32_t>(
-                          2 * kHorizonLevelCells.size()),
-                      1, VK_FORMAT_R16G16B16A16_SFLOAT,
+            ImageDesc{width, height, kHorizonLayers, 1,
+                      VK_FORMAT_R16G16B16A16_SFLOAT,
                       VK_IMAGE_USAGE_SAMPLED_BIT |
                           VK_IMAGE_USAGE_STORAGE_BIT,
                       false, true});
@@ -580,13 +601,36 @@ void TerrainDrawable::EnsureHorizon() {
 
 void TerrainDrawable::RecordHorizon(VkCommandBuffer commands) const {
     ERNIE_GPU_ZONE(renderer_.Context(), commands, "Terrain horizon");
+    RecordHorizonPass(commands, *horizonPipeline_);
+    // The ground level changed under the casters' layers too.
+    castersStale_ = true;
+}
+
+void TerrainDrawable::RecordAfterShadows(
+    VkCommandBuffer commands) const {
+    const RasterRenderer::CastersView& casters = renderer_.Casters();
+    if (!horizonWanted_ || horizon_ == nullptr || !casters.valid ||
+        !(castersStale_ || renderer_.CastersChanged())) {
+        return;
+    }
+    ERNIE_GPU_ZONE(renderer_.Context(), commands,
+                   "Terrain horizon over casters");
+    RecordHorizonPass(commands, *horizonCastersPipeline_);
+    castersStale_ = false;
+}
+
+void TerrainDrawable::RecordHorizonPass(
+    VkCommandBuffer commands, const ComputePipeline& pipeline) const {
     horizon_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
-                      horizonPipeline_->Handle());
+                      pipeline.Handle());
     const DescriptorResource resources[] = {
         DescriptorResource::Of(heights_->View()),
         DescriptorResource::Of(horizon_->View(),
-                               VK_IMAGE_LAYOUT_GENERAL)};
+                               VK_IMAGE_LAYOUT_GENERAL),
+        DescriptorResource::Of(
+            renderer_.LightShadowMaps().View(),
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)};
     horizonLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                         resources);
     HorizonConstants constants{};
@@ -602,6 +646,13 @@ void TerrainDrawable::RecordHorizon(VkCommandBuffer commands) const {
          ++level) {
         constants.levels[level] = HorizonLevel(level);
     }
+    const RasterRenderer::CastersView& casters = renderer_.Casters();
+    constants.sky[0] = casters.top;
+    constants.sky[1] = casters.span;
+    constants.sky[2] = static_cast<float>(origin_.z);
+    constants.sky[3] = params_.exaggeration;
+    constants.skyInfo[0] = casters.layer;
+    constants.skyInfo[1] = casters.resolution;
     horizonLayout_.PushConstants(commands, &constants,
                                  sizeof(constants));
     vkCmdDispatch(commands, (constants.size[2] + 7) / 8,
@@ -818,8 +869,11 @@ void TerrainDrawable::Prepare(
                                static_cast<float>(origin_.z),
                                noData_.value_or(0.0f),
                                noData_ ? 1.0f : 0.0f};
+        // z: whether the map holds the ground-level horizon over what
+        // stands on the terrain.
         horizon.heightsSize = {static_cast<std::uint32_t>(width_),
-                               static_cast<std::uint32_t>(height_), 0,
+                               static_cast<std::uint32_t>(height_),
+                               renderer_.Casters().valid ? 1u : 0u,
                                0};
         for (std::size_t level = 0; level < kHorizonLevelCells.size();
              ++level) {
@@ -1015,8 +1069,13 @@ void TerrainDrawable::RecordShadow(
     VkCommandBuffer commands, const RasterFrame& frame,
     std::size_t cascade, const glm::mat4& lightViewProjection,
     const ShadowCasters& casters) const {
+    // Not into the casters' view: what stands on the terrain, which
+    // the horizon map adds to the heights themselves (a coarse LOD
+    // there would read as relief that is not).
+    const RasterRenderer::CastersView& view = renderer_.Casters();
     if (!prepared_ || cascade >= cascadeRanges_.size() ||
-        !casters.shared) {
+        !casters.shared ||
+        (view.valid && cascade == view.shadowView)) {
         return;
     }
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,

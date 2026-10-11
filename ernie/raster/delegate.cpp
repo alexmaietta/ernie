@@ -2005,9 +2005,13 @@ void RasterDelegate::Sync(const Scene& scene) {
         // So does a simulation step that only rewrites the arrays of
         // prims posed on the GPU: the drawable takes the new arrays.
         if (RefreshGpuXforms(scene, changes)) {
+            renderer_.MarkCastersChanged();
             return;
         }
     }
+    // What casts shadows may have moved: the terrain's horizon over
+    // it follows.
+    renderer_.MarkCastersChanged();
     std::vector<std::string> errors;
     const auto attempt = [&errors](auto&& step) {
         try {
