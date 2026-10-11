@@ -191,12 +191,12 @@ struct LightParams {
     float radius = 0.0f;
     float coneAngle = 180.0f;   ///< Degrees off the axis that are lit; 180 lights every direction.
     float coneSoftness = 0.0f;  ///< Fraction of the cone, at its edge, over which light fades out.
-    /// Sphere, rect and disk (UsdLux's shaping focus): `spectrum` is the emission along the axis,
+    /// Not distant (UsdLux's shaping focus): `spectrum` is the emission along the axis,
     /// and off it the emission per band is spectrum x lerp(focusTint, 1, |cos|^focus), cos of the
     /// angle between the axis and the direction from the light. An empty tint is black.
     float focus = 0.0f;
     std::vector<float> focusTint;
-    /// Sphere, rect and disk with an IES profile: its candela, `kProfileRows` rows of
+    /// Not distant, with an IES profile: its candela, `kProfileRows` rows of
     /// `kProfileColumns`, row i at i x 180 / (kProfileRows - 1) degrees off the axis (its angle
     /// scale applied) and column j at j x 360 / kProfileColumns degrees around it from the light's
     /// +x towards +y; the emission per band is spectrum x the profile, interpolated, besides cone

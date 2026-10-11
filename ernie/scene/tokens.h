@@ -214,13 +214,13 @@ inline constexpr std::string_view kTreatAsLine = "treatAsLine";
 /// Degrees off the axis that a light reaches, and the fraction of that angle over which it fades.
 inline constexpr std::string_view kShapingConeAngle = "inputs:shaping:cone:angle";
 inline constexpr std::string_view kShapingConeSoftness = "inputs:shaping:cone:softness";
-/// float: a sphere, rect or disk light's emission falls off as |cos|^focus of the angle off its
-/// axis; color3f: the tint its falloff fades to instead of black (white undoes the focus).
+/// float: a sphere, rect, disk or cylinder light's emission falls off as |cos|^focus of the angle
+/// off its -z axis; color3f: the tint its falloff fades to instead of black (white undoes it).
 inline constexpr std::string_view kShapingFocus = "inputs:shaping:focus";
 inline constexpr std::string_view kShapingFocusTint = "inputs:shaping:focusTint";
-/// asset: an IES LM-63 profile (`IesProfile`) shaping a sphere, rect or disk light, its nadir
-/// along the light's -z axis and its 0 degree plane through +x. float: scales its vertical angle
-/// about the nadir (above 0) or the zenith (below 0); 0 leaves it. bool: normalize keeps the
+/// asset: an IES LM-63 profile (`IesProfile`) shaping a sphere, rect, disk or cylinder light, its
+/// nadir along the light's -z axis and its 0 degree plane through +x. float: scales its vertical
+/// angle about the nadir (above 0) or the zenith (below 0); 0 leaves it. bool: normalize keeps the
 /// light's power as without the profile; otherwise its candela multiply the intensity.
 inline constexpr std::string_view kShapingIesFile = "inputs:shaping:ies:file";
 inline constexpr std::string_view kShapingIesAngleScale = "inputs:shaping:ies:angleScale";

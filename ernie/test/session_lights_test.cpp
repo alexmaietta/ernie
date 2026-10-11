@@ -463,6 +463,71 @@ TEST(LightParamsOf, IesProfilesShapeLightsInEveryUnit) {
     std::filesystem::remove(file);
 }
 
+namespace {
+
+/// The flux per unit luminance of a Lambertian cylinder side `length` long along x and `radius`
+/// wide, its emission times `g` of the direction (a unit vector, the light's axis -z), by brute
+/// force over its surface normals and the hemisphere each faces.
+template <typename G> double CylinderFlux(double length, double radius, const G& g) {
+    constexpr int kAround = 96;
+    constexpr int kTheta = 96;
+    constexpr int kPhi = 192;
+    const double dA = 2.0 * M_PI / kAround;
+    const double dTheta = 0.5 * M_PI / kTheta;
+    const double dPhi = 2.0 * M_PI / kPhi;
+    double sum = 0.0;
+    for (int a = 0; a < kAround; ++a) {
+        const double angle = (a + 0.5) * dA;
+        const glm::dvec3 n(0.0, std::cos(angle), std::sin(angle));
+        const glm::dvec3 t1(1.0, 0.0, 0.0);
+        const glm::dvec3 t2 = glm::cross(n, t1);
+        for (int i = 0; i < kTheta; ++i) {
+            const double theta = (i + 0.5) * dTheta;
+            for (int j = 0; j < kPhi; ++j) {
+                const double phi = (j + 0.5) * dPhi;
+                const glm::dvec3 w = std::sin(theta) * (std::cos(phi) * t1 + std::sin(phi) * t2) +
+                                     std::cos(theta) * n;
+                sum += std::cos(theta) * std::sin(theta) * g(w);
+            }
+        }
+    }
+    return sum * dTheta * dPhi * radius * dA * length;
+}
+
+}  // namespace
+
+TEST(LightParamsOf, CylinderLightsTakeFocusAndProfilesKeepingTheirPower) {
+    const ernie::SpectralBands bands{380.0, 780.0, 40};
+    Scene scene;
+    const auto luminous = [&](std::string_view path) {
+        return Luminous(ernie::LightParamsOf(scene, path, bands).spectrum, bands);
+    };
+    // 2 m long and 0.25 m in radius: 2 r l = 1 m^2 seen side on.
+    ernie::CylinderLight tube = ernie::CylinderLight::Define(scene, "/Tube")
+                                    .SetLength(2.0)
+                                    .SetRadius(0.25)
+                                    .SetPhotometricPower(1000.0)
+                                    .SetShapingFocus(2.0);
+    const double focused =
+        1000.0 / CylinderFlux(2.0, 0.25, [](const glm::dvec3& w) { return w.z * w.z; });
+    EXPECT_NEAR(luminous("/Tube"), focused, 0.01 * focused) << "1000 lumens, focused";
+    EXPECT_EQ(ernie::LightParamsOf(scene, "/Tube", bands).focus, 2.0f);
+
+    // A downlight profile, its candela over the tube's -z axis.
+    const std::filesystem::path file = WriteTemporary("tube", kDownlight);
+    const ernie::IesProfile profile = ernie::ReadIes(file);
+    tube.ClearShapingFocus().SetShapingIesFile(file.string());
+    const double profiled = 1000.0 / CylinderFlux(2.0, 0.25, [&](const glm::dvec3& w) {
+                                return profile.Sample(glm::degrees(std::acos(-w.z)),
+                                                      glm::degrees(std::atan2(w.y, w.x)));
+                            });
+    EXPECT_NEAR(luminous("/Tube"), profiled, 0.01 * profiled) << "1000 lumens, profiled";
+    // In relative units, the candela times the intensity over 2 r l.
+    tube.ClearPhotometricPower().SetIntensity(3.0);
+    EXPECT_NEAR(luminous("/Tube"), 3.0, 0.03);
+    std::filesystem::remove(file);
+}
+
 TEST(LightParamsOf, CylinderLightsEmitFromTheirSides) {
     const ernie::SpectralBands bands{380.0, 780.0, 40};
     Scene scene;

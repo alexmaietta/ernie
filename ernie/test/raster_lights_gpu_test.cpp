@@ -349,6 +349,64 @@ TEST_F(RasterDelegateTest, CylinderLightsLightAsTheirSidesDo) {
                     expected, 0.03 * expected)
             << "at " << at.x << ", " << at.y;
     }
+
+    // Focused in relative units: times |cos|^2 off its -z axis, by the direction from its centre.
+    ernie::CylinderLight(scene, "/World/Panel").SetShapingFocus(2.0);
+    for (const glm::dvec2 at : {glm::dvec2(6.0, 0.0), glm::dvec2(0.0, 6.0)}) {
+        const glm::dvec3 centre =
+            PixelCentre(scene, static_cast<float>(at.x), static_cast<float>(at.y));
+        const double c = 10.0 / glm::length(centre - glm::dvec3(0.0, 0.0, 10.0));
+        const double expected =
+            0.5 / M_PI * radiance * CylinderIrradiance(8.0, 1.0, 10.0, centre) * c * c;
+        EXPECT_NEAR(RadianceAt(delegate, scene, static_cast<float>(at.x), static_cast<float>(at.y)),
+                    expected, 0.03 * expected)
+            << "focused, at " << at.x << ", " << at.y;
+    }
+
+    // An IES profile: a downlight's candela against 100 cd every way, by the direction from its
+    // centre off its -z axis.
+    const char* downlight = R"(IESNA:LM-63-2002
+TILT=NONE
+1 -1 1 7 1 1 2 0 0 0
+1 1 10
+0 15 30 45 60 75 90
+0
+100 96.592583 86.602540 70.710678 50 25.881905 0
+)";
+    const char* uniform = R"(IESNA:LM-63-2002
+TILT=NONE
+1 -1 1 2 1 1 2 0 0 0
+1 1 10
+0 180
+0
+100 100
+)";
+    const std::filesystem::path directory = std::filesystem::temp_directory_path();
+    const std::filesystem::path shaped = directory / "ernie_raster_lights_tube_downlight.ies";
+    const std::filesystem::path flat = directory / "ernie_raster_lights_tube_uniform.ies";
+    std::ofstream(shaped) << downlight;
+    std::ofstream(flat) << uniform;
+    const ernie::IesProfile profile = ernie::ParseIes(downlight);
+    Scene reference = scene;
+    ernie::CylinderLight(scene, "/World/Panel")
+        .ClearShapingFocus()
+        .SetShapingIesFile(shaped.string());
+    ernie::CylinderLight(reference, "/World/Panel")
+        .ClearShapingFocus()
+        .SetShapingIesFile(flat.string());
+    for (const glm::dvec2 at : {glm::dvec2(6.0, 0.0), glm::dvec2(0.0, 6.0)}) {
+        const auto x = static_cast<float>(at.x);
+        const auto y = static_cast<float>(at.y);
+        const glm::dvec3 centre = PixelCentre(scene, x, y);
+        const double theta =
+            glm::degrees(std::acos(10.0 / glm::length(centre - glm::dvec3(0.0, 0.0, 10.0))));
+        const double expected = profile.Sample(theta, 0.0) / 100.0;
+        EXPECT_NEAR(RadianceAt(delegate, scene, x, y) / RadianceAt(delegate, reference, x, y),
+                    expected, 0.02 * expected)
+            << "profiled, at " << at.x << ", " << at.y;
+    }
+    std::filesystem::remove(shaped);
+    std::filesystem::remove(flat);
 }
 
 TEST_F(RasterDelegateTest, RectAndDiskLightsMatchTheirFormFactors) {

@@ -326,6 +326,50 @@ double ProfileAxis(const std::vector<float>& profile) {
     return axis > 0.0 ? axis : std::max(*std::max_element(profile.begin(), profile.end()), 1e-9f);
 }
 
+/// A light's IES profile grid `theta` radians off its axis and `phi` around it from its +x,
+/// bilinear (as the shading samples it).
+double ProfileAt(const std::vector<float>& profile, double theta, double phi) {
+    constexpr int rows = LightParams::kProfileRows;
+    constexpr int columns = LightParams::kProfileColumns;
+    const double r = std::clamp(theta / M_PI, 0.0, 1.0) * (rows - 1);
+    const int r0 = std::min(static_cast<int>(r), rows - 2);
+    const double tr = r - r0;
+    const double c = phi / (2.0 * M_PI) * columns;
+    const int c0 = ((static_cast<int>(std::floor(c)) % columns) + columns) % columns;
+    const int c1 = (c0 + 1) % columns;
+    const double tc = c - std::floor(c);
+    const auto at = [&](int row, int column) {
+        return static_cast<double>(profile[static_cast<std::size_t>(row * columns + column)]);
+    };
+    return (1.0 - tr) * ((1.0 - tc) * at(r0, c0) + tc * at(r0, c1)) +
+           tr * ((1.0 - tc) * at(r0 + 1, c0) + tc * at(r0 + 1, c1));
+}
+
+/// What a cylinder light's side spreads its power over, per unit of its length times its
+/// diameter: the integral over directions of its shape (about its -z axis) and profile times its
+/// side's projected area there, which is sin of the angle to its length; pi^2 unshaped, so that
+/// times 2 r l it is pi times the side's area.
+double CylinderEmittedSolidAngle(const EmissionShape& shape, const std::vector<float>& profile) {
+    constexpr int kTheta = 512;
+    constexpr int kPhi = 256;
+    const double dTheta = M_PI / kTheta;
+    const double dPhi = 2.0 * M_PI / kPhi;
+    double sum = 0.0;
+    for (int i = 0; i < kTheta; ++i) {
+        const double theta = (i + 0.5) * dTheta;  // off the -z axis
+        const double s = std::sin(theta);
+        const double focused = shape(std::cos(theta));
+        for (int j = 0; j < kPhi; ++j) {
+            const double phi = (j + 0.5) * dPhi;
+            const double along = s * std::cos(phi);  // its component along the length, +x
+            const double projected = std::sqrt(std::max(1.0 - along * along, 0.0));
+            sum +=
+                focused * projected * s * (profile.empty() ? 1.0 : ProfileAt(profile, theta, phi));
+        }
+    }
+    return sum * dTheta * dPhi;
+}
+
 /// The shape of a sphere, rect or disk light's emission (`EmissionShape`), with `coneAngle` and
 /// `coneSoftness` its cone's (180 and 0 for none).
 EmissionShape EmissionShapeOf(const BoundableLight& light, double coneAngle, double coneSoftness) {
@@ -1084,10 +1128,12 @@ LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBa
         throw std::invalid_argument("Light '" + path.String() + "' has a degenerate transform");
     }
     light.tangent = glm::vec3(glm::normalize(x));
+    SetFocus(light, emitter, bands);
+    light.profile = ProfileOf(emitter);
     if (type == kCylinderLight) {
-        // Lambertian over its side, 2 pi r l: a power over pi times that. An illuminance facing
-        // its middle takes its silhouette as l by 2 r, close beyond a few radii. Focus and IES
-        // profiles do not shape it.
+        // Lambertian over its side, 2 pi r l: unshaped, a power over pi times that, and shaped
+        // by its focus and profile about its -z axis as the other lights are. An illuminance on
+        // that axis takes its silhouette as l by 2 r, close beyond a few radii.
         const CylinderLight cylinder(scene, path);
         light.type = LightType::Cylinder;
         light.size = glm::vec2(cylinder.GetLength() * glm::length(xAxis), 0.0f);
@@ -1098,22 +1144,33 @@ LightParams LightParamsOf(const Scene& scene, const Path& path, const SpectralBa
         if (!(area > 0.0)) {
             throw std::invalid_argument("Light '" + path.String() + "' has no area");
         }
+        const double side = 2.0 * radius * length;
+        const EmissionShape shape = EmissionShapeOf(emitter, 180.0, 0.0);
+        const double plain = side * CylinderEmittedSolidAngle(shape, {});
+        const double spread =
+            light.profile.empty() ? plain : side * CylinderEmittedSolidAngle(shape, light.profile);
+        const double axis = light.profile.empty() ? 1.0 : ProfileAxis(light.profile);
         const std::optional<std::vector<float>> pairs = SpectrumPairs(emitter);
         if (emitter.IsPhotometric()) {
             const auto perLux = [&](double distance) {
-                return RectLuminancePerLux(length, 2.0 * radius, distance);
+                return RectLuminancePerLux(length, 2.0 * radius, distance) / axis;
             };
-            light.spectrum = RelativeSpectrum(emitter, bands,
-                                              PhotometricAreaValue(emitter, M_PI * area, perLux));
+            light.spectrum =
+                RelativeSpectrum(emitter, bands, PhotometricAreaValue(emitter, spread, perLux));
         } else if (emitter.HasPower() || pairs) {
-            light.spectrum = LampSpectrum(emitter, bands, pairs ? &*pairs : nullptr, M_PI * area);
+            light.spectrum = LampSpectrum(emitter, bands, pairs ? &*pairs : nullptr, spread);
         } else {
-            light.spectrum = RelativeSpectrum(emitter, bands, LightIntensity(emitter, area));
+            // With a profile, its candela times the intensity over its side's projection 2 r l
+            // (a luminance per candela), or normalized the luminance keeping its flux.
+            const double luminance = LightIntensity(emitter, area);
+            light.spectrum = RelativeSpectrum(emitter, bands,
+                                              light.profile.empty() ? luminance
+                                              : emitter.GetShapingIesNormalize()
+                                                  ? luminance * plain / spread
+                                                  : LightIntensity(emitter) / side);
         }
         return light;
     }
-    SetFocus(light, emitter, bands);
-    light.profile = ProfileOf(emitter);
     if (type != kSphereLight) {
         double area = 0.0;
         if (type == kRectLight) {
