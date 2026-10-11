@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // LROC's Narrow Angle Camera line-scanning the Moon's south pole at a
 // low Sun, posed from a real ISD on LOLA's terrain (fetched on the
-// first run, 3 MB).
+// first run, 12 MB).
 //
 // References:
 // - M. S. Robinson et al., "Lunar Reconnaissance Orbiter Camera
@@ -60,10 +60,10 @@ constexpr std::uint32_t kFirstLine = 3840;
 constexpr std::uint32_t kStripLines = 64;
 constexpr std::uint32_t kStrips = 8;
 
-/// The terrain about the middle line's ground: cells of 10 m, 12 km
-/// across.
-constexpr std::uint32_t kCells = 1201;
-constexpr double kCellSize = 10.0;
+/// The terrain about the middle line's ground: cells of 5 m, the
+/// DEM's own, 12 km across.
+constexpr std::uint32_t kCells = 2401;
+constexpr double kCellSize = 5.0;
 
 /// The Sun's radius and the astronomical unit, metres; the total
 /// solar irradiance at 1 au, W/m^2 (Kopp and Lean 2011).
@@ -92,19 +92,19 @@ double NacCompand(double x) {
 // ---------------------------------------------------------------
 // LOLA
 
-/// LOLA's 10 m polar LDEM south of 85 S at the PDS Geosciences Node:
+/// LOLA's 5 m polar LDEM south of 87.5 S at the PDS Geosciences Node:
 /// 30336 x 30336 16-bit samples, the pole at line and sample 15167.5.
 constexpr const char* kLdemUrl =
     "https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/"
-    "lrolol_1xxx/data/lola_gdr/polar/img/ldem_85s_10m.img";
+    "lrolol_1xxx/data/lola_gdr/polar/img/ldem_875s_5m.img";
 constexpr std::uint64_t kLdemSize = 30336;
 constexpr double kLdemOffset = 15167.5;
-constexpr double kLdemScale = 10.0;
+constexpr double kLdemScale = 5.0;
 constexpr double kMoonRadius = 1737400.0;
 
 /// The cached window's label.
 std::filesystem::path LdemLabel() {
-    return demos::CacheDir() / "lola" / "ldem_85s_10m_lroc_nac.lbl";
+    return demos::CacheDir() / "lola" / "ldem_875s_5m_lroc_nac.lbl";
 }
 
 /// The polar grid's fractional (line, sample) of a latitude and east
@@ -155,7 +155,7 @@ void FetchLdemWindow(double latitudeDeg, double longitudeDeg,
     std::filesystem::create_directories(label.parent_path());
     {
         std::ofstream image(label.parent_path() /
-                                "ldem_85s_10m_lroc_nac.img",
+                                "ldem_875s_5m_lroc_nac.img",
                             std::ios::binary);
         image.write(rows.data(),
                     static_cast<std::streamsize>(rows.size()));
@@ -165,14 +165,14 @@ void FetchLdemWindow(double latitudeDeg, double longitudeDeg,
     {
         std::ofstream text(part);
         text << "PDS_VERSION_ID = PDS3\n"
-                "/* A window of LOLA's LDEM_85S_10M "
+                "/* A window of LOLA's LDEM_875S_5M "
                 "(LRO-L-LOLA-4-GDR-V1.0), fetched\n   by "
                 "demos/cameras/demo_cameras_lroc_nac from the PDS "
                 "Geosciences Node. */\n"
                 "RECORD_TYPE = FIXED_LENGTH\n"
              << "RECORD_BYTES = " << 2 * size << "\n"
              << "FILE_RECORDS = " << size << "\n"
-             << "^IMAGE = \"LDEM_85S_10M_LROC_NAC.IMG\"\n"
+             << "^IMAGE = \"LDEM_875S_5M_LROC_NAC.IMG\"\n"
                 "OBJECT = IMAGE\n"
              << "  LINES = " << size << "\n"
              << "  LINE_SAMPLES = " << size << "\n"
@@ -187,7 +187,7 @@ void FetchLdemWindow(double latitudeDeg, double longitudeDeg,
                 "  A_AXIS_RADIUS = 1737.4 <km>\n"
                 "  CENTER_LATITUDE = -90 <deg>\n"
                 "  CENTER_LONGITUDE = 0 <deg>\n"
-                "  MAP_SCALE = 10 <m/pix>\n"
+                "  MAP_SCALE = 5 <m/pix>\n"
              << "  LINE_PROJECTION_OFFSET = "
              << kLdemOffset - static_cast<double>(firstLine)
              << " <pix>\n"
@@ -300,7 +300,11 @@ class LrocNacDemo : public app::Demo {
         Camera::Define(scene, "/World/View")
             .SetFocalLength(24.0)
             .SetClippingRange(glm::dvec2(10.0, 1e5))
-            .SetExposureTime(1.0 / 250.0);
+            // Sunlit regolith's exposure: the Looney 11 rule, f/11 at
+            // 1/ISO seconds.
+            .SetExposureFStop(11.0)
+            .SetExposureIso(100.0)
+            .SetExposureTime(1.0 / 100.0);
         scene.Set("/World/View", tokens::kTransform,
                   LookAtTransform({-4e3, -4e3, 3e3}, {0.0, 0.0, 0.0},
                                   {0.0, 0.0, 1.0}));

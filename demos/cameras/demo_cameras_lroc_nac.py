@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """LROC's Narrow Angle Camera line-scanning the Moon's south pole at a
 low Sun, posed from a real ISD on LOLA's terrain (fetched on the first
-run, 3 MB).
+run, 12 MB).
 
 References:
 - M. S. Robinson et al., "Lunar Reconnaissance Orbiter Camera (LROC)
@@ -40,10 +40,10 @@ FIRST_LINE = 3840
 STRIP_LINES = 64
 STRIPS = 8
 
-# The terrain about the middle line's ground: cells of 10 m, 12 km
-# across.
-CELLS = 1201
-CELL_SIZE = 10.0
+# The terrain about the middle line's ground: cells of 5 m, the DEM's
+# own, 12 km across.
+CELLS = 2401
+CELL_SIZE = 5.0
 
 # The Sun's radius and the astronomical unit, metres; the total solar
 # irradiance at 1 au, W/m^2 (Kopp and Lean 2011).
@@ -76,22 +76,22 @@ def nac_compand(x):
 
 # ----------------------------------------------------------------- LOLA
 
-# LOLA's 10 m polar LDEM south of 85 S at the PDS Geosciences Node: 30336
+# LOLA's 5 m polar LDEM south of 87.5 S at the PDS Geosciences Node: 30336
 # x 30336 16-bit samples, the pole at line and sample 15167.5.
 LDEM_URL = (
     "https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/"
-    "lrolol_1xxx/data/lola_gdr/polar/img/ldem_85s_10m.img"
+    "lrolol_1xxx/data/lola_gdr/polar/img/ldem_875s_5m.img"
 )
 LDEM_SIZE = 30336
 LDEM_OFFSET = 15167.5
-LDEM_SCALE = 10.0
+LDEM_SCALE = 5.0
 MOON_RADIUS = 1737400.0
 
 
 def ldem_label():
     """The cached window's label."""
     return os.path.join(
-        cache_dir(), "lola", "ldem_85s_10m_lroc_nac.lbl"
+        cache_dir(), "lola", "ldem_875s_5m_lroc_nac.lbl"
     )
 
 
@@ -145,18 +145,18 @@ def fetch_ldem_window(latitude, longitude, half):
     directory = os.path.dirname(label)
     os.makedirs(directory, exist_ok=True)
     with open(
-        os.path.join(directory, "ldem_85s_10m_lroc_nac.img"), "wb"
+        os.path.join(directory, "ldem_875s_5m_lroc_nac.img"), "wb"
     ) as f:
         f.write(rows)
     with open(label + ".part", "w") as f:
         f.write(
             f"""PDS_VERSION_ID = PDS3
-/* A window of LOLA's LDEM_85S_10M (LRO-L-LOLA-4-GDR-V1.0), fetched
+/* A window of LOLA's LDEM_875S_5M (LRO-L-LOLA-4-GDR-V1.0), fetched
    by demos/cameras/demo_cameras_lroc_nac from the PDS Geosciences Node. */
 RECORD_TYPE = FIXED_LENGTH
 RECORD_BYTES = {2 * size}
 FILE_RECORDS = {size}
-^IMAGE = "LDEM_85S_10M_LROC_NAC.IMG"
+^IMAGE = "LDEM_875S_5M_LROC_NAC.IMG"
 OBJECT = IMAGE
   LINES = {size}
   LINE_SAMPLES = {size}
@@ -171,7 +171,7 @@ OBJECT = IMAGE_MAP_PROJECTION
   A_AXIS_RADIUS = 1737.4 <km>
   CENTER_LATITUDE = -90 <deg>
   CENTER_LONGITUDE = 0 <deg>
-  MAP_SCALE = 10 <m/pix>
+  MAP_SCALE = 5 <m/pix>
   LINE_PROJECTION_OFFSET = {LDEM_OFFSET - first_line:g} <pix>
   SAMPLE_PROJECTION_OFFSET = {LDEM_OFFSET - first_sample:g} <pix>
 END_OBJECT = IMAGE_MAP_PROJECTION
@@ -313,7 +313,11 @@ class Demo(ernie.demo.Demo):
             ernie.Camera,
             focal_length=24.0,
             clipping_range=(10.0, 1e5),
-            exposure_time=1.0 / 250.0,
+            # Sunlit regolith's exposure: the Looney 11 rule, f/11 at
+            # 1/ISO seconds.
+            exposure_f_stop=11.0,
+            exposure_iso=100.0,
+            exposure_time=1.0 / 100.0,
         )
         view.set(
             tokens.TRANSFORM,

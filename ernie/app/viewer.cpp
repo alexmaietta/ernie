@@ -2180,12 +2180,27 @@ struct Viewer::State {
         const std::vector<Path> cameras = ViewableCameras(scene);
         if (cameras.size() > 1) {
             ImGui::SeparatorText("Cameras");
+            // Cameras of one name (a stereo rig's Left and Right
+            // under several rigs) show their parent's name too, and
+            // every item's id is its path, so none collide.
+            std::map<std::string, int> names;
+            for (const Path& camera : cameras) {
+                ++names[Label(camera)];
+            }
             for (const Path& camera : cameras) {
                 if (camera == PerspectiveCamera()) {
                     continue;
                 }
-                if (ImGui::MenuItem(Label(camera).c_str(), nullptr,
-                                    camera == activeCamera)) {
+                const std::string label =
+                    names[Label(camera)] > 1 &&
+                            !camera.Parent().IsEmpty()
+                        ? Label(camera.Parent()) + "/" + Label(camera)
+                        : Label(camera);
+                ImGui::PushID(camera.String().c_str());
+                const bool chosen = ImGui::MenuItem(
+                    label.c_str(), nullptr, camera == activeCamera);
+                ImGui::PopID();
+                if (chosen) {
                     SetActive(camera);
                 }
                 if (ImGui::IsItemHovered()) {
