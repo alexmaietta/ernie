@@ -17,6 +17,7 @@ set(ernie_shaders
     film/filter_compand.slang=kFilterCompandSlang
     film/filter_defocus.slang=kFilterDefocusSlang
     film/filter_compand_table.slang=kFilterCompandTableSlang
+    film/filter_compand_lookup.slang=kFilterCompandLookupSlang
     film/filter_dark_current.slang=kFilterDarkCurrentSlang
     film/filter_defect_pixels.slang=kFilterDefectPixelsSlang
     film/filter_demosaic.slang=kFilterDemosaicSlang

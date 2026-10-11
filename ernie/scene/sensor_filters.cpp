@@ -232,6 +232,20 @@ std::vector<float> ResampleCurve(std::span<const float> values,
     return out;
 }
 
+namespace {
+
+// compandLookup's default table, the identity: code c holds input c,
+// inputs past 255 the last code.
+std::vector<float> IdentityCompandUppers() {
+    std::vector<float> uppers(256);
+    for (std::size_t c = 0; c < uppers.size(); ++c) {
+        uppers[c] = static_cast<float>(c);
+    }
+    return uppers;
+}
+
+}  // namespace
+
 std::vector<SensorFilterModel> StandardSensorFilters() {
     using Kind = FilterKind;
     using Domain = FilterDomain;
@@ -757,6 +771,23 @@ std::vector<SensorFilterModel> StandardSensorFilters() {
            {0.0f, 8.0f, 25.0f, 59.0f, 128.0f}}},
          "CompandTable",
          shaders::kFilterCompandTableSlang},
+        {"compandLookup",
+         "Lookup-table companding",
+         "Digital numbers encoded to the codes of a stored table, "
+         "each code's last input DN, as LROC's WAC encodes 11 bits "
+         "in 8 (demos/cameras/lroc holds its table); by default the "
+         "identity. After adc.",
+         {"LROC EDR/CDR Data Product Software Interface "
+          "Specification, version 1.18, 2010, "
+          "Appendix B"},
+         Kind::Pixel,
+         Domain::Digital,
+         {{"codes", 256.0f, "Output codes used, 1 to 256"},
+          {"uppers", 0.0f,
+           "Each code's last input DN, non-decreasing (256 values)",
+           256, IdentityCompandUppers()}},
+         "CompandLookup",
+         shaders::kFilterCompandLookupSlang},
     };
 }
 
