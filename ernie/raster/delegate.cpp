@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/delegate.h"
 
+#include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/material_schemas.h"
 #include "ernie/scene/render_schemas.h"
@@ -763,6 +764,69 @@ void RasterDelegate::SyncHeightfield(const Scene& scene,
     } catch (const std::invalid_argument& error) {
         throw UploadError(terrain, kHeights, error.what());
     }
+}
+
+namespace {
+
+/// Whether `camera` is a Camera exposed automatically.
+bool ExposesAutomatically(const Scene& scene, const Path& camera) {
+    return !camera.IsEmpty() &&
+           scene.TypeOf(camera) == tokens::kCamera &&
+           Camera(scene, camera).GetExposureMode() == tokens::kAuto;
+}
+
+}  // namespace
+
+void RasterDelegate::ApplyAutoExposure(const Scene& scene,
+                                       const Path& stateKey,
+                                       FrameParams& frame) {
+    // The linear value an average scene is keyed to, as the viewer's.
+    constexpr double kMiddleGrey = 0.18;
+    if (!ExposesAutomatically(scene, prims_.camera)) {
+        autoStops_.erase(stateKey);
+        return;
+    }
+    // Metered every frame under its key, for the frames after it;
+    // batches of views meter none and keep their camera's exposure.
+    const std::string key = stateKey.String();
+    frame.meter = true;
+    renderer_.SetMeterKey(key);
+    const auto stops = autoStops_.find(stateKey);
+    if (const std::optional<double> luminance =
+            renderer_.MeteredLuminance(key)) {
+        // The metered HdrColor is the scene's luminance in cd/m^2,
+        // before any exposure.
+        const double target = std::log2(
+            kMiddleGrey /
+            (*luminance * frame.camera.LinearExposureScale()));
+        const double frames =
+            Camera(scene, prims_.camera).GetExposureAdaptation();
+        if (stops == autoStops_.end() || !(frames > 0.0)) {
+            autoStops_[stateKey] = target;
+        } else {
+            stops->second += (target - stops->second) *
+                             (1.0 - std::exp(-1.0 / frames));
+        }
+    }
+    if (const auto found = autoStops_.find(stateKey);
+        found != autoStops_.end()) {
+        frame.exposure *=
+            static_cast<float>(std::exp2(found->second));
+    }
+}
+
+bool RasterDelegate::NeedsMetering(
+    const Scene& scene, const RenderPrims& base,
+    std::span<const RenderProductSpec> specs) const {
+    for (const RenderProductSpec& spec : specs) {
+        const Path& camera =
+            spec.camera.IsEmpty() ? base.camera : spec.camera;
+        if (ExposesAutomatically(scene, camera) &&
+            !renderer_.MeteredLuminance(spec.product.String())) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void RasterDelegate::ApplyDomeDirections(FrameParams& frame) const {
@@ -2310,6 +2374,7 @@ void RasterDelegate::UpdatePrims(
     }
     ApplyDomeSun(frame);
     ApplyDomeDirections(frame);
+    ApplyAutoExposure(scene, stateKey, frame);
     frame.filters.assign(filters.begin(), filters.end());
     // One chain needs no chains of its own: `filters` and `vars` run
     // as it (its filters, which are a var's own when every var has
@@ -2613,6 +2678,21 @@ RasterDelegate::StepAsync(const Scene& scene,
     const RenderPrims base = ResolveRenderPrims(scene, settings);
     const std::vector<RenderProductSpec> specs =
         ResolveRenderProducts(scene, products, settings);
+    // A product exposed automatically with nothing metered yet (its
+    // first frame) renders a frame to meter first, read as soon as
+    // it finishes, so even a single frame is exposed for its scene.
+    if (!metering_ && NeedsMetering(scene, base, specs)) {
+        metering_ = true;
+        try {
+            StepAsync(scene, products, settings).Fetch();
+        } catch (...) {
+            metering_ = false;
+            throw;
+        }
+        metering_ = false;
+        context_.WaitForSubmissions();
+        renderer_.ReadFinishedMeters();
+    }
     RenderProductSetOutputs outputs;
     std::uint64_t submission = 0;
     for (const RenderProductSpec& spec : specs) {
@@ -2835,6 +2915,20 @@ RasterDelegate::StepAsync(const Scene& scene,
             }
             vars.push_back(held);
             chains[c].vars.push_back(held);
+        }
+        // Automatic exposure meters HdrColor: held by the product's
+        // chain if no var asks for it, though not output.
+        if (minimal == MinimalMode::Off &&
+            ExposesAutomatically(scene, prims.camera) &&
+            std::find(vars.begin(), vars.end(),
+                      render_vars::kHdrColor) == vars.end()) {
+            const std::vector<std::string_view>& written =
+                chainWritten.front();
+            if (std::find(written.begin(), written.end(),
+                          render_vars::kHdrColor) != written.end()) {
+                vars.push_back(render_vars::kHdrColor);
+                chains.front().vars.push_back(render_vars::kHdrColor);
+            }
         }
         // Chains no var asks for do not run.
         std::erase_if(chains,

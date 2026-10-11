@@ -320,7 +320,7 @@ class Demo(ernie.demo.Demo):
             ),
         )
         # The published camera: at (278, 273, -800) looking along +z,
-        # 35 mm on a 25 mm square film.
+        # 35 mm on a 25 mm square film, exposed automatically.
         camera = world.define(
             "Camera",
             ernie.Camera,
@@ -330,9 +330,7 @@ class Demo(ernie.demo.Demo):
             # The box's front is 0.8 m away.
             clipping_range=(0.01, 10.0),
             sensor_noise=False,
-            exposure_time=1.0 / 30.0,
-            exposure_iso=200.0,
-            exposure_f_stop=2.8,
+            exposure_mode=tokens.AUTO,
         ).set(
             tokens.TRANSFORM,
             ernie.look_at_transform(

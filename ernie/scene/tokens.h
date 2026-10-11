@@ -177,6 +177,15 @@ inline constexpr std::string_view kExposureIso = "exposure:iso";
 inline constexpr std::string_view kExposureFStop = "exposure:fStop";
 inline constexpr std::string_view kExposureResponsivity =
     "exposure:responsivity";
+/// How the photographic outputs are exposed: kManual by the camera's
+/// exposure settings, or kAuto keyed to middle grey from the metered
+/// scene, over `ernie:exposure:adaptation` frames.
+inline constexpr std::string_view kExposureMode =
+    "ernie:exposure:mode";
+inline constexpr std::string_view kExposureAdaptation =
+    "ernie:exposure:adaptation";
+inline constexpr std::string_view kManual = "manual";
+inline constexpr std::string_view kAuto = "auto";
 /// UsdGeomCamera's lens: its f-number for depth of field and
 /// diffraction (0, the default, is a pinhole with everything in
 /// focus, and diffraction then uses `exposure:fStop`), and the

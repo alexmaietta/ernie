@@ -2180,9 +2180,11 @@ void RasterRenderer::Update(
     }
     // A metering frame counts its luminance for later frames; this
     // slot's last one has finished.
-    ReadMeter();
+    ReadMeter(uploads_.Slot());
     meter_ = params.meter && !batch;
     metered_[uploads_.Slot()] = meter_;
+    meterKeys_[uploads_.Slot()] = meter_ ? meterKey_ : std::string();
+    meterKey_.clear();
     // A visible fit's frame measures what it sees, for later frames'
     // cascades.
     measureDepth_ = shadowsEnabled_ && !batch &&
@@ -3588,12 +3590,20 @@ void RasterRenderer::RecordMeter(VkCommandBuffer commands,
     hdr->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
 }
 
-void RasterRenderer::ReadMeter() {
-    const std::uint32_t slot = uploads_.Slot();
+void RasterRenderer::ReadFinishedMeters() {
+    // Oldest first, so the latest frame's reading is the one kept.
+    for (std::uint32_t k = 1; k <= FrameUploads::kSlots; ++k) {
+        ReadMeter((uploads_.Slot() + k) % FrameUploads::kSlots);
+    }
+}
+
+void RasterRenderer::ReadMeter(std::uint32_t slot) {
     if (!metered_[slot]) {
         return;
     }
     metered_[slot] = false;
+    const std::string key = std::move(meterKeys_[slot]);
+    meterKeys_[slot].clear();
     std::array<std::uint32_t, kMeterBins> bins{};
     meterBins_[slot]->Read(std::as_writable_bytes(std::span(bins)));
     std::uint64_t total = 0;
@@ -3602,6 +3612,7 @@ void RasterRenderer::ReadMeter() {
     }
     if (total == 0) {
         meteredLuminance_.reset();
+        meteredByKey_.erase(key);
         return;
     }
     // The mean log luminance of the pixels between the darkest tenth
@@ -3627,6 +3638,11 @@ void RasterRenderer::ReadMeter() {
     meteredLuminance_ =
         counted > 0.0 ? std::optional(std::exp2(weighted / counted))
                       : std::nullopt;
+    if (meteredLuminance_) {
+        meteredByKey_[key] = *meteredLuminance_;
+    } else {
+        meteredByKey_.erase(key);
+    }
 }
 
 std::optional<std::pair<float, float>>

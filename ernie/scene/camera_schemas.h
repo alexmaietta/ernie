@@ -100,6 +100,18 @@
       (::ernie::AttributeMeta{.label = "f-number", .group = "Exposure", .min = 0.5, .max = 64.0})) \
     X(double, ExposureResponsivity, ::ernie::tokens::kExposureResponsivity, 1.0,                   \
       (::ernie::AttributeMeta{.label = "Responsivity", .group = "Exposure", .max = 100.0}))        \
+    X(std::string, ExposureMode, ::ernie::tokens::kExposureMode, "manual",                         \
+      (::ernie::AttributeMeta{.label = "Mode",                                                     \
+                              .doc = "\"auto\" keys the photographic outputs to middle grey "      \
+                                     "from the metered scene, on top of the settings above; "      \
+                                     "\"manual\" by them alone.",                                  \
+                              .group = "Exposure",                                                 \
+                              .options = {::ernie::tokens::kManual, ::ernie::tokens::kAuto}}))     \
+    X(double, ExposureAdaptation, ::ernie::tokens::kExposureAdaptation, 0.0,                       \
+      (::ernie::AttributeMeta{.label = "Adaptation",                                               \
+                              .doc = "Frames automatic exposure takes to cover 63% of a "          \
+                                     "change; 0 at once.",                                         \
+                              .group = "Exposure", .max = 1000.0}))                                \
     X(double, ShutterOpen, ::ernie::tokens::kShutterOpen, 0.0,                                     \
       (::ernie::AttributeMeta{.label = "Open",                                                     \
                               .doc = "Frames from the frame's time; motion blurs from here to "    \

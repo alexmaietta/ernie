@@ -534,6 +534,26 @@ class RasterRenderer {
         return meteredLuminance_;
     }
 
+    /// As `MeteredLuminance`, of the latest finished frame metered
+    /// under `key` (`SetMeterKey`): one camera's, among several.
+    std::optional<double>
+    MeteredLuminance(std::string_view key) const {
+        const auto found = meteredByKey_.find(key);
+        return found == meteredByKey_.end()
+                   ? std::nullopt
+                   : std::optional<double>(found->second);
+    }
+
+    /// The key the next `Update`'s frame meters under, if it meters.
+    void SetMeterKey(std::string key) {
+        meterKey_ = std::move(key);
+    }
+
+    /// Reads every finished frame's meter at once, rather than as its
+    /// slot comes round again: for a frame metered to expose the next
+    /// (`RasterDelegate::StepAsync`). Nothing may still be running.
+    void ReadFinishedMeters();
+
     /// Which band `Record` shows when presenting SpectralRadiance: 0
     /// to the band count - 1, or -1 (or any other) for the mean over
     /// the bands. It shows as grey at the photographic image's
@@ -716,9 +736,9 @@ class RasterRenderer {
     /// this slot's buffer.
     void RecordMeter(VkCommandBuffer commands,
                      RenderTargets& targets) const;
-    /// Reads this slot's histogram, if its frame metered, into
-    /// `meteredLuminance_`.
-    void ReadMeter();
+    /// Reads slot `slot`'s histogram, if its frame metered, into
+    /// `meteredLuminance_` and its key's `meteredByKey_`.
+    void ReadMeter(std::uint32_t slot);
     /// The view depths from which the sun's cascades start and to
     /// which they reach for a `ShadowFit::Visible` frame: those a
     /// recent frame of the same stream saw, if its view was close to
@@ -1058,6 +1078,11 @@ class RasterRenderer {
         meterBins_;
     std::array<bool, FrameUploads::kSlots> metered_{};
     std::optional<double> meteredLuminance_;
+    /// The key each slot's frame metered under, the next frame's, and
+    /// the latest luminance of each.
+    std::array<std::string, FrameUploads::kSlots> meterKeys_;
+    std::string meterKey_;
+    std::map<std::string, double, std::less<>> meteredByKey_;
     bool meter_ =
         false;  ///< Whether the last `Update`'s frame meters.
     std::vector<std::int32_t>

@@ -277,17 +277,15 @@ class CornellBoxDemo : public app::Demo {
                 centre, centre - glm::dvec3(0.0, 1.0, 0.0),
                 {0.0, 0.0, 1.0}));
         // The published camera: at (278, 273, -800) looking along +z,
-        // 35 mm on a 25 mm square film. The box's front is 0.8 m
-        // away.
+        // 35 mm on a 25 mm square film, exposed automatically. The
+        // box's front is 0.8 m away.
         Camera::Define(scene, "/World/Camera")
             .SetFocalLength(35.0)
             .SetHorizontalAperture(25.0)
             .SetVerticalAperture(25.0)
             .SetClippingRange({0.01, 10.0})
             .SetSensorNoise(false)
-            .SetExposureTime(1.0 / 30.0)
-            .SetExposureIso(200.0)
-            .SetExposureFStop(2.8)
+            .SetExposureMode(std::string(tokens::kAuto))
             .SetTransform(LookAtTransform({0.278, 0.273, -0.8},
                                           {0.278, 0.273, 0.0},
                                           {0.0, 1.0, 0.0}));

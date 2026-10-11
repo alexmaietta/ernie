@@ -335,6 +335,17 @@ class RasterDelegate : public RenderDelegate {
     /// the dome's diffuse light, as many as light slots remain, so
     /// the dome lights without its own diffuse light.
     void ApplyDomeDirections(FrameParams& frame) const;
+    /// Exposes `frame` automatically when its camera's exposure mode
+    /// is auto: meters it under `stateKey`, and adds the stops that
+    /// bring the key's latest metered luminance to middle grey,
+    /// approached over the camera's adaptation frames.
+    void ApplyAutoExposure(const Scene& scene, const Path& stateKey,
+                           FrameParams& frame);
+    /// Whether a product of `specs` exposes automatically with no
+    /// metered frame yet, so `StepAsync` meters one first.
+    bool
+    NeedsMetering(const Scene& scene, const RenderPrims& base,
+                  std::span<const RenderProductSpec> specs) const;
     void SyncMeshes(const Scene& scene);
     void SyncInstancers(const Scene& scene);
     /// Hands the meshes' drawable the arrays of prims posed on the
@@ -437,6 +448,11 @@ class RasterDelegate : public RenderDelegate {
     /// Per product (or the settings for the view), its views' camera
     /// poses at its last frame, for motion blur.
     std::map<Path, std::vector<glm::dmat4>> lastPoses_;
+    /// Per product (or the settings for the view) exposed
+    /// automatically, the stops it adds to its camera's exposure.
+    std::map<Path, double> autoStops_;
+    /// Inside the frame `StepAsync` meters before exposing.
+    bool metering_ = false;
     /// The prims `SetHighlight` outlines, resolved to prim ids (with
     /// their descendants') per frame.
     std::vector<Path> highlight_;

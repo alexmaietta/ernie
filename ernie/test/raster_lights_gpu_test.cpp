@@ -1532,6 +1532,70 @@ TEST_F(RasterDelegateTest, MeteringMeasuresTheScenesLuminance) {
     EXPECT_GT(centre(), base + 40);
 }
 
+TEST_F(RasterDelegateTest,
+       AutomaticExposureKeysTheSceneToMiddleGrey) {
+    // The grey floor fills the view, so automatic exposure shows it
+    // at middle grey, 0.18 linear, 118 in sRGB: from the first frame
+    // (metered first), and whatever lights it.
+    Scene scene = FlatScene();
+    scene.Remove("/World/Terrain");
+    ernie::GroundPlane::Define(scene, "/World/Floor")
+        .SetMaterialBinding("/Looks/Grey");
+    ernie::DistantLight sun(scene, "/World/Sun");
+    sun.SetPhotometricIlluminance(20000.0);
+    ernie::Camera camera(scene, "/World/Camera");
+    camera.SetExposureMode(std::string(tokens::kAuto));
+    RasterDelegate delegate(*context_);
+    const auto centre = [&] {
+        const Tensor image = delegate.Render(scene);
+        return static_cast<int>(
+            image.As<std::uint8_t>()[4 * (kVarSize / 2 * kVarSize +
+                                          kVarSize / 2)]);
+    };
+    EXPECT_NEAR(centre(), 118, 8) << "the first frame";
+    // A tenth of the light: the next frames meter it and catch up.
+    sun.SetPhotometricIlluminance(2000.0);
+    for (int i = 0; i < 3; ++i) {
+        centre();
+    }
+    EXPECT_NEAR(centre(), 118, 8) << "a tenth of the light";
+
+    // Manual exposure shows the light as it is: exposed for this
+    // light, then ten times as much.
+    camera.SetExposureMode(std::string(tokens::kManual))
+        .SetExposureTime(1.0 / 2000.0);
+    const int manual = centre();
+    sun.SetPhotometricIlluminance(20000.0);
+    EXPECT_GT(centre(), manual + 40) << "ten times the light";
+
+    // Adapting over frames: a change shows at first, then fades.
+    camera.SetExposureMode(std::string(tokens::kAuto))
+        .SetExposureAdaptation(8.0);
+    for (int i = 0; i < 4; ++i) {
+        centre();
+    }
+    sun.SetPhotometricIlluminance(2000.0);
+    centre();
+    centre();
+    EXPECT_LT(centre(), 100) << "still dim just after";
+    for (int i = 0; i < 60; ++i) {
+        centre();
+    }
+    EXPECT_NEAR(centre(), 118, 8) << "adapted";
+
+    // Without products, the settings' own of LdrColor alone: it holds
+    // HdrColor besides, for the meter.
+    scene.Set("/Render/Settings", tokens::kProducts,
+              std::vector<ernie::Path>{});
+    camera.SetExposureAdaptation(0.0);
+    RasterDelegate fresh(*context_);
+    const Tensor image = fresh.Render(scene);
+    EXPECT_NEAR(static_cast<int>(image.As<std::uint8_t>()[4 * (
+                    kVarSize / 2 * kVarSize + kVarSize / 2)]),
+                118, 8)
+        << "LdrColor alone";
+}
+
 namespace {
 
 /// FlatScene without its terrain or sun: an empty world, the camera
