@@ -1,6 +1,10 @@
 > 🚧 **This project is in active beta development.** This means the API is unstable, features may be added or removed, and breaking changes are likely to occur frequently and without notice as the design is refined.
 
-[![CI](https://github.com/alexmaietta/ernie/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/alexmaietta/ernie/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/alexmaietta/ernie?include_prereleases&sort=semver&color=orange)](https://github.com/alexmaietta/ernie/releases) [![PyPI](https://img.shields.io/pypi/v/ernie-renderer?color=3775A9&logo=pypi&logoColor=white)](https://pypi.org/project/ernie-renderer/) [![Docs](https://img.shields.io/badge/docs-latest-8A2BE2)](https://alexmaietta.github.io/ernie/) [![License](https://img.shields.io/badge/license-BSD--3--Clause-2E8B57)](LICENSE)
+[![CI](https://github.com/alexmaietta/ernie/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/alexmaietta/ernie/actions/workflows/ci.yml) 
+[![Release](https://img.shields.io/github/v/release/alexmaietta/ernie?include_prereleases&sort=semver&color=orange)](https://github.com/alexmaietta/ernie/releases) 
+[![PyPI](https://img.shields.io/pypi/v/ernie-renderer?color=3775A9&logo=pypi&logoColor=white)](https://pypi.org/project/ernie-renderer/) 
+[![Docs](https://img.shields.io/badge/docs-latest-8A2BE2)](https://alexmaietta.github.io/ernie/) 
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-2E8B57)](LICENSE)
 
 # Efficient Renderer for Natural and Interplanetary Environments (Ernie)
 
@@ -8,7 +12,7 @@
 
 Ernie is a physically accurate, real-time, spectral renderer for interplanetary environments.
 
-It is a Vulkan rasterizer for Linux, Windows and macOS (through MoltenVK), with C++ and Python APIs and a Hydra-like scene API. Ernie is designed around physical quantities, efficient batched rendering and modularity.
+It is a Vulkan rasterizer for Linux, Windows and macOS (through MoltenVK), with C++ and Python APIs and a Hydra-like scene API. Ernie is designed around physical quantities, efficient batched rendering, and user experience.
 
 Ernie is built to be customized and to work alongside other tools. You can add your own BRDFs, sensor filters and light patterns. Rendered outputs and scene attributes (transforms, mesh vertices, light parameters and more) are shared zero copy with any DLPack tensor (PyTorch, JAX, Warp, NumPy), which makes Ernie a good fit for real-time physics simulation and reinforcement learning. Support for OpenUSD and glTF scenes, and for MDL and MaterialX materials, is planned.
 
@@ -17,7 +21,7 @@ Its key features are aimed at planetary robotics and sensing:
 - **Cameras and sensors**
   - Exposure, aperture, motion blur, rolling shutter, lens distortion and vignetting.
   - Perspective, fisheye and orthographic projections, and line-scan pushbroom cameras like LROC's.
-  - Real sensor specs: quantum efficiency curves, full well, read noise, dark current, PRNU, DSNU, gain and ADC bit depth.
+  - Quantum efficiency curves, full well, read noise, dark current, PRNU, DSNU, gain and ADC bit depth.
   - USGS CSM camera models for non-standard instruments.
   - Sensor filter chains (noise models, lens flare, vignetting), with your own filters written in Slang.
 - **Planetary environments**
@@ -36,7 +40,7 @@ Its key features are aimed at planetary robotics and sensing:
   - A floating origin, so large scenes keep their precision.
 - **Tools**
   - A viewer with customizable panels, to drive your own simulations and workflows.
-  - Debug drawing: labels, trajectories and overlays in the scene.
+  - Debug drawing for labels, trajectories and overlays in the scene.
 
 For a more detailed overview of the features, see our [documentation](https://alexmaietta.github.io/ernie/).
 
