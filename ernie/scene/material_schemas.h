@@ -45,6 +45,17 @@
                                      "reflectance spectrum in [0, 1], replacing the albedo; the "  \
                                      "nearest value outside them.",                                \
                               .group = "Surface"}))                                                \
+    X(std::string, ReflectanceLibrary, ::ernie::tokens::kReflectanceLibrary, "",                   \
+      (::ernie::AttributeMeta{.label = "Measured reflectance",                                     \
+                              .doc = "A measured spectrum Ernie embeds (ECOSTRESS), 0.35 to 2.5 "  \
+                                     "um and on into the thermal infrared, replacing the albedo "  \
+                                     "unless a reflectance is given.",                             \
+                              .group = "Surface",                                                  \
+                              .options = {"", "grass", "chaparral", "dry_grass", "loam", "sand",   \
+                                          "concrete", "asphalt", "brick", "pine_wood",             \
+                                          "black_paint", "olive_paint", "white_coating",           \
+                                          "aluminium", "galvanized_steel", "copper", "fine_snow",  \
+                                          "granular_snow", "ice", "water"}}))                      \
     X(bool, AlbedoMapEnable, ::ernie::tokens::kAlbedoMapEnable, true,                              \
       (::ernie::AttributeMeta{.label = "Use albedo map", .group = "Surface"}))                     \
     X(::ernie::Tensor, AlbedoMap, ::ernie::tokens::kAlbedoMap, nullptr,                            \

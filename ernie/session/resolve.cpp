@@ -14,6 +14,7 @@
 #include "ernie/scene/xform.h"
 #include "ernie/util/astronomy.h"
 #include "ernie/util/ies.h"
+#include "ernie/util/reflectance_library.h"
 #include "ernie/util/solar.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -3056,6 +3057,28 @@ MaterialSettings MaterialSettingsOf(const Scene& scene,
                 throw bad("values outside [0, 1]");
             }
         }
+    } else if (const std::string library =
+                   view.GetReflectanceLibrary();
+               !library.empty()) {
+        // A measured spectrum Ernie embeds, by id.
+        const MeasuredReflectance* measured =
+            FindReflectance(library);
+        if (measured == nullptr) {
+            std::string ids;
+            for (const MeasuredReflectance& entry :
+                 ReflectanceLibrary()) {
+                ids +=
+                    (ids.empty() ? "" : ", ") + std::string(entry.id);
+            }
+            throw std::invalid_argument(
+                "Material '" + material.String() + "' names '" +
+                library + "' in '" +
+                std::string(tokens::kReflectanceLibrary) +
+                "', which is none of Ernie's measured "
+                "reflectances: " +
+                ids);
+        }
+        settings.reflectance = measured->spectrum;
     }
     // Emission, from the preview surface or else the Material itself,
     // whatever the model.

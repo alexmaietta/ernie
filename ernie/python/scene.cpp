@@ -10,6 +10,7 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/util/astronomy.h"
 #include "ernie/util/image.h"
+#include "ernie/util/reflectance_library.h"
 #include "ernie/util/tensor.h"
 
 #include <nanobind/operators.h>
@@ -1915,6 +1916,27 @@ void BindScene(nb::module_& m) {
           "A star's temperature in kelvin from its B-V colour index "
           "(Ballesteros 2012).");
     m.def(
+        "reflectance_library",
+        [] {
+            nb::list entries;
+            for (const MeasuredReflectance& entry :
+                 ReflectanceLibrary()) {
+                nb::dict item;
+                item["id"] = std::string(entry.id);
+                item["name"] = std::string(entry.name);
+                item["source"] = std::string(entry.source);
+                item["wavelengths"] = entry.spectrum.Wavelengths();
+                item["values"] = entry.spectrum.Values();
+                entries.append(item);
+            }
+            return entries;
+        },
+        "Ernie's measured reflectance spectra (ECOSTRESS), for "
+        "materials to name in reflectance_library: dicts of id, "
+        "name, source (the ECOSTRESS file), and wavelengths (nm) "
+        "and values (fractions) from 0.35 um to 2.5 um and for most "
+        "into the thermal infrared.");
+    m.def(
         "synthetic_stars",
         [](std::size_t count, std::uint64_t seed, double faintest) {
             StarCatalogue stars =
@@ -2102,6 +2124,7 @@ void BindScene(nb::module_& m) {
         {"BRDF", tokens::kBrdf},
         {"ALBEDO", tokens::kAlbedo},
         {"REFLECTANCE", tokens::kReflectance},
+        {"REFLECTANCE_LIBRARY", tokens::kReflectanceLibrary},
         {"ALBEDO_MAP", tokens::kAlbedoMap},
         {"ALBEDO_MAP_ORIGIN", tokens::kAlbedoMapOrigin},
         {"ALBEDO_MAP_CELL_SIZE", tokens::kAlbedoMapCellSize},

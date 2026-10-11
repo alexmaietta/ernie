@@ -44,6 +44,7 @@ ernie_add_test_suite(
     session_resolve_test.cpp
     session_sampling_test.cpp
     util_image_test.cpp
+    util_reflectance_library_test.cpp
     util_ies_test.cpp
     util_astronomy_test.cpp
     util_atmosphere_test.cpp

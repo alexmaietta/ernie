@@ -677,6 +677,11 @@ inline constexpr std::string_view kAlbedo =
 /// float[] (nm, value) pairs of a reflectance spectrum, replacing the
 /// albedo.
 inline constexpr std::string_view kReflectance = "inputs:reflectance";
+/// token: a measured reflectance spectrum Ernie embeds, by id
+/// (`ReflectanceLibrary`), replacing the albedo unless
+/// `inputs:reflectance` is given.
+inline constexpr std::string_view kReflectanceLibrary =
+    "inputs:reflectanceLibrary";
 inline constexpr std::string_view kAlbedoMap =
     "inputs:albedoMap";  ///< float32 (rows, cols).
 inline constexpr std::string_view kAlbedoMapOrigin =

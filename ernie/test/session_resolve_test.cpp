@@ -583,6 +583,21 @@ TEST(MaterialSettingsOf, AMeasuredReflectanceReplacesTheAlbedo) {
             ernie::MaterialSettingsOf(scene, "/Looks/Red", brdfs),
             std::invalid_argument);
     }
+
+    // A measured spectrum Ernie embeds, by id: grass, bright in the
+    // near infrared; given pairs come first.
+    material.SetReflectance({}).SetReflectanceLibrary("grass");
+    settings = ernie::MaterialSettingsOf(scene, "/Looks/Red", brdfs);
+    EXPECT_GT(settings.reflectance(850.0),
+              5.0 * settings.reflectance(670.0));
+    material.SetReflectance({400.0f, 0.2f, 700.0f, 0.2f});
+    EXPECT_NEAR(ernie::MaterialSettingsOf(scene, "/Looks/Red", brdfs)
+                    .reflectance(850.0),
+                0.2, 1e-6);
+    material.SetReflectance({}).SetReflectanceLibrary("unobtainium");
+    EXPECT_THROW(
+        ernie::MaterialSettingsOf(scene, "/Looks/Red", brdfs),
+        std::invalid_argument);
 }
 
 TEST(BoundMaterial, FollowsBindingsToMaterialsOnly) {

@@ -7,6 +7,7 @@ ernie_add_library(
     ies.cpp
     image.cpp
     profiler.cpp
+    reflectance_library.cpp
     scattering.cpp
     solar.cpp
     spectrum.cpp
