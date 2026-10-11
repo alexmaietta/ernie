@@ -124,11 +124,24 @@ if(SKBUILD)
         FILES ${ernie_demo_data}
         DESTINATION ernie/demos/data
         COMPONENT python)
-    set_target_properties(_ernie PROPERTIES INSTALL_RPATH "$ORIGIN")
+    # Slang's runtime beside the module, found through the rpath (Windows looks beside the module
+    # anyway); on macOS MoltenVK too, which Ernie loads from beside its module without a Vulkan
+    # loader installed.
+    if(APPLE)
+        set_target_properties(_ernie PROPERTIES INSTALL_RPATH "@loader_path")
+    else()
+        set_target_properties(_ernie PROPERTIES INSTALL_RPATH "$ORIGIN")
+    endif()
     include("${PROJECT_SOURCE_DIR}/cmake/ErnieLicenses.cmake")
     ernie_install_licenses(ernie/licenses python)
     install(
         FILES ${ERNIE_SLANG_RUNTIME}
         DESTINATION ernie
         COMPONENT python)
+    if(APPLE)
+        install(
+            FILES "${ERNIE_MOLTENVK_LIBRARY}"
+            DESTINATION ernie
+            COMPONENT python)
+    endif()
 endif()

@@ -13,7 +13,9 @@
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
+#include <string>
 #include <utility>
+#include <vector>
 
 #if defined(__APPLE__)
 #include <dlfcn.h>
@@ -82,9 +84,18 @@ void LoadVulkan() {
         return;
     }
 #if defined(__APPLE__)
-    // Without a Vulkan loader installed, load MoltenVK directly.
-    for (const char* path : {"libMoltenVK.dylib", ERNIE_MOLTENVK_PATH}) {
-        if (void* library = dlopen(path, RTLD_NOW | RTLD_LOCAL)) {
+    // Without a Vulkan loader installed, load MoltenVK directly: an installed one, the one shipped
+    // beside the binary Ernie is in (the Python package's), or the build's.
+    std::vector<std::string> paths = {"libMoltenVK.dylib"};
+    Dl_info self{};
+    if (dladdr(reinterpret_cast<const void*>(&LoadVulkan), &self) != 0 &&
+        self.dli_fname != nullptr) {
+        const std::string binary = self.dli_fname;
+        paths.push_back(binary.substr(0, binary.find_last_of('/') + 1) + "libMoltenVK.dylib");
+    }
+    paths.emplace_back(ERNIE_MOLTENVK_PATH);
+    for (const std::string& path : paths) {
+        if (void* library = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL)) {
             if (auto getProc = reinterpret_cast<PFN_vkGetInstanceProcAddr>(
                     dlsym(library, "vkGetInstanceProcAddr"))) {
                 volkInitializeCustom(getProc);

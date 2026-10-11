@@ -157,8 +157,14 @@ jobs:
   # GPU tests on lavapipe (Mesa's own leaks are not Ernie's, so leak checks are off). On pushes to
   # main and release tags, not pull requests, as it is the slowest job.
   sanitize:
+    name: sanitize (part ${{ matrix.part }} of 3)
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
+    # Every third test each, side by side, as the GCC tests run.
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [1, 2, 3]
     env:
       CC: clang
       CXX: clang++
@@ -194,7 +200,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: ninja-log-sanitize
+          name: ninja-log-sanitize-${{ matrix.part }}
           path: |
             build/.ninja_log
             build/ccache-stats.tsv
@@ -208,11 +214,10 @@ jobs:
         run: |
           VK_DRIVER_FILES=$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' | head -n1)
           export VK_DRIVER_FILES
-          ctest --test-dir build --output-on-failure -j4 --timeout 1800
+          ctest --test-dir build --output-on-failure -j4 --timeout 1800 -I ${{ matrix.part }},,3
 
-  # Windows (MSVC) and macOS (Apple Clang, MoltenVK) build only: Ernie has never been built there,
-  # so these do not block yet; once green, drop continue-on-error and add tests where a software
-  # driver exists (Mesa's lavapipe for Windows).
+  # Windows (MSVC) and macOS (Apple Clang, MoltenVK) build only, through sccache: they do not block
+  # yet, until tests run where a software driver exists (Mesa's lavapipe for Windows).
   build:
     name: build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -233,6 +238,11 @@ jobs:
       - name: Install Ninja
         if: runner.os == 'macOS'
         run: brew install ninja
+      # A compiler cache, as the Linux jobs' ccache: sccache, which caches MSVC too.
+      - uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          variant: sccache
+          key: build-${{ matrix.os }}
       - uses: actions/cache@v6
         with:
           path: |
@@ -243,6 +253,7 @@ jobs:
         shell: bash
         run: >
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
           "-DFETCHCONTENT_BASE_DIR=$PWD/.deps"
           -DERNIE_BUILD_TESTS=ON -DERNIE_BUILD_DEMOS=ON -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
       - name: Build
@@ -258,30 +269,37 @@ jobs:
 
   # The release wheels: manylinux_2_34, one per architecture, each tested on lavapipe
   # (configuration in pyproject.toml, [tool.cibuildwheel]).
+  # Windows (x86_64) and macOS (Apple silicon, MoltenVK bundled) wheels too, smoke-tested on the
+  # scene API: those runners have no Vulkan driver.
   wheel:
-    name: wheel (${{ matrix.arch }})
+    name: wheel (${{ matrix.platform }})
     needs: version
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - arch: x86_64
+          - platform: linux-x86_64
             runner: ubuntu-24.04
-          - arch: aarch64
+          - platform: linux-aarch64
             runner: ubuntu-24.04-arm
+          - platform: windows-amd64
+            runner: windows-2025
+          - platform: macos-arm64
+            runner: macos-15
     steps:
       - uses: actions/checkout@v7
       - name: Version
+        shell: bash
         run: >
-          sed -i 's/set(ERNIE_VERSION_SUFFIX ""/set(ERNIE_VERSION_SUFFIX "${{ needs.version.outputs.suffix }}"/'
+          perl -pi -e 's/set\(ERNIE_VERSION_SUFFIX ""/set(ERNIE_VERSION_SUFFIX "${{ needs.version.outputs.suffix }}"/'
           CMakeLists.txt
       - uses: pypa/cibuildwheel@v4.3.0
         with:
           output-dir: wheelhouse
       - uses: actions/upload-artifact@v7
         with:
-          name: wheel-linux-${{ matrix.arch }}
+          name: wheel-${{ matrix.platform }}
           path: wheelhouse/*.whl
 
   # The aarch64 wheel installed and tested on Ubuntu's arm64 runner, on its lavapipe: AlmaLinux 9
@@ -479,7 +497,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          pattern: wheel-linux-*
+          pattern: wheel-*
           merge-multiple: true
           path: dist
       - uses: actions/download-artifact@v8

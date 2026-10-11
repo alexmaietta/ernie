@@ -88,7 +88,7 @@ ERNIE_INSTALL = "OFF"
 # the oldest base Slang's prebuilt library runs on (GCC 11's libstdc++), and tested on lavapipe.
 [tool.cibuildwheel]
 build = "cp312-*"
-skip = "*-musllinux_*"
+skip = "*-musllinux_* *-win32"
 manylinux-x86_64-image = "manylinux_2_34"
 manylinux-aarch64-image = "manylinux_2_34"
 build-verbosity = 1
@@ -99,6 +99,18 @@ test-command = "VK_DRIVER_FILES=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | hea
 # AlmaLinux 9 has no lavapipe for aarch64: CI tests that wheel on Ubuntu's arm64 runner instead
 # (the wheel-test job).
 test-skip = "*-manylinux_aarch64"
+
+[tool.cibuildwheel.windows]
+# No Vulkan driver on the hosted runners: the scene API, and that the package imports with its DLLs.
+test-command = "python -m pytest -q -p no:cacheprovider {project}/ernie/test/python/test_scene.py"
+
+[tool.cibuildwheel.macos]
+archs = ["arm64"]
+test-command = "python -m pytest -q -p no:cacheprovider {project}/ernie/test/python/test_scene.py"
+# Slang's runtime and MoltenVK are installed beside the module (rpath @loader_path), so delocate
+# has nothing to bundle; 13.3 is the first macOS whose libc++ formats floats (std::to_chars).
+repair-wheel-command = ""
+environment = { MACOSX_DEPLOYMENT_TARGET = "13.3" }
 
 [tool.cibuildwheel.linux]
 # The viewer's window system headers to build; Mesa's lavapipe to test (x86_64 only, see
