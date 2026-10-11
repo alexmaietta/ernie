@@ -461,6 +461,19 @@ public float sunDisc(float3 d, float3 sun, float sunSine, float wavelength, floa
     return pow(mu, alpha) * (alpha + 2.0) / (2.0 * solidAngle);
 }
 
+// An eye at `p` (km from the planet's centre) lifted onto the ground, a metre up, when it is below
+// it, as Hillaire's sky lifts cameras: the atmosphere is seen from the ground at least, not from
+// inside the planet, where its rays would start below the ground they are clipped to.
+//
+// References:
+// - S. Hillaire, UnrealEngineSkyAtmosphere, RenderSkyRayMarching.hlsl (the camera kept
+//   PLANET_RADIUS_OFFSET above the ground). https://github.com/sebh/UnrealEngineSkyAtmosphere
+public float3 aboveGround(float3 p, float bottom) {
+    let r = length(p);
+    let lowest = bottom + 1e-3;
+    return r < lowest ? (r > 0.0 ? p * (lowest / r) : float3(0.0, 0.0, lowest)) : p;
+}
+
 // Hestroffer and Magnan's limb darkening exponent at `wavelength` nm (`sunDisc`).
 public float limbDarkening(float wavelength) {
     return max(-0.023 + 292.0 / wavelength, 0.0);
@@ -549,4 +562,61 @@ public float4 eclipseVisibility(Eclipse eclipse, float3 p, float3 sun, float sun
         visible *= saturate(1.0 - covered);
     }
     return visible;
+}
+
+// The planet's shadow table (`planetShadowMain`): the fraction of the sun's light reaching a point
+// behind the planet, through and past its atmosphere, per band. Across, the point's distance D from
+// the planet's centre, from the top of the atmosphere to `kPlanetShadowReach` times it, evenly in
+// log D; up, the angle sigma between the planet's centre and the sun's as the point sees them, from
+// 0 to where the atmosphere's disc no longer covers any of the sun (its angular radius plus the
+// sun's). Beyond, the sun is whole. It is the transmittance table's size, and shares its image, in
+// the layers after the transmittance's, which keeps shading within its descriptors.
+public static const uint kPlanetShadowWidth = kTransmittanceWidth;
+public static const uint kPlanetShadowHeight = kTransmittanceHeight;
+public static const float kPlanetShadowReach = 256.0;
+
+// The largest separation the shadow table holds at distance `distance`.
+public float planetShadowSeparation(float distance, float top, float sunRadius) {
+    return asin(min(top / distance, 1.0)) + sunRadius;
+}
+
+public float2 planetShadowUv(float distance, float separation, float top, float sunRadius) {
+    let x = log(max(distance / top, 1.0)) / log(kPlanetShadowReach);
+    let y = separation / planetShadowSeparation(distance, top, sunRadius);
+    return float2(textureCoord(saturate(x), float(kPlanetShadowWidth)),
+                  textureCoord(saturate(y), float(kPlanetShadowHeight)));
+}
+
+public void planetShadowDistance(float2 uv, float top, float sunRadius, out float distance,
+                                 out float separation) {
+    distance = top * exp(unitRange(uv.x, float(kPlanetShadowWidth)) * log(kPlanetShadowReach));
+    separation = unitRange(uv.y, float(kPlanetShadowHeight)) *
+                 planetShadowSeparation(distance, top, sunRadius);
+}
+
+// The fraction of the sun's light, per band of the group in table layer `layer`, that reaches a
+// point `toPlanet` (km) from the planet's centre, with the sun of angular radius sine `sunSine` towards `sun`: from the
+// shadow table, the light refracted through its atmosphere into its umbra included. 1 inside the
+// atmosphere (the sky's own tables light it), beyond the table's reach the plain geometric eclipse
+// by the atmosphere's disc.
+public float4 planetShadow(Texture2DArray<float4> table, SamplerState linear, float3 toPlanet,
+                           float3 sun, float sunSine, float4 wavelengths, uint layer, float top) {
+    let distance = length(toPlanet);
+    if (distance <= top) {
+        return float4(1.0);
+    }
+    let direction = toPlanet / distance;
+    let separation = 2.0 * asin(min(0.5 * length(direction - sun), 1.0));
+    let sunRadius = asin(sunSine);
+    if (separation >= planetShadowSeparation(distance, top, sunRadius)) {
+        return float4(1.0);
+    }
+    if (distance > top * kPlanetShadowReach) {
+        var eclipse = noEclipse();
+        eclipse.bodies[0] = float4(toPlanet, top);
+        eclipse.wavelengths = wavelengths;
+        return eclipseVisibility(eclipse, float3(0.0), sun, sunSine);
+    }
+    let uv = planetShadowUv(distance, separation, top, sunRadius);
+    return table.SampleLevel(linear, float3(uv, float(layer)), 0.0);
 }

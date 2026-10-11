@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <numbers>
 #include <optional>
 #include <tuple>
@@ -1096,4 +1097,157 @@ TEST_F(RasterDelegateTest, AnAnnularEclipseLeavesTheSunsRing) {
         EXPECT_NEAR(ring[band] / full[band], expected, 0.03)
             << "band " << band;
     }
+}
+
+namespace {
+
+/// The planet's shadow by the shadow table's integral, finely, with
+/// the CPU's traces: the sun of angular radius `sunRadius` past the
+/// atmosphere's disc (`EclipseReference`) and through it, each
+/// grazing height's ray bent twice its trace's bending from level at
+/// the grazing radius and dimmed by the square of its transmittance
+/// from there, its source on the sun's limb-darkened disc.
+double PlanetShadowReference(const BandedAtmosphere& air,
+                             double distance, double sigma, int band,
+                             double sunRadius) {
+    const double wavelength = air.bands.Centre(band);
+    const double bottom = air.bottomRadius;
+    const double top = bottom + air.topAltitude;
+    double light = EclipseReference(
+        sunRadius, std::asin(top / distance), sigma, wavelength);
+    const double alpha0 = std::max(-0.023 + 292.0 / wavelength, 0.0);
+    const double halfSun = std::sin(0.5 * sunRadius);
+    const double solidAngle = 4.0 * kPi * halfSun * halfSun;
+    constexpr int kHeights = 400;
+    constexpr int kAzimuths = 200;
+    for (int i = 0; i < kHeights; ++i) {
+        const double t = (i + 0.5) / kHeights;
+        const double b = bottom + (top - bottom) * t * t;
+        const double db = (top - bottom) * 2.0 * t / kHeights;
+        const double alpha = std::asin(b / distance);
+        const double dalpha =
+            db / std::sqrt(distance * distance - b * b);
+        double grazing = b;
+        for (int k = 0; k < 4; ++k) {
+            grazing = b / air.RefractiveIndex(grazing - bottom, band);
+        }
+        if (grazing <= bottom) {
+            continue;
+        }
+        const double bending =
+            2.0 * air.Refract(grazing, 0.0, band, 50.0).deviation;
+        const double through =
+            air.TransmittanceToTop(grazing, 0.0, band);
+        const double source = std::abs(alpha - bending);
+        const double halfOff = std::sin(0.5 * (source - sigma));
+        const double across = std::sin(source) * std::sin(sigma);
+        const double room = halfSun * halfSun - halfOff * halfOff;
+        if (room <= 0.0) {
+            continue;
+        }
+        const double psiMax =
+            across <= room
+                ? kPi
+                : 2.0 * std::asin(std::sqrt(room / across));
+        double radiance = 0.0;
+        for (int j = 0; j < kAzimuths; ++j) {
+            const double s =
+                std::sin(0.5 * (j + 0.5) / kAzimuths * psiMax);
+            const double ratio = std::min(
+                std::sqrt(halfOff * halfOff + across * s * s) /
+                    halfSun,
+                1.0);
+            radiance +=
+                std::pow(std::sqrt(1.0 - ratio * ratio), alpha0);
+        }
+        radiance *= (alpha0 + 2.0) / (2.0 * solidAngle) * 2.0 *
+                    psiMax / kAzimuths;
+        light +=
+            through * through * radiance * std::sin(alpha) * dalpha;
+    }
+    return light;
+}
+
+}  // namespace
+
+// The planet's shadow table against the reference integral at its
+// texels' distances and separations: inside the umbra, where only
+// the light refracted through the atmosphere reaches, through the
+// penumbra to the full sun.
+TEST_F(AtmosphereLutsTest, PlanetShadowMatchesTheReference) {
+    ernie::ShaderCompiler compiler;
+    AtmosphereLuts luts(*context_, compiler);
+    luts.Set(Earth(), {380.0, 780.0, 16}, 0.53f);
+    context_->Submit(
+        [&](VkCommandBuffer commands) { luts.Record(commands); });
+    const std::vector<float> table =
+        TableOf(*context_, luts.PlanetShadow());
+    const BandedAtmosphere& air = luts.Banded();
+    const double top = air.bottomRadius + air.topAltitude;
+    const double sunRadius = 0.5 * 0.53 * kPi / 180.0;
+    // After the transmittance's four layers, 256 x 64 each.
+    for (const int x : {80, 190}) {
+        const double distance =
+            top * std::exp(UnitOfTexel(x, 256) * std::log(256.0));
+        for (const int y : {0, 30, 50, 60}) {
+            const double sigma =
+                UnitOfTexel(y, 64) *
+                (std::asin(top / distance) + sunRadius);
+            for (const int band : {2, 13}) {
+                const double reference = PlanetShadowReference(
+                    air, distance, sigma, band, sunRadius);
+                const std::size_t at =
+                    (static_cast<std::size_t>(4 + band / 4) * 64 *
+                         256 +
+                     static_cast<std::size_t>(y) * 256 +
+                     static_cast<std::size_t>(x)) *
+                        4 +
+                    static_cast<std::size_t>(band % 4);
+                EXPECT_NEAR(static_cast<double>(table[at]), reference,
+                            0.05 * reference + 1e-6)
+                    << "texel " << x << ", " << y << " band " << band;
+            }
+        }
+    }
+}
+
+// A full Moon at the centre of the Earth's umbra, overhead at
+// midnight, glows dim and red: the light the atmosphere refracts into
+// the umbra has crossed the long path along the limb twice, where
+// Rayleigh scattering took the blue.
+TEST_F(RasterDelegateTest, TheEclipsedMoonGlowsRed) {
+    const auto moonCentre = [&](bool eclipsed) {
+        Scene scene = SkyScene({0.0, 0.0, 2.0}, {0.0, 0.0, 1000.0},
+                               eclipsed ? -90.0 : -87.0);
+        scene.Set("/World/Air", tokens::kAtmosphereHazeOpticalDepth,
+                  0.0);
+        scene.Set("/World/Camera", tokens::kTransform,
+                  ernie::LookAtTransform({0.0, 0.0, 2.0},
+                                         {0.0, 0.0, 1000.0},
+                                         {1.0, 0.0, 0.0}));
+        ernie::Camera(scene, "/World/Camera")
+            .SetFocalLength(50.0)
+            .SetHorizontalAperture(1.0)
+            .SetVerticalAperture(1.0);
+        // Opposite the sun from the Earth's centre, 6371 km below.
+        ernie::CelestialBody::Define(scene, "/World/Moon");
+        scene.Set("/World/Moon", tokens::kTransform,
+                  glm::translate(
+                      glm::dmat4(1.0),
+                      glm::dvec3(0.0, 0.0, kMoonDistance - 6371e3)));
+        RasterDelegate delegate(*context_);
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        return SpectrumAt(outputs, kVarSize / 2, kVarSize / 2);
+    };
+    // Uneclipsed, the sun 3 degrees aside, for the full Moon's
+    // brightness through the same air.
+    const std::vector<double> full = moonCentre(false);
+    const std::vector<double> eclipsed = moonCentre(true);
+    const double blue = eclipsed[2] / full[2];
+    const double red = eclipsed[13] / full[13];
+    std::printf("umbra: blue %.3g, red %.3g of the full Moon\n", blue,
+                red);
+    EXPECT_GT(red, 1e-5);
+    EXPECT_LT(red, 1e-2);
+    EXPECT_GT(red, 10.0 * blue);
 }

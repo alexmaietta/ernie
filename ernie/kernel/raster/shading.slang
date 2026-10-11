@@ -884,7 +884,7 @@ float3 apparentDirection(float3 eye, float3 w) {
     let bottom = sh.atmosphere[0].w;
     let top = sh.atmosphere[1].x;
     let middle = uint(sh.range.z) / 2;
-    let p = eye * 1e-3 - sh.atmosphere[0].xyz;
+    let p = aboveGround(eye * 1e-3 - sh.atmosphere[0].xyz, sh.atmosphere[0].w);
     // Started from the bending of a ray along the eye's horizon, so a body just below the
     // geometric horizon, whose own ray would meet the ground, starts lifted clear of it; then
     // apparent = true + bending(apparent), which contracts by about a quarter each step near the
@@ -922,7 +922,7 @@ float3 trueDirection(float3 eye, float3 d) {
     let bottom = sh.atmosphere[0].w;
     let top = sh.atmosphere[1].x;
     let middle = uint(sh.range.z) / 2;
-    let p = eye * 1e-3 - sh.atmosphere[0].xyz;
+    let p = aboveGround(eye * 1e-3 - sh.atmosphere[0].xyz, sh.atmosphere[0].w);
     float start;
     float end;
     bool ground;
@@ -1023,8 +1023,8 @@ uint skyBody(float3 eye, float3 d, float pixelRadius, out float3 point, out floa
 // The radiance of celestial body `index` at `point` on it (km from the frame's origin) seen along
 // `d`, per unit sun irradiance, in band group `group`: Lommel-Seeliger reflectance scaled to its
 // normal albedo, a radiance factor of A 2 mu0 / (mu0 + mu), which lights a full moon's disc evenly
-// as the Moon's is; dimmed where the other bodies, or the planet, eclipse the sun there (the
-// planet's umbra black, without the light its air refracts into it).
+// as the Moon's is; dimmed where the other bodies eclipse the sun there, and the planet, whose
+// atmosphere refracts reddened light into its umbra (`planetShadow`).
 //
 // References:
 // - B. Hapke, "Theory of Reflectance and Emittance Spectroscopy", 2nd ed., Cambridge University
@@ -1044,10 +1044,11 @@ float4 bodyRadiance(uint index, float3 point, float3 d, uint group) {
     var visible = eclipseVisibility(bodiesEclipse(group, float3(0.0), index), point, sh.sun.xyz,
                                     sh.atmosphere[1].z);
     if (sh.atmosphere[1].y != 0.0) {
-        var planet = noEclipse();
-        planet.bodies[0] = float4(sh.atmosphere[0].xyz, sh.atmosphere[0].w);
-        planet.wavelengths = groupWavelengths(group);
-        visible *= eclipseVisibility(planet, point, sh.sun.xyz, sh.atmosphere[1].z);
+        // The planet's shadow follows the transmittance in its table.
+        let groups = (uint(sh.range.z) + 3) / 4;
+        visible *= planetShadow(atmosphereTransmittance, tableSampler,
+                                sh.atmosphere[0].xyz - point, sh.sun.xyz, sh.atmosphere[1].z,
+                                groupWavelengths(group), groups + group, sh.atmosphere[1].x);
     }
     let rgb = sh.bodyAlbedo[index].xyz;
     let scale = max(rgb.x, max(rgb.y, rgb.z));
@@ -1166,7 +1167,7 @@ void aerialPerspective(float3 world, float2 ndc, out float transmittance[kMaxBan
     if (span <= 0.0) {
         return;
     }
-    let p = eye * 1e-3 - sh.atmosphere[0].xyz;
+    let p = aboveGround(eye * 1e-3 - sh.atmosphere[0].xyz, sh.atmosphere[0].w);
     let d = toSurface / span;
     float start;
     float end;
@@ -1204,7 +1205,7 @@ void atmosphereSky(inout float radiance[kMaxBands], float3 origin, float3 d,
     let sunSine = sh.atmosphere[1].z;
     let sun = sh.sun.xyz;
     let pixelRadius = sqrt(pixelSolidAngle / PI);
-    let p = origin * 1e-3 - sh.atmosphere[0].xyz;
+    let p = aboveGround(origin * 1e-3 - sh.atmosphere[0].xyz, bottom);
     float start;
     float end;
     bool ground;

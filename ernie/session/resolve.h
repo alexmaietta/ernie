@@ -399,6 +399,10 @@ std::vector<Star> StarsOf(const Scene& scene, const Path& path);
 StarFieldParams StarFieldParamsOf(const Scene& scene,
                                   const Path& path);
 
+/// The mean radius (metres) of an Atmosphere preset's planet, as
+/// `AtmosphereParamsOf` takes it; 0 for an unknown preset.
+double AtmospherePresetRadius(std::string_view preset);
+
 /// The Atmosphere at `path` around the planet Terrain `terrain`
 /// (empty for none): with a planet Terrain the planet is at the
 /// world's origin and has its radius unless

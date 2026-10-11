@@ -56,6 +56,11 @@ static const uint kScatteringSteps = 128;
 [[vk::image_format("rgba32f")]] [[vk::binding(7, 0)]] RWTexture2DArray<float4> irradianceOut;
 [[vk::binding(8, 0)]] Texture2DArray<float4> multiple;
 [[vk::image_format("rgba32f")]] [[vk::binding(9, 0)]] RWTexture2DArray<float4> refractionOut;
+[[vk::binding(10, 0)]] Texture2DArray<float4> refraction;
+// x: the sine of the sun's angular radius, y: the cloud tops' height (km), below which clouds
+// block rays grazing the planet; z: the first band's lower wavelength (nm), w: the band width;
+// then x: the fraction of the limb the clouds cover.
+[[vk::binding(12, 0)]] StructuredBuffer<float4> shadowSettings;
 
 // Refraction, per apparent zenith angle and height: a ray traced out of the atmosphere by the ray
 // equation d(n t)/ds = grad n through its spherically layered refractive index, the bands' bending
@@ -260,4 +265,120 @@ void multipleScatteringMain(uint3 id: SV_DispatchThreadID) {
         transfer += gathered / float(kDirections);
     }
     multipleOut[id] = secondOrder / (1.0 - min(transfer, float4(0.999)));
+}
+
+// The planet's shadow (atmosphere.slang's `planetShadow`), in the transmittance table's layers
+// after its own, per distance from the planet and
+// separation of the planet's centre from the sun's: the sun's light that reaches the point past
+// the atmosphere's disc, plus the light that reaches it through the atmosphere, over the sun's
+// whole light. Through the atmosphere, each direction the point looks in, at angle alpha from the
+// planet's centre, is a ray of impact parameter b = D sin alpha that grazes the planet at the
+// radius r_t where n(r_t) r_t = b (Bouguer's invariant), bent towards the planet by twice the
+// refraction table's bending from r_t level (in and out alike) and dimmed by the square of the
+// transmittance from r_t level to the top. It carries the sun's limb-darkened radiance from the
+// direction it came from, alpha - bending from the planet's centre (across it when negative); its
+// radiance is kept along the ray, so the integral over the point's sky, of solid angle
+// sin alpha dalpha dphi, holds the focusing of the light the atmosphere bends into the umbra as
+// well as its reddening. Rays grazing the ground are blocked, and below the cloud tops the share
+// the clouds cover. Light the atmosphere scatters towards the shadow is left out: next to the
+// refracted sunlight it matters only deep in the umbra after volcanic eruptions (Garcia Munoz
+// and Palle 2011).
+//
+// Across each grazing height, the directions whose rays come from the sun lie within an angle
+// psi_max of the line through the sun's centre, from the half-angle formula
+// sin^2(gamma / 2) = sin^2((a - sigma) / 2) + sin a sin sigma sin^2(psi / 2) for a source at a
+// from the planet's centre and the sun's at sigma, which keeps small angles accurate.
+//
+// References:
+// - F. Link, "Eclipse Phenomena in Astronomy", Springer, 1969, chapter 2 (the theory of the
+//   umbra's light, refracted and extinguished in the atmosphere).
+//   https://doi.org/10.1007/978-3-642-86808-8
+// - A. Garcia Munoz and E. Palle, "Lunar eclipse theory revisited: Scattered sunlight in both the
+//   quiescent and the volcanically perturbed atmosphere", Journal of Quantitative Spectroscopy
+//   and Radiative Transfer 112(10):1609-1621, 2011. https://doi.org/10.1016/j.jqsrt.2011.03.017
+// - S. Schneegans et al., "Physically Based Real-Time Rendering of Eclipses", Computer Graphics
+//   Forum 44, 2025 (shadow maps of the light through and past an atmosphere, by the receiver's
+//   view of the planet and the sun). https://diglib.eg.org/handle/10.1111/cgf70017
+static const uint kShadowHeights = 128;
+static const uint kShadowAzimuths = 32;
+
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void planetShadowMain(uint3 id: SV_DispatchThreadID) {
+    if (id.x >= kPlanetShadowWidth || id.y >= kPlanetShadowHeight) {
+        return;
+    }
+    let bottom = atmosphereBottom(medium);
+    let top = atmosphereTop(medium);
+    let sunSine = shadowSettings[0].x;
+    let cloudTop = shadowSettings[0].y;
+    let clear = 1.0 - shadowSettings[1].x;
+    let sunRadius = asin(sunSine);
+    let group = id.z;
+    float4 wavelengths;
+    float4 exponent;
+    for (uint k = 0; k < 4; ++k) {
+        wavelengths[k] = shadowSettings[0].z + (float(group * 4 + k) + 0.5) * shadowSettings[0].w;
+        exponent[k] = limbDarkening(wavelengths[k]);
+    }
+    let uv = (float2(id.xy) + 0.5) / float2(kPlanetShadowWidth, kPlanetShadowHeight);
+    float distance;
+    float sigma;
+    planetShadowDistance(uv, top, sunRadius, distance, sigma);
+
+    // Past the atmosphere's disc.
+    var eclipse = noEclipse();
+    eclipse.bodies[0] = float4(0.0, 0.0, distance, top);
+    eclipse.wavelengths = wavelengths;
+    var light =
+        eclipseVisibility(eclipse, float3(0.0), float3(sin(sigma), 0.0, cos(sigma)), sunSine);
+
+    // Through it: grazing heights crowded towards the ground, b = bottom + (top - bottom) t^2.
+    let halfSun = sin(0.5 * sunRadius);
+    let solidAngle = 4.0 * PI * halfSun * halfSun;
+    let sinSigma = sin(sigma);
+    for (uint i = 0; i < kShadowHeights; ++i) {
+        let t = (float(i) + 0.5) / float(kShadowHeights);
+        let b = bottom + (top - bottom) * t * t;
+        let db = (top - bottom) * 2.0 * t / float(kShadowHeights);
+        let alpha = asin(b / distance);
+        let dalpha = db / sqrt(max(distance * distance - b * b, 1e-6));
+        let refractivity = refractivityAt(medium, densities, b - bottom, group);
+        for (uint k = 0; k < 4; ++k) {
+            // The grazing radius, n(r_t) r_t = b, in two steps.
+            var grazing = b / (1.0 + refractivity[k]);
+            grazing = b / (1.0 + refractivityAt(medium, densities, grazing - bottom, group)[k]);
+            if (grazing <= bottom) {
+                continue;
+            }
+            let clouds = grazing <= bottom + cloudTop ? clear : 1.0;
+            let bending =
+                2.0 * refractionDeviation(refraction, linear, grazing, 0.0, group, bottom, top)[k];
+            let through = transmittanceToTop(transmittance, linear, grazing, 0.0, group, bottom,
+                                             top)[k];
+            let source = abs(alpha - bending);
+            let halfOff = sin(0.5 * (source - sigma));
+            let across = sin(source) * sinSigma;
+            let room = halfSun * halfSun - halfOff * halfOff;
+            if (room <= 0.0) {
+                continue;
+            }
+            // The directions, either side of the sun's line, whose source lies on the sun.
+            let psiMax = across <= room ? PI : 2.0 * asin(sqrt(room / across));
+            var radiance = 0.0;
+            for (uint j = 0; j < kShadowAzimuths; ++j) {
+                let psi = (float(j) + 0.5) / float(kShadowAzimuths) * psiMax;
+                let s = sin(0.5 * psi);
+                let halfGamma = sqrt(max(halfOff * halfOff + across * s * s, 0.0));
+                let ratio = min(halfGamma / halfSun, 1.0);
+                let mu = sqrt(max(1.0 - ratio * ratio, 0.0));
+                radiance += pow(mu, exponent[k]);
+            }
+            radiance *= (exponent[k] + 2.0) / (2.0 * solidAngle) * 2.0 * psiMax /
+                        float(kShadowAzimuths);
+            light[k] += clouds * through * through * radiance * sin(alpha) * dalpha;
+        }
+    }
+    let groups = uint(medium[1].x);
+    transmittanceOut[uint3(id.xy, groups + group)] = light;
 }

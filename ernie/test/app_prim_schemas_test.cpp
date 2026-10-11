@@ -208,5 +208,33 @@ TEST(PrimSchemasTest, RenderPanelsEditTheCameraAsOneTarget) {
     EXPECT_EQ(bias->kind, PropertyField::Kind::Vec4);
 }
 
+// An Atmosphere's planet radius shows the radius it renders with
+// unset, its preset's or the planet Terrain's, and "custom" once set
+// to another.
+TEST(PrimSchemasTest, AnAtmosphereShowsItsPlanetsRadius) {
+    Scene scene;
+    scene.Define("/Air", tokens::kAtmosphere);
+    scene.Set("/Air", tokens::kAtmospherePreset, std::string("mars"));
+    const BrdfRegistry brdfs = BrdfRegistry::WithBuiltins();
+    const SensorFilterRegistry filters =
+        SensorFilterRegistry::WithStandard();
+    const auto radius = [&] {
+        return *FieldOf(SchemaOf(scene, "/Air", brdfs, filters),
+                        tokens::kAtmospherePlanetRadius);
+    };
+    EXPECT_EQ(radius().fallback, Value(3389.5e3));
+    EXPECT_NE(radius().label.find("(mars)"), std::string::npos);
+    scene.Set("/Air", tokens::kAtmospherePlanetRadius, 3389.5e3);
+    EXPECT_NE(radius().label.find("(mars)"), std::string::npos);
+    scene.Set("/Air", tokens::kAtmospherePlanetRadius, 3000e3);
+    EXPECT_NE(radius().label.find("(custom)"), std::string::npos);
+    scene.Define("/Planet", tokens::kTerrain);
+    scene.Set("/Planet", tokens::kPlanetRadius, 1737.4e3);
+    scene.Remove("/Air");
+    scene.Define("/Air", tokens::kAtmosphere);
+    EXPECT_EQ(radius().fallback, Value(1737.4e3));
+    EXPECT_NE(radius().label.find("(terrain)"), std::string::npos);
+}
+
 }  // namespace
 }  // namespace ernie::app

@@ -6,7 +6,9 @@
 #include "ernie/scene/prim_type.h"
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
+#include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/session/resolve.h"
 
 #include <algorithm>
 #include <array>
@@ -283,9 +285,45 @@ void SensorFilterSections(const SensorFilterPrim& prim,
                            inputs.end());
 }
 
+/// An Atmosphere's planet radius as it renders unset, from the first
+/// visible planet Terrain or else its preset, labelled by where it
+/// comes from; and "custom" once set to another.
+void AtmosphereFields(const Scene& scene, const Path& path,
+                      std::vector<PropertySection>& sections) {
+    double radius = AtmospherePresetRadius(
+        ernie::Atmosphere(scene, path).GetPreset());
+    std::string source = ernie::Atmosphere(scene, path).GetPreset();
+    for (const Path& terrain : scene.Prims(kTerrain)) {
+        if (scene.IsVisible(terrain)) {
+            const double planet =
+                ernie::Terrain(scene, terrain).GetPlanetRadius();
+            if (planet > 0.0) {
+                radius = planet;
+                source = "terrain";
+            }
+            break;
+        }
+    }
+    const Value* authored = scene.Get(path, kAtmospherePlanetRadius);
+    const double value =
+        GetNumber(scene, path, kAtmospherePlanetRadius, 0.0);
+    if (authored != nullptr && value > 0.0 && value != radius) {
+        source = "custom";
+    }
+    for (PropertySection& section : sections) {
+        for (PropertyField& field : section.fields) {
+            if (field.attribute == kAtmospherePlanetRadius) {
+                field.fallback = radius;
+                field.label += " (" + source + ")";
+            }
+        }
+    }
+}
+
 /// Adds to a registered type's `sections` the fields its declaration
 /// cannot hold, which depend on the prim's values: a Material's
-/// chosen BRDF's parameters, a SensorFilter's type's inputs.
+/// chosen BRDF's parameters, a SensorFilter's type's inputs, an
+/// Atmosphere's planet radius.
 void DynamicSectionsOf(const Scene& scene, const Path& path,
                        std::string_view type,
                        const BrdfRegistry& brdfs,
@@ -301,6 +339,8 @@ void DynamicSectionsOf(const Scene& scene, const Path& path,
     } else if (type == kSensorFilter) {
         SensorFilterSections(SensorFilterPrim(scene, path), filters,
                              sections);
+    } else if (type == kAtmosphere) {
+        AtmosphereFields(scene, path, sections);
     }
 }
 

@@ -434,6 +434,11 @@ struct AtmosphereParams {
     double hazeOpticalDepth = 0.1;  ///< Earth, at 550 nm.
     double ozoneColumn = 300.0;     ///< Earth, Dobson units.
     double dustOpticalDepth = 0.5;  ///< Mars, at 880 nm.
+    /// Metres: clouds' tops, below which they block light grazing the
+    /// planet into its shadow, over the fraction `cloudCover` of its
+    /// limb.
+    double cloudTop = 0.0;
+    double cloudCover = 0.5;
 
     bool operator==(const AtmosphereParams&) const = default;
 

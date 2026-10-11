@@ -81,6 +81,7 @@ def test_atmosphere_class():
     assert air.planet_radius == 0.0 and air.ground_albedo == 0.3
     assert air.haze_optical_depth == pytest.approx(0.1)
     assert air.ozone_column == 300.0
+    assert air.cloud_top == 0.0 and air.cloud_cover == 0.5
     assert scene.get("/World/Air", tokens.ATMOSPHERE_PRESET) == "mars"
 
 

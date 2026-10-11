@@ -2394,6 +2394,18 @@ StarFieldParams StarFieldParamsOf(const Scene& scene,
     return field;
 }
 
+double AtmospherePresetRadius(std::string_view preset) {
+    // The IUGG mean radius of the Earth and the IAU mean radius of
+    // Mars (Archinal et al. 2018).
+    if (preset == tokens::kEarth) {
+        return 6371.0088e3;
+    }
+    if (preset == tokens::kMars) {
+        return 3389.5e3;
+    }
+    return 0.0;
+}
+
 AtmosphereParams AtmosphereParamsOf(const Scene& scene,
                                     const Path& path,
                                     const Path& terrain) {
@@ -2404,14 +2416,8 @@ AtmosphereParams AtmosphereParamsOf(const Scene& scene,
     const Atmosphere prim(scene, path);
     AtmosphereParams params;
     params.preset = prim.GetPreset();
-    // The IUGG mean radius of the Earth and the IAU mean radius of
-    // Mars (Archinal et al. 2018).
-    double presetRadius = 0.0;
-    if (params.preset == tokens::kEarth) {
-        presetRadius = 6371.0088e3;
-    } else if (params.preset == tokens::kMars) {
-        presetRadius = 3389.5e3;
-    } else {
+    const double presetRadius = AtmospherePresetRadius(params.preset);
+    if (presetRadius <= 0.0) {
         throw std::invalid_argument(
             "Atmosphere '" + path.String() + "' has no preset '" +
             params.preset + "'; use 'earth' or 'mars'");
@@ -2434,6 +2440,8 @@ AtmosphereParams AtmosphereParamsOf(const Scene& scene,
     params.ozoneColumn = std::max(prim.GetOzoneColumn(), 0.0);
     params.dustOpticalDepth =
         std::max(prim.GetDustOpticalDepth(), 0.0);
+    params.cloudTop = std::max(prim.GetCloudTop(), 0.0);
+    params.cloudCover = std::clamp(prim.GetCloudCover(), 0.0, 1.0);
     return params;
 }
 

@@ -2588,7 +2588,7 @@ void RasterRenderer::Update(
     if (!params.bodies.empty()) {
         sky_ |= kSkyBodies;
     }
-    atmosphere_->Set(params.atmosphere, bands_);
+    atmosphere_->Set(params.atmosphere, bands_, params.sunAngle);
     // The lights first: shading reads the size of the light shadow
     // maps they make.
     WriteLights(params, bounds);

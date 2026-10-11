@@ -6,6 +6,10 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/util/profile.h"
 
+#include <glm/trigonometric.hpp>
+
+#include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <stdexcept>
 #include <vector>
@@ -28,6 +32,8 @@ constexpr DescriptorBinding kBindings[] = {
     {7, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {8, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {9, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {10, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
 /// atmosphere.slang's table sizes.
@@ -84,6 +90,7 @@ void AtmosphereLuts::Placeholders() {
     medium_ = Buffer(zeros);
     densities_ = Buffer(zeros);
     phases_ = Buffer(zeros);
+    shadowSettings_ = Buffer(std::vector<float>(8, 0.0f));
 }
 
 std::unique_ptr<GpuBuffer>
@@ -114,13 +121,31 @@ AtmosphereLuts::ModelOf(const AtmosphereParams& params) {
 
 void AtmosphereLuts::Set(
     const std::optional<AtmosphereParams>& params,
-    const SpectralBands& bands) {
+    const SpectralBands& bands, float sunAngle) {
+    // The clouds and the sun's size shape the planet's shadow alone.
+    const auto withoutClouds = [](AtmosphereParams p) {
+        p.cloudTop = 0.0;
+        p.cloudCover = 0.0;
+        return p;
+    };
     const bool sameModel =
         params.has_value() == params_.has_value() &&
-        (!params || params->SameModel(*params_)) &&
+        (!params ||
+         withoutClouds(*params).SameModel(withoutClouds(*params_))) &&
         (!banded_ || banded_->bands == bands);
+    const bool sameShadow =
+        sameModel && sunAngle == sunAngle_ &&
+        (!params || (params->cloudTop == params_->cloudTop &&
+                     params->cloudCover == params_->cloudCover));
     params_ = params;
+    sunAngle_ = sunAngle;
     if (sameModel) {
+        if (!sameShadow && params) {
+            // A shadow table being recorded may read the settings.
+            vkDeviceWaitIdle(context_.Device());
+            ShadowSettings();
+            shadowStale_ = true;
+        }
         return;
     }
     ERNIE_ZONE("Atmosphere model");
@@ -140,8 +165,9 @@ void AtmosphereLuts::Set(
     Upload();
     const auto groups =
         static_cast<std::uint32_t>((bands.count + 3) / 4);
+    // The transmittance, then the planet's shadow.
     transmittance_ = TableImage(context_, kTransmittanceWidth,
-                                kTransmittanceHeight, groups);
+                                kTransmittanceHeight, 2 * groups);
     multipleScattering_ =
         TableImage(context_, kMultipleScatteringSize,
                    kMultipleScatteringSize, groups);
@@ -149,7 +175,18 @@ void AtmosphereLuts::Set(
                                 kIrradianceHeight, groups);
     refraction_ = TableImage(context_, kRefractionWidth,
                              kRefractionHeight, groups);
+    ShadowSettings();
     stale_ = true;
+}
+
+void AtmosphereLuts::ShadowSettings() {
+    const SpectralBands& bands = banded_->bands;
+    shadowSettings_ = Buffer(
+        {std::max(std::sin(glm::radians(0.5f * sunAngle_)), 1e-5f),
+         static_cast<float>(params_->cloudTop * 1e-3),
+         static_cast<float>(bands.minNm),
+         static_cast<float>(bands.Width()),
+         static_cast<float>(params_->cloudCover), 0.0f, 0.0f, 0.0f});
 }
 
 void AtmosphereLuts::Upload() {
@@ -220,10 +257,12 @@ void AtmosphereLuts::Upload() {
 }
 
 void AtmosphereLuts::Record(VkCommandBuffer commands) const {
-    if (!stale_) {
+    if (!stale_ && !shadowStale_) {
         return;
     }
+    const bool all = stale_;
     stale_ = false;
+    shadowStale_ = false;
     if (!Active()) {
         transmittance_->Transition(
             commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -253,6 +292,9 @@ void AtmosphereLuts::Record(VkCommandBuffer commands) const {
         refractionPipeline_ = std::make_unique<ComputePipeline>(
             context_, layout_,
             compiler_.CompileSpirv(modules, "refractionMain"));
+        shadowPipeline_ = std::make_unique<ComputePipeline>(
+            context_, layout_,
+            compiler_.CompileSpirv(modules, "planetShadowMain"));
     }
     GpuImage* const tables[] = {
         transmittance_.get(), multipleScattering_.get(),
@@ -274,8 +316,10 @@ void AtmosphereLuts::Record(VkCommandBuffer commands) const {
         DescriptorResource::Of(*phases_),
         general(*skyIrradiance_),
         general(*multipleScattering_),
-        general(*refraction_)};
-    const std::uint32_t groups = transmittance_->Desc().layers;
+        general(*refraction_),
+        general(*refraction_),
+        DescriptorResource::Of(*shadowSettings_)};
+    const std::uint32_t groups = transmittance_->Desc().layers / 2;
     // Each table reads the ones before it.
     const auto barrier = [commands] {
         VkMemoryBarrier2 memory{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
@@ -299,17 +343,23 @@ void AtmosphereLuts::Record(VkCommandBuffer commands) const {
         vkCmdDispatch(commands, Groups(width), Groups(height),
                       groups);
     };
-    dispatch(*transmittancePipeline_, kTransmittanceWidth,
+    if (all) {
+        dispatch(*transmittancePipeline_, kTransmittanceWidth,
+                 kTransmittanceHeight);
+        barrier();
+        dispatch(*multiplePipeline_, kMultipleScatteringSize,
+                 kMultipleScatteringSize);
+        barrier();
+        dispatch(*irradiancePipeline_, kIrradianceWidth,
+                 kIrradianceHeight);
+        // Refraction reads the medium alone.
+        dispatch(*refractionPipeline_, kRefractionWidth,
+                 kRefractionHeight);
+        barrier();
+    }
+    // The planet's shadow reads the transmittance and the refraction.
+    dispatch(*shadowPipeline_, kTransmittanceWidth,
              kTransmittanceHeight);
-    barrier();
-    dispatch(*multiplePipeline_, kMultipleScatteringSize,
-             kMultipleScatteringSize);
-    barrier();
-    dispatch(*irradiancePipeline_, kIrradianceWidth,
-             kIrradianceHeight);
-    // Refraction reads the medium alone.
-    dispatch(*refractionPipeline_, kRefractionWidth,
-             kRefractionHeight);
 
     for (GpuImage* table : tables) {
         table->Transition(commands,

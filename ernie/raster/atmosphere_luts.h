@@ -30,12 +30,14 @@ class AtmosphereLuts {
     AtmosphereLuts(const VulkanContext& context,
                    const ShaderCompiler& compiler);
 
-    /// Sets the atmosphere to draw, or none, for `bands`: builds its
-    /// model and medium when they changed (waiting for the device
-    /// first, as recorded tables may still read the old medium), and
-    /// marks the tables for rebuilding.
+    /// Sets the atmosphere to draw, or none, for `bands` and a sun of
+    /// angular diameter `sunAngle` degrees: builds its model and
+    /// medium when they changed (waiting for the device first, as
+    /// recorded tables may still read the old medium), and marks the
+    /// tables for rebuilding; the planet's shadow alone when only the
+    /// sun's size changed.
     void Set(const std::optional<AtmosphereParams>& params,
-             const SpectralBands& bands);
+             const SpectralBands& bands, float sunAngle = 0.53f);
 
     /// Records the passes rebuilding the tables when they are stale,
     /// leaving them ready for sampling; nothing otherwise.
@@ -78,6 +80,14 @@ class AtmosphereLuts {
         return *refraction_;
     }
 
+    /// The fraction of the sun's light reaching points behind the
+    /// planet, through its atmosphere and past it, by distance and
+    /// separation from the sun (atmosphere.slang's `planetShadow`):
+    /// the transmittance table's image, in the layers after its own.
+    const GpuImage& PlanetShadow() const {
+        return *transmittance_;
+    }
+
     /// atmosphere.slang's medium, densities and phase tables, or
     /// small placeholders without an atmosphere.
     const GpuBuffer& Medium() const {
@@ -103,6 +113,9 @@ class AtmosphereLuts {
   private:
     void Upload();
     void Placeholders();
+    /// Writes the shadow settings from the sun's size, the clouds and
+    /// the bands.
+    void ShadowSettings();
     std::unique_ptr<GpuBuffer>
     Buffer(const std::vector<float>& values) const;
 
@@ -115,6 +128,7 @@ class AtmosphereLuts {
     mutable std::unique_ptr<ComputePipeline> multiplePipeline_;
     mutable std::unique_ptr<ComputePipeline> irradiancePipeline_;
     mutable std::unique_ptr<ComputePipeline> refractionPipeline_;
+    mutable std::unique_ptr<ComputePipeline> shadowPipeline_;
     std::optional<AtmosphereParams> params_;
     std::optional<BandedAtmosphere> banded_;
     std::unique_ptr<GpuBuffer> medium_;
@@ -124,7 +138,12 @@ class AtmosphereLuts {
     std::unique_ptr<GpuImage> multipleScattering_;
     std::unique_ptr<GpuImage> skyIrradiance_;
     std::unique_ptr<GpuImage> refraction_;
+    /// atmosphere_luts.slang's shadow settings.
+    std::unique_ptr<GpuBuffer> shadowSettings_;
+    float sunAngle_ = 0.0f;
     mutable bool stale_ = false;
+    /// Whether the planet's shadow alone needs rebuilding.
+    mutable bool shadowStale_ = false;
 };
 
 }  // namespace ernie

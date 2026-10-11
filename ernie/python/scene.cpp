@@ -2239,6 +2239,8 @@ void BindScene(nb::module_& m) {
         {"ATMOSPHERE_OZONE_COLUMN", tokens::kAtmosphereOzoneColumn},
         {"ATMOSPHERE_DUST_OPTICAL_DEPTH",
          tokens::kAtmosphereDustOpticalDepth},
+        {"ATMOSPHERE_CLOUD_TOP", tokens::kAtmosphereCloudTop},
+        {"ATMOSPHERE_CLOUD_COVER", tokens::kAtmosphereCloudCover},
         {"CELESTIAL_BODY", tokens::kCelestialBody},
         {"BODY_RADIUS", tokens::kBodyRadius},
         {"BODY_ALBEDO", tokens::kBodyAlbedo},

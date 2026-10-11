@@ -111,7 +111,15 @@
     X(double, DustOpticalDepth, ::ernie::tokens::kAtmosphereDustOpticalDepth, 0.5,                 \
       (::ernie::AttributeMeta{.doc = "Mars: the dust's vertical optical depth at 880 nm (about "   \
                                      "0.3 to 0.9 in clear seasons, above 1 in dust storms).",      \
-                              .group = "Atmosphere", .max = 10.0}))
+                              .group = "Atmosphere", .max = 10.0}))                                \
+    X(double, CloudTop, ::ernie::tokens::kAtmosphereCloudTop, 0.0,                                 \
+      (::ernie::AttributeMeta{.doc = "Metres: clouds block light grazing the planet below this, "  \
+                                     "darkening its shadow, as in a lunar eclipse's umbra; 0 "     \
+                                     "for clear air.",                                             \
+                              .group = "Atmosphere", .max = 20e3}))                                \
+    X(double, CloudCover, ::ernie::tokens::kAtmosphereCloudCover, 0.5,                             \
+      (::ernie::AttributeMeta{.doc = "The fraction of the planet's limb the clouds cover.",        \
+                              .group = "Atmosphere", .max = 1.0}))
 
 #define ERNIE_CELESTIAL_BODY_ATTRIBUTES(X)                                                         \
     X(double, Radius, ::ernie::tokens::kBodyRadius, 1737.4e3,                                      \

@@ -620,6 +620,13 @@ inline constexpr std::string_view kAtmosphereOzoneColumn =
 /// float: Mars's vertical dust optical depth at 880 nm.
 inline constexpr std::string_view kAtmosphereDustOpticalDepth =
     "ernie:atmosphere:dustOpticalDepth";
+/// float, metres: the clouds' tops, below which they block light
+/// grazing the planet, which reddens the Moon in a lunar eclipse; and
+/// the fraction of the planet's limb they cover.
+inline constexpr std::string_view kAtmosphereCloudTop =
+    "ernie:atmosphere:cloudTop";
+inline constexpr std::string_view kAtmosphereCloudCover =
+    "ernie:atmosphere:cloudCover";
 
 // CelestialBody (Ernie): a sphere far beyond the scene, such as a
 // moon, at its transform's origin, drawn in the sky and casting
