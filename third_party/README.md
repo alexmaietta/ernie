@@ -14,6 +14,16 @@ implementation. Build glue is in `cmake/third_party/<name>.cmake`.
 To update one, replace its headers with the files from the new upstream version, update the
 version here, and rerun the image tests (`ernie_tests_unit` or, inside TerrainGen, `terraingen_tests_ernie_unit`, with `--gtest_filter='Image*:*Png*:*Exr*'`).
 
+## Data
+
+Measured and published tables built into Ernie's sources, with their sources' terms.
+
+| Data | Version | Files | License | Used for |
+| --- | --- | --- | --- | --- |
+| [TSIS-1 Hybrid Solar Reference Spectrum](https://lasp.colorado.edu/lisird/data/tsis1_hsrs), LASP, University of Colorado (Coddington et al. 2021, [doi:10.1029/2020GL091709](https://doi.org/10.1029/2020GL091709); 2023, [doi:10.1029/2022EA002637](https://doi.org/10.1029/2022EA002637)) | Version 2, full spectrum extension (c2022-11-30), reduced to 1 nm bins to 2730 nm and 1% bins to 200 µm by `tools/solar_spectrum.py` | `ernie/util/solar_table.h` | CC BY 4.0 | The Sun's spectrum (`SolarSpectralIrradiance`, the "sun" illuminant) |
+| Ozone absorption cross sections, IUP Bremen (Gorshelev et al. 2014, Serdyuchenko et al. 2014), as 10 nm means by [CosmoScout VR](https://github.com/cosmoscout/cosmoscout-vr) | 233 K | `ernie/util/scattering.cpp` | MIT (CosmoScout VR's tables) | Earth's ozone |
+| Hematite refractive index after Ehlers et al. 2014, from [CosmoScout VR](https://github.com/cosmoscout/cosmoscout-vr) | `mars_realistic.json` | `ernie/util/scattering.cpp` | CC0 | Martian dust |
+
 ## Fetched
 
 Everything else is fetched at configure time (`cmake/third_party/<name>.cmake`, which pins the version as `ERNIE_DEP_VERSION_<name>`) and built into Ernie's binaries. The packages, the wheel and `cmake --install` ship each library's license under `third_party/<name>/` (`cmake/ErnieLicenses.cmake`); add a dependency there as well as here.

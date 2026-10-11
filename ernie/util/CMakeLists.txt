@@ -8,6 +8,7 @@ ernie_add_library(
     image.cpp
     profiler.cpp
     scattering.cpp
+    solar.cpp
     spectrum.cpp
     tensor.cpp
     PUBLIC

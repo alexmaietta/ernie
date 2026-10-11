@@ -430,6 +430,9 @@ inline constexpr std::string_view kWhite = "white";
 inline constexpr std::string_view kBlackbody = "blackbody";
 inline constexpr std::string_view kIlluminantD = "illuminant D";
 inline constexpr std::string_view kCustom = "custom";
+/// The Sun above the atmosphere, measured (`SolarSpectralIrradiance`,
+/// the TSIS-1 Hybrid Solar Reference Spectrum) over its whole range.
+inline constexpr std::string_view kSun = "sun";
 /// float array: (nm, value) pairs, wavelengths increasing, of a
 /// "custom" illuminant's shape; zero outside them.
 inline constexpr std::string_view kPhysicalCustomIlluminant =

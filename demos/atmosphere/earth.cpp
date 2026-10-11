@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Earth's atmosphere from the ground and from orbit: a blue noon sky,
 // a red sunset, and the planet's limb from the International Space
-// Station's 400 km, under the Sun's 1361 W/m^2 as a 5772 K black
-// body.
+// Station's 400 km, under the Sun's measured spectrum (TSIS-1) at
+// 1361 W/m^2.
 
 #include "ernie/app/demo.h"
 #include "ernie/scene/base_schemas.h"
@@ -83,11 +83,10 @@ class EarthDemo : public app::Demo {
         // own.
         Atmosphere::Define(scene, "/World/Air")
             .SetPreset(std::string(tokens::kEarth));
-        // The Sun above the atmosphere.
+        // The Sun above the atmosphere: its measured spectrum.
         DistantLight::Define(scene, "/World/Sun")
             .SetIrradiance(1361.0)
-            .SetPhysicalIlluminant(std::string(tokens::kBlackbody))
-            .SetColorTemperature(5772.0)
+            .SetPhysicalIlluminant(std::string(tokens::kSun))
             .SetAngle(0.53);
         // Grey spheres on the ground, lit by the sun through the air.
         for (int i = 0; i < 3; ++i) {

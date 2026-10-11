@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Earth's atmosphere from the ground and from orbit: a blue noon sky,
 a red sunset, and the planet's limb from the International Space
-Station's 400 km, under the Sun's 1361 W/m^2 as a 5772 K black
-body."""
+Station's 400 km, under the Sun's measured spectrum (TSIS-1) at
+1361 W/m^2."""
 
 import math
 
@@ -53,13 +53,12 @@ class Demo(ernie.demo.Demo):
         # Earth's air, ozone and haze around a planet whose surface is
         # the world's z = 0, the ground beyond any geometry its own.
         world.define("Air", ernie.Atmosphere, preset=tokens.EARTH)
-        # The Sun above the atmosphere.
+        # The Sun above the atmosphere: its measured spectrum.
         self.sun = world.define(
             "Sun",
             ernie.DistantLight,
             irradiance=1361.0,
-            physical_illuminant=tokens.BLACKBODY,
-            color_temperature=5772.0,
+            physical_illuminant=tokens.SUN,
             angle=0.53,
         )
         # Grey spheres on the ground, lit by the sun through the air.

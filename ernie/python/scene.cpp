@@ -2358,6 +2358,7 @@ void BindScene(nb::module_& m) {
         {"BLACKBODY", tokens::kBlackbody},
         {"ILLUMINANT_D", tokens::kIlluminantD},
         {"CUSTOM", tokens::kCustom},
+        {"SUN", tokens::kSun},
         {"VISIBLE", tokens::kVisible},
         {"OVERLAYS", tokens::kOverlays},
         {"MINIMAL_MODE", tokens::kMinimalMode},

@@ -7,6 +7,7 @@
 #include "ernie/session/resolve.h"
 #include "ernie/util/astronomy.h"
 #include "ernie/util/ies.h"
+#include "ernie/util/solar.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
@@ -1076,4 +1077,35 @@ TEST(FrameParamsOf, DomesShowAndStarFieldsTurnWithTheirTransforms) {
     dome.SetVisibleInPrimaryRay(false);
     EXPECT_FALSE(
         ernie::FrameParamsOf(scene, prims, 16, 16).dome->visible);
+}
+
+// The "sun" illuminant: the measured solar spectrum per band, scaled
+// so its whole range carries the irradiance; at Mars's mean 1.524 au,
+// 1361 / 1.524^2 W/m^2 takes the same shape.
+TEST(SunIrradianceOf, TheSunIlluminantIsTheMeasuredSolarSpectrum) {
+    Scene scene;
+    ernie::DistantLight::Define(scene, "/Sun")
+        .SetPhysicalIlluminant(std::string(tokens::kSun))
+        .SetIrradiance(ernie::TotalSolarIrradiance());
+    const ernie::SpectralBands bands{380.0, 780.0, 16};
+    const std::vector<float> irradiance =
+        ernie::SunIrradianceOf(scene, "/Sun", bands);
+    const std::vector<float> measured =
+        ernie::SolarSpectralIrradiance().Bin(bands);
+    ASSERT_EQ(irradiance.size(), measured.size());
+    for (std::size_t b = 0; b < irradiance.size(); ++b) {
+        EXPECT_NEAR(irradiance[b] / measured[b], 1.0f, 1e-6f);
+    }
+    // 380-405 nm, below a black body's share: the calcium and Balmer
+    // lines (1.2107 W m^-2 nm^-1 at 1 au).
+    EXPECT_NEAR(irradiance[0], 1.2107f, 1e-3f);
+
+    ernie::DistantLight(scene, "/Sun")
+        .SetIrradiance(1361.0 / (1.524 * 1.524));
+    const std::vector<float> mars =
+        ernie::SunIrradianceOf(scene, "/Sun", bands);
+    EXPECT_NEAR(mars[8] / irradiance[8],
+                1361.0 / (1.524 * 1.524) /
+                    ernie::TotalSolarIrradiance(),
+                1e-6);
 }

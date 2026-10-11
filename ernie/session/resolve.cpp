@@ -14,6 +14,7 @@
 #include "ernie/scene/xform.h"
 #include "ernie/util/astronomy.h"
 #include "ernie/util/ies.h"
+#include "ernie/util/solar.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -229,6 +230,8 @@ std::function<double(double)> IlluminantShape(const Light& light) {
     } else if (illuminant == kIlluminantD) {
         CieDaylight(560.0, kelvin);  // checks the temperature
         base = [kelvin](double w) { return CieDaylight(w, kelvin); };
+    } else if (illuminant == kSun) {
+        base = [](double w) { return SolarSpectralIrradiance()(w); };
     } else if (illuminant == kCustom) {
         const std::vector<float> pairs =
             light.GetPhysicalCustomIlluminant();
@@ -1312,6 +1315,21 @@ std::vector<float> SunIrradianceOf(const Scene& scene,
     const double temperature = ColorTemperature(sun);
     const std::optional<std::vector<float>> pairs =
         SpectrumPairs(sun);
+    if (sun.HasIrradiance() &&
+        sun.GetPhysicalIlluminant() == tokens::kSun) {
+        // The measured solar spectrum, scaled to the irradiance over
+        // its whole range: the Sun's own at 1361 W/m^2, or at another
+        // distance by the inverse square.
+        std::vector<float> binned =
+            SolarSpectralIrradiance().Bin(bands);
+        const double scale =
+            sun.GetIrradiance() / TotalSolarIrradiance();
+        for (float& value : binned) {
+            value = static_cast<float>(static_cast<double>(value) *
+                                       scale);
+        }
+        return binned;
+    }
     if (sun.HasIrradiance() || pairs) {
         if (pairs) {
             const Spectrum spectrum = Spectrum::FromPairs(*pairs);

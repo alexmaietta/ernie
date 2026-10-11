@@ -52,12 +52,14 @@
       (::ernie::AttributeMeta{                                                                     \
           .label = "Illuminant",                                                                   \
           .doc = "The spectrum's shape: \"white\" (flat) or \"blackbody\", both over 380 to 780 "  \
-                 "nm as Omniverse's, \"illuminant D\" (black body and D at the temperature), or "  \
-                 "\"custom\" (the custom illuminant's pairs). Unset: a black body if the "         \
-                 "temperature is used, else flat, over the whole range.",                          \
+                 "nm as Omniverse's, \"illuminant D\" (black body and D at the temperature), "     \
+                 "\"custom\" (the custom illuminant's pairs), or \"sun\" (the measured TSIS-1 "    \
+                 "solar spectrum, 115 nm to 200 um). Unset: a black body if the temperature is "   \
+                 "used, else flat, over the whole range.",                                         \
           .group = "Spectrum",                                                                     \
           .options = {::ernie::tokens::kWhite, ::ernie::tokens::kBlackbody,                        \
-                      ::ernie::tokens::kIlluminantD, ::ernie::tokens::kCustom}}))                  \
+                      ::ernie::tokens::kIlluminantD, ::ernie::tokens::kCustom,                     \
+                      ::ernie::tokens::kSun}}))                                                    \
     X(std::vector<float>, PhysicalCustomIlluminant, ::ernie::tokens::kPhysicalCustomIlluminant,    \
       std::vector<float>{},                                                                        \
       (::ernie::AttributeMeta{.doc = "(nm, value) pairs, wavelengths increasing, of a \"custom\" " \
