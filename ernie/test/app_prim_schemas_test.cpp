@@ -45,7 +45,9 @@ TEST(PrimSchemasTest, LightPanelsComeFromTheRegistry) {
               (std::vector<std::string>{"Light", "Shape", "Spectrum", "Photometric", "Prim"}));
     // The type's own attributes before its bases' in a section; arrays are not edited.
     EXPECT_EQ(lamp[1].fields.front().attribute, tokens::kRadius);
-    EXPECT_EQ(lamp[1].fields.back().attribute, tokens::kLightPower);
+    EXPECT_EQ(lamp[1].fields.back().attribute, tokens::kShapingIesNormalize);
+    EXPECT_NE(FieldOf(lamp, tokens::kLightPower), nullptr);
+    EXPECT_NE(FieldOf(lamp, tokens::kShapingFocus), nullptr);
     EXPECT_EQ(FieldOf(lamp, tokens::kLightSpectrum), nullptr);
     const PropertyField* color = FieldOf(lamp, tokens::kColor);
     ASSERT_NE(color, nullptr);
