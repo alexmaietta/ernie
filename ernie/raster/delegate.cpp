@@ -910,7 +910,6 @@ void RasterDelegate::ApplyDomeSun(FrameParams& frame) const {
         frame.sunAngle = static_cast<float>(domeSun_->angle);
         frame.sunIrradiance = std::move(spectrum);
         frame.shadows.enabled = true;
-        frame.ambient = 0.0f;
         return;
     }
     LightParams sun;

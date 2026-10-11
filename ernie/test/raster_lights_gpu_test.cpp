@@ -264,39 +264,49 @@ TEST_F(RasterDelegateTest, OtherDistantLightsAddToTheSun) {
         << "cascades over the view, as the sun's";
 }
 
-TEST_F(RasterDelegateTest, EveryDistantLightGivesTheAmbientFraction) {
-    // A distant light's ambient fraction lights from all around, as
-    // the sun's: below the horizon, the floor by it alone, the same
-    // from the sun or another distant light.
-    const auto floor = [&](bool sun, glm::dvec3 towards,
-                           double ambient) {
+TEST_F(RasterDelegateTest, TheScenesAmbientLightComesFromAllAround) {
+    // The grey floor (albedo 0.5): lights below the ground light none
+    // of it; the scene's ambient light, white of a luminance from all
+    // around, lights it to half that luminance, on top of the sun's.
+    const auto rgb = [&](glm::dvec3 towards, double ambient,
+                         glm::dvec3 colour) {
         Scene scene = FlatScene();
         ernie::RenderSettings(scene, "/Render/Settings")
-            .SetAmbient(ambient);
-        const char* path = sun ? "/World/Sun" : "/World/Tilted";
-        if (!sun) {
-            ernie::DistantLight(scene, "/World/Sun").SetIntensity(0.0);
-            ernie::DistantLight::Define(scene, path)
-                .SetShadowEnable(false);
-        }
-        scene.Set(path, tokens::kTransform,
+            .SetAmbient(ambient)
+            .SetAmbientColor(colour);
+        scene.Set("/World/Sun", tokens::kTransform,
+                  ernie::DistantLightTransform(towards));
+        ernie::DistantLight::Define(scene, "/World/Tilted")
+            .SetShadowEnable(false);
+        scene.Set("/World/Tilted", tokens::kTransform,
                   ernie::DistantLightTransform(towards));
         RasterDelegate delegate(*context_);
         ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const auto vars = MapVars(outputs);
         const std::size_t c = kVarSize / 2;
-        return At<float>(MapVars(outputs).at("HdrColor"), c, c, 1);
+        return glm::vec3(At<float>(vars.at("HdrColor"), c, c, 0),
+                         At<float>(vars.at("HdrColor"), c, c, 1),
+                         At<float>(vars.at("HdrColor"), c, c, 2));
+    };
+    const auto floor = [&](glm::dvec3 towards, double ambient) {
+        return rgb(towards, ambient, glm::dvec3(1.0)).g;
     };
     const glm::dvec3 below(0.0, 0.0, -1.0);
-    const float bySun = floor(true, below, 0.5);
-    ASSERT_GT(bySun, 0.0f);
-    EXPECT_NEAR(floor(false, below, 0.5), bySun, 0.03f * bySun)
-        << "another distant light's ambient fraction";
-    // Overhead, the fraction moves the light around but keeps it: a
-    // Lambertian floor's alike.
+    EXPECT_EQ(floor(below, 0.0), 0.0f)
+        << "the sun and another distant light below the ground";
+    EXPECT_NEAR(floor(below, 2.0), 1.0f, 0.03f)
+        << "2 cd/m^2 of ambient light alone";
     const glm::dvec3 above(0.0, 0.0, 1.0);
-    const float direct = floor(false, above, 0.0);
-    EXPECT_NEAR(floor(false, above, 0.5), direct, 0.03f * direct)
-        << "half from all around, half from above";
+    const float direct = floor(above, 0.0);
+    ASSERT_GT(direct, 0.0f);
+    EXPECT_NEAR(floor(above, 2.0), direct + 1.0f, 0.03f * direct)
+        << "added to the lights'";
+    // Its colour shapes it, at the same luminance.
+    const glm::vec3 red = rgb(below, 2.0, glm::dvec3(1.0, 0.1, 0.1));
+    EXPECT_GT(red.r, 3.0f * std::max(red.g, red.b)) << "red";
+    EXPECT_NEAR(0.2126f * red.r + 0.7152f * red.g + 0.0722f * red.b,
+                1.0f, 0.06f)
+        << "as bright";
 }
 
 TEST_F(RasterDelegateTest, TheSunAndAnotherDistantLightBothCastShadows) {
@@ -1092,8 +1102,8 @@ TEST_F(RasterDelegateTest,
             << "dome, roughness " << roughness;
     }
 
-    // The ambient fraction of a sun below the horizon, which lights
-    // nothing directly.
+    // The scene's ambient light, with the sun below the horizon
+    // lighting nothing.
     scene.Remove("/World/Sky");
     ernie::DistantLight::Define(scene, "/World/Sun")
         .SetShadowEnable(false);
@@ -1495,7 +1505,7 @@ TEST_F(RasterDelegateTest,
     // 990 / pi cd/m^2.
     Scene scene = FlatScene();
     scene.Remove("/World/Sun");
-    // A plain Lambertian floor, not the hillshaded terrain.
+    // A plain Lambertian floor, not the shaded terrain.
     scene.Remove("/World/Terrain");
     ernie::GroundPlane::Define(scene, "/World/Floor")
         .SetMaterialBinding("/Looks/Grey");

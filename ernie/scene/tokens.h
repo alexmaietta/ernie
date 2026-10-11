@@ -785,8 +785,11 @@ inline constexpr std::string_view kSensorFilter =
 inline constexpr std::string_view kFilterType = "ernie:filter:type";
 inline constexpr std::string_view kSourceName =
     "sourceName";  ///< RenderVar name, e.g. "LdrColor".
-inline constexpr std::string_view kAmbient =
-    "ernie:ambient";  ///< float fraction of sunlight.
+/// float luminance (cd/m^2) of the scene's ambient light: white,
+/// uniformly from all around, besides the lights.
+inline constexpr std::string_view kAmbient = "ernie:ambient";
+/// float3 linear RGB of the ambient light (its luminance `kAmbient`'s).
+inline constexpr std::string_view kAmbientColor = "ernie:ambientColor";
 /// How dome lights light the scene, as Omniverse RTX's dome lighting
 /// modes: "approximate" (default; diffuse and specular, unoccluded),
 /// "full" (also shadowed, where the dome's `inputs:shadow:enable`

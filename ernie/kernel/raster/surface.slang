@@ -250,7 +250,7 @@ public uint packSurfaceFlags(uint flags, float slopeVariance, float parameter = 
 
 // Minimal shading (`Uniforms::minimal`), RTX Minimal's modes for throughput: the w mode's low
 // bits are no colour (black, for the other outputs alone), one constant colour, or the surface's
-// diffuse colour; kMinimalNoSun set means no sun lights the frame, only the ambient fraction.
+// diffuse colour; kMinimalNoSun set means no sun lights the frame, only the scene's ambient.
 public static const uint kMinimalNone = 0;
 public static const uint kMinimalConstant = 1;
 public static const uint kMinimalTextured = 2;
@@ -282,7 +282,8 @@ float srgbEncode(float c) {
 }
 
 // Minimal shading of what a G-buffer pass wrote: Lambert under the sun (its visibility in
-// `g.normal.w`) and the ambient fraction, of the constant colour or of the material's linear
+// `g.normal.w`) plus the scene's ambient light (`u.motion.yzw`, per channel as a share of what
+// the sun gives a white surface facing it), of the constant colour or of the material's linear
 // colour scaled to the albedo (an albedo map's) and modulated (textures, vertex colours, tints);
 // unlit surfaces show that colour as it is. Exposed, clamped and encoded as sRGB.
 public Minimal minimalShade(GBuffer g) {
@@ -298,11 +299,10 @@ public Minimal minimalShade(GBuffer g) {
         if ((g.ids.w & kUnlit) != 0) {
             color = base;
         } else {
-            let ambient = u.sun.w;
             let sun = (mode & kMinimalNoSun) != 0
                           ? 0.0
                           : max(dot(g.normal.xyz, u.sun.xyz), 0.0) * g.normal.w;
-            color = base * (ambient + (1.0 - ambient) * sun);
+            color = base * (sun + u.motion.yzw);
         }
         color = saturate(color * u.eye.w);
     }

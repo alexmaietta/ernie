@@ -5,10 +5,11 @@
 //     typealias ActiveBrdf = <model type>;
 // and dispatches one pipeline per model, each shading the pixels whose material uses its model.
 //
-// Radiance is L = E / pi * (a * albedo + (1 - a) * F * V) + sum over lights of E_k / pi * F_k * V_k
-// + albedo * L_dome * D, with E the sun's spectral irradiance at normal incidence, F the model's
-// radiance factor (pi times the BRDF times cos(i)), V the shadow visibility and a the ambient
-// fraction. A distant light's E_k is its irradiance; a sphere light's is its intensity over the
+// Radiance is L = E / pi * F * V + sum over lights of E_k / pi * F_k * V_k + albedo * L_dome * D
+// + albedo * L_a * O, with E the sun's spectral irradiance at normal incidence, F the model's
+// radiance factor (pi times the BRDF times cos(i)), V the shadow visibility, L_a the scene's
+// ambient radiance (uniform white light from all around, `ernie:ambient`) and O the ambient
+// occlusion. A distant light's E_k is its irradiance; a sphere light's is its intensity over the
 // squared distance (capped at its radius) times its cone's falloff. A rect or disk light's E_k is
 // its radiance times the length of its vector form factor (the polygon clipped to the receiver's
 // horizon, Lambert's formula), with F_k along that vector. The dome adds its radiance times its
@@ -59,7 +60,8 @@ struct ShadingUniforms {
     float4x4 invViewProj;
     // xyz: camera position.
     float4 eye;
-    // xyz: unit direction towards the sun, w: ambient fraction.
+    // xyz: unit direction towards the sun, w: the scene's ambient spectral radiance as white of
+    // its luminance (W m^-2 sr^-1 nm^-1), which `ambient`'s colour shapes.
     float4 sun;
     // First band's lower wavelength (nm), band width (nm), band count, 1 when the projection is
     // orthographic (every ray along the view direction).
@@ -97,8 +99,11 @@ struct ShadingUniforms {
     // origin and w its radius; then x the atmosphere's top radius, y 1 with an atmosphere, z the
     // sine of the sun's angular radius.
     float4 atmosphere[2];
+    // xyz: the scene's ambient light's colour, linear RGB over its luminance (`sun.w` its
+    // radiance); w unused.
+    float4 ambient;
     // To the views' stride in the buffer, 1280 bytes.
-    float4 padding[9];
+    float4 padding[8];
 }
 
 // What `skyMain` draws behind the scene.
@@ -1239,7 +1244,12 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     let scale = max(modulation.x, max(modulation.y, modulation.z));
     let coefficients = scale > 0.0 ? sigmoidCoefficients(modulation / scale) : float3(0.0);
     let l = sh.sun.xyz;
+    // The scene's ambient light: white radiance of its luminance, shaped by its colour's
+    // spectrum (normalised to its luminance on the host).
     let ambient = sh.sun.w;
+    let ambientScale = max(sh.ambient.x, max(sh.ambient.y, sh.ambient.z));
+    let ambientCoefficients =
+        ambientScale > 0.0 ? sigmoidCoefficients(sh.ambient.xyz / ambientScale) : float3(0.0);
     let bands = uint(sh.range.z);
     let unlit = (ids.w & kUnlit) != 0;
     // Variance of the slopes below the pixel, which widens the model's roughness: their deviation
@@ -1385,19 +1395,23 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             bandIrradiance[k] =
                 bandValue(sh.irradiance, band) * sunAtmosphereTransmittance(world, band);
         }
-        // How the model reflects light from all around: the ambient fraction of the sun's (from
-        // every direction alike, so every lobe sees it whole) and the dome's.
+        // How the model reflects light from all around: the scene's ambient light (from every
+        // direction alike, so every lobe sees it whole) and the dome's.
         let environment = unlit ? diffuseEnvironment(bandAlbedo)
                                 : environmentOf(n, v, bandAlbedo, slopeVariance, params);
-        float3 response;
-        if (unlit) {
-            response = bandAlbedo;
-        } else {
-            let factors = radianceFactors(n, l, v, bandAlbedo, slopeVariance, params);
-            let uniform = environment.diffuse + environment.specular0 + environment.specular1;
-            response = ambient * occlusion * uniform + (1.0 - ambient) * factors * visibility;
-        }
+        let response = unlit ? bandAlbedo
+                             : radianceFactors(n, l, v, bandAlbedo, slopeVariance, params) *
+                                   visibility;
         var radiance = bandIrradiance / PI * response;
+        if (!unlit && ambient > 0.0) {
+            let uniform = environment.diffuse + environment.specular0 + environment.specular1;
+            for (uint j = 0; j < 3; ++j) {
+                let wavelength =
+                    sh.range.x + (float(min(first + j, bands - 1)) + 0.5) * sh.range.y;
+                radiance[j] += ambient * occlusion * uniform[j] *
+                               modulationAt(ambientCoefficients, ambientScale, wavelength);
+            }
+        }
         for (uint j = 0; j < 3; ++j) {
             let band = min(first + j, bands - 1);
             let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;
@@ -1421,13 +1435,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             }
         }
         for (uint k = 0; k < lightCount; ++k) {
-            // A distant light lights by the ambient fraction from all around, as the sun does,
-            // and by the rest from its direction; a dome's directions, its diffuse light, not.
-            let ambientShare = ((sh.view.x >> k) & 1u) != 0 && lights[k].position.w == 0.0 &&
-                                       lights[k].shadow.y < 0.5
-                                   ? ambient
-                                   : 0.0;
-            if (lightScales[k] <= 0.0 && ambientShare <= 0.0) {
+            if (lightScales[k] <= 0.0) {
                 continue;
             }
             float3 lightSpectrum;
@@ -1439,18 +1447,11 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             // A dome's direction stands for its diffuse light alone: the model's diffuse
             // response to surrounding light times cos(i), as a Lambertian radiance factor (the
             // dome keeps its specular light).
-            if (ambientShare > 0.0) {
-                let uniform = environment.diffuse + environment.specular0 + environment.specular1;
-                radiance += ambientShare * occlusion * lightSpectrum / PI * uniform;
-            }
-            if (lightScales[k] <= 0.0) {
-                continue;
-            }
             let factors =
                 lights[k].shadow.y > 0.5
                     ? environment.diffuse * max(dot(n, lightDirections[k]), 0.0)
                     : radianceFactors(n, lightDirections[k], v, bandAlbedo, slopeVariance, params);
-            radiance += (1.0 - ambientShare) * lightScales[k] * lightSpectrum / PI * factors;
+            radiance += lightScales[k] * lightSpectrum / PI * factors;
         }
         // Through the air to the eye: dimmed, with the sun's light it scatters on the way.
         for (uint k = 0; k < 3 && first + k < bands; ++k) {

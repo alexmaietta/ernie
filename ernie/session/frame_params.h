@@ -178,8 +178,8 @@ enum class Occlusion : std::uint32_t {
 /// Minimal shading (`ernie:minimal:mode`), after RTX Minimal: for
 /// throughput, a product draws in one forward pass straight into its
 /// outputs, without the spectral shading, sensor filters, sky or
-/// dome; lit by the sun (the first distant light) and the ambient
-/// fraction.
+/// dome; lit by the sun (the first distant light) and the scene's
+/// ambient light.
 ///
 /// Reference: NVIDIA, "RTX - Minimal Mode", Omniverse Materials and
 /// Rendering documentation.
@@ -430,7 +430,7 @@ struct FrameParams {
     /// undistorted rays of every sensor pixel (`OverscanOf`).
     double overscan = 1.0;
     bool sun = true;  ///< Off lights the scene with `lights` alone
-                      ///< (no sun, ambient or cascades).
+                      ///< (no sun or cascades).
     glm::vec3 sunDirection{
         0.0f, 0.0f, 1.0f};  ///< Unit vector pointing towards the sun.
     /// Angular diameter of the sun's disk in degrees, which widens
@@ -442,8 +442,13 @@ struct FrameParams {
     /// scaled so a white Lambertian surface facing the sun has a
     /// luminance of 1 cd/m^2 (relative units).
     std::vector<float> sunIrradiance;
-    float ambient = 0.15f;  ///< Fraction of sunlight reaching
-                            ///< surfaces without shading.
+    /// Luminance (cd/m^2) of light arriving at every surface
+    /// uniformly from all around, besides the lights
+    /// (`ernie:ambient`); 0 none.
+    float ambient = 0.0f;
+    /// Its linear RGB colour, whatever its brightness
+    /// (`ernie:ambientColor`).
+    glm::vec3 ambientColor{1.0f};
     /// Other lights; the rasterizer takes
     /// `RasterRenderer::kMaxLights`.
     std::vector<LightParams> lights;

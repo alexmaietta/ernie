@@ -77,9 +77,16 @@
       (::ernie::AttributeMeta{.label = "Terrain colour", .group = "Image",                         \
                               .options = {::ernie::tokens::kHillshade, ::ernie::tokens::kColormap, \
                                           ::ernie::tokens::kShadedColormap}}))                     \
-    X(double, Ambient, ::ernie::tokens::kAmbient, 0.15,                                            \
-      (::ernie::AttributeMeta{.doc = "Fraction of sunlight on unlit sides.", .group = "Image",     \
-                              .max = 1.0}))                                                        \
+    X(double, Ambient, ::ernie::tokens::kAmbient, 0.0,                                             \
+      (::ernie::AttributeMeta{.doc = "Luminance (cd/m^2) of light reaching every surface "        \
+                                     "uniformly from all around, besides the lights; 0 none. "     \
+                                     "A DomeLight gives the same, with a map.",                    \
+                              .group = "Image", .max = 1e5}))                                      \
+    X(glm::dvec3, AmbientColor, ::ernie::tokens::kAmbientColor, glm::dvec3(1.0),                   \
+      (::ernie::AttributeMeta{.label = "Ambient colour",                                           \
+                              .doc = "Linear RGB of the ambient light, whose luminance "           \
+                                     "`ernie:ambient` sets whatever the colour's brightness.",     \
+                              .group = "Image", .color = true}))                                   \
     X(glm::dvec3, ClearColor, ::ernie::tokens::kClearColor, glm::dvec3(0.0),                       \
       (::ernie::AttributeMeta{.label = "Background", .doc = "Linear display colour of LdrColor's " \
                                                             "background.",                         \

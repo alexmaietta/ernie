@@ -46,7 +46,7 @@ def test_render_settings_read_fallbacks_and_define_with_keywords():
     )
     assert settings.culling == "cpu"
     # Unset, the renderer's defaults.
-    assert settings.ambient == 0.15
+    assert settings.ambient == 0.0
     assert settings.occlusion == "off" and settings.wireframe == "off"
     assert (
         settings.dome_light_mode == "approximate"

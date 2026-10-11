@@ -13,7 +13,7 @@ import projection;
 public struct Uniforms {
     // The view-projection; a pushbroom's strip in its place (`PushbroomStrip::Packed`).
     public float4x4 viewProj;
-    // xyz: unit direction towards the sun, w: ambient light fraction.
+    // xyz: unit direction towards the sun; w unused.
     public float4 sun;
     // xyz: camera forward, w: dot(eye, forward); view depth = dot(world, forward) - w.
     public float4 forward;
@@ -29,7 +29,9 @@ public struct Uniforms {
     public float4x4 sunViewProj;
     public float4 sunShadow;
     // x: the view's sub-frame time as the share of the way from the last frame's transforms (0)
-    // to this one's (1), which moving meshes interpolate for motion blur; 1 without.
+    // to this one's (1), which moving meshes interpolate for motion blur; 1 without. yzw: minimal
+    // shading's ambient light per RGB channel, as a share of what the sun gives a white surface
+    // facing it.
     public float4 motion;
     // A pushbroom's intrinsics (`PushbroomStrip::Intrinsics`); unused by frame cameras.
     public float4 strip;

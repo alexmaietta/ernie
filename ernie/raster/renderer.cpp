@@ -87,7 +87,10 @@ struct ShadingUniforms {
     /// frame's origin and the bottom radius; the top radius, 1 with
     /// an atmosphere, the sine of the sun's angular radius.
     float atmosphere[2][4];
-    float padding[36];  ///< To the views' stride, so shading reads
+    /// The scene's ambient light's colour, linear RGB over its
+    /// luminance (its luminance is `sun[3]`'s); w unused.
+    float ambient[4];
+    float padding[32];  ///< To the views' stride, so shading reads
                         ///< them as one array.
 };
 static_assert(sizeof(ShadingUniforms) == 1280,
@@ -759,6 +762,42 @@ double LuminanceIntegral() {
         return sum;
     }();
     return integral;
+}
+
+/// The ambient light's colour as linear RGB of luminance 1, or none
+/// (black) for a colour without luminance.
+glm::vec3 UnitLuminanceColor(const glm::vec3& rgb) {
+    const float luminance =
+        0.2126f * rgb.r + 0.7152f * rgb.g + 0.0722f * rgb.b;
+    return luminance > 0.0f ? rgb / luminance : glm::vec3(0.0f);
+}
+
+/// The scene's ambient light for minimal shading, which is lit in
+/// units of the sun, per RGB channel: its colour of unit luminance
+/// times its luminance over a white surface's facing the sun (the
+/// sun's illuminance over pi), or without a sun, of 1 when there is
+/// any.
+glm::vec3 MinimalAmbient(const FrameParams& params,
+                         const SpectralBands& bands) {
+    if (!(params.ambient > 0.0f)) {
+        return glm::vec3(0.0f);
+    }
+    const glm::vec3 colour = UnitLuminanceColor(params.ambientColor);
+    double white = 0.0;
+    if (params.sun && params.sunIrradiance.empty()) {
+        white = 1.0;  // relative units: 1 cd/m^2 on white
+    } else if (params.sun) {
+        for (int b = 0; b < bands.count &&
+                        b < static_cast<int>(params.sunIrradiance.size());
+             ++b) {
+            white += params.sunIrradiance[static_cast<std::size_t>(b)] *
+                     CieXyz(bands.Centre(b)).y * bands.Width();
+        }
+        white *= kLuminousEfficacy / M_PI;
+    }
+    return colour * (white > 0.0
+                         ? static_cast<float>(params.ambient / white)
+                         : 1.0f);
 }
 
 void CopyMatrix(float (&target)[16], const glm::mat4& matrix) {
@@ -2237,7 +2276,7 @@ void RasterRenderer::Update(
             uniforms.sun[0] = params.sunDirection.x;
             uniforms.sun[1] = params.sunDirection.y;
             uniforms.sun[2] = params.sunDirection.z;
-            uniforms.sun[3] = params.ambient;
+            uniforms.sun[3] = 0.0f;
             uniforms.forward[0] = viewOf.forward.x;
             uniforms.forward[1] = viewOf.forward.y;
             uniforms.forward[2] = viewOf.forward.z;
@@ -2267,6 +2306,11 @@ void RasterRenderer::Update(
                           frame.camera.SubframeTime(static_cast<int>(
                               v / (outputViews_ * faces_))))
                     : 1.0f;
+            // Minimal shading's ambient light, per channel.
+            const glm::vec3 ambient = MinimalAmbient(params, bands_);
+            uniforms.motion[1] = ambient.r;
+            uniforms.motion[2] = ambient.g;
+            uniforms.motion[3] = ambient.b;
             if (viewSunCascades_[v] >= 0) {
                 // A view of a world with its own fitted map samples
                 // it in place of cascade 0.
@@ -2627,7 +2671,19 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
     shading.sun[0] = params.sunDirection.x;
     shading.sun[1] = params.sunDirection.y;
     shading.sun[2] = params.sunDirection.z;
-    shading.sun[3] = params.ambient;
+    // The scene's ambient light: white of its luminance, the same
+    // spectral radiance in every band, which its colour of unit
+    // luminance shapes.
+    const glm::vec3 ambientColour =
+        UnitLuminanceColor(params.ambientColor);
+    shading.sun[3] =
+        glm::length(ambientColour) > 0.0f
+            ? static_cast<float>(params.ambient /
+                                 (kLuminousEfficacy * LuminanceIntegral()))
+            : 0.0f;
+    shading.ambient[0] = ambientColour.r;
+    shading.ambient[1] = ambientColour.g;
+    shading.ambient[2] = ambientColour.b;
     shading.range[0] = static_cast<float>(bands_.minNm);
     shading.range[1] = static_cast<float>(bands_.Width());
     shading.range[2] = static_cast<float>(bands_.count);

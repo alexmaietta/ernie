@@ -2443,7 +2443,10 @@ FrameParams FrameParamsOf(const Scene& scene,
     // fallback.
     const RenderSettings options =
         RenderSettings::OrFallbacks(scene, settings);
-    params.ambient = static_cast<float>(options.GetAmbient());
+    params.ambient =
+        std::max(static_cast<float>(options.GetAmbient()), 0.0f);
+    params.ambientColor =
+        glm::max(glm::vec3(options.GetAmbientColor()), glm::vec3(0.0f));
     const std::string domeMode = options.GetDomeLightMode();
     if (domeMode == "approximate") {
         params.domeMode = DomeLightMode::Approximate;

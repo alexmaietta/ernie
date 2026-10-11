@@ -326,8 +326,7 @@ class RasterDelegate : public RenderDelegate {
     void SyncSky(const Scene& scene, const RenderPrims& prims);
     /// Lights `frame` with the sun found in its dome's map
     /// (`domeSun_`) in the full dome lighting mode: as the frame's
-    /// sun (with its cascades, and no ambient fraction, since the
-    /// dome is the sky) when it has none, else as a shadowed distant
+    /// sun (with its cascades) when it has none, else as a shadowed distant
     /// light; the dome then lights with its map without the sun.
     void ApplyDomeSun(FrameParams& frame) const;
     /// In the directions mode, lights `frame` with its dome's
