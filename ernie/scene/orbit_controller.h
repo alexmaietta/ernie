@@ -15,14 +15,19 @@ namespace ernie {
 /// Yaw rotates around the vertical axis (0 looks north, positive
 /// turns the view clockwise seen from above); pitch is the elevation
 /// angle of the eye above the target's horizontal plane.
+///
+/// The target and distance are double precision, as the scene's
+/// transforms are, so the view orbits as smoothly light-years from
+/// the origin as at it (the renderer draws relative to a floating
+/// origin near the eye).
 class OrbitController {
   public:
-    glm::vec3 target{0.0f};
+    glm::dvec3 target{0.0};
     float yaw = 0.0f;  ///< Radians.
     float pitch =
         0.6f;  ///< Radians, clamped to [kMinPitch, kMaxPitch].
-    float distance =
-        100.0f;  ///< World units from the eye to the target.
+    double distance =
+        100.0;  ///< World units from the eye to the target.
     float verticalFov = 0.785398f;  ///< Radians.
 
     /// Pitch stops short of straight down and up, where the view's up
@@ -31,19 +36,19 @@ class OrbitController {
     static constexpr float kMaxPitch = 1.55f;
 
     /// Eye position in world coordinates.
-    glm::vec3 Eye() const;
+    glm::dvec3 Eye() const;
 
     /// Camera-to-world transform of the eye looking at the target, +z
     /// up.
     glm::dmat4 Transform() const;
 
     /// Clipping planes scaled to the orbit distance.
-    float NearPlane() const {
-        return distance * 0.01f;
+    double NearPlane() const {
+        return distance * 0.01;
     }
 
-    float FarPlane() const {
-        return distance * 100.0f;
+    double FarPlane() const {
+        return distance * 100.0;
     }
 
     /// Sets `camera`'s transform, vertical field of view (through its
@@ -69,14 +74,19 @@ class OrbitController {
     void PanVertical(float dx, float dy, float viewportHeight);
 
     /// Zooms by `steps` scroll steps; positive moves closer. Distance
-    /// stays within [1e-3, 1e7].
+    /// stays within [kMinDistance, kMaxDistance].
     void Zoom(float steps);
 
     /// Aims at the centre of the axis-aligned box [`boundsMin`,
     /// `boundsMax`] from a distance at which its bounding sphere fits
     /// the vertical field of view with a small margin.
-    void Frame(const glm::vec3& boundsMin,
-               const glm::vec3& boundsMax);
+    void Frame(const glm::dvec3& boundsMin,
+               const glm::dvec3& boundsMax);
+
+    /// The orbit distance's range: a millimetre to about 100,000
+    /// light-years.
+    static constexpr double kMinDistance = 1e-3;
+    static constexpr double kMaxDistance = 1e21;
 };
 
 }  // namespace ernie

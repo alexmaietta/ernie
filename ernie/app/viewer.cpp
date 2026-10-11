@@ -922,7 +922,14 @@ struct Viewer::State {
     void FrameBounds(const std::optional<Bounds3>& bounds) {
         const Bounds3 box = bounds.value_or(
             Bounds3{glm::vec3(-1.0f), glm::vec3(1.0f)});
-        controller.Frame(box.first, box.second);
+        FrameBox(glm::dvec3(box.first), glm::dvec3(box.second));
+    }
+
+    /// Aims the controller at the box [`low`, `high`] in world
+    /// coordinates, in double precision (prims far from the origin),
+    /// and writes the active camera.
+    void FrameBox(const glm::dvec3& low, const glm::dvec3& high) {
+        controller.Frame(low, high);
         WriteActiveCamera();
     }
 
@@ -3415,39 +3422,36 @@ void Viewer::SetActiveCamera(Path camera) {
 void Viewer::Frame(std::span<const Path> paths) {
     State& s = *state_;
     s.delegate->Sync(s.scene);
-    std::optional<Bounds3> bounds;
-    if (!paths.empty()) {
-        std::vector<std::optional<Bounds3>> boxes;
-        for (const Path& path : paths) {
-            if (s.scene.Has(path)) {
-                std::optional<Bounds3> extent = s.LocalBounds(path);
-                if (extent) {
-                    const glm::dmat4 world =
-                        s.scene.WorldTransform(path);
-                    Bounds3 box{
-                        glm::vec3(std::numeric_limits<float>::max()),
-                        glm::vec3(
-                            std::numeric_limits<float>::lowest())};
-                    for (int corner = 0; corner < 8; ++corner) {
-                        const glm::dvec3 local(
-                            (corner & 1) ? extent->second.x
-                                         : extent->first.x,
-                            (corner & 2) ? extent->second.y
-                                         : extent->first.y,
-                            (corner & 4) ? extent->second.z
-                                         : extent->first.z);
-                        const glm::vec3 point(world *
-                                              glm::dvec4(local, 1.0));
-                        box.first = glm::min(box.first, point);
-                        box.second = glm::max(box.second, point);
-                    }
-                    boxes.emplace_back(box);
-                }
-            }
+    // The prims' world box in double precision, so prims far from the
+    // origin frame as exactly as those at it.
+    bool any = false;
+    glm::dvec3 low(std::numeric_limits<double>::max());
+    glm::dvec3 high(std::numeric_limits<double>::lowest());
+    for (const Path& path : paths) {
+        if (!s.scene.Has(path)) {
+            continue;
         }
-        bounds = Union(boxes);
+        const std::optional<Bounds3> extent = s.LocalBounds(path);
+        if (!extent) {
+            continue;
+        }
+        const glm::dmat4 world = s.scene.WorldTransform(path);
+        for (int corner = 0; corner < 8; ++corner) {
+            const glm::dvec3 local(
+                (corner & 1) ? extent->second.x : extent->first.x,
+                (corner & 2) ? extent->second.y : extent->first.y,
+                (corner & 4) ? extent->second.z : extent->first.z);
+            const glm::dvec3 point(world * glm::dvec4(local, 1.0));
+            low = glm::min(low, point);
+            high = glm::max(high, point);
+        }
+        any = true;
     }
-    s.FrameBounds(bounds ? bounds : s.SceneBounds());
+    if (any) {
+        s.FrameBox(low, high);
+    } else {
+        s.FrameBounds(s.SceneBounds());
+    }
 }
 
 Path Viewer::CameraFromView(const Path& path) {

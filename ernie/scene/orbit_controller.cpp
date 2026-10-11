@@ -8,23 +8,16 @@
 
 namespace ernie {
 
-namespace {
-
-constexpr float kMinDistance = 1e-3f;
-constexpr float kMaxDistance = 1e7f;
-
-}  // namespace
-
-glm::vec3 OrbitController::Eye() const {
-    const float horizontal = std::cos(pitch) * distance;
-    return target + glm::vec3(std::sin(yaw) * horizontal,
-                              -std::cos(yaw) * horizontal,
-                              std::sin(pitch) * distance);
+glm::dvec3 OrbitController::Eye() const {
+    const double horizontal = std::cos(double(pitch)) * distance;
+    return target + glm::dvec3(std::sin(double(yaw)) * horizontal,
+                               -std::cos(double(yaw)) * horizontal,
+                               std::sin(double(pitch)) * distance);
 }
 
 glm::dmat4 OrbitController::Transform() const {
-    return glm::inverse(glm::dmat4(
-        glm::lookAtRH(Eye(), target, glm::vec3(0.0f, 0.0f, 1.0f))));
+    return glm::inverse(
+        glm::lookAtRH(Eye(), target, glm::dvec3(0.0, 0.0, 1.0)));
 }
 
 void OrbitController::Apply(CameraParams& camera) const {
@@ -49,36 +42,40 @@ void OrbitController::Orbit(float deltaYaw, float deltaPitch) {
 }
 
 void OrbitController::Pan(float dx, float dy, float viewportHeight) {
-    const float worldPerPixel = 2.0f * distance *
-                                std::tan(0.5f * verticalFov) /
-                                std::max(viewportHeight, 1.0f);
-    const glm::vec3 right(std::cos(yaw), std::sin(yaw), 0.0f);
-    const glm::vec3 forward(-std::sin(yaw), std::cos(yaw), 0.0f);
-    target += (-dx * right + dy * forward) * worldPerPixel;
+    const double worldPerPixel =
+        2.0 * distance * std::tan(0.5 * double(verticalFov)) /
+        std::max(double(viewportHeight), 1.0);
+    const glm::dvec3 right(std::cos(double(yaw)), std::sin(double(yaw)),
+                           0.0);
+    const glm::dvec3 forward(-std::sin(double(yaw)),
+                             std::cos(double(yaw)), 0.0);
+    target += (-double(dx) * right + double(dy) * forward) * worldPerPixel;
 }
 
 void OrbitController::PanVertical(float dx, float dy,
                                   float viewportHeight) {
-    const float worldPerPixel = 2.0f * distance *
-                                std::tan(0.5f * verticalFov) /
-                                std::max(viewportHeight, 1.0f);
-    const glm::vec3 right(std::cos(yaw), std::sin(yaw), 0.0f);
-    target += (-dx * right + dy * glm::vec3(0.0f, 0.0f, 1.0f)) *
+    const double worldPerPixel =
+        2.0 * distance * std::tan(0.5 * double(verticalFov)) /
+        std::max(double(viewportHeight), 1.0);
+    const glm::dvec3 right(std::cos(double(yaw)), std::sin(double(yaw)),
+                           0.0);
+    target += (-double(dx) * right +
+               double(dy) * glm::dvec3(0.0, 0.0, 1.0)) *
               worldPerPixel;
 }
 
 void OrbitController::Zoom(float steps) {
-    distance = std::clamp(distance * std::pow(0.9f, steps),
+    distance = std::clamp(distance * std::pow(0.9, double(steps)),
                           kMinDistance, kMaxDistance);
 }
 
-void OrbitController::Frame(const glm::vec3& boundsMin,
-                            const glm::vec3& boundsMax) {
-    target = 0.5f * (boundsMin + boundsMax);
-    const float radius = std::max(
-        0.5f * glm::length(boundsMax - boundsMin), kMinDistance);
+void OrbitController::Frame(const glm::dvec3& boundsMin,
+                            const glm::dvec3& boundsMax) {
+    target = 0.5 * (boundsMin + boundsMax);
+    const double radius = std::max(
+        0.5 * glm::length(boundsMax - boundsMin), kMinDistance);
     distance =
-        std::clamp(1.1f * radius / std::sin(0.5f * verticalFov),
+        std::clamp(1.1 * radius / std::sin(0.5 * double(verticalFov)),
                    kMinDistance, kMaxDistance);
 }
 

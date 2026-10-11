@@ -57,10 +57,13 @@ TEST(OrbitController, ProjectionUsesZeroToOneDepth) {
     const glm::vec3 forward =
         glm::normalize(camera.target - camera.Eye());
     EXPECT_NEAR(
-        Project(viewProjection, camera.Eye() + forward * 0.1f).z,
+        Project(viewProjection, glm::vec3(camera.Eye()) + forward * 0.1f)
+            .z,
         0.0f, 1e-4f);
     EXPECT_NEAR(
-        Project(viewProjection, camera.Eye() + forward * 1000.0f).z,
+        Project(viewProjection,
+                glm::vec3(camera.Eye()) + forward * 1000.0f)
+            .z,
         1.0f, 1e-4f);
 }
 
@@ -94,7 +97,8 @@ TEST(OrbitController, PanFollowsTheCursorAtTargetDepth) {
     const float expected = 50.0f * 2.0f * 100.0f *
                            std::tan(0.5f * camera.verticalFov) /
                            viewportHeight;
-    EXPECT_NEAR(glm::length(camera.target - before), expected, 1e-3f);
+    EXPECT_NEAR(glm::length(glm::vec3(camera.target) - before),
+                expected, 1e-3f);
     EXPECT_LT(camera.target.x, before.x);
     EXPECT_FLOAT_EQ(camera.target.z, before.z);
 }
@@ -155,4 +159,42 @@ TEST(OrbitController, AppliesItsPoseFieldOfViewAndClippingToACamera) {
     const glm::dvec3 forward =
         glm::normalize(glm::dvec3(orbit.target - orbit.Eye()));
     EXPECT_NEAR(glm::dot(camera.Forward(), forward), 1.0, 1e-6);
+}
+
+TEST(OrbitController, OrbitsAsExactlyAcrossTheSolarSystem) {
+    // At Saturn's distance, 1.4e12 m, where a float's step is some
+    // 130 km (a double's, 0.2 mm): the view still holds a 10 m orbit
+    // to a few millimetres, frames a metre-sized box there and pans
+    // by a pixel's worth.
+    const glm::dvec3 far(1.4e12, -2.0e11, 3.0e10);
+    OrbitController orbit;
+    orbit.target = far;
+    orbit.distance = 10.0;
+    orbit.yaw = 0.7f;
+    orbit.pitch = 0.3f;
+    EXPECT_NEAR(glm::length(orbit.Eye() - far), 10.0, 5e-3);
+    const glm::dmat4 pose = orbit.Transform();
+    EXPECT_NEAR(glm::length(glm::dvec3(pose[3]) - orbit.Eye()), 0.0,
+                5e-3);
+
+    orbit.Frame(far - glm::dvec3(0.5), far + glm::dvec3(0.5));
+    EXPECT_NEAR(glm::length(orbit.target - far), 0.0, 1e-3)
+        << "framed on the box's centre";
+    EXPECT_LT(orbit.distance, 10.0);
+
+    const glm::dvec3 before = orbit.target;
+    orbit.Pan(1.0f, 0.0f, 1000.0f);
+    const double moved = glm::length(orbit.target - before);
+    EXPECT_GT(moved, 0.0) << "a pixel's pan moves it";
+    EXPECT_LT(moved, 0.01);
+}
+
+TEST(OrbitController, ZoomsOutFarEnoughToFrameASolarSystem) {
+    OrbitController orbit;
+    orbit.Frame(glm::dvec3(-4.5e12), glm::dvec3(4.5e12));
+    EXPECT_GT(orbit.distance, 1e13) << "Neptune's orbit, whole";
+    for (int i = 0; i < 2000; ++i) {
+        orbit.Zoom(-1.0f);
+    }
+    EXPECT_DOUBLE_EQ(orbit.distance, OrbitController::kMaxDistance);
 }

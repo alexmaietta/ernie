@@ -58,7 +58,7 @@ void AuthorControllerCamera(Scene& scene, const Path& path,
         // the distance zooms it too.
         camera.orthographic = true;
         camera.verticalApertureMm =
-            10.0 * 2.0 * static_cast<double>(controller.distance) *
+            10.0 * 2.0 * controller.distance *
             std::tan(0.5 *
                      static_cast<double>(controller.verticalFov));
     }
@@ -66,7 +66,7 @@ void AuthorControllerCamera(Scene& scene, const Path& path,
 }
 
 OrbitController ControllerFromTransform(const glm::dmat4& world,
-                                        float distance,
+                                        double distance,
                                         float verticalFov) {
     const glm::dvec3 eye(world[3]);
     const glm::dvec3 forward = glm::normalize(-glm::dvec3(world[2]));
@@ -79,8 +79,7 @@ OrbitController ControllerFromTransform(const glm::dmat4& world,
         static_cast<float>(
             std::asin(std::clamp(-forward.z, -1.0, 1.0))),
         OrbitController::kMinPitch, OrbitController::kMaxPitch);
-    controller.target =
-        glm::vec3(eye + forward * static_cast<double>(distance));
+    controller.target = eye + forward * distance;
     return controller;
 }
 

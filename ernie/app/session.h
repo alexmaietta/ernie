@@ -44,7 +44,7 @@ void AuthorControllerCamera(Scene& scene, const Path& path,
 /// with `verticalFov`. Pitch is clamped to the controller's range, so
 /// views from below the horizon come back looking from just above it.
 OrbitController ControllerFromTransform(const glm::dmat4& world,
-                                        float distance,
+                                        double distance,
                                         float verticalFov);
 
 /// The local transform that places the prim at `path` at the world
