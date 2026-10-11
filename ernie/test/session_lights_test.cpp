@@ -719,6 +719,63 @@ TEST(LightParamsOf,
     std::filesystem::remove(file);
 }
 
+TEST(LightParamsOf, LasersCarryTheirBeamAndLine) {
+    // 5 mW at 532 nm, 0.1 nm wide, in bands of 25 nm from 380.
+    const ernie::SpectralBands bands{380.0, 780.0, 16};
+    Scene scene;
+    ernie::LaserLight laser =
+        ernie::LaserLight::Define(scene, "/Laser")
+            .SetPower(0.005)
+            .SetWaistRadius({0.001, 0.002})
+            .SetBeamQuality({1.0, 2.0})
+            .SetWaistDistance(3.0);
+    const LightParams params =
+        ernie::LightParamsOf(scene, "/Laser", bands);
+    EXPECT_EQ(params.type, ernie::LightType::Laser);
+    // All its power in the 530-555 nm band, as W/nm.
+    double total = 0.0;
+    for (int i = 0; i < bands.count; ++i) {
+        total += params.spectrum[static_cast<std::size_t>(i)] *
+                 bands.Width();
+    }
+    EXPECT_NEAR(total, 0.005, 1e-8);
+    EXPECT_NEAR(params.spectrum[6], 0.005 / 25.0, 1e-9)
+        << "530 to 555 nm";
+    EXPECT_EQ(params.spectrum[5], 0.0f);
+    // z_R = pi w0^2 / (M^2 lambda).
+    EXPECT_FLOAT_EQ(params.beam.waist.x, 0.001f);
+    EXPECT_NEAR(params.beam.rayleigh.x, M_PI * 1e-6 / 532e-9, 1e-4);
+    EXPECT_NEAR(params.beam.rayleigh.y, M_PI * 4e-6 / (2.0 * 532e-9),
+                1e-4);
+    EXPECT_FLOAT_EQ(params.beam.waistDistance, 3.0f);
+    EXPECT_NEAR(laser.Divergence().x, 532e-9 / (M_PI * 0.001), 1e-9)
+        << "theta = M^2 lambda / (pi w0)";
+
+    // A line straddling two bands splits between them by its
+    // Gaussian: centred on 530 nm, half below, half above.
+    laser.SetWavelength(530.0).SetLinewidth(2.0);
+    const std::vector<float> split =
+        ernie::LightParamsOf(scene, "/Laser", bands).spectrum;
+    EXPECT_NEAR(split[5] * 25.0, 0.0025, 1e-7);
+    EXPECT_NEAR(split[6] * 25.0, 0.0025, 1e-7);
+
+    // An aperture as wide as the beam there (1/e^2 radii 1 and 2 mm
+    // at the waist, which here is the aperture) passes
+    // 1 - exp(-2 a^2 / (w_x w_y)) of its power.
+    laser.SetWaistDistance(0.0).SetApertureRadius(
+        std::sqrt(0.001 * 0.002));
+    const std::vector<float> clipped =
+        ernie::LightParamsOf(scene, "/Laser", bands).spectrum;
+    EXPECT_NEAR((clipped[5] + clipped[6]) * 25.0,
+                0.005 * (1.0 - std::exp(-2.0)), 1e-7);
+    EXPECT_EQ(ernie::ResolveRenderPrims(scene, {}).lights,
+              std::vector<Path>{Path("/Laser")});
+
+    laser.SetWaistRadius({0.0, 0.001});
+    EXPECT_THROW(ernie::LightParamsOf(scene, "/Laser", bands),
+                 std::invalid_argument);
+}
+
 TEST(LightParamsOf, CylinderLightsEmitFromTheirSides) {
     const ernie::SpectralBands bands{380.0, 780.0, 40};
     Scene scene;

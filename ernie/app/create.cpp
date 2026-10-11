@@ -43,6 +43,7 @@ constexpr CreatableType kTypes[] = {
     {kDiskLight, "Disk Light", "Lights", "DiskLight", "/World"},
     {kCylinderLight, "Cylinder Light", "Lights", "CylinderLight",
      "/World"},
+    {kLaserLight, "Laser", "Lights", "Laser", "/World"},
     {kDomeLight, "Dome Light", "Lights", "Dome", "/World"},
     {kStarField, "Star Field", "Lights", "Stars", "/World"},
     {kCamera, "Camera from View", "Cameras", "Camera", "/World"},
@@ -254,6 +255,10 @@ void AuthorDefaultPrim(Scene& scene, const Path& path,
         } else {
             light.SetIntensity(kAbove * kAbove * s * s / area);
         }
+    } else if (type == kLaserLight) {
+        // A 1 mW green pointer above the target, aimed at it: a laser
+        // is a light of its own (it leaves the viewer's lights on).
+        PlaceAbove(scene, path, context, 3.0);
     } else if (type == kCamera) {
         CameraParams camera = context.camera;
         camera.transform =

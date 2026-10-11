@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/scene/light_schemas.h"
 
+#include <cmath>
+
 namespace ernie {
 
 ERNIE_DEFINE_SCHEMA(Light, "Light", &Imageable::Definition(), true,
@@ -43,6 +45,22 @@ ERNIE_DEFINE_SCHEMA(CylinderLight, tokens::kCylinderLight,
                     "A cylinder along its x axis emitting from its "
                     "side, not its caps.",
                     ERNIE_CYLINDER_LIGHT_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(LaserLight, tokens::kLaserLight,
+                    &Imageable::Definition(), false,
+                    "A laser: a Gaussian beam of one spectral line "
+                    "along its -z axis.",
+                    ERNIE_LASER_LIGHT_ATTRIBUTES)
+
+glm::dvec2 LaserLight::RayleighRange() const {
+    const double lambda = GetWavelength() * 1e-9;
+    const glm::dvec2 w0 = GetWaistRadius();
+    return M_PI * w0 * w0 / (GetBeamQuality() * lambda);
+}
+
+glm::dvec2 LaserLight::Divergence() const {
+    const double lambda = GetWavelength() * 1e-9;
+    return GetBeamQuality() * lambda / (M_PI * GetWaistRadius());
+}
 
 bool Light::IsPhotometric() const {
     return Has(tokens::kPhotometricIlluminance) ||
@@ -59,7 +77,8 @@ std::vector<const PrimTypeDef*> LightSchemaTypes() {
             &SphereLight::Definition(),
             &RectLight::Definition(),
             &DiskLight::Definition(),
-            &CylinderLight::Definition()};
+            &CylinderLight::Definition(),
+            &LaserLight::Definition()};
 }
 
 }  // namespace ernie

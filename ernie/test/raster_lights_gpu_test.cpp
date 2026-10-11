@@ -395,7 +395,126 @@ glm::dvec3 PixelCentre(const Scene& scene, float x, float y) {
     return glm::dvec3(glm::vec3(near + t * (far - near)));
 }
 
+/// FlatScene lit only by a laser 10 m above the origin pointing down:
+/// 1 W of a line at the centre of the camera's band 8 (so all of it
+/// there, `*bandWidth` nm wide), its waist `waist` m at the aperture.
+Scene LaserScene(double waist, double* bandWidth) {
+    Scene scene = FlatScene();
+    scene.Remove("/World/Sun");
+    const ernie::SpectralBands bands =
+        ernie::CameraParamsOf(scene, "/World/Camera", kVarSize,
+                              kVarSize)
+            .bands;
+    *bandWidth = bands.Width();
+    ernie::LaserLight::Define(scene, "/World/Laser")
+        .SetPower(1.0)
+        .SetWavelength(bands.Lower(8) + 0.5 * bands.Width())
+        .SetLinewidth(0.0)
+        .SetWaistRadius(glm::dvec2(waist));
+    scene.Set("/World/Laser", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, 10.0},
+                                     {0.0, 0.0, 0.0},
+                                     {0.0, 1.0, 0.0}));
+    return scene;
+}
+
+/// Band 8 of FlatScene's SpectralRadiance, rows of `kVarSize`.
+std::vector<float> Band8(RasterDelegate& delegate,
+                         const Scene& scene) {
+    ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+    const Tensor spectral = outputs.at("/Render/Product")
+                                .vars.at("SpectralRadiance")
+                                .Map(ernie::MapDevice::Cpu)
+                                .tensor;
+    const auto* data = static_cast<const float*>(spectral.Data()) +
+                       8 * kVarSize * kVarSize;
+    return {data, data + kVarSize * kVarSize};
+}
+
+/// A Gaussian beam's 1D profile, 1/e^2 radius `w`, averaged over
+/// `width` centred at `u` (std::erf, apart from the shader's).
+double BeamAverage(double u, double w, double width) {
+    const double k = std::sqrt(2.0) / w;
+    return 0.5 *
+           (std::erf(k * (u + 0.5 * width)) -
+            std::erf(k * (u - 0.5 * width))) /
+           width;
+}
+
 }  // namespace
+
+TEST_F(RasterDelegateTest, LasersLightAGaussianSpot) {
+    RasterDelegate delegate(*context_);
+    double bandWidth = 0.0;
+    // The floor's pixels: their width from two pixels 20 m apart.
+    Scene wide = LaserScene(4.0, &bandWidth);
+    const auto [r0, left] = PixelOf(wide, -10.0f, 0.0f);
+    const auto [r1, right] = PixelOf(wide, 10.0f, 0.0f);
+    const double pixel = (PixelCentre(wide, 10.0f, 0.0f).x -
+                          PixelCentre(wide, -10.0f, 0.0f).x) /
+                         static_cast<double>(right - left);
+    // Grey floor (albedo 0.5): L = 0.5 / pi E, E per watt the beam's
+    // average over the pixel, times 1 W / band width in the band.
+    const auto expected = [&](const glm::dvec3& at, double w) {
+        return 0.5 / M_PI / bandWidth * BeamAverage(at.x, w, pixel) *
+               BeamAverage(at.y, w, pixel);
+    };
+
+    // A collimated beam 4 m in radius (its Rayleigh range thousands
+    // of km): its Gaussian across the floor.
+    for (const glm::dvec2 at :
+         {glm::dvec2(0.0, 0.0), glm::dvec2(4.0, 0.0),
+          glm::dvec2(0.0, -6.0)}) {
+        const auto x = static_cast<float>(at.x);
+        const auto y = static_cast<float>(at.y);
+        const double want = expected(PixelCentre(wide, x, y), 4.0);
+        EXPECT_NEAR(RadianceAt(delegate, wide, x, y), want,
+                    0.03 * want)
+            << "at " << at.x << ", " << at.y;
+    }
+
+    // A beam 1 mm at its waist, 2 mm across 10 m on, a sliver of a
+    // pixel: the pixels it falls on still carry its whole power.
+    Scene narrow = LaserScene(0.001, &bandWidth);
+    const std::vector<float> band = Band8(delegate, narrow);
+    double total = 0.0;
+    for (const float value : band) {
+        total += value * pixel * pixel;
+    }
+    EXPECT_NEAR(total, 0.5 / M_PI / bandWidth,
+                0.03 * 0.5 / M_PI / bandWidth)
+        << "the spot's power, whatever the pixels";
+
+    // Slanted 45 degrees, its spot stretches but keeps its power; a
+    // small cube halfway along the beam (out of the camera's way to
+    // the spot) shadows it.
+    narrow.Set("/World/Laser", tokens::kTransform,
+               ernie::LookAtTransform({-10.0, 0.0, 10.0},
+                                      {0.0, 0.0, 0.0},
+                                      {0.0, 1.0, 0.0}));
+    // On the floor within 2 m of the spot: not the cube's own lit
+    // faces, which the camera sees too.
+    const auto [top, first] = PixelOf(narrow, -2.0f, 2.0f);
+    const auto [bottom, last] = PixelOf(narrow, 2.0f, -2.0f);
+    const auto sum = [&](const Scene& scene) {
+        const std::vector<float> values = Band8(delegate, scene);
+        double power = 0.0;
+        for (std::size_t row = top; row <= bottom; ++row) {
+            for (std::size_t col = first; col <= last; ++col) {
+                power += values[row * kVarSize + col] * pixel * pixel;
+            }
+        }
+        return power;
+    };
+    const double open = sum(narrow);
+    EXPECT_NEAR(open, 0.5 / M_PI / bandWidth,
+                0.03 * 0.5 / M_PI / bandWidth)
+        << "slanted";
+    ernie::Cube::Define(narrow, "/World/Block")
+        .SetSize(0.5)
+        .SetXform({.translate = glm::dvec3(-5.0, 0.0, 5.0)});
+    EXPECT_LT(sum(narrow), 0.01 * open) << "the cube's shadow";
+}
 
 TEST_F(RasterDelegateTest, CylinderLightsLightAsTheirSidesDo) {
     // A tube 8 m long and 2 m across, 10 m up along x, lit from its

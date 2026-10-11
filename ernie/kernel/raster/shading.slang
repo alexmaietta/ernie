@@ -103,7 +103,7 @@ static const uint kMaxLights = 16;
 
 struct LightGpu {
     // xyz: position (sphere, rect, disk) or unit direction towards the light (distant), w: type,
-    // 0 distant, 1 sphere, 2 rect, 3 disk, 4 cylinder.
+    // 0 distant, 1 sphere, 2 rect, 3 disk, 4 cylinder, 5 laser.
     float4 position;
     // xyz: unit cone axis, w: sphere or cylinder radius.
     float4 axis;
@@ -125,6 +125,10 @@ struct LightGpu {
     float4 spectrum[16];
     // A focused light's part its focus leaves alone: its emission times its focus tint.
     float4 tinted[16];
+    // A laser's beam (`LightParams::Beam`): its 1/e^2 waist radii along x and y, its Rayleigh
+    // ranges along each; x: the waist's distance along the beam.
+    float4 beam;
+    float4 beamExtra;
 }
 
 struct MaterialGpu {
@@ -366,7 +370,10 @@ float lightVisibility(LightGpu light, float3 world, float3 n, float nDotL, float
         return 1.0;
     }
     let view = lightView(light, world);
-    let distance = light.position.w == 0.0 ? 1.0 : length(world - light.position.xyz);
+    // Orthographic views (the sun-like distant light's, a laser's along its beam) have texels of
+    // one size; perspective ones grow with distance.
+    let orthographic = light.position.w == 0.0 || light.position.w == 5.0;
+    let distance = orthographic ? 1.0 : length(world - light.position.xyz);
     let texelWorld = light.shadow.x * distance;
     let offset = n * sh.lightShadow.y * texelWorld * max(1.0 - clamp(nDotL, 0.0, 1.0), 0.25);
     let clip = mul(lightViews[view], float4(world + offset, 1.0));
@@ -459,6 +466,73 @@ bool gbufferPoint(int2 pixel, uint layer, out float3 world) {
                      1.0 - (float(pixel.y) + 0.5) / float(size.y) * 2.0);
     world = cameraPoint(sh.invViewProj, sh.strip, ndc, depth);
     return true;
+}
+
+// Pixel `pixel`'s footprint on its surface at `world`: the steps in world units to its
+// neighbours' surface points across (xyz of the first) and down (of the second), either side;
+// zero where no neighbour has a surface. They grow with distance and with how obliquely the
+// surface is seen.
+//
+// References:
+// - H. Igehy, "Tracing Ray Differentials", SIGGRAPH 1999.
+float3x2 pixelFootprint(int2 pixel, uint layer, float3 world) {
+    float3 steps[2] = {float3(0.0), float3(0.0)};
+    for (uint axis = 0; axis < 2; ++axis) {
+        let step = axis == 0 ? int2(1, 0) : int2(0, 1);
+        float3 next;
+        if (gbufferPoint(pixel + step, layer, next) || gbufferPoint(pixel - step, layer, next)) {
+            steps[axis] = next - world;
+        }
+    }
+    return float3x2(steps[0].x, steps[1].x, steps[0].y, steps[1].y, steps[0].z, steps[1].z);
+}
+
+// The error function, to 1.5e-7 (Abramowitz and Stegun 7.1.26).
+//
+// References:
+// - M. Abramowitz and I. A. Stegun, Handbook of Mathematical Functions, 1964, 7.1.26.
+float erfApprox(float x) {
+    let t = 1.0 / (1.0 + 0.3275911 * abs(x));
+    let poly =
+        t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+    let y = 1.0 - poly * exp(-x * x);
+    return x < 0.0 ? -y : y;
+}
+
+// A Gaussian beam's 1D profile across one axis, 1/e^2 radius `w`, normalised to 1 over the line,
+// averaged over `width` centred at `u`: exactly, from erf, so a beam narrower than the width
+// keeps its power; the profile itself at `u` for a width of 0.
+float beamAverage(float u, float w, float width) {
+    if (width < 1e-4 * w) {
+        return sqrt(2.0 / PI) / w * exp(-2.0 * u * u / (w * w));
+    }
+    let k = sqrt(2.0) / w;
+    return 0.5 * (erfApprox(k * (u + 0.5 * width)) - erfApprox(k * (u - 0.5 * width))) / width;
+}
+
+// A laser's irradiance at `world` per watt of its power, normal to its beam, m^-2: its Gaussian
+// beam (`LightParams::Beam`), 2 / (pi w_x w_y) exp(-2 (x^2 / w_x^2 + y^2 / w_y^2)) at the point's
+// distance along it, averaged over the pixel's `footprint` (`pixelFootprint`) as it spans the
+// beam's x and y, so a spot smaller than a pixel spreads over it and the pixels it falls on carry
+// its whole power, however obliquely; 0 behind the laser.
+//
+// References:
+// - A. E. Siegman, Lasers, University Science Books, 1986, ch. 17.
+float laserIrradiance(LightGpu light, float3 world, float3x2 footprint) {
+    let offset = world - light.position.xyz;
+    let along = dot(offset, light.axis.xyz);
+    if (along <= 0.0) {
+        return 0.0;
+    }
+    let x = normalize(light.extentX.xyz);
+    let y = cross(x, light.axis.xyz);
+    let t = (along - light.beamExtra.x) / max(light.beam.zw, float2(1e-12));
+    let w = light.beam.xy * sqrt(1.0 + t * t);
+    // The pixel's extent across the beam along each of its axes.
+    let spanX = abs(mul(x, footprint));
+    let spanY = abs(mul(y, footprint));
+    return beamAverage(dot(offset, x), w.x, spanX.x + spanX.y) *
+           beamAverage(dot(offset, y), w.y, spanY.x + spanY.y);
 }
 
 static const uint kOcclusionDirections = 4;
@@ -842,6 +916,8 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     float3 lightDirections[kMaxLights];
     float lightScales[kMaxLights];
     float lightFocus[kMaxLights];  // |cos|^focus off a focused light's axis, else 1
+    float3x2 footprint = float3x2(0.0);  // the pixel's, once a laser wants it
+    bool footprinted = false;
     for (uint k = 0; k < lightCount; ++k) {
         lightFocus[k] = 1.0;
         if (((sh.view.x >> k) & 1u) == 0) {
@@ -850,10 +926,35 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             continue;
         }
         let light = lights[k];
+        var shadowPoint = world;  // where its shadow map is read
         var toLight = light.position.xyz;
         var scale = 1.0;
         let type = uint(light.position.w);
-        if (type >= 2) {
+        if (type == 5) {
+            // A laser: its beam's irradiance, arriving along the beam.
+            if (!footprinted) {
+                footprint = pixelFootprint(int2(id.xy), id.z, world);
+                footprinted = true;
+            }
+            scale = laserIrradiance(light, world, footprint);
+            toLight = -light.axis.xyz;
+            // Its shadow map is read where the beam meets the pixel's surface, when that lies
+            // within the pixel's footprint (the light of a beam narrower than the pixel comes
+            // from there, which its map, as narrow, sees), moved a footprint back up the beam:
+            // the map's texels can be far finer than the pixel, whose surface (at the camera's
+            // level of detail) is only as true as its footprint.
+            let reach = max(length(float3(footprint[0].x, footprint[1].x, footprint[2].x)),
+                            length(float3(footprint[0].y, footprint[1].y, footprint[2].y)));
+            let crossing = dot(light.axis.xyz, n);
+            if (abs(crossing) > 1e-4) {
+                let hit = light.position.xyz +
+                          light.axis.xyz * (dot(world - light.position.xyz, n) / crossing);
+                if (length(hit - world) <= reach) {
+                    shadowPoint = hit;
+                }
+            }
+            shadowPoint -= light.axis.xyz * reach;
+        } else if (type >= 2) {
             let form = areaFormFactor(light, world, n);
             scale = length(form);
             toLight = scale > 0.0 ? form / scale : n;
@@ -884,7 +985,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         if (nDotL <= 0.0 || scale <= 0.0) {
             scale = 0.0;
         } else {
-            scale *= lightVisibility(light, world, n, nDotL, float2(id.xy));
+            scale *= lightVisibility(light, shadowPoint, n, nDotL, float2(id.xy));
         }
         lightDirections[k] = toLight;
         lightScales[k] = scale;

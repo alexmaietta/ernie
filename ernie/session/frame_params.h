@@ -205,6 +205,10 @@ enum class LightType : std::uint32_t {
     /// `size.x` long along `tangent` and `radius` wide, shaded
     /// through its outline from the shaded point.
     Cylinder = 4,
+    /// A laser's Gaussian beam (Ernie's LaserLight) along `direction`
+    /// from `position`, its x axis `tangent`: `beam` gives its waist,
+    /// and `spectrum` its spectral power, W nm^-1 per band.
+    Laser = 5,
 };
 
 /// A light besides the sun, resolved for a frame from its prim
@@ -266,6 +270,18 @@ struct LightParams {
     std::vector<float> profile;
     static constexpr int kProfileRows = 129;
     static constexpr int kProfileColumns = 64;
+    /// A laser's Gaussian beam (Siegman 1986): its 1/e^2 radius at
+    /// the waist along the light's x and y, its Rayleigh range along
+    /// each, and the waist's distance along the beam from `position`,
+    /// m. The irradiance across the beam z past the waist is 2 P /
+    /// (pi w_x w_y) exp(-2 (x^2 / w_x^2 + y^2 / w_y^2)), with w = w0
+    /// sqrt(1 + (z / z_R)^2) along each axis.
+    struct Beam {
+        glm::vec2 waist{0.0f};
+        glm::vec2 rayleigh{0.0f};
+        float waistDistance = 0.0f;
+    };
+    Beam beam;
     bool shadows = true;
     /// A direction of a dome (`DomeLightMode::Directions`): it lights
     /// with the model's diffuse response to surrounding light

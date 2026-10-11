@@ -820,7 +820,8 @@ RenderPrims ResolveRenderPrims(const Scene& scene,
         for (const std::string_view type :
              {tokens::kDistantLight, tokens::kSphereLight,
               tokens::kRectLight, tokens::kDiskLight,
-              tokens::kCylinderLight, tokens::kDomeLight}) {
+              tokens::kCylinderLight, tokens::kLaserLight,
+              tokens::kDomeLight}) {
             for (const Path& path : scene.Prims(type)) {
                 if (!InSession(path) && scene.IsVisible(path)) {
                     candidates.push_back(path);
@@ -844,12 +845,14 @@ RenderPrims ResolveRenderPrims(const Scene& scene,
                    type == tokens::kSphereLight ||
                    type == tokens::kRectLight ||
                    type == tokens::kDiskLight ||
-                   type == tokens::kCylinderLight) {
+                   type == tokens::kCylinderLight ||
+                   type == tokens::kLaserLight) {
             prims.lights.push_back(path);
         }
     }
     prims.ground = FirstVisible(scene, tokens::kGroundPlane);
     prims.stars = FirstVisible(scene, tokens::kStarField);
+    prims.atmosphere = FirstVisible(scene, tokens::kAtmosphere);
     return prims;
 }
 
@@ -1339,13 +1342,102 @@ std::vector<float> SunIrradianceOf(const Scene& scene,
                                 LightIntensity(sun));
 }
 
+namespace {
+
+/// A laser line's spectral power per band of `bands`, W nm^-1: a
+/// Gaussian of FWHM `linewidth` nm around `wavelength` nm carrying
+/// `power` W, each band's share integrated exactly (with erf), so a
+/// line far narrower than a band keeps its power; a linewidth of 0
+/// puts it all in the band holding the wavelength.
+std::vector<float> LaserLine(const SpectralBands& bands,
+                             double wavelength, double linewidth,
+                             double power) {
+    std::vector<float> values(static_cast<std::size_t>(bands.count),
+                              0.0f);
+    const double sigma =
+        linewidth / (2.0 * std::sqrt(2.0 * std::log(2.0)));
+    const auto below = [&](double nm) {
+        if (sigma <= 0.0) {
+            return nm >= wavelength ? 1.0 : 0.0;
+        }
+        return 0.5 * std::erfc((wavelength - nm) /
+                               (sigma * std::sqrt(2.0)));
+    };
+    for (int i = 0; i < bands.count; ++i) {
+        const double share = below(bands.Lower(i) + bands.Width()) -
+                             below(bands.Lower(i));
+        values[static_cast<std::size_t>(i)] =
+            static_cast<float>(power * share / bands.Width());
+    }
+    return values;
+}
+
+/// The LaserLight at `path` under transform `world` as a light: its
+/// beam from the waist, divergence and power it gives (`LaserLight`),
+/// its power through its aperture, and a shadow view along its beam.
+LightParams LaserParamsOf(const Scene& scene, const Path& path,
+                          const SpectralBands& bands,
+                          const glm::dmat4& world) {
+    const LaserLight laser(scene, path);
+    LightParams light;
+    light.type = LightType::Laser;
+    light.shadows = laser.GetShadowEnable();
+    light.position = glm::dvec3(world[3]);
+    const glm::dvec3 axis = -glm::dvec3(world[2]);
+    const glm::dvec3 xAxis(world[0]);
+    if (glm::length(axis) == 0.0) {
+        throw std::invalid_argument("Light '" + path.String() +
+                                    "' has a degenerate transform");
+    }
+    const glm::dvec3 d = glm::normalize(axis);
+    const glm::dvec3 x = xAxis - glm::dot(xAxis, d) * d;
+    if (glm::length(x) == 0.0) {
+        throw std::invalid_argument("Light '" + path.String() +
+                                    "' has a degenerate transform");
+    }
+    light.direction = glm::vec3(d);
+    light.tangent = glm::vec3(glm::normalize(x));
+    const double wavelength = laser.GetWavelength();
+    const glm::dvec2 waist = laser.GetWaistRadius();
+    const glm::dvec2 quality = laser.GetBeamQuality();
+    const double power = laser.GetPower();
+    if (!(wavelength > 0.0) || !(waist.x > 0.0) || !(waist.y > 0.0) ||
+        quality.x < 1.0 || quality.y < 1.0 || power < 0.0 ||
+        laser.GetLinewidth() < 0.0) {
+        throw std::invalid_argument(
+            "LaserLight '" + path.String() +
+            "' needs a positive wavelength and waist, M^2 of 1 or "
+            "more, and no negative power or linewidth");
+    }
+    light.beam.waist = glm::vec2(waist);
+    light.beam.rayleigh = glm::vec2(laser.RayleighRange());
+    light.beam.waistDistance =
+        static_cast<float>(laser.GetWaistDistance());
+    // An aperture passes the beam's core: of a Gaussian of radii w
+    // there, 1 - exp(-2 a^2 / (w_x w_y)) of its power.
+    double through = power;
+    if (const double a = laser.GetApertureRadius(); a > 0.0) {
+        const glm::dvec2 z(-laser.GetWaistDistance());
+        const glm::dvec2 r = glm::dvec2(light.beam.rayleigh);
+        const glm::dvec2 w =
+            waist * glm::sqrt(1.0 + (z / r) * (z / r));
+        through *= 1.0 - std::exp(-2.0 * a * a / (w.x * w.y));
+    }
+    light.spectrum =
+        LaserLine(bands, wavelength, laser.GetLinewidth(), through);
+    return light;
+}
+
+}  // namespace
+
 LightParams LightParamsOf(const Scene& scene, const Path& path,
                           const SpectralBands& bands) {
     const std::string_view type = scene.TypeOf(path);
     const bool known =
         type == tokens::kDistantLight ||
         type == tokens::kSphereLight || type == tokens::kRectLight ||
-        type == tokens::kDiskLight || type == tokens::kCylinderLight;
+        type == tokens::kDiskLight ||
+        type == tokens::kCylinderLight || type == tokens::kLaserLight;
     return LightParamsOf(scene, path, bands,
                          known ? scene.WorldTransform(path)
                                : glm::dmat4(1.0));
@@ -1365,6 +1457,9 @@ LightParams LightParamsOf(const Scene& scene, const Path& path,
             glm::vec3(glm::normalize(glm::dvec3(world[2])));
         light.spectrum = SunIrradianceOf(scene, path, bands);
         return light;
+    }
+    if (type == kLaserLight) {
+        return LaserParamsOf(scene, path, bands, world);
     }
     if (type != kSphereLight && type != kRectLight &&
         type != kDiskLight && type != kCylinderLight) {

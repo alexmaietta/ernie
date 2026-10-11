@@ -255,7 +255,8 @@ void DrawPrimIcon(ImDrawList* draw, const ImVec2& corner, float size,
              Rgb(206, 198, 214));
     } else if (type == kDistantLight) {
         Sun(draw, at);
-    } else if (type == kSphereLight || type == kCylinderLight) {
+    } else if (type == kSphereLight || type == kCylinderLight ||
+               type == kLaserLight) {
         Bulb(draw, at);
     } else if (type == kRectLight || type == kDiskLight) {
         Panel(draw, at, type == kDiskLight);

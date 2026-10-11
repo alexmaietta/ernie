@@ -177,7 +177,37 @@
                                      "off, it still lights the scene.",                            \
                               .group = "Shape"}))
 
+#define ERNIE_LASER_LIGHT_ATTRIBUTES(X)                                                            \
+    X(double, Wavelength, ::ernie::tokens::kLaserWavelength, 532.0,                                \
+      (::ernie::AttributeMeta{.doc = "Centre wavelength, nm.", .group = "Laser", .min = 200.0,     \
+                              .max = 20000.0}))                                                    \
+    X(double, Linewidth, ::ernie::tokens::kLaserLinewidth, 0.1,                                    \
+      (::ernie::AttributeMeta{.doc = "Spectral width (FWHM), nm.", .group = "Laser",               \
+                              .max = 100.0}))                                                      \
+    X(double, Power, ::ernie::tokens::kLaserPower, 0.001,                                          \
+      (::ernie::AttributeMeta{.doc = "Average optical power out of the aperture, W.",              \
+                              .group = "Laser", .max = 1e5}))                                      \
+    X(glm::dvec2, WaistRadius, ::ernie::tokens::kLaserWaistRadius, glm::dvec2(0.0005),             \
+      (::ernie::AttributeMeta{.label = "Waist radius",                                             \
+                              .doc = "1/e^2 radius at the waist along x and y, m.",                \
+                              .group = "Beam", .max = 100.0}))                                     \
+    X(double, WaistDistance, ::ernie::tokens::kLaserWaistDistance, 0.0,                            \
+      (::ernie::AttributeMeta{.label = "Waist distance",                                           \
+                              .doc = "Where the waist lies along the beam from the aperture, m.",  \
+                              .group = "Beam", .min = -1000.0, .max = 1000.0}))                    \
+    X(glm::dvec2, BeamQuality, ::ernie::tokens::kLaserBeamQuality, glm::dvec2(1.0),                \
+      (::ernie::AttributeMeta{.label = "M^2",                                                      \
+                              .doc = "Beam quality along x and y: 1 for an ideal beam.",           \
+                              .group = "Beam", .min = 1.0, .max = 100.0}))                         \
+    X(double, ApertureRadius, ::ernie::tokens::kLaserApertureRadius, 0.0,                          \
+      (::ernie::AttributeMeta{.label = "Aperture radius",                                          \
+                              .doc = "Clips the beam's tails at the aperture, m; 0 none.",         \
+                              .group = "Beam", .max = 100.0}))                                     \
+    X(bool, ShadowEnable, ::ernie::tokens::kShadowEnable, true,                                    \
+      (::ernie::AttributeMeta{.label = "Shadows", .group = "Laser"}))
+
 // Every attribute of each type, its bases' first, for its accessors.
+#define ERNIE_LASER_LIGHT_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_LASER_LIGHT_ATTRIBUTES(X)
 #define ERNIE_LIGHT_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_LIGHT_ATTRIBUTES(X)
 #define ERNIE_BOUNDABLE_LIGHT_ALL(X) ERNIE_LIGHT_ALL(X) ERNIE_BOUNDABLE_LIGHT_ATTRIBUTES(X)
 #define ERNIE_NONBOUNDABLE_LIGHT_ALL(X) ERNIE_LIGHT_ALL(X) ERNIE_NONBOUNDABLE_LIGHT_ATTRIBUTES(X)
@@ -257,6 +287,26 @@ class CylinderLight : public BoundableLight {
     ERNIE_SCHEMA_BODY(CylinderLight, BoundableLight,
                       ERNIE_CYLINDER_LIGHT_ALL)
     ERNIE_SCHEMA_DEFINE(CylinderLight)
+};
+
+/// A laser (Ernie): a Gaussian beam of one spectral line along its -z
+/// axis, its waist, divergence and power as a datasheet gives them
+/// (ISO 11146). Not a UsdLux light, so none of their inputs.
+///
+/// References:
+/// - A. E. Siegman, Lasers, University Science Books, 1986, ch. 17.
+/// - ISO 11146-1, Lasers and laser-related equipment: test methods
+///   for laser beam widths, divergence angles and beam propagation
+///   ratios.
+class LaserLight : public Imageable {
+    ERNIE_SCHEMA_BODY(LaserLight, Imageable, ERNIE_LASER_LIGHT_ALL)
+    ERNIE_SCHEMA_DEFINE(LaserLight)
+
+    /// The Rayleigh range along x and y, m: pi w0^2 / (M^2 lambda).
+    glm::dvec2 RayleighRange() const;
+    /// The far-field half-angle divergence along x and y, radians:
+    /// M^2 lambda / (pi w0).
+    glm::dvec2 Divergence() const;
 };
 
 /// This file's types' registry entries, bases first (`PrimTypes`).

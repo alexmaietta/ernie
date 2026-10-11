@@ -41,6 +41,7 @@ inline constexpr std::string_view kSphereLight = "SphereLight";
 inline constexpr std::string_view kRectLight = "RectLight";
 inline constexpr std::string_view kDiskLight = "DiskLight";
 inline constexpr std::string_view kCylinderLight = "CylinderLight";
+inline constexpr std::string_view kLaserLight = "LaserLight";
 inline constexpr std::string_view kDomeLight = "DomeLight";
 inline constexpr std::string_view kMaterial = "Material";
 inline constexpr std::string_view kTerrain = "Terrain";
@@ -300,6 +301,25 @@ inline constexpr std::string_view kTreatAsPoint =
 /// drawn as a line (a hint).
 inline constexpr std::string_view kLength = "inputs:length";
 inline constexpr std::string_view kTreatAsLine = "treatAsLine";
+/// A LaserLight (Ernie): a Gaussian beam along its -z axis.
+/// Wavelength and linewidth (FWHM) in nm; average power in W out of
+/// its aperture; 1/e^2 waist radius in m along its x and y (double2);
+/// the waist's distance along the beam from the aperture in m; beam
+/// quality M^2 along x and y (double2, 1 for an ideal beam, ISO
+/// 11146); an aperture radius in m clipping the beam (0 none).
+inline constexpr std::string_view kLaserWavelength =
+    "ernie:laser:wavelength";
+inline constexpr std::string_view kLaserLinewidth =
+    "ernie:laser:linewidth";
+inline constexpr std::string_view kLaserPower = "ernie:laser:power";
+inline constexpr std::string_view kLaserWaistRadius =
+    "ernie:laser:waistRadius";
+inline constexpr std::string_view kLaserWaistDistance =
+    "ernie:laser:waistDistance";
+inline constexpr std::string_view kLaserBeamQuality =
+    "ernie:laser:beamQuality";
+inline constexpr std::string_view kLaserApertureRadius =
+    "ernie:laser:apertureRadius";
 /// Degrees off the axis that a light reaches, and the fraction of
 /// that angle over which it fades.
 inline constexpr std::string_view kShapingConeAngle =

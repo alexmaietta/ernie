@@ -48,8 +48,9 @@ namespace ernie {
 ///   it is set (its visible light prims), or else from every visible
 ///   light outside the session root: `light` is the first
 ///   DistantLight by path, the sun, with cascaded shadows; `lights`
-///   every other DistantLight, SphereLight, RectLight and DiskLight,
-///   sorted by path; `dome` the first DomeLight. A scene without
+///   every other DistantLight, SphereLight, RectLight, DiskLight,
+///   CylinderLight and LaserLight, sorted by path; `dome` the first
+///   DomeLight. A scene without
 ///   lights renders black.
 /// - `ground`: the first visible GroundPlane.
 struct RenderPrims {
@@ -263,6 +264,9 @@ std::vector<float> SunIrradianceOf(const Scene& scene,
 ///   sphere; otherwise relative: `inputs:intensity` times
 ///   2^`inputs:exposure` is its luminance (cd/m^2). Shadows follow
 ///   `inputs:shadow:enable`.
+/// - laser (Ernie's LaserLight): a Gaussian beam along its -z axis,
+///   its waist and Rayleigh ranges in `beam`, its line binned exactly
+///   into the bands as W nm^-1 of the power through its aperture.
 /// @throws std::invalid_argument for another prim type, a negative
 /// radius or power, an area light without area, a degenerate
 /// transform, invalid bands or spectrum pairs.

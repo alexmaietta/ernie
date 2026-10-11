@@ -106,8 +106,10 @@ struct LightGpu {
     float extentY[4];
     float spectrum[SpectralBands::kMaxBands];
     float tinted[SpectralBands::kMaxBands];
+    float beam[4];
+    float beamExtra[4];
 };
-static_assert(sizeof(LightGpu) == 608,
+static_assert(sizeof(LightGpu) == 640,
               "LightGpu must match shading.slang");
 
 /// One light's IES profile on the GPU (shading.slang's kProfileRows x
@@ -734,6 +736,28 @@ std::vector<ShadowCascade> FitLightShadowViews(
         farPlane = std::max(farPlane,
                             1.01f * glm::length(corner - position));
     }
+    if (light.type == LightType::Laser) {
+        // Orthographic along the beam, as wide as the beam's widest
+        // (at the aperture or the scene's far side) out to 2.5 1/e^2
+        // radii, where it carries e^-12.5 of its peak.
+        const LightParams::Beam& beam = light.beam;
+        float widest = 0.0f;
+        for (const float z :
+             {-beam.waistDistance, farPlane - beam.waistDistance}) {
+            const glm::vec2 t = z / glm::max(beam.rayleigh, 1e-12f);
+            const glm::vec2 w = beam.waist * glm::sqrt(1.0f + t * t);
+            widest = std::max(widest, std::max(w.x, w.y));
+        }
+        const float half = std::max(2.5f * widest, 1e-6f);
+        const glm::vec3 along = glm::normalize(light.direction);
+        ShadowCascade view;
+        view.lightViewProjection =
+            glm::orthoRH_ZO(-half, half, -half, half, 0.0f,
+                            farPlane) *
+            glm::lookAtRH(position, position + along, UpFor(along));
+        view.texelWorldSize = 2.0f * half / texels;
+        return {view};
+    }
     const float nearPlane = std::max(light.radius, 1e-4f * farPlane);
     const auto perspective = [&](const glm::vec3& axis, float fov) {
         ShadowCascade view;
@@ -1279,7 +1303,10 @@ void RasterRenderer::WriteLights(
             cone ? std::cos(glm::radians(light.coneAngle *
                                          (1.0f - softness)))
                  : -1.0f;
-        if (bounds) {
+        const bool laser = light.type == LightType::Laser;
+        // A laser posed on the GPU has no shadows yet: the light pass
+        // fits perspective views only.
+        if (bounds && !(laser && light.posedOnGpu)) {
             std::vector<ShadowCascade> views = FitLightShadowViews(
                 light, params.Relative(light.position), bounds->first,
                 bounds->second, resolution);
@@ -1321,6 +1348,15 @@ void RasterRenderer::WriteLights(
                     : 0.0f;
             entry.spectrum[b] = light.spectrum[b] * (1.0f - tint);
             entry.tinted[b] = light.spectrum[b] * tint;
+        }
+        // A laser's beam: its waist radii and Rayleigh ranges, and
+        // the waist's distance along it.
+        if (laser) {
+            entry.beam[0] = light.beam.waist.x;
+            entry.beam[1] = light.beam.waist.y;
+            entry.beam[2] = light.beam.rayleigh.x;
+            entry.beam[3] = light.beam.rayleigh.y;
+            entry.beamExtra[0] = light.beam.waistDistance;
         }
         if (light.posedOnGpu) {
             // The light pass poses it and fits its views as

@@ -1453,7 +1453,9 @@ struct Viewer::State {
         const bool disk = type == tokens::kDiskLight;
         const bool distant = type == tokens::kDistantLight;
         const bool cylinder = type == tokens::kCylinderLight;
-        if (!sphere && !rect && !disk && !distant && !cylinder) {
+        const bool laser = type == tokens::kLaserLight;
+        if (!sphere && !rect && !disk && !distant && !cylinder &&
+            !laser) {
             return false;
         }
         const double reach =
@@ -1503,6 +1505,14 @@ struct Viewer::State {
                 overlay.Arrow(centre, centre + down * reach, style,
                               0.18 * reach);
             }
+            return true;
+        }
+        if (laser) {
+            // Its aperture and beam: a small ring, and a line along
+            // the beam to twice the gizmo's reach.
+            overlay.Circle(centre, down, 0.05 * reach, style);
+            overlay.Arrow(centre, centre + down * 2.0 * reach, style,
+                          0.12 * reach);
             return true;
         }
         if (cylinder) {
@@ -1600,7 +1610,7 @@ struct Viewer::State {
             for (const std::string_view type :
                  {tokens::kDistantLight, tokens::kSphereLight,
                   tokens::kRectLight, tokens::kDiskLight,
-                  tokens::kCylinderLight}) {
+                  tokens::kCylinderLight, tokens::kLaserLight}) {
                 for (const Path& path : scene.Prims(type)) {
                     if (!IsSessionPath(path) && !selected(path)) {
                         DrawLightGizmo(overlay, path,

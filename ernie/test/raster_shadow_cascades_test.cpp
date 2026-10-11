@@ -232,3 +232,32 @@ TEST(FitLightShadowViews, CoversTheSceneFromEachKindOfLight) {
         ernie::FitLightShadowViews(spot, position, low, high, 512)
             .empty());
 }
+
+TEST(FitLightShadowViews, LasersLookAlongTheirBeam) {
+    // A beam 1 mm at its waist, slanted 45 degrees down from 10 m up:
+    // its view sees along it, a point halfway nearer than the end.
+    const glm::vec3 low(-10.0f, -10.0f, 0.0f);
+    const glm::vec3 high(10.0f, 10.0f, 10.0f);
+    LightParams laser;
+    laser.type = LightType::Laser;
+    const glm::vec3 position(-10.0f, 0.0f, 10.0f);
+    laser.position = position;
+    laser.direction = glm::normalize(glm::vec3(1.0f, 0.0f, -1.0f));
+    laser.beam.waist = glm::vec2(0.001f);
+    laser.beam.rayleigh = glm::vec2(5.0f);
+    const std::vector<ShadowCascade> views =
+        ernie::FitLightShadowViews(laser, position, low, high, 512);
+    ASSERT_EQ(views.size(), 1u);
+    const glm::vec3 halfway(-5.0f, 0.0f, 5.0f);
+    const glm::vec3 end(0.0f, 0.0f, 0.0f);
+    EXPECT_TRUE(Sees(views[0], halfway));
+    EXPECT_TRUE(Sees(views[0], end));
+    EXPECT_FALSE(Sees(views[0], {0.0f, 1.0f, 0.0f}))
+        << "a metre off the beam";
+    const auto depth = [&](const glm::vec3& p) {
+        const glm::vec4 clip =
+            views[0].lightViewProjection * glm::vec4(p, 1.0f);
+        return clip.z / clip.w;
+    };
+    EXPECT_LT(depth(halfway), depth(end));
+}
