@@ -1,4 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
+// Vulkan's Win32 types, for memory and semaphores exported to CUDA as Win32 handles: here only, as
+// they bring in <windows.h> and its macros.
+#if defined(_WIN32)
+#define VK_USE_PLATFORM_WIN32_KHR
+#endif
+
 #include "ernie/device/vulkan_context.h"
 
 #include "ernie/device/gpu_profile.h"
@@ -409,15 +415,11 @@ std::unique_ptr<VulkanContext> VulkanContext::Create(const VulkanContextOptions&
         vkGetDeviceProcAddr(c.device_, "vkCmdPushDescriptorSetKHR"));
     if (externalMemory) {
 #if defined(_WIN32)
-        c.exportMemory_ = reinterpret_cast<PFN_vkGetMemoryWin32HandleKHR>(
-            vkGetDeviceProcAddr(c.device_, "vkGetMemoryWin32HandleKHR"));
-        c.exportSemaphore_ = reinterpret_cast<PFN_vkGetSemaphoreWin32HandleKHR>(
-            vkGetDeviceProcAddr(c.device_, "vkGetSemaphoreWin32HandleKHR"));
+        c.exportMemory_ = vkGetDeviceProcAddr(c.device_, "vkGetMemoryWin32HandleKHR");
+        c.exportSemaphore_ = vkGetDeviceProcAddr(c.device_, "vkGetSemaphoreWin32HandleKHR");
 #else
-        c.exportMemory_ = reinterpret_cast<PFN_vkGetMemoryFdKHR>(
-            vkGetDeviceProcAddr(c.device_, "vkGetMemoryFdKHR"));
-        c.exportSemaphore_ = reinterpret_cast<PFN_vkGetSemaphoreFdKHR>(
-            vkGetDeviceProcAddr(c.device_, "vkGetSemaphoreFdKHR"));
+        c.exportMemory_ = vkGetDeviceProcAddr(c.device_, "vkGetMemoryFdKHR");
+        c.exportSemaphore_ = vkGetDeviceProcAddr(c.device_, "vkGetSemaphoreFdKHR");
 #endif
     }
 
@@ -547,14 +549,16 @@ ExternalHandle VulkanContext::ExportMemory(VkDeviceMemory memory) const {
     info.memory = memory;
     info.handleType = kExternalMemoryHandleType;
     HANDLE handle = nullptr;
-    CheckVk(exportMemory_(device_, &info, &handle), "vkGetMemoryWin32HandleKHR");
+    const auto exportMemory = reinterpret_cast<PFN_vkGetMemoryWin32HandleKHR>(exportMemory_);
+    CheckVk(exportMemory(device_, &info, &handle), "vkGetMemoryWin32HandleKHR");
     return handle;
 #else
     VkMemoryGetFdInfoKHR info{VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR};
     info.memory = memory;
     info.handleType = kExternalMemoryHandleType;
     int fd = -1;
-    CheckVk(exportMemory_(device_, &info, &fd), "vkGetMemoryFdKHR");
+    const auto exportMemory = reinterpret_cast<PFN_vkGetMemoryFdKHR>(exportMemory_);
+    CheckVk(exportMemory(device_, &info, &fd), "vkGetMemoryFdKHR");
     return fd;
 #endif
 }
@@ -568,14 +572,17 @@ ExternalHandle VulkanContext::ExportSemaphore(VkSemaphore semaphore) const {
     info.semaphore = semaphore;
     info.handleType = kExternalSemaphoreHandleType;
     HANDLE handle = nullptr;
-    CheckVk(exportSemaphore_(device_, &info, &handle), "vkGetSemaphoreWin32HandleKHR");
+    const auto exportSemaphore =
+        reinterpret_cast<PFN_vkGetSemaphoreWin32HandleKHR>(exportSemaphore_);
+    CheckVk(exportSemaphore(device_, &info, &handle), "vkGetSemaphoreWin32HandleKHR");
     return handle;
 #else
     VkSemaphoreGetFdInfoKHR info{VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR};
     info.semaphore = semaphore;
     info.handleType = kExternalSemaphoreHandleType;
     int fd = -1;
-    CheckVk(exportSemaphore_(device_, &info, &fd), "vkGetSemaphoreFdKHR");
+    const auto exportSemaphore = reinterpret_cast<PFN_vkGetSemaphoreFdKHR>(exportSemaphore_);
+    CheckVk(exportSemaphore(device_, &info, &fd), "vkGetSemaphoreFdKHR");
     return fd;
 #endif
 }

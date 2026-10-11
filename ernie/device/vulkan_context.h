@@ -234,13 +234,10 @@ class VulkanContext {
     VkCommandPool commandPool_ = VK_NULL_HANDLE;
     PFN_vkDestroyDebugUtilsMessengerEXT destroyMessenger_ = nullptr;
     PFN_vkCmdPushDescriptorSetKHR pushDescriptorSet_ = nullptr;
-#if defined(_WIN32)
-    PFN_vkGetMemoryWin32HandleKHR exportMemory_ = nullptr;
-    PFN_vkGetSemaphoreWin32HandleKHR exportSemaphore_ = nullptr;
-#else
-    PFN_vkGetMemoryFdKHR exportMemory_ = nullptr;
-    PFN_vkGetSemaphoreFdKHR exportSemaphore_ = nullptr;
-#endif
+    // vkGetMemoryFdKHR and vkGetSemaphoreFdKHR, or their Win32 counterparts on Windows: kept as
+    // void functions so this header needs no Win32 types (and no <windows.h>).
+    PFN_vkVoidFunction exportMemory_ = nullptr;
+    PFN_vkVoidFunction exportSemaphore_ = nullptr;
     std::string deviceName_;
     std::array<std::uint8_t, VK_UUID_SIZE> deviceUuid_{};
     VkPhysicalDeviceLimits limits_{};

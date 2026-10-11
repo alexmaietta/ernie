@@ -18,12 +18,8 @@ FetchContent_MakeAvailable(volk)
 add_library(ernie_volk STATIC "${volk_SOURCE_DIR}/volk.c")
 target_include_directories(ernie_volk SYSTEM PUBLIC "${volk_SOURCE_DIR}")
 target_compile_definitions(ernie_volk PUBLIC VK_NO_PROTOTYPES)
-if(WIN32)
-    # Vulkan's Win32 types and entry points (VK_KHR_external_memory_win32 and
-    # VK_KHR_external_semaphore_win32, for CUDA interop), which bring in <windows.h>: lean, and
-    # without its min and max macros.
-    target_compile_definitions(ernie_volk PUBLIC VK_USE_PLATFORM_WIN32_KHR WIN32_LEAN_AND_MEAN
-                                                 NOMINMAX)
-endif()
+# No VK_USE_PLATFORM_WIN32_KHR here: it would bring <windows.h> and its macros (near, far,
+# LoadImage...) into every file using Vulkan. The few files needing Win32 types define it themselves
+# (vulkan_context.cpp, for CUDA interop's handles).
 target_link_libraries(ernie_volk PUBLIC ernie_vulkan_headers ${CMAKE_DL_LIBS})
 set_target_properties(ernie_volk PROPERTIES POSITION_INDEPENDENT_CODE ON)
