@@ -3342,7 +3342,9 @@ void RasterRenderer::WriteSensor(const FrameParams& params,
     }
     // The sensor filters the output views, reading the G-buffer of
     // their last sub-frame (`params` holds a view per sub-frame and
-    // output view).
+    // output view). Every view's uniforms go up in one upload.
+    std::vector<SensorUniforms> sensors;
+    sensors.reserve(outputViews_);
     for (std::uint32_t v = 0; v < outputViews_; ++v) {
         const std::uint32_t last =
             (subframes_ - 1) * outputViews_ + v;
@@ -3390,10 +3392,10 @@ void RasterRenderer::WriteSensor(const FrameParams& params,
         sensor.noise[2] =
             FrameSeed(model.seed, params.stream ^ (v * 0x9E3779B9u),
                       params.frame);
-        uploads_.Write(sensorUniforms_,
-                       std::as_bytes(std::span(&sensor, 1)),
-                       v * kSensorStride);
+        sensors.push_back(sensor);
     }
+    uploads_.Write(sensorUniforms_,
+                   std::as_bytes(std::span(sensors)));
 }
 
 void RasterRenderer::WriteMotion(const FrameParams& params,
