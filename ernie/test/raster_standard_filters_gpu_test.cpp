@@ -4,6 +4,7 @@
 #include "ernie/scene/camera.h"
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/geometry_schemas.h"
+#include "ernie/scene/light_schemas.h"
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/terrain_schemas.h"
@@ -921,6 +922,40 @@ TEST_F(
         EXPECT_NEAR(where.x, expected.x, 0.3) << scale;
         EXPECT_NEAR(where.y, expected.y, 0.3) << scale;
     }
+}
+
+TEST_F(RasterDelegateTest, StrayLightComesFromEveryDistantLight) {
+    // The sun straight behind the camera gives none; another distant
+    // light as bright, 60 degrees off the axis to the right, gives the
+    // veil the sun would there (as below).
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    const ernie::DistantLight sun(scene, "/World/Sun");
+    ernie::DistantLight::Define(scene, "/World/Tilted")
+        .SetIntensity(sun.GetIntensity())
+        .SetShadowEnable(false);
+    const double theta = glm::radians(60.0);
+    scene.Set("/World/Tilted", tokens::kTransform,
+              ernie::DistantLightTransform(
+                  {std::sin(theta), 0.0, -std::cos(theta)}));
+    const ernie::CameraParams camera =
+        ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize);
+    const double perPst =
+        4.0 * camera.fStop * camera.fStop / camera.lens.transmission;
+    const auto lit =
+        VarThrough(delegate, scene, "HdrColor", {{"cie", kNone}});
+    const auto veiled = VarThrough(
+        delegate, scene, "HdrColor",
+        {{"strayLight", {{"strength", 1e-3f}, {"gradient", 0.0f}}},
+         {"cie", kNone}});
+    const auto luminance = [](const std::vector<float>& image) {
+        const float* rgb =
+            &image[(kSize / 2 * kSize + kSize / 2) * 4];
+        return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+    };
+    const double expected = perPst * 1e-3 * std::pow(6.0, -2.0);
+    EXPECT_NEAR(luminance(veiled) - luminance(lit), expected,
+                0.02 * expected);
 }
 
 TEST_F(

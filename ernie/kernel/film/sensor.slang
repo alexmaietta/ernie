@@ -47,6 +47,9 @@ import projection;
 
 static const uint kBackground = 0xFFFFFFFF;
 
+// Distant lights besides the sun whose stray light the sensor adds (renderer.cpp's).
+public static const uint kStraySources = 3;
+
 public struct SensorUniforms {
     public float4x4 invViewProj;
     // xyz: camera position.
@@ -99,14 +102,19 @@ public struct SensorUniforms {
     // A pushbroom's (`kPushbroomCamera`) lens: Brown-Conrady p1 and p2 (its k1 to k3 and line's
     // normalised y are `distortion`'s); zw unused.
     public float4 pushbroom;
-    float4 facesPadding[9];
+    // Other distant lights for stray light, as `sun` (`PixelContext.sourceInCamera`).
+    public float4 sources[kStraySources];
+    float4 facesPadding[6];
     // Per band, two to a float4 (`chromaticOf`): the lens's image scale (lateral colour) and focal
     // length shift in millimetres (axial colour).
     public float4 chromatic[32];
     // Per band, four to a float4: the radiance whose image puts the sun's irradiance at normal
     // incidence on the focal plane, E_sun 4 N^2 / (pi T) (`PixelContext.sunFocalRadiance`); 0
-    // without the sun. The views' stride in the buffer is 3584 bytes.
+    // without the sun.
     public float4 sunRadiance[16];
+    // Per band, the other distant lights' as `sunRadiance`, 16 float4 each
+    // (`PixelContext.sourceFocalRadiance`). The views' stride in the buffer is 4352 bytes.
+    public float4 sourceRadiance[16 * kStraySources];
 }
 
 // Band `band`'s image scale (x) and focal length shift in millimetres (y) through `cam`'s lens.
@@ -255,6 +263,13 @@ public struct PixelContext {
     }
     public float sunFocalRadiance(uint band) {
         return sensorViews[view].sunRadiance[band / 4][band % 4];
+    }
+    // Other distant light `source` (below `kStraySources`), as the sun above; w 0 for none.
+    public float4 sourceInCamera(uint source) {
+        return sensorViews[view].sources[source];
+    }
+    public float sourceFocalRadiance(uint source, uint band) {
+        return sensorViews[view].sourceRadiance[16 * source + band / 4][band % 4];
     }
 
     // Photons collected over the exposure per unit spectral radiance in band `band` (the camera

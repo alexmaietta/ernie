@@ -1421,7 +1421,13 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             }
         }
         for (uint k = 0; k < lightCount; ++k) {
-            if (lightScales[k] <= 0.0) {
+            // A distant light lights by the ambient fraction from all around, as the sun does,
+            // and by the rest from its direction; a dome's directions, its diffuse light, not.
+            let ambientShare = ((sh.view.x >> k) & 1u) != 0 && lights[k].position.w == 0.0 &&
+                                       lights[k].shadow.y < 0.5
+                                   ? ambient
+                                   : 0.0;
+            if (lightScales[k] <= 0.0 && ambientShare <= 0.0) {
                 continue;
             }
             float3 lightSpectrum;
@@ -1433,11 +1439,18 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             // A dome's direction stands for its diffuse light alone: the model's diffuse
             // response to surrounding light times cos(i), as a Lambertian radiance factor (the
             // dome keeps its specular light).
+            if (ambientShare > 0.0) {
+                let uniform = environment.diffuse + environment.specular0 + environment.specular1;
+                radiance += ambientShare * occlusion * lightSpectrum / PI * uniform;
+            }
+            if (lightScales[k] <= 0.0) {
+                continue;
+            }
             let factors =
                 lights[k].shadow.y > 0.5
                     ? environment.diffuse * max(dot(n, lightDirections[k]), 0.0)
                     : radianceFactors(n, lightDirections[k], v, bandAlbedo, slopeVariance, params);
-            radiance += lightScales[k] * lightSpectrum / PI * factors;
+            radiance += (1.0 - ambientShare) * lightScales[k] * lightSpectrum / PI * factors;
         }
         // Through the air to the eye: dimmed, with the sun's light it scatters on the way.
         for (uint k = 0; k < 3 && first + k < bands; ++k) {

@@ -11,7 +11,8 @@
 // radiance PST(theta) times `PixelContext.sunFocalRadiance` (the camera equation inverted), added
 // to each band across the image: its mean, times a linear ramp towards the side of the image
 // nearest the sun, 1 at the centre and 1 + `gradient` half a diagonal away towards the sun (1 -
-// `gradient` away from it).
+// `gradient` away from it). Every other distant light (Earthshine, a second star) adds a veil of
+// its own the same way, by its own angle and irradiance.
 //
 // PST(theta) = strength (theta / angle)^-slope, held below `angle`; or, when `angles` (degrees)
 // increase, strength times 10^`logValues` at theta, linear in log PST between them and held
@@ -72,28 +73,44 @@ struct StrayLight : IBandFilter {
         return params.strength * exp2(logPst * 3.32192809);
     }
 
-    static float apply(float radiance, uint band, PixelContext pixel, Params params) {
-        let sun = pixel.sunInCamera();
-        if (sun.w < 0.5 || params.strength == 0.0) {
-            return radiance;
+    // The veil of one source: `source` its direction in the camera's frame (w 1 when it lights
+    // the frame), `focal` its focal radiance in this band.
+    static float veil(float4 source, float focal, PixelContext pixel, Params params) {
+        if (source.w < 0.5 || focal == 0.0) {
+            return 0.0;
         }
         let cam = pixel.uniforms();
         let size = float2(cam.size.xy);
-        // The sun's place in the pinhole image, from the principal point.
-        let ahead = -sun.z;
-        let image = cam.intrinsics.x * float2(sun.x, -sun.y) / max(ahead, 1e-6);
+        // The source's place in the pinhole image, from the principal point.
+        let ahead = -source.z;
+        let image = cam.intrinsics.x * float2(source.x, -source.y) / max(ahead, 1e-6);
         let spot = cam.intrinsics.yz + image;
         if (params.inField < 0.5 && ahead > 0.0 && all(spot >= float2(0.0)) &&
             all(spot <= size)) {
-            return radiance;
+            return 0.0;
         }
         let theta = degrees(acos(clamp(ahead, -1.0, 1.0)));
-        // Towards the sun across the image (y down), from the image's centre.
-        let side = float2(sun.x, -sun.y);
+        // Towards the source across the image (y down), from the image's centre.
+        let side = float2(source.x, -source.y);
         let towards = length(side) > 1e-6 ? normalize(side) : float2(0.0);
         let offset = float2(pixel.id.xy) + 0.5 - 0.5 * size;
         let ramp = dot(offset, towards) / max(0.5 * length(size), 1.0);
         let profile = 1.0 + saturate(params.gradient) * ramp;
-        return radiance + pst(theta, params) * profile * pixel.sunFocalRadiance(band);
+        return pst(theta, params) * profile * focal;
+    }
+
+    // The sun's veil and every other distant light's (`PixelContext.sourceInCamera`), each by
+    // its own angle off the axis.
+    static float apply(float radiance, uint band, PixelContext pixel, Params params) {
+        if (params.strength == 0.0) {
+            return radiance;
+        }
+        var veiled = radiance +
+                     veil(pixel.sunInCamera(), pixel.sunFocalRadiance(band), pixel, params);
+        for (uint s = 0; s < kStraySources; ++s) {
+            veiled += veil(pixel.sourceInCamera(s), pixel.sourceFocalRadiance(s, band), pixel,
+                           params);
+        }
+        return veiled;
     }
 }

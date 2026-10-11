@@ -264,6 +264,41 @@ TEST_F(RasterDelegateTest, OtherDistantLightsAddToTheSun) {
         << "cascades over the view, as the sun's";
 }
 
+TEST_F(RasterDelegateTest, EveryDistantLightGivesTheAmbientFraction) {
+    // A distant light's ambient fraction lights from all around, as
+    // the sun's: below the horizon, the floor by it alone, the same
+    // from the sun or another distant light.
+    const auto floor = [&](bool sun, glm::dvec3 towards,
+                           double ambient) {
+        Scene scene = FlatScene();
+        ernie::RenderSettings(scene, "/Render/Settings")
+            .SetAmbient(ambient);
+        const char* path = sun ? "/World/Sun" : "/World/Tilted";
+        if (!sun) {
+            ernie::DistantLight(scene, "/World/Sun").SetIntensity(0.0);
+            ernie::DistantLight::Define(scene, path)
+                .SetShadowEnable(false);
+        }
+        scene.Set(path, tokens::kTransform,
+                  ernie::DistantLightTransform(towards));
+        RasterDelegate delegate(*context_);
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const std::size_t c = kVarSize / 2;
+        return At<float>(MapVars(outputs).at("HdrColor"), c, c, 1);
+    };
+    const glm::dvec3 below(0.0, 0.0, -1.0);
+    const float bySun = floor(true, below, 0.5);
+    ASSERT_GT(bySun, 0.0f);
+    EXPECT_NEAR(floor(false, below, 0.5), bySun, 0.03f * bySun)
+        << "another distant light's ambient fraction";
+    // Overhead, the fraction moves the light around but keeps it: a
+    // Lambertian floor's alike.
+    const glm::dvec3 above(0.0, 0.0, 1.0);
+    const float direct = floor(false, above, 0.0);
+    EXPECT_NEAR(floor(false, above, 0.5), direct, 0.03f * direct)
+        << "half from all around, half from above";
+}
+
 TEST_F(RasterDelegateTest, TheSunAndAnotherDistantLightBothCastShadows) {
     // A blocker 10 up over the origin, under the sun 30 degrees from
     // the zenith towards +x and Earthshine from 45 degrees towards -x:

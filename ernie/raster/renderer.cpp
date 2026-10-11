@@ -219,6 +219,10 @@ static_assert(sizeof(MaterialGpu) == 592,
 /// spectrum's shape is flat.
 constexpr float kBlackLuminance = 1e-6f;
 
+/// Distant lights besides the sun whose stray light the sensor adds
+/// (sensor.slang's `kStraySources`).
+constexpr std::size_t kStraySources = 3;
+
 struct SensorUniforms {
     float invViewProj[16];
     float eye[4];
@@ -253,7 +257,11 @@ struct SensorUniforms {
     /// A pushbroom's lens: Brown-Conrady p1 and p2 (its k1 to k3 and
     /// line in `distortion`).
     float pushbroom[4];
-    float facesPadding[36];
+    /// Other distant lights for stray light, as `sun`: the unit
+    /// direction towards each in the view's camera frame; w 1 when it
+    /// lights the frame.
+    float sources[kStraySources][4];
+    float facesPadding[24];
     /// Per band, two to a float4: the lens's image scale (lateral
     /// colour) and focal length shift in millimetres (axial colour);
     /// 1 and 0 without chromatic aberration.
@@ -262,8 +270,10 @@ struct SensorUniforms {
     /// at normal incidence on the focal plane, E_sun 4 N^2 / (pi T),
     /// for stray light; 0 without the sun.
     float sunRadiance[SpectralBands::kMaxBands];
+    /// Per band, the other distant lights' as `sunRadiance`.
+    float sourceRadiance[kStraySources][SpectralBands::kMaxBands];
 };
-static_assert(sizeof(SensorUniforms) == 3584,
+static_assert(sizeof(SensorUniforms) == 4352,
               "SensorUniforms must match sensor.slang");
 
 /// Per-view uniforms sit in one buffer at multiples of this, the
@@ -2937,6 +2947,27 @@ void RasterRenderer::WriteSensor(const FrameParams& params,
             static_cast<float>(irradiance / focal);
     }
     sensor.sun[3] = params.sun ? 1.0f : 0.0f;
+    // Other distant lights' stray light, as the sun's: the first few,
+    // not a dome's directions (its diffuse light).
+    std::vector<const LightParams*> sources;
+    for (const LightParams& light : params.lights) {
+        if (light.type == LightType::Distant && !light.domeDiffuse &&
+            sources.size() < kStraySources) {
+            sources.push_back(&light);
+        }
+    }
+    for (std::size_t s = 0; s < sources.size(); ++s) {
+        const std::vector<float>& spectrum = sources[s]->spectrum;
+        for (int i = 0; i < bands_.count &&
+                        i < static_cast<int>(spectrum.size()) &&
+                        focal > 0.0 && std::isfinite(focal);
+             ++i) {
+            sensor.sourceRadiance[s][i] = static_cast<float>(
+                static_cast<double>(spectrum[static_cast<std::size_t>(i)]) /
+                focal);
+        }
+        sensor.sources[s][3] = 1.0f;
+    }
     sensor.faces[0] = static_cast<float>(faces_);
     if (faces_ > 1) {
         const glm::dvec3 face = FrameParams::FaceIntrinsics(
@@ -2982,6 +3013,16 @@ void RasterRenderer::WriteSensor(const FrameParams& params,
         sensor.sun[0] = towards.x;
         sensor.sun[1] = towards.y;
         sensor.sun[2] = towards.z;
+        for (std::size_t s = 0; s < sources.size(); ++s) {
+            const glm::vec3 source =
+                glm::mat3(view.view) * sources[s]->direction;
+            const glm::vec3 unit = glm::length(source) > 0.0f
+                                       ? glm::normalize(source)
+                                       : source;
+            sensor.sources[s][0] = unit.x;
+            sensor.sources[s][1] = unit.y;
+            sensor.sources[s][2] = unit.z;
+        }
         // Every view of a batch has noise of its own; view 0's is the
         // single view's.
         sensor.noise[2] =
