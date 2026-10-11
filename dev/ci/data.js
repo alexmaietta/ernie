@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791702353754,
+  "lastUpdate": 1791703182631,
   "repoUrl": "https://github.com/alexmaietta/ernie",
   "entries": {
     "CI": [
@@ -4077,6 +4077,203 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-gcc-3: ccache miss rate",
             "value": 30.06,
+            "unit": "%"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "committer": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "id": "88e39bb84c909f2c58a50587a8e619baf9089ef4",
+          "message": "Format job fixes, and lavapipe registered for the Windows wheel test",
+          "timestamp": "2026-10-11T07:13:59Z",
+          "url": "https://github.com/alexmaietta/ernie/commit/88e39bb84c909f2c58a50587a8e619baf9089ef4"
+        },
+        "date": 1791703180689,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "CI: wall time",
+            "value": 5.35,
+            "unit": "min"
+          },
+          {
+            "name": "build (macos-15): job",
+            "value": 2.23,
+            "unit": "min"
+          },
+          {
+            "name": "build (macos-15): Build",
+            "value": 1.6,
+            "unit": "min"
+          },
+          {
+            "name": "version: job",
+            "value": 0.08,
+            "unit": "min"
+          },
+          {
+            "name": "packages: job",
+            "value": 4.4,
+            "unit": "min"
+          },
+          {
+            "name": "packages: Build the packages",
+            "value": 3.3,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (macos-arm64): job",
+            "value": 4.57,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (macos-arm64): wheel build",
+            "value": 4.38,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: job",
+            "value": 0.15,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: Build and check the sdist",
+            "value": 0.03,
+            "unit": "min"
+          },
+          {
+            "name": "build-macos-15: compile time",
+            "value": 6.08,
+            "unit": "min"
+          },
+          {
+            "name": "build-macos-15: compiles",
+            "value": 476,
+            "unit": "files"
+          },
+          {
+            "name": "build-windows-2025: compile time",
+            "value": 13,
+            "unit": "min"
+          },
+          {
+            "name": "build-windows-2025: compiles",
+            "value": 387,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-1: compile time",
+            "value": 8.94,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-1: compiles",
+            "value": 402,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-1: ccache miss rate",
+            "value": 16.96,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-2: compile time",
+            "value": 14.54,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-2: compiles",
+            "value": 402,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-2: ccache miss rate",
+            "value": 16.96,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-3: compile time",
+            "value": 11.72,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-3: compiles",
+            "value": 402,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-3: ccache miss rate",
+            "value": 16.96,
+            "unit": "%"
+          },
+          {
+            "name": "test-clang: compile time",
+            "value": 12.34,
+            "unit": "min"
+          },
+          {
+            "name": "test-clang: compiles",
+            "value": 500,
+            "unit": "files"
+          },
+          {
+            "name": "test-clang: ccache miss rate",
+            "value": 21.44,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-1: compile time",
+            "value": 17.45,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-1: compiles",
+            "value": 482,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-1: ccache miss rate",
+            "value": 30.77,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-2: compile time",
+            "value": 16.09,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-2: compiles",
+            "value": 500,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-2: ccache miss rate",
+            "value": 32.87,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-3: compile time",
+            "value": 12.56,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-3: compiles",
+            "value": 500,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-3: ccache miss rate",
+            "value": 33.27,
             "unit": "%"
           }
         ]
