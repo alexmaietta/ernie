@@ -20,7 +20,7 @@ GpuBuffer::GpuBuffer(const VulkanContext& context, VkDeviceSize size, VkBufferUs
         }
         VkExternalMemoryBufferCreateInfo external{
             VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO};
-        external.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+        external.handleTypes = kExternalMemoryHandleType;
         info.pNext = &external;
         CheckVk(vkCreateBuffer(context.Device(), &info, nullptr, &buffer_), "vkCreateBuffer");
         VkMemoryRequirements requirements{};
@@ -28,7 +28,7 @@ GpuBuffer::GpuBuffer(const VulkanContext& context, VkDeviceSize size, VkBufferUs
         VkMemoryDedicatedAllocateInfo dedicated{VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO};
         dedicated.buffer = buffer_;
         VkExportMemoryAllocateInfo exported{VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO};
-        exported.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+        exported.handleTypes = kExternalMemoryHandleType;
         exported.pNext = &dedicated;
         VkMemoryAllocateInfo allocate{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
         allocate.pNext = &exported;
@@ -119,16 +119,11 @@ void GpuBuffer::Release() {
     }
 }
 
-int GpuBuffer::ExportFd() const {
+ExternalHandle GpuBuffer::ExportHandle() const {
     if (sharedMemory_ == VK_NULL_HANDLE) {
         throw std::logic_error("Only shared buffers export their memory");
     }
-    VkMemoryGetFdInfoKHR info{VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR};
-    info.memory = sharedMemory_;
-    info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
-    int fd = -1;
-    CheckVk(context_->GetMemoryFd()(context_->Device(), &info, &fd), "vkGetMemoryFdKHR");
-    return fd;
+    return context_->ExportMemory(sharedMemory_);
 }
 
 void GpuBuffer::Write(std::span<const std::byte> bytes, VkDeviceSize offset) {

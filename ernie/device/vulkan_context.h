@@ -17,6 +17,26 @@
 
 namespace ernie {
 
+/// Memory or a semaphore exported for another API, such as CUDA: a POSIX file descriptor, or a
+/// Win32 NT handle on Windows.
+#if defined(_WIN32)
+using ExternalHandle = void*;
+inline constexpr VkExternalMemoryHandleTypeFlagBits kExternalMemoryHandleType =
+    VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+inline constexpr VkExternalSemaphoreHandleTypeFlagBits kExternalSemaphoreHandleType =
+    VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+#else
+using ExternalHandle = int;
+inline constexpr VkExternalMemoryHandleTypeFlagBits kExternalMemoryHandleType =
+    VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+inline constexpr VkExternalSemaphoreHandleTypeFlagBits kExternalSemaphoreHandleType =
+    VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
+#endif
+
+/// Closes an exported handle its importer did not take: a file descriptor an import failed with,
+/// or any Win32 handle (CUDA imports them without taking ownership).
+void CloseExternalHandle(ExternalHandle handle);
+
 /// Options for `VulkanContext::Create`.
 struct VulkanContextOptions {
     /// Enable the Khronos validation layer when it is installed; its messages are collected (see
@@ -116,21 +136,22 @@ class VulkanContext {
         return multiDrawIndirect_;
     }
 
-    /// Whether buffers can be allocated with `BufferMemory::Shared`: memory exported as POSIX file
-    /// descriptors (VK_KHR_external_memory_fd), for CUDA interop.
+    /// Whether buffers can be allocated with `BufferMemory::Shared`: memory and semaphores exported
+    /// for CUDA interop, as POSIX file descriptors (VK_KHR_external_memory_fd and
+    /// VK_KHR_external_semaphore_fd) or, on Windows, Win32 handles (their _win32 counterparts).
     bool SupportsExternalMemory() const {
-        return getMemoryFd_ != nullptr;
+        return exportMemory_ != nullptr && exportSemaphore_ != nullptr;
     }
 
-    /// `vkGetMemoryFdKHR` for this device, or null without external memory support.
-    PFN_vkGetMemoryFdKHR GetMemoryFd() const {
-        return getMemoryFd_;
-    }
+    /// A new handle to `memory`, allocated exportable as `kExternalMemoryHandleType`, which the
+    /// importer takes (`CloseExternalHandle`).
+    /// @throws std::runtime_error without `SupportsExternalMemory`, or if the export fails.
+    ExternalHandle ExportMemory(VkDeviceMemory memory) const;
 
-    /// `vkGetSemaphoreFdKHR` for this device, or null without external memory support.
-    PFN_vkGetSemaphoreFdKHR GetSemaphoreFd() const {
-        return getSemaphoreFd_;
-    }
+    /// A new handle to `semaphore`, created exportable (`CreateTimelineSemaphore`), as
+    /// `ExportMemory`.
+    /// @throws std::runtime_error as `ExportMemory`.
+    ExternalHandle ExportSemaphore(VkSemaphore semaphore) const;
 
     /// The index of a device-local memory type among `typeBits`.
     /// @throws std::runtime_error if there is none.
@@ -213,8 +234,13 @@ class VulkanContext {
     VkCommandPool commandPool_ = VK_NULL_HANDLE;
     PFN_vkDestroyDebugUtilsMessengerEXT destroyMessenger_ = nullptr;
     PFN_vkCmdPushDescriptorSetKHR pushDescriptorSet_ = nullptr;
-    PFN_vkGetMemoryFdKHR getMemoryFd_ = nullptr;
-    PFN_vkGetSemaphoreFdKHR getSemaphoreFd_ = nullptr;
+#if defined(_WIN32)
+    PFN_vkGetMemoryWin32HandleKHR exportMemory_ = nullptr;
+    PFN_vkGetSemaphoreWin32HandleKHR exportSemaphore_ = nullptr;
+#else
+    PFN_vkGetMemoryFdKHR exportMemory_ = nullptr;
+    PFN_vkGetSemaphoreFdKHR exportSemaphore_ = nullptr;
+#endif
     std::string deviceName_;
     std::array<std::uint8_t, VK_UUID_SIZE> deviceUuid_{};
     VkPhysicalDeviceLimits limits_{};

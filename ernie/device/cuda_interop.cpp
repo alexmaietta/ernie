@@ -4,28 +4,9 @@
 #include "ernie/util/profile.h"
 
 #if defined(_WIN32)
-// CUDA interop shares memory and semaphores as POSIX file descriptors; on Windows it would take
-// Win32 handles (VK_KHR_external_memory_win32). Until then Create reports it unavailable there, and
-// these stand-ins for the POSIX loader keep the rest compiling.
-namespace {
-constexpr int RTLD_NOW = 0;
-constexpr int RTLD_LOCAL = 0;
-void* dlopen(const char* /*path*/, int /*flags*/) {
-    return nullptr;
-}
-void* dlsym(void* /*library*/, const char* /*name*/) {
-    return nullptr;
-}
-int dlclose(void* /*library*/) {
-    return 0;
-}
-int close(int /*fd*/) {
-    return 0;
-}
-}  // namespace
+#include <windows.h>
 #else
 #include <dlfcn.h>
-#include <unistd.h>
 #endif
 
 #include <algorithm>
@@ -197,8 +178,37 @@ static_assert(sizeof(ExternalSemaphoreWaitParams) == 144,
               "Must match CUDA_EXTERNAL_SEMAPHORE_WAIT_PARAMS");
 
 constexpr Result kSuccess = 0;
-constexpr int kSemaphoreTimelineFd = 9;
-constexpr int kHandleTypeOpaqueFd = 1;
+// The handle types Vulkan exports here (ExternalHandle): CU_EXTERNAL_SEMAPHORE_HANDLE_TYPE_
+// TIMELINE_SEMAPHORE_WIN32 and CU_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32 on Windows, their _FD
+// counterparts elsewhere.
+#if defined(_WIN32)
+constexpr int kSemaphoreTimeline = 10;
+constexpr int kMemoryOpaque = 2;
+#else
+constexpr int kSemaphoreTimeline = 9;
+constexpr int kMemoryOpaque = 1;
+#endif
+
+/// Puts an exported handle in a CUDA handle description's union.
+template <typename Desc> void SetHandle(Desc& desc, ExternalHandle handle) {
+#if defined(_WIN32)
+    desc.handle.win32.handle = handle;
+#else
+    desc.handle.fd = handle;
+#endif
+}
+
+/// After an import: CUDA owns a file descriptor it imported, but never a Win32 handle.
+void ReleaseAfterImport(ExternalHandle handle, bool imported) {
+#if defined(_WIN32)
+    (void)imported;
+    CloseExternalHandle(handle);
+#else
+    if (!imported) {
+        CloseExternalHandle(handle);
+    }
+#endif
+}
 constexpr unsigned int kDedicated = 1;
 const Stream kLegacyStream = reinterpret_cast<Stream>(0x1);
 constexpr unsigned int kEventDisableTiming = 0x2;
@@ -243,8 +253,33 @@ struct Driver {
 
 }  // namespace cu
 
+// The CUDA driver, loaded at run time: nvcuda.dll on Windows, libcuda.so.1 elsewhere.
+#if defined(_WIN32)
+constexpr const char* kCudaDriver = "nvcuda.dll";
+void* OpenLibrary(const char* name) {
+    return reinterpret_cast<void*>(LoadLibraryA(name));
+}
+void* LibrarySymbol(void* library, const char* name) {
+    return reinterpret_cast<void*>(GetProcAddress(static_cast<HMODULE>(library), name));
+}
+void CloseLibrary(void* library) {
+    FreeLibrary(static_cast<HMODULE>(library));
+}
+#else
+constexpr const char* kCudaDriver = "libcuda.so.1";
+void* OpenLibrary(const char* name) {
+    return dlopen(name, RTLD_NOW | RTLD_LOCAL);
+}
+void* LibrarySymbol(void* library, const char* name) {
+    return dlsym(library, name);
+}
+void CloseLibrary(void* library) {
+    dlclose(library);
+}
+#endif
+
 template <typename Function> bool LoadSymbol(void* library, const char* name, Function& function) {
-    function = reinterpret_cast<Function>(dlsym(library, name));
+    function = reinterpret_cast<Function>(LibrarySymbol(library, name));
     return function != nullptr;
 }
 
@@ -300,7 +335,7 @@ struct CudaInterop::State {
             driver.primaryCtxRelease(device);
         }
         if (library != nullptr) {
-            dlclose(library);
+            CloseLibrary(library);
         }
     }
 
@@ -360,17 +395,13 @@ std::unique_ptr<CudaInterop> CudaInterop::Create(const VulkanContext& context, s
         }
         return nullptr;
     };
-#if defined(_WIN32)
-    (void)context;
-    return fail("CUDA interop is not available on Windows yet");
-#endif
     if (!context.SupportsExternalMemory()) {
-        return fail("the Vulkan device cannot export memory (VK_KHR_external_memory_fd)");
+        return fail("the Vulkan device cannot export memory and semaphores to other APIs");
     }
     auto state = std::make_shared<State>();
-    state->library = dlopen("libcuda.so.1", RTLD_NOW | RTLD_LOCAL);
+    state->library = OpenLibrary(kCudaDriver);
     if (state->library == nullptr) {
-        return fail("the CUDA driver (libcuda.so.1) is not installed");
+        return fail(std::string("the CUDA driver (") + kCudaDriver + ") is not installed");
     }
     cu::Driver& d = state->driver;
     void* lib = state->library;
@@ -439,17 +470,13 @@ std::unique_ptr<CudaInterop> CudaInterop::Create(const VulkanContext& context, s
             for (const auto& [semaphore, imported] :
                  {std::pair(state->toVulkan, &state->toVulkanCuda),
                   std::pair(state->toCuda, &state->toCudaCuda)}) {
-                VkSemaphoreGetFdInfoKHR info{VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR};
-                info.semaphore = semaphore;
-                info.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
-                int fd = -1;
-                CheckVk(context.GetSemaphoreFd()(context.Device(), &info, &fd),
-                        "vkGetSemaphoreFdKHR");
+                const ExternalHandle exported = context.ExportSemaphore(semaphore);
                 cu::ExternalSemaphoreHandleDesc handle{};
-                handle.type = cu::kSemaphoreTimelineFd;
-                handle.handle.fd = fd;
-                if (d.importExternalSemaphore(imported, &handle) != cu::kSuccess) {
-                    close(fd);
+                handle.type = cu::kSemaphoreTimeline;
+                cu::SetHandle(handle, exported);
+                const bool ok = d.importExternalSemaphore(imported, &handle) == cu::kSuccess;
+                cu::ReleaseAfterImport(exported, ok);
+                if (!ok) {
                     return fail("CUDA cannot import Vulkan timeline semaphores");
                 }
             }
@@ -483,16 +510,15 @@ std::uint64_t CudaInterop::DevicePointer(GpuBuffer& buffer) {
     auto import = std::make_shared<Import>();
     import->state = state_;
     const State::Scope scope(*state_);
+    const ExternalHandle exported = buffer.ExportHandle();
     cu::ExternalMemoryHandleDesc handle{};
-    handle.type = cu::kHandleTypeOpaqueFd;
-    handle.handle.fd = buffer.ExportFd();
+    handle.type = cu::kMemoryOpaque;
+    cu::SetHandle(handle, exported);
     handle.size = buffer.AllocationSize();
     handle.flags = cu::kDedicated;
     const cu::Result result = state_->driver.importExternalMemory(&import->memory, &handle);
-    if (result != cu::kSuccess) {
-        close(handle.handle.fd);
-        state_->Check(result, "cuImportExternalMemory");
-    }
+    cu::ReleaseAfterImport(exported, result == cu::kSuccess);
+    state_->Check(result, "cuImportExternalMemory");
     cu::ExternalMemoryBufferDesc mapped{};
     mapped.size = buffer.Size();
     state_->Check(
@@ -560,16 +586,15 @@ CudaArrayView CudaInterop::MapImage(GpuImage& image) {
     auto import = std::make_shared<Import>();
     import->state = state_;
     const State::Scope scope(*state_);
+    const ExternalHandle exported = image.ExportHandle();
     cu::ExternalMemoryHandleDesc handle{};
-    handle.type = cu::kHandleTypeOpaqueFd;
-    handle.handle.fd = image.ExportFd();
+    handle.type = cu::kMemoryOpaque;
+    cu::SetHandle(handle, exported);
     handle.size = image.AllocationSize();
     handle.flags = cu::kDedicated;
     const cu::Result result = state_->driver.importExternalMemory(&import->memory, &handle);
-    if (result != cu::kSuccess) {
-        close(handle.handle.fd);
-        state_->Check(result, "cuImportExternalMemory");
-    }
+    cu::ReleaseAfterImport(exported, result == cu::kSuccess);
+    state_->Check(result, "cuImportExternalMemory");
     cu::ExternalMemoryMipmappedArrayDesc mapped{};
     mapped.arrayDesc.width = desc.width;
     mapped.arrayDesc.height = desc.height;

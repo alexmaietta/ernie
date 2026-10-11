@@ -12,8 +12,25 @@
 #if defined(__APPLE__)
 #include <dlfcn.h>
 #endif
+#if defined(_WIN32)
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 namespace ernie {
+
+void CloseExternalHandle(ExternalHandle handle) {
+#if defined(_WIN32)
+    if (handle != nullptr) {
+        CloseHandle(handle);
+    }
+#else
+    if (handle >= 0) {
+        close(handle);
+    }
+#endif
+}
 
 namespace {
 
@@ -291,11 +308,19 @@ std::unique_ptr<VulkanContext> VulkanContext::Create(const VulkanContextOptions&
     if (Has(deviceExtensions, "VK_KHR_portability_subset")) {
         enabled.push_back("VK_KHR_portability_subset");
     }
-    const bool externalMemory = Has(deviceExtensions, VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME) &&
-                                Has(deviceExtensions, VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
+    // Memory and semaphores shared with CUDA: as file descriptors, or Win32 handles on Windows.
+#if defined(_WIN32)
+    const char* const externalMemoryExtension = VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME;
+    const char* const externalSemaphoreExtension = VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME;
+#else
+    const char* const externalMemoryExtension = VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME;
+    const char* const externalSemaphoreExtension = VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME;
+#endif
+    const bool externalMemory = Has(deviceExtensions, externalMemoryExtension) &&
+                                Has(deviceExtensions, externalSemaphoreExtension);
     if (externalMemory) {
-        enabled.push_back(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
-        enabled.push_back(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
+        enabled.push_back(externalMemoryExtension);
+        enabled.push_back(externalSemaphoreExtension);
     }
 #if ERNIE_TRACY
     // Profiling builds put GPU zones on the CPU's timeline with calibrated timestamps.
@@ -383,10 +408,17 @@ std::unique_ptr<VulkanContext> VulkanContext::Create(const VulkanContextOptions&
     c.pushDescriptorSet_ = reinterpret_cast<PFN_vkCmdPushDescriptorSetKHR>(
         vkGetDeviceProcAddr(c.device_, "vkCmdPushDescriptorSetKHR"));
     if (externalMemory) {
-        c.getMemoryFd_ = reinterpret_cast<PFN_vkGetMemoryFdKHR>(
+#if defined(_WIN32)
+        c.exportMemory_ = reinterpret_cast<PFN_vkGetMemoryWin32HandleKHR>(
+            vkGetDeviceProcAddr(c.device_, "vkGetMemoryWin32HandleKHR"));
+        c.exportSemaphore_ = reinterpret_cast<PFN_vkGetSemaphoreWin32HandleKHR>(
+            vkGetDeviceProcAddr(c.device_, "vkGetSemaphoreWin32HandleKHR"));
+#else
+        c.exportMemory_ = reinterpret_cast<PFN_vkGetMemoryFdKHR>(
             vkGetDeviceProcAddr(c.device_, "vkGetMemoryFdKHR"));
-        c.getSemaphoreFd_ = reinterpret_cast<PFN_vkGetSemaphoreFdKHR>(
+        c.exportSemaphore_ = reinterpret_cast<PFN_vkGetSemaphoreFdKHR>(
             vkGetDeviceProcAddr(c.device_, "vkGetSemaphoreFdKHR"));
+#endif
     }
 
     VmaVulkanFunctions functions{};
@@ -506,12 +538,54 @@ std::uint32_t VulkanContext::DeviceLocalMemoryType(std::uint32_t typeBits) const
     throw std::runtime_error("No device-local memory type");
 }
 
+ExternalHandle VulkanContext::ExportMemory(VkDeviceMemory memory) const {
+    if (!SupportsExternalMemory()) {
+        throw std::runtime_error("The Vulkan device cannot export memory");
+    }
+#if defined(_WIN32)
+    VkMemoryGetWin32HandleInfoKHR info{VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR};
+    info.memory = memory;
+    info.handleType = kExternalMemoryHandleType;
+    HANDLE handle = nullptr;
+    CheckVk(exportMemory_(device_, &info, &handle), "vkGetMemoryWin32HandleKHR");
+    return handle;
+#else
+    VkMemoryGetFdInfoKHR info{VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR};
+    info.memory = memory;
+    info.handleType = kExternalMemoryHandleType;
+    int fd = -1;
+    CheckVk(exportMemory_(device_, &info, &fd), "vkGetMemoryFdKHR");
+    return fd;
+#endif
+}
+
+ExternalHandle VulkanContext::ExportSemaphore(VkSemaphore semaphore) const {
+    if (!SupportsExternalMemory()) {
+        throw std::runtime_error("The Vulkan device cannot export semaphores");
+    }
+#if defined(_WIN32)
+    VkSemaphoreGetWin32HandleInfoKHR info{VK_STRUCTURE_TYPE_SEMAPHORE_GET_WIN32_HANDLE_INFO_KHR};
+    info.semaphore = semaphore;
+    info.handleType = kExternalSemaphoreHandleType;
+    HANDLE handle = nullptr;
+    CheckVk(exportSemaphore_(device_, &info, &handle), "vkGetSemaphoreWin32HandleKHR");
+    return handle;
+#else
+    VkSemaphoreGetFdInfoKHR info{VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR};
+    info.semaphore = semaphore;
+    info.handleType = kExternalSemaphoreHandleType;
+    int fd = -1;
+    CheckVk(exportSemaphore_(device_, &info, &fd), "vkGetSemaphoreFdKHR");
+    return fd;
+#endif
+}
+
 VkSemaphore VulkanContext::CreateTimelineSemaphore(std::uint64_t initial, bool exportable) const {
     VkSemaphoreTypeCreateInfo type{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
     type.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
     type.initialValue = initial;
     VkExportSemaphoreCreateInfo exported{VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO};
-    exported.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
+    exported.handleTypes = kExternalSemaphoreHandleType;
     if (exportable) {
         if (!SupportsExternalMemory()) {
             throw std::runtime_error("The Vulkan device cannot export semaphores");

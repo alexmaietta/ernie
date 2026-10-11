@@ -101,9 +101,14 @@ add_library(ernie_build_options INTERFACE)
 if(TARGET terraingen_warnings)
     target_link_libraries(ernie_build_options INTERFACE terraingen_warnings terraingen_coverage)
 elseif(MSVC)
-    target_compile_options(ernie_build_options INTERFACE /W4)
-    # M_PI and the other math constants, which MSVC's <cmath> declares only on request.
-    target_compile_definitions(ernie_build_options INTERFACE _USE_MATH_DEFINES)
+    # Standard conformance (two-phase lookup, __cplusplus as the real standard), UTF-8 sources, and
+    # room for large objects (the templated bindings and schemas).
+    target_compile_options(ernie_build_options INTERFACE /W4 /permissive- /Zc:__cplusplus /utf-8
+                                                         /bigobj)
+    # M_PI and the other math constants, which MSVC's <cmath> declares only on request; and
+    # <windows.h> lean and without min and max macros, wherever it comes in.
+    target_compile_definitions(ernie_build_options INTERFACE _USE_MATH_DEFINES WIN32_LEAN_AND_MEAN
+                                                             NOMINMAX)
 else()
     target_compile_options(
         ernie_build_options

@@ -90,10 +90,10 @@ class GpuImage {
     /// @throws std::invalid_argument if the number of mips or a mip's size does not match.
     void Upload(std::span<const std::span<const std::byte>> mipData);
 
-    /// For shared images, a new file descriptor for the image's memory, owned by the caller until
-    /// it imports it elsewhere (CUDA takes ownership on import).
+    /// For shared images, a new handle to the image's memory (a file descriptor, or a Win32 handle
+    /// on Windows), owned by the caller until it imports it elsewhere (`CloseExternalHandle`).
     /// @throws std::logic_error for other images, or std::runtime_error if export fails.
-    int ExportFd() const;
+    ExternalHandle ExportHandle() const;
 
     /// For shared images, the size of the image's dedicated memory allocation.
     VkDeviceSize AllocationSize() const {

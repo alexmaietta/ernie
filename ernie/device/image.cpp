@@ -68,7 +68,7 @@ GpuImage::GpuImage(const VulkanContext& context, const ImageDesc& desc)
         }
         VkExternalMemoryImageCreateInfo external{
             VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO};
-        external.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+        external.handleTypes = kExternalMemoryHandleType;
         info.pNext = &external;
         CheckVk(vkCreateImage(context.Device(), &info, nullptr, &image_), "vkCreateImage");
         VkMemoryRequirements requirements{};
@@ -76,7 +76,7 @@ GpuImage::GpuImage(const VulkanContext& context, const ImageDesc& desc)
         VkMemoryDedicatedAllocateInfo dedicated{VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO};
         dedicated.image = image_;
         VkExportMemoryAllocateInfo exported{VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO};
-        exported.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+        exported.handleTypes = kExternalMemoryHandleType;
         exported.pNext = &dedicated;
         VkMemoryAllocateInfo allocate{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
         allocate.pNext = &exported;
@@ -202,16 +202,11 @@ void GpuImage::Release() {
     view_ = VK_NULL_HANDLE;
 }
 
-int GpuImage::ExportFd() const {
+ExternalHandle GpuImage::ExportHandle() const {
     if (sharedMemory_ == VK_NULL_HANDLE) {
         throw std::logic_error("Only shared images export their memory");
     }
-    VkMemoryGetFdInfoKHR info{VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR};
-    info.memory = sharedMemory_;
-    info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
-    int fd = -1;
-    CheckVk(context_->GetMemoryFd()(context_->Device(), &info, &fd), "vkGetMemoryFdKHR");
-    return fd;
+    return context_->ExportMemory(sharedMemory_);
 }
 
 VkImageView GpuImage::LayerView(std::uint32_t layer) const {
