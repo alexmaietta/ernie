@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791688139652,
+  "lastUpdate": 1791688292116,
   "repoUrl": "https://github.com/alexmaietta/ernie",
   "entries": {
     "CI": [
@@ -1416,6 +1416,148 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-gcc-3: ccache miss rate",
             "value": 8.64,
+            "unit": "%"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "committer": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "id": "e4b84e307970892a46f89dc682b105064b6ed248",
+          "message": "README: Ernie builds on Windows and macOS too, experimental until tested there",
+          "timestamp": "2026-10-11T03:09:24Z",
+          "url": "https://github.com/alexmaietta/ernie/commit/e4b84e307970892a46f89dc682b105064b6ed248"
+        },
+        "date": 1791688291116,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "CI: wall time",
+            "value": 1.77,
+            "unit": "min"
+          },
+          {
+            "name": "format: job",
+            "value": 0.38,
+            "unit": "min"
+          },
+          {
+            "name": "version: job",
+            "value": 0.08,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: job",
+            "value": 0.18,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: Build and check the sdist",
+            "value": 0.05,
+            "unit": "min"
+          },
+          {
+            "name": "build-macos-15: compile time",
+            "value": 3.52,
+            "unit": "min"
+          },
+          {
+            "name": "build-macos-15: compiles",
+            "value": 238,
+            "unit": "files"
+          },
+          {
+            "name": "build-windows-2025: compile time",
+            "value": 1.4,
+            "unit": "min"
+          },
+          {
+            "name": "build-windows-2025: compiles",
+            "value": 73,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize: compile time",
+            "value": 3.28,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize: compiles",
+            "value": 307,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize: ccache miss rate",
+            "value": 5.56,
+            "unit": "%"
+          },
+          {
+            "name": "test-clang: compile time",
+            "value": 3.71,
+            "unit": "min"
+          },
+          {
+            "name": "test-clang: compiles",
+            "value": 425,
+            "unit": "files"
+          },
+          {
+            "name": "test-clang: ccache miss rate",
+            "value": 11.08,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-1: compile time",
+            "value": 2.73,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-1: compiles",
+            "value": 343,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-1: ccache miss rate",
+            "value": 10.65,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-2: compile time",
+            "value": 3.1,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-2: compiles",
+            "value": 328,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-2: ccache miss rate",
+            "value": 11.11,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-3: compile time",
+            "value": 2.47,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-3: compiles",
+            "value": 304,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-3: ccache miss rate",
+            "value": 10.56,
             "unit": "%"
           }
         ]
