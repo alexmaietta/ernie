@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -31,10 +32,12 @@ namespace {
 
 class ImageFiles : public testing::Test {
   protected:
+    // A directory of the test's own: ctest runs the tests as processes side by side, and gtest's
+    // random seed comes from the clock, so tests started together would share one by the seed.
     void SetUp() override {
+        const std::string test = ::testing::UnitTest::GetInstance()->current_test_info()->name();
         dir_ = std::filesystem::temp_directory_path() /
-               ("terraingen_image_test_" +
-                std::to_string(::testing::UnitTest::GetInstance()->random_seed()));
+               ("ernie_image_test_" + test + "_" + std::to_string(std::random_device{}()));
         std::filesystem::create_directories(dir_);
     }
 
