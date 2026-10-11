@@ -41,6 +41,11 @@ static const float kPi = 3.14159265358979;
 public static const uint kTransmittanceWidth = 256;
 public static const uint kTransmittanceHeight = 64;
 public static const uint kMultipleScatteringSize = 32;
+// The sky irradiance table: by the sun's zenith cosine from -0.2 (twilight, below which the sky's
+// light is negligible) to 1 across, and the height up.
+public static const uint kIrradianceWidth = 64;
+public static const uint kIrradianceHeight = 16;
+public static const float kIrradianceMinMuSun = -0.2;
 
 public float atmosphereBottom(StructuredBuffer<float4> medium) {
     return medium[0].x;
@@ -186,6 +191,33 @@ public float2 multipleScatteringUv(float r, float muSun, float bottom, float top
 public float4 multipleScattering(Texture2DArray<float4> table, SamplerState linear, float r,
                                  float muSun, uint group, float bottom, float top) {
     let uv = multipleScatteringUv(r, muSun, bottom, top);
+    return table.SampleLevel(linear, float3(uv, float(group)), 0.0);
+}
+
+// The sky irradiance table's coordinates, as Bruneton's: the sun's zenith cosine over
+// [kIrradianceMinMuSun, 1] and the height's fraction of the atmosphere, each between the first
+// and last texel centres; and back.
+public float2 irradianceUv(float r, float muSun, float bottom, float top) {
+    let x = (muSun - kIrradianceMinMuSun) / (1.0 - kIrradianceMinMuSun);
+    return float2(textureCoord(clamp(x, 0.0, 1.0), float(kIrradianceWidth)),
+                  textureCoord(clamp((r - bottom) / (top - bottom), 0.0, 1.0),
+                               float(kIrradianceHeight)));
+}
+
+public void irradianceRMu(float2 uv, float bottom, float top, out float r, out float muSun) {
+    let x = unitRange(uv.x, float(kIrradianceWidth));
+    muSun = kIrradianceMinMuSun + x * (1.0 - kIrradianceMinMuSun);
+    r = bottom + unitRange(uv.y, float(kIrradianceHeight)) * (top - bottom);
+}
+
+// The sky's irradiance on a level surface at radius `r` with the sun at zenith cosine `muSun`, per
+// unit sun irradiance above the atmosphere, for band group `group`; 0 below the table's twilight.
+public float4 skyIrradiance(Texture2DArray<float4> table, SamplerState linear, float r,
+                            float muSun, uint group, float bottom, float top) {
+    if (muSun < kIrradianceMinMuSun) {
+        return float4(0.0);
+    }
+    let uv = irradianceUv(r, muSun, bottom, top);
     return table.SampleLevel(linear, float3(uv, float(group)), 0.0);
 }
 

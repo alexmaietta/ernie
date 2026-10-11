@@ -17,12 +17,12 @@ namespace ernie {
 /// A planet's atmosphere on the GPU for the rasterizer
 /// (atmosphere.slang): its medium, each constituent's coefficients
 /// per band and densities by altitude, and the tables built from it,
-/// the transmittance to the top of the atmosphere and Hillaire's
-/// multiple scattering. They are rebuilt only when the atmosphere's
-/// model or the spectral bands change; shading reads them every
-/// frame.
+/// the transmittance to the top of the atmosphere, Hillaire's
+/// multiple scattering and the sky's irradiance on level ground. They
+/// are rebuilt only when the atmosphere's model or the spectral bands
+/// change; shading reads them every frame.
 ///
-/// Both tables are float32 arrays with a layer per four bands: their
+/// The tables are float32 arrays with a layer per four bands: their
 /// values span many orders of magnitude, and the shaders filter them
 /// linearly.
 class AtmosphereLuts {
@@ -64,6 +64,13 @@ class AtmosphereLuts {
         return *multipleScattering_;
     }
 
+    /// The sky's irradiance on level ground per unit sun irradiance,
+    /// by sun zenith cosine and height (atmosphere.slang's
+    /// `skyIrradiance`).
+    const GpuImage& SkyIrradiance() const {
+        return *skyIrradiance_;
+    }
+
     /// atmosphere.slang's medium, densities and phase tables, or
     /// small placeholders without an atmosphere.
     const GpuBuffer& Medium() const {
@@ -99,6 +106,7 @@ class AtmosphereLuts {
     /// Compiled when first recorded.
     mutable std::unique_ptr<ComputePipeline> transmittancePipeline_;
     mutable std::unique_ptr<ComputePipeline> multiplePipeline_;
+    mutable std::unique_ptr<ComputePipeline> irradiancePipeline_;
     std::optional<AtmosphereParams> params_;
     std::optional<BandedAtmosphere> banded_;
     std::unique_ptr<GpuBuffer> medium_;
@@ -106,6 +114,7 @@ class AtmosphereLuts {
     std::unique_ptr<GpuBuffer> phases_;
     std::unique_ptr<GpuImage> transmittance_;
     std::unique_ptr<GpuImage> multipleScattering_;
+    std::unique_ptr<GpuImage> skyIrradiance_;
     mutable bool stale_ = false;
 };
 

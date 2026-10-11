@@ -13,9 +13,15 @@
 // orders a truncated sum would lose. Each step integrates its in-scattering analytically for
 // constant coefficients (Hillaire 2015).
 //
+// Sky irradiance, third, per height and sun zenith cosine: the sky's radiance (single scattering by
+// each constituent's phase function, multiple scattering from Psi_ms, as the sky pass marches it)
+// integrated over the upper hemisphere of a level surface, by 64 directions spread evenly over its
+// projected disc (a cosine-weighted Fibonacci spiral), so the irradiance is pi times their mean.
+//
 // Bindings: 0 the medium, 1 the constituents' densities, 2 the transmittance table (storage),
 // 3 the transmittance table (sampled), 4 a linear sampler, 5 the multiple scattering table
-// (storage). Every image is in the general layout.
+// (storage), 6 the constituents' phase functions, 7 the sky irradiance table (storage), 8 the
+// multiple scattering table (sampled). Every image is in the general layout.
 //
 // References:
 // - S. Hillaire, "A Scalable and Production Ready Sky and Atmosphere Rendering Technique",
@@ -45,6 +51,50 @@ static const uint kScatteringSteps = 128;
 [[vk::binding(3, 0)]] Texture2DArray<float4> transmittance;
 [[vk::binding(4, 0)]] SamplerState linear;
 [[vk::image_format("rgba32f")]] [[vk::binding(5, 0)]] RWTexture2DArray<float4> multipleOut;
+[[vk::binding(6, 0)]] StructuredBuffer<float> phases;
+[[vk::image_format("rgba32f")]] [[vk::binding(7, 0)]] RWTexture2DArray<float4> irradianceOut;
+[[vk::binding(8, 0)]] Texture2DArray<float4> multiple;
+
+static const uint kIrradianceSteps = 32;
+// The sine of the Sun's angular radius, 0.266 degrees, over which it sets behind the planet.
+static const float kSunSine = 0.00465;
+
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void skyIrradianceMain(uint3 id: SV_DispatchThreadID) {
+    if (id.x >= kIrradianceWidth || id.y >= kIrradianceHeight) {
+        return;
+    }
+    let bottom = atmosphereBottom(medium);
+    let top = atmosphereTop(medium);
+    let uv = (float2(id.xy) + 0.5) / float2(kIrradianceWidth, kIrradianceHeight);
+    float r;
+    float muSun;
+    irradianceRMu(uv, bottom, top, r, muSun);
+    // A little inside the shell, so rays start in the medium.
+    r = clamp(r, bottom + 1e-3, top - 1e-3);
+    let origin = float3(0.0, 0.0, r);
+    let sun = float3(sqrt(max(1.0 - muSun * muSun, 0.0)), 0.0, muSun);
+    var irradiance = float4(0.0);
+    for (uint i = 0; i < kDirections; ++i) {
+        let disc = sqrt((float(i) + 0.5) / float(kDirections));
+        let phi = float(i) * 2.39996322972865;  // the golden angle
+        let direction =
+            float3(disc * cos(phi), disc * sin(phi), sqrt(max(1.0 - disc * disc, 0.0)));
+        float start;
+        float end;
+        bool ground;
+        if (!clipToAtmosphere(origin, direction, bottom, top, start, end, ground)) {
+            continue;
+        }
+        float4 light;
+        float4 through;
+        scatterAlong(medium, densities, phases, transmittance, multiple, linear, origin, direction,
+                     start, end, sun, kSunSine, id.z, kIrradianceSteps, light, through);
+        irradiance += light;
+    }
+    irradianceOut[id] = PI * irradiance / float(kDirections);
+}
 
 [shader("compute")]
 [numthreads(8, 8, 1)]

@@ -24,12 +24,17 @@ constexpr DescriptorBinding kBindings[] = {
     {3, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {4, VK_DESCRIPTOR_TYPE_SAMPLER, kCompute},
     {5, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {7, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {8, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
 };
 
 /// atmosphere.slang's table sizes.
 constexpr std::uint32_t kTransmittanceWidth = 256;
 constexpr std::uint32_t kTransmittanceHeight = 64;
 constexpr std::uint32_t kMultipleScatteringSize = 32;
+constexpr std::uint32_t kIrradianceWidth = 64;
+constexpr std::uint32_t kIrradianceHeight = 16;
 
 constexpr VkBufferUsageFlags kStorage =
     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
@@ -62,7 +67,8 @@ AtmosphereLuts::AtmosphereLuts(const VulkanContext& context,
                            VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
                            1.0f, false}),
       transmittance_(TableImage(context, 1, 1, 1)),
-      multipleScattering_(TableImage(context, 1, 1, 1)) {
+      multipleScattering_(TableImage(context, 1, 1, 1)),
+      skyIrradiance_(TableImage(context, 1, 1, 1)) {
     // The placeholder tables are never written; shading reads them
     // only without an atmosphere, so their contents do not matter.
     Placeholders();
@@ -121,6 +127,7 @@ void AtmosphereLuts::Set(
         Placeholders();
         transmittance_ = TableImage(context_, 1, 1, 1);
         multipleScattering_ = TableImage(context_, 1, 1, 1);
+        skyIrradiance_ = TableImage(context_, 1, 1, 1);
         stale_ = true;
         return;
     }
@@ -133,6 +140,8 @@ void AtmosphereLuts::Set(
     multipleScattering_ =
         TableImage(context_, kMultipleScatteringSize,
                    kMultipleScatteringSize, groups);
+    skyIrradiance_ = TableImage(context_, kIrradianceWidth,
+                                kIrradianceHeight, groups);
     stale_ = true;
 }
 
@@ -203,6 +212,8 @@ void AtmosphereLuts::Record(VkCommandBuffer commands) const {
             commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         multipleScattering_->Transition(
             commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        skyIrradiance_->Transition(
+            commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         return;
     }
     ERNIE_GPU_ZONE(context_, commands, "Atmosphere tables");
@@ -217,48 +228,68 @@ void AtmosphereLuts::Record(VkCommandBuffer commands) const {
             context_, layout_,
             compiler_.CompileSpirv(modules,
                                    "multipleScatteringMain"));
+        irradiancePipeline_ = std::make_unique<ComputePipeline>(
+            context_, layout_,
+            compiler_.CompileSpirv(modules, "skyIrradianceMain"));
     }
-    transmittance_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
-    multipleScattering_->Transition(commands,
-                                    VK_IMAGE_LAYOUT_GENERAL);
+    for (GpuImage* image :
+         {transmittance_.get(), multipleScattering_.get(),
+          skyIrradiance_.get()}) {
+        image->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    }
+    const auto general = [](const GpuImage& image) {
+        return DescriptorResource::Of(image.View(),
+                                      VK_IMAGE_LAYOUT_GENERAL);
+    };
     const DescriptorResource resources[] = {
         DescriptorResource::Of(*medium_),
         DescriptorResource::Of(*densities_),
-        DescriptorResource::Of(transmittance_->View(),
-                               VK_IMAGE_LAYOUT_GENERAL),
-        DescriptorResource::Of(transmittance_->View(),
-                               VK_IMAGE_LAYOUT_GENERAL),
+        general(*transmittance_),
+        general(*transmittance_),
         DescriptorResource::Of(sampler_),
-        DescriptorResource::Of(multipleScattering_->View(),
-                               VK_IMAGE_LAYOUT_GENERAL)};
+        general(*multipleScattering_),
+        DescriptorResource::Of(*phases_),
+        general(*skyIrradiance_),
+        general(*multipleScattering_)};
     const std::uint32_t groups = transmittance_->Desc().layers;
+    // Each table reads the ones before it.
+    const auto barrier = [commands] {
+        VkMemoryBarrier2 memory{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+        memory.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        memory.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+        memory.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        memory.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+        VkDependencyInfo dependency{
+            VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        dependency.memoryBarrierCount = 1;
+        dependency.pMemoryBarriers = &memory;
+        vkCmdPipelineBarrier2(commands, &dependency);
+    };
+    const auto dispatch = [&](const ComputePipeline& pipeline,
+                              std::uint32_t width,
+                              std::uint32_t height) {
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          pipeline.Handle());
+        layout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                     resources);
+        vkCmdDispatch(commands, Groups(width), Groups(height),
+                      groups);
+    };
+    dispatch(*transmittancePipeline_, kTransmittanceWidth,
+             kTransmittanceHeight);
+    barrier();
+    dispatch(*multiplePipeline_, kMultipleScatteringSize,
+             kMultipleScatteringSize);
+    barrier();
+    dispatch(*irradiancePipeline_, kIrradianceWidth,
+             kIrradianceHeight);
 
-    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
-                      transmittancePipeline_->Handle());
-    layout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
-    vkCmdDispatch(commands, Groups(kTransmittanceWidth),
-                  Groups(kTransmittanceHeight), groups);
-
-    VkMemoryBarrier2 barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
-    barrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-    barrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
-    barrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-    barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
-    VkDependencyInfo dependency{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
-    dependency.memoryBarrierCount = 1;
-    dependency.pMemoryBarriers = &barrier;
-    vkCmdPipelineBarrier2(commands, &dependency);
-
-    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
-                      multiplePipeline_->Handle());
-    layout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
-    vkCmdDispatch(commands, Groups(kMultipleScatteringSize),
-                  Groups(kMultipleScatteringSize), groups);
-
-    transmittance_->Transition(
-        commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    multipleScattering_->Transition(
-        commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    for (GpuImage* image :
+         {transmittance_.get(), multipleScattering_.get(),
+          skyIrradiance_.get()}) {
+        image->Transition(commands,
+                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
 }
 
 }  // namespace ernie

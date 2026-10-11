@@ -11,6 +11,7 @@
 #include "support/delegate_scenes.h"
 #include "support/vulkan_fixture.h"
 
+#include <glm/glm.hpp>
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -173,6 +174,20 @@ AtmosphereParams Earth() {
     return params;
 }
 
+double Bilinear(const std::vector<float>& table, int width,
+                int height, int band, double u, double v);
+
+/// The sky irradiance table's value of band `band` with the sun at
+/// zenith cosine `muSun`, at the fraction `height` of the atmosphere
+/// (atmosphere.slang's `irradianceUv`).
+double SkyIrradianceAt(const std::vector<float>& table, int band,
+                       double muSun, double height) {
+    const double x = (muSun + 0.2) / 1.2;
+    const double u = (0.5 + x * 63.0) / 64.0;
+    const double v = (0.5 + height * 15.0) / 16.0;
+    return Bilinear(table, 64, 16, band, u, v);
+}
+
 }  // namespace
 
 class AtmosphereLutsTest : public VulkanTest {};
@@ -283,25 +298,34 @@ TEST_F(RasterDelegateTest, TheAtmosphereDimsAndReddensTheSun) {
                 values[(b * kVarSize + c) * kVarSize + c]);
         }
         std::optional<BandedAtmosphere> air;
+        std::vector<float> sky;
         if (atmosphere) {
-            air = delegate.Renderer().AtmosphereTables().Banded();
+            const ernie::AtmosphereLuts& tables =
+                delegate.Renderer().AtmosphereTables();
+            air = tables.Banded();
+            sky = TableOf(*context_, tables.SkyIrradiance());
         }
-        return std::make_pair(centre, air);
+        return std::make_tuple(centre, air, sky);
     };
-    const auto [clear, none] = render(false);
-    const auto [dimmed, air] = render(true);
+    const auto [clear, none, noSky] = render(false);
+    const auto [dimmed, air, sky] = render(true);
     ASSERT_TRUE(air.has_value());
     ASSERT_EQ(clear.size(), dimmed.size());
     for (std::size_t b = 0; b < clear.size(); ++b) {
         ASSERT_GT(clear[b], 0.0);
-        const double expected = air->TransmittanceToTop(
-            air->bottomRadius, std::sin(e), static_cast<int>(b));
-        EXPECT_NEAR(dimmed[b] / clear[b], expected, 0.01)
+        // The level ground under the sun dimmed by its slant path,
+        // and lit by the sky: clear is albedo E cos / pi, so the sky
+        // adds its irradiance over cos.
+        const int band = static_cast<int>(b);
+        const double toSun = air->TransmittanceToTop(
+            air->bottomRadius, std::sin(e), band);
+        const double fromSky =
+            SkyIrradianceAt(sky, band, std::sin(e), 0.0) /
+            std::sin(e);
+        EXPECT_NEAR(dimmed[b] / clear[b], toSun + fromSky, 0.01)
             << "band " << b;
+        EXPECT_GT(fromSky, 0.0) << "band " << b;
     }
-    EXPECT_LT(dimmed.front() / clear.front(),
-              0.8 * dimmed.back() / clear.back())
-        << "blue dims more than red";
 }
 
 namespace {
@@ -597,34 +621,151 @@ TEST_F(RasterDelegateTest, TheAirHazesTheGroundBelow) {
             SpectrumAt(outputs, kVarSize / 2, kVarSize / 2);
         std::optional<BandedAtmosphere> air;
         std::vector<float> multiple;
+        std::vector<float> sky;
         if (atmosphere) {
             const ernie::AtmosphereLuts& tables =
                 delegate.Renderer().AtmosphereTables();
             air = tables.Banded();
             multiple =
                 TableOf(*context_, tables.MultipleScattering());
+            sky = TableOf(*context_, tables.SkyIrradiance());
         }
         return std::make_tuple(
-            spectrum, air, multiple,
+            spectrum, air, multiple, sky,
             ernie::SunIrradianceOf(scene, "/World/Sun",
                                    air ? air->bands
                                        : ernie::SpectralBands{}));
     };
-    const auto [clear, none, noTable, noSun] = render(false);
-    const auto [hazed, air, multiple, sun] = render(true);
+    const auto [clear, none, noTable, noSky, noSun] = render(false);
+    const auto [hazed, air, multiple, sky, sun] = render(true);
     ASSERT_TRUE(air.has_value());
     for (std::size_t b = 0; b < clear.size(); ++b) {
         const int band = static_cast<int>(b);
-        // The ground itself under the dimmed sun, then the air
-        // between.
+        // The ground itself under the dimmed sun and the sky (clear
+        // is albedo E cos / pi), then the air between.
         const double toSun = air->TransmittanceToTop(
             air->bottomRadius, std::sin(e), band);
+        const double fromSky =
+            SkyIrradianceAt(sky, band, std::sin(e), 0.0) /
+            std::sin(e);
         double through = 1.0;
         const double scattered = VerticalReference(
             *air, multiple, band, e, true, 0.0, height, &through);
         const double expected =
-            clear[b] * toSun * through +
+            clear[b] * (toSun + fromSky) * through +
             static_cast<double>(sun[b]) * scattered;
         EXPECT_NEAR(hazed[b] / expected, 1.0, 0.02) << "band " << b;
+    }
+}
+
+namespace {
+
+/// The sky's radiance per unit sun irradiance seen from radius `r`
+/// on the z axis along unit `d` (upwards), the sun along unit `sun`:
+/// single scattering by each constituent's phase function and the
+/// reference transmittance, multiple scattering from the renderer's
+/// Psi_ms table, over 400 steps to the top.
+double SkyRadianceReference(const BandedAtmosphere& air,
+                            const std::vector<float>& multiple,
+                            int band, double r, glm::dvec3 d,
+                            glm::dvec3 sun) {
+    const double bottom = air.bottomRadius;
+    const double top = bottom + air.topAltitude;
+    const double length =
+        -r * d.z + std::sqrt(r * r * (d.z * d.z - 1.0) + top * top);
+    constexpr int kSteps = 400;
+    const double step = length / kSteps;
+    const double nu = glm::dot(d, sun);
+    const auto b = static_cast<std::size_t>(band);
+    double transmittance = 1.0;
+    double radiance = 0.0;
+    for (int s = 0; s < kSteps; ++s) {
+        const glm::dvec3 point =
+            glm::dvec3(0.0, 0.0, r) + (s + 0.5) * step * d;
+        const double radius = glm::length(point);
+        const double altitude = radius - bottom;
+        double extinction = 0.0;
+        double scattering = 0.0;
+        double phased = 0.0;
+        for (std::size_t c = 0; c < air.constituents.size(); ++c) {
+            const auto& constituent = air.constituents[c];
+            const double density = constituent.density(altitude);
+            const double sc =
+                density *
+                static_cast<double>(constituent.scattering[b]);
+            extinction +=
+                sc + density * static_cast<double>(
+                                   constituent.absorption[b]);
+            scattering += sc;
+            phased += sc * PhaseAt(air, c, band, nu);
+        }
+        const double muSun = glm::dot(point, sun) / radius;
+        const double ground =
+            radius * radius * (muSun * muSun - 1.0) + bottom * bottom;
+        const double toSun =
+            muSun < 0.0 && ground >= 0.0
+                ? 0.0
+                : air.TransmittanceToTop(radius, muSun, band, 200);
+        const double u = (0.5 + (0.5 + 0.5 * muSun) * 31.0) / 32.0;
+        const double v =
+            (0.5 + std::clamp(altitude / air.topAltitude, 0.0, 1.0) *
+                       31.0) /
+            32.0;
+        const double psi = Bilinear(multiple, 32, 32, band, u, v);
+        const double sample = std::exp(-extinction * step);
+        radiance += transmittance *
+                    (phased * toSun + scattering * psi) *
+                    (1.0 - sample) / std::max(extinction, 1e-30);
+        transmittance *= sample;
+    }
+    return radiance;
+}
+
+}  // namespace
+
+// The sky irradiance table against the reference sky's radiance
+// integrated over the hemisphere of level ground by 256 directions
+// (cosine weighted on a Fibonacci spiral), four times the table's.
+TEST_F(AtmosphereLutsTest, SkyIrradianceMatchesTheReference) {
+    ernie::ShaderCompiler compiler;
+    AtmosphereLuts luts(*context_, compiler);
+    luts.Set(Earth(), {380.0, 780.0, 16});
+    context_->Submit(
+        [&](VkCommandBuffer commands) { luts.Record(commands); });
+    const std::vector<float> multiple =
+        TableOf(*context_, luts.MultipleScattering());
+    const std::vector<float> table =
+        TableOf(*context_, luts.SkyIrradiance());
+    const BandedAtmosphere& air = luts.Banded();
+    // The sun overhead and 10 degrees up, at the ground (1 m up, as
+    // the table's rays start).
+    for (const int x : {63, 21}) {
+        const double muSun = -0.2 + 1.2 * x / 63.0;
+        const glm::dvec3 sun(std::sqrt(1.0 - muSun * muSun), 0.0,
+                             muSun);
+        for (const int band : {1, 12}) {
+            constexpr int kDirections = 256;
+            double irradiance = 0.0;
+            for (int i = 0; i < kDirections; ++i) {
+                const double disc =
+                    std::sqrt((i + 0.5) / kDirections);
+                const double phi = i * 2.39996322972865;
+                const glm::dvec3 d(disc * std::cos(phi),
+                                   disc * std::sin(phi),
+                                   std::sqrt(1.0 - disc * disc));
+                irradiance += SkyRadianceReference(
+                    air, multiple, band, air.bottomRadius + 1.0, d,
+                    sun);
+            }
+            irradiance *= kPi / kDirections;
+            const std::size_t at =
+                (static_cast<std::size_t>(band / 4) * 16 * 64 +
+                 static_cast<std::size_t>(x)) *
+                    4 +
+                static_cast<std::size_t>(band % 4);
+            EXPECT_NEAR(static_cast<double>(table[at]) / irradiance,
+                        1.0, 0.03)
+                << "sun cosine " << muSun << " band " << band;
+        }
     }
 }

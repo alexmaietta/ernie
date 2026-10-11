@@ -881,6 +881,52 @@ float4 occlusionSlice(float3 n, float3 tangent, float3 v, float2 horizons) {
 [[vk::binding(24, 0)]] StructuredBuffer<float4> atmosphereMedium;
 [[vk::binding(25, 0)]] StructuredBuffer<float> atmosphereDensities;
 [[vk::binding(26, 0)]] StructuredBuffer<float> atmospherePhases;
+[[vk::binding(28, 0)]] Texture2DArray<float4> atmosphereSkyIrradiance;
+
+// The light of the sky and the ground around a surface at `world` (relative to the frame's
+// origin, metres) facing `normal` (its bent normal where geometry occludes part of the sky), seen
+// over the fraction `visibility` of its surroundings: per band, the radiance of a uniform
+// surround giving the same irradiance, per unit sun irradiance above the atmosphere; 0 without an
+// atmosphere. The sky lights it as isotropically over the part of the sky it faces,
+// (1 + cos tilt) / 2, of the sky's irradiance on level ground (the sky irradiance table); the
+// ground, Lambertian with the atmosphere's ground albedo and lit by the sun and the sky, over the
+// rest.
+//
+// References:
+// - B. Y. H. Liu and R. C. Jordan, "The long-term average performance of flat-plate solar-energy
+//   collectors", Solar Energy 7(2):53-74, 1963 (irradiance on tilted surfaces from the sky and
+//   the ground). https://doi.org/10.1016/0038-092X(63)90006-9
+// - E. Bruneton, "Precomputed Atmospheric Scattering: a New Implementation", 2017,
+//   `GetSunAndSkyIrradiance`. https://ebruneton.github.io/precomputed_atmospheric_scattering/
+void skyLight(float3 world, float3 normal, float visibility, out float light[kMaxBands]) {
+    let bands = uint(sh.range.z);
+    for (uint band = 0; band < kMaxBands; ++band) {
+        light[band] = 0.0;
+    }
+    if (sh.atmosphere[1].y == 0.0) {
+        return;
+    }
+    let bottom = sh.atmosphere[0].w;
+    let top = sh.atmosphere[1].x;
+    let p = world * 1e-3 - sh.atmosphere[0].xyz;
+    let r = max(length(p), bottom);
+    let up = normalize(p);
+    let muSun = dot(up, sh.sun.xyz);
+    let facing = 0.5 * (1.0 + dot(normal, up));
+    for (uint group = 0; group * 4 < bands; ++group) {
+        let sky = skyIrradiance(atmosphereSkyIrradiance, tableSampler, r, muSun, group, bottom,
+                                top);
+        // The ground below, lit by the sun through the air and by the sky.
+        let toSun = sunTransmittance(atmosphereTransmittance, tableSampler, up * bottom,
+                                     sh.sun.xyz, sh.atmosphere[1].z, group, bottom, top);
+        let ground = groundAlbedo(atmosphereMedium, group) *
+                     (toSun * max(muSun, 0.0) + sky);
+        let surround = (sky * facing + ground * (1.0 - facing)) * visibility / PI;
+        for (uint k = 0; k < 4 && group * 4 + k < bands; ++k) {
+            light[group * 4 + k] = surround[k];
+        }
+    }
+}
 
 // Steps of the sky's march through the atmosphere per pixel, and of the aerial perspective's
 // between the eye and a surface.
@@ -1364,6 +1410,8 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     float aerialTransmittance[kMaxBands];
     float aerialScattered[kMaxBands];
     aerialPerspective(world, ndc.xy, aerialTransmittance, aerialScattered);
+    float surround[kMaxBands];
+    skyLight(world, lookup, unlit ? 0.0 : occlusion, surround);
     for (uint first = 0; first < bands; first += 3) {
         float3 bandAlbedo = float3(0.0);
         float3 bandIrradiance = float3(0.0);
@@ -1395,6 +1443,8 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             if (material.info.z != 0 && !unlit) {
                 radiance[j] += bandValue(material.emission, band);
             }
+            // The atmosphere's sky and ground around it, diffusely.
+            radiance[j] += environment.diffuse[j] * bandValue(sh.irradiance, band) * surround[band];
             if (domeScale > 0.0) {
                 radiance[j] += environment.diffuse[j] * dome *
                                modulationAt(domeCoefficients, domeScale, wavelength);

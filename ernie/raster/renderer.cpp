@@ -304,6 +304,7 @@ constexpr DescriptorBinding kShadingBindings[] = {
     {25, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {26, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {27, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {28, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
 };
 
 /// shading.slang's ShadingConstants: the dispatch's model and first
@@ -4055,7 +4056,8 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
             DescriptorResource::Of(atmosphere_->Medium()),
             DescriptorResource::Of(atmosphere_->Densities()),
             DescriptorResource::Of(atmosphere_->Phases()),
-            DescriptorResource::Of(patternNorms_)};
+            DescriptorResource::Of(patternNorms_),
+            sampled(atmosphere_->SkyIrradiance())};
         // The dispatch's model and first view, and the terrain
         // horizon (none without its image).
         const auto constantsFor = [&](std::uint32_t model) {
