@@ -249,7 +249,7 @@ struct Image {
     glm::vec4 Mean() const;
 };
 
-Image LoadImage(const std::filesystem::path&amp; path, ImageEncoding encoding);
+Image LoadImageFile(const std::filesystem::path&amp; path, ImageEncoding encoding);
 
 float SrgbToLinear(float value);
 float LinearToSrgb(float value);

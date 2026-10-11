@@ -677,10 +677,10 @@
     int faces
 ) const
 </code></pre>
-<p>The raster passes draw these; the sensor follows the original camera's lens rays onto them. A copy for one face. </p>
+<p>The raster passes draw these; the sensor follows the original camera's lens rays onto them. A copy for one face. With the poses on the GPU, <code>poses</code> are their estimates, and the GPU turns the poses themselves (views.slang). </p>
 <p><strong>Exception:</strong></p>
 <ul>
-<li><code>std::invalid_argument</code> for faces other than 1, <code>kCubeFaces</code> and <code>kAllCubeFaces</code>, or with the poses on the GPU. </li>
+<li><code>std::invalid_argument</code> for faces other than 1, <code>kCubeFaces</code> and <code>kAllCubeFaces</code>. </li>
 </ul>
 <hr>
 

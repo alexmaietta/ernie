@@ -217,6 +217,7 @@
 #include &lt;cstdint&gt;
 #include &lt;functional&gt;
 #include &lt;map&gt;
+#include &lt;set&gt;
 #include &lt;span&gt;
 #include &lt;string&gt;
 #include &lt;string_view&gt;
@@ -439,6 +440,7 @@ class Scene {
         std::map&lt;std::string, std::uint64_t, std::less&lt;&gt;&gt; versions;
         std::array&lt;std::uint64_t, kStampCount&gt; stamps{};
         std::uint64_t ownTransform = 0;  
+        std::uint64_t latest = 0;        
     };
 
     PrimData&amp; Find(const Path&amp; path);
@@ -454,6 +456,8 @@ class Scene {
     std::map&lt;Path, PrimData&gt; prims_;
     std::uint64_t removals_ = 0;  
     std::map&lt;Path, std::uint64_t&gt; removed_;
+    std::set&lt;std::pair&lt;std::uint64_t, Path&gt;&gt; stamped_;
+    std::map&lt;std::string, std::set&lt;Path&gt;, std::less&lt;&gt;&gt; byType_;
     std::map&lt;std::string, Overlay, std::less&lt;&gt;&gt; overlays_;
     std::uint64_t version_ = 0;
     UniqueId id_;
