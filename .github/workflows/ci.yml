@@ -370,11 +370,10 @@ jobs:
           7z x -y -ort rt.zip > /dev/null
           cp rt/*/x64/vulkan-1.dll mesa/x64/
           cygpath -w "$vulkan/mesa/x64" >> "$GITHUB_PATH"
-          # Both names: Windows finds a loader in System32 before PATH, and
-          # older loaders read only VK_ICD_FILENAMES.
-          icd=$(cygpath -w "$vulkan/mesa/x64/lvp_icd.x86_64.json")
-          echo "VK_DRIVER_FILES=$icd" >> "$GITHUB_ENV"
-          echo "VK_ICD_FILENAMES=$icd" >> "$GITHUB_ENV"
+          # Registered where the loader looks for drivers: it ignores
+          # VK_DRIVER_FILES in an elevated process, as the runner's are.
+          reg add 'HKLM\SOFTWARE\Khronos\Vulkan\Drivers' //f //t REG_DWORD //d 0 \
+            //v "$(cygpath -w "$vulkan/mesa/x64/lvp_icd.x86_64.json")"
       - uses: astral-sh/setup-uv@v7
       - name: Install the wheel
         run: |

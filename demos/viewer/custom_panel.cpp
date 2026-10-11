@@ -136,7 +136,7 @@ class CustomPanelDemo : public app::Demo {
                 [this](std::size_t index) { Select(index); });
         colour_ = w.Color(
             "Colour", colours_[0],
-            [this](std::array<double, 3> rgb) { Paint(rgb); });
+            [this](const std::array<double, 3>& rgb) { Paint(rgb); });
         visible_ = w.Checkbox("Visible", true,
                               [this](bool shown) { Show(shown); });
         w.Separator();

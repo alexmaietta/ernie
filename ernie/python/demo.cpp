@@ -198,7 +198,8 @@ void BindDemo(nb::module_& m) {
                 }
                 return nb::cast(demo.OwnScene());
             },
-            nb::for_getter(nb::sig("def scene(self) -> ernie._ernie.Scene")),
+            nb::for_getter(
+                nb::sig("def scene(self) -> ernie._ernie.Scene")),
             "The scene to build into: the viewer's, or the demo's "
             "own without one.")
         // Shared, not tied to the demo: images and batch cameras keep
