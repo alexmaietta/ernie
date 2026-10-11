@@ -394,6 +394,40 @@
       (::ernie::AttributeMeta{.label = &quot;Aperture radius&quot;,                                          \
                               .doc = &quot;Clips the beam's tails at the aperture, m; 0 none.&quot;,         \
                               .group = &quot;Beam&quot;, .max = 100.0}))                                     \
+    X(std::string, Pattern, ::ernie::tokens::kLaserPattern, &quot;spot&quot;,                                \
+      (::ernie::AttributeMeta{.doc = &quot;The beam itself, a line fanned along x, or a grid of &quot;       \
+                                     &quot;beamlets.&quot;,                                                  \
+                              .group = &quot;Pattern&quot;,                                                  \
+                              .options = {::ernie::tokens::kSpot, ::ernie::tokens::kLine,          \
+                                          ::ernie::tokens::kGrid}}))                               \
+    X(double, FanAngle, ::ernie::tokens::kLaserFanAngle, 60.0,                                     \
+      (::ernie::AttributeMeta{.label = &quot;Fan angle&quot;,                                                \
+                              .doc = &quot;A line's full angle along x, degrees.&quot;, .group = &quot;Pattern&quot;,  \
+                              .min = 0.01, .max = 170.0}))                                         \
+    X(std::string, LineProfile, ::ernie::tokens::kLaserLineProfile, &quot;flat&quot;,                        \
+      (::ernie::AttributeMeta{.label = &quot;Line profile&quot;,                                             \
+                              .doc = &quot;Along a line: flat (a Powell lens) or Gaussian, 1/e^2 at &quot;   \
+                                     &quot;the fan's edges (a cylindrical lens).&quot;,                      \
+                              .group = &quot;Pattern&quot;,                                                  \
+                              .options = {::ernie::tokens::kFlat, ::ernie::tokens::kGaussian}}))  \
+    X(int, GridColumns, ::ernie::tokens::kLaserGridColumns, 5,                                     \
+      (::ernie::AttributeMeta{.label = &quot;Columns&quot;, .doc = &quot;A grid's beamlets along x.&quot;,             \
+                              .group = &quot;Pattern&quot;, .min = 1.0, .max = 1000.0}))                     \
+    X(int, GridRows, ::ernie::tokens::kLaserGridRows, 5,                                           \
+      (::ernie::AttributeMeta{.label = &quot;Rows&quot;, .doc = &quot;A grid's beamlets along y.&quot;,                \
+                              .group = &quot;Pattern&quot;, .min = 1.0, .max = 1000.0}))                     \
+    X(glm::dvec2, GridPitch, ::ernie::tokens::kLaserGridPitch, glm::dvec2(2.0),                    \
+      (::ernie::AttributeMeta{.label = &quot;Pitch&quot;,                                                    \
+                              .doc = &quot;Degrees between a grid's beamlets along x and y.&quot;,           \
+                              .group = &quot;Pattern&quot;, .min = 0.001, .max = 60.0}))                     \
+    X(double, Efficiency, ::ernie::tokens::kLaserEfficiency, 1.0,                                  \
+      (::ernie::AttributeMeta{.doc = &quot;Fraction of the power that goes into the line or the &quot;       \
+                                     &quot;grid's beamlets.&quot;,                                           \
+                              .group = &quot;Pattern&quot;, .max = 1.0}))                                    \
+    X(double, ZeroOrder, ::ernie::tokens::kLaserZeroOrder, 0.0,                                    \
+      (::ernie::AttributeMeta{.label = &quot;Zero order&quot;,                                               \
+                              .doc = &quot;Fraction of a grid's power left in a beam along the axis.&quot;,  \
+                              .group = &quot;Pattern&quot;, .max = 1.0}))                                    \
     X(bool, ShadowEnable, ::ernie::tokens::kShadowEnable, true,                                    \
       (::ernie::AttributeMeta{.label = &quot;Shadows&quot;, .group = &quot;Laser&quot;}))
 

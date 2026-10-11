@@ -205,6 +205,21 @@
 <ul>
 <li><code>#include &lt;ernie/session/frame_params.h&gt;</code></li>
 </ul>
+<h2 id="public-types">Public Types</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">enum std::uint32_t</td>
+<td style="text-align: left;"><a href="#enum-pattern"><strong>Pattern</strong></a>  <br><em>The pattern it makes (</em> <code>tokens::kLaserPattern</code> <em>): the beam itself; a line fanned over</em><code>fan</code> <em>radians along x, its profile along the line flat or Gaussian; or a grid of</em><code>cells</code> <em>beamlets</em><code>pitch</code> <em>radians apart.</em></td>
+</tr>
+</tbody>
+</table>
 <h2 id="public-attributes">Public Attributes</h2>
 <table>
 <thead>
@@ -214,6 +229,30 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: right;">glm::uvec2</td>
+<td style="text-align: left;"><a href="#variable-cells"><strong>cells</strong></a>   = <code>{1u}</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-efficiency"><strong>efficiency</strong></a>   = <code>1.0f</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-fan"><strong>fan</strong></a>   = <code>0.0f</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-gaussianline"><strong>gaussianLine</strong></a>   = <code>false</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./#enum-pattern"><strong>Pattern</strong></a></td>
+<td style="text-align: left;"><a href="#variable-pattern"><strong>pattern</strong></a>   = <code>Pattern::Spot</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec2</td>
+<td style="text-align: left;"><a href="#variable-pitch"><strong>pitch</strong></a>   = <code>{0.0f}</code><br></td>
+</tr>
 <tr>
 <td style="text-align: right;">glm::vec2</td>
 <td style="text-align: left;"><a href="#variable-rayleigh"><strong>rayleigh</strong></a>   = <code>{0.0f}</code><br></td>
@@ -226,11 +265,56 @@
 <td style="text-align: right;">float</td>
 <td style="text-align: left;"><a href="#variable-waistdistance"><strong>waistDistance</strong></a>   = <code>0.0f</code><br></td>
 </tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-zeroorder"><strong>zeroOrder</strong></a>   = <code>0.0f</code><br></td>
+</tr>
 </tbody>
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
 <p>The irradiance across the beam z past the waist is 2 P / (pi w_x w_y) exp(-2 (x^2 / w_x^2 + y^2 / w_y^2)), with w = w0 sqrt(1 + (z / z_R)^2) along each axis. </p>
+<h2 id="public-types-documentation">Public Types Documentation</h2>
+<h3 id="enum-pattern">enum Pattern</h3>
+<p><em>The pattern it makes (</em> <code>tokens::kLaserPattern</code> <em>): the beam itself; a line fanned over</em><code>fan</code> <em>radians along x, its profile along the line flat or Gaussian; or a grid of</em><code>cells</code> <em>beamlets</em><code>pitch</code> <em>radians apart.</em></p>
+<pre><code class="language-C++">enum ernie::LightParams::Beam::Pattern {
+    Spot,
+    Line,
+    Grid
+};
+</code></pre>
+<p><code>efficiency</code> of the power goes into the line or the beamlets, <code>zeroOrder</code> into a beam along the axis (grids). </p>
+<hr>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-cells">variable cells</h3>
+<pre><code class="language-C++">glm::uvec2 ernie::LightParams::Beam::cells;
+</code></pre>
+<hr>
+
+<h3 id="variable-efficiency">variable efficiency</h3>
+<pre><code class="language-C++">float ernie::LightParams::Beam::efficiency;
+</code></pre>
+<hr>
+
+<h3 id="variable-fan">variable fan</h3>
+<pre><code class="language-C++">float ernie::LightParams::Beam::fan;
+</code></pre>
+<hr>
+
+<h3 id="variable-gaussianline">variable gaussianLine</h3>
+<pre><code class="language-C++">bool ernie::LightParams::Beam::gaussianLine;
+</code></pre>
+<hr>
+
+<h3 id="variable-pattern">variable pattern</h3>
+<pre><code class="language-C++">Pattern ernie::LightParams::Beam::pattern;
+</code></pre>
+<hr>
+
+<h3 id="variable-pitch">variable pitch</h3>
+<pre><code class="language-C++">glm::vec2 ernie::LightParams::Beam::pitch;
+</code></pre>
+<hr>
+
 <h3 id="variable-rayleigh">variable rayleigh</h3>
 <pre><code class="language-C++">glm::vec2 ernie::LightParams::Beam::rayleigh;
 </code></pre>
@@ -243,6 +327,11 @@
 
 <h3 id="variable-waistdistance">variable waistDistance</h3>
 <pre><code class="language-C++">float ernie::LightParams::Beam::waistDistance;
+</code></pre>
+<hr>
+
+<h3 id="variable-zeroorder">variable zeroOrder</h3>
+<pre><code class="language-C++">float ernie::LightParams::Beam::zeroOrder;
 </code></pre>
 <hr>
 

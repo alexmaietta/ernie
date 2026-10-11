@@ -11115,6 +11115,14 @@ connects to.</p>
                 <p>Linear RGB radiance in cd/m^2 for white, without a UsdPreviewSurface (whose own is read</p>
               </div>
             </li>
+            <li>
+              <b><code>reflectance</code></b>
+                  (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>(nm, value) pairs, wavelengths increasing, of a measured reflectance spectrum in [0, 1],</p>
+              </div>
+            </li>
         </ul>
       </td>
     </tr>
@@ -11580,6 +11588,30 @@ then). Default (0.0, 0.0, 0.0). USD name <code>inputs:emissiveColor</code>.</p>
 
 </div>
 
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.reflectance" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">reflectance</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">reflectance: list[float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>(nm, value) pairs, wavelengths increasing, of a measured reflectance spectrum in [0, 1],
+replacing the albedo; the nearest value outside them. USD name <code>inputs:reflectance</code>.</p>
+
+    </div>
+
+</div>
+
 
 
 
@@ -11598,6 +11630,7 @@ then). Default (0.0, 0.0, 0.0). USD name <code>inputs:emissiveColor</code>.</p>
     quaternion_order: str = ...,
     brdf: str = ...,
     albedo: Sequence[float] = ...,
+    reflectance: float | Sequence[float] = ...,
     albedo_map_enable: bool = ...,
     albedo_map: Any = ...,
     albedo_map_origin: Sequence[float] = ...,

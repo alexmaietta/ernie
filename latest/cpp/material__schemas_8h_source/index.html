@@ -222,6 +222,11 @@
                               .group = &quot;Surface&quot;}))                                                \
     X(glm::dvec3, Albedo, ::ernie::tokens::kAlbedo, glm::dvec3(1.0),                               \
       (::ernie::AttributeMeta{.doc = &quot;Linear RGB&quot;, .group = &quot;Surface&quot;, .color = true}))            \
+    X(std::vector&lt;float&gt;, Reflectance, ::ernie::tokens::kReflectance, std::vector&lt;float&gt;{},        \
+      (::ernie::AttributeMeta{.doc = &quot;(nm, value) pairs, wavelengths increasing, of a measured &quot;  \
+                                     &quot;reflectance spectrum in [0, 1], replacing the albedo; the &quot;  \
+                                     &quot;nearest value outside them.&quot;,                                \
+                              .group = &quot;Surface&quot;}))                                                \
     X(bool, AlbedoMapEnable, ::ernie::tokens::kAlbedoMapEnable, true,                              \
       (::ernie::AttributeMeta{.label = &quot;Use albedo map&quot;, .group = &quot;Surface&quot;}))                     \
     X(::ernie::Tensor, AlbedoMap, ::ernie::tokens::kAlbedoMap, nullptr,                            \

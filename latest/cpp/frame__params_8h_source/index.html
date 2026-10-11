@@ -353,6 +353,14 @@ struct LightParams {
         glm::vec2 waist{0.0f};
         glm::vec2 rayleigh{0.0f};
         float waistDistance = 0.0f;
+        enum class Pattern : std::uint32_t { Spot, Line, Grid };
+        Pattern pattern = Pattern::Spot;
+        float fan = 0.0f;
+        bool gaussianLine = false;
+        glm::uvec2 cells{1u};
+        glm::vec2 pitch{0.0f};
+        float efficiency = 1.0f;
+        float zeroOrder = 0.0f;
     };
     Beam beam;
     bool shadows = true;
