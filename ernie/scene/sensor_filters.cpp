@@ -398,6 +398,27 @@ std::vector<SensorFilterModel> StandardSensorFilters() {
          {},
          0,
          true},
+        {"strayLight",
+         "Stray light",
+         "Sunlight from outside the field scattered by the optics and baffles into a veil over "
+         "the image: the sun's irradiance times the point source transmittance at its angle off "
+         "the axis (a power law, or a table of angles and values), with a gradient towards its "
+         "side; none behind the camera. Before qe and cie.",
+         {"R. P. Breault, \"Control of Stray Light\", Handbook of Optics, 2nd ed., vol. I, "
+          "chapter 38, 1995",
+          "E. C. Fest, \"Stray Light Analysis and Control\", SPIE Press, 2013"},
+         Kind::Band,
+         Domain::Spectrum,
+         {{"strength", 1e-4f, "PST at angle, or the table's scale (1 for a measured PST)"},
+          {"angle", 10.0f, "Degrees off axis where the power law's PST is strength"},
+          {"slope", 2.0f, "The power law's power of the angle"},
+          {"cutoff", 90.0f, "Degrees off axis beyond which no sunlight enters"},
+          {"gradient", 0.5f, "The veil's rise towards the sun's side, 0 to 1"},
+          {"inField", 0.0f, "1: also while the sun images on the sensor (glare's case)"},
+          {"angles", 0.0f, "A PST table's angles off axis, degrees, increasing (up to 25)", 25},
+          {"logValues", 0.0f, "log10 of the table's PST at those angles, as many", 25}},
+         "StrayLight",
+         shaders::kFilterStrayLightSlang},
         {"lag",
          "Image lag",
          "A fraction of each frame's charge read out with the next, so moving highlights trail "

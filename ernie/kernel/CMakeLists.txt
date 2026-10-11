@@ -30,6 +30,7 @@ set(ernie_shaders
     film/filter_readout_taps.slang=kFilterReadoutTapsSlang
     film/filter_smear.slang=kFilterSmearSlang
     film/filter_spectral_transmission.slang=kFilterSpectralTransmissionSlang
+    film/filter_stray_light.slang=kFilterStrayLightSlang
     film/filter_tdi.slang=kFilterTdiSlang
     film/filter_temporal_average.slang=kFilterTemporalAverageSlang
     film/filter_tone_curve.slang=kFilterToneCurveSlang

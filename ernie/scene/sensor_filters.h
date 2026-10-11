@@ -226,6 +226,9 @@ class SensorFilterRegistry {
 /// - `flare` (spatial, electrons; pyramid): lens flare ghosts, the image's bright sources as
 ///   defocused aperture shapes on the line through the principal point, each at its own scale,
 ///   size and coating tint; after `qe`, before `noise`.
+/// - `strayLight` (band): the sun's light from outside the field as a veil over the image, its
+///   irradiance times the optics' point source transmittance at its angle off the axis (from the
+///   frame's sun, which the image lacks); before `qe` and `cie`.
 /// - `lag` (pixel, electrons; temporal): a `fraction` of each frame's charge read out with the
 ///   next.
 /// - `temporalAverage` (pixel, rgb; temporal): an exponential moving average, `alpha` the new

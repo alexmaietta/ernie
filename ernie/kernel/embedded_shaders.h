@@ -53,6 +53,7 @@ extern const char kFilterReadoutTapsSlang[];
 extern const char kFilterTdiSlang[];
 extern const char kFilterTemporalAverageSlang[];
 extern const char kFilterSpectralTransmissionSlang[];
+extern const char kFilterStrayLightSlang[];
 extern const char kFilterToneCurveSlang[];
 extern const char kFilterWhiteBalanceSlang[];
 

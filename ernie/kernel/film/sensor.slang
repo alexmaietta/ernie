@@ -92,10 +92,17 @@ public struct SensorUniforms {
     // pixels, zw their principal point.
     public float4x4 faceInvProj;
     public float4 faces;
-    float4 facesPadding[11];
+    // xyz: the unit direction towards the sun in the camera's frame (x right, y up, the camera
+    // looking down -z); w: 1 when the sun lights the frame, else 0 (`PixelContext.sunInCamera`).
+    public float4 sun;
+    float4 facesPadding[10];
     // Per band, two to a float4 (`chromaticOf`): the lens's image scale (lateral colour) and focal
-    // length shift in millimetres (axial colour). The views' stride in the buffer is 3328 bytes.
+    // length shift in millimetres (axial colour).
     public float4 chromatic[32];
+    // Per band, four to a float4: the radiance whose image puts the sun's irradiance at normal
+    // incidence on the focal plane, E_sun 4 N^2 / (pi T) (`PixelContext.sunFocalRadiance`); 0
+    // without the sun. The views' stride in the buffer is 3584 bytes.
+    public float4 sunRadiance[16];
 }
 
 // Band `band`'s image scale (x) and focal length shift in millimetres (y) through `cam`'s lens.
@@ -232,6 +239,18 @@ public struct PixelContext {
     }
     public float focusDistance() {
         return sensorViews[view].optics.w;
+    }
+
+    // The sun, for stray light: the unit direction towards it in the camera's frame (x right,
+    // y up, the camera looking down -z), w 1 when it lights the frame; and per band the radiance
+    // whose image puts its irradiance at normal incidence on the focal plane (through the camera
+    // equation E = pi T L / (4 N^2) on axis), so a share k of that irradiance reaching the
+    // sensor reads as k times this radiance. Zero without the sun.
+    public float4 sunInCamera() {
+        return sensorViews[view].sun;
+    }
+    public float sunFocalRadiance(uint band) {
+        return sensorViews[view].sunRadiance[band / 4][band % 4];
     }
 
     // Photons collected over the exposure per unit spectral radiance in band `band` (the camera

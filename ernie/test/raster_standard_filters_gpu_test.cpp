@@ -514,6 +514,71 @@ TEST_F(RasterDelegateTest, FlareGhostsMirrorBrightSourcesThroughTheCentreAndKeep
     }
 }
 
+TEST_F(RasterDelegateTest, StrayLightRisesAsTheSunNearsTheFieldAndVanishesBehindTheCamera) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();  // the sun straight behind the camera
+    const auto base = VarThrough(delegate, scene, "HdrColor", {{"cie", kNone}});
+    EXPECT_EQ(VarThrough(delegate, scene, "HdrColor", {{"strayLight", kNone}, {"cie", kNone}}),
+              base)
+        << "none from behind the camera";
+    const ernie::CameraParams camera = ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize);
+    // The camera looks down -z: the sun `degrees` off its axis, to the right.
+    const auto aim = [&scene](double degrees) {
+        const double theta = glm::radians(degrees);
+        scene.Set("/World/Sun", tokens::kTransform,
+                  ernie::DistantLightTransform({std::sin(theta), 0.0, -std::cos(theta)}));
+    };
+    const auto luminance = [](const std::vector<float>& image, std::size_t x, std::size_t y) {
+        const float* rgb = &image[(y * kSize + x) * 4];
+        return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+    };
+    const std::size_t middle = kSize / 2;  // the background between the quad and the rocks
+    // The veil at the centre without a gradient: the sun's (relative) illuminance pi times the
+    // PST, through the camera equation, a luminance of 4 N^2 PST / T.
+    const double perPst = 4.0 * camera.fStop * camera.fStop / camera.lens.transmission;
+    double previous = 0.0;
+    for (const double degrees : {80.0, 60.0, 40.0}) {
+        aim(degrees);
+        const auto lit = VarThrough(delegate, scene, "HdrColor", {{"cie", kNone}});
+        const auto veiled =
+            VarThrough(delegate, scene, "HdrColor",
+                       {{"strayLight", {{"strength", 1e-3f}, {"gradient", 0.0f}}}, {"cie", kNone}});
+        const double expected = perPst * 1e-3 * std::pow(degrees / 10.0, -2.0);
+        const double veil = luminance(veiled, middle, middle) - luminance(lit, middle, middle);
+        EXPECT_NEAR(veil, expected, 0.02 * expected) << degrees;
+        EXPECT_GT(veil, previous) << "rising as the sun nears the field";
+        previous = veil;
+        EXPECT_EQ(VarThrough(delegate, scene, "HdrColor",
+                             {{"strayLight", {{"strength", 0.0f}}}, {"cie", kNone}}),
+                  lit)
+            << "untouched at zero strength";
+    }
+    // Brighter towards the sun's side (right), the mean kept at the centre.
+    const auto lit = VarThrough(delegate, scene, "HdrColor", {{"cie", kNone}});
+    const auto ramped =
+        VarThrough(delegate, scene, "HdrColor",
+                   {{"strayLight", {{"strength", 1e-3f}, {"gradient", 1.0f}}}, {"cie", kNone}});
+    const double right = luminance(ramped, kSize - 8, middle) - luminance(lit, kSize - 8, middle);
+    const double left = luminance(ramped, 8, middle) - luminance(lit, 8, middle);
+    EXPECT_GT(right, 1.5 * left);
+    EXPECT_NEAR(0.5 * (left + right), previous, 0.05 * previous);
+    // A PST table instead of the power law: 1e-4 at 30 degrees, 1e-6 at 50, so 1e-5 at 40.
+    const auto tabled =
+        VarsThrough(delegate, scene, {"HdrColor"},
+                    {{"strayLight", {{"strength", 1.0f}, {"gradient", 0.0f}}}, {"cie", kNone}},
+                    {{0, {{"angles", {30.0f, 50.0f}}, {"logValues", {-4.0f, -6.0f}}}}})
+            .at("HdrColor");
+    EXPECT_NEAR(luminance(tabled, middle, middle) - luminance(lit, middle, middle), perPst * 1e-5,
+                0.03 * perPst * 1e-5);
+    // Past the cutoff the aperture no longer sees the sun; in the field, it is glare's case.
+    for (const double degrees : {100.0, 10.0}) {
+        aim(degrees);
+        EXPECT_EQ(VarThrough(delegate, scene, "HdrColor", {{"strayLight", kNone}, {"cie", kNone}}),
+                  VarThrough(delegate, scene, "HdrColor", {{"cie", kNone}}))
+            << degrees;
+    }
+}
+
 TEST_F(RasterDelegateTest, RenderVarsCanNameTheirOwnChains) {
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();

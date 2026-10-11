@@ -133,12 +133,18 @@ struct SensorUniforms {
     float faceInvProj[16];
     /// Faces (1 without), the faces' focal length in raster pixels, their principal point.
     float faces[4];
-    float facesPadding[44];
+    /// The unit direction towards the sun in the view's camera frame; 1 when the sun lights the
+    /// frame.
+    float sun[4];
+    float facesPadding[40];
     /// Per band, two to a float4: the lens's image scale (lateral colour) and focal length shift
     /// in millimetres (axial colour); 1 and 0 without chromatic aberration.
     float chromatic[SpectralBands::kMaxBands / 2][4];
+    /// Per band: the radiance whose image puts the sun's irradiance at normal incidence on the
+    /// focal plane, E_sun 4 N^2 / (pi T), for stray light; 0 without the sun.
+    float sunRadiance[SpectralBands::kMaxBands];
 };
-static_assert(sizeof(SensorUniforms) == 3328, "SensorUniforms must match sensor.slang");
+static_assert(sizeof(SensorUniforms) == 3584, "SensorUniforms must match sensor.slang");
 
 /// Per-view uniforms sit in one buffer at multiples of this, the largest
 /// `minUniformBufferOffsetAlignment` Vulkan allows.
@@ -1954,6 +1960,17 @@ void RasterRenderer::WriteSensor(const FrameParams& params, const FrameParams& r
         sensor.chromatic[i / 2][(i % 2) * 2] = static_cast<float>(scale);
         sensor.chromatic[i / 2][(i % 2) * 2 + 1] = static_cast<float>(shift);
     }
+    // The sun for stray light: its irradiance as the radiance whose image puts it on the focal
+    // plane, through the camera equation (`CameraParams::IrradiancePerRadiance` on axis).
+    const double focal = camera.IrradiancePerRadiance({0.0, 0.0});
+    for (int i = 0; i < bands_.count && params.sun && focal > 0.0 && std::isfinite(focal); ++i) {
+        const double irradiance =
+            params.sunIrradiance.empty()
+                ? M_PI / (kLuminousEfficacy * LuminanceIntegral())
+                : static_cast<double>(params.sunIrradiance[static_cast<std::size_t>(i)]);
+        sensor.sunRadiance[i] = static_cast<float>(irradiance / focal);
+    }
+    sensor.sun[3] = params.sun ? 1.0f : 0.0f;
     sensor.faces[0] = static_cast<float>(faces_);
     if (faces_ > 1) {
         const glm::dvec3 face = FrameParams::FaceIntrinsics(extent_.width, extent_.height);
@@ -1984,6 +2001,11 @@ void RasterRenderer::WriteSensor(const FrameParams& params, const FrameParams& r
         sensor.forward[0] = view.forward.x;
         sensor.forward[1] = view.forward.y;
         sensor.forward[2] = view.forward.z;
+        const glm::vec3 sun = glm::mat3(view.view) * params.sunDirection;
+        const glm::vec3 towards = glm::length(sun) > 0.0f ? glm::normalize(sun) : sun;
+        sensor.sun[0] = towards.x;
+        sensor.sun[1] = towards.y;
+        sensor.sun[2] = towards.z;
         // Every view of a batch has noise of its own; view 0's is the single view's.
         sensor.noise[2] = FrameSeed(model.seed, params.stream ^ (v * 0x9E3779B9u), params.frame);
         uploads_.Write(sensorUniforms_, std::as_bytes(std::span(&sensor, 1)), v * kSensorStride);
