@@ -1,10 +1,14 @@
 version: 2
 updates:
-  # The actions the workflows use, grouped into one pull request a week.
+  # The actions the workflows use: new major versions only, grouped into one pull request a month.
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     groups:
       actions:
         patterns: ["*"]
+        update-types: ["major"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
