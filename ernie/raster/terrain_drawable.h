@@ -302,6 +302,8 @@ class TerrainDrawable : public RasterDrawable {
     std::optional<float> noData_;  ///< The heights' no-data value, host or device ones.
     /// Makes the horizon map and its pipeline for the current heights, when missing.
     void EnsureHorizon();
+    /// The height above the ground horizon map level `level` sees from, in height units.
+    float HorizonLevel(std::size_t level) const;
     /// Records the horizon map's computation from the heights image.
     void RecordHorizon(VkCommandBuffer commands) const;
 };

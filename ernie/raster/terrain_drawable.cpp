@@ -109,7 +109,12 @@ constexpr DescriptorBinding kHorizonBindings[] = {
 struct HorizonConstants {
     std::uint32_t size[4];
     float values[4];
+    float levels[4];
 };
+
+/// The heights above the ground the horizon map's levels see from, in cells: the ground, then
+/// heights for what stands on the terrain (terrain_horizon.slang).
+constexpr std::array<float, 4> kHorizonLevelCells{0.0f, 2.0f, 8.0f, 32.0f};
 
 /// terrain_update.slang's constants.
 struct UpdateConstants {
@@ -461,6 +466,10 @@ void TerrainDrawable::RecordCull(VkCommandBuffer commands) const {
     }
 }
 
+float TerrainDrawable::HorizonLevel(std::size_t level) const {
+    return kHorizonLevelCells[level] * static_cast<float>(pixelSize_);
+}
+
 void TerrainDrawable::EnsureHorizon() {
     if (horizonPipeline_ == nullptr) {
         const std::vector<ShaderModuleSource> modules{
@@ -477,7 +486,8 @@ void TerrainDrawable::EnsureHorizon() {
             static_cast<std::uint32_t>((height_ + horizonScale_ - 1) / horizonScale_);
         horizon_ = std::make_unique<GpuImage>(
             renderer_.Context(),
-            ImageDesc{width, height, 2, 1, VK_FORMAT_R16G16B16A16_SFLOAT,
+            ImageDesc{width, height, static_cast<std::uint32_t>(2 * kHorizonLevelCells.size()), 1,
+                      VK_FORMAT_R16G16B16A16_SFLOAT,
                       VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, false, true});
         horizonDirty_ = true;
     }
@@ -500,6 +510,9 @@ void TerrainDrawable::RecordHorizon(VkCommandBuffer commands) const {
     constants.values[1] = static_cast<float>(pixelSize_);
     constants.values[2] = noData_.value_or(0.0f);
     constants.values[3] = noData_ ? 1.0f : 0.0f;
+    for (std::size_t level = 0; level < kHorizonLevelCells.size(); ++level) {
+        constants.levels[level] = HorizonLevel(level);
+    }
     horizonLayout_.PushConstants(commands, &constants, sizeof(constants));
     vkCmdDispatch(commands, (constants.size[2] + 7) / 8, (constants.size[3] + 7) / 8, 1);
     horizon_->Transition(commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -660,6 +673,15 @@ void TerrainDrawable::Prepare(const FrameParams& frame, std::span<const ShadowCa
                         static_cast<float>(originY_ - origin_.y),
                         static_cast<float>(pixelSize_ * horizonScale_), params_.exaggeration};
         horizon.info = {horizon_->Desc().width, horizon_->Desc().height, params_.primId, 1};
+        // The heights, for how far what stands on the terrain stands above it.
+        horizon.heights = heights_.get();
+        horizon.heightsGrid = {static_cast<float>(pixelSize_), static_cast<float>(origin_.z),
+                               noData_.value_or(0.0f), noData_ ? 1.0f : 0.0f};
+        horizon.heightsSize = {static_cast<std::uint32_t>(width_),
+                               static_cast<std::uint32_t>(height_), 0, 0};
+        for (std::size_t level = 0; level < kHorizonLevelCells.size(); ++level) {
+            horizon.levels[level] = HorizonLevel(level);
+        }
     }
     renderer_.SetTerrainHorizon(horizon);
     if (!HasHeightfield()) {

@@ -696,6 +696,50 @@ TEST_F(RasterDelegateTest, TerrainHorizonsShadowTheDomeFromOffScreen) {
     EXPECT_GT(fullFar, fullNear + 0.05f * approximateFar) << "less so farther from it";
 }
 
+TEST_F(RasterDelegateTest, TerrainHorizonsShadowWhatStandsOnTheTerrain) {
+    // The cliff of TerrainHorizonsShadowTheDomeFromOffScreen, and a block 6 m wide whose top
+    // stands 30 m up, 13 m from the cliff. From the top the cliff rises 57 degrees at most,
+    // hiding about a sixth of its cosine-weighted sky; from the floor beside it, 11 m from the
+    // cliff, 78 degrees, hiding over a third. Only the horizon map at the top's height sees that.
+    Scene scene = FlatScene();
+    scene.Remove("/World/Sun");
+    std::vector<float> heights(65 * 65, 0.0f);
+    for (int row = 0; row < 65; ++row) {
+        for (int col = 0; col < 65; ++col) {
+            const double x = -65.0 + (col + 0.5) * 2.0;
+            if (x >= 25.0 && x <= 35.0) {
+                heights[static_cast<std::size_t>(row * 65 + col)] = 50.0f;
+            }
+        }
+    }
+    ernie::Terrain(scene, "/World/Terrain").SetHeights(Tensor::Copy<float>(heights, {65, 65}));
+    ernie::Cube::Define(scene, "/World/Block")
+        .SetSize(1.0)
+        .SetXform({.translate = glm::dvec3(12.0, 0.0, 15.0), .scale = glm::dvec3(6.0, 6.0, 30.0)});
+    ernie::DomeLight::Define(scene, "/World/Sky").SetIntensity(1.0);
+    RasterDelegate delegate(*context_);
+    // The pixels seeing the block's top at (12, 0, 30) and the floor at (14, -8).
+    const glm::mat4 viewProjection =
+        ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize).RasterView().ViewProjection();
+    const glm::vec4 clip = viewProjection * glm::vec4(12.0f, 0.0f, 30.0f, 1.0f);
+    const glm::vec2 ndc = glm::vec2(clip) / clip.w;
+    const auto topRow = static_cast<std::size_t>((0.5f - ndc.y * 0.5f) * kVarSize);
+    const auto topCol = static_cast<std::size_t>((ndc.x * 0.5f + 0.5f) * kVarSize);
+    const auto [floorRow, floorCol] = PixelOf(scene, 14.0f, -8.0f);
+    const auto lit = [&] {
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const auto vars = MapVars(outputs);
+        return std::pair(At<float>(vars.at("HdrColor"), topRow, topCol, 1),
+                         At<float>(vars.at("HdrColor"), floorRow, floorCol, 1));
+    };
+    const auto [approximateTop, approximateFloor] = lit();
+    ernie::RenderSettings::Define(scene, "/Render/Settings").SetDomeLightMode("full");
+    const auto [fullTop, fullFloor] = lit();
+    EXPECT_LT(fullTop, 0.92f * approximateTop) << "the cliff hides some of the top's sky";
+    EXPECT_GT(fullTop / approximateTop, 1.1f * fullFloor / approximateFloor)
+        << "but less than the floor's below it";
+}
+
 TEST_F(RasterDelegateTest, EmissiveSurfacesShowTheirLuminanceUnlit) {
     // With no light at all, a floor emitting white of 2 cd/m^2 shows a luminance of 2 (HdrColor
     // is in cd/m^2), and red emission reads red.

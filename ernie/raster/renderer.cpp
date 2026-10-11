@@ -183,6 +183,7 @@ constexpr DescriptorBinding kShadingBindings[] = {
     {18, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {19, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {20, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {21, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
 };
 
 /// shading.slang's ShadingConstants: the dispatch's model and first view, and the terrain horizon
@@ -191,8 +192,11 @@ struct ShadingConstants {
     std::uint32_t model[4];
     float horizonGrid[4];
     std::uint32_t horizonInfo[4];
+    float heightsGrid[4];
+    std::uint32_t heightsSize[4];
+    float horizonLevels[4];
 };
-static_assert(sizeof(ShadingConstants) == 48, "ShadingConstants must match shading.slang");
+static_assert(sizeof(ShadingConstants) == 96, "ShadingConstants must match shading.slang");
 
 constexpr DescriptorBinding kFilterBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
@@ -685,6 +689,13 @@ RasterRenderer::RasterRenderer(const VulkanContext& context, VkFormat presentFor
     const std::span<const std::byte> layers[] = {std::as_bytes(std::span(nadir)),
                                                  std::as_bytes(std::span(nadir))};
     noHorizon_->Upload(layers);
+    // A height in place of a terrain's, read only with its horizon map.
+    noHeights_ =
+        std::make_unique<GpuImage>(context_, ImageDesc{1, 1, 1, 1, VK_FORMAT_R32_SFLOAT,
+                                                       VK_IMAGE_USAGE_SAMPLED_BIT, false, false});
+    const float flat = 0.0f;
+    const std::span<const std::byte> height[] = {std::as_bytes(std::span(&flat, 1))};
+    noHeights_->Upload(height);
 
     const std::vector<ShaderModuleSource> hzbModules{{"hzb", shaders::kHzbSlang}};
     const std::vector<ShaderModuleSource> pyramidModules{{"pyramid", shaders::kPyramidSlang}};
@@ -2839,7 +2850,8 @@ void RasterRenderer::Shade(VkCommandBuffer commands, RenderTargets& targets,
             general(occlusion_[0] != nullptr ? *occlusion_[0] : *noOcclusion_),
             general(occlusion_[1] != nullptr ? *occlusion_[1] : *noOcclusion_),
             sampled(terrainHorizon_.image != nullptr ? *terrainHorizon_.image : *noHorizon_),
-            DescriptorResource::Of(lightProfiles_)};
+            DescriptorResource::Of(lightProfiles_),
+            sampled(terrainHorizon_.heights != nullptr ? *terrainHorizon_.heights : *noHeights_)};
         // The dispatch's model and first view, and the terrain horizon (none without its image).
         const auto constantsFor = [&](std::uint32_t model) {
             ShadingConstants constants{};
@@ -2850,6 +2862,14 @@ void RasterRenderer::Shade(VkCommandBuffer commands, RenderTargets& targets,
                           constants.horizonGrid);
                 std::copy(terrainHorizon_.info.begin(), terrainHorizon_.info.end(),
                           constants.horizonInfo);
+                std::copy(terrainHorizon_.levels.begin(), terrainHorizon_.levels.end(),
+                          constants.horizonLevels);
+                if (terrainHorizon_.heights != nullptr) {
+                    std::copy(terrainHorizon_.heightsGrid.begin(),
+                              terrainHorizon_.heightsGrid.end(), constants.heightsGrid);
+                    std::copy(terrainHorizon_.heightsSize.begin(),
+                              terrainHorizon_.heightsSize.end(), constants.heightsSize);
+                }
             }
             return constants;
         };

@@ -191,6 +191,14 @@ class RasterRenderer {
         const GpuImage* image = nullptr;
         std::array<float, 4> grid{};
         std::array<std::uint32_t, 4> info{};
+        /// The terrain's heights (R32F), for how far a point stands above the ground: their cell
+        /// size, the frame origin's height (subtracted from the terrain's), the no-data value
+        /// and 1 when there is one; their width and height.
+        const GpuImage* heights = nullptr;
+        std::array<float, 4> heightsGrid{};
+        std::array<std::uint32_t, 4> heightsSize{};
+        /// The heights above the ground the map's levels see from, in height units.
+        std::array<float, 4> levels{};
     };
 
     /// Sets the terrain horizon this frame's dome occlusion reads; a default one for none.
@@ -681,6 +689,7 @@ class RasterRenderer {
     bool domeShadowed_ = false;
     TerrainHorizon terrainHorizon_;
     std::unique_ptr<GpuImage> noHorizon_;  ///< Binds in place of a terrain's horizon map.
+    std::unique_ptr<GpuImage> noHeights_;  ///< Binds in place of a terrain's heights.
     std::unique_ptr<ComputePipeline> occlusionPipeline_;
     std::unique_ptr<ComputePipeline> occlusionFilterPipeline_;
     mutable std::array<std::unique_ptr<GpuImage>, 2> occlusion_;

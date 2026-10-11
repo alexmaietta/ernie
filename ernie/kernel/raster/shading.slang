@@ -147,6 +147,13 @@ struct ShadingConstants {
     // width, height, the terrain's prim id and 1 when there is one.
     float4 horizonGrid;
     uint4 horizonInfo;
+    // The terrain's heights (`terrainHeights`): their cell size, the frame origin's height
+    // (subtracted from the terrain's), the no-data value and 1 when there is one; their width
+    // and height.
+    float4 heightsGrid;
+    uint4 heightsSize;
+    // The heights above the ground the horizon map's levels see from, in height units.
+    float4 horizonLevels;
 }
 
 [[vk::binding(0, 0)]] StructuredBuffer<ShadingUniforms> shadingViews;
@@ -549,35 +556,85 @@ float4 occlusionSlice(float3 n, float3 tangent, float3 v, float2 horizons) {
     return float4(projectedLength * (t0 * tangent + t1 * v), projectedLength * arc);
 }
 
-// The terrain's horizon map (terrain_horizon.slang): per texel, the tangents of the horizon's
-// elevation towards azimuths 0 to 135 degrees (layer 0) and 180 to 315 (layer 1), before
-// vertical exaggeration.
+// The terrain's horizon map (terrain_horizon.slang): per texel and level (a height above the
+// ground, `ShadingConstants::horizonLevels`), the tangents of the horizon's elevation towards
+// azimuths 0 to 135 degrees (layer 2 level) and 180 to 315 (layer 2 level + 1), before vertical
+// exaggeration.
 [[vk::binding(19, 0)]] Texture2DArray<float4> horizonMap;
+// The terrain's heights, before exaggeration, rows from its north edge.
+[[vk::binding(21, 0)]] Texture2D<float> terrainHeights;
 
-// The horizon tangents around texel `texel` (clamped to the map), as eight values.
-void horizonTexel(int2 texel, out float4 first, out float4 second) {
-    let at = clamp(texel, int2(0), int2(pass.horizonInfo.xy) - 1);
-    first = horizonMap.Load(int4(at, 0, 0));
-    second = horizonMap.Load(int4(at, 1, 0));
+static const uint kHorizonLevels = 4;
+
+// The horizon tangents of level `level` around texel `texel` (clamped to the map), as eight
+// values, bilinear at fraction `f` towards the next texels.
+void horizonAround(int2 texel, float2 f, uint level, out float4 first, out float4 second) {
+    let last = int2(pass.horizonInfo.xy) - 1;
+    float4 a[2], b[2], c[2], d[2];
+    for (uint side = 0; side < 2; ++side) {
+        let layer = 2 * level + side;
+        a[side] = horizonMap.Load(int4(clamp(texel, int2(0), last), layer, 0));
+        b[side] = horizonMap.Load(int4(clamp(texel + int2(1, 0), int2(0), last), layer, 0));
+        c[side] = horizonMap.Load(int4(clamp(texel + int2(0, 1), int2(0), last), layer, 0));
+        d[side] = horizonMap.Load(int4(clamp(texel + int2(1, 1), int2(0), last), layer, 0));
+    }
+    first = lerp(lerp(a[0], b[0], f.x), lerp(c[0], d[0], f.x), f.y);
+    second = lerp(lerp(a[1], b[1], f.x), lerp(c[1], d[1], f.x), f.y);
 }
 
-// The dome's visibility and bent normal over terrain at world point `world` (relative to the
-// frame's origin) with unit normal `n`, from the terrain's horizon map: the horizons around the
-// point (bilinear in its texels), in four vertical slices whose horizons to either side are the
-// map's opposite azimuths, integrated as `occlusionSlice` does about the vertical. They see the
-// whole terrain, on screen or not, at the map's resolution.
-float4 terrainOcclusion(float3 world, float3 n) {
+// How far world point `world` (relative to the frame's origin) stands above the terrain under
+// it, in height units (before exaggeration): bilinear in the heights. False off the terrain or
+// over no-data.
+bool aboveTerrain(float3 world, out float above) {
+    above = 0.0;
+    let grid = pass.horizonGrid;
+    let size = int2(pass.heightsSize.xy);
+    let cell = float2(world.x - grid.x, grid.y - world.y) / pass.heightsGrid.x - 0.5;
+    if (any(cell < -0.5) || any(cell > float2(size) - 0.5)) {
+        return false;
+    }
+    let base = int2(floor(cell));
+    let f = saturate(cell - float2(base));
+    float h[4];
+    for (uint k = 0; k < 4; ++k) {
+        let at = clamp(base + int2(k & 1, k >> 1), int2(0), size - 1);
+        h[k] = terrainHeights.Load(int3(at, 0));
+        if ((pass.heightsGrid.w > 0.5 && h[k] == pass.heightsGrid.z) || isnan(h[k])) {
+            return false;
+        }
+    }
+    let ground = lerp(lerp(h[0], h[1], f.x), lerp(h[2], h[3], f.x), f.y);
+    above = (world.z + pass.heightsGrid.y) / grid.w - ground;
+    return true;
+}
+
+// The dome's visibility and bent normal at world point `world` (relative to the frame's origin)
+// with unit normal `n`, `above` height units over the terrain (0 on it), from the terrain's
+// horizon map: the horizons around the point (bilinear in its texels, linear between the levels
+// bracketing `above`, extrapolated past the highest), in four vertical slices whose horizons to
+// either side are the map's opposite azimuths, integrated as `occlusionSlice` does about the
+// vertical. They see the whole terrain, on screen or not, at the map's resolution.
+float4 terrainOcclusion(float3 world, float3 n, float above) {
     let grid = pass.horizonGrid;
     let cell = float2(world.x - grid.x, grid.y - world.y) / grid.z - 0.5;
     let base = int2(floor(cell));
     let f = cell - float2(base);
-    float4 a0, a1, b0, b1, c0, c1, d0, d1;
-    horizonTexel(base, a0, a1);
-    horizonTexel(base + int2(1, 0), b0, b1);
-    horizonTexel(base + int2(0, 1), c0, c1);
-    horizonTexel(base + int2(1, 1), d0, d1);
-    let first = lerp(lerp(a0, b0, f.x), lerp(c0, d0, f.x), f.y) * grid.w;
-    let second = lerp(lerp(a1, b1, f.x), lerp(c1, d1, f.x), f.y) * grid.w;
+    uint lower = 0;
+    while (lower + 2 < kHorizonLevels && above > pass.horizonLevels[lower + 1]) {
+        lower += 1;
+    }
+    float4 first, second;
+    horizonAround(base, f, lower, first, second);
+    if (above > 0.0) {
+        float4 upperFirst, upperSecond;
+        horizonAround(base, f, lower + 1, upperFirst, upperSecond);
+        let span = pass.horizonLevels[lower + 1] - pass.horizonLevels[lower];
+        let t = span > 0.0 ? (above - pass.horizonLevels[lower]) / span : 0.0;
+        first = max(lerp(first, upperFirst, t), float4(-100.0));
+        second = max(lerp(second, upperSecond, t), float4(-100.0));
+    }
+    first *= grid.w;
+    second *= grid.w;
     // Elevation tangents as cosines of the angle from the vertical: sin(atan(t)).
     let up = float3(0.0, 0.0, 1.0);
     let towards = first * rsqrt(1.0 + first * first);
@@ -627,12 +684,17 @@ void occlusionMain(uint3 id : SV_DispatchThreadID) {
     let v = viewVector(ndc.xy, world);
     let n = facingNormal(normalize(gNormal.Load(pixel).xyz), v);
     var occlusion = domeOcclusion(int2(id.xy), id.z, world, ndc.z, n, v);
-    // Over terrain, the horizon map's occlusion too, which sees the whole terrain: the less
-    // visible of the two (as Unreal combines distance field and screen-space occlusion).
-    if (pass.horizonInfo.w != 0 && gIds.Load(pixel).y == pass.horizonInfo.z) {
-        let terrain = terrainOcclusion(world, n);
-        if (terrain.w < occlusion.w) {
-            occlusion = terrain;
+    // Over terrain, and on what stands over it, the horizon map's occlusion too, which sees the
+    // whole terrain: the less visible of the two (as Unreal combines distance field and
+    // screen-space occlusion).
+    if (pass.horizonInfo.w != 0) {
+        float above = 0.0;
+        let onTerrain = gIds.Load(pixel).y == pass.horizonInfo.z;
+        if (onTerrain || aboveTerrain(world, above)) {
+            let terrain = terrainOcclusion(world, n, onTerrain ? 0.0 : max(above, 0.0));
+            if (terrain.w < occlusion.w) {
+                occlusion = terrain;
+            }
         }
     }
     occlusionRaw[id] = occlusion;
