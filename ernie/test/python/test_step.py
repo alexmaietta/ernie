@@ -70,6 +70,20 @@ def test_step_returns_outputs_by_product(renderer):
     assert renderer.take_validation_messages() == []
 
 
+def test_steps_move_the_sensor_clock_on(renderer):
+    scene = product_scene()
+    renderer.reset_time(2.0)
+    frame = renderer.step(
+        scene, render_products=["/Render/Camera"], delta_time=0.5
+    )["/Render/Camera"].frames[0]
+    assert (frame.start_time, frame.time) == (2.0, 2.5)
+    assert renderer.time == 2.5
+    # The animation's clock is the scene's, apart from it.
+    assert ernie.Stage(scene).time == 0.0
+    with pytest.raises(ValueError):
+        renderer.step(scene, delta_time=-1.0)
+
+
 def test_step_async_waits_polls_and_fetches(renderer):
     scene = product_scene()
     expected = np.array(

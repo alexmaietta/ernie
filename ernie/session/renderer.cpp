@@ -49,14 +49,16 @@ std::string Renderer::DeviceName() const {
 
 RenderProductSetOutputs Renderer::Step(const Scene& scene,
                                        std::span<const Path> products,
-                                       const Path& settings) {
-    return delegate_->Step(scene, products, settings);
+                                       const Path& settings,
+                                       double deltaTime) {
+    return delegate_->Step(scene, products, settings, deltaTime);
 }
 
 StepOperation Renderer::StepAsync(const Scene& scene,
                                   std::span<const Path> products,
-                                  const Path& settings) {
-    return delegate_->StepAsync(scene, products, settings);
+                                  const Path& settings,
+                                  double deltaTime) {
+    return delegate_->StepAsync(scene, products, settings, deltaTime);
 }
 
 Tensor Renderer::Render(const Scene& scene, const Path& settings,

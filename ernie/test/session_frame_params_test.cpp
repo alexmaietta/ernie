@@ -27,6 +27,16 @@ void ExpectNear(const glm::dmat4& a, const glm::dmat4& b,
 
 }  // namespace
 
+TEST(Shutter, FrameRelativeTimesAreOnTheSensorClock) {
+    FrameParams frame;
+    frame.startTime = 10.0;
+    frame.time = 10.5;
+    EXPECT_EQ(frame.TimeAt(0.0), 10.5);
+    EXPECT_EQ(frame.TimeAt(-1.0), 10.0) << "the last frame's end";
+    EXPECT_EQ(frame.TimeAt(-0.5), 10.25);
+    EXPECT_EQ(frame.Subframes().time, 10.5) << "sub-frames keep it";
+}
+
 TEST(Shutter, SubframesSpanTheShutterAndReadout) {
     CameraParams camera;
     EXPECT_EQ(camera.Subframes(), 1) << "closed by default";

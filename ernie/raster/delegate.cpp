@@ -6,6 +6,7 @@
 #include "ernie/scene/material_schemas.h"
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
+#include "ernie/scene/stage_schemas.h"
 #include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/wide_view.h"
@@ -2228,6 +2229,7 @@ void RasterDelegate::Update(const Scene& scene, const Path& settings,
     // still be running.
     context_.WaitForSubmissions();
     BeginFrame();
+    window_ = TakeTimeWindow();
     anchoredViews_ = false;
     meshes_.SetAnchoredViews({});
     const RenderPrims prims = ResolveRenderPrims(scene, settings);
@@ -2383,6 +2385,12 @@ void RasterDelegate::UpdatePrims(
     } else if (chains.size() > 1) {
         frame.chains = std::move(chains);
     }
+    // Its span of the sensor clock, and the animation's time.
+    frame.startTime = window_.start;
+    frame.time = window_.end;
+    const Stage stage(scene);
+    frame.timeCode = stage.GetTimeCode();
+    frame.timeCodesPerSecond = stage.GetTimeCodesPerSecond();
     frame.poses = std::move(poses);
     frame.posesOnGpu = posesParent.has_value();
     frame.posesQuaternions = frame.posesOnGpu && gpuPosesQuaternions_;
@@ -2671,12 +2679,16 @@ std::uint32_t RasterDelegate::BeginFrame() {
 StepOperation
 RasterDelegate::StepAsync(const Scene& scene,
                           std::span<const Path> products,
-                          const Path& settings) {
+                          const Path& settings, double deltaTime) {
     ERNIE_ZONE("StepAsync");
     ComputeInterop* compute = Compute();
     const RenderPrims base = ResolveRenderPrims(scene, settings);
     const std::vector<RenderProductSpec> specs =
         ResolveRenderProducts(scene, products, settings);
+    // The step's span of the sensor clock, which a frame metered
+    // first leaves to it.
+    AdvanceTime(deltaTime);
+    const TimeWindow window = TakeTimeWindow();
     // A product exposed automatically with nothing metered yet (its
     // first frame) renders a frame to meter first, read as soon as
     // it finishes, so even a single frame is exposed for its scene.
@@ -2692,6 +2704,7 @@ RasterDelegate::StepAsync(const Scene& scene,
         context_.WaitForSubmissions();
         renderer_.ReadFinishedMeters();
     }
+    window_ = window;
     RenderProductSetOutputs outputs;
     std::uint64_t submission = 0;
     for (const RenderProductSpec& spec : specs) {
@@ -3027,6 +3040,8 @@ RasterDelegate::StepAsync(const Scene& scene,
         slotSubmissions_[slot] = submission;
         RenderProductOutput& output = outputs[spec.product];
         output.product = spec.product;
+        output.startTime = window.start;
+        output.time = window.end;
         for (const auto& [path, name] : spec.vars) {
             output.vars.emplace(name,
                                 RenderVarOutput(frame, path, name));

@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -51,8 +52,8 @@ class FakeDelegate : public RenderDelegate {
     void Record(VkCommandBuffer, const ernie::RenderingTarget&,
                 std::string_view) override {}
     ernie::StepOperation StepAsync(const Scene&,
-                                   std::span<const Path>,
-                                   const Path&) override {
+                                   std::span<const Path>, const Path&,
+                                   double) override {
         throw std::logic_error("not rendered");
     }
     ernie::ComputeInterop* Compute(std::string* why) override {
@@ -72,6 +73,7 @@ class FakeDelegate : public RenderDelegate {
     }
 
     using RenderDelegate::NextFrame;
+    using RenderDelegate::TakeTimeWindow;
 
   private:
     ernie::SensorFilterRegistry filters_;
@@ -105,6 +107,38 @@ TEST(RenderDelegate,
         << "authored frames repeat";
     EXPECT_EQ(delegate.NextFrame(scene, {}, left).frame, 5u)
         << "no settings: the count";
+}
+
+TEST(RenderDelegate, ItsSensorClockSpansEachFrame) {
+    FakeDelegate delegate;
+    EXPECT_EQ(delegate.Time(), 0.0);
+    // Each frame spans the clock from the last frame's end to now.
+    delegate.AdvanceTime(0.25);
+    auto window = delegate.TakeTimeWindow();
+    EXPECT_EQ(window.start, 0.0);
+    EXPECT_EQ(window.end, 0.25);
+    delegate.AdvanceTime(0.5);
+    delegate.AdvanceTime(0.25);
+    window = delegate.TakeTimeWindow();
+    EXPECT_EQ(window.start, 0.25);
+    EXPECT_EQ(window.end, 1.0);
+    window = delegate.TakeTimeWindow();
+    EXPECT_EQ(window.start, window.end) << "no time passed";
+
+    // A reset moves the clock and the next frame's start.
+    delegate.ResetTime(100.0);
+    delegate.AdvanceTime(0.1);
+    window = delegate.TakeTimeWindow();
+    EXPECT_EQ(window.start, 100.0);
+    EXPECT_NEAR(window.end, 100.1, 1e-12);
+
+    EXPECT_THROW(delegate.AdvanceTime(-1.0), std::invalid_argument);
+    EXPECT_THROW(
+        delegate.AdvanceTime(std::numeric_limits<double>::infinity()),
+        std::invalid_argument);
+    EXPECT_THROW(
+        delegate.ResetTime(std::numeric_limits<double>::quiet_NaN()),
+        std::invalid_argument);
 }
 
 TEST(RenderDelegate, GpuRendersNeedComputeInterop) {

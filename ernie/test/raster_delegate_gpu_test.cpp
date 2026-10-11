@@ -207,6 +207,29 @@ TEST_F(RasterDelegateTest, OutputsDoNotDependOnThePresentFormat) {
               0);
 }
 
+TEST_F(RasterDelegateTest, StepsMoveTheSensorClockOn) {
+    const TestRaster raster = RollingTerrain(9, 9, 2.0);
+    Scene scene = TerrainScene(raster);
+    RasterDelegate delegate(*context_);
+    delegate.Sync(scene);
+    ernie::SetCamera(scene, "/World/Camera", FramingCamera(delegate));
+    // Each step's frame spans the clock from the last frame's end.
+    ernie::RenderProductSetOutputs outputs =
+        delegate.Step(scene, {}, "/Render/Settings", 0.125);
+    ASSERT_EQ(outputs.size(), 1u);
+    EXPECT_EQ(outputs.begin()->second.startTime, 0.0);
+    EXPECT_EQ(outputs.begin()->second.time, 0.125);
+    outputs = delegate.Step(scene, {}, "/Render/Settings", 0.25);
+    EXPECT_EQ(outputs.begin()->second.startTime, 0.125);
+    EXPECT_EQ(outputs.begin()->second.time, 0.375);
+    EXPECT_EQ(delegate.Time(), 0.375);
+    // A reset starts the next frame there; no delta, none spanned.
+    delegate.ResetTime(7.0);
+    outputs = delegate.Step(scene, {}, "/Render/Settings");
+    EXPECT_EQ(outputs.begin()->second.startTime, 7.0);
+    EXPECT_EQ(outputs.begin()->second.time, 7.0);
+}
+
 TEST_F(RasterDelegateTest, SyncsHeightfieldEditsRemovalsAndTextures) {
     Scene scene = TerrainScene(RollingTerrain(33, 17, 2.0));
     RasterDelegate delegate(*context_);

@@ -186,10 +186,13 @@ class RenderVarOutput {
 };
 
 /// The outputs of one render product in a step: its render vars by
-/// name.
+/// name, and the span of the sensor clock its frame covers, seconds
+/// (`RenderDelegate::Time`), as ovrtx's frame start and end times.
 struct RenderProductOutput {
     Path product;
     std::map<std::string, RenderVarOutput> vars;
+    double startTime = 0.0;
+    double time = 0.0;
 };
 
 /// Outputs of a step by render product path.

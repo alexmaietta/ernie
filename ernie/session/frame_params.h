@@ -543,6 +543,23 @@ struct FrameParams {
     /// frame, which holds the camera still.
     std::vector<glm::dmat4> previousPoses;
 
+    /// The frame on the sensor clock (`RenderDelegate::Time`),
+    /// seconds: it ends at `time`, its frame-relative time 0, and
+    /// starts at `startTime`, the last frame's end, -1. The scene's
+    /// animation is at `timeCode` (`Stage::GetTimeCode`),
+    /// `timeCodesPerSecond` to a second.
+    double time = 0.0;
+    double startTime = 0.0;
+    double timeCode = 0.0;
+    double timeCodesPerSecond = 24.0;
+
+    /// The sensor clock at frame-relative time `frames` (a shutter's
+    /// `shutter:open` or `close`, say): `time` plus `frames` frames
+    /// of `time - startTime`.
+    double TimeAt(double frames) const {
+        return time + frames * (time - startTime);
+    }
+
     /// The world each view sees (`tokens::kWorld`): its own and the
     /// shared one, or every world for -1; empty for every view seeing
     /// every world.

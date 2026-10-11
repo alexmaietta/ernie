@@ -719,6 +719,13 @@ std::shared_ptr<Demo> DemoRunner::Run(std::shared_ptr<Demo> demo) {
                 if (o.test) {
                     demo->TestPostStep();
                 }
+                // Headless, the sensor clock keeps the demo's time, a
+                // frame ending where its step does; a window's viewer
+                // runs it with its frames.
+                if (!o.Windowed()) {
+                    demo->GetRenderer().Delegate().AdvanceTime(
+                        demo->frameDt);
+                }
             }
             demo->Render();
             if (stepping) {

@@ -95,9 +95,12 @@ struct PyCudaArrayMapping {
     PyRenderVarOutput var;
 };
 
-/// One frame of a render product: its render vars by path.
+/// One frame of a render product: its render vars by path, and its
+/// span of the sensor clock.
 struct PyFrame {
     std::map<std::string, PyRenderVarOutput> renderVars;
+    double startTime = 0.0;
+    double time = 0.0;
 };
 
 /// The outputs of one render product of a step.
@@ -115,6 +118,8 @@ PyOutputs Wrap(const RenderProductSetOutputs& outputs,
         PyProductOutput product;
         product.product = path.String();
         PyFrame frame;
+        frame.startTime = output.startTime;
+        frame.time = output.time;
         for (const auto& [name, var] : output.vars) {
             frame.renderVars.emplace(
                 var.GetPath().String(),
@@ -312,7 +317,12 @@ void BindRender(nb::module_& m) {
     nb::class_<PyFrame>(m, "Frame",
                         "A rendered frame of a render product.")
         .def_ro("render_vars", &PyFrame::renderVars,
-                "Render vars by RenderVar path.");
+                "Render vars by RenderVar path.")
+        .def_ro("start_time", &PyFrame::startTime,
+                "Where on the sensor clock (Renderer.time) the frame "
+                "starts, seconds: the last frame's end.")
+        .def_ro("time", &PyFrame::time,
+                "Where on the sensor clock the frame ends, seconds.");
 
     nb::class_<PyProductOutput>(m, "RenderProductOutput",
                                 "The outputs of one render product.")
@@ -653,7 +663,7 @@ void BindRender(nb::module_& m) {
             "step_async",
             [](nb::pointer_and_handle<Renderer> self,
                const Scene& scene, nb::handle renderProducts,
-               const Path& settings) {
+               const Path& settings, double deltaTime) {
                 const std::vector<Path> products =
                     PathsOf(renderProducts);
                 PyOperation op;
@@ -661,37 +671,53 @@ void BindRender(nb::module_& m) {
                 {
                     nb::gil_scoped_release release;
                     op.operation = self.p->Delegate().StepAsync(
-                        scene, products, settings);
+                        scene, products, settings, deltaTime);
                 }
                 return op;
             },
             nb::arg("scene"),
             nb::arg("render_products").none() = nb::none(),
-            nb::arg("settings") = Path(),
-            "Renders the RenderProduct prims `render_products` (or "
-            "the settings' products, or a "
-            "default one) and returns an Operation at once.")
+            nb::arg("settings") = Path(), nb::arg("delta_time") = 0.0,
+            "Moves the sensor clock (`time`) on by `delta_time` "
+            "seconds, then renders the RenderProduct prims "
+            "`render_products` (or the settings' products, or a "
+            "default one) over the clock since the last frame and "
+            "returns an Operation at once.")
         .def(
             "step",
             [](nb::pointer_and_handle<Renderer> self,
                const Scene& scene, nb::handle renderProducts,
-               const Path& settings) {
+               const Path& settings, double deltaTime) {
                 const std::vector<Path> products =
                     PathsOf(renderProducts);
                 RenderProductSetOutputs outputs;
                 {
                     nb::gil_scoped_release release;
-                    outputs = self.p->Delegate().Step(scene, products,
-                                                      settings);
+                    outputs = self.p->Delegate().Step(
+                        scene, products, settings, deltaTime);
                 }
                 return Wrap(outputs, self.h);
             },
             nb::arg("scene"),
             nb::arg("render_products").none() = nb::none(),
-            nb::arg("settings") = Path(),
+            nb::arg("settings") = Path(), nb::arg("delta_time") = 0.0,
             "step_async(...).wait().fetch(): the outputs by render "
             "product path, each with "
             ".frames[0].render_vars by RenderVar path.")
+        .def_prop_ro(
+            "time", [](Renderer& r) { return r.Delegate().Time(); },
+            "The sensor clock, seconds: where the last frame ended. "
+            "Steps move it on by their delta_time; the scene's "
+            "animation keeps its own (ernie.Stage(scene).time), as "
+            "ovrtx keeps USD time apart from its step clock.")
+        .def(
+            "reset_time",
+            [](Renderer& r, double time) {
+                r.Delegate().ResetTime(time);
+            },
+            nb::arg("time"),
+            "Sets the sensor clock to `time` seconds; the next frame "
+            "starts there.")
         .def(
             "cuda_copy",
             [](Renderer& r, const AnyArray& source,

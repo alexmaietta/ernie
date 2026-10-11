@@ -6,6 +6,7 @@
 #include "ernie/session/resolve.h"
 #include "ernie/session/sampling.h"
 
+#include <cmath>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -15,8 +16,27 @@ namespace ernie {
 RenderProductSetOutputs
 RenderDelegate::Step(const Scene& scene,
                      std::span<const Path> products,
-                     const Path& settings) {
-    return StepAsync(scene, products, settings).Fetch();
+                     const Path& settings, double deltaTime) {
+    return StepAsync(scene, products, settings, deltaTime).Fetch();
+}
+
+void RenderDelegate::AdvanceTime(double deltaTime) {
+    if (!(deltaTime >= 0.0) || !std::isfinite(deltaTime)) {
+        throw std::invalid_argument(
+            "The sensor clock moves on by a finite, non-negative "
+            "time, not " +
+            std::to_string(deltaTime));
+    }
+    time_ += deltaTime;
+}
+
+void RenderDelegate::ResetTime(double time) {
+    if (!std::isfinite(time)) {
+        throw std::invalid_argument(
+            "The sensor clock is set to a finite time");
+    }
+    time_ = time;
+    frameStart_ = time;
 }
 
 Tensor RenderDelegate::Render(const Scene& scene,

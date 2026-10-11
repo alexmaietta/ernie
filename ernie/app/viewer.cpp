@@ -2677,6 +2677,9 @@ struct Viewer::State {
             delegate->SetViewVar(capture && !capture->var.empty()
                                      ? capture->var
                                      : viewVar);
+            // The sensor clock runs with the viewer, a frame's
+            // seconds a frame.
+            delegate->AdvanceTime(std::max(frameInfo.delta, 0.0));
             delegate->Update(scene, SessionSettingsPath(),
                              viewport->Extent());
             const RenderingTarget target =

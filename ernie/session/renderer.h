@@ -56,13 +56,15 @@ class Renderer {
     /// empty) and waits for them; see `RenderDelegate::StepAsync`.
     RenderProductSetOutputs Step(const Scene& scene,
                                  std::span<const Path> products = {},
-                                 const Path& settings = {});
+                                 const Path& settings = {},
+                                 double deltaTime = 0.0);
 
     /// Renders `products` of `scene` and returns at once; see
     /// `RenderDelegate::StepAsync`.
     StepOperation StepAsync(const Scene& scene,
                             std::span<const Path> products = {},
-                            const Path& settings = {});
+                            const Path& settings = {},
+                            double deltaTime = 0.0);
 
     /// Renders the settings' first product and returns its LdrColor;
     /// see `RenderDelegate::Render`.

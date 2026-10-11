@@ -187,16 +187,22 @@ class RenderDelegate {
     /// loop that maps its outputs to CUDA without waiting keeps the
     /// GPU busy (a backend may bound the steps in flight, as the
     /// rasterizer does at two).
-    /// @throws std::invalid_argument as `ResolveRenderProducts` and
-    /// `Update`.
+    ///
+    /// The step first moves the sensor clock on by `deltaTime`
+    /// seconds (`AdvanceTime`; none by default), so its frames span
+    /// the clock from the last frame's end to the new time, as
+    /// ovrtx's `step` simulates [last time, last time + delta].
+    /// @throws std::invalid_argument as `ResolveRenderProducts`,
+    /// `Update` and `AdvanceTime`.
     virtual StepOperation
     StepAsync(const Scene& scene, std::span<const Path> products = {},
-              const Path& settings = {}) = 0;
+              const Path& settings = {}, double deltaTime = 0.0) = 0;
 
     /// `StepAsync(...).Fetch()`.
     RenderProductSetOutputs Step(const Scene& scene,
                                  std::span<const Path> products = {},
-                                 const Path& settings = {});
+                                 const Path& settings = {},
+                                 double deltaTime = 0.0);
 
     /// Renders the first product of the settings and returns its
     /// `LdrColor`: a uint8 (rows, cols, 4) RGBA tensor, rows top to
@@ -275,8 +281,43 @@ class RenderDelegate {
     /// bounds (an infinite ground plane does not count).
     virtual std::optional<Bounds3> SceneBounds() const = 0;
 
+    /// The sensor clock, seconds: where the last frame ended. Steps
+    /// advance it by their `deltaTime` (`StepAsync`), an interactive
+    /// view by `AdvanceTime` before each `Update`, and `ResetTime`
+    /// sets it, as ovrtx's `step` and `reset` do. Each frame spans
+    /// the clock from the last frame's end to now
+    /// (`FrameParams::startTime`, `time`): what its lights, pulses
+    /// and rolling shutter run through. The scene's animation has a
+    /// clock of its own (`Stage::GetTimeCode`), so it can hold or
+    /// loop while sensors run on.
+    double Time() const {
+        return time_;
+    }
+
+    /// Moves the clock on by `deltaTime` seconds, which the next
+    /// frame spans.
+    /// @throws std::invalid_argument for a negative or non-finite
+    /// `deltaTime`.
+    void AdvanceTime(double deltaTime);
+
+    /// Sets the clock to `time` seconds; the next frame starts there.
+    /// @throws std::invalid_argument for a non-finite `time`.
+    void ResetTime(double time);
+
   protected:
     RenderDelegate() = default;
+
+    /// The span of the clock the next frame covers, from the last
+    /// frame's end to now, which the frame after starts from.
+    struct TimeWindow {
+        double start = 0.0;
+        double end = 0.0;
+    };
+    TimeWindow TakeTimeWindow() {
+        const TimeWindow window{frameStart_, time_};
+        frameStart_ = time_;
+        return window;
+    }
 
     /// The frame of the next image of `product` (the settings' path
     /// for the interactive view): the `ernie:frame` of the resolved
@@ -288,6 +329,8 @@ class RenderDelegate {
 
   private:
     std::map<Path, std::uint64_t> frameCounts_;
+    double time_ = 0.0;
+    double frameStart_ = 0.0;
 };
 
 /// The backends `CreateRenderDelegate` knows: "raster".
