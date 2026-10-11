@@ -795,14 +795,16 @@ BrdfCheckModules(const BrdfModel& model) {
 
 namespace {
 
-/// Whether frame `params` shadows its dome: the full or directions
-/// dome lighting mode, with a shadowing dome, screen-space (so not
+/// Whether frame `params` shadows its dome or its atmosphere's sky
+/// light: the full or directions dome lighting mode with a shadowing
+/// dome, or an atmosphere, whose sky light the same occlusion darkens
+/// under overhangs and in the terrain's valleys; screen-space (so not
 /// for pushbroom strips).
 bool DomeShadowedOf(const FrameParams& params) {
-    return params.dome && params.dome->shadow &&
-           (params.domeMode == DomeLightMode::Full ||
-            params.domeMode == DomeLightMode::Directions) &&
-           !params.camera.pushbroom;
+    const bool dome = params.dome && params.dome->shadow &&
+                      (params.domeMode == DomeLightMode::Full ||
+                       params.domeMode == DomeLightMode::Directions);
+    return (dome || params.atmosphere) && !params.camera.pushbroom;
 }
 
 }  // namespace
