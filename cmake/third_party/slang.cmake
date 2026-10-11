@@ -67,3 +67,7 @@ file(
     "${slang_library_dir}/slang-compiler.dll"
     "${slang_library_dir}/slang-glslang.dll")
 set(ERNIE_SLANG_RUNTIME_DIR "${slang_library_dir}")
+# Windows has no rpath: a program finds its DLLs beside it, so the build's programs get Slang's.
+if(WIN32 AND CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+    file(COPY ${ERNIE_SLANG_RUNTIME} DESTINATION "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+endif()

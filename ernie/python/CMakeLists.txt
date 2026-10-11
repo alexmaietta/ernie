@@ -25,6 +25,11 @@ foreach(nanobind_library nanobind-static nanobind-static-abi3)
     endif()
 endforeach()
 set_target_properties(_ernie PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${ernie_package_dir}")
+# Windows has no rpath: the module finds Slang's DLLs beside it, so the build's package imports
+# (and its stubs generate).
+if(WIN32)
+    file(COPY ${ERNIE_SLANG_RUNTIME} DESTINATION "${ernie_package_dir}")
+endif()
 # Type stubs beside the module, for IDEs, type checkers and the Python API docs: _ernie/ holds a
 # .pyi per module (the extension still imports first), and py.typed marks the package as typed.
 set(ernie_stubs "${ernie_package_dir}/_ernie/__init__.pyi" "${ernie_package_dir}/_ernie/tokens.pyi")
