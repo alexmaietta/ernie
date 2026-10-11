@@ -27,24 +27,70 @@ using demos::Check;
 // Metres in an astronomical unit.
 constexpr double kAu = 1.495978707e11;
 
+enum class Kind { Cube, Sphere, Cylinder, Cone, Capsule };
+
+struct Shape {
+    Kind kind;
+    glm::dvec3 colour;
+};
+
 struct Place {
     const char* key;
     const char* label;
-    double distance;  // metres from the origin
+    double distance;              // metres from the origin
+    std::array<Shape, 3> shapes;  // left to right
 };
 
 // The places, each a probe at its distance from the origin along one
-// direction: a red cube, a green sphere and a blue cube a metre
-// apart, with a 10 cm cube on the sphere. Doubles hold such detail to
-// about a millimetre out to the solar system's edge (1e13 m); beyond,
-// they too run short.
+// direction: three shapes a metre apart, with a 10 cm cube on the
+// middle one; Neptune's red, green and blue, which the test finds in
+// their places. Doubles hold such detail to about a millimetre out to
+// the solar system's edge (1e13 m); beyond, they too run short.
 const std::array<Place, 5> kPlaces = {{
-    {"Home", "Home", 0.0},
-    {"Moon", "The Moon's distance", 3.844e8},
-    {"Mars", "Mars (1.52 AU)", 1.524 * kAu},
-    {"Saturn", "Saturn (9.58 AU)", 9.583 * kAu},
-    {"Neptune", "Neptune (30.07 AU)", 30.07 * kAu},
+    {"Home",
+     "Home",
+     0.0,
+     {{{Kind::Cube, {0.8, 0.1, 0.1}},
+       {Kind::Sphere, {0.1, 0.7, 0.2}},
+       {Kind::Cube, {0.1, 0.2, 0.8}}}}},
+    {"Moon",
+     "The Moon's distance",
+     3.844e8,
+     {{{Kind::Sphere, {0.85, 0.85, 0.8}},
+       {Kind::Cone, {0.9, 0.5, 0.1}},
+       {Kind::Cube, {0.4, 0.4, 0.45}}}}},
+    {"Mars",
+     "Mars (1.52 AU)",
+     1.524 * kAu,
+     {{{Kind::Capsule, {0.7, 0.3, 0.15}},
+       {Kind::Cube, {0.9, 0.8, 0.2}},
+       {Kind::Sphere, {0.1, 0.6, 0.6}}}}},
+    {"Saturn",
+     "Saturn (9.58 AU)",
+     9.583 * kAu,
+     {{{Kind::Cylinder, {0.85, 0.7, 0.3}},
+       {Kind::Sphere, {0.5, 0.2, 0.7}},
+       {Kind::Cone, {0.2, 0.7, 0.85}}}}},
+    {"Neptune",
+     "Neptune (30.07 AU)",
+     30.07 * kAu,
+     {{{Kind::Cone, {0.85, 0.25, 0.1}},
+       {Kind::Capsule, {0.15, 0.7, 0.3}},
+       {Kind::Cylinder, {0.15, 0.3, 0.85}}}}},
 }};
+
+/// A shape's half height, for the cube on top.
+double HalfHeight(Kind kind) {
+    switch (kind) {
+    case Kind::Cube:
+        return 0.3;
+    case Kind::Capsule:
+        return 0.45;
+    default:
+        return 0.35;
+    }
+}
+
 // Where the camera starts, and the test looks: the farthest.
 constexpr std::size_t kStart = kPlaces.size() - 1;
 
@@ -87,18 +133,40 @@ std::string Describe(std::size_t index) {
            Length(Step(place.distance, 52)) + ".";
 }
 
-void DefineShape(Scene& scene, const Path& path, bool sphere,
-                 double size, glm::dvec3 at, glm::dvec3 colour) {
-    if (sphere) {
-        Sphere::Define(scene, path)
-            .SetRadius(size)
-            .SetDisplayColor(colour);
-    } else {
+/// A shape about a metre across at `x` along the probe.
+void DefineShape(Scene& scene, const Path& path, Kind kind, double x,
+                 glm::dvec3 colour) {
+    switch (kind) {
+    case Kind::Cube:
         Cube::Define(scene, path)
-            .SetSize(size)
+            .SetSize(0.6)
             .SetDisplayColor(colour);
+        break;
+    case Kind::Sphere:
+        Sphere::Define(scene, path)
+            .SetRadius(0.35)
+            .SetDisplayColor(colour);
+        break;
+    case Kind::Cylinder:
+        Cylinder::Define(scene, path)
+            .SetRadius(0.3)
+            .SetHeight(0.7)
+            .SetDisplayColor(colour);
+        break;
+    case Kind::Cone:
+        Cone::Define(scene, path)
+            .SetRadius(0.35)
+            .SetHeight(0.7)
+            .SetDisplayColor(colour);
+        break;
+    case Kind::Capsule:
+        Capsule::Define(scene, path)
+            .SetRadius(0.25)
+            .SetHeight(0.4)
+            .SetDisplayColor(colour);
+        break;
     }
-    SetXform(scene, path, {.translate = at});
+    SetXform(scene, path, {.translate = glm::dvec3(x, 0.0, 0.0)});
 }
 
 class FloatingOriginDemo : public app::Demo {
@@ -114,14 +182,21 @@ class FloatingOriginDemo : public app::Demo {
             Xform::Define(scene, probe);
             SetXform(scene, probe,
                      {.translate = PositionAt(place.distance)});
-            DefineShape(scene, probe.Child("Red"), false, 0.6,
-                        {-1.0, 0.0, 0.0}, {0.8, 0.1, 0.1});
-            DefineShape(scene, probe.Child("Green"), true, 0.35,
-                        {0.0, 0.0, 0.0}, {0.1, 0.7, 0.2});
-            DefineShape(scene, probe.Child("Blue"), false, 0.6,
-                        {1.0, 0.0, 0.0}, {0.1, 0.2, 0.8});
-            DefineShape(scene, probe.Child("Tip"), false, 0.1,
-                        {0.0, 0.0, 0.4}, {0.9, 0.9, 0.9});
+            for (std::size_t i = 0; i < place.shapes.size(); ++i) {
+                DefineShape(scene,
+                            probe.Child("Shape" + std::to_string(i)),
+                            place.shapes[i].kind,
+                            static_cast<double>(i) - 1.0,
+                            place.shapes[i].colour);
+            }
+            const Path tip = probe.Child("Tip");
+            Cube::Define(scene, tip)
+                .SetSize(0.1)
+                .SetDisplayColor(glm::dvec3(0.9));
+            SetXform(scene, tip,
+                     {.translate = glm::dvec3(
+                          0.0, 0.0,
+                          HalfHeight(place.shapes[1].kind) + 0.05)});
             probes_.push_back(probe);
         }
         DistantLight::Define(scene, "/World/Sun")

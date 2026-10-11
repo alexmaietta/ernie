@@ -15,10 +15,9 @@ from ernie import tokens
 AU = 1.495978707e11
 
 # The places, each a probe at its distance from the origin along one
-# direction: a red cube, a green sphere and a blue cube a metre apart,
-# with a 10 cm cube on the sphere. Doubles hold such detail to about a
-# millimetre out to the solar system's edge (1e13 m); beyond, they too
-# run short.
+# direction: three shapes a metre apart, with a 10 cm cube on the
+# middle one. Doubles hold such detail to about a millimetre out to
+# the solar system's edge (1e13 m); beyond, they too run short.
 PLACES = [
     ("Home", "Home", 0.0),
     ("Moon", "The Moon's distance", 3.844e8),
@@ -31,6 +30,66 @@ DIRECTION = np.array([1.0, 0.35, 0.12]) / np.linalg.norm(
 )
 # Where the camera starts, and the test looks: the farthest.
 START = len(PLACES) - 1
+
+# Each place's shapes, left to right, and their colours; Neptune's
+# red, green and blue, which the test finds in their places.
+PROBES = {
+    "Home": [
+        ("cube", (0.8, 0.1, 0.1)),
+        ("sphere", (0.1, 0.7, 0.2)),
+        ("cube", (0.1, 0.2, 0.8)),
+    ],
+    "Moon": [
+        ("sphere", (0.85, 0.85, 0.8)),
+        ("cone", (0.9, 0.5, 0.1)),
+        ("cube", (0.4, 0.4, 0.45)),
+    ],
+    "Mars": [
+        ("capsule", (0.7, 0.3, 0.15)),
+        ("cube", (0.9, 0.8, 0.2)),
+        ("sphere", (0.1, 0.6, 0.6)),
+    ],
+    "Saturn": [
+        ("cylinder", (0.85, 0.7, 0.3)),
+        ("sphere", (0.5, 0.2, 0.7)),
+        ("cone", (0.2, 0.7, 0.85)),
+    ],
+    "Neptune": [
+        ("cone", (0.85, 0.25, 0.1)),
+        ("capsule", (0.15, 0.7, 0.3)),
+        ("cylinder", (0.15, 0.3, 0.85)),
+    ],
+}
+
+# Each shape's half height, for the cube on top.
+HALF_HEIGHT = {
+    "cube": 0.3,
+    "sphere": 0.35,
+    "cylinder": 0.35,
+    "cone": 0.35,
+    "capsule": 0.45,
+}
+
+
+def define_shape(parent, name, kind, x, colour):
+    """A shape about a metre across at `x` along the probe."""
+    common = {"translate": (x, 0.0, 0.0), "display_color": colour}
+    if kind == "cube":
+        parent.define(name, ernie.Cube, size=0.6, **common)
+    elif kind == "sphere":
+        parent.define(name, ernie.Sphere, radius=0.35, **common)
+    elif kind == "cylinder":
+        parent.define(
+            name, ernie.Cylinder, radius=0.3, height=0.7, **common
+        )
+    elif kind == "cone":
+        parent.define(
+            name, ernie.Cone, radius=0.35, height=0.7, **common
+        )
+    else:
+        parent.define(
+            name, ernie.Capsule, radius=0.25, height=0.4, **common
+        )
 
 
 def position(distance):
@@ -75,31 +134,20 @@ class Demo(ernie.demo.Demo):
             probe = world.define(
                 key, ernie.Xform, translate=position(distance)
             )
-            probe.define(
-                "Red",
-                ernie.Cube,
-                size=0.6,
-                translate=(-1.0, 0.0, 0.0),
-                display_color=(0.8, 0.1, 0.1),
-            )
-            probe.define(
-                "Green",
-                ernie.Sphere,
-                radius=0.35,
-                display_color=(0.1, 0.7, 0.2),
-            )
-            probe.define(
-                "Blue",
-                ernie.Cube,
-                size=0.6,
-                translate=(1.0, 0.0, 0.0),
-                display_color=(0.1, 0.2, 0.8),
-            )
+            shapes = PROBES[key]
+            for i, (kind, colour) in enumerate(shapes):
+                define_shape(
+                    probe, f"Shape{i}", kind, float(i - 1), colour
+                )
             probe.define(
                 "Tip",
                 ernie.Cube,
                 size=0.1,
-                translate=(0.0, 0.0, 0.4),
+                translate=(
+                    0.0,
+                    0.0,
+                    HALF_HEIGHT[shapes[1][0]] + 0.05,
+                ),
                 display_color=(0.9, 0.9, 0.9),
             )
             self.probes.append(probe)
