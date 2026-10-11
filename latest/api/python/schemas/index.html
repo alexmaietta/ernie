@@ -412,19 +412,6 @@ registered type or one derived from it.</p>
               </td>
             </tr>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.Schema.define)" href="#ernie.schema.Schema.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            get (ernie.schema.Schema.get)" href="#ernie.schema.Schema.get">get</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -493,6 +480,14 @@ registered type or one derived from it.</p>
               </div>
             </li>
             <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._SchemaDefine">_SchemaDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
               <b><code>path</code></b>
                   (<code><a class="autorefs autorefs-internal" title="            Path (ernie._ernie.Path)" href="../scene/#ernie.Path">Path</a></code>)
               –
@@ -555,6 +550,28 @@ registered type or one derived from it.</p>
 
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">__slots__ = ('prim',)</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Schema.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_SchemaDefine] = _Define()</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -815,27 +832,6 @@ derived from it.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="ernie.schema.Schema.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(parent: Scene | Prim | Schema, path: str | Path, **attributes: Any) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
 <h3 id="ernie.schema.Schema.get" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">get</span>
 
@@ -1019,9 +1015,11 @@ x, y, z]) and <code>transform</code> a 4 x 4 matrix (rows of four); C++
 reads the same format (<code>ernie/scene/scene_json.h</code>)::</p>
 <pre><code>ernie.load_scene({
     "/World": {"type": "Xform",
-        "Rock": {"type": "Sphere", "radius": 0.5, "translate": [0, 0, 1]},
+        "Rock": {"type": "Sphere", "radius": 0.5,
+            "translate": [0, 0, 1]},
         "Sun": {"type": "DistantLight", "angle": 0.53}},
-    "/Render/Settings": {"type": "RenderSettings", "resolution": [640, 480]},
+    "/Render/Settings": {"type": "RenderSettings",
+        "resolution": [640, 480]},
 })
 </code></pre>
 <p>C++ loads it (<code>LoadScene</code>), so both read a description the same
@@ -2752,19 +2750,6 @@ world. Default -1. USD name <code>ernie:world</code>.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.Xform.define)" href="#ernie.schema.Xform.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.Xform.set)" href="#ernie.schema.Xform.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -2778,6 +2763,30 @@ world. Default -1. USD name <code>ernie:world</code>.</p>
 
 
 
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._XformDefine">_XformDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
 
 
 <div class="doc doc-children">
@@ -2788,41 +2797,29 @@ world. Default -1. USD name <code>ernie:world</code>.</p>
 
 
 
+<div class="doc doc-object doc-attribute">
 
-
-
-<div class="doc doc-object doc-function">
 
 
 <h3 id="ernie.schema.Xform.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
 
 
   <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
   </span>
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_XformDefine]</code></pre>
 
     <div class="doc doc-contents ">
-
 
     </div>
 
 </div>
+
+
+
 
 <div class="doc doc-object doc-function">
 
@@ -2899,19 +2896,6 @@ world. Default -1. USD name <code>ernie:world</code>.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.Scope.define)" href="#ernie.schema.Scope.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.Scope.set)" href="#ernie.schema.Scope.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -2925,6 +2909,30 @@ world. Default -1. USD name <code>ernie:world</code>.</p>
 
 
 
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._ScopeDefine">_ScopeDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
 
 
 <div class="doc doc-children">
@@ -2935,41 +2943,29 @@ world. Default -1. USD name <code>ernie:world</code>.</p>
 
 
 
+<div class="doc doc-object doc-attribute">
 
-
-
-<div class="doc doc-object doc-function">
 
 
 <h3 id="ernie.schema.Scope.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
 
 
   <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
   </span>
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_ScopeDefine]</code></pre>
 
     <div class="doc doc-contents ">
-
 
     </div>
 
 </div>
+
+
+
 
 <div class="doc doc-object doc-function">
 
@@ -3380,19 +3376,6 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.Cube.define)" href="#ernie.schema.Cube.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.Cube.set)" href="#ernie.schema.Cube.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -3416,6 +3399,14 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
       <th class="field-name">Attributes:</th>
       <td class="field-body">
         <ul class="first simple">
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._CubeDefine">_CubeDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
             <li>
               <b><code>size</code></b>
                   (<code><span title="float">float</span></code>)
@@ -3444,6 +3435,27 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 
 
 
+<h3 id="ernie.schema.Cube.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_CubeDefine]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Cube.size" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">size</span>
 
@@ -3465,43 +3477,6 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="ernie.schema.Cube.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    extent: float | Sequence[float] | Any = ...,
-    display_color: Sequence[float] | Any = ...,
-    material_binding: str | Path | Prim | Schema = ...,
-    size: float = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 
@@ -3582,19 +3557,6 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.Sphere.define)" href="#ernie.schema.Sphere.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.Sphere.set)" href="#ernie.schema.Sphere.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -3618,6 +3580,14 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
       <th class="field-name">Attributes:</th>
       <td class="field-body">
         <ul class="first simple">
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._SphereDefine">_SphereDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
             <li>
               <b><code>radius</code></b>
                   (<code><span title="float">float</span></code>)
@@ -3646,6 +3616,27 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 
 
 
+<h3 id="ernie.schema.Sphere.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_SphereDefine]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Sphere.radius" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">radius</span>
 
@@ -3667,43 +3658,6 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="ernie.schema.Sphere.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    extent: float | Sequence[float] | Any = ...,
-    display_color: Sequence[float] | Any = ...,
-    material_binding: str | Path | Prim | Schema = ...,
-    radius: float = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 
@@ -3936,19 +3890,6 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.Cylinder.define)" href="#ernie.schema.Cylinder.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.Cylinder.set)" href="#ernie.schema.Cylinder.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -3972,6 +3913,14 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
       <th class="field-name">Attributes:</th>
       <td class="field-body">
         <ul class="first simple">
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._CylinderDefine">_CylinderDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
             <li>
               <b><code>height</code></b>
                   (<code><span title="float">float</span></code>)
@@ -4003,6 +3952,27 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 
 
 
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Cylinder.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_CylinderDefine]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-attribute">
 
@@ -4052,45 +4022,6 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="ernie.schema.Cylinder.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    extent: float | Sequence[float] | Any = ...,
-    display_color: Sequence[float] | Any = ...,
-    material_binding: str | Path | Prim | Schema = ...,
-    axis: str = ...,
-    radius: float = ...,
-    height: float = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 
@@ -4173,19 +4104,6 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.Cone.define)" href="#ernie.schema.Cone.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.Cone.set)" href="#ernie.schema.Cone.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -4209,6 +4127,14 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
       <th class="field-name">Attributes:</th>
       <td class="field-body">
         <ul class="first simple">
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._ConeDefine">_ConeDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
             <li>
               <b><code>height</code></b>
                   (<code><span title="float">float</span></code>)
@@ -4240,6 +4166,27 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 
 
 
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Cone.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_ConeDefine]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-attribute">
 
@@ -4289,45 +4236,6 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="ernie.schema.Cone.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    extent: float | Sequence[float] | Any = ...,
-    display_color: Sequence[float] | Any = ...,
-    material_binding: str | Path | Prim | Schema = ...,
-    axis: str = ...,
-    radius: float = ...,
-    height: float = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 
@@ -4410,19 +4318,6 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.Capsule.define)" href="#ernie.schema.Capsule.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.Capsule.set)" href="#ernie.schema.Capsule.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -4446,6 +4341,14 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
       <th class="field-name">Attributes:</th>
       <td class="field-body">
         <ul class="first simple">
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._CapsuleDefine">_CapsuleDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
             <li>
               <b><code>height</code></b>
                   (<code><span title="float">float</span></code>)
@@ -4477,6 +4380,27 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 
 
 
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Capsule.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_CapsuleDefine]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-attribute">
 
@@ -4526,45 +4450,6 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="ernie.schema.Capsule.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    extent: float | Sequence[float] | Any = ...,
-    display_color: Sequence[float] | Any = ...,
-    material_binding: str | Path | Prim | Schema = ...,
-    axis: str = ...,
-    radius: float = ...,
-    height: float = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 
@@ -4647,19 +4532,6 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.Plane.define)" href="#ernie.schema.Plane.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.Plane.set)" href="#ernie.schema.Plane.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -4683,6 +4555,14 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
       <th class="field-name">Attributes:</th>
       <td class="field-body">
         <ul class="first simple">
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._PlaneDefine">_PlaneDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
             <li>
               <b><code>length</code></b>
                   (<code><span title="float">float</span></code>)
@@ -4714,6 +4594,27 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 
 
 
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Plane.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_PlaneDefine]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-attribute">
 
@@ -4763,45 +4664,6 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="ernie.schema.Plane.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    extent: float | Sequence[float] | Any = ...,
-    display_color: Sequence[float] | Any = ...,
-    material_binding: str | Path | Prim | Schema = ...,
-    axis: str = ...,
-    width: float = ...,
-    length: float = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 
@@ -5036,19 +4898,6 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.Mesh.define)" href="#ernie.schema.Mesh.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.Mesh.set)" href="#ernie.schema.Mesh.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -5072,6 +4921,14 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
       <th class="field-name">Attributes:</th>
       <td class="field-body">
         <ul class="first simple">
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._MeshDefine">_MeshDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
             <li>
               <b><code>face_vertex_counts</code></b>
                   (<code><span title="typing.Any">Any</span></code>)
@@ -5111,6 +4968,27 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 
 
 
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_MeshDefine]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-attribute">
 
@@ -5183,46 +5061,6 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="ernie.schema.Mesh.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    extent: float | Sequence[float] | Any = ...,
-    display_color: Sequence[float] | Any = ...,
-    material_binding: str | Path | Prim | Schema = ...,
-    points: Any = ...,
-    face_vertex_counts: Any = ...,
-    face_vertex_indices: Any = ...,
-    normals: Any = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 
@@ -5306,19 +5144,6 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.Points.define)" href="#ernie.schema.Points.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.Points.set)" href="#ernie.schema.Points.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -5342,6 +5167,14 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
       <th class="field-name">Attributes:</th>
       <td class="field-body">
         <ul class="first simple">
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._PointsDefine">_PointsDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
             <li>
               <b><code>widths</code></b>
                   (<code><span title="list">list</span>[<span title="float">float</span>] | <span title="typing.Any">Any</span></code>)
@@ -5370,6 +5203,27 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 
 
 
+<h3 id="ernie.schema.Points.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_PointsDefine]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Points.widths" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">widths</span>
 
@@ -5392,44 +5246,6 @@ array instead. Default [1.0]. USD name <code>widths</code>.</p>
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="ernie.schema.Points.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    extent: float | Sequence[float] | Any = ...,
-    display_color: Sequence[float] | Any = ...,
-    material_binding: str | Path | Prim | Schema = ...,
-    points: Any = ...,
-    widths: float | Sequence[float] | Any = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 
@@ -5512,19 +5328,6 @@ orientations and scales.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.PointInstancer.define)" href="#ernie.schema.PointInstancer.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.PointInstancer.set)" href="#ernie.schema.PointInstancer.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -5548,6 +5351,14 @@ orientations and scales.</p>
       <th class="field-name">Attributes:</th>
       <td class="field-body">
         <ul class="first simple">
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._PointInstancerDefine">_PointInstancerDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
             <li>
               <b><code>orientations</code></b>
                   (<code><span title="typing.Any">Any</span></code>)
@@ -5611,6 +5422,27 @@ orientations and scales.</p>
 
 
 
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.PointInstancer.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_PointInstancerDefine]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-attribute">
 
@@ -5758,46 +5590,6 @@ all when unset. USD name <code>protoIndices</code>.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="ernie.schema.PointInstancer.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    extent: float | Sequence[float] | Any = ...,
-    positions: Any = ...,
-    orientations: Any = ...,
-    scales: Any = ...,
-    proto_indices: Any = ...,
-    prototypes: str | Path | Prim | Schema | Sequence[str | Path | Prim | Schema] = ...,
-    worlds: Any = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
 <h3 id="ernie.schema.PointInstancer.set" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">set</span>
 
@@ -5877,19 +5669,6 @@ all when unset. USD name <code>protoIndices</code>.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.Volume.define)" href="#ernie.schema.Volume.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.Volume.set)" href="#ernie.schema.Volume.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -5903,6 +5682,30 @@ all when unset. USD name <code>protoIndices</code>.</p>
 
 
 
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._VolumeDefine">_VolumeDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
 
 
 <div class="doc doc-children">
@@ -5913,44 +5716,29 @@ all when unset. USD name <code>protoIndices</code>.</p>
 
 
 
+<div class="doc doc-object doc-attribute">
 
-
-
-<div class="doc doc-object doc-function">
 
 
 <h3 id="ernie.schema.Volume.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
 
 
   <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
   </span>
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    extent: float | Sequence[float] | Any = ...,
-    display_color: Sequence[float] | Any = ...,
-    material_binding: str | Path | Prim | Schema = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_VolumeDefine]</code></pre>
 
     <div class="doc doc-contents ">
-
 
     </div>
 
 </div>
+
+
+
 
 <div class="doc doc-object doc-function">
 
@@ -6031,19 +5819,6 @@ optionally as a checkerboard.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.GroundPlane.define)" href="#ernie.schema.GroundPlane.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.GroundPlane.set)" href="#ernie.schema.GroundPlane.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -6097,6 +5872,14 @@ optionally as a checkerboard.</p>
               –
               <div class="doc-md-description">
                 <p>Edge of a square, metres; positive. Default 1.0. USD name <code>ernie:checker:size</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._GroundPlaneDefine">_GroundPlaneDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
               </div>
             </li>
             <li>
@@ -6228,6 +6011,27 @@ optionally as a checkerboard.</p>
 
 
 
+<h3 id="ernie.schema.GroundPlane.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_GroundPlaneDefine]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.GroundPlane.height" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">height</span>
 
@@ -6272,45 +6076,6 @@ optionally as a checkerboard.</p>
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="ernie.schema.GroundPlane.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    height: float = ...,
-    checker: bool = ...,
-    checker_size: float = ...,
-    checker_color0: Sequence[float] = ...,
-    checker_color1: Sequence[float] = ...,
-    material_binding: str | Path | Prim | Schema = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 
@@ -6394,19 +6159,6 @@ six cube faces.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.Terrain.define)" href="#ernie.schema.Terrain.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.Terrain.set)" href="#ernie.schema.Terrain.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -6436,6 +6188,14 @@ six cube faces.</p>
               –
               <div class="doc-md-description">
                 <p>World units between neighbouring heights. Default 1.0. USD name <code>ernie:cellSize</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._TerrainDefine">_TerrainDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
               </div>
             </li>
             <li>
@@ -6512,6 +6272,27 @@ six cube faces.</p>
     <div class="doc doc-contents ">
 
         <p>World units between neighbouring heights. Default 1.0. USD name <code>ernie:cellSize</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Terrain.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_TerrainDefine]</code></pre>
+
+    <div class="doc doc-contents ">
 
     </div>
 
@@ -6638,48 +6419,6 @@ name <code>ernie:radius</code>.</p>
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="ernie.schema.Terrain.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    extent: float | Sequence[float] | Any = ...,
-    display_color: Sequence[float] | Any = ...,
-    material_binding: str | Path | Prim | Schema = ...,
-    heights: Any = ...,
-    origin: Sequence[float] = ...,
-    cell_size: float = ...,
-    exaggeration: float = ...,
-    no_data: float = ...,
-    planet_radius: float = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 
@@ -7794,19 +7533,6 @@ brightness. Default 10000.0. USD name <code>photometric:illuminance</code>.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.DistantLight.define)" href="#ernie.schema.DistantLight.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.DistantLight.set)" href="#ernie.schema.DistantLight.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -7836,6 +7562,14 @@ brightness. Default 10000.0. USD name <code>photometric:illuminance</code>.</p>
               –
               <div class="doc-md-description">
                 <p>Degrees the light subtends; widens penumbrae. Default 0.53. USD name <code>inputs:angle</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._DistantLightDefine">_DistantLightDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
               </div>
             </li>
             <li>
@@ -7889,6 +7623,27 @@ brightness. Default 10000.0. USD name <code>photometric:illuminance</code>.</p>
 
 
 
+<h3 id="ernie.schema.DistantLight.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_DistantLightDefine]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.DistantLight.irradiance" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">irradiance</span>
 
@@ -7911,52 +7666,6 @@ physical. Default 1361.0. USD name <code>ernie:irradiance</code>.</p>
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="ernie.schema.DistantLight.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    intensity: float = ...,
-    exposure: float = ...,
-    color: Sequence[float] = ...,
-    enable_color_temperature: bool = ...,
-    color_temperature: float = ...,
-    shadow_enable: bool = ...,
-    normalize: bool = ...,
-    physical_illuminant: str = ...,
-    physical_custom_illuminant: float | Sequence[float] = ...,
-    spectrum: float | Sequence[float] = ...,
-    photometric_illuminance: float = ...,
-    angle: float = ...,
-    irradiance: float = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 
@@ -8046,19 +7755,6 @@ physical. Default 1361.0. USD name <code>ernie:irradiance</code>.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.DomeLight.define)" href="#ernie.schema.DomeLight.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.DomeLight.set)" href="#ernie.schema.DomeLight.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -8082,6 +7778,14 @@ physical. Default 1361.0. USD name <code>ernie:irradiance</code>.</p>
       <th class="field-name">Attributes:</th>
       <td class="field-body">
         <ul class="first simple">
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._DomeLightDefine">_DomeLightDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
             <li>
               <b><code>texture</code></b>
                   (<code><span title="typing.Any">Any</span></code>)
@@ -8121,6 +7825,27 @@ physical. Default 1361.0. USD name <code>ernie:irradiance</code>.</p>
 
 
 
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.DomeLight.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_DomeLightDefine]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-attribute">
 
@@ -8195,53 +7920,6 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="ernie.schema.DomeLight.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    intensity: float = ...,
-    exposure: float = ...,
-    color: Sequence[float] = ...,
-    enable_color_temperature: bool = ...,
-    color_temperature: float = ...,
-    shadow_enable: bool = ...,
-    normalize: bool = ...,
-    physical_illuminant: str = ...,
-    physical_custom_illuminant: float | Sequence[float] = ...,
-    spectrum: float | Sequence[float] = ...,
-    photometric_illuminance: float = ...,
-    texture_file: str = ...,
-    texture: Any = ...,
-    visible_in_primary_ray: bool = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 
@@ -8332,19 +8010,6 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.SphereLight.define)" href="#ernie.schema.SphereLight.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.SphereLight.set)" href="#ernie.schema.SphereLight.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -8368,6 +8033,14 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
       <th class="field-name">Attributes:</th>
       <td class="field-body">
         <ul class="first simple">
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._SphereLightDefine">_SphereLightDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
             <li>
               <b><code>radius</code></b>
                   (<code><span title="float">float</span></code>)
@@ -8415,6 +8088,27 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
 
 
 
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.SphereLight.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_SphereLightDefine]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-attribute">
 
@@ -8516,62 +8210,6 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="ernie.schema.SphereLight.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    intensity: float = ...,
-    exposure: float = ...,
-    color: Sequence[float] = ...,
-    enable_color_temperature: bool = ...,
-    color_temperature: float = ...,
-    shadow_enable: bool = ...,
-    normalize: bool = ...,
-    physical_illuminant: str = ...,
-    physical_custom_illuminant: float | Sequence[float] = ...,
-    spectrum: float | Sequence[float] = ...,
-    power: float = ...,
-    shaping_focus: float = ...,
-    shaping_focus_tint: Sequence[float] = ...,
-    shaping_ies_file: str = ...,
-    shaping_ies_angle_scale: float = ...,
-    shaping_ies_normalize: bool = ...,
-    photometric_power: float = ...,
-    photometric_illuminance: float = ...,
-    photometric_illuminance_distance: float = ...,
-    radius: float = ...,
-    treat_as_point: bool = ...,
-    shaping_cone_angle: float = ...,
-    shaping_cone_softness: float = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
 <h3 id="ernie.schema.SphereLight.set" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">set</span>
 
@@ -8667,19 +8305,6 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.RectLight.define)" href="#ernie.schema.RectLight.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.RectLight.set)" href="#ernie.schema.RectLight.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -8703,6 +8328,14 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
       <th class="field-name">Attributes:</th>
       <td class="field-body">
         <ul class="first simple">
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._RectLightDefine">_RectLightDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
             <li>
               <b><code>height</code></b>
                   (<code><span title="float">float</span></code>)
@@ -8734,6 +8367,27 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
 
 
 
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RectLight.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_RectLightDefine]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-attribute">
 
@@ -8783,60 +8437,6 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="ernie.schema.RectLight.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    intensity: float = ...,
-    exposure: float = ...,
-    color: Sequence[float] = ...,
-    enable_color_temperature: bool = ...,
-    color_temperature: float = ...,
-    shadow_enable: bool = ...,
-    normalize: bool = ...,
-    physical_illuminant: str = ...,
-    physical_custom_illuminant: float | Sequence[float] = ...,
-    spectrum: float | Sequence[float] = ...,
-    power: float = ...,
-    shaping_focus: float = ...,
-    shaping_focus_tint: Sequence[float] = ...,
-    shaping_ies_file: str = ...,
-    shaping_ies_angle_scale: float = ...,
-    shaping_ies_normalize: bool = ...,
-    photometric_power: float = ...,
-    photometric_illuminance: float = ...,
-    photometric_illuminance_distance: float = ...,
-    width: float = ...,
-    height: float = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 
@@ -8934,19 +8534,6 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.DiskLight.define)" href="#ernie.schema.DiskLight.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.DiskLight.set)" href="#ernie.schema.DiskLight.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -8970,6 +8557,14 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
       <th class="field-name">Attributes:</th>
       <td class="field-body">
         <ul class="first simple">
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._DiskLightDefine">_DiskLightDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
             <li>
               <b><code>radius</code></b>
                   (<code><span title="float">float</span></code>)
@@ -8998,6 +8593,27 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
 
 
 
+<h3 id="ernie.schema.DiskLight.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_DiskLightDefine]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.DiskLight.radius" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">radius</span>
 
@@ -9019,59 +8635,6 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="ernie.schema.DiskLight.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    intensity: float = ...,
-    exposure: float = ...,
-    color: Sequence[float] = ...,
-    enable_color_temperature: bool = ...,
-    color_temperature: float = ...,
-    shadow_enable: bool = ...,
-    normalize: bool = ...,
-    physical_illuminant: str = ...,
-    physical_custom_illuminant: float | Sequence[float] = ...,
-    spectrum: float | Sequence[float] = ...,
-    power: float = ...,
-    shaping_focus: float = ...,
-    shaping_focus_tint: Sequence[float] = ...,
-    shaping_ies_file: str = ...,
-    shaping_ies_angle_scale: float = ...,
-    shaping_ies_normalize: bool = ...,
-    photometric_power: float = ...,
-    photometric_illuminance: float = ...,
-    photometric_illuminance_distance: float = ...,
-    radius: float = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 
@@ -9169,19 +8732,6 @@ takes the catalogue's frame into the world.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.StarField.define)" href="#ernie.schema.StarField.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.StarField.set)" href="#ernie.schema.StarField.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -9219,6 +8769,14 @@ takes the catalogue's frame into the world.</p>
               –
               <div class="doc-md-description">
                 <p>float32 (stars), degrees, in the catalogue's frame. USD name <code>ernie:stars:declination</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._StarFieldDefine">_StarFieldDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
               </div>
             </li>
             <li>
@@ -9335,6 +8893,27 @@ takes the catalogue's frame into the world.</p>
     <div class="doc doc-contents ">
 
         <p>float32 (stars), degrees, in the catalogue's frame. USD name <code>ernie:stars:declination</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.StarField.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_StarFieldDefine]</code></pre>
+
+    <div class="doc doc-contents ">
 
     </div>
 
@@ -9510,48 +9089,6 @@ the Sun's. USD name <code>ernie:stars:temperature</code>.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="ernie.schema.StarField.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    magnitude_limit: float = ...,
-    exposure: float = ...,
-    zero_point: float = ...,
-    magnitude: Any = ...,
-    right_ascension: Any = ...,
-    declination: Any = ...,
-    direction: Any = ...,
-    color_index: Any = ...,
-    temperature: Any = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
 <h3 id="ernie.schema.StarField.set" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">set</span>
 
@@ -9635,19 +9172,6 @@ shutter, and Ernie's lens, scan, spectral sampling, sensor and view poses.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.Camera.define)" href="#ernie.schema.Camera.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.Camera.set)" href="#ernie.schema.Camera.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -9677,6 +9201,14 @@ shutter, and Ernie's lens, scan, spectral sampling, sensor and view poses.</p>
               –
               <div class="doc-md-description">
                 <p>Near and far, scene units. Default (1.0, 1000000.0). USD name <code>clippingRange</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._CameraDefine">_CameraDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
               </div>
             </li>
             <li>
@@ -10105,6 +9637,27 @@ shutter, and Ernie's lens, scan, spectral sampling, sensor and view poses.</p>
     <div class="doc doc-contents ">
 
         <p>Near and far, scene units. Default (1.0, 1000000.0). USD name <code>clippingRange</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Camera.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_CameraDefine]</code></pre>
+
+    <div class="doc doc-contents ">
 
     </div>
 
@@ -11264,89 +10817,6 @@ name <code>ernie:shutter:rolling</code>.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="ernie.schema.Camera.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    projection: str = ...,
-    focal_length: float = ...,
-    vertical_aperture: float = ...,
-    horizontal_aperture: float = ...,
-    horizontal_aperture_offset: float = ...,
-    vertical_aperture_offset: float = ...,
-    clipping_range: Sequence[float] = ...,
-    f_stop: float = ...,
-    focus_distance: float = ...,
-    lens_projection: str = ...,
-    lens_distortion: float | Sequence[float] = ...,
-    lens_fisheye: float | Sequence[float] = ...,
-    lens_vignetting: bool = ...,
-    lens_transmission: float = ...,
-    lens_chromatic_scale: float | Sequence[float] = ...,
-    lens_chromatic_focus: float | Sequence[float] = ...,
-    lens_rays: Any = ...,
-    lens_rays_step: int = ...,
-    exposure: float = ...,
-    exposure_time: float = ...,
-    exposure_iso: float = ...,
-    exposure_f_stop: float = ...,
-    exposure_responsivity: float = ...,
-    shutter_open: float = ...,
-    shutter_close: float = ...,
-    shutter_samples: int = ...,
-    shutter_rolling: float = ...,
-    scan: str = ...,
-    pushbroom_line_offset: float = ...,
-    spectral_range: Sequence[float] = ...,
-    spectral_bands: int = ...,
-    sensor_type: str = ...,
-    sensor_noise: bool = ...,
-    sensor_full_well: float = ...,
-    sensor_read_noise: float = ...,
-    sensor_dark_current: float = ...,
-    sensor_prnu: float = ...,
-    sensor_dsnu: float = ...,
-    sensor_electrons_per_dn: float = ...,
-    sensor_adc_bits: int = ...,
-    sensor_black_level: float = ...,
-    sensor_pixel_pitch: float = ...,
-    sensor_seed: int = ...,
-    sensor_qe_r: float | Sequence[float] = ...,
-    sensor_qe_g: float | Sequence[float] = ...,
-    sensor_qe_b: float | Sequence[float] = ...,
-    sensor_qe_mono: float | Sequence[float] = ...,
-    poses: Any = ...,
-    poses_device: str = ...,
-    worlds: Any = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
 <h3 id="ernie.schema.Camera.set" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">set</span>
 
@@ -11470,19 +10940,6 @@ connects to.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.Material.define)" href="#ernie.schema.Material.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.Material.set)" href="#ernie.schema.Material.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -11560,6 +11017,14 @@ connects to.</p>
               –
               <div class="doc-md-description">
                 <p>The reflectance model, a BrdfRegistry id; unset with a UsdPreviewSurface connected,</p>
+              </div>
+            </li>
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._MaterialDefine">_MaterialDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
               </div>
             </li>
             <li>
@@ -11825,6 +11290,27 @@ connects to.</p>
 
         <p>The reflectance model, a BrdfRegistry id; unset with a UsdPreviewSurface connected,
 "preview_surface". Default 'lambert'. USD name <code>ernie:brdf</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_MaterialDefine]</code></pre>
+
+    <div class="doc doc-contents ">
 
     </div>
 
@@ -12100,57 +11586,6 @@ then). Default (0.0, 0.0, 0.0). USD name <code>inputs:emissiveColor</code>.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="ernie.schema.Material.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    brdf: str = ...,
-    albedo: Sequence[float] = ...,
-    albedo_map_enable: bool = ...,
-    albedo_map: Any = ...,
-    albedo_map_origin: Sequence[float] = ...,
-    albedo_map_cell_size: float = ...,
-    albedo_map_no_data: float = ...,
-    emissive_color: Sequence[float] = ...,
-    detail_albedo: Any = ...,
-    detail_normal: Any = ...,
-    detail_tile_size: float = ...,
-    detail_albedo_strength: float = ...,
-    detail_normal_strength: float = ...,
-    detail_directx_normals: bool = ...,
-    detail_hex_tiling: bool = ...,
-    detail_hex_rotation: float = ...,
-    detail_hex_contrast: float = ...,
-    detail_hex_sharpness: float = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
 <h3 id="ernie.schema.Material.set" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">set</span>
 
@@ -12241,19 +11676,6 @@ then). Default (0.0, 0.0, 0.0). USD name <code>inputs:emissiveColor</code>.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.Shader.define)" href="#ernie.schema.Shader.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.Shader.set)" href="#ernie.schema.Shader.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -12299,6 +11721,14 @@ then). Default (0.0, 0.0, 0.0). USD name <code>inputs:emissiveColor</code>.</p>
               –
               <div class="doc-md-description">
                 <p>Default 0.01. USD name <code>inputs:clearcoatRoughness</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._ShaderDefine">_ShaderDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
               </div>
             </li>
             <li>
@@ -12526,6 +11956,27 @@ then). Default (0.0, 0.0, 0.0). USD name <code>inputs:emissiveColor</code>.</p>
     <div class="doc doc-contents ">
 
         <p>Default 0.01. USD name <code>inputs:clearcoatRoughness</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Shader.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_ShaderDefine]</code></pre>
+
+    <div class="doc doc-contents ">
 
     </div>
 
@@ -12956,60 +12407,6 @@ name <code>ernie:texture</code>.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="ernie.schema.Shader.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    info_id: str = ...,
-    diffuse_color: Sequence[float] = ...,
-    roughness: float = ...,
-    metallic: float = ...,
-    ior: float = ...,
-    use_specular_workflow: bool = ...,
-    specular_color: Sequence[float] = ...,
-    clearcoat: float = ...,
-    clearcoat_roughness: float = ...,
-    emissive_color: Sequence[float] = ...,
-    opacity: float = ...,
-    opacity_threshold: float = ...,
-    file: str = ...,
-    texture: Any = ...,
-    wrap_s: str = ...,
-    wrap_t: str = ...,
-    source_color_space: str = ...,
-    bias: Sequence[float] = ...,
-    rotation: float = ...,
-    translation: Sequence[float] = ...,
-    varname: str = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
 <h3 id="ernie.schema.Shader.set" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">set</span>
 
@@ -13421,19 +12818,6 @@ name <code>resolution</code>.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.RenderSettings.define)" href="#ernie.schema.RenderSettings.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.RenderSettings.set)" href="#ernie.schema.RenderSettings.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -13487,6 +12871,14 @@ name <code>resolution</code>.</p>
               –
               <div class="doc-md-description">
                 <p>What lies outside a view is skipped: whole draws (cpu), then every instance (gpu). Default</p>
+              </div>
+            </li>
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._RenderSettingsDefine">_RenderSettingsDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
               </div>
             </li>
             <li>
@@ -13810,6 +13202,27 @@ name <code>resolution</code>.</p>
 
         <p>What lies outside a view is skipped: whole draws (cpu), then every instance (gpu). Default
 'gpu'. USD name <code>ernie:culling</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_RenderSettingsDefine]</code></pre>
+
+    <div class="doc doc-contents ">
 
     </div>
 
@@ -14457,76 +13870,6 @@ The viewport's toolbar may override it. Default 'off'. USD name <code>ernie:wire
 <div class="doc doc-object doc-function">
 
 
-<h3 id="ernie.schema.RenderSettings.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    camera: str | Path | Prim | Schema | Sequence[str | Path | Prim | Schema] = ...,
-    cameras: str | Path | Prim | Schema | Sequence[str | Path | Prim | Schema] = ...,
-    resolution: Sequence[float] = ...,
-    overlays: str = ...,
-    minimal_mode: str = ...,
-    minimal_constant_color: Sequence[float] = ...,
-    products: str | Path | Prim | Schema | Sequence[str | Path | Prim | Schema] = ...,
-    lights: str | Path | Prim | Schema | Sequence[str | Path | Prim | Schema] = ...,
-    color_mode: str = ...,
-    ambient: float = ...,
-    clear_color: Sequence[float] = ...,
-    wireframe: str = ...,
-    frame: int = ...,
-    exposure_compensation: float = ...,
-    meter: bool = ...,
-    culling: str = ...,
-    occlusion: str = ...,
-    lod_mesh_error: float = ...,
-    lod_enable: bool = ...,
-    lod_detail: float = ...,
-    lod_morph_start: float = ...,
-    lod_freeze: bool = ...,
-    lod_show_levels: bool = ...,
-    shadow_fit: str = ...,
-    shadow_cascades: int = ...,
-    shadow_resolution: int = ...,
-    shadow_softness: float = ...,
-    shadow_normal_offset: float = ...,
-    shadow_split_lambda: float = ...,
-    shadow_show_cascades: bool = ...,
-    shadow_worlds: str = ...,
-    shadow_world_fit: str = ...,
-    shadow_world_resolution: int = ...,
-    shadow_world_margin: float = ...,
-    dome_light_mode: str = ...,
-    dome_shadow_radius: float = ...,
-    dome_directions: int = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
 <h3 id="ernie.schema.RenderSettings.set" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">set</span>
 
@@ -14636,19 +13979,6 @@ The viewport's toolbar may override it. Default 'off'. USD name <code>ernie:wire
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.RenderProduct.define)" href="#ernie.schema.RenderProduct.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.RenderProduct.set)" href="#ernie.schema.RenderProduct.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -14672,6 +14002,14 @@ The viewport's toolbar may override it. Default 'off'. USD name <code>ernie:wire
       <th class="field-name">Attributes:</th>
       <td class="field-body">
         <ul class="first simple">
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._RenderProductDefine">_RenderProductDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
             <li>
               <b><code>filters</code></b>
                   (<code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="            Path (ernie._ernie.Path)" href="../scene/#ernie.Path">Path</a>]</code>)
@@ -14703,6 +14041,27 @@ The viewport's toolbar may override it. Default 'off'. USD name <code>ernie:wire
 
 
 
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderProduct.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_RenderProductDefine]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-attribute">
 
@@ -14752,51 +14111,6 @@ The viewport's toolbar may override it. Default 'off'. USD name <code>ernie:wire
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="ernie.schema.RenderProduct.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    camera: str | Path | Prim | Schema | Sequence[str | Path | Prim | Schema] = ...,
-    cameras: str | Path | Prim | Schema | Sequence[str | Path | Prim | Schema] = ...,
-    resolution: Sequence[float] = ...,
-    overlays: str = ...,
-    minimal_mode: str = ...,
-    minimal_constant_color: Sequence[float] = ...,
-    ordered_vars: str
-    | Path
-    | Prim
-    | Schema
-    | Sequence[str | Path | Prim | Schema] = ...,
-    filters: str | Path | Prim | Schema | Sequence[str | Path | Prim | Schema] = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 
@@ -14885,19 +14199,6 @@ The viewport's toolbar may override it. Default 'off'. USD name <code>ernie:wire
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.RenderVar.define)" href="#ernie.schema.RenderVar.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.RenderVar.set)" href="#ernie.schema.RenderVar.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -14921,6 +14222,14 @@ The viewport's toolbar may override it. Default 'off'. USD name <code>ernie:wire
       <th class="field-name">Attributes:</th>
       <td class="field-body">
         <ul class="first simple">
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._RenderVarDefine">_RenderVarDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
             <li>
               <b><code>filters</code></b>
                   (<code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="            Path (ernie._ernie.Path)" href="../scene/#ernie.Path">Path</a>]</code>)
@@ -14952,6 +14261,27 @@ The viewport's toolbar may override it. Default 'off'. USD name <code>ernie:wire
 
 
 
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderVar.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_RenderVarDefine]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-attribute">
 
@@ -15003,41 +14333,6 @@ name <code>sourceName</code>.</p>
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="ernie.schema.RenderVar.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    source_name: str = ...,
-    filters: str | Path | Prim | Schema | Sequence[str | Path | Prim | Schema] = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 
@@ -15116,19 +14411,6 @@ name <code>sourceName</code>.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            define
-
-
-  
-      classmethod
-   (ernie.schema.SensorFilter.define)" href="#ernie.schema.SensorFilter.define">define</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.SensorFilter.set)" href="#ernie.schema.SensorFilter.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -15152,6 +14434,14 @@ name <code>sourceName</code>.</p>
       <th class="field-name">Attributes:</th>
       <td class="field-body">
         <ul class="first simple">
+            <li>
+              <b><code>define</code></b>
+                  (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._SensorFilterDefine">_SensorFilterDefine</span>]</code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
             <li>
               <b><code>filter_type</code></b>
                   (<code><span title="str">str</span></code>)
@@ -15180,6 +14470,27 @@ name <code>sourceName</code>.</p>
 
 
 
+<h3 id="ernie.schema.SensorFilter.define" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">define: _Define[_SensorFilterDefine]</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.SensorFilter.filter_type" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">filter_type</span>
 
@@ -15202,40 +14513,6 @@ parameters are inputs:*. USD name <code>ernie:filter:type</code>.</p>
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="ernie.schema.SensorFilter.define" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">define</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">define(
-    parent: Scene | Prim | Schema,
-    path: str | Path,
-    *,
-    visibility: str = ...,
-    world: int = ...,
-    quaternion_order: str = ...,
-    filter_type: str = ...,
-    translate: Sequence[float] = ...,
-    rotate: Sequence[float] = ...,
-    rotation_order: str = "XYZ",
-    orient: Quat = ...,
-    scale: float | Sequence[float] = ...,
-) -&gt; Self</code></pre>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 

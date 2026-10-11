@@ -236,6 +236,25 @@
 </tr>
 </tbody>
 </table>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-extinction"><strong>Extinction</strong></a> (double altitude, int band) const<br><em>The extinction coefficient (m^-1) of band</em> <code>band</code> <em>at</em><code>altitude</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-transmittancetotop"><strong>TransmittanceToTop</strong></a> (double r, double mu, int band, int steps=4000) const<br><em>The transmittance of band</em> <code>band</code> <em>from radius</em><code>r</code> <em>(m) along a ray at cosine</em><code>mu</code> <em>from the zenith to the top of the atmosphere, by the midpoint rule over</em><code>steps</code> <em>steps; the reference the renderer's transmittance table is tested against.</em></td>
+</tr>
+</tbody>
+</table>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
 <h3 id="variable-bands">variable bands</h3>
 <pre><code class="language-C++">SpectralBands ernie::BandedAtmosphere::bands;
@@ -260,6 +279,27 @@
 <h3 id="variable-topaltitude">variable topAltitude</h3>
 <pre><code class="language-C++">double ernie::BandedAtmosphere::topAltitude;
 </code></pre>
+<hr>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-extinction">function Extinction</h3>
+<p><em>The extinction coefficient (m^-1) of band</em> <code>band</code> <em>at</em><code>altitude</code> <em>.</em></p>
+<pre><code class="language-C++">double ernie::BandedAtmosphere::Extinction (
+    double altitude,
+    int band
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-transmittancetotop">function TransmittanceToTop</h3>
+<p><em>The transmittance of band</em> <code>band</code> <em>from radius</em><code>r</code> <em>(m) along a ray at cosine</em><code>mu</code> <em>from the zenith to the top of the atmosphere, by the midpoint rule over</em><code>steps</code> <em>steps; the reference the renderer's transmittance table is tested against.</em></p>
+<pre><code class="language-C++">double ernie::BandedAtmosphere::TransmittanceToTop (
+    double r,
+    double mu,
+    int band,
+    int steps=4000
+) const
+</code></pre>
+<p>For rays above the horizon. </p>
 <hr>
 
 <hr />

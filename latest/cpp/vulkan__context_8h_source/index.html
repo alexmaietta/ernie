@@ -321,6 +321,14 @@ class VulkanContext {
                exportSemaphore_ != nullptr;
     }
 
+    bool SupportsLinearSampling(VkFormat format) const {
+        VkFormatProperties properties{};
+        vkGetPhysicalDeviceFormatProperties(physicalDevice_, format,
+                                            &amp;properties);
+        return (properties.linearTilingFeatures &amp;
+                VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) != 0;
+    }
+
     ExternalHandle ExportMemory(VkDeviceMemory memory) const;
 
     ExternalHandle ExportSemaphore(VkSemaphore semaphore) const;

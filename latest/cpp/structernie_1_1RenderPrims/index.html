@@ -216,6 +216,10 @@
 <tbody>
 <tr>
 <td style="text-align: right;"><a href="../classernie_1_1Path/"><strong>Path</strong></a></td>
+<td style="text-align: left;"><a href="#variable-atmosphere"><strong>atmosphere</strong></a>  <br><em>The first visible</em> <a href="../classernie_1_1Atmosphere/"><em><strong>Atmosphere</strong></em></a> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Path/"><strong>Path</strong></a></td>
 <td style="text-align: left;"><a href="#variable-camera"><strong>camera</strong></a>  <br></td>
 </tr>
 <tr>
@@ -266,10 +270,16 @@
 <li><code>camera</code>: the settings' <code>camera</code> relationship, or else the first <a href="../classernie_1_1Camera/"><strong>Camera</strong></a> outside the session root.</li>
 <li><code>terrain</code>: the first visible <a href="../classernie_1_1Terrain/"><strong>Terrain</strong></a>.</li>
 <li><code>material</code>: the terrain's <code>material:binding</code> when it names a <a href="../classernie_1_1Material/"><strong>Material</strong></a>.</li>
-<li>the lights, from the settings' <code>ernie:lights</code> relationship when it is set (its visible light prims), or else from every visible light outside the session root: <code>light</code> is the first <a href="../classernie_1_1DistantLight/"><strong>DistantLight</strong></a> by path, the sun, with cascaded shadows; <code>lights</code> every other <a href="../classernie_1_1DistantLight/"><strong>DistantLight</strong></a>, <a href="../classernie_1_1SphereLight/"><strong>SphereLight</strong></a>, <a href="../classernie_1_1RectLight/"><strong>RectLight</strong></a> and <a href="../classernie_1_1DiskLight/"><strong>DiskLight</strong></a>, sorted by path; <code>dome</code> the first <a href="../classernie_1_1DomeLight/"><strong>DomeLight</strong></a>. A scene without lights renders black.</li>
+<li>the lights, from the settings' <code>ernie:lights</code> relationship when it is set (its visible light prims), or else from every visible light outside the session root: <code>light</code> is the first <a href="../classernie_1_1DistantLight/"><strong>DistantLight</strong></a> by path, the sun, with cascaded shadows; <code>lights</code> every other <a href="../classernie_1_1DistantLight/"><strong>DistantLight</strong></a>, <a href="../classernie_1_1SphereLight/"><strong>SphereLight</strong></a>, <a href="../classernie_1_1RectLight/"><strong>RectLight</strong></a>, <a href="../classernie_1_1DiskLight/"><strong>DiskLight</strong></a>, <a href="../classernie_1_1CylinderLight/"><strong>CylinderLight</strong></a> and <a href="../classernie_1_1LaserLight/"><strong>LaserLight</strong></a>, sorted by path; <code>dome</code> the first <a href="../classernie_1_1DomeLight/"><strong>DomeLight</strong></a>. A scene without lights renders black.</li>
 <li><code>ground</code>: the first visible <a href="../classernie_1_1GroundPlane/"><strong>GroundPlane</strong></a>. </li>
 </ul>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-atmosphere">variable atmosphere</h3>
+<p><em>The first visible</em> <a href="../classernie_1_1Atmosphere/"><em><strong>Atmosphere</strong></em></a> <em>.</em></p>
+<pre><code class="language-C++">Path ernie::RenderPrims::atmosphere;
+</code></pre>
+<hr>
+
 <h3 id="variable-camera">variable camera</h3>
 <pre><code class="language-C++">Path ernie::RenderPrims::camera;
 </code></pre>

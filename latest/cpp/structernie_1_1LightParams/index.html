@@ -205,6 +205,21 @@
 <ul>
 <li><code>#include &lt;ernie/session/frame_params.h&gt;</code></li>
 </ul>
+<h2 id="classes">Classes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1LightParams_1_1Beam/"><strong>Beam</strong></a> <br><em>A laser's Gaussian beam (Siegman 1986): its 1/e^2 radius at the waist along the light's x and y, its Rayleigh range along each, and the waist's distance along the beam from</em> <code>position</code> <em>, m.</em></td>
+</tr>
+</tbody>
+</table>
 <h2 id="public-attributes">Public Attributes</h2>
 <table>
 <thead>
@@ -214,6 +229,10 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1LightParams_1_1Beam/"><strong>Beam</strong></a></td>
+<td style="text-align: left;"><a href="#variable-beam"><strong>beam</strong></a>  <br></td>
+</tr>
 <tr>
 <td style="text-align: right;">float</td>
 <td style="text-align: left;"><a href="#variable-coneangle"><strong>coneAngle</strong></a>   = <code>180.0f</code><br><em>Degrees off the axis that are lit; 180 lights every direction.</em></td>
@@ -309,6 +328,11 @@
 <p>Reference: J. Arvo, "The Irradiance Jacobian for Partially
 Occluded Polyhedral Sources", SIGGRAPH '94, 343-350, 1994. <a href="https://doi.org/10.1145/192161.192250">https://doi.org/10.1145/192161.192250</a> </p>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-beam">variable beam</h3>
+<pre><code class="language-C++">Beam ernie::LightParams::beam;
+</code></pre>
+<hr>
+
 <h3 id="variable-coneangle">variable coneAngle</h3>
 <p><em>Degrees off the axis that are lit; 180 lights every direction.</em> </p>
 <pre><code class="language-C++">float ernie::LightParams::coneAngle;

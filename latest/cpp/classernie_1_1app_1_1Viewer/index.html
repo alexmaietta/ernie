@@ -418,8 +418,28 @@
 <td style="text-align: left;"><a href="#function-log"><strong>Log</strong></a> (<a href="../namespaceernie_1_1app/#enum-loglevel"><strong>LogLevel</strong></a> level, std::string text) <br><em>Adds a message to the viewer's log, shown in the Log panel; the viewer itself logs render errors as they start.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-logarray"><strong>LogArray</strong></a> (std::string_view name, const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp; array, std::uintptr_t stream=1) <br><em>Logs</em> <code>array</code> <em>, (n) or (rows, cols) numbers on the host or the GPU, as a heatmap in the Plots panel, replacing the last; a GPU array is downloaded after the work queued on compute stream</em><code>stream</code> <em>.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">const std::deque&lt; <a href="../structernie_1_1app_1_1LogEntry/"><strong>LogEntry</strong></a> &gt; &amp;</td>
 <td style="text-align: left;"><a href="#function-logentries"><strong>LogEntries</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-logimage"><strong>LogImage</strong></a> (std::string_view name, const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp; image, std::uintptr_t stream=1) <br><em>Logs</em> <code>image</code> <em>in a panel of its own titled</em><code>name</code> <em>, replacing the last: (rows, cols), (rows, cols, channels) or a batch (views, rows, cols, channels), with 1, 3 or 4 channels, uint8 (0 to 255, shown as they are, so sRGB) or float32 (0 to 1).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-logscalar"><strong>LogScalar</strong></a> (std::string_view name, double value, bool clear=false, int smoothing=1) <br><em>Logging, after Newton's viewers'</em> <code>log_scalar</code> <em>,</em><code>log_array</code> <em>and</em><code>log_image</code> <em>: values a simulation or sensor produces, shown live as they change.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; double &gt;</td>
+<td style="text-align: left;"><a href="#function-loggedscalars"><strong>LoggedScalars</strong></a> (std::string_view name) const<br><em>The samples of scalar signal</em> <code>name</code> <em>so far, oldest first; empty if none.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#function-mapimage"><strong>MapImage</strong></a> (std::string_view name, std::vector&lt; std::int64_t &gt; shape, <a href="../namespaceernie/#enum-dtype"><strong>DType</strong></a> type, std::uintptr_t stream=1) <br><em>The texture of the image panel</em> <code>name</code> <em>itself, as a tensor of</em><code>shape</code> <em>and</em><code>type</code> <em>(as</em><code>LogImage</code> <em>takes them, without 3 channels) on the viewer's GPU, its rows the texture's pitch apart: write it on compute stream</em><code>stream</code> <em>and</em><code>UnmapImage</code> <em>, and the panel shows it with no copy at all.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::optional&lt; double &gt;</td>
@@ -492,6 +512,10 @@
 <tr>
 <td style="text-align: right;">void</td>
 <td style="text-align: left;"><a href="#function-removecallback"><strong>RemoveCallback</strong></a> (std::uint64_t id) <br><em>Removes the frame, UI, pre-render, post-render or selection callback with id</em> <code>id</code> <em>; unknown ids are ignored.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-removelogged"><strong>RemoveLogged</strong></a> (std::string_view name) <br><em>Forgets the scalar signal, array or image</em> <code>name</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
@@ -628,6 +652,10 @@
 <tr>
 <td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#function-undo"><strong>Undo</strong></a> () <br><em>Undoes or redoes the last GUI edit (Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y); returns whether there was one.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-unmapimage"><strong>UnmapImage</strong></a> (std::string_view name, std::uintptr_t stream=1) <br><em>Ends writing image</em> <code>name</code> <em>(</em><code>MapImage</code> <em>): frames sample it after the work queued on</em><code>stream</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">int</td>
@@ -1108,9 +1136,75 @@ inline T &amp; ernie::app::Viewer::AddPanel (
 <p>The log keeps the latest few thousand messages. </p>
 <hr>
 
+<h3 id="function-logarray">function LogArray</h3>
+<p><em>Logs</em> <code>array</code> <em>, (n) or (rows, cols) numbers on the host or the GPU, as a heatmap in the Plots panel, replacing the last; a GPU array is downloaded after the work queued on compute stream</em><code>stream</code> <em>.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::LogArray (
+    std::string_view name,
+    const Tensor &amp; array,
+    std::uintptr_t stream=1
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for another shape or type. </li>
+</ul>
+<hr>
+
 <h3 id="function-logentries">function LogEntries</h3>
 <pre><code class="language-C++">const std::deque&lt; LogEntry &gt; &amp; ernie::app::Viewer::LogEntries () const
 </code></pre>
+<hr>
+
+<h3 id="function-logimage">function LogImage</h3>
+<p><em>Logs</em> <code>image</code> <em>in a panel of its own titled</em><code>name</code> <em>, replacing the last: (rows, cols), (rows, cols, channels) or a batch (views, rows, cols, channels), with 1, 3 or 4 channels, uint8 (0 to 255, shown as they are, so sRGB) or float32 (0 to 1).</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::LogImage (
+    std::string_view name,
+    const Tensor &amp; image,
+    std::uintptr_t stream=1
+) 
+</code></pre>
+<p>A host image is uploaded with the next frame. An image on the viewer's GPU (<code>Delegate() .Compute()</code>) is copied device to device into the texture after the work queued on compute stream <code>stream</code>, without the host; to skip even that copy, write the texture itself (<code>MapImage</code>). </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for another shape or type, a device other than the host or the viewer's GPU, or a name another panel has. </li>
+</ul>
+<hr>
+
+<h3 id="function-logscalar">function LogScalar</h3>
+<p><em>Logging, after Newton's viewers'</em> <code>log_scalar</code> <em>,</em><code>log_array</code> <em>and</em><code>log_image</code> <em>: values a simulation or sensor produces, shown live as they change.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::LogScalar (
+    std::string_view name,
+    double value,
+    bool clear=false,
+    int smoothing=1
+) 
+</code></pre>
+<p>Each belongs to the registration scope current when first logged (<code>SetScope</code>), so a demo's logs go with it.</p>
+<p>Logs <code>value</code> as the next sample of the scalar signal <code>name</code>, drawn as a line of its last thousand samples in the Plots panel. <code>clear</code> drops the samples before; <code>smoothing</code> averages that many values into each sample. </p>
+<hr>
+
+<h3 id="function-loggedscalars">function LoggedScalars</h3>
+<p><em>The samples of scalar signal</em> <code>name</code> <em>so far, oldest first; empty if none.</em></p>
+<pre><code class="language-C++">std::vector&lt; double &gt; ernie::app::Viewer::LoggedScalars (
+    std::string_view name
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-mapimage">function MapImage</h3>
+<p><em>The texture of the image panel</em> <code>name</code> <em>itself, as a tensor of</em><code>shape</code> <em>and</em><code>type</code> <em>(as</em><code>LogImage</code> <em>takes them, without 3 channels) on the viewer's GPU, its rows the texture's pitch apart: write it on compute stream</em><code>stream</code> <em>and</em><code>UnmapImage</code> <em>, and the panel shows it with no copy at all.</em></p>
+<pre><code class="language-C++">Tensor ernie::app::Viewer::MapImage (
+    std::string_view name,
+    std::vector&lt; std::int64_t &gt; shape,
+    DType type,
+    std::uintptr_t stream=1
+) 
+</code></pre>
+<p>Map again for each new image; the writes on <code>stream</code> follow the frames that sampled the last one. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::runtime_error</code> without GPU interop, or if the GPU cannot sample the linear images that need (<code>VulkanContext::SupportsLinearSampling</code>); std::invalid_argument as <code>LogImage</code>. </li>
+</ul>
 <hr>
 
 <h3 id="function-meteredev">function MeteredEv</h3>
@@ -1219,6 +1313,14 @@ inline T &amp; ernie::app::Viewer::AddPanel (
 <p><em>Removes the frame, UI, pre-render, post-render or selection callback with id</em> <code>id</code> <em>; unknown ids are ignored.</em></p>
 <pre><code class="language-C++">void ernie::app::Viewer::RemoveCallback (
     std::uint64_t id
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-removelogged">function RemoveLogged</h3>
+<p><em>Forgets the scalar signal, array or image</em> <code>name</code> <em>.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::RemoveLogged (
+    std::string_view name
 ) 
 </code></pre>
 <hr>
@@ -1495,6 +1597,15 @@ inline T &amp; ernie::app::Viewer::AddPanel (
 <h3 id="function-undo">function Undo</h3>
 <p><em>Undoes or redoes the last GUI edit (Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y); returns whether there was one.</em> </p>
 <pre><code class="language-C++">bool ernie::app::Viewer::Undo () 
+</code></pre>
+<hr>
+
+<h3 id="function-unmapimage">function UnmapImage</h3>
+<p><em>Ends writing image</em> <code>name</code> <em>(</em><code>MapImage</code> <em>): frames sample it after the work queued on</em><code>stream</code> <em>.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::UnmapImage (
+    std::string_view name,
+    std::uintptr_t stream=1
+) 
 </code></pre>
 <hr>
 

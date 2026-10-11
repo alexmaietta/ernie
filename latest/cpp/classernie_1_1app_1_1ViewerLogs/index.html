@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1app_1_1ViewerLogs/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Class ernie::app::ViewerLogs - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Class ernie::app::ViewerLogs";
+        var mkdocs_page_input_path = "cpp/classernie_1_1app_1_1ViewerLogs.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/classernie_1_1app_1_1ViewerLogs/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Class ernie::app::ViewerLogs</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/classernie_1_1app_1_1ViewerLogs.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-ernieappviewerlogs">Class ernie::app::ViewerLogs</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../namespaceernie_1_1app/"><strong>app</strong></a> <strong>&gt;</strong> <a href="./"><strong>ViewerLogs</strong></a></p>
+<p><em>What the viewer's logging calls collect (</em> <code>Viewer::LogScalar</code> <em>,</em><code>LogArray</code> <em>,</em><code>LogImage</code> <em>), after Newton's viewers'</em><code>log_scalar</code> <em>,</em><code>log_array</code> <em>and</em><code>log_image</code> <em>: scalar signals and arrays drawn in the Plots panel, and images each in a panel of its own, as textures the GPU samples where they were written.</em><a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/app/logs.h&gt;</code></li>
+</ul>
+<h2 id="public-static-attributes">Public Static Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">constexpr std::size_t</td>
+<td style="text-align: left;"><a href="#variable-khistory"><strong>kHistory</strong></a>   = <code>1000</code><br><em>Samples a scalar signal keeps.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-drawplots"><strong>DrawPlots</strong></a> () <br><em>Draws the Plots panel's contents.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-forget"><strong>Forget</strong></a> (ImagePanel &amp; panel) <br><em>Called by an image panel going away.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1VulkanContext/"><strong>VulkanContext</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-gpu"><strong>Gpu</strong></a> () <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-logarray"><strong>LogArray</strong></a> (std::string_view name, const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp; array, std::uint64_t scope) <br><code>array</code> <em>on the host: (n) or (rows, cols) numbers.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-logimage"><strong>LogImage</strong></a> (<a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> &amp; viewer, std::string_view name, const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp; image, <a href="../classernie_1_1ComputeInterop/"><strong>ComputeInterop</strong></a> * compute, std::uintptr_t stream, std::uint64_t scope) <br><em>Logs</em> <code>image</code> <em>(on the host or</em><code>compute</code> <em>'s device) into the image panel</em><code>name</code> <em>, which</em><code>viewer</code> <em>gets in</em><code>scope</code> <em>if it is new.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-logscalar"><strong>LogScalar</strong></a> (std::string_view name, double value, bool clear, int smoothing, std::uint64_t scope) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#function-mapimage"><strong>MapImage</strong></a> (<a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> &amp; viewer, std::string_view name, std::vector&lt; std::int64_t &gt; shape, <a href="../namespaceernie/#enum-dtype"><strong>DType</strong></a> type, <a href="../classernie_1_1ComputeInterop/"><strong>ComputeInterop</strong></a> &amp; compute, std::uintptr_t stream, std::uint64_t scope) <br><em>The image panel</em> <code>name</code> <em>'s texture as a tensor on</em><code>compute</code> <em>'s device to write in place.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../classernie_1_1Sampler/"><strong>Sampler</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-nearestsampler"><strong>NearestSampler</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-record"><strong>Record</strong></a> (VkCommandBuffer commands, std::size_t slot) <br><em>Records this frame's host uploads into</em> <code>commands</code> <em>, using frame slot</em><code>slot</code> <em>'s staging.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-releaseimages"><strong>ReleaseImages</strong></a> () <br><em>Releases every image panel's texture and image, while ImGui and the device still exist: for the viewer's shutdown, which destroys its panels afterwards.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-remove"><strong>Remove</strong></a> (<a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> &amp; viewer, std::string_view name) <br><em>Forgets</em> <code>name</code> <em>'s plot or image panel.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-removescope"><strong>RemoveScope</strong></a> (std::uint64_t scope) <br><em>Forgets the plots logged in</em> <code>scope</code> <em>; its image panels go with the scope's panels.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-samplescomputeimages"><strong>SamplesComputeImages</strong></a> () const<br><em>Whether the frame samples an image a compute device writes, so its submission must signal the compute side (</em> <code>ComputeInterop::NextVulkanSignal</code> <em>) before it writes the image again.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; double &gt;</td>
+<td style="text-align: left;"><a href="#function-scalars"><strong>Scalars</strong></a> (std::string_view name) const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-unmapimage"><strong>UnmapImage</strong></a> (std::string_view name, <a href="../classernie_1_1ComputeInterop/"><strong>ComputeInterop</strong></a> &amp; compute, std::uintptr_t stream) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-viewerlogs-12"><strong>ViewerLogs</strong></a> (<a href="../classernie_1_1VulkanContext/"><strong>VulkanContext</strong></a> &amp; gpu) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-viewerlogs-22"><strong>ViewerLogs</strong></a> (const <a href="./"><strong>ViewerLogs</strong></a> &amp;) = delete<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>ViewerLogs</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-operator"><strong>operator=</strong></a> (const <a href="./"><strong>ViewerLogs</strong></a> &amp;) = delete<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-viewerlogs"><strong>~ViewerLogs</strong></a> () <br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>An image lives in a linear shared Vulkan image where the device samples those (<code>VulkanContext::SupportsLinearSampling</code>): a CUDA array view of it (<code>Map</code>) is the texture itself, written in place with no copy, and CUDA images logged from elsewhere arrive by one device-to-device copy. Host images are staged through the frame. Everything logged belongs to the registration scope current when first logged (<code>Viewer::SetScope</code>).</p>
+<p>References:
+* Newton's viewers (<code>newton.viewer</code>: <code>log_scalar</code>, <code>log_array</code>, <code>log_image</code>), <a href="https://github.com/newton-physics/newton">https://github.com/newton-physics/newton</a> </p>
+<h2 id="public-static-attributes-documentation">Public Static Attributes Documentation</h2>
+<h3 id="variable-khistory">variable kHistory</h3>
+<p><em>Samples a scalar signal keeps.</em> </p>
+<pre><code class="language-C++">constexpr std::size_t ernie::app::ViewerLogs::kHistory;
+</code></pre>
+<hr>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-drawplots">function DrawPlots</h3>
+<p><em>Draws the Plots panel's contents.</em> </p>
+<pre><code class="language-C++">void ernie::app::ViewerLogs::DrawPlots () 
+</code></pre>
+<hr>
+
+<h3 id="function-forget">function Forget</h3>
+<p><em>Called by an image panel going away.</em> </p>
+<pre><code class="language-C++">void ernie::app::ViewerLogs::Forget (
+    ImagePanel &amp; panel
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-gpu">function Gpu</h3>
+<pre><code class="language-C++">inline VulkanContext &amp; ernie::app::ViewerLogs::Gpu () 
+</code></pre>
+<hr>
+
+<h3 id="function-logarray">function LogArray</h3>
+<p><code>array</code> <em>on the host: (n) or (rows, cols) numbers.</em></p>
+<pre><code class="language-C++">void ernie::app::ViewerLogs::LogArray (
+    std::string_view name,
+    const Tensor &amp; array,
+    std::uint64_t scope
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-logimage">function LogImage</h3>
+<p><em>Logs</em> <code>image</code> <em>(on the host or</em><code>compute</code> <em>'s device) into the image panel</em><code>name</code> <em>, which</em><code>viewer</code> <em>gets in</em><code>scope</code> <em>if it is new.</em></p>
+<pre><code class="language-C++">void ernie::app::ViewerLogs::LogImage (
+    Viewer &amp; viewer,
+    std::string_view name,
+    const Tensor &amp; image,
+    ComputeInterop * compute,
+    std::uintptr_t stream,
+    std::uint64_t scope
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-logscalar">function LogScalar</h3>
+<pre><code class="language-C++">void ernie::app::ViewerLogs::LogScalar (
+    std::string_view name,
+    double value,
+    bool clear,
+    int smoothing,
+    std::uint64_t scope
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-mapimage">function MapImage</h3>
+<p><em>The image panel</em> <code>name</code> <em>'s texture as a tensor on</em><code>compute</code> <em>'s device to write in place.</em></p>
+<pre><code class="language-C++">Tensor ernie::app::ViewerLogs::MapImage (
+    Viewer &amp; viewer,
+    std::string_view name,
+    std::vector&lt; std::int64_t &gt; shape,
+    DType type,
+    ComputeInterop &amp; compute,
+    std::uintptr_t stream,
+    std::uint64_t scope
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-nearestsampler">function NearestSampler</h3>
+<pre><code class="language-C++">inline const Sampler &amp; ernie::app::ViewerLogs::NearestSampler () const
+</code></pre>
+<hr>
+
+<h3 id="function-record">function Record</h3>
+<p><em>Records this frame's host uploads into</em> <code>commands</code> <em>, using frame slot</em><code>slot</code> <em>'s staging.</em></p>
+<pre><code class="language-C++">void ernie::app::ViewerLogs::Record (
+    VkCommandBuffer commands,
+    std::size_t slot
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-releaseimages">function ReleaseImages</h3>
+<p><em>Releases every image panel's texture and image, while ImGui and the device still exist: for the viewer's shutdown, which destroys its panels afterwards.</em> </p>
+<pre><code class="language-C++">void ernie::app::ViewerLogs::ReleaseImages () 
+</code></pre>
+<hr>
+
+<h3 id="function-remove">function Remove</h3>
+<p><em>Forgets</em> <code>name</code> <em>'s plot or image panel.</em></p>
+<pre><code class="language-C++">void ernie::app::ViewerLogs::Remove (
+    Viewer &amp; viewer,
+    std::string_view name
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-removescope">function RemoveScope</h3>
+<p><em>Forgets the plots logged in</em> <code>scope</code> <em>; its image panels go with the scope's panels.</em></p>
+<pre><code class="language-C++">void ernie::app::ViewerLogs::RemoveScope (
+    std::uint64_t scope
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-samplescomputeimages">function SamplesComputeImages</h3>
+<p><em>Whether the frame samples an image a compute device writes, so its submission must signal the compute side (</em> <code>ComputeInterop::NextVulkanSignal</code> <em>) before it writes the image again.</em></p>
+<pre><code class="language-C++">bool ernie::app::ViewerLogs::SamplesComputeImages () const
+</code></pre>
+<hr>
+
+<h3 id="function-scalars">function Scalars</h3>
+<pre><code class="language-C++">std::vector&lt; double &gt; ernie::app::ViewerLogs::Scalars (
+    std::string_view name
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-unmapimage">function UnmapImage</h3>
+<pre><code class="language-C++">void ernie::app::ViewerLogs::UnmapImage (
+    std::string_view name,
+    ComputeInterop &amp; compute,
+    std::uintptr_t stream
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-viewerlogs-12">function ViewerLogs [1/2]</h3>
+<pre><code class="language-C++">explicit ernie::app::ViewerLogs::ViewerLogs (
+    VulkanContext &amp; gpu
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-viewerlogs-22">function ViewerLogs [2/2]</h3>
+<pre><code class="language-C++">ernie::app::ViewerLogs::ViewerLogs (
+    const ViewerLogs &amp;
+) = delete
+</code></pre>
+<hr>
+
+<h3 id="function-operator">function operator=</h3>
+<pre><code class="language-C++">ViewerLogs &amp; ernie::app::ViewerLogs::operator= (
+    const ViewerLogs &amp;
+) = delete
+</code></pre>
+<hr>
+
+<h3 id="function-viewerlogs">function ~ViewerLogs</h3>
+<pre><code class="language-C++">ernie::app::ViewerLogs::~ViewerLogs () 
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/app/logs.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../js/sidebar.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

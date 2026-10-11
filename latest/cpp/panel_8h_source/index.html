@@ -205,6 +205,7 @@
 <pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include &lt;array&gt;
 #include &lt;cstdint&gt;
 #include &lt;functional&gt;
 #include &lt;memory&gt;
@@ -289,6 +290,11 @@ class WidgetPanel final : public Panel {
              std::size_t selected,
              std::function&lt;void(std::size_t)&gt; onChange);
 
+    Id InputText(std::string label, std::string value,
+                 std::function&lt;void(const std::string&amp;)&gt; onChange);
+    Id Color(std::string label, std::array&lt;double, 3&gt; value,
+             std::function&lt;void(std::array&lt;double, 3&gt;)&gt; onChange);
+
     Id Plot(std::string label,
             std::function&lt;std::vector&lt;float&gt;()&gt; source);
 
@@ -296,6 +302,7 @@ class WidgetPanel final : public Panel {
     void Set(Id widget, double value);
     void Set(Id widget, std::size_t value);
     void Set(Id widget, std::string value);
+    void Set(Id widget, std::array&lt;double, 3&gt; value);
 
     void Remove(Id widget);
     void Clear();
@@ -307,6 +314,8 @@ class WidgetPanel final : public Panel {
     std::vector&lt;std::unique_ptr&lt;Widget&gt;&gt; widgets_;
     Id next_ = 1;
 };
+
+bool InputString(const char* label, std::string&amp; text, int flags = 0);
 
 }  // namespace ernie::app
 </code></pre>

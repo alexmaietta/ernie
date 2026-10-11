@@ -235,6 +235,10 @@
 <tbody>
 <tr>
 <td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1Atmosphere/"><strong>Atmosphere</strong></a> <br><em>A planet's atmosphere from a physical model (</em> <code>EarthAtmosphere</code> <em>,</em><code>MarsAtmosphere</code> <em>): its gases and aerosols scatter and absorb the sun's light on its way to the ground, the sun's</em><a href="../classernie_1_1DistantLight/"><em><strong>DistantLight</strong></em></a> <em>then giving the irradiance above the atmosphere.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1StarField/"><strong>StarField</strong></a> <br><em>Stars from a catalogue as points of light at infinity, behind everything else, each with a black-body spectrum.</em></td>
 </tr>
 <tr>
@@ -254,6 +258,14 @@
 <tbody>
 <tr>
 <td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_atmosphere_all"><strong>ERNIE_ATMOSPHERE_ALL</strong></a> (X) <code>[**ERNIE\_IMAGEABLE\_ATTRIBUTES**](base__schemas_8h.md#define-ernie_imageable_attributes)(X) [**ERNIE\_ATMOSPHERE\_ATTRIBUTES**](terrain__schemas_8h.md#define-ernie_atmosphere_attributes)(X)</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_atmosphere_attributes"><strong>ERNIE_ATMOSPHERE_ATTRIBUTES</strong></a> (X) <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">define</td>
 <td style="text-align: left;"><a href="./#define-ernie_star_field_all"><strong>ERNIE_STAR_FIELD_ALL</strong></a> (X) <code>[**ERNIE\_IMAGEABLE\_ATTRIBUTES**](base__schemas_8h.md#define-ernie_imageable_attributes)(X) [**ERNIE\_STAR\_FIELD\_ATTRIBUTES**](terrain__schemas_8h.md#define-ernie_star_field_attributes)(X)</code><br></td>
 </tr>
 <tr>
@@ -271,6 +283,20 @@
 </tbody>
 </table>
 <h2 id="macro-definition-documentation">Macro Definition Documentation</h2>
+<h3 id="define-ernie_atmosphere_all">define ERNIE_ATMOSPHERE_ALL</h3>
+<pre><code class="language-C++">#define ERNIE_ATMOSPHERE_ALL (
+    X
+) `ERNIE_IMAGEABLE_ATTRIBUTES (X) ERNIE_ATMOSPHERE_ATTRIBUTES (X)`
+</code></pre>
+<hr>
+
+<h3 id="define-ernie_atmosphere_attributes">define ERNIE_ATMOSPHERE_ATTRIBUTES</h3>
+<pre><code class="language-C++">#define ERNIE_ATMOSPHERE_ATTRIBUTES (
+    X
+) `/* multi line expression */`
+</code></pre>
+<hr>
+
 <h3 id="define-ernie_star_field_all">define ERNIE_STAR_FIELD_ALL</h3>
 <pre><code class="language-C++">#define ERNIE_STAR_FIELD_ALL (
     X

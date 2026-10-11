@@ -169,7 +169,15 @@
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
-         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1Atmosphere/</loc>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1Atmosphere/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1AtmosphereModel/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1AtmosphereParams/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
@@ -545,6 +553,10 @@
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1LaserLight/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1LensModel/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
@@ -558,6 +570,10 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1LightParams/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1LightParams_1_1Beam/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
@@ -1041,6 +1057,10 @@
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1app_1_1ViewerLogs/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1app_1_1ViewerOptions/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
@@ -1113,6 +1133,14 @@
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1app_1_1ViewerLogs_1_1Array/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1app_1_1ViewerLogs_1_1Scalar/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/namespacestd/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
@@ -1182,6 +1210,14 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/icons_8h_source/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/logs_8h/</loc>
+         <lastmod>2026-10-11</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/logs_8h_source/</loc>
          <lastmod>2026-10-11</lastmod>
     </url>
     <url>

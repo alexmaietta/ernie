@@ -501,6 +501,54 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            log_array (ernie._ernie.app.Demo.log_array)" href="#ernie._ernie.app.Demo.log_array">log_array</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Logs array to the viewer's heatmap name (Viewer.log_array) when there is a viewer, and keeps it either way (logged_array).</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            log_image (ernie._ernie.app.Demo.log_image)" href="#ernie._ernie.app.Demo.log_image">log_image</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Logs image to the viewer's image panel name (Viewer.log_image) when there is a viewer, and keeps it either way (logged_image).</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            log_scalar (ernie._ernie.app.Demo.log_scalar)" href="#ernie._ernie.app.Demo.log_scalar">log_scalar</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Logs value to the viewer's scalar plot name (Viewer.log_scalar) when there is a viewer, and keeps it either way (logged_scalars).</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            logged_array (ernie._ernie.app.Demo.logged_array)" href="#ernie._ernie.app.Demo.logged_array">logged_array</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The last array logged as name, or None.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            logged_image (ernie._ernie.app.Demo.logged_image)" href="#ernie._ernie.app.Demo.logged_image">logged_image</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The last image logged as name, as logged, or None.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            logged_scalars (ernie._ernie.app.Demo.logged_scalars)" href="#ernie._ernie.app.Demo.logged_scalars">logged_scalars</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Every value logged to scalar name, oldest first.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            render (ernie._ernie.app.Demo.render)" href="#ernie._ernie.app.Demo.render">render</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -590,7 +638,7 @@
             </li>
             <li>
               <b><code>scene</code></b>
-                  (<code><span title="object">object</span></code>)
+                  (<code><a class="autorefs autorefs-internal" title="            Scene (ernie._ernie.Scene)" href="../scene/#ernie.Scene">Scene</a></code>)
               –
               <div class="doc-md-description">
                 <p>The scene to build into: the viewer's, or the demo's own without one.</p>
@@ -735,7 +783,7 @@
   </span>
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">scene: object</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">scene: Scene</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -827,6 +875,120 @@
     <div class="doc doc-contents ">
 
         <p>One line on what the demo shows.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Demo.log_array" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">log_array</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">log_array(name: str, array: object, stream: object | None = None) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Logs array to the viewer's heatmap name (Viewer.log_array) when there is a viewer, and keeps it either way (logged_array).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Demo.log_image" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">log_image</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">log_image(name: str, image: object, stream: object | None = None) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Logs image to the viewer's image panel name (Viewer.log_image) when there is a viewer, and keeps it either way (logged_image).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Demo.log_scalar" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">log_scalar</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">log_scalar(name: str, value: float, clear: bool = False, smoothing: int = 1) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Logs value to the viewer's scalar plot name (Viewer.log_scalar) when there is a viewer, and keeps it either way (logged_scalars).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Demo.logged_array" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">logged_array</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">logged_array(name: str) -&gt; numpy.typing.NDArray | None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The last array logged as name, or None.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Demo.logged_image" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">logged_image</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">logged_image(name: str) -&gt; numpy.typing.NDArray | None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The last image logged as name, as logged, or None.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Demo.logged_scalars" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">logged_scalars</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">logged_scalars(name: str) -&gt; list[float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Every value logged to scalar name, oldest first.</p>
 
 
     </div>
@@ -3668,6 +3830,14 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            focus_panel (ernie._ernie.app.Viewer.focus_panel)" href="#ernie._ernie.app.Viewer.focus_panel">focus_panel</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Shows the panel titled <code>title</code> and brings it to the front of its dock.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            frame (ernie._ernie.app.Viewer.frame)" href="#ernie._ernie.app.Viewer.frame">frame</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -3700,10 +3870,50 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            log_array (ernie._ernie.app.Viewer.log_array)" href="#ernie._ernie.app.Viewer.log_array">log_array</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Logs array, (n) or (rows, cols) numbers from any framework, on the CPU or the GPU, as a heatmap in the Plots panel, replacing the last (Newton's log_array).</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            log_image (ernie._ernie.app.Viewer.log_image)" href="#ernie._ernie.app.Viewer.log_image">log_image</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Logs image in a panel of its own titled name, replacing the last (Newton's log_image): (rows, cols), (rows, cols, channels) or a batch (views, rows, cols, channels), with 1, 3 or 4 channels, uint8 (0 to 255, shown as they are) or float32 (0 to 1), from any DLPack framework (NumPy, PyTorch, JAX, Warp, CuPy). A CUDA image is copied device to device into the panel's texture after the work queued on stream, without the host; map_image writes the texture itself, with no copy.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            log_scalar (ernie._ernie.app.Viewer.log_scalar)" href="#ernie._ernie.app.Viewer.log_scalar">log_scalar</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Logs value as the next sample of the scalar signal name, drawn as a line of its last thousand samples in the Plots panel (Newton's log_scalar). clear drops the samples before; smoothing averages that many values into each sample.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            logged_scalars (ernie._ernie.app.Viewer.logged_scalars)" href="#ernie._ernie.app.Viewer.logged_scalars">logged_scalars</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The samples of scalar signal name so far, oldest first.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            map (ernie._ernie.app.Viewer.map)" href="#ernie._ernie.app.Viewer.map">map</a></code></td>
               <td>
                 <div class="doc-md-description">
                   <p>As Renderer.map, for the viewer's scene and renderer: a CUDA array over the viewer's own memory for the attribute, to write in place and then <code>scene.unmap(path, attribute, stream)</code>; map again every frame.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            map_image (ernie._ernie.app.Viewer.map_image)" href="#ernie._ernie.app.Viewer.map_image">map_image</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The texture of image panel name itself, as a writable CUDA array of shape (as log_image takes, with 1 or 4 channels) and dtype: write it on stream (with Warp, PyTorch, CuPy...), then unmap_image(name, stream), and the panel shows it with no copy at all. Its rows are the texture's pitch apart (see its strides). Map again for each new image.</p>
                 </div>
               </td>
             </tr>
@@ -3784,6 +3994,14 @@
               <td>
                 <div class="doc-md-description">
                   
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            remove_logged (ernie._ernie.app.Viewer.remove_logged)" href="#ernie._ernie.app.Viewer.remove_logged">remove_logged</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Forgets the scalar signal, array or image name.</p>
                 </div>
               </td>
             </tr>
@@ -3896,6 +4114,14 @@
               <td>
                 <div class="doc-md-description">
                   <p>Undoes the last GUI edit; returns whether there was one.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            unmap_image (ernie._ernie.app.Viewer.unmap_image)" href="#ernie._ernie.app.Viewer.unmap_image">unmap_image</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Ends writing image name (map_image): frames show it after the work queued on stream.</p>
                 </div>
               </td>
             </tr>
@@ -5104,6 +5330,25 @@
 <div class="doc doc-object doc-function">
 
 
+<h3 id="ernie._ernie.app.Viewer.focus_panel" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">focus_panel</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">focus_panel(title: str) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Shows the panel titled <code>title</code> and brings it to the front of its dock.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="ernie._ernie.app.Viewer.frame" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">frame</span>
 
@@ -5176,6 +5421,82 @@
 <div class="doc doc-object doc-function">
 
 
+<h3 id="ernie._ernie.app.Viewer.log_array" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">log_array</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">log_array(name: str, array: object, stream: object | None = None) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Logs array, (n) or (rows, cols) numbers from any framework, on the CPU or the GPU, as a heatmap in the Plots panel, replacing the last (Newton's log_array).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Viewer.log_image" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">log_image</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">log_image(name: str, image: object, stream: object | None = None) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Logs image in a panel of its own titled name, replacing the last (Newton's log_image): (rows, cols), (rows, cols, channels) or a batch (views, rows, cols, channels), with 1, 3 or 4 channels, uint8 (0 to 255, shown as they are) or float32 (0 to 1), from any DLPack framework (NumPy, PyTorch, JAX, Warp, CuPy). A CUDA image is copied device to device into the panel's texture after the work queued on stream, without the host; map_image writes the texture itself, with no copy.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Viewer.log_scalar" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">log_scalar</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">log_scalar(name: str, value: float, clear: bool = False, smoothing: int = 1) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Logs value as the next sample of the scalar signal name, drawn as a line of its last thousand samples in the Plots panel (Newton's log_scalar). clear drops the samples before; smoothing averages that many values into each sample.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Viewer.logged_scalars" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">logged_scalars</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">logged_scalars(name: str) -&gt; list[float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The samples of scalar signal name so far, oldest first.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="ernie._ernie.app.Viewer.map" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">map</span>
 
@@ -5186,6 +5507,30 @@
     <div class="doc doc-contents ">
 
         <p>As Renderer.map, for the viewer's scene and renderer: a CUDA array over the viewer's own memory for the attribute, to write in place and then <code>scene.unmap(path, attribute, stream)</code>; map again every frame.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Viewer.map_image" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">map_image</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">map_image(
+    name: str,
+    shape: Sequence[int],
+    dtype: object = "uint8",
+    stream: object | None = None,
+) -&gt; object</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The texture of image panel name itself, as a writable CUDA array of shape (as log_image takes, with 1 or 4 channels) and dtype: write it on stream (with Warp, PyTorch, CuPy...), then unmap_image(name, stream), and the panel shows it with no copy at all. Its rows are the texture's pitch apart (see its strides). Map again for each new image.</p>
 
 
     </div>
@@ -5374,6 +5719,25 @@
 <pre class="highlight"><code class="language-python doc-signature">remove_callback(id: int) -&gt; None</code></pre>
 
     <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Viewer.remove_logged" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">remove_logged</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">remove_logged(name: str) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Forgets the scalar signal, array or image name.</p>
 
 
     </div>
@@ -5632,6 +5996,25 @@
     <div class="doc doc-contents ">
 
         <p>Undoes the last GUI edit; returns whether there was one.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Viewer.unmap_image" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">unmap_image</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">unmap_image(name: str, stream: object | None = None) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Ends writing image name (map_image): frames show it after the work queued on stream.</p>
 
 
     </div>
@@ -6342,10 +6725,26 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            color (ernie._ernie.app.WidgetPanel.color)" href="#ernie._ernie.app.WidgetPanel.color">color</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>An RGB colour swatch with a picker; on_change gets (r, g, b) in [0, 1].</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            combo (ernie._ernie.app.WidgetPanel.combo)" href="#ernie._ernie.app.WidgetPanel.combo">combo</a></code></td>
               <td>
                 <div class="doc-md-description">
                   
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            input_text (ernie._ernie.app.WidgetPanel.input_text)" href="#ernie._ernie.app.WidgetPanel.input_text">input_text</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>A field of editable text; on_change gets the text after each edit.</p>
                 </div>
               </td>
             </tr>
@@ -6377,7 +6776,7 @@
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie._ernie.app.WidgetPanel.set)" href="#ernie._ernie.app.WidgetPanel.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Sets a checkbox (bool), combo (int index), slider (float) or text (str) without calling its callback.</p>
+                  <p>Sets a checkbox (bool), combo (int index), slider (float), text or text field (str) or colour (r, g, b) without calling its callback.</p>
                 </div>
               </td>
             </tr>
@@ -6576,6 +6975,29 @@
 <div class="doc doc-object doc-function">
 
 
+<h3 id="ernie._ernie.app.WidgetPanel.color" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">color</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">color(
+    label: str,
+    value: Sequence[float],
+    on_change: Callable[[Sequence[float]], None] | None = None,
+) -&gt; int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>An RGB colour swatch with a picker; on_change gets (r, g, b) in [0, 1].</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="ernie._ernie.app.WidgetPanel.combo" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">combo</span>
 
@@ -6589,6 +7011,27 @@
 ) -&gt; int</code></pre>
 
     <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.WidgetPanel.input_text" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">input_text</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">input_text(
+    label: str, value: str = "", on_change: Callable[[str], None] | None = None
+) -&gt; int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>A field of editable text; on_change gets the text after each edit.</p>
 
 
     </div>
@@ -6656,11 +7099,11 @@
 
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">set(widget: int, value: object) -&gt; None</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">set(widget: int, value: bool | int | float | str | tuple[float, float, float]) -&gt; None</code></pre>
 
     <div class="doc doc-contents ">
 
-        <p>Sets a checkbox (bool), combo (int index), slider (float) or text (str) without calling its callback.</p>
+        <p>Sets a checkbox (bool), combo (int index), slider (float), text or text field (str) or colour (r, g, b) without calling its callback.</p>
 
 
     </div>

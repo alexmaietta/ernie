@@ -230,6 +230,7 @@ inline constexpr std::string_view kSphereLight = &quot;SphereLight&quot;;
 inline constexpr std::string_view kRectLight = &quot;RectLight&quot;;
 inline constexpr std::string_view kDiskLight = &quot;DiskLight&quot;;
 inline constexpr std::string_view kCylinderLight = &quot;CylinderLight&quot;;
+inline constexpr std::string_view kLaserLight = &quot;LaserLight&quot;;
 inline constexpr std::string_view kDomeLight = &quot;DomeLight&quot;;
 inline constexpr std::string_view kMaterial = &quot;Material&quot;;
 inline constexpr std::string_view kTerrain = &quot;Terrain&quot;;
@@ -237,6 +238,8 @@ inline constexpr std::string_view kGroundPlane =
     &quot;GroundPlane&quot;;  
 inline constexpr std::string_view kStarField =
     &quot;StarField&quot;;  
+inline constexpr std::string_view kAtmosphere =
+    &quot;Atmosphere&quot;;  
 inline constexpr std::string_view kRenderSettings = &quot;RenderSettings&quot;;
 inline constexpr std::string_view kRenderProduct = &quot;RenderProduct&quot;;
 inline constexpr std::string_view kRenderVar = &quot;RenderVar&quot;;
@@ -419,6 +422,19 @@ inline constexpr std::string_view kTreatAsPoint =
     &quot;treatAsPoint&quot;;  
 inline constexpr std::string_view kLength = &quot;inputs:length&quot;;
 inline constexpr std::string_view kTreatAsLine = &quot;treatAsLine&quot;;
+inline constexpr std::string_view kLaserWavelength =
+    &quot;ernie:laser:wavelength&quot;;
+inline constexpr std::string_view kLaserLinewidth =
+    &quot;ernie:laser:linewidth&quot;;
+inline constexpr std::string_view kLaserPower = &quot;ernie:laser:power&quot;;
+inline constexpr std::string_view kLaserWaistRadius =
+    &quot;ernie:laser:waistRadius&quot;;
+inline constexpr std::string_view kLaserWaistDistance =
+    &quot;ernie:laser:waistDistance&quot;;
+inline constexpr std::string_view kLaserBeamQuality =
+    &quot;ernie:laser:beamQuality&quot;;
+inline constexpr std::string_view kLaserApertureRadius =
+    &quot;ernie:laser:apertureRadius&quot;;
 inline constexpr std::string_view kShapingConeAngle =
     &quot;inputs:shaping:cone:angle&quot;;
 inline constexpr std::string_view kShapingConeSoftness =
@@ -499,6 +515,26 @@ inline constexpr std::string_view kStarsMagnitudeLimit =
     &quot;ernie:stars:magnitudeLimit&quot;;
 inline constexpr std::string_view kStarsZeroPoint =
     &quot;ernie:stars:zeroPoint&quot;;
+
+// Atmosphere (Ernie): a planet's gases and aerosols, from physical
+// models (`EarthAtmosphere`, `MarsAtmosphere`), around the planet
+// Terrain or, without one, a planet under the world's origin. Renders
+// use the first visible Atmosphere.
+//
+inline constexpr std::string_view kAtmospherePreset =
+    &quot;ernie:atmosphere:preset&quot;;
+inline constexpr std::string_view kEarth = &quot;earth&quot;;
+inline constexpr std::string_view kMars = &quot;mars&quot;;
+inline constexpr std::string_view kAtmospherePlanetRadius =
+    &quot;ernie:atmosphere:planetRadius&quot;;
+inline constexpr std::string_view kAtmosphereGroundAlbedo =
+    &quot;ernie:atmosphere:groundAlbedo&quot;;
+inline constexpr std::string_view kAtmosphereHazeOpticalDepth =
+    &quot;ernie:atmosphere:hazeOpticalDepth&quot;;
+inline constexpr std::string_view kAtmosphereOzoneColumn =
+    &quot;ernie:atmosphere:ozoneColumn&quot;;
+inline constexpr std::string_view kAtmosphereDustOpticalDepth =
+    &quot;ernie:atmosphere:dustOpticalDepth&quot;;
 
 // Terrain (Ernie): a north-up heightfield, x east, y north, z up.
 inline constexpr std::string_view kHeights =

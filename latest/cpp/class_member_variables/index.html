@@ -213,6 +213,7 @@
 <li><strong>aerosolOpticalDepth</strong> (<a href="../structernie_1_1EarthAtmosphereOptions/"><strong>ernie::EarthAtmosphereOptions</strong></a>)</li>
 <li><strong>aerosolScaleHeight</strong> (<a href="../structernie_1_1EarthAtmosphereOptions/"><strong>ernie::EarthAtmosphereOptions</strong></a>)</li>
 <li><strong>ambient</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>)</li>
+<li><strong>atmosphere</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>, <a href="../structernie_1_1RenderPrims/"><strong>ernie::RenderPrims</strong></a>)</li>
 <li><strong>aovOffset</strong> (<a href="../structernie_1_1FrameParams_1_1SensorChain/"><strong>ernie::FrameParams::SensorChain</strong></a>)</li>
 <li><strong>allocationSize_</strong> (<a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>)</li>
 <li><strong>allocation_</strong> (<a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>, <a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
@@ -237,12 +238,13 @@
 <li><strong>activeCamera</strong> (<a href="../structernie_1_1app_1_1CreateContext/"><strong>ernie::app::CreateContext</strong></a>)</li>
 <li><strong>attribute</strong> (<a href="../structernie_1_1app_1_1PropertyField/"><strong>ernie::app::PropertyField</strong></a>, <a href="../structernie_1_1EditHistory_1_1Step/"><strong>ernie::EditHistory::Step</strong></a>)</li>
 <li><strong>accent</strong> (<a href="../structernie_1_1app_1_1Theme/"><strong>ernie::app::Theme</strong></a>)</li>
+<li><strong>arrays_</strong> (<a href="../classernie_1_1app_1_1ViewerLogs/"><strong>ernie::app::ViewerLogs</strong></a>)</li>
 <li><strong>active_</strong> (<a href="../classernie_1_1profiler_1_1ScopedZone/"><strong>ernie::profiler::ScopedZone</strong></a>)</li>
 <li><strong>after</strong> (<a href="../structernie_1_1EditHistory_1_1Step/"><strong>ernie::EditHistory::Step</strong></a>)</li>
 </ul>
 <h2 id="b">b</h2>
 <ul>
-<li><strong>bottomRadius</strong> (<a href="../structernie_1_1Atmosphere/"><strong>ernie::Atmosphere</strong></a>, <a href="../structernie_1_1BandedAtmosphere/"><strong>ernie::BandedAtmosphere</strong></a>)</li>
+<li><strong>bottomRadius</strong> (<a href="../structernie_1_1AtmosphereModel/"><strong>ernie::AtmosphereModel</strong></a>, <a href="../structernie_1_1BandedAtmosphere/"><strong>ernie::BandedAtmosphere</strong></a>)</li>
 <li><strong>bands</strong> (<a href="../structernie_1_1BandedAtmosphere/"><strong>ernie::BandedAtmosphere</strong></a>, <a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
 <li><strong>bits</strong> (<a href="../structernie_1_1Change/"><strong>ernie::Change</strong></a>)</li>
 <li><strong>binding</strong> (<a href="../structernie_1_1DescriptorBinding/"><strong>ernie::DescriptorBinding</strong></a>)</li>
@@ -250,6 +252,7 @@
 <li><strong>buffer_</strong> (<a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>)</li>
 <li><strong>bytes_</strong> (<a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
 <li><strong>bodyRotation</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>)</li>
+<li><strong>beam</strong> (<a href="../structernie_1_1LightParams/"><strong>ernie::LightParams</strong></a>)</li>
 <li><strong>brdf</strong> (<a href="../structernie_1_1MaterialSettings/"><strong>ernie::MaterialSettings</strong></a>)</li>
 <li><strong>brdfParams</strong> (<a href="../structernie_1_1MaterialSettings/"><strong>ernie::MaterialSettings</strong></a>)</li>
 <li><strong>b</strong> (<a href="../structernie_1_1OverlaySegment/"><strong>ernie::OverlaySegment</strong></a>)</li>
@@ -269,7 +272,7 @@
 </ul>
 <h2 id="c">c</h2>
 <ul>
-<li><strong>constituents</strong> (<a href="../structernie_1_1Atmosphere/"><strong>ernie::Atmosphere</strong></a>, <a href="../structernie_1_1BandedAtmosphere/"><strong>ernie::BandedAtmosphere</strong></a>)</li>
+<li><strong>constituents</strong> (<a href="../structernie_1_1AtmosphereModel/"><strong>ernie::AtmosphereModel</strong></a>, <a href="../structernie_1_1BandedAtmosphere/"><strong>ernie::BandedAtmosphere</strong></a>)</li>
 <li><strong>color</strong> (<a href="../structernie_1_1AttributeMeta/"><strong>ernie::AttributeMeta</strong></a>, <a href="../structernie_1_1OverlayItem/"><strong>ernie::OverlayItem</strong></a>, <a href="../structernie_1_1OverlayStyle/"><strong>ernie::OverlayStyle</strong></a>, <a href="../structernie_1_1RenderingTarget/"><strong>ernie::RenderingTarget</strong></a>)</li>
 <li><strong>c</strong> (<a href="../structernie_1_1CahvoreModel/"><strong>ernie::CahvoreModel</strong></a>)</li>
 <li><strong>camera</strong> (<a href="../structernie_1_1CahvoreModel_1_1ErnieCamera/"><strong>ernie::CahvoreModel::ErnieCamera</strong></a>, <a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>, <a href="../structernie_1_1IsdCameraModel_1_1FrameView/"><strong>ernie::IsdCameraModel::FrameView</strong></a>, <a href="../structernie_1_1IsdLineScanner_1_1Strip/"><strong>ernie::IsdLineScanner::Strip</strong></a>, <a href="../structernie_1_1IsdPushFrame_1_1Framelet/"><strong>ernie::IsdPushFrame::Framelet</strong></a>, <a href="../structernie_1_1RenderPrims/"><strong>ernie::RenderPrims</strong></a>, <a href="../structernie_1_1RenderProductSpec/"><strong>ernie::RenderProductSpec</strong></a>, <a href="../structernie_1_1app_1_1CreateContext/"><strong>ernie::app::CreateContext</strong></a>)</li>
@@ -287,6 +290,7 @@
 <li><strong>colorFormats</strong> (<a href="../structernie_1_1GraphicsPipelineDesc/"><strong>ernie::GraphicsPipelineDesc</strong></a>)</li>
 <li><strong>colorWriteMask</strong> (<a href="../structernie_1_1GraphicsPipelineDesc/"><strong>ernie::GraphicsPipelineDesc</strong></a>)</li>
 <li><strong>candela</strong> (<a href="../structernie_1_1IesProfile/"><strong>ernie::IesProfile</strong></a>)</li>
+<li><strong>components</strong> (<a href="../structernie_1_1ImageDesc/"><strong>ernie::ImageDesc</strong></a>)</li>
 <li><strong>constantFrames</strong> (<a href="../structernie_1_1IsdRotation/"><strong>ernie::IsdRotation</strong></a>)</li>
 <li><strong>constantRotation</strong> (<a href="../structernie_1_1IsdRotation/"><strong>ernie::IsdRotation</strong></a>)</li>
 <li><strong>centerTime</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>)</li>
@@ -317,9 +321,11 @@
 <li><strong>create</strong> (<a href="../structernie_1_1app_1_1DemoInfo/"><strong>ernie::app::DemoInfo</strong></a>)</li>
 <li><strong>cpu</strong> (<a href="../structernie_1_1profiler_1_1Frame/"><strong>ernie::profiler::Frame</strong></a>)</li>
 <li><strong>chunks</strong> (<a href="../structernie_1_1FrameUploads_1_1Staging/"><strong>ernie::FrameUploads::Staging</strong></a>)</li>
+<li><strong>cols</strong> (<a href="../structernie_1_1app_1_1ViewerLogs_1_1Array/"><strong>ernie::app::ViewerLogs::Array</strong></a>)</li>
 </ul>
 <h2 id="d">d</h2>
 <ul>
+<li><strong>dustOpticalDepth</strong> (<a href="../structernie_1_1AtmosphereParams/"><strong>ernie::AtmosphereParams</strong></a>, <a href="../structernie_1_1MarsAtmosphereOptions/"><strong>ernie::MarsAtmosphereOptions</strong></a>)</li>
 <li><strong>dirty</strong> (<a href="../structernie_1_1AttributeMeta/"><strong>ernie::AttributeMeta</strong></a>)</li>
 <li><strong>doc</strong> (<a href="../structernie_1_1AttributeMeta/"><strong>ernie::AttributeMeta</strong></a>, <a href="../structernie_1_1PrimTypeDef/"><strong>ernie::PrimTypeDef</strong></a>)</li>
 <li><strong>density</strong> (<a href="../structernie_1_1BandedConstituent/"><strong>ernie::BandedConstituent</strong></a>, <a href="../structernie_1_1Constituent/"><strong>ernie::Constituent</strong></a>)</li>
@@ -346,7 +352,6 @@
 <li><strong>distortion</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>)</li>
 <li><strong>distortionCoefficients</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>)</li>
 <li><strong>domeDiffuse</strong> (<a href="../structernie_1_1LightParams/"><strong>ernie::LightParams</strong></a>)</li>
-<li><strong>dustOpticalDepth</strong> (<a href="../structernie_1_1MarsAtmosphereOptions/"><strong>ernie::MarsAtmosphereOptions</strong></a>)</li>
 <li><strong>detail</strong> (<a href="../structernie_1_1MaterialSettings/"><strong>ernie::MaterialSettings</strong></a>)</li>
 <li><strong>distance</strong> (<a href="../classernie_1_1OrbitController/"><strong>ernie::OrbitController</strong></a>)</li>
 <li><strong>depth</strong> (<a href="../structernie_1_1OverlayItem/"><strong>ernie::OverlayItem</strong></a>, <a href="../structernie_1_1OverlayStyle/"><strong>ernie::OverlayStyle</strong></a>, <a href="../structernie_1_1RenderingTarget/"><strong>ernie::RenderingTarget</strong></a>, <a href="../structernie_1_1profiler_1_1Zone/"><strong>ernie::profiler::Zone</strong></a>, <a href="../structernie_1_1GpuTimer_1_1Pending/"><strong>ernie::GpuTimer::Pending</strong></a>)</li>
@@ -451,6 +456,7 @@
 </ul>
 <h2 id="g">g</h2>
 <ul>
+<li><strong>groundAlbedo</strong> (<a href="../structernie_1_1AtmosphereParams/"><strong>ernie::AtmosphereParams</strong></a>)</li>
 <li><strong>group</strong> (<a href="../structernie_1_1AttributeMeta/"><strong>ernie::AttributeMeta</strong></a>, <a href="../structernie_1_1app_1_1CreatableType/"><strong>ernie::app::CreatableType</strong></a>, <a href="../structernie_1_1EditHistory_1_1Step/"><strong>ernie::EditHistory::Step</strong></a>)</li>
 <li><strong>gravity</strong> (<a href="../structernie_1_1EarthAtmosphereOptions/"><strong>ernie::EarthAtmosphereOptions</strong></a>, <a href="../structernie_1_1MarsAtmosphereOptions/"><strong>ernie::MarsAtmosphereOptions</strong></a>)</li>
 <li><strong>groupDepth_</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>)</li>
@@ -461,11 +467,13 @@
 <li><strong>ground</strong> (<a href="../structernie_1_1RenderPrims/"><strong>ernie::RenderPrims</strong></a>)</li>
 <li><strong>gpuBytes</strong> (<a href="../structernie_1_1RenderStats/"><strong>ernie::RenderStats</strong></a>)</li>
 <li><strong>gpuProfiler_</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>gpu_</strong> (<a href="../classernie_1_1app_1_1ViewerLogs/"><strong>ernie::app::ViewerLogs</strong></a>)</li>
 <li><strong>grid</strong> (<a href="../structernie_1_1app_1_1ViewportDisplay/"><strong>ernie::app::ViewportDisplay</strong></a>)</li>
 <li><strong>gpu</strong> (<a href="../structernie_1_1profiler_1_1Frame/"><strong>ernie::profiler::Frame</strong></a>)</li>
 </ul>
 <h2 id="h">h</h2>
 <ul>
+<li><strong>hazeOpticalDepth</strong> (<a href="../structernie_1_1AtmosphereParams/"><strong>ernie::AtmosphereParams</strong></a>)</li>
 <li><strong>h</strong> (<a href="../structernie_1_1CahvoreModel/"><strong>ernie::CahvoreModel</strong></a>)</li>
 <li><strong>height</strong> (<a href="../structernie_1_1CahvoreModel/"><strong>ernie::CahvoreModel</strong></a>, <a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>, <a href="../structernie_1_1ComputeArrayView/"><strong>ernie::ComputeArrayView</strong></a>, <a href="../structernie_1_1DensityLayer/"><strong>ernie::DensityLayer</strong></a>, <a href="../structernie_1_1Image/"><strong>ernie::Image</strong></a>, <a href="../structernie_1_1ImageDesc/"><strong>ernie::ImageDesc</strong></a>, <a href="../structernie_1_1LensRayTable/"><strong>ernie::LensRayTable</strong></a>, <a href="../structernie_1_1RasterView/"><strong>ernie::RasterView</strong></a>, <a href="../structernie_1_1app_1_1ViewerOptions/"><strong>ernie::app::ViewerOptions</strong></a>)</li>
 <li><strong>horizontalApertureOffsetMm</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
@@ -508,7 +516,7 @@
 <li><strong>impl_</strong> (<a href="../classernie_1_1ShaderCompiler/"><strong>ernie::ShaderCompiler</strong></a>)</li>
 <li><strong>irradiance555</strong> (<a href="../structernie_1_1Star/"><strong>ernie::Star</strong></a>)</li>
 <li><strong>index</strong> (<a href="../structernie_1_1Swapchain_1_1Frame/"><strong>ernie::Swapchain::Frame</strong></a>, <a href="../structernie_1_1profiler_1_1Frame/"><strong>ernie::profiler::Frame</strong></a>)</li>
-<li><strong>images_</strong> (<a href="../classernie_1_1Swapchain/"><strong>ernie::Swapchain</strong></a>)</li>
+<li><strong>images_</strong> (<a href="../classernie_1_1Swapchain/"><strong>ernie::Swapchain</strong></a>, <a href="../classernie_1_1app_1_1ViewerLogs/"><strong>ernie::app::ViewerLogs</strong></a>)</li>
 <li><strong>instance_</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
 <li><strong>instanceExtensions</strong> (<a href="../structernie_1_1VulkanContextOptions/"><strong>ernie::VulkanContextOptions</strong></a>)</li>
 <li><strong>iconSize</strong> (<a href="../structernie_1_1app_1_1Theme/"><strong>ernie::app::Theme</strong></a>)</li>
@@ -560,6 +568,7 @@
 <li><strong>kStampCount</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
 <li><strong>kMaxParamFloats</strong> (<a href="../classernie_1_1SensorFilterRegistry/"><strong>ernie::SensorFilterRegistry</strong></a>)</li>
 <li><strong>kMaxBands</strong> (<a href="../structernie_1_1SpectralBands/"><strong>ernie::SpectralBands</strong></a>)</li>
+<li><strong>kHistory</strong> (<a href="../classernie_1_1app_1_1ViewerLogs/"><strong>ernie::app::ViewerLogs</strong></a>)</li>
 </ul>
 <h2 id="l">l</h2>
 <ul>
@@ -576,6 +585,7 @@
 <li><strong>lights</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>, <a href="../structernie_1_1RenderPrims/"><strong>ernie::RenderPrims</strong></a>, <a href="../structernie_1_1app_1_1ViewportDisplay/"><strong>ernie::app::ViewportDisplay</strong></a>)</li>
 <li><strong>lifetime_</strong> (<a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>)</li>
 <li><strong>layerViews_</strong> (<a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
+<li><strong>linear</strong> (<a href="../structernie_1_1ImageDesc/"><strong>ernie::ImageDesc</strong></a>)</li>
 <li><strong>lineJitter</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>)</li>
 <li><strong>lineRates</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>)</li>
 <li><strong>lineSumming</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>)</li>
@@ -591,6 +601,9 @@
 <li><strong>loadDepth</strong> (<a href="../structernie_1_1RenderingTarget/"><strong>ernie::RenderingTarget</strong></a>)</li>
 <li><strong>lightResolution</strong> (<a href="../structernie_1_1ShadowSettings/"><strong>ernie::ShadowSettings</strong></a>)</li>
 <li><strong>limits_</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>loggedArrays_</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
+<li><strong>loggedImages_</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
+<li><strong>loggedScalars_</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
 <li><strong>list</strong> (<a href="../structernie_1_1app_1_1DemoOptions/"><strong>ernie::app::DemoOptions</strong></a>)</li>
 <li><strong>left</strong> (<a href="../structernie_1_1app_1_1DockSizes/"><strong>ernie::app::DockSizes</strong></a>)</li>
 <li><strong>lastDirectory_</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
@@ -661,6 +674,7 @@
 </ul>
 <h2 id="o">o</h2>
 <ul>
+<li><strong>ozoneColumn</strong> (<a href="../structernie_1_1AtmosphereParams/"><strong>ernie::AtmosphereParams</strong></a>, <a href="../structernie_1_1EarthAtmosphereOptions/"><strong>ernie::EarthAtmosphereOptions</strong></a>)</li>
 <li><strong>options</strong> (<a href="../structernie_1_1AttributeMeta/"><strong>ernie::AttributeMeta</strong></a>, <a href="../structernie_1_1app_1_1PropertyField/"><strong>ernie::app::PropertyField</strong></a>)</li>
 <li><strong>origin</strong> (<a href="../structernie_1_1CahvoreModel_1_1Ray/"><strong>ernie::CahvoreModel::Ray</strong></a>, <a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>)</li>
 <li><strong>o</strong> (<a href="../structernie_1_1CahvoreModel/"><strong>ernie::CahvoreModel</strong></a>)</li>
@@ -670,7 +684,6 @@
 <li><strong>output</strong> (<a href="../structernie_1_1Connection/"><strong>ernie::Connection</strong></a>, <a href="../structernie_1_1app_1_1DemoOptions/"><strong>ernie::app::DemoOptions</strong></a>)</li>
 <li><strong>optics</strong> (<a href="../structernie_1_1Constituent/"><strong>ernie::Constituent</strong></a>)</li>
 <li><strong>outer</strong> (<a href="../structernie_1_1CubeSphereRegion/"><strong>ernie::CubeSphereRegion</strong></a>)</li>
-<li><strong>ozoneColumn</strong> (<a href="../structernie_1_1EarthAtmosphereOptions/"><strong>ernie::EarthAtmosphereOptions</strong></a>)</li>
 <li><strong>open_</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>, <a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
 <li><strong>occlusion</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>)</li>
 <li><strong>overlays</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>, <a href="../structernie_1_1RenderProductSpec/"><strong>ernie::RenderProductSpec</strong></a>, <a href="../structernie_1_1app_1_1ViewportDisplay/"><strong>ernie::app::ViewportDisplay</strong></a>)</li>
@@ -698,6 +711,9 @@
 </ul>
 <h2 id="p">p</h2>
 <ul>
+<li><strong>planetCentre</strong> (<a href="../structernie_1_1AtmosphereParams/"><strong>ernie::AtmosphereParams</strong></a>)</li>
+<li><strong>planetRadius</strong> (<a href="../structernie_1_1AtmosphereParams/"><strong>ernie::AtmosphereParams</strong></a>)</li>
+<li><strong>preset</strong> (<a href="../structernie_1_1AtmosphereParams/"><strong>ernie::AtmosphereParams</strong></a>)</li>
 <li><strong>pyName</strong> (<a href="../classernie_1_1AttributeDef/"><strong>ernie::AttributeDef</strong></a>)</li>
 <li><strong>plural</strong> (<a href="../structernie_1_1AttributeMeta/"><strong>ernie::AttributeMeta</strong></a>)</li>
 <li><strong>phaseAngles</strong> (<a href="../structernie_1_1BandedAtmosphere/"><strong>ernie::BandedAtmosphere</strong></a>)</li>
@@ -757,6 +773,8 @@
 <li><strong>pillRounding</strong> (<a href="../structernie_1_1app_1_1Theme/"><strong>ernie::app::Theme</strong></a>)</li>
 <li><strong>propertyLabelWidth</strong> (<a href="../structernie_1_1app_1_1Theme/"><strong>ernie::app::Theme</strong></a>)</li>
 <li><strong>prims</strong> (<a href="../structernie_1_1EditHistory_1_1Step/"><strong>ernie::EditHistory::Step</strong></a>)</li>
+<li><strong>pending</strong> (<a href="../structernie_1_1app_1_1ViewerLogs_1_1Scalar/"><strong>ernie::app::ViewerLogs::Scalar</strong></a>)</li>
+<li><strong>pendingCount</strong> (<a href="../structernie_1_1app_1_1ViewerLogs_1_1Scalar/"><strong>ernie::app::ViewerLogs::Scalar</strong></a>)</li>
 </ul>
 <h2 id="q">q</h2>
 <ul>
@@ -780,11 +798,13 @@
 <li><strong>rollingShutter</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
 <li><strong>radius_</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>)</li>
 <li><strong>radiance</strong> (<a href="../structernie_1_1DomeParams/"><strong>ernie::DomeParams</strong></a>)</li>
+<li><strong>rowPitch_</strong> (<a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
 <li><strong>reset</strong> (<a href="../structernie_1_1GpuXform/"><strong>ernie::GpuXform</strong></a>)</li>
 <li><strong>row</strong> (<a href="../structernie_1_1GpuXform/"><strong>ernie::GpuXform</strong></a>)</li>
 <li><strong>referenceFrame</strong> (<a href="../structernie_1_1IsdRotation/"><strong>ernie::IsdRotation</strong></a>)</li>
 <li><strong>rays</strong> (<a href="../structernie_1_1LensModel/"><strong>ernie::LensModel</strong></a>, <a href="../structernie_1_1LensRayTable/"><strong>ernie::LensRayTable</strong></a>)</li>
-<li><strong>rows</strong> (<a href="../structernie_1_1LensRayTable/"><strong>ernie::LensRayTable</strong></a>, <a href="../structernie_1_1Scene_1_1PrimData/"><strong>ernie::Scene::PrimData</strong></a>)</li>
+<li><strong>rows</strong> (<a href="../structernie_1_1LensRayTable/"><strong>ernie::LensRayTable</strong></a>, <a href="../structernie_1_1Scene_1_1PrimData/"><strong>ernie::Scene::PrimData</strong></a>, <a href="../structernie_1_1app_1_1ViewerLogs_1_1Array/"><strong>ernie::app::ViewerLogs::Array</strong></a>)</li>
+<li><strong>rayleigh</strong> (<a href="../structernie_1_1LightParams_1_1Beam/"><strong>ernie::LightParams::Beam</strong></a>)</li>
 <li><strong>radius</strong> (<a href="../structernie_1_1LightParams/"><strong>ernie::LightParams</strong></a>)</li>
 <li><strong>relativeNumber</strong> (<a href="../structernie_1_1LogNormalMode/"><strong>ernie::LogNormalMode</strong></a>)</li>
 <li><strong>reflectance</strong> (<a href="../structernie_1_1MaterialSettings/"><strong>ernie::MaterialSettings</strong></a>)</li>
@@ -842,7 +862,7 @@
 <li><strong>scales</strong> (<a href="../structernie_1_1InstanceData/"><strong>ernie::InstanceData</strong></a>)</li>
 <li><strong>sampleJitter</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>)</li>
 <li><strong>sampleSumming</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>)</li>
-<li><strong>samples</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>)</li>
+<li><strong>samples</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>, <a href="../structernie_1_1app_1_1ViewerLogs_1_1Scalar/"><strong>ernie::app::ViewerLogs::Scalar</strong></a>)</li>
 <li><strong>semiMajorAxis</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>)</li>
 <li><strong>semiMinorAxis</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>)</li>
 <li><strong>startingDetectorLine</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>)</li>
@@ -861,7 +881,7 @@
 <li><strong>submission</strong> (<a href="../structernie_1_1ProductFrame/"><strong>ernie::ProductFrame</strong></a>)</li>
 <li><strong>shift</strong> (<a href="../structernie_1_1PushbroomStrip/"><strong>ernie::PushbroomStrip</strong></a>)</li>
 <li><strong>settings</strong> (<a href="../structernie_1_1RenderPrims/"><strong>ernie::RenderPrims</strong></a>, <a href="../structernie_1_1app_1_1ViewerOptions/"><strong>ernie::app::ViewerOptions</strong></a>)</li>
-<li><strong>sampler_</strong> (<a href="../classernie_1_1Sampler/"><strong>ernie::Sampler</strong></a>)</li>
+<li><strong>sampler_</strong> (<a href="../classernie_1_1Sampler/"><strong>ernie::Sampler</strong></a>, <a href="../classernie_1_1app_1_1ViewerLogs/"><strong>ernie::app::ViewerLogs</strong></a>)</li>
 <li><strong>stamped_</strong> (<a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
 <li><strong>states</strong> (<a href="../structernie_1_1SensorFilterModel/"><strong>ernie::SensorFilterModel</strong></a>)</li>
 <li><strong>seed</strong> (<a href="../structernie_1_1SensorModel/"><strong>ernie::SensorModel</strong></a>)</li>
@@ -885,20 +905,24 @@
 <li><strong>start</strong> (<a href="../structernie_1_1app_1_1FileDialogOptions/"><strong>ernie::app::FileDialogOptions</strong></a>, <a href="../structernie_1_1profiler_1_1Frame/"><strong>ernie::profiler::Frame</strong></a>, <a href="../structernie_1_1profiler_1_1Zone/"><strong>ernie::profiler::Zone</strong></a>)</li>
 <li><strong>selection</strong> (<a href="../structernie_1_1app_1_1Theme/"><strong>ernie::app::Theme</strong></a>, <a href="../structernie_1_1app_1_1ViewportDisplay/"><strong>ernie::app::ViewportDisplay</strong></a>)</li>
 <li><strong>separator</strong> (<a href="../structernie_1_1app_1_1Theme/"><strong>ernie::app::Theme</strong></a>)</li>
+<li><strong>scalars_</strong> (<a href="../classernie_1_1app_1_1ViewerLogs/"><strong>ernie::app::ViewerLogs</strong></a>)</li>
 <li><strong>start_</strong> (<a href="../classernie_1_1profiler_1_1ScopedZone/"><strong>ernie::profiler::ScopedZone</strong></a>)</li>
 <li><strong>schema</strong> (<a href="../structernie_1_1Scene_1_1PrimData/"><strong>ernie::Scene::PrimData</strong></a>)</li>
 <li><strong>stamps</strong> (<a href="../structernie_1_1Scene_1_1PrimData/"><strong>ernie::Scene::PrimData</strong></a>)</li>
 <li><strong>streams</strong> (<a href="../structernie_1_1Scene_1_1PrimData/"><strong>ernie::Scene::PrimData</strong></a>)</li>
+<li><strong>scope</strong> (<a href="../structernie_1_1app_1_1ViewerLogs_1_1Array/"><strong>ernie::app::ViewerLogs::Array</strong></a>, <a href="../structernie_1_1app_1_1ViewerLogs_1_1Scalar/"><strong>ernie::app::ViewerLogs::Scalar</strong></a>)</li>
+<li><strong>smoothing</strong> (<a href="../structernie_1_1app_1_1ViewerLogs_1_1Scalar/"><strong>ernie::app::ViewerLogs::Scalar</strong></a>)</li>
 </ul>
 <h2 id="t">t</h2>
 <ul>
-<li><strong>topAltitude</strong> (<a href="../structernie_1_1Atmosphere/"><strong>ernie::Atmosphere</strong></a>, <a href="../structernie_1_1BandedAtmosphere/"><strong>ernie::BandedAtmosphere</strong></a>)</li>
+<li><strong>topAltitude</strong> (<a href="../structernie_1_1AtmosphereModel/"><strong>ernie::AtmosphereModel</strong></a>, <a href="../structernie_1_1BandedAtmosphere/"><strong>ernie::BandedAtmosphere</strong></a>)</li>
 <li><strong>typeName</strong> (<a href="../structernie_1_1BrdfModel/"><strong>ernie::BrdfModel</strong></a>, <a href="../structernie_1_1SensorFilterModel/"><strong>ernie::SensorFilterModel</strong></a>)</li>
 <li><strong>transform</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
 <li><strong>type</strong> (<a href="../structernie_1_1ComputeArrayView/"><strong>ernie::ComputeArrayView</strong></a>, <a href="../structernie_1_1DescriptorBinding/"><strong>ernie::DescriptorBinding</strong></a>, <a href="../structernie_1_1IesProfile/"><strong>ernie::IesProfile</strong></a>, <a href="../structernie_1_1LightParams/"><strong>ernie::LightParams</strong></a>, <a href="../structernie_1_1SensorFilterStep/"><strong>ernie::SensorFilterStep</strong></a>, <a href="../structernie_1_1app_1_1CreatableType/"><strong>ernie::app::CreatableType</strong></a>, <a href="../structernie_1_1EditHistory_1_1PrimSnapshot/"><strong>ernie::EditHistory::PrimSnapshot</strong></a>, <a href="../structernie_1_1EditHistory_1_1Step/"><strong>ernie::EditHistory::Step</strong></a>, <a href="../structernie_1_1Scene_1_1PrimData/"><strong>ernie::Scene::PrimData</strong></a>)</li>
 <li><strong>trees_</strong> (<a href="../classernie_1_1CubeSphereLod/"><strong>ernie::CubeSphereLod</strong></a>)</li>
 <li><strong>tileSize</strong> (<a href="../structernie_1_1DetailSettings/"><strong>ernie::DetailSettings</strong></a>)</li>
 <li><strong>toDome</strong> (<a href="../structernie_1_1DomeParams/"><strong>ernie::DomeParams</strong></a>)</li>
+<li><strong>texelOffset_</strong> (<a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
 <li><strong>translate</strong> (<a href="../structernie_1_1GpuXform/"><strong>ernie::GpuXform</strong></a>, <a href="../structernie_1_1XformOps/"><strong>ernie::XformOps</strong></a>)</li>
 <li><strong>tilt</strong> (<a href="../structernie_1_1IesProfile/"><strong>ernie::IesProfile</strong></a>)</li>
 <li><strong>to</strong> (<a href="../structernie_1_1IsdLineScanner_1_1Strip/"><strong>ernie::IsdLineScanner::Strip</strong></a>, <a href="../structernie_1_1PushbroomStrip/"><strong>ernie::PushbroomStrip</strong></a>)</li>
@@ -961,7 +985,7 @@
 <li><strong>vertexEntry</strong> (<a href="../structernie_1_1GraphicsPipelineDesc/"><strong>ernie::GraphicsPipelineDesc</strong></a>)</li>
 <li><strong>vertexSpirv</strong> (<a href="../structernie_1_1GraphicsPipelineDesc/"><strong>ernie::GraphicsPipelineDesc</strong></a>)</li>
 <li><strong>vertical</strong> (<a href="../structernie_1_1IesProfile/"><strong>ernie::IesProfile</strong></a>)</li>
-<li><strong>values</strong> (<a href="../structernie_1_1IsdSamples/"><strong>ernie::IsdSamples</strong></a>, <a href="../structernie_1_1EditHistory_1_1PrimSnapshot/"><strong>ernie::EditHistory::PrimSnapshot</strong></a>, <a href="../structernie_1_1Scene_1_1PrimData/"><strong>ernie::Scene::PrimData</strong></a>)</li>
+<li><strong>values</strong> (<a href="../structernie_1_1IsdSamples/"><strong>ernie::IsdSamples</strong></a>, <a href="../structernie_1_1EditHistory_1_1PrimSnapshot/"><strong>ernie::EditHistory::PrimSnapshot</strong></a>, <a href="../structernie_1_1Scene_1_1PrimData/"><strong>ernie::Scene::PrimData</strong></a>, <a href="../structernie_1_1app_1_1ViewerLogs_1_1Array/"><strong>ernie::app::ViewerLogs::Array</strong></a>)</li>
 <li><strong>velocities</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>)</li>
 <li><strong>vignetting</strong> (<a href="../structernie_1_1LensModel/"><strong>ernie::LensModel</strong></a>)</li>
 <li><strong>version_</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>, <a href="../classernie_1_1Scene/"><strong>ernie::Scene</strong></a>)</li>
@@ -986,6 +1010,8 @@
 <li><strong>wireframe</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>)</li>
 <li><strong>worlds</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>, <a href="../structernie_1_1ShadowSettings/"><strong>ernie::ShadowSettings</strong></a>)</li>
 <li><strong>wFirst</strong> (<a href="../structernie_1_1GpuXform/"><strong>ernie::GpuXform</strong></a>)</li>
+<li><strong>waist</strong> (<a href="../structernie_1_1LightParams_1_1Beam/"><strong>ernie::LightParams::Beam</strong></a>)</li>
+<li><strong>waistDistance</strong> (<a href="../structernie_1_1LightParams_1_1Beam/"><strong>ernie::LightParams::Beam</strong></a>)</li>
 <li><strong>world</strong> (<a href="../structernie_1_1LightParams/"><strong>ernie::LightParams</strong></a>, <a href="../structernie_1_1OverlayItem/"><strong>ernie::OverlayItem</strong></a>, <a href="../structernie_1_1OverlayStyle/"><strong>ernie::OverlayStyle</strong></a>)</li>
 <li><strong>width_</strong> (<a href="../classernie_1_1LodQuadtree/"><strong>ernie::LodQuadtree</strong></a>)</li>
 <li><strong>wavelengths_</strong> (<a href="../classernie_1_1RefractiveIndex/"><strong>ernie::RefractiveIndex</strong></a>, <a href="../classernie_1_1Spectrum/"><strong>ernie::Spectrum</strong></a>)</li>

@@ -244,11 +244,19 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="./#typedef-id"><strong>Id</strong></a></td>
+<td style="text-align: left;"><a href="#function-color"><strong>Color</strong></a> (std::string label, std::array&lt; double, 3 &gt; value, std::function&lt; void(std::array&lt; double, 3 &gt;)&gt; onChange) <br><em>An RGB colour swatch with a picker, components in [0, 1].</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./#typedef-id"><strong>Id</strong></a></td>
 <td style="text-align: left;"><a href="#function-combo"><strong>Combo</strong></a> (std::string label, std::vector&lt; std::string &gt; items, std::size_t selected, std::function&lt; void(std::size_t)&gt; onChange) <br></td>
 </tr>
 <tr>
 <td style="text-align: right;">virtual void</td>
 <td style="text-align: left;"><a href="#function-draw"><strong>Draw</strong></a> (<a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> &amp; viewer) override<br><em>Draws the panel's contents for the current frame.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./#typedef-id"><strong>Id</strong></a></td>
+<td style="text-align: left;"><a href="#function-inputtext"><strong>InputText</strong></a> (std::string label, std::string value, std::function&lt; void(const std::string &amp;)&gt; onChange) <br><em>A field of editable text;</em> <code>onChange</code> <em>gets it after each edit.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="./#typedef-id"><strong>Id</strong></a></td>
@@ -264,19 +272,23 @@
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-set-14"><strong>Set</strong></a> (<a href="./#typedef-id"><strong>Id</strong></a> widget, bool value) <br><em>Sets the value of a checkbox (</em> <code>bool</code> <em>), slider (</em><code>double</code> <em>) or combo (index), or a text's text.</em></td>
+<td style="text-align: left;"><a href="#function-set-15"><strong>Set</strong></a> (<a href="./#typedef-id"><strong>Id</strong></a> widget, bool value) <br><em>Sets the value of a checkbox (</em> <code>bool</code> <em>), slider (</em><code>double</code> <em>), combo (index) or colour, or the text of a text or text field.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-set-24"><strong>Set</strong></a> (<a href="./#typedef-id"><strong>Id</strong></a> widget, double value) <br></td>
+<td style="text-align: left;"><a href="#function-set-25"><strong>Set</strong></a> (<a href="./#typedef-id"><strong>Id</strong></a> widget, double value) <br></td>
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-set-34"><strong>Set</strong></a> (<a href="./#typedef-id"><strong>Id</strong></a> widget, std::size_t value) <br></td>
+<td style="text-align: left;"><a href="#function-set-35"><strong>Set</strong></a> (<a href="./#typedef-id"><strong>Id</strong></a> widget, std::size_t value) <br></td>
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-set-44"><strong>Set</strong></a> (<a href="./#typedef-id"><strong>Id</strong></a> widget, std::string value) <br></td>
+<td style="text-align: left;"><a href="#function-set-45"><strong>Set</strong></a> (<a href="./#typedef-id"><strong>Id</strong></a> widget, std::string value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-set-55"><strong>Set</strong></a> (<a href="./#typedef-id"><strong>Id</strong></a> widget, std::array&lt; double, 3 &gt; value) <br></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="./#typedef-id"><strong>Id</strong></a></td>
@@ -374,6 +386,16 @@
 </code></pre>
 <hr>
 
+<h3 id="function-color">function Color</h3>
+<p><em>An RGB colour swatch with a picker, components in [0, 1].</em> </p>
+<pre><code class="language-C++">Id ernie::app::WidgetPanel::Color (
+    std::string label,
+    std::array&lt; double, 3 &gt; value,
+    std::function&lt; void(std::array&lt; double, 3 &gt;)&gt; onChange
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-combo">function Combo</h3>
 <pre><code class="language-C++">Id ernie::app::WidgetPanel::Combo (
     std::string label,
@@ -391,6 +413,16 @@
 ) override
 </code></pre>
 <p>Implements <a href="../classernie_1_1app_1_1Panel/#function-draw"><em>ernie::app::Panel::Draw</em></a></p>
+<hr>
+
+<h3 id="function-inputtext">function InputText</h3>
+<p><em>A field of editable text;</em> <code>onChange</code> <em>gets it after each edit.</em></p>
+<pre><code class="language-C++">Id ernie::app::WidgetPanel::InputText (
+    std::string label,
+    std::string value,
+    std::function&lt; void(const std::string &amp;)&gt; onChange
+) 
+</code></pre>
 <hr>
 
 <h3 id="function-plot">function Plot</h3>
@@ -414,8 +446,8 @@
 </code></pre>
 <hr>
 
-<h3 id="function-set-14">function Set [1/4]</h3>
-<p><em>Sets the value of a checkbox (</em> <code>bool</code> <em>), slider (</em><code>double</code> <em>) or combo (index), or a text's text.</em></p>
+<h3 id="function-set-15">function Set [1/5]</h3>
+<p><em>Sets the value of a checkbox (</em> <code>bool</code> <em>), slider (</em><code>double</code> <em>), combo (index) or colour, or the text of a text or text field.</em></p>
 <pre><code class="language-C++">void ernie::app::WidgetPanel::Set (
     Id widget,
     bool value
@@ -423,7 +455,7 @@
 </code></pre>
 <hr>
 
-<h3 id="function-set-24">function Set [2/4]</h3>
+<h3 id="function-set-25">function Set [2/5]</h3>
 <pre><code class="language-C++">void ernie::app::WidgetPanel::Set (
     Id widget,
     double value
@@ -431,7 +463,7 @@
 </code></pre>
 <hr>
 
-<h3 id="function-set-34">function Set [3/4]</h3>
+<h3 id="function-set-35">function Set [3/5]</h3>
 <pre><code class="language-C++">void ernie::app::WidgetPanel::Set (
     Id widget,
     std::size_t value
@@ -439,10 +471,18 @@
 </code></pre>
 <hr>
 
-<h3 id="function-set-44">function Set [4/4]</h3>
+<h3 id="function-set-45">function Set [4/5]</h3>
 <pre><code class="language-C++">void ernie::app::WidgetPanel::Set (
     Id widget,
     std::string value
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-set-55">function Set [5/5]</h3>
+<pre><code class="language-C++">void ernie::app::WidgetPanel::Set (
+    Id widget,
+    std::array&lt; double, 3 &gt; value
 ) 
 </code></pre>
 <hr>

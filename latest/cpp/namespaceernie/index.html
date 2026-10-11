@@ -265,8 +265,16 @@
 </thead>
 <tbody>
 <tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1Atmosphere/"><strong>Atmosphere</strong></a> <br><em>A planet's atmosphere from a physical model (</em> <code>EarthAtmosphere</code> <em>,</em><code>MarsAtmosphere</code> <em>): its gases and aerosols scatter and absorb the sun's light on its way to the ground, the sun's</em><a href="../classernie_1_1DistantLight/"><em><strong>DistantLight</strong></em></a> <em>then giving the irradiance above the atmosphere.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1Atmosphere/"><strong>Atmosphere</strong></a> <br><em>A spherical shell of constituents around a planet of radius</em> <code>bottomRadius</code> <em>, up to</em><code>bottomRadius + topAltitude</code> <em>.</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1AtmosphereModel/"><strong>AtmosphereModel</strong></a> <br><em>A spherical shell of constituents around a planet of radius</em> <code>bottomRadius</code> <em>, up to</em><code>bottomRadius + topAltitude</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1AtmosphereParams/"><strong>AtmosphereParams</strong></a> <br><em>A planet's atmosphere (</em> <code>AtmosphereParamsOf</code> <em>): the physical model's settings and where the planet lies.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
@@ -611,6 +619,10 @@
 <tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1IsdSensor/"><strong>IsdSensor</strong></a> <br><em>A camera's image support data (ISD) in the Community Sensor Model's JSON form, as ALE (the USGS Abstraction Layer for Ephemerides) writes it from SPICE kernels for planetary cameras such as LRO's NAC and WAC, MRO's CTX and HiRISE: the image's size and timing, the focal plane's map to detector pixels, the optics, and the spacecraft's and the body's states over the image.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1LaserLight/"><strong>LaserLight</strong></a> <br><em>A laser (Ernie): a Gaussian beam of one spectral line along its -z axis, its waist, divergence and power as a datasheet gives them (ISO 11146).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -1334,6 +1346,10 @@
 <td style="text-align: left;"><a href="#function-aspectof"><strong>AspectOf</strong></a> (VkFormat format) <br><em>Aspect of an image format: depth for depth formats, colour otherwise.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="../structernie_1_1AtmosphereParams/"><strong>AtmosphereParams</strong></a></td>
+<td style="text-align: left;"><a href="#function-atmosphereparamsof"><strong>AtmosphereParamsOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; terrain) <br><em>The</em> <a href="../classernie_1_1Atmosphere/"><em><strong>Atmosphere</strong></em></a> <em>at</em><code>path</code> <em>around the planet</em><a href="../classernie_1_1Terrain/"><em><strong>Terrain</strong></em></a> __<code>terrain</code> <em>(empty for none): with a planet</em><a href="../classernie_1_1Terrain/"><em><strong>Terrain</strong></em></a> <em>the planet is at the world's origin and has its radius unless</em><code>ernie:atmosphere:planetRadius</code> <em>sets one; without, it is that radius, else the preset planet's mean radius, centred that far below the origin.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">void</td>
 <td style="text-align: left;"><a href="#function-authorlrocnac"><strong>AuthorLrocNac</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; camera, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; product, <a href="./#enum-lrocnac"><strong>LrocNac</strong></a> which=LrocNac::Left) <br><em>Authors one of LROC's Narrow Angle Cameras as published, onto</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <strong><code>camera</code> <em>and the readout chain of</em><a href="../classernie_1_1RenderProduct/"><em><strong>RenderProduct</strong></em></a> </strong><code>product</code> <em>.</em></td>
 </tr>
@@ -1371,7 +1387,7 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1BandedAtmosphere/"><strong>BandedAtmosphere</strong></a></td>
-<td style="text-align: left;"><a href="#function-bandaverage"><strong>BandAverage</strong></a> (const <a href="../structernie_1_1Atmosphere/"><strong>Atmosphere</strong></a> &amp; atmosphere, const <a href="../structernie_1_1SpectralBands/"><strong>SpectralBands</strong></a> &amp; bands, int phaseAngles=256) <br><em>Averages</em> <code>atmosphere</code> <em>over</em><code>bands</code> <em>, sampling each band every 10 nm or less.</em></td>
+<td style="text-align: left;"><a href="#function-bandaverage"><strong>BandAverage</strong></a> (const <a href="../structernie_1_1AtmosphereModel/"><strong>AtmosphereModel</strong></a> &amp; atmosphere, const <a href="../structernie_1_1SpectralBands/"><strong>SpectralBands</strong></a> &amp; bands, int phaseAngles=256) <br><em>Averages</em> <code>atmosphere</code> <em>over</em><code>bands</code> <em>, sampling each band every 10 nm or less.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; const <a href="../structernie_1_1PrimTypeDef/"><strong>PrimTypeDef</strong></a> * &gt;</td>
@@ -1598,7 +1614,7 @@
 <td style="text-align: left;"><a href="#function-domeparamsof"><strong>DomeParamsOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, const <a href="../structernie_1_1SpectralBands/"><strong>SpectralBands</strong></a> &amp; bands) <br><em>The</em> <a href="../classernie_1_1DomeLight/"><em><strong>DomeLight</strong></em></a> <em>at</em><code>path</code> <em>for</em><code>bands</code> <em>: radiance</em><code>ernie:spectrum</code> <em>(W m^-2 sr^-1 nm^-1), or in relative units</em><code>inputs:intensity</code> <em>times 2^</em><code>inputs:exposure</code> <em>as luminance (cd/m^2) with the shape of</em><code>inputs:color</code> <em>and the enabled colour temperature; its map</em><code>ernie:texture</code> <em>(uniform without one) rotated by its transform.</em></td>
 </tr>
 <tr>
-<td style="text-align: right;"><a href="../structernie_1_1Atmosphere/"><strong>Atmosphere</strong></a></td>
+<td style="text-align: right;"><a href="../structernie_1_1AtmosphereModel/"><strong>AtmosphereModel</strong></a></td>
 <td style="text-align: left;"><a href="#function-earthatmosphere"><strong>EarthAtmosphere</strong></a> (double radius, const <a href="../structernie_1_1EarthAtmosphereOptions/"><strong>EarthAtmosphereOptions</strong></a> &amp; options={}) <br><em>Earth's atmosphere over a planet of radius</em> <code>radius</code> <em>(m).</em></td>
 </tr>
 <tr>
@@ -1802,7 +1818,7 @@
 <td style="text-align: left;"><a href="#function-lrocwacbandof"><strong>LrocWacBandOf</strong></a> (<a href="./#enum-lrocwacband"><strong>LrocWacBand</strong></a> band) <br><em>Band</em> <code>band</code> <em>'s values (Robinson et al. 2010, Tables 3 and 4).</em></td>
 </tr>
 <tr>
-<td style="text-align: right;"><a href="../structernie_1_1Atmosphere/"><strong>Atmosphere</strong></a></td>
+<td style="text-align: right;"><a href="../structernie_1_1AtmosphereModel/"><strong>AtmosphereModel</strong></a></td>
 <td style="text-align: left;"><a href="#function-marsatmosphere"><strong>MarsAtmosphere</strong></a> (double radius, const <a href="../structernie_1_1MarsAtmosphereOptions/"><strong>MarsAtmosphereOptions</strong></a> &amp; options={}) <br><em>Mars's atmosphere over a planet of radius</em> <code>radius</code> <em>(m).</em></td>
 </tr>
 <tr>
@@ -2418,7 +2434,8 @@ Rendering", Journal of Computer Graphics Techniques 9(3):21-38, 2020 (pcg3d).</p
     Sphere = 1,
     Rect = 2,
     Disk = 3,
-    Cylinder = 4
+    Cylinder = 4,
+    Laser = 5
 };
 </code></pre>
 <hr>
@@ -2839,6 +2856,24 @@ Rendering", Journal of Computer Graphics Techniques 9(3):21-38, 2020 (pcg3d).</p
 </code></pre>
 <hr>
 
+<h3 id="function-atmosphereparamsof">function AtmosphereParamsOf</h3>
+<p><em>The</em> <a href="../classernie_1_1Atmosphere/"><em><strong>Atmosphere</strong></em></a> <em>at</em><code>path</code> <em>around the planet</em><a href="../classernie_1_1Terrain/"><em><strong>Terrain</strong></em></a> __<code>terrain</code> <em>(empty for none): with a planet</em><a href="../classernie_1_1Terrain/"><em><strong>Terrain</strong></em></a> <em>the planet is at the world's origin and has its radius unless</em><code>ernie:atmosphere:planetRadius</code> <em>sets one; without, it is that radius, else the preset planet's mean radius, centred that far below the origin.</em></p>
+<pre><code class="language-C++">AtmosphereParams ernie::AtmosphereParamsOf (
+    const Scene &amp; scene,
+    const Path &amp; path,
+    const Path &amp; terrain
+) 
+</code></pre>
+<p>References:
+* H. Moritz, "Geodetic Reference System 1980", Journal of Geodesy 74(1):128-133, 2000 (the Earth's mean radius R1, 6371.0088 km). <a href="https://doi.org/10.1007/s001900050278">https://doi.org/10.1007/s001900050278</a>
+* B. A. Archinal et al., "Report of the IAU Working Group on
+  Cartographic Coordinates and Rotational Elements: 2015", Celestial Mechanics and Dynamical Astronomy 130:22, 2018 (Mars's mean radius, 3389.5 km). <a href="https://doi.org/10.1007/s10569-017-9805-5">https://doi.org/10.1007/s10569-017-9805-5</a> </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for another prim type or an unknown preset. </li>
+</ul>
+<hr>
+
 <h3 id="function-authorlrocnac">function AuthorLrocNac</h3>
 <p><em>Authors one of LROC's Narrow Angle Cameras as published, onto</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <strong><code>camera</code> <em>and the readout chain of</em><a href="../classernie_1_1RenderProduct/"><em><strong>RenderProduct</strong></em></a> </strong><code>product</code> <em>.</em></p>
 <pre><code class="language-C++">void ernie::AuthorLrocNac (
@@ -3002,7 +3037,7 @@ Imaging Investigation", Space Science Reviews 217:24, 2021, <a href="https://doi
 <h3 id="function-bandaverage">function BandAverage</h3>
 <p><em>Averages</em> <code>atmosphere</code> <em>over</em><code>bands</code> <em>, sampling each band every 10 nm or less.</em></p>
 <pre><code class="language-C++">BandedAtmosphere ernie::BandAverage (
-    const Atmosphere &amp; atmosphere,
+    const AtmosphereModel &amp; atmosphere,
     const SpectralBands &amp; bands,
     int phaseAngles=256
 ) 
@@ -3564,7 +3599,7 @@ Sampling", SIGGRAPH 2005 posters. <a href="https://vgl.ict.usc.edu/Research/Medi
 
 <h3 id="function-earthatmosphere">function EarthAtmosphere</h3>
 <p><em>Earth's atmosphere over a planet of radius</em> <code>radius</code> <em>(m).</em></p>
-<pre><code class="language-C++">Atmosphere ernie::EarthAtmosphere (
+<pre><code class="language-C++">AtmosphereModel ernie::EarthAtmosphere (
     double radius,
     const EarthAtmosphereOptions &amp; options={}
 ) 
@@ -3995,7 +4030,8 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 <ul>
 <li>distant: towards the light along its +z axis, its spectrum as <code>SunIrradianceOf</code>;</li>
 <li>sphere: at its world position with its cone (<code>inputs:shaping:cone:angle</code> and <code>:softness</code>, default 180 degrees: unshaped) around its -z axis, radius <code>inputs:radius</code> (default 0.5; 0 with <code>treatAsPoint</code>). Physical with <code>ernie:power</code> or <code>ernie:spectrum</code> (<code>tokens::kLightPower</code>); otherwise relative, following UsdLux: <code>inputs:intensity</code> times 2^<code>inputs:exposure</code> is the luminance (cd/m^2) of its surface, so its luminous intensity is that times pi r^2 (times 1 for a point), with the shape of <code>inputs:color</code> and the enabled colour temperature.</li>
-<li>rect and disk: centred at its world position, emitting along its -z axis from a face of <code>inputs:width</code> x <code>inputs:height</code> (default 1 x 1) or radius <code>inputs:radius</code> (default 0.5), scaled by its transform. Physical with <code>ernie:power</code> or <code>ernie:spectrum</code> as a sphere; otherwise relative: <code>inputs:intensity</code> times 2^<code>inputs:exposure</code> is its luminance (cd/m^2). Shadows follow <code>inputs:shadow:enable</code>. </li>
+<li>rect and disk: centred at its world position, emitting along its -z axis from a face of <code>inputs:width</code> x <code>inputs:height</code> (default 1 x 1) or radius <code>inputs:radius</code> (default 0.5), scaled by its transform. Physical with <code>ernie:power</code> or <code>ernie:spectrum</code> as a sphere; otherwise relative: <code>inputs:intensity</code> times 2^<code>inputs:exposure</code> is its luminance (cd/m^2). Shadows follow <code>inputs:shadow:enable</code>.</li>
+<li>laser (Ernie's <a href="../classernie_1_1LaserLight/"><strong>LaserLight</strong></a>): a Gaussian beam along its -z axis, its waist and Rayleigh ranges in <code>beam</code>, its line binned exactly into the bands as W nm^-1 of the power through its aperture. </li>
 </ul>
 <p><strong>Exception:</strong></p>
 <ul>
@@ -4136,7 +4172,7 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 
 <h3 id="function-marsatmosphere">function MarsAtmosphere</h3>
 <p><em>Mars's atmosphere over a planet of radius</em> <code>radius</code> <em>(m).</em></p>
-<pre><code class="language-C++">Atmosphere ernie::MarsAtmosphere (
+<pre><code class="language-C++">AtmosphereModel ernie::MarsAtmosphere (
     double radius,
     const MarsAtmosphereOptions &amp; options={}
 ) 

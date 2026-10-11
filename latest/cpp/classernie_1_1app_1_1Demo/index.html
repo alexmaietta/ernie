@@ -294,6 +294,30 @@
 <td style="text-align: left;"><a href="#function-image"><strong>Image</strong></a> () const<br><em>The last frame rendered without a viewer (</em> <code>Render</code> <em>), LdrColor uint8 (rows, cols, 4); empty in a viewer.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-logarray"><strong>LogArray</strong></a> (std::string_view name, const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp; array, std::uintptr_t stream=1) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-logimage"><strong>LogImage</strong></a> (std::string_view name, const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp; image, std::uintptr_t stream=1) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-logscalar"><strong>LogScalar</strong></a> (std::string_view name, double value, bool clear=false, int smoothing=1) <br><em>Logs as the viewer's</em> <code>LogScalar</code> <em>,</em><code>LogArray</code> <em>and</em><code>LogImage</code> <em>(after Newton's examples'</em><code>viewer.log_scalar</code> <em>and friends) when there is a viewer, and keeps what was logged either way, for checks without one (</em><code>LoggedScalars</code> <em>,</em><code>LoggedArray</code> <em>,</em><code>LoggedImage</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#function-loggedarray"><strong>LoggedArray</strong></a> (std::string_view name) const<br><em>The last array or image logged as</em> <code>name</code> <em>, as logged (on the host or the GPU); empty if none.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#function-loggedimage"><strong>LoggedImage</strong></a> (std::string_view name) const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; double &gt;</td>
+<td style="text-align: left;"><a href="#function-loggedscalars"><strong>LoggedScalars</strong></a> (std::string_view name) const<br><em>Every value logged to scalar</em> <code>name</code> <em>, oldest first, unsmoothed; empty if none.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">virtual double</td>
 <td style="text-align: left;"><a href="#function-maxframedt"><strong>MaxFrameDt</strong></a> () const<br><em>The longest step in a window, so a stall does not throw the demo:</em> <code>maxFrameDt</code> <em>.</em></td>
 </tr>
@@ -470,6 +494,58 @@
 <h3 id="function-image">function Image</h3>
 <p><em>The last frame rendered without a viewer (</em> <code>Render</code> <em>), LdrColor uint8 (rows, cols, 4); empty in a viewer.</em></p>
 <pre><code class="language-C++">const Tensor &amp; ernie::app::Demo::Image () const
+</code></pre>
+<hr>
+
+<h3 id="function-logarray">function LogArray</h3>
+<pre><code class="language-C++">void ernie::app::Demo::LogArray (
+    std::string_view name,
+    const Tensor &amp; array,
+    std::uintptr_t stream=1
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-logimage">function LogImage</h3>
+<pre><code class="language-C++">void ernie::app::Demo::LogImage (
+    std::string_view name,
+    const Tensor &amp; image,
+    std::uintptr_t stream=1
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-logscalar">function LogScalar</h3>
+<p><em>Logs as the viewer's</em> <code>LogScalar</code> <em>,</em><code>LogArray</code> <em>and</em><code>LogImage</code> <em>(after Newton's examples'</em><code>viewer.log_scalar</code> <em>and friends) when there is a viewer, and keeps what was logged either way, for checks without one (</em><code>LoggedScalars</code> <em>,</em><code>LoggedArray</code> <em>,</em><code>LoggedImage</code> <em>).</em></p>
+<pre><code class="language-C++">void ernie::app::Demo::LogScalar (
+    std::string_view name,
+    double value,
+    bool clear=false,
+    int smoothing=1
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-loggedarray">function LoggedArray</h3>
+<p><em>The last array or image logged as</em> <code>name</code> <em>, as logged (on the host or the GPU); empty if none.</em></p>
+<pre><code class="language-C++">Tensor ernie::app::Demo::LoggedArray (
+    std::string_view name
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-loggedimage">function LoggedImage</h3>
+<pre><code class="language-C++">Tensor ernie::app::Demo::LoggedImage (
+    std::string_view name
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-loggedscalars">function LoggedScalars</h3>
+<p><em>Every value logged to scalar</em> <code>name</code> <em>, oldest first, unsmoothed; empty if none.</em></p>
+<pre><code class="language-C++">std::vector&lt; double &gt; ernie::app::Demo::LoggedScalars (
+    std::string_view name
+) const
 </code></pre>
 <hr>
 

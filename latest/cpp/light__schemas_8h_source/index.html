@@ -368,7 +368,37 @@
                                      &quot;off, it still lights the scene.&quot;,                            \
                               .group = &quot;Shape&quot;}))
 
+#define ERNIE_LASER_LIGHT_ATTRIBUTES(X)                                                            \
+    X(double, Wavelength, ::ernie::tokens::kLaserWavelength, 532.0,                                \
+      (::ernie::AttributeMeta{.doc = &quot;Centre wavelength, nm.&quot;, .group = &quot;Laser&quot;, .min = 200.0,     \
+                              .max = 20000.0}))                                                    \
+    X(double, Linewidth, ::ernie::tokens::kLaserLinewidth, 0.1,                                    \
+      (::ernie::AttributeMeta{.doc = &quot;Spectral width (FWHM), nm.&quot;, .group = &quot;Laser&quot;,               \
+                              .max = 100.0}))                                                      \
+    X(double, Power, ::ernie::tokens::kLaserPower, 0.001,                                          \
+      (::ernie::AttributeMeta{.doc = &quot;Average optical power out of the aperture, W.&quot;,              \
+                              .group = &quot;Laser&quot;, .max = 1e5}))                                      \
+    X(glm::dvec2, WaistRadius, ::ernie::tokens::kLaserWaistRadius, glm::dvec2(0.0005),             \
+      (::ernie::AttributeMeta{.label = &quot;Waist radius&quot;,                                             \
+                              .doc = &quot;1/e^2 radius at the waist along x and y, m.&quot;,                \
+                              .group = &quot;Beam&quot;, .max = 100.0}))                                     \
+    X(double, WaistDistance, ::ernie::tokens::kLaserWaistDistance, 0.0,                            \
+      (::ernie::AttributeMeta{.label = &quot;Waist distance&quot;,                                           \
+                              .doc = &quot;Where the waist lies along the beam from the aperture, m.&quot;,  \
+                              .group = &quot;Beam&quot;, .min = -1000.0, .max = 1000.0}))                    \
+    X(glm::dvec2, BeamQuality, ::ernie::tokens::kLaserBeamQuality, glm::dvec2(1.0),                \
+      (::ernie::AttributeMeta{.label = &quot;M^2&quot;,                                                      \
+                              .doc = &quot;Beam quality along x and y: 1 for an ideal beam.&quot;,           \
+                              .group = &quot;Beam&quot;, .min = 1.0, .max = 100.0}))                         \
+    X(double, ApertureRadius, ::ernie::tokens::kLaserApertureRadius, 0.0,                          \
+      (::ernie::AttributeMeta{.label = &quot;Aperture radius&quot;,                                          \
+                              .doc = &quot;Clips the beam's tails at the aperture, m; 0 none.&quot;,         \
+                              .group = &quot;Beam&quot;, .max = 100.0}))                                     \
+    X(bool, ShadowEnable, ::ernie::tokens::kShadowEnable, true,                                    \
+      (::ernie::AttributeMeta{.label = &quot;Shadows&quot;, .group = &quot;Laser&quot;}))
+
 // Every attribute of each type, its bases' first, for its accessors.
+#define ERNIE_LASER_LIGHT_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_LASER_LIGHT_ATTRIBUTES(X)
 #define ERNIE_LIGHT_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_LIGHT_ATTRIBUTES(X)
 #define ERNIE_BOUNDABLE_LIGHT_ALL(X) ERNIE_LIGHT_ALL(X) ERNIE_BOUNDABLE_LIGHT_ATTRIBUTES(X)
 #define ERNIE_NONBOUNDABLE_LIGHT_ALL(X) ERNIE_LIGHT_ALL(X) ERNIE_NONBOUNDABLE_LIGHT_ATTRIBUTES(X)
@@ -431,6 +461,15 @@ class CylinderLight : public BoundableLight {
     ERNIE_SCHEMA_BODY(CylinderLight, BoundableLight,
                       ERNIE_CYLINDER_LIGHT_ALL)
     ERNIE_SCHEMA_DEFINE(CylinderLight)
+};
+
+class LaserLight : public Imageable {
+    ERNIE_SCHEMA_BODY(LaserLight, Imageable, ERNIE_LASER_LIGHT_ALL)
+    ERNIE_SCHEMA_DEFINE(LaserLight)
+
+
+    glm::dvec2 RayleighRange() const;
+    glm::dvec2 Divergence() const;
 };
 
 std::vector&lt;const PrimTypeDef*&gt; LightSchemaTypes();

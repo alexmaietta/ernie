@@ -219,8 +219,12 @@
 <td style="text-align: left;"><a href="#variable-array"><strong>array</strong></a>   = <code>false</code><br><em>View the image as a 2D array even with one layer, for shaders that declare an array.</em></td>
 </tr>
 <tr>
-<td style="text-align: right;">VkFormat</td>
-<td style="text-align: left;"><a href="#variable-format"><strong>format</strong></a>   = <code>VK\_FORMAT\_R8G8B8A8\_UNORM</code><br></td>
+<td style="text-align: right;"><a href="./#variable-array"><strong>VkComponentMapping</strong></a></td>
+<td style="text-align: left;"><a href="#variable-components"><strong>components</strong></a>   = <code>{}</code><br><em>How the image's view maps its channels, such as a grey image's red to all three.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./#variable-array"><strong>VkFormat</strong></a></td>
+<td style="text-align: left;"><a href="#variable-format"><strong>format</strong></a>   = <code>[**VK\_FORMAT\_R8G8B8A8\_UNORM**](structernie_1_1ImageDesc.md#variable-array)</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::uint32_t</td>
@@ -235,16 +239,20 @@
 <td style="text-align: left;"><a href="#variable-layers"><strong>layers</strong></a>   = <code>1</code><br></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="./#variable-array"><strong>bool</strong></a></td>
+<td style="text-align: left;"><a href="#variable-linear"><strong>linear</strong></a>   = <code>[**false**](structernie_1_1ImageDesc.md#variable-array)</code><br><em>Lay the texels out linearly, rows</em> <code>RowPitch</code> <em>bytes apart, rather than in the device's own tiling: with</em><code>shared</code> <em>, compute APIs write the image as a plain pitched array in place, and shaders sample that same memory (</em><code>VulkanContext::SupportsLinearSampling</code> <em>).</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::uint32_t</td>
 <td style="text-align: left;"><a href="#variable-mips"><strong>mips</strong></a>   = <code>1</code><br></td>
 </tr>
 <tr>
-<td style="text-align: right;">bool</td>
-<td style="text-align: left;"><a href="#variable-shared"><strong>shared</strong></a>   = <code>false</code><br><em>Allocate in a dedicated allocation exportable as a POSIX file descriptor, for CUDA to read the image in place (</em> <code>VulkanContext::SupportsExternalMemory</code> <em>).</em></td>
+<td style="text-align: right;"><a href="./#variable-array"><strong>bool</strong></a></td>
+<td style="text-align: left;"><a href="#variable-shared"><strong>shared</strong></a>   = <code>[**false**](structernie_1_1ImageDesc.md#variable-array)</code><br><em>Allocate in a dedicated allocation exportable as a POSIX file descriptor, for CUDA to read the image in place (</em> <code>VulkanContext::SupportsExternalMemory</code> <em>).</em></td>
 </tr>
 <tr>
-<td style="text-align: right;">VkImageUsageFlags</td>
-<td style="text-align: left;"><a href="#variable-usage"><strong>usage</strong></a>   = <code>VK\_IMAGE\_USAGE\_SAMPLED\_BIT</code><br></td>
+<td style="text-align: right;"><a href="./#variable-array"><strong>VkImageUsageFlags</strong></a></td>
+<td style="text-align: left;"><a href="#variable-usage"><strong>usage</strong></a>   = <code>[**VK\_IMAGE\_USAGE\_SAMPLED\_BIT**](structernie_1_1ImageDesc.md#variable-array)</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::uint32_t</td>
@@ -256,6 +264,12 @@
 <h3 id="variable-array">variable array</h3>
 <p><em>View the image as a 2D array even with one layer, for shaders that declare an array.</em> </p>
 <pre><code class="language-C++">bool ernie::ImageDesc::array;
+</code></pre>
+<hr>
+
+<h3 id="variable-components">variable components</h3>
+<p><em>How the image's view maps its channels, such as a grey image's red to all three.</em> </p>
+<pre><code class="language-C++">VkComponentMapping ernie::ImageDesc::components;
 </code></pre>
 <hr>
 
@@ -278,6 +292,13 @@
 <h3 id="variable-layers">variable layers</h3>
 <pre><code class="language-C++">std::uint32_t ernie::ImageDesc::layers;
 </code></pre>
+<hr>
+
+<h3 id="variable-linear">variable linear</h3>
+<p><em>Lay the texels out linearly, rows</em> <code>RowPitch</code> <em>bytes apart, rather than in the device's own tiling: with</em><code>shared</code> <em>, compute APIs write the image as a plain pitched array in place, and shaders sample that same memory (</em><code>VulkanContext::SupportsLinearSampling</code> <em>).</em></p>
+<pre><code class="language-C++">bool ernie::ImageDesc::linear;
+</code></pre>
+<p>One layer and one mip. </p>
 <hr>
 
 <h3 id="variable-mips">variable mips</h3>

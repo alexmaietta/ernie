@@ -338,6 +338,25 @@ class Viewer {
 
     void RemoveScope(std::uint64_t scope);
 
+    void LogScalar(std::string_view name, double value,
+                   bool clear = false, int smoothing = 1);
+
+    std::vector&lt;double&gt; LoggedScalars(std::string_view name) const;
+
+    void LogArray(std::string_view name, const Tensor&amp; array,
+                  std::uintptr_t stream = 1);
+
+    void LogImage(std::string_view name, const Tensor&amp; image,
+                  std::uintptr_t stream = 1);
+
+    Tensor MapImage(std::string_view name,
+                    std::vector&lt;std::int64_t&gt; shape, DType type,
+                    std::uintptr_t stream = 1);
+
+    void UnmapImage(std::string_view name, std::uintptr_t stream = 1);
+
+    void RemoveLogged(std::string_view name);
+
     Scene&amp; GetScene();
     VulkanContext&amp; Context();
     const VulkanContext&amp; Context() const;
@@ -512,6 +531,8 @@ class Viewer {
     void SetTheme(const Theme&amp; theme);
 
   private:
+    void EnsurePlotsPanel();
+
     struct State;
     std::unique_ptr&lt;State&gt; state_;
 };

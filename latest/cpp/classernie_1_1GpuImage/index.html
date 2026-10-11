@@ -271,6 +271,14 @@
 <td style="text-align: left;"><a href="#function-mipview"><strong>MipView</strong></a> (std::uint32_t mip) const<br><em>View of mip</em> <code>mip</code> <em>alone, of every layer as a 2D array for array images, such as one level of a depth pyramid of a batch of views; a 2D view of it otherwise.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">VkDeviceSize</td>
+<td style="text-align: left;"><a href="#function-rowpitch"><strong>RowPitch</strong></a> () const<br><em>For linear images, the bytes from one row's first texel to the next's, and from the memory's start to the first texel; zero for others.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkDeviceSize</td>
+<td style="text-align: left;"><a href="#function-texeloffset"><strong>TexelOffset</strong></a> () const<br></td>
+</tr>
+<tr>
 <td style="text-align: right;">void</td>
 <td style="text-align: left;"><a href="#function-transition"><strong>Transition</strong></a> (VkCommandBuffer commands, VkImageLayout layout) <br><em>Records a barrier moving every subresource to</em> <code>layout</code> <em>; waits for and makes visible all earlier work, which is simple rather than minimal.</em></td>
 </tr>
@@ -425,6 +433,17 @@
 <ul>
 <li><code>std::out_of_range</code> for a mip the image does not have. </li>
 </ul>
+<hr>
+
+<h3 id="function-rowpitch">function RowPitch</h3>
+<p><em>For linear images, the bytes from one row's first texel to the next's, and from the memory's start to the first texel; zero for others.</em> </p>
+<pre><code class="language-C++">inline VkDeviceSize ernie::GpuImage::RowPitch () const
+</code></pre>
+<hr>
+
+<h3 id="function-texeloffset">function TexelOffset</h3>
+<pre><code class="language-C++">inline VkDeviceSize ernie::GpuImage::TexelOffset () const
+</code></pre>
 <hr>
 
 <h3 id="function-transition">function Transition</h3>

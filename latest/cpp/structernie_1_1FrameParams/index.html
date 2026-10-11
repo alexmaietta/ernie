@@ -234,6 +234,10 @@
 <td style="text-align: left;"><a href="#variable-ambient"><strong>ambient</strong></a>   = <code>0.15f</code><br><em>Fraction of sunlight reaching surfaces without shading.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::optional&lt; <a href="../structernie_1_1AtmosphereParams/"><strong>AtmosphereParams</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#variable-atmosphere"><strong>atmosphere</strong></a>  <br><em>The planet's atmosphere.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../structernie_1_1CameraParams/"><strong>CameraParams</strong></a></td>
 <td style="text-align: left;"><a href="#variable-camera"><strong>camera</strong></a>  <br><em>The camera: pose, projection, spectral bands, exposure, lens and sensor.</em></td>
 </tr>
@@ -451,6 +455,12 @@
 <h3 id="variable-ambient">variable ambient</h3>
 <p><em>Fraction of sunlight reaching surfaces without shading.</em> </p>
 <pre><code class="language-C++">float ernie::FrameParams::ambient;
+</code></pre>
+<hr>
+
+<h3 id="variable-atmosphere">variable atmosphere</h3>
+<p><em>The planet's atmosphere.</em> </p>
+<pre><code class="language-C++">std::optional&lt;AtmosphereParams&gt; ernie::FrameParams::atmosphere;
 </code></pre>
 <hr>
 

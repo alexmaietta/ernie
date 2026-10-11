@@ -306,6 +306,10 @@
 <td style="text-align: left;"><a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> <br><em>An interactive window onto an Ernie</em> <code>Scene</code> <em>: a docked viewport rendering the scene with a</em><code>RenderDelegate</code> <em>(the rasterizer), plus Stage, Property, Render Settings, Sensor, Stats and Log panels.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1app_1_1ViewerLogs/"><strong>ViewerLogs</strong></a> <br><em>What the viewer's logging calls collect (</em> <code>Viewer::LogScalar</code> <em>,</em><code>LogArray</code> <em>,</em><code>LogImage</code> <em>), after Newton's viewers'</em><code>log_scalar</code> <em>,</em><code>log_array</code> <em>and</em><code>log_image</code> <em>: scalar signals and arrays drawn in the Plots panel, and images each in a panel of its own, as textures the GPU samples where they were written.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1app_1_1ViewerOptions/"><strong>ViewerOptions</strong></a> <br><em>Options for opening a</em> <code>Viewer</code> <em>.</em></td>
 </tr>
@@ -446,6 +450,10 @@
 <tr>
 <td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#function-hastransform"><strong>HasTransform</strong></a> (std::string_view type) <br><em>Whether prims of</em> <code>type</code> <em>are placed by their transform, for the Transform section.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-inputstring"><strong>InputString</strong></a> (const char * label, std::string &amp; text, int flags=0) <br><em>ImGui::InputText on a std::string, which grows as the user types;</em> <code>flags</code> <em>are ImGuiInputTextFlags.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -800,6 +808,16 @@
 <p><em>Whether prims of</em> <code>type</code> <em>are placed by their transform, for the Transform section.</em></p>
 <pre><code class="language-C++">bool ernie::app::HasTransform (
     std::string_view type
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-inputstring">function InputString</h3>
+<p><em>ImGui::InputText on a std::string, which grows as the user types;</em> <code>flags</code> <em>are ImGuiInputTextFlags.</em></p>
+<pre><code class="language-C++">bool ernie::app::InputString (
+    const char * label,
+    std::string &amp; text,
+    int flags=0
 ) 
 </code></pre>
 <hr>

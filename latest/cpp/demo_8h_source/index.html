@@ -213,6 +213,7 @@
 #include &lt;cstdint&gt;
 #include &lt;filesystem&gt;
 #include &lt;functional&gt;
+#include &lt;map&gt;
 #include &lt;memory&gt;
 #include &lt;optional&gt;
 #include &lt;span&gt;
@@ -280,6 +281,17 @@ class Demo {
 
     std::shared_ptr&lt;WidgetPanel&gt; SharedWidgets();
 
+    void LogScalar(std::string_view name, double value,
+                   bool clear = false, int smoothing = 1);
+    void LogArray(std::string_view name, const Tensor&amp; array,
+                  std::uintptr_t stream = 1);
+    void LogImage(std::string_view name, const Tensor&amp; image,
+                  std::uintptr_t stream = 1);
+
+    std::vector&lt;double&gt; LoggedScalars(std::string_view name) const;
+    Tensor LoggedArray(std::string_view name) const;
+    Tensor LoggedImage(std::string_view name) const;
+
     virtual std::uint64_t NumFrames() const;
     virtual double FixedDt() const;
     virtual double MaxFrameDt() const;
@@ -317,6 +329,10 @@ class Demo {
     std::shared_ptr&lt;Scene&gt; ownScene_;
     std::shared_ptr&lt;Renderer&gt; renderer_;
     std::shared_ptr&lt;WidgetPanel&gt; widgets_;
+    std::map&lt;std::string, std::vector&lt;double&gt;, std::less&lt;&gt;&gt;
+        loggedScalars_;
+    std::map&lt;std::string, Tensor, std::less&lt;&gt;&gt; loggedArrays_;
+    std::map&lt;std::string, Tensor, std::less&lt;&gt;&gt; loggedImages_;
     Tensor image_;
     bool untestedSteps_ = false;
     bool untestedFinal_ = false;

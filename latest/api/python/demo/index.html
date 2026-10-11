@@ -268,13 +268,18 @@ from ernie import tokens
 class Demo(ernie.demo.Demo):
     def __init__(self, viewer, args):
         super().__init__(viewer, args)
-        self.ball = self.scene.define("/World/Ball", ernie.Sphere, radius=0.5)
+        self.ball = self.scene.define(
+            "/World/Ball", ernie.Sphere, radius=0.5
+        )
         self.scene.define("/World/Sun", ernie.DistantLight)
         self.scene.define("/World/Camera", ernie.Camera).set(
-            tokens.TRANSFORM, ernie.look_at_transform((0, -5, 2), (0, 0, 0)))
+            tokens.TRANSFORM,
+            ernie.look_at_transform((0, -5, 2), (0, 0, 0)),
+        )
 
     def step(self):
-        self.ball.set(translate=(0, 0, self.time))  # moved by self.frame_dt each step
+        # moved by self.frame_dt each step
+        self.ball.set(translate=(0, 0, self.time))
 
     def test_final(self):
         assert self.render_image()[..., :3].any()
@@ -1417,7 +1422,8 @@ define a Demo class, by category and name.</p>
         <p>Parses the command line and opens the viewer it asks for:
 <code>(viewer, args)</code>, with viewer an <code>ernie.app.Viewer</code> on a new
 Scene, or None under <code>--viewer null</code> and <code>--benchmark</code>. The runner
-(<code>ernie.app.DemoRunner</code>) rides along in the arguments for <code>run</code>.</p>
+(<code>ernie.app.DemoRunner</code>) rides along in the arguments for
+<code>run</code>.</p>
 
 
     </div>
@@ -1437,7 +1443,8 @@ Scene, or None under <code>--viewer null</code> and <code>--benchmark</code>. Th
     <div class="doc doc-contents ">
 
         <p>Imports the demo file at <code>path</code> afresh (its directory first on
-sys.path, for the helpers beside it) and returns its Demo class.</p>
+sys.path, for the helpers beside it) and returns its Demo
+class.</p>
 
 
     </div>

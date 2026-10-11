@@ -259,7 +259,7 @@ struct Constituent {
     OpticsModel optics;
 };
 
-struct Atmosphere {
+struct AtmosphereModel {
     double bottomRadius = 6371e3;
     double topAltitude = 100e3;
     std::vector&lt;Constituent&gt; constituents;
@@ -277,7 +277,7 @@ struct EarthAtmosphereOptions {
     double aerosolScaleHeight = 1200.0;
 };
 
-Atmosphere
+AtmosphereModel
 EarthAtmosphere(double radius,
                 const EarthAtmosphereOptions&amp; options = {});
 
@@ -290,8 +290,9 @@ struct MarsAtmosphereOptions {
     double dustOpticalDepth = 0.5;
 };
 
-Atmosphere MarsAtmosphere(double radius,
-                          const MarsAtmosphereOptions&amp; options = {});
+AtmosphereModel
+MarsAtmosphere(double radius,
+               const MarsAtmosphereOptions&amp; options = {});
 
 std::vector&lt;double&gt; PhaseCosines(int count);
 
@@ -309,9 +310,14 @@ struct BandedAtmosphere {
     SpectralBands bands;
     int phaseAngles = 0;
     std::vector&lt;BandedConstituent&gt; constituents;
+
+    double Extinction(double altitude, int band) const;
+
+    double TransmittanceToTop(double r, double mu, int band,
+                              int steps = 4000) const;
 };
 
-BandedAtmosphere BandAverage(const Atmosphere&amp; atmosphere,
+BandedAtmosphere BandAverage(const AtmosphereModel&amp; atmosphere,
                              const SpectralBands&amp; bands,
                              int phaseAngles = 256);
 

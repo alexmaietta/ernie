@@ -242,7 +242,8 @@ struct RenderPrims {
     std::vector&lt;Path&gt; lights;
     Path dome;
     Path ground;
-    Path stars;  
+    Path stars;       
+    Path atmosphere;  
     std::optional&lt;glm::dmat4&gt; cameraTransform;
     std::map&lt;Path, glm::dmat4&gt; lightTransforms;
 };
@@ -355,6 +356,10 @@ std::vector&lt;Star&gt; StarsOf(const Scene&amp; scene, const Path&amp; path);
 
 StarFieldParams StarFieldParamsOf(const Scene&amp; scene,
                                   const Path&amp; path);
+
+AtmosphereParams AtmosphereParamsOf(const Scene&amp; scene,
+                                    const Path&amp; path,
+                                    const Path&amp; terrain);
 
 double OverscanOf(const CameraParams&amp; camera);
 

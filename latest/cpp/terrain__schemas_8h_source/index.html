@@ -271,8 +271,33 @@
                                      &quot;Without either, stars are 5772 K, the Sun's.&quot;,               \
                               .group = &quot;Stars&quot;}))
 
+#define ERNIE_ATMOSPHERE_ATTRIBUTES(X)                                                             \
+    X(std::string, Preset, ::ernie::tokens::kAtmospherePreset, &quot;earth&quot;,                            \
+      (::ernie::AttributeMeta{.doc = &quot;The planet's physical model: Earth's air, ozone and haze, &quot;  \
+                                     &quot;or Mars's carbon dioxide and dust.&quot;,                         \
+                              .group = &quot;Atmosphere&quot;,                                               \
+                              .options = {::ernie::tokens::kEarth, ::ernie::tokens::kMars}}))      \
+    X(double, PlanetRadius, ::ernie::tokens::kAtmospherePlanetRadius, 0.0,                         \
+      (::ernie::AttributeMeta{.doc = &quot;Metres; 0 takes the planet Terrain's radius, or else the &quot;   \
+                                     &quot;preset planet's, centred under the world's origin.&quot;,         \
+                              .group = &quot;Atmosphere&quot;, .max = 1e9}))                                 \
+    X(double, GroundAlbedo, ::ernie::tokens::kAtmosphereGroundAlbedo, 0.3,                         \
+      (::ernie::AttributeMeta{.doc = &quot;The ground's reflectance for light scattered in the air.&quot;,   \
+                              .group = &quot;Atmosphere&quot;, .max = 1.0}))                                 \
+    X(double, HazeOpticalDepth, ::ernie::tokens::kAtmosphereHazeOpticalDepth, 0.1,                 \
+      (::ernie::AttributeMeta{.doc = &quot;Earth: the haze's vertical optical depth at 550 nm.&quot;,        \
+                              .group = &quot;Atmosphere&quot;, .max = 5.0}))                                 \
+    X(double, OzoneColumn, ::ernie::tokens::kAtmosphereOzoneColumn, 300.0,                         \
+      (::ernie::AttributeMeta{.doc = &quot;Earth: total column ozone, Dobson units.&quot;,                   \
+                              .group = &quot;Atmosphere&quot;, .max = 1000.0}))                              \
+    X(double, DustOpticalDepth, ::ernie::tokens::kAtmosphereDustOpticalDepth, 0.5,                 \
+      (::ernie::AttributeMeta{.doc = &quot;Mars: the dust's vertical optical depth at 880 nm (about &quot;   \
+                                     &quot;0.3 to 0.9 in clear seasons, above 1 in dust storms).&quot;,      \
+                              .group = &quot;Atmosphere&quot;, .max = 10.0}))
+
 #define ERNIE_TERRAIN_ALL(X) ERNIE_GPRIM_ALL(X) ERNIE_TERRAIN_ATTRIBUTES(X)
 #define ERNIE_STAR_FIELD_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_STAR_FIELD_ATTRIBUTES(X)
+#define ERNIE_ATMOSPHERE_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_ATMOSPHERE_ATTRIBUTES(X)
 // clang-format on
 
 namespace ernie {
@@ -285,6 +310,11 @@ class Terrain : public Gprim {
 class StarField : public Imageable {
     ERNIE_SCHEMA_BODY(StarField, Imageable, ERNIE_STAR_FIELD_ALL)
     ERNIE_SCHEMA_DEFINE(StarField)
+};
+
+class Atmosphere : public Imageable {
+    ERNIE_SCHEMA_BODY(Atmosphere, Imageable, ERNIE_ATMOSPHERE_ALL)
+    ERNIE_SCHEMA_DEFINE(Atmosphere)
 };
 
 std::vector&lt;const PrimTypeDef*&gt; TerrainSchemaTypes();

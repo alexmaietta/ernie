@@ -260,6 +260,14 @@ class ComputeInterop {
                         std::vector&lt;std::int64_t&gt; shape,
                         VkDeviceSize offset = 0) = 0;
 
+    virtual Tensor ViewImage(std::shared_ptr&lt;GpuImage&gt; image,
+                             DType type,
+                             std::vector&lt;std::int64_t&gt; shape,
+                             std::vector&lt;std::int64_t&gt; strides) = 0;
+
+    virtual void CopyToImage(const Tensor&amp; source, GpuImage&amp; image,
+                             std::uintptr_t stream = 1) = 0;
+
     virtual void Copy(const Tensor&amp; source, const Tensor&amp; destination,
                       std::uintptr_t stream = 1) = 0;
 

@@ -232,6 +232,10 @@
 <td style="text-align: left;"><a href="#function-copytobuffer"><strong>CopyToBuffer</strong></a> (const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp; source, <a href="../classernie_1_1GpuBuffer/"><strong>GpuBuffer</strong></a> &amp; buffer, VkDeviceSize offset=0, std::uintptr_t stream=1) = 0<br><em>Queues a device-to-device copy of a contiguous tensor on this device into</em> <code>buffer</code> <em>at byte</em><code>offset</code> <em>on stream</em><code>stream</code> <em>, so it follows the work writing the tensor there and the Vulkan work submitted so far (which may still read the buffer,</em><code>NextVulkanSignal</code> <em>), and returns without waiting; Vulkan work reading the buffer must wait for</em><code>VulkanWait</code> <em>.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-copytoimage"><strong>CopyToImage</strong></a> (const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp; source, <a href="../classernie_1_1GpuImage/"><strong>GpuImage</strong></a> &amp; image, std::uintptr_t stream=1) = 0<br><em>Queues a device-to-device copy of the contiguous image or batch</em> <code>source</code> <em>, (rows, cols), (rows, cols, channels) or (views, rows, cols, channels), into the linear shared image</em><code>image</code> <em>, the views side by side from its left edge, on</em><code>stream</code> <em>, after the Vulkan work submitted so far (which may still read the image,</em><code>NextVulkanSignal</code> <em>), without waiting; Vulkan work reading the image must wait for</em><code>VulkanWait</code> <em>.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">virtual int</td>
 <td style="text-align: left;"><a href="#function-device"><strong>Device</strong></a> () const = 0<br><em>The device ordinal in the compute API.</em></td>
 </tr>
@@ -274,6 +278,10 @@
 <tr>
 <td style="text-align: right;">virtual <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
 <td style="text-align: left;"><a href="#function-view"><strong>View</strong></a> (std::shared_ptr&lt; <a href="../classernie_1_1GpuBuffer/"><strong>GpuBuffer</strong></a> &gt; buffer, <a href="../namespaceernie/#enum-dtype"><strong>DType</strong></a> type, std::vector&lt; std::int64_t &gt; shape, VkDeviceSize offset=0) = 0<br><em>A tensor of</em> <code>type</code> <em>and</em><code>shape</code> <em>on this device over</em><code>buffer</code> <em>'s memory from byte</em><code>offset</code> <em>, which keeps the buffer alive.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#function-viewimage"><strong>ViewImage</strong></a> (std::shared_ptr&lt; <a href="../classernie_1_1GpuImage/"><strong>GpuImage</strong></a> &gt; image, <a href="../namespaceernie/#enum-dtype"><strong>DType</strong></a> type, std::vector&lt; std::int64_t &gt; shape, std::vector&lt; std::int64_t &gt; strides) = 0<br><em>A tensor of</em> <code>type</code> <em>,</em><code>shape</code> <em>and</em><code>strides</code> <em>(in elements, as DLPack's) on this device over the texels of the linear shared image</em><code>image</code> <em>(</em><code>ImageDesc::linear</code> <em>and</em><code>shared</code> <em>), from its first texel: writing it writes the image itself, which shaders then sample with no copy.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">virtual <a href="../structernie_1_1TimelinePoint/"><strong>TimelinePoint</strong></a></td>
@@ -388,6 +396,21 @@
 </ul>
 <hr>
 
+<h3 id="function-copytoimage">function CopyToImage</h3>
+<p><em>Queues a device-to-device copy of the contiguous image or batch</em> <code>source</code> <em>, (rows, cols), (rows, cols, channels) or (views, rows, cols, channels), into the linear shared image</em><code>image</code> <em>, the views side by side from its left edge, on</em><code>stream</code> <em>, after the Vulkan work submitted so far (which may still read the image,</em><code>NextVulkanSignal</code> <em>), without waiting; Vulkan work reading the image must wait for</em><code>VulkanWait</code> <em>.</em></p>
+<pre><code class="language-C++">virtual void ernie::ComputeInterop::CopyToImage (
+    const Tensor &amp; source,
+    GpuImage &amp; image,
+    std::uintptr_t stream=1
+) = 0
+</code></pre>
+<p>A texel of <code>source</code> must be one of the image. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a source not on this device or not contiguous, an image that is not linear and shared, or views that do not fit. </li>
+</ul>
+<hr>
+
 <h3 id="function-device">function Device</h3>
 <p><em>The device ordinal in the compute API.</em> </p>
 <pre><code class="language-C++">virtual int ernie::ComputeInterop::Device () const = 0
@@ -485,6 +508,22 @@
 <p><strong>Exception:</strong></p>
 <ul>
 <li><code>std::invalid_argument</code> if the buffer is not <code>BufferMemory::Shared</code> or too small. </li>
+</ul>
+<hr>
+
+<h3 id="function-viewimage">function ViewImage</h3>
+<p><em>A tensor of</em> <code>type</code> <em>,</em><code>shape</code> <em>and</em><code>strides</code> <em>(in elements, as DLPack's) on this device over the texels of the linear shared image</em><code>image</code> <em>(</em><code>ImageDesc::linear</code> <em>and</em><code>shared</code> <em>), from its first texel: writing it writes the image itself, which shaders then sample with no copy.</em></p>
+<pre><code class="language-C++">virtual Tensor ernie::ComputeInterop::ViewImage (
+    std::shared_ptr&lt; GpuImage &gt; image,
+    DType type,
+    std::vector&lt; std::int64_t &gt; shape,
+    std::vector&lt; std::int64_t &gt; strides
+) = 0
+</code></pre>
+<p>Keeps the image alive. Work writing it must first wait for the Vulkan work reading the image (<code>WaitForVulkan</code>), and Vulkan work reading it afterwards for <code>SignalVulkan</code>. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for an image that is not linear and shared, or a view past its end. </li>
 </ul>
 <hr>
 

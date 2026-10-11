@@ -226,6 +226,8 @@ struct ImageDesc {
     bool shared = false;
     bool array = false;
     std::uint32_t groupLayers = 0;
+    bool linear = false;
+    VkComponentMapping components{};
 };
 
 class GpuImage {
@@ -273,6 +275,13 @@ class GpuImage {
         return sharedMemory_ != VK_NULL_HANDLE ? bytes_ : 0;
     }
 
+    VkDeviceSize RowPitch() const {
+        return rowPitch_;
+    }
+    VkDeviceSize TexelOffset() const {
+        return texelOffset_;
+    }
+
     void Attach(std::shared_ptr&lt;void&gt; object) {
         attached_ = std::move(object);
     }
@@ -298,6 +307,8 @@ class GpuImage {
     std::vector&lt;VkImageView&gt; mipViews_;
     VkImageLayout layout_ = VK_IMAGE_LAYOUT_UNDEFINED;
     VkDeviceSize bytes_ = 0;
+    VkDeviceSize rowPitch_ = 0;
+    VkDeviceSize texelOffset_ = 0;
 };
 
 VkImageAspectFlags AspectOf(VkFormat format);
