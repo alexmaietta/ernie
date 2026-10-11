@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791704994492,
+  "lastUpdate": 1791705185723,
   "repoUrl": "https://github.com/alexmaietta/ernie",
   "entries": {
     "CI": [
@@ -5038,6 +5038,178 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-gcc-3: ccache miss rate",
             "value": 26.24,
+            "unit": "%"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "committer": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "id": "8a7352df3c0eaf4559db8dcf537b41d74f3d476b",
+          "message": "Lamp test counts the sun illuminant; Windows device check from a script file",
+          "timestamp": "2026-10-11T07:49:11Z",
+          "url": "https://github.com/alexmaietta/ernie/commit/8a7352df3c0eaf4559db8dcf537b41d74f3d476b"
+        },
+        "date": 1791705184135,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "CI: wall time",
+            "value": 3.52,
+            "unit": "min"
+          },
+          {
+            "name": "format: job",
+            "value": 0.47,
+            "unit": "min"
+          },
+          {
+            "name": "version: job",
+            "value": 0.12,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: job",
+            "value": 0.15,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: Build and check the sdist",
+            "value": 0.03,
+            "unit": "min"
+          },
+          {
+            "name": "build-macos-15: compile time",
+            "value": 6.42,
+            "unit": "min"
+          },
+          {
+            "name": "build-macos-15: compiles",
+            "value": 378,
+            "unit": "files"
+          },
+          {
+            "name": "build-windows-2025: compile time",
+            "value": 6.08,
+            "unit": "min"
+          },
+          {
+            "name": "build-windows-2025: compiles",
+            "value": 350,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-1: compile time",
+            "value": 9.26,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-1: compiles",
+            "value": 403,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-1: ccache miss rate",
+            "value": 16.67,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-2: compile time",
+            "value": 9.14,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-2: compiles",
+            "value": 362,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-2: ccache miss rate",
+            "value": 11.42,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-3: compile time",
+            "value": 9.41,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-3: compiles",
+            "value": 364,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-3: ccache miss rate",
+            "value": 12.12,
+            "unit": "%"
+          },
+          {
+            "name": "test-clang: compile time",
+            "value": 6.75,
+            "unit": "min"
+          },
+          {
+            "name": "test-clang: compiles",
+            "value": 392,
+            "unit": "files"
+          },
+          {
+            "name": "test-clang: ccache miss rate",
+            "value": 12.02,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-1: compile time",
+            "value": 7.63,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-1: compiles",
+            "value": 386,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-1: ccache miss rate",
+            "value": 28.57,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-2: compile time",
+            "value": 7.39,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-2: compiles",
+            "value": 412,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-2: ccache miss rate",
+            "value": 30.45,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-3: compile time",
+            "value": 7.55,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-3: compiles",
+            "value": 372,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-3: ccache miss rate",
+            "value": 28.57,
             "unit": "%"
           }
         ]
