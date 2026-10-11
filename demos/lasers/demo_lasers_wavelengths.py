@@ -1,12 +1,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Six lasers from violet to near infrared, at powers from 1 to 20 mW,
-spot a wall in a dim room seen by four cameras at once: visible RGB, a
-532 nm narrowband filter, a near-infrared camera and a wideband
-silicon mono camera. Each sees only the lines its bands reach."""
+"""Six lasers from violet to near infrared seen by four cameras, each
+seeing only the lines its bands reach."""
 
 import numpy as np
 
 import ernie
+import ernie.app
 import ernie.demo
 from ernie import tokens
 from ernie.demo import side_by_side, write_png

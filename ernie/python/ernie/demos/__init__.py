@@ -7,13 +7,15 @@ Newton's examples.
     python -m ernie.demos
     # Every demo's name.
     python -m ernie.demos --list
-    python -m ernie.demos lighting/illuminants --viewer null \\
+    python -m ernie.demos demo_lighting_illuminants --viewer null \\
         --output illuminants.png
-    python -m ernie.demos lighting/illuminants --help
+    python -m ernie.demos demo_lighting_illuminants --help
 
-The demos are `<category>/<name>.py` files, each the twin of a C++
-demo (the `ernie` program's, `ernie --demo lighting/illuminants`) but
-for those in `interop/`, which show Python's GPU interop. The options
+The demos are `<category>/demo_<category>_<name>.py` files, named by
+their stem, each the twin of a C++ demo (the `ernie` program's,
+`ernie --demo demo_lighting_illuminants`, and the `ernie-demos`
+package's `demo_lighting_illuminants` program) but for those in
+`interop/`, which show Python's GPU interop. The options
 after the name are the demo's: those every demo takes
 (`ernie.demo.create_parser`) and its own. In a window, the Demos panel
 switches between them all.
@@ -34,22 +36,29 @@ from ..demo import discover_demos
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 
 #: The demo `python -m ernie.demos` runs without a name.
-DEFAULT = "viewer/custom_panel"
+DEFAULT = "demo_viewer_custom_panel"
 
-USAGE = """Usage: python -m ernie.demos [category/name] [options]
+USAGE = """Usage: python -m ernie.demos [NAME] [options]
        python -m ernie.demos --list
-       python -m ernie.demos category/name --help
+       python -m ernie.demos demo_<category>_<name> --help
 
-Runs one of Ernie's Python demos (viewer/custom_panel without a
+Runs one of Ernie's Python demos (demo_viewer_custom_panel without a
 name), with a Demos panel to switch to the others; --list lists them,
 and NAME --help shows a demo's options."""
 
 
 def demos():
-    """The demos here as {"category/name": path}, by category and
-    name."""
+    """The demos here as {"demo_<category>_<name>": path}, by
+    category and name."""
     return {
         entry.id: entry.path for entry in discover_demos(DIRECTORY)
+    }
+
+
+def _aliases():
+    """The former `<category>/<name>` ids, to the new ones."""
+    return {
+        entry.path_id: entry.id for entry in discover_demos(DIRECTORY)
     }
 
 
@@ -71,6 +80,7 @@ def main(argv=None):
         else DEFAULT
     )
     name = name.removesuffix(".py").replace(" ", "_")
+    name = _aliases().get(name, name)
     if name not in found:
         print(
             f"No demo named '{name}'; these are:\n  "

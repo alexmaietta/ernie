@@ -1,14 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""LROC's Wide Angle Camera over Tycho as it took a real image: each
-framelet posed by the image's ISD (ALE's from LRO's SPICE kernels), on
-LOLA's terrain, under the Sun where the ISD puts it, through the WAC's
-604 nm band and readout as published, its 11-bit numbers companded to
-the 8 it sends; and the Narrow Angle Camera's readout from the same
-orbit.
-
-LOLA's terrain about Tycho is fetched into the cache on the first run
-(27 MB; not under --test); without it the ground is the bare reference
-sphere.
+"""LROC's Wide Angle Camera over Tycho, posed from a real image's ISD
+on LOLA's terrain (fetched on the first run, 27 MB).
 
 References:
 - M. S. Robinson et al., "Lunar Reconnaissance Orbiter Camera (LROC)
@@ -212,7 +204,7 @@ def fetch_ldem_window():
     samples in the window alone (HTTP range requests; a tile is 2.1
     GB), and writes it to the cache as an image and a PDS3 label of its
     own, which `ernie.read_cylindrical_dem` reads as it would the whole
-    tile. As demos/cameras/lroc.cpp's `FetchLdemWindow`."""
+    tile. As demo_cameras_lroc.cpp's `FetchLdemWindow`."""
     first = round((WINDOW_WEST - 270.0) * PIXELS_PER_DEGREE)
     samples = round((WINDOW_EAST - WINDOW_WEST) * PIXELS_PER_DEGREE)
     rows = bytearray()
@@ -253,7 +245,7 @@ def fetch_ldem_window():
         f.write(
             f"""PDS_VERSION_ID = PDS3
 /* A window of LOLA's LDEM_512 (LRO-L-LOLA-4-GDR-V1.0), fetched by
-   demos/cameras/lroc from the PDS Geosciences Node. */
+   demo_cameras_lroc from the PDS Geosciences Node. */
 RECORD_TYPE = FIXED_LENGTH
 RECORD_BYTES = {2 * samples}
 FILE_RECORDS = {lines}

@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// A pulsed 650 nm line laser, 20 us pulses at 1 kHz (2% of the time
-// on), across a wall, seen by three cameras: a 1/60 s exposure sees
-// its average, a 50 us exposure in step with the pulses catches one
-// at twenty times the average, and the same 50 us between pulses sees
-// none of it. The renderer's sensor clock (`RenderDelegate::Time`)
-// times each frame.
+// A pulsed line laser seen by three cameras: a long exposure sees its
+// average, short ones catch a pulse or miss it.
 
 #include "ernie/app/demo.h"
 #include "ernie/scene/base_schemas.h"

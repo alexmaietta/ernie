@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// Mars's atmosphere from a rover and from orbit: the butterscotch
-// sky of suspended dust at noon, the blue glow around the setting sun
-// that the dust scatters forward, and the thin limb from 300 km,
-// under the Sun's measured spectrum at Mars's mean distance.
+// Mars's atmosphere from a rover and from orbit: the dusty noon sky,
+// the blue sunset and the thin limb.
 
 #include "ernie/app/demo.h"
 #include "ernie/scene/base_schemas.h"

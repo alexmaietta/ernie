@@ -22,7 +22,7 @@ void DefineDefaultScene(Scene& scene);
 ///     ernie                       the default scene, Demos panel
 ///     ernie scene.json            a scene file (LoadSceneFile)
 ///     ernie scene.json --output x.png     renders it, no window
-///     ernie --demo lighting/illuminants   that demo running
+///     ernie --demo demo_lighting_illuminants   that demo running
 ///     ernie --list                the demos' names
 ///
 /// It takes the options every demo takes (`ParseDemoOptions`), so a

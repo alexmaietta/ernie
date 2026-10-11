@@ -344,7 +344,7 @@ std::string DemoInfo::Label() const {
 }
 
 std::string DemoInfo::Id() const {
-    std::string id = category + "/" + name;
+    std::string id = "demo_" + category + "_" + name;
     std::replace(id.begin(), id.end(), ' ', '_');
     return id;
 }
@@ -379,7 +379,11 @@ std::optional<std::size_t> FindDemo(std::span<const DemoInfo> demos,
     for (std::size_t i = 0; i < demos.size(); ++i) {
         std::string label = demos[i].Label();
         std::replace(label.begin(), label.end(), ' ', '_');
-        if (demos[i].Id() == wanted || label == wanted) {
+        // The former "category/name" ids too.
+        std::string path = demos[i].category + "/" + demos[i].name;
+        std::replace(path.begin(), path.end(), ' ', '_');
+        if (demos[i].Id() == wanted || label == wanted ||
+            path == wanted) {
             return i;
         }
     }
@@ -443,13 +447,13 @@ struct DemoRunner::State {
     void AddPanel() {
         const std::uint64_t previous = viewer->Scope();
         viewer->SetScope(0);
-        // In the bottom dock with the Log and Stats, the Log staying
-        // in front.
+        // In the upper right with the Stage, the Stage staying in
+        // front.
         panel =
-            &viewer->AddPanel("Demos", Dock::Bottom,
+            &viewer->AddPanel("Demos", Dock::Right,
                               [this](Viewer& v) { DrawPanel(v); });
-        if (viewer->FindPanel("Log") != nullptr) {
-            viewer->FocusPanel("Log");
+        if (viewer->FindPanel("Stage") != nullptr) {
+            viewer->FocusPanel("Stage");
         }
         viewer->SetScope(previous);
     }

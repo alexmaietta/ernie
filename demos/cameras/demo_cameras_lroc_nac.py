@@ -1,19 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""LROC's Narrow Angle Camera over the Moon's south pole as an ISD has
-it: the line scanner rendered strip by strip from LRO's poses (ALE's,
-from its SPICE kernels), 2 x 2 summed, 0.72 m across the track and 20 m
-along it from 36 km up, on LOLA's 10 m polar terrain, the Sun 1 degree
-above the horizon where the ISD puts it, through the NAC's readout to
-the 8 bits it sends.
-
-Its lines take 11.9 ms, far longer than a daylit image's (under a
-millisecond): exposed for the shadows, it saturates on the sunlit
-ground. Ernie draws no light scattered from sunlit slopes into the
-shadows, which stay black.
-
-LOLA's terrain about the pole is fetched into the cache on the first
-run (3 MB; not under --test); without it the ground is the bare
-reference sphere.
+"""LROC's Narrow Angle Camera line-scanning the Moon's south pole at a
+low Sun, posed from a real ISD on LOLA's terrain (fetched on the first
+run, 3 MB).
 
 References:
 - M. S. Robinson et al., "Lunar Reconnaissance Orbiter Camera (LROC)

@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Benchmarks a batched camera rendering one view per cloned
-environment, with GPU poses and observations kept on the GPU, as a
-reinforcement learning loop does."""
+"""Benchmarks a batched camera, one view per cloned environment, with
+poses and images kept on the GPU."""
 
 import time
 
@@ -17,7 +16,7 @@ STEPS = 60  # distinct poses, cycled
 WARMUP = 5  # steps before timing: uploads, pipelines, allocations
 
 # An environment's things, cubes and spheres in turn: their colours
-# and where they stand, the same in batch_camera.cpp.
+# and where they stand, the same in demo_batched_cameras.cpp.
 THINGS = [
     ((0.700, 0.918, 0.821), (-1.649, -1.199)),
     ((0.899, 0.204, 0.857), (1.782, -0.192)),

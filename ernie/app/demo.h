@@ -261,8 +261,9 @@ struct DemoInfo {
     /// "category: name", as the panel lists it.
     std::string Label() const;
 
-    /// "category/name", as `--demo` and `--list` name it, with
-    /// underscores for spaces.
+    /// "demo_<category>_<name>", as `--demo` and `--list` name it,
+    /// its files and its program are named, with underscores for
+    /// spaces.
     std::string Id() const;
 };
 
@@ -305,9 +306,10 @@ struct DemoRegistration {
             ::ernie::app::MakeDemoInfo<Class>(category, name,        \
                                               description))
 
-/// Finds the demo `id` among `demos`: "category/name" (such as
-/// "lighting/illuminants"), or the panel's label "category: name";
-/// underscores and spaces match each other. Returns its index.
+/// Finds the demo `id` among `demos`: its id (such as
+/// "demo_lighting_illuminants"), the former "category/name", or the
+/// panel's label "category: name"; underscores and spaces match each
+/// other. Returns its index.
 std::optional<std::size_t> FindDemo(std::span<const DemoInfo> demos,
                                     std::string_view id);
 

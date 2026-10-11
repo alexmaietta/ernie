@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// Structured light: a 450 nm projector shows a six-bit Gray code, one
-// bit plane per frame of its sequence (`ernie:laser:sequence:count`),
-// to a mono camera beside it. Each frame of the sensor clock
-// shows the next plane; the six frames decode to the projector column
-// each pixel sees, from which a scanner would triangulate depth.
+// Structured light: an 850 nm projector's Gray code, one bit plane a
+// frame, decoded to the projector column each pixel sees.
 //
 // References:
 // - J. Salvi, J. Pages and J. Batlle, "Pattern codification
-// strategies
-//   in structured light systems", Pattern Recognition 37(4), 2004.
+//   strategies in structured light systems", Pattern Recognition
+//   37(4), 2004.
 // - J. L. Posdamer and M. D. Altschuler, "Surface measurement by
 //   space-encoded projected beam systems", CGIP 18(1), 1982.
 

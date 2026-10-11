@@ -29,7 +29,8 @@ any of Ernie's demos. With --viewer null or --output, renders without a window.
   ernie                               the viewer on the default scene
   ernie scene.json                    the viewer on a scene file (JSON, as ernie.save_scene writes)
   ernie scene.json --output out.png   renders the scene file to a PNG
-  ernie --demo lighting/illuminants   the viewer with a demo running
+  ernie --demo demo_lighting_illuminants
+                                      the viewer with a demo running
   ernie --list                        the demos' names
 
 Options:

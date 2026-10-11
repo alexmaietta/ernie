@@ -11,7 +11,8 @@ from conftest import REQUIRE_VALIDATION
 import ernie
 import ernie.demo
 
-#: The repository's demos: demos/<category>/<name>.{cpp,py}.
+#: The repository's demos:
+#: demos/<category>/demo_<category>_<name>.{cpp,py}.
 DEMOS = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "demos")
 )
@@ -26,9 +27,9 @@ AWAITING_TWINS = set()
 #: Smaller batches than the demos' benchmark sizes, which software
 #: Vulkan in CI renders slowly.
 SMALL_BATCHES = {
-    "batched/batch_camera": ["--views", "64"],
-    "interop/robot_arms": ["--worlds", "16"],
-    "batched/gpu_poses": ["--views", "32"],
+    "demo_batched_cameras": ["--views", "64"],
+    "demo_interop_robot_arms": ["--worlds", "16"],
+    "demo_batched_gpu_poses": ["--views", "32"],
 }
 
 
@@ -213,8 +214,8 @@ def test_demos_package_lists_the_shipped_demos():
     result = run([sys.executable, "-m", "ernie.demos", "--list"])
     names = result.stdout.split()
     assert (
-        "viewer/custom_panel" in names
-        and "lighting/illuminants" in names
+        "demo_viewer_custom_panel" in names
+        and "demo_lighting_illuminants" in names
     )
 
 
@@ -240,7 +241,11 @@ def test_entries_take_category_and_name_from_their_directory_and_file(
     tmp_path,
 ):
     (tmp_path / "lighting").mkdir()
-    (tmp_path / "lighting" / "dome_daylight.py").write_text(
+    (
+        tmp_path / "lighting" / "demo_lighting_dome_daylight.py"
+    ).write_text("class Demo(object):\n    pass\n")
+    # A file of the former form, `<name>.py`, takes the same kind of id.
+    (tmp_path / "lighting" / "spot.py").write_text(
         "class Demo(object):\n    pass\n"
     )
     (tmp_path / "lighting" / "_helpers.py").write_text(
@@ -254,7 +259,8 @@ def test_entries_take_category_and_name_from_their_directory_and_file(
     )
     entries = ernie.demo.discover_demos(str(tmp_path))
     assert [(entry.id, entry.label) for entry in entries] == [
-        ("lighting/dome_daylight", "lighting: dome daylight")
+        ("demo_lighting_dome_daylight", "lighting: dome daylight"),
+        ("demo_lighting_spot", "lighting: spot"),
     ]
 
 

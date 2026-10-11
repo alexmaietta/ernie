@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Earth's atmosphere from the ground and from orbit: a blue noon sky,
-a red sunset, and the planet's limb from the International Space
-Station's 400 km, under the Sun's measured spectrum (TSIS-1) at
-1361 W/m^2."""
+"""Earth's atmosphere from the ground and from orbit: a noon sky, a
+sunset and the limb from the ISS."""
 
 import math
 

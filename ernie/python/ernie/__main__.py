@@ -10,7 +10,7 @@ with.
         the viewer on a scene file (ernie.save_scene's JSON)
     ernie scene.json --output out.png
         renders the scene file to a PNG
-    ernie --demo lighting/illuminants
+    ernie --demo demo_lighting_illuminants
         the viewer with one of the C++ demos running
     ernie --list
         the C++ demos' names

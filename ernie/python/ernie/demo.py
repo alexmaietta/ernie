@@ -344,8 +344,8 @@ def main(demo_class):
 def catalog(demo_class, args):
     """The Demos panel's entries for a run of `demo_class`, `(infos,
     current)`: the demos of every category beside its own
-    (`demos/<category>/<name>.py`), or the class alone when it is not
-    among them."""
+    (`demos/<category>/demo_<category>_<name>.py`), or the class alone
+    when it is not among them."""
     path = _module_file(demo_class)
     entries = (
         discover_demos(os.path.dirname(os.path.dirname(path)))
@@ -382,8 +382,10 @@ def catalog(demo_class, args):
 
 
 class DemoEntry:
-    """A demo file, `<category>/<name>.py`: its path, category and
-    name."""
+    """A demo file, `<category>/demo_<category>_<name>.py`: its path,
+    category, name and id (its file's stem, `demo_<category>_<name>`,
+    as `--demo` and `python -m ernie.demos` take it). A file of the
+    former `<category>/<name>.py` form gets the same id."""
 
     def __init__(self, path):
         self.path = path
@@ -391,8 +393,14 @@ class DemoEntry:
             os.path.dirname(os.path.abspath(path))
         )
         stem = os.path.splitext(os.path.basename(path))[0]
-        self.name = stem.replace("_", " ")
-        self.id = f"{self.category}/{stem}"
+        prefix = f"demo_{self.category}_"
+        short = (
+            stem[len(prefix) :] if stem.startswith(prefix) else stem
+        )
+        self.name = short.replace("_", " ")
+        self.id = f"{prefix}{short}"
+        #: The former id, `<category>/<name>`, which still finds it.
+        self.path_id = f"{self.category}/{short}"
 
     @property
     def label(self):
@@ -400,8 +408,8 @@ class DemoEntry:
 
 
 def discover_demos(root):
-    """The demos under `root`, `<category>/<name>.py` files that
-    define a Demo class, by category and name."""
+    """The demos under `root`, `<category>/demo_<category>_<name>.py`
+    files that define a Demo class, by category and name."""
     entries = []
     for category in sorted(os.listdir(root)):
         directory = os.path.join(root, category)

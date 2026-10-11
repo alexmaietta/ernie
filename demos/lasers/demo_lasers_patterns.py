@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""A 532 nm projector over a few objects on a table, through each of
-its patterns: the bare beam, a line, a diffractive grid, a seeded
-field of dots in 3 x 3 tiles, sinusoidal fringes from an image, and
-rings from a pattern written in Slang and registered at run time."""
+"""A 532 nm projector over a table through each of its patterns, one
+of them written in Slang at run time."""
 
 from pathlib import Path
 

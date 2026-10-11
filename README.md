@@ -170,10 +170,10 @@ Planned future examples.
 
 **Lasers**
 
-- Lasers from 405 to 940 nm seen by RGB, narrowband, NIR and wideband cameras (`lasers/wavelengths`)
-- A projector's patterns: spot, line, grid, dots, fringes and rings written in Slang (`lasers/patterns`)
-- A pulsed line laser against long, in-step and between-pulse exposures (`lasers/pulsed`)
-- Gray-code structured light decoded to projector columns (`lasers/structured_light`)
+- Lasers from 405 to 940 nm seen by RGB, narrowband, NIR and wideband cameras (`demo_lasers_wavelengths`)
+- A projector's patterns: spot, line, grid, dots, fringes and rings written in Slang (`demo_lasers_patterns`)
+- A pulsed line laser against long, in-step and between-pulse exposures (`demo_lasers_pulsed`)
+- Gray-code structured light decoded to projector columns (`demo_lasers_structured_light`)
 
 **Star Field**
 

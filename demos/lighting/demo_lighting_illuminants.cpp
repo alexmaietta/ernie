@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// One spot light at 1600 lumens under four illuminants (white, D 4000
-// K, blackbody 2000 K and a fluorescent spectrum), lighting a colour
-// chart: the same brightness, different colours.
+// One spot light under four illuminants on a colour chart: the same
+// brightness, different colours.
 
 #include "ernie/app/demo.h"
 #include "ernie/scene/base_schemas.h"

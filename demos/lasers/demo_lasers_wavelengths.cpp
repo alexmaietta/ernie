@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// Six lasers from violet to near infrared, at powers from 1 to 20 mW,
-// spot a wall in a dim room seen by four cameras at once: visible
-// RGB, a 532 nm narrowband filter, a near-infrared camera and a
-// wideband silicon mono camera. Each sees only the lines its bands
-// reach.
+// Six lasers from violet to near infrared seen by four cameras, each
+// seeing only the lines its bands reach.
 
 #include "ernie/app/demo.h"
+#include "ernie/app/viewer.h"
 #include "ernie/scene/base_schemas.h"
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/geometry_schemas.h"

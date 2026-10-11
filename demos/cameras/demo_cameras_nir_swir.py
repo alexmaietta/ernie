@@ -1,12 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Measured materials under the Sun, seen from overhead by three
-cameras: visible RGB, a near-infrared camera (760 to 1000 nm) and a
-shortwave-infrared InGaAs camera filtered to 1.57 to 1.65 um, as
-Landsat 8's band 6 tells snow from cloud. Each patch reflects
-as the material does (`reflectance_library`, from the ECOSTRESS
-Spectral Library): grass dark in the visible and bright in the near
-infrared, snow white in the visible and dark past 1.4 um, asphalt dark
-throughout.
+"""Measured materials seen by visible, near-infrared and
+shortwave-infrared cameras: grass, snow and asphalt each change with
+the band.
 
 References:
 - S. K. Meerdink et al., "The ECOSTRESS spectral library version 1.0",

@@ -1,13 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Perseverance's cameras on a patch of Mars: the Navcam and front
-Hazcam stereo pairs (f-theta lenses on the CMV-20000, 12-bit numbers
-demosaiced, sent as JPEG) and the Mastcam-Z pair at its widest zoom,
-toed in, with its filter wheels' narrow bands into the near infrared,
-all as published, under the Sun's measured spectrum at Mars's distance
-through its dusty air.
-
-Each camera is binned to 320 x 240 (16 x 16 of the engineering
-cameras' pixels, 5 x 5 of Mastcam-Z's).
+"""Perseverance's Navcam, Hazcam and Mastcam-Z stereo pairs on a patch
+of Mars, as published, each binned to 320 x 240.
 
 References:
 - J. N. Maki et al., "The Mars 2020 Engineering Cameras and Microphone

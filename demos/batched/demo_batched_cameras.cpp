@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// Benchmarks a batched camera rendering one view per cloned
-// environment, with GPU poses and observations kept on the GPU, as a
-// reinforcement learning loop does.
+// Benchmarks a batched camera, one view per cloned environment, with
+// poses and images kept on the GPU.
 
 #include "ernie/app/demo.h"
 #include "ernie/device/compute_interop.h"
@@ -40,7 +39,7 @@ constexpr int kWarmup =
     5;  // steps before timing: uploads, pipelines, allocations
 
 // An environment's things, cubes and spheres in turn: their colours
-// and where they stand, the same in batch_camera.py.
+// and where they stand, the same in demo_batched_cameras.py.
 struct Thing {
     glm::dvec3 colour;
     double x;
@@ -452,5 +451,5 @@ class BatchCameraDemo : public app::Demo {
 }  // namespace
 
 ERNIE_REGISTER_DEMO(
-    BatchCameraDemo, "batched", "batch camera",
+    BatchCameraDemo, "batched", "cameras",
     "A view per environment rendered in batches, timed per step.");

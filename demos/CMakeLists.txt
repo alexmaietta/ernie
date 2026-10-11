@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# Ernie's demos, by category: demos/<category>/<name>.cpp beside <name>.py, the same demo in each
-# language (interop/ is Python only). Each C++ demo registers itself (ERNIE_REGISTER_DEMO), and
-# their objects go into the `ernie` program and the Python module, whose Demos panels list them.
-# With ERNIE_BUILD_DEMOS each is also a program of its own, demo_<category>_<name>.
+# Ernie's demos, by category: demos/<category>/demo_<category>_<name>.cpp beside its .py, the
+# same demo in each language (interop/ is Python only), named by that stem. Each C++ demo
+# registers itself (ERNIE_REGISTER_DEMO), and their objects go into the `ernie` program and the
+# Python module, whose Demos panels list them. With ERNIE_BUILD_DEMOS each is also a program of
+# its own, named as its files.
 
 file(GLOB ernie_demo_cpp CONFIGURE_DEPENDS
      "${CMAKE_CURRENT_SOURCE_DIR}/*/*.cpp")
@@ -45,11 +46,18 @@ if(ERNIE_BUILD_DEMOS)
         get_filename_component(name "${source}" NAME_WE)
         get_filename_component(directory "${source}" DIRECTORY)
         get_filename_component(category "${directory}" NAME)
-        set(program "demo_${category}_${name}")
+        # The demo's id and program: its file's stem,
+        # demo_<category>_<name> (a file of the former <name> form
+        # gets the prefix).
+        if(name MATCHES "^demo_${category}_")
+            set(program "${name}")
+        else()
+            set(program "demo_${category}_${name}")
+        endif()
         add_executable(${program} main.cpp
                                   $<TARGET_OBJECTS:ernie_demos>)
-        target_compile_definitions(
-            ${program} PRIVATE ERNIE_DEMO_ID="${category}/${name}")
+        target_compile_definitions(${program}
+                                   PRIVATE ERNIE_DEMO_ID="${program}")
         target_link_libraries(
             ${program} PRIVATE ernie_app ernie_build_options
                                ${ernie_demo_links})
