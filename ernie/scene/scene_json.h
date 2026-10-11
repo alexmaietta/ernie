@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include "ernie/util/tensor.h"
+
 #include <filesystem>
+#include <span>
 #include <string_view>
 
 /// Scenes described in JSON, the format of Python's `ernie.load_scene`:
@@ -27,17 +30,18 @@
 ///   numbers (math convention: column vectors, translation in the last column).
 /// - Values convert as Python's do: booleans, integers (32-bit), other numbers as doubles,
 ///   strings, arrays of strings, arrays of 2 numbers (`ivec2` when both are integers), 3 or 4 as
-///   vectors, other lengths as float arrays, and 4 x 4 nested arrays as matrices. A declared
-///   attribute's value is then converted to its type (`AttributeDef::Coerce`: a string to a
-///   relationship target, say); one declared as a tensor (`points`, `heights`) takes a possibly
-///   nested array as a CPU tensor, int32 for one of whole numbers (`AttributeMeta::integer`:
-///   indices, counts) and float32 for any other, whatever the numbers look like, written with
-///   `Scene::Write`. A declared 4-vector takes its 4 numbers as doubles, and a declared
-///   `AttributeMeta::lenient` attribute keeps a value its type cannot convert. On any other
-///   attribute, nested arrays other than 4 x 4 (such as a per-vertex `primvars:displayColor`, N
-///   rows of 3) are a float32 tensor; on an undeclared one, 4 numbers for an `xformOp:orient` (or
-///   `xformOp:orient:<suffix>`) are a quaternion as [w, x, y, z]. Values are checked as
-///   `Scene::Set` checks them (`Validate`).
+///   vectors, other lengths as float arrays, and 4 x 4 nested arrays as matrices; nested arrays
+///   other than 4 x 4 are a float32 tensor.
+/// - Those are the rules for undeclared attributes only. A declared one, or a transform op
+///   (`FindXformOp`: `xformOp:orient:<suffix>` too), is read as its kind: a tensor (`points`,
+///   `heights`) as a CPU tensor, int32 for one of whole numbers (`AttributeMeta::integer`: indices,
+///   counts) and float32 for any other, whatever the numbers look like, written with
+///   `Scene::Write`; an `AttributeMeta::array` attribute's array of values, nested deeper than one
+///   value (a per-vertex `primvars:displayColor`, N rows of 3), as a float32 tensor; a `Vec4`'s 4
+///   numbers as doubles, a `Quat`'s as [w, x, y, z] and a `Matrix` as 4 rows; then converted to
+///   its type (`AttributeDef::Coerce`: a string to a relationship target, say), a
+///   `AttributeMeta::lenient` attribute keeping a value its type cannot convert. Values are
+///   checked as `Scene::Set` checks them (`Validate`).
 ///
 /// `SaveScene` writes the format back, so that `LoadScene` of its text into an empty scene
 /// rebuilds the scene: every prim but the viewer's (under `tokens::kSessionRoot`), roots by path
@@ -64,10 +68,16 @@ namespace ernie {
 
 class Scene;
 
-/// Builds the prims `json` describes into `scene` (see above).
+/// Builds the prims `json` describes into `scene` (see above). An attribute's value may be
+/// `{"$array": i}`, `arrays[i]` in its place: written as it is, shared and not copied
+/// (`Scene::Write`, keeping its element type), where an array goes (a tensor attribute, an
+/// `AttributeMeta::array` attribute's array of values, nested arrays on an undeclared one), and
+/// else, as for transform keys, read as the numbers it holds, as if written in the JSON. Python's
+/// `ernie.load_scene` hands a dict's arrays over so, without copying them through the text.
 /// @throws std::invalid_argument for text that is not JSON (with its line and column), a
-/// description of the wrong shape, or a value `scene` rejects, naming the prim and the key.
-void LoadScene(Scene& scene, std::string_view json);
+/// description of the wrong shape, an `"$array"` index out of range, or a value `scene` rejects,
+/// naming the prim and the key.
+void LoadScene(Scene& scene, std::string_view json, std::span<const Tensor> arrays = {});
 
 /// `LoadScene` with the text of the file at `path`.
 /// @throws std::invalid_argument if the file cannot be read, naming it, or as `LoadScene`.
@@ -77,8 +87,8 @@ void LoadSceneFile(Scene& scene, const std::filesystem::path& path);
 /// key per line, arrays of numbers or strings on one line, nested arrays a row per line.
 /// @throws std::invalid_argument naming the prim and the attribute for a GPU tensor, a NaN or
 /// infinite number, an attribute whose name `LoadScene` would read as something else (`type`, a
-/// transform key such as `scale`, or another declared attribute's Python name), or a child named as
-/// an attribute of its parent.
+/// transform key such as `scale`, or another declared attribute's Python name), or a child named as an
+/// attribute of its parent.
 std::string SaveScene(const Scene& scene);
 
 /// Writes `SaveScene(scene)` to the file at `path`, replacing it.

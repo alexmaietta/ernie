@@ -4,6 +4,8 @@
 #include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
+#include <nanobind/stl/string_view.h>
+#include <nanobind/stl/vector.h>
 
 #include "ernie/scene/scene.h"
 #include "ernie/scene/scene_json.h"
@@ -14,10 +16,31 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace ernie::python {
 
 void BindSceneJson(nb::module_& m) {
+    // ernie.load_scene (ernie/schema.py) takes dicts too, writing them as JSON for these.
+    m.def(
+        "_load_scene_text",
+        [](Scene& scene, std::string_view text, const std::vector<AnyArray>& arrays) {
+            std::vector<Tensor> tensors;
+            tensors.reserve(arrays.size());
+            for (const AnyArray& array : arrays) {
+                tensors.push_back(TensorFromArray(array));
+            }
+            LoadScene(scene, text, tensors);
+        },
+        nb::arg("scene"), nb::arg("text"), nb::arg("arrays") = std::vector<AnyArray>{},
+        "C++'s LoadScene: the prims JSON text describes, into scene, with arrays (any DLPack "
+        "arrays) for its {\"$array\": i} values.");
+    m.def(
+        "_load_scene_file",
+        [](Scene& scene, const std::filesystem::path& path) { LoadSceneFile(scene, path); },
+        nb::arg("scene"), nb::arg("path"),
+        "C++'s LoadSceneFile: the prims a JSON file describes, into scene.");
     m.def(
         "save_scene",
         [](const Scene& scene, const std::optional<std::filesystem::path>& path) {

@@ -34,7 +34,9 @@ void BindSchema(nb::module_& m) {
         .value("RELATIONSHIP", AttributeKind::Relationship)
         .value("RELATIONSHIPS", AttributeKind::Relationships)
         .value("FLOAT_ARRAY", AttributeKind::FloatArray)
-        .value("TENSOR", AttributeKind::Tensor);
+        .value("TENSOR", AttributeKind::Tensor)
+        .value("QUAT", AttributeKind::Quat)
+        .value("MATRIX", AttributeKind::Matrix);
 
     nb::class_<AttributeDef>(m, "AttributeDef",
                              "An attribute a registered prim type declares: its USD and Python "
@@ -66,10 +68,15 @@ void BindSchema(nb::module_& m) {
         .def_prop_ro(
             "is_integer", [](const AttributeDef& def) { return def.meta.integer; },
             "Whether it is an array of whole numbers (indices, counts), loaded as int32.")
+        .def_prop_ro(
+            "takes_array", [](const AttributeDef& def) { return def.meta.array; },
+            "Whether it also takes an array in place of its value: colours per vertex for "
+            "display_color, a width per point, a pose per prim for a transform op.")
         .def(
             "read",
             [](const AttributeDef& def, const Prim& prim) -> nb::object {
-                if (def.kind == AttributeKind::Tensor) {
+                if (def.kind == AttributeKind::Tensor ||
+                    (def.meta.array && prim.Get(def.name) == nullptr && prim.Read(def.name))) {
                     const Tensor* tensor = prim.Read(def.name);
                     return tensor != nullptr ? ArrayFromTensor(*tensor) : nb::none();
                 }
@@ -83,12 +90,16 @@ void BindSchema(nb::module_& m) {
             },
             nb::arg("prim"),
             "The attribute of `prim` as its declared type, or its default while unset; a list of "
-            "paths for a relationship to several prims; an array (or None) for tensors.")
+            "paths for a relationship to several prims; an array (or None) for tensors, and the "
+            "array written in place of the value of one that takes one (takes_array).")
         .def(
             "write",
             [](const AttributeDef& def, Prim& prim, nb::handle value) {
+                AnyArray array;
                 if (def.kind == AttributeKind::Tensor) {
                     prim.Write(def.name, TensorFromArray(nb::cast<AnyArray>(value)));
+                } else if (def.meta.array && nb::try_cast(value, array)) {
+                    prim.Write(def.name, TensorFromArray(array));
                 } else {
                     prim.Set(def.name, def.Coerce(ValueFromPython(value)));
                 }
@@ -96,7 +107,8 @@ void BindSchema(nb::module_& m) {
             nb::arg("prim"), nb::arg("value"),
             "Sets the attribute of `prim`, converted to its declared type (an int to a float, a "
             "str to a Path; a relationship to several prims takes one target or a list); writes "
-            "an array for tensors.")
+            "an array for tensors, and for one that takes an array in place of its value "
+            "(takes_array: colours per vertex for display_color).")
         .def("__repr__", [](const AttributeDef& def) {
             return "AttributeDef('" + def.pyName + "', '" + std::string(def.name) + "')";
         });

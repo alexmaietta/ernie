@@ -229,6 +229,42 @@ def test_scene_files_load_as_cpp_loads_them():
     assert np.allclose(scene.local_transform("/A"), scene.local_transform("/B"))
 
 
+def test_values_are_read_by_their_declared_kind():
+    # One value, or an array in its place where one is declared to take it.
+    assert ernie.Mesh.display_color.takes_array and not ernie.Mesh.material_binding.takes_array
+    scene = ernie.Scene()
+    mesh = ernie.Mesh.define(scene, "/Mesh", display_color=(1, 0, 0))
+    assert mesh.display_color == (1.0, 0.0, 0.0)
+    mesh.display_color = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+    assert mesh.display_color.dtype == np.float32 and mesh.display_color.shape == (3, 3)
+    with pytest.raises(ValueError, match="not an array"):
+        scene.write("/Mesh", tokens.MATERIAL_BINDING, np.zeros((2, 3), np.float32))
+    # Transform ops by their kind, untyped prims' too: four numbers are not a quaternion.
+    scene.define("/Group", "")
+    with pytest.raises(ValueError, match="quaternion"):
+        scene.set("/Group", tokens.ORIENT, (0.0, 0.0, 0.0, 1.0))
+    # A description dict may hold arrays, quaternions and paths; C++ reads it. Arrays go over
+    # beside the JSON, written where an array goes without a copy, and read as numbers elsewhere.
+    points = np.eye(3, dtype=np.float32)
+    colors = np.eye(3, dtype=np.float64)
+    loaded = ernie.load_scene({
+        "/Mesh": {"type": "Mesh", "points": points, "display_color": colors,
+                  "material_binding": ernie.Path("/Looks/A"), "translate": np.array([0, 0, 2.0]),
+                  "extent": [0, 0, 0, 1, 1, 1],
+                  "xformOp:orient:pivot": ernie.Quat(1, 0, 0, 0), "user:size": np.float32(2)},
+    })
+    loaded_mesh = ernie.Mesh.at(loaded, "/Mesh")
+    assert np.shares_memory(loaded_mesh.points, points)
+    assert loaded_mesh.display_color.dtype == np.float64  # as written, not converted
+    assert loaded.get("/Mesh", tokens.TRANSLATE) == (0.0, 0.0, 2.0)
+    assert loaded.get("/Mesh", "user:size") == 2.0
+    assert loaded_mesh.display_color.shape == (3, 3)
+    assert loaded_mesh.material_binding == ernie.Path("/Looks/A")
+    assert isinstance(loaded.get("/Mesh", "xformOp:orient:pivot"), ernie.Quat)
+    with pytest.raises(ValueError, match="'/Mesh'.*xformOp:orient"):
+        ernie.load_scene({"/Mesh": {"xformOp:orient": [1, 0, 0]}})
+
+
 def test_saved_scenes_load_back_equal(tmp_path):
     scene = ernie.Scene()
     world = scene.define("/World", ernie.Xform)

@@ -15,6 +15,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <limits>
@@ -27,6 +28,7 @@ using ernie::DType;
 using ernie::LoadScene;
 using ernie::Path;
 using ernie::Scene;
+using ernie::Tensor;
 namespace tokens = ernie::tokens;
 
 namespace {
@@ -359,6 +361,141 @@ TEST(SaveScene, RoundTripsThroughLoadScene) {
               (std::vector<Path>{"/World/Instancer/Box", "/World/Instancer/Ball"}));
     EXPECT_EQ(ernie::Sphere(loaded, "/World/Rock").GetMaterialBinding(), Path("/Looks/Stone"));
     EXPECT_TRUE(loaded.Get("/Render/Settings", tokens::kWireframe)->Is<bool>());
+}
+
+/// A value of `def`'s kind other than its default, to see it come back.
+ernie::Value SampleOf(const ernie::AttributeDef& def) {
+    using ernie::AttributeKind;
+    switch (def.kind) {
+    case AttributeKind::Bool:
+        return !*def.fallback.Get<bool>();
+    case AttributeKind::Int:
+        return *def.fallback.Get<int>() + 1;
+    case AttributeKind::Double:
+        return *def.fallback.Get<double>() + 0.25;
+    case AttributeKind::Vec2:
+        return glm::dvec2(0.25, 0.5);
+    case AttributeKind::Vec3:
+        return glm::dvec3(0.25, 0.5, 0.75);
+    case AttributeKind::Vec4:
+        return glm::dvec4(0.25, 0.5, 0.75, 0.1);
+    case AttributeKind::Token:
+        return def.meta.options.empty() ? std::string("sample")
+                                        : std::string(def.meta.options.back());
+    case AttributeKind::Relationship:
+        return Path("/Target");
+    case AttributeKind::Relationships:
+        return std::vector<Path>{"/Target", "/Other"};
+    case AttributeKind::FloatArray:
+        return std::vector<float>{0.25f, 0.5f, 0.75f, 1.0f, 1.25f};
+    case AttributeKind::Quat:
+        return glm::normalize(glm::dquat(0.5, 0.5, -0.5, 0.25));
+    case AttributeKind::Matrix:
+        return glm::translate(glm::dmat4(1.0), glm::dvec3(1.0, 2.0, 3.0));
+    case AttributeKind::Tensor:
+        break;
+    }
+    return {};
+}
+
+TEST(SaveScene, EveryDeclaredAttributeRoundTripsAsItsKind) {
+    // One prim of every registered type with every attribute it declares set, each array
+    // attribute's array form on a second prim, and every transform op: what loads back is what
+    // was saved, by kind, not by how the JSON looks.
+    Scene scene;
+    for (const ernie::PrimTypeDef* type : ernie::PrimTypes()) {
+        if (type->abstract) {
+            continue;
+        }
+        const Path path("/" + std::string(type->name));
+        const Path arrays("/" + std::string(type->name) + "Arrays");
+        scene.Define(path, type->name);
+        scene.Define(arrays, type->name);
+        for (const ernie::AttributeDef* def : type->AllAttributes()) {
+            SCOPED_TRACE(std::string(type->name) + " " + std::string(def->name));
+            if (def->kind == ernie::AttributeKind::Tensor) {
+                scene.Write(path, def->name,
+                            def->meta.integer
+                                ? Tensor::Copy<std::int32_t>(std::array<std::int32_t, 3>{1, 2, 3},
+                                                             {3})
+                                : Tensor::Copy<float>(std::array<float, 6>{1, 2, 3, 4, 5, 6.5f},
+                                                      {2, 3}));
+                continue;
+            }
+            scene.Set(path, def->name, SampleOf(*def));
+            if (def->meta.array) {
+                scene.Write(arrays, def->name,
+                            Tensor::Copy<float>(std::array<float, 6>{1, 2, 3, 4, 5, 6.5f}, {2, 3}));
+            }
+        }
+    }
+    scene.Define("/Ops", "Xform");
+    scene.Set("/Ops", tokens::kTranslate, glm::dvec3(1.0, 2.0, 3.0));
+    scene.Set("/Ops", std::string(tokens::kOrient) + ":pivot",
+              glm::normalize(glm::dquat(0.5, 0.5, -0.5, 0.25)));
+    scene.Set("/Ops", tokens::kRotateX, 30.0);
+    scene.Set("/Ops", tokens::kRotateZYX, glm::dvec3(10.0, 20.0, 30.0));
+    scene.Set("/Ops", tokens::kScale, glm::dvec3(2.0));
+    scene.Set("/Ops", tokens::kTransform, glm::translate(glm::dmat4(1.0), glm::dvec3(1.0)));
+    scene.Write("/Ops", tokens::kOrient,
+                Tensor::Copy<float>(std::array<float, 8>{0, 0, 0, 1, 0, 0, 1, 0}, {2, 4}));
+
+    const std::string text = ernie::SaveScene(scene);
+    Scene loaded;
+    LoadScene(loaded, text);
+    ExpectEquivalent(scene, loaded);
+    EXPECT_EQ(ernie::SaveScene(loaded), text);
+    EXPECT_TRUE(loaded.Get("/Ops", std::string(tokens::kOrient) + ":pivot")->Is<glm::dquat>());
+    EXPECT_TRUE(loaded.Get("/Ops", tokens::kTransform)->Is<glm::dmat4>());
+    EXPECT_EQ(loaded.Read("/MeshArrays", tokens::kDisplayColor)->Shape(),
+              (std::vector<std::int64_t>{2, 3}));
+}
+
+TEST(SaveScene, ArraysAndValuesAreCheckedByKind) {
+    Scene scene;
+    scene.Define("/Mesh", "Mesh");
+    scene.Define("/Group", "");
+    const Tensor rows = Tensor::Copy<float>(std::array<float, 6>{1, 2, 3, 4, 5, 6}, {2, 3});
+    // An array in place of a value only where one is declared to take it.
+    EXPECT_NO_THROW(scene.Write("/Mesh", tokens::kDisplayColor, rows));
+    EXPECT_THROW(scene.Write("/Mesh", tokens::kMaterialBinding, rows), std::invalid_argument);
+    // Transform ops by their kind, on untyped prims too: four numbers are not a quaternion.
+    EXPECT_THROW(scene.Set("/Group", tokens::kOrient, glm::vec4(0, 0, 0, 1)),
+                 std::invalid_argument);
+    EXPECT_THROW(scene.Set("/Group", "xformOp:translate:pivot", 1.0), std::invalid_argument);
+    EXPECT_NO_THROW(scene.Set("/Group", tokens::kScale, 2.0));
+    EXPECT_THROW(LoadScene(scene, R"({"/Group": {"xformOp:orient": [1, 0, 0]}})"),
+                 std::invalid_argument);
+    LoadScene(scene, R"({"/Group": {"xformOp:orient:pivot": [1, 0, 0, 0]}})");
+    EXPECT_EQ(*scene.Get("/Group", "xformOp:orient:pivot")->Get<glm::dquat>(),
+              glm::dquat(1, 0, 0, 0));
+}
+
+TEST(LoadScene, TakesArraysBesideTheJsonWithoutCopying) {
+    const Tensor points =
+        Tensor::Copy<float>(std::array<float, 9>{0, 0, 0, 1, 0, 0, 0, 1, 0}, {3, 3});
+    const Tensor colors = Tensor::Copy<double>(std::array<double, 6>{1, 0, 0, 0, 1, 0}, {2, 3});
+    const Tensor up = Tensor::Copy<double>(std::array<double, 3>{0, 0, 2}, {3});
+    const std::array<Tensor, 3> arrays{points, colors, up};
+    Scene scene;
+    LoadScene(scene,
+              R"({"/Mesh": {"type": "Mesh", "points": {"$array": 0},
+                            "display_color": {"$array": 1}, "translate": {"$array": 2},
+                            "user:offset": {"$array": 2}}})",
+              arrays);
+    // Where an array goes, written as it is: shared, its element type kept.
+    EXPECT_EQ(scene.Read("/Mesh", tokens::kPoints)->Data(), points.Data());
+    EXPECT_EQ(scene.Read("/Mesh", tokens::kDisplayColor)->Type(), DType::Float64);
+    // Elsewhere, read as the numbers it holds.
+    EXPECT_EQ(*scene.Get("/Mesh", tokens::kTranslate)->Get<glm::dvec3>(), glm::dvec3(0, 0, 2));
+    EXPECT_EQ(*scene.Get("/Mesh", "user:offset")->Get<glm::dvec3>(), glm::dvec3(0, 0, 2));
+    try {
+        LoadScene(scene, R"({"/Mesh": {"points": {"$array": 3}}})", arrays);
+        FAIL() << "an index past the arrays loads";
+    } catch (const std::invalid_argument& error) {
+        EXPECT_NE(std::string(error.what()).find("of the 3 arrays"), std::string::npos)
+            << error.what();
+    }
 }
 
 TEST(SaveScene, WritesStablePrettyJson) {

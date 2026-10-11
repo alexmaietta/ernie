@@ -52,6 +52,8 @@ enum class AttributeKind {
     Relationships,  ///< A list of target `Path`s; one `Path` authored alone is a list of one.
     FloatArray,     ///< A small `std::vector<float>`, such as (nm, value) pairs.
     Tensor,         ///< Bulk data, written and read as a `Tensor`.
+    Quat,           ///< A `glm::dquat`, written [w, x, y, z] in scene descriptions.
+    Matrix,         ///< A `glm::dmat4` (math convention), written as 4 rows of 4.
 };
 
 /// How an attribute is described and edited. Declared with designated initializers in this order.
@@ -76,6 +78,11 @@ struct AttributeMeta {
     /// For a list of targets usually holding one (a product's camera, or a batch's cameras): the
     /// plural name Python reads the list by, its own name then reading the first target alone.
     std::string_view plural;
+    /// It also takes an array written in place of its value (`Scene::Write`): colours per vertex
+    /// for one `displayColor`, a width per point, a pose per prim for a transform op. Scene
+    /// loaders make float32 arrays of nested arrays for it; others take no array. Declare such an
+    /// attribute as `OrArray<T>`, which sets it and gives its view `Read<Name>`.
+    bool array = false;
 };
 
 class AttributeDef;
@@ -146,6 +153,27 @@ template <> struct AttributeTraits<glm::dvec4> {
     static glm::dvec4 Read(const Scene& scene, const Path& path, std::string_view name,
                            glm::dvec4 fallback);
     static std::optional<glm::dvec4> From(const Value& value);
+};
+
+template <> struct AttributeTraits<glm::dquat> {
+    static constexpr AttributeKind kKind = AttributeKind::Quat;
+    using Result = glm::dquat;
+    using Arg = glm::dquat;
+    /// A `dquat`; `fallback` when unset or of another type (four numbers are not one: w may be
+    /// first or last).
+    static glm::dquat Read(const Scene& scene, const Path& path, std::string_view name,
+                           glm::dquat fallback);
+    static std::optional<glm::dquat> From(const Value& value);
+};
+
+template <> struct AttributeTraits<glm::dmat4> {
+    static constexpr AttributeKind kKind = AttributeKind::Matrix;
+    using Result = glm::dmat4;
+    using Arg = const glm::dmat4&;
+    /// A `dmat4`; `fallback` when unset or of another type.
+    static glm::dmat4 Read(const Scene& scene, const Path& path, std::string_view name,
+                           const glm::dmat4& fallback);
+    static std::optional<glm::dmat4> From(const Value& value);
 };
 
 template <> struct AttributeTraits<std::string> {
@@ -231,6 +259,19 @@ template <> struct AttributeTraits<Tensor> {
     }
 };
 
+/// An attribute declared as `T` that also takes an array written in place of its value: colours
+/// per vertex for one `displayColor`, a width per point. Declaring one so sets
+/// `AttributeMeta::array`; its view reads the value with `Get<Name>` as for `T`, and the array
+/// with `Read<Name>` (null when none is written) and `Write<Name>`.
+template <typename T> struct OrArray {
+    using Value = T;
+};
+
+template <typename T> inline constexpr bool kIsOrArray = false;
+template <typename T> inline constexpr bool kIsOrArray<OrArray<T>> = true;
+
+template <typename T> struct AttributeTraits<OrArray<T>> : AttributeTraits<T> {};
+
 /// One declared attribute of a prim type.
 class AttributeDef {
   public:
@@ -265,9 +306,18 @@ class AttributeDef {
     static AttributeDef Describe(std::string_view name, std::string_view member, AttributeKind kind,
                                  AttributeMeta meta);
 
+    friend const AttributeDef* FindXformOp(std::string_view attribute);
+
     Value (*read_)(const AttributeDef&, const Scene&, const Path&) = nullptr;
     std::optional<Value> (*from_)(const Value&) = nullptr;
 };
+
+/// The transform op `attribute` names ("xformOp:orient", "xformOp:translate:pivot") as a declared
+/// attribute, any prim's: `xformOp:translate` and the Euler rotations a `Vec3`, `xformOp:scale` a
+/// `Vec3` or one number, `rotateX` (Y, Z) a `Double` in degrees, `xformOp:orient` a `Quat` and
+/// `xformOp:transform` a `Matrix`, each also taking an array of them, a pose per prim
+/// (`AttributeMeta::array`); null for other names and ops Ernie does not know.
+const AttributeDef* FindXformOp(std::string_view attribute);
 
 /// A registered prim type: its name (`Scene::Define`'s type), its base, and the attributes it
 /// declares itself; abstract ones, such as "Light", are bases only.
@@ -299,17 +349,20 @@ struct PrimTypeDef {
 };
 
 /// Checks that `attribute` may be set on a prim of `type` (at `path`, for messages), and that
-/// `value`, when given, is of its declared type, as `Scene::Set` and `Scene::Write` do:
-/// - a declared attribute takes what its readers take (`AttributeDef::Coerce`; anything for
-///   tensors, whose readers also take small arrays, and for `AttributeMeta::lenient` ones);
+/// `value` is of its declared type, or, when null (`Scene::Write`), that it takes an array, as
+/// `Scene::Set` and `Scene::Write` do:
+/// - a declared attribute, or a transform op (`FindXformOp`), takes what its readers take
+///   (`AttributeDef::Coerce`; anything for `AttributeMeta::lenient` ones), and an array only when
+///   it is a tensor or `AttributeMeta::array` (a tensor also takes small arrays as values);
 /// - an undeclared one is an error when its name has no namespace (`radus`), or is in a
 ///   namespace the type declares attributes in and does not open (`inputs:radus` on a light,
 ///   `ernie:sensor:noize` on a camera), with the closest declared names suggested;
 /// - everything else is allowed: other namespaces (custom data such as `user:speed`), the type's
-///   open namespaces (`PrimTypeDef::openNamespaces`), `primvars:*`, xformOps and
-///   `xformOpOrder`, and UsdShade connections (`<input>.connect`).
+///   open namespaces (`PrimTypeDef::openNamespaces`), undeclared `primvars:*`, `xformOpOrder`
+///   and ops Ernie does not know, and UsdShade connections (`<input>.connect`).
+/// A null `type` (an untyped prim, or one of a type not registered) checks transform ops only.
 /// @throws std::invalid_argument naming the prim and the attribute.
-void Validate(const PrimTypeDef& type, const Path& path, std::string_view attribute,
+void Validate(const PrimTypeDef* type, const Path& path, std::string_view attribute,
               const Value* value);
 
 /// Every registered prim type, bases before the types derived from them.
@@ -376,7 +429,8 @@ class SchemaView {
 
 /// One attribute's accessors in a view class: `Get<Name>` (the fallback when unset), `Has<Name>`
 /// (whether it is authored), and `Set<Name>` and `Clear<Name>` (removing it, `Scene::Clear`),
-/// which return the view for chaining.
+/// which return the view for chaining; for an `OrArray` attribute, `Read<Name>` and
+/// `Write<Name>` too, its array.
 #define ERNIE_ATTRIBUTE_ACCESSORS(Type, Name, token, fallback, meta)                               \
     ::ernie::AttributeTraits<Type>::Result Get##Name() const {                                     \
         return ::ernie::AttributeTraits<Type>::Read(GetScene(), GetPath(), token, fallback);       \
@@ -390,6 +444,19 @@ class SchemaView {
     }                                                                                              \
     Self& Clear##Name() {                                                                          \
         Edit().Clear(GetPath(), token);                                                            \
+        return static_cast<Self&>(*this);                                                          \
+    }                                                                                              \
+    /** For an `OrArray` attribute: the array written in place of its value, or null. */          \
+    template <typename T = Type>                                                                   \
+        requires ::ernie::kIsOrArray<T>                                                            \
+    const ::ernie::Tensor* Read##Name() const {                                                    \
+        return GetScene().Read(GetPath(), token);                                                  \
+    }                                                                                              \
+    /** For an `OrArray` attribute: writes an array in place of its value (`Scene::Write`). */    \
+    template <typename T = Type>                                                                   \
+        requires ::ernie::kIsOrArray<T>                                                            \
+    Self& Write##Name(::ernie::Tensor array) {                                                     \
+        Edit().Write(GetPath(), token, std::move(array));                                          \
         return static_cast<Self&>(*this);                                                          \
     }
 
@@ -471,7 +538,9 @@ namespace ernie::detail {
 template <typename T>
 void WriteAttribute(Scene& scene, const Path& path, std::string_view name,
                     typename AttributeTraits<T>::Arg value) {
-    if constexpr (std::is_same_v<T, Tensor>) {
+    if constexpr (kIsOrArray<T>) {
+        WriteAttribute<typename T::Value>(scene, path, name, value);
+    } else if constexpr (std::is_same_v<T, Tensor>) {
         scene.Write(path, name, std::move(value));
     } else if constexpr (std::is_same_v<T, std::string>) {
         scene.Set(path, name, Value(std::string(value)));
@@ -487,7 +556,10 @@ void WriteAttribute(Scene& scene, const Path& path, std::string_view name,
 template <typename T, typename Fallback>
 AttributeDef MakeAttribute(std::string_view name, std::string_view member, const Fallback& fallback,
                            AttributeMeta meta) {
-    if constexpr (std::is_same_v<T, Tensor>) {
+    if constexpr (kIsOrArray<T>) {
+        meta.array = true;
+        return MakeAttribute<typename T::Value>(name, member, fallback, std::move(meta));
+    } else if constexpr (std::is_same_v<T, Tensor>) {
         return AttributeDef::MakeTensor(name, member, std::move(meta));
     } else {
         return AttributeDef::Make<T>(name, member, T(fallback), std::move(meta));

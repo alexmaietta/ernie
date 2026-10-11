@@ -168,10 +168,28 @@ TEST(GeometrySchemas, PointsWidthsAreOneForAllOrOnePerPoint) {
     // A single number, as written before widths were a list, reads as a list of one.
     scene.Set("/Cloud", tokens::kWidths, 0.25);
     EXPECT_EQ(cloud.GetWidths(), std::vector<float>{0.25f});
-    // Widths written as an array are readable by name; the declared value is the fallback then.
-    cloud.Write(tokens::kWidths, Tensor::Copy<float>(std::array<float, 3>{1, 2, 3}, {3}));
-    EXPECT_EQ(scene.Read("/Cloud", tokens::kWidths)->Elements(), 3);
+    // Widths written as an array (an OrArray attribute) read back through the view; the declared
+    // value is the fallback then.
+    EXPECT_EQ(cloud.ReadWidths(), nullptr);
+    cloud.WriteWidths(Tensor::Copy<float>(std::array<float, 3>{1, 2, 3}, {3}));
+    ASSERT_NE(cloud.ReadWidths(), nullptr);
+    EXPECT_EQ(cloud.ReadWidths()->Elements(), 3);
     EXPECT_EQ(cloud.GetWidths(), std::vector<float>{1.0f});
+    EXPECT_TRUE(ernie::Points::Definition().Find(tokens::kWidths)->meta.array);
+    EXPECT_FALSE(ernie::Points::Definition().Find(tokens::kMaterialBinding)->meta.array);
+}
+
+TEST(GeometrySchemas, DisplayColorsArePerPrimOrPerVertex) {
+    Scene scene;
+    ernie::Mesh mesh = ernie::Mesh::Define(scene, "/Mesh");
+    mesh.SetDisplayColor({1.0, 0.0, 0.0});
+    EXPECT_EQ(mesh.GetDisplayColor(), glm::dvec3(1.0, 0.0, 0.0));
+    EXPECT_EQ(mesh.ReadDisplayColor(), nullptr);
+    mesh.WriteDisplayColor(Tensor::Copy<float>(std::array<float, 6>{1, 0, 0, 0, 1, 0}, {2, 3}));
+    ASSERT_NE(mesh.ReadDisplayColor(), nullptr);
+    EXPECT_EQ(mesh.ReadDisplayColor()->Shape(), (std::vector<std::int64_t>{2, 3}));
+    EXPECT_EQ(ernie::Mesh::Definition().Find(tokens::kDisplayColor)->kind,
+              ernie::AttributeKind::Vec3);
 }
 
 TEST(GeometrySchemas, RegistryDescribesTheTypes) {

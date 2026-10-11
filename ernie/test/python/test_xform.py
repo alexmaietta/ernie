@@ -218,9 +218,10 @@ def test_op_edits_mark_the_transform_dirty():
 
 def test_bad_ops_raise_naming_the_problem():
     scene, prim = rock()
-    prim.set(tokens.ORIENT, (1.0, 0.0, 0.0, 0.0)).set(tokens.XFORM_OP_ORDER, [tokens.ORIENT])
-    with pytest.raises(ValueError, match="quaternion"):
-        scene.local_transform("/World/Rock")
+    # Known ops are checked as they are set: four numbers are not a quaternion (w first or last?).
+    with pytest.raises(ValueError, match="'xformOp:orient' must be a quaternion"):
+        prim.set(tokens.ORIENT, (1.0, 0.0, 0.0, 0.0))
+    # Unknown ops are refused as the transform is read.
     prim.set(tokens.XFORM_OP_ORDER, ["xformOp:shear"])
     with pytest.raises(ValueError, match="xformOp:shear"):
         scene.local_transform("/World/Rock")

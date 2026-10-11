@@ -32,14 +32,16 @@
                               .options = {::ernie::tokens::kXyzw, ::ernie::tokens::kWxyz}}))
 
 #define ERNIE_BOUNDABLE_ATTRIBUTES(X)                                                              \
-    X(std::vector<float>, Extent, ::ernie::tokens::kExtent, std::vector<float>{},                  \
+    X(::ernie::OrArray<std::vector<float>>, Extent, ::ernie::tokens::kExtent,                      \
+      std::vector<float>{},                                                                        \
       (::ernie::AttributeMeta{.doc = "The prim's local bounds as six numbers, (min x, y, z, max "  \
                                      "x, y, z); unset, computed from its geometry. A (2, 3) "      \
                                      "array written in its place is read too.",                    \
                               .group = "Geometry"}))
 
 #define ERNIE_GPRIM_ATTRIBUTES(X)                                                                  \
-    X(glm::dvec3, DisplayColor, ::ernie::tokens::kDisplayColor, glm::dvec3(0.5),                   \
+    X(::ernie::OrArray<glm::dvec3>, DisplayColor, ::ernie::tokens::kDisplayColor,                  \
+      glm::dvec3(0.5),                                                                             \
       (::ernie::AttributeMeta{.label = "Display colour",                                           \
                               .doc = "Linear RGB of the whole prim; colours per vertex are "       \
                                      "written as an array instead.",                               \

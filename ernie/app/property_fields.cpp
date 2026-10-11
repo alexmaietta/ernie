@@ -5,6 +5,7 @@
 #include "ernie/app/viewer.h"
 #include "ernie/scene/schema.h"
 
+#include <glm/gtc/quaternion.hpp>
 #include <imgui.h>
 
 #include <algorithm>
@@ -110,6 +111,16 @@ Value Shown(const Scene& scene, const Path& path, const PropertyField& field) {
     case Kind::Vec2:
     case Kind::Int2:
         return Vec2Of(*authored);
+    case Kind::Vec3:
+        return GetVec3(scene, path, field.attribute, Vec3Of(field.fallback));
+    case Kind::Vec4:
+        return authored->Get<glm::vec4>() != nullptr || authored->Get<glm::dvec4>() != nullptr
+                   ? Value(Vec4Of(*authored))
+                   : field.fallback;
+    case Kind::Quat:
+        return authored->Get<glm::dquat>() != nullptr ? *authored : field.fallback;
+    case Kind::Matrix:
+        return authored->Get<glm::dmat4>() != nullptr ? *authored : field.fallback;
     case Kind::Target:
         return TargetOf(*authored);
     case Kind::Curve:
@@ -206,6 +217,42 @@ bool CurveEditor(std::vector<float>& values, double min, double max, float heigh
     return changed;
 }
 
+/// "array (100, 3) float32", "array (100, 3) float32 on the GPU": what a field shows for an array.
+std::string ArrayText(const Tensor& array) {
+    std::string text = "array (";
+    for (std::size_t i = 0; i < array.Rank(); ++i) {
+        text += (i > 0 ? ", " : "") + std::to_string(array.Shape()[i]);
+    }
+    text += array.Rank() == 1 ? ",) " : ") ";
+    switch (array.Type()) {
+    case DType::UInt8:
+        text += "uint8";
+        break;
+    case DType::UInt16:
+        text += "uint16";
+        break;
+    case DType::UInt32:
+        text += "uint32";
+        break;
+    case DType::Int32:
+        text += "int32";
+        break;
+    case DType::Int64:
+        text += "int64";
+        break;
+    case DType::Float16:
+        text += "float16";
+        break;
+    case DType::Float32:
+        text += "float32";
+        break;
+    case DType::Float64:
+        text += "float64";
+        break;
+    }
+    return array.Location().kind == DeviceKind::Cpu ? text : text + " on the GPU";
+}
+
 /// The field's widget for `shown`; the new value when edited.
 std::optional<Value> Widget(Viewer& viewer, const PropertyField& field, const Value& shown) {
     using Kind = PropertyField::Kind;
@@ -283,10 +330,66 @@ std::optional<Value> Widget(Viewer& viewer, const PropertyField& field, const Va
         }
         break;
     }
+    case Kind::Vec3: {
+        glm::dvec3 value = Vec3Of(shown);
+        const double largest = std::max({std::abs(value.x), std::abs(value.y), std::abs(value.z)});
+        if (ImGui::DragScalarN("##v", ImGuiDataType_Double, &value[0], 3,
+                               static_cast<float>(std::max(largest, 1.0) / 200.0), nullptr,
+                               nullptr, "%.4g")) {
+            return value;
+        }
+        break;
+    }
+    case Kind::Vec4: {
+        glm::dvec4 value = Vec4Of(shown);
+        const double largest = std::max({std::abs(value.x), std::abs(value.y), std::abs(value.z),
+                                         std::abs(value.w)});
+        if (ImGui::DragScalarN("##v", ImGuiDataType_Double, &value[0], 4,
+                               static_cast<float>(std::max(largest, 1.0) / 200.0), nullptr,
+                               nullptr, "%.4g")) {
+            return value;
+        }
+        break;
+    }
     case Kind::Int2: {
         glm::ivec2 value(Vec2Of(shown));
         if (ImGui::DragInt2("##v", &value[0], 1.0f, 1, 16384)) {
             return value;
+        }
+        break;
+    }
+    case Kind::Quat: {
+        // As Euler angles, glm's convention both ways (glm::eulerAngles and the dquat of a vector
+        // of angles), so an edit round-trips.
+        const auto* q = shown.Get<glm::dquat>();
+        glm::dvec3 degrees =
+            glm::degrees(glm::eulerAngles(q != nullptr ? *q : glm::dquat(1, 0, 0, 0)));
+        if (ImGui::DragScalarN("##v", ImGuiDataType_Double, &degrees[0], 3, 0.5f, nullptr, nullptr,
+                               "%.2f°")) {
+            return glm::normalize(glm::dquat(glm::radians(degrees)));
+        }
+        break;
+    }
+    case Kind::Matrix: {
+        const auto* shownMatrix = shown.Get<glm::dmat4>();
+        glm::dmat4 matrix = shownMatrix != nullptr ? *shownMatrix : glm::dmat4(1.0);
+        bool changed = false;
+        for (int row = 0; row < 4; ++row) {
+            ImGui::PushID(row);
+            ImGui::SetNextItemWidth(-1.0f);
+            std::array<double, 4> values{matrix[0][row], matrix[1][row], matrix[2][row],
+                                         matrix[3][row]};
+            if (ImGui::DragScalarN("##row", ImGuiDataType_Double, values.data(), 4, 0.01f,
+                                   nullptr, nullptr, "%.4g")) {
+                for (int column = 0; column < 4; ++column) {
+                    matrix[column][row] = values[static_cast<std::size_t>(column)];
+                }
+                changed = true;
+            }
+            ImGui::PopID();
+        }
+        if (changed) {
+            return matrix;
         }
         break;
     }
@@ -402,7 +505,13 @@ std::string DrawPropertyFields(Viewer& viewer, const Path& path,
             continue;
         }
         ImGui::PushID(field.attribute.c_str());
-        const bool authored = scene.Get(path, field.attribute) != nullptr;
+        // An array written in place of the value (per-vertex colours) is shown, not edited, so
+        // an edit cannot replace it unseen; a curve edits a flat one itself.
+        const Tensor* array = scene.Get(path, field.attribute) == nullptr &&
+                                      field.kind != PropertyField::Kind::Curve
+                                  ? scene.Read(path, field.attribute)
+                                  : nullptr;
+        const bool authored = scene.Get(path, field.attribute) != nullptr || array != nullptr;
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
         ImGui::AlignTextToFramePadding();
@@ -427,7 +536,15 @@ std::string DrawPropertyFields(Viewer& viewer, const Path& path,
         }
         ImGui::TableSetColumnIndex(1);
         ImGui::SetNextItemWidth(-1.0f);
-        if (const std::optional<Value> edited = Widget(viewer, field, Shown(scene, path, field))) {
+        if (array != nullptr) {
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("%s", ArrayText(*array).c_str());
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Written as an array, one value per element; reset it to edit "
+                                  "one value for all");
+            }
+        } else if (const std::optional<Value> edited =
+                       Widget(viewer, field, Shown(scene, path, field))) {
             try {
                 if (edited->Empty()) {
                     viewer.ClearAttribute(path, field.attribute);

@@ -337,9 +337,7 @@ std::vector<Path> Scene::Prims(std::string_view type) const {
 
 void Scene::Set(const Path& path, std::string_view attribute, Value value) {
     PrimData& prim = Find(path);
-    if (prim.schema != nullptr) {
-        Validate(*prim.schema, path, attribute, &value);
-    }
+    Validate(prim.schema, path, attribute, &value);
     ++version_;
     if (const auto tensor = prim.tensors.find(attribute); tensor != prim.tensors.end()) {
         prim.tensors.erase(tensor);
@@ -372,8 +370,8 @@ void Scene::Write(const Path& path, std::string_view attribute, Tensor tensor,
 void Scene::WriteTensor(const Path& path, PrimData& prim, std::string_view attribute, Tensor tensor,
                         std::uintptr_t stream, std::optional<std::pair<Tensor, std::int64_t>> row,
                         bool checked) {
-    if (prim.schema != nullptr && !checked) {
-        Validate(*prim.schema, path, attribute, nullptr);
+    if (!checked) {
+        Validate(prim.schema, path, attribute, nullptr);
     }
     // Found before inserted, so rewriting an attribute every step allocates no keys.
     if (const auto it = prim.streams.find(attribute); it != prim.streams.end()) {
@@ -471,9 +469,8 @@ void Scene::Write(const PrimSet& prims, std::string_view attribute, const Tensor
     std::vector<const PrimTypeDef*> checked;
     for (std::size_t i = 0; i < prims.Size(); ++i) {
         const PrimTypeDef* schema = static_cast<PrimData*>(prims.prims_[i])->schema;
-        if (schema != nullptr &&
-            std::find(checked.begin(), checked.end(), schema) == checked.end()) {
-            Validate(*schema, prims.Paths()[i], attribute, nullptr);
+        if (std::find(checked.begin(), checked.end(), schema) == checked.end()) {
+            Validate(schema, prims.Paths()[i], attribute, nullptr);
             checked.push_back(schema);
         }
     }

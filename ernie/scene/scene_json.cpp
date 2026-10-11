@@ -207,6 +207,63 @@ bool IsTensorArray(const Json& json) {
     return !matrix;
 }
 
+/// How deeply `json` nests arrays, following first elements: 0 for a number, 1 for [1, 2].
+std::size_t DepthOf(const Json& json) {
+    std::size_t depth = 0;
+    for (const Json* item = &json; item->is_array() && !item->empty(); item = &item->front()) {
+        ++depth;
+    }
+    return depth + (json.is_array() && json.empty() ? 1 : 0);
+}
+
+/// How deeply one value of `def`'s kind nests: a matrix two levels, a vector or float array one, a
+/// number none.
+std::size_t ValueDepth(const AttributeDef& def) {
+    if (def.kind == AttributeKind::Matrix) {
+        return 2;
+    }
+    if (def.kind == AttributeKind::Bool || def.kind == AttributeKind::Int ||
+        def.kind == AttributeKind::Double) {
+        return 0;
+    }
+    return 1;
+}
+
+/// Whether `json` is an array of `def`'s values written in place of one value
+/// (`AttributeMeta::array`): nested deeper than one value of its kind.
+bool IsArrayOf(const AttributeDef& def, const Json& json) {
+    return def.meta.array && DepthOf(json) > ValueDepth(def);
+}
+
+/// Whether `json` refers to one of the arrays given with the text: `{"$array": index}`. No child
+/// is named so: prim names cannot start with "$".
+bool IsArrayRef(const Json& json) {
+    return json.is_object() && json.size() == 1 && json.contains("$array");
+}
+
+Json TensorJson(const Tensor& tensor);
+
+/// `json` as a value of `def`'s kind, before `AttributeDef::Coerce`: 4 numbers a `dvec4` or a
+/// quaternion as [w, x, y, z] by its kind (`ValueOf` makes them a float `vec4`), 4 rows a matrix.
+Value DeclaredValueOf(const AttributeDef& def, const Json& json) {
+    if (def.kind == AttributeKind::Vec4 && IsNumbers(json, 4)) {
+        return glm::dvec4(json[0].get<double>(), json[1].get<double>(), json[2].get<double>(),
+                          json[3].get<double>());
+    }
+    if (def.kind == AttributeKind::Quat) {
+        if (!IsNumbers(json, 4)) {
+            throw std::invalid_argument("'" + std::string(def.name) +
+                                        "' takes a quaternion as 4 numbers, [w, x, y, z]");
+        }
+        return glm::dquat(json[0].get<double>(), json[1].get<double>(), json[2].get<double>(),
+                          json[3].get<double>());
+    }
+    if (def.kind == AttributeKind::Matrix) {
+        return MatrixOf(json);
+    }
+    return ValueOf(json);
+}
+
 /// Three numbers as a vector.
 glm::dvec3 Vec3Of(const Json& json, std::string_view what) {
     if (!json.is_array() || json.size() != 3 || !json[0].is_number() || !json[1].is_number() ||
@@ -230,9 +287,44 @@ RotationOrder RotationOrderOf(const Json& json) {
     throw std::invalid_argument(R"(rotation_order is "XYZ", "XZY", "YXZ", "YZX", "ZXY" or "ZYX")");
 }
 
-/// Sets one key of a prim: a transform part into `xform`, or an attribute.
+/// Sets one key of a prim: a transform part into `xform`, or an attribute. `array`, when given,
+/// is the value in place of `given` (`{"$array": i}`): written as it is where an array goes (a
+/// tensor attribute, an `AttributeMeta::array` one's array of values, an undeclared one's nested
+/// arrays), else read as the numbers it holds.
 void SetKey(Scene& scene, const Path& path, const PrimTypeDef* type, const std::string& key,
-            const Json& json, XformOps& xform, bool& hasXform) {
+            const Json& given, const Tensor* array, XformOps& xform, bool& hasXform) {
+    const bool transformKey = key == "translate" || key == "rotate" || key == "rotation_order" ||
+                              key == "orient" || key == "scale" || key == "transform";
+    const AttributeDef* def = nullptr;
+    std::string_view name = key;
+    if (!transformKey) {
+        if (type != nullptr) {
+            def = type->FindByPyName(key);
+            def = def != nullptr ? def : type->Find(key);
+        }
+        name = def != nullptr ? def->name : std::string_view(key);
+        // A transform op ("xformOp:orient:pivot") is declared by its op (`FindXformOp`).
+        def = def != nullptr ? def : FindXformOp(name);
+    }
+    Json numbers;
+    if (array != nullptr) {
+        const std::size_t rank = array->Rank();
+        bool whole = false;
+        if (!transformKey && def == nullptr) {
+            whole = rank >= 2 && array->Shape() != std::vector<std::int64_t>{4, 4};
+        } else if (!transformKey) {
+            whole = def->kind == AttributeKind::Tensor || (def->meta.array && rank > ValueDepth(*def));
+        }
+        if (whole) {
+            scene.Write(path, name, *array);  // Shared, not copied, as Scene::Write keeps it.
+            return;
+        }
+        numbers = TensorJson(*array);
+        if (rank == 0) {
+            numbers = Json(numbers[0]);
+        }
+    }
+    const Json& json = array != nullptr ? numbers : given;
     if (key == "translate") {
         xform.translate = Vec3Of(json, key);
     } else if (key == "rotate") {
@@ -251,23 +343,20 @@ void SetKey(Scene& scene, const Path& path, const PrimTypeDef* type, const std::
         scene.Set(path, tokens::kTransform, Value(MatrixOf(json)));
         return;
     } else {
-        const AttributeDef* def = nullptr;
-        if (type != nullptr) {
-            def = type->FindByPyName(key);
-            def = def != nullptr ? def : type->Find(key);
-        }
-        const std::string_view name = def != nullptr ? def->name : std::string_view(key);
-        if (def != nullptr && def->kind == AttributeKind::Tensor) {
+        if (def == nullptr) {
+            // Undeclared: as the JSON reads, nested arrays other than 4 x 4 a float32 tensor.
+            if (IsTensorArray(json)) {
+                scene.Write(path, name, TensorOf(json, false));
+            } else {
+                scene.Set(path, name, ValueOf(json));
+            }
+        } else if (def->kind == AttributeKind::Tensor) {
             scene.Write(path, name, TensorOf(json, def->meta.integer));
-        } else if (IsTensorArray(json)) {
-            // Per-element data for a value attribute too, such as per-vertex displayColor.
+        } else if (IsArrayOf(*def, json)) {
+            // Values per element written in place of one (per-vertex displayColor).
             scene.Write(path, name, TensorOf(json, false));
-        } else if (def != nullptr) {
-            // A declared 4-vector keeps double precision (ValueOf makes 4 numbers a float vec4).
-            Value value = def->kind == AttributeKind::Vec4 && IsNumbers(json, 4)
-                              ? Value(glm::dvec4(json[0].get<double>(), json[1].get<double>(),
-                                                 json[2].get<double>(), json[3].get<double>()))
-                              : ValueOf(json);
+        } else {
+            Value value = DeclaredValueOf(*def, json);
             try {
                 value = def->Coerce(value);
             } catch (const std::invalid_argument&) {
@@ -277,14 +366,6 @@ void SetKey(Scene& scene, const Path& path, const PrimTypeDef* type, const std::
                 }
             }
             scene.Set(path, name, std::move(value));
-        } else if ((name == tokens::kOrient ||
-                    name.starts_with(std::string(tokens::kOrient) + ":")) &&
-                   IsNumbers(json, 4)) {
-            scene.Set(path, name,
-                      glm::dquat(json[0].get<double>(), json[1].get<double>(),
-                                 json[2].get<double>(), json[3].get<double>()));
-        } else {
-            scene.Set(path, name, ValueOf(json));
         }
         return;
     }
@@ -298,8 +379,9 @@ void SetKey(Scene& scene, const Path& path, const PrimTypeDef* type, const std::
                                 std::string(message));
 }
 
-/// Defines (or finds) the prim at `path` as `body` describes it, then its children.
-void LoadPrim(Scene& scene, const Path& path, const Json& body) {
+/// Defines (or finds) the prim at `path` as `body` describes it, then its children; `arrays` are
+/// what `{"$array": i}` values refer to.
+void LoadPrim(Scene& scene, const Path& path, const Json& body, std::span<const Tensor> arrays) {
     const auto fail = [&](std::string_view key, std::string_view message) {
         Fail(path, key, message);
     };
@@ -322,11 +404,20 @@ void LoadPrim(Scene& scene, const Path& path, const Json& body) {
     XformOps xform;
     bool hasXform = false;
     for (const auto& [key, value] : body.items()) {
-        if (key == "type" || value.is_object()) {
+        if (key == "type" || (value.is_object() && !IsArrayRef(value))) {
             continue;
         }
+        const Tensor* array = nullptr;
+        if (IsArrayRef(value)) {
+            const Json& index = value["$array"];
+            if (!index.is_number_unsigned() || index.get<std::size_t>() >= arrays.size()) {
+                fail(key, "\"$array\" is the index of one of the " +
+                              std::to_string(arrays.size()) + " arrays given with the JSON");
+            }
+            array = &arrays[index.get<std::size_t>()];
+        }
         try {
-            SetKey(scene, path, type, key, value, xform, hasXform);
+            SetKey(scene, path, type, key, value, array, xform, hasXform);
         } catch (const std::exception& error) {
             fail(key, error.what());
         }
@@ -339,21 +430,21 @@ void LoadPrim(Scene& scene, const Path& path, const Json& body) {
         }
     }
     for (const auto& [key, value] : body.items()) {
-        if (value.is_object()) {
+        if (value.is_object() && !IsArrayRef(value)) {
             Path child;
             try {
                 child = Path(path.String() + "/" + key);
             } catch (const std::exception& error) {
                 fail(key, error.what());
             }
-            LoadPrim(scene, child, value);
+            LoadPrim(scene, child, value, arrays);
         }
     }
 }
 
 }  // namespace
 
-void LoadScene(Scene& scene, std::string_view json) {
+void LoadScene(Scene& scene, std::string_view json, std::span<const Tensor> arrays) {
     Json description;
     try {
         description = Json::parse(json);
@@ -372,7 +463,7 @@ void LoadScene(Scene& scene, std::string_view json) {
         } catch (const std::exception& error) {
             throw std::invalid_argument("Scene JSON, \"" + key + "\": " + error.what());
         }
-        LoadPrim(scene, path, body);
+        LoadPrim(scene, path, body, arrays);
     }
 }
 

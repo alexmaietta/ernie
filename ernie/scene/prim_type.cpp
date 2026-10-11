@@ -126,6 +126,32 @@ std::optional<glm::dvec4> AttributeTraits<glm::dvec4>::From(const Value& value) 
     return std::nullopt;
 }
 
+glm::dquat AttributeTraits<glm::dquat>::Read(const Scene& scene, const Path& path,
+                                             std::string_view name, glm::dquat fallback) {
+    const Value* value = scene.Get(path, name);
+    return value != nullptr ? From(*value).value_or(fallback) : fallback;
+}
+
+std::optional<glm::dquat> AttributeTraits<glm::dquat>::From(const Value& value) {
+    if (const auto* q = value.Get<glm::dquat>()) {
+        return *q;
+    }
+    return std::nullopt;
+}
+
+glm::dmat4 AttributeTraits<glm::dmat4>::Read(const Scene& scene, const Path& path,
+                                             std::string_view name, const glm::dmat4& fallback) {
+    const Value* value = scene.Get(path, name);
+    return value != nullptr ? From(*value).value_or(fallback) : fallback;
+}
+
+std::optional<glm::dmat4> AttributeTraits<glm::dmat4>::From(const Value& value) {
+    if (const auto* m = value.Get<glm::dmat4>()) {
+        return *m;
+    }
+    return std::nullopt;
+}
+
 std::optional<std::string> AttributeTraits<std::string>::From(const Value& value) {
     if (const auto* s = value.Get<std::string>()) {
         return *s;
@@ -258,7 +284,7 @@ Value AttributeDef::Coerce(const Value& value) const {
             return std::move(*converted);
         }
     }
-    static constexpr std::array<std::string_view, 11> kKinds{"a bool",
+    static constexpr std::array<std::string_view, 13> kKinds{"a bool",
                                                              "an int",
                                                              "a number",
                                                              "a 2-vector",
@@ -268,7 +294,9 @@ Value AttributeDef::Coerce(const Value& value) const {
                                                              "a prim path",
                                                              "a prim path or a list of them",
                                                              "a float array",
-                                                             "an array (write it)"};
+                                                             "an array (write it)",
+                                                             "a quaternion",
+                                                             "a 4 x 4 matrix"};
     throw std::invalid_argument("'" + std::string(name) + "' must be " +
                                 std::string(kKinds[static_cast<std::size_t>(kind)]));
 }
@@ -339,8 +367,8 @@ std::string Suggestion(const PrimTypeDef& type, std::string_view name) {
     return text + "?";
 }
 
-/// Attributes any prim may carry, whatever its type: primvars, transform ops and their order,
-/// and UsdShade connections.
+/// Attributes any prim may carry, whatever its type: undeclared primvars, transform ops Ernie does
+/// not know and their order, and UsdShade connections.
 bool AlwaysAllowed(std::string_view attribute) {
     return attribute.starts_with("xformOp") || attribute.starts_with("primvars:") ||
            attribute.ends_with(".connect");
@@ -387,39 +415,123 @@ const TypeIndex* IndexOf(const PrimTypeDef& type) {
     return it != indices.end() ? &it->second : nullptr;
 }
 
+/// Checks `value`, or an array written in its place when null, against the declared `def` of a
+/// prim of `type` (null: untyped).
+void CheckValue(const AttributeDef& def, const PrimTypeDef* type, const Path& path,
+                const Value* value) {
+    if (def.meta.lenient) {
+        return;
+    }
+    const auto fail = [&](std::string_view message) {
+        throw std::invalid_argument(
+            "'" + path.String() + "'" +
+            (type != nullptr ? " (" + std::string(type->name) + ")" : std::string()) + ": " +
+            std::string(message));
+    };
+    if (value == nullptr) {
+        if (def.kind != AttributeKind::Tensor && !def.meta.array) {
+            fail("'" + std::string(def.name) + "' takes one value, not an array; set it");
+        }
+        return;
+    }
+    if (def.kind == AttributeKind::Tensor) {
+        return;
+    }
+    // Numbers of any type, as `GetNumber` reads them (an int attribute's reader rounds, or
+    // checks, them itself), and ints for bools, as `GetBool` reads them.
+    const bool number = value->Is<double>() || value->Is<float>() || value->Is<int>();
+    if (((def.kind == AttributeKind::Int || def.kind == AttributeKind::Double) && number) ||
+        (def.kind == AttributeKind::Bool && (value->Is<bool>() || value->Is<int>()))) {
+        return;
+    }
+    try {
+        def.Coerce(*value);
+    } catch (const std::invalid_argument& error) {
+        fail(error.what());
+    }
+}
+
 }  // namespace
 
-void Validate(const PrimTypeDef& type, const Path& path, std::string_view attribute,
+const AttributeDef* FindXformOp(std::string_view attribute) {
+    constexpr std::string_view kPrefix = "xformOp:";
+    if (!attribute.starts_with(kPrefix)) {
+        return nullptr;
+    }
+    std::string_view op = attribute.substr(kPrefix.size());
+    op = op.substr(0, op.find(':'));
+    static const std::vector<AttributeDef> kOps = [] {
+        const auto make = [](std::string_view name, std::string_view member, const auto& fallback,
+                             std::string_view doc) {
+            return AttributeDef::Make(name, member, fallback,
+                                      AttributeMeta{.doc = doc, .group = "Transform", .array = true});
+        };
+        std::vector<AttributeDef> ops;
+        ops.push_back(make(tokens::kTranslate, "Translate", glm::dvec3(0.0), "Metres."));
+        AttributeDef scale =
+            make(tokens::kScale, "Scale", glm::dvec3(1.0), "Factors along x, y and z, or one.");
+        scale.from_ = [](const Value& value) -> std::optional<Value> {
+            if (const std::optional<glm::dvec3> factors = AttributeTraits<glm::dvec3>::From(value)) {
+                return Value(*factors);
+            }
+            if (const std::optional<double> factor = NumberOf(value)) {
+                return Value(glm::dvec3(*factor));
+            }
+            return std::nullopt;
+        };
+        ops.push_back(std::move(scale));
+        for (const auto& [name, member] :
+             {std::pair{tokens::kRotateX, "RotateX"}, std::pair{tokens::kRotateY, "RotateY"},
+              std::pair{tokens::kRotateZ, "RotateZ"}}) {
+            ops.push_back(make(name, member, 0.0, "Degrees."));
+        }
+        for (const auto& [name, member] :
+             {std::pair{tokens::kRotateXYZ, "RotateXYZ"}, std::pair{tokens::kRotateXZY, "RotateXZY"},
+              std::pair{tokens::kRotateYXZ, "RotateYXZ"}, std::pair{tokens::kRotateYZX, "RotateYZX"},
+              std::pair{tokens::kRotateZXY, "RotateZXY"},
+              std::pair{tokens::kRotateZYX, "RotateZYX"}}) {
+            ops.push_back(make(name, member, glm::dvec3(0.0), "Euler angles in degrees."));
+        }
+        ops.push_back(make(tokens::kOrient, "Orient", glm::dquat(1.0, 0.0, 0.0, 0.0),
+                           "A rotation as a quaternion."));
+        ops.push_back(make(tokens::kTransform, "Transform", glm::dmat4(1.0),
+                           "A matrix, column vectors with the translation in the last column."));
+        return ops;
+    }();
+    for (const AttributeDef& def : kOps) {
+        if (def.name.substr(kPrefix.size()) == op) {
+            return &def;
+        }
+    }
+    return nullptr;
+}
+
+void Validate(const PrimTypeDef* type, const Path& path, std::string_view attribute,
               const Value* value) {
+    if (type == nullptr) {
+        if (const AttributeDef* op = FindXformOp(attribute)) {
+            CheckValue(*op, nullptr, path, value);
+        }
+        return;
+    }
+    if (const AttributeDef* def = type->Find(attribute)) {
+        CheckValue(*def, type, path, value);
+        return;
+    }
+    if (const AttributeDef* op = FindXformOp(attribute)) {
+        CheckValue(*op, type, path, value);
+        return;
+    }
     if (AlwaysAllowed(attribute)) {
         return;
     }
-    if (const AttributeDef* def = type.Find(attribute)) {
-        if (value == nullptr || def->kind == AttributeKind::Tensor || def->meta.lenient) {
-            return;
-        }
-        // Numbers of any type, as `GetNumber` reads them (an int attribute's reader rounds, or
-        // checks, them itself), and ints for bools, as `GetBool` reads them.
-        const bool number = value->Is<double>() || value->Is<float>() || value->Is<int>();
-        if (((def->kind == AttributeKind::Int || def->kind == AttributeKind::Double) && number) ||
-            (def->kind == AttributeKind::Bool && (value->Is<bool>() || value->Is<int>()))) {
-            return;
-        }
-        try {
-            def->Coerce(*value);
-        } catch (const std::invalid_argument& error) {
-            throw std::invalid_argument("'" + path.String() + "' (" + std::string(type.name) +
-                                        "): " + error.what());
-        }
-        return;
-    }
-    const TypeIndex* index = IndexOf(type);
-    if (index != nullptr ? index->openAll : type.IsOpen("*")) {
+    const TypeIndex* index = IndexOf(*type);
+    if (index != nullptr ? index->openAll : type->IsOpen("*")) {
         return;
     }
     const std::string_view space = NamespaceOf(attribute);
     if (!space.empty()) {
-        if (type.IsOpen(space)) {
+        if (type->IsOpen(space)) {
             return;
         }
         // Custom data in a namespace of its own is the author's; a typo in one of the type's
@@ -428,7 +540,7 @@ void Validate(const PrimTypeDef& type, const Path& path, std::string_view attrib
         if (index != nullptr) {
             declared = index->spaces.contains(space);
         } else {
-            for (const AttributeDef* def : type.AllAttributes()) {
+            for (const AttributeDef* def : type->AllAttributes()) {
                 declared = declared || NamespaceOf(def->name) == space;
             }
         }
@@ -436,9 +548,9 @@ void Validate(const PrimTypeDef& type, const Path& path, std::string_view attrib
             return;
         }
     }
-    throw std::invalid_argument("'" + path.String() + "' is a " + std::string(type.name) +
+    throw std::invalid_argument("'" + path.String() + "' is a " + std::string(type->name) +
                                 ", which has no attribute '" + std::string(attribute) + "'" +
-                                Suggestion(type, attribute));
+                                Suggestion(*type, attribute));
 }
 
 const AttributeDef* PrimTypeDef::Find(std::string_view attribute) const {

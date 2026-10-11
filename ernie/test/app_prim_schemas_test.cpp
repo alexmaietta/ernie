@@ -159,8 +159,10 @@ TEST(PrimSchemasTest, RenderPanelsEditTheCameraAsOneTarget) {
         EXPECT_EQ(FieldOf(sections, tokens::kProducts), nullptr);
         EXPECT_EQ(FieldOf(sections, tokens::kOrderedVars), nullptr);
     }
-    // A 4-vector that is not a colour has no field.
-    EXPECT_EQ(FieldOf(SchemaOf(scene, "/Tex", brdfs, filters), tokens::kShaderBias), nullptr);
+    // A 4-vector that is not a colour is edited as four numbers.
+    const PropertyField* bias = FieldOf(SchemaOf(scene, "/Tex", brdfs, filters), tokens::kShaderBias);
+    ASSERT_NE(bias, nullptr);
+    EXPECT_EQ(bias->kind, PropertyField::Kind::Vec4);
 }
 
 }  // namespace

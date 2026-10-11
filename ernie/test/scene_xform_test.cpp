@@ -459,8 +459,9 @@ TEST(Xform, BadOpsNameThePrimAndOp) {
     const Path rock("/World/Rock");
     const auto message = [&](auto author) {
         Scene scene = OnePrim();
-        author(scene);
         try {
+            // Known ops' values are checked as they are set (`FindXformOp`), the rest as read.
+            author(scene);
             scene.LocalTransform(rock);
         } catch (const std::invalid_argument& error) {
             return std::string(error.what());
@@ -493,7 +494,8 @@ TEST(Xform, BadOpsNameThePrimAndOp) {
         scene.Set(rock, tokens::kTranslate, 1.0);
         scene.Set(rock, tokens::kXformOpOrder, Order({tokens::kTranslate}));
     });
-    EXPECT_NE(arity.find("three numbers"), std::string::npos) << arity;
+    EXPECT_NE(arity.find("3-vector"), std::string::npos) << arity;
+    EXPECT_NE(arity.find("/World/Rock"), std::string::npos) << arity;
 
     const std::string order =
         message([&](Scene& scene) { scene.Set(rock, tokens::kXformOpOrder, tokens::kTranslate); });

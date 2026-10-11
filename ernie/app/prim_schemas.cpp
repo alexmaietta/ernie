@@ -56,14 +56,16 @@ std::optional<PropertyField> FieldOf(const AttributeDef& def) {
         kind = Kind::Vec2;
         break;
     case AttributeKind::Vec3:
-        if (def.meta.color) {
-            kind = Kind::Color;
-        }
+        kind = def.meta.color ? Kind::Color : Kind::Vec3;
         break;
     case AttributeKind::Vec4:
-        if (def.meta.color) {
-            kind = Kind::Color4;
-        }
+        kind = def.meta.color ? Kind::Color4 : Kind::Vec4;
+        break;
+    case AttributeKind::Quat:
+        kind = Kind::Quat;
+        break;
+    case AttributeKind::Matrix:
+        kind = Kind::Matrix;
         break;
     case AttributeKind::Token:
         kind = def.meta.options.empty() ? Kind::Text : Kind::Token;

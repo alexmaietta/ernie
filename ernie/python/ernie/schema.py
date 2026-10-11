@@ -51,6 +51,8 @@ from ._ernie import (
     PrimType,
     Quat,
     Scene,
+    _load_scene_file,
+    _load_scene_text,
     find_prim_type,
     prim_types,
     tokens,
@@ -72,6 +74,15 @@ _prim_define = Prim.define
 def _closest(name: str, names) -> str:
     matches = difflib.get_close_matches(name, list(names), n=3)
     return f"; did you mean {', '.join(repr(m) for m in matches)}?" if matches else ""
+
+
+def _write(definition: AttributeDef, prim: Prim, value: Any) -> None:
+    """Sets ``definition`` on ``prim``: a prim given for a target as its path, and nested lists
+    for one that takes an array in place of its value (per-vertex colours) as a float32 array."""
+    if (definition.takes_array and isinstance(value, (list, tuple)) and value
+            and isinstance(value[0], (list, tuple))):
+        value = np.asarray(value, dtype=np.float32)
+    definition.write(prim, _target(value))
 
 
 def _target(value: Any) -> Any:
@@ -125,7 +136,7 @@ class _Attribute:
         return self.definition.read(instance.prim)
 
     def __set__(self, instance: Schema, value: Any) -> None:
-        self.definition.write(instance.prim, _target(value))
+        _write(self.definition, instance.prim, value)
 
 
 class _FirstTarget(_Attribute):
@@ -248,7 +259,7 @@ class Schema:
                     f"{type(self).__name__} has no attribute {name!r}"
                     + _closest(name, [*self._attributes, *_XFORM_KEYS])
                 )
-            definition.write(self.prim, _target(value))
+            _write(definition, self.prim, value)
         if xform:
             self.prim.set_xform(**xform)
         return self
@@ -359,95 +370,48 @@ def load_scene(description: Any, scene: Scene | None = None) -> Scene:
             "/Render/Settings": {"type": "RenderSettings", "resolution": [640, 480]},
         })
 
-    Values are checked as setting them is; lists for array attributes become arrays: int32 for
-    those of whole numbers (``face_vertex_indices``, ``proto_indices``; ``AttributeDef.is_integer``),
-    float32 for the rest (``points``, ``heights``), whatever the numbers look like."""
+    C++ loads it (``LoadScene``), so both read a description the same way: each value is read as
+    its attribute's declared kind, checked as setting it is. Lists for array attributes become
+    arrays: int32 for those of whole numbers (``face_vertex_indices``, ``proto_indices``;
+    ``AttributeDef.is_integer``), float32 for the rest (``points``, ``heights``), whatever the
+    numbers look like; nested lists for one that takes an array in place of its value
+    (``AttributeDef.takes_array``: per-vertex ``display_color``) are a float32 array. A dict may
+    hold ``Quat``s, ``Path``s and prims too, and arrays (NumPy, or any DLPack array, a CUDA one
+    included): where an array goes, written as it is, shared and not copied, its dtype kept, as
+    ``Scene.write`` writes one; elsewhere (``translate``, a ``radius``) read as the numbers it
+    holds, which needs a CPU array.
+
+    Raises:
+        ValueError: A value its attribute does not take, or JSON that does not parse, naming
+            the prim and key (or the line and column).
+        TypeError: The description is not a dict, JSON text or a file path."""
+    scene = scene if scene is not None else Scene()
     if isinstance(description, (str, os.PathLike)):
         text = str(description)
         if text.lstrip().startswith("{"):
-            description = json.loads(text)
+            _load_scene_text(scene, text)
         else:
-            with open(description) as file:
-                description = json.load(file)
+            _load_scene_file(scene, description)
+        return scene
     if not isinstance(description, dict):
         raise TypeError(f"A scene description is a dict of prim paths, not {type(description).__name__}")
-    scene = scene if scene is not None else Scene()
-    for key, body in description.items():
-        _load_prim(scene, key if key.startswith("/") else "/" + key, body)
+    # Arrays go to C++ beside the text, not through it: {"$array": i} stands for arrays[i].
+    arrays: list[Any] = []
+
+    def json_value(value: Any) -> Any:
+        if isinstance(value, Quat):
+            return [value.w, value.x, value.y, value.z]
+        if isinstance(value, (Path, Prim, Schema)):
+            return str(value.path if isinstance(value, (Prim, Schema)) else value)
+        if isinstance(value, np.generic):
+            return value.item()
+        if isinstance(value, np.ndarray) or hasattr(value, "__dlpack__"):
+            arrays.append(value)
+            return {"$array": len(arrays) - 1}
+        raise TypeError(f"A scene description has no value of type {type(value).__name__}")
+
+    _load_scene_text(scene, json.dumps(description, default=json_value), arrays)
     return scene
-
-
-def _load_prim(scene: Scene, path: str, body: Any) -> None:
-    if not isinstance(body, dict):
-        raise TypeError(f"'{path}' must be described by a dict of attributes and children")
-    type_name = body.get("type")
-    existing = scene.get_prim(path)
-    if type_name is not None or existing is None:
-        prim = _scene_define(scene, path, type_name or "")
-    else:
-        prim = existing
-    cls = classes.get(prim.type)
-    attributes = {k: v for k, v in body.items() if k != "type" and not isinstance(v, dict)}
-    transform = attributes.pop("transform", None)
-    xform = {key: attributes.pop(key) for key in _XFORM_KEYS if key in attributes}
-    if isinstance(xform.get("orient"), (list, tuple)):
-        xform["orient"] = Quat(*xform["orient"])  # [w, x, y, z], as JSON writes one
-    keywords = {}
-    for name, value in attributes.items():
-        definition = cls._attributes.get(name) if cls is not None else None
-        if definition is None and cls is not None:
-            definition = next((d for d in cls._attributes.values() if d.name == name), None)
-        if definition is None:
-            # As the C++ loader reads what SaveScene writes: an orient op's [w, x, y, z] as a
-            # quaternion, and nested arrays other than 4 x 4 (per-vertex colours) as an array.
-            if name.split(":")[:2] == ["xformOp", "orient"] and _numbers(value, 4):
-                prim.set(name, Quat(*value))
-            elif _nested(value):
-                prim.write(name, np.asarray(value, dtype=np.float32))
-            else:
-                prim.set(name, _target(value))
-            continue
-        if definition.kind == AttributeKind.TENSOR:
-            value = _array(value, definition.is_integer)
-        elif _nested(value):  # a value per element (per-vertex display colours) as an array
-            prim.write(definition.name, np.asarray(value, dtype=np.float32))
-            continue
-        keywords[definition.py_name] = value
-    if cls is not None:
-        cls(prim).set(**keywords)
-    if xform:
-        prim.set_xform(**xform)
-    if transform is not None:
-        prim.set(tokens.TRANSFORM, transform)
-    for name, child in body.items():
-        if isinstance(child, dict):
-            _load_prim(scene, f"{path.rstrip('/')}/{name}", child)
-
-
-def _numbers(value: Any, count: int) -> bool:
-    """Whether ``value`` is a list of ``count`` numbers."""
-    return (isinstance(value, (list, tuple)) and len(value) == count
-            and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in value))
-
-
-def _nested(value: Any) -> bool:
-    """Whether ``value`` is a list of lists other than a 4 x 4 matrix."""
-    if not isinstance(value, (list, tuple)) or not value:
-        return False
-    if not all(isinstance(row, (list, tuple)) for row in value):
-        return False
-    return not (len(value) == 4 and all(_numbers(row, 4) for row in value))
-
-
-def _array(value: Any, integer: bool) -> Any:
-    """A list from a description as an array: int32 for an attribute of whole numbers (indices,
-    counts), float32 for any other, whatever the numbers look like."""
-    if not isinstance(value, (list, tuple)):
-        return value
-    array = np.asarray(value)
-    if integer and not np.issubdtype(array.dtype, np.integer):
-        raise ValueError("An array of whole numbers takes no fractions")
-    return array.astype(np.int32 if integer else np.float32)
 
 
 __all__ += ["load_scene"]

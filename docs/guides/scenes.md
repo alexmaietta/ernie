@@ -280,7 +280,7 @@ ernie.PointInstancer.write_rows(scene, swarms, positions=positions, orientations
                                 translate=centres)               # (64, 3)
 ```
 
-A write to many prims checks the attribute once for each prim type among them, before writing any row. In C++ an array attribute's setter takes a `Tensor` (`Tensor::Copy<float>(values, {3, 3})`, or one from DLPack), and its getter returns the written `const Tensor*`, null when unset; arrays have no default.
+A write to many prims checks the attribute once for each prim type among them, before writing any row. In C++ an array attribute's setter takes a `Tensor` (`Tensor::Copy<float>(values, {3, 3})`, or one from DLPack), and its getter returns the written `const Tensor*`, null when unset; arrays have no default. An attribute that takes an array in place of its value has both: `mesh.GetDisplayColor()` for the one colour, and `mesh.ReadDisplayColor()` and `mesh.WriteDisplayColor(tensor)` for colours per vertex.
 
 ## Validation
 
@@ -297,7 +297,16 @@ lamp.radius = "big"
 # ValueError: 'inputs:radius' must be a number
 ```
 
-C++ throws `std::invalid_argument` with the same messages, such as `'/World/Lamp' (SphereLight): 'inputs:radius' must be a number`. Values convert as their readers would read them: any number for a number, an int for a bool, a tuple or list for a vector, a string for a relationship. A keyword `define` defines the prim before it sets the attributes, so after a failed one the prim is there, with the attributes set before the bad one.
+C++ throws `std::invalid_argument` with the same messages, such as `'/World/Lamp' (SphereLight): 'inputs:radius' must be a number`. Values convert as their readers would read them: any number for a number, an int for a bool, a tuple or list for a vector, a string for a relationship.
+
+An array written in place of a value (`scene.write`, `Scene::Write`) is taken only by array attributes and by those declared to take one (`AttributeDef.takes_array`, C++'s `AttributeMeta::array`): `display_color` with a colour per vertex, `widths` with one per point, `extent` as (2, 3), and transform ops with a pose per prim. Setting such an attribute to nested lists writes them as a float32 array:
+
+```python
+mesh.display_color = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]   # a (3, 3) float32 array
+mesh.display_color.shape                                  # (3, 3)
+```
+
+Transform ops are declared too, for every prim, untyped ones included (C++'s `FindXformOp`): `xformOp:translate` and the Euler rotations take 3 numbers, `xformOp:scale` 3 or one, `xformOp:rotateX` (Y, Z) one angle, `xformOp:orient` a `Quat` (four plain numbers are refused, since w may come first or last) and `xformOp:transform` a 4 x 4 matrix, suffixed ops (`xformOp:orient:pivot`) as their op. A keyword `define` defines the prim before it sets the attributes, so after a failed one the prim is there, with the attributes set before the bad one.
 
 Some names stay open, for data Ernie does not declare:
 
@@ -305,12 +314,12 @@ Some names stay open, for data Ernie does not declare:
 | --- | --- |
 | Attributes in a namespace the type does not declare attributes in: your own data | `user:batteryLevel`, `sim:mass` |
 | Primvars | `primvars:temperature` |
-| Transform ops and their order | `xformOp:translate:pivot`, `xformOpOrder` |
+| Transform ops (checked by their kind, above) and their order | `xformOp:translate:pivot`, `xformOpOrder` |
 | UsdShade connections | `outputs:surface.connect` |
 | Any name in the type's open namespaces | a Material's or Shader's `inputs:*` and `outputs:*`, a SensorFilter's `inputs:*` |
 | Any name at all on a grouping prim | `Xform` and `Scope` |
 
-What is caught is a name without a namespace (`radus`), and a name in a namespace the type uses but does not open (`inputs:radus` on a light, `ernie:sensor:noize` on a camera). So put your own data in a namespace of your own, not in `inputs:` or `ernie:`. Untyped prims, and prims of types that are not registered, take anything.
+What is caught is a name without a namespace (`radus`), and a name in a namespace the type uses but does not open (`inputs:radus` on a light, `ernie:sensor:noize` on a camera). So put your own data in a namespace of your own, not in `inputs:` or `ernie:`. Untyped prims, and prims of types that are not registered, take anything but transform op values of the wrong kind.
 
 ## Loading scenes from a dict or JSON
 
@@ -358,9 +367,10 @@ The format:
 | `"orient"` | A quaternion as `[w, x, y, z]`, the real part first as in `ernie.Quat(w, x, y, z)` (in a Python dict, a `Quat` too). |
 | `"transform"` | A 4 x 4 matrix as rows of four (column vectors, translation in the last column). |
 | Lists for array attributes | Become arrays: int32 for attributes of whole numbers (`face_vertex_counts`, `face_vertex_indices`, `proto_indices`; `AttributeDef.is_integer`), float32 for the rest (`points`, `heights`), whatever the numbers look like. |
+| Nested lists for an attribute that takes an array | Become a float32 array: a `display_color` per vertex as rows of 3. |
 | Strings for relationships | Target paths; lists of them for list relationships. |
 
-Every value is checked as setting it is, so a misspelt name or a wrong value raises as above. Attributes may be given by Python name or USD name alike; either way they are converted to their declared types, arrays included.
+Each value is read as its attribute's declared kind (a transform op's too, `xformOp:orient:pivot` as a quaternion), not by how it looks, and checked as setting it is, so a misspelt name or a wrong value raises as above. Attributes may be given by Python name or USD name alike. Only undeclared attributes are read by their look: 2 to 4 numbers as a vector, other lists as float arrays, nested lists as a float32 array. Python's `load_scene` hands the description to C++'s `LoadScene` (a dict written as JSON first, its `Quat`s, `Path`s and prims included), so the two read every description the same way. Arrays in a dict (NumPy, or any DLPack array, CUDA ones included) go over beside the JSON rather than through it, each as `{"$array": i}` in the text and the array itself in `LoadScene`'s `arrays`: where an array goes (`points`, `heights`, per-vertex `display_color`) it is written as it is, shared and not copied, its dtype kept, as `scene.write` writes it; elsewhere (`translate`, a radius) it is read as the numbers it holds. So a dict of large arrays loads without the arrays being turned into lists.
 
 ## The C++ API
 
@@ -410,7 +420,7 @@ The typed attributes cover what Ernie declares. Set by USD name, with `prim.set(
 
 A prim type is declared in C++, and everything else follows from that declaration. Say you want a fiducial marker for a pose-estimation pipeline.
 
-**1. List its attributes** in a header, as an X-macro: one `X(C++ type, Name, USD name, default, (AttributeMeta{...}))` entry per attribute. The C++ types are `bool`, `int`, `double`, `glm::dvec2`, `glm::dvec3`, `glm::dvec4`, `std::string` (a token or file path), `ernie::Path` (a relationship), `std::vector<ernie::Path>` (a list of targets), `std::vector<float>` (a small array such as (nm, value) pairs) and `ernie::Tensor` (an array, default `nullptr`). Then a second macro with the base's attributes first, for the accessors:
+**1. List its attributes** in a header, as an X-macro: one `X(C++ type, Name, USD name, default, (AttributeMeta{...}))` entry per attribute. The C++ types are `bool`, `int`, `double`, `glm::dvec2`, `glm::dvec3`, `glm::dvec4`, `std::string` (a token or file path), `ernie::Path` (a relationship), `std::vector<ernie::Path>` (a list of targets), `std::vector<float>` (a small array such as (nm, value) pairs) and `ernie::Tensor` (an array, default `nullptr`). Wrap a type as `ernie::OrArray<T>` for an attribute that also takes an array written in place of its value, as `display_color` does with a colour per vertex: its view then has `Read<Name>()` (the array, or null) and `Write<Name>(tensor)` beside `Get<Name>()`, loaders read nested lists for it as such an array, and Python's `AttributeDef.takes_array` is true. Then a second macro with the base's attributes first, for the accessors:
 
 ```cpp
 // ernie/scene/fiducial_schemas.h

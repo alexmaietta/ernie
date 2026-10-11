@@ -23,7 +23,11 @@ struct PropertyField {
         Color,   ///< Linear RGB.
         Color4,  ///< Linear RGBA.
         Vec2,
+        Vec3,
+        Vec4,
         Int2,  ///< Such as a resolution.
+        Quat,  ///< A rotation, edited as Euler angles in degrees (x, then y, then z).
+        Matrix,  ///< A 4 x 4 matrix, edited row by row (column vectors, translation in the last).
         Text,
         Target,  ///< A relationship to one prim, of type `options[0]` when given.
         /// A float array as a curve over [0, 1], edited by dragging across it, which sets the

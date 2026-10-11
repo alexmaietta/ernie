@@ -23,6 +23,8 @@ _TYPES = {
     AttributeKind.RELATIONSHIPS: "list[Path]",
     AttributeKind.FLOAT_ARRAY: "list[float]",
     AttributeKind.TENSOR: "Any",
+    AttributeKind.QUAT: "Quat",
+    AttributeKind.MATRIX: "tuple[tuple[float, ...], ...]",
 }
 
 # What setting accepts, where it is wider than what reading returns.
@@ -67,7 +69,7 @@ def _attribute_doc(attribute):
 def _keywords(prim_type):
     keywords = []
     for a in prim_type.all_attributes():
-        argument = _ARGUMENTS.get(a.kind, _TYPES[a.kind])
+        argument = _ARGUMENTS.get(a.kind, _TYPES[a.kind]) + (" | Any" if a.takes_array else "")
         keywords.append(f"{a.py_name}: {argument} = ...")
         if a.plural:
             keywords.append(f"{a.plural}: {argument} = ...")
@@ -127,7 +129,9 @@ def main(output):
                 lines.append(f"    {attribute.plural}: {_TYPES[attribute.kind]}")
                 lines += _doc("Every target. " + _attribute_doc(attribute), "    ")
                 continue
-            lines.append(f"    {attribute.py_name}: {_TYPES[attribute.kind]}")
+            # One that takes an array in place of its value reads as the array when one is written.
+            array = " | Any" if attribute.takes_array else ""
+            lines.append(f"    {attribute.py_name}: {_TYPES[attribute.kind]}{array}")
             lines += _doc(_attribute_doc(attribute), "    ")
         keywords = ", ".join(_keywords(prim_type))
         if not prim_type.abstract:
