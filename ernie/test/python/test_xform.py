@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""USD transform ops (xformOp:translate, :orient, :rotateXYZ..., :scale, xformOpOrder): values,
-composition, Quat, set_xform, set_local_transform, row writes, and rendering."""
+"""USD transform ops (xformOp:translate, :orient, :rotateXYZ...,
+:scale, xformOpOrder): values, composition, Quat, set_xform,
+set_local_transform, row writes, and rendering."""
 
 import itertools
 import math
@@ -26,7 +27,10 @@ ROTATE_OPS = {
 
 
 def axis_rotation(axis, degrees):
-    c, s = math.cos(math.radians(degrees)), math.sin(math.radians(degrees))
+    c, s = (
+        math.cos(math.radians(degrees)),
+        math.sin(math.radians(degrees)),
+    )
     a, b = (axis + 1) % 3, (axis + 2) % 3
     r = np.eye(4)
     r[a, a], r[a, b], r[b, a], r[b, b] = c, -s, s, c
@@ -34,7 +38,8 @@ def axis_rotation(axis, degrees):
 
 
 def euler(degrees, order):
-    """Fixed-axis rotation applying order[0]'s axis first: R_last @ R_middle @ R_first."""
+    """Fixed-axis rotation applying order[0]'s axis first: R_last @
+    R_middle @ R_first."""
     m = np.eye(4)
     for letter in order:
         axis = "XYZ".index(letter)
@@ -57,9 +62,21 @@ def quat_matrix(w, x, y, z):
     w, x, y, z = w / n, x / n, y / n, z / n
     m = np.eye(4)
     m[:3, :3] = [
-        [1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)],
-        [2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)],
-        [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)],
+        [
+            1 - 2 * (y * y + z * z),
+            2 * (x * y - w * z),
+            2 * (x * z + w * y),
+        ],
+        [
+            2 * (x * y + w * z),
+            1 - 2 * (x * x + z * z),
+            2 * (y * z - w * x),
+        ],
+        [
+            2 * (x * z - w * y),
+            2 * (y * z + w * x),
+            1 - 2 * (x * x + y * y),
+        ],
     ]
     return m
 
@@ -74,7 +91,8 @@ def rock(scene=None):
     return scene, scene.define("/World/Rock", tokens.XFORM)
 
 
-# --- Tokens and values ------------------------------------------------------------------------
+# --- Tokens and values
+# ------------------------------------------------------------------------
 
 
 def test_tokens_are_usd_names():
@@ -96,7 +114,12 @@ def test_quats_round_trip_and_name_their_layout():
     scene, prim = rock()
     q = ernie.Quat(0.5, 0.5, -0.5, 0.5)
     assert (q.w, q.x, q.y, q.z) == (0.5, 0.5, -0.5, 0.5)
-    assert q.wxyz == (0.5, 0.5, -0.5, 0.5) and q.xyzw == (0.5, -0.5, 0.5, 0.5)
+    assert q.wxyz == (0.5, 0.5, -0.5, 0.5) and q.xyzw == (
+        0.5,
+        -0.5,
+        0.5,
+        0.5,
+    )
     assert ernie.Quat.from_xyzw(0.5, -0.5, 0.5, 0.5) == q
     prim.set(tokens.ORIENT, q)
     got = prim.get(tokens.ORIENT)
@@ -109,20 +132,29 @@ def test_quats_round_trip_and_name_their_layout():
 def test_token_lists_round_trip():
     scene, prim = rock()
     prim.set(tokens.XFORM_OP_ORDER, [tokens.TRANSLATE, tokens.SCALE])
-    assert prim.get(tokens.XFORM_OP_ORDER) == [tokens.TRANSLATE, tokens.SCALE]
+    assert prim.get(tokens.XFORM_OP_ORDER) == [
+        tokens.TRANSLATE,
+        tokens.SCALE,
+    ]
     with pytest.raises(TypeError):
         prim.set(tokens.XFORM_OP_ORDER, [tokens.TRANSLATE, 3])
 
 
 def test_quat_constructors_match_reference_rotations():
     q = ernie.Quat.from_axis_angle((0, 0, 2), 90.0)
-    np.testing.assert_allclose(quat_matrix(*q.wxyz), axis_rotation(2, 90.0), atol=1e-15)
+    np.testing.assert_allclose(
+        quat_matrix(*q.wxyz), axis_rotation(2, 90.0), atol=1e-15
+    )
     rng = np.random.default_rng(3)
     for order in ORDERS:
         for _ in range(50):
             degrees = rng.uniform(-180, 180, 3)
             q = ernie.Quat.from_euler(degrees, order)
-            np.testing.assert_allclose(quat_matrix(*q.wxyz), euler(degrees, order), atol=1e-12)
+            np.testing.assert_allclose(
+                quat_matrix(*q.wxyz),
+                euler(degrees, order),
+                atol=1e-12,
+            )
 
 
 def test_quat_euler_round_trips_in_every_order():
@@ -133,28 +165,41 @@ def test_quat_euler_round_trips_in_every_order():
             degrees = rng.uniform(-179, 179, 3)
             degrees[middle] = rng.uniform(-89, 89)
             np.testing.assert_allclose(
-                ernie.Quat.from_euler(degrees, order).euler(order), degrees, atol=1e-9
+                ernie.Quat.from_euler(degrees, order).euler(order),
+                degrees,
+                atol=1e-9,
             )
     with pytest.raises(ValueError):
         ernie.Quat.from_euler((0, 0, 0), "XYX")
 
 
-# --- Composition ------------------------------------------------------------------------------
+# --- Composition
+# ------------------------------------------------------------------------------
 
 
 def test_without_ops_the_transform_op_is_the_local_transform():
     scene, prim = rock()
-    np.testing.assert_array_equal(scene.local_transform("/World/Rock"), np.eye(4))
+    np.testing.assert_array_equal(
+        scene.local_transform("/World/Rock"), np.eye(4)
+    )
     prim.set(tokens.TRANSFORM, translate((1, 2, 3)))
-    np.testing.assert_array_equal(scene.local_transform("/World/Rock"), translate((1, 2, 3)))
+    np.testing.assert_array_equal(
+        scene.local_transform("/World/Rock"), translate((1, 2, 3))
+    )
 
 
 @pytest.mark.parametrize("order", ORDERS)
 def test_every_euler_op_matches_the_reference(order):
     scene, prim = rock()
     degrees = (12.0, -34.0, 56.0)
-    prim.set(ROTATE_OPS[order], degrees).set(tokens.XFORM_OP_ORDER, [ROTATE_OPS[order]])
-    np.testing.assert_allclose(scene.local_transform("/World/Rock"), euler(degrees, order), atol=1e-12)
+    prim.set(ROTATE_OPS[order], degrees).set(
+        tokens.XFORM_OP_ORDER, [ROTATE_OPS[order]]
+    )
+    np.testing.assert_allclose(
+        scene.local_transform("/World/Rock"),
+        euler(degrees, order),
+        atol=1e-12,
+    )
 
 
 @pytest.mark.parametrize("axis", range(3))
@@ -162,7 +207,11 @@ def test_single_axis_rotations(axis):
     scene, prim = rock()
     op = (tokens.ROTATE_X, tokens.ROTATE_Y, tokens.ROTATE_Z)[axis]
     prim.set(op, 30.0).set(tokens.XFORM_OP_ORDER, [op])
-    np.testing.assert_allclose(scene.local_transform("/World/Rock"), axis_rotation(axis, 30.0), atol=1e-15)
+    np.testing.assert_allclose(
+        scene.local_transform("/World/Rock"),
+        axis_rotation(axis, 30.0),
+        atol=1e-15,
+    )
 
 
 def test_ops_multiply_in_order_first_outermost():
@@ -171,7 +220,9 @@ def test_ops_multiply_in_order_first_outermost():
     prim.set(tokens.TRANSLATE, (10.0, -2.0, 0.5))
     prim.set(tokens.ORIENT, ernie.Quat(*q))
     prim.set(tokens.SCALE, (2.0, 3.0, 4.0))
-    for order in itertools.permutations([tokens.TRANSLATE, tokens.ORIENT, tokens.SCALE]):
+    for order in itertools.permutations(
+        [tokens.TRANSLATE, tokens.ORIENT, tokens.SCALE]
+    ):
         prim.set(tokens.XFORM_OP_ORDER, list(order))
         parts = {
             tokens.TRANSLATE: translate((10.0, -2.0, 0.5)),
@@ -179,25 +230,41 @@ def test_ops_multiply_in_order_first_outermost():
             tokens.SCALE: scale((2.0, 3.0, 4.0)),
         }
         expected = parts[order[0]] @ parts[order[1]] @ parts[order[2]]
-        np.testing.assert_allclose(scene.local_transform("/World/Rock"), expected, atol=1e-12)
+        np.testing.assert_allclose(
+            scene.local_transform("/World/Rock"), expected, atol=1e-12
+        )
 
 
 def test_pivots_and_inverted_ops():
     scene, prim = rock()
-    prim.set("xformOp:translate:pivot", (5.0, 5.0, 0.0)).set(tokens.ROTATE_Z, 90.0)
+    prim.set("xformOp:translate:pivot", (5.0, 5.0, 0.0)).set(
+        tokens.ROTATE_Z, 90.0
+    )
     prim.set(
         tokens.XFORM_OP_ORDER,
-        ["xformOp:translate:pivot", tokens.ROTATE_Z, "!invert!xformOp:translate:pivot"],
+        [
+            "xformOp:translate:pivot",
+            tokens.ROTATE_Z,
+            "!invert!xformOp:translate:pivot",
+        ],
     )
     m = scene.local_transform("/World/Rock")
-    np.testing.assert_allclose(m @ [5, 5, 0, 1], [5, 5, 0, 1], atol=1e-12)
-    np.testing.assert_allclose(m @ [6, 5, 0, 1], [5, 6, 0, 1], atol=1e-12)
+    np.testing.assert_allclose(
+        m @ [5, 5, 0, 1], [5, 5, 0, 1], atol=1e-12
+    )
+    np.testing.assert_allclose(
+        m @ [6, 5, 0, 1], [5, 6, 0, 1], atol=1e-12
+    )
 
 
 def test_empty_order_is_the_identity():
     scene, prim = rock()
-    prim.set(tokens.TRANSFORM, translate((1, 1, 1))).set(tokens.XFORM_OP_ORDER, [])
-    np.testing.assert_array_equal(scene.local_transform("/World/Rock"), np.eye(4))
+    prim.set(tokens.TRANSFORM, translate((1, 1, 1))).set(
+        tokens.XFORM_OP_ORDER, []
+    )
+    np.testing.assert_array_equal(
+        scene.local_transform("/World/Rock"), np.eye(4)
+    )
 
 
 def test_reset_xform_stack_ignores_ancestors():
@@ -206,20 +273,32 @@ def test_reset_xform_stack_ignores_ancestors():
     scene.get_prim("/World").set_xform(translate=(100, 0, 0))
     arm = scene.get_prim("/World/Robot/Arm")
     arm.set(tokens.TRANSLATE, (0, 0, 1)).set(
-        tokens.XFORM_OP_ORDER, [tokens.RESET_XFORM_STACK, tokens.TRANSLATE]
+        tokens.XFORM_OP_ORDER,
+        [tokens.RESET_XFORM_STACK, tokens.TRANSLATE],
     )
-    np.testing.assert_array_equal(scene.world_transform("/World/Robot/Arm"), translate((0, 0, 1)))
+    np.testing.assert_array_equal(
+        scene.world_transform("/World/Robot/Arm"),
+        translate((0, 0, 1)),
+    )
 
 
 def test_op_edits_mark_the_transform_dirty():
-    for attribute in (tokens.XFORM_OP_ORDER, tokens.TRANSLATE, tokens.ORIENT, tokens.ROTATE_ZYX):
+    for attribute in (
+        tokens.XFORM_OP_ORDER,
+        tokens.TRANSLATE,
+        tokens.ORIENT,
+        tokens.ROTATE_ZYX,
+    ):
         assert ernie.dirty_of(attribute) == ernie.Dirty.TRANSFORM
 
 
 def test_bad_ops_raise_naming_the_problem():
     scene, prim = rock()
-    # Known ops are checked as they are set: four numbers are not a quaternion (w first or last?).
-    with pytest.raises(ValueError, match="'xformOp:orient' must be a quaternion"):
+    # Known ops are checked as they are set: four numbers are not a
+    # quaternion (w first or last?).
+    with pytest.raises(
+        ValueError, match="'xformOp:orient' must be a quaternion"
+    ):
         prim.set(tokens.ORIENT, (1.0, 0.0, 0.0, 0.0))
     # Unknown ops are refused as the transform is read.
     prim.set(tokens.XFORM_OP_ORDER, ["xformOp:shear"])
@@ -227,27 +306,50 @@ def test_bad_ops_raise_naming_the_problem():
         scene.local_transform("/World/Rock")
 
 
-# --- set_xform and set_local_transform --------------------------------------------------------
+# --- set_xform and set_local_transform
+# --------------------------------------------------------
 
 
 @pytest.mark.parametrize("order", ORDERS)
 def test_set_xform_writes_translate_rotate_scale(order):
     scene, prim = rock()
-    assert prim.set_xform(translate=(1, 2, 3), rotate=(10, 20, 30), rotation_order=order, scale=2) is prim
-    assert prim.get(tokens.XFORM_OP_ORDER) == [tokens.TRANSLATE, ROTATE_OPS[order], tokens.SCALE]
-    expected = translate((1, 2, 3)) @ euler((10, 20, 30), order) @ scale(2.0)
-    np.testing.assert_allclose(scene.local_transform("/World/Rock"), expected, atol=1e-12)
+    assert (
+        prim.set_xform(
+            translate=(1, 2, 3),
+            rotate=(10, 20, 30),
+            rotation_order=order,
+            scale=2,
+        )
+        is prim
+    )
+    assert prim.get(tokens.XFORM_OP_ORDER) == [
+        tokens.TRANSLATE,
+        ROTATE_OPS[order],
+        tokens.SCALE,
+    ]
+    expected = (
+        translate((1, 2, 3)) @ euler((10, 20, 30), order) @ scale(2.0)
+    )
+    np.testing.assert_allclose(
+        scene.local_transform("/World/Rock"), expected, atol=1e-12
+    )
 
 
 def test_set_xform_with_orient_and_partial_ops():
     scene, prim = rock()
     prim.set_xform(orient=ernie.Quat.from_xyzw(0, 0, 1, 1))
     assert prim.get(tokens.XFORM_OP_ORDER) == [tokens.ORIENT]
-    np.testing.assert_allclose(scene.local_transform("/World/Rock"), axis_rotation(2, 90), atol=1e-15)
+    np.testing.assert_allclose(
+        scene.local_transform("/World/Rock"),
+        axis_rotation(2, 90),
+        atol=1e-15,
+    )
     prim.set_xform(scale=(1, 2, 3))
     assert prim.get(tokens.XFORM_OP_ORDER) == [tokens.SCALE]
     with pytest.raises(ValueError):
-        prim.set_xform(rotate=(0, 0, 0), orient=ernie.Quat(1, 0, 0, 0))
+        prim.set_xform(
+            rotate=(0, 0, 0), orient=ernie.Quat(1, 0, 0, 0)
+        )
     with pytest.raises(TypeError):
         prim.set_xform(orient=(1, 0, 0, 0))
     with pytest.raises(ValueError):
@@ -258,13 +360,26 @@ def test_set_local_transform_keeps_the_prims_ops():
     rng = np.random.default_rng(7)
     for order in ORDERS:
         scene, prim = rock()
-        prim.set_xform(translate=(0, 0, 0), rotate=(0, 0, 0), rotation_order=order, scale=1)
-        target = translate(rng.uniform(-5, 5, 3)) @ quat_matrix(*random_quat(rng)) @ scale(
-            rng.uniform(0.5, 2, 3)
+        prim.set_xform(
+            translate=(0, 0, 0),
+            rotate=(0, 0, 0),
+            rotation_order=order,
+            scale=1,
+        )
+        target = (
+            translate(rng.uniform(-5, 5, 3))
+            @ quat_matrix(*random_quat(rng))
+            @ scale(rng.uniform(0.5, 2, 3))
         )
         scene.set_local_transform("/World/Rock", target)
-        assert prim.get(tokens.XFORM_OP_ORDER) == [tokens.TRANSLATE, ROTATE_OPS[order], tokens.SCALE]
-        np.testing.assert_allclose(scene.local_transform("/World/Rock"), target, atol=1e-9)
+        assert prim.get(tokens.XFORM_OP_ORDER) == [
+            tokens.TRANSLATE,
+            ROTATE_OPS[order],
+            tokens.SCALE,
+        ]
+        np.testing.assert_allclose(
+            scene.local_transform("/World/Rock"), target, atol=1e-9
+        )
 
 
 def test_set_local_transform_falls_back_to_the_transform_op():
@@ -273,20 +388,25 @@ def test_set_local_transform_falls_back_to_the_transform_op():
     turned = axis_rotation(0, 30.0)
     scene.set_local_transform("/World/Rock", turned)
     assert prim.get(tokens.XFORM_OP_ORDER) == [tokens.TRANSFORM]
-    np.testing.assert_allclose(scene.local_transform("/World/Rock"), turned, atol=1e-15)
+    np.testing.assert_allclose(
+        scene.local_transform("/World/Rock"), turned, atol=1e-15
+    )
     # Without ops it simply sets xformOp:transform.
     scene2, prim2 = rock()
     scene2.set_local_transform("/World/Rock", turned)
     assert prim2.get(tokens.XFORM_OP_ORDER) is None
 
 
-# --- Row writes -------------------------------------------------------------------------------
+# --- Row writes
+# -------------------------------------------------------------------------------
 
 
 def make_links(scene, n):
     paths = [f"/World_{i}/Link" for i in range(n)]
     for path in paths:
-        scene.define(path, ernie.Xform).set(tokens.XFORM_OP_ORDER, [tokens.TRANSLATE, tokens.ORIENT])
+        scene.define(path, ernie.Xform).set(
+            tokens.XFORM_OP_ORDER, [tokens.TRANSLATE, tokens.ORIENT]
+        )
     return paths
 
 
@@ -297,14 +417,19 @@ def test_one_array_poses_many_prims(dtype):
     paths = make_links(scene, 64)
     positions = rng.uniform(-100, 100, (64, 3)).astype(dtype)
     wxyz = np.array([random_quat(rng) for _ in paths])
-    xyzw = np.roll(wxyz, -1, axis=1).astype(dtype)  # rows of x, y, z, w
+    xyzw = np.roll(wxyz, -1, axis=1).astype(
+        dtype
+    )  # rows of x, y, z, w
     scene.write(paths, tokens.TRANSLATE, positions)
     scene.write(paths, tokens.ORIENT, xyzw)
     tolerance = 1e-5 if dtype == np.float32 else 1e-12
     for i, path in enumerate(paths):
         expected = translate(positions[i]) @ quat_matrix(*wxyz[i])
         np.testing.assert_allclose(
-            scene.local_transform(path), expected, atol=tolerance * 100, rtol=tolerance
+            scene.local_transform(path),
+            expected,
+            atol=tolerance * 100,
+            rtol=tolerance,
         )
 
 
@@ -313,10 +438,14 @@ def test_transform_rows_are_row_major_matrices():
     paths = [f"/P{i}" for i in range(4)]
     for path in paths:
         scene.define(path, ernie.Xform)
-    matrices = np.stack([translate((i, 2 * i, 3 * i)) for i in range(4)])
+    matrices = np.stack(
+        [translate((i, 2 * i, 3 * i)) for i in range(4)]
+    )
     scene.write(paths, tokens.TRANSFORM, matrices)
     for i, path in enumerate(paths):
-        np.testing.assert_array_equal(scene.local_transform(path), matrices[i])
+        np.testing.assert_array_equal(
+            scene.local_transform(path), matrices[i]
+        )
 
 
 def test_rewriting_rows_moves_the_prims():
@@ -326,17 +455,25 @@ def test_rewriting_rows_moves_the_prims():
     scene.changes(cursor)
     scene.write(paths, tokens.TRANSLATE, np.ones((3, 3)))
     changed = dict(scene.changes(cursor))
-    assert all(changed[ernie.Path(p)] & ernie.Dirty.TRANSFORM for p in paths)
-    np.testing.assert_array_equal(scene.local_transform(paths[0])[:3, 3], [1, 1, 1])
+    assert all(
+        changed[ernie.Path(p)] & ernie.Dirty.TRANSFORM for p in paths
+    )
+    np.testing.assert_array_equal(
+        scene.local_transform(paths[0])[:3, 3], [1, 1, 1]
+    )
 
 
-# --- Rendering --------------------------------------------------------------------------------
+# --- Rendering
+# --------------------------------------------------------------------------------
 
 
 def staged_scene():
     scene = ernie.Scene()
-    camera = scene.define("/World/Camera", ernie.Camera, focal_length=24.0).set(
-        tokens.TRANSFORM, ernie.look_at_transform((0, -20, 12), (0, 0, 0))
+    camera = scene.define(
+        "/World/Camera", ernie.Camera, focal_length=24.0
+    ).set(
+        tokens.TRANSFORM,
+        ernie.look_at_transform((0, -20, 12), (0, 0, 0)),
     )
     scene.define(
         "/Render/Settings",
@@ -346,15 +483,29 @@ def staged_scene():
         clear_color=(0.0, 0.0, 0.0),
     )
     scene.define("/World/Sun", ernie.DistantLight).set(
-        tokens.TRANSFORM, ernie.distant_light_transform((0.3, -0.5, 0.8))
+        tokens.TRANSFORM,
+        ernie.distant_light_transform((0.3, -0.5, 0.8)),
     )
     return scene
 
 
 POSES = [
-    dict(translate=(-4.0, 0.0, 0.0), rotate=(20.0, 0.0, 45.0), rotation_order="ZYX", scale=(1.0, 2.0, 1.0)),
-    dict(translate=(0.0, 2.0, 1.0), orient=ernie.Quat.from_axis_angle((1, 1, 0), 60.0), scale=1.5),
-    dict(translate=(4.0, -1.0, 0.0), rotate=(0.0, 30.0, 0.0), rotation_order="XYZ"),
+    dict(
+        translate=(-4.0, 0.0, 0.0),
+        rotate=(20.0, 0.0, 45.0),
+        rotation_order="ZYX",
+        scale=(1.0, 2.0, 1.0),
+    ),
+    dict(
+        translate=(0.0, 2.0, 1.0),
+        orient=ernie.Quat.from_axis_angle((1, 1, 0), 60.0),
+        scale=1.5,
+    ),
+    dict(
+        translate=(4.0, -1.0, 0.0),
+        rotate=(0.0, 30.0, 0.0),
+        rotation_order="XYZ",
+    ),
 ]
 
 
@@ -373,7 +524,9 @@ def test_ops_render_like_the_equivalent_matrices(renderer):
     by_ops, by_matrix = staged_scene(), staged_scene()
     for i, pose in enumerate(POSES):
         by_ops.define(f"/World/Box{i}", ernie.Cube, **pose)
-        by_matrix.define(f"/World/Box{i}", ernie.Cube).set(tokens.TRANSFORM, reference_matrix(pose))
+        by_matrix.define(f"/World/Box{i}", ernie.Cube).set(
+            tokens.TRANSFORM, reference_matrix(pose)
+        )
     ops_image = renderer.render(by_ops).astype(np.int32)
     matrix_image = renderer.render(by_matrix).astype(np.int32)
     assert (ops_image[..., :3] > 0).any(), "the boxes are in view"
@@ -383,29 +536,52 @@ def test_ops_render_like_the_equivalent_matrices(renderer):
 
 def test_editing_ops_moves_what_renders(renderer):
     scene = staged_scene()
-    box = scene.define("/World/Box", ernie.Cube, translate=(-4.0, 0.0, 0.0))
+    box = scene.define(
+        "/World/Box", ernie.Cube, translate=(-4.0, 0.0, 0.0)
+    )
     left = renderer.render(scene).astype(np.int32)
     box.set(tokens.TRANSLATE, (4.0, 0.0, 0.0))
     right = renderer.render(scene).astype(np.int32)
     expected = staged_scene()
-    expected.define("/World/Box", ernie.Cube).set(tokens.TRANSFORM, translate((4.0, 0.0, 0.0)))
+    expected.define("/World/Box", ernie.Cube).set(
+        tokens.TRANSFORM, translate((4.0, 0.0, 0.0))
+    )
     assert np.abs(right - left).max() > 50, "the box moved"
-    assert np.abs(right - renderer.render(expected).astype(np.int32)).max() <= 1
+    assert (
+        np.abs(
+            right - renderer.render(expected).astype(np.int32)
+        ).max()
+        <= 1
+    )
 
 
 def test_row_written_poses_render(renderer):
     scene, expected = staged_scene(), staged_scene()
     paths = [f"/World/Box{i}" for i in range(3)]
     for path in paths:
-        scene.define(path, ernie.Cube).set(tokens.XFORM_OP_ORDER, [tokens.TRANSLATE, tokens.ORIENT])
-    positions = np.array([[-4.0, 0.0, 0.0], [0.0, 0.0, 2.0], [4.0, 0.0, 0.0]])
-    wxyz = [ernie.Quat.from_euler((0.0, 0.0, 30.0 * i)).wxyz for i in range(3)]
+        scene.define(path, ernie.Cube).set(
+            tokens.XFORM_OP_ORDER, [tokens.TRANSLATE, tokens.ORIENT]
+        )
+    positions = np.array(
+        [[-4.0, 0.0, 0.0], [0.0, 0.0, 2.0], [4.0, 0.0, 0.0]]
+    )
+    wxyz = [
+        ernie.Quat.from_euler((0.0, 0.0, 30.0 * i)).wxyz
+        for i in range(3)
+    ]
     scene.write(paths, tokens.TRANSLATE, positions)
-    scene.write(paths, tokens.ORIENT, np.roll(np.array(wxyz), -1, axis=1))
+    scene.write(
+        paths, tokens.ORIENT, np.roll(np.array(wxyz), -1, axis=1)
+    )
     for i, path in enumerate(paths):
         expected.define(path, ernie.Cube).set(
-            tokens.TRANSFORM, translate(positions[i]) @ quat_matrix(*wxyz[i])
+            tokens.TRANSFORM,
+            translate(positions[i]) @ quat_matrix(*wxyz[i]),
         )
-    assert np.abs(
-        renderer.render(scene).astype(np.int32) - renderer.render(expected).astype(np.int32)
-    ).max() <= 1
+    assert (
+        np.abs(
+            renderer.render(scene).astype(np.int32)
+            - renderer.render(expected).astype(np.int32)
+        ).max()
+        <= 1
+    )

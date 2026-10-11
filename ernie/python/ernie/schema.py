@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Typed prim classes, one per registered prim type (``ernie.prim_types()``).
+"""Typed prim classes, one per registered prim type
+(``ernie.prim_types()``).
 
-Each class wraps a ``Prim`` and has a property per attribute its type and bases declare, read as
-the declared type (the default while unset) and converted to it when set::
+Each class wraps a ``Prim`` and has a property per attribute its type
+and bases declare, read as the declared type (the default while unset)
+and converted to it when set::
 
     import ernie
 
@@ -14,17 +16,21 @@ the declared type (the default while unset) and converted to it when set::
     lamp.color_temperature           # 6500.0, the default
     ernie.SphereLight.radius.doc     # on the class, a property is its AttributeDef
 
-``scene.define(path, cls, **attributes)`` and ``prim.define(relative, cls, **attributes)`` return
-an instance of ``cls``; with a type name instead of a class they return the ``Prim`` as before,
-taking keyword attributes too when the type is registered. Unknown attributes raise, with the
-closest names. ``translate``, ``rotate``, ``rotation_order``, ``orient`` and ``scale`` set the
-transform (``Prim.set_xform``). Anything else a ``Prim`` has (``path``, ``get``, ``write``,
-``set_xform``, ``define``) is available on the instance, and ``prim.set(token, value)`` still
-sets any attribute by USD name.
+``scene.define(path, cls, **attributes)`` and ``prim.define(relative,
+cls, **attributes)`` return an instance of ``cls``; with a type name
+instead of a class they return the ``Prim`` as before, taking keyword
+attributes too when the type is registered. Unknown attributes raise,
+with the closest names. ``translate``, ``rotate``, ``rotation_order``,
+``orient`` and ``scale`` set the transform (``Prim.set_xform``).
+Anything else a ``Prim`` has (``path``, ``get``, ``write``,
+``set_xform``, ``define``) is available on the instance, and
+``prim.set(token, value)`` still sets any attribute by USD name.
 
-An existing prim is typed with ``cls.at(scene, path)``, or ``cls.at(prim, relative)`` below a
-prim, which raise if there is no prim there or it is of another type; ``ernie.typed(prim)`` is
-the instance of the prim's own (most derived) class, or the ``Prim`` itself for a type with no
+An existing prim is typed with ``cls.at(scene, path)``, or
+``cls.at(prim, relative)`` below a prim, which raise if there is no
+prim there or it is of another type; ``ernie.typed(prim)`` is the
+instance of the prim's own (most derived) class, or the ``Prim``
+itself for a type with no
 class::
 
     sun = ernie.DistantLight.at(scene, "/World/Sun")
@@ -55,12 +61,17 @@ from ._ernie import (
     _load_scene_text,
     find_prim_type,
     prim_types,
-    tokens,
 )
 
 __all__ = ["AttributeName", "Schema", "typed"]
 
-_XFORM_KEYS = ("translate", "rotate", "rotation_order", "orient", "scale")
+_XFORM_KEYS = (
+    "translate",
+    "rotate",
+    "rotation_order",
+    "orient",
+    "scale",
+)
 # The transform ops `Schema.write_rows` writes as rows.
 _ROW_XFORM_OPS = {
     "translate": "xformOp:translate",
@@ -73,21 +84,31 @@ _prim_define = Prim.define
 
 def _closest(name: str, names) -> str:
     matches = difflib.get_close_matches(name, list(names), n=3)
-    return f"; did you mean {', '.join(repr(m) for m in matches)}?" if matches else ""
+    return (
+        f"; did you mean {', '.join(repr(m) for m in matches)}?"
+        if matches
+        else ""
+    )
 
 
 def _write(definition: AttributeDef, prim: Prim, value: Any) -> None:
-    """Sets ``definition`` on ``prim``: a prim given for a target as its path, and nested lists
-    for one that takes an array in place of its value (per-vertex colours) as a float32 array."""
-    if (definition.takes_array and isinstance(value, (list, tuple)) and value
-            and isinstance(value[0], (list, tuple))):
+    """Sets ``definition`` on ``prim``: a prim given for a target as
+    its path, and nested lists for one that takes an array in place of
+    its value (per-vertex colours) as a float32 array."""
+    if (
+        definition.takes_array
+        and isinstance(value, (list, tuple))
+        and value
+        and isinstance(value[0], (list, tuple))
+    ):
         value = np.asarray(value, dtype=np.float32)
     definition.write(prim, _target(value))
 
 
 def _target(value: Any) -> Any:
-    """A relationship target given as a prim or a typed prim, as its path; in a list of targets,
-    each, and the strs among paths as paths."""
+    """A relationship target given as a prim or a typed prim, as its
+    path; in a list of targets, each, and the strs among paths as
+    paths."""
     if isinstance(value, Schema):
         return value.prim.path
     if isinstance(value, Prim):
@@ -95,16 +116,21 @@ def _target(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         targets = [_target(item) for item in value]
         if any(isinstance(item, Path) for item in targets):
-            return [Path(item) if isinstance(item, str) else item for item in targets]
+            return [
+                Path(item) if isinstance(item, str) else item
+                for item in targets
+            ]
         return targets
     return value
 
 
 class AttributeName(str):
-    """A declared attribute as a typed prim class gives it (``ernie.PointInstancer.positions``):
-    its USD name, a str, so any function taking an attribute takes it
-    (``scene.write(prims, ernie.PointInstancer.positions, rows)``), that also describes it with its
-    ``AttributeDef``'s members (``doc``, ``kind``, ``default``, ``py_name``...)."""
+    """A declared attribute as a typed prim class gives it
+    (``ernie.PointInstancer.positions``): its USD name, a str, so any
+    function taking an attribute takes it (``scene.write(prims,
+    ernie.PointInstancer.positions, rows)``), that also describes it
+    with its ``AttributeDef``'s members (``doc``, ``kind``,
+    ``default``, ``py_name``...)."""
 
     def __new__(cls, definition: AttributeDef) -> AttributeName:
         name = super().__new__(cls, definition.name)
@@ -121,8 +147,8 @@ class AttributeName(str):
 
 
 class _Attribute:
-    """One declared attribute as a property: its `AttributeName` on the class, its value on an
-    instance."""
+    """One declared attribute as a property: its `AttributeName` on
+    the class, its value on an instance."""
 
     __slots__ = ("definition", "name")
 
@@ -130,7 +156,9 @@ class _Attribute:
         self.definition = name.definition
         self.name = name
 
-    def __get__(self, instance: Schema | None, owner: type | None = None) -> Any:
+    def __get__(
+        self, instance: Schema | None, owner: type | None = None
+    ) -> Any:
         if instance is None:
             return self.name
         return self.definition.read(instance.prim)
@@ -140,33 +168,45 @@ class _Attribute:
 
 
 class _FirstTarget(_Attribute):
-    """A list of targets that usually holds one, by its singular name (``camera``): its first
-    target, or None; set to one target or a list. Its ``plural`` reads the whole list."""
+    """A list of targets that usually holds one, by its singular name
+    (``camera``): its first target, or None; set to one target or a
+    list. Its ``plural`` reads the whole list."""
 
     __slots__ = ()
 
-    def __get__(self, instance: Schema | None, owner: type | None = None) -> Any:
+    def __get__(
+        self, instance: Schema | None, owner: type | None = None
+    ) -> Any:
         if instance is None:
             return self.name
         targets = self.definition.read(instance.prim)
         return targets[0] if targets else None
 
 
-def _define_type(cls: type, parent: Any, path: str | Path, **attributes: Any) -> Any:
-    """Defines a prim of `cls`'s type at ``path`` in a Scene, or relative to a prim, and sets
-    ``attributes``."""
+def _define_type(
+    cls: type, parent: Any, path: str | Path, **attributes: Any
+) -> Any:
+    """Defines a prim of `cls`'s type at ``path`` in a Scene, or
+    relative to a prim, and sets ``attributes``."""
     if cls.prim_type.abstract:
-        raise TypeError(f"{cls.__name__} is abstract; define one of the types derived from it")
+        raise TypeError(
+            f"{cls.__name__} is abstract; define one of the types derived from it"
+        )
     if isinstance(parent, Schema):
         parent = parent.prim
-    define = _scene_define if isinstance(parent, Scene) else _prim_define
-    return cls(define(parent, path, cls.prim_type.name)).set(**attributes)
+    define = (
+        _scene_define if isinstance(parent, Scene) else _prim_define
+    )
+    return cls(define(parent, path, cls.prim_type.name)).set(
+        **attributes
+    )
 
 
 class _Define:
     """``define`` on a typed prim class defines a prim of its type
-    (``ernie.Sphere.define(scene, "/World/Rock")``); on a typed prim, a child of it, as
-    ``Prim.define`` does (``material.define("Surface", ernie.Shader)``)."""
+    (``ernie.Sphere.define(scene, "/World/Rock")``); on a typed prim,
+    a child of it, as ``Prim.define`` does
+    (``material.define("Surface", ernie.Shader)``)."""
 
     def __get__(self, instance: Any, owner: type) -> Any:
         if instance is None:
@@ -175,8 +215,8 @@ class _Define:
 
 
 class Schema:
-    """Base of the typed prim classes: a ``Prim`` of the class's registered type or one derived
-    from it."""
+    """Base of the typed prim classes: a ``Prim`` of the class's
+    registered type or one derived from it."""
 
     __slots__ = ("prim",)
     prim_type: ClassVar[PrimType]
@@ -184,52 +224,80 @@ class Schema:
 
     def __init__(self, prim: Prim) -> None:
         if not isinstance(prim, Prim) or not prim.valid:
-            raise ValueError(f"{type(self).__name__} needs a valid Prim, not {prim!r}")
+            raise ValueError(
+                f"{type(self).__name__} needs a valid Prim, not {prim!r}"
+            )
         found = find_prim_type(prim.type)
         if found is None or not found.is_a(self.prim_type.name):
             what = f"a {prim.type}" if prim.type else "untyped"
-            raise TypeError(f"'{prim.path}' is {what}, not a {self.prim_type.name}")
+            raise TypeError(
+                f"'{prim.path}' is {what}, not a {self.prim_type.name}"
+            )
         object.__setattr__(self, "prim", prim)
 
     define = _Define()
 
     @classmethod
-    def at(cls, parent: Scene | Prim | Schema, path: str | Path) -> Any:
-        """The existing prim at ``path`` in a Scene, or at ``path`` relative to a prim ("Surface",
-        "Rig/Arm"), as this class.
+    def at(
+        cls, parent: Scene | Prim | Schema, path: str | Path
+    ) -> Any:
+        """The existing prim at ``path`` in a Scene, or at ``path``
+        relative to a prim ("Surface", "Rig/Arm"), as this class.
 
         Raises:
             LookupError: There is no prim there.
-            TypeError: The prim is not of this class's type or one derived from it.
+            TypeError: The prim is not of this class's type or one
+                derived from it.
         """
         if isinstance(parent, Schema):
             parent = parent.prim
         if not isinstance(parent, (Scene, Prim)):
-            raise TypeError(f"{cls.__name__}.at looks in a Scene or below a prim, not {parent!r}")
+            raise TypeError(
+                f"{cls.__name__}.at looks in a Scene or below a prim, not {parent!r}"
+            )
         prim = parent.get_prim(path)
         if prim is None:
-            where = f"'{path}'" if isinstance(parent, Scene) else f"'{path}' below '{parent.path}'"
-            raise LookupError(f"No prim at {where} for {cls.__name__}.at")
+            where = (
+                f"'{path}'"
+                if isinstance(parent, Scene)
+                else f"'{path}' below '{parent.path}'"
+            )
+            raise LookupError(
+                f"No prim at {where} for {cls.__name__}.at"
+            )
         return cls(prim)
 
     @classmethod
     def attributes(cls) -> list[AttributeDef]:
         """Every attribute of the type, its root base's first."""
-        return list({definition.name: definition for definition in cls._attributes.values()}.values())
+        return list(
+            {
+                definition.name: definition
+                for definition in cls._attributes.values()
+            }.values()
+        )
 
     @classmethod
     def write_rows(
-        cls, scene: Scene, prims: Any, *, stream: Any = None, **arrays: Any
+        cls,
+        scene: Scene,
+        prims: Any,
+        *,
+        stream: Any = None,
+        **arrays: Any,
     ) -> None:
-        """Writes row i of each array, by Python name, as that attribute of prim i of ``prims`` (a
-        PrimSet, or a list of paths), every step of a simulation:
-        ``ernie.PointInstancer.write_rows(scene, prims, positions=p, orientations=q)``.
-        ``translate``, ``orient`` (x, y, z, w) and ``scale`` write the transform ops, which from
-        CUDA arrays pose the prims on the GPU. The arrays are DLPack arrays written without
-        copying; ``stream`` is as for ``Scene.write``.
+        """Writes row i of each array, by Python name, as that
+        attribute of prim i of ``prims`` (a PrimSet, or a list of
+        paths), every step of a simulation:
+        ``ernie.PointInstancer.write_rows(scene, prims, positions=p,
+        orientations=q)``. ``translate``, ``orient`` (x, y, z, w) and
+        ``scale`` write the transform ops, which from CUDA arrays pose
+        the prims on the GPU. The arrays are DLPack arrays written
+        without copying; ``stream`` is as for ``Scene.write``.
 
         Raises:
-            TypeError: A name is not an array attribute of this class or a transform op.
+            TypeError: A name is not an array attribute of this class
+                or a transform op.
         """
         names = dict(_ROW_XFORM_OPS)
         names.update(
@@ -240,24 +308,32 @@ class Schema:
         for name in arrays:
             if name not in names:
                 raise TypeError(
-                    f"{cls.__name__} has no array attribute {name!r}" + _closest(name, names)
+                    f"{cls.__name__} has no array attribute {name!r}"
+                    + _closest(name, names)
                 )
         for name, rows in arrays.items():
             scene.write(prims, names[name], rows, stream=stream)
 
     def set(self, *attribute: Any, **attributes: Any) -> Any:
-        """Sets attributes by Python name, and the transform from ``translate``, ``rotate``,
-        ``rotation_order``, ``orient`` and ``scale``; ``set(token, value)`` sets one by USD name.
-        Returns this prim."""
+        """Sets attributes by Python name, and the transform from
+        ``translate``, ``rotate``, ``rotation_order``, ``orient`` and
+        ``scale``; ``set(token, value)`` sets one by USD name. Returns
+        this prim."""
         if attribute:
             self.prim.set(*attribute)
-        xform = {key: attributes.pop(key) for key in _XFORM_KEYS if key in attributes}
+        xform = {
+            key: attributes.pop(key)
+            for key in _XFORM_KEYS
+            if key in attributes
+        }
         for name, value in attributes.items():
             definition = self._attributes.get(name)
             if definition is None:
                 raise TypeError(
                     f"{type(self).__name__} has no attribute {name!r}"
-                    + _closest(name, [*self._attributes, *_XFORM_KEYS])
+                    + _closest(
+                        name, [*self._attributes, *_XFORM_KEYS]
+                    )
                 )
             _write(definition, self.prim, value)
         if xform:
@@ -271,18 +347,23 @@ class Schema:
             return getattr(self.prim, name)
         except AttributeError:
             raise AttributeError(
-                f"{type(self).__name__} has no attribute {name!r}" + _closest(name, self._attributes)
+                f"{type(self).__name__} has no attribute {name!r}"
+                + _closest(name, self._attributes)
             ) from None
 
     def __setattr__(self, name: str, value: Any) -> None:
         if name not in self._attributes:
             raise AttributeError(
-                f"{type(self).__name__} has no attribute {name!r}" + _closest(name, self._attributes)
+                f"{type(self).__name__} has no attribute {name!r}"
+                + _closest(name, self._attributes)
             )
         object.__setattr__(self, name, value)
 
     def __eq__(self, other: object) -> bool:
-        return isinstance(other, Schema) and other.prim.path == self.prim.path
+        return (
+            isinstance(other, Schema)
+            and other.prim.path == self.prim.path
+        )
 
     def __hash__(self) -> int:
         return hash(self.prim.path)
@@ -295,7 +376,11 @@ def _build() -> dict[str, type[Schema]]:
     reserved = set(dir(Schema)) | set(dir(Prim))
     classes: dict[str, type[Schema]] = {}
     for prim_type in prim_types():
-        base = classes[prim_type.base.name] if prim_type.base is not None else Schema
+        base = (
+            classes[prim_type.base.name]
+            if prim_type.base is not None
+            else Schema
+        )
         namespace: dict[str, Any] = {
             "__slots__": (),
             "__doc__": prim_type.doc,
@@ -304,10 +389,14 @@ def _build() -> dict[str, type[Schema]]:
             "_attributes": dict(base._attributes),
         }
         for definition in prim_type.attributes:
-            names = [definition.py_name] + ([definition.plural] if definition.plural else [])
+            names = [definition.py_name] + (
+                [definition.plural] if definition.plural else []
+            )
             for name in names:
                 if name in reserved:
-                    raise RuntimeError(f"{prim_type.name}.{name} hides a Prim member")
+                    raise RuntimeError(
+                        f"{prim_type.name}.{name} hides a Prim member"
+                    )
                 namespace["_attributes"][name] = definition
             name = AttributeName(definition)
             if definition.plural:
@@ -315,7 +404,9 @@ def _build() -> dict[str, type[Schema]]:
                 namespace[definition.plural] = _Attribute(name)
             else:
                 namespace[definition.py_name] = _Attribute(name)
-        classes[prim_type.name] = builtins.type(prim_type.name, (base,), namespace)
+        classes[prim_type.name] = builtins.type(
+            prim_type.name, (base,), namespace
+        )
     return classes
 
 
@@ -325,21 +416,32 @@ __all__ += list(classes)
 
 
 def typed(prim: Prim | Schema) -> Schema | Prim:
-    """``prim`` as an instance of its type's class, the most derived (a SphereLight's
-    ``ernie.SphereLight``, a Light given as ``ernie.Light``), or the ``Prim`` itself when its type
-    has no class (untyped, or not registered)."""
+    """``prim`` as an instance of its type's class, the most derived
+    (a SphereLight's ``ernie.SphereLight``, a Light given as
+    ``ernie.Light``), or the ``Prim`` itself when its type has no
+    class (untyped, or not registered)."""
     if isinstance(prim, Schema):
         prim = prim.prim
     if not isinstance(prim, Prim) or not prim.valid:
-        raise TypeError(f"typed needs a valid Prim or typed prim, not {prim!r}")
+        raise TypeError(
+            f"typed needs a valid Prim or typed prim, not {prim!r}"
+        )
     cls = classes.get(prim.type)
     return cls(prim) if cls is not None else prim
 
 
-def _define(self: Scene | Prim, path: str | Path, type: Any, /, **attributes: Any) -> Any:
+def _define(
+    self: Scene | Prim,
+    path: str | Path,
+    type: Any,
+    /,
+    **attributes: Any,
+) -> Any:
     if isinstance(type, builtins.type) and issubclass(type, Schema):
         return type.define(self, path, **attributes)
-    define = _scene_define if isinstance(self, Scene) else _prim_define
+    define = (
+        _scene_define if isinstance(self, Scene) else _prim_define
+    )
     prim = define(self, path, type)
     if attributes:
         cls = classes.get(type)
@@ -353,15 +455,19 @@ def _define(self: Scene | Prim, path: str | Path, type: Any, /, **attributes: An
 
 
 def load_scene(description: Any, scene: Scene | None = None) -> Scene:
-    """Builds prims from a description, into ``scene`` or a new Scene, and returns the scene.
+    """Builds prims from a description, into ``scene`` or a new Scene,
+    and returns the scene.
 
-    The description is a dict (or JSON text, or the path of a ``.json`` file) from prim paths to
-    prims; each prim is a dict whose ``"type"`` names its type (none for an untyped prim, or to
-    leave an existing prim's type alone), whose dict values are its children by name, and whose
-    other values are its attributes, by Python name (``radius``) or USD name
-    (``"inputs:radius"``), with ``translate``, ``rotate``, ``rotation_order``, ``orient`` and
-    ``scale`` setting its transform ops (``orient`` a ``Quat`` or [w, x, y, z]) and ``transform``
-    a 4 x 4 matrix (rows of four); C++ reads the same format (``ernie/scene/scene_json.h``)::
+    The description is a dict (or JSON text, or the path of a
+    ``.json`` file) from prim paths to prims; each prim is a dict
+    whose ``"type"`` names its type (none for an untyped prim, or to
+    leave an existing prim's type alone), whose dict values are its
+    children by name, and whose other values are its attributes, by
+    Python name (``radius``) or USD name (``"inputs:radius"``), with
+    ``translate``, ``rotate``, ``rotation_order``, ``orient`` and
+    ``scale`` setting its transform ops (``orient`` a ``Quat`` or [w,
+    x, y, z]) and ``transform`` a 4 x 4 matrix (rows of four); C++
+    reads the same format (``ernie/scene/scene_json.h``)::
 
         ernie.load_scene({
             "/World": {"type": "Xform",
@@ -370,21 +476,27 @@ def load_scene(description: Any, scene: Scene | None = None) -> Scene:
             "/Render/Settings": {"type": "RenderSettings", "resolution": [640, 480]},
         })
 
-    C++ loads it (``LoadScene``), so both read a description the same way: each value is read as
-    its attribute's declared kind, checked as setting it is. Lists for array attributes become
-    arrays: int32 for those of whole numbers (``face_vertex_indices``, ``proto_indices``;
-    ``AttributeDef.is_integer``), float32 for the rest (``points``, ``heights``), whatever the
-    numbers look like; nested lists for one that takes an array in place of its value
-    (``AttributeDef.takes_array``: per-vertex ``display_color``) are a float32 array. A dict may
-    hold ``Quat``s, ``Path``s and prims too, and arrays (NumPy, or any DLPack array, a CUDA one
-    included): where an array goes, written as it is, shared and not copied, its dtype kept, as
-    ``Scene.write`` writes one; elsewhere (``translate``, a ``radius``) read as the numbers it
-    holds, which needs a CPU array.
+    C++ loads it (``LoadScene``), so both read a description the same
+    way: each value is read as its attribute's declared kind, checked
+    as setting it is. Lists for array attributes become arrays: int32
+    for those of whole numbers (``face_vertex_indices``,
+    ``proto_indices``; ``AttributeDef.is_integer``), float32 for the
+    rest (``points``, ``heights``), whatever the numbers look like;
+    nested lists for one that takes an array in place of its value
+    (``AttributeDef.takes_array``: per-vertex ``display_color``) are a
+    float32 array. A dict may hold ``Quat``s, ``Path``s and prims too,
+    and arrays (NumPy, or any DLPack array, a CUDA one included):
+    where an array goes, written as it is, shared and not copied, its
+    dtype kept, as ``Scene.write`` writes one; elsewhere
+    (``translate``, a ``radius``) read as the numbers it holds, which
+    needs a CPU array.
 
     Raises:
-        ValueError: A value its attribute does not take, or JSON that does not parse, naming
-            the prim and key (or the line and column).
-        TypeError: The description is not a dict, JSON text or a file path."""
+        ValueError: A value its attribute does not take, or JSON that
+            does not parse, naming the prim and key (or the line and
+            column).
+        TypeError: The description is not a dict, JSON text or a file
+            path."""
     scene = scene if scene is not None else Scene()
     if isinstance(description, (str, os.PathLike)):
         text = str(description)
@@ -394,23 +506,36 @@ def load_scene(description: Any, scene: Scene | None = None) -> Scene:
             _load_scene_file(scene, description)
         return scene
     if not isinstance(description, dict):
-        raise TypeError(f"A scene description is a dict of prim paths, not {type(description).__name__}")
-    # Arrays go to C++ beside the text, not through it: {"$array": i} stands for arrays[i].
+        raise TypeError(
+            f"A scene description is a dict of prim paths, not {type(description).__name__}"
+        )
+    # Arrays go to C++ beside the text, not through it: {"$array": i}
+    # stands for arrays[i].
     arrays: list[Any] = []
 
     def json_value(value: Any) -> Any:
         if isinstance(value, Quat):
             return [value.w, value.x, value.y, value.z]
         if isinstance(value, (Path, Prim, Schema)):
-            return str(value.path if isinstance(value, (Prim, Schema)) else value)
+            return str(
+                value.path
+                if isinstance(value, (Prim, Schema))
+                else value
+            )
         if isinstance(value, np.generic):
             return value.item()
-        if isinstance(value, np.ndarray) or hasattr(value, "__dlpack__"):
+        if isinstance(value, np.ndarray) or hasattr(
+            value, "__dlpack__"
+        ):
             arrays.append(value)
             return {"$array": len(arrays) - 1}
-        raise TypeError(f"A scene description has no value of type {type(value).__name__}")
+        raise TypeError(
+            f"A scene description has no value of type {type(value).__name__}"
+        )
 
-    _load_scene_text(scene, json.dumps(description, default=json_value), arrays)
+    _load_scene_text(
+        scene, json.dumps(description, default=json_value), arrays
+    )
     return scene
 
 

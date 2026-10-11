@@ -1,22 +1,25 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""One spot light, four illuminants (physical:illuminant), after the Omniverse RTX physical
-lighting page's illuminant figure: "white", "illuminant D" at 4000 K, "blackbody" at 2000 K and a
-"custom" fluorescent spectrum, each at the same 1600 lumens (photometric:power), lighting a
-checkered wall with a colour chart and two spheres in a dark room. The Python twin of
-illuminants.cpp.
+"""One spot light, four illuminants (physical:illuminant), after the
+Omniverse RTX physical lighting page's illuminant figure: "white",
+"illuminant D" at 4000 K, "blackbody" at 2000 K and a "custom"
+fluorescent spectrum, each at the same 1600 lumens
+(photometric:power), lighting a checkered wall with a colour chart and
+two spheres in a dark room. The Python twin of illuminants.cpp.
 
     python -m ernie.demos lighting/illuminants [--viewer null --output illuminants.png]
 
-The lumens stay the same, so each image has about the same brightness; the illuminant changes
-only the colour of the light, and how the chart's patches render under it. The page's custom
-illuminant is CIE F5; here the custom spectrum is fluorescent-like rather than F5 itself: mercury
-emission lines at 405, 436, 546 and 578 nm over a broad halophosphate band.
+The lumens stay the same, so each image has about the same brightness;
+the illuminant changes only the colour of the light, and how the
+chart's patches render under it. The page's custom illuminant is CIE
+F5; here the custom spectrum is fluorescent-like rather than F5
+itself: mercury emission lines at 405, 436, 546 and 578 nm over a
+broad halophosphate band.
 
 References:
 - NVIDIA, "Omniverse RTX Renderer: Lighting, Physical Lighting",
   https://docs.omniverse.nvidia.com/materials-and-rendering/latest/lighting.html
-- D. Pascale, "RGB coordinates of the Macbeth ColorChecker", BabelColor, 2006 (the patches' sRGB
-  values).
+- D. Pascale, "RGB coordinates of the Macbeth ColorChecker",
+  BabelColor, 2006 (the patches' sRGB values).
 """
 
 import numpy as np
@@ -24,15 +27,40 @@ import numpy as np
 import ernie
 import ernie.demo
 from ernie import tokens
-from ernie.demo import mean_linear_rgb, side_by_side, srgb_to_linear, write_png
+from ernie.demo import (
+    mean_linear_rgb,
+    side_by_side,
+    srgb_to_linear,
+    write_png,
+)
 
-# The ColorChecker's 24 patches in sRGB, row by row from dark skin to black.
+# The ColorChecker's 24 patches in sRGB, row by row from dark skin to
+# black.
 CHART = [
-    (115, 82, 68), (194, 150, 130), (98, 122, 157), (87, 108, 67), (133, 128, 177),
-    (103, 189, 170), (214, 126, 44), (80, 91, 166), (193, 90, 99), (94, 60, 108),
-    (157, 188, 64), (224, 163, 46), (56, 61, 150), (70, 148, 73), (175, 54, 60),
-    (231, 199, 31), (187, 86, 149), (8, 133, 161), (243, 243, 242), (200, 200, 200),
-    (160, 160, 160), (122, 122, 121), (85, 85, 85), (52, 52, 52),
+    (115, 82, 68),
+    (194, 150, 130),
+    (98, 122, 157),
+    (87, 108, 67),
+    (133, 128, 177),
+    (103, 189, 170),
+    (214, 126, 44),
+    (80, 91, 166),
+    (193, 90, 99),
+    (94, 60, 108),
+    (157, 188, 64),
+    (224, 163, 46),
+    (56, 61, 150),
+    (70, 148, 73),
+    (175, 54, 60),
+    (231, 199, 31),
+    (187, 86, 149),
+    (8, 133, 161),
+    (243, 243, 242),
+    (200, 200, 200),
+    (160, 160, 160),
+    (122, 122, 121),
+    (85, 85, 85),
+    (52, 52, 52),
 ]
 
 ILLUMINANTS = [
@@ -44,20 +72,38 @@ ILLUMINANTS = [
 
 
 def fluorescent():
-    """(nm, value) pairs of a fluorescent-like spectrum: mercury lines over broad yellow and blue
-    phosphor bands, weighted to CIE F5's white point (x 0.311, y 0.337 against F5's 0.314,
-    0.335)."""
+    """(nm, value) pairs of a fluorescent-like spectrum: mercury lines
+    over broad yellow and blue phosphor bands, weighted to CIE F5's
+    white point (x 0.311, y 0.337 against F5's 0.314, 0.335)."""
     wavelengths = np.arange(380.0, 781.0, 1.0)
     band = np.exp(-0.5 * ((wavelengths - 570.0) / 80.0) ** 2)
     band += 0.8 * np.exp(-0.5 * ((wavelengths - 470.0) / 30.0) ** 2)
-    for line, weight in [(404.7, 0.8), (435.8, 2.0), (546.1, 0.5), (578.0, 0.2)]:
-        band += weight * np.exp(-0.5 * ((wavelengths - line) / 1.5) ** 2)
-    return np.stack([wavelengths, band], axis=1).astype(np.float32).ravel().tolist()
+    for line, weight in [
+        (404.7, 0.8),
+        (435.8, 2.0),
+        (546.1, 0.5),
+        (578.0, 0.2),
+    ]:
+        band += weight * np.exp(
+            -0.5 * ((wavelengths - line) / 1.5) ** 2
+        )
+    return (
+        np.stack([wavelengths, band], axis=1)
+        .astype(np.float32)
+        .ravel()
+        .tolist()
+    )
 
 
 def box(parent, path, centre, size, colour):
-    parent.define(path, ernie.Cube, size=1.0, translate=centre, scale=size,
-                  display_color=tuple(float(c) for c in colour))
+    parent.define(
+        path,
+        ernie.Cube,
+        size=1.0,
+        translate=centre,
+        scale=size,
+        display_color=tuple(float(c) for c in colour),
+    )
 
 
 class Demo(ernie.demo.Demo):
@@ -66,45 +112,108 @@ class Demo(ernie.demo.Demo):
     def __init__(self, viewer, args):
         super().__init__(viewer, args)
         world = self.scene.define("/World", ernie.Xform)
-        world.define("Floor", ernie.GroundPlane, checker=True, checker_size=0.25,
-                     checker_color0=(0.35, 0.35, 0.35), checker_color1=(0.2, 0.2, 0.2))
+        world.define(
+            "Floor",
+            ernie.GroundPlane,
+            checker=True,
+            checker_size=0.25,
+            checker_color0=(0.35, 0.35, 0.35),
+            checker_color1=(0.2, 0.2, 0.2),
+        )
         # A checkered back wall 3 m wide and 3 m high at y = 1.
         wall = world.define("Wall", ernie.Xform)
         for i in range(12):
             for j in range(12):
                 grey = 0.32 if (i + j) % 2 == 0 else 0.2
-                box(wall, f"T{i}_{j}", (-1.5 + 0.25 * (i + 0.5), 1.05, 0.25 * (j + 0.5)),
-                    (0.25, 0.1, 0.25), (grey, grey, grey))
-        # The colour chart on the wall, 6 x 4 patches of 10 cm on a black card.
+                box(
+                    wall,
+                    f"T{i}_{j}",
+                    (-1.5 + 0.25 * (i + 0.5), 1.05, 0.25 * (j + 0.5)),
+                    (0.25, 0.1, 0.25),
+                    (grey, grey, grey),
+                )
+        # The colour chart on the wall, 6 x 4 patches of 10 cm on a
+        # black card.
         chart = world.define("Chart", ernie.Xform)
-        box(chart, "Card", (-0.25, 0.99, 1.3), (0.68, 0.01, 0.47), (0.03, 0.03, 0.03))
+        box(
+            chart,
+            "Card",
+            (-0.25, 0.99, 1.3),
+            (0.68, 0.01, 0.47),
+            (0.03, 0.03, 0.03),
+        )
         for k, rgb in enumerate(CHART):
             col, row = k % 6, k // 6
-            box(chart, f"P{k}", (-0.525 + 0.11 * col, 0.98, 1.465 - 0.11 * row),
-                (0.1, 0.02, 0.1), srgb_to_linear(np.array(rgb) / 255.0))
-        world.define("Ball", ernie.Sphere, radius=0.15, translate=(0.25, 0.6, 0.15),
-                     display_color=(0.5, 0.5, 0.5))
-        world.define("Ball2", ernie.Sphere, radius=0.15, translate=(-0.1, 0.55, 0.15),
-                     display_color=(0.8, 0.8, 0.8))
-        # A spot near the ceiling at the left, grazing the wall: 1600 lumens.
-        self.spot = world.define("Spot", ernie.SphereLight, radius=0.05, shaping_cone_angle=40.0,
-                                 shaping_cone_softness=0.4, photometric_power=1600.0,
-                                 physical_custom_illuminant=fluorescent()).set(
+            box(
+                chart,
+                f"P{k}",
+                (-0.525 + 0.11 * col, 0.98, 1.465 - 0.11 * row),
+                (0.1, 0.02, 0.1),
+                srgb_to_linear(np.array(rgb) / 255.0),
+            )
+        world.define(
+            "Ball",
+            ernie.Sphere,
+            radius=0.15,
+            translate=(0.25, 0.6, 0.15),
+            display_color=(0.5, 0.5, 0.5),
+        )
+        world.define(
+            "Ball2",
+            ernie.Sphere,
+            radius=0.15,
+            translate=(-0.1, 0.55, 0.15),
+            display_color=(0.8, 0.8, 0.8),
+        )
+        # A spot near the ceiling at the left, grazing the wall: 1600
+        # lumens.
+        self.spot = world.define(
+            "Spot",
+            ernie.SphereLight,
+            radius=0.05,
+            shaping_cone_angle=40.0,
+            shaping_cone_softness=0.4,
+            photometric_power=1600.0,
+            physical_custom_illuminant=fluorescent(),
+        ).set(
             tokens.TRANSFORM,
-            ernie.look_at_transform((-1.2, 0.6, 2.9), (-0.25, 1.0, 1.0), (0.0, 1.0, 0.0)))
-        # ISO 400, f/2, 1/125 s: the spot's lumens fill only its 40 degree cone, so the wall in
-        # it is bright; the cone's centre just clips.
-        camera = world.define("Camera", ernie.Camera, focal_length=18.0, sensor_noise=False,
-                              exposure_time=1.0 / 125.0, exposure_iso=400.0,
-                              exposure_f_stop=2.0).set(
-            tokens.TRANSFORM, ernie.look_at_transform((0.0, -2.6, 1.3), (0.0, 1.0, 1.2)))
-        self.scene.define("/Render/Settings", ernie.RenderSettings, camera=camera,
-                          resolution=(448, 300), ambient=0.0)
+            ernie.look_at_transform(
+                (-1.2, 0.6, 2.9), (-0.25, 1.0, 1.0), (0.0, 1.0, 0.0)
+            ),
+        )
+        # ISO 400, f/2, 1/125 s: the spot's lumens fill only its 40
+        # degree cone, so the wall in it is bright; the cone's centre
+        # just clips.
+        camera = world.define(
+            "Camera",
+            ernie.Camera,
+            focal_length=18.0,
+            sensor_noise=False,
+            exposure_time=1.0 / 125.0,
+            exposure_iso=400.0,
+            exposure_f_stop=2.0,
+        ).set(
+            tokens.TRANSFORM,
+            ernie.look_at_transform(
+                (0.0, -2.6, 1.3), (0.0, 1.0, 1.2)
+            ),
+        )
+        self.scene.define(
+            "/Render/Settings",
+            ernie.RenderSettings,
+            camera=camera,
+            resolution=(448, 300),
+            ambient=0.0,
+        )
         self.light_with(0)
 
         # The demo's option, in the Demos panel: the illuminant.
-        self.widgets.combo("Illuminant", [name for name, _, _ in ILLUMINANTS], 0,
-                           on_change=self.light_with)
+        self.widgets.combo(
+            "Illuminant",
+            [name for name, _, _ in ILLUMINANTS],
+            0,
+            on_change=self.light_with,
+        )
         if viewer is not None:
             viewer.active_camera = camera.path
 
@@ -115,7 +224,8 @@ class Demo(ernie.demo.Demo):
         self.spot.color_temperature = kelvin
 
     def render_all(self):
-        """The scene under each illuminant in turn, RGBA uint8; leaves the light as it was."""
+        """The scene under each illuminant in turn, RGBA uint8; leaves
+        the light as it was."""
         current = self.illuminant
         images = []
         for index in range(len(ILLUMINANTS)):
@@ -129,20 +239,38 @@ class Demo(ernie.demo.Demo):
         write_png(path, side_by_side(self.render_all()))
 
     def test_final(self):
-        means = [mean_linear_rgb(image) for image in self.render_all()]
-        luminance = [float(m @ np.array([0.2126, 0.7152, 0.0722])) for m in means]
+        means = [
+            mean_linear_rgb(image) for image in self.render_all()
+        ]
+        luminance = [
+            float(m @ np.array([0.2126, 0.7152, 0.0722]))
+            for m in means
+        ]
         warmth = [float(m[0] / max(m[2], 1e-6)) for m in means]
         for (name, _, _), y, w in zip(ILLUMINANTS, luminance, warmth):
             print(f"{name}: mean luminance {y:.4f}, red/blue {w:.2f}")
-        # The same 1600 lumens: about the same brightness under every illuminant.
+        # The same 1600 lumens: about the same brightness under every
+        # illuminant.
         assert luminance[0] > 0.005, "the spot should light the wall"
-        assert max(luminance) < 1.2 * min(luminance), "the same lumens should look as bright"
-        # Only the colour changes: 4000 K warmer than white, 2000 K warmer still.
-        assert 0.7 < warmth[0] < 1.4, "the white light should be about neutral"
-        assert warmth[1] > 1.15 * warmth[0], "illuminant D at 4000 K should be warmer than white"
-        assert warmth[2] > 1.5 * warmth[1], "a 2000 K blackbody should be warmer than 4000 K"
-        # The mercury lines at 405 and 436 nm tip the fluorescent spectrum blue of white.
-        assert warmth[3] < 0.9 * warmth[0], "the fluorescent light should be cooler than white"
+        assert max(luminance) < 1.2 * min(luminance), (
+            "the same lumens should look as bright"
+        )
+        # Only the colour changes: 4000 K warmer than white, 2000 K
+        # warmer still.
+        assert 0.7 < warmth[0] < 1.4, (
+            "the white light should be about neutral"
+        )
+        assert warmth[1] > 1.15 * warmth[0], (
+            "illuminant D at 4000 K should be warmer than white"
+        )
+        assert warmth[2] > 1.5 * warmth[1], (
+            "a 2000 K blackbody should be warmer than 4000 K"
+        )
+        # The mercury lines at 405 and 436 nm tip the fluorescent
+        # spectrum blue of white.
+        assert warmth[3] < 0.9 * warmth[0], (
+            "the fluorescent light should be cooler than white"
+        )
 
 
 if __name__ == "__main__":

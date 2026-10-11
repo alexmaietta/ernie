@@ -1,10 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 import numpy as np
 import pytest
-
-import ernie
-from ernie import tokens
 from test_cuda import instancer_scene
+
+from ernie import tokens
 
 
 @pytest.fixture
@@ -16,7 +15,9 @@ def cuda_renderer(renderer):
 
 def green_columns(image):
     pixels = np.asarray(image).astype(np.int32)
-    green = (pixels[..., 1] > 200) & (2 * (pixels[..., 0] + pixels[..., 2]) < pixels[..., 1])
+    green = (pixels[..., 1] > 200) & (
+        2 * (pixels[..., 0] + pixels[..., 2]) < pixels[..., 1]
+    )
     return np.nonzero(green.any(axis=0))[0]
 
 
@@ -26,29 +27,43 @@ def test_mapped_cpu_arrays_are_written_in_place(renderer):
     assert columns.size and columns.max() < 24
     with scene.map("/World/Rocks", tokens.POSITIONS) as positions:
         positions[0, 0] = 10.0
-    np.testing.assert_array_equal(scene.read("/World/Rocks", tokens.POSITIONS), [[10, 0, 0]])
+    np.testing.assert_array_equal(
+        scene.read("/World/Rocks", tokens.POSITIONS), [[10, 0, 0]]
+    )
     columns = green_columns(renderer.render(scene))
-    assert columns.size and columns.min() > 24, "the instance moved right"
+    assert columns.size and columns.min() > 24, (
+        "the instance moved right"
+    )
     assert renderer.take_validation_messages() == []
 
 
-def test_mapped_cuda_arrays_are_written_in_place_every_step(cuda_renderer):
+def test_mapped_cuda_arrays_are_written_in_place_every_step(
+    cuda_renderer,
+):
     scene = instancer_scene(np.array([[-10.0, 0.0, 0.0]], np.float32))
     scene.write(
         "/World/Rocks",
         tokens.POSITIONS,
-        cuda_renderer.cuda_upload(np.array([[-10.0, 0.0, 0.0]], np.float32)),
+        cuda_renderer.cuda_upload(
+            np.array([[-10.0, 0.0, 0.0]], np.float32)
+        ),
         stream=1,
     )
     for x in (10.0, -10.0, 10.0, -10.0):
-        mapping = scene.map("/World/Rocks", tokens.POSITIONS, stream=1)
+        mapping = scene.map(
+            "/World/Rocks", tokens.POSITIONS, stream=1
+        )
         assert mapping.array.__dlpack_device__() == (2, 0)
-        value = cuda_renderer.cuda_upload(np.array([[x, 0.0, 0.0]], np.float32))
+        value = cuda_renderer.cuda_upload(
+            np.array([[x, 0.0, 0.0]], np.float32)
+        )
         cuda_renderer.cuda_copy(value, mapping.array, stream=1)
         mapping.unmap()
         columns = green_columns(cuda_renderer.render(scene))
         assert columns.size
-        assert (columns.min() > 24) == (x > 0), f"step drew the array written for x={x}"
+        assert (columns.min() > 24) == (x > 0), (
+            f"step drew the array written for x={x}"
+        )
     assert cuda_renderer.take_validation_messages() == []
 
 

@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Runs the README's Python examples as written, so they keep working as the API changes."""
+"""Runs the README's Python examples as written, so they keep working
+as the API changes."""
 
 import pathlib
 import re
@@ -13,7 +14,9 @@ README = pathlib.Path(__file__).resolve().parents[3] / "README.md"
 
 
 def python_blocks():
-    return re.findall(r"```python\n(.*?)```", README.read_text(), re.DOTALL)
+    return re.findall(
+        r"```python\n(.*?)```", README.read_text(), re.DOTALL
+    )
 
 
 def test_the_readme_has_python_examples():

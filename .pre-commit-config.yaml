@@ -53,3 +53,22 @@ repos:
     hooks:
       - id: cmake-format
         additional_dependencies: ["pyyaml>=5.1"]
+
+  # Python: ruff lints and formats to 70 columns (pyproject.toml's [tool.ruff]).
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.0
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  # mypy against the built package's stubs (build/python), so it runs from the
+  # development environment, where the build is ([tool.mypy]).
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        language: system
+        entry: mypy
+        types: [python]
+        pass_filenames: false

@@ -4,10 +4,10 @@ import sys
 
 import numpy as np
 import pytest
+from test_render import quad
 
 import ernie
 from ernie import tokens
-from test_render import quad
 
 
 @pytest.fixture
@@ -19,30 +19,47 @@ def cuda_renderer(renderer):
 
 def instancer_scene(positions):
     scene = ernie.Scene()
-    scene.define("/World/Camera", ernie.Camera, focal_length=18.0).set(
-        tokens.TRANSFORM, ernie.look_at_transform((0, 0, 60), (0, 0, 0), up=(0, 1, 0))
+    scene.define(
+        "/World/Camera", ernie.Camera, focal_length=18.0
+    ).set(
+        tokens.TRANSFORM,
+        ernie.look_at_transform((0, 0, 60), (0, 0, 0), up=(0, 1, 0)),
     )
-    scene.define("/Render/Settings", ernie.RenderSettings, resolution=(48, 48))
-    scene.define("/World/Rocks", ernie.PointInstancer, positions=positions).set(
-        tokens.PROTOTYPES, [ernie.Path("/World/Rocks/Rock")]
-    ).set(tokens.EXTENT, [-15.0, -15.0, -1.0, 15.0, 15.0, 1.0])
-    quad(scene, "/World/Rocks/Rock", 1.5).set(display_color=(0.0, 1.0, 0.0))
+    scene.define(
+        "/Render/Settings", ernie.RenderSettings, resolution=(48, 48)
+    )
+    scene.define(
+        "/World/Rocks", ernie.PointInstancer, positions=positions
+    ).set(tokens.PROTOTYPES, [ernie.Path("/World/Rocks/Rock")]).set(
+        tokens.EXTENT, [-15.0, -15.0, -1.0, 15.0, 15.0, 1.0]
+    )
+    quad(scene, "/World/Rocks/Rock", 1.5).set(
+        display_color=(0.0, 1.0, 0.0)
+    )
     scene.define("/World/Sun", ernie.DistantLight).set(
-        tokens.TRANSFORM, ernie.distant_light_transform((0.0, 0.0, 1.0))
+        tokens.TRANSFORM,
+        ernie.distant_light_transform((0.0, 0.0, 1.0)),
     )
     return scene
 
 
 def test_cuda_instances_render_like_host_ones(cuda_renderer):
-    positions = np.array([[-10.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.0, 10.0, 0.0]], np.float32)
-    expected = np.array(cuda_renderer.render(instancer_scene(positions)))
+    positions = np.array(
+        [[-10.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.0, 10.0, 0.0]],
+        np.float32,
+    )
+    expected = np.array(
+        cuda_renderer.render(instancer_scene(positions))
+    )
     on_gpu = cuda_renderer.cuda_upload(positions)
     image = cuda_renderer.render(instancer_scene(on_gpu))
     np.testing.assert_array_equal(image, expected)
 
 
 def test_renders_into_cuda_memory(cuda_renderer):
-    positions = np.array([[-10.0, 0.0, 0.0], [10.0, 0.0, 0.0]], np.float32)
+    positions = np.array(
+        [[-10.0, 0.0, 0.0], [10.0, 0.0, 0.0]], np.float32
+    )
     scene = instancer_scene(positions)
     expected = np.array(cuda_renderer.render(scene))
     result = cuda_renderer.render(scene, device="cuda")
@@ -50,8 +67,12 @@ def test_renders_into_cuda_memory(cuda_renderer):
     assert result.shape == (48, 48, 4)
     assert result.__dlpack_device__() == (2, 0)
     assert type(result.__dlpack__(stream=-1)).__name__ == "PyCapsule"
-    assert type(result.__dlpack__(stream=None)).__name__ == "PyCapsule"
-    np.testing.assert_array_equal(np.array(cuda_renderer.cuda_download(result)), expected)
+    assert (
+        type(result.__dlpack__(stream=None)).__name__ == "PyCapsule"
+    )
+    np.testing.assert_array_equal(
+        np.array(cuda_renderer.cuda_download(result)), expected
+    )
     assert cuda_renderer.take_validation_messages() == []
 
 
@@ -75,16 +96,28 @@ def test_rejects_bad_devices(renderer):
 def test_back_to_back_cuda_renders_stay_correct(cuda_renderer):
     scene = instancer_scene(np.array([[-10.0, 0.0, 0.0]], np.float32))
     expected = np.array(cuda_renderer.render(scene))
-    results = [cuda_renderer.render(scene, device="cuda") for _ in range(4)]
+    results = [
+        cuda_renderer.render(scene, device="cuda") for _ in range(4)
+    ]
     for result in results:
-        np.testing.assert_array_equal(np.array(cuda_renderer.cuda_download(result)), expected)
+        np.testing.assert_array_equal(
+            np.array(cuda_renderer.cuda_download(result)), expected
+        )
 
 
 def test_poses_written_from_cuda_stay_on_the_gpu(cuda_renderer):
-    positions = np.array([[-10.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.0, 10.0, 0.0]], np.float32)
+    positions = np.array(
+        [[-10.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.0, 10.0, 0.0]],
+        np.float32,
+    )
     poses = np.stack(
         [
-            np.array(ernie.look_at_transform((x, 0, 60), (x, 0, 0), up=(0, 1, 0)), np.float32)
+            np.array(
+                ernie.look_at_transform(
+                    (x, 0, 60), (x, 0, 0), up=(0, 1, 0)
+                ),
+                np.float32,
+            )
             for x in (-10.0, 0.0, 10.0)
         ]
     )
@@ -95,10 +128,15 @@ def test_poses_written_from_cuda_stay_on_the_gpu(cuda_renderer):
         if device is not None:
             scene.set("/World/Camera", tokens.POSES_DEVICE, device)
         scene.define(
-            "/Render/Batch", ernie.RenderProduct, camera="/World/Camera", resolution=(48, 48)
+            "/Render/Batch",
+            ernie.RenderProduct,
+            camera="/World/Camera",
+            resolution=(48, 48),
         )
         return np.array(
-            cuda_renderer.step(scene, render_products=["/Render/Batch"])["/Render/Batch"]
+            cuda_renderer.step(
+                scene, render_products=["/Render/Batch"]
+            )["/Render/Batch"]
             .frames[0]
             .render_vars["/Render/Batch/LdrColor"]
             .map()
@@ -106,35 +144,58 @@ def test_poses_written_from_cuda_stay_on_the_gpu(cuda_renderer):
 
     host = render(poses)
     on_gpu = cuda_renderer.cuda_upload(poses)
-    # Computed on the GPU in float32, the views' matrices round slightly differently.
+    # Computed on the GPU in float32, the views' matrices round
+    # slightly differently.
     gpu = render(on_gpu)
-    assert np.mean(np.abs(gpu.astype(int) - host.astype(int)) > 8) < 0.005
-    np.testing.assert_array_equal(render(on_gpu, device=tokens.HOST), host)
+    assert (
+        np.mean(np.abs(gpu.astype(int) - host.astype(int)) > 8)
+        < 0.005
+    )
+    np.testing.assert_array_equal(
+        render(on_gpu, device=tokens.HOST), host
+    )
     assert cuda_renderer.take_validation_messages() == []
 
 
 def test_mapped_poses_are_written_in_place(cuda_renderer):
-    positions = np.array([[-10.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.0, 10.0, 0.0]], np.float32)
+    positions = np.array(
+        [[-10.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.0, 10.0, 0.0]],
+        np.float32,
+    )
 
     def poses_at(xs):
         return np.stack(
             [
-                np.array(ernie.look_at_transform((x, 0, 60), (x, 0, 0), up=(0, 1, 0)), np.float32)
+                np.array(
+                    ernie.look_at_transform(
+                        (x, 0, 60), (x, 0, 0), up=(0, 1, 0)
+                    ),
+                    np.float32,
+                )
                 for x in xs
             ]
         )
 
     def batch_scene(poses):
         scene = instancer_scene(positions)
-        scene.write("/World/Camera", tokens.POSES, cuda_renderer.cuda_upload(poses))
+        scene.write(
+            "/World/Camera",
+            tokens.POSES,
+            cuda_renderer.cuda_upload(poses),
+        )
         scene.define(
-            "/Render/Batch", ernie.RenderProduct, camera="/World/Camera", resolution=(48, 48)
+            "/Render/Batch",
+            ernie.RenderProduct,
+            camera="/World/Camera",
+            resolution=(48, 48),
         )
         return scene
 
     def render(scene):
         return np.array(
-            cuda_renderer.step(scene, render_products=["/Render/Batch"])["/Render/Batch"]
+            cuda_renderer.step(
+                scene, render_products=["/Render/Batch"]
+            )["/Render/Batch"]
             .frames[0]
             .render_vars["/Render/Batch/LdrColor"]
             .map()
@@ -145,31 +206,51 @@ def test_mapped_poses_are_written_in_place(cuda_renderer):
     scene = batch_scene(first)
     render(scene)
     mapped = cuda_renderer.map(scene, "/World/Camera", tokens.POSES)
-    np.testing.assert_array_equal(np.array(cuda_renderer.cuda_download(mapped)), first)
+    np.testing.assert_array_equal(
+        np.array(cuda_renderer.cuda_download(mapped)), first
+    )
     cuda_renderer.cuda_copy(cuda_renderer.cuda_upload(moved), mapped)
     scene.unmap("/World/Camera", tokens.POSES)
-    np.testing.assert_array_equal(render(scene), render(batch_scene(moved)))
+    np.testing.assert_array_equal(
+        render(scene), render(batch_scene(moved))
+    )
     # Mapped again, it holds what the last frame rendered.
     again = cuda_renderer.map(scene, "/World/Camera", tokens.POSES)
-    np.testing.assert_array_equal(np.array(cuda_renderer.cuda_download(again)), moved)
+    np.testing.assert_array_equal(
+        np.array(cuda_renderer.cuda_download(again)), moved
+    )
     with pytest.raises(ValueError, match="write them first"):
-        cuda_renderer.map(instancer_scene(positions), "/World/Camera", tokens.POSES)
+        cuda_renderer.map(
+            instancer_scene(positions), "/World/Camera", tokens.POSES
+        )
     assert cuda_renderer.take_validation_messages() == []
 
 
 def test_mapped_arrays_are_written_in_place(cuda_renderer):
-    positions = np.array([[-10.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.0, 10.0, 0.0]], np.float32)
+    positions = np.array(
+        [[-10.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.0, 10.0, 0.0]],
+        np.float32,
+    )
     scene = instancer_scene(positions)
     cuda_renderer.render(scene)
-    mapped = cuda_renderer.map(scene, "/World/Rocks", tokens.POSITIONS)
-    # A writable DLPack array (for torch, cupy, warp.from_dlpack) holding the values.
+    mapped = cuda_renderer.map(
+        scene, "/World/Rocks", tokens.POSITIONS
+    )
+    # A writable DLPack array (for torch, cupy, warp.from_dlpack)
+    # holding the values.
     assert mapped.__dlpack_device__() == (2, 0)
-    np.testing.assert_array_equal(np.array(cuda_renderer.cuda_download(mapped)), positions)
-    moved = np.array([[-10.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 10.0, 0.0]], np.float32)
+    np.testing.assert_array_equal(
+        np.array(cuda_renderer.cuda_download(mapped)), positions
+    )
+    moved = np.array(
+        [[-10.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 10.0, 0.0]],
+        np.float32,
+    )
     cuda_renderer.cuda_copy(cuda_renderer.cuda_upload(moved), mapped)
     scene.unmap("/World/Rocks", tokens.POSITIONS)
     np.testing.assert_array_equal(
         np.array(cuda_renderer.render(scene)),
-        np.array(cuda_renderer.render(instancer_scene(moved))))
+        np.array(cuda_renderer.render(instancer_scene(moved))),
+    )
     with pytest.raises(ValueError):
         cuda_renderer.map(scene, "/World/Rocks", tokens.NORMALS)

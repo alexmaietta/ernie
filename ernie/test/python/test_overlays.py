@@ -1,28 +1,40 @@
 # SPDX-License-Identifier: BSD-3-Clause
 import numpy as np
 import pytest
+from conftest import make_terrain_scene
 
 import ernie
-
-from conftest import make_terrain_scene
 
 
 def test_overlays_build_from_python_values():
     scene = ernie.Scene()
     overlay = scene.overlay("debug")
     assert overlay is not None and overlay.empty
-    endpoints = np.array([[[0, 0, 0], [1, 0, 0]], [[0, 1, 0], [1, 1, 0]]], dtype=np.float32)
-    returned = overlay.lines(endpoints, colors=[(1, 0, 0, 1), (0, 1, 0, 0.5)], width=3)
-    overlay.lines(endpoints.reshape(-1, 3), colors=[(1, 0, 0), (0, 1, 0)])
+    endpoints = np.array(
+        [[[0, 0, 0], [1, 0, 0]], [[0, 1, 0], [1, 1, 0]]],
+        dtype=np.float32,
+    )
+    returned = overlay.lines(
+        endpoints, colors=[(1, 0, 0, 1), (0, 1, 0, 0.5)], width=3
+    )
+    overlay.lines(
+        endpoints.reshape(-1, 3), colors=[(1, 0, 0), (0, 1, 0)]
+    )
     assert returned is overlay
-    overlay.line((0, 0, 0), (0, 0, 1), color=(1, 1, 1), depth="xray", world=2).box(
-        (-1, -1, -1), (1, 1, 1), transform=np.eye(4)
-    ).arrow((0, 0, 0), (0, 0, 5)).sphere((0, 0, 0), 2.0).axes(np.eye(4), 0.5)
+    overlay.line(
+        (0, 0, 0), (0, 0, 1), color=(1, 1, 1), depth="xray", world=2
+    ).box((-1, -1, -1), (1, 1, 1), transform=np.eye(4)).arrow(
+        (0, 0, 0), (0, 0, 5)
+    ).sphere((0, 0, 0), 2.0).axes(np.eye(4), 0.5)
     overlay.polyline([(0, 0, 0), (1, 0, 0), (1, 1, 0)], closed=True)
     overlay.wire_mesh([(0, 0, 0), (1, 0, 0), (1, 1, 0)], [[0, 1, 2]])
     overlay.triangles(np.zeros((3, 3)), np.array([0, 1, 2]))
-    overlay.marker((0, 0, 0), shape="diamond", size=10).markers(np.zeros((4, 3)), shape="plus")
-    overlay.label((0, 0, 0), "contact", size=14, background=(0, 0, 0, 0))
+    overlay.marker((0, 0, 0), shape="diamond", size=10).markers(
+        np.zeros((4, 3)), shape="plus"
+    )
+    overlay.label(
+        (0, 0, 0), "contact", size=14, background=(0, 0, 0, 0)
+    )
     assert "segments" in repr(overlay)
     assert scene.overlay_names() == ["debug"]
 
@@ -44,10 +56,22 @@ def test_overlays_build_from_python_values():
 def test_overlays_draw_over_products_that_ask_for_them(renderer):
     scene = make_terrain_scene()
     plain = np.array(renderer.render(scene))
-    scene.overlay("debug").line((-60, 0, 0), (60, 0, 0), color=(1, 0, 1), width=4, depth="always")
-    np.testing.assert_array_equal(np.array(renderer.render(scene)), plain)
+    scene.overlay("debug").line(
+        (-60, 0, 0),
+        (60, 0, 0),
+        color=(1, 0, 1),
+        width=4,
+        depth="always",
+    )
+    np.testing.assert_array_equal(
+        np.array(renderer.render(scene)), plain
+    )
     ernie.RenderSettings.at(scene, "/Render/Settings").overlays = "*"
     drawn = np.array(renderer.render(scene))
-    magenta = (drawn[..., 0] == 255) & (drawn[..., 1] == 0) & (drawn[..., 2] == 255)
+    magenta = (
+        (drawn[..., 0] == 255)
+        & (drawn[..., 1] == 0)
+        & (drawn[..., 2] == 255)
+    )
     assert magenta.sum() > 20
     assert renderer.take_validation_messages() == []

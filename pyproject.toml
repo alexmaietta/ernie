@@ -53,6 +53,52 @@ ernie = "ernie.__main__:main"
 test = ["pytest>=8", "pillow"]
 # Demos whose GPU kernels drive the scene (demos/interop).
 demos = ["warp-lang>=1.0"]
+# Development: formatting, linting and type checking (CONTRIBUTING.md).
+dev = ["ruff>=0.17", "mypy>=2.4", "pre-commit>=4"]
+
+# Formatting and linting: code wraps at 70 columns, as clang-format's.
+[tool.ruff]
+line-length = 70
+target-version = "py312"
+extend-exclude = ["third_party", "build", "dist", "site", ".venv"]
+
+[tool.ruff.lint]
+# pycodestyle errors, pyflakes, warnings, imports, pyupgrade, bugbear.
+# Long lines are left to the formatter: strings, URLs and docstring
+# examples it cannot wrap stay as they are.
+select = ["E4", "E7", "E9", "F", "W", "I", "UP", "B"]
+ignore = ["E501", "B905"]
+
+[tool.ruff.lint.isort]
+# The package as installed, not the repository's ernie/ directory.
+known-first-party = ["ernie"]
+
+[tool.ruff.lint.per-file-ignores]
+# pytest fixtures imported into a test module and taken as arguments.
+"ernie/test/python/*" = ["F811", "B007", "B018"]
+
+# Type checking of the package as built (build/python/ernie, with the
+# extension's stubs) and the demos.
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "build/python"
+files = ["build/python/ernie", "demos"]
+explicit_package_bases = true
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+exclude = ["build/python/ernie/demos/"]
+
+[[tool.mypy.overrides]]
+module = ["warp", "warp.*", "torch", "torch.*", "PIL", "PIL.*"]
+ignore_missing_imports = true
+
+# Generated stubs: each prim type's define() and set() name its own
+# attributes where Schema's take any, and nanobind's __eq__ takes its
+# own type.
+[[tool.mypy.overrides]]
+module = ["ernie._ernie", "ernie._ernie.*", "ernie.schema"]
+disable_error_code = ["override"]
 
 [tool.scikit-build]
 minimum-version = "build-system.requires"

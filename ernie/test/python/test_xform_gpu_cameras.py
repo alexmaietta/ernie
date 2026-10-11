@@ -1,31 +1,42 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Cameras under prims posed on the GPU (a camera on a robot's link): each view posed on the GPU
-under its link's pose, rendered against the same links posed on the CPU."""
+"""Cameras under prims posed on the GPU (a camera on a robot's link):
+each view posed on the GPU under its link's pose, rendered against the
+same links posed on the CPU."""
 
 import numpy as np
 import pytest
+from test_xform_gpu import assert_same_image, cuda_renderer, quats  # noqa: F401
 
 import ernie
 from ernie import tokens
-from test_xform_gpu import assert_same_image, cuda_renderer, quats  # noqa: F401
 
 # The link's box wherever the link goes, in the world's frame.
 EXTENT = [-2.0, -2.0, -0.5, 2.0, 2.0, 0.5]
 
 
 def world_scene(count, ops=(tokens.TRANSLATE, tokens.ORIENT)):
-    """`count` worlds, each a link posed by `ops` with a box and a camera on it, looking along
-    the link at a few boxes of the world's own; one product renders every world's camera."""
+    """`count` worlds, each a link posed by `ops` with a box and a
+    camera on it, looking along the link at a few boxes of the world's
+    own; one product renders every world's camera."""
     scene = ernie.Scene()
-    # No shadows: the sun's map is fitted to the scene's bounds, the extents on the GPU and the
-    # posed boxes on the CPU, shading the ground a little differently.
-    scene.define("/World/Sun", ernie.DistantLight, shadow_enable=False).set(
-        tokens.TRANSFORM, ernie.distant_light_transform((0.3, -0.5, 0.8))
+    # No shadows: the sun's map is fitted to the scene's bounds, the
+    # extents on the GPU and the posed boxes on the CPU, shading the
+    # ground a little differently.
+    scene.define(
+        "/World/Sun", ernie.DistantLight, shadow_enable=False
+    ).set(
+        tokens.TRANSFORM,
+        ernie.distant_light_transform((0.3, -0.5, 0.8)),
     )
     scene.define("/World/Ground", ernie.GroundPlane)
     links, cameras = [], []
     for i in range(count):
-        env = scene.define(f"/Envs/Env{i}", ernie.Xform, world=i, translate=(100.0 * i, 0.0, 0.0))
+        env = scene.define(
+            f"/Envs/Env{i}",
+            ernie.Xform,
+            world=i,
+            translate=(100.0 * i, 0.0, 0.0),
+        )
         for k in range(3):
             env.define(
                 f"Box{k}",
@@ -34,18 +45,28 @@ def world_scene(count, ops=(tokens.TRANSLATE, tokens.ORIENT)):
                 display_color=(0.2 + 0.3 * k, 0.5, 0.9 - 0.3 * k),
             )
         link = env.define("Link", ernie.Xform)
-        link.set(tokens.XFORM_OP_ORDER, list(ops)).set(tokens.XFORM_EXTENT, EXTENT)
+        link.set(tokens.XFORM_OP_ORDER, list(ops)).set(
+            tokens.XFORM_EXTENT, EXTENT
+        )
         link.define("Box", ernie.Cube, scale=(0.5, 0.5, 0.5))
-        # The camera: up the link and turned to look along +x (cameras look down their -z).
-        mount = link.define("Mount", ernie.Xform, translate=(0.0, 0.0, 1.0))
-        camera = mount.define("Camera", ernie.Camera, focal_length=12.0)
-        camera.set(tokens.TRANSFORM, ernie.look_at_transform((0, 0, 0), (1, 0, -0.2)))
+        # The camera: up the link and turned to look along +x (cameras
+        # look down their -z).
+        mount = link.define(
+            "Mount", ernie.Xform, translate=(0.0, 0.0, 1.0)
+        )
+        camera = mount.define(
+            "Camera", ernie.Camera, focal_length=12.0
+        )
+        camera.set(
+            tokens.TRANSFORM,
+            ernie.look_at_transform((0, 0, 0), (1, 0, -0.2)),
+        )
         links.append(str(link.path))
         cameras.append(camera.path)
     # One product, many cameras: a list relationship, set by name.
-    scene.define("/Render/Wrists", ernie.RenderProduct, resolution=(64, 48)).set(
-        tokens.CAMERA_REL, cameras
-    )
+    scene.define(
+        "/Render/Wrists", ernie.RenderProduct, resolution=(64, 48)
+    ).set(tokens.CAMERA_REL, cameras)
     return scene, links
 
 
@@ -56,14 +77,18 @@ def link_arrays(count, seed):
     orientations[:, 2] = np.sin(yaw / 2)
     orientations[:, 3] = np.cos(yaw / 2)
     return {
-        tokens.TRANSLATE: (rng.uniform(-1, 1, (count, 3)) * [1, 1, 0]).astype(np.float32),
+        tokens.TRANSLATE: (
+            rng.uniform(-1, 1, (count, 3)) * [1, 1, 0]
+        ).astype(np.float32),
         tokens.ORIENT: orientations,
     }
 
 
 def views(renderer, scene, product="/Render/Wrists"):
     outputs = renderer.step(scene, render_products=[product])[product]
-    return np.array(outputs.frames[0].render_vars[f"{product}/LdrColor"].map()).astype(np.int32)
+    return np.array(
+        outputs.frames[0].render_vars[f"{product}/LdrColor"].map()
+    ).astype(np.int32)
 
 
 def render_both(renderer, count, arrays, scene_of=world_scene):
@@ -85,13 +110,19 @@ def test_wrist_cameras_see_like_cpu_posed_ones(cuda_renderer):
 
 
 def test_each_wrist_camera_sees_its_own_world(cuda_renderer):
-    """Worlds move their links differently: views differ as their links do."""
+    """Worlds move their links differently: views differ as their
+    links do."""
     arrays = link_arrays(2, seed=2)
     arrays[tokens.ORIENT][:] = [0.0, 0.0, 0.0, 1.0]
     arrays[tokens.TRANSLATE][:] = 0.0
     _, same = render_both(cuda_renderer, 2, arrays)
     np.testing.assert_array_equal(same[0], same[1])
-    arrays[tokens.ORIENT][1] = [0.0, 0.0, np.sin(0.25), np.cos(0.25)]  # world 1 turned
+    arrays[tokens.ORIENT][1] = [
+        0.0,
+        0.0,
+        np.sin(0.25),
+        np.cos(0.25),
+    ]  # world 1 turned
     _, turned = render_both(cuda_renderer, 2, arrays)
     np.testing.assert_array_equal(turned[0], same[0])
     assert np.abs(turned[1] - same[1]).max() > 50
@@ -130,17 +161,24 @@ def test_wrist_cameras_follow_their_links_step_by_step(cuda_renderer):
         for view in range(3):
             assert_same_image(gpu[view], cpu[view])
         if previous is not None:
-            assert np.abs(gpu - previous).max() > 50, "the views moved with the links"
+            assert np.abs(gpu - previous).max() > 50, (
+                "the views moved with the links"
+            )
         previous = gpu
 
 
 def test_wrist_cameras_under_composed_links(cuda_renderer):
-    """Links posed by Euler angles, composed on the GPU before the views read them."""
+    """Links posed by Euler angles, composed on the GPU before the
+    views read them."""
     ops = (tokens.TRANSLATE, tokens.ROTATE_ZYX)
     rng = np.random.default_rng(4)
     arrays = {
-        tokens.TRANSLATE: (rng.uniform(-1, 1, (3, 3)) * [1, 1, 0]).astype(np.float32),
-        tokens.ROTATE_ZYX: np.stack([np.zeros(3), np.zeros(3), rng.uniform(-25, 25, 3)], 1).astype(np.float32),
+        tokens.TRANSLATE: (
+            rng.uniform(-1, 1, (3, 3)) * [1, 1, 0]
+        ).astype(np.float32),
+        tokens.ROTATE_ZYX: np.stack(
+            [np.zeros(3), np.zeros(3), rng.uniform(-25, 25, 3)], 1
+        ).astype(np.float32),
     }
     images = []
     for upload in (None, cuda_renderer.cuda_upload):
@@ -153,7 +191,8 @@ def test_wrist_cameras_under_composed_links(cuda_renderer):
 
 
 def test_wrist_cameras_two_posed_links_deep(cuda_renderer):
-    """A camera on a link under a base, both posed on the GPU: the views read the composed pose."""
+    """A camera on a link under a base, both posed on the GPU: the
+    views read the composed pose."""
     count = 3
     base_arrays = link_arrays(count, seed=5)
     arrays = link_arrays(count, seed=6)
@@ -162,25 +201,49 @@ def test_wrist_cameras_two_posed_links_deep(cuda_renderer):
         scene, links = world_scene(count)
         bases = []
         for i in range(count):
-            # The link moves under a new base between the world and it.
+            # The link moves under a new base between the world and
+            # it.
             base = scene.define(f"/Envs/Env{i}/Base", ernie.Xform)
-            base.set(tokens.XFORM_OP_ORDER, [tokens.TRANSLATE, tokens.ORIENT])
-            base.set(tokens.XFORM_EXTENT, [-4.0, -4.0, -0.5, 4.0, 4.0, 0.5])
-            link = base.define("Link", ernie.Xform).set(
-                tokens.XFORM_OP_ORDER, [tokens.TRANSLATE, tokens.ORIENT]
-            ).set(tokens.XFORM_EXTENT, EXTENT)
+            base.set(
+                tokens.XFORM_OP_ORDER,
+                [tokens.TRANSLATE, tokens.ORIENT],
+            )
+            base.set(
+                tokens.XFORM_EXTENT, [-4.0, -4.0, -0.5, 4.0, 4.0, 0.5]
+            )
+            link = (
+                base.define("Link", ernie.Xform)
+                .set(
+                    tokens.XFORM_OP_ORDER,
+                    [tokens.TRANSLATE, tokens.ORIENT],
+                )
+                .set(tokens.XFORM_EXTENT, EXTENT)
+            )
             link.define("Box", ernie.Cube, scale=(0.5, 0.5, 0.5))
-            mount = link.define("Mount", ernie.Xform, translate=(0.0, 0.0, 1.0))
-            mount.define("Camera", ernie.Camera, focal_length=12.0).set(
-                tokens.TRANSFORM, ernie.look_at_transform((0, 0, 0), (1, 0, -0.2))
+            mount = link.define(
+                "Mount", ernie.Xform, translate=(0.0, 0.0, 1.0)
+            )
+            mount.define(
+                "Camera", ernie.Camera, focal_length=12.0
+            ).set(
+                tokens.TRANSFORM,
+                ernie.look_at_transform((0, 0, 0), (1, 0, -0.2)),
             )
             scene.remove(links[i])
             bases.append(str(base.path))
-        cameras = [ernie.Path(f"/Envs/Env{i}/Base/Link/Mount/Camera") for i in range(count)]
+        cameras = [
+            ernie.Path(f"/Envs/Env{i}/Base/Link/Mount/Camera")
+            for i in range(count)
+        ]
         scene.set("/Render/Wrists", tokens.CAMERA_REL, cameras)
-        for paths, rows_of in ((bases, base_arrays), ([f"{b}/Link" for b in bases], arrays)):
+        for paths, rows_of in (
+            (bases, base_arrays),
+            ([f"{b}/Link" for b in bases], arrays),
+        ):
             for op, rows in rows_of.items():
-                scene.write(paths, op, upload(rows) if upload else rows)
+                scene.write(
+                    paths, op, upload(rows) if upload else rows
+                )
         images.append(views(cuda_renderer, scene))
     for view in range(count):
         assert_same_image(images[1][view], images[0][view])
@@ -188,8 +251,18 @@ def test_wrist_cameras_two_posed_links_deep(cuda_renderer):
 
 def test_wrist_cameras_take_no_poses(cuda_renderer):
     scene, links = world_scene(2)
-    scene.write(links, tokens.TRANSLATE, cuda_renderer.cuda_upload(np.zeros((2, 3), np.float32)))
-    scene.write(links, tokens.ORIENT, cuda_renderer.cuda_upload(quats(2)))
-    scene.write("/Envs/Env0/Link/Mount/Camera", tokens.POSES, np.eye(4, dtype=np.float32)[None])
+    scene.write(
+        links,
+        tokens.TRANSLATE,
+        cuda_renderer.cuda_upload(np.zeros((2, 3), np.float32)),
+    )
+    scene.write(
+        links, tokens.ORIENT, cuda_renderer.cuda_upload(quats(2))
+    )
+    scene.write(
+        "/Envs/Env0/Link/Mount/Camera",
+        tokens.POSES,
+        np.eye(4, dtype=np.float32)[None],
+    )
     with pytest.raises(ValueError, match="takes no"):
         views(cuda_renderer, scene)

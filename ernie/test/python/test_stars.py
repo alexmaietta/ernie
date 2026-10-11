@@ -18,17 +18,34 @@ def test_astronomy_helpers():
     assert abs(math.degrees(math.asin(pole[2])) - 52.0) < 1e-9
     assert abs(pole[0]) < 1e-12
     stars = ernie.synthetic_stars(100, seed=3)
-    assert stars == ernie.synthetic_stars(100, seed=3), "the same for the same seed"
-    assert len(stars["magnitude"]) == 100 and max(stars["magnitude"]) <= 6.5
+    assert stars == ernie.synthetic_stars(100, seed=3), (
+        "the same for the same seed"
+    )
+    assert (
+        len(stars["magnitude"]) == 100
+        and max(stars["magnitude"]) <= 6.5
+    )
 
 
 def test_stars_and_the_dome_show_behind_the_scene(renderer):
     scene = ernie.Scene()
     camera = scene.define(
-        "/World/Camera", ernie.Camera, sensor_noise=False, exposure_time=1e6
-    ).set(tokens.TRANSFORM, ernie.look_at_transform((0.0, 0.0, 0.0), (1.0, 0.0, 0.0)))
-    scene.define("/Render/Settings", ernie.RenderSettings, camera=camera, resolution=(32, 32))
-    # One bright star straight ahead: right ascension 0 on the equator is +x.
+        "/World/Camera",
+        ernie.Camera,
+        sensor_noise=False,
+        exposure_time=1e6,
+    ).set(
+        tokens.TRANSFORM,
+        ernie.look_at_transform((0.0, 0.0, 0.0), (1.0, 0.0, 0.0)),
+    )
+    scene.define(
+        "/Render/Settings",
+        ernie.RenderSettings,
+        camera=camera,
+        resolution=(32, 32),
+    )
+    # One bright star straight ahead: right ascension 0 on the equator
+    # is +x.
     scene.define(
         "/World/Stars",
         ernie.StarField,
@@ -37,12 +54,19 @@ def test_stars_and_the_dome_show_behind_the_scene(renderer):
         magnitude=np.array([0.0], np.float32),
     )
     image = np.asarray(renderer.render(scene))
-    assert image[15:17, 15:17, :3].max() > 200, "the star at the centre"
+    assert image[15:17, 15:17, :3].max() > 200, (
+        "the star at the centre"
+    )
     assert image[2, 2, :3].max() < 60, "dark sky elsewhere"
 
     sky = scene.define("/World/Sky", ernie.DomeLight, intensity=1e-6)
     lit = np.asarray(renderer.render(scene))
-    assert lit[2, 2, :3].min() > image[2, 2, :3].max(), "the dome fills the background"
+    assert lit[2, 2, :3].min() > image[2, 2, :3].max(), (
+        "the dome fills the background"
+    )
     sky.visible_in_primary_ray = False
-    assert np.asarray(renderer.render(scene))[2, 2, :3].max() == image[2, 2, :3].max()
+    assert (
+        np.asarray(renderer.render(scene))[2, 2, :3].max()
+        == image[2, 2, :3].max()
+    )
     assert renderer.take_validation_messages() == []

@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Writes ernie/schema.pyi: the typed prim classes `ernie.schema` builds from the prim type
-registry at import, as stubs IDEs, type checkers and the API docs can read.
+"""Writes ernie/schema.pyi: the typed prim classes `ernie.schema`
+builds from the prim type registry at import, as stubs IDEs, type
+checkers and the API docs can read.
 
     python stub_schema.py <output.pyi>    (with the built package on PYTHONPATH)
 """
@@ -52,8 +53,12 @@ def _doc(text, indent):
     if not text:
         return []
     lines = textwrap.wrap(text, 96 - len(indent))
-    return [f'{indent}"""{lines[0]}' + ('"""' if len(lines) == 1 else "")] + (
-        [f"{indent}{line}" for line in lines[1:]] + [f'{indent}"""'] if len(lines) > 1 else []
+    return [
+        f'{indent}"""{lines[0]}' + ('"""' if len(lines) == 1 else "")
+    ] + (
+        [f"{indent}{line}" for line in lines[1:]] + [f'{indent}"""']
+        if len(lines) > 1
+        else []
     )
 
 
@@ -69,7 +74,9 @@ def _attribute_doc(attribute):
 def _keywords(prim_type):
     keywords = []
     for a in prim_type.all_attributes():
-        argument = _ARGUMENTS.get(a.kind, _TYPES[a.kind]) + (" | Any" if a.takes_array else "")
+        argument = _ARGUMENTS.get(a.kind, _TYPES[a.kind]) + (
+            " | Any" if a.takes_array else ""
+        )
         keywords.append(f"{a.py_name}: {argument} = ...")
         if a.plural:
             keywords.append(f"{a.plural}: {argument} = ...")
@@ -119,19 +126,34 @@ def main(output):
         "",
     ]
     for prim_type in ernie.prim_types():
-        base = prim_type.base.name if prim_type.base is not None else "Schema"
+        base = (
+            prim_type.base.name
+            if prim_type.base is not None
+            else "Schema"
+        )
         lines.append(f"class {prim_type.name}({base}):")
         lines += _doc(prim_type.doc, "    ")
         for attribute in prim_type.attributes:
             if attribute.plural:
                 lines.append(f"    {attribute.py_name}: Path | None")
-                lines += _doc("The first target. " + _attribute_doc(attribute), "    ")
-                lines.append(f"    {attribute.plural}: {_TYPES[attribute.kind]}")
-                lines += _doc("Every target. " + _attribute_doc(attribute), "    ")
+                lines += _doc(
+                    "The first target. " + _attribute_doc(attribute),
+                    "    ",
+                )
+                lines.append(
+                    f"    {attribute.plural}: {_TYPES[attribute.kind]}"
+                )
+                lines += _doc(
+                    "Every target. " + _attribute_doc(attribute),
+                    "    ",
+                )
                 continue
-            # One that takes an array in place of its value reads as the array when one is written.
+            # One that takes an array in place of its value reads as
+            # the array when one is written.
             array = " | Any" if attribute.takes_array else ""
-            lines.append(f"    {attribute.py_name}: {_TYPES[attribute.kind]}{array}")
+            lines.append(
+                f"    {attribute.py_name}: {_TYPES[attribute.kind]}{array}"
+            )
             lines += _doc(_attribute_doc(attribute), "    ")
         keywords = ", ".join(_keywords(prim_type))
         if not prim_type.abstract:
@@ -139,9 +161,13 @@ def main(output):
             lines.append(
                 f"    def define(cls, parent: Scene | Prim | Schema, path: str | Path, *, {keywords}) -> Self: ..."
             )
-        lines.append(f"    def set(self, *attribute: Any, {keywords}) -> Self: ...")
+        lines.append(
+            f"    def set(self, *attribute: Any, {keywords}) -> Self: ..."
+        )
         lines.append("")
-    lines.append("def typed(prim: Prim | Schema) -> Schema | Prim: ...")
+    lines.append(
+        "def typed(prim: Prim | Schema) -> Schema | Prim: ..."
+    )
     lines.append(
         "def load_scene(description: dict[str, Any] | str | os.PathLike[str], "
         "scene: Scene | None = None) -> Scene: ..."

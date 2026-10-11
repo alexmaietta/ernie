@@ -1,11 +1,14 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Demos: a base class for Ernie's demos and the loop that runs them, in a window, headless or
-through a bare renderer, with a Demos panel to switch between them.
+"""Demos: a base class for Ernie's demos and the loop that runs them,
+in a window, headless or through a bare renderer, with a Demos panel
+to switch between them.
 
-A demo subclasses Demo, builds its scene into `self.scene` in `__init__`, advances it in `step`
-and checks itself in `test_final`. Its scene has a Camera of its own, even when the demo is meant
-for the viewer (which frames the scene with its own camera): without a viewer (`--viewer null`,
-`--benchmark`) and in tests (`render_image`) the scene renders through it::
+A demo subclasses Demo, builds its scene into `self.scene` in
+`__init__`, advances it in `step` and checks itself in `test_final`.
+Its scene has a Camera of its own, even when the demo is meant for the
+viewer (which frames the scene with its own camera): without a viewer
+(`--viewer null`, `--benchmark`) and in tests (`render_image`) the
+scene renders through it::
 
     import ernie
     import ernie.demo
@@ -28,31 +31,38 @@ for the viewer (which frames the scene with its own camera): without a viewer (`
     if __name__ == "__main__":
         ernie.demo.main(Demo)
 
-`main(Demo)` is `init(Demo.create_parser())` then `run(Demo(viewer, args), args)`, as Newton's
-examples run. The common options:
+`main(Demo)` is `init(Demo.create_parser())` then `run(Demo(viewer,
+args), args)`, as Newton's examples run. The common options:
 
-- `--viewer window` (the default) opens the viewer, with a Demos panel listing the demos beside
-  this one to switch to, pause, step and reset; `--headless` renders the viewer without a window
-  (no display needed); `--viewer null` has no viewer and renders the scene's RenderSettings
-  through an `ernie.Renderer` each frame.
-- `--num-frames N` stops after N frames (in a window, runs until it closes without it).
-- `--benchmark [SECONDS]` forces `--viewer null`, and reports frames per second after a few
-  frames' warm-up, stopping after SECONDS or `--num-frames`, whichever comes first.
-- `--test` calls the demo's `test_post_step` after every step and `test_final` at the end; one of
-  them must exist.
-- `--output PATH` writes the last frame (or what `save_output` makes) as PNG.
+- `--viewer window` (the default) opens the viewer, with a Demos panel
+  listing the demos beside this one to switch to, pause, step and
+  reset; `--headless` renders the viewer without a window (no display
+  needed); `--viewer null` has no viewer and renders the scene's
+  RenderSettings through an `ernie.Renderer` each frame.
+- `--num-frames N` stops after N frames (in a window, runs until it
+  closes without it).
+- `--benchmark [SECONDS]` forces `--viewer null`, and reports frames
+  per second after a few frames' warm-up, stopping after SECONDS or
+  `--num-frames`, whichever comes first.
+- `--test` calls the demo's `test_post_step` after every step and
+  `test_final` at the end; one of them must exist.
+- `--output PATH` writes the last frame (or what `save_output` makes)
+  as PNG.
 - `--paused`, `--device`, `--renderer`, `--validation` and `--vsync`.
 
-The base class and the loop are C++'s (`ernie.app.Demo`, `ernie.app.DemoRunner`; ernie/app/demo.h),
-which C++ demos derive from and run the same way; this module adds argparse options, NumPy images
-and the demos found beside a Python one. In the viewer, a demo uses it as any application does
-(`add_panel`, `on_frame`, `active_camera` ...); what it adds is removed (it registers in a scope
-of its own, `Viewer.scope`), and the viewport's display settings are restored, when the Demos
-panel switches away.
+The base class and the loop are C++'s (`ernie.app.Demo`,
+`ernie.app.DemoRunner`; ernie/app/demo.h), which C++ demos derive from
+and run the same way; this module adds argparse options, NumPy images
+and the demos found beside a Python one. In the viewer, a demo uses it
+as any application does (`add_panel`, `on_frame`, `active_camera`
+...); what it adds is removed (it registers in a scope of its own,
+`Viewer.scope`), and the viewport's display settings are restored,
+when the Demos panel switches away.
 
 References:
-- Newton's examples (`newton.examples`: `Example`, `create_parser`, `init`, `run` and the
-  example browser), https://github.com/newton-physics/newton
+- Newton's examples (`newton.examples`: `Example`, `create_parser`,
+  `init`, `run` and the example browser),
+  https://github.com/newton-physics/newton
 """
 
 import argparse
@@ -68,35 +78,54 @@ import numpy as np
 from . import _ernie
 
 if not hasattr(_ernie, "app"):
-    raise ImportError("This build of Ernie has no app; configure it with -DERNIE_BUILD_APP=ON")
+    raise ImportError(
+        "This build of Ernie has no app; configure it with -DERNIE_BUILD_APP=ON"
+    )
 
 _app = _ernie.app
 
-#: Arguments every demo shares, kept when the Demos panel switches demos.
-COMMON_ARGS = ("viewer", "headless", "device", "renderer", "validation", "vsync", "paused")
+#: Arguments every demo shares, kept when the Demos panel switches
+#: demos.
+COMMON_ARGS = (
+    "viewer",
+    "headless",
+    "device",
+    "renderer",
+    "validation",
+    "vsync",
+    "paused",
+)
 
 
 class Demo(_app.Demo):
-    """A demo: a scene built in `__init__`, advanced by `step`, rendered by `render`.
+    """A demo: a scene built in `__init__`, advanced by `step`,
+    rendered by `render`.
 
     Attributes:
-        viewer: The viewer the demo shows in, or None under `--viewer null`.
+        viewer: The viewer the demo shows in, or None under `--viewer
+            null`.
         args: The parsed arguments (`create_parser`).
-        scene: The Scene to build into: the viewer's, or a new one without a viewer.
-        renderer: An `ernie.Renderer` of the demo's own, opened on first use.
+        scene: The Scene to build into: the viewer's, or a new one
+            without a viewer.
+        renderer: An `ernie.Renderer` of the demo's own, opened on
+            first use.
         frame: Steps taken so far.
         time: Demo seconds at the start of this step.
-        frame_dt: Seconds this step advances: the time since the last frame in a window
-            (at most `max_frame_dt`), else `fixed_dt`.
-        image: The last LdrColor rendered without a viewer, uint8 (rows, cols, 4).
+        frame_dt: Seconds this step advances: the time since the last
+            frame in a window (at most `max_frame_dt`), else
+            `fixed_dt`.
+        image: The last LdrColor rendered without a viewer, uint8
+            (rows, cols, 4).
     """
 
-    #: Frames to run without a window when `--num-frames` is not given; a demo may set its own
-    #: in `__init__`, from its options.
+    #: Frames to run without a window when `--num-frames` is not
+    #: given; a demo may set its own in `__init__`, from its options.
     num_frames = 100
-    #: Seconds each step advances without a window, for repeatable runs.
+    #: Seconds each step advances without a window, for repeatable
+    #: runs.
     fixed_dt = 1.0 / 60.0
-    #: Longest step in a window, so a stall does not throw the simulation.
+    #: Longest step in a window, so a stall does not throw the
+    #: simulation.
     max_frame_dt = 1.0 / 30.0
     #: Window title; "Ernie demos" when empty.
     title = ""
@@ -110,33 +139,41 @@ class Demo(_app.Demo):
 
     @classmethod
     def create_parser(cls):
-        """The common options; override and add a demo's own to the parser this returns."""
+        """The common options; override and add a demo's own to the
+        parser this returns."""
         return create_parser(cls)
 
     @classmethod
     def description(cls):
-        """The first paragraph of the demo's module docstring, on one line."""
+        """The first paragraph of the demo's module docstring, on one
+        line."""
         module = sys.modules.get(cls.__module__)
-        doc = (module.__doc__ if module else None) or cls.__doc__ or ""
+        doc = (
+            (module.__doc__ if module else None) or cls.__doc__ or ""
+        )
         return " ".join(doc.strip().split("\n\n")[0].split())
 
     def render(self):
-        """Draws a frame: through the viewer, or with `renderer` into `image` without one."""
+        """Draws a frame: through the viewer, or with `renderer` into
+        `image` without one."""
         if self.viewer is not None:
             self.viewer.step()
         else:
             self.image = np.asarray(self.renderer.render(self.scene))
 
     def render_image(self):
-        """The scene's LdrColor as its RenderSettings (or its first Camera) describe, uint8
-        (rows, cols, 4): the last frame without a viewer, else rendered now with `renderer`, for
-        tests. Not the viewport: the viewer's own camera is not the scene's."""
+        """The scene's LdrColor as its RenderSettings (or its first
+        Camera) describe, uint8 (rows, cols, 4): the last frame
+        without a viewer, else rendered now with `renderer`, for
+        tests. Not the viewport: the viewer's own camera is not the
+        scene's."""
         if self.viewer is None and self.image is not None:
             return self.image
         return np.asarray(self.renderer.render(self.scene))
 
     def save_output(self, path):
-        """Writes `--output`: the viewport's next frame in a viewer, else the last frame."""
+        """Writes `--output`: the viewport's next frame in a viewer,
+        else the last frame."""
         if self.viewer is not None:
             self.viewer.capture(path)
             self.viewer.step()
@@ -144,40 +181,90 @@ class Demo(_app.Demo):
             write_png(path, self.render_image()[..., :3])
 
     def map(self, path, attribute, stream=None):
-        """A CUDA array over the renderer's own copy of an attribute, to write in place and then
-        `scene.unmap`: the viewer's (`Viewer.map`) or `renderer`'s (`Renderer.map`)."""
+        """A CUDA array over the renderer's own copy of an attribute,
+        to write in place and then `scene.unmap`: the viewer's
+        (`Viewer.map`) or `renderer`'s (`Renderer.map`)."""
         if self.viewer is not None:
             return self.viewer.map(path, attribute, stream=stream)
-        return self.renderer.map(self.scene, path, attribute, stream=stream)
+        return self.renderer.map(
+            self.scene, path, attribute, stream=stream
+        )
 
 
 def create_parser(demo_class=Demo):
-    """An argument parser with the options every demo shares; `Demo.create_parser` calls it."""
-    parser = argparse.ArgumentParser(description=demo_class.description() or None,
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--viewer", choices=["window", "null"], default="window",
-                        help="'window' shows the viewer; 'null' renders the scene's "
-                        "RenderSettings with a bare Renderer and no viewer")
-    parser.add_argument("--headless", action=argparse.BooleanOptionalAction, default=False,
-                        help="render the viewer without a window (no display needed)")
-    parser.add_argument("--num-frames", type=int, default=None,
-                        help="frames to run; a window runs until closed, else "
-                        f"{demo_class.num_frames} for this demo")
-    parser.add_argument("--benchmark", type=float, default=False, nargs="?", const=None,
-                        metavar="SECONDS",
-                        help="report frames per second, rendering with --viewer null; stop "
-                        "after SECONDS, if given, or --num-frames")
-    parser.add_argument("--test", action=argparse.BooleanOptionalAction, default=False,
-                        help="run the demo's test_post_step and test_final checks")
-    parser.add_argument("--output", metavar="PATH", help="write the last frame here as PNG")
-    parser.add_argument("--paused", action=argparse.BooleanOptionalAction, default=False,
-                        help="start paused (the Demos panel resumes)")
-    parser.add_argument("--device", default=None, help="GPU to prefer, by part of its name")
-    parser.add_argument("--renderer", default="raster", help="render backend")
-    parser.add_argument("--validation", action=argparse.BooleanOptionalAction, default=False,
-                        help="enable the Vulkan validation layer where installed")
-    parser.add_argument("--vsync", action=argparse.BooleanOptionalAction, default=False,
-                        help="wait for the display's refresh")
+    """An argument parser with the options every demo shares;
+    `Demo.create_parser` calls it."""
+    parser = argparse.ArgumentParser(
+        description=demo_class.description() or None,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--viewer",
+        choices=["window", "null"],
+        default="window",
+        help="'window' shows the viewer; 'null' renders the scene's "
+        "RenderSettings with a bare Renderer and no viewer",
+    )
+    parser.add_argument(
+        "--headless",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="render the viewer without a window (no display needed)",
+    )
+    parser.add_argument(
+        "--num-frames",
+        type=int,
+        default=None,
+        help="frames to run; a window runs until closed, else "
+        f"{demo_class.num_frames} for this demo",
+    )
+    parser.add_argument(
+        "--benchmark",
+        type=float,
+        default=False,
+        nargs="?",
+        const=None,
+        metavar="SECONDS",
+        help="report frames per second, rendering with --viewer null; stop "
+        "after SECONDS, if given, or --num-frames",
+    )
+    parser.add_argument(
+        "--test",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="run the demo's test_post_step and test_final checks",
+    )
+    parser.add_argument(
+        "--output",
+        metavar="PATH",
+        help="write the last frame here as PNG",
+    )
+    parser.add_argument(
+        "--paused",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="start paused (the Demos panel resumes)",
+    )
+    parser.add_argument(
+        "--device",
+        default=None,
+        help="GPU to prefer, by part of its name",
+    )
+    parser.add_argument(
+        "--renderer", default="raster", help="render backend"
+    )
+    parser.add_argument(
+        "--validation",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="enable the Vulkan validation layer where installed",
+    )
+    parser.add_argument(
+        "--vsync",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="wait for the display's refresh",
+    )
     return parser
 
 
@@ -187,9 +274,12 @@ def default_args(parser):
 
 
 def options_from_args(args):
-    """The `ernie.app.DemoOptions` the parsed arguments of `create_parser` describe."""
+    """The `ernie.app.DemoOptions` the parsed arguments of
+    `create_parser` describe."""
     options = _app.DemoOptions()
-    options.viewer = args.viewer == "window" and args.benchmark is False
+    options.viewer = (
+        args.viewer == "window" and args.benchmark is False
+    )
     options.headless = args.headless
     options.num_frames = args.num_frames
     options.benchmark = args.benchmark is not False
@@ -205,9 +295,10 @@ def options_from_args(args):
 
 
 def init(parser=None, title="Ernie demos"):
-    """Parses the command line and opens the viewer it asks for: `(viewer, args)`, with viewer an
-    `ernie.app.Viewer` on a new Scene, or None under `--viewer null` and `--benchmark`. The
-    runner (`ernie.app.DemoRunner`) rides along in the arguments for `run`."""
+    """Parses the command line and opens the viewer it asks for:
+    `(viewer, args)`, with viewer an `ernie.app.Viewer` on a new
+    Scene, or None under `--viewer null` and `--benchmark`. The runner
+    (`ernie.app.DemoRunner`) rides along in the arguments for `run`."""
     parser = parser or create_parser()
     args = parser.parse_args()
     if args.benchmark is not False:
@@ -217,47 +308,80 @@ def init(parser=None, title="Ernie demos"):
 
 
 def run(demo, args):
-    """Steps and renders `demo` until its window closes or it has run `--num-frames`, then writes
-    `--output`, runs its final test and reports the benchmark. In a window the Demos panel lists
-    the demo files beside this one. Returns the demo running at the end."""
+    """Steps and renders `demo` until its window closes or it has run
+    `--num-frames`, then writes `--output`, runs its final test and
+    reports the benchmark. In a window the Demos panel lists the demo
+    files beside this one. Returns the demo running at the end."""
     runner = getattr(args, "runner", None)
     if runner is None:
-        runner = args.runner = _app.DemoRunner(options_from_args(args))
+        runner = args.runner = _app.DemoRunner(
+            options_from_args(args)
+        )
     if runner.viewer is not None:
         runner.set_catalog(*catalog(type(demo), args))
     return runner.run(demo)
 
 
 def main(demo_class):
-    """Runs `demo_class` from the command line: `run(demo_class(*init(...)), args)`."""
-    viewer, args = init(demo_class.create_parser(), title=demo_class.title or "Ernie demos")
+    """Runs `demo_class` from the command line:
+    `run(demo_class(*init(...)), args)`."""
+    viewer, args = init(
+        demo_class.create_parser(),
+        title=demo_class.title or "Ernie demos",
+    )
     demo = demo_class(viewer, args)
     return run(demo, args)
 
 
 def catalog(demo_class, args):
-    """The Demos panel's entries for a run of `demo_class`, `(infos, current)`: the demos of every
-    category beside its own (`demos/<category>/<name>.py`), or the class alone when it is not
+    """The Demos panel's entries for a run of `demo_class`, `(infos,
+    current)`: the demos of every category beside its own
+    (`demos/<category>/<name>.py`), or the class alone when it is not
     among them."""
     path = _module_file(demo_class)
-    entries = discover_demos(os.path.dirname(os.path.dirname(path))) if path else []
-    current = next((i for i, entry in enumerate(entries)
-                    if os.path.exists(entry.path) and os.path.samefile(entry.path, path)), None)
-    infos = [_app.DemoInfo(entry.category, entry.name, "", _creator(entry.path, args))
-             for entry in entries]
+    entries = (
+        discover_demos(os.path.dirname(os.path.dirname(path)))
+        if path
+        else []
+    )
+    current = next(
+        (
+            i
+            for i, entry in enumerate(entries)
+            if os.path.exists(entry.path)
+            and os.path.samefile(entry.path, path)
+        ),
+        None,
+    )
+    infos = [
+        _app.DemoInfo(
+            entry.category, entry.name, "", _creator(entry.path, args)
+        )
+        for entry in entries
+    ]
     if current is None:
-        infos.insert(0, _app.DemoInfo("this", demo_class.__name__, demo_class.description(),
-                                      _creator(demo_class, args)))
+        infos.insert(
+            0,
+            _app.DemoInfo(
+                "this",
+                demo_class.__name__,
+                demo_class.description(),
+                _creator(demo_class, args),
+            ),
+        )
         current = 0
     return infos, current
 
 
 class DemoEntry:
-    """A demo file, `<category>/<name>.py`: its path, category and name."""
+    """A demo file, `<category>/<name>.py`: its path, category and
+    name."""
 
     def __init__(self, path):
         self.path = path
-        self.category = os.path.basename(os.path.dirname(os.path.abspath(path)))
+        self.category = os.path.basename(
+            os.path.dirname(os.path.abspath(path))
+        )
         stem = os.path.splitext(os.path.basename(path))[0]
         self.name = stem.replace("_", " ")
         self.id = f"{self.category}/{stem}"
@@ -268,31 +392,36 @@ class DemoEntry:
 
 
 def discover_demos(root):
-    """The demos under `root`, `<category>/<name>.py` files that define a Demo class, by category
-    and name."""
+    """The demos under `root`, `<category>/<name>.py` files that
+    define a Demo class, by category and name."""
     entries = []
     for category in sorted(os.listdir(root)):
         directory = os.path.join(root, category)
-        if category.startswith((".", "_")) or not os.path.isdir(directory):
+        if category.startswith((".", "_")) or not os.path.isdir(
+            directory
+        ):
             continue
         for filename in sorted(os.listdir(directory)):
-            if filename.startswith("_") or not filename.endswith(".py"):
+            if filename.startswith("_") or not filename.endswith(
+                ".py"
+            ):
                 continue
             path = os.path.join(directory, filename)
             with open(path, encoding="utf-8") as file:
-                if re.search(r"^class Demo\(", file.read(), re.MULTILINE):
+                if re.search(
+                    r"^class Demo\(", file.read(), re.MULTILINE
+                ):
                     entries.append(DemoEntry(path))
     return entries
 
 
 def load_demo_class(path):
-    """Imports the demo file at `path` afresh (its directory first on sys.path, for the helpers
-    beside it) and returns its Demo class."""
+    """Imports the demo file at `path` afresh (its directory first on
+    sys.path, for the helpers beside it) and returns its Demo class."""
     directory = os.path.dirname(os.path.abspath(path))
     if directory not in sys.path:
         sys.path.insert(0, directory)
-    name = "ernie_demo_{}_{}".format(os.path.basename(directory),
-                                     os.path.splitext(os.path.basename(path))[0])
+    name = f"ernie_demo_{os.path.basename(directory)}_{os.path.splitext(os.path.basename(path))[0]}"
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
@@ -301,7 +430,8 @@ def load_demo_class(path):
 
 
 def write_png(path, image):
-    """Writes an (rows, cols, 3 or 4) uint8 image as PNG with only the standard library."""
+    """Writes an (rows, cols, 3 or 4) uint8 image as PNG with only the
+    standard library."""
     image = np.ascontiguousarray(image, dtype=np.uint8)
     if image.ndim == 2:
         image = np.repeat(image[..., None], 3, axis=2)
@@ -311,21 +441,36 @@ def write_png(path, image):
 
     def chunk(kind, data):
         body = kind + data
-        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
+        return (
+            struct.pack(">I", len(data))
+            + body
+            + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
+        )
 
-    header = struct.pack(">IIBBBBB", cols, rows, 8, colour_type, 0, 0, 0)
+    header = struct.pack(
+        ">IIBBBBB", cols, rows, 8, colour_type, 0, 0, 0
+    )
     with open(path, "wb") as file:
-        file.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) +
-                   chunk(b"IDAT", zlib.compress(raw, 6)) + chunk(b"IEND", b""))
+        file.write(
+            b"\x89PNG\r\n\x1a\n"
+            + chunk(b"IHDR", header)
+            + chunk(b"IDAT", zlib.compress(raw, 6))
+            + chunk(b"IEND", b"")
+        )
 
 
 def side_by_side(images, gap=4):
-    """uint8 (rows, cols, channels) images of one height next to each other with black gaps."""
+    """uint8 (rows, cols, channels) images of one height next to each
+    other with black gaps."""
     height = images[0].shape[0]
     parts = []
     for i, image in enumerate(images):
         if i > 0:
-            parts.append(np.zeros((height, gap, image.shape[2]), dtype=np.uint8))
+            parts.append(
+                np.zeros(
+                    (height, gap, image.shape[2]), dtype=np.uint8
+                )
+            )
         parts.append(np.asarray(image, dtype=np.uint8))
     return np.concatenate(parts, axis=1)
 
@@ -333,33 +478,59 @@ def side_by_side(images, gap=4):
 def srgb_to_linear(rgb):
     """An sRGB-encoded colour in [0, 1] to linear."""
     rgb = np.asarray(rgb, dtype=np.float64)
-    return np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
+    return np.where(
+        rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4
+    )
 
 
 def mean_linear_rgb(image):
-    """The mean colour of a uint8 (rows, cols, 3 or 4) image, decoded from sRGB to linear."""
-    return srgb_to_linear(np.asarray(image)[..., :3].reshape(-1, 3).mean(axis=0) / 255.0)
+    """The mean colour of a uint8 (rows, cols, 3 or 4) image, decoded
+    from sRGB to linear."""
+    return srgb_to_linear(
+        np.asarray(image)[..., :3].reshape(-1, 3).mean(axis=0) / 255.0
+    )
 
 
 def heatmap(values, low, high):
-    """`values` from `low` (blue) through cyan, green and yellow to `high` (red), as RGB uint8."""
-    t = np.clip((np.asarray(values, dtype=np.float64) - low) / max(high - low, 1e-12), 0.0, 1.0)
-    stops = np.array([[0, 0, 255], [0, 255, 255], [0, 255, 0], [255, 255, 0], [255, 0, 0]],
-                     dtype=np.float64)
+    """`values` from `low` (blue) through cyan, green and yellow to
+    `high` (red), as RGB uint8."""
+    t = np.clip(
+        (np.asarray(values, dtype=np.float64) - low)
+        / max(high - low, 1e-12),
+        0.0,
+        1.0,
+    )
+    stops = np.array(
+        [
+            [0, 0, 255],
+            [0, 255, 255],
+            [0, 255, 0],
+            [255, 255, 0],
+            [255, 0, 0],
+        ],
+        dtype=np.float64,
+    )
     position = t * (len(stops) - 1)
     index = np.minimum(position.astype(int), len(stops) - 2)
     fraction = (position - index)[..., None]
-    return ((1.0 - fraction) * stops[index] + fraction * stops[index + 1]).astype(np.uint8)
+    return (
+        (1.0 - fraction) * stops[index] + fraction * stops[index + 1]
+    ).astype(np.uint8)
 
 
 def _creator(source, args):
-    """create(viewer, options) for the Demos panel: builds the demo of the file (or class)
-    `source` with its parser's defaults and the run's shared arguments. It holds those values,
-    not `args`, which holds the runner that holds it."""
+    """create(viewer, options) for the Demos panel: builds the demo of
+    the file (or class) `source` with its parser's defaults and the
+    run's shared arguments. It holds those values, not `args`, which
+    holds the runner that holds it."""
     shared = {name: getattr(args, name) for name in COMMON_ARGS}
 
     def create(viewer, options):
-        demo_class = load_demo_class(source) if isinstance(source, str) else source
+        demo_class = (
+            load_demo_class(source)
+            if isinstance(source, str)
+            else source
+        )
         demo_args = default_args(demo_class.create_parser())
         for name, value in shared.items():
             setattr(demo_args, name, value)

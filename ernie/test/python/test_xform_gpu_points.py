@@ -1,31 +1,46 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Points and PointInstancers under prims posed on the GPU (particles or parts on a robot's link):
-posed on the GPU under their link's pose, rendered against the same links posed on the CPU."""
+"""Points and PointInstancers under prims posed on the GPU (particles
+or parts on a robot's link): posed on the GPU under their link's pose,
+rendered against the same links posed on the CPU."""
 
 import numpy as np
 import pytest
+from test_xform_gpu import (  # noqa: F401
+    assert_same_image,
+    cuda_renderer,
+    quats,
+    staged_scene,
+)
 
 import ernie
 from ernie import tokens
-from test_xform_gpu import assert_same_image, cuda_renderer, quats, staged_scene  # noqa: F401
 
 OFFSETS = [(-6.0, 0.0, 0.0), (0.0, 0.0, 0.0), (6.0, 0.0, 0.0)]
-# The link's points and instances wherever the link goes, in the world's frame.
+# The link's points and instances wherever the link goes, in the
+# world's frame.
 EXTENT = [-5.0, -5.0, -5.0, 5.0, 5.0, 5.0]
 
 
 def link_scene(points=True, instancer=True, extent=EXTENT, depth=1):
-    """A link per world under `depth` GPU-posed Xforms, holding a cloud of points and a
-    PointInstancer of boxes; the sun casts no shadows, whose map is fitted to the bounds (the
-    extents on the GPU, the posed prims on the CPU)."""
+    """A link per world under `depth` GPU-posed Xforms, holding a
+    cloud of points and a PointInstancer of boxes; the sun casts no
+    shadows, whose map is fitted to the bounds (the extents on the
+    GPU, the posed prims on the CPU)."""
     scene = staged_scene()
     ernie.DistantLight.at(scene, "/World/Sun").shadow_enable = False
     levels = [[] for _ in range(depth)]
     for i, offset in enumerate(OFFSETS):
-        link = scene.define(f"/World/Env{i}", ernie.Xform, translate=offset, scale=2.0)
+        link = scene.define(
+            f"/World/Env{i}", ernie.Xform, translate=offset, scale=2.0
+        )
         for level in range(depth):
-            link = link.define("Link" if level == depth - 1 else "Base", ernie.Xform)
-            link.set(tokens.XFORM_OP_ORDER, [tokens.TRANSLATE, tokens.ORIENT])
+            link = link.define(
+                "Link" if level == depth - 1 else "Base", ernie.Xform
+            )
+            link.set(
+                tokens.XFORM_OP_ORDER,
+                [tokens.TRANSLATE, tokens.ORIENT],
+            )
             if extent is not None:
                 link.set(tokens.XFORM_EXTENT, extent)
             levels[level].append(str(link.path))
@@ -35,21 +50,33 @@ def link_scene(points=True, instancer=True, extent=EXTENT, depth=1):
                 "Cloud",
                 ernie.Points,
                 translate=(1.5, 0.0, 0.0),
-                points=np.array([[0, 0, 0], [0, 1, 0], [0, -1, 0.5]], np.float32),
+                points=np.array(
+                    [[0, 0, 0], [0, 1, 0], [0, -1, 0.5]], np.float32
+                ),
                 display_color=(0.9, 0.2, 0.2),
-            ).write(tokens.WIDTHS, np.array([0.8, 0.6, 0.7], np.float32))  # widths per point
+            ).write(
+                tokens.WIDTHS, np.array([0.8, 0.6, 0.7], np.float32)
+            )  # widths per point
         if instancer:
             parts = link.define(
                 "Parts",
                 ernie.PointInstancer,
                 translate=(0.0, 1.5, 0.0),
                 rotate=(0.0, 0.0, 30.0),
-                positions=np.array([[0, 0, 0], [1, 0, 0], [0, 0, 1]], np.float32),
+                positions=np.array(
+                    [[0, 0, 0], [1, 0, 0], [0, 0, 1]], np.float32
+                ),
                 orientations=quats(3, seed=7),
-                scales=np.array([[1, 1, 1], [0.5, 1, 1], [1, 0.5, 1.5]], np.float32),
+                scales=np.array(
+                    [[1, 1, 1], [0.5, 1, 1], [1, 0.5, 1.5]],
+                    np.float32,
+                ),
             )
             part = parts.define(
-                "Part", ernie.Cube, scale=(0.3, 0.3, 0.3), display_color=(0.2, 0.8, 0.3)
+                "Part",
+                ernie.Cube,
+                scale=(0.3, 0.3, 0.3),
+                display_color=(0.2, 0.8, 0.3),
             )
             parts.set(tokens.PROTOTYPES, [part.path])
     return scene, levels
@@ -58,7 +85,9 @@ def link_scene(points=True, instancer=True, extent=EXTENT, depth=1):
 def link_arrays(count, seed):
     rng = np.random.default_rng(seed)
     return {
-        tokens.TRANSLATE: rng.uniform(-1.5, 1.5, (count, 3)).astype(np.float32),
+        tokens.TRANSLATE: rng.uniform(-1.5, 1.5, (count, 3)).astype(
+            np.float32
+        ),
         tokens.ORIENT: quats(count, seed),
     }
 
@@ -79,31 +108,45 @@ def render_both(renderer, arrays_per_level, **scene_args):
 
 
 @pytest.mark.parametrize(
-    "what", [{"instancer": False}, {"points": False}, {}], ids=["points", "instancer", "both"]
+    "what",
+    [{"instancer": False}, {"points": False}, {}],
+    ids=["points", "instancer", "both"],
 )
 def test_points_and_instances_on_posed_links(cuda_renderer, what):
-    cpu, gpu = render_both(cuda_renderer, [link_arrays(3, seed=1)], **what)
+    cpu, gpu = render_both(
+        cuda_renderer, [link_arrays(3, seed=1)], **what
+    )
     assert_same_image(gpu, cpu)
     assert cuda_renderer.take_validation_messages() == []
 
 
 def test_two_posed_links_deep(cuda_renderer):
-    cpu, gpu = render_both(cuda_renderer, [link_arrays(3, seed=2), link_arrays(3, seed=3)], depth=2)
+    cpu, gpu = render_both(
+        cuda_renderer,
+        [link_arrays(3, seed=2), link_arrays(3, seed=3)],
+        depth=2,
+    )
     assert_same_image(gpu, cpu)
 
 
-def test_points_and_instances_follow_their_links_step_by_step(cuda_renderer):
+def test_points_and_instances_follow_their_links_step_by_step(
+    cuda_renderer,
+):
     scene, levels = link_scene()
     previous = None
     for step in range(3):
         arrays = link_arrays(3, seed=20 + step)
-        write_levels(scene, levels, [arrays], cuda_renderer.cuda_upload)
+        write_levels(
+            scene, levels, [arrays], cuda_renderer.cuda_upload
+        )
         gpu = cuda_renderer.render(scene)
         reference, reference_levels = link_scene()
         write_levels(reference, reference_levels, [arrays])
         assert_same_image(gpu, cuda_renderer.render(reference))
         if previous is not None:
-            assert np.abs(gpu.astype(np.int32) - previous).max() > 50, "they moved with the links"
+            assert (
+                np.abs(gpu.astype(np.int32) - previous).max() > 50
+            ), "they moved with the links"
         previous = gpu.astype(np.int32)
 
 
@@ -115,9 +158,14 @@ def test_gpu_points_and_instances_on_posed_links(cuda_renderer):
         scene, levels = link_scene()
         for i in range(3):
             link = levels[0][i]
-            for path, attribute in ((f"{link}/Cloud", tokens.POINTS), (f"{link}/Parts", tokens.POSITIONS)):
+            for path, attribute in (
+                (f"{link}/Cloud", tokens.POINTS),
+                (f"{link}/Parts", tokens.POSITIONS),
+            ):
                 rows = np.array(scene.read(path, attribute))
-                scene.write(path, attribute, upload(rows) if upload else rows)
+                scene.write(
+                    path, attribute, upload(rows) if upload else rows
+                )
         write_levels(scene, levels, [arrays], upload)
         images.append(cuda_renderer.render(scene))
     assert_same_image(images[1], images[0])
@@ -125,10 +173,20 @@ def test_gpu_points_and_instances_on_posed_links(cuda_renderer):
 
 def test_points_under_posed_links_need_their_extent(cuda_renderer):
     scene, levels = link_scene(instancer=False, extent=None)
-    write_levels(scene, levels, [link_arrays(3, seed=5)], cuda_renderer.cuda_upload)
+    write_levels(
+        scene,
+        levels,
+        [link_arrays(3, seed=5)],
+        cuda_renderer.cuda_upload,
+    )
     with pytest.raises(ValueError, match="xform:extent"):
         cuda_renderer.render(scene)
     scene, levels = link_scene(points=False, extent=None)
-    write_levels(scene, levels, [link_arrays(3, seed=5)], cuda_renderer.cuda_upload)
+    write_levels(
+        scene,
+        levels,
+        [link_arrays(3, seed=5)],
+        cuda_renderer.cuda_upload,
+    )
     with pytest.raises(ValueError, match="xform:extent"):
         cuda_renderer.render(scene)
