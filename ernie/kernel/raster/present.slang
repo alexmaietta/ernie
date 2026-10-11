@@ -177,3 +177,20 @@ float4 presentOutline(VertexOutput in) : SV_Target {
     colour.a = constants.range.a;
     return colour;
 }
+
+// A cube camera's overlays over a presented var other than LdrColor, from sensor.slang's
+// `overlayLensMain` resampling them through the lens (bound at 0): rgb their colour over black,
+// their opacity already weighted in and sRGB-encoded as LdrColor holds it, and a the share of the
+// image that shows through. Blended source over at opacity 1 - a, as the overlay pass draws onto
+// the attachment.
+[shader("fragment")]
+float4 presentOverlay(VertexOutput in) : SV_Target {
+    let value = floatVar.Load(int3(int2(in.position.xy), 0));
+    let opacity = 1.0 - value.a;
+    if (opacity <= 0.0) {
+        discard;
+    }
+    var colour = display(value.rgb / opacity);
+    colour.a = opacity;
+    return colour;
+}

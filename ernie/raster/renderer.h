@@ -755,11 +755,20 @@ class RasterRenderer {
     void RecordFaceRows(VkCommandBuffer commands,
                         std::uint32_t firstView) const;
     /// `RecordOverlays` for a camera rendered on cube faces: drawn on
-    /// its faces, then resampled through its lens onto `color`.
+    /// its faces, then resampled through its lens onto `color`; or,
+    /// with `store`, into `color` as their colour over black and what
+    /// shows through (alpha), for view 0 only, for
+    /// `PresentFaceOverlays`.
     void RecordFaceOverlays(VkCommandBuffer commands,
                             RenderTargets& targets,
-                            std::uint32_t firstView,
-                            GpuImage& color) const;
+                            std::uint32_t firstView, GpuImage& color,
+                            bool store = false) const;
+    /// A cube camera's overlays over the presented var `present`
+    /// shows when it is not LdrColor: resampled through the lens
+    /// (`lensOverlays_`), then blended over it by the present pass.
+    void PresentFaceOverlays(VkCommandBuffer commands,
+                             RenderTargets& targets,
+                             const RenderingTarget& present) const;
     /// The overlay pass's target for view `view`, reading `targets`'
     /// depth layer `layer`.
     OverlayPass::Target OverlayTarget(RenderTargets& targets,
@@ -892,6 +901,7 @@ class RasterRenderer {
     std::unique_ptr<GraphicsPipeline> presentUint_;
     std::unique_ptr<GraphicsPipeline> presentSpectral_;
     std::unique_ptr<GraphicsPipeline> presentOutline_;
+    std::unique_ptr<GraphicsPipeline> presentOverlay_;
     std::unique_ptr<GpuBuffer>
         highlight_;  ///< A bit per highlighted prim id.
     /// One chain's sensor kernels: its plan, its custom filters'
@@ -1018,6 +1028,10 @@ class RasterRenderer {
     /// the lens onto LdrColor (sensor.slang's `overlayLensMain`, a
     /// pipeline per lens kernel); made when first drawn.
     mutable std::array<std::unique_ptr<GpuImage>, 2> faceOverlays_;
+    /// The same resampled for a presented var other than LdrColor:
+    /// colour over black, and what shows through as alpha
+    /// (`PresentFaceOverlays`).
+    mutable std::unique_ptr<GpuImage> lensOverlays_;
     std::unique_ptr<PipelineLayout> overlayLensLayout_;
     /// A cube camera with a rolling shutter: its faces' sensor rows
     /// (sensor.slang's `faceRowsMain`), which motion.slang times

@@ -1095,6 +1095,8 @@ public void writeOutputs(SensorPixel value, PixelContext pixel, uint holds) {
 // weighted by their opacity; the difference over white gives what of the image below shows
 // through, so LdrColor blends as when they draw onto it directly. A pass of its own, without a
 // sensor plan: bindings 0, 9 and 15 (for a lens of rays) as the sensor kernels', 32 and 33.
+// With `pass.view.y` 1 it stores the two at 9 instead (colour over black, and what shows through
+// as alpha), for the present pass to blend over another var (`RasterRenderer::Record`).
 [[vk::binding(32, 0)]] Texture2DArray<float4> overlayOverBlack;
 [[vk::binding(33, 0)]] Texture2DArray<float4> overlayOverWhite;
 
@@ -1125,6 +1127,12 @@ void overlayLensMain(uint3 id : SV_DispatchThreadID) {
     let black = overlayAt(overlayOverBlack, tap.raster, tap.layer, size).rgb;
     let white = overlayAt(overlayOverWhite, tap.raster, tap.layer, size).rgb;
     let through = saturate(dot(white - black, float3(1.0 / 3.0)));
+    if (pass.view.y == 1) {
+        // For a presented var other than LdrColor: their colour over black and what shows
+        // through, which present.slang's `presentOverlay` blends over the presented image.
+        ldrColor[id] = float4(black, through);
+        return;
+    }
     let below = ldrColor[id];
     ldrColor[id] = float4(black + through * below.rgb, below.a);
 }

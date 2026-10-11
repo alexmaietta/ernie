@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include "ernie/device/offscreen_target.h"
 #include "ernie/raster/delegate.h"
 #include "ernie/scene/camera.h"
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/overlay.h"
 #include "ernie/scene/render_schemas.h"
+#include "ernie/scene/sensor_filters.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/wide_view.h"
 #include "support/delegate_scenes.h"
@@ -173,6 +175,81 @@ TEST_F(RasterDelegateTest, OverlaysFollowACubeCamerasLens) {
         EXPECT_LT(texel(off)[0], 60) << "x = " << x;
     }
     EXPECT_GT(lit, 20);
+}
+
+TEST_F(RasterDelegateTest,
+       CubeCamerasOverlaysDrawOverAnyPresentedVar) {
+    // As OverlaysFollowACubeCamerasLens, presenting DistanceToCamera
+    // to UNORM and sRGB targets: the line lands where the lens puts
+    // it in the colour it has on LdrColor, and leaves the rest of the
+    // presented image as it was.
+    Scene scene = OverlayScene();
+    const double aperture = 20.0;
+    const double corner = std::sqrt(2.0) * 0.5 * kSize;
+    ernie::Camera(scene, "/World/Camera")
+        .SetLensProjection(ernie::tokens::kFisheye)
+        .SetVerticalAperture(aperture)
+        .SetHorizontalAperture(aperture)
+        .SetFocalLength(aperture * corner / (100.0 * M_PI / 180.0) /
+                        kSize);
+    const ernie::CameraParams camera =
+        ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize);
+    ASSERT_EQ(ernie::CubeFacesOf(camera), ernie::kCubeFaces);
+    OverlayStyle style;
+    style.width = 3.0f;
+    style.depth = OverlayDepth::Always;
+    style.color = {0.2f, 0.6f, 1.0f, 1.0f};
+    scene.GetOverlay("debug").Line({-150.0, -15.0, 0.0},
+                                   {150.0, -15.0, 0.0}, style);
+    const double f = camera.FocalLengthPixels();
+    const glm::dvec2 centre = camera.PrincipalPoint();
+    const auto pixelOf = [&](glm::dvec3 p) {
+        const glm::dvec3 v = p - glm::dvec3(0.0, 0.0, 60.0);
+        const double theta = std::acos(-v.z / glm::length(v));
+        const glm::dvec2 across =
+            glm::normalize(glm::dvec2(v.x, v.y));
+        return centre + theta * f * glm::dvec2(across.x, -across.y);
+    };
+    const auto offset = [](glm::dvec2 pixel) {
+        return 4 * (static_cast<std::size_t>(pixel.y) * kSize +
+                    static_cast<std::size_t>(pixel.x));
+    };
+    RasterDelegate ldr(*context_);
+    const std::vector<std::uint8_t> onLdr = Bytes(ldr.Render(scene));
+    for (const VkFormat format :
+         {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_SRGB}) {
+        RasterDelegate delegate(*context_, format);
+        const auto present = [&](bool overlays) {
+            scene.GetOverlay("debug").SetVisible(overlays);
+            delegate.Update(scene, "/Render/Settings",
+                            {kSize, kSize});
+            ernie::OffscreenTarget target(*context_, kSize, kSize,
+                                          format);
+            context_->Submit([&](VkCommandBuffer commands) {
+                delegate.Record(
+                    commands, target.Prepare(commands),
+                    ernie::render_vars::kDistanceToCamera);
+            });
+            return target.ReadColor();
+        };
+        const std::vector<std::uint8_t> without = present(false);
+        const std::vector<std::uint8_t> with = present(true);
+        int lit = 0;
+        for (double x = -140.0; x <= 140.0; x += 10.0) {
+            const std::size_t on = offset(pixelOf({x, -15.0, 0.0}));
+            for (std::size_t c = 0; c < 3; ++c) {
+                EXPECT_NEAR(with[on + c], onLdr[on + c], 3)
+                    << format << " x = " << x;
+            }
+            lit += with[on + 2] > 200 && with[on] < 80 ? 1 : 0;
+            const std::size_t off = offset(pixelOf({x, 15.0, 0.0}));
+            for (std::size_t c = 0; c < 4; ++c) {
+                EXPECT_EQ(with[off + c], without[off + c])
+                    << format << " x = " << x;
+            }
+        }
+        EXPECT_GT(lit, 20) << format;
+    }
 }
 
 TEST_F(RasterDelegateTest, OverlaysDrawMarkersLabelsAndShapes) {

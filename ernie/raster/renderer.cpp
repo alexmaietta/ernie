@@ -1089,6 +1089,7 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
     presentUint_ = presentPipeline("presentUint");
     presentSpectral_ = presentPipeline("presentSpectral");
     presentOutline_ = presentPipeline("presentOutline", true);
+    presentOverlay_ = presentPipeline("presentOverlay", true);
     highlight_ = std::make_unique<GpuBuffer>(
         context_, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         BufferMemory::Device);
@@ -3145,14 +3146,20 @@ void RasterRenderer::Record(
     RecordShadows(commands, drawables);
     // With a present target the overlays go over what it shows,
     // whichever var, not LdrColor; a cube camera's, which follow its
-    // lens, onto LdrColor when it shows that (and else not).
+    // lens, onto LdrColor when it shows that, else resampled through
+    // the lens and blended over the presented image.
     const bool lensOverlays = faces_ > 1 && present != nullptr &&
                               var == render_vars::kLdrColor;
     RecordViews(commands, targets, drawables, 0,
                 present == nullptr || lensOverlays);
     if (present != nullptr) {
         Present(commands, targets, *present, var);
-        if (!overlays_->Empty() && faces_ == 1) {
+        if (!overlays_->Empty() && faces_ > 1 && !lensOverlays) {
+            ERNIE_GPU_ZONE(context_, commands, "Overlays");
+            targets.Depth().Transition(
+                commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            PresentFaceOverlays(commands, targets, *present);
+        } else if (!overlays_->Empty() && faces_ == 1) {
             ERNIE_GPU_ZONE(context_, commands, "Overlays");
             targets.Depth().Transition(
                 commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -3779,7 +3786,8 @@ void RasterRenderer::RecordFaceRows(VkCommandBuffer commands,
 void RasterRenderer::RecordFaceOverlays(VkCommandBuffer commands,
                                         RenderTargets& targets,
                                         std::uint32_t firstView,
-                                        GpuImage& color) const {
+                                        GpuImage& color,
+                                        bool store) const {
     // Each face draws its overlays as a frame camera's view, over
     // black and over white.
     const std::uint32_t layers = targets.RasterLayers();
@@ -3843,7 +3851,7 @@ void RasterRenderer::RecordFaceOverlays(VkCommandBuffer commands,
                              resources);
     const std::uint32_t constants[8] = {
         firstView,
-        0u,
+        store ? 1u : 0u,
         0u,
         0u,
         sensorPasses_.front().tableOffset,
@@ -3853,8 +3861,60 @@ void RasterRenderer::RecordFaceOverlays(VkCommandBuffer commands,
     overlayLensLayout_->PushConstants(commands, constants,
                                       sizeof(constants));
     vkCmdDispatch(commands, Groups(extent_.width),
-                  Groups(extent_.height), targets.Views());
+                  Groups(extent_.height),
+                  store ? 1u : targets.Views());
     ShaderBarrier(commands);
+}
+
+void RasterRenderer::PresentFaceOverlays(
+    VkCommandBuffer commands, RenderTargets& targets,
+    const RenderingTarget& present) const {
+    if (lensOverlays_ == nullptr ||
+        lensOverlays_->Desc().width != extent_.width ||
+        lensOverlays_->Desc().height != extent_.height) {
+        vkDeviceWaitIdle(context_.Device());
+        lensOverlays_ = std::make_unique<GpuImage>(
+            context_, ImageDesc{extent_.width, extent_.height, 1, 1,
+                                VK_FORMAT_R8G8B8A8_UNORM,
+                                VK_IMAGE_USAGE_STORAGE_BIT |
+                                    VK_IMAGE_USAGE_SAMPLED_BIT,
+                                false, true});
+    }
+    RecordFaceOverlays(commands, targets, 0, *lensOverlays_, true);
+    lensOverlays_->Transition(
+        commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    // Blended over what the present pass drew, as the overlay pass
+    // draws a frame camera's.
+    RenderingTarget target = present;
+    target.depth = VK_NULL_HANDLE;
+    target.loadColor = true;
+    BeginRendering(commands, target);
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      presentOverlay_->Handle());
+    // As `Present`'s bindings: the image at 0 (and 1), its array view
+    // at 2.
+    const DescriptorResource image = DescriptorResource::Of(
+        lensOverlays_->LayerView(0),
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    const DescriptorResource array = DescriptorResource::Of(
+        lensOverlays_->View(),
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    const std::array<DescriptorResource, 4> views{
+        image, image, array, DescriptorResource::Of(*highlight_)};
+    presentLayout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                        views);
+    const bool srgb = presentFormat_ == VK_FORMAT_R8G8B8A8_SRGB ||
+                      presentFormat_ == VK_FORMAT_B8G8R8A8_SRGB;
+    struct {
+        std::uint32_t flags[4];
+        float range[4];
+    } constants{{srgb ? 1u : 0u, 0u, 0u, 0u},
+                {0.0f, 0.0f, 0.0f, 0.0f}};
+    presentLayout_.PushConstants(commands, &constants,
+                                 sizeof(constants));
+    vkCmdDraw(commands, 3, 1, 0, 0);
+    vkCmdEndRendering(commands);
+    lensOverlays_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
 }
 
 void RasterRenderer::BeginFrame(std::uint32_t slot) {
