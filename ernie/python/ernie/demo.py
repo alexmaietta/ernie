@@ -87,7 +87,8 @@ class Demo:
         image: The last LdrColor rendered without a viewer, uint8 (rows, cols, 4).
     """
 
-    #: Frames to run without a window when `--num-frames` is not given.
+    #: Frames to run without a window when `--num-frames` is not given; a demo may set its own
+    #: in `__init__`, from its options.
     num_frames = 100
     #: Seconds each step advances without a window, for repeatable runs.
     fixed_dt = 1.0 / 60.0
@@ -224,7 +225,7 @@ def run(demo, args):
         raise NotImplementedError(f"{type(demo).__name__} has no test_final or test_post_step")
     num_frames = args.num_frames
     if num_frames is None and (viewer is None or args.headless):
-        num_frames = type(demo).num_frames
+        num_frames = demo.num_frames
     benchmark = args.benchmark is not False
     deadline = args.benchmark if benchmark else None
 
@@ -267,7 +268,7 @@ def run(demo, args):
                 if deadline is not None and time.perf_counter() - timer_start >= deadline:
                     break
 
-    if args.output:
+    if args.output and demo is not None:
         demo.save_output(args.output)
         print(f"wrote {args.output}")
     if test_final:
@@ -279,8 +280,15 @@ def run(demo, args):
             elapsed = time.perf_counter() - timer_start
             print(f"Benchmark: {_format_fps(timed_frames / max(elapsed, 1e-9))} FPS "
                   f"({timed_frames} frames in {elapsed:.2f} s)")
+    if demo is not None:
+        demo.close()
     if viewer is not None:
         viewer.close()
+        # The viewer holds the demo's callbacks and the panel's, which hold the demo and through
+        # it the viewer: a cycle through C++ that Python's collector cannot see.
+        viewer._release()
+        if browser is not None:
+            viewer.raw.remove_panel("Demos")
     return demo
 
 

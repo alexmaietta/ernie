@@ -3,8 +3,8 @@
 cratered ground near the Moon's south pole, through the NAC's published sensor and readout to
 the 8-bit numbers it sends.
 
-    PYTHONPATH=build/python python demos/python/demo_cameras_lroc_nac_strip.py
-    PYTHONPATH=build/python python demos/python/demo_cameras_lroc_nac_strip.py --output nac.png
+    PYTHONPATH=build/python python demos/python/demo_cameras_lroc_nac_strip.py \
+        [--viewer null --output nac.png] [--isd ISD]
 
 The ISD (ALE's image support data, from usgscsm's tests) gives the camera's orbit, pointing,
 line time, 2 x 2 summed detector and lens distortion; `IsdLineScanner.author_strip` turns each run
@@ -29,16 +29,14 @@ References:
   diameter for simple craters).
 """
 
-import argparse
 import math
 import os
 
 import numpy as np
 
 import ernie
+import ernie.demo
 from ernie import tokens
-
-from demo_support import write_png
 
 ISD = os.path.join(os.path.dirname(__file__), "..", "..", "ernie", "test", "fixtures", "isd",
                    "toughLroNacLineScan.json")
@@ -90,13 +88,14 @@ def terrain_heights(radius, seed=4):
     return heights.astype(np.float32)
 
 
-def build_scene(scanner):
+def build_scene(scene, scanner):
+    """Builds the terrain, sun, NAC and its render settings into `scene`; returns the local
+    frame."""
     middle = FIRST_LINE + 0.5 * STRIP_LINES * STRIPS
     centre = np.array(scanner.image_to_ground(middle, 0.5 * scanner.samples))
     frame = local_frame(centre)
     radius = float(np.linalg.norm(centre))
 
-    scene = ernie.Scene()
     # Hapke's model with its lunar defaults; single-scattering albedo about 0.25 for lunar soil.
     regolith = scene.define("/Looks/Regolith", ernie.Material, brdf="hapke",
                             albedo=(0.25, 0.25, 0.25))
@@ -120,7 +119,7 @@ def build_scene(scanner):
     # NAC everywhere).
     scene.define("/Render/Settings", ernie.RenderSettings, ambient=0.0, camera=camera).set(
         tokens.PRODUCTS, [nac.path])
-    return scene, frame
+    return frame
 
 
 def author_strip(scanner, scene, frame, first, at_end):
@@ -131,30 +130,63 @@ def author_strip(scanner, scene, frame, first, at_end):
     scene.set("/Render/Nac", tokens.RESOLUTION, resolution)
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--isd", default=ISD, help="the NAC image's ISD (ALE JSON)")
-    parser.add_argument("--output", default="lroc_nac_strip.png", help="where to write the image")
-    args = parser.parse_args()
-    scanner = ernie.IsdLineScanner.from_file(args.isd)
-    print(f"{scanner.sensor}: {scanner.samples} samples x {scanner.lines} lines")
-    scene, frame = build_scene(scanner)
-    renderer = ernie.Renderer()
-    # The first strip's start, then each strip to its end: the camera's last pose is the next
-    # strip's first.
-    author_strip(scanner, scene, frame, FIRST_LINE, at_end=False)
-    renderer.step(scene, render_products=["/Render/Nac"], settings="/Render/Settings")
-    strips = []
-    for k in range(STRIPS):
-        author_strip(scanner, scene, frame, FIRST_LINE + k * STRIP_LINES, at_end=True)
-        frame_out = renderer.step(scene, render_products=["/Render/Nac"],
-                                  settings="/Render/Settings")["/Render/Nac"].frames[0]
-        strips.append(np.array(frame_out.render_vars["/Render/Vars/RawDN"].map())[..., 0])
-    image = np.concatenate(strips, axis=0).astype(np.uint8)
-    print(f"8-bit DN from {image.min()} to {image.max()}, mean {image.mean():.1f}")
-    write_png(args.output, np.repeat(image[..., None], 3, axis=2))
-    print(f"wrote {args.output}")
+class Demo(ernie.demo.Demo):
+    num_frames = STRIPS  # one strip a step; a window starts the image over after the last
+
+    @classmethod
+    def create_parser(cls):
+        parser = super().create_parser()
+        parser.add_argument("--isd", default=ISD, help="the NAC image's ISD (ALE JSON)")
+        return parser
+
+    def __init__(self, viewer, args):
+        super().__init__(viewer, args)
+        self.scanner = ernie.IsdLineScanner.from_file(args.isd)
+        print(f"{self.scanner.sensor}: {self.scanner.samples} samples x "
+              f"{self.scanner.lines} lines")
+        self.local = build_scene(self.scene, self.scanner)
+        self.strips = [None] * STRIPS
+
+    def step(self):
+        k = self.frame % STRIPS
+        if k == 0:
+            # The first strip's start, rendered and dropped: each strip then runs to its end, the
+            # camera's last pose being the next strip's first.
+            self.strips = [None] * STRIPS
+            author_strip(self.scanner, self.scene, self.local, FIRST_LINE, at_end=False)
+            self.renderer.step(self.scene, render_products=["/Render/Nac"],
+                               settings="/Render/Settings")
+        author_strip(self.scanner, self.scene, self.local, FIRST_LINE + k * STRIP_LINES,
+                     at_end=True)
+        out = self.renderer.step(self.scene, render_products=["/Render/Nac"],
+                                 settings="/Render/Settings")["/Render/Nac"].frames[0]
+        self.strips[k] = np.array(out.render_vars["/Render/Vars/RawDN"].map())[..., 0]
+        if k == STRIPS - 1:
+            image = self.mosaic()
+            print(f"8-bit DN from {image.min()} to {image.max()}, mean {image.mean():.1f}")
+
+    def render(self):
+        # `step` renders the NAC's product; without a viewer there is nothing more to draw.
+        if self.viewer is not None:
+            super().render()
+
+    def mosaic(self):
+        """The strips rendered so far, top to bottom, as 8-bit DN; strips still to come black."""
+        width = next(s.shape[1] for s in self.strips if s is not None)
+        return np.concatenate([s if s is not None else np.zeros((STRIP_LINES, width))
+                               for s in self.strips], axis=0).astype(np.uint8)
+
+    def save_output(self, path):
+        ernie.demo.write_png(path, self.mosaic())
+
+    def test_final(self):
+        assert all(s is not None for s in self.strips), "every strip should have rendered"
+        image = self.mosaic()
+        assert image.shape[0] == STRIPS * STRIP_LINES
+        assert image.std() > 2.0, "the craters and their shadows should not render flat"
+        assert image.mean() > 5.0 and np.mean(image == 255) < 0.05, \
+            "the companded DN should be neither black nor saturated"
 
 
 if __name__ == "__main__":
-    main()
+    ernie.demo.main(Demo)

@@ -28,6 +28,7 @@ nav:
       - Installation: getting-started/installation.md
       - Quickstart: getting-started/quickstart.md
       - Viewer: getting-started/viewer.md
+      - Demos: getting-started/demos.md
   - Concepts:
       - Scene description: concepts/scene.md
       - Transforms: concepts/transforms.md
@@ -69,6 +70,7 @@ nav:
           - Astronomy: api/python/astronomy.md
           - Batched cameras: api/python/batch.md
           - Viewer: api/python/app.md
+          - Demos: api/python/demo.md
           - Tokens: api/python/tokens.md
       - C++:
           - Overview: api/cpp.md

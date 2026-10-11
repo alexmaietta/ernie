@@ -1,30 +1,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Small helpers the demos share: writing PNGs without extra packages, heatmaps, side by side.
+"""Small helpers the demos share: heatmaps, side by side, sRGB, and `write_png` (from ernie.demo).
 
 Not a demo itself; the demos import it from this directory.
 """
 
-import struct
-import zlib
-
 import numpy as np
 
-
-def write_png(path, image):
-    """Writes an (rows, cols, 3 or 4) uint8 image as PNG with only the standard library."""
-    image = np.ascontiguousarray(image, dtype=np.uint8)
-    rows, cols, channels = image.shape
-    colour_type = {3: 2, 4: 6}[channels]
-    raw = b"".join(b"\x00" + image[r].tobytes() for r in range(rows))
-
-    def chunk(kind, data):
-        body = kind + data
-        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
-
-    header = struct.pack(">IIBBBBB", cols, rows, 8, colour_type, 0, 0, 0)
-    with open(path, "wb") as file:
-        file.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) +
-                   chunk(b"IDAT", zlib.compress(raw, 6)) + chunk(b"IEND", b""))
+from ernie.demo import write_png  # noqa: F401 - shared with the demos that import it from here
 
 
 def heatmap(values, low, high):

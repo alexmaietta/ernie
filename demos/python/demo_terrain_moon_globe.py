@@ -2,10 +2,8 @@
 """The whole Moon as one terrain: a Moon-sized body of cratered relief drawn with planet-scale
 level of detail, from orbit down to a few kilometres above the ground.
 
-    PYTHONPATH=build/python python demos/python/demo_terrain_moon_globe.py
-    PYTHONPATH=build/python python demos/python/demo_terrain_moon_globe.py --output moon.png
     PYTHONPATH=build/python python demos/python/demo_terrain_moon_globe.py \
-        --textures ~/Downloads/moon_01_4k.blend.zip
+        [--viewer null --output moon.png] [--textures ~/Downloads/moon_01_4k.blend.zip]
 
 A Terrain with `ernie:radius` is a planet: its heights are six cube faces (Ernie's
 equiangular cube sphere, faces 0 to 3 round the equator from longitude 0 eastwards, 4 the north
@@ -17,7 +15,8 @@ centimetre camera moves although it is 3,475 km across.
 The relief is illustrative: a few low basins and several thousand bowl craters with raised
 rims, their sizes drawn from a cumulative power law and the larger ones' depths capped. Shading uses Hapke's lunar BRDF; with
 Poly Haven's moon_01 scan (CC0, https://polyhaven.com/a/moon_01) as detail textures, the regolith
-gains texture close up. Without --output the viewer opens, starting in orbit.
+gains texture close up. The viewer opens in orbit; `--output` writes the orbit and a view low
+over the terminator side by side.
 
 References:
 - NASA NSSDCA, "Moon Fact Sheet", updated 11 January 2024 (volumetric mean radius 1737.4 km).
@@ -29,7 +28,6 @@ References:
   124(1):93-114, 1996 (the equiangular cube sphere).
 """
 
-import argparse
 import math
 import os
 import tempfile
@@ -37,9 +35,10 @@ import tempfile
 import numpy as np
 
 import ernie
+import ernie.demo
 from ernie import tokens
 
-from demo_support import side_by_side, write_png
+from demo_support import side_by_side
 
 RADIUS = 1737400.0  # metres, the Moon's mean radius
 FACE_CELLS = 1024   # grid quads along each cube face, about 2.7 km each
@@ -128,8 +127,9 @@ def moon_heights(seed=7, craters=6000, smallest=8000.0, largest=250000.0):
     return heights.astype(np.float32)
 
 
-def build_scene(heights, maps=None):
-    scene = ernie.Scene()
+def build_scene(scene, heights, maps=None):
+    """Builds the Moon, Sun, stars, camera and render settings into `scene`; returns the
+    camera."""
     regolith = scene.define("/Looks/Regolith", ernie.Material, brdf="hapke",
                             albedo=(0.25, 0.25, 0.25))
     if maps is not None:
@@ -155,7 +155,7 @@ def build_scene(heights, maps=None):
                           exposure_iso=100.0, exposure_time=1.0 / 250.0, exposure_f_stop=5.6)
     scene.define("/Render/Settings", ernie.RenderSettings, camera=camera, resolution=SIZE,
                  shadow_fit=tokens.VISIBLE, ambient=0.0, color_mode=tokens.HILLSHADE)
-    return scene, camera
+    return camera
 
 
 def in_orbit(camera):
@@ -180,30 +180,48 @@ def low_over_the_terminator(camera):
     camera.clipping_range = (10.0, 4.0e5)
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--output", help="write orbit and low-altitude images here instead of "
-                                         "opening the viewer")
-    parser.add_argument("--textures", help="Poly Haven's moon_01 download (a .zip of any "
-                                           "resolution) or a folder of its maps, for detail")
-    args = parser.parse_args()
-    maps = None
-    if args.textures:
-        from demo_materials_lunar_regolith import load_maps
-        with tempfile.TemporaryDirectory() as scratch:
-            maps = load_maps(os.path.expanduser(args.textures), scratch)
-    scene, camera = build_scene(moon_heights(), maps)
-    in_orbit(camera)
-    if not args.output:
-        from ernie.app import Viewer
-        Viewer(scene).run()
-        return
-    renderer = ernie.Renderer()
-    orbit = np.array(renderer.render(scene))[..., :3]
-    low_over_the_terminator(camera)
-    low = np.array(renderer.render(scene))[..., :3]
-    write_png(args.output, side_by_side([orbit, low]))
+class Demo(ernie.demo.Demo):
+    num_frames = 1
+
+    @classmethod
+    def create_parser(cls):
+        parser = super().create_parser()
+        parser.add_argument("--textures", default=None,
+                            help="Poly Haven's moon_01 download (a .zip of any resolution) or a "
+                            "folder of its maps, for detail; none by default")
+        return parser
+
+    def __init__(self, viewer, args):
+        super().__init__(viewer, args)
+        maps = None
+        if args.textures:
+            from demo_materials_lunar_regolith import load_maps
+            with tempfile.TemporaryDirectory() as scratch:
+                maps = load_maps(os.path.expanduser(args.textures), scratch)
+        self.camera = build_scene(self.scene, moon_heights(), maps)
+        in_orbit(self.camera)
+
+    def views(self):
+        """The orbit and the view low over the terminator, rendered with the scene's camera,
+        which is left in orbit."""
+        orbit = self.render_image()[..., :3]
+        low_over_the_terminator(self.camera)
+        try:
+            low = np.asarray(self.renderer.render(self.scene))[..., :3]
+        finally:
+            in_orbit(self.camera)
+        return orbit, low
+
+    def save_output(self, path):
+        ernie.demo.write_png(path, side_by_side(list(self.views())))
+
+    def test_final(self):
+        orbit, low = self.views()
+        lit = np.mean(orbit.max(axis=-1) > 40)
+        assert 0.05 < lit < 0.6, f"the sunlit Moon should fill part of the frame, not {lit:.0%}"
+        assert orbit[:20, :20].mean() < 20, "the corner should be dark space"
+        assert low.std() > 10.0, "the craters' long shadows should not render flat"
 
 
 if __name__ == "__main__":
-    main()
+    ernie.demo.main(Demo)

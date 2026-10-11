@@ -2,9 +2,11 @@
 """Adds three custom sensor filters written in Slang and renders through them: an IR-cut filter on
 the spectrum (a band filter, before the sensor integrates the bands), hot pixels on the
 electrons (a pixel filter, between QE and the ADC) and a glow on linear colour (a spatial
-filter, reading the pixels around its own). Saves the RawDN and LdrColor images.
+filter, reading the pixels around its own). `--output` writes the RawDN and LdrColor images side
+by side.
 
-    PYTHONPATH=build/python python demos/python/demo_sensor_custom_filters.py [out_prefix]
+    PYTHONPATH=build/python python demos/python/demo_sensor_custom_filters.py \
+        [--viewer null --output filters.png]
 
 A custom filter is a Slang struct implementing IBandFilter, IPixelFilter, ISpatialBandFilter or
 ISpatialPixelFilter from module `sensor`, with a nested Params struct of one float per
@@ -12,14 +14,18 @@ parameter; SensorFilter prims name it in ernie:filter:type and set its parameter
 inputs:<name>. The renderer fuses band and pixel filters with the built-in ones into one kernel,
 so they cost about as much as their own arithmetic; a spatial filter splits the kernel, the part
 before writing its domain to an image it reads.
-"""
 
-import sys
+The filters are added to the demo's own Renderer, which renders the two products; in a viewer the
+viewport shows the photographic camera without them.
+"""
 
 import numpy as np
 
 import ernie
+import ernie.demo
 from ernie import tokens
+
+from demo_support import side_by_side
 
 IR_CUT = """
 import sensor;
@@ -72,8 +78,9 @@ struct Glow : ISpatialPixelFilter {
 """
 
 
-def build_scene():
-    scene = ernie.Scene()
+def build_scene(scene):
+    """Builds the box, sun, both cameras, the filter chain and the two products into `scene`;
+    returns the photographic camera."""
     world = scene.define("/World", ernie.Xform)
     world.define("Ground", ernie.GroundPlane)
     world.define("Sun", ernie.DistantLight).set(
@@ -114,41 +121,64 @@ def build_scene():
         render.define(product, ernie.RenderProduct, camera=camera, resolution=(320, 240)).set(
             tokens.ORDERED_VARS, [render_var.path]
         ).set(tokens.FILTERS, paths)
-    return scene
+    return photo
 
 
-def main():
-    prefix = sys.argv[1] if len(sys.argv) > 1 else "demo_sensor_custom_filters"
-    renderer = ernie.Renderer()
-    renderer.add_sensor_filter(
-        "irCut", "IrCut", IR_CUT, kind="band", params={"cutoff": 700.0, "width": 50.0}
-    )
-    renderer.add_sensor_filter(
-        "hotPixels", "HotPixels", HOT_PIXELS, kind="pixel", domain="electrons",
-        params={"fraction": 1e-4, "electrons": 2000.0},
-    )
-    renderer.add_sensor_filter(
-        "glow", "Glow", GLOW, kind="spatial", domain="rgb",
-        params={"radius": 4.0, "strength": 0.3},
-    )
-    outputs = renderer.step(build_scene(), render_products=["/Render/Raw", "/Render/Photo"])
-    raw = np.array(outputs["/Render/Raw"].frames[0].render_vars["/Render/Vars/RawDN"].map())
-    ldr = np.array(outputs["/Render/Photo"].frames[0].render_vars["/Render/Vars/LdrColor"].map())
-    print(f"RawDN {raw.shape} {raw.dtype}, max {raw.max()}; LdrColor {ldr.shape}")
-    try:
-        from PIL import Image
+class Demo(ernie.demo.Demo):
+    num_frames = 1
 
-        # Scaled to the 99th percentile: the scene in range, the hot pixels saturated.
-        scale = 255.0 / max(float(np.percentile(raw[..., :3], 99)), 1.0)
-        raw_image = np.clip(raw[..., :3] * scale, 0, 255).astype(np.uint8)
-        Image.fromarray(raw_image).save(f"{prefix}_raw.png")
-        Image.fromarray(ldr).save(f"{prefix}_ldr.png")
-        print(f"Saved {prefix}_raw.png and {prefix}_ldr.png")
-    except ImportError:
-        np.save(f"{prefix}_raw.npy", raw)
-        np.save(f"{prefix}_ldr.npy", ldr)
-        print("Saved .npy files (install Pillow for PNGs)")
+    def __init__(self, viewer, args):
+        super().__init__(viewer, args)
+        photo = build_scene(self.scene)
+        renderer = self.renderer
+        renderer.add_sensor_filter(
+            "irCut", "IrCut", IR_CUT, kind="band", params={"cutoff": 700.0, "width": 50.0}
+        )
+        renderer.add_sensor_filter(
+            "hotPixels", "HotPixels", HOT_PIXELS, kind="pixel", domain="electrons",
+            params={"fraction": 1e-4, "electrons": 2000.0},
+        )
+        renderer.add_sensor_filter(
+            "glow", "Glow", GLOW, kind="spatial", domain="rgb",
+            params={"radius": 4.0, "strength": 0.3},
+        )
+        self.raw = None
+        self.ldr = None
+        if viewer is not None:
+            viewer.active_camera = photo.path
+
+    def step(self):
+        if self.raw is not None:
+            return  # a still scene: the products rendered once
+        outputs = self.renderer.step(self.scene, render_products=["/Render/Raw", "/Render/Photo"])
+        frames = {path: outputs[path].frames[0] for path in ("/Render/Raw", "/Render/Photo")}
+        self.raw = np.array(frames["/Render/Raw"].render_vars["/Render/Vars/RawDN"].map())
+        self.ldr = np.array(frames["/Render/Photo"].render_vars["/Render/Vars/LdrColor"].map())
+        print(f"RawDN {self.raw.shape} {self.raw.dtype}, max {self.raw.max()}; "
+              f"LdrColor {self.ldr.shape}")
+
+    def render(self):
+        # Without a viewer the frame is the photographic product, through the custom filters.
+        if self.viewer is not None:
+            super().render()
+        else:
+            self.image = self.ldr
+
+    def save_output(self, path):
+        # RawDN scaled to its 99th percentile (the scene in range, the hot pixels saturated)
+        # beside LdrColor.
+        scale = 255.0 / max(float(np.percentile(self.raw[..., :3], 99)), 1.0)
+        raw_image = np.clip(self.raw[..., :3] * scale, 0, 255).astype(np.uint8)
+        ernie.demo.write_png(path, side_by_side([raw_image, self.ldr[..., :3]]))
+
+    def test_final(self):
+        raw = self.raw[..., :3].astype(np.float64)
+        ldr = self.ldr[..., :3]
+        assert raw.max() > 0 and ldr.std() > 1.0, "both products should show the scene"
+        # Hot pixels: a fraction of 0.002 with 5000 extra electrons stands far above the scene.
+        hot = np.mean(raw.max(axis=-1) > 4.0 * np.percentile(raw, 99))
+        assert 1e-4 < hot < 0.01, f"about 0.2% of pixels should be hot, not {hot:.4%}"
 
 
 if __name__ == "__main__":
-    main()
+    ernie.demo.main(Demo)

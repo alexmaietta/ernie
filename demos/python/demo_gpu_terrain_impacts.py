@@ -2,15 +2,16 @@
 """A lunar plain cratered by impacts as you watch: Warp kernels make the terrain and carve every
 crater on the GPU, and Ernie rebuilds only the patch each one changed.
 
-    PYTHONPATH=build/python python demos/python/demo_gpu_terrain_impacts.py [--capture impacts.png]
+    PYTHONPATH=build/python python demos/python/demo_gpu_terrain_impacts.py [--rate 3]
+        [--viewer null --output impacts.png]
 
 Needs Warp (`uv pip install warp-lang`) and CUDA interop. A kernel fills a Warp array with
 rolling fractal relief, written once as the terrain's heights. From then on each frame maps the
-renderer's own copy of the heights (`Viewer.map`, a CUDA array over Ernie's memory) and each
-impact's kernel carves a bowl with a raised rim and an ejecta blanket straight into it; unmapping
-on the kernels' stream with `ernie:heights:dirty`, the rectangle of cells the impacts touched,
-has the renderer recompute the gradients, their mips and the level-of-detail bounds of that
-rectangle alone, on the GPU. Nothing is copied, and the host never reads the heights.
+renderer's own copy of the heights (`Viewer.map` or `Renderer.map`, a CUDA array over Ernie's
+memory) and each impact's kernel carves a bowl with a raised rim and an ejecta blanket straight
+into it; unmapping on the kernels' stream with `ernie:heights:dirty`, the rectangle of cells the
+impacts touched, has the renderer recompute the gradients, their mips and the level-of-detail
+bounds of that rectangle alone, on the GPU. Nothing is copied, and the host never reads the heights.
 
 References:
 - H. J. Melosh, "Impact Cratering: A Geologic Process", Oxford University Press, 1989 (crater
@@ -20,13 +21,13 @@ References:
   Ejecta", Earth and Planetary Science Letters 20(2):226-236, 1973.
 """
 
-import argparse
 import math
 
 import numpy as np
 import warp as wp
 
 import ernie
+import ernie.demo
 from ernie import tokens
 
 CELLS = 1024  # cells along each side
@@ -74,8 +75,7 @@ def impact(heights: wp.array2d(dtype=float), first: wp.vec2i, centre: wp.vec2, r
     heights[row, col] = heights[row, col] + change
 
 
-def build_scene(heights):
-    scene = ernie.Scene()
+def build_scene(scene, heights):
     regolith = scene.define("/Looks/Regolith", ernie.Material, brdf="hapke",
                             albedo=(0.25, 0.25, 0.25))
     extent = CELLS * CELL
@@ -93,7 +93,7 @@ def build_scene(heights):
         tokens.TRANSFORM, ernie.look_at_transform((0.0, -150.0, 70.0), (0.0, 0.0, 0.0)))
     scene.define("/Render/Settings", ernie.RenderSettings, camera=camera, ambient=0.02,
                  color_mode=tokens.HILLSHADE)
-    return scene
+    return terrain, camera
 
 
 class Impacts:
@@ -127,46 +127,53 @@ def carve(heights, impacts, count, stream_device):
     return (int(low[0]), int(low[1]), int(high[0] - low[0]), int(high[1] - low[1]))
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--capture", help="render without a window and save the image here")
-    parser.add_argument("--rate", type=int, default=3, help="impacts per frame")
-    args = parser.parse_args()
+class Demo(ernie.demo.Demo):
+    num_frames = 120
 
-    wp.init()
-    device = "cuda:0"
-    stream = wp.get_stream(device)
-    heights = wp.zeros((CELLS, CELLS), dtype=float, device=device)
-    wp.launch(relief, dim=(CELLS, CELLS), inputs=[heights, 7], device=device)
-    scene = build_scene(heights)
-    impacts = Impacts()
-    terrain = ernie.Path("/World/Terrain")
+    @classmethod
+    def create_parser(cls):
+        parser = super().create_parser()
+        parser.add_argument("--rate", type=int, default=3, help="impacts per frame")
+        return parser
 
-    from ernie.app import Viewer
-    viewer = Viewer(scene, title="Ernie: impacts carved by Warp kernels",
-                    hidden=args.capture is not None)
+    def __init__(self, viewer, args):
+        super().__init__(viewer, args)
+        wp.init()
+        self.device = "cuda:0"
+        self.stream = wp.get_stream(self.device)
+        heights = wp.zeros((CELLS, CELLS), dtype=float, device=self.device)
+        wp.launch(relief, dim=(CELLS, CELLS), inputs=[heights, 7], device=self.device)
+        self.relief = heights.numpy()
+        self.terrain, camera = build_scene(self.scene, heights)
+        self.impacts = Impacts()
+        self.carved = 0
+        if viewer is not None:
+            viewer.active_camera = camera.path
+            if args.output:
+                display = viewer.viewport_display
+                display.lights = display.grid = display.cameras = False
+                viewer.viewport_display = display
 
-    def update(v, info):
+    def step(self):
         # Ernie's own copy of the heights, carved straight into: nothing is copied at all.
-        mapped = wp.from_dlpack(v.map(terrain, tokens.HEIGHTS, stream=stream))
-        dirty = carve(mapped, impacts, args.rate, device)
-        v.scene.set(terrain, tokens.HEIGHTS_DIRTY, [float(x) for x in dirty])
-        v.scene.unmap(terrain, tokens.HEIGHTS, stream=stream)
+        path = self.terrain.path
+        mapped = wp.from_dlpack(self.map(path, tokens.HEIGHTS, stream=self.stream))
+        dirty = carve(mapped, self.impacts, self.args.rate, self.device)
+        self.scene.set(path, tokens.HEIGHTS_DIRTY, [float(x) for x in dirty])
+        self.scene.unmap(path, tokens.HEIGHTS, stream=self.stream)
+        self.carved += self.args.rate
 
-    viewer.active_camera = ernie.Path("/World/Camera")
-    if args.capture is not None:
-        display = viewer.viewport_display
-        display.lights = display.grid = display.cameras = False
-        viewer.viewport_display = display
-    viewer.on_frame(update)
-    if args.capture is None:
-        viewer.run()
-        return
-    for _ in range(120):
-        viewer.step()
-    viewer.capture(args.capture)
-    viewer.step()
+    def test_final(self):
+        # The renderer's heights, read back once for the test.
+        path = self.terrain.path
+        heights = wp.from_dlpack(self.map(path, tokens.HEIGHTS, stream=self.stream)).numpy()
+        self.scene.unmap(path, tokens.HEIGHTS, stream=self.stream)
+        changed = np.abs(heights - self.relief) > 0.01
+        assert self.carved > 0 and changed.any(), "the impacts should carve the terrain"
+        assert changed.mean() < 0.5, "the craters should change patches, not the whole plain"
+        image = self.render_image()[..., :3]
+        assert image.std() > 1.0, "the hillshaded terrain should not render flat"
 
 
 if __name__ == "__main__":
-    main()
+    ernie.demo.main(Demo)

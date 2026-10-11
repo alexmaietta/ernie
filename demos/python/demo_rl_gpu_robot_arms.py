@@ -4,31 +4,36 @@ kinematics into link positions and quaternions, and Ernie renders one view per w
 arrays without the poses ever coming to the host, as a reinforcement learning loop whose
 simulator keeps its state on the GPU.
 
-    PYTHONPATH=build/python python demos/python/demo_rl_gpu_robot_arms.py [worlds] [--capture arms.png]
+    PYTHONPATH=build/python python demos/python/demo_rl_gpu_robot_arms.py [--worlds 1024]
+        [--viewer null --output arms.png]
 
-Each world ("environment") holds a three-link arm over a shared ground. The links are Xform prims
-whose transform ops (`xformOp:translate`, `xformOp:orient`) are written as rows of two CUDA arrays
-for all links at once (`Scene.write` of many paths); the boxes under them are posed by the GPU
-between their world's transform and their own (`tokens.XFORM_EXTENT` bounds each link so nothing
-is copied to the host). The cameras orbit their worlds, their poses also computed by a kernel as
-positions and quaternions (`ernie:poses` as (views, 7)). Needs Warp (`pip install warp-lang`).
+Each world ("environment") holds a three-link arm, the worlds laid out on a grid over a shared
+ground. The links are Xform prims whose transform ops (`xformOp:translate`, `xformOp:orient`) are
+written as rows of two CUDA arrays for all links at once (`Scene.write` of many paths); the boxes
+under them are posed by the GPU between their world's transform and their own
+(`tokens.XFORM_EXTENT` bounds each link so nothing is copied to the host). The cameras orbit
+their worlds, their poses also computed by a kernel as positions and quaternions (`ernie:poses`
+as (views, 7)). Each step renders every view through a BatchCamera; the viewer shows the grid of
+worlds, and `--output` writes the first 16 worlds' last views as a contact sheet. Needs Warp
+(`pip install warp-lang`).
 """
 
-import argparse
+import math
 import time
 
 import numpy as np
 import warp as wp
 
 import ernie
-from demo_support import write_png
+import ernie.demo
 from ernie import tokens
 from ernie.batch import BatchCamera
 
 SIZE = 64
 LINKS = 3
 LENGTHS = (1.2, 1.0, 0.6)
-STEPS = 120
+SPACING = 8.0  # metres between neighbouring worlds on the grid
+WARMUP = 5  # steps before timing: pipelines, allocations
 
 
 @wp.kernel
@@ -64,13 +69,15 @@ def arm_poses(
 
 
 @wp.kernel
-def camera_poses(t: float, views: int, poses: wp.array2d(dtype=float)):
-    """A view per world circling it: position, then the quaternion (x, y, z, w) of a camera
-    looking down its -z at the arm, +y up."""
+def camera_poses(t: float, views: int, columns: int, spacing: float,
+                 poses: wp.array2d(dtype=float)):
+    """A view per world circling it at its place on the grid: position, then the quaternion
+    (x, y, z, w) of a camera looking down its -z at the arm, +y up."""
     view = wp.tid()
+    centre = wp.vec3(spacing * float(view % columns), spacing * float(view // columns), 0.0)
     heading = 0.2 * t + 6.2831853 * float(view) / float(views)
-    eye = wp.vec3(5.0 * wp.cos(heading), 5.0 * wp.sin(heading), 3.0)
-    forward = wp.normalize(wp.vec3(0.0, 0.0, 1.2) - eye)
+    eye = centre + wp.vec3(5.0 * wp.cos(heading), 5.0 * wp.sin(heading), 3.0)
+    forward = wp.normalize(centre + wp.vec3(0.0, 0.0, 1.2) - eye)
     right = wp.normalize(wp.cross(forward, wp.vec3(0.0, 0.0, 1.0)))
     up = wp.cross(right, forward)
     rotation = wp.mat33(
@@ -86,8 +93,7 @@ def camera_poses(t: float, views: int, poses: wp.array2d(dtype=float)):
     poses[view, 6] = q[3]
 
 
-def build_scene(worlds):
-    scene = ernie.Scene()
+def build_scene(scene, worlds, columns):
     scene.define("/World/Ground", ernie.GroundPlane)
     scene.define("/World/Sun", ernie.DistantLight).set(
         tokens.TRANSFORM, ernie.distant_light_transform((0.4, -0.6, 0.7))
@@ -108,10 +114,21 @@ def build_scene(worlds):
     for world in range(worlds):
         env = env0 if world == 0 else ernie.Xform(scene.clone("/Envs/Env0", f"/Envs/Env{world}"))
         env.world = world
+        row, column = divmod(world, columns)
+        env.set(translate=(SPACING * column, SPACING * row, 0.0))
         links += [f"{env.path}/Link{k}" for k in range(LINKS)]
     scene.define("/World/Camera", ernie.Camera, focal_length=18.0, spectral_bands=3)
+    # An overview of the grid for the viewer and for --viewer null; the batch views are the
+    # BatchCamera's, through /World/Camera.
+    rows = (worlds + columns - 1) // columns
+    middle = (0.5 * SPACING * (columns - 1), 0.5 * SPACING * (rows - 1), 0.0)
+    reach = SPACING * max(columns, rows)
+    overview = scene.define("/World/Overview", ernie.Camera, focal_length=24.0).set(
+        tokens.TRANSFORM, ernie.look_at_transform(
+            (middle[0] - 0.15 * reach, middle[1] - 0.9 * reach, 0.6 * reach + 4.0), middle))
+    scene.define("/Render/Settings", ernie.RenderSettings, camera=overview)
     # Looked up once and kept, as every step writes all of them.
-    return scene, ernie.PrimSet(links)
+    return ernie.PrimSet(links), overview
 
 
 def contact_sheet(images, columns=4):
@@ -123,50 +140,102 @@ def contact_sheet(images, columns=4):
     return sheet
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("worlds", nargs="?", type=int, default=1024)
-    parser.add_argument("--capture", help="write the first 16 worlds' last views here")
-    args = parser.parse_args()
+class Demo(ernie.demo.Demo):
+    num_frames = 120
 
-    renderer = ernie.Renderer()
-    if not renderer.cuda_available:
-        print("This demo needs CUDA interop")
-        return
-    wp.init()
-    device = wp.get_device("cuda:0")
-    stream = wp.get_stream(device)
+    @classmethod
+    def create_parser(cls):
+        parser = super().create_parser()
+        parser.add_argument("--worlds", type=int, default=1024, help="worlds, one view each")
+        return parser
 
-    scene, links = build_scene(args.worlds)
-    positions = wp.zeros(len(links), dtype=wp.vec3, device=device)
-    orientations = wp.zeros(len(links), dtype=wp.quat, device=device)
-    poses = wp.zeros((args.worlds, 7), dtype=float, device=device)
-    camera = BatchCamera(renderer, scene, "/World/Camera", args.worlds, resolution=(SIZE, SIZE))
-    camera.set_worlds(np.arange(args.worlds, dtype=np.int32))
+    def __init__(self, viewer, args):
+        super().__init__(viewer, args)
+        if not self.renderer.cuda_available:
+            raise RuntimeError("This demo needs CUDA interop")
+        wp.init()
+        self.device = wp.get_device("cuda:0")
+        self.stream = wp.get_stream(self.device)
+        self.worlds = args.worlds
+        self.columns = math.ceil(math.sqrt(self.worlds))
 
-    def step(t):
-        wp.launch(arm_poses, args.worlds, [t, wp.vec3(*LENGTHS), positions, orientations], device=device)
-        wp.launch(camera_poses, args.worlds, [t, args.worlds, poses], device=device)
+        self.links, overview = build_scene(self.scene, self.worlds, self.columns)
+        self.positions = wp.zeros(len(self.links), dtype=wp.vec3, device=self.device)
+        self.orientations = wp.zeros(len(self.links), dtype=wp.quat, device=self.device)
+        self.poses = wp.zeros((self.worlds, 7), dtype=float, device=self.device)
+        self.camera = BatchCamera(self.renderer, self.scene, "/World/Camera", self.worlds,
+                                  resolution=(SIZE, SIZE))
+        self.camera.set_worlds(np.arange(self.worlds, dtype=np.int32))
+        self.observations = None
+        self.timer_start = None
+        self.timed_steps = 0
+        if viewer is not None:
+            viewer.active_camera = overview.path
+
+    def step(self):
+        t = self.time
+        wp.launch(arm_poses, self.worlds,
+                  [t, wp.vec3(*LENGTHS), self.positions, self.orientations], device=self.device)
+        wp.launch(camera_poses, self.worlds, [t, self.worlds, self.columns, SPACING, self.poses],
+                  device=self.device)
         # The kernels' arrays as they are, on the stream they were written on.
-        scene.write(links, tokens.TRANSLATE, positions, stream=stream.cuda_stream)
-        scene.write(links, tokens.ORIENT, orientations, stream=stream.cuda_stream)
-        return camera.step(poses, stream=stream.cuda_stream)
+        stream = self.stream.cuda_stream
+        self.scene.write(self.links, tokens.TRANSLATE, self.positions, stream=stream)
+        self.scene.write(self.links, tokens.ORIENT, self.orientations, stream=stream)
+        self.observations = self.camera.step(self.poses, stream=stream)
+        if self.frame + 1 == WARMUP:
+            self.renderer.cuda_download(self.observations["LdrColor"])  # wait for the warm-up
+            self.timer_start = time.perf_counter()
+        elif self.timer_start is not None:
+            self.timed_steps += 1
 
-    for s in range(5):  # warm up: pipelines, allocations
-        step(s / 30.0)
-    start = time.perf_counter()
-    for s in range(STEPS):
-        observations = step((5 + s) / 30.0)
-    images = renderer.cuda_download(observations["LdrColor"])
-    per_step = (time.perf_counter() - start) / STEPS
-    print(
-        f"{args.worlds} worlds of {LINKS}-link arms ({len(links)} links posed on the GPU): "
-        f"{per_step * 1e3:.2f} ms per step, {args.worlds / per_step:,.0f} views per second"
-    )
-    if args.capture:
-        write_png(args.capture, contact_sheet(np.asarray(images)[:16]))
-        print(f"Wrote {args.capture}")
+    def render(self):
+        # Without a viewer the batch step is the render; the overview renders only on demand.
+        if self.viewer is not None:
+            self.viewer.step()
+
+    def images(self):
+        """The last step's views, uint8 (worlds, SIZE, SIZE, 4), waiting for the render."""
+        return np.asarray(self.renderer.cuda_download(self.observations["LdrColor"]))
+
+    def save_output(self, path):
+        self.report()
+        ernie.demo.write_png(path, contact_sheet(self.images()[:16]))
+
+    def close(self):
+        self.report()
+
+    def report(self):
+        """Prints the time per step since the warm-up, once the last step has finished; before
+        the output and the test, so that their renders are not counted."""
+        if self.observations is None or not self.timed_steps:
+            return
+        self.images()  # the last step finished
+        per_step = (time.perf_counter() - self.timer_start) / self.timed_steps
+        where = "" if self.viewer is None else ", with the viewer drawing"
+        print(
+            f"{self.worlds} worlds of {LINKS}-link arms ({len(self.links)} links posed on the "
+            f"GPU): {per_step * 1e3:.2f} ms per step{where}, "
+            f"{self.worlds / per_step:,.0f} views per second"
+        )
+        self.timed_steps = 0
+
+    def test_final(self):
+        self.report()
+        images = self.images()[..., :3]
+        assert images.shape == (self.worlds, SIZE, SIZE, 3)
+        assert images.std() > 1.0, "the views should not render flat"
+        # Every arm is posed and seen differently.
+        if self.worlds > 1:
+            assert np.abs(images[0].astype(int) - images[1]).max() > 16, \
+                "worlds 0 and 1 should differ"
+        # The arms' colours: each view sees its own arm (orange, blue or white links).
+        arms = (images[..., 0] > images[..., 2] + 60) | (images[..., 2] > images[..., 0] + 60)
+        seen = arms.reshape(self.worlds, -1).any(axis=1).mean()
+        assert seen > 0.9, f"only {seen:.0%} of the views see their arm"
+        overview = self.render_image()[..., :3]
+        assert overview.std() > 1.0, "the overview of the grid should not render flat"
 
 
 if __name__ == "__main__":
-    main()
+    ernie.demo.main(Demo)

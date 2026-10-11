@@ -8,7 +8,8 @@ The lumens stay the same, so each image has about the same brightness; the illum
 only the colour of the light, and how the chart's patches render under it.
 
     PYTHONPATH=build/python python demos/python/demo_lighting_illuminants.py
-    PYTHONPATH=build/python python demos/python/demo_lighting_illuminants.py --output illuminants.png
+    PYTHONPATH=build/python python demos/python/demo_lighting_illuminants.py --viewer null \
+        --output illuminants.png
 
 The page's custom illuminant is CIE F5; here the custom spectrum is fluorescent-like rather than F5
 itself: mercury emission lines at 405, 436, 546 and 578 nm over a broad halophosphate band.
@@ -20,11 +21,10 @@ References:
   values).
 """
 
-import argparse
-
 import numpy as np
 
 import ernie
+import ernie.demo
 from ernie import tokens
 
 from demo_support import side_by_side, srgb_to_linear, write_png
@@ -65,77 +65,93 @@ def box(parent, path, centre, size, colour):
                   display_color=tuple(float(c) for c in colour))
 
 
-def build_scene():
-    scene = ernie.Scene()
-    world = scene.define("/World", ernie.Xform)
-    world.define("Floor", ernie.GroundPlane, checker=True, checker_size=0.25,
-                 checker_color0=(0.35, 0.35, 0.35), checker_color1=(0.2, 0.2, 0.2))
-    # A checkered back wall 3 m wide and 3 m high at y = 1.
-    wall = world.define("Wall", ernie.Xform)
-    for i in range(12):
-        for j in range(12):
-            grey = 0.32 if (i + j) % 2 == 0 else 0.2
-            box(wall, f"T{i}_{j}", (-1.5 + 0.25 * (i + 0.5), 1.05, 0.25 * (j + 0.5)),
-                (0.25, 0.1, 0.25), (grey, grey, grey))
-    # The colour chart on the wall, 6 x 4 patches of 10 cm on a black card.
-    chart = world.define("Chart", ernie.Xform)
-    box(chart, "Card", (-0.25, 0.99, 1.3), (0.68, 0.01, 0.47), (0.03, 0.03, 0.03))
-    for k, rgb in enumerate(CHART):
-        col, row = k % 6, k // 6
-        box(chart, f"P{k}", (-0.525 + 0.11 * col, 0.98, 1.465 - 0.11 * row),
-            (0.1, 0.02, 0.1), srgb_to_linear(np.array(rgb) / 255.0))
-    world.define("Ball", ernie.Sphere, radius=0.15, translate=(0.25, 0.6, 0.15),
-                 display_color=(0.5, 0.5, 0.5))
-    world.define("Ball2", ernie.Sphere, radius=0.15, translate=(-0.1, 0.55, 0.15),
-                 display_color=(0.8, 0.8, 0.8))
-    # A spot near the ceiling at the left, grazing the wall: 1600 lumens.
-    spot = world.define("Spot", ernie.SphereLight, radius=0.05, shaping_cone_angle=40.0,
-                        shaping_cone_softness=0.4, photometric_power=1600.0,
-                        physical_custom_illuminant=fluorescent()).set(
-        tokens.TRANSFORM,
-        ernie.look_at_transform((-1.2, 0.6, 2.9), (-0.25, 1.0, 1.0), (0.0, 1.0, 0.0)),
-    )
-    camera = world.define("Camera", ernie.Camera, focal_length=18.0, sensor_noise=False,
-                          exposure_time=1.0 / 15.0, exposure_iso=400.0, exposure_f_stop=2.0).set(
-        tokens.TRANSFORM, ernie.look_at_transform((0.0, -2.6, 1.3), (0.0, 1.0, 1.2))
-    )
-    scene.define("/Render/Settings", ernie.RenderSettings, camera=camera, resolution=SIZE,
-                 ambient=0.0)
-    return scene, spot
+class Demo(ernie.demo.Demo):
+    num_frames = 1
+    title = "Illuminants"
 
+    def __init__(self, viewer, args):
+        super().__init__(viewer, args)
+        world = self.scene.define("/World", ernie.Xform)
+        world.define("Floor", ernie.GroundPlane, checker=True, checker_size=0.25,
+                     checker_color0=(0.35, 0.35, 0.35), checker_color1=(0.2, 0.2, 0.2))
+        # A checkered back wall 3 m wide and 3 m high at y = 1.
+        wall = world.define("Wall", ernie.Xform)
+        for i in range(12):
+            for j in range(12):
+                grey = 0.32 if (i + j) % 2 == 0 else 0.2
+                box(wall, f"T{i}_{j}", (-1.5 + 0.25 * (i + 0.5), 1.05, 0.25 * (j + 0.5)),
+                    (0.25, 0.1, 0.25), (grey, grey, grey))
+        # The colour chart on the wall, 6 x 4 patches of 10 cm on a black card.
+        chart = world.define("Chart", ernie.Xform)
+        box(chart, "Card", (-0.25, 0.99, 1.3), (0.68, 0.01, 0.47), (0.03, 0.03, 0.03))
+        for k, rgb in enumerate(CHART):
+            col, row = k % 6, k // 6
+            box(chart, f"P{k}", (-0.525 + 0.11 * col, 0.98, 1.465 - 0.11 * row),
+                (0.1, 0.02, 0.1), srgb_to_linear(np.array(rgb) / 255.0))
+        world.define("Ball", ernie.Sphere, radius=0.15, translate=(0.25, 0.6, 0.15),
+                     display_color=(0.5, 0.5, 0.5))
+        world.define("Ball2", ernie.Sphere, radius=0.15, translate=(-0.1, 0.55, 0.15),
+                     display_color=(0.8, 0.8, 0.8))
+        # A spot near the ceiling at the left, grazing the wall: 1600 lumens.
+        self.spot = world.define("Spot", ernie.SphereLight, radius=0.05, shaping_cone_angle=40.0,
+                                 shaping_cone_softness=0.4, photometric_power=1600.0,
+                                 physical_custom_illuminant=fluorescent()).set(
+            tokens.TRANSFORM,
+            ernie.look_at_transform((-1.2, 0.6, 2.9), (-0.25, 1.0, 1.0), (0.0, 1.0, 0.0)))
+        camera = world.define("Camera", ernie.Camera, focal_length=18.0, sensor_noise=False,
+                              exposure_time=1.0 / 15.0, exposure_iso=400.0,
+                              exposure_f_stop=2.0).set(
+            tokens.TRANSFORM, ernie.look_at_transform((0.0, -2.6, 1.3), (0.0, 1.0, 1.2)))
+        self.scene.define("/Render/Settings", ernie.RenderSettings, camera=camera,
+                          resolution=SIZE, ambient=0.0)
+        self.light_with(0)
 
-def light_with(spot, illuminant, kelvin):
-    spot.physical_illuminant = illuminant
-    spot.color_temperature = kelvin
+        if viewer is not None:
+            # In the viewer, a panel switches the illuminant.
+            from ernie.app import Dock
 
+            viewer.active_camera = camera.path
+            panel = viewer.add_panel("Illuminant", Dock.RIGHT)
+            panel.combo("Illuminant", [name for name, _, _ in ILLUMINANTS], 0,
+                        on_change=self.light_with)
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--output", help="write the four images side by side here")
-    args = parser.parse_args()
-    scene, spot = build_scene()
-    if args.output:
-        renderer = ernie.Renderer()
+    def light_with(self, index):
+        _, illuminant, kelvin = ILLUMINANTS[index]
+        self.illuminant = index
+        self.spot.physical_illuminant = illuminant
+        self.spot.color_temperature = kelvin
+
+    def render_all(self):
+        """The scene under each illuminant in turn, RGB uint8; leaves the light as it was."""
+        current = self.illuminant
         images = []
-        for name, illuminant, kelvin in ILLUMINANTS:
-            light_with(spot, illuminant, kelvin)
-            images.append(np.array(renderer.render(scene))[..., :3])
-            print(f"rendered {name}")
-        write_png(args.output, side_by_side(images))
-        print(f"wrote {args.output}")
-        return
+        for index in range(len(ILLUMINANTS)):
+            self.light_with(index)
+            images.append(np.array(self.renderer.render(self.scene))[..., :3])
+        self.light_with(current)
+        return images
 
-    # In the viewer, a panel switches the illuminant.
-    from ernie.app import Dock, Viewer
+    def save_output(self, path):
+        """The four illuminants side by side."""
+        write_png(path, side_by_side(self.render_all()))
 
-    viewer = Viewer(scene, title="Illuminants")
-    viewer.active_camera = ernie.Path("/World/Camera")
-    panel = viewer.add_panel("Illuminant", Dock.RIGHT)
-    light_with(spot, *ILLUMINANTS[0][1:])
-    panel.combo("Illuminant", [name for name, _, _ in ILLUMINANTS], 0,
-                on_change=lambda index: light_with(spot, *ILLUMINANTS[index][1:]))
-    viewer.run()
+    def test_final(self):
+        means = [srgb_to_linear(image.reshape(-1, 3).mean(axis=0) / 255.0)
+                 for image in self.render_all()]
+        luminance = [float(m @ np.array([0.2126, 0.7152, 0.0722])) for m in means]
+        warmth = [float(m[0] / max(m[2], 1e-6)) for m in means]
+        for (name, _, _), y, w in zip(ILLUMINANTS, luminance, warmth):
+            print(f"{name}: mean luminance {y:.4f}, red/blue {w:.2f}")
+        # The same 1600 lumens: about the same brightness under every illuminant.
+        assert luminance[0] > 0.005, "the spot should light the wall"
+        assert max(luminance) < 1.2 * min(luminance), "the same lumens should look as bright"
+        # Only the colour changes: 4000 K warmer than white, 2000 K warmer still.
+        assert 0.7 < warmth[0] < 1.4, "the white light should be about neutral"
+        assert warmth[1] > 1.15 * warmth[0], "illuminant D at 4000 K should be warmer than white"
+        assert warmth[2] > 1.5 * warmth[1], "a 2000 K blackbody should be warmer than 4000 K"
+        # The mercury lines at 405 and 436 nm tip the fluorescent spectrum blue of white.
+        assert warmth[3] < 0.9 * warmth[0], "the fluorescent light should be cooler than white"
 
 
 if __name__ == "__main__":
-    main()
+    ernie.demo.main(Demo)

@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """A flag waving on its pole, its mesh deformed every frame by a Warp kernel on the GPU.
 
-    PYTHONPATH=build/python python demos/python/demo_gpu_deforming_flag.py [--capture flag.png]
+    PYTHONPATH=build/python python demos/python/demo_gpu_deforming_flag.py
+        [--viewer null --output flag.png]
 
 Needs Warp (`uv pip install warp-lang`) and CUDA interop. A Warp kernel writes the flag's points
 and vertex colours into Warp arrays each frame, and `scene.write` hands Ernie those arrays on the
@@ -11,12 +12,11 @@ recomputes them on the GPU from the moved points (area-weighted around each vert
 `extent` bounds every pose, so Ernie need not read the points back to bound them either.
 """
 
-import argparse
-
 import numpy as np
 import warp as wp
 
 import ernie
+import ernie.demo
 from ernie import tokens
 
 COLUMNS = 160  # vertices along the flag, from the pole
@@ -60,71 +60,65 @@ def flag_triangles():
     return np.stack([a, b, c, a, c, d], axis=1).reshape(-1).astype(np.int32)
 
 
-def build_scene(points, colors):
-    scene = ernie.Scene()
-    world = scene.define("/World", ernie.Xform)
-    world.define("Ground", ernie.GroundPlane, checker=True, checker_size=1.0)
-    world.define("Pole", ernie.Cylinder, radius=0.05, height=FOOT + HEIGHT + 0.2,
-                 translate=(0.0, 0.0, 0.5 * (FOOT + HEIGHT + 0.2)), display_color=(0.7, 0.7, 0.7))
-    indices = flag_triangles()
-    count = COLUMNS * ROWS
-    flag = world.define(
-        "Flag", ernie.Mesh, face_vertex_counts=np.full(indices.size // 3, 3, np.int32),
-        face_vertex_indices=indices,
-        normals=np.tile(np.array([0.0, -1.0, 0.0], np.float32), (count, 1)))
-    # Every pose the kernel can give, so bounds never need the points on the host.
-    flag.set(tokens.EXTENT, [-0.1, -1.2, FOOT - 0.3, WIDTH + 0.1, 1.2, FOOT + HEIGHT + 0.1])
-    # The kernel's arrays, on the GPU: the points, and the vertex colours as displayColor.
-    flag.write(tokens.POINTS, points).write(tokens.DISPLAY_COLOR, colors)
-    world.define("Sun", ernie.DistantLight).set(
-        tokens.TRANSFORM, ernie.distant_light_transform((-0.5, -0.8, 0.6)))
-    camera = world.define("Camera", ernie.Camera, focal_length=30.0).set(
-        tokens.TRANSFORM, ernie.look_at_transform((8.5, -4.5, 4.2), (1.6, 0.0, 2.9)))
-    scene.define("/Render/Settings", ernie.RenderSettings, camera=camera)
-    return scene
+class Demo(ernie.demo.Demo):
+    num_frames = 60
 
+    def __init__(self, viewer, args):
+        super().__init__(viewer, args)
+        wp.init()
+        self.device = "cuda:0"
+        count = COLUMNS * ROWS
+        self.points = wp.zeros(count, dtype=wp.vec3, device=self.device)
+        self.colors = wp.zeros(count, dtype=wp.vec3, device=self.device)
+        self.stream = wp.get_stream(self.device)
+        wp.launch(wave, dim=count, inputs=[self.points, self.colors, 0.0], device=self.device)
+        self.first_points = self.points.numpy()
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--capture", help="render without a window and save the image here")
-    args = parser.parse_args()
+        scene = self.scene
+        world = scene.define("/World", ernie.Xform)
+        world.define("Ground", ernie.GroundPlane, checker=True, checker_size=1.0)
+        world.define("Pole", ernie.Cylinder, radius=0.05, height=FOOT + HEIGHT + 0.2,
+                     translate=(0.0, 0.0, 0.5 * (FOOT + HEIGHT + 0.2)),
+                     display_color=(0.7, 0.7, 0.7))
+        indices = flag_triangles()
+        self.flag = world.define(
+            "Flag", ernie.Mesh, face_vertex_counts=np.full(indices.size // 3, 3, np.int32),
+            face_vertex_indices=indices,
+            normals=np.tile(np.array([0.0, -1.0, 0.0], np.float32), (count, 1)))
+        # Every pose the kernel can give, so bounds never need the points on the host.
+        self.flag.set(tokens.EXTENT,
+                      [-0.1, -1.2, FOOT - 0.3, WIDTH + 0.1, 1.2, FOOT + HEIGHT + 0.1])
+        # The kernel's arrays, on the GPU: the points, and the vertex colours as displayColor.
+        self.flag.write(tokens.POINTS, self.points).write(tokens.DISPLAY_COLOR, self.colors)
+        world.define("Sun", ernie.DistantLight).set(
+            tokens.TRANSFORM, ernie.distant_light_transform((-0.5, -0.8, 0.6)))
+        camera = world.define("Camera", ernie.Camera, focal_length=30.0).set(
+            tokens.TRANSFORM, ernie.look_at_transform((8.5, -4.5, 4.2), (1.6, 0.0, 2.9)))
+        scene.define("/Render/Settings", ernie.RenderSettings, camera=camera)
 
-    wp.init()
-    device = "cuda:0"
-    count = COLUMNS * ROWS
-    points = wp.zeros(count, dtype=wp.vec3, device=device)
-    colors = wp.zeros(count, dtype=wp.vec3, device=device)
-    stream = wp.get_stream(device)
-    wp.launch(wave, dim=count, inputs=[points, colors, 0.0], device=device)
-    scene = build_scene(points, colors)
+        if viewer is not None:
+            viewer.active_camera = camera.path
+            if args.output:
+                display = viewer.viewport_display
+                display.lights = display.grid = display.cameras = False
+                viewer.viewport_display = display
 
-    from ernie.app import Viewer
-    viewer = Viewer(scene, title="Ernie: a flag deformed by a Warp kernel",
-                    hidden=args.capture is not None)
-    clock = {"time": 0.0}
-
-    def update(v, info):
-        clock["time"] += min(info.delta, 1.0 / 30.0) if args.capture is None else 1.0 / 60.0
-        wp.launch(wave, dim=count, inputs=[points, colors, clock["time"]], device=device)
+    def step(self):
+        wp.launch(wave, dim=COLUMNS * ROWS, inputs=[self.points, self.colors, self.time],
+                  device=self.device)
         # Ernie copies the arrays after the kernel, on its stream; nothing waits on the host.
-        v.scene.write(flag_path, tokens.POINTS, points, stream=stream)
-        v.scene.write(flag_path, tokens.DISPLAY_COLOR, colors, stream=stream)
+        self.scene.write(self.flag.path, tokens.POINTS, self.points, stream=self.stream)
+        self.scene.write(self.flag.path, tokens.DISPLAY_COLOR, self.colors, stream=self.stream)
 
-    flag_path = ernie.Path("/World/Flag")
-    viewer.active_camera = ernie.Path("/World/Camera")
-    if args.capture is not None:
-        display = viewer.viewport_display
-        display.lights = display.grid = display.cameras = False
-        viewer.viewport_display = display
-    viewer.on_frame(update)
-    if args.capture is None:
-        viewer.run()
-        return
-    for _ in range(60):
-        viewer.step()
-    viewer.capture(args.capture)
-    viewer.step()
+    def test_final(self):
+        moved = np.abs(self.points.numpy() - self.first_points).max()
+        assert self.time > 0.0 and moved > 0.05, f"the flag should wave (moved {moved:.3f} m)"
+        image = self.render_image()[..., :3]
+        assert image.std() > 1.0, "the flag, pole and ground should not render flat"
+        # The flag's stripes: blue, white and red somewhere in the frame.
+        assert ((image[..., 2] > image[..., 0] + 40)).any(), "the flag's blue stripe is missing"
+        assert ((image[..., 0] > image[..., 2] + 40)).any(), "the flag's red stripe is missing"
 
 
 if __name__ == "__main__":
-    main()
+    ernie.demo.main(Demo)

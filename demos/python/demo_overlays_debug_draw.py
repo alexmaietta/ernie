@@ -4,35 +4,23 @@ velocity, contacts, bounding boxes, frames and labels, redrawn every frame. The 
 shows or clears each layer.
 
     PYTHONPATH=build/python python demos/python/demo_overlays_debug_draw.py
+    PYTHONPATH=build/python python demos/python/demo_overlays_debug_draw.py --headless \
+        --output overlays.png
 
-Pass --capture PATH to render a few frames without a window and save the last.
+Overlays draw only in the viewer: `--headless` renders it without a window and saves its
+viewport, overlays and all; `--viewer null` renders the scene's camera without them.
 """
 
-import argparse
 import math
 
 import numpy as np
 
 import ernie
+import ernie.demo
 from ernie import tokens
-from ernie.app import Viewer
 
 GRAVITY = 9.81
 RADIUS = 0.5
-
-
-def build_scene():
-    scene = ernie.Scene()
-    world = scene.define("/World", ernie.Xform)
-    world.define("Ground", ernie.GroundPlane, checker=True, checker_size=1.0)
-    world.define("Sun", ernie.DistantLight).set(
-        tokens.TRANSFORM, ernie.distant_light_transform((0.4, -0.5, 0.8))
-    )
-    for i, x in enumerate((-4.0, 4.0)):
-        world.define(f"Box{i}", ernie.Cube, size=2.0, translate=(x, 2.0, 1.0),
-                     display_color=(0.75, 0.45, 0.3))
-    ball = world.define("Ball", ernie.Sphere, radius=RADIUS, display_color=(0.25, 0.55, 0.9))
-    return scene, ball
 
 
 class Ball:
@@ -87,29 +75,40 @@ def draw(scene, ball):
     labels.marker((0, 0, 0), shape="ring", size=10, depth="always")
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--capture", help="render without a window and save the image here")
-    args = parser.parse_args()
+class Demo(ernie.demo.Demo):
+    num_frames = 90
 
-    scene, sphere = build_scene()
-    ball = Ball()
-    viewer = Viewer(scene, title="Ernie overlays", hidden=args.capture is not None)
+    def __init__(self, viewer, args):
+        super().__init__(viewer, args)
+        world = self.scene.define("/World", ernie.Xform)
+        world.define("Ground", ernie.GroundPlane, checker=True, checker_size=1.0)
+        world.define("Sun", ernie.DistantLight).set(
+            tokens.TRANSFORM, ernie.distant_light_transform((0.4, -0.5, 0.8)))
+        for i, x in enumerate((-4.0, 4.0)):
+            world.define(f"Box{i}", ernie.Cube, size=2.0, translate=(x, 2.0, 1.0),
+                         display_color=(0.75, 0.45, 0.3))
+        self.sphere = world.define("Ball", ernie.Sphere, radius=RADIUS,
+                                   display_color=(0.25, 0.55, 0.9))
+        # The viewer frames the scene with its own camera; this one renders it without a viewer.
+        world.define("Camera", ernie.Camera, focal_length=24.0).set(
+            tokens.TRANSFORM, ernie.look_at_transform((0.0, -16.0, 8.0), (0.0, 0.0, 1.0)))
+        self.ball = Ball()
+        self.lowest = self.ball.height
+        self.sphere.set(translate=self.ball.position())
 
-    def update(v, info):
-        ball.step(min(info.delta, 1.0 / 30.0) if args.capture is None else 1.0 / 60.0)
-        sphere.set(translate=ball.position())
-        draw(v.scene, ball)
+    def step(self):
+        self.ball.step(self.frame_dt)
+        self.lowest = min(self.lowest, self.ball.height)
+        self.sphere.set(translate=self.ball.position())
+        draw(self.scene, self.ball)
 
-    viewer.on_frame(update)
-    if args.capture is None:
-        viewer.run()
-        return
-    for _ in range(90):
-        viewer.step()
-    viewer.capture(args.capture)
-    viewer.step()
+    def test_final(self):
+        assert self.lowest >= RADIUS - 1e-6, f"the ball sank to z={self.lowest:.3f}"
+        assert self.ball.contacts, "the ball should have bounced"
+        assert len(self.ball.path) == min(self.frame, 240)
+        image = self.render_image()[..., :3]
+        assert image.std() > 1.0, "the ground, boxes and ball should not render flat"
 
 
 if __name__ == "__main__":
-    main()
+    ernie.demo.main(Demo)

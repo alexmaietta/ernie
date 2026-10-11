@@ -10,7 +10,8 @@ star 1e-8. The renderer spreads each star's irradiance over the pixels around it
 their brightness at any resolution, and draws them only where no geometry is in front.
 
     PYTHONPATH=build/python python demos/python/demo_lighting_star_field.py
-    PYTHONPATH=build/python python demos/python/demo_lighting_star_field.py --output stars.png
+    PYTHONPATH=build/python python demos/python/demo_lighting_star_field.py --viewer null \
+        --output stars.png
     PYTHONPATH=build/python python demos/python/demo_lighting_star_field.py --catalogue bsc.csv
 
 The built-in stars are about forty of the brightest, with J2000 positions, V magnitudes and B-V
@@ -33,13 +34,13 @@ References:
 - J. Meeus, "Astronomical Algorithms", 2nd edition, Willmann-Bell, 1998 (sidereal time).
 """
 
-import argparse
 import csv
 import math
 
 import numpy as np
 
 import ernie
+import ernie.demo
 from ernie import tokens
 
 from demo_support import side_by_side, write_png
@@ -135,65 +136,107 @@ def direction_of(ra, dec, transform):
     return np.asarray(transform)[:3, :3] @ local
 
 
-def build_scene(catalogue_path):
-    scene = ernie.Scene()
-    ground = scene.define("/Looks/Ground", ernie.Material, albedo=(0.18, 0.16, 0.14))
-    world = scene.define("/World", ernie.Xform)
-    world.define("Ground", ernie.GroundPlane, material_binding=ground)
-    # A house and a tree in silhouette to the south-east.
-    world.define("House", ernie.Cube, size=1.0, translate=(9.0, -26.0, 2.5),
-                 scale=(9.0, 6.0, 5.0), material_binding=ground)
-    world.define("Roof", ernie.Cube, size=1.0, translate=(9.0, -26.0, 5.6),
-                 scale=(9.5, 6.5, 1.2), material_binding=ground)
-    world.define("Tree", ernie.Sphere, radius=3.0, translate=(-12.0, -22.0, 5.5),
-                 material_binding=ground)
-
-    # A moonless night: about 6e-4 lux from the sky's glow.
-    world.define("Night", ernie.DomeLight, photometric_illuminance=6e-4, texture=sky_map())
-    sky = ernie.celestial_to_local(LATITUDE, LONGITUDE, WHEN)
-    ra, dec, mag, bv = catalogue(catalogue_path)
-    world.define("Stars", ernie.StarField, right_ascension=ra, declination=dec, magnitude=mag,
-                 color_index=bv).set(tokens.TRANSFORM, sky)
-
-    # A night exposure, ISO 1600, f/2.8, 15 s: the brightest stars clip to white, magnitude 6
-    # ones are just visible, and the sky's glow is dark grey.
-    camera = world.define("Camera", ernie.Camera, exposure_iso=1600.0, exposure_time=15.0,
-                          exposure_f_stop=2.8, sensor_noise=False)
-    scene.define("/Render/Settings", ernie.RenderSettings, camera=camera, resolution=SIZE)
-    return scene, sky, camera
+def bright_points(image, margin=40.0):
+    """Pixels well above the sky's median in the image's top two thirds: the stars."""
+    grey = image[: image.shape[0] * 2 // 3].astype(np.float64).mean(axis=2)
+    return int((grey > np.median(grey) + margin).sum())
 
 
-def aim(camera, target, focal_length):
-    eye = np.array([0.0, 0.0, 1.6])
-    camera.set(tokens.TRANSFORM, ernie.look_at_transform(tuple(eye), tuple(eye + 100.0 * target)))
-    camera.focal_length = focal_length
+class Demo(ernie.demo.Demo):
+    num_frames = 1
+    title = "Star field"
 
+    @classmethod
+    def create_parser(cls):
+        parser = super().create_parser()
+        parser.add_argument("--catalogue", default=None,
+                            help="CSV of ra_deg,dec_deg,vmag,bv in place of the built-in stars")
+        return parser
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--output", help="write the image here instead of opening a window")
-    parser.add_argument("--catalogue", help="CSV of ra_deg,dec_deg,vmag,bv in place of the "
-                                            "built-in stars")
-    args = parser.parse_args()
-    scene, sky, camera = build_scene(args.catalogue)
-    alnilam = direction_of(84.05, -1.20, sky)
-    print(f"Orion's belt: {math.degrees(math.asin(alnilam[2])):.0f} degrees up, azimuth "
-          f"{math.degrees(math.atan2(alnilam[0], alnilam[1])) % 360:.0f}")
-    renderer = ernie.Renderer()
-    # Wide, south and up; then 35 mm on Orion.
-    south = np.array([0.0, -math.cos(math.radians(30.0)), math.sin(math.radians(30.0))])
-    aim(camera, south, 14.0)
-    wide = np.array(renderer.render(scene))[..., :3]
-    aim(camera, alnilam, 35.0)
-    orion = np.array(renderer.render(scene))[..., :3]
-    image = side_by_side([wide, orion])
-    if args.output:
-        write_png(args.output, image)
-    else:
-        from ernie.app import Viewer
-        aim(camera, south, 14.0)
-        Viewer(scene).run()
+    def __init__(self, viewer, args):
+        super().__init__(viewer, args)
+        scene = self.scene
+        ground = scene.define("/Looks/Ground", ernie.Material, albedo=(0.18, 0.16, 0.14))
+        world = scene.define("/World", ernie.Xform)
+        world.define("Ground", ernie.GroundPlane, material_binding=ground)
+        # A house and a tree in silhouette to the south-east.
+        world.define("House", ernie.Cube, size=1.0, translate=(9.0, -26.0, 2.5),
+                     scale=(9.0, 6.0, 5.0), material_binding=ground)
+        world.define("Roof", ernie.Cube, size=1.0, translate=(9.0, -26.0, 5.6),
+                     scale=(9.5, 6.5, 1.2), material_binding=ground)
+        world.define("Tree", ernie.Sphere, radius=3.0, translate=(-12.0, -22.0, 5.5),
+                     material_binding=ground)
+
+        # A moonless night: about 6e-4 lux from the sky's glow.
+        world.define("Night", ernie.DomeLight, photometric_illuminance=6e-4, texture=sky_map())
+        sky = ernie.celestial_to_local(LATITUDE, LONGITUDE, WHEN)
+        ra, dec, mag, bv = catalogue(args.catalogue)
+        world.define("Stars", ernie.StarField, right_ascension=ra, declination=dec,
+                     magnitude=mag, color_index=bv).set(tokens.TRANSFORM, sky)
+
+        # A night exposure, ISO 1600, f/2.8, 15 s: the brightest stars clip to white, magnitude 6
+        # ones are just visible, and the sky's glow is dark grey.
+        self.camera = world.define("Camera", ernie.Camera, exposure_iso=1600.0,
+                                   exposure_time=15.0, exposure_f_stop=2.8, sensor_noise=False)
+        scene.define("/Render/Settings", ernie.RenderSettings, camera=self.camera,
+                     resolution=SIZE)
+
+        self.alnilam = direction_of(84.05, -1.20, sky)
+        print(f"Orion's belt: {self.belt_altitude():.0f} degrees up, azimuth "
+              f"{self.belt_azimuth():.0f}")
+        # Wide, south and up; or 35 mm on Orion.
+        south = np.array([0.0, -math.cos(math.radians(30.0)), math.sin(math.radians(30.0))])
+        self.lenses = [("14 mm, south", south, 14.0), ("35 mm, Orion", self.alnilam, 35.0)]
+        self.aim(0)
+
+        if viewer is not None:
+            from ernie.app import Dock
+
+            viewer.active_camera = self.camera.path
+            panel = viewer.add_panel("Lens", Dock.RIGHT)
+            panel.combo("Lens", [name for name, _, _ in self.lenses], 0, on_change=self.aim)
+
+    def aim(self, index):
+        _, target, focal_length = self.lenses[index]
+        self.lens = index
+        eye = np.array([0.0, 0.0, 1.6])
+        self.camera.set(tokens.TRANSFORM,
+                        ernie.look_at_transform(tuple(eye), tuple(eye + 100.0 * target)))
+        self.camera.focal_length = focal_length
+
+    def belt_altitude(self):
+        return math.degrees(math.asin(self.alnilam[2]))
+
+    def belt_azimuth(self):
+        return math.degrees(math.atan2(self.alnilam[0], self.alnilam[1])) % 360
+
+    def render_lenses(self):
+        """The night through each lens, RGB uint8; leaves the camera as it was."""
+        current = self.lens
+        images = []
+        for index in range(len(self.lenses)):
+            self.aim(index)
+            images.append(np.array(self.renderer.render(self.scene))[..., :3])
+        self.aim(current)
+        return images
+
+    def save_output(self, path):
+        """The wide lens and the 35 mm one side by side."""
+        write_png(path, side_by_side(self.render_lenses()))
+
+    def test_final(self):
+        # In mid-January at 21:00, Orion stands high in the south from 40 N.
+        assert 30.0 < self.belt_altitude() < 55.0, "Orion's belt should be high in the sky"
+        assert 150.0 < self.belt_azimuth() < 210.0, "Orion's belt should be in the south"
+        wide, orion = self.render_lenses()
+        for name, image in [("wide", wide), ("Orion", orion)]:
+            stars = bright_points(image)
+            print(f"{name}: {stars} bright star pixels")
+            assert stars >= 20, f"the {name} view should show stars"
+        # The 15 s exposure keeps the airglow dark: the sky is a dark grey, not black or bright.
+        sky = float(np.median(wide[: SIZE[1] // 2]))
+        assert 2.0 < sky < 120.0, f"the night sky's median {sky} should be a dark grey"
 
 
 if __name__ == "__main__":
-    main()
+    ernie.demo.main(Demo)

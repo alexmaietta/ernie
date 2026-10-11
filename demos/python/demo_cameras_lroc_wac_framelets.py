@@ -3,8 +3,8 @@
 its ISD over cratered ground, through one band's published sensor and readout to the 11-bit
 numbers it digitises.
 
-    PYTHONPATH=build/python python demos/python/demo_cameras_lroc_wac_framelets.py
-    PYTHONPATH=build/python python demos/python/demo_cameras_lroc_wac_framelets.py --band 415
+    PYTHONPATH=build/python python demos/python/demo_cameras_lroc_wac_framelets.py \
+        [--viewer null --output wac.png] [--band 415] [--isd ISD]
 
 The ISD (ALE's image support data, from usgscsm's tests) is a visible band's image: 364 framelets
 of 14 lines by 1024 samples, each exposed for 39 ms, one every 0.516 s, the last exposed at the
@@ -33,16 +33,14 @@ References:
   diameter for simple craters).
 """
 
-import argparse
 import math
 import os
 
 import numpy as np
 
 import ernie
+import ernie.demo
 from ernie import tokens
-
-from demo_support import write_png
 
 ISD = os.path.join(os.path.dirname(__file__), "..", "..", "ernie", "test", "fixtures", "isd",
                    "lroWacPushFrame.json")
@@ -93,14 +91,15 @@ def terrain_heights(radius, seed=7):
     return heights.astype(np.float32)
 
 
-def build_scene(camera, band):
+def build_scene(scene, camera, band):
+    """Builds the terrain, sun, WAC band and its render settings into `scene`; returns the local
+    frame."""
     lines = camera.framelet_lines
     middle = (FIRST_FRAMELET + 0.5 * FRAMELETS) * lines
     centre = np.array(camera.image_to_ground(middle, 0.5 * camera.samples))
     frame = local_frame(centre)
     radius = float(np.linalg.norm(centre))
 
-    scene = ernie.Scene()
     # Hapke's model with its lunar defaults; single-scattering albedo about 0.25 for lunar soil.
     regolith = scene.define("/Looks/Regolith", ernie.Material, brdf="hapke",
                             albedo=(0.25, 0.25, 0.25))
@@ -123,39 +122,71 @@ def build_scene(camera, band):
     # No sky to light the shadows: only the sun.
     scene.define("/Render/Settings", ernie.RenderSettings, ambient=0.0, camera=wac_camera).set(
         tokens.PRODUCTS, [wac.path])
-    return scene, frame
+    return frame
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--isd", default=ISD, help="the WAC image's ISD (ALE JSON)")
-    parser.add_argument("--band", type=int, default=605,
-                        help="the WAC band to model: 320, 360, 415, 565, 605, 645 or 690 nm")
-    parser.add_argument("--output", default="lroc_wac_framelets.png",
-                        help="where to write the image")
-    args = parser.parse_args()
-    camera = ernie.IsdPushFrame.from_file(args.isd)
-    print(f"{camera.sensor}: {camera.framelets} framelets of {camera.samples} x "
-          f"{camera.framelet_lines}")
-    scene, frame = build_scene(camera, args.band)
-    renderer = ernie.Renderer()
-    framelets = []
-    for index in range(FIRST_FRAMELET, FIRST_FRAMELET + FRAMELETS):
-        samples, lines, _, rows_reversed, _ = camera.author_framelet(scene, "/World/Camera",
-                                                                    index)
-        pose = np.array(scene.get("/World/Camera", tokens.TRANSFORM))
-        scene.set("/World/Camera", tokens.TRANSFORM, frame @ pose)
-        scene.set("/Render/Wac", tokens.RESOLUTION, (samples, lines))
-        out = renderer.step(scene, render_products=["/Render/Wac"],
-                            settings="/Render/Settings")["/Render/Wac"].frames[0]
+class Demo(ernie.demo.Demo):
+    num_frames = FRAMELETS  # one framelet a step; a window starts the image over after the last
+
+    @classmethod
+    def create_parser(cls):
+        parser = super().create_parser()
+        parser.add_argument("--isd", default=ISD, help="the WAC image's ISD (ALE JSON)")
+        parser.add_argument("--band", type=int, default=605,
+                            help="the WAC band to model: 320, 360, 415, 565, 605, 645 or 690 nm")
+        return parser
+
+    def __init__(self, viewer, args):
+        super().__init__(viewer, args)
+        self.camera = ernie.IsdPushFrame.from_file(args.isd)
+        print(f"{self.camera.sensor}: {self.camera.framelets} framelets of "
+              f"{self.camera.samples} x {self.camera.framelet_lines}")
+        self.local = build_scene(self.scene, self.camera, args.band)
+        self.framelets = [None] * FRAMELETS
+
+    def step(self):
+        k = self.frame % FRAMELETS
+        if k == 0:
+            self.framelets = [None] * FRAMELETS
+        samples, lines, _, rows_reversed, _ = self.camera.author_framelet(
+            self.scene, "/World/Camera", FIRST_FRAMELET + k)
+        pose = np.array(self.scene.get("/World/Camera", tokens.TRANSFORM))
+        self.scene.set("/World/Camera", tokens.TRANSFORM, self.local @ pose)
+        self.scene.set("/Render/Wac", tokens.RESOLUTION, (samples, lines))
+        out = self.renderer.step(self.scene, render_products=["/Render/Wac"],
+                                 settings="/Render/Settings")["/Render/Wac"].frames[0]
         dn = np.array(out.render_vars["/Render/Vars/RawDN"].map())[..., 0]
-        framelets.append(dn[::-1] if rows_reversed else dn)
-    image = np.concatenate(framelets, axis=0)
-    print(f"11-bit DN from {image.min():.0f} to {image.max():.0f}, mean {image.mean():.1f}")
-    shown = np.clip(image * (255.0 / max(image.max(), 1.0)), 0, 255).astype(np.uint8)
-    write_png(args.output, np.repeat(shown[..., None], 3, axis=2))
-    print(f"wrote {args.output}")
+        self.framelets[k] = dn[::-1] if rows_reversed else dn
+        if k == FRAMELETS - 1:
+            image = self.mosaic()
+            print(f"11-bit DN from {image.min():.0f} to {image.max():.0f}, "
+                  f"mean {image.mean():.1f}")
+
+    def render(self):
+        # `step` renders the WAC's product; without a viewer there is nothing more to draw.
+        if self.viewer is not None:
+            super().render()
+
+    def mosaic(self):
+        """The framelets rendered so far, stacked in order, as RawDN; those to come zero."""
+        shape = next(f.shape for f in self.framelets if f is not None)
+        return np.concatenate([f if f is not None else np.zeros(shape)
+                               for f in self.framelets], axis=0)
+
+    def save_output(self, path):
+        # RawDN stretched linearly from 0 to its largest.
+        image = self.mosaic()
+        shown = np.clip(image * (255.0 / max(image.max(), 1.0)), 0, 255).astype(np.uint8)
+        ernie.demo.write_png(path, shown)
+
+    def test_final(self):
+        assert all(f is not None for f in self.framelets), "every framelet should have rendered"
+        image = self.mosaic()
+        assert image.shape[0] == FRAMELETS * self.camera.framelet_lines
+        assert image.min() >= 0 and image.max() <= 2047, "RawDN should fit the 11-bit ADC"
+        assert image.mean() > 20.0 and image.std() > 5.0, \
+            "the sunlit craters should read well above the ADC's floor, and not flat"
 
 
 if __name__ == "__main__":
-    main()
+    ernie.demo.main(Demo)
