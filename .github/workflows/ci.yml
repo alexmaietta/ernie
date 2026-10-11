@@ -24,7 +24,7 @@ jobs:
     outputs:
       suffix: ${{ steps.version.outputs.suffix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - id: version
@@ -53,8 +53,8 @@ jobs:
   format:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - uses: pre-commit/action@v3.0.1
@@ -83,14 +83,14 @@ jobs:
       CXX: ${{ matrix.cxx }}
       ERNIE_TEST_REQUIRE_VALIDATION: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Vulkan (lavapipe, validation layers) and the app's window system headers
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build mesa-vulkan-drivers vulkan-validationlayers \
             libvulkan1 xvfb libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
             libwayland-dev libxkbcommon-dev
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
       - name: Python environment
         run: |
           uv venv --python ${{ matrix.python }}
@@ -99,7 +99,7 @@ jobs:
         with:
           key: test-${{ matrix.compiler }}
       # The fetched dependencies' sources (Slang alone is hundreds of MB), keyed on their pins.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             .deps/*-src
@@ -130,7 +130,7 @@ jobs:
       CXX: clang++
       ERNIE_TEST_REQUIRE_VALIDATION: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Vulkan (lavapipe, validation layers)
         run: |
           sudo apt-get update
@@ -138,7 +138,7 @@ jobs:
       - uses: hendrikmuhs/ccache-action@v1.2
         with:
           key: sanitize
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             .deps/*-src
@@ -175,8 +175,8 @@ jobs:
       matrix:
         os: [windows-2025, macos-15]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Python packages
@@ -186,7 +186,7 @@ jobs:
       - name: Install Ninja
         if: runner.os == 'macOS'
         run: brew install ninja
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             .deps/*-src
@@ -216,7 +216,7 @@ jobs:
           - arch: aarch64
             runner: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Version
         run: >
           sed -i 's/set(ERNIE_VERSION_SUFFIX ""/set(ERNIE_VERSION_SUFFIX "${{ needs.version.outputs.suffix }}"/'
@@ -224,7 +224,7 @@ jobs:
       - uses: pypa/cibuildwheel@v4.3.0
         with:
           output-dir: wheelhouse
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheel-linux-${{ matrix.arch }}
           path: wheelhouse/*.whl
@@ -238,8 +238,8 @@ jobs:
     env:
       ERNIE_TEST_REQUIRE_VALIDATION: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: wheel-linux-aarch64
           path: wheelhouse
@@ -247,7 +247,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y mesa-vulkan-drivers vulkan-validationlayers libvulkan1 xvfb
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
       - name: Install the wheel
         run: |
           uv venv --python 3.12
@@ -262,17 +262,17 @@ jobs:
     needs: version
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Version
         run: >
           sed -i 's/set(ERNIE_VERSION_SUFFIX ""/set(ERNIE_VERSION_SUFFIX "${{ needs.version.outputs.suffix }}"/'
           CMakeLists.txt
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
       - name: Build and check the sdist
         run: |
           uv build --sdist --out-dir dist .
           uvx twine check --strict dist/*
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sdist
           path: dist/*.tar.gz
@@ -286,14 +286,14 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: wheel-linux-x86_64
           path: wheelhouse
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Install Doxygen and the docs tools
@@ -321,7 +321,7 @@ jobs:
     runs-on: ubuntu-24.04
     container: quay.io/pypa/manylinux_2_34_x86_64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Version
         run: >
           sed -i 's/set(ERNIE_VERSION_SUFFIX ""/set(ERNIE_VERSION_SUFFIX "${{ needs.version.outputs.suffix }}"/'
@@ -342,7 +342,7 @@ jobs:
           mkdir packages
           cp build/package-deb/packages/*.deb build/package-deb/packages/*.tar.gz \
             build/package-rpm/packages/*.rpm packages/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: packages-linux-x86_64
           path: packages/*
@@ -374,8 +374,8 @@ jobs:
             install: dnf install -y -q
             packages: ./packages/*.rpm mesa-vulkan-drivers cmake gcc-c++ make
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: packages-linux-x86_64
           path: packages
