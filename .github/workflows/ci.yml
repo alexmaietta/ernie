@@ -370,7 +370,11 @@ jobs:
           7z x -y -ort rt.zip > /dev/null
           cp rt/*/x64/vulkan-1.dll mesa/x64/
           cygpath -w "$vulkan/mesa/x64" >> "$GITHUB_PATH"
-          echo "VK_DRIVER_FILES=$(cygpath -w "$vulkan/mesa/x64/lvp_icd.x86_64.json")" >> "$GITHUB_ENV"
+          # Both names: Windows finds a loader in System32 before PATH, and
+          # older loaders read only VK_ICD_FILENAMES.
+          icd=$(cygpath -w "$vulkan/mesa/x64/lvp_icd.x86_64.json")
+          echo "VK_DRIVER_FILES=$icd" >> "$GITHUB_ENV"
+          echo "VK_ICD_FILENAMES=$icd" >> "$GITHUB_ENV"
       - uses: astral-sh/setup-uv@v7
       - name: Install the wheel
         run: |
@@ -380,7 +384,7 @@ jobs:
         run: |
           tests="ernie/test/python/test_readme.py ernie/test/python/test_scene.py ernie/test/python/test_app.py"
           if [ "$RUNNER_OS" = Windows ]; then
-            .venv/Scripts/python -c "import ernie; ernie.Renderer()"
+            VK_LOADER_DEBUG=error,warn,driver .venv/Scripts/python -c "import ernie; ernie.Renderer()"
             .venv/Scripts/python -m pytest -q -p no:cacheprovider $tests
           else
             xvfb-run -a .venv/bin/python -m pytest -q -p no:cacheprovider $tests
