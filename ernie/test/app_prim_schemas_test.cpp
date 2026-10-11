@@ -64,7 +64,7 @@ TEST(PrimSchemasTest, LightPanelsComeFromTheRegistry) {
         FieldOf(lamp, tokens::kPhysicalIlluminant);
     ASSERT_NE(illuminant, nullptr);
     EXPECT_EQ(illuminant->kind, PropertyField::Kind::Token);
-    EXPECT_EQ(illuminant->options.size(), 4u);
+    EXPECT_EQ(illuminant->options.size(), 5u);
     EXPECT_EQ(FieldOf(lamp, tokens::kPhotometricPower)->fallback,
               Value(1600.0));
 

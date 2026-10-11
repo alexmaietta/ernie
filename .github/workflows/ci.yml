@@ -385,11 +385,15 @@ jobs:
           if [ "$RUNNER_OS" = Windows ]; then
             # A device first, with the loader's log and the process's own
             # exit status (bash reports a crash as 127).
-            VK_LOADER_DEBUG=error,warn,driver pwsh -NoProfile -Command '
-              .venv\Scripts\python -X faulthandler -c "import ernie; print(\"imported\", flush=True); r = ernie.Renderer(); print(\"device\", flush=True); del r; print(\"released\", flush=True)"
-              $status = $LASTEXITCODE
-              "exit status 0x{0:X8}" -f $status
-              exit $status'
+            check="$RUNNER_TEMP/device_check.py"
+            printf '%s\n' 'import ernie' 'print("imported", flush=True)' \
+              'r = ernie.Renderer()' 'print("device", flush=True)' 'del r' \
+              'print("released", flush=True)' > "$check"
+            VK_LOADER_DEBUG=error,warn,driver pwsh -NoProfile -Command "
+              .venv\\Scripts\\python -X faulthandler '$(cygpath -w "$check")'
+              \$status = \$LASTEXITCODE
+              'exit status 0x{0:X8}' -f \$status
+              exit \$status"
             .venv/Scripts/python -m pytest -q -p no:cacheprovider $tests
           else
             xvfb-run -a .venv/bin/python -m pytest -q -p no:cacheprovider $tests
