@@ -9,6 +9,7 @@
 #include <chrono>
 #include <cstdio>
 #include <stdexcept>
+#include <tuple>
 #include <utility>
 
 namespace ernie::app {
@@ -170,14 +171,20 @@ void Demo::SaveOutput(const std::filesystem::path& path) {
         viewer_->Step();
         return;
     }
-    const Tensor image = RenderImage();
+    WritePng(path, RenderImage());
+}
+
+void WritePng(const std::filesystem::path& path, const Tensor& image) {
     const std::vector<std::int64_t>& shape = image.Shape();
-    if (shape.size() != 3 || shape[2] != 4) {
-        throw std::runtime_error("The scene's LdrColor is not an (rows, cols, 4) image");
+    if (shape.size() != 3 || (shape[2] != 3 && shape[2] != 4) || image.Type() != DType::UInt8 ||
+        image.Location().kind != DeviceKind::Cpu) {
+        throw std::invalid_argument("WritePng takes a uint8 (rows, cols, 3 or 4) CPU image");
     }
     const int rows = static_cast<int>(shape[0]);
     const int cols = static_cast<int>(shape[1]);
-    if (stbi_write_png(path.string().c_str(), cols, rows, 4, image.Data(), cols * 4) == 0) {
+    const int channels = static_cast<int>(shape[2]);
+    if (stbi_write_png(path.string().c_str(), cols, rows, channels, image.Data(),
+                       cols * channels) == 0) {
         throw std::runtime_error("Cannot write " + path.string());
     }
 }
@@ -253,6 +260,46 @@ bool Demo::Untested() const {
 
 std::string DemoInfo::Label() const {
     return category + ": " + name;
+}
+
+std::string DemoInfo::Id() const {
+    std::string id = category + "/" + name;
+    std::replace(id.begin(), id.end(), ' ', '_');
+    return id;
+}
+
+namespace {
+
+std::vector<DemoInfo>& Registry() {
+    static std::vector<DemoInfo> registry;
+    return registry;
+}
+
+}  // namespace
+
+DemoRegistration::DemoRegistration(DemoInfo info) {
+    Registry().push_back(std::move(info));
+}
+
+std::vector<DemoInfo> RegisteredDemos() {
+    std::vector<DemoInfo> demos = Registry();
+    std::sort(demos.begin(), demos.end(), [](const DemoInfo& a, const DemoInfo& b) {
+        return std::tie(a.category, a.name) < std::tie(b.category, b.name);
+    });
+    return demos;
+}
+
+std::optional<std::size_t> FindDemo(std::span<const DemoInfo> demos, std::string_view id) {
+    std::string wanted(id);
+    std::replace(wanted.begin(), wanted.end(), ' ', '_');
+    for (std::size_t i = 0; i < demos.size(); ++i) {
+        std::string label = demos[i].Label();
+        std::replace(label.begin(), label.end(), ' ', '_');
+        if (demos[i].Id() == wanted || label == wanted) {
+            return i;
+        }
+    }
+    return std::nullopt;
 }
 
 struct DemoRunner::State {
@@ -598,19 +645,13 @@ int DemoMain(int argc, char** argv, std::vector<DemoInfo> demos, std::size_t sta
         return 2;
     }
     if (!options.demo.empty()) {
-        const auto named = [&](const DemoInfo& info) {
-            std::string spaced = options.demo;
-            std::replace(spaced.begin(), spaced.end(), '_', ' ');
-            return info.name == spaced || info.Label() == options.demo ||
-                   info.category + " " + info.name == spaced;
-        };
-        const auto found = std::find_if(demos.begin(), demos.end(), named);
-        if (found == demos.end()) {
+        const std::optional<std::size_t> found = FindDemo(demos, options.demo);
+        if (!found) {
             std::fprintf(stderr, "%s: no demo named '%s' (--list lists them)\n", program.c_str(),
                          options.demo.c_str());
             return 2;
         }
-        start = static_cast<std::size_t>(found - demos.begin());
+        start = *found;
     }
     if (options.help) {
         std::printf("Usage: %s [options]\n\n", program.c_str());
@@ -622,7 +663,7 @@ int DemoMain(int argc, char** argv, std::vector<DemoInfo> demos, std::size_t sta
     }
     if (options.list) {
         for (const DemoInfo& info : demos) {
-            std::printf("%s\n", info.Label().c_str());
+            std::printf("%s\n", info.Id().c_str());
         }
         return 0;
     }

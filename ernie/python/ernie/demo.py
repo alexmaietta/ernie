@@ -236,10 +236,11 @@ def main(demo_class):
 
 
 def catalog(demo_class, args):
-    """The Demos panel's entries for a run of `demo_class`, `(infos, current)`: the demo files
-    beside its module, or the class alone when it is not among them."""
+    """The Demos panel's entries for a run of `demo_class`, `(infos, current)`: the demos of every
+    category beside its own (`demos/<category>/<name>.py`), or the class alone when it is not
+    among them."""
     path = _module_file(demo_class)
-    entries = discover_demos(os.path.dirname(path)) if path else []
+    entries = discover_demos(os.path.dirname(os.path.dirname(path))) if path else []
     current = next((i for i, entry in enumerate(entries)
                     if os.path.exists(entry.path) and os.path.samefile(entry.path, path)), None)
     infos = [_app.DemoInfo(entry.category, entry.name, "", _creator(entry.path, args))
@@ -252,30 +253,35 @@ def catalog(demo_class, args):
 
 
 class DemoEntry:
-    """A demo file: its path, category and name from `demo_<category>_<name>.py`."""
+    """A demo file, `<category>/<name>.py`: its path, category and name."""
 
     def __init__(self, path):
         self.path = path
+        self.category = os.path.basename(os.path.dirname(os.path.abspath(path)))
         stem = os.path.splitext(os.path.basename(path))[0]
-        parts = stem.split("_", 2)
-        self.category = parts[1] if len(parts) > 1 else "other"
-        self.name = parts[2].replace("_", " ") if len(parts) > 2 else stem
+        self.name = stem.replace("_", " ")
+        self.id = f"{self.category}/{stem}"
 
     @property
     def label(self):
         return f"{self.category}: {self.name}"
 
 
-def discover_demos(directory):
-    """The `demo_*.py` files in `directory` that define a Demo class, by category and name."""
+def discover_demos(root):
+    """The demos under `root`, `<category>/<name>.py` files that define a Demo class, by category
+    and name."""
     entries = []
-    for filename in sorted(os.listdir(directory)):
-        if not (filename.startswith("demo_") and filename.endswith(".py")):
+    for category in sorted(os.listdir(root)):
+        directory = os.path.join(root, category)
+        if category.startswith((".", "_")) or not os.path.isdir(directory):
             continue
-        path = os.path.join(directory, filename)
-        with open(path, encoding="utf-8") as file:
-            if re.search(r"^class Demo\(", file.read(), re.MULTILINE):
-                entries.append(DemoEntry(path))
+        for filename in sorted(os.listdir(directory)):
+            if filename.startswith("_") or not filename.endswith(".py"):
+                continue
+            path = os.path.join(directory, filename)
+            with open(path, encoding="utf-8") as file:
+                if re.search(r"^class Demo\(", file.read(), re.MULTILINE):
+                    entries.append(DemoEntry(path))
     return entries
 
 
@@ -285,7 +291,8 @@ def load_demo_class(path):
     directory = os.path.dirname(os.path.abspath(path))
     if directory not in sys.path:
         sys.path.insert(0, directory)
-    name = "ernie_demo_" + os.path.splitext(os.path.basename(path))[0]
+    name = "ernie_demo_{}_{}".format(os.path.basename(directory),
+                                     os.path.splitext(os.path.basename(path))[0])
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
@@ -310,6 +317,39 @@ def write_png(path, image):
     with open(path, "wb") as file:
         file.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) +
                    chunk(b"IDAT", zlib.compress(raw, 6)) + chunk(b"IEND", b""))
+
+
+def side_by_side(images, gap=4):
+    """uint8 (rows, cols, channels) images of one height next to each other with black gaps."""
+    height = images[0].shape[0]
+    parts = []
+    for i, image in enumerate(images):
+        if i > 0:
+            parts.append(np.zeros((height, gap, image.shape[2]), dtype=np.uint8))
+        parts.append(np.asarray(image, dtype=np.uint8))
+    return np.concatenate(parts, axis=1)
+
+
+def srgb_to_linear(rgb):
+    """An sRGB-encoded colour in [0, 1] to linear."""
+    rgb = np.asarray(rgb, dtype=np.float64)
+    return np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
+
+
+def mean_linear_rgb(image):
+    """The mean colour of a uint8 (rows, cols, 3 or 4) image, decoded from sRGB to linear."""
+    return srgb_to_linear(np.asarray(image)[..., :3].reshape(-1, 3).mean(axis=0) / 255.0)
+
+
+def heatmap(values, low, high):
+    """`values` from `low` (blue) through cyan, green and yellow to `high` (red), as RGB uint8."""
+    t = np.clip((np.asarray(values, dtype=np.float64) - low) / max(high - low, 1e-12), 0.0, 1.0)
+    stops = np.array([[0, 0, 255], [0, 255, 255], [0, 255, 0], [255, 255, 0], [255, 0, 0]],
+                     dtype=np.float64)
+    position = t * (len(stops) - 1)
+    index = np.minimum(position.astype(int), len(stops) - 2)
+    fraction = (position - index)[..., None]
+    return ((1.0 - fraction) * stops[index] + fraction * stops[index + 1]).astype(np.uint8)
 
 
 def _creator(source, args):
@@ -342,10 +382,14 @@ __all__ = [
     "create_parser",
     "default_args",
     "discover_demos",
+    "heatmap",
     "init",
     "load_demo_class",
     "main",
+    "mean_linear_rgb",
     "options_from_args",
     "run",
+    "side_by_side",
+    "srgb_to_linear",
     "write_png",
 ]

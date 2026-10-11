@@ -3,8 +3,8 @@
 each a clone of the first, with camera poses that change every step on the GPU, and reports the
 time per step and views rendered per second.
 
-    PYTHONPATH=build/python python demos/python/demo_rl_batch_camera.py [--views 1024]
-        [--bands 3] [--minimal texturedDiffuse] [--viewer null] [--sweep] [--output views.png]
+    python -m ernie.demos batched/batch_camera [--views 1024] [--bands 3]
+        [--minimal texturedDiffuse] [--viewer null] [--sweep] [--output views.png]
 
 Each environment holds a few boxes and spheres over a shared ground under a sun with shadows. The
 views orbit their environment, a step's poses arrive as a CUDA array, and the observations stay

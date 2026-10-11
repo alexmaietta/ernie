@@ -20,7 +20,7 @@ Every option is off by default, so a plain configure builds just the libraries.
 | Option | Default | What it does |
 | --- | --- | --- |
 | `ERNIE_BUILD_TESTS` | off | GoogleTest suites and the Python tests |
-| `ERNIE_BUILD_DEMOS` | off | C++ demos in `demos/cpp` |
+| `ERNIE_BUILD_DEMOS` | off | A program per C++ demo, `demo_<category>_<name>` (the `ernie` program has them all either way) |
 | `ERNIE_BUILD_PYTHON` | off | The `ernie` Python module |
 | `ERNIE_BUILD_APP` | off | The viewer (`ernie` executable and `ernie::app`) |
 | `ERNIE_INSTALL` | off | libernie, the install rules and packages (not on Windows yet) |
@@ -58,7 +58,7 @@ Packages: `cmake --preset package-deb` (or `package-rpm`), then `cmake --build -
 - Each module in `ernie/` is a library that depends only on the modules before it (see `ernie/CMakeLists.txt`). Headers sit next to their sources and are included as `"ernie/<module>/<file>.h"`.
 - Document public API with `///` comments. When code implements a published technique, cite it in a `References:` list in the doc comment.
 - Scene attributes use physical units (meters, kelvin, lux and so on). Say which unit in the doc comment.
-- Demos go in `demos/cpp` or `demos/python` and are named `demo_<category>_<description>`.
+- Demos go in `demos/<category>/` as a pair, `<name>.cpp` and `<name>.py`, the same demo in each language (registered with `ERNIE_REGISTER_DEMO` in C++); only `demos/interop/` is Python alone. `ernie/test/python/test_demos.py` checks every pair renders the same image.
 - Tests are named `<module>_<topic>_test.cpp`. GPU tests use the `_gpu_test.cpp` suffix.
 
 ## Pull requests

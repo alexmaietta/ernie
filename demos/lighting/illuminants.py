@@ -2,17 +2,15 @@
 """One spot light, four illuminants (physical:illuminant), after the Omniverse RTX physical
 lighting page's illuminant figure: "white", "illuminant D" at 4000 K, "blackbody" at 2000 K and a
 "custom" fluorescent spectrum, each at the same 1600 lumens (photometric:power), lighting a
-checkered wall with a colour chart and two spheres in a dark room.
+checkered wall with a colour chart and two spheres in a dark room. The Python twin of
+illuminants.cpp.
+
+    python -m ernie.demos lighting/illuminants [--viewer null --output illuminants.png]
 
 The lumens stay the same, so each image has about the same brightness; the illuminant changes
-only the colour of the light, and how the chart's patches render under it.
-
-    PYTHONPATH=build/python python demos/python/demo_lighting_illuminants.py
-    PYTHONPATH=build/python python demos/python/demo_lighting_illuminants.py --viewer null \
-        --output illuminants.png
-
-The page's custom illuminant is CIE F5; here the custom spectrum is fluorescent-like rather than F5
-itself: mercury emission lines at 405, 436, 546 and 578 nm over a broad halophosphate band.
+only the colour of the light, and how the chart's patches render under it. The page's custom
+illuminant is CIE F5; here the custom spectrum is fluorescent-like rather than F5 itself: mercury
+emission lines at 405, 436, 546 and 578 nm over a broad halophosphate band.
 
 References:
 - NVIDIA, "Omniverse RTX Renderer: Lighting, Physical Lighting",
@@ -26,10 +24,7 @@ import numpy as np
 import ernie
 import ernie.demo
 from ernie import tokens
-
-from demo_support import side_by_side, srgb_to_linear, write_png
-
-SIZE = (300, 448)
+from ernie.demo import mean_linear_rgb, side_by_side, srgb_to_linear, write_png
 
 # The ColorChecker's 24 patches in sRGB, row by row from dark skin to black.
 CHART = [
@@ -67,7 +62,6 @@ def box(parent, path, centre, size, colour):
 
 class Demo(ernie.demo.Demo):
     num_frames = 1
-    title = "Illuminants"
 
     def __init__(self, viewer, args):
         super().__init__(viewer, args)
@@ -103,7 +97,7 @@ class Demo(ernie.demo.Demo):
                               exposure_f_stop=2.0).set(
             tokens.TRANSFORM, ernie.look_at_transform((0.0, -2.6, 1.3), (0.0, 1.0, 1.2)))
         self.scene.define("/Render/Settings", ernie.RenderSettings, camera=camera,
-                          resolution=SIZE, ambient=0.0)
+                          resolution=(448, 300), ambient=0.0)
         self.light_with(0)
 
         if viewer is not None:
@@ -122,12 +116,12 @@ class Demo(ernie.demo.Demo):
         self.spot.color_temperature = kelvin
 
     def render_all(self):
-        """The scene under each illuminant in turn, RGB uint8; leaves the light as it was."""
+        """The scene under each illuminant in turn, RGBA uint8; leaves the light as it was."""
         current = self.illuminant
         images = []
         for index in range(len(ILLUMINANTS)):
             self.light_with(index)
-            images.append(np.array(self.renderer.render(self.scene))[..., :3])
+            images.append(np.array(self.renderer.render(self.scene)))
         self.light_with(current)
         return images
 
@@ -136,8 +130,7 @@ class Demo(ernie.demo.Demo):
         write_png(path, side_by_side(self.render_all()))
 
     def test_final(self):
-        means = [srgb_to_linear(image.reshape(-1, 3).mean(axis=0) / 255.0)
-                 for image in self.render_all()]
+        means = [mean_linear_rgb(image) for image in self.render_all()]
         luminance = [float(m @ np.array([0.2126, 0.7152, 0.0722])) for m in means]
         warmth = [float(m[0] / max(m[2], 1e-6)) for m in means]
         for (name, _, _), y, w in zip(ILLUMINANTS, luminance, warmth):

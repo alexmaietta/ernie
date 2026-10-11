@@ -51,13 +51,23 @@ configure_file(ernie/app.py "${ernie_package_dir}/app.py" COPYONLY)
 configure_file(ernie/batch.py "${ernie_package_dir}/batch.py" COPYONLY)
 configure_file(ernie/demo.py "${ernie_package_dir}/demo.py" COPYONLY)
 configure_file(ernie/schema.py "${ernie_package_dir}/schema.py" COPYONLY)
-# ernie.demos: the Python demos and the ISDs they read, run by `python -m ernie.demos`.
-file(GLOB ernie_demo_sources CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/demos/python/*.py")
+configure_file(ernie/cli.py "${ernie_package_dir}/cli.py" COPYONLY)
+configure_file(ernie/__main__.py "${ernie_package_dir}/__main__.py" COPYONLY)
+# ernie.demos: the Python demos (demos/<category>/<name>.py) and the ISDs they read, run by
+# `python -m ernie.demos`.
+file(
+    GLOB ernie_demo_sources CONFIGURE_DEPENDS
+    RELATIVE "${PROJECT_SOURCE_DIR}/demos"
+    "${PROJECT_SOURCE_DIR}/demos/*/*.py")
 set(ernie_demo_data "${PROJECT_SOURCE_DIR}/ernie/test/fixtures/isd/toughLroNacLineScan.json"
                     "${PROJECT_SOURCE_DIR}/ernie/test/fixtures/isd/lroWacPushFrame.json")
-foreach(source ernie/demos/__init__.py ernie/demos/__main__.py ${ernie_demo_sources})
+foreach(source ernie/demos/__init__.py ernie/demos/__main__.py)
     get_filename_component(name "${source}" NAME)
     configure_file("${source}" "${ernie_package_dir}/demos/${name}" COPYONLY)
+endforeach()
+foreach(source ${ernie_demo_sources})
+    configure_file("${PROJECT_SOURCE_DIR}/demos/${source}" "${ernie_package_dir}/demos/${source}"
+                   COPYONLY)
 endforeach()
 foreach(source ${ernie_demo_data})
     get_filename_component(name "${source}" NAME)
@@ -84,6 +94,8 @@ if(SKBUILD)
               ernie/batch.py
               ernie/demo.py
               ernie/schema.py
+              ernie/cli.py
+              ernie/__main__.py
               "${ernie_package_dir}/schema.pyi"
               "${ernie_package_dir}/py.typed"
         DESTINATION ernie
@@ -93,9 +105,16 @@ if(SKBUILD)
         DESTINATION ernie/_ernie
         COMPONENT python)
     install(
-        FILES ernie/demos/__init__.py ernie/demos/__main__.py ${ernie_demo_sources}
+        FILES ernie/demos/__init__.py ernie/demos/__main__.py
         DESTINATION ernie/demos
         COMPONENT python)
+    foreach(source ${ernie_demo_sources})
+        get_filename_component(category "${source}" DIRECTORY)
+        install(
+            FILES "${PROJECT_SOURCE_DIR}/demos/${source}"
+            DESTINATION ernie/demos/${category}
+            COMPONENT python)
+    endforeach()
     install(
         FILES ${ernie_demo_data}
         DESTINATION ernie/demos/data

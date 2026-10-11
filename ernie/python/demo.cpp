@@ -9,6 +9,7 @@
 #include <nanobind/stl/vector.h>
 #include <nanobind/trampoline.h>
 
+#include "ernie/app/cli.h"
 #include "ernie/app/demo.h"
 
 #include <cstdint>
@@ -111,6 +112,17 @@ void BindDemo(nb::module_& m) {
                 "The arguments that are none of the shared options, for the demo's own.")
         .def_prop_ro("windowed", &DemoOptions::Windowed, "A viewer with a window.");
     m.def(
+        "main",
+        [](const std::vector<std::string>& args, const std::string& version) {
+            return app::ErnieMain(args, version);
+        },
+        nb::arg("args"), nb::arg("version"),
+        "The `ernie` program (ernie.cli): the viewer on a scene file or the default scene with "
+        "a Demos panel of Ernie's C++ demos, or a render without a window; args without the "
+        "program name. Returns the exit status.");
+    m.def("registered_demos", &app::RegisteredDemos,
+          "The C++ demos compiled in (ERNIE_REGISTER_DEMO), by category and name.");
+    m.def(
         "parse_demo_options",
         [](const std::vector<std::string>& args) { return app::ParseDemoOptions(args); },
         nb::arg("args"),
@@ -171,7 +183,9 @@ void BindDemo(nb::module_& m) {
         .def_ro("category", &DemoInfo::category)
         .def_ro("name", &DemoInfo::name)
         .def_ro("description", &DemoInfo::description)
-        .def_prop_ro("label", &DemoInfo::Label, "\"category: name\", as the panel lists it.");
+        .def_prop_ro("label", &DemoInfo::Label, "\"category: name\", as the panel lists it.")
+        .def_prop_ro("id", &DemoInfo::Id,
+                     "\"category/name\", as `ernie --demo` and `--list` name it.");
 
     nb::class_<DemoRunner>(
         m, "DemoRunner",

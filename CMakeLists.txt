@@ -23,7 +23,7 @@ set(ERNIE_VERSION "${PROJECT_VERSION}${ERNIE_VERSION_SUFFIX}")
 
 option(ERNIE_BUILD_TESTS "Build Ernie's tests" OFF)
 option(ERNIE_BUILD_PYTHON "Build Ernie's Python module" OFF)
-option(ERNIE_BUILD_DEMOS "Build Ernie's C++ demos" OFF)
+option(ERNIE_BUILD_DEMOS "Build a program for each of Ernie's C++ demos" OFF)
 option(ERNIE_BUILD_APP
        "Build Ernie's app, the GUI viewer (GLFW, Dear ImGui, ImPlot, ImGuizmo, fonts)" OFF)
 option(ERNIE_TRACY "Instrument Ernie for the Tracy profiler (CPU and Vulkan GPU zones, on demand)"
@@ -128,7 +128,9 @@ if(ERNIE_INSTALL)
     include(cmake/ErniePackaging.cmake)
 endif()
 
-if(ERNIE_BUILD_DEMOS)
+# The demos: built into the `ernie` program and the Python module with the app, and each as a
+# program of its own with ERNIE_BUILD_DEMOS.
+if(TARGET ernie_app)
     add_subdirectory(demos)
 endif()
 

@@ -3,6 +3,7 @@ ernie_add_library(
     ernie_app
     SOURCES
     camera_panel.cpp
+    cli.cpp
     create.cpp
     demo.cpp
     file_dialog.cpp
@@ -28,7 +29,8 @@ ernie_add_library(
     ernie_gui_fonts
     ernie_stb)
 
-# The `ernie` executable: the viewer on a default scene.
+# The `ernie` executable: the viewer on a scene file or a default scene, with the demos
+# (demos/CMakeLists.txt adds their objects to it).
 add_executable(ernie_viewer main.cpp)
 set_target_properties(ernie_viewer PROPERTIES OUTPUT_NAME ernie)
 target_link_libraries(ernie_viewer PRIVATE ernie_build_options)

@@ -176,6 +176,9 @@ struct DemoInfo {
 
     /// "category: name", as the panel lists it.
     std::string Label() const;
+
+    /// "category/name", as `--demo` and `--list` name it, with underscores for spaces.
+    std::string Id() const;
 };
 
 /// A `DemoInfo` for the demo class `T`, constructed from (Viewer*, const DemoOptions&).
@@ -186,6 +189,32 @@ DemoInfo MakeDemoInfo(std::string category, std::string name, std::string descri
                 return std::make_shared<T>(viewer, options);
             }};
 }
+
+/// Writes `image`, uint8 (rows, cols, 3 or 4) on the CPU, as PNG.
+/// @throws std::invalid_argument for another shape or type, or std::runtime_error if the file
+/// cannot be written.
+void WritePng(const std::filesystem::path& path, const Tensor& image);
+
+/// The demos registered with `ERNIE_REGISTER_DEMO`, sorted by category then name: Ernie's own
+/// (the ernie_demos library, in the `ernie` program and the Python module) and any an
+/// application links in.
+std::vector<DemoInfo> RegisteredDemos();
+
+/// Registers a demo at static initialization, for `RegisteredDemos`.
+struct DemoRegistration {
+    explicit DemoRegistration(DemoInfo info);
+};
+
+/// Registers the demo class `Class` as `category`/`name`, such as "lighting"/"illuminants", with
+/// a one-line description, in a source file of its own. Link the object file itself (an object
+/// library), not through a static archive, which would drop it as unreferenced.
+#define ERNIE_REGISTER_DEMO(Class, category, name, description)                                    \
+    static const ::ernie::app::DemoRegistration ernie_demo_registration_##Class(                   \
+        ::ernie::app::MakeDemoInfo<Class>(category, name, description))
+
+/// Finds the demo `id` among `demos`: "category/name" (such as "lighting/illuminants"), or the
+/// panel's label "category: name"; underscores and spaces match each other. Returns its index.
+std::optional<std::size_t> FindDemo(std::span<const DemoInfo> demos, std::string_view id);
 
 /// Runs demos as Newton's examples run: opens the viewer the options ask for (or none), runs a
 /// demo until its window closes or it has run its frames, then writes `--output`, runs its

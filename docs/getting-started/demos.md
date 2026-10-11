@@ -1,18 +1,30 @@
 # Demos
 
-Ernie's demos show its features one at a time: lighting in physical units, real orbital cameras, terrain and planets, GPU interop, batched rendering for reinforcement learning. Each is one file, `demo_<category>_<description>.py`, and runs the same way, after Newton's examples. The package ships them, as `ernie.demos`.
+Ernie's demos show its features one at a time: lighting in physical units, real orbital cameras, terrain and planets, GPU interop, batched rendering for reinforcement learning. They live in `demos/<category>/`, each a pair, `<name>.cpp` and `<name>.py`: the same scene and checks in each language, rendering the same image. Only `demos/interop/`, which shows Python's GPU interop (Warp, DLPack, CUDA streams), is Python alone. A demo is named `<category>/<name>`, such as `lighting/illuminants`. They run the same way, after Newton's examples.
 
 ## Running a demo
 
+The `ernie` program, which `pip install ernie-renderer` puts on the path, runs the C++ demos:
+
 ```sh
-python -m ernie.demos                         # the sun panel demo
-python -m ernie.demos --list                  # every demo's name
-python -m ernie.demos lighting_illuminants    # one by name, with its options after it
+ernie                                  # the viewer on the default scene, with the Demos panel
+ernie --demo lighting/illuminants      # the viewer with a demo running
+ernie --list                           # every demo's name
+ernie scene.json                       # the viewer on a scene file (ernie.save_scene's JSON)
+ernie scene.json --output scene.png    # renders a scene file without a window
 ```
 
-From a checkout, run the files themselves: `PYTHONPATH=build/python python demos/python/demo_lighting_illuminants.py`.
+`python -m ernie.demos` runs the Python demos, which the package ships as `ernie.demos`:
 
-This opens the viewer on the demo's scene, with a Demos panel on the left. Its menu lists every demo beside this one, by category; choosing one clears the scene and builds that demo in the same window. The panel also pauses, single-steps and resets the demo.
+```sh
+python -m ernie.demos                         # viewer/sun_panel
+python -m ernie.demos --list
+python -m ernie.demos lighting/illuminants    # one by name, with its options after it
+```
+
+From a checkout, run the files themselves (`PYTHONPATH=build/python python demos/lighting/illuminants.py`), or a C++ demo's own program, which `-DERNIE_BUILD_DEMOS=ON` builds as `demo_<category>_<name>` (`build/bin/demo_lighting_illuminants`).
+
+Each opens the viewer with a Demos panel on the left. Its menu lists the demos in the same language, by category; choosing one clears the scene and builds that demo in the same window. The panel also pauses, single-steps and resets the demo.
 
 Every demo takes these options:
 
@@ -34,13 +46,13 @@ Every demo takes these options:
 A demo's own options follow these; `--help` lists them all. For example:
 
 ```sh
-python -m ernie.demos lighting_illuminants --viewer null --output illuminants.png
-python -m ernie.demos overlays_debug_draw --headless --output overlays.png
-python -m ernie.demos viewer_sun_panel --benchmark --num-frames 300
-python -m ernie.demos overlays_debug_draw --viewer null --test
+ernie --demo lighting/illuminants --viewer null --output illuminants.png
+python -m ernie.demos lighting/illuminants --viewer null --output illuminants.png
+python -m ernie.demos viewer/sun_panel --headless --test
+ernie --demo viewer/sun_panel --benchmark --num-frames 300
 ```
 
-The Python tests run every demo with `--viewer null --test` (`ernie/test/python/test_demos.py`).
+The Python tests (`ernie/test/python/test_demos.py`) run every demo in both languages with `--viewer null --test`, check that each has its twin, and check that the twins' `--output` images match.
 
 ## Writing a demo
 
@@ -87,7 +99,7 @@ What to know:
 - A demo uses the viewer as any application does: `add_panel`, `on_frame`, `add_hud_item`, `active_camera`, `viewport_display`. A demo registers in a scope of its own (`Viewer.scope`), so when the Demos panel switches away, what it added is removed, and the viewport's display settings are restored. A camera, lighting or RenderSettings it chooses is kept over the viewer's reset of its session.
 - Add your own options by overriding the class method `create_parser`, adding to what `super().create_parser()` returns. Give every option a default: the Demos panel opens demos with their defaults.
 - Override `save_output(path)` for a composite `--output` (images side by side, a contact sheet), and `render` when the per-frame render should differ, as for batch renders through `self.renderer`. `self.map(path, attribute, stream)` maps an attribute through the viewer or the renderer, whichever draws the demo, for in-place GPU writes. `close()` runs when the demo ends or is switched away.
-- Name the file `demo_<category>_<description>.py` and put it with the others, and the Demos panel lists it under its category.
+- Put it in `demos/<category>/<name>.py` beside its C++ twin, `<name>.cpp`, and the Demos panel lists it under its category. The image helpers both languages share are `ernie.demo`'s (`side_by_side`, `srgb_to_linear`, `mean_linear_rgb`, `heatmap`, `write_png`) and `demos/util.h`'s.
 
 `ernie.demo.init` and `ernie.demo.run` are `main`'s two halves, for a script that builds its own parser or runs a demo it constructs itself.
 
@@ -127,4 +139,6 @@ int main(int argc, char** argv) {
 }
 ```
 
-The C++ names follow Python's: `Step`, `Render`, `SaveOutput`, `TestPostStep`, `TestFinal` and `Close` to override; `GetScene`, `GetViewer` (null without one), `GetRenderer`, `RenderImage`, `frame`, `time` and `frameDt`; and `numFrames`, `fixedDt`, `maxFrameDt` and `description` to set. `demos/cpp` has two, built with `-DERNIE_BUILD_DEMOS=ON`.
+The C++ names follow Python's: `Step`, `Render`, `SaveOutput`, `TestPostStep`, `TestFinal` and `Close` to override; `GetScene`, `GetViewer` (null without one), `GetRenderer`, `RenderImage`, `frame`, `time` and `frameDt`; and `numFrames`, `fixedDt`, `maxFrameDt` and `description` to set. `WritePng` writes an image.
+
+Ernie's own C++ demos register themselves instead, with `ERNIE_REGISTER_DEMO(Class, "category", "name", "description")` at the end of their file, and `RegisteredDemos()` lists them; an application linking its demos' object files can do the same and pass `RegisteredDemos()` to `DemoMain`.

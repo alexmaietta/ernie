@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Opens the viewer on a scene built in code, with a panel of its own that moves the sun.
+"""Opens the viewer on a scene built in code, with a panel of its own that moves the sun. The
+Python twin of sun_panel.cpp.
 
-    PYTHONPATH=build/python python demos/python/demo_viewer_sun_panel.py
+    python -m ernie.demos viewer/sun_panel [--viewer null --output sun.png]
 """
 
 import math

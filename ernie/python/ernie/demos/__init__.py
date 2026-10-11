@@ -4,12 +4,13 @@
 
     python -m ernie.demos                     # the sun panel demo, with the Demos panel
     python -m ernie.demos --list              # every demo's name
-    python -m ernie.demos lighting_illuminants --viewer null --output illuminants.png
-    python -m ernie.demos lighting_illuminants --help
+    python -m ernie.demos lighting/illuminants --viewer null --output illuminants.png
+    python -m ernie.demos lighting/illuminants --help
 
-A demo's name is its file's without `demo_` and `.py` (`lighting_illuminants`). The options after
-the name are the demo's: those every demo takes (`ernie.demo.create_parser`) and its own. In a
-window, the Demos panel switches between them all.
+The demos are `<category>/<name>.py` files, each the twin of a C++ demo (the `ernie` program's,
+`ernie --demo lighting/illuminants`) but for those in `interop/`, which show Python's GPU interop.
+The options after the name are the demo's: those every demo takes (`ernie.demo.create_parser`) and
+its own. In a window, the Demos panel switches between them all.
 
 To write demos of your own, subclass `ernie.demo.Demo` in Python or `ernie::app::Demo` in C++
 (ernie/app/demo.h); they run the same way, from your own files.
@@ -21,24 +22,23 @@ import sys
 
 from ..demo import discover_demos
 
-#: Where the demos are: this package's directory.
+#: Where the demos are: this package's directory, a directory per category.
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 
 #: The demo `python -m ernie.demos` runs without a name.
-DEFAULT = "viewer_sun_panel"
+DEFAULT = "viewer/sun_panel"
 
-USAGE = """Usage: python -m ernie.demos [name] [options]
+USAGE = """Usage: python -m ernie.demos [category/name] [options]
        python -m ernie.demos --list
-       python -m ernie.demos name --help
+       python -m ernie.demos category/name --help
 
-Runs one of Ernie's demos (the sun panel demo without a name); --list lists them, and NAME
---help shows a demo's options."""
+Runs one of Ernie's Python demos (viewer/sun_panel without a name), with a Demos panel to switch
+to the others; --list lists them, and NAME --help shows a demo's options."""
 
 
 def demos():
-    """The demos here as {name: path}, by category and name."""
-    return {os.path.splitext(os.path.basename(entry.path))[0].removeprefix("demo_"): entry.path
-            for entry in discover_demos(DIRECTORY)}
+    """The demos here as {"category/name": path}, by category and name."""
+    return {entry.id: entry.path for entry in discover_demos(DIRECTORY)}
 
 
 def main(argv=None):
@@ -53,13 +53,10 @@ def main(argv=None):
         print("\n".join(found))
         return 0
     name = argv.pop(0) if argv and not argv[0].startswith("-") else DEFAULT
-    name = name.removeprefix("demo_").removesuffix(".py").replace(" ", "_")
+    name = name.removesuffix(".py").replace(" ", "_")
     if name not in found:
         print(f"No demo named '{name}'; these are:\n  " + "\n  ".join(found), file=sys.stderr)
         return 2
-    # The demos import the helpers beside them (demo_support).
-    if DIRECTORY not in sys.path:
-        sys.path.insert(0, DIRECTORY)
     sys.argv = [found[name], *argv]
     runpy.run_path(found[name], run_name="__main__")
     return 0
