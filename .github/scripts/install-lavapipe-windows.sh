@@ -9,8 +9,11 @@
 # (GITHUB_PATH) for later steps.
 set -euo pipefail
 
-mesa_version=26.2.3
-mesa_sha256=3f3613adb43cfd0f2e665ce2400b130c275f0b3317cb3a05566320a3a67589ed
+# 26.2.4 or later: earlier releases free llvmpipe's memory on Windows
+# with free() where _aligned_malloc() allocated it, which corrupts the
+# heap at every vkFreeMemory.
+mesa_version=26.2.4
+mesa_sha256=351fc8c8b695878ffb3eaa044b3ead08672a48b1a045e3c3e3975811df0f6695
 loader_version=1.4.363.0
 loader_sha256=a25a927aa8b9f0371048f1861cf88ac3b9bc9b1fb332c42d897c8ab32695769a
 
