@@ -66,6 +66,8 @@ CMV_FULL_WELL = 15000.0
 # (horizontal, vertical, diagonal; degrees).
 NAVCAM = ("Navcam", 19.1, 12.0, 3.5, 0.424, (96.0, 73.0, 120.0))
 HAZCAM = ("Hazcam", 14.0, 12.0, 0.9, 0.248, (136.0, 102.0, 172.0))
+# The rear Hazcams: the front pair's optics, 93.4 cm apart.
+REAR_HAZCAM = ("RearHazcam", 14.0, 12.0, 0.9, 0.934, HAZCAM[5])
 
 
 def cmv_reaches():
@@ -205,18 +207,55 @@ ROCKS = (
     (-0.6, 2.2, 0.18),
 )
 
-# The rigs, each looking down its -z with +y up: the mast's Navcams and
-# Mastcam-Z about 2 m up looking 15 degrees down, the front Hazcams 0.7
-# m up and 30 degrees down, all north (+y). Path, eye and degrees down.
-NAVCAM_RIG = ("/World/Rover/Navcam", (0.0, 0.0, 2.0), 15.0)
-HAZCAM_RIG = ("/World/Rover/Hazcam", (0.0, 0.6, 0.7), 30.0)
-MASTCAM_RIG = ("/World/Rover/MastcamZ", (0.3, 0.0, 2.0), 15.0)
+# The rigs, each looking down its -z with +y up, a heading (degrees
+# clockwise from north, +y) and a tilt down: the mast's Navcams and
+# Mastcam-Z about 2 m up looking 15 degrees down ahead (north), the
+# front Hazcams 0.7 m up and 30 degrees down ahead, the rear ones behind
+# the rover looking back. Path, eye, degrees down and heading.
+NAVCAM_RIG = ("/World/Rover/Navcam", (0.0, 0.0, 2.0), 15.0, 0.0)
+HAZCAM_RIG = ("/World/Rover/Hazcam", (0.0, 0.6, 0.7), 30.0, 0.0)
+REAR_HAZCAM_RIG = (
+    "/World/Rover/RearHazcam",
+    (0.0, -0.9, 0.7),
+    30.0,
+    180.0,
+)
+MASTCAM_RIG = ("/World/Rover/MastcamZ", (0.3, 0.0, 2.0), 15.0, 0.0)
+
+# The cameras the viewer can show: name and camera (a pair's left eye).
+VIEWS = (
+    ("Overview", "/World/View"),
+    ("Navcam", "/World/Rover/Navcam/Left"),
+    ("Front Hazcam", "/World/Rover/Hazcam/Left"),
+    ("Rear Hazcam", "/World/Rover/RearHazcam/Left"),
+    ("Mastcam-Z", "/World/Rover/MastcamZ/Left"),
+)
+
+
+def filter_name(e, number):
+    """Filter `number` of eye `e`'s wheel, as Table 3 names it: L0 to
+    L7, R0 to R7."""
+    effective, _, density = FILTERS[e][number]
+    name = f"{'L' if e == 0 else 'R'}{number} "
+    if number == 0:
+        return name + "Bayer RGB"
+    name += f"{int(effective)} nm"
+    if density > 0.0:
+        name += f", solar (ND {int(density)})"
+    return name
 
 
 def rig_transform(rig):
-    _, eye, down_deg = rig
+    _, eye, down_deg, heading_deg = rig
     down = math.radians(down_deg)
-    forward = np.array([0.0, math.cos(down), -math.sin(down)])
+    heading = math.radians(heading_deg)
+    forward = np.array(
+        [
+            math.sin(heading) * math.cos(down),
+            math.cos(heading) * math.cos(down),
+            -math.sin(down),
+        ]
+    )
     return np.asarray(
         ernie.look_at_transform(
             eye, tuple(np.asarray(eye) + forward), (0.0, 0.0, 1.0)
@@ -243,6 +282,8 @@ class Demo(ernie.demo.Demo):
 
     def __init__(self, viewer, args):
         super().__init__(viewer, args)
+        self.focal_mm = SHORTEST_FOCAL_MM
+        self.filters = [0, 0]
         scene = self.scene
         scene.define("/World", ernie.Xform)
         scene.define(
@@ -294,6 +335,7 @@ class Demo(ernie.demo.Demo):
         scene.define("/World/Rover", ernie.Xform)
         self.define_engineering_pair(NAVCAM_RIG, NAVCAM)
         self.define_engineering_pair(HAZCAM_RIG, HAZCAM)
+        self.define_engineering_pair(REAR_HAZCAM_RIG, REAR_HAZCAM)
         self.define_mastcam_pair()
 
         # The viewer's own view: the rover's patch from behind.
@@ -320,6 +362,44 @@ class Demo(ernie.demo.Demo):
         if viewer is not None:
             viewer.active_camera = view.path
 
+        # The camera the viewer shows (a pair's left eye), Mastcam-Z's
+        # zoom and each eye's filter wheel.
+        def show(index):
+            if viewer is not None:
+                viewer.active_camera = VIEWS[index][1]
+
+        def zoom(focal):
+            self.focal_mm = focal
+            for e in range(2):
+                self.use_mastcam_filter(
+                    self.mastcam_camera(e), e, self.filters[e]
+                )
+
+        self.widgets.combo(
+            "Camera", [name for name, _ in VIEWS], 0, on_change=show
+        )
+        self.widgets.slider(
+            "Mastcam-Z focal length (mm)",
+            SHORTEST_FOCAL_MM,
+            LONGEST_FOCAL_MM,
+            SHORTEST_FOCAL_MM,
+            on_change=zoom,
+        )
+
+        def wheel(e):
+            def turn(index):
+                self.set_mastcam_filter(e, index)
+
+            return turn
+
+        for e in range(2):
+            self.widgets.combo(
+                f"Mastcam-Z {'left' if e == 0 else 'right'} filter",
+                [filter_name(e, number) for number in range(8)],
+                0,
+                on_change=wheel(e),
+            )
+
     def save_output(self, path):
         """The left Navcam, Hazcam and Mastcam-Z images and the right
         Navcam's, side by side, as the rover sends them."""
@@ -334,16 +414,23 @@ class Demo(ernie.demo.Demo):
         write_png(path, side_by_side(images)[..., :3])
 
     def test_final(self):
-        for rig in (NAVCAM_RIG, HAZCAM_RIG, MASTCAM_RIG):
+        for rig in (
+            NAVCAM_RIG,
+            HAZCAM_RIG,
+            REAR_HAZCAM_RIG,
+            MASTCAM_RIG,
+        ):
             for eye in EYES:
                 self.camera(f"{rig[0]}/{eye}").sensor_noise = False
         self.check_fields_of_view(NAVCAM, NAVCAM_RIG, 1.0)
         self.check_fields_of_view(HAZCAM, HAZCAM_RIG, 1.5)
         self.check_stereo(NAVCAM, NAVCAM_RIG, 5.0, 0.1)
         self.check_stereo(HAZCAM, HAZCAM_RIG, 1.0, 0.05)
+        self.check_stereo(REAR_HAZCAM, REAR_HAZCAM_RIG, 1.0, 0.05)
         self.check_mastcam_rig()
         self.check_soil_is_red()
         self.check_near_infrared()
+        self.check_every_filter_and_zoom()
 
     # -------------------------------------------------------- helpers
 
@@ -377,6 +464,8 @@ class Demo(ernie.demo.Demo):
                 f"{product}/{var}", ernie.RenderVar, source_name=var
             )
             paths.append(ernie.Path(f"{product}/{var}"))
+        if self.scene.has(ernie.Path(f"{product}/Chain")):
+            self.scene.remove(ernie.Path(f"{product}/Chain"))
         filters = [
             self.scene.define(
                 f"{product}/Chain/Step{i}",
@@ -475,24 +564,37 @@ class Demo(ernie.demo.Demo):
                     * math.radians(TOE_IN_DEG),
                 ),
             )
-            self.use_mastcam_filter(camera.path, e, 0)
-            self.define_product(
-                f"/Render/MastcamZ{eye}",
-                camera.path,
-                [
-                    "qe",
-                    "bayer",
-                    "noise",
-                    "adc",
-                    "demosaic",
-                    "cie",
-                    "exposure",
-                ],
-            )
+            self.set_mastcam_filter(e, 0)
+
+    def mastcam_camera(self, e):
+        return f"{MASTCAM_RIG[0]}/{EYES[e]}"
+
+    def set_mastcam_filter(self, e, number):
+        """Mastcam-Z eye `e` through filter `number`, with its readout:
+        qe, bayer, noise, adc and demosaic for filter 0's colour, qe,
+        noise and adc for a narrow band; then cie and exposure for the
+        image to show."""
+        self.filters[e] = number
+        self.use_mastcam_filter(self.mastcam_camera(e), e, number)
+        self.define_product(
+            f"/Render/MastcamZ{EYES[e]}",
+            self.mastcam_camera(e),
+            [
+                "qe",
+                "bayer",
+                "noise",
+                "adc",
+                "demosaic",
+                "cie",
+                "exposure",
+            ]
+            if number == 0
+            else ["qe", "noise", "adc", "cie", "exposure"],
+        )
 
     def use_mastcam_filter(self, path, e, number):
         """Mastcam-Z camera `path` (eye `e`) through filter `number` at
-        the widest zoom: filter 0 an RGB sensor whose channels are
+        the zoom's focal length: filter 0 an RGB sensor whose channels are
         Gaussians at Table 3's Bayer effective wavelengths and half
         widths peaking at ~40%; 1 to 7 one channel, the filter's
         passband (2 x HWHM about its effective wavelength, ramped over
@@ -500,11 +602,11 @@ class Demo(ernie.demo.Demo):
         the ~40% peak, the spectral range narrowed to it."""
         camera = self.camera(path)
         camera.set(
-            focal_length=SHORTEST_FOCAL_MM,
+            focal_length=self.focal_mm,
             horizontal_aperture=1e-3 * KAI_PIXEL_UM * KAI_WIDTH,
             vertical_aperture=1e-3 * KAI_PIXEL_UM * KAI_HEIGHT,
             clipping_range=(0.05, 1e4),
-            exposure_f_stop=f_number_at(SHORTEST_FOCAL_MM),
+            exposure_f_stop=f_number_at(self.focal_mm),
             exposure_time=2e-5,
             exposure_mode="auto",  # the 8-bit images
             exposure_iso=100.0,  # the gain is the ADC's
@@ -718,6 +820,40 @@ class Demo(ernie.demo.Demo):
         assert 100.0 < means[0] and 0.0 < means[1] < 0.5 * means[0], (
             "R6 should see less than half of R1's light"
         )
+
+    def check_every_filter_and_zoom(self):
+        """Every filter of both wheels renders an image to show and, but
+        for the solar filters, collects light; at the long end of the
+        zoom the camera closes to f/9.5. Back to filter 0 at 26 mm."""
+        for e, eye in enumerate(EYES):
+            product = f"/Render/MastcamZ{eye}"
+            for number in range(1, 8):
+                self.set_mastcam_filter(e, number)
+                self.camera(
+                    self.mastcam_camera(e)
+                ).sensor_noise = False
+                ldr = self.render_vars([product], "LdrColor")[product]
+                electrons = self.render_vars([product], "Electrons")[
+                    product
+                ]
+                assert ldr.size > 0 and (
+                    number == 7 or float(electrons.sum()) > 0.0
+                ), "every filter should render"
+            self.set_mastcam_filter(e, 0)
+            self.camera(self.mastcam_camera(e)).sensor_noise = False
+        self.focal_mm = LONGEST_FOCAL_MM
+        self.use_mastcam_filter(self.mastcam_camera(0), 0, 0)
+        left = self.camera(self.mastcam_camera(0))
+        print(
+            f"Mastcam-Z at {left.focal_length:.0f} mm: "
+            f"f/{left.exposure_f_stop:.1f}"
+        )
+        assert (
+            abs(left.exposure_f_stop - NARROWEST_F_NUMBER) < 1e-12
+        ), "the zoom's long end should be f/9.5"
+        self.focal_mm = SHORTEST_FOCAL_MM
+        self.use_mastcam_filter(self.mastcam_camera(0), 0, 0)
+        left.sensor_noise = False
 
 
 if __name__ == "__main__":

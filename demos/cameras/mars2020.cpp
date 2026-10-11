@@ -99,6 +99,9 @@ constexpr Optics kNavcam{"Navcam", 19.1,  12.0,
                          3.5,      0.424, {96.0, 73.0, 120.0}};
 constexpr Optics kHazcam{"Hazcam", 14.0,  12.0,
                          0.9,      0.248, {136.0, 102.0, 172.0}};
+/// The rear Hazcams: the front pair's optics, 93.4 cm apart.
+constexpr Optics kRearHazcam{
+    "RearHazcam", 14.0, 12.0, 0.9, 0.934, {136.0, 102.0, 172.0}};
 
 /// The half widths the fields reach on the detector, mm: across,
 /// down and to the corner.
@@ -117,7 +120,7 @@ double FThetaK1(const Optics& optics) {
     const std::array<double, 3> reaches = CmvReaches();
     double numerator = 0.0;
     double denominator = 0.0;
-    for (int i = 0; i < 3; ++i) {
+    for (std::size_t i = 0; i < 3; ++i) {
         const double theta = 0.5 * optics.fieldsDeg[i] * kDegree;
         const double r = reaches[i] / optics.focalMm;
         const double cube = theta * theta * theta;
@@ -248,24 +251,32 @@ constexpr std::array<std::array<double, 3>, 6> kRocks = {{
     {-0.6, 2.2, 0.18},
 }};
 
-/// The rigs, each looking down its -z with +y up: the mast's
-/// Navcams and Mastcam-Z about 2 m up looking 15 degrees down, the
-/// front Hazcams 0.7 m up and 30 degrees down, all north (+y).
+/// The rigs, each looking down its -z with +y up, a heading
+/// (degrees clockwise from north, +y) and a tilt down: the mast's
+/// Navcams and Mastcam-Z about 2 m up looking 15 degrees down ahead
+/// (north), the front Hazcams 0.7 m up and 30 degrees down ahead, the
+/// rear ones behind the rover looking back.
 struct Rig {
     const char* path;
     glm::dvec3 eye;
     double downDeg;
+    double headingDeg;
 };
 constexpr Rig kNavcamRig{
-    "/World/Rover/Navcam", {0.0, 0.0, 2.0}, 15.0};
+    "/World/Rover/Navcam", {0.0, 0.0, 2.0}, 15.0, 0.0};
 constexpr Rig kHazcamRig{
-    "/World/Rover/Hazcam", {0.0, 0.6, 0.7}, 30.0};
+    "/World/Rover/Hazcam", {0.0, 0.6, 0.7}, 30.0, 0.0};
+constexpr Rig kRearHazcamRig{
+    "/World/Rover/RearHazcam", {0.0, -0.9, 0.7}, 30.0, 180.0};
 constexpr Rig kMastcamRig{
-    "/World/Rover/MastcamZ", {0.3, 0.0, 2.0}, 15.0};
+    "/World/Rover/MastcamZ", {0.3, 0.0, 2.0}, 15.0, 0.0};
 
 glm::dmat4 RigTransform(const Rig& rig) {
     const double down = rig.downDeg * kDegree;
-    const glm::dvec3 forward(0.0, std::cos(down), -std::sin(down));
+    const double heading = rig.headingDeg * kDegree;
+    const glm::dvec3 forward(std::sin(heading) * std::cos(down),
+                             std::cos(heading) * std::cos(down),
+                             -std::sin(down));
     return LookAtTransform(rig.eye, rig.eye + forward,
                            {0.0, 0.0, 1.0});
 }
@@ -289,6 +300,36 @@ Tensor Var(RenderProductSetOutputs& outputs, const Path& product,
 }
 
 constexpr const char* kEyes[2] = {"Left", "Right"};
+
+/// The cameras the viewer can show: name and camera (a pair's left
+/// eye).
+const std::array<std::pair<const char*, const char*>, 5> kViews = {{
+    {"Overview", "/World/View"},
+    {"Navcam", "/World/Rover/Navcam/Left"},
+    {"Front Hazcam", "/World/Rover/Hazcam/Left"},
+    {"Rear Hazcam", "/World/Rover/RearHazcam/Left"},
+    {"Mastcam-Z", "/World/Rover/MastcamZ/Left"},
+}};
+
+/// Filter `filter` of eye `e`'s wheel, as Table 3 names it: L0 to
+/// L7, R0 to R7.
+std::string FilterName(int e, int filter) {
+    const Filter& band = kFilters[e][filter];
+    std::string name = std::string(e == 0 ? "L" : "R") +
+                       std::to_string(filter) + " ";
+    if (filter == 0) {
+        return name + "Bayer RGB";
+    }
+    name +=
+        std::to_string(static_cast<int>(band.effectiveNm)) + " nm";
+    if (band.neutralDensity > 0.0) {
+        name +=
+            ", solar (ND " +
+            std::to_string(static_cast<int>(band.neutralDensity)) +
+            ")";
+    }
+    return name;
+}
 
 class Mars2020Demo : public app::Demo {
   public:
@@ -334,6 +375,7 @@ class Mars2020Demo : public app::Demo {
         Xform::Define(scene, "/World/Rover");
         DefineEngineeringPair(kNavcamRig, kNavcam);
         DefineEngineeringPair(kHazcamRig, kHazcam);
+        DefineEngineeringPair(kRearHazcamRig, kRearHazcam);
         DefineMastcamPair();
 
         // The viewer's own view: the rover's patch from behind.
@@ -350,6 +392,41 @@ class Mars2020Demo : public app::Demo {
             .SetAmbient(0.0);
         if (viewer != nullptr) {
             viewer->SetActiveCamera("/World/View");
+        }
+
+        // The camera the viewer shows (a pair's left eye),
+        // Mastcam-Z's zoom and each eye's filter wheel.
+        std::vector<std::string> cameras;
+        for (const auto& [name, path] : kViews) {
+            cameras.emplace_back(name);
+        }
+        Widgets().Combo("Camera", std::move(cameras), 0,
+                        [viewer](std::size_t index) {
+                            if (viewer != nullptr) {
+                                viewer->SetActiveCamera(
+                                    kViews[index].second);
+                            }
+                        });
+        Widgets().Slider("Mastcam-Z focal length (mm)",
+                         kShortestFocalMm, kLongestFocalMm,
+                         kShortestFocalMm, [this](double focal) {
+                             focalMm_ = focal;
+                             for (int e = 0; e < 2; ++e) {
+                                 UseMastcamFilter(MastcamCamera(e), e,
+                                                  filters_[e]);
+                             }
+                         });
+        for (int e = 0; e < 2; ++e) {
+            std::vector<std::string> names;
+            for (int f = 0; f < 8; ++f) {
+                names.push_back(FilterName(e, f));
+            }
+            Widgets().Combo(
+                std::string("Mastcam-Z ") +
+                    (e == 0 ? "left" : "right") + " filter",
+                std::move(names), 0, [this, e](std::size_t index) {
+                    SetMastcamFilter(e, static_cast<int>(index));
+                });
         }
     }
 
@@ -371,7 +448,8 @@ class Mars2020Demo : public app::Demo {
     void TestFinal() override {
         Scene& scene = GetScene();
         for (const char* rig :
-             {kNavcamRig.path, kHazcamRig.path, kMastcamRig.path}) {
+             {kNavcamRig.path, kHazcamRig.path, kRearHazcamRig.path,
+              kMastcamRig.path}) {
             for (const char* eye : kEyes) {
                 Camera(scene, Path(rig).Child(eye))
                     .SetSensorNoise(false);
@@ -381,9 +459,11 @@ class Mars2020Demo : public app::Demo {
         CheckFieldsOfView(kHazcam, kHazcamRig, 1.5);
         CheckStereo(kNavcam, kNavcamRig, 5.0, 0.1);
         CheckStereo(kHazcam, kHazcamRig, 1.0, 0.05);
+        CheckStereo(kRearHazcam, kRearHazcamRig, 1.0, 0.05);
         CheckMastcamRig();
         CheckSoilIsRed();
         CheckNearInfrared();
+        CheckEveryFilterAndZoom();
     }
 
   private:
@@ -406,6 +486,9 @@ class Mars2020Demo : public app::Demo {
             vars.push_back(path);
         }
         std::vector<Path> filters;
+        if (scene.Has(product.Child("Chain"))) {
+            scene.Remove(product.Child("Chain"));
+        }
         for (std::size_t i = 0; i < types.size(); ++i) {
             const Path path = product.Child("Chain").Child(
                 "Step" + std::to_string(i));
@@ -490,29 +573,46 @@ class Mars2020Demo : public app::Demo {
                 camera, tokens::kTransform,
                 EyePose((e == 0 ? -0.5 : 0.5) * kMastcamBaselineM,
                         (e == 0 ? -1.0 : 1.0) * kToeInDeg * kDegree));
-            UseMastcamFilter(camera, e, 0);
-            DefineProduct(
-                Path(std::string("/Render/MastcamZ") + kEyes[e]),
-                camera,
-                {"qe", "bayer", "noise", "adc", "demosaic", "cie",
-                 "exposure"});
+            SetMastcamFilter(e, 0);
         }
     }
 
+    Path MastcamCamera(int e) const {
+        return Path(kMastcamRig.path).Child(kEyes[e]);
+    }
+
+    /// Mastcam-Z eye `e` through filter `filter`, with its readout:
+    /// qe, bayer, noise, adc and demosaic for filter 0's colour, qe,
+    /// noise and adc for a narrow band; then cie and exposure for the
+    /// image to show.
+    void SetMastcamFilter(int e, int filter) {
+        filters_[e] = filter;
+        UseMastcamFilter(MastcamCamera(e), e, filter);
+        DefineProduct(
+            Path(std::string("/Render/MastcamZ") + kEyes[e]),
+            MastcamCamera(e),
+            filter == 0
+                ? std::vector<std::string>{"qe", "bayer", "noise",
+                                           "adc", "demosaic", "cie",
+                                           "exposure"}
+                : std::vector<std::string>{"qe", "noise", "adc",
+                                           "cie", "exposure"});
+    }
+
     /// Mastcam-Z camera `camera` (eye `e`) through filter `filter` at
-    /// the widest zoom: filter 0 an RGB sensor whose channels are
-    /// Gaussians at Table 3's Bayer effective wavelengths and half
-    /// widths peaking at ~40%; 1 to 7 one channel, the filter's
+    /// the zoom's focal length: filter 0 an RGB sensor whose channels
+    /// are Gaussians at Table 3's Bayer effective wavelengths and
+    /// half widths peaking at ~40%; 1 to 7 one channel, the filter's
     /// passband (2 x HWHM about its effective wavelength, ramped over
     /// 2 nm about the half maxima, times 10^-ND) on silicon scaled to
     /// the ~40% peak, the spectral range narrowed to it.
     void UseMastcamFilter(const Path& camera, int e, int filter) {
         Camera prim(GetScene(), camera);
-        prim.SetFocalLength(kShortestFocalMm)
+        prim.SetFocalLength(focalMm_)
             .SetHorizontalAperture(1e-3 * kKaiPixelUm * kKaiWidth)
             .SetVerticalAperture(1e-3 * kKaiPixelUm * kKaiHeight)
             .SetClippingRange(glm::dvec2(0.05, 1e4))
-            .SetExposureFStop(FNumberAt(kShortestFocalMm))
+            .SetExposureFStop(FNumberAt(focalMm_))
             .SetExposureTime(2e-5)
             .SetExposureMode("auto")  // the 8-bit images
             .SetExposureIso(100.0)    // the gain is the ADC's
@@ -524,7 +624,7 @@ class Mars2020Demo : public app::Demo {
             .SetSensorNoise(true);
         if (filter == 0) {
             std::array<std::vector<float>, 3> curves;
-            for (int c = 0; c < 3; ++c) {
+            for (std::size_t c = 0; c < 3; ++c) {
                 const Filter& channel = kBayer[e][c];
                 const double sigma =
                     channel.hwhmNm / std::sqrt(2.0 * std::log(2.0));
@@ -579,13 +679,13 @@ class Mars2020Demo : public app::Demo {
             Camera(GetScene(), Path(rig.path).Child("Left"))
                 .GetLensFisheye();
         const std::array<double, 3> reaches = CmvReaches();
-        for (int i = 0; i < 3; ++i) {
+        for (std::size_t i = 0; i < 3; ++i) {
             const double degrees =
                 2.0 *
                 FThetaAngle(reaches[i] / optics.focalMm,
                             static_cast<double>(fisheye[0])) /
                 kDegree;
-            std::printf("%s field %d: %.1f degrees for %.0f\n",
+            std::printf("%s field %zu: %.1f degrees for %.0f\n",
                         optics.name, i, degrees, optics.fieldsDeg[i]);
             Check(std::abs(degrees - optics.fieldsDeg[i]) < tolerance,
                   "the lens should see the published fields of view");
@@ -736,6 +836,51 @@ class Mars2020Demo : public app::Demo {
                   means[1] < 0.5 * means[0],
               "R6 should see less than half of R1's light");
     }
+
+    /// Every filter of both wheels renders an image to show and, but
+    /// for the solar filters, collects light; at the long end of the
+    /// zoom the camera closes to f/9.5. Back to filter 0 at 26 mm.
+    void CheckEveryFilterAndZoom() {
+        Scene& scene = GetScene();
+        for (int e = 0; e < 2; ++e) {
+            const Path product =
+                Path(std::string("/Render/MastcamZ") + kEyes[e]);
+            for (int f = 1; f < 8; ++f) {
+                SetMastcamFilter(e, f);
+                Camera(scene, MastcamCamera(e)).SetSensorNoise(false);
+                const Path products[] = {product};
+                RenderProductSetOutputs outputs =
+                    GetRenderer().Step(scene, products);
+                const Tensor ldr = Var(outputs, product, "LdrColor");
+                const Tensor electrons =
+                    Var(outputs, product, "Electrons");
+                double sum = 0.0;
+                for (std::int64_t k = 0; k < electrons.Elements();
+                     ++k) {
+                    sum +=
+                        static_cast<double>(electrons.As<float>()[k]);
+                }
+                Check(ldr.Elements() > 0 && (f == 7 || sum > 0.0),
+                      "every filter should render");
+            }
+            SetMastcamFilter(e, 0);
+            Camera(scene, MastcamCamera(e)).SetSensorNoise(false);
+        }
+        focalMm_ = kLongestFocalMm;
+        UseMastcamFilter(MastcamCamera(0), 0, 0);
+        const Camera left(scene, MastcamCamera(0));
+        std::printf("Mastcam-Z at %.0f mm: f/%.1f\n",
+                    left.GetFocalLength(), left.GetExposureFStop());
+        Check(std::abs(left.GetExposureFStop() - kNarrowestFNumber) <
+                  1e-12,
+              "the zoom's long end should be f/9.5");
+        focalMm_ = kShortestFocalMm;
+        UseMastcamFilter(MastcamCamera(0), 0, 0);
+        Camera(scene, MastcamCamera(0)).SetSensorNoise(false);
+    }
+
+    double focalMm_ = kShortestFocalMm;
+    int filters_[2] = {0, 0};
 };
 
 }  // namespace
