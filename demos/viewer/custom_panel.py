@@ -53,10 +53,17 @@ class Demo(ernie.demo.Demo):
         self.selected = 0
         self.bobbing = False
         self.heights: list[float] = []
+        # A panel of the demo's own, docked beside the viewport; the
+        # Demos panel's options without a viewer.
+        if viewer is not None:
+            self.panel = viewer.add_panel("Custom panel")
+            viewer.focus_panel("Custom panel")
+        else:
+            self.panel = self.widgets
         self.add_widgets()
 
     def add_widgets(self):
-        w = self.widgets
+        w = self.panel
         # Text, and a field whose text it shows.
         self.caption = w.text("Five boxes under a sun.")
         w.input_text(
@@ -120,13 +127,13 @@ class Demo(ernie.demo.Demo):
 
     def reset_sun(self):
         self.aim_sun(elevation=45.0, azimuth=30.0)
-        self.widgets.set(self.elevation_slider, self.elevation)
-        self.widgets.set(self.azimuth_slider, self.azimuth)
+        self.panel.set(self.elevation_slider, self.elevation)
+        self.panel.set(self.azimuth_slider, self.azimuth)
 
     def select(self, index):
         self.selected = index
-        self.widgets.set(self.colour, self.colours[index])
-        self.widgets.set(self.visible, self.shown[index])
+        self.panel.set(self.colour, self.colours[index])
+        self.panel.set(self.visible, self.shown[index])
         self.heights = []
 
     def paint(self, rgb):

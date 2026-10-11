@@ -63,10 +63,20 @@ class CustomPanelDemo : public app::Demo {
             .SetTransform(LookAtTransform(
                 {0.0, -14.0, 6.0}, {0.0, 0.0, 0.5}, {0.0, 0.0, 1.0}));
         AimSun();
+        // A panel of the demo's own, docked beside the viewport; the
+        // Demos panel's options without a viewer.
+        if (viewer != nullptr) {
+            panel_ = &viewer->AddWidgetPanel("Custom panel",
+                                             app::Dock::Right);
+            viewer->FocusPanel("Custom panel");
+        } else {
+            panel_ = &Widgets();
+        }
         AddWidgets();
     }
 
-    // C++ demos can also draw Dear ImGui directly, after the widgets.
+    // C++ demos can also draw Dear ImGui directly, in the Demos
+    // panel's options.
     void Gui() override {
         ImGui::TextDisabled("Drawn with ImGui in Gui()");
     }
@@ -99,12 +109,12 @@ class CustomPanelDemo : public app::Demo {
 
   private:
     void AddWidgets() {
-        app::WidgetPanel& w = Widgets();
+        app::WidgetPanel& w = *panel_;
         // Text, and a field whose text it shows.
         caption_ = w.Text("Five boxes under a sun.");
         w.InputText("Caption", "Five boxes under a sun.",
                     [this](const std::string& text) {
-                        Widgets().Set(caption_, text);
+                        panel_->Set(caption_, text);
                     });
         w.Separator();
         // Sliders, and a button that sets them back.
@@ -151,14 +161,14 @@ class CustomPanelDemo : public app::Demo {
 
     void ResetSun() {
         AimSun(45.0, 30.0);
-        Widgets().Set(elevationSlider_, elevation_);
-        Widgets().Set(azimuthSlider_, azimuth_);
+        panel_->Set(elevationSlider_, elevation_);
+        panel_->Set(azimuthSlider_, azimuth_);
     }
 
     void Select(std::size_t index) {
         selected_ = static_cast<int>(index);
-        Widgets().Set(colour_, colours_[index]);
-        Widgets().Set(visible_, static_cast<bool>(shown_[index]));
+        panel_->Set(colour_, colours_[index]);
+        panel_->Set(visible_, static_cast<bool>(shown_[index]));
         heights_.clear();
     }
 
@@ -182,6 +192,8 @@ class CustomPanelDemo : public app::Demo {
     int selected_ = 0;
     bool bobbing_ = false;
     std::vector<float> heights_;
+    // The custom panel, or the Demos panel's options.
+    app::WidgetPanel* panel_ = nullptr;
     app::WidgetPanel::Id caption_ = 0;
     app::WidgetPanel::Id elevationSlider_ = 0;
     app::WidgetPanel::Id azimuthSlider_ = 0;
