@@ -136,6 +136,10 @@ struct LightGpu {
     // ranges along each; x: the waist's distance along the beam.
     float4 beam;
     float4 beamExtra;
+    // beamExtra yzw: its pattern (0 spot, 1 line, 2 grid), the efficiency into it and its zero
+    // order. pattern: a line's half fan angle (radians) and profile (1 Gaussian), or a grid's
+    // columns, rows and pitch along x and y (radians).
+    float4 pattern;
 }
 
 struct MaterialGpu {
@@ -379,7 +383,8 @@ float lightVisibility(LightGpu light, float3 world, float3 n, float nDotL, float
     let view = lightView(light, world);
     // Orthographic views (the sun-like distant light's, a laser's along its beam) have texels of
     // one size; perspective ones grow with distance.
-    let orthographic = light.position.w == 0.0 || light.position.w == 5.0;
+    let orthographic =
+        light.position.w == 0.0 || (light.position.w == 5.0 && light.beamExtra.y < 0.5);
     let distance = orthographic ? 1.0 : length(world - light.position.xyz);
     let texelWorld = light.shadow.x * distance;
     let offset = n * sh.lightShadow.y * texelWorld * max(1.0 - clamp(nDotL, 0.0, 1.0), 0.25);
@@ -517,11 +522,22 @@ float beamAverage(float u, float w, float width) {
     return 0.5 * (erfApprox(k * (u + 0.5 * width)) - erfApprox(k * (u - 0.5 * width))) / width;
 }
 
-// A laser's irradiance at `world` per watt of its power, normal to its beam, m^-2: its Gaussian
-// beam (`LightParams::Beam`), 2 / (pi w_x w_y) exp(-2 (x^2 / w_x^2 + y^2 / w_y^2)) at the point's
-// distance along it, averaged over the pixel's `footprint` (`pixelFootprint`) as it spans the
-// beam's x and y, so a spot smaller than a pixel spreads over it and the pixels it falls on carry
-// its whole power, however obliquely; 0 behind the laser.
+// The standard normal distribution's cumulative probability at `x`.
+float normalBelow(float x) {
+    return 0.5 * (1.0 + erfApprox(x * 0.70710678));
+}
+
+// A laser's irradiance at `world` per watt of its power, normal to its beam, m^-2, by its pattern
+// (`LightParams::Beam`), each averaged over the pixel's `footprint` (`pixelFootprint`) as it spans
+// the beam's x and y, so a feature smaller than a pixel spreads over it and the pixels it falls on
+// carry its whole power, however obliquely; 0 behind the laser.
+// - spot: its Gaussian beam, 2 / (pi w_x w_y) exp(-2 (x^2 / w_x^2 + y^2 / w_y^2)) at the point's
+//   distance z along it, w = w0 sqrt(1 + (z / z_R)^2) along each axis;
+// - line: fanned along x, its power per radian of fan g(a) (flat over the fan, its edges as soft as
+//   the beam is wide, or Gaussian with 1/e^2 at the fan's edges), so per metre along the line
+//   g(a) cos^2 a / z at angle a = atan(x / z), the beam's Gaussian across it;
+// - grid: beamlets at the pitch's angles, each a Gaussian beam centred z tan(angle) off the axis
+//   with its share of the power, the zero order on the axis; the pixel sums those around it.
 //
 // References:
 // - A. E. Siegman, Lasers, University Science Books, 1986, ch. 17.
@@ -538,8 +554,62 @@ float laserIrradiance(LightGpu light, float3 world, float3x2 footprint) {
     // The pixel's extent across the beam along each of its axes.
     let spanX = abs(mul(x, footprint));
     let spanY = abs(mul(y, footprint));
-    return beamAverage(dot(offset, x), w.x, spanX.x + spanX.y) *
-           beamAverage(dot(offset, y), w.y, spanY.x + spanY.y);
+    let width = float2(spanX.x + spanX.y, spanY.x + spanY.y);
+    let rx = dot(offset, x);
+    let ry = dot(offset, y);
+    let kind = uint(light.beamExtra.y);
+    let efficiency = light.beamExtra.z;
+    // A pattern's light is reckoned on the plane across the axis at its distance; across the ray
+    // from the aperture it is that over the cosine between the ray and the axis (shading then
+    // applies the surface's own cosine).
+    let oblique = length(offset) / along;
+    if (kind == 1) {
+        // Along the line, in angle: the pixel spans width cos^2 a / z of it, and the beam's own
+        // width w / z softens the fan's edges (Gaussian, as w is the 1/e^2 radius, sigma w / 2).
+        let a = atan(rx / along);
+        let c2 = along * along / (along * along + rx * rx);
+        let pixel = width.x * c2 / along;
+        let sigma2 = 0.25 * w.x * w.x / (along * along) + pixel * pixel / 12.0;
+        let halfFan = light.pattern.x;
+        var density = 0.0;
+        if (light.pattern.y > 0.5) {
+            let s = sqrt(0.25 * halfFan * halfFan + sigma2);
+            density = exp(-0.5 * a * a / (s * s)) / (sqrt(2.0 * PI) * s);
+        } else {
+            let s = sqrt(max(sigma2, 1e-20));
+            density = (normalBelow((a + halfFan) / s) - normalBelow((a - halfFan) / s)) /
+                      (2.0 * halfFan);
+        }
+        return oblique * efficiency * density * c2 / along * beamAverage(ry, w.y, width.y);
+    }
+    if (kind == 2) {
+        // The nearest beamlet along each axis and its neighbours, which a pixel can straddle.
+        let cells = light.pattern.xy;
+        let pitch = light.pattern.zw;
+        let nearest = round(atan(float2(rx, ry) / along) / pitch + 0.5 * (cells - 1.0));
+        let share = efficiency / (cells.x * cells.y);
+        var sum = 0.0;
+        for (int i = -1; i <= 1; ++i) {
+            let column = nearest.x + float(i);
+            if (column < 0.0 || column > cells.x - 1.0) {
+                continue;
+            }
+            let cx = along * tan((column - 0.5 * (cells.x - 1.0)) * pitch.x);
+            let across = beamAverage(rx - cx, w.x, width.x);
+            for (int j = -1; j <= 1; ++j) {
+                let row = nearest.y + float(j);
+                if (row < 0.0 || row > cells.y - 1.0) {
+                    continue;
+                }
+                let cy = along * tan((row - 0.5 * (cells.y - 1.0)) * pitch.y);
+                sum += share * across * beamAverage(ry - cy, w.y, width.y);
+            }
+        }
+        // What the element leaves undiffracted, along the axis.
+        return oblique * (sum + light.beamExtra.w * beamAverage(rx, w.x, width.x) *
+                                    beamAverage(ry, w.y, width.y));
+    }
+    return beamAverage(rx, w.x, width.x) * beamAverage(ry, w.y, width.y);
 }
 
 static const uint kOcclusionDirections = 4;
@@ -960,23 +1030,30 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                 footprinted = true;
             }
             scale = laserIrradiance(light, world, footprint);
-            toLight = -light.axis.xyz;
-            // Its shadow map is read where the beam meets the pixel's surface, when that lies
-            // within the pixel's footprint (the light of a beam narrower than the pixel comes
-            // from there, which its map, as narrow, sees), moved a footprint back up the beam:
-            // the map's texels can be far finer than the pixel, whose surface (at the camera's
-            // level of detail) is only as true as its footprint.
             let reach = max(length(float3(footprint[0].x, footprint[1].x, footprint[2].x)),
                             length(float3(footprint[0].y, footprint[1].y, footprint[2].y)));
-            let crossing = dot(light.axis.xyz, n);
-            if (abs(crossing) > 1e-4) {
-                let hit = light.position.xyz +
-                          light.axis.xyz * (dot(world - light.position.xyz, n) / crossing);
-                if (length(hit - world) <= reach) {
-                    shadowPoint = hit;
+            if (light.beamExtra.y > 0.5) {
+                // A pattern spreads from the aperture, as a spot light's light does; its
+                // perspective map is read a footprint back towards it.
+                toLight = normalize(light.position.xyz - world);
+                shadowPoint = world + toLight * reach;
+            } else {
+                toLight = -light.axis.xyz;
+                // A spot's shadow map is read where the beam meets the pixel's surface, when
+                // that lies within the pixel's footprint (the light of a beam narrower than the
+                // pixel comes from there, which its map, as narrow, sees), moved a footprint back
+                // up the beam: the map's texels can be far finer than the pixel, whose surface (at
+                // the camera's level of detail) is only as true as its footprint.
+                let crossing = dot(light.axis.xyz, n);
+                if (abs(crossing) > 1e-4) {
+                    let hit = light.position.xyz +
+                              light.axis.xyz * (dot(world - light.position.xyz, n) / crossing);
+                    if (length(hit - world) <= reach) {
+                        shadowPoint = hit;
+                    }
                 }
+                shadowPoint -= light.axis.xyz * reach;
             }
-            shadowPoint -= light.axis.xyz * reach;
         } else if (type >= 2) {
             let form = areaFormFactor(light, world, n);
             scale = length(form);

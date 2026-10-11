@@ -1425,6 +1425,69 @@ LightParams LaserParamsOf(const Scene& scene, const Path& path,
     }
     light.spectrum =
         LaserLine(bands, wavelength, laser.GetLinewidth(), through);
+    // Its pattern. Patterns spread from the aperture, so their shadow
+    // view is a perspective one over the pattern's angular extent
+    // (`coneAngle`), its beamlets' spread added; a spot's looks along
+    // its beam.
+    using Pattern = LightParams::Beam::Pattern;
+    LightParams::Beam& beam = light.beam;
+    const std::string pattern = laser.GetPattern();
+    beam.efficiency = static_cast<float>(laser.GetEfficiency());
+    beam.zeroOrder = static_cast<float>(laser.GetZeroOrder());
+    const glm::dvec2 spread = 2.0 * laser.Divergence();
+    double extent = 0.0;  // half-angle, radians
+    if (pattern == tokens::kLine) {
+        beam.pattern = Pattern::Line;
+        beam.fan =
+            static_cast<float>(glm::radians(laser.GetFanAngle()));
+        beam.gaussianLine =
+            laser.GetLineProfile() == tokens::kGaussian;
+        if (!(beam.fan > 0.0f) ||
+            !(beam.fan < glm::radians(170.0f)) ||
+            (!beam.gaussianLine &&
+             laser.GetLineProfile() != tokens::kFlat)) {
+            throw std::invalid_argument(
+                "LaserLight '" + path.String() +
+                "' needs a fan angle above 0 and below 170 degrees "
+                "and a "
+                "line profile of \"flat\" or \"gaussian\"");
+        }
+        extent = 0.5 * beam.fan + spread.x;
+    } else if (pattern == tokens::kGrid) {
+        beam.pattern = Pattern::Grid;
+        const int columns = laser.GetGridColumns();
+        const int rows = laser.GetGridRows();
+        const glm::dvec2 pitch = glm::radians(laser.GetGridPitch());
+        if (columns < 1 || rows < 1 || !(pitch.x > 0.0) ||
+            !(pitch.y > 0.0)) {
+            throw std::invalid_argument(
+                "LaserLight '" + path.String() +
+                "' needs one or more grid columns and rows and a "
+                "positive pitch");
+        }
+        beam.cells = glm::uvec2(static_cast<unsigned>(columns),
+                                static_cast<unsigned>(rows));
+        beam.pitch = glm::vec2(pitch);
+        const glm::dvec2 half =
+            0.5 * glm::dvec2(columns - 1, rows - 1) * pitch + spread;
+        extent = std::atan(glm::length(glm::tan(half)));
+    } else if (pattern != tokens::kSpot) {
+        throw std::invalid_argument("LaserLight '" + path.String() +
+                                    "' has unknown pattern '" +
+                                    pattern + "'");
+    }
+    if (beam.efficiency < 0.0f || beam.zeroOrder < 0.0f ||
+        beam.efficiency + beam.zeroOrder > 1.0f + 1e-6f) {
+        throw std::invalid_argument(
+            "LaserLight '" + path.String() +
+            "' sends more than its power into its pattern: "
+            "efficiency "
+            "and zero order add to at most 1");
+    }
+    if (beam.pattern != Pattern::Spot) {
+        light.coneAngle = static_cast<float>(
+            std::min(glm::degrees(extent) + 1.0, 180.0));
+    }
     return light;
 }
 

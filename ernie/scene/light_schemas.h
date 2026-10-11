@@ -203,6 +203,40 @@
       (::ernie::AttributeMeta{.label = "Aperture radius",                                          \
                               .doc = "Clips the beam's tails at the aperture, m; 0 none.",         \
                               .group = "Beam", .max = 100.0}))                                     \
+    X(std::string, Pattern, ::ernie::tokens::kLaserPattern, "spot",                                \
+      (::ernie::AttributeMeta{.doc = "The beam itself, a line fanned along x, or a grid of "       \
+                                     "beamlets.",                                                  \
+                              .group = "Pattern",                                                  \
+                              .options = {::ernie::tokens::kSpot, ::ernie::tokens::kLine,          \
+                                          ::ernie::tokens::kGrid}}))                               \
+    X(double, FanAngle, ::ernie::tokens::kLaserFanAngle, 60.0,                                     \
+      (::ernie::AttributeMeta{.label = "Fan angle",                                                \
+                              .doc = "A line's full angle along x, degrees.", .group = "Pattern",  \
+                              .min = 0.01, .max = 170.0}))                                         \
+    X(std::string, LineProfile, ::ernie::tokens::kLaserLineProfile, "flat",                        \
+      (::ernie::AttributeMeta{.label = "Line profile",                                             \
+                              .doc = "Along a line: flat (a Powell lens) or Gaussian, 1/e^2 at "   \
+                                     "the fan's edges (a cylindrical lens).",                      \
+                              .group = "Pattern",                                                  \
+                              .options = {::ernie::tokens::kFlat, ::ernie::tokens::kGaussian}}))  \
+    X(int, GridColumns, ::ernie::tokens::kLaserGridColumns, 5,                                     \
+      (::ernie::AttributeMeta{.label = "Columns", .doc = "A grid's beamlets along x.",             \
+                              .group = "Pattern", .min = 1.0, .max = 1000.0}))                     \
+    X(int, GridRows, ::ernie::tokens::kLaserGridRows, 5,                                           \
+      (::ernie::AttributeMeta{.label = "Rows", .doc = "A grid's beamlets along y.",                \
+                              .group = "Pattern", .min = 1.0, .max = 1000.0}))                     \
+    X(glm::dvec2, GridPitch, ::ernie::tokens::kLaserGridPitch, glm::dvec2(2.0),                    \
+      (::ernie::AttributeMeta{.label = "Pitch",                                                    \
+                              .doc = "Degrees between a grid's beamlets along x and y.",           \
+                              .group = "Pattern", .min = 0.001, .max = 60.0}))                     \
+    X(double, Efficiency, ::ernie::tokens::kLaserEfficiency, 1.0,                                  \
+      (::ernie::AttributeMeta{.doc = "Fraction of the power that goes into the line or the "       \
+                                     "grid's beamlets.",                                           \
+                              .group = "Pattern", .max = 1.0}))                                    \
+    X(double, ZeroOrder, ::ernie::tokens::kLaserZeroOrder, 0.0,                                    \
+      (::ernie::AttributeMeta{.label = "Zero order",                                               \
+                              .doc = "Fraction of a grid's power left in a beam along the axis.",  \
+                              .group = "Pattern", .max = 1.0}))                                    \
     X(bool, ShadowEnable, ::ernie::tokens::kShadowEnable, true,                                    \
       (::ernie::AttributeMeta{.label = "Shadows", .group = "Laser"}))
 

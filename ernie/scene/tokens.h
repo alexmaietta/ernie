@@ -322,6 +322,35 @@ inline constexpr std::string_view kLaserBeamQuality =
     "ernie:laser:beamQuality";
 inline constexpr std::string_view kLaserApertureRadius =
     "ernie:laser:apertureRadius";
+/// A laser's pattern: "spot" (its beam), "line" (fanned over
+/// `fanAngle` degrees along its x axis, its profile along the line
+/// "flat" as a Powell lens gives or "gaussian" as a cylindrical lens
+/// does, the beam's across it) or "grid" (`gridColumns` x `gridRows`
+/// beamlets `gridPitch` degrees apart along x and y, as a diffractive
+/// element splits it). `efficiency` of the power goes into the
+/// pattern and `zeroOrder` stays in an undiffracted beam along the
+/// axis (grids); the rest is lost.
+inline constexpr std::string_view kLaserPattern =
+    "ernie:laser:pattern";
+inline constexpr std::string_view kLaserFanAngle =
+    "ernie:laser:fanAngle";
+inline constexpr std::string_view kLaserLineProfile =
+    "ernie:laser:lineProfile";
+inline constexpr std::string_view kLaserGridColumns =
+    "ernie:laser:gridColumns";
+inline constexpr std::string_view kLaserGridRows =
+    "ernie:laser:gridRows";
+inline constexpr std::string_view kLaserGridPitch =
+    "ernie:laser:gridPitch";
+inline constexpr std::string_view kLaserEfficiency =
+    "ernie:laser:efficiency";
+inline constexpr std::string_view kLaserZeroOrder =
+    "ernie:laser:zeroOrder";
+inline constexpr std::string_view kSpot = "spot";
+inline constexpr std::string_view kLine = "line";
+inline constexpr std::string_view kGrid = "grid";
+inline constexpr std::string_view kFlat = "flat";
+inline constexpr std::string_view kGaussian = "gaussian";
 /// Degrees off the axis that a light reaches, and the fraction of
 /// that angle over which it fades.
 inline constexpr std::string_view kShapingConeAngle =

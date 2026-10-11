@@ -719,6 +719,56 @@ TEST(LightParamsOf,
     std::filesystem::remove(file);
 }
 
+TEST(LightParamsOf, LaserPatternsAndTheirShadowCones) {
+    const ernie::SpectralBands bands{380.0, 780.0, 16};
+    Scene scene;
+    ernie::LaserLight laser =
+        ernie::LaserLight::Define(scene, "/Laser");
+    using Pattern = LightParams::Beam::Pattern;
+    EXPECT_EQ(
+        ernie::LightParamsOf(scene, "/Laser", bands).beam.pattern,
+        Pattern::Spot);
+
+    // A 60 degree line: its half fan, and a shadow cone over it.
+    laser.SetPattern("line").SetFanAngle(60.0).SetLineProfile(
+        "gaussian");
+    const LightParams line =
+        ernie::LightParamsOf(scene, "/Laser", bands);
+    EXPECT_EQ(line.beam.pattern, Pattern::Line);
+    EXPECT_NEAR(line.beam.fan, glm::radians(60.0f), 1e-6f);
+    EXPECT_TRUE(line.beam.gaussianLine);
+    EXPECT_GT(line.coneAngle, 30.0f);
+    EXPECT_LT(line.coneAngle, 32.0f);
+
+    // A 5 x 3 grid 4 degrees apart, 10% in its zero order: its cone
+    // reaches the corner beamlets, atan(|(tan 8, tan 4)|).
+    laser.SetPattern("grid")
+        .SetGridColumns(5)
+        .SetGridRows(3)
+        .SetGridPitch({4.0, 4.0})
+        .SetEfficiency(0.8)
+        .SetZeroOrder(0.1);
+    const LightParams grid =
+        ernie::LightParamsOf(scene, "/Laser", bands);
+    EXPECT_EQ(grid.beam.pattern, Pattern::Grid);
+    EXPECT_EQ(grid.beam.cells, glm::uvec2(5u, 3u));
+    EXPECT_FLOAT_EQ(grid.beam.efficiency, 0.8f);
+    EXPECT_FLOAT_EQ(grid.beam.zeroOrder, 0.1f);
+    const double corner = glm::degrees(std::atan(
+        glm::length(glm::dvec2(std::tan(glm::radians(8.0)),
+                               std::tan(glm::radians(4.0))))));
+    EXPECT_GT(grid.coneAngle, corner);
+    EXPECT_LT(grid.coneAngle, corner + 1.5);
+
+    laser.SetZeroOrder(0.5);
+    EXPECT_THROW(ernie::LightParamsOf(scene, "/Laser", bands),
+                 std::invalid_argument)
+        << "more than its power";
+    laser.SetZeroOrder(0.0).SetPattern("rings");
+    EXPECT_THROW(ernie::LightParamsOf(scene, "/Laser", bands),
+                 std::invalid_argument);
+}
+
 TEST(LightParamsOf, LasersCarryTheirBeamAndLine) {
     // 5 mW at 532 nm, 0.1 nm wide, in bands of 25 nm from 380.
     const ernie::SpectralBands bands{380.0, 780.0, 16};

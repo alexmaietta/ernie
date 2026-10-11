@@ -280,6 +280,20 @@ struct LightParams {
         glm::vec2 waist{0.0f};
         glm::vec2 rayleigh{0.0f};
         float waistDistance = 0.0f;
+        /// The pattern it makes (`tokens::kLaserPattern`): the beam
+        /// itself; a line fanned over `fan` radians along x, its
+        /// profile along the line flat or Gaussian; or a grid of
+        /// `cells` beamlets `pitch` radians apart. `efficiency` of
+        /// the power goes into the line or the beamlets, `zeroOrder`
+        /// into a beam along the axis (grids).
+        enum class Pattern : std::uint32_t { Spot, Line, Grid };
+        Pattern pattern = Pattern::Spot;
+        float fan = 0.0f;
+        bool gaussianLine = false;
+        glm::uvec2 cells{1u};
+        glm::vec2 pitch{0.0f};
+        float efficiency = 1.0f;
+        float zeroOrder = 0.0f;
     };
     Beam beam;
     bool shadows = true;

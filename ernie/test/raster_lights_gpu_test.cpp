@@ -443,6 +443,71 @@ double BeamAverage(double u, double w, double width) {
 
 }  // namespace
 
+TEST_F(RasterDelegateTest, LaserLinesAndGridsSpreadTheirPower) {
+    RasterDelegate delegate(*context_);
+    double bandWidth = 0.0;
+    // A 1 mm beam 10 m up, fanned into a flat 60 degree line along x.
+    Scene scene = LaserScene(0.001, &bandWidth);
+    ernie::LaserLight laser(scene, "/World/Laser");
+    laser.SetPattern("line").SetFanAngle(60.0).SetEfficiency(0.9);
+    const auto [r0, left] = PixelOf(scene, -10.0f, 0.0f);
+    const auto [r1, right] = PixelOf(scene, 10.0f, 0.0f);
+    const double pixel = (PixelCentre(scene, 10.0f, 0.0f).x -
+                          PixelCentre(scene, -10.0f, 0.0f).x) /
+                         static_cast<double>(right - left);
+    // L = 0.5 / pi E on the grey floor, 1 W / band width in the band.
+    const double unit = 0.5 / M_PI / bandWidth;
+    const auto column = [&](const std::vector<float>& band,
+                            std::size_t col) {
+        double power = 0.0;
+        for (std::size_t row = 0; row < kVarSize; ++row) {
+            power += band[row * kVarSize + col] * pixel * pixel;
+        }
+        return power / unit;
+    };
+    std::vector<float> band = Band8(delegate, scene);
+    // Per metre of line, P g(a) cos^2 a / z: flat g = 1 / fan.
+    for (const float x : {0.0f, 4.0f}) {
+        const double centre = PixelCentre(scene, x, 0.0f).x;
+        const double a = std::atan(centre / 10.0);
+        const double want = 0.9 / glm::radians(60.0) * std::cos(a) *
+                            std::cos(a) / 10.0 * pixel;
+        EXPECT_NEAR(column(band, PixelOf(scene, x, 0.0f).second),
+                    want, 0.03 * want)
+            << "at x = " << x;
+    }
+    EXPECT_LT(column(band, PixelOf(scene, 8.0f, 0.0f).second), 1e-4)
+        << "past the fan's edge, 5.8 m out";
+
+    // A 3 x 3 grid 20 degrees apart: 90% shared by its beamlets, 10%
+    // in the zero order at its centre.
+    laser.SetPattern("grid")
+        .SetGridColumns(3)
+        .SetGridRows(3)
+        .SetGridPitch({20.0, 20.0})
+        .SetZeroOrder(0.1);
+    band = Band8(delegate, scene);
+    const double offset = 10.0 * std::tan(glm::radians(20.0));
+    const auto dot = [&](double x, double y) {
+        const auto [row, col] = PixelOf(scene, static_cast<float>(x),
+                                        static_cast<float>(y));
+        double power = 0.0;
+        for (std::size_t r = row - 1; r <= row + 1; ++r) {
+            for (std::size_t c = col - 1; c <= col + 1; ++c) {
+                power += band[r * kVarSize + c] * pixel * pixel;
+            }
+        }
+        return power / unit;
+    };
+    EXPECT_NEAR(dot(0.0, 0.0), 0.1 + 0.1, 0.006) << "the centre";
+    for (const glm::dvec2 at :
+         {glm::dvec2(offset, 0.0), glm::dvec2(-offset, offset),
+          glm::dvec2(offset, -offset)}) {
+        EXPECT_NEAR(dot(at.x, at.y), 0.1, 0.003)
+            << "at " << at.x << ", " << at.y;
+    }
+}
+
 TEST_F(RasterDelegateTest, LasersLightAGaussianSpot) {
     RasterDelegate delegate(*context_);
     double bandWidth = 0.0;

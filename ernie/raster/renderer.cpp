@@ -112,8 +112,9 @@ struct LightGpu {
     float tinted[SpectralBands::kMaxBands];
     float beam[4];
     float beamExtra[4];
+    float pattern[4];
 };
-static_assert(sizeof(LightGpu) == 640,
+static_assert(sizeof(LightGpu) == 656,
               "LightGpu must match shading.slang");
 
 /// One light's IES profile on the GPU (shading.slang's kProfileRows x
@@ -742,7 +743,11 @@ std::vector<ShadowCascade> FitLightShadowViews(
         farPlane = std::max(farPlane,
                             1.01f * glm::length(corner - position));
     }
-    if (light.type == LightType::Laser) {
+    // A laser's spot: orthographic along the beam (a patterned laser
+    // spreads from its aperture, so a spot light's perspective view
+    // over the pattern below).
+    if (light.type == LightType::Laser &&
+        light.beam.pattern == LightParams::Beam::Pattern::Spot) {
         // Orthographic along the beam, as wide as the beam's widest
         // (at the aperture or the scene's far side) out to 2.5 1/e^2
         // radii, where it carries e^-12.5 of its peak.
@@ -1312,9 +1317,11 @@ void RasterRenderer::WriteLights(
                                          (1.0f - softness)))
                  : -1.0f;
         const bool laser = light.type == LightType::Laser;
-        // A laser posed on the GPU has no shadows yet: the light pass
-        // fits perspective views only.
-        if (bounds && !(laser && light.posedOnGpu)) {
+        // A laser's spot posed on the GPU has no shadows yet: the
+        // light pass fits perspective views only.
+        if (bounds && !(laser && light.posedOnGpu &&
+                        light.beam.pattern ==
+                            LightParams::Beam::Pattern::Spot)) {
             std::vector<ShadowCascade> views = FitLightShadowViews(
                 light, params.Relative(light.position), bounds->first,
                 bounds->second, resolution);
@@ -1365,6 +1372,23 @@ void RasterRenderer::WriteLights(
             entry.beam[2] = light.beam.rayleigh.x;
             entry.beam[3] = light.beam.rayleigh.y;
             entry.beamExtra[0] = light.beam.waistDistance;
+            // Its pattern: kind (0 spot, 1 line, 2 grid), efficiency,
+            // zero order; a line's half fan angle and profile (1
+            // Gaussian), or a grid's columns, rows and pitch.
+            const LightParams::Beam& beam = light.beam;
+            entry.beamExtra[1] = static_cast<float>(beam.pattern);
+            entry.beamExtra[2] = beam.efficiency;
+            entry.beamExtra[3] = beam.zeroOrder;
+            if (beam.pattern == LightParams::Beam::Pattern::Line) {
+                entry.pattern[0] = 0.5f * beam.fan;
+                entry.pattern[1] = beam.gaussianLine ? 1.0f : 0.0f;
+            } else if (beam.pattern ==
+                       LightParams::Beam::Pattern::Grid) {
+                entry.pattern[0] = static_cast<float>(beam.cells.x);
+                entry.pattern[1] = static_cast<float>(beam.cells.y);
+                entry.pattern[2] = beam.pitch.x;
+                entry.pattern[3] = beam.pitch.y;
+            }
         }
         if (light.posedOnGpu) {
             // The light pass poses it and fits its views as
