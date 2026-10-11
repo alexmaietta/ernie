@@ -20,9 +20,18 @@ def demo_files():
     return [entry.path for entry in ernie.demo.discover_demos(DEMOS)]
 
 
+#: Smaller batches than the demos' benchmark sizes, which software Vulkan in CI renders slowly.
+SMALL_BATCHES = {
+    "demo_rl_batch_camera.py": ["--views", "64"],
+    "demo_rl_gpu_robot_arms.py": ["--worlds", "16"],
+    "demo_worlds_gpu_poses.py": ["--views", "32"],
+}
+
+
 @pytest.mark.parametrize("path", demo_files(), ids=os.path.basename)
 def test_demo_runs_its_checks_without_a_viewer(path, renderer):
-    command = [sys.executable, path, "--viewer", "null", "--test"]
+    command = [sys.executable, path, "--viewer", "null", "--test",
+               *SMALL_BATCHES.get(os.path.basename(path), [])]
     if REQUIRE_VALIDATION:
         command.append("--validation")
     result = subprocess.run(command, cwd=DEMOS, env=demo_environment(), capture_output=True,
