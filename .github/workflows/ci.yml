@@ -306,34 +306,77 @@ jobs:
           name: wheel-${{ matrix.platform }}
           path: wheelhouse/*.whl
 
-  # The aarch64 wheel installed and tested on Ubuntu's arm64 runner, on its lavapipe: AlmaLinux 9
-  # (the wheel's build image) has no lavapipe for aarch64, so cibuildwheel skips testing it there.
+  # Each wheel installed on a plain runner and smoke tested on a software Vulkan driver: the
+  # README's examples (import and render), the scene API and the bundled viewer. Linux uses
+  # Ubuntu's lavapipe (AlmaLinux 9, the wheels' build image, has none for aarch64), and Windows
+  # Mesa's lavapipe from mesa-dist-win with LunarG's Vulkan loader.
   wheel-test:
-    name: wheel-test (aarch64)
+    name: wheel-test (${{ matrix.platform }})
     needs: wheel
-    runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x86_64
+            os: ubuntu-24.04
+          - platform: linux-aarch64
+            os: ubuntu-24.04-arm
+          - platform: windows-amd64
+            os: windows-2025
+    runs-on: ${{ matrix.os }}
     env:
       ERNIE_TEST_REQUIRE_VALIDATION: "1"
+      MESA_VERSION: "26.2.3"
+      MESA_SHA256: 3f3613adb43cfd0f2e665ce2400b130c275f0b3317cb3a05566320a3a67589ed
+      VULKAN_RT_VERSION: "1.4.363.0"
+      VULKAN_RT_SHA256: a25a927aa8b9f0371048f1861cf88ac3b9bc9b1fb332c42d897c8ab32695769a
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
-          name: wheel-linux-aarch64
+          name: wheel-${{ matrix.platform }}
           path: wheelhouse
       - name: Install Vulkan (lavapipe, validation layers)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y mesa-vulkan-drivers vulkan-validationlayers libvulkan1 xvfb
+          VK_DRIVER_FILES=$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' | head -n1)
+          echo "VK_DRIVER_FILES=$VK_DRIVER_FILES" >> "$GITHUB_ENV"
+      - name: Install Vulkan (lavapipe, Vulkan loader)
+        if: runner.os == 'Windows'
+        # The loader alone, without the SDK's validation layers: the smoke test checks for a
+        # device itself instead.
+        run: |
+          echo "ERNIE_TEST_REQUIRE_VALIDATION=0" >> "$GITHUB_ENV"
+          vulkan="$RUNNER_TEMP/vulkan"
+          mkdir -p "$vulkan" && cd "$vulkan"
+          curl -fsSL -o mesa.7z "https://github.com/pal1000/mesa-dist-win/releases/download/$MESA_VERSION/mesa3d-$MESA_VERSION-release-msvc.7z"
+          curl -fsSL -o rt.zip "https://sdk.lunarg.com/sdk/download/$VULKAN_RT_VERSION/windows/VulkanRT-X64-$VULKAN_RT_VERSION-Components.zip"
+          echo "$MESA_SHA256  mesa.7z" | sha256sum -c -
+          echo "$VULKAN_RT_SHA256  rt.zip" | sha256sum -c -
+          7z x -y -omesa mesa.7z > /dev/null
+          7z x -y -ort rt.zip > /dev/null
+          cp rt/*/x64/vulkan-1.dll mesa/x64/
+          cygpath -w "$vulkan/mesa/x64" >> "$GITHUB_PATH"
+          echo "VK_DRIVER_FILES=$(cygpath -w "$vulkan/mesa/x64/lvp_icd.x86_64.json")" >> "$GITHUB_ENV"
       - uses: astral-sh/setup-uv@v7
       - name: Install the wheel
         run: |
           uv venv --python 3.12
           uv pip install wheelhouse/*.whl pytest pillow
-      - name: Test on lavapipe
+      - name: Smoke test
         run: |
-          VK_DRIVER_FILES=$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' | head -n1)
-          export VK_DRIVER_FILES
-          xvfb-run -a .venv/bin/python -m pytest -q -p no:cacheprovider ernie/test/python
+          tests="ernie/test/python/test_readme.py ernie/test/python/test_scene.py ernie/test/python/test_app.py"
+          if [ "$RUNNER_OS" = Windows ]; then
+            .venv/Scripts/python -c "import ernie; ernie.Renderer()"
+            .venv/Scripts/python -m pytest -q -p no:cacheprovider $tests
+          else
+            xvfb-run -a .venv/bin/python -m pytest -q -p no:cacheprovider $tests
+          fi
 
   sdist:
     needs: version

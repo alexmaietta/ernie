@@ -132,7 +132,11 @@ ERNIE_USE_SYSTEM_GLFW = "OFF"
 ERNIE_INSTALL = "OFF"
 
 # Release wheels (cibuildwheel): one stable-ABI wheel per architecture, built in manylinux_2_34,
-# the oldest base Slang's prebuilt library runs on (GCC 11's libstdc++), and tested on lavapipe.
+# the oldest base Slang's prebuilt library runs on (GCC 11's libstdc++).
+# CI's wheel-test job installs the Linux and Windows wheels on plain
+# runners and renders with them on lavapipe; the macOS runners have no
+# Vulkan driver, so cibuildwheel tests the scene API there, and that the
+# package imports with its libraries.
 [tool.cibuildwheel]
 build = "cp312-*"
 skip = "*-musllinux_* *-win32"
@@ -140,29 +144,19 @@ manylinux-x86_64-image = "manylinux_2_34"
 manylinux-aarch64-image = "manylinux_2_34"
 build-verbosity = 1
 test-extras = ["test"]
-# A smoke test of the packaging: the README's examples (import and render), the scene API and the
-# bundled viewer. CI's test jobs run the whole suite from source.
-test-command = "VK_DRIVER_FILES=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n 1) python -m pytest -q -p no:cacheprovider {project}/ernie/test/python/test_readme.py {project}/ernie/test/python/test_scene.py {project}/ernie/test/python/test_app.py"
-# AlmaLinux 9 has no lavapipe for aarch64: CI tests that wheel on Ubuntu's arm64 runner instead
-# (the wheel-test job).
-test-skip = "*-manylinux_aarch64"
-
-[tool.cibuildwheel.windows]
-# No Vulkan driver on the hosted runners: the scene API, and that the package imports with its DLLs.
 test-command = "python -m pytest -q -p no:cacheprovider {project}/ernie/test/python/test_scene.py"
+test-skip = "*-manylinux_* *-win_amd64"
 
 [tool.cibuildwheel.macos]
 archs = ["arm64"]
-test-command = "python -m pytest -q -p no:cacheprovider {project}/ernie/test/python/test_scene.py"
 # Slang's runtime and MoltenVK are installed beside the module (rpath @loader_path), so delocate
 # has nothing to bundle; 13.3 is the first macOS whose libc++ formats floats (std::to_chars).
 repair-wheel-command = ""
 environment = { MACOSX_DEPLOYMENT_TARGET = "13.3" }
 
 [tool.cibuildwheel.linux]
-# The viewer's window system headers to build; Mesa's lavapipe to test (x86_64 only, see
-# test-skip).
-before-all = "dnf install -y -q --enablerepo=crb libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel libXext-devel wayland-devel wayland-protocols-devel libxkbcommon-devel && dnf install -y -q --setopt=strict=0 mesa-vulkan-drivers vulkan-loader"
+# The viewer's window system headers to build.
+before-all = "dnf install -y -q --enablerepo=crb libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel libXext-devel wayland-devel wayland-protocols-devel libxkbcommon-devel"
 # Slang's runtime is already in the wheel beside the module, found through $ORIGIN. The native
 # `ernie` program links AlmaLinux 9's crt1.o, marked as needing x86-64-v2 (SSE4.2, CPUs since
 # 2009), which auditwheel would refuse; Ernie needs no more than baseline x86-64 itself.
