@@ -242,7 +242,7 @@
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
 <p>Consecutive strips chain: each's <code>from</code> is the last one's <code>to</code>, so stepping the camera's transform through the strips' <code>to</code>s (after a first step at the first <code>from</code>) renders the image strip by strip.</p>
-<p>The pose between <code>from</code> and <code>to</code> is a straight line and a great-arc turn, which departs from the orbit's curve by about a T^2 / 8 for its acceleration a over the strip's time T: keep strips short (for LRO's NAC, 64 lines are 0.8 s and 0.1 m). The lens's distortion along the detector is fitted as the camera's Brown-Conrady k1 to k3, which the pushbroom's lens resamples through. </p>
+<p>The pose between <code>from</code> and <code>to</code> is a straight line and a great-arc turn, which departs from the orbit's curve by about a T^2 / 8 for its acceleration a over the strip's time T: keep strips short (for LRO's NAC, 64 lines are 0.8 s and 0.1 m). The lens's distortion along the detector and off it is fitted as the camera's Brown-Conrady k1 to k3, p1 and p2, which the pushbroom's lens resamples through (rows of points off the line from the time that sees them). </p>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
 <h3 id="variable-camera">variable camera</h3>
 <pre><code class="language-C++">CameraParams ernie::IsdLineScanner::Strip::camera;

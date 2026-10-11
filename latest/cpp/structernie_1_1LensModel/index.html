@@ -335,7 +335,7 @@
 <p><em>Lateral colour (</em> <code>ernie:lens:chromatic:scale</code> <em>): the image's scale per wavelength relative to the reference's, about the principal point, which the sensor resamples each band at.</em></p>
 <pre><code class="language-C++">Spectrum ernie::LensModel::chromaticScale;
 </code></pre>
-<p>Empty for none. </p>
+<p>A pushbroom's band sees the reference's at its point of the line over the scale: along the line, and for a line off the axis off it, at another time (as its distortion's points off the line). Empty for none. </p>
 <hr>
 
 <h3 id="variable-fisheye">variable fisheye</h3>

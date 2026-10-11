@@ -521,7 +521,7 @@
 <p><em>A pushbroom (line scan) camera (</em> <code>ernie:camera:scan</code> <em>"pushbroom"): one detector line along the image's x axis,</em><code>lineOffsetMm</code> <em>off the principal point along y on the focal plane, read out once per image row as the camera moves.</em></p>
 <pre><code class="language-C++">bool ernie::CameraParams::pushbroom;
 </code></pre>
-<p>Row r (from the top) is exposed at the pose (r + 0.5) / height of the way from the last frame's pose to this frame's, so a frame is one strip of the scan. Its lens may distort radially (k1 to k3, with r^2 from the line's distance off the axis too), moving pixels along the line only; it has no tangential distortion, shutter interval or rolling readout of its own.</p>
+<p>Row r (from the top) is exposed at the pose (r + 0.5) / height of the way from the last frame's pose to this frame's, so a frame is one strip of the scan. Its lens distorts as a frame camera's (Brown-Conrady k1 to k3, p1 and p2, with r^2 from the line's distance off the axis too): a pixel sees along the undistorted direction of its point of the line, which may lie off the line (a line off the axis, decentring), and is then seen at another time; the sensor finds that row from the raster's depth (sensor.slang's <code>retimed</code>), rows past the strip's ends taking the nearest end's. It has no shutter interval or rolling readout of its own.</p>
 <p>Reference: R. Gupta and R. I. Hartley, "Linear Pushbroom
 Cameras", IEEE TPAMI 19(9):963-975, 1997. </p>
 <hr>
@@ -591,7 +591,7 @@ Cameras", IEEE TPAMI 19(9):963-975, 1997. </p>
 </code></pre>
 <p><strong>Exception:</strong></p>
 <ul>
-<li><code>std::invalid_argument</code> for non-positive sizes, times, f-numbers, ISO or focal length, a bad clipping range, a degenerate transform, a bad spectral range, no sensor channels or more than four, or a shutter closing before it opens, a negative rolling readout or shutter samples outside 1 to <code>kMaxShutterSamples</code>, an orthographic camera with lens distortion or a fisheye or a non-positive pixel pitch, a pushbroom that is orthographic, has a fisheye or tangential distortion or more than one sub-frame, or a fisheye with Brown-Conrady distortion or a field reaching past <code>LensModel::kMaxFisheyeFieldAngle</code>. </li>
+<li><code>std::invalid_argument</code> for non-positive sizes, times, f-numbers, ISO or focal length, a bad clipping range, a degenerate transform, a bad spectral range, no sensor channels or more than four, or a shutter closing before it opens, a negative rolling readout or shutter samples outside 1 to <code>kMaxShutterSamples</code>, an orthographic camera with lens distortion or a fisheye or a non-positive pixel pitch, a pushbroom that is orthographic, has a fisheye or a ray table or more than one sub-frame, or a fisheye with Brown-Conrady distortion or a field reaching past <code>LensModel::kMaxFisheyeFieldAngle</code>. </li>
 </ul>
 <hr>
 
