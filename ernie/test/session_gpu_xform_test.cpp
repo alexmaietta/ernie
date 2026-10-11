@@ -62,8 +62,7 @@ std::string ErrorOf(const Scene& scene, const Path& path) {
 
 }  // namespace
 
-// --- Rows
-// -------------------------------------------------------------------------------------
+// Rows
 
 TEST(SceneRows, WritesOfManyPathsRememberTheTensorAndRow) {
     Scene scene;
@@ -121,8 +120,7 @@ TEST(SceneRows, OtherWritesForgetTheRow) {
     }
 }
 
-// --- Which prims are posed on the GPU
-// ---------------------------------------------------------
+// Which prims are posed on the GPU
 
 TEST(GpuXform, CpuOpsAreNoGpuPose) {
     Scene scene;
@@ -325,8 +323,7 @@ TEST(GpuXform, ATransformArrayAloneIsComposed) {
     EXPECT_EQ(pose->ops[0].first, tokens::kTransform);
 }
 
-// --- Anchors
-// ----------------------------------------------------------------------------------
+// Anchors
 
 TEST(GpuXform, AnchorsAreTheNearestGpuPoseAbove) {
     Scene scene;
@@ -356,8 +353,7 @@ TEST(GpuXform, AResetBelowTheAnchorCutsItOff) {
             .has_value());
 }
 
-// --- Camera poses as positions and quaternions
-// -------------------------------------------------
+// Camera poses as positions and quaternions
 
 TEST(CameraPoses, RowsOfPositionsAndQuaternionsMatchMatrices) {
     Scene scene;
@@ -408,8 +404,7 @@ TEST(CameraPoses, OtherShapesAreRefused) {
         << "GPU rows of seven stay on the GPU";
 }
 
-// --- PrimSets
-// ---------------------------------------------------------------------------------
+// PrimSets
 
 TEST(PrimSets, WriteRowsLikePathsAndKeepThePrims) {
     Scene scene;
@@ -491,8 +486,7 @@ TEST(PrimSets,
         << "nothing was written";
 }
 
-// --- Quaternion order
-// --------------------------------------------------------------------------
+// Quaternion order
 
 TEST(QuaternionOrder, OrientArraysMayPutWFirst) {
     Scene scene;

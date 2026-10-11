@@ -342,8 +342,7 @@ def test_writing_cpu_values_again_moves_back_to_the_cpu(
     )
 
 
-# --- Camera poses as positions and quaternions
-# ------------------------------------------------
+# Camera poses as positions and quaternions
 
 
 def camera_poses(count, seed=40):
@@ -451,8 +450,7 @@ def test_rewriting_part_of_a_group_from_new_arrays(cuda_renderer):
     )
 
 
-# --- Quaternion order and PrimSets
-# ------------------------------------------------------------
+# Quaternion order and PrimSets
 
 
 def test_w_first_orientations_render_like_w_last(cuda_renderer):

@@ -69,7 +69,7 @@ set(ernie_deb_window_libraries
     "libx11-6, libxcursor1, libxrandr2, libxinerama1, libxi6, libxext6, libxkbcommon0, libwayland-client0, libwayland-cursor0"
 )
 
-# --- DEB --------------------------------------------------------------------------------------
+# DEB
 
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 set(CPACK_DEBIAN_PACKAGE_NAME ernie)
@@ -103,7 +103,7 @@ endif()
 set(CPACK_DEBIAN_PACKAGE_RECOMMENDS
     "mesa-vulkan-drivers | vulkan-icd, ${ernie_deb_window_libraries}")
 
-# --- RPM --------------------------------------------------------------------------------------
+# RPM
 
 set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
 set(CPACK_RPM_PACKAGE_NAME ernie)

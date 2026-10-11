@@ -200,8 +200,7 @@ def test_composed_poses_step_on_the_fast_path(cuda_renderer):
         assert_same_image(image, cuda_renderer.render(cpu_scene))
 
 
-# --- Nested GPU-posed prims
-# -------------------------------------------------------------------
+# Nested GPU-posed prims
 
 
 def arm(scene, count):

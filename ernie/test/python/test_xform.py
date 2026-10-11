@@ -91,8 +91,7 @@ def rock(scene=None):
     return scene, scene.define("/World/Rock", tokens.XFORM)
 
 
-# --- Tokens and values
-# ------------------------------------------------------------------------
+# Tokens and values
 
 
 def test_tokens_are_usd_names():
@@ -173,8 +172,7 @@ def test_quat_euler_round_trips_in_every_order():
         ernie.Quat.from_euler((0, 0, 0), "XYX")
 
 
-# --- Composition
-# ------------------------------------------------------------------------------
+# Composition
 
 
 def test_without_ops_the_transform_op_is_the_local_transform():
@@ -306,8 +304,7 @@ def test_bad_ops_raise_naming_the_problem():
         scene.local_transform("/World/Rock")
 
 
-# --- set_xform and set_local_transform
-# --------------------------------------------------------
+# set_xform and set_local_transform
 
 
 @pytest.mark.parametrize("order", ORDERS)
@@ -397,8 +394,7 @@ def test_set_local_transform_falls_back_to_the_transform_op():
     assert prim2.get(tokens.XFORM_OP_ORDER) is None
 
 
-# --- Row writes
-# -------------------------------------------------------------------------------
+# Row writes
 
 
 def make_links(scene, n):
@@ -463,8 +459,7 @@ def test_rewriting_rows_moves_the_prims():
     )
 
 
-# --- Rendering
-# --------------------------------------------------------------------------------
+# Rendering
 
 
 def staged_scene():

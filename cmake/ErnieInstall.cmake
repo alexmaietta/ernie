@@ -26,7 +26,7 @@ else()
     set(ernie_origin "$ORIGIN")
 endif()
 
-# --- libernie ---------------------------------------------------------------------------------
+# libernie
 
 set(ernie_modules
     ernie_util
@@ -117,7 +117,7 @@ install(
     DESTINATION ${ERNIE_INSTALL_PRIVATE_LIBDIR}
     COMPONENT runtime)
 
-# --- The viewer -------------------------------------------------------------------------------
+# The viewer
 
 if(TARGET ernie_viewer)
     file(RELATIVE_PATH ernie_bin_to_lib
@@ -131,7 +131,7 @@ if(TARGET ernie_viewer)
                     COMPONENT viewer)
 endif()
 
-# --- Headers ----------------------------------------------------------------------------------
+# Headers
 
 # The public API: the scene, sessions and the app, with the device types they take (a Vulkan
 # context, compute interop, images and buffers). raster/ and kernel/ are internal.
@@ -185,12 +185,12 @@ if(TARGET ernie_app)
         COMPONENT dev)
 endif()
 
-# --- Licenses ---------------------------------------------------------------------------------
+# Licenses
 
 include("${PROJECT_SOURCE_DIR}/cmake/ErnieLicenses.cmake")
 ernie_install_licenses(${ERNIE_INSTALL_DOCDIR} runtime)
 
-# --- CMake package ----------------------------------------------------------------------------
+# CMake package
 
 install(
     EXPORT ErnieTargets

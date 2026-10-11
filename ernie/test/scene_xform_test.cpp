@@ -119,8 +119,7 @@ Order(std::initializer_list<std::string_view> ops) {
 
 }  // namespace
 
-// --- Euler angles
-// ------------------------------------------------------------------------------
+// Euler angles
 
 TEST(Xform, EulerRotationMatchesAxisRotationsInEveryOrder) {
     std::mt19937 random(7);
@@ -246,8 +245,7 @@ TEST(Xform, RotateOpsNameTheirOrder) {
               tokens::kRotateZYX);
 }
 
-// --- Composing ops
-// -----------------------------------------------------------------------------
+// Composing ops
 
 TEST(Xform, APrimWithoutOpsIsAtTheIdentity) {
     const Scene scene = OnePrim();
@@ -491,8 +489,7 @@ TEST(Xform, InvertingAnyOpUndoesIt) {
     }
 }
 
-// --- The transform stack
-// -----------------------------------------------------------------------
+// The transform stack
 
 TEST(Xform, WorldTransformsComposeOpsDownTheHierarchy) {
     Scene scene;
@@ -567,8 +564,7 @@ TEST(Xform, OpEditsMarkTheTransformChanged) {
               ernie::Dirty::Transform);
 }
 
-// --- Errors
-// ------------------------------------------------------------------------------------
+// Errors
 
 TEST(Xform, BadOpsNameThePrimAndOp) {
     const Path rock("/World/Rock");
@@ -695,8 +691,7 @@ TEST(Xform, GpuTensorOpsAreReadThroughAReader) {
                  std::invalid_argument);
 }
 
-// --- Op values as tensors
-// ----------------------------------------------------------------------
+// Op values as tensors
 
 TEST(Xform, OpValuesMayBeCpuTensors) {
     Scene scene = OnePrim();
@@ -787,8 +782,7 @@ TEST(Xform, TensorOpsMustBeFloats) {
     EXPECT_THROW(scene.LocalTransform(rock), std::invalid_argument);
 }
 
-// --- SetXform
-// ----------------------------------------------------------------------------------
+// SetXform
 
 TEST(Xform, SetXformWritesOpsInTranslateRotateScaleOrder) {
     Scene scene = OnePrim();
@@ -855,8 +849,7 @@ TEST(Xform, AnEmptyXformIsTheIdentity) {
     EXPECT_EQ(scene.LocalTransform(rock), glm::dmat4(1.0));
 }
 
-// --- Setting a matrix through the ops
-// ----------------------------------------------------------
+// Setting a matrix through the ops
 
 TEST(Xform, APrimWithoutOpsTakesTheMatrixAsItsTransformOp) {
     Scene scene = OnePrim();
@@ -1028,8 +1021,7 @@ TEST(Xform, DecomposingKeepsAResetStack) {
     EXPECT_EQ(scene.LocalTransform(rock), target);
 }
 
-// --- Values and the edit history
-// ---------------------------------------------------------------
+// Values and the edit history
 
 TEST(Xform, ValuesHoldQuaternionsAndTokenLists) {
     const Value q(glm::dquat(1, 0, 0, 0));
