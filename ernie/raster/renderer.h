@@ -745,6 +745,12 @@ class RasterRenderer {
     /// this one; otherwise none.
     std::optional<std::pair<float, float>>
     VisibleDepths(const FrameParams& params);
+    /// Cascades of a light towards `towards` (a unit vector) over
+    /// `cascadeFit_`'s view, `resolution` texels across each: the
+    /// sun's, and other distant lights' in their own maps.
+    std::vector<ShadowCascade>
+    FitViewCascades(const glm::vec3& towards,
+                    std::uint32_t resolution) const;
     /// Records the overlays over views `firstView` on of `targets`'
     /// LdrColor.
     void RecordOverlays(VkCommandBuffer commands,
@@ -797,6 +803,21 @@ class RasterRenderer {
     std::unique_ptr<GpuImage> shadowMaps_;
     std::uint32_t shadowResolution_ = 0;
     std::vector<ShadowCascade> cascades_;
+    /// What a single view's cascades fit to this frame: its view, a
+    /// cube camera's face extent (0 for others), the casters' box
+    /// down to any floor they shadow, the split count and weight, and
+    /// the depths it saw (a visible fit's). None in a batch, without
+    /// bounds, or without a distant light's shadows.
+    struct CascadeFit {
+        CameraView view;
+        float around = 0.0f;
+        glm::vec3 casterLow{0.0f};
+        glm::vec3 casterHigh{0.0f};
+        int count = 1;
+        float lambda = 0.5f;
+        std::optional<std::pair<float, float>> seen;
+    };
+    std::optional<CascadeFit> cascadeFit_;
     std::vector<ShadowCascade> lightViews_;
     std::vector<ShadowCascade> shadowViews_;
     std::unique_ptr<GpuImage> lightShadowMaps_;

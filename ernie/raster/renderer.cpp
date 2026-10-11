@@ -1528,9 +1528,24 @@ void RasterRenderer::WriteLights(
         // light pass fits perspective views only.
         if (bounds &&
             !(laser && light.posedOnGpu && light.beam.IsSpot())) {
-            std::vector<ShadowCascade> views = FitLightShadowViews(
-                light, params.Relative(light.position), bounds->first,
-                bounds->second, resolution);
+            // A distant light over a single view casts cascades over
+            // it, as the sun does, when its maps have room for them;
+            // otherwise one map over the whole scene, as a dome's
+            // many directions do (`ApplyDomeDirections`).
+            std::vector<ShadowCascade> views;
+            if (distant && light.shadows && !light.posedOnGpu &&
+                !light.domeDiffuse && cascadeFit_ && axis.z > 0.0f) {
+                views = FitViewCascades(axis, resolution);
+                if (lightViews_.size() + views.size() >
+                    kMaxLightShadowViews) {
+                    views.clear();
+                }
+            }
+            if (views.empty()) {
+                views = FitLightShadowViews(
+                    light, params.Relative(light.position),
+                    bounds->first, bounds->second, resolution);
+            }
             if (!views.empty() && lightViews_.size() + views.size() <=
                                       kMaxLightShadowViews) {
                 entry.cone[2] =
@@ -2121,58 +2136,43 @@ void RasterRenderer::Update(
             CreateShadowMaps(resolution, shadowLayers_);
         }
     }
+    // What a single view's cascades fit to, the sun's and other
+    // distant lights' alike (`FitViewCascades`).
+    const bool distantCascades =
+        std::any_of(params.lights.begin(), params.lights.end(),
+                    [](const LightParams& light) {
+                        return light.type == LightType::Distant &&
+                               light.shadows;
+                    });
+    cascadeFit_.reset();
+    if (!batch && bounds && (shadowsEnabled_ || distantCascades)) {
+        CascadeFit fit;
+        fit.view = view;
+        fit.around = around;
+        // Where the shadows land counts too: on a ground plane, which
+        // has no bounds, they reach past the casters, and down to it
+        // when the casters float above it.
+        fit.casterLow = bounds->first;
+        fit.casterHigh = bounds->second;
+        for (const RasterDrawable* drawable : drawables) {
+            if (const std::optional<float> floor =
+                    drawable->ShadowFloor()) {
+                fit.casterLow.z = std::min(fit.casterLow.z, *floor);
+            }
+        }
+        fit.count = std::clamp(shadows.cascades, 1, kMaxCascades);
+        fit.lambda = shadows.splitLambda;
+        if (shadows.fit == ShadowFit::Visible) {
+            fit.seen = VisibleDepths(params);
+        }
+        cascadeFit_ = fit;
+    }
     if (shadowsEnabled_ && !batch) {
         if (shadows.resolution != shadowResolution_) {
             CreateShadowMaps(shadows.resolution, kMaxCascades);
         }
-        // Where the shadows land counts too: on a ground plane, which
-        // has no bounds, they reach past the casters, and down to it
-        // when the casters float above it.
-        glm::vec3 casters = bounds->first;
-        for (const RasterDrawable* drawable : drawables) {
-            if (const std::optional<float> floor =
-                    drawable->ShadowFloor()) {
-                casters.z = std::min(casters.z, *floor);
-            }
-        }
-        const auto [low, high] =
-            WithShadows(casters, bounds->second, params.sunDirection);
-        // How far the casters reach along the view; a cube camera's
-        // faces look every way.
-        float farthest = 0.0f;
-        for (int i = 0; i < 8; ++i) {
-            const glm::vec3 corner((i & 1) ? high.x : low.x,
-                                   (i & 2) ? high.y : low.y,
-                                   (i & 4) ? high.z : low.z);
-            farthest = std::max(
-                farthest,
-                around > 0.0f
-                    ? glm::length(corner - view.eye)
-                    : glm::dot(corner - view.eye, view.forward));
-        }
-        // A margin keeps surfaces at exactly the farthest depth, such
-        // as flat ground under a nadir camera, inside the last
-        // cascade.
-        float shadowDistance =
-            std::min(view.farPlane, 1.01f * farthest);
-        float splitNear = view.nearPlane;
-        // Sample distribution shadow maps: the cascades span only the
-        // depths the view sees, within those the casters can shadow.
-        if (shadows.fit == ShadowFit::Visible) {
-            if (const std::optional<std::pair<float, float>> seen =
-                    VisibleDepths(params)) {
-                shadowDistance =
-                    std::max(std::min(shadowDistance, seen->second),
-                             view.nearPlane * 1.01f);
-                splitNear = std::clamp(seen->first, view.nearPlane,
-                                       0.95f * shadowDistance);
-            }
-        }
-        cascades_ = FitCascades(
-            view, shadowDistance, params.sunDirection, low, high,
-            std::clamp(shadows.cascades, 1, kMaxCascades),
-            shadows.splitLambda, shadowResolution_, splitNear,
-            around);
+        cascades_ =
+            FitViewCascades(params.sunDirection, shadowResolution_);
         // A single view's cascades hold what it sees: the shared
         // casters and its world's.
         for (std::uint32_t c = 0; c < cascades_.size(); ++c) {
@@ -2191,7 +2191,7 @@ void RasterRenderer::Update(
     meterKey_.clear();
     // A visible fit's frame measures what it sees, for later frames'
     // cascades.
-    measureDepth_ = shadowsEnabled_ && !batch &&
+    measureDepth_ = cascadeFit_.has_value() &&
                     params.shadows.fit == ShadowFit::Visible;
     if (measureDepth_) {
         DepthSample& sample = depthSlots_[uploads_.Slot()];
@@ -3655,6 +3655,43 @@ void RasterRenderer::ReadMeter(std::uint32_t slot) {
     } else {
         meteredByKey_.erase(key);
     }
+}
+
+std::vector<ShadowCascade>
+RasterRenderer::FitViewCascades(const glm::vec3& towards,
+                                std::uint32_t resolution) const {
+    const CascadeFit& fit = *cascadeFit_;
+    const CameraView& view = fit.view;
+    const auto [low, high] =
+        WithShadows(fit.casterLow, fit.casterHigh, towards);
+    // How far the casters reach along the view; a cube camera's faces
+    // look every way.
+    float farthest = 0.0f;
+    for (int i = 0; i < 8; ++i) {
+        const glm::vec3 corner((i & 1) ? high.x : low.x,
+                               (i & 2) ? high.y : low.y,
+                               (i & 4) ? high.z : low.z);
+        farthest = std::max(
+            farthest, fit.around > 0.0f
+                          ? glm::length(corner - view.eye)
+                          : glm::dot(corner - view.eye, view.forward));
+    }
+    // A margin keeps surfaces at exactly the farthest depth, such as
+    // flat ground under a nadir camera, inside the last cascade.
+    float shadowDistance = std::min(view.farPlane, 1.01f * farthest);
+    float splitNear = view.nearPlane;
+    // Sample distribution shadow maps: the cascades span only the
+    // depths the view sees, within those the casters can shadow.
+    if (fit.seen) {
+        shadowDistance =
+            std::max(std::min(shadowDistance, fit.seen->second),
+                     view.nearPlane * 1.01f);
+        splitNear = std::clamp(fit.seen->first, view.nearPlane,
+                               0.95f * shadowDistance);
+    }
+    return FitCascades(view, shadowDistance, towards, low, high,
+                       fit.count, fit.lambda, resolution, splitNear,
+                       fit.around);
 }
 
 std::optional<std::pair<float, float>>

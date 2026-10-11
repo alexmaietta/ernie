@@ -369,11 +369,23 @@ float interleavedGradientNoise(float2 pixel) {
     return frac(52.9829189 * frac(dot(pixel, float2(0.06711056, 0.00583715))));
 }
 
-// The shadow view of a light's maps that sees `world`: its only one, or for a cube the face of
-// the dominant axis from the light (faces +x, -x, +y, -y, +z, -z).
+// The shadow view of a light's maps that sees `world`: its only one; for a distant light's
+// cascades over the view (`RasterRenderer::FitViewCascades`), the finest whose map holds it, else
+// the coarsest; or for a cube the face of the dominant axis from the light (faces +x, -x, +y,
+// -y, +z, -z).
 uint lightView(LightGpu light, float3 world) {
     let first = uint(light.cone.z);
-    if (light.cone.w < 6.0) {
+    let count = uint(light.cone.w);
+    if (light.position.w == 0.0 && count > 1) {
+        for (uint c = 0; c + 1 < count; ++c) {
+            let clip = mul(lightViews[first + c], float4(world, 1.0)).xyz;
+            if (all(abs(clip.xy) <= float2(1.0)) && clip.z >= 0.0 && clip.z <= 1.0) {
+                return first + c;
+            }
+        }
+        return first + count - 1;
+    }
+    if (count < 6) {
         return first;
     }
     let d = world - light.position.xyz;
@@ -406,6 +418,12 @@ struct LightTap {
     float2 uv;
     float depth;
     bool inside;
+}
+
+// The world width of a texel of orthographic light view `view`: its map's width over its texels,
+// from the view's first row (2 over the map's width in world units).
+float lightTexelWorld(uint view) {
+    return 2.0 / (sh.lightShadow.z * max(length(lightViews[view][0].xyz), 1e-12));
 }
 
 // Poisson sample `i` of a disk `radius` wide across a light's ray, turned by `rotation` (cosine,
@@ -453,7 +471,9 @@ float lightVisibility(LightGpu light, float3 world, float3 n, float nDotL, float
     let distant = light.position.w == 0.0;
     let orthographic = distant || (light.position.w == 5.0 && light.beamExtra.y < 0.5);
     let distance = orthographic ? 1.0 : length(world - light.position.xyz);
-    let texelWorld = light.shadow.x * distance;
+    // A distant light's texels are its cascade's: the world width of its map over its texels.
+    let texelWorld = distant ? lightTexelWorld(lightView(light, world))
+                             : light.shadow.x * distance;
     let offset = n * sh.lightShadow.y * texelWorld * max(1.0 - clamp(nDotL, 0.0, 1.0), 0.25);
     let receiver = world + offset;
     let centre = lightTap(light, receiver);
@@ -503,7 +523,10 @@ float lightVisibility(LightGpu light, float3 world, float3 n, float nDotL, float
             let drop =
                 length(lightPoisson(i)) * searchTexels * texelWorld * tilt;
             if (orthographic) {
-                let gap = (tap.depth - stored) / depthPerWorld;
+                // In the tap's own view, which may be another cascade.
+                let tapDepthPerWorld =
+                    max(abs(dot(lightViews[tap.view][2].xyz, towards)), 1e-12);
+                let gap = (tap.depth - stored) / tapDepthPerWorld;
                 if (gap > drop) {
                     blockers += 1.0;
                     blockerSum += gap;

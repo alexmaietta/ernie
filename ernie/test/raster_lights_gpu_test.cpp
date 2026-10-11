@@ -257,7 +257,47 @@ TEST_F(RasterDelegateTest, OtherDistantLightsAddToTheSun) {
     const std::size_t c = kVarSize / 2;
     EXPECT_NEAR(At<float>(vars.at("HdrColor"), c, c, 1), 0.75f, 0.03f)
         << "0.5 cd/m^2 from the sun and 0.25 from Earthshine";
-    EXPECT_EQ(delegate.Renderer().LightShadowViews().size(), 1u);
+    EXPECT_EQ(delegate.Renderer().LightShadowViews().size(),
+              static_cast<std::size_t>(
+                  ernie::RenderSettings(scene, "/Render/Settings")
+                      .GetShadowCascades()))
+        << "cascades over the view, as the sun's";
+}
+
+TEST_F(RasterDelegateTest, TheSunAndAnotherDistantLightBothCastShadows) {
+    // A blocker 10 up over the origin, under the sun 30 degrees from
+    // the zenith towards +x and Earthshine from 45 degrees towards -x:
+    // the sun's shadow lies 5.8 towards -x, Earthshine's 10 towards
+    // +x, both where the camera above sees past the blocker, each
+    // dimming only its own light there.
+    Scene scene = FlatScene();
+    ernie::DistantLight(scene, "/World/Sun").SetShadowEnable(true);
+    scene.Set("/World/Sun", tokens::kTransform,
+              ernie::DistantLightTransform(
+                  {0.5, 0.0, std::sqrt(0.75)}));
+    ernie::DistantLight::Define(scene, "/World/Earthshine")
+        .SetIntensity(0.5)
+        .SetShadowEnable(true);
+    scene.Set("/World/Earthshine", tokens::kTransform,
+              ernie::DistantLightTransform({-1.0, 0.0, 1.0}));
+    const float sunX = -10.0f * std::tan(glm::radians(30.0f));
+    RasterDelegate delegate(*context_);
+    const float sunLit = RadianceAt(delegate, scene, sunX, 0.0f);
+    const float earthLit = RadianceAt(delegate, scene, 10.0f, 0.0f);
+    DefineQuad(scene, "/World/Blocker", 2.0f);
+    scene.Set(
+        "/World/Blocker", tokens::kTransform,
+        glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 10.0)));
+    // A flat floor's light: the sun's cos 30 against Earthshine's
+    // half intensity at cos 45.
+    const float sun = std::sqrt(0.75f);
+    const float earth = 0.5f * std::sqrt(0.5f);
+    EXPECT_NEAR(RadianceAt(delegate, scene, sunX, 0.0f) / sunLit,
+                earth / (sun + earth), 0.08f)
+        << "in the sun's shadow, Earthshine alone";
+    EXPECT_NEAR(RadianceAt(delegate, scene, 10.0f, 0.0f) / earthLit,
+                sun / (sun + earth), 0.08f)
+        << "in Earthshine's shadow, the sun alone";
 }
 
 TEST_F(RasterDelegateTest, TheSunsDiskWidensPenumbrae) {
@@ -941,8 +981,11 @@ TEST_F(RasterDelegateTest, WiderDistantLightsCastWiderPenumbrae) {
                                  glm::dvec3(12.0, 0.0, 20.0)));
         const float in = RadianceAt(delegate, scene, -1.5f, 0.0f);
         const float out = RadianceAt(delegate, scene, 1.5f, 0.0f);
-        EXPECT_EQ(delegate.Renderer().LightShadowViews().size(), 1u)
-            << "a map of its own, not the sun's cascades";
+        EXPECT_EQ(delegate.Renderer().LightShadowViews().size(),
+                  static_cast<std::size_t>(
+                      ernie::RenderSettings(scene, "/Render/Settings")
+                          .GetShadowCascades()))
+            << "cascades of its own, not the sun's";
         return std::pair{in / inLit, out / outLit};
     };
     const auto [pointIn, pointOut] = fractions(0.0);
