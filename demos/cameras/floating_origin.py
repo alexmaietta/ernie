@@ -2,6 +2,7 @@
 """Metre-sized probes from the origin out to Neptune's distance, each
 as sharp as the last: the renderer draws relative to the eye."""
 
+import functools
 import math
 
 import numpy as np
@@ -136,7 +137,7 @@ class Demo(ernie.demo.Demo):
         self.where = w.text(describe(START))
         w.separator()
         for i, (_, label, _) in enumerate(PLACES):
-            w.button(label, lambda i=i: self.go(i))
+            w.button(label, functools.partial(self.go, i))
 
     def go(self, index):
         """Frames place `index`'s probe with the viewer's camera."""
