@@ -231,6 +231,10 @@
 <td style="text-align: left;"><a href="#variable-name"><strong>name</strong></a>  <br></td>
 </tr>
 <tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-normalized"><strong>normalized</strong></a>   = <code>false</code><br><em>Its emission integrates to 1 over the whole tangent plane, whatever its parameters and footprint, so Ernie need not integrate it (the built-in spot, line and grid).</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1LightPatternParam/"><strong>LightPatternParam</strong></a> &gt;</td>
 <td style="text-align: left;"><a href="#variable-params"><strong>params</strong></a>  <br></td>
 </tr>
@@ -260,7 +264,9 @@
 </tbody>
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
-<p><code>slang</code> is a Slang module that may <code>import light_pattern;</code> (<code>LightPatternSlang</code>) and defines a struct named <code>typeName</code> implementing <code>ILightPattern</code>, whose  gives the relative power per unit area of the tangent plane (x / z, y / z along the laser's x and y, z along its beam) at <code>t</code>, averaged over a footprint <code>footprint</code> wide in it (a pixel's, so features finer than a pixel can keep their power), at the laser's <code>wavelength</code> (nm) and the frame's <code>time</code> (s; 0 until frames carry one). Its scale does not matter: Ernie integrates it over |t| &lt; <code>extent</code> on the GPU, so the laser emits its power's <code>ernie:laser:efficiency</code> into it. Parameter <code>i</code> is <code>p.get(i)</code>.  </p>
+<p><code>slang</code> is a Slang module that may <code>import light_pattern;</code> (<code>LightPatternSlang</code>) and defines a struct named <code>typeName</code> implementing <code>ILightPattern</code>, whose  gives the relative power per unit area of the tangent plane (x / z, y / z along the laser's x and y, z along its beam) at <code>input.t</code>, averaged over a pixel's footprint <code>input.footprint</code> wide in it (so features finer than a pixel keep their power), at the laser's <code>input.wavelength</code> (nm) and the frame's <code>input.time</code> (s; 0 until frames carry one). <code>input.beam</code> is the beam's own 1/e^2 radius there, w(z) / z, which a pattern of beamlets draws each one with (<code>beamlet</code>); a continuous pattern can ignore it.</p>
+<p>Its scale does not matter: Ernie integrates it over |t| &lt; <code>extent</code> on the GPU, so the laser emits its power's <code>ernie:laser:efficiency</code> into it (its <code>ernie:laser:zeroOrder</code> going into an undiffracted spot), unless <code>normalized</code> says it integrates to 1 already. Parameter <code>i</code> is <code>p.get(i)</code>; the laser's <code>ernie:laser:pattern:data</code> is <code>p.data(i)</code> (<code>p.dataCount()</code> of them) and its <code>ernie:laser:pattern:image</code> <code>p.image(uv,
+footprint)</code>.  </p>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
 <h3 id="variable-description">variable description</h3>
 <pre><code class="language-C++">std::string ernie::LightPatternModel::description;
@@ -271,6 +277,7 @@
 <p><em>The largest |x / z| and |y / z| it lights: it emits nothing beyond, and its shadow view covers that much.</em> </p>
 <pre><code class="language-C++">double ernie::LightPatternModel::extent;
 </code></pre>
+<p>A built-in pattern's comes with each laser (<code>LightParams::Beam::extent</code>). </p>
 <hr>
 
 <h3 id="variable-id">variable id</h3>
@@ -281,6 +288,12 @@
 
 <h3 id="variable-name">variable name</h3>
 <pre><code class="language-C++">std::string ernie::LightPatternModel::name;
+</code></pre>
+<hr>
+
+<h3 id="variable-normalized">variable normalized</h3>
+<p><em>Its emission integrates to 1 over the whole tangent plane, whatever its parameters and footprint, so Ernie need not integrate it (the built-in spot, line and grid).</em> </p>
+<pre><code class="language-C++">bool ernie::LightPatternModel::normalized;
 </code></pre>
 <hr>
 

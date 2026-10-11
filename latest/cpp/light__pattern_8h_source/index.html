@@ -208,6 +208,8 @@
 #include &quot;ernie/util/shader_source.h&quot;
 
 #include &lt;cstddef&gt;
+#include &lt;cstdint&gt;
+#include &lt;filesystem&gt;
 #include &lt;span&gt;
 #include &lt;string&gt;
 #include &lt;string_view&gt;
@@ -229,6 +231,7 @@ struct LightPatternModel {
     std::string typeName;  
     std::string slang;     
     double extent = 1.0;
+    bool normalized = false;
 
     std::vector&lt;float&gt; Defaults() const;
 };
@@ -236,6 +239,10 @@ struct LightPatternModel {
 class LightPatternRegistry {
   public:
     static constexpr std::size_t kMaxParams = 16;
+
+    LightPatternRegistry() = default;
+
+    static LightPatternRegistry WithBuiltins();
 
     void Add(LightPatternModel model);
 
@@ -255,6 +262,15 @@ std::string_view LightPatternSlang();
 
 std::vector&lt;ShaderModuleSource&gt;
 LightPatternModules(const LightPatternRegistry&amp; registry);
+
+struct LightPatternImage {
+    std::uint32_t width = 0;
+    std::uint32_t height = 0;
+    std::vector&lt;float&gt; texels;  
+};
+
+LightPatternImage
+LoadLightPatternImage(const std::filesystem::path&amp; path);
 
 }  // namespace ernie
 </code></pre>

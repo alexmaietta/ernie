@@ -206,6 +206,7 @@
 #pragma once
 
 #include &quot;ernie/scene/camera.h&quot;
+#include &quot;ernie/scene/light_pattern.h&quot;
 #include &quot;ernie/scene/sensor_filters.h&quot;
 
 #include &lt;glm/glm.hpp&gt;
@@ -215,6 +216,7 @@
 #include &lt;array&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdint&gt;
+#include &lt;memory&gt;
 #include &lt;optional&gt;
 #include &lt;string&gt;
 #include &lt;string_view&gt;
@@ -355,22 +357,18 @@ struct LightParams {
         glm::vec2 waist{0.0f};
         glm::vec2 rayleigh{0.0f};
         float waistDistance = 0.0f;
-        enum class Pattern : std::uint32_t {
-            Spot,
-            Line,
-            Grid,
-            Custom
-        };
-        Pattern pattern = Pattern::Spot;
-        float fan = 0.0f;
-        bool gaussianLine = false;
-        glm::uvec2 cells{1u};
-        glm::vec2 pitch{0.0f};
+        std::string pattern{&quot;spot&quot;};
+        std::vector&lt;float&gt; patternParams;
+        glm::vec2 extent{0.0f};
         float efficiency = 1.0f;
         float zeroOrder = 0.0f;
-        std::string customPattern;
-        std::vector&lt;float&gt; patternParams;
+        std::vector&lt;float&gt; patternData;
+        std::shared_ptr&lt;const LightPatternImage&gt; patternImage;
         float wavelength = 0.0f;  
+
+        bool IsSpot() const {
+            return pattern == &quot;spot&quot;;
+        }
     };
     Beam beam;
     bool shadows = true;

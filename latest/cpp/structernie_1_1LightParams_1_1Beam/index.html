@@ -205,21 +205,6 @@
 <ul>
 <li><code>#include &lt;ernie/session/frame_params.h&gt;</code></li>
 </ul>
-<h2 id="public-types">Public Types</h2>
-<table>
-<thead>
-<tr>
-<th style="text-align: right;">Type</th>
-<th style="text-align: left;">Name</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: right;">enum std::uint32_t</td>
-<td style="text-align: left;"><a href="#enum-pattern"><strong>Pattern</strong></a>  <br><em>The pattern it makes (</em> <code>tokens::kLaserPattern</code> <em>): the beam itself; a line fanned over</em><code>fan</code> <em>radians along x, its profile along the line flat or Gaussian; or a grid of</em><code>cells</code> <em>beamlets</em><code>pitch</code> <em>radians apart.</em></td>
-</tr>
-</tbody>
-</table>
 <h2 id="public-attributes">Public Attributes</h2>
 <table>
 <thead>
@@ -230,36 +215,28 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: right;">glm::uvec2</td>
-<td style="text-align: left;"><a href="#variable-cells"><strong>cells</strong></a>   = <code>{1u}</code><br></td>
-</tr>
-<tr>
-<td style="text-align: right;">std::string</td>
-<td style="text-align: left;"><a href="#variable-custompattern"><strong>customPattern</strong></a>  <br></td>
-</tr>
-<tr>
 <td style="text-align: right;">float</td>
 <td style="text-align: left;"><a href="#variable-efficiency"><strong>efficiency</strong></a>   = <code>1.0f</code><br></td>
 </tr>
 <tr>
-<td style="text-align: right;">float</td>
-<td style="text-align: left;"><a href="#variable-fan"><strong>fan</strong></a>   = <code>0.0f</code><br></td>
+<td style="text-align: right;">glm::vec2</td>
+<td style="text-align: left;"><a href="#variable-extent"><strong>extent</strong></a>   = <code>{0.0f}</code><br></td>
 </tr>
 <tr>
-<td style="text-align: right;">bool</td>
-<td style="text-align: left;"><a href="#variable-gaussianline"><strong>gaussianLine</strong></a>   = <code>false</code><br></td>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#variable-pattern"><strong>pattern</strong></a>   = <code>{"spot"}</code><br><em>The pattern it makes (</em> <code>tokens::kLaserPattern</code> <em>), a</em><code>LightPatternModel</code> <em>the renderer finds by id: a built-in one ("spot", "line", "grid", "image") with its parameters in</em><code>patternParams</code> <em>and its tangent-plane half extents in</em><code>extent</code> <em>(0 unbounded), or a custom one with its parameters as given (the renderer fills in defaults and its extent).</em></td>
 </tr>
 <tr>
-<td style="text-align: right;"><a href="./#enum-pattern"><strong>Pattern</strong></a></td>
-<td style="text-align: left;"><a href="#variable-pattern"><strong>pattern</strong></a>   = <code>Pattern::Spot</code><br></td>
+<td style="text-align: right;">std::vector&lt; float &gt;</td>
+<td style="text-align: left;"><a href="#variable-patterndata"><strong>patternData</strong></a>  <br><em>What patterns read besides their parameters:</em> <code>ernie:laser:pattern:data</code> <em>and the image</em><code>ernie:laser:pattern:image</code> <em>(null without one).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::shared_ptr&lt; const <a href="../structernie_1_1LightPatternImage/"><strong>LightPatternImage</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#variable-patternimage"><strong>patternImage</strong></a>  <br></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; float &gt;</td>
 <td style="text-align: left;"><a href="#variable-patternparams"><strong>patternParams</strong></a>  <br></td>
-</tr>
-<tr>
-<td style="text-align: right;">glm::vec2</td>
-<td style="text-align: left;"><a href="#variable-pitch"><strong>pitch</strong></a>   = <code>{0.0f}</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::vec2</td>
@@ -283,58 +260,54 @@
 </tr>
 </tbody>
 </table>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-isspot"><strong>IsSpot</strong></a> () const<br></td>
+</tr>
+</tbody>
+</table>
 <h2 id="detailed-description">Detailed Description</h2>
 <p>The irradiance across the beam z past the waist is 2 P / (pi w_x w_y) exp(-2 (x^2 / w_x^2 + y^2 / w_y^2)), with w = w0 sqrt(1 + (z / z_R)^2) along each axis. </p>
-<h2 id="public-types-documentation">Public Types Documentation</h2>
-<h3 id="enum-pattern">enum Pattern</h3>
-<p><em>The pattern it makes (</em> <code>tokens::kLaserPattern</code> <em>): the beam itself; a line fanned over</em><code>fan</code> <em>radians along x, its profile along the line flat or Gaussian; or a grid of</em><code>cells</code> <em>beamlets</em><code>pitch</code> <em>radians apart.</em></p>
-<pre><code class="language-C++">enum ernie::LightParams::Beam::Pattern {
-    Spot,
-    Line,
-    Grid,
-    Custom
-};
-</code></pre>
-<p><code>efficiency</code> of the power goes into the line or the beamlets, <code>zeroOrder</code> into a beam along the axis (grids). A custom pattern (<code>LightPatternModel</code>) is named by <code>customPattern</code>, its parameters <code>patternParams</code> as given (the renderer fills in defaults). </p>
-<hr>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
-<h3 id="variable-cells">variable cells</h3>
-<pre><code class="language-C++">glm::uvec2 ernie::LightParams::Beam::cells;
-</code></pre>
-<hr>
-
-<h3 id="variable-custompattern">variable customPattern</h3>
-<pre><code class="language-C++">std::string ernie::LightParams::Beam::customPattern;
-</code></pre>
-<hr>
-
 <h3 id="variable-efficiency">variable efficiency</h3>
 <pre><code class="language-C++">float ernie::LightParams::Beam::efficiency;
 </code></pre>
 <hr>
 
-<h3 id="variable-fan">variable fan</h3>
-<pre><code class="language-C++">float ernie::LightParams::Beam::fan;
-</code></pre>
-<hr>
-
-<h3 id="variable-gaussianline">variable gaussianLine</h3>
-<pre><code class="language-C++">bool ernie::LightParams::Beam::gaussianLine;
+<h3 id="variable-extent">variable extent</h3>
+<pre><code class="language-C++">glm::vec2 ernie::LightParams::Beam::extent;
 </code></pre>
 <hr>
 
 <h3 id="variable-pattern">variable pattern</h3>
-<pre><code class="language-C++">Pattern ernie::LightParams::Beam::pattern;
+<p><em>The pattern it makes (</em> <code>tokens::kLaserPattern</code> <em>), a</em><code>LightPatternModel</code> <em>the renderer finds by id: a built-in one ("spot", "line", "grid", "image") with its parameters in</em><code>patternParams</code> <em>and its tangent-plane half extents in</em><code>extent</code> <em>(0 unbounded), or a custom one with its parameters as given (the renderer fills in defaults and its extent).</em></p>
+<pre><code class="language-C++">std::string ernie::LightParams::Beam::pattern;
+</code></pre>
+<p><code>efficiency</code> of the power goes into the pattern, <code>zeroOrder</code> into a spot along the axis. </p>
+<hr>
+
+<h3 id="variable-patterndata">variable patternData</h3>
+<p><em>What patterns read besides their parameters:</em> <code>ernie:laser:pattern:data</code> <em>and the image</em><code>ernie:laser:pattern:image</code> <em>(null without one).</em></p>
+<pre><code class="language-C++">std::vector&lt;float&gt; ernie::LightParams::Beam::patternData;
+</code></pre>
+<hr>
+
+<h3 id="variable-patternimage">variable patternImage</h3>
+<pre><code class="language-C++">std::shared_ptr&lt;const LightPatternImage&gt; ernie::LightParams::Beam::patternImage;
 </code></pre>
 <hr>
 
 <h3 id="variable-patternparams">variable patternParams</h3>
 <pre><code class="language-C++">std::vector&lt;float&gt; ernie::LightParams::Beam::patternParams;
-</code></pre>
-<hr>
-
-<h3 id="variable-pitch">variable pitch</h3>
-<pre><code class="language-C++">glm::vec2 ernie::LightParams::Beam::pitch;
 </code></pre>
 <hr>
 
@@ -361,6 +334,11 @@
 
 <h3 id="variable-zeroorder">variable zeroOrder</h3>
 <pre><code class="language-C++">float ernie::LightParams::Beam::zeroOrder;
+</code></pre>
+<hr>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-isspot">function IsSpot</h3>
+<pre><code class="language-C++">inline bool ernie::LightParams::Beam::IsSpot () const
 </code></pre>
 <hr>
 

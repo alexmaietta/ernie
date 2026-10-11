@@ -337,6 +337,12 @@ inline constexpr std::string_view kExposureIso = &quot;exposure:iso&quot;;
 inline constexpr std::string_view kExposureFStop = &quot;exposure:fStop&quot;;
 inline constexpr std::string_view kExposureResponsivity =
     &quot;exposure:responsivity&quot;;
+inline constexpr std::string_view kExposureMode =
+    &quot;ernie:exposure:mode&quot;;
+inline constexpr std::string_view kExposureAdaptation =
+    &quot;ernie:exposure:adaptation&quot;;
+inline constexpr std::string_view kManual = &quot;manual&quot;;
+inline constexpr std::string_view kAuto = &quot;auto&quot;;
 inline constexpr std::string_view kFStop = &quot;fStop&quot;;
 inline constexpr std::string_view kFocusDistance = &quot;focusDistance&quot;;
 inline constexpr std::string_view kShutterOpen = &quot;shutter:open&quot;;
@@ -453,9 +459,16 @@ inline constexpr std::string_view kLaserZeroOrder =
     &quot;ernie:laser:zeroOrder&quot;;
 inline constexpr std::string_view kLaserPatternParams =
     &quot;ernie:laser:pattern:params&quot;;
+inline constexpr std::string_view kLaserPatternData =
+    &quot;ernie:laser:pattern:data&quot;;
+inline constexpr std::string_view kLaserPatternImage =
+    &quot;ernie:laser:pattern:image&quot;;
+inline constexpr std::string_view kLaserPatternFieldOfView =
+    &quot;ernie:laser:pattern:fieldOfView&quot;;
 inline constexpr std::string_view kSpot = &quot;spot&quot;;
 inline constexpr std::string_view kLine = &quot;line&quot;;
 inline constexpr std::string_view kGrid = &quot;grid&quot;;
+inline constexpr std::string_view kImage = &quot;image&quot;;
 inline constexpr std::string_view kFlat = &quot;flat&quot;;
 inline constexpr std::string_view kGaussian = &quot;gaussian&quot;;
 inline constexpr std::string_view kShapingConeAngle =

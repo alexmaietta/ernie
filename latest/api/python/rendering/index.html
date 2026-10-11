@@ -269,7 +269,7 @@
               <td><code><a class="autorefs autorefs-internal" title="            add_light_pattern (ernie.Renderer.add_light_pattern)" href="#ernie.Renderer.add_light_pattern">add_light_pattern</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Registers a laser pattern written in Slang, for LaserLights to name in ernie:laser:pattern: struct <code>type_name</code> in module <code>slang</code> (which may <code>import light_pattern;</code>) implementing ILightPattern, whose <code>float emission(float2 t, float2 footprint, float wavelength, float time, LightPatternParams p)</code> gives the relative power per unit area of the tangent plane at t = (x / z, y / z) averaged over <code>footprint</code> of it; any scale, as Ernie integrates it over |t| &lt; <code>extent</code> so the laser emits its power. <code>params</code> is {name: default} in order, or a list of {"name", "default", "description"}; LaserLights set them in ernie:laser:pattern:params, read with p.get(i). Raises ValueError for an invalid pattern or one that fails to compile, with the compiler's diagnostics.</p>
+                  <p>Registers a laser pattern written in Slang, for LaserLights to name in ernie:laser:pattern: struct <code>type_name</code> in module <code>slang</code> (which may <code>import light_pattern;</code>) implementing ILightPattern, whose <code>float emission(LightPatternInput input, LightPatternParams p)</code> gives the relative power per unit area of the tangent plane at input.t = (x / z, y / z), averaged over input.footprint of it (input.beam being the beam's own radius there, for <code>beamlet</code>); any scale, as Ernie integrates it over |t| &lt; <code>extent</code> so the laser emits its power, unless <code>normalized</code> says it integrates to 1. <code>params</code> is {name: default} in order, or a list of {"name", "default", "description"}; LaserLights set them in ernie:laser:pattern:params, read with p.get(i), and their ernie:laser:pattern:data and ernie:laser:pattern:image are p.data(i) and p.image(uv, footprint). Raises ValueError for an invalid pattern or one that fails to compile, with the compiler's diagnostics.</p>
                 </div>
               </td>
             </tr>
@@ -657,13 +657,14 @@
     slang: str,
     params: object | None = None,
     extent: float = 1.0,
+    normalized: bool = False,
     name: str = "",
     description: str = "",
 ) -&gt; None</code></pre>
 
     <div class="doc doc-contents ">
 
-        <p>Registers a laser pattern written in Slang, for LaserLights to name in ernie:laser:pattern: struct <code>type_name</code> in module <code>slang</code> (which may <code>import light_pattern;</code>) implementing ILightPattern, whose <code>float emission(float2 t, float2 footprint, float wavelength, float time, LightPatternParams p)</code> gives the relative power per unit area of the tangent plane at t = (x / z, y / z) averaged over <code>footprint</code> of it; any scale, as Ernie integrates it over |t| &lt; <code>extent</code> so the laser emits its power. <code>params</code> is {name: default} in order, or a list of {"name", "default", "description"}; LaserLights set them in ernie:laser:pattern:params, read with p.get(i). Raises ValueError for an invalid pattern or one that fails to compile, with the compiler's diagnostics.</p>
+        <p>Registers a laser pattern written in Slang, for LaserLights to name in ernie:laser:pattern: struct <code>type_name</code> in module <code>slang</code> (which may <code>import light_pattern;</code>) implementing ILightPattern, whose <code>float emission(LightPatternInput input, LightPatternParams p)</code> gives the relative power per unit area of the tangent plane at input.t = (x / z, y / z), averaged over input.footprint of it (input.beam being the beam's own radius there, for <code>beamlet</code>); any scale, as Ernie integrates it over |t| &lt; <code>extent</code> so the laser emits its power, unless <code>normalized</code> says it integrates to 1. <code>params</code> is {name: default} in order, or a list of {"name", "default", "description"}; LaserLights set them in ernie:laser:pattern:params, read with p.get(i), and their ernie:laser:pattern:data and ernie:laser:pattern:image are p.data(i) and p.image(uv, footprint). Raises ValueError for an invalid pattern or one that fails to compile, with the compiler's diagnostics.</p>
 
 
     </div>

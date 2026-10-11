@@ -205,6 +205,8 @@
 <ul>
 <li><code>#include "ernie/util/shader_source.h"</code></li>
 <li><code>#include &lt;cstddef&gt;</code></li>
+<li><code>#include &lt;cstdint&gt;</code></li>
+<li><code>#include &lt;filesystem&gt;</code></li>
 <li><code>#include &lt;span&gt;</code></li>
 <li><code>#include &lt;string&gt;</code></li>
 <li><code>#include &lt;string_view&gt;</code></li>
@@ -234,6 +236,10 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1LightPatternImage/"><strong>LightPatternImage</strong></a> <br><em>A laser's pattern image (</em> <code>ernie:laser:pattern:image</code> <em>) as patterns read it: one linear channel, the mean of its colour channels, its rows top to bottom, and its mip levels after it down to 1 x 1, each</em><code>max(1, size &gt;&gt; n)</code> <em>on a side and averaging the texels above.</em></td>
+</tr>
 <tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1LightPatternModel/"><strong>LightPatternModel</strong></a> <br><em>A laser's pattern written in Slang: the relative power a laser sends towards each direction, its watts, beam and shadows staying Ernie's.</em></td>

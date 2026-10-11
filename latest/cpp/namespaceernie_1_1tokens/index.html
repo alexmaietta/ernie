@@ -273,6 +273,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kauto"><strong>kAuto</strong></a>   = <code>"auto"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kaxis"><strong>kAxis</strong></a>   = <code>/* multi line expression */</code><br><em>"X", "Y" or "Z" (default).</em></td>
 </tr>
 <tr>
@@ -485,6 +489,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kexposureadaptation"><strong>kExposureAdaptation</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kexposurecompensation"><strong>kExposureCompensation</strong></a>   = <code>/* multi line expression */</code><br><em>float, stops: exposure compensation on the photographic outputs (HdrColor's display, LdrColor), on top of the camera's own exposure; default 0.</em></td>
 </tr>
 <tr>
@@ -494,6 +502,10 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kexposureiso"><strong>kExposureIso</strong></a>   = <code>"exposure:iso"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kexposuremode"><strong>kExposureMode</strong></a>   = <code>/* multi line expression */</code><br><em>How the photographic outputs are exposed: kManual by the camera's exposure settings, or kAuto keyed to middle grey from the metered scene, over</em> <code>ernie:exposure:adaptation</code> <em>frames.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -633,6 +645,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kimage"><strong>kImage</strong></a>   = <code>"image"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kin"><strong>kIn</strong></a>   = <code>"inputs:in"</code><br><em>UsdTransform2d:</em> <code>in</code> <em>scaled, then rotated (degrees, counter-clockwise), then translated.</em></td>
 </tr>
 <tr>
@@ -705,7 +721,19 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
-<td style="text-align: left;"><a href="#variable-klaserpattern"><strong>kLaserPattern</strong></a>   = <code>/* multi line expression */</code><br><em>A laser's pattern: "spot" (its beam), "line" (fanned over</em> <code>fanAngle</code> <em>degrees along its x axis, its profile along the line "flat" as a Powell lens gives or "gaussian" as a cylindrical lens does, the beam's across it) or "grid" (</em><code>gridColumns</code> <em>x</em><code>gridRows</code> <em>beamlets</em><code>gridPitch</code> <em>degrees apart along x and y, as a diffractive element splits it).</em></td>
+<td style="text-align: left;"><a href="#variable-klaserpattern"><strong>kLaserPattern</strong></a>   = <code>/* multi line expression */</code><br><em>A laser's pattern: "spot" (its beam), "line" (fanned over</em> <code>fanAngle</code> <em>degrees along its x axis, its profile along the line "flat" as a Powell lens gives or "gaussian" as a cylindrical lens does, the beam's across it), "grid" (</em><code>gridColumns</code> <em>x</em><code>gridRows</code> <em>beamlets</em><code>gridPitch</code> <em>degrees apart along x and y, as a diffractive element splits it), "image" (</em><code>pattern:image</code> <em>over</em><code>pattern:fieldOfView</code> <em>, as a projector shows it) or a registered custom pattern (</em><code>LightPatternModel</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klaserpatterndata"><strong>kLaserPatternData</strong></a>   = <code>/* multi line expression */</code><br><em>float[]: data a custom pattern reads (</em> <code>p.data(i)</code> <em>), such as a diffractive element's beamlet angles.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klaserpatternfieldofview"><strong>kLaserPatternFieldOfView</strong></a>   = <code>/* multi line expression */</code><br><em>double2: the full angles, degrees, that "image" spreads its image over along x and y.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klaserpatternimage"><strong>kLaserPatternImage</strong></a>   = <code>/* multi line expression */</code><br><em>asset: an image of the pattern's relative power (linear, colour channels averaged), drawn by "image" and read by custom patterns (</em> <code>p.image(uv, footprint)</code> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -822,6 +850,10 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-klodshowlevels"><strong>kLodShowLevels</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kmanual"><strong>kManual</strong></a>   = <code>"manual"</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -1621,6 +1653,11 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-kauto">variable kAuto</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kAuto;
+</code></pre>
+<hr>
+
 <h3 id="variable-kaxis">variable kAxis</h3>
 <p><em>"X", "Y" or "Z" (default).</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kAxis;
@@ -1905,6 +1942,11 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-kexposureadaptation">variable kExposureAdaptation</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kExposureAdaptation;
+</code></pre>
+<hr>
+
 <h3 id="variable-kexposurecompensation">variable kExposureCompensation</h3>
 <p><em>float, stops: exposure compensation on the photographic outputs (HdrColor's display, LdrColor), on top of the camera's own exposure; default 0.</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kExposureCompensation;
@@ -1918,6 +1960,12 @@
 
 <h3 id="variable-kexposureiso">variable kExposureIso</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kExposureIso;
+</code></pre>
+<hr>
+
+<h3 id="variable-kexposuremode">variable kExposureMode</h3>
+<p><em>How the photographic outputs are exposed: kManual by the camera's exposure settings, or kAuto keyed to middle grey from the metered scene, over</em> <code>ernie:exposure:adaptation</code> <em>frames.</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kExposureMode;
 </code></pre>
 <hr>
 
@@ -2105,6 +2153,11 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-kimage">variable kImage</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kImage;
+</code></pre>
+<hr>
+
 <h3 id="variable-kin">variable kIn</h3>
 <p><em>UsdTransform2d:</em> <code>in</code> <em>scaled, then rotated (degrees, counter-clockwise), then translated.</em></p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kIn;
@@ -2198,10 +2251,28 @@
 <hr>
 
 <h3 id="variable-klaserpattern">variable kLaserPattern</h3>
-<p><em>A laser's pattern: "spot" (its beam), "line" (fanned over</em> <code>fanAngle</code> <em>degrees along its x axis, its profile along the line "flat" as a Powell lens gives or "gaussian" as a cylindrical lens does, the beam's across it) or "grid" (</em><code>gridColumns</code> <em>x</em><code>gridRows</code> <em>beamlets</em><code>gridPitch</code> <em>degrees apart along x and y, as a diffractive element splits it).</em></p>
+<p><em>A laser's pattern: "spot" (its beam), "line" (fanned over</em> <code>fanAngle</code> <em>degrees along its x axis, its profile along the line "flat" as a Powell lens gives or "gaussian" as a cylindrical lens does, the beam's across it), "grid" (</em><code>gridColumns</code> <em>x</em><code>gridRows</code> <em>beamlets</em><code>gridPitch</code> <em>degrees apart along x and y, as a diffractive element splits it), "image" (</em><code>pattern:image</code> <em>over</em><code>pattern:fieldOfView</code> <em>, as a projector shows it) or a registered custom pattern (</em><code>LightPatternModel</code> <em>).</em></p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserPattern;
 </code></pre>
-<p><code>efficiency</code> of the power goes into the pattern and <code>zeroOrder</code> stays in an undiffracted beam along the axis (grids); the rest is lost. </p>
+<p><code>efficiency</code> of the power goes into the pattern and <code>zeroOrder</code> stays in an undiffracted beam along the axis; the rest is lost. </p>
+<hr>
+
+<h3 id="variable-klaserpatterndata">variable kLaserPatternData</h3>
+<p><em>float[]: data a custom pattern reads (</em> <code>p.data(i)</code> <em>), such as a diffractive element's beamlet angles.</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserPatternData;
+</code></pre>
+<hr>
+
+<h3 id="variable-klaserpatternfieldofview">variable kLaserPatternFieldOfView</h3>
+<p><em>double2: the full angles, degrees, that "image" spreads its image over along x and y.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserPatternFieldOfView;
+</code></pre>
+<hr>
+
+<h3 id="variable-klaserpatternimage">variable kLaserPatternImage</h3>
+<p><em>asset: an image of the pattern's relative power (linear, colour channels averaged), drawn by "image" and read by custom patterns (</em> <code>p.image(uv, footprint)</code> <em>).</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLaserPatternImage;
+</code></pre>
 <hr>
 
 <h3 id="variable-klaserpatternparams">variable kLaserPatternParams</h3>
@@ -2367,6 +2438,11 @@
 
 <h3 id="variable-klodshowlevels">variable kLodShowLevels</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLodShowLevels;
+</code></pre>
+<hr>
+
+<h3 id="variable-kmanual">variable kManual</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kManual;
 </code></pre>
 <hr>
 

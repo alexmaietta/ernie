@@ -188,6 +188,8 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.ATMOSPHERE_PRESET"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ATMOSPHERE_PRESET</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.AUTO"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;AUTO</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.AXIS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;AXIS</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.BLACKBODY"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;BLACKBODY</a>
@@ -286,11 +288,15 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.EXPOSURE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;EXPOSURE</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.EXPOSURE_ADAPTATION"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;EXPOSURE_ADAPTATION</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.EXPOSURE_COMPENSATION"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;EXPOSURE_COMPENSATION</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.EXPOSURE_FSTOP"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;EXPOSURE_FSTOP</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.EXPOSURE_ISO"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;EXPOSURE_ISO</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.EXPOSURE_MODE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;EXPOSURE_MODE</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.EXPOSURE_RESPONSIVITY"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;EXPOSURE_RESPONSIVITY</a>
     </li>
@@ -406,6 +412,8 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.LOD_SHOW_LEVELS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;LOD_SHOW_LEVELS</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.MANUAL"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;MANUAL</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.MARS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;MARS</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.MATERIAL"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;MATERIAL</a>
@@ -499,6 +507,8 @@
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.RADIUS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;RADIUS</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.RECT_LIGHT"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;RECT_LIGHT</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.REFLECTANCE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;REFLECTANCE</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.RENDER_PRODUCT"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;RENDER_PRODUCT</a>
     </li>
@@ -1113,6 +1123,27 @@
 
 </h2>
 <pre class="highlight"><code class="language-python doc-signature">ATMOSPHERE_PRESET: str = 'ernie:atmosphere:preset'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.AUTO" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">AUTO</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">AUTO: str = 'auto'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -2153,6 +2184,27 @@
 
 
 
+<h2 id="ernie.tokens.EXPOSURE_ADAPTATION" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">EXPOSURE_ADAPTATION</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">EXPOSURE_ADAPTATION: str = 'ernie:exposure:adaptation'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h2 id="ernie.tokens.EXPOSURE_COMPENSATION" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">EXPOSURE_COMPENSATION</span>
 
@@ -2205,6 +2257,27 @@
 
 </h2>
 <pre class="highlight"><code class="language-python doc-signature">EXPOSURE_ISO: str = 'exposure:iso'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.EXPOSURE_MODE" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">EXPOSURE_MODE</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">EXPOSURE_MODE: str = 'ernie:exposure:mode'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -3413,6 +3486,27 @@
 
 
 
+<h2 id="ernie.tokens.MANUAL" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">MANUAL</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">MANUAL: str = 'manual'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h2 id="ernie.tokens.MARS" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">MARS</span>
 
@@ -4389,6 +4483,27 @@
 
 </h2>
 <pre class="highlight"><code class="language-python doc-signature">RECT_LIGHT: str = 'RectLight'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.REFLECTANCE" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">REFLECTANCE</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">REFLECTANCE: str = 'inputs:reflectance'</code></pre>
 
     <div class="doc doc-contents ">
 

@@ -9220,6 +9220,14 @@ shutter, and Ernie's lens, scan, spectral sampling, sensor and view poses.</p>
               </div>
             </li>
             <li>
+              <b><code>exposure_adaptation</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Frames automatic exposure takes to cover 63% of a change; 0 at once. Default 0.0. USD name</p>
+              </div>
+            </li>
+            <li>
               <b><code>exposure_f_stop</code></b>
                   (<code><span title="float">float</span></code>)
               –
@@ -9233,6 +9241,14 @@ shutter, and Ernie's lens, scan, spectral sampling, sensor and view poses.</p>
               –
               <div class="doc-md-description">
                 <p>Default 100.0. USD name <code>exposure:iso</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>exposure_mode</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>"auto" keys the photographic outputs to middle grey from the metered scene, on top of the</p>
               </div>
             </li>
             <li>
@@ -9690,6 +9706,30 @@ shutter, and Ernie's lens, scan, spectral sampling, sensor and view poses.</p>
 
 
 
+<h3 id="ernie.schema.Camera.exposure_adaptation" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">exposure_adaptation</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">exposure_adaptation: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Frames automatic exposure takes to cover 63% of a change; 0 at once. Default 0.0. USD name
+<code>ernie:exposure:adaptation</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Camera.exposure_f_stop" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">exposure_f_stop</span>
 
@@ -9727,6 +9767,30 @@ shutter, and Ernie's lens, scan, spectral sampling, sensor and view poses.</p>
     <div class="doc doc-contents ">
 
         <p>Default 100.0. USD name <code>exposure:iso</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Camera.exposure_mode" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">exposure_mode</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">exposure_mode: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>"auto" keys the photographic outputs to middle grey from the metered scene, on top of the
+settings above; "manual" by them alone. Default 'manual'. USD name <code>ernie:exposure:mode</code>.</p>
 
     </div>
 
@@ -10850,6 +10914,8 @@ name <code>ernie:shutter:rolling</code>.</p>
     exposure_iso: float = ...,
     exposure_f_stop: float = ...,
     exposure_responsivity: float = ...,
+    exposure_mode: str = ...,
+    exposure_adaptation: float = ...,
     shutter_open: float = ...,
     shutter_close: float = ...,
     shutter_samples: int = ...,

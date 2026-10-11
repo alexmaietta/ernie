@@ -646,6 +646,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1LightPatternImage/"><strong>LightPatternImage</strong></a> <br><em>A laser's pattern image (</em> <code>ernie:laser:pattern:image</code> <em>) as patterns read it: one linear channel, the mean of its colour channels, its rows top to bottom, and its mip levels after it down to 1 x 1, each</em><code>max(1, size &gt;&gt; n)</code> <em>on a side and averaging the texels above.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1LightPatternModel/"><strong>LightPatternModel</strong></a> <br><em>A laser's pattern written in Slang: the relative power a laser sends towards each direction, its watts, beam and shadows staying Ernie's.</em></td>
 </tr>
 <tr>
@@ -1791,15 +1795,11 @@
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1ShaderModuleSource/"><strong>ShaderModuleSource</strong></a> &gt;</td>
-<td style="text-align: left;"><a href="#function-lightpatternmodules"><strong>LightPatternModules</strong></a> (const <a href="../classernie_1_1LightPatternRegistry/"><strong>LightPatternRegistry</strong></a> &amp; registry) <br><em>The Slang modules a shader drawing</em> <code>registry</code> <em>'s patterns compiles with:</em><code>light_pattern</code> <em>, each pattern's module, and</em><code>light_patterns</code> <em>, whose</em>`customPattern(index, t, footprint,</td>
-</tr>
-<tr>
-<td style="text-align: right;">wavelength, time, p)<code>_calls pattern_</code>index<code>_'s_</code>emission` <em>(0 for none).</em></td>
-<td style="text-align: left;"></td>
+<td style="text-align: left;"><a href="#function-lightpatternmodules"><strong>LightPatternModules</strong></a> (const <a href="../classernie_1_1LightPatternRegistry/"><strong>LightPatternRegistry</strong></a> &amp; registry) <br><em>The Slang modules a shader drawing</em> <code>registry</code> <em>'s patterns compiles with:</em><code>light_pattern</code> <em>, each pattern's module, and</em><code>light_patterns</code> <em>, whose</em><code>lightPattern(index, input, p)</code> <em>calls pattern</em><code>index</code> <em>'s</em><code>emission</code> <em>(0 for none).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::string_view</td>
-<td style="text-align: left;"><a href="#function-lightpatternslang"><strong>LightPatternSlang</strong></a> () <br><em>The Slang module</em> <code>light_pattern</code> <em>:</em><code>LightPatternParams</code> <em>(sixteen floats,</em><code>get(i)</code> <em>) and</em><code>ILightPattern</code> <em>.</em></td>
+<td style="text-align: left;"><a href="#function-lightpatternslang"><strong>LightPatternSlang</strong></a> () <br><em>The Slang module</em> <code>light_pattern</code> <em>:</em><code>LightPatternInput</code> <em>,</em><code>LightPatternParams</code> <em>(sixteen floats</em><code>get(i)</code> <em>, the laser's data</em><code>data(i)</code> <em>and image</em><code>image(uv, footprint)</code> <em>),</em><code>ILightPattern</code> <em>, and helpers for patterns:</em><code>beamAverage</code> <em>,</em><code>beamlet</code> <em>and</em><code>normalBelow</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; const <a href="../structernie_1_1PrimTypeDef/"><strong>PrimTypeDef</strong></a> * &gt;</td>
@@ -1812,6 +1812,10 @@
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1Image/"><strong>Image</strong></a></td>
 <td style="text-align: left;"><a href="#function-loadimagefile"><strong>LoadImageFile</strong></a> (const std::filesystem::path &amp; path, <a href="./#enum-imageencoding"><strong>ImageEncoding</strong></a> encoding) <br><em>Loads a PNG (8- or 16-bit), JPEG or OpenEXR file.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1LightPatternImage/"><strong>LightPatternImage</strong></a></td>
+<td style="text-align: left;"><a href="#function-loadlightpatternimage"><strong>LoadLightPatternImage</strong></a> (const std::filesystem::path &amp; path) <br><em>Reads</em> <code>path</code> <em>(PNG, JPEG or OpenEXR; PNG and JPEG values taken as linear, as a pattern's relative power) as a</em><code>LightPatternImage</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
@@ -4088,8 +4092,7 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 <hr>
 
 <h3 id="function-lightpatternmodules">function LightPatternModules</h3>
-<p><em>The Slang modules a shader drawing</em> <code>registry</code> <em>'s patterns compiles with:</em><code>light_pattern</code> <em>, each pattern's module, and</em><code>light_patterns</code> <em>, whose</em><code>customPattern(index, t, footprint,
-wavelength, time, p)</code> <em>calls pattern</em><code>index</code> <em>'s</em><code>emission</code> <em>(0 for none).</em></p>
+<p><em>The Slang modules a shader drawing</em> <code>registry</code> <em>'s patterns compiles with:</em><code>light_pattern</code> <em>, each pattern's module, and</em><code>light_patterns</code> <em>, whose</em><code>lightPattern(index, input, p)</code> <em>calls pattern</em><code>index</code> <em>'s</em><code>emission</code> <em>(0 for none).</em></p>
 <pre><code class="language-C++">std::vector&lt; ShaderModuleSource &gt; ernie::LightPatternModules (
     const LightPatternRegistry &amp; registry
 ) 
@@ -4097,7 +4100,7 @@ wavelength, time, p)</code> <em>calls pattern</em><code>index</code> <em>'s</em>
 <hr>
 
 <h3 id="function-lightpatternslang">function LightPatternSlang</h3>
-<p><em>The Slang module</em> <code>light_pattern</code> <em>:</em><code>LightPatternParams</code> <em>(sixteen floats,</em><code>get(i)</code> <em>) and</em><code>ILightPattern</code> <em>.</em></p>
+<p><em>The Slang module</em> <code>light_pattern</code> <em>:</em><code>LightPatternInput</code> <em>,</em><code>LightPatternParams</code> <em>(sixteen floats</em><code>get(i)</code> <em>, the laser's data</em><code>data(i)</code> <em>and image</em><code>image(uv, footprint)</code> <em>),</em><code>ILightPattern</code> <em>, and helpers for patterns:</em><code>beamAverage</code> <em>,</em><code>beamlet</code> <em>and</em><code>normalBelow</code> <em>.</em></p>
 <pre><code class="language-C++">std::string_view ernie::LightPatternSlang () 
 </code></pre>
 <hr>
@@ -4126,6 +4129,18 @@ wavelength, time, p)</code> <em>calls pattern</em><code>index</code> <em>'s</em>
 <p><strong>Exception:</strong></p>
 <ul>
 <li><code>std::runtime_error</code> if the file cannot be read or decoded, or its extension is not .png, .jpg, .jpeg or .exr. </li>
+</ul>
+<hr>
+
+<h3 id="function-loadlightpatternimage">function LoadLightPatternImage</h3>
+<p><em>Reads</em> <code>path</code> <em>(PNG, JPEG or OpenEXR; PNG and JPEG values taken as linear, as a pattern's relative power) as a</em><code>LightPatternImage</code> <em>.</em></p>
+<pre><code class="language-C++">LightPatternImage ernie::LoadLightPatternImage (
+    const std::filesystem::path &amp; path
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::runtime_error</code> if it cannot be read, or std::invalid_argument if it is larger than 65535 on a side. </li>
 </ul>
 <hr>
 
