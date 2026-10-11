@@ -38,9 +38,13 @@ find_package(
     CONFIG
     REQUIRED
     PATHS
-    "${slang_SOURCE_DIR}/lib/cmake/slang"
-    # The Windows release keeps its CMake package at the top.
-    "${slang_SOURCE_DIR}/cmake"
+    "${slang_SOURCE_DIR}"
+    # Where each release keeps its CMake package: lib/ (Linux x86_64, macOS), lib64/ (Linux
+    # aarch64), or the top (Windows).
+    PATH_SUFFIXES
+    lib/cmake/slang
+    lib64/cmake/slang
+    cmake
     NO_DEFAULT_PATH)
 
 # Visible to applications that install Slang's runtime library beside their binaries.

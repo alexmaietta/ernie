@@ -379,7 +379,9 @@ void RasterMaterial::WriteUniform() {
     u.opacity[1] = settings.opacityThreshold;
     u.opacity[2] = hasScalarTexture_[2] && settings.opacityTexture ? 1.0f : 0.0f;
     const std::size_t count = std::min(brdfParams.size(), BrdfRegistry::kMaxParams);
-    std::memcpy(u.params, brdfParams.data(), count * sizeof(float));
+    if (count > 0) {
+        std::memcpy(u.params, brdfParams.data(), count * sizeof(float));
+    }
     uploads_.Write(uniform_, std::as_bytes(std::span(&u, 1)));
 }
 

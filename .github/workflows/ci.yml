@@ -354,6 +354,9 @@ jobs:
     needs: packages
     runs-on: ubuntu-24.04
     container: ${{ matrix.image }}
+    # The clean systems have Make, not the workflow's Ninja.
+    env:
+      CMAKE_GENERATOR: Unix Makefiles
     strategy:
       fail-fast: false
       matrix:

@@ -1,5 +1,6 @@
 [build-system]
-requires = ["scikit-build-core>=0.11", "nanobind>=2.4"]
+# numpy: the build imports the module to write its type stubs (nanobind's stubgen).
+requires = ["scikit-build-core>=0.11", "nanobind>=2.4", "numpy>=1.26"]
 build-backend = "scikit_build_core.build"
 
 [project]

@@ -102,6 +102,8 @@ if(TARGET terraingen_warnings)
     target_link_libraries(ernie_build_options INTERFACE terraingen_warnings terraingen_coverage)
 elseif(MSVC)
     target_compile_options(ernie_build_options INTERFACE /W4)
+    # M_PI and the other math constants, which MSVC's <cmath> declares only on request.
+    target_compile_definitions(ernie_build_options INTERFACE _USE_MATH_DEFINES)
 else()
     target_compile_options(
         ernie_build_options

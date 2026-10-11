@@ -12,5 +12,8 @@ if(TARGET glfw AND TARGET ernie_volk)
                                PUBLIC "${dear_imgui_SOURCE_DIR}/backends")
     # Vulkan functions come from volk, as in Ernie, so the backend works with MoltenVK too.
     target_compile_definitions(dear_imgui_glfw_vulkan PUBLIC IMGUI_IMPL_VULKAN_USE_VOLK)
+    # No OpenGL header from glfw3.h in the backend (viewer.cpp asks the same): Ernie draws with
+    # Vulkan, and build machines need not have GL/gl.h.
+    target_compile_definitions(dear_imgui_glfw_vulkan PRIVATE GLFW_INCLUDE_NONE)
     target_link_libraries(dear_imgui_glfw_vulkan PUBLIC dear_imgui glfw ernie_volk)
 endif()

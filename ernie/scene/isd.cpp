@@ -276,7 +276,10 @@ IsdSensor ReadIsd(std::string_view json) {
         sensor.lineSumming = NumberOr(isd, "detector_line_summing", 1.0);
         sensor.sampleSumming = NumberOr(isd, "detector_sample_summing", 1.0);
         if (isd.contains("optical_distortion") && !isd["optical_distortion"].empty()) {
-            const auto& [name, model] = *isd["optical_distortion"].items().begin();
+            // Its one model, by an iterator that outlives the reads (items() makes a temporary).
+            const auto first = isd["optical_distortion"].begin();
+            const std::string name = first.key();
+            const auto& model = first.value();
             sensor.distortion = name;
             if (model.contains("coefficients")) {
                 sensor.distortionCoefficients = Numbers(model["coefficients"], "coefficients");
