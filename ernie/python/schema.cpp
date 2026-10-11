@@ -3,6 +3,7 @@
 
 #include "ernie/scene/prim_type.h"
 #include "ernie/scene/scene.h"
+#include "ernie/scene/stage_schemas.h"
 
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
@@ -238,6 +239,11 @@ void BindSchema(nb::module_& m) {
     m.def("find_prim_type", &FindPrimType, nb::arg("name"),
           nb::rv_policy::reference,
           "The registered prim type named `name`, or None.");
+    m.def(
+        "stage_type", [] { return &Stage::Definition(); },
+        nb::rv_policy::reference,
+        "The schema of a scene's stage metadata, on its root prim: "
+        "not a prim type, as no prim is defined as one.");
 }
 
 }  // namespace ernie::python

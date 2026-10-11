@@ -343,8 +343,8 @@ SchemaOf(const Scene& scene, const Path& path,
     const std::string& type = scene.TypeOf(path);
     // Registered types' sections come from their declarations, "Prim"
     // among them, then what their declarations cannot hold
-    // (`DynamicSectionsOf`).
-    if (const PrimTypeDef* registered = FindPrimType(type)) {
+    // (`DynamicSectionsOf`); the root's, its stage metadata.
+    if (const PrimTypeDef* registered = scene.SchemaOf(path)) {
         std::vector<PropertySection> sections =
             SectionsOf(*registered);
         DynamicSectionsOf(scene, path, type, brdfs, filters,

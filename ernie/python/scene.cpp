@@ -2091,6 +2091,15 @@ void BindScene(nb::module_& m) {
     nb::module_ tokens =
         m.def_submodule("tokens", "Prim type and attribute names.");
     const std::pair<const char*, std::string_view> names[] = {
+        {"UP_AXIS", tokens::kUpAxis},
+        {"METERS_PER_UNIT", tokens::kMetersPerUnit},
+        {"KILOGRAMS_PER_UNIT", tokens::kKilogramsPerUnit},
+        {"TIME_CODES_PER_SECOND", tokens::kTimeCodesPerSecond},
+        {"FRAMES_PER_SECOND", tokens::kFramesPerSecond},
+        {"START_TIME_CODE", tokens::kStartTimeCode},
+        {"END_TIME_CODE", tokens::kEndTimeCode},
+        {"DEFAULT_PRIM", tokens::kDefaultPrim},
+        {"TIME_CODE", tokens::kTimeCode},
         {"XFORM", tokens::kXform},
         {"SCOPE", tokens::kScope},
         {"MESH", tokens::kMesh},

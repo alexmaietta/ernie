@@ -468,7 +468,7 @@ void LoadPrim(Scene& scene, const Path& path, const Json& body,
     } catch (const std::exception& error) {
         fail("type", error.what());
     }
-    const PrimTypeDef* type = FindPrimType(scene.TypeOf(path));
+    const PrimTypeDef* type = scene.SchemaOf(path);
     XformOps xform;
     bool hasXform = false;
     for (const auto& [key, value] : body.items()) {
@@ -505,7 +505,9 @@ void LoadPrim(Scene& scene, const Path& path, const Json& body,
         if (value.is_object() && !IsArrayRef(value)) {
             Path child;
             try {
-                child = Path(path.String() + "/" + key);
+                child =
+                    Path(path.IsRoot() ? "/" + key
+                                       : path.String() + "/" + key);
             } catch (const std::exception& error) {
                 fail(key, error.what());
             }
@@ -761,7 +763,7 @@ Json PrimJson(const Scene& scene, const Path& path) {
     if (!typeName.empty()) {
         body["type"] = typeName;
     }
-    const PrimTypeDef* type = FindPrimType(typeName);
+    const PrimTypeDef* type = scene.SchemaOf(path);
     for (const std::string& name : scene.Attributes(path)) {
         // LoadScene takes these keys for something else, so the
         // attribute would not come back.
@@ -792,6 +794,10 @@ Json PrimJson(const Scene& scene, const Path& path) {
         } catch (const std::invalid_argument& error) {
             SaveFail(path, name, error.what());
         }
+    }
+    // The root's children are the top level's.
+    if (path.IsRoot()) {
+        return body;
     }
     for (const Path& child : scene.Children(path)) {
         const std::string name(child.Name());
@@ -860,6 +866,10 @@ void Print(const Json& json, int indent, std::string& out) {
 
 std::string SaveScene(const Scene& scene) {
     Json description = Json::object();
+    // The root's attributes, the stage metadata (`Stage`), under "/".
+    if (!scene.Attributes(Path::Root()).empty()) {
+        description["/"] = PrimJson(scene, Path::Root());
+    }
     const Path session(tokens::kSessionRoot);
     for (const Path& root : scene.Children(Path::Root())) {
         if (root != session) {

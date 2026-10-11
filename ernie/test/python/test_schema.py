@@ -534,3 +534,25 @@ def test_saved_scenes_load_back_equal(tmp_path):
         scene.local_transform("/World"),
     )
     assert ernie.save_scene(loaded) == text
+
+
+def test_stage_metadata_is_on_the_root():
+    scene = ernie.Scene()
+    stage = ernie.Stage(scene)
+    assert stage == ernie.Stage(scene.get_prim("/"))
+    assert (stage.up_axis, stage.meters_per_unit) == ("Z", 1.0)
+    assert stage.time_codes_per_second == 24.0
+    stage.up_axis = "Y"
+    stage.time_codes_per_second = 60.0
+    stage.time = 2.5
+    assert stage.time_code == 150.0 and stage.time == 2.5
+    assert scene.get("/", tokens.UP_AXIS) == "Y"
+    with pytest.raises(AttributeError):
+        stage.metres_per_unit = 1.0
+    with pytest.raises(TypeError):
+        ernie.Stage(scene.define("/World", "Xform"))
+    loaded = ernie.load_scene(ernie.save_scene(scene))
+    assert ernie.Stage(loaded).up_axis == "Y"
+    assert ernie.Stage(loaded).time_code == 150.0
+    loaded = ernie.load_scene({"/": {"meters_per_unit": 0.01}})
+    assert ernie.Stage(loaded).meters_per_unit == 0.01

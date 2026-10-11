@@ -2,6 +2,7 @@
 #include "ernie/scene/scene.h"
 
 #include "ernie/scene/prim_type.h"
+#include "ernie/scene/stage_schemas.h"
 
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/xform.h"
@@ -138,7 +139,10 @@ Scene::UniqueId::UniqueId() {
 }
 
 Scene::Scene() {
-    prims_.emplace(Path::Root(), PrimData{});
+    // The root holds the stage metadata (`Stage`).
+    PrimData root;
+    root.schema = &Stage::Definition();
+    prims_.emplace(Path::Root(), std::move(root));
 }
 
 Scene::PrimData& Scene::Find(const Path& path) {
@@ -324,6 +328,10 @@ Prim Scene::GetPrim(const Path& path) {
 
 const std::string& Scene::TypeOf(const Path& path) const {
     return Find(path).type;
+}
+
+const PrimTypeDef* Scene::SchemaOf(const Path& path) const {
+    return Find(path).schema;
 }
 
 std::vector<Path> Scene::Children(const Path& path) const {

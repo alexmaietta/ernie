@@ -23,6 +23,7 @@ ernie_add_library(
     scene_json.cpp
     schema.cpp
     sensor_filters.cpp
+    stage_schemas.cpp
     terrain_schemas.cpp
     wide_view.cpp
     xform.cpp

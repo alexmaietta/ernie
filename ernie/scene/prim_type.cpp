@@ -742,7 +742,8 @@ namespace {
 const PrimTypeDef& Checked(const Scene& scene, const Path& path,
                            const PrimTypeDef& type) {
     const std::string& name = scene.TypeOf(path);
-    const PrimTypeDef* found = FindPrimType(name);
+    // Its schema: its type's, or the root's stage metadata.
+    const PrimTypeDef* found = scene.SchemaOf(path);
     if (found == nullptr || !found->IsA(type)) {
         throw std::invalid_argument(
             "'" + path.String() + "' is " +

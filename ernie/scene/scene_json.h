@@ -22,7 +22,8 @@
 ///     }
 ///
 /// - The top level maps prim paths (absolute, or relative to the
-///   root) to prims.
+///   root) to prims; "/" holds the stage metadata (`Stage`), as
+///   `{"/": {"upAxis": "Z", "timeCodesPerSecond": 60}}`.
 /// - A prim is an object: `"type"` names its type (`Scene::Define`;
 ///   registered or not). Without one, a new prim is untyped and an
 ///   existing prim keeps its type and attributes. Keys whose values

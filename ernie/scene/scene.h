@@ -228,6 +228,12 @@ class Scene {
     /// @throws std::invalid_argument if the prim does not exist.
     const std::string& TypeOf(const Path& path) const;
 
+    /// The schema the prim's attributes are checked against: its
+    /// registered type's, the root's `Stage` (its stage metadata), or
+    /// null.
+    /// @throws std::invalid_argument if the prim does not exist.
+    const PrimTypeDef* SchemaOf(const Path& path) const;
+
     /// The children of `path`, in path order.
     std::vector<Path> Children(const Path& path) const;
 

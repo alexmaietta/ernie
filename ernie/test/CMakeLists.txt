@@ -32,6 +32,7 @@ ernie_add_test_suite(
     scene_json_test.cpp
     scene_schema_test.cpp
     scene_sensor_filters_test.cpp
+    scene_stage_test.cpp
     scene_terrain_schemas_test.cpp
     scene_wide_view_test.cpp
     scene_xform_test.cpp

@@ -93,7 +93,7 @@ def main(output):
         "",
         "from ._ernie import AttributeDef, Path, Prim, PrimType, Quat, Scene",
         "",
-        f"__all__ = {['AttributeName', 'Schema', 'typed', 'load_scene', *[t.name for t in ernie.prim_types()]]!r}",
+        f"__all__ = {['AttributeName', 'Schema', 'typed', 'load_scene', *[t.name for t in ernie.prim_types()], 'Stage']!r}",
         "",
         "classes: dict[str, type[Schema]]",
         "",
@@ -147,46 +147,14 @@ def main(output):
             if prim_type.base is not None
             else "Schema"
         )
-        keywords = ", ".join(_keywords(prim_type))
-        if not prim_type.abstract:
-            # Its class's define, with its attributes as keywords.
-            lines.append(f"class _{prim_type.name}Define(Protocol):")
-            lines.append(
-                f"    def __call__(self, parent: Scene | Prim | Schema, path: str | Path, *, {keywords}) -> {prim_type.name}: ..."
-            )
-            lines.append("")
-        lines.append(f"class {prim_type.name}({base}):")
-        lines += _doc(prim_type.doc, "    ")
-        for attribute in prim_type.attributes:
-            if attribute.plural:
-                lines.append(f"    {attribute.py_name}: Path | None")
-                lines += _doc(
-                    "The first target. " + _attribute_doc(attribute),
-                    "    ",
-                )
-                lines.append(
-                    f"    {attribute.plural}: {_TYPES[attribute.kind]}"
-                )
-                lines += _doc(
-                    "Every target. " + _attribute_doc(attribute),
-                    "    ",
-                )
-                continue
-            # One that takes an array in place of its value reads as
-            # the array when one is written.
-            array = " | Any" if attribute.takes_array else ""
-            lines.append(
-                f"    {attribute.py_name}: {_TYPES[attribute.kind]}{array}"
-            )
-            lines += _doc(_attribute_doc(attribute), "    ")
-        if not prim_type.abstract:
-            lines.append(
-                f"    define: ClassVar[_Define[_{prim_type.name}Define]]"
-            )
-        lines.append(
-            f"    def set(self, *attribute: Any, {keywords}) -> Self: ..."
-        )
-        lines.append("")
+        lines += _class_lines(prim_type, base)
+    # The stage metadata's view, of the root prim (not a prim type).
+    lines += _class_lines(ernie.stage_type(), "Schema")[:-1]
+    lines += [
+        "    time: float",
+        '    """The animation\'s time, seconds: the time code over the time codes per second."""',
+        "",
+    ]
     lines.append(
         "def typed(prim: Prim | Schema) -> Schema | Prim: ..."
     )
@@ -197,6 +165,53 @@ def main(output):
     lines.append("")
     with open(output, "w") as stub:
         stub.write("\n".join(lines))
+
+
+def _class_lines(prim_type, base):
+    """The stub of `prim_type`'s class, deriving from `base`, ending
+    in a blank line."""
+    lines = []
+    keywords = ", ".join(_keywords(prim_type))
+    if not prim_type.abstract:
+        # Its class's define, with its attributes as keywords.
+        lines.append(f"class _{prim_type.name}Define(Protocol):")
+        lines.append(
+            f"    def __call__(self, parent: Scene | Prim | Schema, path: str | Path, *, {keywords}) -> {prim_type.name}: ..."
+        )
+        lines.append("")
+    lines.append(f"class {prim_type.name}({base}):")
+    lines += _doc(prim_type.doc, "    ")
+    for attribute in prim_type.attributes:
+        if attribute.plural:
+            lines.append(f"    {attribute.py_name}: Path | None")
+            lines += _doc(
+                "The first target. " + _attribute_doc(attribute),
+                "    ",
+            )
+            lines.append(
+                f"    {attribute.plural}: {_TYPES[attribute.kind]}"
+            )
+            lines += _doc(
+                "Every target. " + _attribute_doc(attribute),
+                "    ",
+            )
+            continue
+        # One that takes an array in place of its value reads as the
+        # array when one is written.
+        array = " | Any" if attribute.takes_array else ""
+        lines.append(
+            f"    {attribute.py_name}: {_TYPES[attribute.kind]}{array}"
+        )
+        lines += _doc(_attribute_doc(attribute), "    ")
+    if not prim_type.abstract:
+        lines.append(
+            f"    define: ClassVar[_Define[_{prim_type.name}Define]]"
+        )
+    lines.append(
+        f"    def set(self, *attribute: Any, {keywords}) -> Self: ..."
+    )
+    lines.append("")
+    return lines
 
 
 if __name__ == "__main__":

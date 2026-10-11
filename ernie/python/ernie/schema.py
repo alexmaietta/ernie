@@ -73,6 +73,7 @@ from ._ernie import (
     _load_scene_text,
     find_prim_type,
     prim_types,
+    stage_type,
 )
 
 __all__ = ["AttributeName", "Schema", "typed"]
@@ -388,8 +389,37 @@ class Schema:
         return f"{type(self).__name__}('{self.prim.path}')"
 
 
-def _build() -> dict[str, type[Schema]]:
+def _make_class(
+    prim_type: PrimType, base: type[Schema]
+) -> type[Schema]:
     reserved = set(dir(Schema)) | set(dir(Prim))
+    namespace: dict[str, Any] = {
+        "__slots__": (),
+        "__doc__": prim_type.doc,
+        "__module__": "ernie",
+        "prim_type": prim_type,
+        "_attributes": dict(base._attributes),
+    }
+    for definition in prim_type.attributes:
+        names = [definition.py_name] + (
+            [definition.plural] if definition.plural else []
+        )
+        for name in names:
+            if name in reserved:
+                raise RuntimeError(
+                    f"{prim_type.name}.{name} hides a Prim member"
+                )
+            namespace["_attributes"][name] = definition
+        name = AttributeName(definition)
+        if definition.plural:
+            namespace[definition.py_name] = _FirstTarget(name)
+            namespace[definition.plural] = _Attribute(name)
+        else:
+            namespace[definition.py_name] = _Attribute(name)
+    return builtins.type(prim_type.name, (base,), namespace)
+
+
+def _build() -> dict[str, type[Schema]]:
     classes: dict[str, type[Schema]] = {}
     for prim_type in prim_types():
         base = (
@@ -397,38 +427,60 @@ def _build() -> dict[str, type[Schema]]:
             if prim_type.base is not None
             else Schema
         )
-        namespace: dict[str, Any] = {
-            "__slots__": (),
-            "__doc__": prim_type.doc,
-            "__module__": "ernie",
-            "prim_type": prim_type,
-            "_attributes": dict(base._attributes),
-        }
-        for definition in prim_type.attributes:
-            names = [definition.py_name] + (
-                [definition.plural] if definition.plural else []
-            )
-            for name in names:
-                if name in reserved:
-                    raise RuntimeError(
-                        f"{prim_type.name}.{name} hides a Prim member"
-                    )
-                namespace["_attributes"][name] = definition
-            name = AttributeName(definition)
-            if definition.plural:
-                namespace[definition.py_name] = _FirstTarget(name)
-                namespace[definition.plural] = _Attribute(name)
-            else:
-                namespace[definition.py_name] = _Attribute(name)
-        classes[prim_type.name] = builtins.type(
-            prim_type.name, (base,), namespace
-        )
+        classes[prim_type.name] = _make_class(prim_type, base)
     return classes
 
 
 classes = _build()
 globals().update(classes)
 __all__ += list(classes)
+
+
+class _StageView(Schema):
+    """A scene's stage metadata: a view of its root prim, which stays
+    untyped."""
+
+    __slots__ = ()
+
+    def __init__(self, scene: Scene | Prim) -> None:
+        prim = (
+            scene.get_prim("/") if isinstance(scene, Scene) else scene
+        )
+        if not isinstance(prim, Prim) or not prim.valid:
+            raise ValueError(
+                f"Stage needs a Scene or its root Prim, not {scene!r}"
+            )
+        if str(prim.path) != "/":
+            raise TypeError(
+                f"'{prim.path}' is not the root prim, which holds the "
+                "stage metadata"
+            )
+        object.__setattr__(self, "prim", prim)
+
+    @property
+    def time(self) -> float:
+        """The animation's time, seconds: the time code over the time
+        codes per second; setting it sets the time code."""
+        return self.time_code / self.time_codes_per_second
+
+    @time.setter
+    def time(self, seconds: float) -> None:
+        self.time_code = seconds * self.time_codes_per_second
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "time":
+            object.__setattr__(self, name, value)
+        else:
+            super().__setattr__(name, value)
+
+
+Stage = _make_class(stage_type(), _StageView)
+Stage.__doc__ = (
+    f"{stage_type().doc} ``ernie.Stage(scene)`` is the scene's: "
+    "``ernie.Stage(scene).up_axis``, ``ernie.Stage(scene).time = "
+    "2.0``."
+)
+__all__ += ["Stage"]
 
 
 def typed(prim: Prim | Schema) -> Schema | Prim:

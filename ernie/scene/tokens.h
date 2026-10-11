@@ -20,6 +20,29 @@ namespace ernie::tokens {
 /// and when gathering the scene's lights.
 inline constexpr std::string_view kSessionRoot = "/__session";
 
+// Stage metadata (UsdStage's, which USD keeps on the stage's
+// pseudo-root; Ernie on its root prim `/`, `Stage`): the axis that
+// points up ("Y" or "Z"), metres and kilograms per scene unit, the
+// time codes and frames per second, the time codes animation plays
+// between, and the prim a reference to the scene brings in.
+inline constexpr std::string_view kUpAxis = "upAxis";
+inline constexpr std::string_view kMetersPerUnit = "metersPerUnit";
+inline constexpr std::string_view kKilogramsPerUnit =
+    "kilogramsPerUnit";
+inline constexpr std::string_view kTimeCodesPerSecond =
+    "timeCodesPerSecond";
+inline constexpr std::string_view kFramesPerSecond =
+    "framesPerSecond";
+inline constexpr std::string_view kStartTimeCode = "startTimeCode";
+inline constexpr std::string_view kEndTimeCode = "endTimeCode";
+inline constexpr std::string_view kDefaultPrim = "defaultPrim";
+/// double: the time code the scene's animation is at (Ernie), as
+/// ovstage's `apply_usd_time` sets it: apart from a render delegate's
+/// sensor clock (`RenderDelegate::Time`).
+inline constexpr std::string_view kTimeCode = "ernie:timeCode";
+inline constexpr std::string_view kY = "Y";
+inline constexpr std::string_view kZ = "Z";
+
 // Prim types.
 inline constexpr std::string_view kXform = "Xform";
 inline constexpr std::string_view kScope = "Scope";
@@ -788,8 +811,10 @@ inline constexpr std::string_view kSourceName =
 /// float luminance (cd/m^2) of the scene's ambient light: white,
 /// uniformly from all around, besides the lights.
 inline constexpr std::string_view kAmbient = "ernie:ambient";
-/// float3 linear RGB of the ambient light (its luminance `kAmbient`'s).
-inline constexpr std::string_view kAmbientColor = "ernie:ambientColor";
+/// float3 linear RGB of the ambient light (its luminance
+/// `kAmbient`'s).
+inline constexpr std::string_view kAmbientColor =
+    "ernie:ambientColor";
 /// How dome lights light the scene, as Omniverse RTX's dome lighting
 /// modes: "approximate" (default; diffuse and specular, unoccluded),
 /// "full" (also shadowed, where the dome's `inputs:shadow:enable`
