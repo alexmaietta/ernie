@@ -1,17 +1,21 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/offscreen_target.h"
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/camera.h"
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
+#include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/util/astronomy.h"
 #include "support/delegate_scenes.h"
 #include "support/vulkan_fixture.h"
 
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <iterator>
@@ -170,6 +174,88 @@ double Variation(const std::vector<float>& values,
 
 const std::map<std::string, float> kNone;
 
+/// The size of StarThrough's image.
+constexpr std::size_t kStarSize = 64;
+
+/// The Bessel function J_n(x) by Bessel's integral, (1 / pi) int_0^pi
+/// cos(n t - x sin t) dt, whose periodic integrand the trapezoid rule
+/// integrates to near machine precision.
+double BesselJ(int n, double x) {
+    constexpr int kSteps = 400;
+    double sum = 0.0;
+    for (int i = 0; i <= kSteps; ++i) {
+        const double t = M_PI * i / kSteps;
+        sum += (i == 0 || i == kSteps ? 0.5 : 1.0) *
+               std::cos(n * t - x * std::sin(t));
+    }
+    return sum / kSteps;
+}
+
+/// The share of an Airy pattern's light within x = pi r / (lambda N)
+/// of its centre, 1 - J0(x)^2 - J1(x)^2 (Born and Wolf, Principles of
+/// Optics, section 8.5.2).
+double AiryEncircled(double x) {
+    return 1.0 - BesselJ(0, x) * BesselJ(0, x) -
+           BesselJ(1, x) * BesselJ(1, x);
+}
+
+/// A magnitude 0 star of the Sun's temperature just off the axis of
+/// FlatScene's camera (without the terrain and sun) at f/`fNumber`:
+/// its SpectralRadiance through SensorFilter prims of `steps`, as a
+/// kStarSize square of each band.
+std::vector<float> StarThrough(RasterDelegate& delegate,
+                               double fNumber, const Steps& steps) {
+    Scene scene = FlatScene();
+    scene.Remove("/World/Terrain");
+    scene.Remove("/World/Sun");
+    scene.Set("/World/Camera", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, 0.0}, {1.0, 0.0, 0.0},
+                                     {0.0, 0.0, 1.0}));
+    ernie::Camera(scene, "/World/Camera").SetExposureFStop(fNumber);
+    const auto one = [](float value) {
+        return Tensor::Copy<float>(std::array{value}, {1});
+    };
+    ernie::StarField::Define(scene, "/World/Stars")
+        .SetRightAscension(one(0.003f))
+        .SetDeclination(one(0.002f))
+        .SetMagnitude(one(0.0f))
+        .SetTemperature(one(5772.0f));
+    std::vector<Path> filters;
+    for (std::size_t i = 0; i < steps.size(); ++i) {
+        const Path path("/Render/Filters/F" + std::to_string(i));
+        ernie::SensorFilterPrim::Define(scene, path)
+            .SetFilterType(steps[i].first);
+        for (const auto& [name, value] : steps[i].second) {
+            scene.Set(path, "inputs:" + name, value);
+        }
+        filters.push_back(path);
+    }
+    const Path var("/Render/Vars/Star");
+    ernie::RenderVar::Define(scene, var)
+        .SetSourceName("SpectralRadiance");
+    ernie::RenderProduct::Define(scene, "/Render/Star")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(kStarSize, kStarSize));
+    scene.Set("/Render/Star", tokens::kOrderedVars,
+              std::vector<Path>{var});
+    scene.Set("/Render/Star", tokens::kFilters, filters);
+    const Path product[] = {"/Render/Star"};
+    const Tensor tensor = delegate.Step(scene, product)
+                              .at("/Render/Star")
+                              .vars.at("SpectralRadiance")
+                              .Map(ernie::MapDevice::Cpu)
+                              .tensor;
+    return {tensor.As<float>(),
+            tensor.As<float>() + tensor.Elements()};
+}
+
+/// Band `band` of a StarThrough image at (`row`, `col`).
+double StarAt(const std::vector<float>& image, std::size_t band,
+              std::size_t row, std::size_t col) {
+    return static_cast<double>(
+        image[(band * kStarSize + row) * kStarSize + col]);
+}
+
 }  // namespace
 
 TEST_F(RasterDelegateTest, TheStandardSensorFiltersAreRegistered) {
@@ -202,6 +288,180 @@ TEST_F(RasterDelegateTest,
                    {{"psf", kNone}, {"cie", kNone}});
     EXPECT_NEAR(Sum(diffraction, 0), Sum(base, 0),
                 0.01 * Sum(base, 0));
+}
+
+TEST_F(
+    RasterDelegateTest,
+    TheAiryPointSpreadGrowsStarsIntoRingedDiscsAndKeepsTheirLight) {
+    RasterDelegate delegate(*context_);
+    const ernie::CameraParams camera = ernie::CameraParamsOf(
+        FlatScene(), "/World/Camera", kStarSize, kStarSize);
+    const double f = camera.FocalLengthPixels();
+    const double pitchUm = camera.PixelPitchMetres() * 1e6;
+    const auto pixels = [](std::size_t i) {
+        return static_cast<double>(i) + 0.5;
+    };
+    // Band `band`'s spectral irradiance: its pixels' radiance times
+    // their solid angles.
+    const auto irradiance = [&](const std::vector<float>& image,
+                                std::size_t band) {
+        double sum = 0.0;
+        for (std::size_t row = 0; row < kStarSize; ++row) {
+            for (std::size_t col = 0; col < kStarSize; ++col) {
+                const double x = (pixels(col) - 0.5 * kStarSize) / f;
+                const double y = (pixels(row) - 0.5 * kStarSize) / f;
+                const double cosine =
+                    1.0 / std::sqrt(1.0 + x * x + y * y);
+                sum += StarAt(image, band, row, col) * cosine *
+                       cosine * cosine / (f * f);
+            }
+        }
+        return sum;
+    };
+    // The share of band `band`'s light in pixels whose centres lie
+    // between `inner` and `outer` pixels of `centre`.
+    const auto within = [&](const std::vector<float>& image,
+                            std::size_t band, glm::dvec2 centre,
+                            double inner, double outer) {
+        double part = 0.0;
+        double total = 0.0;
+        for (std::size_t row = 0; row < kStarSize; ++row) {
+            for (std::size_t col = 0; col < kStarSize; ++col) {
+                const double r = glm::length(
+                    glm::dvec2(pixels(col), pixels(row)) - centre);
+                const double value = StarAt(image, band, row, col);
+                part += r >= inner && r < outer ? value : 0.0;
+                total += value;
+            }
+        }
+        return part / total;
+    };
+    // lambda N 3 to 5 pixels, so the star's own pixel or two of
+    // spread hardly blurs the pattern.
+    constexpr double kFNumber = 1650.0;
+    constexpr float kRadius = 30.0f;
+    const auto airy = [&](double fNumber, float obstruction) {
+        return StarThrough(delegate, fNumber,
+                           {{"psf",
+                             {{"profile", 1.0f},
+                              {"maxRadius", kRadius},
+                              {"obstruction", obstruction}}}});
+    };
+    const std::vector<float> sharp =
+        StarThrough(delegate, kFNumber, {});
+    const std::vector<float> clear = airy(kFNumber, 0.0f);
+    const std::vector<float> slower = airy(2.0 * kFNumber, 0.0f);
+    const std::vector<float> obstructed = airy(kFNumber, 0.33f);
+    const std::vector<float> gaussian = StarThrough(
+        delegate, kFNumber, {{"psf", {{"maxRadius", kRadius}}}});
+
+    // The star where the sharp image puts it.
+    glm::dvec2 centre(0.0);
+    double weight = 0.0;
+    for (std::size_t row = 0; row < kStarSize; ++row) {
+        for (std::size_t col = 0; col < kStarSize; ++col) {
+            const double value = StarAt(sharp, 12, row, col);
+            centre += value * glm::dvec2(pixels(col), pixels(row));
+            weight += value;
+        }
+    }
+    ASSERT_GT(weight, 0.0);
+    centre /= weight;
+    ASSERT_LT(glm::length(centre - glm::dvec2(0.5 * kStarSize)), 4.0)
+        << "near the middle";
+
+    // The kernel's square holds the light of the pattern within about
+    // its own area's radius, and keeps all of it, so the pattern's
+    // shares within it grow by one over that.
+    const double kernel = (2.0 * kRadius + 1.0) / std::sqrt(M_PI);
+    for (const std::size_t band : {std::size_t{2}, std::size_t{12}}) {
+        const double expected = ernie::BlackbodySpectralIrradiance(
+            camera.bands.Lower(static_cast<int>(band)) +
+                0.5 * camera.bands.Width(),
+            5772.0, 2.54e-6);
+        for (const auto* image : {&clear, &slower, &obstructed}) {
+            EXPECT_NEAR(irradiance(*image, band),
+                        irradiance(sharp, band),
+                        0.01 * irradiance(sharp, band))
+                << "light is kept, band " << band;
+        }
+        EXPECT_NEAR(irradiance(clear, band), expected,
+                    0.03 * expected)
+            << "band " << band;
+
+        // 84% of the light within the first dark ring, 1.22 lambda N:
+        // wider for redder bands and slower lenses.
+        for (const double fNumber : {kFNumber, 2.0 * kFNumber}) {
+            const double lambdaN =
+                camera.bands.Centre(static_cast<int>(band)) * 1e-3 *
+                fNumber / pitchUm;  // pixels
+            const auto& image = fNumber == kFNumber ? clear : slower;
+            const double folded =
+                AiryEncircled(M_PI * kernel / lambdaN);
+            EXPECT_NEAR(
+                within(image, band, centre, 0.0, 1.2197 * lambdaN),
+                AiryEncircled(3.8317) / folded, 0.025)
+                << "band " << band << ", f/" << fNumber;
+            if (fNumber == kFNumber) {
+                // The Gaussian fit, sigma = 0.42 lambda N, has no
+                // rings: it holds 1 - exp(-(1.2197 / 0.42)^2 / 2) =
+                // 98.5% there, less the pixels' and the star's own
+                // spread at a pattern 2 to 3 pixels across, so well
+                // above the Airy pattern's.
+                EXPECT_GT(within(gaussian, band, centre, 0.0,
+                                 1.2197 * lambdaN),
+                          0.92);
+                // The wings, falling as r^-3, hold a share falling as
+                // 1 / r.
+                const double wings =
+                    (AiryEncircled(M_PI * 20.0 / lambdaN) -
+                     AiryEncircled(M_PI * 8.0 / lambdaN)) /
+                    folded;
+                EXPECT_NEAR(within(image, band, centre, 8.0, 20.0),
+                            wings, 0.2 * wings)
+                    << "band " << band;
+                EXPECT_LT(within(gaussian, band, centre, 8.0, 20.0),
+                          0.1 * wings);
+                // A secondary mirror a third of the aperture across
+                // moves light from the core into the first rings
+                // (Mahajan 1986): within 1.22 lambda N about 68% in
+                // place of 84%, and from there to 3 lambda N about
+                // 24% in place of 10%.
+                EXPECT_LT(within(obstructed, band, centre, 0.0,
+                                 1.2197 * lambdaN),
+                          within(clear, band, centre, 0.0,
+                                 1.2197 * lambdaN) -
+                              0.1)
+                    << "band " << band;
+                EXPECT_GT(within(obstructed, band, centre,
+                                 1.2197 * lambdaN, 3.0 * lambdaN),
+                          1.5 * within(clear, band, centre,
+                                       1.2197 * lambdaN,
+                                       3.0 * lambdaN))
+                    << "band " << band;
+            }
+        }
+    }
+
+    // Rings far finer than a pixel at a fast lens, and about a third
+    // of a pixel (as LRO's NAC's at f/3.59 and 7 micrometre pixels):
+    // light is kept, nearly all of it near the star.
+    for (const double fNumber : {1.0, 160.0}) {
+        const std::vector<float> fine = StarThrough(
+            delegate, fNumber,
+            {{"psf", {{"profile", 1.0f}, {"obstruction", 0.33f}}}});
+        const std::vector<float> base =
+            StarThrough(delegate, fNumber, {});
+        for (const std::size_t band :
+             {std::size_t{2}, std::size_t{12}}) {
+            EXPECT_NEAR(irradiance(fine, band),
+                        irradiance(base, band),
+                        0.01 * irradiance(base, band))
+                << "f/" << fNumber << ", band " << band;
+            EXPECT_GT(within(fine, band, centre, 0.0, 3.0), 0.9)
+                << "f/" << fNumber << ", band " << band;
+        }
+    }
 }
 
 TEST_F(RasterDelegateTest,

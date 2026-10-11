@@ -138,3 +138,21 @@ def test_add_sensor_filter_rejects_bad_filters(renderer):
             params={"scale": 1.0},
         )
     assert "bad3" not in renderer.sensor_filters
+
+
+def test_the_airy_point_spread_keeps_light_and_softens_edges(
+    renderer, terrain_scene
+):
+    base = hdr_through(renderer, terrain_scene, ["cie"])
+    airy = hdr_through(
+        renderer,
+        terrain_scene,
+        ["psf", "cie"],
+        {"profile": 1.0, "obstruction": 0.33, "blur": 1.0},
+    )
+    np.testing.assert_allclose(
+        airy[..., 0].sum(), base[..., 0].sum(), rtol=0.01
+    )
+    edges = np.abs(np.diff(airy[..., 0], axis=1)).sum()
+    assert edges < 0.9 * np.abs(np.diff(base[..., 0], axis=1)).sum()
+    assert renderer.take_validation_messages() == []

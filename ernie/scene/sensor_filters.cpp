@@ -268,12 +268,23 @@ std::vector<SensorFilterModel> StandardSensorFilters() {
         {"psf",
          "Point spread",
          "The lens's point-spread function: diffraction for the "
-         "camera's f-number per band "
-         "(a Gaussian fit to the Airy disc, sigma = 0.42 lambda N) "
-         "with a Gaussian blur for "
-         "aberrations; light is kept.",
+         "camera's f-number per band, "
+         "a Gaussian fit to the Airy disc (sigma = 0.42 lambda N) or "
+         "the Airy pattern itself "
+         "with its rings and r^-3 wings, integrated over each pixel, "
+         "behind an optional central "
+         "obstruction; with a Gaussian blur for aberrations; light "
+         "is kept.",
          {"G. B. Airy, \"On the Diffraction of an Object-glass with "
           "Circular Aperture\", 1835",
+          "M. Born and E. Wolf, \"Principles of Optics\", 7th ed., "
+          "1999, section 8.5.2",
+          "J. W. Goodman, \"Introduction to Fourier Optics\", 3rd "
+          "ed., 2005, section 4.4",
+          "V. N. Mahajan, \"Uniform versus Gaussian beams: a "
+          "comparison of the effects of "
+          "diffraction, obscuration, and aberrations\", JOSA A 3(4), "
+          "1986",
           "B. Zhang, J. Zerubia and J.-C. Olivo-Marin, \"Gaussian "
           "approximations of fluorescence "
           "microscope point-spread function models\", Applied Optics "
@@ -283,7 +294,15 @@ std::vector<SensorFilterModel> StandardSensorFilters() {
          {{"blur", 0.0f,
            "Gaussian sigma in pixels added to diffraction's"},
           {"maxRadius", 12.0f,
-           "The widest kernel in pixels, bounding the cost"}},
+           "The widest kernel in pixels, bounding the cost"},
+          {"profile", 0.0f,
+           "0 the Gaussian fit to the Airy disc, 1 the Airy pattern"},
+          {"obstruction", 0.0f,
+           "The central obstruction's diameter over the aperture's, "
+           "0 to 0.95 (Airy only)"},
+          {"samples", 8.0f,
+           "Sub-pixel samples per axis integrating the Airy pattern, "
+           "1 to 16"}},
          "Psf",
          shaders::kFilterPsfSlang},
         {"defocus",
