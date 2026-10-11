@@ -552,6 +552,39 @@ TEST(InstanceDataOf, ReadsArraysAndGroupsInstancesByPrototype) {
                  std::invalid_argument);
 }
 
+TEST(MaterialSettingsOf, AMeasuredReflectanceReplacesTheAlbedo) {
+    Scene scene;
+    const BrdfRegistry brdfs = BrdfRegistry::WithBuiltins();
+    ernie::Material material =
+        ernie::Material::Define(scene, "/Looks/Red")
+            .SetAlbedo({0.5, 0.5, 0.5})
+            .SetReflectance({400.0f, 0.04f, 550.0f, 0.06f, 700.0f,
+                             0.64f});
+    ernie::MaterialSettings settings =
+        ernie::MaterialSettingsOf(scene, "/Looks/Red", brdfs);
+    EXPECT_EQ(settings.reflectance.Wavelengths(),
+              (std::vector<double>{400.0, 550.0, 700.0}));
+    EXPECT_NEAR(settings.reflectance(625.0), 0.35, 1e-6);
+    // Held at the ends beyond the samples.
+    EXPECT_NEAR(settings.reflectance(780.0), 0.64, 1e-6);
+
+    // Without one, the albedo's RGB.
+    material.SetReflectance({});
+    EXPECT_TRUE(ernie::MaterialSettingsOf(scene, "/Looks/Red", brdfs)
+                    .reflectance.Empty());
+
+    // Pairs that are not a spectrum, and values no surface reflects.
+    for (const std::vector<float>& bad :
+         {std::vector<float>{400.0f, 0.5f, 700.0f},
+          std::vector<float>{700.0f, 0.5f, 400.0f, 0.5f},
+          std::vector<float>{400.0f, 0.5f, 700.0f, 1.5f}}) {
+        material.SetReflectance(bad);
+        EXPECT_THROW(
+            ernie::MaterialSettingsOf(scene, "/Looks/Red", brdfs),
+            std::invalid_argument);
+    }
+}
+
 TEST(BoundMaterial, FollowsBindingsToMaterialsOnly) {
     Scene scene;
     ernie::Material::Define(scene, "/Looks/Rock");

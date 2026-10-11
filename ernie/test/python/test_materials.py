@@ -205,3 +205,58 @@ def test_preview_surfaces_shade_metals_and_dielectrics_differently(
         "metallic changes the shading"
     )
     assert renderer.take_validation_messages() == []
+
+
+def test_measured_reflectance_spectra_colour_a_surface(renderer):
+    scene = ernie.Scene()
+    scene.define(
+        "/World/Camera", ernie.Camera, focal_length=18.0
+    ).set(
+        tokens.TRANSFORM,
+        ernie.look_at_transform((0, 0, 60), (0, 0, 0), up=(0, 1, 0)),
+    )
+    scene.define("/World/Sun", ernie.DistantLight).set(
+        tokens.TRANSFORM,
+        ernie.distant_light_transform((0.0, 0.0, 1.0)),
+    )
+    scene.define(
+        "/Render/Settings", ernie.RenderSettings, resolution=(32, 32)
+    )
+    half = 12.0
+    points = np.array(
+        [
+            [-half, -half, 0],
+            [half, -half, 0],
+            [half, half, 0],
+            [-half, half, 0],
+        ]
+    )
+    # Coarse samples of the Cornell box's red and green walls.
+    red = [400, 0.04, 550, 0.06, 600, 0.29, 650, 0.61, 700, 0.64]
+    green = [400, 0.09, 500, 0.29, 530, 0.48, 600, 0.16, 700, 0.16]
+    material = scene.define(
+        "/Looks/M", ernie.Material, albedo=(1.0, 1.0, 1.0)
+    )
+    scene.define(
+        "/World/Quad",
+        ernie.Mesh,
+        points=points,
+        face_vertex_counts=np.array([4]),
+        face_vertex_indices=np.arange(4),
+        material_binding=material,
+    )
+
+    def centre():
+        image = renderer.render(scene).astype(np.float64)
+        return image[8:24, 8:24, :3].mean(axis=(0, 1))
+
+    white = centre()
+    assert abs(white[0] - white[1]) < 0.1 * white[1]
+    material.reflectance = red
+    r, g, b = centre()
+    assert r > 2 * g and r > 2 * b, "the red spectrum reads red"
+    material.reflectance = green
+    r, g, b = centre()
+    # Green, with some blue: the curve reflects blue-greens too.
+    assert g > 1.5 * r and g > 1.2 * b, "the green one green"
+    assert renderer.take_validation_messages() == []

@@ -568,6 +568,9 @@ inline constexpr std::string_view kBrdf =
     "ernie:brdf";  ///< BRDF model id.
 inline constexpr std::string_view kAlbedo =
     "inputs:albedo";  ///< vec3 linear albedo.
+/// float[] (nm, value) pairs of a reflectance spectrum, replacing the
+/// albedo.
+inline constexpr std::string_view kReflectance = "inputs:reflectance";
 inline constexpr std::string_view kAlbedoMap =
     "inputs:albedoMap";  ///< float32 (rows, cols).
 inline constexpr std::string_view kAlbedoMapOrigin =

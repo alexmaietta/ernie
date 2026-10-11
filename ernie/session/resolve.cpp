@@ -2875,6 +2875,27 @@ MaterialSettings MaterialSettingsOf(const Scene& scene,
             static_cast<float>(shader.GetOpacityThreshold()), 0.0f,
             1.0f);
     }
+    // A measured reflectance spectrum replaces the albedo, whichever
+    // model shades it.
+    const std::vector<float> reflectance = view.GetReflectance();
+    if (!reflectance.empty()) {
+        const auto bad = [&](const std::string& why) {
+            return std::invalid_argument(
+                "Material '" + material.String() + "' has '" +
+                std::string(kReflectance) + "' " + why);
+        };
+        try {
+            settings.reflectance = Spectrum::FromPairs(reflectance);
+        } catch (const std::invalid_argument& error) {
+            throw bad(std::string("pairs that are not a spectrum: ") +
+                      error.what());
+        }
+        for (const double value : settings.reflectance.Values()) {
+            if (!(value >= 0.0 && value <= 1.0)) {
+                throw bad("values outside [0, 1]");
+            }
+        }
+    }
     // Emission, from the preview surface or else the Material itself,
     // whatever the model.
     const Path& emitter = surface.IsEmpty() ? material : surface;
