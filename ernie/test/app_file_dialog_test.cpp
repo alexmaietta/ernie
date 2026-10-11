@@ -79,8 +79,11 @@ TEST(FileDialogListing, ResolvesTypedNames) {
               dir / "a.json");
     EXPECT_EQ(ChosenPath(dir, "sub/../c.txt", nullptr, false),
               dir / "c.txt");
-    EXPECT_EQ(ChosenPath(dir, "/abs/x.json", nullptr, false),
-              fs::path("/abs/x.json"));
+    // Absolute on every platform: Windows's needs a drive, as "/abs"
+    // alone is on the current one.
+    const fs::path absolute = dir.root_path() / "abs" / "x.json";
+    EXPECT_EQ(ChosenPath(dir, absolute.string(), nullptr, false),
+              absolute);
     EXPECT_EQ(ChosenPath(dir, "new", &kJson, true), dir / "new.json")
         << "saving adds the type";
     EXPECT_EQ(ChosenPath(dir, "new", &kJson, false), dir / "new");
