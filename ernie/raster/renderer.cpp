@@ -3027,25 +3027,48 @@ void RasterRenderer::WriteSensor(const FrameParams& params,
             weights[static_cast<std::size_t>(i)] *
             kLuminousEfficacy));
     }
-    // A monochrome sensor's photographic outputs are grey: its
-    // channel's spectral response, scaled so that a flat spectrum
-    // keeps the luminance the CIE observer gives it.
-    if (model.channels.size() == 1) {
-        const std::vector<float> response =
-            model.channels.front().quantumEfficiency.Bin(bands_);
-        double luminance = 0.0;
-        double total = 0.0;
-        for (int i = 0; i < bands_.count; ++i) {
-            const glm::dvec3& rgb =
-                colours[static_cast<std::size_t>(i)];
-            luminance +=
-                0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b;
-            total += response[static_cast<std::size_t>(i)];
+    // A sensor's own photographic response: each channel's spectral
+    // response over its peak, taken as the CIE observer's luminous
+    // efficiency (whose peak is 1), so a response shaped as the eye's
+    // shows the luminance the eye sees, and one beyond the visible
+    // (the near infrared, say) shows the light it sees, which the eye
+    // would not. A monochrome sensor's outputs are grey, its
+    // channel's response; a colour sensor's are its channels' as red,
+    // green and blue when the eye sees less than half the light they
+    // do (false colour), else the eye's colour.
+    std::vector<std::vector<float>> responses;
+    float peak = 0.0f;
+    for (const SensorChannel& channel : model.channels) {
+        responses.push_back(channel.quantumEfficiency.Bin(bands_));
+        for (const float value : responses.back()) {
+            peak = std::max(peak, value);
         }
-        const double scale = total > 0.0 ? luminance / total : 0.0;
+    }
+    const auto own = [&](std::size_t c, int i) {
+        return peak > 0.0f
+                   ? kLuminousEfficacy *
+                         responses[c][static_cast<std::size_t>(i)] /
+                         peak * bands_.Width()
+                   : 0.0;
+    };
+    if (model.channels.size() == 1) {
         for (int i = 0; i < bands_.count; ++i) {
-            colours[static_cast<std::size_t>(i)] = glm::dvec3(
-                scale * response[static_cast<std::size_t>(i)]);
+            colours[static_cast<std::size_t>(i)] =
+                glm::dvec3(own(0, i));
+        }
+    } else if (model.channels.size() == 3) {
+        double eye = 0.0;
+        double channels = 0.0;
+        for (int i = 0; i < bands_.count; ++i) {
+            eye += kLuminousEfficacy *
+                   weights[static_cast<std::size_t>(i)].y;
+            channels += std::max({own(0, i), own(1, i), own(2, i)});
+        }
+        if (eye < 0.5 * channels) {
+            for (int i = 0; i < bands_.count; ++i) {
+                colours[static_cast<std::size_t>(i)] =
+                    glm::dvec3(own(0, i), own(1, i), own(2, i));
+            }
         }
     }
     for (int i = 0; i < bands_.count; ++i) {
