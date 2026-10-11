@@ -31,14 +31,17 @@ constexpr const char* kLightPatternSlang = R"(
 [[vk::binding(29, 0)]] StructuredBuffer<float> lightPatternData;
 
 // Where a pattern is evaluated: t = (x / z, y / z) on the tangent plane, a pixel's footprint
-// there, the beam's own 1/e^2 radius there (w(z) / z), the laser's wavelength (nm) and the time
-// (s).
+// there, the beam's own 1/e^2 radius there (w(z) / z), the laser's wavelength (nm), the frame's
+// time on the sensor clock (s, as a float), and which of the `frames` patterns of the laser's
+// sequence (ernie:laser:sequence:count) shows: 0 of 1 without one.
 public struct LightPatternInput {
     public float2 t;
     public float2 footprint;
     public float2 beam;
     public float wavelength;
     public float time;
+    public uint frame;
+    public uint frames;
 }
 
 public struct LightPatternParams {
@@ -280,13 +283,21 @@ constexpr const char* kImageSlang = R"(
 import light_pattern;
 
 // The laser's image over |t.x| < p0 and |t.y| < p1 (tangents of half its field of view), its top
-// towards +y, averaged over the pixel's footprint and the beam's width.
+// towards +y, averaged over the pixel's footprint and the beam's width. A sequence's frames are
+// the image's equal bands, top to bottom.
 public struct LaserImage : ILightPattern {
     public float emission(LightPatternInput input, LightPatternParams p) {
         let half = float2(p.get(0), p.get(1));
-        let uv = float2(0.5 + 0.5 * input.t.x / half.x, 0.5 - 0.5 * input.t.y / half.y);
+        let frames = float(max(input.frames, 1));
+        // Within its frame's band, half a texel from the next, so its edges do not blend in
+        // another frame's.
+        let edge = 0.5 / float(max(p.imageSize().y, 1));
+        let uv = float2(0.5 + 0.5 * input.t.x / half.x,
+                        clamp((float(input.frame) + 0.5 - 0.5 * input.t.y / half.y) / frames,
+                              float(input.frame) / frames + edge,
+                              float(input.frame + 1) / frames - edge));
         let blur = sqrt(input.footprint * input.footprint + input.beam * input.beam);
-        return p.image(uv, 0.5 * blur / half);
+        return p.image(uv, 0.5 * blur / half / float2(1.0, frames));
     }
 }
 )";

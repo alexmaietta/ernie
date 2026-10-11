@@ -814,6 +814,20 @@ TEST(LightParamsOf, LaserPatternsAndTheirShadowCones) {
                  std::invalid_argument);
     laser.SetDotJitter(0.9);
 
+    // Pulses and a sequence carry through; pulses longer than their
+    // period cannot be.
+    laser.SetPulseRate(1000.0).SetPulseWidth(1e-4).SetSequenceCount(
+        4);
+    const LightParams timed =
+        ernie::LightParamsOf(scene, "/Laser", bands);
+    EXPECT_EQ(timed.beam.pulseRate, 1000.0);
+    EXPECT_EQ(timed.beam.sequenceCount, 4);
+    EXPECT_NEAR(timed.beam.sequencePeriod, 1.0 / 30.0, 1e-12);
+    laser.SetPulseWidth(2e-3);
+    EXPECT_THROW(ernie::LightParamsOf(scene, "/Laser", bands),
+                 std::invalid_argument);
+    laser.SetPulseRate(0.0).SetSequenceCount(1);
+
     // An image needs its file; over 40 x 30 degrees it reaches
     // tan 20 and tan 15 across the tangent plane.
     laser.SetPattern("image");

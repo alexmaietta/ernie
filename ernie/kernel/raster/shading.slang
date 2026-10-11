@@ -210,6 +210,11 @@ struct ShadingConstants {
 // the renderer's `patternNormMain`), which its emission is divided by so the laser emits its
 // power.
 [[vk::binding(27, 0)]] StructuredBuffer<float> patternNorms;
+// Per shaded view and light slot, kMaxLit (sequence frame, weight) pairs: the frames a laser shows
+// over the view's span of the sensor clock and how much, its pulses' energy then over their
+// average included (the renderer's `WriteLightTiming`).
+[[vk::binding(31, 0)]] StructuredBuffer<float2> lightTiming;
+static const uint kMaxLit = 4;
 static const uint kProfileRows = 129;
 static const uint kProfileColumns = 64;
 
@@ -681,7 +686,8 @@ float3x2 pixelFootprint(int2 pixel, uint layer, float3 world) {
 // the plane across the axis that is its emission over z^2. It is given the beam's own 1/e^2
 // radius there, w(z) / z with w = w0 sqrt(1 + (z / z_R)^2) along each axis, so the spot (the beam
 // itself) is 2 / (pi w_x w_y) exp(-2 (x^2 / w_x^2 + y^2 / w_y^2)) near its waist and far from it
-// alike. `efficiency` of the power goes into the pattern, the zero order into a spot.
+// alike. `efficiency` of the power goes into the pattern, the zero order into a spot. A sequence
+// shows its frame `frame`.
 //
 // Across the ray, that irradiance is over the cosine between the ray and the axis: a pattern's
 // rays leave the aperture, while the beam's own follow its wavefronts, of radius
@@ -689,7 +695,7 @@ float3x2 pixelFootprint(int2 pixel, uint layer, float3 world) {
 //
 // References:
 // - A. E. Siegman, Lasers, University Science Books, 1986, ch. 17.
-float laserIrradiance(LightGpu light, uint slot, float3 world, float3x2 footprint) {
+float laserIrradiance(LightGpu light, uint slot, float3 world, float3x2 footprint, uint frame) {
     let offset = world - light.position.xyz;
     let along = dot(offset, light.axis.xyz);
     if (along <= 0.0) {
@@ -711,6 +717,8 @@ float laserIrradiance(LightGpu light, uint slot, float3 world, float3x2 footprin
     input.beam = w / along;
     input.wavelength = light.pattern.y;
     input.time = light.pattern.z;
+    input.frame = frame;
+    input.frames = max(uint(light.pattern.w), 1);
     // The beam's rays' slope r / R and a pattern's from the aperture.
     let slope = across * z / (z * z + zr * zr);
     let beamOblique = sqrt(1.0 + dot(slope, slope));
@@ -1400,7 +1408,15 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                 footprint = pixelFootprint(int2(id.xy), id.z, world);
                 footprinted = true;
             }
-            scale = laserIrradiance(light, k, world, footprint);
+            // Over the frames of its sequence the view's span of time shows, each weighted by
+            // its share of the span and its pulses then.
+            scale = 0.0;
+            for (uint s = 0; s < kMaxLit; ++s) {
+                let lit = lightTiming[(shadedView * kMaxLights + k) * kMaxLit + s];
+                if (lit.y > 0.0) {
+                    scale += lit.y * laserIrradiance(light, k, world, footprint, uint(lit.x));
+                }
+            }
             let reach = max(length(float3(footprint[0].x, footprint[1].x, footprint[2].x)),
                             length(float3(footprint[0].y, footprint[1].y, footprint[2].y)));
             if (light.beamExtra.y > 0.5) {

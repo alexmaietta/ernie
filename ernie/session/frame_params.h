@@ -305,10 +305,39 @@ struct LightParams {
         std::vector<float> patternData;
         std::shared_ptr<const LightPatternImage> patternImage;
         float wavelength = 0.0f;  ///< nm, the line's centre.
+        /// Its timing on the sensor clock, seconds: pulses
+        /// `pulseWidth` long at `pulseRate` per second from
+        /// `pulseDelay` (a rate of 0, continuous), and a sequence of
+        /// `sequenceCount` pattern frames, each `sequencePeriod`
+        /// long, from `sequenceDelay`.
+        double pulseRate = 0.0;
+        double pulseWidth = 0.0;
+        double pulseDelay = 0.0;
+        int sequenceCount = 1;
+        double sequencePeriod = 1.0;
+        double sequenceDelay = 0.0;
 
         bool IsSpot() const {
             return pattern == "spot";
         }
+
+        /// One frame of its sequence lit during a span of time, and
+        /// how much: the light's mean over the span relative to its
+        /// average power.
+        struct Lit {
+            std::uint32_t frame = 0;
+            float weight = 0.0f;
+        };
+        static constexpr std::size_t kMaxLit = 4;
+
+        /// What the beam shows over [`start`, `end`] seconds of the
+        /// sensor clock: each sequence frame shown then, weighted by
+        /// its share of the span times its pulses' energy then over
+        /// their average (1 / duty cycle while a pulse is on, 0
+        /// between them), exactly. A span of no length is its
+        /// instant's. Over more than `kMaxLit` frames, `kMaxLit` of
+        /// them spread evenly carry the weight of all.
+        std::vector<Lit> LitBetween(double start, double end) const;
     };
     Beam beam;
     bool shadows = true;

@@ -281,6 +281,29 @@
       (::ernie::AttributeMeta{.label = "Pattern data",                                             \
                               .doc = "Data a custom pattern reads, p.data(i).",                    \
                               .group = "Pattern"}))                                                \
+    X(double, PulseRate, ::ernie::tokens::kLaserPulseRate, 0.0,                                    \
+      (::ernie::AttributeMeta{.label = "Pulse rate",                                               \
+                              .doc = "Pulses per second; 0 a continuous beam.", .group = "Time",   \
+                              .max = 1e9}))                                                        \
+    X(double, PulseWidth, ::ernie::tokens::kLaserPulseWidth, 0.0,                                  \
+      (::ernie::AttributeMeta{.label = "Pulse width", .doc = "Each pulse's length, seconds.",      \
+                              .group = "Time", .max = 1.0}))                                       \
+    X(double, PulseDelay, ::ernie::tokens::kLaserPulseDelay, 0.0,                                  \
+      (::ernie::AttributeMeta{.label = "Pulse delay",                                              \
+                              .doc = "When a pulse starts on the sensor clock, seconds.",          \
+                              .group = "Time", .min = -1.0, .max = 1.0}))                          \
+    X(int, SequenceCount, ::ernie::tokens::kLaserSequenceCount, 1,                                 \
+      (::ernie::AttributeMeta{.label = "Sequence count",                                           \
+                              .doc = "Patterns shown in turn; 1 one pattern.", .group = "Time",    \
+                              .min = 1.0, .max = 1024.0}))                                         \
+    X(double, SequencePeriod, ::ernie::tokens::kLaserSequencePeriod, 1.0 / 30.0,                   \
+      (::ernie::AttributeMeta{.label = "Sequence period",                                          \
+                              .doc = "How long each pattern of a sequence shows, seconds.",        \
+                              .group = "Time", .max = 10.0}))                                      \
+    X(double, SequenceDelay, ::ernie::tokens::kLaserSequenceDelay, 0.0,                            \
+      (::ernie::AttributeMeta{.label = "Sequence delay",                                           \
+                              .doc = "When the first pattern shows on the sensor clock, seconds.", \
+                              .group = "Time", .min = -10.0, .max = 10.0}))                        \
     X(bool, ShadowEnable, ::ernie::tokens::kShadowEnable, true,                                    \
       (::ernie::AttributeMeta{.label = "Shadows", .group = "Laser"}))
 

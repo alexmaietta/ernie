@@ -980,8 +980,20 @@ class RasterRenderer {
     std::vector<std::pair<std::vector<float>,
                           std::shared_ptr<const LightPatternImage>>>
         patternDataHeld_;
+    /// Per shaded view and light slot, `LightParams::Beam::kMaxLit`
+    /// (sequence frame, weight) pairs: what a laser shows over the
+    /// view's span of the sensor clock (shading.slang's
+    /// lightTiming), grown as the views need.
+    std::unique_ptr<GpuBuffer> lightTiming_;
     /// Records the integration of the frame's light patterns.
     void RecordPatternNorms(VkCommandBuffer commands) const;
+    /// Writes `lightTiming_` for `params`' lasers over `views` shaded
+    /// views: a single frame's over the camera's exposure ending at
+    /// its shutter's close, a sub-frame's over its share of the
+    /// shutter around its time.
+    void WriteLightTiming(const FrameParams& frame,
+                          const FrameParams& params,
+                          std::uint32_t views);
     GpuBuffer lightViewMatrices_;
     /// Per light shadow view, a Shadows block (frame.slang) whose
     /// first matrix its shadow pass draws with

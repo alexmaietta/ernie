@@ -252,3 +252,62 @@ TEST(FrameParams, CubeFacesTurnEachViewOntoItsFaces) {
     EXPECT_EQ(frame.Faces(ernie::kCubeFaces).Views(),
               2u * ernie::kCubeFaces);
 }
+
+TEST(LaserTiming, PulsesWeighTheirEnergyOverTheSpan) {
+    using Beam = ernie::LightParams::Beam;
+    Beam beam;
+    // Continuous: all of it, whatever the span.
+    ASSERT_EQ(beam.LitBetween(3.0, 4.0).size(), 1u);
+    EXPECT_EQ(beam.LitBetween(3.0, 4.0)[0].weight, 1.0f);
+    // 10 ms pulses at 10 Hz, a tenth of the time on: a span holding
+    // one pulse in 50 ms gets twice the average, one between pulses
+    // none, a long one the average.
+    beam.pulseRate = 10.0;
+    beam.pulseWidth = 0.01;
+    EXPECT_FLOAT_EQ(beam.LitBetween(0.0, 0.05)[0].weight, 2.0f);
+    EXPECT_FLOAT_EQ(beam.LitBetween(0.02, 0.05)[0].weight, 0.0f);
+    EXPECT_FLOAT_EQ(beam.LitBetween(0.095, 0.105)[0].weight, 5.0f)
+        << "half of a pulse in 10 ms";
+    EXPECT_NEAR(beam.LitBetween(-3.0, 7.0)[0].weight, 1.0f, 1e-6f);
+    // An instant: ten times the average during a pulse, else none.
+    EXPECT_FLOAT_EQ(beam.LitBetween(1.005, 1.005)[0].weight, 10.0f);
+    EXPECT_FLOAT_EQ(beam.LitBetween(1.02, 1.02)[0].weight, 0.0f);
+    beam.pulseDelay = 0.03;
+    EXPECT_FLOAT_EQ(beam.LitBetween(0.035, 0.035)[0].weight, 10.0f)
+        << "pulses from their delay";
+}
+
+TEST(LaserTiming, SequencesShowEachFrameForItsShareOfTheSpan) {
+    using Beam = ernie::LightParams::Beam;
+    Beam beam;
+    beam.sequenceCount = 3;
+    beam.sequencePeriod = 0.1;
+    std::vector<Beam::Lit> lit = beam.LitBetween(0.05, 0.15);
+    ASSERT_EQ(lit.size(), 2u);
+    EXPECT_EQ(lit[0].frame, 0u);
+    EXPECT_EQ(lit[1].frame, 1u);
+    EXPECT_FLOAT_EQ(lit[0].weight, 0.5f);
+    EXPECT_FLOAT_EQ(lit[1].weight, 0.5f);
+    lit = beam.LitBetween(0.25, 0.25);
+    ASSERT_EQ(lit.size(), 1u);
+    EXPECT_EQ(lit[0].frame, 2u);
+    lit = beam.LitBetween(-0.1, 0.0);
+    ASSERT_EQ(lit.size(), 1u);
+    EXPECT_EQ(lit[0].frame, 2u) << "before its delay, counting back";
+    // Over ten frames, four of them spread evenly carry it all.
+    lit = beam.LitBetween(0.0, 1.0);
+    ASSERT_EQ(lit.size(), Beam::kMaxLit);
+    float sum = 0.0f;
+    for (const Beam::Lit& each : lit) {
+        sum += each.weight;
+    }
+    EXPECT_NEAR(sum, 1.0f, 1e-6f);
+    // With pulses: only the frame a pulse falls in.
+    beam.pulseRate = 10.0;
+    beam.pulseWidth = 0.01;
+    beam.pulseDelay = 0.12;
+    lit = beam.LitBetween(0.05, 0.15);
+    ASSERT_EQ(lit.size(), 2u);
+    EXPECT_FLOAT_EQ(lit[0].weight, 0.0f);
+    EXPECT_FLOAT_EQ(lit[1].weight, 1.0f);
+}

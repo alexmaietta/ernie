@@ -394,6 +394,27 @@ inline constexpr std::string_view kLaserDotJitter =
     "ernie:laser:dotJitter";
 inline constexpr std::string_view kLaserDotSeed =
     "ernie:laser:dotSeed";
+/// A pulsed laser (0 rate: continuous): pulses `pulse:width` seconds
+/// long at `pulse:rate` per second, the first starting
+/// `pulse:delay` seconds into the sensor clock
+/// (`RenderDelegate::Time`); its `power` is their average.
+inline constexpr std::string_view kLaserPulseRate =
+    "ernie:laser:pulse:rate";
+inline constexpr std::string_view kLaserPulseWidth =
+    "ernie:laser:pulse:width";
+inline constexpr std::string_view kLaserPulseDelay =
+    "ernie:laser:pulse:delay";
+/// A sequence of `sequence:count` patterns (1: one), each shown for
+/// `sequence:period` seconds in turn from `sequence:delay` seconds
+/// into the sensor clock, as structured light's Gray codes and phase
+/// shifts are: the pattern's frames (`LightPatternInput::frame`), an
+/// image's stacked top to bottom.
+inline constexpr std::string_view kLaserSequenceCount =
+    "ernie:laser:sequence:count";
+inline constexpr std::string_view kLaserSequencePeriod =
+    "ernie:laser:sequence:period";
+inline constexpr std::string_view kLaserSequenceDelay =
+    "ernie:laser:sequence:delay";
 inline constexpr std::string_view kLaserEfficiency =
     "ernie:laser:efficiency";
 inline constexpr std::string_view kLaserZeroOrder =

@@ -185,6 +185,83 @@ PushbroomStrip FrameParams::Strip(std::size_t view) const {
     return strip;
 }
 
+std::vector<LightParams::Beam::Lit>
+LightParams::Beam::LitBetween(double start, double end) const {
+    const bool pulsed = pulseRate > 0.0;
+    const double period = pulsed ? 1.0 / pulseRate : 0.0;
+    const double duty =
+        pulsed ? std::min(pulseWidth * pulseRate, 1.0) : 1.0;
+    // The pulses' seconds on from `pulseDelay` to `t`.
+    const auto onUntil = [&](double t) {
+        const double u = t - pulseDelay;
+        const double n = std::floor(u / period);
+        return n * pulseWidth +
+               std::clamp(u - n * period, 0.0, pulseWidth);
+    };
+    // The light's mean over [a, b] over its average.
+    const auto mean = [&](double a, double b) {
+        if (!pulsed) {
+            return 1.0;
+        }
+        if (!(duty > 0.0)) {
+            return 0.0;
+        }
+        if (!(b > a)) {
+            const double u = a - pulseDelay;
+            return u - std::floor(u / period) * period < pulseWidth
+                       ? 1.0 / duty
+                       : 0.0;
+        }
+        return (onUntil(b) - onUntil(a)) / (b - a) / duty;
+    };
+    const int count = std::max(sequenceCount, 1);
+    if (count == 1) {
+        return {{0u, static_cast<float>(mean(start, end))}};
+    }
+    // The sequence's slots the span meets, slot n shown from
+    // `sequenceDelay + n sequencePeriod`.
+    const auto frameOf = [&](double slot) {
+        const auto n = static_cast<long long>(slot) % count;
+        return static_cast<std::uint32_t>(n < 0 ? n + count : n);
+    };
+    const double first =
+        std::floor((start - sequenceDelay) / sequencePeriod);
+    if (!(end > start)) {
+        return {
+            {frameOf(first), static_cast<float>(mean(start, end))}};
+    }
+    const double last =
+        std::ceil((end - sequenceDelay) / sequencePeriod) - 1.0;
+    const double slots = std::max(last - first + 1.0, 1.0);
+    std::vector<Lit> lit;
+    if (slots <= static_cast<double>(kMaxLit)) {
+        for (double slot = first; slot <= last; slot += 1.0) {
+            const double a = std::max(
+                start, sequenceDelay + slot * sequencePeriod);
+            const double b = std::min(
+                end, sequenceDelay + (slot + 1.0) * sequencePeriod);
+            if (b > a) {
+                lit.push_back(
+                    {frameOf(slot),
+                     static_cast<float>(mean(a, b) * (b - a) /
+                                        (end - start))});
+            }
+        }
+        return lit;
+    }
+    const auto share = static_cast<float>(
+        mean(start, end) / static_cast<double>(kMaxLit));
+    for (std::size_t i = 0; i < kMaxLit; ++i) {
+        lit.push_back(
+            {frameOf(
+                 first +
+                 std::floor((static_cast<double>(i) + 0.5) * slots /
+                            static_cast<double>(kMaxLit))),
+             share});
+    }
+    return lit;
+}
+
 FrameParams FrameParams::Subframes() const {
     FrameParams result = *this;
     const int subframes = camera.Subframes();

@@ -1595,6 +1595,27 @@ LightParams LaserParamsOf(const Scene& scene, const Path& path,
             "efficiency "
             "and zero order add to at most 1");
     }
+    // Its pulses and sequence of patterns.
+    beam.pulseRate = laser.GetPulseRate();
+    beam.pulseWidth = laser.GetPulseWidth();
+    beam.pulseDelay = laser.GetPulseDelay();
+    beam.sequenceCount = laser.GetSequenceCount();
+    beam.sequencePeriod = laser.GetSequencePeriod();
+    beam.sequenceDelay = laser.GetSequenceDelay();
+    if (!(beam.pulseRate >= 0.0) || !std::isfinite(beam.pulseRate) ||
+        (beam.pulseRate > 0.0 &&
+         (!(beam.pulseWidth > 0.0) ||
+          beam.pulseWidth * beam.pulseRate > 1.0 + 1e-9)) ||
+        !std::isfinite(beam.pulseDelay) || beam.sequenceCount < 1 ||
+        !(beam.sequencePeriod > 0.0) ||
+        !std::isfinite(beam.sequencePeriod) ||
+        !std::isfinite(beam.sequenceDelay)) {
+        throw std::invalid_argument(
+            "LaserLight '" + path.String() +
+            "' needs a pulse rate of 0 or more with pulses that fit "
+            "it, one or more patterns in its sequence and a positive "
+            "period");
+    }
     if (!beam.IsSpot()) {
         light.coneAngle = static_cast<float>(
             std::min(glm::degrees(extent) + 1.0, 180.0));

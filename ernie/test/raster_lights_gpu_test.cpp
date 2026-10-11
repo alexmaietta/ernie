@@ -785,6 +785,76 @@ TEST_F(RasterDelegateTest, LaserDotsAreSeededAndKeepTheirPower) {
     EXPECT_NEAR(total(second), 0.9, 0.03);
 }
 
+TEST_F(RasterDelegateTest, LaserPulsesAndSequencesFollowTheClock) {
+    RasterDelegate delegate(*context_);
+    double bandWidth = 0.0;
+    Scene scene = LaserScene(0.001, &bandWidth);
+    const auto [r0, left] = PixelOf(scene, -10.0f, 0.0f);
+    const auto [r1, right] = PixelOf(scene, 10.0f, 0.0f);
+    const double pixel = (PixelCentre(scene, 10.0f, 0.0f).x -
+                          PixelCentre(scene, -10.0f, 0.0f).x) /
+                         static_cast<double>(right - left);
+    const double unit = 0.5 / M_PI / bandWidth;
+    const auto total = [&](const std::vector<float>& band) {
+        double power = 0.0;
+        for (const float value : band) {
+            power += value * pixel * pixel;
+        }
+        return power / unit;
+    };
+    // A 50 ms exposure ending at each frame's time.
+    scene.Set("/World/Camera", tokens::kExposureTime,
+              ernie::Value(0.05));
+
+    // 10 ms pulses at 10 Hz: an exposure holding a pulse sees twice
+    // the average power, one between pulses none.
+    ernie::LaserLight laser(scene, "/World/Laser");
+    laser.SetPulseRate(10.0).SetPulseWidth(0.01);
+    delegate.ResetTime(0.05);
+    EXPECT_NEAR(total(Band8(delegate, scene)), 2.0, 0.06)
+        << "the pulse at 0 s";
+    delegate.ResetTime(0.08);
+    EXPECT_NEAR(total(Band8(delegate, scene)), 0.0, 1e-6)
+        << "between pulses";
+
+    // A sequence of two images, 0.1 s each: the left half of the
+    // field lit, then the right; a 4 m x 2 m field on the floor.
+    const std::filesystem::path file =
+        std::filesystem::temp_directory_path() /
+        "ernie_laser_sequence_test.png";
+    std::array<std::uint8_t, 64> texels{};
+    for (std::size_t row = 0; row < 8; ++row) {
+        for (std::size_t col = 0; col < 8; ++col) {
+            texels[row * 8 + col] = (row < 4) == (col < 4) ? 255 : 0;
+        }
+    }
+    ASSERT_NE(stbi_write_png(file.string().c_str(), 8, 8, 1,
+                             texels.data(), 8),
+              0);
+    laser.SetPulseRate(0.0)
+        .SetPattern("image")
+        .SetPatternImage(file.string())
+        .SetPatternFieldOfView(
+            glm::degrees(2.0 * glm::atan(glm::dvec2(0.2, 0.1))))
+        .SetSequenceCount(2)
+        .SetSequencePeriod(0.1);
+    const auto at = [&](const std::vector<float>& band, float x) {
+        const auto [row, col] = PixelOf(scene, x, 0.0f);
+        return band[row * kVarSize + col] / unit;
+    };
+    // All 1 W in a lit half of 4 m^2.
+    delegate.ResetTime(0.05);
+    std::vector<float> band = Band8(delegate, scene);
+    EXPECT_NEAR(at(band, -1.0f), 0.25, 0.0125) << "frame 0, left";
+    EXPECT_LT(at(band, 1.0f), 0.0125);
+    EXPECT_NEAR(total(band), 1.0, 0.05);
+    delegate.ResetTime(0.15);
+    band = Band8(delegate, scene);
+    EXPECT_LT(at(band, -1.0f), 0.0125);
+    EXPECT_NEAR(at(band, 1.0f), 0.25, 0.0125) << "frame 1, right";
+    std::filesystem::remove(file);
+}
+
 TEST_F(RasterDelegateTest, LasersLightAGaussianSpot) {
     RasterDelegate delegate(*context_);
     double bandWidth = 0.0;

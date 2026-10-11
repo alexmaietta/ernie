@@ -36,12 +36,16 @@ struct LightPatternParam {
 /// `input.t`, averaged over a pixel's footprint `input.footprint`
 /// wide in it (so features finer than a pixel keep their power), at
 /// the laser's `input.wavelength` (nm) and the frame's `input.time`
-/// (s; 0 until frames carry one). `input.beam` is the beam's own
-/// 1/e^2 radius there, w(z) / z, which a pattern of beamlets draws
-/// each one with (`beamlet`); a continuous pattern can ignore it.
+/// on the sensor clock (s). `input.beam` is the beam's own 1/e^2
+/// radius there, w(z) / z, which a pattern of beamlets draws each one
+/// with (`beamlet`); a continuous pattern can ignore it. A laser with
+/// a sequence (`ernie:laser:sequence:count`) shows its frame
+/// `input.frame` of `input.frames` (0 of 1 without one), the frames
+/// its exposure spans weighted by their time in it.
 ///
 /// Its scale does not matter: Ernie integrates it over |t| < `extent`
-/// on the GPU, so the laser emits its power's
+/// on the GPU, averaged over its sequence's frames, so the laser
+/// emits its power's
 /// `ernie:laser:efficiency` into it (its `ernie:laser:zeroOrder`
 /// going into an undiffracted spot), unless `normalized` says it
 /// integrates to 1 already. Parameter `i` is `p.get(i)`; the laser's

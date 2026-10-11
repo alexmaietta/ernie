@@ -117,7 +117,8 @@ struct LightGpu {
     float beam[4];
     float beamExtra[4];
     /// x: its pattern's index in the registry, y: the laser's
-    /// wavelength (nm), z: the frame's time (s); `patternExtent` xy
+    /// wavelength (nm), z: the frame's time (s), w: its sequence's
+    /// frames (`lightTiming_` says which show); `patternExtent` xy
     /// its tangent-plane half extents (0 unbounded); `patternLayout`
     /// its data and image in `patternData_` (shading.slang's
     /// LightPatternParams); its parameters.
@@ -149,7 +150,8 @@ constexpr DescriptorBinding kPatternBindings[] = {
 };
 
 /// Integrates each job's pattern over its extent on a grid of 256 x
-/// 256 cells, a workgroup per job, into `norms` at its slot.
+/// 256 cells, averaged over its sequence's frames (`info.z`), a
+/// workgroup per job, into `norms` at its slot.
 constexpr const char* kPatternNormSlang = R"(
 import light_pattern;
 import light_patterns;
@@ -181,13 +183,18 @@ void patternNormMain(uint3 group : SV_GroupID,
     input.beam = float2(0.0);
     input.wavelength = job.values.z;
     input.time = job.values.w;
+    input.frames = max(job.info.z, 1);
     input.t.y = -extent.y + (float(thread.x) + 0.5) * cell.y;
+    // Averaged over the sequence's frames.
     var sum = 0.0;
-    for (uint i = 0; i < kCells; ++i) {
-        input.t.x = -extent.x + (float(i) + 0.5) * cell.x;
-        sum += max(lightPattern(job.info.x, input, p), 0.0);
+    for (uint frame = 0; frame < input.frames; ++frame) {
+        input.frame = frame;
+        for (uint i = 0; i < kCells; ++i) {
+            input.t.x = -extent.x + (float(i) + 0.5) * cell.x;
+            sum += max(lightPattern(job.info.x, input, p), 0.0);
+        }
     }
-    partial[thread.x] = sum * cell.x * cell.y;
+    partial[thread.x] = sum * cell.x * cell.y / float(input.frames);
     GroupMemoryBarrierWithGroupSync();
     for (uint stride = kCells / 2; stride > 0; stride /= 2) {
         if (thread.x < stride) {
@@ -339,6 +346,7 @@ constexpr DescriptorBinding kShadingBindings[] = {
     {28, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {29, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {30, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {31, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
 /// shading.slang's ShadingConstants: the dispatch's model and first
@@ -1000,6 +1008,9 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
       patternData_(std::make_unique<GpuBuffer>(
           context, sizeof(float), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
           BufferMemory::Device)),
+      lightTiming_(std::make_unique<GpuBuffer>(
+          context, sizeof(glm::vec2),
+          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device)),
       lightViewMatrices_(
           context, kMaxLightShadowViews * sizeof(glm::mat4),
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device),
@@ -1223,6 +1234,61 @@ void RasterRenderer::AddLightPattern(LightPatternModel model) {
     skyPipelines_ = {};
     occlusionPipeline_.reset();
     occlusionFilterPipeline_.reset();
+}
+
+void RasterRenderer::WriteLightTiming(const FrameParams& frame,
+                                      const FrameParams& params,
+                                      std::uint32_t views) {
+    constexpr std::size_t kLit = LightParams::Beam::kMaxLit;
+    std::vector<glm::vec2> timing(static_cast<std::size_t>(views) *
+                                      kMaxLights * kLit,
+                                  glm::vec2(0.0f));
+    const CameraParams& camera = frame.camera;
+    // A sub-frame's share of the shutter, seconds.
+    const double spacing =
+        subframes_ > 1
+            ? std::abs(frame.TimeAt(camera.SubframeTime(1)) -
+                       frame.TimeAt(camera.SubframeTime(0)))
+            : 0.0;
+    bool timed = false;
+    for (std::uint32_t v = 0; v < views; ++v) {
+        double start = 0.0;
+        double end = 0.0;
+        if (subframes_ > 1) {
+            const double at = frame.TimeAt(camera.SubframeTime(
+                static_cast<int>(v / (outputViews_ * faces_))));
+            start = at - 0.5 * spacing;
+            end = at + 0.5 * spacing;
+        } else {
+            end = frame.TimeAt(camera.shutterClose);
+            start = end - camera.exposureTime;
+        }
+        for (std::size_t i = 0;
+             i < params.lights.size() && i < kMaxLights; ++i) {
+            const LightParams& light = params.lights[i];
+            if (light.type != LightType::Laser) {
+                continue;
+            }
+            const std::vector<LightParams::Beam::Lit> lit =
+                light.beam.LitBetween(start, end);
+            for (std::size_t k = 0; k < lit.size() && k < kLit; ++k) {
+                timing[(v * kMaxLights + i) * kLit + k] = glm::vec2(
+                    static_cast<float>(lit[k].frame), lit[k].weight);
+            }
+            timed = true;
+        }
+    }
+    if (!timed) {
+        return;
+    }
+    const VkDeviceSize bytes = timing.size() * sizeof(glm::vec2);
+    if (lightTiming_->Size() < bytes) {
+        vkDeviceWaitIdle(context_.Device());
+        lightTiming_ = std::make_unique<GpuBuffer>(
+            context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            BufferMemory::Device);
+    }
+    uploads_.Write(*lightTiming_, std::as_bytes(std::span(timing)));
 }
 
 void RasterRenderer::RecordPatternNorms(
@@ -1659,7 +1725,9 @@ void RasterRenderer::WriteLights(
                 lightPatterns_.IndexOf(model->id));
             entry.pattern[0] = static_cast<float>(index);
             entry.pattern[1] = beam.wavelength;
-            entry.pattern[2] = 0.0f;
+            entry.pattern[2] = static_cast<float>(params.time);
+            entry.pattern[3] =
+                static_cast<float>(std::max(beam.sequenceCount, 1));
             entry.patternExtent[0] = beam.extent.x;
             entry.patternExtent[1] = beam.extent.y;
             entry.patternLayout[0] =
@@ -1695,6 +1763,8 @@ void RasterRenderer::WriteLights(
                 PatternJob job{};
                 job.info[0] = index;
                 job.info[1] = static_cast<std::uint32_t>(i);
+                job.info[2] = static_cast<std::uint32_t>(
+                    std::max(beam.sequenceCount, 1));
                 job.values[0] = beam.extent.x;
                 job.values[1] = beam.extent.y;
                 job.values[2] = entry.pattern[1];
@@ -4341,7 +4411,8 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
             DescriptorResource::Of(patternNorms_),
             sampled(atmosphere_->SkyIrradiance()),
             DescriptorResource::Of(*patternData_),
-            sampled(atmosphere_->Refraction())};
+            sampled(atmosphere_->Refraction()),
+            DescriptorResource::Of(*lightTiming_)};
         // The dispatch's model and first view, and the terrain
         // horizon (none without its image).
         const auto constantsFor = [&](std::uint32_t model) {
