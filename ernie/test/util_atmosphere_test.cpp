@@ -14,8 +14,9 @@ namespace {
 
 constexpr double kPi = std::numbers::pi;
 
-const ernie::Constituent& Find(const ernie::Atmosphere& atmosphere,
-                               std::string_view name) {
+const ernie::Constituent&
+Find(const ernie::AtmosphereModel& atmosphere,
+     std::string_view name) {
     for (const ernie::Constituent& constituent :
          atmosphere.constituents) {
         if (constituent.name == name) {
@@ -25,7 +26,7 @@ const ernie::Constituent& Find(const ernie::Atmosphere& atmosphere,
     throw std::runtime_error("no constituent " + std::string(name));
 }
 
-double Depth(const ernie::Atmosphere& atmosphere,
+double Depth(const ernie::AtmosphereModel& atmosphere,
              std::string_view name, double nm) {
     const ernie::Constituent& constituent = Find(atmosphere, name);
     const ernie::ParticleOptics optics = constituent.optics(nm, {});
@@ -85,7 +86,7 @@ TEST(DensityProfile, ColumnsMatchClosedForms) {
 // column's mass-weighted height (978.92 cm s^-2) instead of the
 // standard 980.665.
 TEST(EarthAtmosphere, RayleighDepthMatchesBodhaine) {
-    const ernie::Atmosphere earth = ernie::EarthAtmosphere(
+    const ernie::AtmosphereModel earth = ernie::EarthAtmosphere(
         6371e3, {.ozoneColumn = 0.0, .aerosolOpticalDepth = 0.0});
     EXPECT_NEAR(Depth(earth, "molecules", 550.0) /
                     (0.097069 * 978.916 / 980.665),
@@ -102,7 +103,7 @@ TEST(EarthAtmosphere, RayleighDepthMatchesBodhaine) {
 }
 
 TEST(EarthAtmosphere, OzoneHoldsItsColumn) {
-    const ernie::Atmosphere earth =
+    const ernie::AtmosphereModel earth =
         ernie::EarthAtmosphere(6371e3, {.ozoneColumn = 300.0});
     const ernie::Constituent& ozone = Find(earth, "ozone");
     EXPECT_NEAR(ozone.numberDensity *
@@ -115,7 +116,7 @@ TEST(EarthAtmosphere, OzoneHoldsItsColumn) {
 }
 
 TEST(EarthAtmosphere, AerosolsHaveTheRequestedDepth) {
-    const ernie::Atmosphere earth =
+    const ernie::AtmosphereModel earth =
         ernie::EarthAtmosphere(6371e3, {.aerosolOpticalDepth = 0.15});
     EXPECT_NEAR(Depth(earth, "aerosols", 550.0), 0.15, 1e-9);
     EXPECT_NEAR(earth.VerticalOpticalDepth(550.0),
@@ -134,7 +135,7 @@ TEST(EarthAtmosphere, AerosolsHaveTheRequestedDepth) {
 }
 
 TEST(MarsAtmosphere, ThinCarbonDioxideAndDust) {
-    const ernie::Atmosphere mars =
+    const ernie::AtmosphereModel mars =
         ernie::MarsAtmosphere(3389.5e3, {.dustOpticalDepth = 0.5});
     const ernie::Constituent& molecules = Find(mars, "molecules");
     EXPECT_NEAR(molecules.numberDensity,
@@ -151,7 +152,8 @@ TEST(MarsAtmosphere, ThinCarbonDioxideAndDust) {
 // strongly, the cause of blue sunsets (Ehlers et al. 2014; Schneegans
 // et al. 2024).
 TEST(MarsAtmosphere, DustAbsorbsBlueAndScattersForward) {
-    const ernie::Atmosphere mars = ernie::MarsAtmosphere(3389.5e3);
+    const ernie::AtmosphereModel mars =
+        ernie::MarsAtmosphere(3389.5e3);
     const ernie::Constituent& dust = Find(mars, "dust");
     const auto albedo = [&dust](double nm) {
         const ernie::ParticleOptics optics = dust.optics(nm, {});
@@ -174,7 +176,8 @@ TEST(PhaseCosines, DenseNearForward) {
 }
 
 TEST(BandAverage, AveragesCoefficientsAndNormalisedPhases) {
-    const ernie::Atmosphere earth = ernie::EarthAtmosphere(6371e3);
+    const ernie::AtmosphereModel earth =
+        ernie::EarthAtmosphere(6371e3);
     const ernie::SpectralBands bands{380.0, 780.0, 16};
     const ernie::BandedAtmosphere banded =
         ernie::BandAverage(earth, bands, 256);

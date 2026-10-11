@@ -168,7 +168,8 @@ OpticsModel MieAerosol(std::vector<LogNormalMode> modes,
     };
 }
 
-double Atmosphere::VerticalOpticalDepth(double wavelengthNm) const {
+double
+AtmosphereModel::VerticalOpticalDepth(double wavelengthNm) const {
     double depth = 0.0;
     for (const Constituent& constituent : constituents) {
         const ParticleOptics optics =
@@ -180,9 +181,10 @@ double Atmosphere::VerticalOpticalDepth(double wavelengthNm) const {
     return depth;
 }
 
-Atmosphere EarthAtmosphere(double radius,
-                           const EarthAtmosphereOptions& options) {
-    Atmosphere atmosphere;
+AtmosphereModel
+EarthAtmosphere(double radius,
+                const EarthAtmosphereOptions& options) {
+    AtmosphereModel atmosphere;
     atmosphere.bottomRadius = radius;
     atmosphere.topAltitude = 100e3;
 
@@ -221,9 +223,9 @@ Atmosphere EarthAtmosphere(double radius,
     return atmosphere;
 }
 
-Atmosphere MarsAtmosphere(double radius,
-                          const MarsAtmosphereOptions& options) {
-    Atmosphere atmosphere;
+AtmosphereModel MarsAtmosphere(double radius,
+                               const MarsAtmosphereOptions& options) {
+    AtmosphereModel atmosphere;
     atmosphere.bottomRadius = radius;
     atmosphere.topAltitude = 100e3;
 
@@ -279,7 +281,38 @@ std::vector<double> PhaseCosines(int count) {
     return cosines;
 }
 
-BandedAtmosphere BandAverage(const Atmosphere& atmosphere,
+double BandedAtmosphere::Extinction(double altitude, int band) const {
+    const auto b = static_cast<std::size_t>(band);
+    double extinction = 0.0;
+    for (const BandedConstituent& constituent : constituents) {
+        extinction +=
+            (static_cast<double>(constituent.scattering[b]) +
+             static_cast<double>(constituent.absorption[b])) *
+            constituent.density(altitude);
+    }
+    return extinction;
+}
+
+double BandedAtmosphere::TransmittanceToTop(double r, double mu,
+                                            int band,
+                                            int steps) const {
+    const double top = bottomRadius + topAltitude;
+    // Where the ray leaves the sphere of radius `top`.
+    const double discriminant = r * r * (mu * mu - 1.0) + top * top;
+    const double length = std::max(
+        0.0, -r * mu + std::sqrt(std::max(discriminant, 0.0)));
+    const double step = length / steps;
+    double depth = 0.0;
+    for (int i = 0; i < steps; ++i) {
+        const double t = (i + 0.5) * step;
+        const double radius =
+            std::sqrt(r * r + t * t + 2.0 * r * mu * t);
+        depth += Extinction(radius - bottomRadius, band) * step;
+    }
+    return std::exp(-depth);
+}
+
+BandedAtmosphere BandAverage(const AtmosphereModel& atmosphere,
                              const SpectralBands& bands,
                              int phaseAngles) {
     bands.Check();

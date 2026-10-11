@@ -844,3 +844,35 @@ TEST(DomeDirectionsOf,
                     ernie::Image(64, 32, glm::vec4(0.0f)), 4)
                     .empty());
 }
+
+TEST(AtmosphereParamsOf, PlacesThePlanet) {
+    Scene scene;
+    ernie::Atmosphere::Define(scene, "/World/Air")
+        .SetPreset(std::string(tokens::kMars))
+        .SetDustOpticalDepth(-1.0);
+    // Without a planet Terrain: the preset planet's surface at z = 0.
+    RenderPrims prims = ernie::ResolveRenderPrims(scene, {});
+    EXPECT_EQ(prims.atmosphere, Path("/World/Air"));
+    ernie::AtmosphereParams air = ernie::AtmosphereParamsOf(
+        scene, prims.atmosphere, prims.terrain);
+    EXPECT_EQ(air.preset, "mars");
+    EXPECT_DOUBLE_EQ(air.planetRadius, 3389.5e3);
+    EXPECT_DOUBLE_EQ(air.planetCentre.z, -3389.5e3);
+    EXPECT_DOUBLE_EQ(air.dustOpticalDepth, 0.0) << "clamped";
+
+    // A planet Terrain gives its radius and centre.
+    ernie::Terrain::Define(scene, "/World/Mars")
+        .SetPlanetRadius(3396.2e3);
+    prims = ernie::ResolveRenderPrims(scene, {});
+    air = ernie::AtmosphereParamsOf(scene, prims.atmosphere,
+                                    prims.terrain);
+    EXPECT_DOUBLE_EQ(air.planetRadius, 3396.2e3);
+    EXPECT_EQ(air.planetCentre, glm::dvec3(0.0));
+    EXPECT_TRUE(air.SameModel(air));
+
+    scene.Set("/World/Air", tokens::kAtmospherePreset,
+              std::string("venus"));
+    EXPECT_THROW(ernie::AtmosphereParamsOf(scene, prims.atmosphere,
+                                           prims.terrain),
+                 std::invalid_argument);
+}

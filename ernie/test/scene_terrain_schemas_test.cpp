@@ -136,9 +136,21 @@ TEST(TerrainSchemas, RegistryDescribesTheTypes) {
     EXPECT_EQ(stars.AllAttributes().front()->name,
               tokens::kVisibility);
 
+    const PrimTypeDef& atmosphere = ernie::GetPrimType("Atmosphere");
+    EXPECT_EQ(atmosphere.base, &ernie::GetPrimType("Imageable"));
+    EXPECT_EQ(atmosphere.Find(tokens::kAtmospherePreset)->fallback,
+              Value(std::string("earth")));
+    EXPECT_EQ(
+        atmosphere.Find(tokens::kAtmospherePreset)->meta.options,
+        (std::vector<std::string_view>{tokens::kEarth,
+                                       tokens::kMars}));
+    EXPECT_EQ(atmosphere.FindByPyName("dust_optical_depth")->name,
+              tokens::kAtmosphereDustOpticalDepth);
+
     const std::vector<const PrimTypeDef*> types =
         ernie::TerrainSchemaTypes();
-    ASSERT_EQ(types.size(), 2u);
+    ASSERT_EQ(types.size(), 3u);
     EXPECT_EQ(types[0], &terrain);
     EXPECT_EQ(types[1], &stars);
+    EXPECT_EQ(types[2], &atmosphere);
 }

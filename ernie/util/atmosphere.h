@@ -99,7 +99,7 @@ struct Constituent {
 
 /// A spherical shell of constituents around a planet of radius
 /// `bottomRadius`, up to `bottomRadius + topAltitude`.
-struct Atmosphere {
+struct AtmosphereModel {
     double bottomRadius = 6371e3;
     double topAltitude = 100e3;
     std::vector<Constituent> constituents;
@@ -145,7 +145,7 @@ struct EarthAtmosphereOptions {
 ///   and Data Archive for Aerosol Characterization", Remote Sensing
 ///   of Environment 66(1):1-16, 1998.
 ///   https://doi.org/10.1016/S0034-4257(98)00031-5
-Atmosphere
+AtmosphereModel
 EarthAtmosphere(double radius,
                 const EarthAtmosphereOptions& options = {});
 
@@ -186,8 +186,9 @@ struct MarsAtmosphereOptions {
 ///   https://doi.org/10.1364/AO.53.001808
 /// - Schneegans et al. 2024 (see `DensityProfile`), section 3 and
 ///   table 1.
-Atmosphere MarsAtmosphere(double radius,
-                          const MarsAtmosphereOptions& options = {});
+AtmosphereModel
+MarsAtmosphere(double radius,
+               const MarsAtmosphereOptions& options = {});
 
 /// The scattering angles of tabulated phase functions: theta_i = pi
 /// (i / (count - 1))^2, dense near the forward direction where
@@ -215,12 +216,24 @@ struct BandedAtmosphere {
     SpectralBands bands;
     int phaseAngles = 0;
     std::vector<BandedConstituent> constituents;
+
+    /// The extinction coefficient (m^-1) of band `band` at
+    /// `altitude`.
+    double Extinction(double altitude, int band) const;
+
+    /// The transmittance of band `band` from radius `r` (m) along a
+    /// ray at cosine `mu` from the zenith to the top of the
+    /// atmosphere, by the midpoint rule over `steps` steps; the
+    /// reference the renderer's transmittance table is tested
+    /// against. For rays above the horizon.
+    double TransmittanceToTop(double r, double mu, int band,
+                              int steps = 4000) const;
 };
 
 /// Averages `atmosphere` over `bands`, sampling each band every 10 nm
 /// or less. Phase functions are averaged weighted by scattering, so
 /// that the band's scattered radiance is preserved.
-BandedAtmosphere BandAverage(const Atmosphere& atmosphere,
+BandedAtmosphere BandAverage(const AtmosphereModel& atmosphere,
                              const SpectralBands& bands,
                              int phaseAngles = 256);
 

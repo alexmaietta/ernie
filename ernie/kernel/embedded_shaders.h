@@ -86,6 +86,8 @@ extern const char kMotionSlang[];
 extern const char kMotionVectorsSlang[];
 
 /// GPU instance culling for mesh draws.
+extern const char kAtmosphereSlang[];
+extern const char kAtmosphereLutsSlang[];
 extern const char kCullSlang[];
 
 /// Mesh and PointInstancer passes.

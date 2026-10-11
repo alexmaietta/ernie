@@ -364,6 +364,29 @@ struct StarFieldParams {
     glm::mat3 toCatalogue{1.0f};
 };
 
+/// A planet's atmosphere (`AtmosphereParamsOf`): the physical model's
+/// settings and where the planet lies. Renderers rebuild their tables
+/// of it only when the settings or the spectral bands change.
+struct AtmosphereParams {
+    /// `tokens::kEarth` or `tokens::kMars`.
+    std::string preset = "earth";
+    double planetRadius = 0.0;     ///< Metres.
+    glm::dvec3 planetCentre{0.0};  ///< World.
+    double groundAlbedo = 0.3;
+    double hazeOpticalDepth = 0.1;  ///< Earth, at 550 nm.
+    double ozoneColumn = 300.0;     ///< Earth, Dobson units.
+    double dustOpticalDepth = 0.5;  ///< Mars, at 880 nm.
+
+    bool operator==(const AtmosphereParams&) const = default;
+
+    /// Whether the physical model differs, the planet's place aside.
+    bool SameModel(const AtmosphereParams& other) const {
+        AtmosphereParams placed = other;
+        placed.planetCentre = planetCentre;
+        return placed == *this;
+    }
+};
+
 /// Per-frame parameters of a render, whatever the backend: the
 /// camera, the sun, the other lights, the sensor filters and the
 /// frame's place in the random streams. `shadows` tunes the
@@ -408,6 +431,8 @@ struct FrameParams {
     bool domeDirectionsLit = false;
     std::optional<StarFieldParams>
         stars;  ///< Stars behind everything, as last uploaded.
+    std::optional<AtmosphereParams>
+        atmosphere;  ///< The planet's atmosphere.
     float exposure =
         1.0f;  ///< Extra scale on the photographic output.
     bool meter =

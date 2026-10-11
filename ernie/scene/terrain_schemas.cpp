@@ -16,8 +16,15 @@ ERNIE_DEFINE_SCHEMA(
     "else; its transform takes the catalogue's frame into the world.",
     ERNIE_STAR_FIELD_ATTRIBUTES)
 
+ERNIE_DEFINE_SCHEMA(
+    Atmosphere, tokens::kAtmosphere, &Imageable::Definition(), false,
+    "A planet's atmosphere from a physical model, around the planet "
+    "Terrain or a planet under the world's origin.",
+    ERNIE_ATMOSPHERE_ATTRIBUTES)
+
 std::vector<const PrimTypeDef*> TerrainSchemaTypes() {
-    return {&Terrain::Definition(), &StarField::Definition()};
+    return {&Terrain::Definition(), &StarField::Definition(),
+            &Atmosphere::Definition()};
 }
 
 }  // namespace ernie

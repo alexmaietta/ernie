@@ -2189,6 +2189,49 @@ StarFieldParams StarFieldParamsOf(const Scene& scene,
     return field;
 }
 
+AtmosphereParams AtmosphereParamsOf(const Scene& scene,
+                                    const Path& path,
+                                    const Path& terrain) {
+    if (scene.TypeOf(path) != tokens::kAtmosphere) {
+        throw std::invalid_argument("'" + path.String() +
+                                    "' is not an Atmosphere");
+    }
+    const Atmosphere prim(scene, path);
+    AtmosphereParams params;
+    params.preset = prim.GetPreset();
+    // The IUGG mean radius of the Earth and the IAU mean radius of
+    // Mars (Archinal et al. 2018).
+    double presetRadius = 0.0;
+    if (params.preset == tokens::kEarth) {
+        presetRadius = 6371.0088e3;
+    } else if (params.preset == tokens::kMars) {
+        presetRadius = 3389.5e3;
+    } else {
+        throw std::invalid_argument(
+            "Atmosphere '" + path.String() + "' has no preset '" +
+            params.preset + "'; use 'earth' or 'mars'");
+    }
+    const double planetTerrain =
+        terrain.IsEmpty() ? 0.0
+                          : Terrain(scene, terrain).GetPlanetRadius();
+    const double radius = prim.GetPlanetRadius();
+    params.planetRadius = radius > 0.0          ? radius
+                          : planetTerrain > 0.0 ? planetTerrain
+                                                : presetRadius;
+    params.planetCentre =
+        planetTerrain > 0.0
+            ? glm::dvec3(0.0)
+            : glm::dvec3(0.0, 0.0, -params.planetRadius);
+    params.groundAlbedo =
+        std::clamp(prim.GetGroundAlbedo(), 0.0, 1.0);
+    params.hazeOpticalDepth =
+        std::max(prim.GetHazeOpticalDepth(), 0.0);
+    params.ozoneColumn = std::max(prim.GetOzoneColumn(), 0.0);
+    params.dustOpticalDepth =
+        std::max(prim.GetDustOpticalDepth(), 0.0);
+    return params;
+}
+
 double OverscanOf(const CameraParams& camera) {
     // A camera rendered on cube faces resamples their own projection,
     // not one pinhole image.
@@ -2365,6 +2408,10 @@ FrameParams FrameParamsOf(const Scene& scene,
     }
     if (!prims.stars.IsEmpty()) {
         params.stars = StarFieldParamsOf(scene, prims.stars);
+    }
+    if (!prims.atmosphere.IsEmpty()) {
+        params.atmosphere = AtmosphereParamsOf(
+            scene, prims.atmosphere, prims.terrain);
     }
     for (const Path& light : prims.lights) {
         const auto posed = prims.lightTransforms.find(light);

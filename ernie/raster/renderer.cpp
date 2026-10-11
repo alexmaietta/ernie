@@ -83,7 +83,11 @@ struct ShadingUniforms {
     /// mode), the occlusion's world radius and its largest radius in
     /// pixels.
     float domeLighting[4];
-    float padding[44];  ///< To the views' stride, so shading reads
+    /// The atmosphere (km): the planet's centre relative to the
+    /// frame's origin and the bottom radius; the top radius, 1 with
+    /// an atmosphere, the sine of the sun's angular radius.
+    float atmosphere[2][4];
+    float padding[36];  ///< To the views' stride, so shading reads
                         ///< them as one array.
 };
 static_assert(sizeof(ShadingUniforms) == 1280,
@@ -228,6 +232,7 @@ constexpr DescriptorBinding kShadingBindings[] = {
     {19, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {20, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {21, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {22, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
 };
 
 /// shading.slang's ShadingConstants: the dispatch's model and first
@@ -339,6 +344,7 @@ std::vector<ShaderModuleSource> ShadingModules(const BrdfModel& brdf,
         {"brdf", std::string(BrdfSlang())},
         {BrdfModuleName(brdf), brdf.slang},
         ProjectionModule(pushbroom),
+        {"atmosphere", shaders::kAtmosphereSlang},
         {"shading", "import " + BrdfModuleName(brdf) +
                         ";\ntypealias ActiveBrdf = " + brdf.typeName +
                         ";\n" + shaders::kShadingSlang}};
@@ -920,6 +926,8 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
     const std::span<const std::byte> height[] = {
         std::as_bytes(std::span(&flat, 1))};
     noHeights_->Upload(height);
+    atmosphere_ =
+        std::make_unique<AtmosphereLuts>(context_, compiler_);
 
     const std::vector<ShaderModuleSource> hzbModules{
         {"hzb", shaders::kHzbSlang}};
@@ -2139,6 +2147,7 @@ void RasterRenderer::Update(
     if (params.stars && starCount_ > 0) {
         sky_ |= kSkyStars;
     }
+    atmosphere_->Set(params.atmosphere, bands_);
     // The lights first: shading reads the size of the light shadow
     // maps they make.
     WriteLights(params, bounds);
@@ -2368,6 +2377,26 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
             : 1.0f;
     shading.domeLighting[2] = params.domeShadowRadius;
     shading.domeLighting[3] = 32.0f;
+    // The atmosphere in kilometres: the planet's centre relative to
+    // the frame's origin (from double, as it lies thousands of
+    // kilometres away) and its radii, and the sine of the sun's
+    // angular radius, over which it sets behind the planet.
+    if (atmosphere_->Active()) {
+        const BandedAtmosphere& banded = atmosphere_->Banded();
+        const glm::dvec3 centre =
+            (atmosphere_->Params().planetCentre - params.origin) *
+            1e-3;
+        shading.atmosphere[0][0] = static_cast<float>(centre.x);
+        shading.atmosphere[0][1] = static_cast<float>(centre.y);
+        shading.atmosphere[0][2] = static_cast<float>(centre.z);
+        shading.atmosphere[0][3] =
+            static_cast<float>(banded.bottomRadius * 1e-3);
+        shading.atmosphere[1][0] = static_cast<float>(
+            (banded.bottomRadius + banded.topAltitude) * 1e-3);
+        shading.atmosphere[1][1] = 1.0f;
+        shading.atmosphere[1][2] = std::max(
+            std::sin(glm::radians(0.5f * params.sunAngle)), 1e-5f);
+    }
     shading.sky[1] = map.width;
     shading.sky[2] = map.height;
     shading.sky[3] = map.mips;
@@ -2840,6 +2869,9 @@ void RasterRenderer::RecordShadows(
         // use of the buffers it fills.
         uploads_.Record(commands);
     }
+    // The atmosphere's tables, when it or the bands changed, before
+    // any view shades with them.
+    atmosphere_->Record(commands);
     {
         ERNIE_GPU_ZONE(context_, commands, "Prepass");
         // Poses composed on the GPU, and views posed under them,
@@ -3776,7 +3808,8 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
             DescriptorResource::Of(lightProfiles_),
             sampled(terrainHorizon_.heights != nullptr
                         ? *terrainHorizon_.heights
-                        : *noHeights_)};
+                        : *noHeights_),
+            sampled(atmosphere_->Transmittance())};
         // The dispatch's model and first view, and the terrain
         // horizon (none without its image).
         const auto constantsFor = [&](std::uint32_t model) {

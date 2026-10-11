@@ -66,3 +66,19 @@ def test_star_field_class():
         ernie.StarField(
             scene.define("/World/Terrain", ernie.Terrain).prim
         )
+
+
+def test_atmosphere_class():
+    scene = ernie.Scene()
+    air = scene.define(
+        "/World/Air",
+        ernie.Atmosphere,
+        preset=tokens.MARS,
+        dust_optical_depth=2.0,
+    )
+    assert isinstance(air, ernie.Imageable)
+    assert air.preset == "mars" and air.dust_optical_depth == 2.0
+    assert air.planet_radius == 0.0 and air.ground_albedo == 0.3
+    assert air.haze_optical_depth == pytest.approx(0.1)
+    assert air.ozone_column == 300.0
+    assert scene.get("/World/Air", tokens.ATMOSPHERE_PRESET) == "mars"

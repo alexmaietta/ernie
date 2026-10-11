@@ -60,6 +60,7 @@ ernie_add_test_suite(
     device_frame_uploads_test.cpp
     device_pipeline_test.cpp
     device_vulkan_context_test.cpp
+    raster_atmosphere_gpu_test.cpp
     raster_batch_gpu_test.cpp
     raster_culling_gpu_test.cpp
     raster_delegate_gpu_test.cpp

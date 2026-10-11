@@ -62,7 +62,8 @@ struct RenderPrims {
     std::vector<Path> lights;
     Path dome;
     Path ground;
-    Path stars;  ///< The first visible StarField.
+    Path stars;       ///< The first visible StarField.
+    Path atmosphere;  ///< The first visible Atmosphere.
     /// A stand-in for the camera's world transform, for a camera
     /// posed on the GPU (`CameraParamsOf`).
     std::optional<glm::dmat4> cameraTransform;
@@ -394,6 +395,28 @@ std::vector<Star> StarsOf(const Scene& scene, const Path& path);
 /// @throws std::invalid_argument for another prim type.
 StarFieldParams StarFieldParamsOf(const Scene& scene,
                                   const Path& path);
+
+/// The Atmosphere at `path` around the planet Terrain `terrain`
+/// (empty for none): with a planet Terrain the planet is at the
+/// world's origin and has its radius unless
+/// `ernie:atmosphere:planetRadius` sets one; without, it is that
+/// radius, else the preset planet's mean radius, centred that far
+/// below the origin.
+///
+/// References:
+/// - H. Moritz, "Geodetic Reference System 1980", Journal of Geodesy
+///   74(1):128-133, 2000 (the Earth's mean radius R1, 6371.0088 km).
+///   https://doi.org/10.1007/s001900050278
+/// - B. A. Archinal et al., "Report of the IAU Working Group on
+///   Cartographic Coordinates and Rotational Elements: 2015",
+///   Celestial Mechanics and Dynamical Astronomy 130:22, 2018 (Mars's
+///   mean radius, 3389.5 km).
+///   https://doi.org/10.1007/s10569-017-9805-5
+/// @throws std::invalid_argument for another prim type or an unknown
+/// preset.
+AtmosphereParams AtmosphereParamsOf(const Scene& scene,
+                                    const Path& path,
+                                    const Path& terrain);
 
 /// How much wider than the sensor's the raster image's field of view
 /// must be for every sensor pixel's undistorted ray to land in it: 1

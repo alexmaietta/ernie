@@ -6,6 +6,7 @@
 #include "ernie/device/image.h"
 #include "ernie/device/pipeline.h"
 #include "ernie/device/shader_compiler.h"
+#include "ernie/raster/atmosphere_luts.h"
 #include "ernie/raster/drawable.h"
 #include "ernie/raster/material.h"
 #include "ernie/raster/minimal_targets.h"
@@ -144,6 +145,11 @@ class RasterRenderer {
 
     const ShaderCompiler& Compiler() const {
         return compiler_;
+    }
+
+    /// The atmosphere of the last `Update` and its tables.
+    const AtmosphereLuts& AtmosphereTables() const {
+        return *atmosphere_;
     }
 
     const BrdfRegistry& Brdfs() const {
@@ -934,6 +940,8 @@ class RasterRenderer {
         noHorizon_;  ///< Binds in place of a terrain's horizon map.
     std::unique_ptr<GpuImage>
         noHeights_;  ///< Binds in place of a terrain's heights.
+    std::unique_ptr<AtmosphereLuts>
+        atmosphere_;  ///< The planet's atmosphere and its tables.
     std::unique_ptr<ComputePipeline> occlusionPipeline_;
     std::unique_ptr<ComputePipeline> occlusionFilterPipeline_;
     mutable std::array<std::unique_ptr<GpuImage>, 2> occlusion_;

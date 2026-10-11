@@ -32,7 +32,8 @@
 // sampler, 8 spectral radiance, 9 lights, 10 the lights' shadow maps, 11 their comparison sampler,
 // 12 their view-projections, 13 the dome's map, 14 the stars, 15 their grid cells, 16 the map
 // that lights the scene (13's, without its sun when that is lit on its own), 17 and 18 the dome
-// occlusion, raw and filtered, 19 the terrain's horizon map.
+// occlusion, raw and filtered, 19 the terrain's horizon map, 20 the lights' profiles, 21 the
+// terrain's heights, 22 the atmosphere's transmittance table.
 //
 // References:
 // - W. Jakob and J. Hanika, "A Low-Dimensional Function Space for Efficient Spectral Upsampling",
@@ -42,6 +43,8 @@
 // - M. Planck, "Ueber das Gesetz der Energieverteilung im Normalspectrum", Annalen der Physik
 //   309(3):553-563, 1901 (black-body spectra).
 import brdf;
+// The planet's atmosphere: the sun's transmittance through it (atmosphere.slang).
+import atmosphere;
 // The camera's projection: a frame camera's matrices, or a pushbroom's strip
 // (projection_pinhole.slang, projection_pushbroom.slang).
 import projection;
@@ -87,8 +90,12 @@ struct ShadingUniforms {
     // lights diffusely (0 in the limited mode), z the occlusion's world radius, w its largest
     // radius in pixels.
     float4 domeLighting;
+    // The atmosphere (atmosphere.slang), in km: xyz the planet's centre relative to the frame's
+    // origin and w its radius; then x the atmosphere's top radius, y 1 with an atmosphere, z the
+    // sine of the sun's angular radius.
+    float4 atmosphere[2];
     // To the views' stride in the buffer, 1280 bytes.
-    float4 padding[11];
+    float4 padding[9];
 }
 
 // What `skyMain` draws behind the scene.
@@ -638,6 +645,22 @@ float4 occlusionSlice(float3 n, float3 tangent, float3 v, float2 horizons) {
 [[vk::binding(19, 0)]] Texture2DArray<float4> horizonMap;
 // The terrain's heights, before exaggeration, rows from its north edge.
 [[vk::binding(21, 0)]] Texture2D<float> terrainHeights;
+// The atmosphere's transmittance to its top (atmosphere.slang), a layer per four bands.
+[[vk::binding(22, 0)]] Texture2DArray<float4> atmosphereTransmittance;
+
+// The sun's transmittance through the atmosphere in band `band` to the point `world` (relative to
+// the frame's origin, metres); 1 without an atmosphere. The sun's irradiance is then what arrives
+// above the atmosphere.
+float sunAtmosphereTransmittance(float3 world, uint band) {
+    if (sh.atmosphere[1].y == 0.0) {
+        return 1.0;
+    }
+    let p = world * 1e-3 - sh.atmosphere[0].xyz;
+    let groups = sunTransmittance(atmosphereTransmittance, tableSampler, p, sh.sun.xyz,
+                                  sh.atmosphere[1].z, band / 4, sh.atmosphere[0].w,
+                                  sh.atmosphere[1].x);
+    return groups[band % 4];
+}
 
 static const uint kHorizonLevels = 4;
 
@@ -998,7 +1021,8 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;
             bandAlbedo[k] = bandValue(material.reflectance, band) * albedo.x *
                             modulationAt(coefficients, scale, wavelength);
-            bandIrradiance[k] = bandValue(sh.irradiance, band);
+            bandIrradiance[k] =
+                bandValue(sh.irradiance, band) * sunAtmosphereTransmittance(world, band);
         }
         // How the model reflects light from all around: the ambient fraction of the sun's (from
         // every direction alike, so every lobe sees it whole) and the dome's.

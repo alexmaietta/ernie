@@ -260,7 +260,7 @@ void DrawPrimIcon(ImDrawList* draw, const ImVec2& corner, float size,
         Bulb(draw, at);
     } else if (type == kRectLight || type == kDiskLight) {
         Panel(draw, at, type == kDiskLight);
-    } else if (type == kDomeLight) {
+    } else if (type == kDomeLight || type == kAtmosphere) {
         Dome(draw, at);
     } else if (type == kStarField) {
         Stars(draw, at);

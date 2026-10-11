@@ -49,6 +49,8 @@ inline constexpr std::string_view kGroundPlane =
     "GroundPlane";  ///< Ernie: an infinite floor.
 inline constexpr std::string_view kStarField =
     "StarField";  ///< Ernie: stars behind everything.
+inline constexpr std::string_view kAtmosphere =
+    "Atmosphere";  ///< Ernie: a planet's air and aerosols.
 inline constexpr std::string_view kRenderSettings = "RenderSettings";
 inline constexpr std::string_view kRenderProduct = "RenderProduct";
 inline constexpr std::string_view kRenderVar = "RenderVar";
@@ -465,6 +467,33 @@ inline constexpr std::string_view kStarsMagnitudeLimit =
 /// for a star of magnitude m.
 inline constexpr std::string_view kStarsZeroPoint =
     "ernie:stars:zeroPoint";
+
+// Atmosphere (Ernie): a planet's gases and aerosols, from physical
+// models (`EarthAtmosphere`, `MarsAtmosphere`), around the planet
+// Terrain or, without one, a planet under the world's origin. Renders
+// use the first visible Atmosphere.
+//
+/// token: the planet's model, "earth" or "mars".
+inline constexpr std::string_view kAtmospherePreset =
+    "ernie:atmosphere:preset";
+inline constexpr std::string_view kEarth = "earth";
+inline constexpr std::string_view kMars = "mars";
+/// float, metres: the planet's radius; 0 takes the planet Terrain's,
+/// or else the preset's (Earth 6371 km, Mars 3389.5 km).
+inline constexpr std::string_view kAtmospherePlanetRadius =
+    "ernie:atmosphere:planetRadius";
+/// float: the ground's reflectance for light scattered in the air.
+inline constexpr std::string_view kAtmosphereGroundAlbedo =
+    "ernie:atmosphere:groundAlbedo";
+/// float: Earth's vertical haze optical depth at 550 nm.
+inline constexpr std::string_view kAtmosphereHazeOpticalDepth =
+    "ernie:atmosphere:hazeOpticalDepth";
+/// float, Dobson units: Earth's total column ozone.
+inline constexpr std::string_view kAtmosphereOzoneColumn =
+    "ernie:atmosphere:ozoneColumn";
+/// float: Mars's vertical dust optical depth at 880 nm.
+inline constexpr std::string_view kAtmosphereDustOpticalDepth =
+    "ernie:atmosphere:dustOpticalDepth";
 
 // Terrain (Ernie): a north-up heightfield, x east, y north, z up.
 inline constexpr std::string_view kHeights =

@@ -38,6 +38,8 @@ set(ernie_shaders
     film/lens.slang=kLensSlang
     film/pyramid.slang=kPyramidSlang
     film/sensor.slang=kSensorSlang
+    raster/atmosphere.slang=kAtmosphereSlang
+    raster/atmosphere_luts.slang=kAtmosphereLutsSlang
     raster/cull.slang=kCullSlang
     raster/depth_range.slang=kDepthRangeSlang
     raster/hzb.slang=kHzbSlang

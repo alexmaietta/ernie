@@ -2,6 +2,7 @@
 ernie_add_library(
     ernie_raster
     SOURCES
+    atmosphere_luts.cpp
     delegate.cpp
     ground_drawable.cpp
     material.cpp
