@@ -167,6 +167,16 @@ class VulkanContext {
                exportSemaphore_ != nullptr;
     }
 
+    /// Whether shaders can sample linear images (`ImageDesc::linear`)
+    /// of `format`, which compute APIs then write in place.
+    bool SupportsLinearSampling(VkFormat format) const {
+        VkFormatProperties properties{};
+        vkGetPhysicalDeviceFormatProperties(physicalDevice_, format,
+                                            &properties);
+        return (properties.linearTilingFeatures &
+                VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) != 0;
+    }
+
     /// A new handle to `memory`, allocated exportable as
     /// `kExternalMemoryHandleType`, which the importer takes
     /// (`CloseExternalHandle`).

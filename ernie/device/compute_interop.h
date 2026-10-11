@@ -115,6 +115,35 @@ class ComputeInterop {
                         std::vector<std::int64_t> shape,
                         VkDeviceSize offset = 0) = 0;
 
+    /// A tensor of `type`, `shape` and `strides` (in elements, as
+    /// DLPack's) on this device over the texels of the linear shared
+    /// image `image` (`ImageDesc::linear` and `shared`), from its
+    /// first texel: writing it writes the image itself, which shaders
+    /// then sample with no copy. Keeps the image alive. Work writing
+    /// it must first wait for the Vulkan work reading the image
+    /// (`WaitForVulkan`), and Vulkan work reading it afterwards for
+    /// `SignalVulkan`.
+    /// @throws std::invalid_argument for an image that is not linear
+    /// and shared, or a view past its end.
+    virtual Tensor ViewImage(std::shared_ptr<GpuImage> image,
+                             DType type,
+                             std::vector<std::int64_t> shape,
+                             std::vector<std::int64_t> strides) = 0;
+
+    /// Queues a device-to-device copy of the contiguous image or
+    /// batch `source`, (rows, cols), (rows, cols, channels) or
+    /// (views, rows, cols, channels), into the linear shared image
+    /// `image`, the views side by side from its left edge, on
+    /// `stream`, after the Vulkan work submitted so far (which may
+    /// still read the image, `NextVulkanSignal`), without waiting;
+    /// Vulkan work reading the image must wait for `VulkanWait`. A
+    /// texel of `source` must be one of the image.
+    /// @throws std::invalid_argument for a source not on this device
+    /// or not contiguous, an image that is not linear and shared, or
+    /// views that do not fit.
+    virtual void CopyToImage(const Tensor& source, GpuImage& image,
+                             std::uintptr_t stream = 1) = 0;
+
     /// Queues a device-to-device copy of contiguous tensor `source`
     /// into contiguous tensor `destination` of the same byte size on
     /// `stream`, without waiting.

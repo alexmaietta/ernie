@@ -55,6 +55,10 @@ GpuImage::GpuImage(const VulkanContext& context,
         throw std::invalid_argument(
             "An image's layers must be a whole number of groups");
     }
+    if (desc.linear && (desc.layers != 1 || desc.mips != 1)) {
+        throw std::invalid_argument(
+            "A linear image has one layer and one mip");
+    }
     VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
     info.imageType = VK_IMAGE_TYPE_2D;
     info.format = desc.format;
@@ -62,7 +66,8 @@ GpuImage::GpuImage(const VulkanContext& context,
     info.mipLevels = desc.mips;
     info.arrayLayers = desc.layers;
     info.samples = VK_SAMPLE_COUNT_1_BIT;
-    info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    info.tiling = desc.linear ? VK_IMAGE_TILING_LINEAR
+                              : VK_IMAGE_TILING_OPTIMAL;
     info.usage = desc.usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
                  VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -115,6 +120,14 @@ GpuImage::GpuImage(const VulkanContext& context,
                 "vmaCreateImage");
         bytes_ = result.size;
     }
+    if (desc.linear) {
+        const VkImageSubresource texels{AspectOf(desc.format), 0, 0};
+        VkSubresourceLayout layout{};
+        vkGetImageSubresourceLayout(context.Device(), image_, &texels,
+                                    &layout);
+        rowPitch_ = layout.rowPitch;
+        texelOffset_ = layout.offset;
+    }
 
     VkImageViewCreateInfo view{
         VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
@@ -123,6 +136,7 @@ GpuImage::GpuImage(const VulkanContext& context,
     view.viewType =
         array ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
     view.format = desc.format;
+    view.components = desc.components;
     view.subresourceRange = {AspectOf(desc.format), 0, desc.mips, 0,
                              desc.layers};
     CheckVk(
@@ -184,7 +198,8 @@ GpuImage::GpuImage(GpuImage&& other) noexcept
       layerViews_(std::move(other.layerViews_)),
       groupViews_(std::move(other.groupViews_)),
       mipViews_(std::move(other.mipViews_)), layout_(other.layout_),
-      bytes_(other.bytes_) {}
+      bytes_(other.bytes_), rowPitch_(other.rowPitch_),
+      texelOffset_(other.texelOffset_) {}
 
 GpuImage& GpuImage::operator=(GpuImage&& other) noexcept {
     if (this != &other) {
@@ -203,6 +218,8 @@ GpuImage& GpuImage::operator=(GpuImage&& other) noexcept {
         mipViews_ = std::move(other.mipViews_);
         layout_ = other.layout_;
         bytes_ = other.bytes_;
+        rowPitch_ = other.rowPitch_;
+        texelOffset_ = other.texelOffset_;
     }
     return *this;
 }

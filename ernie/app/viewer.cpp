@@ -4,8 +4,10 @@
 #include "ernie/app/builtin_panels.h"
 #include "ernie/app/create.h"
 #include "ernie/app/icons.h"
+#include "ernie/app/logs.h"
 #include "ernie/app/prim_icons.h"
 #include "ernie/app/session.h"
+#include "ernie/device/compute_interop.h"
 #include "ernie/device/gpu_profile.h"
 #include "ernie/device/image.h"
 #include "ernie/device/offscreen_target.h"
@@ -398,6 +400,10 @@ struct Viewer::State {
 
     std::unique_ptr<OffscreenTarget> viewport;
     std::unique_ptr<Sampler> sampler;
+    /// What `LogScalar`, `LogArray` and `LogImage` collected, and the
+    /// Plots panel once added.
+    std::unique_ptr<ViewerLogs> logs;
+    Panel* plotsPanel = nullptr;
     VkDescriptorSet viewportTexture = VK_NULL_HANDLE;
     VkExtent2D requestedViewport{640, 360};
 
@@ -649,6 +655,9 @@ struct Viewer::State {
         if (gpu) {
             vkDeviceWaitIdle(gpu->Device());
         }
+        // The logged images' textures, before ImGui and the device
+        // go; their panels go later.
+        logs.reset();
         if (viewportTexture != VK_NULL_HANDLE) {
             ImGui_ImplVulkan_RemoveTexture(viewportTexture);
         }
@@ -747,6 +756,7 @@ struct Viewer::State {
         renderer = options.renderer;
         sampler = std::make_unique<Sampler>(
             *gpu, SamplerDesc{VK_FILTER_LINEAR});
+        logs = std::make_unique<ViewerLogs>(*gpu);
     }
 
     VkFormat UiFormat() const {
@@ -2746,10 +2756,24 @@ struct Viewer::State {
             wait.value = point.value;
             wait.stageMask = point.stages;
         }
-        VkSemaphoreSubmitInfo signal{
-            VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO};
+        std::vector<VkSemaphoreSubmitInfo> signals;
         if (image != nullptr) {
+            VkSemaphoreSubmitInfo& signal = signals.emplace_back();
+            signal.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
             signal.semaphore = image->rendered;
+            signal.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        }
+        // Logged images the compute device writes in place: its next
+        // writes wait for this frame's sampling of them.
+        if (ComputeInterop* compute = logs->SamplesComputeImages()
+                                          ? delegate->Compute()
+                                          : nullptr;
+            compute != nullptr) {
+            const TimelinePoint point = compute->NextVulkanSignal();
+            VkSemaphoreSubmitInfo& signal = signals.emplace_back();
+            signal.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            signal.semaphore = point.semaphore;
+            signal.value = point.value;
             signal.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         }
         VkCommandBufferSubmitInfo commandInfo{
@@ -2761,8 +2785,9 @@ struct Viewer::State {
         submit.pWaitSemaphoreInfos = waits.data();
         submit.commandBufferInfoCount = 1;
         submit.pCommandBufferInfos = &commandInfo;
-        submit.signalSemaphoreInfoCount = image != nullptr ? 1 : 0;
-        submit.pSignalSemaphoreInfos = &signal;
+        submit.signalSemaphoreInfoCount =
+            static_cast<std::uint32_t>(signals.size());
+        submit.pSignalSemaphoreInfos = signals.data();
         vkResetFences(gpu->Device(), 1, &frame->done);
         CheckVk(vkQueueSubmit2(gpu->Queue(), 1, &submit, frame->done),
                 "vkQueueSubmit2");
@@ -2966,6 +2991,8 @@ bool Viewer::State::Step() {
         ERNIE_ZONE("Viewer viewport");
         RecordViewport(commands);
     }
+    // Logged host images, uploaded before the UI samples them.
+    logs->Record(commands, frameSlot);
     {
         ERNIE_ZONE("Viewer UI draw");
         ERNIE_GPU_ZONE(*gpu, commands, "UI");
@@ -3198,6 +3225,7 @@ void Viewer::RemoveScope(std::uint64_t scope) {
     std::erase_if(s.viewportToggles, in);
     std::erase_if(s.hudItems, in);
     std::erase_if(s.viewportMenuItems, in);
+    s.logs->RemoveScope(scope);
     s.hudTime = -kHudRefresh;
     std::vector<std::string> titles;
     for (const auto& [title, added] : s.panelScopes) {
@@ -3208,6 +3236,88 @@ void Viewer::RemoveScope(std::uint64_t scope) {
     for (const std::string& title : titles) {
         RemovePanel(title);
     }
+}
+
+namespace {
+
+constexpr const char* kPlotsTitle = "Plots";
+
+ComputeInterop& RequireCompute(RenderDelegate& delegate) {
+    std::string why;
+    ComputeInterop* compute = delegate.Compute(&why);
+    if (compute == nullptr) {
+        throw std::runtime_error("The viewer has no GPU interop: " +
+                                 why);
+    }
+    return *compute;
+}
+
+}  // namespace
+
+void Viewer::LogScalar(std::string_view name, double value,
+                       bool clear, int smoothing) {
+    State& s = *state_;
+    s.logs->LogScalar(name, value, clear, smoothing, s.scope);
+    EnsurePlotsPanel();
+}
+
+std::vector<double>
+Viewer::LoggedScalars(std::string_view name) const {
+    return state_->logs->Scalars(name);
+}
+
+void Viewer::LogArray(std::string_view name, const Tensor& array,
+                      std::uintptr_t stream) {
+    State& s = *state_;
+    const Tensor host =
+        array.Location().kind == DeviceKind::Cpu
+            ? array
+            : RequireCompute(*s.delegate).Download(array, stream);
+    s.logs->LogArray(name, host, s.scope);
+    EnsurePlotsPanel();
+}
+
+void Viewer::LogImage(std::string_view name, const Tensor& image,
+                      std::uintptr_t stream) {
+    State& s = *state_;
+    ComputeInterop* compute = image.Location().kind == DeviceKind::Cpu
+                                  ? nullptr
+                                  : &RequireCompute(*s.delegate);
+    s.logs->LogImage(*this, name, image, compute, stream, s.scope);
+}
+
+Tensor Viewer::MapImage(std::string_view name,
+                        std::vector<std::int64_t> shape, DType type,
+                        std::uintptr_t stream) {
+    State& s = *state_;
+    return s.logs->MapImage(*this, name, std::move(shape), type,
+                            RequireCompute(*s.delegate), stream,
+                            s.scope);
+}
+
+void Viewer::UnmapImage(std::string_view name,
+                        std::uintptr_t stream) {
+    State& s = *state_;
+    s.logs->UnmapImage(name, RequireCompute(*s.delegate), stream);
+}
+
+void Viewer::RemoveLogged(std::string_view name) {
+    state_->logs->Remove(*this, name);
+}
+
+void Viewer::EnsurePlotsPanel() {
+    State& s = *state_;
+    if (s.plotsPanel != nullptr) {
+        return;
+    }
+    // The application's own, whichever scope logs first, as every
+    // scope's plots draw in it.
+    const std::uint64_t previous = s.scope;
+    s.scope = 0;
+    s.plotsPanel = &AddPanel(kPlotsTitle, Dock::RightLower,
+                             [&s](Viewer&) { s.logs->DrawPlots(); });
+    s.scope = previous;
+    FocusPanel(kPlotsTitle);
 }
 
 void Viewer::SaveScene(const std::filesystem::path& path) {
@@ -3796,6 +3906,9 @@ void Viewer::RemovePanel(const std::string& title) {
         requests.end());
     state_->drawnPanels.erase(title);
     state_->panelScopes.erase(title);
+    if (found->get() == state_->plotsPanel) {
+        state_->plotsPanel = nullptr;
+    }
     panels.erase(found);
 }
 

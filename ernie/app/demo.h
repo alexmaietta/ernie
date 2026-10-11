@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <span>
@@ -148,6 +149,26 @@ class Demo {
     /// as its Python wrapper.
     std::shared_ptr<WidgetPanel> SharedWidgets();
 
+    /// Logs as the viewer's `LogScalar`, `LogArray` and `LogImage`
+    /// (after Newton's examples' `viewer.log_scalar` and friends)
+    /// when there is a viewer, and keeps what was logged either way,
+    /// for checks without one (`LoggedScalars`, `LoggedArray`,
+    /// `LoggedImage`).
+    void LogScalar(std::string_view name, double value,
+                   bool clear = false, int smoothing = 1);
+    void LogArray(std::string_view name, const Tensor& array,
+                  std::uintptr_t stream = 1);
+    void LogImage(std::string_view name, const Tensor& image,
+                  std::uintptr_t stream = 1);
+
+    /// Every value logged to scalar `name`, oldest first, unsmoothed;
+    /// empty if none.
+    std::vector<double> LoggedScalars(std::string_view name) const;
+    /// The last array or image logged as `name`, as logged (on the
+    /// host or the GPU); empty if none.
+    Tensor LoggedArray(std::string_view name) const;
+    Tensor LoggedImage(std::string_view name) const;
+
     /// Frames to run without a window when `--num-frames` is not
     /// given: `numFrames`.
     virtual std::uint64_t NumFrames() const;
@@ -215,6 +236,10 @@ class Demo {
     std::shared_ptr<Scene> ownScene_;
     std::shared_ptr<Renderer> renderer_;
     std::shared_ptr<WidgetPanel> widgets_;
+    std::map<std::string, std::vector<double>, std::less<>>
+        loggedScalars_;
+    std::map<std::string, Tensor, std::less<>> loggedArrays_;
+    std::map<std::string, Tensor, std::less<>> loggedImages_;
     Tensor image_;
     bool untestedSteps_ = false;
     bool untestedFinal_ = false;

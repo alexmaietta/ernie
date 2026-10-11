@@ -54,6 +54,11 @@ class CudaInterop final : public ComputeInterop {
     Tensor View(std::shared_ptr<GpuBuffer> buffer, DType type,
                 std::vector<std::int64_t> shape,
                 VkDeviceSize offset = 0) override;
+    Tensor ViewImage(std::shared_ptr<GpuImage> image, DType type,
+                     std::vector<std::int64_t> shape,
+                     std::vector<std::int64_t> strides) override;
+    void CopyToImage(const Tensor& source, GpuImage& image,
+                     std::uintptr_t stream = 1) override;
     void Copy(const Tensor& source, const Tensor& destination,
               std::uintptr_t stream = 1) override;
     Tensor Upload(const Tensor& host) override;
@@ -80,6 +85,9 @@ class CudaInterop final : public ComputeInterop {
 
     explicit CudaInterop(std::shared_ptr<State> state);
     std::uint64_t DevicePointer(GpuBuffer& buffer);
+    /// The CUDA address of a linear shared image's first texel,
+    /// importing its memory on first use.
+    std::uint64_t DevicePointer(GpuImage& image);
     void CheckOnDevice(const Tensor& tensor) const;
 
     std::shared_ptr<State> state_;

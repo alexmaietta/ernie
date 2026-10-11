@@ -31,6 +31,16 @@ struct ImageDesc {
     /// this many as 2D arrays (`GroupView`), such as one view's
     /// spectral bands in a batch of views; 0 for none.
     std::uint32_t groupLayers = 0;
+    /// Lay the texels out linearly, rows `RowPitch` bytes apart,
+    /// rather than in the device's own tiling: with `shared`, compute
+    /// APIs write the image as a plain pitched array in place, and
+    /// shaders sample that same memory
+    /// (`VulkanContext::SupportsLinearSampling`). One layer and one
+    /// mip.
+    bool linear = false;
+    /// How the image's view maps its channels, such as a grey image's
+    /// red to all three.
+    VkComponentMapping components{};
 };
 
 /// A device-local Vulkan image with a view of all its mips and
@@ -115,6 +125,16 @@ class GpuImage {
         return sharedMemory_ != VK_NULL_HANDLE ? bytes_ : 0;
     }
 
+    /// For linear images, the bytes from one row's first texel to the
+    /// next's, and from the memory's start to the first texel; zero
+    /// for others.
+    VkDeviceSize RowPitch() const {
+        return rowPitch_;
+    }
+    VkDeviceSize TexelOffset() const {
+        return texelOffset_;
+    }
+
     /// Keeps `object`, such as a CUDA import of the image's memory,
     /// until the image is destroyed, releasing it before the memory
     /// is freed.
@@ -145,6 +165,8 @@ class GpuImage {
     std::vector<VkImageView> mipViews_;
     VkImageLayout layout_ = VK_IMAGE_LAYOUT_UNDEFINED;
     VkDeviceSize bytes_ = 0;
+    VkDeviceSize rowPitch_ = 0;
+    VkDeviceSize texelOffset_ = 0;
 };
 
 /// Aspect of an image format: depth for depth formats, colour

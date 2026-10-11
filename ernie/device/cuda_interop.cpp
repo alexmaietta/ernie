@@ -581,11 +581,122 @@ std::uint64_t CudaInterop::DevicePointer(GpuBuffer& buffer) {
     return pointer;
 }
 
+std::uint64_t CudaInterop::DevicePointer(GpuImage& image) {
+    if (image.AllocationSize() == 0 || !image.Desc().linear) {
+        throw std::invalid_argument(
+            "CUDA can only address linear shared images");
+    }
+    if (auto* import = static_cast<Import*>(image.Attached().get())) {
+        return import->pointer + image.TexelOffset();
+    }
+    auto import = std::make_shared<Import>();
+    import->state = state_;
+    const State::Scope scope(*state_);
+    const ExternalHandle exported = image.ExportHandle();
+    cu::ExternalMemoryHandleDesc handle{};
+    handle.type = cu::kMemoryOpaque;
+    cu::SetHandle(handle, exported);
+    handle.size = image.AllocationSize();
+    handle.flags = cu::kDedicated;
+    const cu::Result result =
+        state_->driver.importExternalMemory(&import->memory, &handle);
+    cu::ReleaseAfterImport(exported, result == cu::kSuccess);
+    state_->Check(result, "cuImportExternalMemory");
+    // The linear image's memory is its rows, read as a plain buffer.
+    cu::ExternalMemoryBufferDesc mapped{};
+    mapped.size = image.AllocationSize();
+    state_->Check(state_->driver.externalMemoryGetMappedBuffer(
+                      &import->pointer, import->memory, &mapped),
+                  "cuExternalMemoryGetMappedBuffer");
+    const std::uint64_t pointer =
+        import->pointer + image.TexelOffset();
+    image.Attach(std::move(import));
+    return pointer;
+}
+
+Tensor CudaInterop::ViewImage(std::shared_ptr<GpuImage> image,
+                              DType type,
+                              std::vector<std::int64_t> shape,
+                              std::vector<std::int64_t> strides) {
+    const Tensor shaped(nullptr, type, shape, strides);
+    // The farthest byte the view reaches, from the first texel.
+    std::int64_t last = 0;
+    for (std::size_t d = 0; d < shape.size(); ++d) {
+        last += (shape[d] - 1) * shaped.Strides()[d];
+    }
+    const VkDeviceSize end =
+        image->TexelOffset() +
+        static_cast<VkDeviceSize>(last + 1) * SizeOf(type);
+    const std::uint64_t pointer = DevicePointer(*image);
+    if (shaped.Elements() > 0 && end > image->AllocationSize()) {
+        throw std::invalid_argument(
+            "CudaInterop::ViewImage past the end of the image");
+    }
+    return Tensor(reinterpret_cast<void*>(pointer), type,
+                  std::move(shape), std::move(strides),
+                  {DeviceKind::Cuda, state_->ordinal},
+                  std::move(image));
+}
+
+void CudaInterop::CopyToImage(const Tensor& source, GpuImage& image,
+                              std::uintptr_t stream) {
+    ERNIE_ZONE("CUDA copy to image");
+    CheckOnDevice(source);
+    const std::vector<std::int64_t>& shape = source.Shape();
+    if (shape.size() < 2 || shape.size() > 4) {
+        throw std::invalid_argument(
+            "CudaInterop::CopyToImage needs (rows, cols), (rows, "
+            "cols, channels) or "
+            "(views, rows, cols, channels)");
+    }
+    const bool batch = shape.size() == 4;
+    const auto views = static_cast<std::size_t>(batch ? shape[0] : 1);
+    const auto rows = static_cast<std::size_t>(shape[batch ? 1 : 0]);
+    const auto cols = static_cast<std::size_t>(shape[batch ? 2 : 1]);
+    const std::size_t rowBytes =
+        static_cast<std::size_t>(source.Elements()) *
+        SizeOf(source.Type()) /
+        std::max<std::size_t>(views * rows, 1);
+    const ImageDesc& desc = image.Desc();
+    if (rows > desc.height || cols * views > desc.width ||
+        rowBytes * views > image.RowPitch()) {
+        throw std::invalid_argument("CudaInterop::CopyToImage: the "
+                                    "views do not fit the image");
+    }
+    if (rowBytes == 0 || rows == 0) {
+        return;
+    }
+    const std::uint64_t destination = DevicePointer(image);
+    WaitForVulkan(stream);
+    const State::Scope scope(*state_);
+    const auto onStream = reinterpret_cast<cu::Stream>(stream);
+    for (std::size_t view = 0; view < views; ++view) {
+        cu::Memcpy2d copy{};
+        copy.srcMemoryType = cu::kMemoryDevice;
+        copy.srcDevice =
+            reinterpret_cast<cu::DevicePtr>(source.Data()) +
+            view * rows * rowBytes;
+        copy.srcPitch = rowBytes;
+        copy.dstMemoryType = cu::kMemoryDevice;
+        copy.dstDevice = destination + view * rowBytes;
+        copy.dstPitch = image.RowPitch();
+        copy.widthInBytes = rowBytes;
+        copy.height = rows;
+        state_->Check(state_->driver.memcpy2DAsync(&copy, onStream),
+                      "cuMemcpy2DAsync");
+    }
+    SignalVulkanAfter(stream);
+}
+
 CudaArrayView CudaInterop::MapImage(GpuImage& image) {
     const ImageDesc& desc = image.Desc();
     if (image.AllocationSize() == 0) {
         throw std::invalid_argument(
             "CUDA can only reach shared images");
+    }
+    if (desc.linear) {
+        throw std::invalid_argument("A linear image maps as a tensor "
+                                    "(ViewImage), not an array");
     }
     if (desc.layers != 1 || desc.mips != 1) {
         throw std::invalid_argument(

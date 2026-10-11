@@ -240,6 +240,68 @@ class Viewer {
     /// @throws std::invalid_argument for scope 0.
     void RemoveScope(std::uint64_t scope);
 
+    /// Logging, after Newton's viewers' `log_scalar`, `log_array` and
+    /// `log_image`: values a simulation or sensor produces, shown
+    /// live as they change. Each belongs to the registration scope
+    /// current when first logged (`SetScope`), so a demo's logs go
+    /// with it.
+    ///
+    /// Logs `value` as the next sample of the scalar signal `name`,
+    /// drawn as a line of its last thousand samples in the Plots
+    /// panel. `clear` drops the samples before; `smoothing` averages
+    /// that many values into each sample.
+    void LogScalar(std::string_view name, double value,
+                   bool clear = false, int smoothing = 1);
+
+    /// The samples of scalar signal `name` so far, oldest first;
+    /// empty if none.
+    std::vector<double> LoggedScalars(std::string_view name) const;
+
+    /// Logs `array`, (n) or (rows, cols) numbers on the host or the
+    /// GPU, as a heatmap in the Plots panel, replacing the last; a
+    /// GPU array is downloaded after the work queued on compute
+    /// stream `stream`.
+    /// @throws std::invalid_argument for another shape or type.
+    void LogArray(std::string_view name, const Tensor& array,
+                  std::uintptr_t stream = 1);
+
+    /// Logs `image` in a panel of its own titled `name`, replacing
+    /// the last: (rows, cols), (rows, cols, channels) or a batch
+    /// (views, rows, cols, channels), with 1, 3 or 4 channels, uint8
+    /// (0 to 255, shown as they are, so sRGB) or float32 (0 to 1). A
+    /// host image is uploaded with the next frame. An image on the
+    /// viewer's GPU (`Delegate().Compute()`) is copied device to
+    /// device into the texture after the work queued on compute
+    /// stream `stream`, without the host; to skip even that copy,
+    /// write the texture itself (`MapImage`).
+    /// @throws std::invalid_argument for another shape or type, a
+    /// device other than the host or the viewer's GPU, or a name
+    /// another panel has.
+    void LogImage(std::string_view name, const Tensor& image,
+                  std::uintptr_t stream = 1);
+
+    /// The texture of the image panel `name` itself, as a tensor of
+    /// `shape` and `type` (as `LogImage` takes them, without 3
+    /// channels) on the viewer's GPU, its rows the texture's pitch
+    /// apart: write it on compute stream `stream` and `UnmapImage`,
+    /// and the panel shows it with no copy at all. Map again for each
+    /// new image; the writes on `stream` follow the frames that
+    /// sampled the last one.
+    /// @throws std::runtime_error without GPU interop, or if the GPU
+    /// cannot sample the linear images that need
+    /// (`VulkanContext::SupportsLinearSampling`);
+    /// std::invalid_argument as `LogImage`.
+    Tensor MapImage(std::string_view name,
+                    std::vector<std::int64_t> shape, DType type,
+                    std::uintptr_t stream = 1);
+
+    /// Ends writing image `name` (`MapImage`): frames sample it after
+    /// the work queued on `stream`.
+    void UnmapImage(std::string_view name, std::uintptr_t stream = 1);
+
+    /// Forgets the scalar signal, array or image `name`.
+    void RemoveLogged(std::string_view name);
+
     Scene& GetScene();
     VulkanContext& Context();
     const VulkanContext& Context() const;
@@ -628,6 +690,10 @@ class Viewer {
     void SetTheme(const Theme& theme);
 
   private:
+    /// Adds the Plots panel the first time a scalar or array is
+    /// logged.
+    void EnsurePlotsPanel();
+
     struct State;
     std::unique_ptr<State> state_;
 };

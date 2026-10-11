@@ -236,6 +236,50 @@ std::shared_ptr<WidgetPanel> Demo::SharedWidgets() {
     return widgets_;
 }
 
+void Demo::LogScalar(std::string_view name, double value, bool clear,
+                     int smoothing) {
+    std::vector<double>& samples = loggedScalars_[std::string(name)];
+    if (clear) {
+        samples.clear();
+    }
+    samples.push_back(value);
+    if (viewer_ != nullptr) {
+        viewer_->LogScalar(name, value, clear, smoothing);
+    }
+}
+
+void Demo::LogArray(std::string_view name, const Tensor& array,
+                    std::uintptr_t stream) {
+    loggedArrays_[std::string(name)] = array;
+    if (viewer_ != nullptr) {
+        viewer_->LogArray(name, array, stream);
+    }
+}
+
+void Demo::LogImage(std::string_view name, const Tensor& image,
+                    std::uintptr_t stream) {
+    loggedImages_[std::string(name)] = image;
+    if (viewer_ != nullptr) {
+        viewer_->LogImage(name, image, stream);
+    }
+}
+
+std::vector<double> Demo::LoggedScalars(std::string_view name) const {
+    const auto found = loggedScalars_.find(name);
+    return found != loggedScalars_.end() ? found->second
+                                         : std::vector<double>{};
+}
+
+Tensor Demo::LoggedArray(std::string_view name) const {
+    const auto found = loggedArrays_.find(name);
+    return found != loggedArrays_.end() ? found->second : Tensor{};
+}
+
+Tensor Demo::LoggedImage(std::string_view name) const {
+    const auto found = loggedImages_.find(name);
+    return found != loggedImages_.end() ? found->second : Tensor{};
+}
+
 std::uint64_t Demo::NumFrames() const {
     return numFrames;
 }

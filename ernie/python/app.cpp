@@ -659,6 +659,9 @@ void BindApp(nb::module_& parent) {
             nb::arg("title"), nb::arg("visible"),
             "Shows or hides the panel titled `title`, as the Window "
             "menu does.")
+        .def("focus_panel", &Viewer::FocusPanel, nb::arg("title"),
+             "Shows the panel titled `title` and brings it to the "
+             "front of its dock.")
         .def(
             "add_menu_item",
             [](Viewer& viewer, const std::string& menu,
@@ -750,6 +753,103 @@ void BindApp(nb::module_& parent) {
              nb::arg("id"),
              "Removes a viewport toggle, heads-up display item or "
              "viewport menu item.")
+        .def("log_scalar", &Viewer::LogScalar, nb::arg("name"),
+             nb::arg("value"), nb::arg("clear") = false,
+             nb::arg("smoothing") = 1,
+             "Logs value as the next sample of the scalar signal "
+             "name, drawn as a line of its "
+             "last thousand samples in the Plots panel (Newton's "
+             "log_scalar). clear drops the "
+             "samples before; smoothing averages that many values "
+             "into each sample.")
+        .def(
+            "logged_scalars", &Viewer::LoggedScalars, nb::arg("name"),
+            "The samples of scalar signal name so far, oldest first.")
+        .def(
+            "log_array",
+            [](Viewer& viewer, std::string_view name,
+               const AnyArray& array, nb::handle stream) {
+                viewer.LogArray(name, TensorFromArray(array),
+                                StreamOf(stream));
+            },
+            nb::arg("name"), nb::arg("array"),
+            nb::arg("stream").none() = nb::none(),
+            // Any NumPy or DLPack array, not only NumPy's.
+            nb::sig("def log_array(self, name: str, array: object, "
+                    "stream: object | None = None) -> None"),
+            "Logs array, (n) or (rows, cols) numbers from any "
+            "framework, on the CPU or the GPU, "
+            "as a heatmap in the Plots panel, replacing the last "
+            "(Newton's log_array).")
+        .def(
+            "log_image",
+            [](Viewer& viewer, std::string_view name,
+               const AnyArray& image, nb::handle stream) {
+                viewer.LogImage(name, TensorFromArray(image),
+                                StreamOf(stream));
+            },
+            nb::arg("name"), nb::arg("image"),
+            nb::arg("stream").none() = nb::none(),
+            nb::sig("def log_image(self, name: str, image: object, "
+                    "stream: object | None = None) -> None"),
+            "Logs image in a panel of its own titled name, replacing "
+            "the last (Newton's "
+            "log_image): (rows, cols), (rows, cols, channels) or a "
+            "batch (views, rows, cols, "
+            "channels), with 1, 3 or 4 channels, uint8 (0 to 255, "
+            "shown as they are) or float32 "
+            "(0 to 1), from any DLPack framework (NumPy, PyTorch, "
+            "JAX, Warp, CuPy). A CUDA image "
+            "is copied device to device into the panel's texture "
+            "after the work queued on "
+            "stream, without the host; map_image writes the texture "
+            "itself, with no copy.")
+        .def(
+            "map_image",
+            [](nb::pointer_and_handle<Viewer> self,
+               std::string_view name, std::vector<std::int64_t> shape,
+               nb::handle dtype, nb::handle stream) {
+                const std::string type = nb::cast<std::string>(
+                    nb::module_::import_("numpy")
+                        .attr("dtype")(dtype)
+                        .attr("name"));
+                if (type != "uint8" && type != "float32") {
+                    throw nb::value_error(
+                        "map_image takes dtype uint8 or float32");
+                }
+                const DType parsed =
+                    type == "uint8" ? DType::UInt8 : DType::Float32;
+                return ArrayFromTensor(
+                    KeepingAlive(
+                        self.p->MapImage(name, std::move(shape),
+                                         parsed, StreamOf(stream)),
+                        self.h),
+                    true);
+            },
+            nb::arg("name"), nb::arg("shape"),
+            nb::arg("dtype") = "uint8",
+            nb::arg("stream").none() = nb::none(),
+            "The texture of image panel name itself, as a writable "
+            "CUDA array of shape (as "
+            "log_image takes, with 1 or 4 channels) and dtype: write "
+            "it on stream (with Warp, "
+            "PyTorch, CuPy...), then unmap_image(name, stream), and "
+            "the panel shows it with no "
+            "copy at all. Its rows are the texture's pitch apart "
+            "(see its strides). Map again "
+            "for each new image.")
+        .def(
+            "unmap_image",
+            [](Viewer& viewer, std::string_view name,
+               nb::handle stream) {
+                viewer.UnmapImage(name, StreamOf(stream));
+            },
+            nb::arg("name"), nb::arg("stream").none() = nb::none(),
+            "Ends writing image name (map_image): frames show it "
+            "after the work queued on "
+            "stream.")
+        .def("remove_logged", &Viewer::RemoveLogged, nb::arg("name"),
+             "Forgets the scalar signal, array or image name.")
         .def("save_layout", &Viewer::SaveLayout, nb::arg("path"))
         .def("load_layout", &Viewer::LoadLayout, nb::arg("path"))
         .def_prop_rw("theme", &Viewer::GetTheme, &Viewer::SetTheme);

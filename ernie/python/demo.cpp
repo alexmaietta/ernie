@@ -6,6 +6,7 @@
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/stl/string.h>
+#include <nanobind/stl/string_view.h>
 #include <nanobind/stl/vector.h>
 #include <nanobind/trampoline.h>
 
@@ -197,6 +198,7 @@ void BindDemo(nb::module_& m) {
                 }
                 return nb::cast(demo.OwnScene());
             },
+            nb::for_getter(nb::sig("def scene(self) -> ernie._ernie.Scene")),
             "The scene to build into: the viewer's, or the demo's "
             "own without one.")
         // Shared, not tied to the demo: images and batch cameras keep
@@ -211,6 +213,67 @@ void BindDemo(nb::module_& m) {
                      "Options section: a WidgetPanel "
                      "to add sliders, checkboxes and combos to, with "
                      "or without a viewer.")
+        .def("log_scalar", &Demo::LogScalar, nb::arg("name"),
+             nb::arg("value"), nb::arg("clear") = false,
+             nb::arg("smoothing") = 1,
+             "Logs value to the viewer's scalar plot name "
+             "(Viewer.log_scalar) when there is a "
+             "viewer, and keeps it either way (logged_scalars).")
+        .def(
+            "log_array",
+            [](Demo& demo, std::string_view name,
+               const AnyArray& array, nb::handle stream) {
+                demo.LogArray(name, TensorFromArray(array),
+                              StreamOf(stream));
+            },
+            nb::arg("name"), nb::arg("array"),
+            nb::arg("stream").none() = nb::none(),
+            // Any NumPy or DLPack array, not only NumPy's.
+            nb::sig("def log_array(self, name: str, array: object, "
+                    "stream: object | None = None) -> None"),
+            "Logs array to the viewer's heatmap name "
+            "(Viewer.log_array) when there is a viewer, "
+            "and keeps it either way (logged_array).")
+        .def(
+            "log_image",
+            [](Demo& demo, std::string_view name,
+               const AnyArray& image, nb::handle stream) {
+                demo.LogImage(name, TensorFromArray(image),
+                              StreamOf(stream));
+            },
+            nb::arg("name"), nb::arg("image"),
+            nb::arg("stream").none() = nb::none(),
+            nb::sig("def log_image(self, name: str, image: object, "
+                    "stream: object | None = None) -> None"),
+            "Logs image to the viewer's image panel name "
+            "(Viewer.log_image) when there is a "
+            "viewer, and keeps it either way (logged_image).")
+        .def("logged_scalars", &Demo::LoggedScalars, nb::arg("name"),
+             "Every value logged to scalar name, oldest first.")
+        .def(
+            "logged_array",
+            [](const Demo& demo,
+               std::string_view name) -> nb::object {
+                const Tensor array = demo.LoggedArray(name);
+                return array.Empty() ? nb::none()
+                                     : ArrayFromTensor(array);
+            },
+            nb::arg("name"),
+            nb::sig("def logged_array(self, name: str) -> "
+                    "numpy.typing.NDArray | None"),
+            "The last array logged as name, or None.")
+        .def(
+            "logged_image",
+            [](const Demo& demo,
+               std::string_view name) -> nb::object {
+                const Tensor image = demo.LoggedImage(name);
+                return image.Empty() ? nb::none()
+                                     : ArrayFromTensor(image);
+            },
+            nb::arg("name"),
+            nb::sig("def logged_image(self, name: str) -> "
+                    "numpy.typing.NDArray | None"),
+            "The last image logged as name, as logged, or None.")
         .def_prop_ro("options", &Demo::Options,
                      "The run's shared options.")
         .def_rw("frame", &Demo::frame, "Steps taken so far.")
