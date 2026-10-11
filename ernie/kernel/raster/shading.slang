@@ -376,41 +376,170 @@ uint lightView(LightGpu light, float3 world) {
     return first + (d.z >= 0.0 ? 4 : 5);
 }
 
+// Largest PCF radius in texels for a light's penumbra: wider than the sun's (frame.slang), as a
+// lamp near its casters throws penumbrae of several degrees (a 1024-texel cube face's texel is
+// 1.5 mrad).
+static const float kMaxLightFilterTexels = 64.0;
+
+// Poisson sample `i` of 16 in the unit disk.
+float2 lightPoisson(uint i) {
+    let pair = sh.poisson[i / 2];
+    return i % 2 == 0 ? pair.xy : pair.zw;
+}
+
+// Where a point falls in a light's shadow maps: the view that sees it, its place in that view's
+// map and its depth there; not `inside` off the map or behind the light.
+struct LightTap {
+    uint view;
+    float4 clip;
+    float2 uv;
+    float depth;
+    bool inside;
+}
+
+// Poisson sample `i` of a disk `radius` wide across a light's ray, turned by `rotation` (cosine,
+// sine), on unit axes `across` and `across2`.
+float3 lightDisk(uint i, float2 rotation, float3 across, float3 across2, float radius) {
+    let p = lightPoisson(i);
+    let q = float2(rotation.x * p.x - rotation.y * p.y, rotation.y * p.x + rotation.x * p.y);
+    return (q.x * across + q.y * across2) * radius;
+}
+
+LightTap lightTap(LightGpu light, float3 point) {
+    LightTap tap;
+    tap.view = lightView(light, point);
+    tap.clip = mul(lightViews[tap.view], float4(point, 1.0));
+    let ndc = tap.clip.xyz / max(tap.clip.w, 1e-20);
+    // Receivers beyond the far plane compare at it, as the sun's (frame.slang).
+    tap.depth = min(ndc.z, 0.99999994);
+    tap.uv = float2(0.5 * ndc.x + 0.5, 0.5 - 0.5 * ndc.y);
+    tap.inside = tap.clip.w > 0.0 && all(tap.uv >= float2(0.0)) && all(tap.uv <= float2(1.0));
+    return tap;
+}
+
 // Fraction of a light reaching `world` past its shadow map: Poisson-disk PCF with normal offset,
 // as the sun's shadows (frame.slang). Points outside the map are lit.
+//
+// The taps lie on a disk across the light's ray through the receiver, each looked up in the view
+// that sees it, so a cube's filter crosses the seams between its faces.
+//
+// Lights with a size get percentage-closer soft shadows, as the sun's: a blocker search averages
+// the distance of occluders within the light's footprint, and the filter widens to the penumbra
+// they cast. A local light of radius R (`extentX.w`), seen from the receiver at distance d_r past
+// blockers at d_b, casts a penumbra of R (d_r - d_b) / (d_b d_r) radians as the map sees it; a
+// distant light's (`extentY.w`, the tangent of its angular radius) is its gap to the blockers
+// times that tangent. Every tap compares against the receiver's plane, which the disk across the
+// ray meets at a slant, so tilted surfaces do not shadow themselves.
+//
+// Reference: R. Fernando, "Percentage-Closer Soft Shadows", SIGGRAPH 2005 Sketches.
+// https://doi.org/10.1145/1187112.1187153
 float lightVisibility(LightGpu light, float3 world, float3 n, float nDotL, float2 pixel) {
     if (light.cone.w <= 0.0) {
         return 1.0;
     }
-    let view = lightView(light, world);
     // Orthographic views (the sun-like distant light's, a laser's along its beam) have texels of
     // one size; perspective ones grow with distance.
-    let orthographic =
-        light.position.w == 0.0 || (light.position.w == 5.0 && light.beamExtra.y < 0.5);
+    let distant = light.position.w == 0.0;
+    let orthographic = distant || (light.position.w == 5.0 && light.beamExtra.y < 0.5);
     let distance = orthographic ? 1.0 : length(world - light.position.xyz);
     let texelWorld = light.shadow.x * distance;
     let offset = n * sh.lightShadow.y * texelWorld * max(1.0 - clamp(nDotL, 0.0, 1.0), 0.25);
-    let clip = mul(lightViews[view], float4(world + offset, 1.0));
-    if (clip.w <= 0.0) {
+    let receiver = world + offset;
+    let centre = lightTap(light, receiver);
+    if (!centre.inside) {
         return 1.0;
     }
-    // Receivers beyond the far plane compare at it, as the sun's (frame.slang).
-    let ndc = float3(clip.xy / clip.w, min(clip.z / clip.w, 0.99999994));
-    let uv = float2(0.5 * ndc.x + 0.5, 0.5 - 0.5 * ndc.y);
-    if (any(uv < float2(0.0)) || any(uv > float2(1.0))) {
-        return 1.0;
-    }
+    // Towards the light along its ray through the receiver; a laser's orthographic view looks
+    // down its beam.
+    let towards = distant ? light.position.xyz
+                          : (orthographic ? -light.axis.xyz
+                                          : normalize(light.position.xyz - receiver));
+    let across = normalize(cross(towards, abs(towards.z) < 0.9 ? float3(0.0, 0.0, 1.0)
+                                                               : float3(1.0, 0.0, 0.0)));
+    let across2 = cross(towards, across);
     let angle = 6.28318530718 * interleavedGradientNoise(pixel);
-    let c = cos(angle);
-    let sn = sin(angle);
-    let radius = sh.lightShadow.x / sh.lightShadow.z;
+    let rotation = float2(cos(angle), sin(angle));
+    let size = sh.lightShadow.z;
+    let softness = sh.lightShadow.x;
+    let cosine = clamp(nDotL, 0.05, 1.0);
+    // How far the receiver's plane falls towards the light per world unit across it.
+    let tilt = min(sqrt(1.0 - cosine * cosine) / cosine, 10.0);
+    var filterTexels = softness;
+
+    let lightRadius = orthographic ? 0.0 : light.extentX.w;
+    let tanRadius = distant ? light.extentY.w : 0.0;
+    if (lightRadius > 0.0 || tanRadius > 0.0) {
+        // An orthographic view's depth per world unit towards the light.
+        let ahead = mul(lightViews[centre.view], float4(receiver + towards, 1.0));
+        let depthPerWorld = max(abs(ahead.z / ahead.w - centre.depth), 1e-12);
+        // Search where blockers halfway to the light (a local light) or between the near plane
+        // and the receiver (a distant one) would shadow it.
+        let searchTexels =
+            clamp(orthographic ? centre.depth / depthPerWorld * tanRadius / texelWorld
+                               : lightRadius / max(distance * light.shadow.x, 1e-12),
+                  softness, kMaxLightFilterTexels);
+        var blockers = 0.0;
+        var blockerSum = 0.0;
+        for (uint i = 0; i < 16; ++i) {
+            let point = receiver + lightDisk(i, rotation, across, across2,
+                                             searchTexels * texelWorld);
+            let tap = lightTap(light, point);
+            if (!tap.inside) {
+                continue;
+            }
+            let texel = min(int2(tap.uv * size), int2(int(size) - 1));
+            let stored = lightShadowMaps.Load(int4(texel, int(tap.view), 0));
+            let drop =
+                length(lightPoisson(i)) * searchTexels * texelWorld * tilt;
+            if (orthographic) {
+                let gap = (tap.depth - stored) / depthPerWorld;
+                if (gap > drop) {
+                    blockers += 1.0;
+                    blockerSum += gap;
+                }
+            } else {
+                // Along the ray from the light (where clip w is 0) through the tap, clip z and w
+                // are affine in the fraction s of the way: the stored depth gives its s.
+                let atLight = mul(lightViews[tap.view], float4(light.position.xyz, 1.0)).z;
+                let s = atLight / (stored * tap.clip.w - tap.clip.z + atLight);
+                let tapDistance = length(point - light.position.xyz);
+                let blocker = clamp(s, 1e-3, 1.0) * tapDistance;
+                if (tapDistance - blocker > drop) {
+                    blockers += 1.0;
+                    blockerSum += blocker;
+                }
+            }
+        }
+        if (blockers == 0.0) {
+            return 1.0;
+        }
+        var penumbraTexels = 0.0;
+        if (orthographic) {
+            penumbraTexels = blockerSum / blockers * tanRadius / texelWorld;
+        } else {
+            let blocker = blockerSum / blockers;
+            let radians = lightRadius * (distance - blocker) / (blocker * distance);
+            penumbraTexels = radians / light.shadow.x;
+        }
+        filterTexels = clamp(penumbraTexels, softness, kMaxLightFilterTexels);
+    }
     var lit = 0.0;
     for (uint i = 0; i < 16; ++i) {
-        let pair = sh.poisson[i / 2];
-        let p = i % 2 == 0 ? pair.xy : pair.zw;
-        let tap = uv + float2(c * p.x - sn * p.y, sn * p.x + c * p.y) * radius;
-        lit += lightShadowMaps.SampleCmpLevelZero(lightShadowSampler, float3(tap, float(view)),
-                                                  ndc.z);
+        let point =
+            receiver + lightDisk(i, rotation, across, across2, filterTexels * texelWorld);
+        let tap = lightTap(light, point);
+        if (!tap.inside) {
+            lit += 1.0;
+            continue;
+        }
+        // Compared at the receiver's plane, lowered towards the light by the tap's distance
+        // across it.
+        let drop = length(lightPoisson(i)) * filterTexels * texelWorld * tilt;
+        let toLight = orthographic ? towards : normalize(light.position.xyz - point);
+        let lowered = mul(lightViews[tap.view], float4(point + toLight * drop, 1.0));
+        let depth = min(lowered.z / max(lowered.w, 1e-20), 0.99999994);
+        lit += lightShadowMaps.SampleCmpLevelZero(lightShadowSampler,
+                                                  float3(tap.uv, float(tap.view)), depth);
     }
     return lit / 16.0;
 }

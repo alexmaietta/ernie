@@ -1533,7 +1533,10 @@ LightParams LightParamsOf(const Scene& scene, const Path& path,
     const std::string_view type = scene.TypeOf(path);
     if (type == kDistantLight) {
         light.type = LightType::Distant;
-        light.shadows = DistantLight(scene, path).GetShadowEnable();
+        const DistantLight distant(scene, path);
+        light.shadows = distant.GetShadowEnable();
+        light.angle =
+            std::max(static_cast<float>(distant.GetAngle()), 0.0f);
         light.direction =
             glm::vec3(glm::normalize(glm::dvec3(world[2])));
         light.spectrum = SunIrradianceOf(scene, path, bands);

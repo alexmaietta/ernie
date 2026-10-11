@@ -731,6 +731,81 @@ TEST_F(RasterDelegateTest, AreaLightsCastShadows) {
         << "a cube at the centre";
 }
 
+TEST_F(RasterDelegateTest, LargerLightsCastWiderPenumbrae) {
+    // A lamp at (40, 0, 40) and a blocker halfway to the origin, over
+    // x in [4, 20], whose edge throws its shadow's edge onto x = 0,
+    // out of the way of the camera looking down: a point's edge is
+    // sharp, and a sphere of radius 4 spreads it over about 5.6 to
+    // each side (its radius times the receiver's gap to the blocker
+    // over the blocker's to the light, slanted onto the ground).
+    const auto fractions = [&](double radius) {
+        RasterDelegate delegate(*context_);
+        Scene scene = LampScene(40.0);
+        scene.Set("/World/Lamp", tokens::kTransform,
+                  ernie::LookAtTransform({40.0, 0.0, 40.0},
+                                         {0.0, 0.0, 0.0},
+                                         {0.0, 1.0, 0.0}));
+        ernie::SphereLight lamp(scene, "/World/Lamp");
+        lamp.SetShadowEnable(true);
+        if (radius > 0.0) {
+            lamp.SetTreatAsPoint(false).SetRadius(radius);
+        }
+        const float inLit = RadianceAt(delegate, scene, -2.5f, 0.0f);
+        const float outLit = RadianceAt(delegate, scene, 2.5f, 0.0f);
+        DefineQuad(scene, "/World/Blocker", 8.0f);
+        scene.Set("/World/Blocker", tokens::kTransform,
+                  glm::translate(glm::dmat4(1.0),
+                                 glm::dvec3(12.0, 0.0, 20.0)));
+        return std::pair{
+            RadianceAt(delegate, scene, -2.5f, 0.0f) / inLit,
+            RadianceAt(delegate, scene, 2.5f, 0.0f) / outLit};
+    };
+    const auto [pointIn, pointOut] = fractions(0.0);
+    EXPECT_LT(pointIn, 0.1f) << "inside a point's shadow";
+    EXPECT_GT(pointOut, 0.9f) << "outside it";
+    const auto [sphereIn, sphereOut] = fractions(4.0);
+    EXPECT_GT(sphereIn, 0.15f) << "the penumbra reaches inside";
+    EXPECT_LT(sphereOut, 0.85f) << "and outside";
+}
+
+TEST_F(RasterDelegateTest, WiderDistantLightsCastWiderPenumbrae) {
+    // A distant light besides the sun, from 45 degrees towards +x,
+    // past a blocker 20 up over x in [4, 20] whose edge throws its
+    // shadow's edge onto x = 0: sharp from a point in the sky, and
+    // from one 10 degrees across spread over about 3.5 to each side
+    // (the 28 between the edge and the ground along the light times
+    // the tangent of its angular radius, slanted onto the ground).
+    const auto fractions = [&](double angle) {
+        RasterDelegate delegate(*context_);
+        Scene scene = FlatScene();
+        // The first distant light by path is the sun, which this one
+        // follows.
+        ernie::DistantLight(scene, "/World/Sun").SetIntensity(0.0);
+        ernie::DistantLight::Define(scene, "/World/Tilted")
+            .SetShadowEnable(true)
+            .SetAngle(angle);
+        scene.Set("/World/Tilted", tokens::kTransform,
+                  ernie::DistantLightTransform({1.0, 0.0, 1.0}));
+        const float inLit = RadianceAt(delegate, scene, -1.5f, 0.0f);
+        const float outLit = RadianceAt(delegate, scene, 1.5f, 0.0f);
+        DefineQuad(scene, "/World/Blocker", 8.0f);
+        scene.Set("/World/Blocker", tokens::kTransform,
+                  glm::translate(glm::dmat4(1.0),
+                                 glm::dvec3(12.0, 0.0, 20.0)));
+        const float in = RadianceAt(delegate, scene, -1.5f, 0.0f);
+        const float out = RadianceAt(delegate, scene, 1.5f, 0.0f);
+        EXPECT_EQ(delegate.Renderer().LightShadowViews().size(), 1u)
+            << "a map of its own, not the sun's cascades";
+        return std::pair{in / inLit, out / outLit};
+    };
+    const auto [pointIn, pointOut] = fractions(0.0);
+    EXPECT_LT(pointIn, 0.1f) << "inside a point's shadow";
+    EXPECT_GT(pointOut, 0.9f) << "outside it";
+    const auto [sphereIn, sphereOut] = fractions(10.0);
+    EXPECT_GT(sphereIn, 0.15f) << "the penumbra reaches inside";
+    EXPECT_LT(sphereOut, 0.85f) << "and outside";
+}
+
 TEST_F(RasterDelegateTest, DomesLightEverySurfaceDiffusely) {
     Scene scene = FlatScene();
     scene.Remove("/World/Sun");

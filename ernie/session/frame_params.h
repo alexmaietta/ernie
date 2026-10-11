@@ -249,6 +249,9 @@ struct LightParams {
     /// outside it and is capped at its surface value inside), or disk
     /// radius.
     float radius = 0.0f;
+    /// Distant: its angular diameter in degrees, which widens its
+    /// shadows' penumbrae.
+    float angle = 0.0f;
     float coneAngle = 180.0f;  ///< Degrees off the axis that are lit;
                                ///< 180 lights every direction.
     float coneSoftness = 0.0f;  ///< Fraction of the cone, at its

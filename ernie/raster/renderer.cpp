@@ -1312,6 +1312,28 @@ void RasterRenderer::WriteLights(
             entry.extentX[k] = x[k] * half.x;
             entry.extentY[k] = y[k] * half.y;
         }
+        // The light's size for its shadows' penumbrae (shading.slang):
+        // a local light's radius, a rect's or cylinder's the mean of
+        // its half extents; a distant light's tangent of its angular
+        // radius.
+        float shadowRadius = 0.0f;
+        switch (light.type) {
+        case LightType::Sphere:
+        case LightType::Disk:
+            shadowRadius = light.radius;
+            break;
+        case LightType::Rect:
+            shadowRadius = 0.5f * (half.x + half.y);
+            break;
+        case LightType::Cylinder:
+            shadowRadius = 0.5f * (half.x + light.radius);
+            break;
+        default:
+            break;
+        }
+        entry.extentX[3] = shadowRadius;
+        entry.extentY[3] =
+            distant ? std::tan(0.5f * glm::radians(light.angle)) : 0.0f;
         const bool cone = !distant && light.coneAngle < 180.0f;
         const float softness =
             std::clamp(light.coneSoftness, 0.0f, 1.0f);
