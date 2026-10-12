@@ -21,6 +21,24 @@ namespace {
 
 constexpr std::uint32_t kSpirvMagic = 0x07230203;
 
+/// Sets or unsets an environment variable: setenv and unsetenv are
+/// POSIX's, _putenv_s Windows's (an empty value unsets).
+void SetEnv(const char* name, const char* value) {
+#if defined(_WIN32)
+    _putenv_s(name, value);
+#else
+    setenv(name, value, 1);
+#endif
+}
+
+void UnsetEnv(const char* name) {
+#if defined(_WIN32)
+    _putenv_s(name, "");
+#else
+    unsetenv(name);
+#endif
+}
+
 /// A compute shader evaluating `model`, the way hosts compose
 /// reflectance models.
 std::vector<ShaderModuleSource> ProbeModules(const BrdfModel& model) {
@@ -104,7 +122,7 @@ TEST(ShaderCompiler, CachesSpirvOnDiskUntilTheSourcesChange) {
     fs::remove_all(cache);
     const char* previous = std::getenv("ERNIE_SHADER_CACHE");
     const std::string saved = previous != nullptr ? previous : "";
-    setenv("ERNIE_SHADER_CACHE", cache.string().c_str(), 1);
+    SetEnv("ERNIE_SHADER_CACHE", cache.string().c_str());
     std::vector<ShaderModuleSource> modules = {{"cached", R"(
 [[vk::binding(0, 0)]] RWStructuredBuffer<float> values;
 [shader("compute")]
@@ -136,7 +154,7 @@ void main() { values[0] = 1.0; })"}};
         EXPECT_EQ(damaged.CompileSpirv(modules, "main"), first);
         EXPECT_EQ(damaged.CacheHits(), 0u);
     }
-    setenv("ERNIE_SHADER_CACHE", "0", 1);
+    SetEnv("ERNIE_SHADER_CACHE", "0");
     {
         const ShaderCompiler off;
         off.CompileSpirv(modules, "main");
@@ -144,9 +162,9 @@ void main() { values[0] = 1.0; })"}};
         EXPECT_EQ(off.CacheHits(), 0u);
     }
     if (previous != nullptr) {
-        setenv("ERNIE_SHADER_CACHE", saved.c_str(), 1);
+        SetEnv("ERNIE_SHADER_CACHE", saved.c_str());
     } else {
-        unsetenv("ERNIE_SHADER_CACHE");
+        UnsetEnv("ERNIE_SHADER_CACHE");
     }
     fs::remove_all(cache);
 }
