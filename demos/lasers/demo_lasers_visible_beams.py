@@ -148,7 +148,7 @@ class Demo(ernie.demo.Demo):
         ).set(
             tokens.TRANSFORM,
             ernie.look_at_transform(
-                (6.5, 4.5, 1.6), (0.0, 4.5, 1.1), (0.0, 0.0, 1.0)
+                (4.5, 0.0, 4.5), (0.0, 4.2, 1.0), (0.0, 0.0, 1.0)
             ),
         )
         product = scene.define("/Render/Camera", ernie.RenderProduct)
