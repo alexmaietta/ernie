@@ -23,6 +23,8 @@ public struct PlanetUniforms {
     // x: refinement levels k (`CubeSphereLod::SetRefinement`); patches are on the fine grid of
     // 2^k quads per data quad.
     public uint4 refine;
+    // xyz: (body.x / a_i)^2 for the ellipsoid's semi-axes a_i, all 1 on a sphere.
+    public float4 shape;
 }
 
 [[vk::binding(10, 0)]] public ConstantBuffer<PlanetUniforms> p;
@@ -134,13 +136,30 @@ float2 morphRange(uint level) {
     return level % 2 == 0 ? pair.xy : pair.zw;
 }
 
-// Grid point `g` of a patch anchored at `anchor` (its origin vertex `origin`), relative to the
-// frame's origin.
+// The ellipsoid's outward normal at its point along unit direction `d`, parallel to d_i / a_i^2.
+public float3 surfaceNormal(float3 d) {
+    return normalize(d * p.shape.xyz);
+}
+
+// Grid point `g` of a patch anchored at `anchor` (the base point of its origin vertex `origin`),
+// relative to the frame's origin. Base points lie on the ellipsoid at radius r(d) = body.x /
+// sqrt(q), q = sum d_i^2 shape_i, along direction d; their difference r(d) (d - dA) + (r(d) -
+// r(dA)) dA takes r(d) - r(dA) from q - qA = sum (d - dA)_i (d + dA)_i shape_i rather than
+// subtraction. Heights rise along the ellipsoid's normal.
 float3 surfacePoint(uint face, int2 g, int2 origin, float3 anchor, out float h) {
     float3 direction;
     let offset = directionOffset(face, g, origin, direction);
+    let directionA = direction - offset;
+    let q = dot(direction * direction, p.shape.xyz);
+    let qA = dot(directionA * directionA, p.shape.xyz);
+    let rootQ = sqrt(q);
+    let rootQA = sqrt(qA);
+    // 1 / sqrt(q) - 1 / sqrt(qA) = (qA - q) / (sqrt(q) sqrt(qA) (sqrt(q) + sqrt(qA)))
+    let dq = dot(offset * (direction + directionA), p.shape.xyz);
+    let dr = -dq / (rootQ * rootQA * (rootQ + rootQA));
+    let base = offset / rootQ + dr * directionA;
     h = heightAt(face, g);
-    return anchor + p.body.x * offset + (h * p.body.y) * direction;
+    return anchor + p.body.x * base + (h * p.body.y) * surfaceNormal(direction);
 }
 
 public struct PlanetVertex {
@@ -200,10 +219,10 @@ public PlanetVertex planetVertex(uint vertexIndex, uint instanceIndex) {
 // The surface normal at grid point `grid` of `face` from the gradient texture rather than from
 // the mesh, so shading does not change as levels morph; filtered over the pixel's footprint
 // through the gradients' mips (fragment shaders only: it takes screen derivatives). `up` is the
-// sphere's normal there.
+// ellipsoid's normal there.
 public float3 planetNormal(uint face, float2 grid, out float3 up) {
     let f = faceFrame(face);
-    up = faceDirection(face, faceCoords(grid));
+    up = surfaceNormal(faceDirection(face, faceCoords(grid)));
     let tu = normalize(f.u - up * dot(up, f.u));
     let tv = normalize(f.v - up * dot(up, f.v));
     let size = float(p.dims.x + 1);

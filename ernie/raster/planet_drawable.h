@@ -69,6 +69,12 @@ class PlanetDrawable : public RasterDrawable {
         double radius,
         std::span<const RasterView, CubeSphereLod::kFaces> faces);
 
+    /// As above on the ellipsoid of semi-axes `radii` along x, y and
+    /// z (`CubeSphereLod::SetRadii`), heights along its normals.
+    void SetHeights(
+        const glm::dvec3& radii,
+        std::span<const RasterView, CubeSphereLod::kFaces> faces);
+
     /// Drops the heights, so nothing is drawn. Waits for the device
     /// to go idle.
     void ClearHeights();

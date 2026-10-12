@@ -91,7 +91,48 @@ void CubeSphereLod::Shape(double radius, std::uint32_t faceCells,
             LodQuadtree(faceCells + 1, faceCells + 1, 1.0, leafCells);
     }
     radius_ = radius;
+    radii_ = glm::dvec3(radius);
     faceCells_ = faceCells;
+}
+
+// For unit d moving along a great circle with unit tangent t (d . t =
+// 0), q = sum d_i^2 w_i (w_i = 1 / a_i^2) changes by 2 sum d_i t_i
+// w_i per radian, at most w_max - w_min by Cauchy-Schwarz, and the
+// radius q^(-1/2) by half a_max^3 times that. The normal's largest
+// tilt from the radial direction is that of an ellipse of the extreme
+// semi-axes, tan = (a^2 - c^2) / (2 a c) (the greatest difference
+// between geodetic and geocentric latitude).
+void CubeSphereLod::SetRadii(const glm::dvec3& radii) {
+    for (int i = 0; i < 3; ++i) {
+        if (!std::isfinite(radii[i]) || radii[i] <= 0.0) {
+            throw std::invalid_argument(
+                "Cube sphere radii must be positive and finite");
+        }
+    }
+    radii_ = radii;
+    const double most = std::max({radii.x, radii.y, radii.z});
+    const double least = std::min({radii.x, radii.y, radii.z});
+    radius_ = most;
+    radiusSlope_ = 0.5 * most * most * most *
+                   (1.0 / (least * least) - 1.0 / (most * most));
+    const double tilt = std::atan((most * most - least * least) /
+                                  (2.0 * most * least));
+    normalSin_ = std::sin(tilt);
+    normalCos_ = std::cos(tilt);
+    // n = d + e with |de| per radian at most the normal map's stretch
+    // less 1, (a_max / a_min)^2 - 1, and the tilt e - (e . d) d
+    // changing by at most twice that plus twice |e|.
+    tiltRate_ = 2.0 * (most * most / (least * least) - 1.0) +
+                2.0 * normalSin_;
+}
+
+double CubeSphereLod::SurfaceRadius(const glm::dvec3& d) const {
+    const glm::dvec3 scaled = d / radii_;
+    return 1.0 / std::sqrt(glm::dot(scaled, scaled));
+}
+
+glm::dvec3 CubeSphereLod::SurfaceNormal(const glm::dvec3& d) const {
+    return glm::normalize(d / (radii_ * radii_));
 }
 
 CubeSphereLod::CubeSphereLod(double radius, std::uint32_t faceCells,
@@ -116,7 +157,35 @@ CubeSphereLod::CubeSphereLod(
     }
     Shape(radius, static_cast<std::uint32_t>(side - 1), leafCells);
     for (std::uint32_t face = 0; face < kFaces; ++face) {
-        trees_[face] = LodQuadtree(faces[face], leafCells);
+        const RasterView& raster = faces[face];
+        trees_[face] = LodQuadtree(raster, leafCells);
+        std::vector<float>& heights = heights_[face];
+        heights.resize(side * side);
+        for (std::size_t row = 0; row < side; ++row) {
+            for (std::size_t col = 0; col < side; ++col) {
+                const float h = raster(col, row);
+                heights[row * side + col] =
+                    raster.IsValid(h) ? h : 0.0f;
+            }
+        }
+        double step = 0.0;
+        for (std::size_t row = 0; row < side; ++row) {
+            for (std::size_t col = 0; col < side; ++col) {
+                const double h = heights[row * side + col];
+                if (col + 1 < side) {
+                    step = std::max(
+                        step,
+                        std::abs(heights[row * side + col + 1] - h));
+                }
+                if (row + 1 < side) {
+                    step = std::max(
+                        step,
+                        std::abs(heights[(row + 1) * side + col] -
+                                 h));
+                }
+            }
+        }
+        maxStep_[face] = step;
     }
 }
 
@@ -174,15 +243,69 @@ void CubeSphereLod::SetRefinement(std::uint32_t levels) {
     refinement_ = levels;
 }
 
-const glm::vec2& CubeSphereLod::NodeHeights(std::uint32_t face,
-                                            std::uint32_t level,
-                                            std::uint32_t x,
-                                            std::uint32_t y) const {
+float CubeSphereLod::FineHeight(std::uint32_t face, std::uint32_t col,
+                                std::uint32_t row) const {
+    const std::vector<float>& heights = heights_.at(face);
+    const std::size_t side = faceCells_ + 1;
+    const std::uint32_t mask = (1u << refinement_) - 1u;
+    const std::uint32_t c = col >> refinement_;
+    const std::uint32_t r = row >> refinement_;
+    const std::uint32_t c1 = std::min(c + 1, faceCells_);
+    const std::uint32_t r1 = std::min(r + 1, faceCells_);
+    const float scale =
+        std::ldexp(1.0f, -static_cast<int>(refinement_));
+    const float tx = static_cast<float>(col & mask) * scale;
+    const float ty = static_cast<float>(row & mask) * scale;
+    const auto at = [&](std::uint32_t i, std::uint32_t j) {
+        return heights[j * side + i];
+    };
+    const float top = at(c, r) + (at(c1, r) - at(c, r)) * tx;
+    const float bottom = at(c, r1) + (at(c1, r1) - at(c, r1)) * tx;
+    return top + (bottom - top) * ty;
+}
+
+glm::vec2 CubeSphereLod::NodeHeights(std::uint32_t face,
+                                     std::uint32_t level,
+                                     std::uint32_t x,
+                                     std::uint32_t y) const {
     if (level >= refinement_) {
         return trees_.at(face).NodeHeights(level - refinement_, x, y);
     }
     const std::uint32_t up = refinement_ - level;
-    return trees_.at(face).NodeHeights(0, x >> up, y >> up);
+    const glm::vec2 leaf =
+        trees_.at(face).NodeHeights(0, x >> up, y >> up);
+    if (leaf.x > leaf.y || heights_.at(face).empty()) {
+        return leaf;
+    }
+    // Bilinear heights reach their extremes at the data's vertices
+    // or, within one quad, at the region's corners.
+    const std::uint32_t cells = LeafCells() << level;
+    const std::uint32_t col0 = x * cells;
+    const std::uint32_t row0 = y * cells;
+    glm::vec2 range(std::numeric_limits<float>::infinity(),
+                    -std::numeric_limits<float>::infinity());
+    const auto take = [&range](float h) {
+        range = glm::vec2(std::min(range.x, h), std::max(range.y, h));
+    };
+    if (cells < (1u << refinement_)) {
+        for (const std::uint32_t corner : {0u, 1u, 2u, 3u}) {
+            take(FineHeight(face, col0 + (corner & 1u) * cells,
+                            row0 + (corner >> 1) * cells));
+        }
+        return range;
+    }
+    const std::vector<float>& heights = heights_[face];
+    const std::size_t side = faceCells_ + 1;
+    const std::uint32_t first = col0 >> refinement_;
+    const std::uint32_t last = (col0 + cells) >> refinement_;
+    const std::uint32_t top = row0 >> refinement_;
+    const std::uint32_t bottom = (row0 + cells) >> refinement_;
+    for (std::uint32_t row = top; row <= bottom; ++row) {
+        for (std::uint32_t col = first; col <= last; ++col) {
+            take(heights[row * side + col]);
+        }
+    }
+    return range;
 }
 
 void CubeSphereLod::SetLeaves(std::uint32_t face,
@@ -191,6 +314,7 @@ void CubeSphereLod::SetLeaves(std::uint32_t face,
         throw std::invalid_argument("Cube sphere face out of range");
     }
     trees_[face].SetLeaves(leaves);
+    heights_[face].clear();
 }
 
 glm::vec2 CubeSphereLod::HeightRange() const {
@@ -212,7 +336,7 @@ CubeSphereRegion CubeSphereLod::NodeRegion(std::uint32_t face,
                                            std::uint32_t x,
                                            std::uint32_t y,
                                            float exaggeration) const {
-    const glm::vec2& h = NodeHeights(face, level, x, y);
+    const glm::vec2 h = NodeHeights(face, level, x, y);
     CubeSphereRegion region;
     if (h.x > h.y) {
         region.inner = 1.0;
@@ -231,13 +355,40 @@ CubeSphereRegion CubeSphereLod::NodeRegion(std::uint32_t face,
         region.angle = std::max(region.angle, Angle(region.axis, d));
     }
     region.angle *= 1.0 + 1e-12;
-    const double low =
-        radius_ + static_cast<double>(h.x) * exaggeration;
-    const double high =
-        radius_ + static_cast<double>(h.y) * exaggeration;
-    region.inner =
-        std::max(0.0, std::min(low, high)) * std::cos(region.angle);
-    region.outer = std::max(0.0, std::max(low, high));
+    // On an ellipsoid the base radius over the cap is within
+    // `radiusSlope_` per radian of the axis's, and a height h along a
+    // normal tilted from its direction moves a point radially by
+    // between h cos(tilt) and h, and turns it by asin(|h| sin(tilt) /
+    // |p|). Nearby points turn alike, so the cap centres on the
+    // axis's point at the middle height and widens by how the turn
+    // varies over the heights and across the node.
+    const double spread = radiusSlope_ * region.angle;
+    const double base = SurfaceRadius(region.axis);
+    const double baseLow = std::max(
+        std::min({radii_.x, radii_.y, radii_.z}), base - spread);
+    const double baseHigh = std::min(radius_, base + spread);
+    const double h0 =
+        std::min(static_cast<double>(h.x) * exaggeration,
+                 static_cast<double>(h.y) * exaggeration);
+    const double h1 =
+        std::max(static_cast<double>(h.x) * exaggeration,
+                 static_cast<double>(h.y) * exaggeration);
+    const double low = baseLow + (h0 < 0.0 ? h0 : h0 * normalCos_);
+    const double high = baseHigh + (h1 > 0.0 ? h1 : h1 * normalCos_);
+    if (normalSin_ > 0.0 && low > 0.0) {
+        const double middle = 0.5 * (h0 + h1);
+        region.axis =
+            glm::normalize(BasePoint(region.axis) +
+                           middle * SurfaceNormal(region.axis));
+        // asin(x) <= x pi / 2 bounds the turn's change by its sine's.
+        const double turn = (0.5 * (h1 - h0) * normalSin_ +
+                             std::max(std::abs(h0), std::abs(h1)) *
+                                 tiltRate_ * region.angle) /
+                            low;
+        region.angle += 0.5 * kPi * std::min(1.0, turn);
+    }
+    region.inner = std::max(0.0, low) * std::cos(region.angle);
+    region.outer = std::max(0.0, high);
     return region;
 }
 
@@ -252,9 +403,10 @@ double CubeSphereLod::OccluderRadius(float exaggeration) const {
     if (Empty() || h.x > h.y) {
         return 0.0;
     }
-    const double lowest =
-        radius_ + static_cast<double>(std::min(h.x * exaggeration,
-                                               h.y * exaggeration));
+    const double least = static_cast<double>(
+        std::min(h.x * exaggeration, h.y * exaggeration));
+    const double lowest = std::min({radii_.x, radii_.y, radii_.z}) +
+                          (least < 0.0 ? least : least * normalCos_);
     return std::max(0.0, lowest) *
            std::cos(kPi / (2.0 * static_cast<double>(LeafCells())));
 }
@@ -262,23 +414,64 @@ double CubeSphereLod::OccluderRadius(float exaggeration) const {
 double CubeSphereLod::MinFirstRange(float exaggeration,
                                     float morphStart) const {
     double range = 0.0;
-    // Refined levels: each node's sideways extent halves with its
-    // level, as the range does, so its data leaf's (a refined node
-    // spans 2^-(k - level) of it) sets every refined level's bound.
+    // Refined levels: a node's extent, the angle its cap widens by
+    // and its heights' span (at most 2 w steps between neighbouring
+    // vertices over w data quads) all scale with its size, halving
+    // with each level as the ranges do, so a bound on each data leaf
+    // scaled to its size sets every refined level's. Without a face's
+    // heights its nodes' spans go unbounded here.
     if (refinement_ > 0) {
         const std::uint32_t leaves = trees_[0].LeavesPerSide();
+        const std::uint32_t cells = LeafCells() << refinement_;
+        const double scale =
+            std::abs(static_cast<double>(exaggeration));
         double widest = 0.0;
         for (std::uint32_t face = 0; face < kFaces; ++face) {
+            const double span = 2.0 * LeafCells() * maxStep_[face] *
+                                scale *
+                                (heights_[face].empty() ? 0.0 : 1.0);
             for (std::uint32_t y = 0; y < leaves; ++y) {
                 for (std::uint32_t x = 0; x < leaves; ++x) {
                     const CubeSphereRegion r = NodeRegion(
                         face, refinement_, x, y, exaggeration);
-                    if (!r.Empty()) {
-                        widest = std::max(
-                            widest, 2.0 * r.outer *
-                                        std::sin(std::min(
-                                            r.angle, 0.5 * kPi)));
+                    if (r.Empty()) {
+                        continue;
                     }
+                    const glm::dvec3 axis =
+                        FineDirection(face, x * cells + cells / 2,
+                                      y * cells + cells / 2);
+                    double angle = 0.0;
+                    for (const std::uint32_t corner :
+                         {0u, 1u, 2u, 3u}) {
+                        angle = std::max(
+                            angle,
+                            Angle(
+                                axis,
+                                FineDirection(
+                                    face,
+                                    x * cells + (corner & 1u) * cells,
+                                    y * cells +
+                                        (corner >> 1) * cells)));
+                    }
+                    const glm::vec2 h =
+                        trees_[face].NodeHeights(0, x, y);
+                    const double highest =
+                        std::max(std::abs(h.x), std::abs(h.y)) *
+                        scale;
+                    const double low =
+                        std::min({radii_.x, radii_.y, radii_.z}) -
+                        highest;
+                    double turn = 0.0;
+                    if (normalSin_ > 0.0 && low > 0.0) {
+                        turn = 0.5 * kPi *
+                               (0.5 * span * normalSin_ +
+                                highest * tiltRate_ * angle) /
+                               low;
+                    }
+                    widest = std::max(widest,
+                                      2.0 * r.outer * (angle + turn) +
+                                          2.0 * radiusSlope_ * angle +
+                                          span);
                 }
             }
         }

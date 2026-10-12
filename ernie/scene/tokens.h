@@ -805,6 +805,9 @@ inline constexpr std::string_view kExaggeration =
 /// rather than a raster, so `ernie:origin` and `ernie:cellSize` do
 /// not apply.
 inline constexpr std::string_view kPlanetRadius = "ernie:radius";
+/// double3: a planet's ellipsoid, its semi-axes along the Terrain's
+/// x, y and z; overrides `ernie:radius` where set.
+inline constexpr std::string_view kPlanetRadii = "ernie:radii";
 /// double, world units: a planet's finest LOD quad
 /// (`TerrainParams::finestCell`).
 inline constexpr std::string_view kFinestCell = "ernie:finestCell";

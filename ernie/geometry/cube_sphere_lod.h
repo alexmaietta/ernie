@@ -90,6 +90,14 @@ struct CubeSphereRegion {
 /// patches' origins are on the fine grid. A refined node's heights
 /// are its data leaf's.
 ///
+/// The body may be an ellipsoid (`SetRadii`), triaxial or not: the
+/// cube's grid stays the same in direction, a height of 0 lies on the
+/// ellipsoid along the vertex's direction (`BasePoint`), and heights
+/// rise along the ellipsoid's geodetic normal there
+/// (`SurfaceNormal`). Node regions widen by bounds on how much the
+/// surface radius and the normal's tilt can vary, so selection stays
+/// conservative.
+///
 /// Positions on a planet need more precision than single floats.
 /// Selection works in doubles, and its frustum is relative to the
 /// eye: build it from a view-projection matrix whose view has the eye
@@ -100,6 +108,14 @@ struct CubeSphereRegion {
 ///   New Method for the Solution of Partial Differential Equations in
 ///   Spherical Geometry", Journal of Computational Physics
 ///   124(1):93-114, 1996. https://doi.org/10.1006/jcph.1996.0047
+/// - P. Cozzi and K. Ring, "3D Engine Design for Virtual Globes", A
+///   K Peters/CRC Press, 2011, chapter 2 (the ellipsoid's geodetic
+///   normal, proportional to x_i / a_i^2).
+///   https://doi.org/10.1201/9781439865583
+/// - M. Lambers and A. Kolb, "Ellipsoidal Cube Maps for Accurate
+///   Rendering of Planetary-Scale Terrain Data", Pacific Graphics
+///   2012 Short Papers, 5-10 (a cube-map quadtree on an ellipsoid).
+///   https://diglib.eg.org/handle/10.2312/PE.PG.PG2012short.005-010
 /// - F. Strugar, "Continuous Distance-Dependent Level of Detail for
 ///   Rendering Heightmaps", Journal of Graphics, GPU, and Game Tools
 ///   14(4):57-74, 2009.
@@ -178,9 +194,40 @@ class CubeSphereLod {
         return faceCells_ == 0;
     }
 
+    /// The largest of `Radii()`; the sphere's radius.
     double Radius() const {
         return radius_;
     }
+
+    /// The body's semi-axes along x, y and z: equal for a sphere.
+    const glm::dvec3& Radii() const {
+        return radii_;
+    }
+
+    /// Makes the body the ellipsoid of semi-axes `radii`, triaxial
+    /// or not: base points move onto it along their directions
+    /// (`BasePoint`) and heights rise along its normals
+    /// (`SurfaceNormal`).
+    /// @throws std::invalid_argument for radii that are not positive
+    /// and finite.
+    void SetRadii(const glm::dvec3& radii);
+
+    /// The distance from the centre to the ellipsoid along unit
+    /// direction `d`: 1 / sqrt(sum d_i^2 / a_i^2).
+    double SurfaceRadius(const glm::dvec3& d) const;
+
+    /// The ellipsoid's point along unit direction `d`, where a height
+    /// of 0 lies. It is the radial point, not the foot of the normal
+    /// through a point off the surface (Cesium's
+    /// `scaleToGeodeticSurface` iterates from it to that).
+    glm::dvec3 BasePoint(const glm::dvec3& d) const {
+        return SurfaceRadius(d) * d;
+    }
+
+    /// The ellipsoid's outward unit (geodetic) normal at its point
+    /// along unit direction `d`, along which heights rise: parallel
+    /// to d_i / a_i^2.
+    glm::dvec3 SurfaceNormal(const glm::dvec3& d) const;
 
     /// Grid quads along each side of a face.
     std::uint32_t FaceCells() const {
@@ -292,13 +339,39 @@ class CubeSphereLod {
                        float exaggeration, double occluder,
                        std::vector<LodPatch>& out) const;
 
-    /// The (min, max) height of node (`x`, `y`) on `level`: a
-    /// refined node's, its data leaf's.
-    const glm::vec2& NodeHeights(std::uint32_t face,
-                                 std::uint32_t level, std::uint32_t x,
-                                 std::uint32_t y) const;
+    /// The (min, max) height of node (`x`, `y`) on `level`. A refined
+    /// node's heights are bilinear between the data's vertices, so
+    /// they range over the vertices it covers or, within one data
+    /// quad, over its corners; without the face's heights (after
+    /// `SetLeaves`), its data leaf's.
+    glm::vec2 NodeHeights(std::uint32_t face, std::uint32_t level,
+                          std::uint32_t x, std::uint32_t y) const;
+
+    /// The height at fine grid point (`col`, `row`) of `face`,
+    /// bilinear between the data's vertices, as planet.slang draws.
+    float FineHeight(std::uint32_t face, std::uint32_t col,
+                     std::uint32_t row) const;
 
     double radius_ = 0.0;
+    glm::dvec3 radii_{0.0};
+    /// Bounds over the ellipsoid: how fast `SurfaceRadius` can change
+    /// per radian of direction, and the sine and cosine of the
+    /// largest angle between a direction and the normal at its base
+    /// point.
+    double radiusSlope_ = 0.0;
+    double normalSin_ = 0.0;
+    double normalCos_ = 1.0;
+    /// A bound on how fast the normal's tilt from the radial
+    /// direction (as a tangent vector) changes per radian of
+    /// direction.
+    double tiltRate_ = 0.0;
+    /// Each face's vertex heights, invalid ones 0 as drawn, for
+    /// refined nodes' bounds; empty after `SetLeaves`.
+    std::array<std::vector<float>, kFaces> heights_;
+    /// Each face's largest height difference between neighbouring
+    /// vertices: a refined node w data quads across spans at most 2 w
+    /// of it.
+    std::array<double, kFaces> maxStep_{};
     std::uint32_t faceCells_ = 0;
     std::uint32_t refinement_ = 0;
     std::array<LodQuadtree, kFaces> trees_;

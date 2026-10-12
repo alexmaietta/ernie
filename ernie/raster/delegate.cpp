@@ -677,14 +677,14 @@ void RasterDelegate::SyncHeightfield(const Scene& scene,
         }
         return;
     }
-    const Key key =
-        KeyOf(scene, terrain,
-              {kHeights, kOrigin, kCellSize, kNoData, kPlanetRadius});
+    const Key key = KeyOf(scene, terrain,
+                          {kHeights, kOrigin, kCellSize, kNoData,
+                           kPlanetRadius, kPlanetRadii});
     if (heightfield_ == key) {
         return;
     }
     heightfield_ = key;
-    if (prim->HasPlanetRadius()) {
+    if (prim->HasPlanetRadius() || prim->HasPlanetRadii()) {
         try {
             if (terrain_.HasHeightfield()) {
                 terrain_.ClearHeightfield();
@@ -713,7 +713,11 @@ void RasterDelegate::SyncHeightfield(const Scene& scene,
                         static_cast<float>(prim->GetNoData());
                 }
             }
-            planet_.SetHeights(prim->GetPlanetRadius(), faces);
+            planet_.SetHeights(
+                prim->HasPlanetRadii()
+                    ? prim->GetPlanetRadii()
+                    : glm::dvec3(prim->GetPlanetRadius()),
+                faces);
         } catch (const std::invalid_argument& error) {
             throw UploadError(terrain, kHeights, error.what());
         }

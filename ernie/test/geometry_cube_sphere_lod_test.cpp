@@ -89,9 +89,12 @@ glm::dvec3 Vertex(const CubeSphereLod& lod, const Faces& faces,
                   std::uint32_t face, glm::ivec2 c,
                   float exaggeration) {
     const double h = FineHeight(lod, faces, face, c);
-    return lod.FineDirection(face, static_cast<std::uint32_t>(c.x),
-                             static_cast<std::uint32_t>(c.y)) *
-           (lod.Radius() + h * static_cast<double>(exaggeration));
+    const glm::dvec3 d =
+        lod.FineDirection(face, static_cast<std::uint32_t>(c.x),
+                          static_cast<std::uint32_t>(c.y));
+    return lod.BasePoint(d) +
+           lod.SurfaceNormal(d) *
+               (h * static_cast<double>(exaggeration));
 }
 
 glm::ivec2 GridIndex(const LodPatch& patch, glm::uvec2 local) {
@@ -712,6 +715,105 @@ TEST(CubeSphereLod, RefinementReachesTheFinestLevelUnderTheEye) {
     }
     for (const int count : Coverage(lod, all)) {
         EXPECT_EQ(count, 1);
+    }
+}
+
+TEST(CubeSphereLod, EllipsoidBasePointsAndNormals) {
+    CubeSphereLod lod(kRadius, 32, 8);
+    EXPECT_THROW(lod.SetRadii({100.0, 0.0, 90.0}),
+                 std::invalid_argument);
+    const glm::dvec3 radii(100.0, 95.0, 80.0);
+    lod.SetRadii(radii);
+    EXPECT_EQ(lod.Radius(), 100.0);
+    for (const glm::dvec3& d :
+         {glm::dvec3(1.0, 0.0, 0.0), glm::dvec3(0.0, 0.0, -1.0),
+          glm::normalize(glm::dvec3(0.3, -0.8, 0.5))}) {
+        const glm::dvec3 p = lod.BasePoint(d);
+        const glm::dvec3 q = p / radii;
+        EXPECT_NEAR(glm::dot(q, q), 1.0, 1e-12) << "on the ellipsoid";
+        // The normal is perpendicular to the surface: to the base
+        // points of nearby directions.
+        const glm::dvec3 n = lod.SurfaceNormal(d);
+        const glm::dvec3 side =
+            glm::normalize(glm::cross(d, glm::dvec3(0.1, 0.2, 0.9)));
+        const glm::dvec3 near =
+            lod.BasePoint(glm::normalize(d + 1e-6 * side));
+        EXPECT_NEAR(glm::dot(n, glm::normalize(near - p)), 0.0, 1e-5);
+        EXPECT_GT(glm::dot(n, d), 0.0);
+    }
+    EXPECT_NEAR(lod.SurfaceRadius({0.0, 1.0, 0.0}), 95.0, 1e-12);
+}
+
+TEST(CubeSphereLod, EllipsoidRegionsHoldTheirVertices) {
+    const Faces faces = Relief(32, 6.0);
+    for (const glm::dvec3& radii : {glm::dvec3(100.0, 100.0, 85.0),
+                                    glm::dvec3(100.0, 92.0, 80.0),
+                                    glm::dvec3(100.0, 94.0, 82.0)}) {
+        CubeSphereLod lod = Build(faces, 8);
+        lod.SetRadii(radii);
+        lod.SetRefinement(2);
+        const float exaggeration = 4.0f;
+        int checked = 0;
+        for (std::uint32_t level = 0; level < lod.Levels(); ++level) {
+            const std::uint32_t cells = lod.LeafCells() << level;
+            const std::uint32_t side = lod.FineCells() / cells;
+            for (std::uint32_t face = 0; face < CubeSphereLod::kFaces;
+                 ++face) {
+                for (std::uint32_t y = 0; y < side; ++y) {
+                    for (std::uint32_t x = 0; x < side; ++x) {
+                        const CubeSphereRegion region =
+                            lod.NodeRegion(face, level, x, y,
+                                           exaggeration);
+                        for (std::uint32_t j = 0; j <= cells;
+                             j += 1) {
+                            for (std::uint32_t i = 0; i <= cells;
+                                 i += 1) {
+                                const glm::ivec2 c(x * cells + i,
+                                                   y * cells + j);
+                                ASSERT_LE(region.Distance(Vertex(
+                                              lod, faces, face, c,
+                                              exaggeration)),
+                                          1e-9 * kRadius)
+                                    << "level " << level;
+                                ++checked;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        EXPECT_GT(checked, 0);
+    }
+}
+
+// Steep relief, exaggerated, over refined levels on a sphere and a
+// triaxial ellipsoid: patches tile, and seams close.
+TEST(CubeSphereLod, RefinedSteepReliefTilesWithoutCracks) {
+    const Faces faces = Relief(32);
+    CubeSphereLod lod = Build(faces, 8);
+    lod.SetRefinement(2);
+    for (const glm::dvec3& radii :
+         {glm::dvec3(100.0), glm::dvec3(100.0, 94.0, 82.0)}) {
+        lod.SetRadii(radii);
+        for (const float exaggeration : {1.0f, 4.0f}) {
+            const auto ranges = lod.Ranges(
+                lod.MinFirstRange(exaggeration, kMorphStart),
+                kMorphStart);
+            for (const glm::dvec3& eye : TestEyes()) {
+                std::vector<LodPatch> patches;
+                lod.Select(eye, ranges, nullptr, exaggeration, false,
+                           patches);
+                for (const int count : Coverage(lod, patches)) {
+                    ASSERT_EQ(count, 1);
+                }
+                const SeamReport report = CheckSeams(
+                    lod, faces, patches, eye, ranges, exaggeration);
+                EXPECT_EQ(report.levelJumps, 0);
+                EXPECT_EQ(report.cracks, 0)
+                    << "radii " << radii.y << ", " << radii.z
+                    << "; exaggeration " << exaggeration;
+            }
+        }
     }
 }
 

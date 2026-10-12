@@ -34,8 +34,9 @@ struct PlanetUniforms {
     std::uint32_t ids[4];
     float hillshade[4];
     std::uint32_t refine[4];
+    float shape[4];
 };
-static_assert(sizeof(PlanetUniforms) == 352,
+static_assert(sizeof(PlanetUniforms) == 368,
               "PlanetUniforms must match planet.slang");
 
 constexpr VkDeviceSize kUniformsStride = 512;
@@ -96,8 +97,8 @@ Frustum Shifted(Frustum frustum, const glm::vec3& offset) {
 }
 
 /// A face's slopes along increasing column and row, per vertex:
-/// central differences of the heights over the arc between the
-/// neighbours at the body's radius (one-sided at the face's edges),
+/// central differences of the heights over the distance between the
+/// neighbours' base points (one-sided at the face's edges),
 /// and their mip chain packed as half floats, each level averaging 2
 /// x 2 of the one before.
 std::vector<std::vector<std::uint32_t>>
@@ -109,15 +110,12 @@ PackedFaceGradients(const CubeSphereLod& lod, std::uint32_t face,
     };
     const auto arc = [&](std::size_t c0, std::size_t r0,
                          std::size_t c1, std::size_t r1) {
-        const double angle = std::acos(std::clamp(
-            glm::dot(lod.VertexDirection(
-                         face, static_cast<std::uint32_t>(c0),
-                         static_cast<std::uint32_t>(r0)),
-                     lod.VertexDirection(
-                         face, static_cast<std::uint32_t>(c1),
-                         static_cast<std::uint32_t>(r1))),
-            -1.0, 1.0));
-        return lod.Radius() * angle;
+        return glm::distance(lod.BasePoint(lod.VertexDirection(
+                                 face, static_cast<std::uint32_t>(c0),
+                                 static_cast<std::uint32_t>(r0))),
+                             lod.BasePoint(lod.VertexDirection(
+                                 face, static_cast<std::uint32_t>(c1),
+                                 static_cast<std::uint32_t>(r1))));
     };
     std::size_t w = side;
     std::size_t h = side;
@@ -269,7 +267,15 @@ void PlanetDrawable::ClearHeights() {
 void PlanetDrawable::SetHeights(
     double radius,
     std::span<const RasterView, CubeSphereLod::kFaces> faces) {
-    CubeSphereLod lod(radius, faces, kLodLeafCells);
+    SetHeights(glm::dvec3(radius), faces);
+}
+
+void PlanetDrawable::SetHeights(
+    const glm::dvec3& radii,
+    std::span<const RasterView, CubeSphereLod::kFaces> faces) {
+    CubeSphereLod lod(std::max({radii.x, radii.y, radii.z}), faces,
+                      kLodLeafCells);
+    lod.SetRadii(radii);
     const std::uint32_t side = lod.FaceCells() + 1;
     if (side > renderer_.Context().Limits().maxImageDimension2D) {
         throw std::invalid_argument(
@@ -355,9 +361,8 @@ void PlanetDrawable::Select(const glm::dvec3& eye,
     for (std::size_t i = first; i < patches_.size(); ++i) {
         const LodPatch& patch = patches_[i];
         const glm::dvec3 anchor =
-            lod_.FineDirection(patch.face, patch.originX,
-                               patch.originY) *
-                lod_.Radius() -
+            lod_.BasePoint(lod_.FineDirection(
+                patch.face, patch.originX, patch.originY)) -
             Offset();
         anchors_.emplace_back(glm::vec3(anchor), 0.0f);
     }
@@ -382,6 +387,12 @@ void PlanetDrawable::Prepare(
     lod_.SetRefinement(RefinementFor(lod_, params_.finestCell));
     PlanetUniforms uniforms{};
     uniforms.refine[0] = lod_.Refinement();
+    // (Radius() / a_i)^2: the ellipsoid relative to the sphere of the
+    // largest radius, which `body.x` holds.
+    for (int i = 0; i < 3; ++i) {
+        const double ratio = lod_.Radius() / lod_.Radii()[i];
+        uniforms.shape[i] = static_cast<float>(ratio * ratio);
+    }
     uniforms.body[0] = static_cast<float>(lod_.Radius());
     uniforms.body[1] = params_.exaggeration;
     uniforms.body[2] = minHeight_;
@@ -464,9 +475,9 @@ void PlanetDrawable::Prepare(
                 lod_.SelectAll(patches_);
                 for (const LodPatch& patch : patches_) {
                     const glm::dvec3 anchor =
-                        lod_.FineDirection(patch.face, patch.originX,
-                                           patch.originY) *
-                            lod_.Radius() -
+                        lod_.BasePoint(lod_.FineDirection(
+                            patch.face, patch.originX,
+                            patch.originY)) -
                         Offset();
                     anchors_.emplace_back(glm::vec3(anchor), 0.0f);
                 }

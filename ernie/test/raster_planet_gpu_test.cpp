@@ -127,6 +127,33 @@ TEST_F(RasterDelegateTest, APlanetFromOrbitIsADiscOfItsAngularSize) {
                 0.12 * expected);
 }
 
+// An oblate planet from over its equator: the silhouette's height
+// over its width is c / a, the tangents from the eye to an ellipse of
+// semi-axes a and c leaving at angles whose tangents are a and c over
+// sqrt(D^2 - a^2).
+TEST_F(RasterDelegateTest, AnEllipsoidPlanetFromOrbitIsItsShape) {
+    Scene scene = PlanetScene(128);
+    ernie::Terrain(scene, "/World/Moon")
+        .SetPlanetRadii(glm::dvec3(kMoon, kMoon, 0.7 * kMoon));
+    PlaceCamera(scene, {3.0 * kMoon, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                {0.0, 0.0, 1.0}, {1e4, 1e8});
+    RasterDelegate delegate(*context_);
+    delegate.Sync(scene);
+    const Tensor image = delegate.Render(scene);
+    const auto* pixels = image.As<std::uint8_t>();
+    std::size_t wide = 0;
+    std::size_t tall = 0;
+    for (std::uint32_t i = 0; i < kSize; ++i) {
+        wide +=
+            IsClear(pixels + (kSize / 2 * kSize + i) * 4) ? 0u : 1u;
+        tall +=
+            IsClear(pixels + (i * kSize + kSize / 2) * 4) ? 0u : 1u;
+    }
+    ASSERT_GT(wide, kSize / 8);
+    EXPECT_NEAR(static_cast<double>(tall) / static_cast<double>(wide),
+                0.7, 0.05);
+}
+
 TEST_F(RasterDelegateTest,
        APlanetSeenFromLowAltitudeFillsBelowTheHorizon) {
     Scene scene = PlanetScene(256);

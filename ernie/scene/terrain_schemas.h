@@ -56,6 +56,12 @@
                                      "rotation not yet applied), its heights cube faces, and the " \
                                      "origin and cell size do not apply.",                         \
                               .group = "Terrain"}))                                                \
+    X(glm::dvec3, PlanetRadii, ::ernie::tokens::kPlanetRadii, glm::dvec3(0.0),                     \
+      (::ernie::AttributeMeta{.label = "Radii", .doc = "World units. Set, the Terrain is a planet " \
+                                     "on the ellipsoid of these semi-axes along its x, y and z "   \
+                                     "(oblate as a, a, c; triaxial too), heights rising along "    \
+                                     "its normals; overrides the radius.",                          \
+                              .group = "Terrain"}))                                                \
     X(double, FinestCell, ::ernie::tokens::kFinestCell, 1.0,                                       \
       (::ernie::AttributeMeta{.label = "Finest cell", .doc = "World units. A planet's LOD "        \
                                      "refines below its heights' quads, bilinear between them, "   \
