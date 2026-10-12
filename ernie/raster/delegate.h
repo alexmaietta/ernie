@@ -133,6 +133,11 @@ class RasterDelegate : public RenderDelegate {
     void SetMeshWriter(const Path& path, MeshWriter writer,
                        std::optional<Bounds3> bounds = {}) override;
 
+    /// As `RenderDelegate::SetFieldWriter`.
+    void SetFieldWriter(const Path& path,
+                        std::array<std::uint32_t, 3> shape,
+                        FieldWriter writer) override;
+
     /// As `RenderDelegate::MapArray` of a PrimSet: transform op
     /// `attribute` (`xformOp:*`) of prims posed on the GPU as one
     /// group, rows of one array written to exactly `prims` in row

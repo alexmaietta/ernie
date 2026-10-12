@@ -41,7 +41,15 @@ std::optional<VolumeFieldParams> FieldOf(const Scene& scene,
         const DenseField dense(scene, target);
         const Tensor* values = dense.GetValues();
         if (values == nullptr || values->Elements() == 0) {
-            return std::nullopt;
+            // Its values may come from a writer on the GPU
+            // (`RenderDelegate::SetFieldWriter`), which the renderer
+            // looks for.
+            VolumeFieldParams field;
+            field.toVolume = toLocal * scene.WorldTransform(target);
+            field.array = target.String();
+            field.dense = true;
+            field.voxelSize = dense.GetVoxelSize();
+            return field;
         }
         if (values->Type() != DType::Float32 || values->Rank() != 3 ||
             (values->Location().kind != DeviceKind::Cpu &&

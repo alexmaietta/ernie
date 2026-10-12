@@ -134,9 +134,12 @@ void PipelineLayout::Push(
             break;
         }
     }
-    context_.PushDescriptorSet()(
-        commands, point, layout_, 0,
-        static_cast<std::uint32_t>(writes.size()), writes.data());
+    // None for a layout without bindings, whose shaders take pointers.
+    if (!writes.empty()) {
+        context_.PushDescriptorSet()(
+            commands, point, layout_, 0,
+            static_cast<std::uint32_t>(writes.size()), writes.data());
+    }
     // Another layout's set 0 disturbs set 1, so the heap is bound
     // again with each push.
     context_.Bindless().Bind(commands, point, layout_);

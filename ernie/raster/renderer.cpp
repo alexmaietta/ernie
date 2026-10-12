@@ -6423,9 +6423,14 @@ void RasterRenderer::SetOverlayComputeInterop(
     overlays_->SetComputeInterop(compute);
 }
 
-void RasterRenderer::SetVolumeComputeInterop(
-    ComputeInterop* compute) {
+void RasterRenderer::SetVolumeComputeInterop(ComputeInterop* compute) {
     volumes_->SetComputeInterop(compute);
+}
+
+void RasterRenderer::SetVolumeFieldWriter(
+    const std::string& path, std::array<std::uint32_t, 3> shape,
+    FieldWriter writer) {
+    volumes_->SetFieldWriter(path, shape, std::move(writer));
 }
 
 std::uint64_t RasterRenderer::GpuBytes() const {

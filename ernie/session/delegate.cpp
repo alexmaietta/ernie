@@ -90,6 +90,13 @@ void RenderDelegate::SetMeshWriter(const Path&, MeshWriter,
                                 " renderer has no mesh writers");
 }
 
+void RenderDelegate::SetFieldWriter(const Path&,
+                                    std::array<std::uint32_t, 3>,
+                                    FieldWriter) {
+    throw std::invalid_argument("The " + Info().name +
+                                " renderer has no field writers");
+}
+
 FrameId RenderDelegate::NextFrame(const Scene& scene,
                                   const Path& settings,
                                   const Path& product) {

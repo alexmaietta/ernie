@@ -475,6 +475,11 @@ class RasterRenderer {
     /// Connects the compute device volumes' grid arrays are copied
     /// from (`VolumePass::SetComputeInterop`).
     void SetVolumeComputeInterop(ComputeInterop* compute);
+    /// Has `writer` write the DenseField at `path` each frame
+    /// (`VolumePass::SetFieldWriter`).
+    void SetVolumeFieldWriter(const std::string& path,
+                              std::array<std::uint32_t, 3> shape,
+                              FieldWriter writer);
 
     /// The buffer the views' poses of a frame with
     /// `FrameParams::posesOnGpu` are copied into before it records

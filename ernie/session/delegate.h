@@ -11,6 +11,7 @@
 #include "ernie/session/outputs.h"
 #include "ernie/util/tensor.h"
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -73,6 +74,23 @@ struct MeshWriteTarget {
 /// command buffer, such as compute dispatches that build its surface.
 using MeshWriter =
     std::function<void(VkCommandBuffer, const MeshWriteTarget&)>;
+
+/// Where a DenseField's writer (`RenderDelegate::SetFieldWriter`)
+/// writes this frame: its (x, y, z) float32 values, z fastest, at
+/// device address `values`, which is `offset` bytes into `buffer` (for
+/// copies), `shape` of them.
+struct FieldWriteTarget {
+    VkDeviceAddress values = 0;
+    VkBuffer buffer = VK_NULL_HANDLE;
+    VkDeviceSize offset = 0;
+    std::array<std::uint32_t, 3> shape{};
+};
+
+/// Records GPU work writing a DenseField's values (`FieldWriteTarget`)
+/// into a frame's command buffer, such as a simulation's compute
+/// dispatches.
+using FieldWriter =
+    std::function<void(VkCommandBuffer, const FieldWriteTarget&)>;
 
 /// Where an image sits in the deterministic random streams of
 /// `sampling.h`.
@@ -199,6 +217,16 @@ class RenderDelegate {
     /// @throws std::invalid_argument if the backend has no writers.
     virtual void SetMeshWriter(const Path& path, MeshWriter writer,
                                std::optional<Bounds3> bounds = {});
+
+    /// Has `writer` write the DenseField at `path` on the GPU every
+    /// frame, recorded into the frame before anything samples it: its
+    /// `shape` (x, y, z) float32 values, z fastest, in place of its
+    /// `ernie:values` (which may be unset). A null writer stops
+    /// writing.
+    /// @throws std::invalid_argument if the backend has no writers.
+    virtual void SetFieldWriter(const Path& path,
+                                std::array<std::uint32_t, 3> shape,
+                                FieldWriter writer);
 
     /// The render vars `Record` can draw of the frame the last
     /// `Update` prepared: `Info().viewVars` and what that frame adds,

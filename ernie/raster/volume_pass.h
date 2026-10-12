@@ -7,6 +7,7 @@
 #include "ernie/device/image.h"
 #include "ernie/device/pipeline.h"
 #include "ernie/device/shader_compiler.h"
+#include "ernie/session/delegate.h"
 #include "ernie/session/frame_params.h"
 #include "ernie/util/nanovdb.h"
 #include "ernie/util/spectrum.h"
@@ -95,6 +96,13 @@ class VolumePass {
         compute_ = compute;
     }
 
+    /// Has `writer` write the values of the DenseField at `path` (its
+    /// prim path), `shape` of them, every frame in `Prepare` before
+    /// they are scattered into its grid; a null writer stops it.
+    void SetFieldWriter(const std::string& path,
+                        std::array<std::uint32_t, 3> shape,
+                        FieldWriter writer);
+
     /// Whether any volume is drawn this frame.
     bool Active() const {
         return active_;
@@ -173,6 +181,10 @@ class VolumePass {
         double voxelSize = 1.0;
         DenseNanoVdbLayout layout;
         bool scatter = false;
+        /// A DenseField a writer fills each frame (`SetFieldWriter`):
+        /// its path, and its values' shape.
+        std::string writer;
+        glm::uvec3 shape{0};
         std::uint64_t offset = 0;  ///< In the pool, bytes.
         bool used = false;
     };
@@ -196,6 +208,9 @@ class VolumePass {
         std::uint32_t valuesWord = 0;
         glm::uvec3 shape{0};
         glm::uvec3 leaves{0};
+        /// The field's writer, which writes its values into
+        /// `staging_` first; none for values copied there.
+        FieldWriter writer;
     };
 
     const VulkanContext& context_;
@@ -226,7 +241,12 @@ class VolumePass {
     /// Dense grids' values on their way to the pool, and the scatters
     /// due (`denseScatterMain`).
     std::unique_ptr<GpuBuffer> staging_;
+    bool stagingShared_ = false;
     mutable std::vector<Scatter> scatters_;
+    /// The fields' writers by path, with their shapes.
+    std::map<std::string,
+             std::pair<std::array<std::uint32_t, 3>, FieldWriter>>
+        writers_;
     PipelineLayout scatterLayout_;
     mutable std::unique_ptr<ComputePipeline> scatterPipeline_;
     mutable std::size_t scatterPipelinePatterns_ = 0;
