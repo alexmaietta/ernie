@@ -201,7 +201,7 @@
               
                 <h1 id="struct-erniesensorfilterparam">Struct ernie::SensorFilterParam</h1>
 <p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>SensorFilterParam</strong></a></p>
-<p><em>A custom filter's parameter: a float its prim sets as</em> <code>inputs:&lt;name&gt;</code> <em>, or with</em><code>size</code> <em>above 1 an array of floats (</em><code>float name[size]</code> <em>in the filter's</em><code>Params</code> <em>, such as a curve; sensor.slang's</em><code>curveAt</code> <em>reads one), which the prim sets as a float array of any length, resampled linearly to</em><code>size</code> <em>(a single number fills it).</em></p>
+<p><em>A custom filter's parameter: a float its prim sets as</em> <code>inputs:&lt;name&gt;</code> <em>, or with</em><code>size</code> <em>above 1 an array of floats (</em><code>float name[size]</code> <em>in the filter's</em><code>Params</code> <em>, such as a curve; sensor.slang's</em><code>curveAt</code> <em>reads one), which the prim sets as a float array of any length, resampled linearly to</em><code>size</code> <em>(a single number fills it).</em><a href="#detailed-description">More...</a></p>
 <ul>
 <li><code>#include &lt;ernie/scene/sensor_filters.h&gt;</code></li>
 </ul>
@@ -234,8 +234,14 @@
 <td style="text-align: right;">std::uint32_t</td>
 <td style="text-align: left;"><a href="#variable-size"><strong>size</strong></a>   = <code>1</code><br></td>
 </tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-table"><strong>table</strong></a>   = <code>false</code><br></td>
+</tr>
 </tbody>
 </table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>A <code>table</code> of <code>size</code> values (one per detector, say) stays in the parameter buffer instead, its <code>Params</code> field a float holding where it starts, read with sensor.slang's <code>paramTable</code>; the prim's values are taken as they are, the last repeated to <code>size</code>. </p>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
 <h3 id="variable-defaultvalue">variable defaultValue</h3>
 <pre><code class="language-C++">float ernie::SensorFilterParam::defaultValue;
@@ -261,6 +267,11 @@
 
 <h3 id="variable-size">variable size</h3>
 <pre><code class="language-C++">std::uint32_t ernie::SensorFilterParam::size;
+</code></pre>
+<hr>
+
+<h3 id="variable-table">variable table</h3>
+<pre><code class="language-C++">bool ernie::SensorFilterParam::table;
 </code></pre>
 <hr>
 
