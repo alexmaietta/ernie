@@ -259,7 +259,9 @@ def test_class_attributes_name_their_attribute_for_bulk_writes():
     )
     # Colours per instance, an array as the poses.
     colours = np.random.default_rng(0).random((3, 2, 3), np.float32)
-    ernie.PointInstancer.write_rows(scene, prims, display_color=colours)
+    ernie.PointInstancer.write_rows(
+        scene, prims, display_color=colours
+    )
     assert np.array_equal(
         ernie.PointInstancer.at(scene, "/Swarm1").display_color,
         colours[1],

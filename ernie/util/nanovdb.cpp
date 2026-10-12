@@ -355,13 +355,15 @@ ReadNanoVdb(const std::filesystem::path& path) {
 
 const NanoVdbGrid* FindNanoVdbGrid(std::span<const NanoVdbGrid> grids,
                                    std::string_view name, int index) {
+    // An index into the caller's grids, which cppcheck follows where
+    // a range over the span would look like a temporary to it.
     int seen = 0;
-    for (const NanoVdbGrid& grid : grids) {
-        if (!name.empty() && grid.name != name) {
+    for (std::size_t i = 0; i < grids.size(); ++i) {
+        if (!name.empty() && grids[i].name != name) {
             continue;
         }
         if (seen++ == index) {
-            return &grid;
+            return grids.data() + i;
         }
     }
     return nullptr;
