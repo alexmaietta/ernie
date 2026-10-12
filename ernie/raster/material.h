@@ -9,6 +9,7 @@
 #include "ernie/util/image.h"
 #include "ernie/util/raster_view.h"
 #include "ernie/util/spectrum.h"
+#include "ernie/util/texture_file.h"
 
 #include <glm/glm.hpp>
 
@@ -116,6 +117,28 @@ class RasterMaterial {
     void SetScalarTexture(Scalar which, const Image* image,
                           const TextureReader& reader);
 
+    /// As the overloads above, for textures read as stored from DDS
+    /// and KTX2 files (`LoadTextureFile`): the first layer's mips
+    /// upload as they are, BC1 to BC7 blocks included, never decoded.
+    /// A reader's colour space picks the sRGB or plain variant of
+    /// formats with both (raw plain, sRGB sRGB, auto the file's own);
+    /// one- and two-channel albedo reads as grey (and alpha).
+    /// Scalars take `reader`'s channel through the image view, with
+    /// no scale or bias. Normal maps hold n / 2 + 1/2 under the usual
+    /// scale 2 and bias -1, in three channels or in two (BC5), the
+    /// shader rebuilding z; they carry no slope deviation for
+    /// roughness, as `MipFilter::NormalSlopes` adds.
+    /// @throws std::invalid_argument for a texture larger than the
+    /// device allows, a block-compressed one without
+    /// `VulkanContext::SupportsTextureCompressionBc`, a scale or bias
+    /// other than those, or a normal map of one channel.
+    void SetAlbedoTexture(const TextureData& albedo,
+                          const TextureReader& reader);
+    void SetNormalTexture(const TextureData& normal,
+                          const TextureReader& reader);
+    void SetScalarTexture(Scalar which, const TextureData& image,
+                          const TextureReader& reader);
+
     bool HasAlbedoTexture() const {
         return hasAlbedoTexture_;
     }
@@ -196,6 +219,13 @@ class RasterMaterial {
                                          MipFilter filter,
                                          ImageEncoding encoding,
                                          VkFormat format) const;
+    /// The first layer's mips of a stored texture, in its format or
+    /// that format's sRGB or plain variant per `reader`, viewed
+    /// through `components`.
+    std::unique_ptr<GpuImage>
+    UploadStored(const TextureData& texture,
+                 const TextureReader& reader,
+                 VkComponentMapping components) const;
 
     const VulkanContext& context_;
     FrameUploads& uploads_;
@@ -220,6 +250,11 @@ class RasterMaterial {
     bool hasAlbedoMap_ = false;
     bool hasAlbedoTexture_ = false;
     bool hasNormalTexture_ = false;
+    /// How mesh.slang decodes the normal map (`Surface::textures.y`):
+    /// 1 n * 127 + 128 with the slope deviation in alpha (uploaded
+    /// from an `Image`), 2 n / 2 + 1/2 in rgb, 3 the same in rg with
+    /// z rebuilt (stored textures).
+    float normalEncoding_ = 1.0f;
     std::array<bool, 3> hasScalarTexture_{false, false, false};
     bool hasDetailAlbedo_ = false;
     bool hasDetailNormal_ = false;

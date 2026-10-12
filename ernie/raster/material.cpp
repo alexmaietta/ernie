@@ -75,6 +75,57 @@ VkSamplerAddressMode AddressModeOf(TextureWrap wrap) {
     return VK_SAMPLER_ADDRESS_MODE_REPEAT;
 }
 
+VkFormat VkFormatOf(TextureFormat format) {
+    using F = TextureFormat;
+    switch (format) {
+    case F::R8:
+        return VK_FORMAT_R8_UNORM;
+    case F::Rg8:
+        return VK_FORMAT_R8G8_UNORM;
+    case F::Rgba8:
+        return VK_FORMAT_R8G8B8A8_UNORM;
+    case F::Rgba8Srgb:
+        return VK_FORMAT_R8G8B8A8_SRGB;
+    case F::Bgra8:
+        return VK_FORMAT_B8G8R8A8_UNORM;
+    case F::Bgra8Srgb:
+        return VK_FORMAT_B8G8R8A8_SRGB;
+    case F::Rgba16F:
+        return VK_FORMAT_R16G16B16A16_SFLOAT;
+    case F::Rgba32F:
+        return VK_FORMAT_R32G32B32A32_SFLOAT;
+    case F::Bc1:
+        return VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+    case F::Bc1Srgb:
+        return VK_FORMAT_BC1_RGBA_SRGB_BLOCK;
+    case F::Bc2:
+        return VK_FORMAT_BC2_UNORM_BLOCK;
+    case F::Bc2Srgb:
+        return VK_FORMAT_BC2_SRGB_BLOCK;
+    case F::Bc3:
+        return VK_FORMAT_BC3_UNORM_BLOCK;
+    case F::Bc3Srgb:
+        return VK_FORMAT_BC3_SRGB_BLOCK;
+    case F::Bc4:
+        return VK_FORMAT_BC4_UNORM_BLOCK;
+    case F::Bc4Snorm:
+        return VK_FORMAT_BC4_SNORM_BLOCK;
+    case F::Bc5:
+        return VK_FORMAT_BC5_UNORM_BLOCK;
+    case F::Bc5Snorm:
+        return VK_FORMAT_BC5_SNORM_BLOCK;
+    case F::Bc6hUfloat:
+        return VK_FORMAT_BC6H_UFLOAT_BLOCK;
+    case F::Bc6hSfloat:
+        return VK_FORMAT_BC6H_SFLOAT_BLOCK;
+    case F::Bc7:
+        return VK_FORMAT_BC7_UNORM_BLOCK;
+    case F::Bc7Srgb:
+        return VK_FORMAT_BC7_SRGB_BLOCK;
+    }
+    throw std::invalid_argument("Unknown texture format");
+}
+
 /// A trilinear, anisotropic sampler wrapping as `reader` does.
 std::unique_ptr<Sampler> TextureSampler(const VulkanContext& context,
                                         const TextureReader& reader) {
@@ -212,6 +263,86 @@ void RasterMaterial::SetNormalTexture(const Image* normal,
     normalTexture_ = std::move(image);
     normalSampler_ = std::move(sampler);
     hasNormalTexture_ = normal != nullptr;
+    normalEncoding_ = 1.0f;
+    WriteUniform();
+}
+
+void RasterMaterial::SetAlbedoTexture(const TextureData& albedo,
+                                      const TextureReader& reader) {
+    // Grey textures, with alpha in a second channel, read as rgb.
+    VkComponentMapping components{};
+    const std::uint32_t channels = InfoOf(albedo.format).channels;
+    if (channels <= 2) {
+        components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R,
+                      VK_COMPONENT_SWIZZLE_R,
+                      channels == 2 ? VK_COMPONENT_SWIZZLE_G
+                                    : VK_COMPONENT_SWIZZLE_ONE};
+    }
+    auto image = UploadStored(albedo, reader, components);
+    auto sampler = TextureSampler(context_, reader);
+    vkDeviceWaitIdle(context_.Device());
+    albedoTexture_ = std::move(image);
+    albedoSampler_ = std::move(sampler);
+    hasAlbedoTexture_ = true;
+    WriteUniform();
+}
+
+void RasterMaterial::SetNormalTexture(const TextureData& normal,
+                                      const TextureReader& reader) {
+    const std::uint32_t channels = InfoOf(normal.format).channels;
+    if (channels < 2) {
+        throw std::invalid_argument(
+            "A normal map needs two or three channels");
+    }
+    const int axes = channels == 2 ? 2 : 3;
+    for (int c = 0; c < axes; ++c) {
+        if (reader.scale[c] != 2.0f || reader.bias[c] != -1.0f) {
+            throw std::invalid_argument(
+                "A stored normal map is read with scale 2 and bias "
+                "-1");
+        }
+    }
+    auto image = UploadStored(normal, reader, VkComponentMapping{});
+    auto sampler = TextureSampler(context_, reader);
+    vkDeviceWaitIdle(context_.Device());
+    normalTexture_ = std::move(image);
+    normalSampler_ = std::move(sampler);
+    hasNormalTexture_ = true;
+    normalEncoding_ = channels == 2 ? 3.0f : 2.0f;
+    WriteUniform();
+}
+
+void RasterMaterial::SetScalarTexture(Scalar which,
+                                      const TextureData& image,
+                                      const TextureReader& reader) {
+    const int channel = std::clamp(reader.channel, 0, 3);
+    if (reader.scale[channel] != 1.0f ||
+        reader.bias[channel] != 0.0f) {
+        throw std::invalid_argument(
+            "A stored one-channel texture is read without scale or "
+            "bias");
+    }
+    // The reader's channel into r, which the shaders read; a channel
+    // the format lacks reads as its alpha would (1) or, for grey
+    // images, as the grey.
+    const std::uint32_t channels = InfoOf(image.format).channels;
+    constexpr std::array<VkComponentSwizzle, 4> kSwizzles{
+        VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G,
+        VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A};
+    VkComponentSwizzle source = kSwizzles[channel];
+    if (static_cast<std::uint32_t>(channel) >= channels) {
+        source = channel == 3 ? VK_COMPONENT_SWIZZLE_ONE
+                              : VK_COMPONENT_SWIZZLE_R;
+    }
+    auto texture = UploadStored(
+        image, reader,
+        {source, source, source, VK_COMPONENT_SWIZZLE_ONE});
+    auto sampler = TextureSampler(context_, reader);
+    vkDeviceWaitIdle(context_.Device());
+    const auto slot = static_cast<std::size_t>(which);
+    scalarTextures_[slot] = std::move(texture);
+    scalarSamplers_[slot] = std::move(sampler);
+    hasScalarTexture_[slot] = true;
     WriteUniform();
 }
 
@@ -445,8 +576,9 @@ void RasterMaterial::WriteUniform() {
         u.opacityUv);
     u.textures[0] =
         hasAlbedoTexture_ && settings.albedoTexture ? 1.0f : 0.0f;
-    u.textures[1] =
-        hasNormalTexture_ && settings.normalTexture ? 1.0f : 0.0f;
+    u.textures[1] = hasNormalTexture_ && settings.normalTexture
+                        ? normalEncoding_
+                        : 0.0f;
     u.textures[2] = hasScalarTexture_[0] && settings.roughnessTexture
                         ? 1.0f
                         : 0.0f;
@@ -480,6 +612,42 @@ std::uint64_t RasterMaterial::GpuBytes() const {
            albedoTexture_->Bytes() + normalTexture_->Bytes() +
            scalarTextures_[0]->Bytes() + scalarTextures_[1]->Bytes() +
            scalarTextures_[2]->Bytes();
+}
+
+std::unique_ptr<GpuImage>
+RasterMaterial::UploadStored(const TextureData& texture,
+                             const TextureReader& reader,
+                             VkComponentMapping components) const {
+    TextureFormat format = texture.format;
+    if (reader.colorSpace != TextureColorSpace::Auto) {
+        format = WithSrgb(format, reader.colorSpace ==
+                                      TextureColorSpace::Srgb);
+    }
+    if (InfoOf(format).compressed() &&
+        !context_.SupportsTextureCompressionBc()) {
+        throw std::invalid_argument(
+            "The device cannot sample BC-compressed textures");
+    }
+    const std::uint32_t maxSize =
+        context_.Limits().maxImageDimension2D;
+    if (texture.width > maxSize || texture.height > maxSize) {
+        throw std::invalid_argument(
+            "Texture exceeds the device's maximum texture size");
+    }
+    ImageDesc desc{texture.width,
+                   texture.height,
+                   1,
+                   texture.mips,
+                   VkFormatOf(format),
+                   VK_IMAGE_USAGE_SAMPLED_BIT};
+    desc.components = components;
+    auto image = std::make_unique<GpuImage>(context_, desc);
+    std::vector<std::span<const std::byte>> mips;
+    for (std::uint32_t mip = 0; mip < texture.mips; ++mip) {
+        mips.push_back(texture.Mip(0, mip));
+    }
+    image->Upload(mips);
+    return image;
 }
 
 std::unique_ptr<GpuImage>

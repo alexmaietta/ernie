@@ -17,7 +17,12 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
+#include <fstream>
+#include <span>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using ernie::Path;
@@ -115,6 +120,93 @@ float GreenAt(const Scene& scene, const Tensor& hdr, float x,
     const auto row =
         static_cast<std::size_t>((0.5f - ndc.y * 0.5f) * kSize);
     return hdr.As<float>()[4 * (row * kSize + col) + 1];
+}
+
+/// A DDS file of `width` x `height` with one mip: `fourCc`'s blocks,
+/// or with no FourCC 32-bit RGBA texels, then `payload`; written to
+/// the test's temporary directory as `name`.
+std::string WriteDds(const std::string& name, std::uint32_t width,
+                     std::uint32_t height, std::string_view fourCc,
+                     std::span<const std::uint8_t> payload) {
+    std::array<std::uint32_t, 32> header{};
+    std::memcpy(&header[0], "DDS ", 4);
+    header[1] = 124;
+    header[2] = 0x1007;
+    header[3] = height;
+    header[4] = width;
+    header[7] = 1;
+    header[19] = 32;
+    if (!fourCc.empty()) {
+        header[20] = 0x4;
+        std::memcpy(&header[21], fourCc.data(), 4);
+    } else {
+        header[20] = 0x41;
+        header[22] = 32;
+        header[23] = 0xffu;
+        header[24] = 0xff00u;
+        header[25] = 0xff0000u;
+        header[26] = 0xff000000u;
+    }
+    const std::string path = ::testing::TempDir() + name;
+    std::ofstream file(path, std::ios::binary);
+    file.write(reinterpret_cast<const char*>(header.data()), 128);
+    file.write(reinterpret_cast<const char*>(payload.data()),
+               static_cast<std::streamsize>(payload.size()));
+    return path;
+}
+
+/// A KTX2 file of VkFormat `vkFormat`, `width` x `height`, one level
+/// holding `payload`, written as `name`.
+std::string WriteKtx2(const std::string& name, std::uint32_t vkFormat,
+                      std::uint32_t width, std::uint32_t height,
+                      std::span<const std::uint8_t> payload) {
+    std::array<std::uint32_t, 26> header{};
+    constexpr std::array<std::uint8_t, 12> kIdentifier{
+        0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32,
+        0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A};
+    std::memcpy(header.data(), kIdentifier.data(), 12);
+    header[3] = vkFormat;
+    header[4] = 1;
+    header[5] = width;
+    header[6] = height;
+    header[9] = 1;     // faces
+    header[10] = 1;    // levels
+    header[20] = 104;  // level 0's offset, then its lengths
+    header[22] = static_cast<std::uint32_t>(payload.size());
+    header[24] = header[22];
+    const std::string path = ::testing::TempDir() + name;
+    std::ofstream file(path, std::ios::binary);
+    file.write(reinterpret_cast<const char*>(header.data()), 104);
+    file.write(reinterpret_cast<const char*>(payload.data()),
+               static_cast<std::streamsize>(payload.size()));
+    return path;
+}
+
+/// HdrColor's rgb at the pixels showing quad points (+-4, +-4).
+std::vector<float> Quadrants(RasterDelegate& delegate,
+                             const Scene& scene) {
+    const Tensor hdr = Render(delegate, scene, "HdrColor");
+    std::vector<float> rgb;
+    for (const glm::vec2 point :
+         {glm::vec2(-4, 4), glm::vec2(4, 4), glm::vec2(-4, -4),
+          glm::vec2(4, -4)}) {
+        const glm::vec4 clip =
+            ernie::CameraParamsOf(scene, "/World/Camera", kSize,
+                                  kSize)
+                .RasterView()
+                .ViewProjection() *
+            glm::vec4(point, 0.0f, 1.0f);
+        const glm::vec2 ndc = glm::vec2(clip) / clip.w;
+        const auto col =
+            static_cast<std::size_t>((ndc.x * 0.5f + 0.5f) * kSize);
+        const auto row =
+            static_cast<std::size_t>((0.5f - ndc.y * 0.5f) * kSize);
+        for (std::size_t c = 0; c < 3; ++c) {
+            rgb.push_back(
+                hdr.As<float>()[4 * (row * kSize + col) + c]);
+        }
+    }
+    return rgb;
 }
 
 /// /Looks/M as a plain grey preview surface lit and seen from
@@ -334,4 +426,84 @@ TEST_F(RasterDelegateTest, TexturesFollowTheSceneTheyComeFrom) {
     const float dark = render(0);
     const float bright = render(255);
     EXPECT_GT(bright, dark + 0.1f);
+}
+
+TEST_F(RasterDelegateTest, StoredTexturesRenderAsTheirDecodedTwins) {
+    // The same 2 x 2 RGBA8 image as a tensor (decoded, mipped and
+    // uploaded) and as a DDS file (uploaded as stored); then a BC1
+    // block of pure red in a KTX2 file against a red tensor.
+    Scene scene = TexturedScene();
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor,
+                   "/Looks/M/Tex", "outputs:rgb");
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetWrapS("clamp")
+        .SetWrapT("clamp");
+    const std::array<std::uint8_t, 16> texels{
+        255, 0, 0,   255, 0,   255, 0,   255,
+        0,   0, 255, 255, 255, 255, 255, 255};
+    RasterDelegate delegate(*context_);
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetTexture(Tensor::Copy<std::uint8_t>(texels, {2, 2, 4}));
+    const std::vector<float> decoded = Quadrants(delegate, scene);
+    scene.Clear("/Looks/M/Tex", tokens::kShaderTexture);
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetFile(WriteDds("stored_rgba8.dds", 2, 2, "", texels));
+    const std::vector<float> stored = Quadrants(delegate, scene);
+    ASSERT_EQ(stored.size(), decoded.size());
+    for (std::size_t i = 0; i < stored.size(); ++i) {
+        EXPECT_NEAR(stored[i], decoded[i], 0.01f * decoded[i] + 1e-4f)
+            << "value " << i;
+    }
+
+    // BC1 (VkFormat 133): both endpoints red 565, every index 0.
+    const std::array<std::uint8_t, 8> red{0x00, 0xF8, 0x00, 0xF8,
+                                          0,    0,    0,    0};
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetFile(WriteKtx2("stored_bc1.ktx2", 133, 4, 4, red));
+    const std::vector<float> bc1 = Quadrants(delegate, scene);
+    scene.Clear("/Looks/M/Tex", tokens::kFile);
+    const std::array<std::uint8_t, 4> texel{255, 0, 0, 255};
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetTexture(Tensor::Copy<std::uint8_t>(texel, {1, 1, 4}));
+    const std::vector<float> tensor = Quadrants(delegate, scene);
+    ASSERT_GT(tensor[0], tensor[1] + 0.05f);
+    for (std::size_t i = 0; i < bc1.size(); ++i) {
+        EXPECT_NEAR(bc1[i], tensor[i], 0.01f * tensor[i] + 1e-4f)
+            << "value " << i;
+    }
+}
+
+TEST_F(RasterDelegateTest, StoredBc5NormalMapsRebuildZ) {
+    // As NormalMapsTiltTheSurfaceAlongItsTextureCoordinates, from a
+    // BC5 (ATI2) DDS file: x = sin 30 and y = 0 stored as n / 2 + 1/2
+    // in two channels, z rebuilt in the shader.
+    Scene scene = TexturedScene();
+    ernie::Material(scene, "/Looks/M").SetBrdf("lambert");
+    scene.Set("/World/Sun", tokens::kTransform,
+              ernie::DistantLightTransform({1.0, 0.0, 1.0}));
+    // Each channel's block: both endpoints the value, every index 0.
+    const std::array<std::uint8_t, 16> block{
+        191, 191, 0, 0, 0, 0, 0, 0, 128, 128, 0, 0, 0, 0, 0, 0};
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetFile(WriteDds("stored_bc5.dds", 4, 4, "ATI2", block));
+    scene.Set("/Looks/M/Tex", tokens::kShaderScale,
+              glm::vec4(2.0f, 2.0f, 2.0f, 1.0f));
+    scene.Set("/Looks/M/Tex", tokens::kShaderBias,
+              glm::vec4(-1.0f, -1.0f, -1.0f, 0.0f));
+    RasterDelegate delegate(*context_);
+    const float flat = CentreGreen(delegate, scene);
+    ASSERT_GT(flat, 0.0f);
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kNormalInput,
+                   "/Looks/M/Tex", "outputs:rgb");
+    const float towards = CentreGreen(delegate, scene);
+    EXPECT_NEAR(towards / flat,
+                std::cos(glm::radians(15.0f)) /
+                    std::cos(glm::radians(45.0f)),
+                0.03f);
+
+    // Without the usual scale and bias the file cannot be read as
+    // normals.
+    scene.Set("/Looks/M/Tex", tokens::kShaderBias, glm::vec4(0.0f));
+    EXPECT_THROW(Render(delegate, scene, "HdrColor"),
+                 std::invalid_argument);
 }

@@ -150,6 +150,17 @@ class GpuImage {
     /// @throws std::invalid_argument for other formats.
     static std::uint32_t TexelBytes(VkFormat format);
 
+    /// Bytes of one 4 x 4 block of a BC1 to BC7 format; 0 for formats
+    /// that are not block-compressed.
+    static std::uint32_t BlockBytes(VkFormat format);
+
+    /// Tightly packed bytes of a `width` x `height` mip of `format`,
+    /// in whole blocks for block-compressed formats.
+    /// @throws std::invalid_argument for a format `TexelBytes` and
+    /// `BlockBytes` do not know.
+    static VkDeviceSize MipBytes(VkFormat format, std::uint32_t width,
+                                 std::uint32_t height);
+
   private:
     void Release();
 

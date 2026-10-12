@@ -63,8 +63,10 @@ struct MeshDraw {
 // Texture coordinates (s, t) per corner of every mesh's triangles, its levels of detail's too.
 [[vk::binding(21, 0)]] StructuredBuffer<float> uvs;
 [[vk::binding(22, 0)]] Sampler2D albedoTexture;
-// Tangent-space normals stored as n * 127 + 128 in 8 bits, with the deviation of the slopes each
-// texel covers in alpha (`MipFilter::NormalSlopes`), as the detail normal map.
+// Tangent-space normals as `surface.textures.y` says: 1 stored as n * 127 + 128 in 8 bits, with
+// the deviation of the slopes each texel covers in alpha (`MipFilter::NormalSlopes`), as the
+// detail normal map; from DDS and KTX2 files as stored, 2 n / 2 + 1/2 in rgb, 3 the same in rg
+// (BC5) with z rebuilt.
 [[vk::binding(23, 0)]] Sampler2D normalTexture;
 // Roughness and metallic, one channel each in r.
 [[vk::binding(24, 0)]] Sampler2D roughnessTexture;
@@ -396,11 +398,18 @@ UvSample uvTextures(float2 st, float3 world, inout float3 normal) {
         let size = max(dot(tangent, tangent), dot(bitangent, bitangent));
         if (size > 1e-30) {
             let texel = normalTexture.Sample(imageUv(normalUv));
-            let n = (texel.xyz * 255.0 - 128.0) / 127.0;
+            var n = (texel.xyz * 255.0 - 128.0) / 127.0;
+            if (surface.textures.y > 2.5) {
+                let xy = texel.xy * 2.0 - 1.0;
+                n = float3(xy, sqrt(saturate(1.0 - dot(xy, xy))));
+            } else if (surface.textures.y > 1.5) {
+                n = texel.xyz * 2.0 - 1.0;
+            } else {
+                let sigma = min(texel.w, 0.999) / (1.0 - min(texel.w, 0.999));
+                s.slopeVariance += sigma * sigma;
+            }
             let scale = rsqrt(size);
             normal = normalize(tangent * scale * n.x + bitangent * scale * n.y + normal * n.z);
-            let sigma = min(texel.w, 0.999) / (1.0 - min(texel.w, 0.999));
-            s.slopeVariance += sigma * sigma;
         }
     }
     return s;

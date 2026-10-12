@@ -1,0 +1,518 @@
+// SPDX-License-Identifier: BSD-3-Clause
+#include "ernie/util/texture_file.h"
+
+#include <algorithm>
+#include <array>
+#include <cctype>
+#include <cstring>
+#include <fstream>
+#include <optional>
+#include <stdexcept>
+#include <string>
+
+namespace ernie {
+
+namespace {
+
+// Bounds that keep every size below in range, far past what devices
+// sample.
+constexpr std::uint32_t kMaxSide = 1u << 16;
+constexpr std::uint32_t kMaxLayers = 2048;
+
+std::uint32_t U32(std::span<const std::byte> file, std::size_t at) {
+    if (at + 4 > file.size()) {
+        throw std::runtime_error("Texture file is truncated");
+    }
+    std::uint32_t value = 0;
+    std::memcpy(&value, file.data() + at, 4);
+    return value;  // Little-endian, as both formats and hosts are.
+}
+
+std::uint64_t U64(std::span<const std::byte> file, std::size_t at) {
+    return U32(file, at) |
+           (static_cast<std::uint64_t>(U32(file, at + 4)) << 32);
+}
+
+constexpr std::uint32_t FourCc(const char (&code)[5]) {
+    return static_cast<std::uint32_t>(code[0]) |
+           (static_cast<std::uint32_t>(code[1]) << 8) |
+           (static_cast<std::uint32_t>(code[2]) << 16) |
+           (static_cast<std::uint32_t>(code[3]) << 24);
+}
+
+std::string LowerExtension(const std::filesystem::path& path) {
+    std::string extension = path.extension().string();
+    std::transform(extension.begin(), extension.end(),
+                   extension.begin(), [](unsigned char c) {
+                       return static_cast<char>(std::tolower(c));
+                   });
+    return extension;
+}
+
+std::uint32_t MipCount(std::uint32_t width, std::uint32_t height) {
+    std::uint32_t count = 1;
+    for (std::uint32_t side = std::max(width, height); side > 1;
+         side >>= 1) {
+        ++count;
+    }
+    return count;
+}
+
+/// A texture of `format`, `width` x `height` with `layers` layers and
+/// `mips` mips, its bytes still to fill: checks the shape and lays
+/// out `offsets` layer by layer.
+TextureData Shape(TextureFormat format, std::uint32_t width,
+                  std::uint32_t height, std::uint32_t layers,
+                  std::uint32_t mips) {
+    if (width == 0 || height == 0 || width > kMaxSide ||
+        height > kMaxSide) {
+        throw std::runtime_error("Texture file has a size of " +
+                                 std::to_string(width) + " x " +
+                                 std::to_string(height));
+    }
+    if (layers == 0 || layers > kMaxLayers) {
+        throw std::runtime_error("Texture file has " +
+                                 std::to_string(layers) + " layers");
+    }
+    if (mips == 0 || mips > MipCount(width, height)) {
+        throw std::runtime_error("Texture file has " +
+                                 std::to_string(mips) + " mips");
+    }
+    TextureData data;
+    data.format = format;
+    data.width = width;
+    data.height = height;
+    data.layers = layers;
+    data.mips = mips;
+    std::size_t total = 0;
+    for (std::uint32_t layer = 0; layer < layers; ++layer) {
+        for (std::uint32_t mip = 0; mip < mips; ++mip) {
+            data.offsets.push_back(total);
+            total += ImageBytes(format, std::max(1u, width >> mip),
+                                std::max(1u, height >> mip));
+        }
+    }
+    data.bytes.resize(total);
+    return data;
+}
+
+std::optional<TextureFormat> FromDxgi(std::uint32_t dxgi) {
+    switch (dxgi) {
+    case 2:
+        return TextureFormat::Rgba32F;
+    case 10:
+        return TextureFormat::Rgba16F;
+    case 28:
+        return TextureFormat::Rgba8;
+    case 29:
+        return TextureFormat::Rgba8Srgb;
+    case 49:
+        return TextureFormat::Rg8;
+    case 61:
+        return TextureFormat::R8;
+    case 71:
+        return TextureFormat::Bc1;
+    case 72:
+        return TextureFormat::Bc1Srgb;
+    case 74:
+        return TextureFormat::Bc2;
+    case 75:
+        return TextureFormat::Bc2Srgb;
+    case 77:
+        return TextureFormat::Bc3;
+    case 78:
+        return TextureFormat::Bc3Srgb;
+    case 80:
+        return TextureFormat::Bc4;
+    case 81:
+        return TextureFormat::Bc4Snorm;
+    case 83:
+        return TextureFormat::Bc5;
+    case 84:
+        return TextureFormat::Bc5Snorm;
+    case 87:
+        return TextureFormat::Bgra8;
+    case 91:
+        return TextureFormat::Bgra8Srgb;
+    case 95:
+        return TextureFormat::Bc6hUfloat;
+    case 96:
+        return TextureFormat::Bc6hSfloat;
+    case 98:
+        return TextureFormat::Bc7;
+    case 99:
+        return TextureFormat::Bc7Srgb;
+    default:
+        return std::nullopt;
+    }
+}
+
+std::optional<TextureFormat> FromVkFormat(std::uint32_t vk) {
+    switch (vk) {
+    case 9:
+        return TextureFormat::R8;  // R8_UNORM
+    case 16:
+        return TextureFormat::Rg8;  // R8G8_UNORM
+    case 37:
+        return TextureFormat::Rgba8;  // R8G8B8A8_UNORM
+    case 43:
+        return TextureFormat::Rgba8Srgb;  // R8G8B8A8_SRGB
+    case 44:
+        return TextureFormat::Bgra8;  // B8G8R8A8_UNORM
+    case 50:
+        return TextureFormat::Bgra8Srgb;  // B8G8R8A8_SRGB
+    case 97:
+        return TextureFormat::Rgba16F;  // R16G16B16A16_SFLOAT
+    case 109:
+        return TextureFormat::Rgba32F;  // R32G32B32A32_SFLOAT
+    // BC1_RGB read as BC1_RGBA: they differ only in the alpha of
+    // blocks in three-colour mode.
+    case 131:
+    case 133:
+        return TextureFormat::Bc1;
+    case 132:
+    case 134:
+        return TextureFormat::Bc1Srgb;
+    case 135:
+        return TextureFormat::Bc2;
+    case 136:
+        return TextureFormat::Bc2Srgb;
+    case 137:
+        return TextureFormat::Bc3;
+    case 138:
+        return TextureFormat::Bc3Srgb;
+    case 139:
+        return TextureFormat::Bc4;
+    case 140:
+        return TextureFormat::Bc4Snorm;
+    case 141:
+        return TextureFormat::Bc5;
+    case 142:
+        return TextureFormat::Bc5Snorm;
+    case 143:
+        return TextureFormat::Bc6hUfloat;
+    case 144:
+        return TextureFormat::Bc6hSfloat;
+    case 145:
+        return TextureFormat::Bc7;
+    case 146:
+        return TextureFormat::Bc7Srgb;
+    default:
+        return std::nullopt;
+    }
+}
+
+/// The format of a DDS file without a DX10 header, from its pixel
+/// format (`DDS_PIXELFORMAT` at `at`).
+TextureFormat LegacyDdsFormat(std::span<const std::byte> file,
+                              std::size_t at) {
+    constexpr std::uint32_t kFourCcFlag = 0x4;
+    constexpr std::uint32_t kRgbFlag = 0x40;
+    const std::uint32_t flags = U32(file, at + 4);
+    if ((flags & kFourCcFlag) != 0) {
+        const std::uint32_t code = U32(file, at + 8);
+        switch (code) {
+        case FourCc("DXT1"):
+            return TextureFormat::Bc1;
+        case FourCc("DXT2"):
+        case FourCc("DXT3"):
+            return TextureFormat::Bc2;
+        case FourCc("DXT4"):
+        case FourCc("DXT5"):
+            return TextureFormat::Bc3;
+        case FourCc("ATI1"):
+        case FourCc("BC4U"):
+            return TextureFormat::Bc4;
+        case FourCc("BC4S"):
+            return TextureFormat::Bc4Snorm;
+        case FourCc("ATI2"):
+        case FourCc("BC5U"):
+            return TextureFormat::Bc5;
+        case FourCc("BC5S"):
+            return TextureFormat::Bc5Snorm;
+        case 113:
+            return TextureFormat::Rgba16F;  // A16B16G16R16F
+        case 116:
+            return TextureFormat::Rgba32F;  // A32B32G32R32F
+        default:
+            throw std::runtime_error(
+                "DDS file has an unsupported FourCC code " +
+                std::to_string(code));
+        }
+    }
+    const std::uint32_t bits = U32(file, at + 12);
+    const std::uint32_t red = U32(file, at + 16);
+    const std::uint32_t green = U32(file, at + 20);
+    const std::uint32_t blue = U32(file, at + 24);
+    if ((flags & kRgbFlag) != 0 && bits == 32 && green == 0xff00u) {
+        if (red == 0xffu && blue == 0xff0000u) {
+            return TextureFormat::Rgba8;
+        }
+        if (red == 0xff0000u && blue == 0xffu) {
+            return TextureFormat::Bgra8;
+        }
+    }
+    throw std::runtime_error(
+        "DDS file has an unsupported uncompressed layout");
+}
+
+}  // namespace
+
+TextureFormatInfo InfoOf(TextureFormat format) {
+    using F = TextureFormat;
+    switch (format) {
+    case F::R8:
+        return {1, 1, 1, false};
+    case F::Rg8:
+        return {1, 2, 2, false};
+    case F::Rgba8:
+    case F::Bgra8:
+        return {1, 4, 4, false};
+    case F::Rgba8Srgb:
+    case F::Bgra8Srgb:
+        return {1, 4, 4, true};
+    case F::Rgba16F:
+        return {1, 8, 4, false};
+    case F::Rgba32F:
+        return {1, 16, 4, false};
+    case F::Bc1:
+        return {4, 8, 4, false};
+    case F::Bc1Srgb:
+        return {4, 8, 4, true};
+    case F::Bc2:
+    case F::Bc3:
+    case F::Bc7:
+        return {4, 16, 4, false};
+    case F::Bc2Srgb:
+    case F::Bc3Srgb:
+    case F::Bc7Srgb:
+        return {4, 16, 4, true};
+    case F::Bc4:
+    case F::Bc4Snorm:
+        return {4, 8, 1, false};
+    case F::Bc5:
+    case F::Bc5Snorm:
+        return {4, 16, 2, false};
+    case F::Bc6hUfloat:
+    case F::Bc6hSfloat:
+        return {4, 16, 3, false};
+    }
+    throw std::invalid_argument("Unknown texture format");
+}
+
+TextureFormat WithSrgb(TextureFormat format, bool srgb) {
+    using F = TextureFormat;
+    constexpr std::array<std::array<F, 2>, 6> kPairs{{
+        {F::Rgba8, F::Rgba8Srgb},
+        {F::Bgra8, F::Bgra8Srgb},
+        {F::Bc1, F::Bc1Srgb},
+        {F::Bc2, F::Bc2Srgb},
+        {F::Bc3, F::Bc3Srgb},
+        {F::Bc7, F::Bc7Srgb},
+    }};
+    for (const auto& pair : kPairs) {
+        if (format == pair[0] || format == pair[1]) {
+            return pair[srgb ? 1 : 0];
+        }
+    }
+    return format;
+}
+
+std::size_t ImageBytes(TextureFormat format, std::uint32_t width,
+                       std::uint32_t height) {
+    const TextureFormatInfo info = InfoOf(format);
+    const std::size_t across =
+        (width + info.blockSize - 1) / info.blockSize;
+    const std::size_t down =
+        (height + info.blockSize - 1) / info.blockSize;
+    return across * down * info.blockBytes;
+}
+
+std::span<const std::byte> TextureData::Mip(std::uint32_t layer,
+                                            std::uint32_t mip) const {
+    if (layer >= layers || mip >= mips) {
+        throw std::out_of_range("Texture has no layer " +
+                                std::to_string(layer) + " mip " +
+                                std::to_string(mip));
+    }
+    const std::size_t at = offsets[std::size_t{layer} * mips + mip];
+    return std::span(bytes).subspan(
+        at, ImageBytes(format, std::max(1u, width >> mip),
+                       std::max(1u, height >> mip)));
+}
+
+bool IsTextureFile(const std::filesystem::path& path) {
+    const std::string extension = LowerExtension(path);
+    return extension == ".dds" || extension == ".ktx2";
+}
+
+TextureData ReadDds(std::span<const std::byte> file) {
+    // "DDS ", then the 124-byte DDS_HEADER, its pixel format at 76.
+    constexpr std::size_t kHeader = 4;
+    constexpr std::size_t kPixelFormat = kHeader + 72;
+    if (U32(file, 0) != FourCc("DDS ") || U32(file, kHeader) != 124) {
+        throw std::runtime_error("Not a DDS file");
+    }
+    constexpr std::uint32_t kMipCountFlag = 0x20000;
+    constexpr std::uint32_t kDepthFlag = 0x800000;
+    constexpr std::uint32_t kCubeMap = 0x200;
+    const std::uint32_t flags = U32(file, kHeader + 4);
+    const std::uint32_t height = U32(file, kHeader + 8);
+    const std::uint32_t width = U32(file, kHeader + 12);
+    const std::uint32_t depth = U32(file, kHeader + 20);
+    const std::uint32_t mipCount = U32(file, kHeader + 24);
+    const std::uint32_t caps2 = U32(file, kHeader + 108);
+    if ((flags & kDepthFlag) != 0 && depth > 1) {
+        throw std::runtime_error("DDS volume textures are not read");
+    }
+    const std::uint32_t mips =
+        (flags & kMipCountFlag) != 0 && mipCount > 0 ? mipCount : 1;
+
+    std::size_t data = kHeader + 124;
+    TextureFormat format;
+    std::uint32_t layers = 1;
+    bool cube = (caps2 & kCubeMap) != 0;
+    if (U32(file, kPixelFormat + 8) == FourCc("DX10")) {
+        // DDS_HEADER_DXT10: format, dimension, misc flags, array
+        // size.
+        const std::uint32_t dxgi = U32(file, data);
+        const std::uint32_t dimension = U32(file, data + 4);
+        constexpr std::uint32_t kTexture2d = 3;
+        constexpr std::uint32_t kCubeFlag = 0x4;
+        if (dimension != kTexture2d) {
+            throw std::runtime_error(
+                "DDS file is not a 2D texture (dimension " +
+                std::to_string(dimension) + ")");
+        }
+        const std::optional<TextureFormat> known = FromDxgi(dxgi);
+        if (!known) {
+            throw std::runtime_error(
+                "DDS file has an unsupported DXGI format " +
+                std::to_string(dxgi));
+        }
+        format = *known;
+        cube = (U32(file, data + 8) & kCubeFlag) != 0;
+        layers = std::max(1u, U32(file, data + 12));
+        data += 20;
+    } else {
+        format = LegacyDdsFormat(file, kPixelFormat);
+    }
+    if (cube) {
+        if (layers > kMaxLayers / 6) {
+            throw std::runtime_error(
+                "DDS file has too many cube maps");
+        }
+        layers *= 6;
+    }
+    TextureData texture = Shape(format, width, height, layers, mips);
+    texture.cube = cube;
+    // Each layer's mips follow the one before, as `TextureData` lays
+    // them out.
+    if (file.size() < data ||
+        file.size() - data < texture.bytes.size()) {
+        throw std::runtime_error("DDS file is truncated");
+    }
+    std::memcpy(texture.bytes.data(), file.data() + data,
+                texture.bytes.size());
+    return texture;
+}
+
+TextureData ReadKtx2(std::span<const std::byte> file) {
+    constexpr std::array<std::uint8_t, 12> kIdentifier{
+        0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32,
+        0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A};
+    if (file.size() < 80 ||
+        std::memcmp(file.data(), kIdentifier.data(), 12) != 0) {
+        throw std::runtime_error("Not a KTX2 file");
+    }
+    const std::uint32_t vkFormat = U32(file, 12);
+    const std::uint32_t width = U32(file, 20);
+    const std::uint32_t height = U32(file, 24);
+    const std::uint32_t depth = U32(file, 28);
+    const std::uint32_t layerCount = U32(file, 32);
+    const std::uint32_t faces = U32(file, 36);
+    const std::uint32_t levels = std::max(1u, U32(file, 40));
+    const std::uint32_t supercompression = U32(file, 44);
+    if (supercompression != 0 || vkFormat == 0) {
+        throw std::runtime_error(
+            "KTX2 file is supercompressed (Basis Universal or zstd), "
+            "which needs libktx, not yet linked");
+    }
+    if (depth > 1) {
+        throw std::runtime_error("KTX2 volume textures are not read");
+    }
+    if (faces != 1 && faces != 6) {
+        throw std::runtime_error("KTX2 file has " +
+                                 std::to_string(faces) + " faces");
+    }
+    const std::optional<TextureFormat> format =
+        FromVkFormat(vkFormat);
+    if (!format) {
+        throw std::runtime_error(
+            "KTX2 file has an unsupported VkFormat " +
+            std::to_string(vkFormat));
+    }
+    const std::uint32_t arrays = std::max(1u, layerCount);
+    if (arrays > kMaxLayers / faces) {
+        throw std::runtime_error("KTX2 file has too many layers");
+    }
+    TextureData texture =
+        Shape(*format, width, height, arrays * faces, levels);
+    texture.cube = faces == 6;
+    // The level index follows the 80-byte header: each level's offset
+    // and length, level 0 the largest. A level holds every layer's
+    // faces in turn.
+    for (std::uint32_t level = 0; level < levels; ++level) {
+        const std::size_t entry = 80 + std::size_t{level} * 24;
+        const std::uint64_t offset = U64(file, entry);
+        const std::uint64_t length = U64(file, entry + 8);
+        const std::size_t image =
+            ImageBytes(*format, std::max(1u, width >> level),
+                       std::max(1u, height >> level));
+        if (length != std::uint64_t{image} * texture.layers ||
+            offset > file.size() || file.size() - offset < length) {
+            throw std::runtime_error(
+                "KTX2 file has a malformed level " +
+                std::to_string(level));
+        }
+        for (std::uint32_t layer = 0; layer < texture.layers;
+             ++layer) {
+            std::memcpy(
+                texture.bytes.data() +
+                    texture
+                        .offsets[std::size_t{layer} * levels + level],
+                file.data() + offset + std::size_t{layer} * image,
+                image);
+        }
+    }
+    return texture;
+}
+
+TextureData LoadTextureFile(const std::filesystem::path& path) {
+    std::ifstream stream(path, std::ios::binary);
+    if (!stream) {
+        throw std::runtime_error("Cannot open " + path.string());
+    }
+    std::vector<std::byte> file(
+        static_cast<std::size_t>(std::filesystem::file_size(path)));
+    stream.read(reinterpret_cast<char*>(file.data()),
+                static_cast<std::streamsize>(file.size()));
+    if (!stream) {
+        throw std::runtime_error("Cannot read " + path.string());
+    }
+    const std::string extension = LowerExtension(path);
+    try {
+        if (extension == ".dds") {
+            return ReadDds(file);
+        }
+        if (extension == ".ktx2") {
+            return ReadKtx2(file);
+        }
+    } catch (const std::runtime_error& error) {
+        throw std::runtime_error(path.string() + ": " + error.what());
+    }
+    throw std::runtime_error(path.string() +
+                             " is neither a .dds nor a .ktx2 file");
+}
+
+}  // namespace ernie

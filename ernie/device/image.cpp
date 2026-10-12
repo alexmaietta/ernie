@@ -30,6 +30,10 @@ VkImageAspectFlags AspectOf(VkFormat format) {
 
 std::uint32_t GpuImage::TexelBytes(VkFormat format) {
     switch (format) {
+    case VK_FORMAT_R8_UNORM:
+        return 1;
+    case VK_FORMAT_R8G8_UNORM:
+        return 2;
     case VK_FORMAT_R8G8B8A8_UNORM:
     case VK_FORMAT_R8G8B8A8_SRGB:
     case VK_FORMAT_B8G8R8A8_UNORM:
@@ -49,6 +53,38 @@ std::uint32_t GpuImage::TexelBytes(VkFormat format) {
     default:
         throw std::invalid_argument("Unsupported texel format");
     }
+}
+
+std::uint32_t GpuImage::BlockBytes(VkFormat format) {
+    switch (format) {
+    case VK_FORMAT_BC1_RGBA_UNORM_BLOCK:
+    case VK_FORMAT_BC1_RGBA_SRGB_BLOCK:
+    case VK_FORMAT_BC4_UNORM_BLOCK:
+    case VK_FORMAT_BC4_SNORM_BLOCK:
+        return 8;
+    case VK_FORMAT_BC2_UNORM_BLOCK:
+    case VK_FORMAT_BC2_SRGB_BLOCK:
+    case VK_FORMAT_BC3_UNORM_BLOCK:
+    case VK_FORMAT_BC3_SRGB_BLOCK:
+    case VK_FORMAT_BC5_UNORM_BLOCK:
+    case VK_FORMAT_BC5_SNORM_BLOCK:
+    case VK_FORMAT_BC6H_UFLOAT_BLOCK:
+    case VK_FORMAT_BC6H_SFLOAT_BLOCK:
+    case VK_FORMAT_BC7_UNORM_BLOCK:
+    case VK_FORMAT_BC7_SRGB_BLOCK:
+        return 16;
+    default:
+        return 0;
+    }
+}
+
+VkDeviceSize GpuImage::MipBytes(VkFormat format, std::uint32_t width,
+                                std::uint32_t height) {
+    if (const std::uint32_t block = BlockBytes(format); block > 0) {
+        return VkDeviceSize{(width + 3) / 4} * ((height + 3) / 4) *
+               block;
+    }
+    return VkDeviceSize{width} * height * TexelBytes(format);
 }
 
 GpuImage::GpuImage(const VulkanContext& context,
@@ -333,7 +369,6 @@ void GpuImage::Upload(
         throw std::invalid_argument(
             "GpuImage::Upload needs data for every mip");
     }
-    const std::uint32_t texel = TexelBytes(desc_.format);
     std::vector<VkBufferImageCopy> regions;
     VkDeviceSize total = 0;
     for (std::size_t i = 0; i < mipData.size(); ++i) {
@@ -341,8 +376,7 @@ void GpuImage::Upload(
         const auto layer = static_cast<std::uint32_t>(i / mips);
         const std::uint32_t w = std::max(1u, desc_.width >> mip);
         const std::uint32_t h = std::max(1u, desc_.height >> mip);
-        if (mipData[i].size() !=
-            static_cast<std::size_t>(w) * h * texel) {
+        if (mipData[i].size() != MipBytes(desc_.format, w, h)) {
             throw std::invalid_argument(
                 "GpuImage::Upload got the wrong size for a mip");
         }

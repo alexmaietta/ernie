@@ -14,6 +14,7 @@
 #include "ernie/scene/wide_view.h"
 #include "ernie/session/product_frame.h"
 #include "ernie/util/profile.h"
+#include "ernie/util/texture_file.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -590,6 +591,22 @@ void RasterDelegate::SyncMaterial(const Scene& scene,
         }
         material.textures[slot] = key;
         try {
+            // DDS and KTX2 files upload as stored, never decoded.
+            if (reader && reader->image.empty() &&
+                IsTextureFile(reader->file)) {
+                const TextureData stored =
+                    LoadTextureFile(reader->file);
+                if (slot == 0) {
+                    gpu.SetAlbedoTexture(stored, *reader);
+                } else if (slot == 1) {
+                    gpu.SetNormalTexture(stored, *reader);
+                } else {
+                    gpu.SetScalarTexture(
+                        static_cast<RasterMaterial::Scalar>(slot - 2),
+                        stored, *reader);
+                }
+                continue;
+            }
             const std::optional<Image> image =
                 reader ? std::optional(TextureImageOf(scene, *reader))
                        : std::nullopt;

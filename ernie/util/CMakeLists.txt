@@ -15,6 +15,7 @@ ernie_add_library(
     solar.cpp
     spectrum.cpp
     tensor.cpp
+    texture_file.cpp
     PUBLIC
     ernie_glm
     ernie_dlpack

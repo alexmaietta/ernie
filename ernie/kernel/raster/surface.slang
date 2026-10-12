@@ -27,8 +27,8 @@ public struct Surface {
     public float4 hexPhaseXz;
     // Textures through mesh texture coordinates (mesh.slang): the albedo texture's scale and
     // bias, each texture's coordinate transform (UsdTransform2d) as the rows of a 2 x 3 matrix in
-    // xyz, and whether there is an albedo texture (x), a normal map (y), a roughness texture (z)
-    // and a metallic texture (w).
+    // xyz, and whether there is an albedo texture (x), a normal map (y, its encoding: see
+    // mesh.slang's `normalTexture`), a roughness texture (z) and a metallic texture (w).
     public float4 albedoTextureScale;
     public float4 albedoTextureBias;
     public float4 albedoUv[2];

@@ -565,6 +565,11 @@ VulkanContext::Create(const VulkanContextOptions& options) {
     features.features.samplerAnisotropy =
         supported.features.samplerAnisotropy;
     c.anisotropy_ = supported.features.samplerAnisotropy == VK_TRUE;
+    // For BC1 to BC7 textures read from DDS and KTX2 files as stored.
+    features.features.textureCompressionBC =
+        supported.features.textureCompressionBC;
+    c.textureCompressionBc_ =
+        supported.features.textureCompressionBC == VK_TRUE;
     features.features.fillModeNonSolid =
         supported.features.fillModeNonSolid;
     // For shadow maps that clamp casters in front of their near

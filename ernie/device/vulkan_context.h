@@ -177,6 +177,12 @@ class VulkanContext {
         return anisotropy_;
     }
 
+    /// Whether images can be BC1 to BC7 block-compressed
+    /// (`textureCompressionBC`), as DDS and KTX2 textures often are.
+    bool SupportsTextureCompressionBc() const {
+        return textureCompressionBc_;
+    }
+
     /// Whether one indirect draw call may draw several commands
     /// (`multiDrawIndirect`); without it, callers issue one call per
     /// command.
@@ -343,6 +349,7 @@ class VulkanContext {
     VkPhysicalDeviceLimits limits_{};
     bool rayQuery_ = false;
     bool anisotropy_ = false;
+    bool textureCompressionBc_ = false;
     bool depthClamp_ = false;
     bool fragmentAtomics_ = false;
     bool multiDrawIndirect_ = false;
