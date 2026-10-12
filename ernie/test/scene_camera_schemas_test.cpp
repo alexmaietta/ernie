@@ -245,7 +245,8 @@ TEST(CameraSchema, RegistryDescribesTheCamera) {
 
     // Every attribute once, in the viewer's sections.
     const std::set<std::string_view> groups{
-        "Prim", "Lens", "Exposure", "Shutter", "Sensor", "Views"};
+        "Prim",   "Lens",  "Exposure", "Shutter",
+        "Sensor", "Views", "Polarizer"};
     std::set<std::string_view> names;
     for (const AttributeDef* def : camera.AllAttributes()) {
         EXPECT_TRUE(names.insert(def->name).second) << def->name;

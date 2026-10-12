@@ -55,7 +55,7 @@ struct CameraView {
 /// A right-handed reverse-Z perspective projection to depth [0, 1]:
 /// 1 at `nearPlane`, 0 at `farPlane`, or with an infinite far plane
 /// near / distance. Shaders linearise its depth d as B / (A + d) with
-/// A = projection[2][2] and B = projection[3][2].
+/// A = `projection[2][2]` and B = `projection[3][2]`.
 glm::mat4 ReversedPerspective(float verticalFov, float aspect,
                               float nearPlane, float farPlane);
 
