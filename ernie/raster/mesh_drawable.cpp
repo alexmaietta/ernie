@@ -2658,20 +2658,33 @@ void MeshDrawable::Cull(const FrameParams& params,
     // shadow view can see: all of them without culling, else those
     // whose bounds meet the frustum. With GPU culling, every
     // instanced range left becomes a job that tests its instances one
-    // by one (cull.slang). Only when a view or shadow view tests them
-    // on the CPU: with the views' poses on the GPU and shadow views
-    // the GPU fits, none does.
-    const bool tested = culling_ != Culling::Off &&
-                        (!params.posesOnGpu ||
-                         std::any_of(cascades.begin(), cascades.end(),
-                                     [](const ShadowCascade& c) {
-                                         return !c.gpuFitted;
-                                     }));
+    // by one (cull.slang). The CPU tests a range's bounds only where
+    // no job will test its instances, with CPU culling or for plain
+    // meshes drawn directly as occluders, and only for views whose
+    // pose it knows: with the views' poses on the GPU and shadow
+    // views the GPU fits, none.
+    const bool cpuTests =
+        culling_ == Culling::Cpu ||
+        (culling_ == Culling::Gpu && occlusion_ != Occlusion::Off);
+    const bool tested =
+        cpuTests && (!params.posesOnGpu ||
+                     std::any_of(cascades.begin(), cascades.end(),
+                                 [](const ShadowCascade& c) {
+                                     return !c.gpuFitted;
+                                 }));
+    // A range is a job of the GPU's when GPU culling tests its
+    // instances: an instancer's, or a plain mesh's without occlusion
+    // culling (with it they draw directly, as occluders).
+    const auto isJob = [&](std::size_t item) {
+        return culling_ == Culling::Gpu &&
+               (items_[item].instancer ||
+                occlusion_ == Occlusion::Off);
+    };
     std::vector<std::vector<std::optional<Bounds3>>> bounds(
         tested ? items_.size() : 0);
     for (std::size_t i = 0; i < items_.size() && tested; ++i) {
         for (const WorldRange& range : itemRanges_[i]) {
-            bounds[i].push_back(range.count == 0
+            bounds[i].push_back(range.count == 0 || isJob(i)
                                     ? std::nullopt
                                     : RangeBounds(i, range));
         }
@@ -2800,7 +2813,10 @@ void MeshDrawable::Cull(const FrameParams& params,
                 ((linkMask >> group) & 1u) == 0) {
                 continue;
             }
-            if (posed && culling_ != Culling::Off) {
+            // A job's instances are tested on the GPU, each against
+            // the view's planes: nothing to test here.
+            const bool job = isJob(i);
+            if (posed && culling_ != Culling::Off && !job) {
                 const std::optional<Bounds3>& box = bounds[i][r];
                 if (box &&
                     !frustum.Intersects(box->first, box->second)) {
@@ -2812,9 +2828,7 @@ void MeshDrawable::Cull(const FrameParams& params,
             // Draws of their own too, without occlusion culling (with
             // it they draw directly, as occluders): a job of their
             // one instance, so every view's draws go out indirectly.
-            if (culling_ == Culling::Gpu &&
-                (items_[i].instancer ||
-                 occlusion_ == Occlusion::Off)) {
+            if (job) {
                 entry.job = static_cast<std::int32_t>(jobs.size());
                 GpuCullJob job{};
                 job.range[0] = entry.item;
@@ -2844,8 +2858,10 @@ void MeshDrawable::Cull(const FrameParams& params,
     for (std::size_t v = 0; v < params.Views(); ++v) {
         viewWorlds[v] = params.ViewWorld(v);
     }
+    // Host poses too, when no view tests bounds here: then only the
+    // views' cull blocks change from frame to frame.
     const bool cacheable =
-        params.posesOnGpu && !params.camera.pushbroom;
+        (params.posesOnGpu || !cpuTests) && !params.camera.pushbroom;
     const bool reuse = cacheable && viewLayout_.valid &&
                        viewLayout_.layoutVersion == layoutVersion_ &&
                        viewLayout_.idOffsets == itemIdOffsets_ &&
@@ -2859,24 +2875,29 @@ void MeshDrawable::Cull(const FrameParams& params,
         visible = viewLayout_.visible;
         draws = viewLayout_.draws;
         viewJobStarts_ = viewLayout_.jobStarts;
-        // The GPU writes each view's planes and matrix
-        // (`RecordViewPoses`); the rest of a block is the camera's,
-        // the same for every view: the first view's, copied.
-        const glm::mat4 viewProjection =
-            params.View(0).ViewProjection();
-        const float perUnit =
-            glm::length(glm::vec3(viewProjection[0][1],
-                                  viewProjection[1][1],
-                                  viewProjection[2][1])) *
-            0.5f * static_cast<float>(params.camera.height);
-        pushView(Frustum::FromMatrix(viewProjection), viewProjection,
-                 perUnit, occlusion_ != Occlusion::Off);
-        const std::vector<glm::vec4> block(
-            views.end() -
-                static_cast<std::ptrdiff_t>(kCullViewStride),
-            views.end());
-        for (std::size_t v = 1; v < params.Views(); ++v) {
-            views.insert(views.end(), block.begin(), block.end());
+        // With poses on the GPU, it writes each view's planes and
+        // matrix (`RecordViewPoses`); the rest of a block is the
+        // camera's, the same for every view: the first view's,
+        // copied. With host poses each view's own.
+        for (std::size_t v = 0; v < params.Views(); ++v) {
+            if (params.posesOnGpu && v > 0) {
+                const std::vector<glm::vec4> block(
+                    views.begin(),
+                    views.begin() +
+                        static_cast<std::ptrdiff_t>(kCullViewStride));
+                views.insert(views.end(), block.begin(), block.end());
+                continue;
+            }
+            const glm::mat4 viewProjection =
+                params.View(v).ViewProjection();
+            const float perUnit =
+                glm::length(glm::vec3(viewProjection[0][1],
+                                      viewProjection[1][1],
+                                      viewProjection[2][1])) *
+                0.5f * static_cast<float>(params.camera.height);
+            pushView(Frustum::FromMatrix(viewProjection),
+                     viewProjection, perUnit,
+                     occlusion_ != Occlusion::Off);
         }
     }
     if (!reuse) {
