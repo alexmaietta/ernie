@@ -814,3 +814,26 @@ TEST_F(RasterDelegateTest, TheAirInFrontOfAVolumeShows) {
     EXPECT_GT(walledSum, 0.3 * skySum);
     EXPECT_LT(walledSum, 0.95 * skySum);
 }
+
+TEST_F(RasterDelegateTest, VolumeSettingsTradeQualityForSpeed) {
+    // The render settings' cap on octaves leaves single scattering;
+    // coarser steps through the cube and towards the sun still give
+    // its transmittance.
+    constexpr double kSigma = 2.0;
+    RasterDelegate delegate(*context_);
+    Scene scene = VolumeScene(kSigma, 0.0);
+    ernie::Material(scene, "/Looks/Gas")
+        .SetVolumeAlbedo(glm::dvec3(1.0))
+        .SetPhaseFunction(std::string(tokens::kIsotropic))
+        .SetScatteringOctaves(6);
+    ernie::RenderSettings settings(scene, "/Render/Settings");
+    settings.SetVolumeMaxOctaves(1)
+        .SetVolumeShadowSteps(4)
+        .SetVolumeStepsPerVoxel(1.0)
+        .SetVolumeMaxSteps(64);
+    const std::vector<double> ratio = ScatteredOverEach(
+        delegate, scene, kSigma, 1.0 / (4.0 * std::numbers::pi));
+    for (std::size_t band = 0; band < ratio.size(); ++band) {
+        EXPECT_NEAR(ratio[band], 1.0, 0.05) << "band " << band;
+    }
+}

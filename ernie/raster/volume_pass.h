@@ -66,11 +66,6 @@ class VolumePass {
         const LightPatternRegistry* patterns = nullptr;
     };
 
-    /// The most steps a ray takes through one volume.
-    static constexpr std::uint32_t kMaxSteps = 256;
-    /// Steps per voxel of the density grid, at most.
-    static constexpr double kStepsPerVoxel = 2.0;
-
     VolumePass(const VulkanContext& context,
                const ShaderCompiler& compiler);
 
@@ -82,14 +77,16 @@ class VolumePass {
     /// relative to `origin`; empty when the poses are on the GPU)
     /// only those its frustum reaches; and for each light shadow
     /// view, the world whose volumes it shadows with besides the
-    /// shared ones (`lightViewWorlds`, `ShadowCasters::world`'s).
+    /// shared ones (`lightViewWorlds`, `ShadowCasters::world`'s); as
+    /// finely as `settings` say.
     /// @throws std::runtime_error if a grid's file cannot be read.
     void Set(std::span<const VolumeParams> volumes,
              const glm::dvec3& origin, const SpectralBands& bands,
              std::span<const std::int32_t> viewWorlds,
              std::span<const glm::mat4> viewProjections,
              std::span<const std::int32_t> lightViewWorlds,
-             std::uint64_t frame, FrameUploads& uploads);
+             const VolumeSettings& settings, std::uint64_t frame,
+             FrameUploads& uploads);
 
     /// The compute device whose arrays NanoVDBFields may hold, which
     /// copies their grids into the pool; Vulkan work reading the pool
@@ -103,8 +100,11 @@ class VolumePass {
         return active_;
     }
 
-    /// Texels across a light shadow view's volume shadow map.
-    static constexpr std::uint32_t kShadowSize = 256;
+    /// Texels across a light shadow view's volume shadow map, as the
+    /// last `Set`'s settings say.
+    std::uint32_t ShadowSize() const {
+        return settings_.shadowResolution;
+    }
 
     /// Records what the march and shading read of the volumes before
     /// the views draw, once the light shadow views are known: the
@@ -204,6 +204,7 @@ class VolumePass {
     mutable std::uint32_t shadowViews_ = 0;
     std::uint32_t views_ = 0;
     std::uint32_t seed_ = 0;
+    VolumeSettings settings_;
     bool active_ = false;
 };
 

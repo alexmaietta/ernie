@@ -60,8 +60,6 @@ static const uint kMaxIntervals = 8;
 static const uint kMaxGroups = 16;
 // The transmittance below which a ray is opaque.
 static const float kOpaque = 1e-3;
-// Steps of the march towards a light through the volume.
-static const uint kShadowSteps = 12;
 static const uint kMaxLights = 16;
 // Per view and light, the (sequence frame, weight) pairs a laser shows (shading.slang's).
 static const uint kMaxLit = 4;
@@ -131,7 +129,7 @@ struct VolumeConstants {
     // x: 1 when the background holds radiance (a sky); without one, this pass writes the
     // background's, no radiance but what volumes emit, and the sensor reads it as held. y: the
     // layers from a radiance layer to its Stokes Q, and on to U, with a polarizer (0 without
-    // them). zw unused.
+    // them). z: the render settings' steps and octaves (`shadowSteps` and on). w unused.
     uint4 flags;
     // Byte offsets in a block: x `view` (the lights it sees, a bit each; its world's slot in a
     // batch's distant light maps; its first light), y `lightShadow` (z the maps' texels across), z
@@ -366,7 +364,7 @@ float phaseOf(VolumeMaterialGpu material, float cosG, float spread = 1.0) {
 // Reference: M. Wrenninge, C. Kulla and V. Lundqvist, "Oz: The Great and Volumetric", SIGGRAPH
 //   2013 Talks. https://doi.org/10.1145/2504459.2504518
 float octavesOf(VolumeMaterialGpu material, float cosG, float depth) {
-    let octaves = uint(material.scattering.x);
+    let octaves = min(uint(material.scattering.x), maxOctaves());
     float sum = 0.0;
     float a = 1.0;
     float b = 1.0;
@@ -417,9 +415,20 @@ float volumesDepth(uint2 run, float3 world, float3 towards, float far, uint cast
     return depth;
 }
 
-// The transmittance of `volumesDepth`'s path, in `kShadowSteps` steps.
-float volumesShadow(uint2 run, float3 world, float3 towards, float far, uint casters) {
-    return exp(-volumesDepth(run, world, towards, far, casters, kShadowSteps));
+// The render settings' steps through each volume towards a light, up and down for the sky's light
+// (0: unoccluded) and through the air in front of the volumes (0: none), and the most octaves of
+// any material (`VolumeSettings`, a byte each of `constants.flags.z`).
+uint shadowSteps() {
+    return constants.flags.z & 0xFFu;
+}
+uint skyLightSteps() {
+    return (constants.flags.z >> 8) & 0xFFu;
+}
+uint airSteps() {
+    return (constants.flags.z >> 16) & 0xFFu;
+}
+uint maxOctaves() {
+    return constants.flags.z >> 24;
 }
 
 // The inverse of `matrix` by cofactors, 0 for a singular one (views.slang's `invert`).
@@ -672,9 +681,6 @@ LightReach reachOf(LightGpu light, uint slot, uint view, float3 world, float3x2 
     return reach;
 }
 
-// Steps of the march up and down through the volumes for the sky's and the ground's light.
-static const uint kSkyLightSteps = 6;
-
 // Adds to `emitted` the light of the sky and the ground around world point `world` (relative to
 // the frame's origin) that the medium there scatters towards the eye, `scale` its scattering
 // coefficient times the step's weight and the material's sky light scale. Each of the view's
@@ -698,8 +704,9 @@ void emitSkyLight(inout float4 emitted[kMaxGroups], uint materialIndex, float3 w
     let p = world * 1e-3 - air[0].xyz;
     let r = max(length(p), bottom);
     let up = normalize(p);
-    let above = exp(-volumesDepth(shadowRun, world, up, 1e30, ~0u, kSkyLightSteps));
-    let below = exp(-volumesDepth(shadowRun, world, -up, 1e30, ~0u, kSkyLightSteps));
+    let steps = skyLightSteps();
+    let above = steps > 0 ? exp(-volumesDepth(shadowRun, world, up, 1e30, ~0u, steps)) : 1.0;
+    let below = steps > 0 ? exp(-volumesDepth(shadowRun, world, -up, 1e30, ~0u, steps)) : 1.0;
     for (uint k = 0; k < lightCount; ++k) {
         let light = shading.lights[viewLights.z + k];
         if ((viewLights.x & (1u << k)) == 0 || uint(light.position.w) != kDistantLight ||
@@ -722,9 +729,6 @@ void emitSkyLight(inout float4 emitted[kMaxGroups], uint materialIndex, float3 w
         }
     }
 }
-
-// Steps of the air's march from the eye to the volumes.
-static const uint kAirSteps = 32;
 
 // The distant lights the atmosphere carries (shading.slang's `skyLights`): those of `viewLights`
 // that are not a dome's directions, with their irradiance in band group `g`.
@@ -939,7 +943,7 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
                     }
                     let depth = light.links.z != 0
                                     ? volumesDepth(shadowRun, world, reach.towards, reach.far,
-                                                   light.links.y, kShadowSteps)
+                                                   light.links.y, shadowSteps())
                                     : 0.0;
                     let lit = weight * sigma *
                               octavesOf(material, dot(reach.towards, -direction), depth) *
@@ -984,7 +988,7 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
         airLight[g] = float4(0.0);
         airThrough[g] = float4(1.0);
     }
-    if (air[1].y != 0.0 && !unwritten && transmittance < 1.0) {
+    if (air[1].y != 0.0 && !unwritten && transmittance < 1.0 && airSteps() > 0) {
         let front = frontSum / (1.0 - transmittance);
         let bottom = air[0].w;
         let top = air[1].x;
@@ -997,7 +1001,7 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
                                    atmosphereTransmittance, atmosphereMultiple, tableSampler, p,
                                    direction, max(start, 0.0), end,
                                    skyLightsOf(viewLights, lightCount, g), noEclipse(), g,
-                                   kAirSteps, airLight[g], airThrough[g]);
+                                   airSteps(), airLight[g], airThrough[g]);
             }
         }
     }

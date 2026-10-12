@@ -464,9 +464,11 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                      std::span<const std::int32_t> viewWorlds,
                      std::span<const glm::mat4> viewProjections,
                      std::span<const std::int32_t> lightViewWorlds,
+                     const VolumeSettings& settings,
                      std::uint64_t frame, FrameUploads& uploads) {
     ERNIE_ZONE("Volumes");
     seed_ = static_cast<std::uint32_t>(frame * 2654435761u);
+    settings_ = settings;
     views_ = static_cast<std::uint32_t>(viewWorlds.size());
     for (auto& [key, loaded] : grids_) {
         loaded.used = false;
@@ -616,7 +618,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                          glm::translate(glm::dmat4(1.0), origin),
                      placed.toLocal);
                 placed.params[3] = static_cast<float>(
-                    std::max(voxel, 1e-9) / kStepsPerVoxel);
+                    std::max(voxel, 1e-9) / settings_.stepsPerVoxel);
                 placed.info[1] = static_cast<std::uint32_t>(world);
                 placed.info[2] = volume.linkGroup;
                 instances.push_back(placed);
@@ -721,7 +723,7 @@ void VolumePass::Prepare(VkCommandBuffer commands,
     resources.lightViews = lightViews.Address();
     resources.lightViewWorlds = addresses_[4];
     resources.volumeCount = volumeCount_;
-    resources.shadowSize = kShadowSize;
+    resources.shadowSize = ShadowSize();
     resources.lightCount = lightCount;
     // After whatever read the last frame's, before the passes reading
     // these.
@@ -748,18 +750,19 @@ void VolumePass::Prepare(VkCommandBuffer commands,
     if (shadowViews == 0) {
         return;
     }
+    const std::uint32_t size = ShadowSize();
     if (shadowMap_ == nullptr ||
-        shadowMap_->Desc().layers != 3 * shadowViews) {
+        shadowMap_->Desc().layers != 3 * shadowViews ||
+        shadowMap_->Desc().width != size) {
         if (shadowMap_ != nullptr) {
             vkDeviceWaitIdle(context_.Device());
         }
         shadowMap_ = std::make_unique<GpuImage>(
-            context_,
-            ImageDesc{kShadowSize, kShadowSize, 3 * shadowViews, 1,
-                      VK_FORMAT_R32G32B32A32_SFLOAT,
-                      VK_IMAGE_USAGE_STORAGE_BIT |
-                          VK_IMAGE_USAGE_SAMPLED_BIT,
-                      false, true});
+            context_, ImageDesc{size, size, 3 * shadowViews, 1,
+                                VK_FORMAT_R32G32B32A32_SFLOAT,
+                                VK_IMAGE_USAGE_STORAGE_BIT |
+                                    VK_IMAGE_USAGE_SAMPLED_BIT,
+                                false, true});
     }
     if (shadowPipeline_ == nullptr ||
         shadowPipelinePatterns_ != patterns.Models().size()) {
@@ -794,8 +797,7 @@ void VolumePass::Prepare(VkCommandBuffer commands,
                       shadowPipeline_->Handle());
     shadowLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                        resourcesOf);
-    vkCmdDispatch(commands, Groups(kShadowSize), Groups(kShadowSize),
-                  shadowViews);
+    vkCmdDispatch(commands, Groups(size), Groups(size), shadowViews);
     shadowMap_->Transition(commands,
                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
@@ -856,7 +858,7 @@ void VolumePass::Record(VkCommandBuffer commands,
     VolumeConstants constants{};
     constants.layout[0] = firstView;
     constants.layout[1] = layout.stride;
-    constants.layout[2] = kMaxSteps;
+    constants.layout[2] = settings_.maxSteps;
     constants.layout[3] = seed_;
     constants.offsets[0] = layout.invViewProj;
     constants.offsets[1] = layout.strip;
@@ -865,6 +867,11 @@ void VolumePass::Record(VkCommandBuffer commands,
     constants.flags[0] = sky ? 1u : 0u;
     constants.flags[1] =
         targets.Stokes() ? targets.StokesOffset() : 0u;
+    // The steps towards the lights, the sky and through the air, and
+    // the most octaves, a byte each.
+    constants.flags[2] =
+        settings_.shadowSteps | (settings_.skyLightSteps << 8) |
+        (settings_.airSteps << 16) | (settings_.maxOctaves << 24);
     constants.lights[0] = layout.view;
     constants.lights[1] = layout.lightShadow;
     constants.lights[2] = layout.atmosphere;

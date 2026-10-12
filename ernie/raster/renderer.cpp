@@ -3415,15 +3415,15 @@ void RasterRenderer::Update(
             }
         }
         // Each light shadow view's volumes cast as its geometry does.
-        std::vector<std::int32_t> lightViewWorlds(
-            lightViews_.size(), lightCasters_.world);
+        std::vector<std::int32_t> lightViewWorlds(lightViews_.size(),
+                                                  lightCasters_.world);
         for (std::size_t k = 0; k < layeredPasses_.size(); ++k) {
             lightViewWorlds[firstLayeredView_ + k] =
                 layeredPasses_[k].casters.world;
         }
         volumes_->Set(raster.volumes, raster.origin, bands_,
                       viewWorlds_, viewProjections, lightViewWorlds,
-                      params.frame, uploads_);
+                      params.volumeSettings, params.frame, uploads_);
     }
     // A cube camera's motion is its faces', which the sensor maps
     // through the lens.
@@ -5474,7 +5474,7 @@ void RasterRenderer::WriteShadingResources(
         volumeShadows != nullptr
             ? texture(Kind::Texture2DArray, *volumeShadows)
             : 0xFFFFFFFFu;
-    resources.volumeShadowSize = VolumePass::kShadowSize;
+    resources.volumeShadowSize = volumes_->ShadowSize();
 
     // In the command stream, after the dispatches reading the last
     // and before those reading this.
@@ -6000,8 +6000,7 @@ void RasterRenderer::SetOverlayComputeInterop(
     overlays_->SetComputeInterop(compute);
 }
 
-void RasterRenderer::SetVolumeComputeInterop(
-    ComputeInterop* compute) {
+void RasterRenderer::SetVolumeComputeInterop(ComputeInterop* compute) {
     volumes_->SetComputeInterop(compute);
 }
 

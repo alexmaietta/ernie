@@ -518,6 +518,23 @@ struct AtmosphereParams {
     }
 };
 
+/// How finely volumes render (RenderSettings' `ernie:volumes:*`):
+/// steps through each volume, towards each light, up and down for the
+/// sky's light (0, unoccluded) and through the air in front (0, none),
+/// the most orders of multiple scattering, and the texels across the
+/// volumes' shadow maps.
+struct VolumeSettings {
+    double stepsPerVoxel = 2.0;
+    std::uint32_t maxSteps = 256;
+    std::uint32_t shadowSteps = 12;
+    std::uint32_t skyLightSteps = 6;
+    std::uint32_t airSteps = 32;
+    std::uint32_t maxOctaves = 8;
+    std::uint32_t shadowResolution = 256;
+
+    bool operator==(const VolumeSettings&) const = default;
+};
+
 /// A field a volume shades with (`VolumesOf`): a grid of a NanoVDB
 /// file, an OpenVDBAsset's, or of a NanoVDBField's array (`buffer`).
 struct VolumeFieldParams {
@@ -670,6 +687,7 @@ struct FrameParams {
     Wireframe wireframe =
         Wireframe::Off;  ///< How triangle edges are drawn.
     ShadowSettings shadows;
+    VolumeSettings volumeSettings;  ///< How finely volumes render.
     /// The sensor filters to run, with their inputs
     /// (`CheckFilterChain`); empty runs `DefaultFilterChain`.
     std::vector<SensorFilterStep> filters;
