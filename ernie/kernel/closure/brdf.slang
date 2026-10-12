@@ -66,8 +66,25 @@ public EnvironmentResponse diffuseEnvironment(float3 albedo) {
     return r;
 }
 
+// The share of a radiance factor that facets reflect at the surface (a specular lobe), which
+// polarizes it by Fresnel's laws about the facets' plane of incidence, and the facets' index of
+// refraction; the rest is scattered beneath the surface and leaves depolarized.
+public struct SpecularReflection {
+    public float3 factor;
+    public float ior;
+}
+
 public interface IBrdf {
     float3 radianceFactor(BrdfInput s, BrdfParams p);
+
+    // The specular part of `radianceFactor` for polarization. Models that do not override it
+    // reflect nothing specularly: all their light diffuse.
+    SpecularReflection specularReflection(BrdfInput s, BrdfParams p) {
+        SpecularReflection r;
+        r.factor = float3(0.0);
+        r.ior = 1.5;
+        return r;
+    }
 
     // The response to surrounding light for a viewer at cos(e) `mu` (`s.mu`; the other angles of
     // `s` are unused), for the dome and ambient terms of a rasterizer. Models that do not

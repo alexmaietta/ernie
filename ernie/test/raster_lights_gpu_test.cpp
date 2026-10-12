@@ -1091,6 +1091,62 @@ TEST_F(RasterDelegateTest, PolarizersPassPolarizedLightByItsAngle) {
         << "depolarized";
 }
 
+TEST_F(RasterDelegateTest,
+       SpecularReflectionPolarizesByFresnelsLaws) {
+    // FlatScene's floor as black glass (index 1.5), mirroring the sun
+    // into the camera in the x-z plane: its light comes off polarized
+    // across that plane of incidence, along the image's x.
+    Scene scene = FlatScene();
+    ernie::Material glass(scene, "/Looks/Grey");
+    glass.SetBrdf("preview_surface").SetAlbedo(glm::dvec3(0.0));
+    scene.Set("/Looks/Grey", "inputs:roughness", 0.3);
+    scene.Set("/Looks/Grey", "inputs:ior", 1.5);
+    RasterDelegate delegate(*context_);
+    const std::size_t c = kVarSize / 2;
+    const auto lit = [&](double incidence) {
+        const glm::dvec3 towards(std::sin(incidence), 0.0,
+                                 std::cos(incidence));
+        scene.Set("/World/Sun", tokens::kTransform,
+                  ernie::DistantLightTransform(towards));
+        scene.Set("/World/Camera", tokens::kTransform,
+                  ernie::LookAtTransform(
+                      100.0 * glm::dvec3(-towards.x, 0.0, towards.z),
+                      {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}));
+    };
+    ernie::Camera camera(scene, "/World/Camera");
+    const auto through = [&](double degrees) {
+        camera.SetPolarizerType("linear")
+            .SetPolarizerExtinction(10.0)
+            .SetPolarizerTransmission(0.8)
+            .SetPolarizerAngle(degrees);
+        return static_cast<double>(
+            Band8(delegate, scene)[c * kVarSize + c]);
+    };
+    // The degree of polarization the polarizer sees: (I_0 - I_90) /
+    // (I_0 + I_90) over (k1 - k2) / (k1 + k2).
+    const auto measured = [&] {
+        const double along = through(0.0);
+        const double across = through(90.0);
+        return (along - across) / (along + across) * (0.88 / 0.72);
+    };
+    // Fresnel's (R_s - R_p) / (R_s + R_p) at incidence i onto n
+    // = 1.5.
+    const auto fresnel = [](double i) {
+        const double t = std::asin(std::sin(i) / 1.5);
+        const double rs = std::sin(i - t) / std::sin(i + t);
+        const double rp = std::tan(i - t) / std::tan(i + t);
+        return (rs * rs - rp * rp) / (rs * rs + rp * rp);
+    };
+    // At Brewster's angle, atan(1.5), wholly polarized.
+    lit(std::atan(1.5));
+    camera.SetPolarizerType("none");
+    ASSERT_GT(Band8(delegate, scene)[c * kVarSize + c], 0.0f);
+    EXPECT_NEAR(measured(), 1.0, 0.02) << "Brewster's angle";
+    lit(glm::radians(30.0));
+    EXPECT_NEAR(measured(), fresnel(glm::radians(30.0)), 0.02)
+        << "30 degrees";
+}
+
 TEST_F(RasterDelegateTest, LasersLightAGaussianSpot) {
     RasterDelegate delegate(*context_);
     double bandWidth = 0.0;

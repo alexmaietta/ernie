@@ -121,6 +121,31 @@ public struct PreviewSurface : IBrdf {
     }
 
     public float3 radianceFactor(BrdfInput s, BrdfParams p) {
+        let lobes = lobesOf(s, p);
+        // The radiance factor is pi times f_r times cos(i).
+        return PI * s.mu0 * (lobes.diffuse + lobes.specular);
+    }
+
+    // The specular lobes (the base's and the clearcoat's), which Fresnel's laws polarize, with
+    // the index of refraction of the base's facets: its ior; a metal's, approximately, the real
+    // index whose normal reflectance is its albedo's mean (the complex index's phases ignored);
+    // in the specular workflow, the one whose normal reflectance is the specularColor's mean.
+    public override SpecularReflection specularReflection(BrdfInput s, BrdfParams p) {
+        let lobes = lobesOf(s, p);
+        SpecularReflection r;
+        r.factor = PI * s.mu0 * lobes.specular;
+        r.ior = lobes.ior;
+        return r;
+    }
+
+    // f_r's diffuse and specular parts, and the specular facets' index of refraction.
+    struct Lobes {
+        float3 diffuse;
+        float3 specular;
+        float ior;
+    }
+
+    static Lobes lobesOf(BrdfInput s, BrdfParams p) {
         let mu0 = s.mu0;
         let mu = s.mu;
         // The half vector from cos(g): |l + v| = sqrt(2 + 2 cos g).
@@ -140,22 +165,25 @@ public struct PreviewSurface : IBrdf {
         let ior = max(p.get(2), 1.0);
         let r0 = (ior - 1.0) / (ior + 1.0);
         let diffuse = s.albedo / PI;
-        float3 base;
+        Lobes lobes;
         if (p.get(3) > 0.5) {
             let f0 = (p.get(4) + p.get(5) + p.get(6)) / 3.0;
             let fresnel = schlick(float3(f0), vDotH);
-            base = (1.0 - fresnel) * diffuse +
-                   fresnel * specular *
-                       reciprocalCompensation(float3(f0), lobeRoughness, mu0, mu);
+            lobes.diffuse = (1.0 - fresnel) * diffuse;
+            lobes.specular = fresnel * specular *
+                             reciprocalCompensation(float3(f0), lobeRoughness, mu0, mu);
+            lobes.ior = iorOfReflectance(f0);
         } else {
             let fDielectric = schlick(float3(r0 * r0), vDotH);
-            let dielectric =
-                (1.0 - fDielectric) * diffuse +
-                fDielectric * specular *
-                    reciprocalCompensation(float3(r0 * r0), lobeRoughness, mu0, mu);
             let metal = schlick(s.albedo, vDotH) * specular *
                         reciprocalCompensation(s.albedo, lobeRoughness, mu0, mu);
-            base = lerp(dielectric, metal, metallic);
+            lobes.diffuse = (1.0 - metallic) * (1.0 - fDielectric) * diffuse;
+            lobes.specular =
+                lerp(fDielectric * specular *
+                         reciprocalCompensation(float3(r0 * r0), lobeRoughness, mu0, mu),
+                     metal, metallic);
+            let albedoMean = (s.albedo.x + s.albedo.y + s.albedo.z) / 3.0;
+            lobes.ior = lerp(ior, iorOfReflectance(albedoMean), metallic);
         }
 
         let clearcoat = saturate(p.get(7));
@@ -165,9 +193,16 @@ public struct PreviewSurface : IBrdf {
             let coatA2 = clamp(coatAlpha * coatAlpha + unresolved, 1e-6, 1.0);
             let coatFresnel = schlick(float3(0.04), vDotH).x * clearcoat;
             let coat = ggx(nDotH, coatA2) * smithVisibility(mu0, mu, coatA2);
-            base = base * (1.0 - coatFresnel) + coatFresnel * coat;
+            lobes.diffuse *= 1.0 - coatFresnel;
+            lobes.specular = lobes.specular * (1.0 - coatFresnel) + coatFresnel * coat;
         }
-        // The radiance factor is pi times f_r times cos(i).
-        return PI * mu0 * base;
+        return lobes;
+    }
+
+    // The real index of refraction whose reflectance at normal incidence is `f0`:
+    // f0 = ((n - 1) / (n + 1))^2.
+    static float iorOfReflectance(float f0) {
+        let root = sqrt(clamp(f0, 0.0, 0.98));
+        return (1.0 + root) / (1.0 - root);
     }
 }

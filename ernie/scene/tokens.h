@@ -600,7 +600,8 @@ inline constexpr std::string_view kPolarizationDegree =
 inline constexpr std::string_view kPolarizationAngle =
     "ernie:polarization:angle";
 /// A material's share of incident polarization its diffuse
-/// reflection keeps, 0 (all scattered into unpolarized light) to 1.
+/// reflection keeps, 0 (all scattered into unpolarized light) to 1;
+/// its specular reflection polarizes by Fresnel's laws regardless.
 inline constexpr std::string_view kPolarizationRetention =
     "ernie:polarization:retention";
 /// A camera's polarizer (Ernie): "none", "linear" (one in front of

@@ -646,6 +646,76 @@ float3 radianceFactors(float3 n, float3 l, float3 v, float3 albedo, float slopeV
     return max(model.radianceFactor(input, params), float3(0.0));
 }
 
+// The active model's specular part of `radianceFactors` (`IBrdf::specularReflection`).
+SpecularReflection specularOf(float3 n, float3 l, float3 v, float3 albedo, float slopeVariance,
+                              BrdfParams params) {
+    var input = brdfInputOf(n, l, v, albedo);
+    input.slopeVariance = slopeVariance;
+    ActiveBrdf model;
+    var r = model.specularReflection(input, params);
+    r.factor = input.mu0 > 0.0 ? max(r.factor, float3(0.0)) : float3(0.0);
+    return r;
+}
+
+// Fresnel's reflectances at cos(i) `cosI` onto a medium of relative index of refraction `ior`, for
+// light polarized across (s) and in (p) the plane of incidence, and the sign of r_s r_p, which
+// turns negative past Brewster's angle.
+//
+// Reference: M. Born and E. Wolf, "Principles of Optics", 7th ed., Cambridge, 1999, sec. 1.5.
+float3 fresnelSP(float cosI, float ior) {
+    let sinT2 = (1.0 - cosI * cosI) / (ior * ior);
+    if (sinT2 >= 1.0) {
+        return float3(1.0, 1.0, 1.0);
+    }
+    let cosT = sqrt(1.0 - sinT2);
+    let rs = (cosI - ior * cosT) / (cosI + ior * cosT);
+    let rp = (ior * cosI - cosT) / (ior * cosI + cosT);
+    return float3(rs * rs, rp * rp, rs * rp < 0.0 ? -1.0 : 1.0);
+}
+
+// Specular reflection's linear Stokes Q and U over I in the pixel's frame (`frameX`, `frameY`),
+// for light arriving from unit direction `l`, `polarized` of it along its field `field`, mirrored
+// towards `v` by facets of index `ior` facing their half vector: the incident Stokes in the s
+// and p frame of the plane holding `l` and `v`, through Fresnel's Mueller matrix (R_s + R_p and
+// R_s - R_p halved, and sqrt(R_s R_p) on U), then its polarized part along its field's
+// direction, seen in the pixel's frame. Unpolarized light comes off polarized across that plane.
+//
+// Reference: E. Collett, "Field Guide to Polarization", SPIE FG05, 2005 (the Mueller matrix of
+// reflection).
+float2 specularStokes(float3 l, float3 v, float polarized, float3 field, float ior,
+                      float3 frameX, float3 frameY) {
+    let across = cross(l, v);
+    if (dot(across, across) < 1e-12) {
+        return float2(0.0);
+    }
+    let s = normalize(across);
+    let h = normalize(l + v);
+    let f = fresnelSP(saturate(dot(l, h)), ior);
+    // The incident light's Stokes over I in its s and p frame, p across s and its travel, -l.
+    let pIn = cross(s, -l);
+    let fs = dot(field, s);
+    let fp = dot(field, pIn);
+    let fields = fs * fs + fp * fp;
+    let qIn = fields > 1e-8 ? polarized * (fs * fs - fp * fp) / fields : 0.0;
+    let uIn = fields > 1e-8 ? polarized * 2.0 * fs * fp / fields : 0.0;
+    let mean = 0.5 * (f.x + f.y);
+    let difference = 0.5 * (f.x - f.y);
+    let i = mean + difference * qIn;
+    let q = difference + mean * qIn;
+    let u = f.z * sqrt(f.x * f.y) * uIn;
+    let degree = sqrt(q * q + u * u) / max(i, 1e-12);
+    if (degree < 1e-6) {
+        return float2(0.0);
+    }
+    // The reflected field's direction, chi from s towards p across its travel, v.
+    let chi = 0.5 * atan2(u, q);
+    let reflected = cos(chi) * s + sin(chi) * cross(s, v);
+    let x = dot(reflected, frameX);
+    let y = dot(reflected, frameY);
+    let seen = max(x * x + y * y, 1e-12);
+    return degree * float2(x * x - y * y, 2.0 * x * y) / seen;
+}
+
 // The active model's response to light from all around (`IBrdf::environment`) for the viewer
 // along `v` and the bands' albedos `albedo`.
 EnvironmentResponse environmentOf(float3 n, float3 v, float3 albedo, float slopeVariance,
@@ -1677,6 +1747,14 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             lobes[1].w *= shadowed ? coneOcclusion(occlusionState, mirror, probe.roughness1) : 1.0;
         }
     }
+    // With a polarizer, the dome's mirrored light's Stokes Q and U over I: unpolarized light
+    // polarized by the facets' Fresnel reflection about the mirror direction.
+    var mirrorStokes = float2(0.0);
+    if (stokes != 0 && (lobes[0].w > 0.0 || lobes[1].w > 0.0)) {
+        let mirror = 2.0 * dot(n, v) * n - v;
+        let facets = specularOf(n, mirror, v, float3(albedo.x), slopeVariance, params);
+        mirrorStokes = specularStokes(mirror, v, 0.0, float3(0.0), facets.ior, frameX, frameY);
+    }
 
     // Per light: direction towards it and the scale on its spectrum (inverse square, cone and
     // shadow); 0 for lights that cannot reach the point.
@@ -1848,14 +1926,19 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                 radiance[j] += environment.diffuse[j] * dome *
                                modulationAt(domeCoefficients, domeScale, wavelength);
             }
+            // The dome's light mirrored in the specular lobes, polarized by Fresnel's laws.
+            var mirrored = 0.0;
             if (lobes[0].w > 0.0) {
-                radiance[j] += environment.specular0[j] * dome *
-                               modulationAt(lobes[0].xyz, lobes[0].w, wavelength);
+                mirrored += environment.specular0[j] * dome *
+                            modulationAt(lobes[0].xyz, lobes[0].w, wavelength);
             }
             if (lobes[1].w > 0.0) {
-                radiance[j] += environment.specular1[j] * dome *
-                               modulationAt(lobes[1].xyz, lobes[1].w, wavelength);
+                mirrored += environment.specular1[j] * dome *
+                            modulationAt(lobes[1].xyz, lobes[1].w, wavelength);
             }
+            radiance[j] += mirrored;
+            q[j] += mirrored * mirrorStokes.x;
+            u[j] += mirrored * mirrorStokes.y;
         }
         for (uint k = 0; k < lightCount; ++k) {
             if (lightScales[k] <= 0.0) {
@@ -1879,8 +1962,26 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                     : radianceFactors(n, lightDirections[k], v, bandAlbedo, slopeVariance, params);
             let reflected = lightScales[k] * lightSpectrum / PI * factors;
             radiance += reflected;
-            q += reflected * lightStokes[k].x;
-            u += reflected * lightStokes[k].y;
+            if (stokes != 0) {
+                // Its specular part, polarized by Fresnel's laws; the rest diffuse, keeping the
+                // light's polarization as far as the material does.
+                var specular = float3(0.0);
+                var specularPart = float2(0.0);
+                if (lights[k].shadow.y <= 0.5) {
+                    let facets =
+                        specularOf(n, lightDirections[k], v, bandAlbedo, slopeVariance, params);
+                    specular = min(lightScales[k] * lightSpectrum / PI * facets.factor, reflected);
+                    if (any(specular > 0.0)) {
+                        let polarization = lights[sh.view.z + k].polarization;
+                        specularPart = specularStokes(lightDirections[k], v, polarization.w,
+                                                      polarization.xyz, facets.ior, frameX,
+                                                      frameY);
+                    }
+                }
+                let diffuse = reflected - specular;
+                q += diffuse * lightStokes[k].x + specular * specularPart.x;
+                u += diffuse * lightStokes[k].y + specular * specularPart.y;
+            }
         }
         // Through the air to the eye: dimmed, with the sun's light it scatters on the way.
         for (uint k = 0; k < 3 && first + k < bands; ++k) {
