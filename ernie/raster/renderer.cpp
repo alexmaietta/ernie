@@ -113,6 +113,20 @@ struct ShadingUniforms {
 static_assert(sizeof(ShadingUniforms) == 1280,
               "ShadingUniforms must match shading.slang");
 
+/// A view's own shading uniforms (shading.slang's ShadingView), after
+/// the ShadingUniforms every view shares, whose `invViewProj`, `eye`,
+/// `view` and `strip` go unused: what differs between the views of a
+/// batch.
+struct ShadingView {
+    float invViewProj[16];
+    float eye[4];
+    std::uint32_t view[4];
+    float strip[4];
+    float padding[4];
+};
+static_assert(sizeof(ShadingView) == 128,
+              "ShadingView must match shading.slang");
+
 /// shading.slang's kSky* bits: what its sky pass draws behind the
 /// scene, and whether a dome lights it (for shading only; `sky_`
 /// holds the others).
@@ -514,8 +528,10 @@ constexpr VkDeviceSize Aligned(VkDeviceSize bytes) {
 }
 
 constexpr VkDeviceSize kUniformsStride = Aligned(sizeof(Uniforms));
-constexpr VkDeviceSize kShadingStride =
-    Aligned(sizeof(ShadingUniforms));
+/// The shading uniforms every view shares, then each view's
+/// ShadingView.
+constexpr VkDeviceSize kShadingShared = sizeof(ShadingUniforms);
+constexpr VkDeviceSize kShadingStride = sizeof(ShadingView);
 /// The sensor's shared uniforms, then every view's SensorView.
 constexpr VkDeviceSize kSensorShared = sizeof(SensorUniforms);
 constexpr VkDeviceSize kSensorStride = sizeof(SensorView);
@@ -523,8 +539,9 @@ constexpr VkDeviceSize kSensorStride = sizeof(SensorView);
 /// one at a time.
 constexpr VkDeviceSize kLightShadowBlockStride =
     Aligned(sizeof(ShadowUniforms));
-static_assert(kShadingStride == sizeof(ShadingUniforms),
-              "Shading indexes the views' uniforms as an array");
+static_assert(kShadingShared % 16 == 0 && kShadingStride % 16 == 0,
+              "Shading reads the views' blocks as arrays after the "
+              "shared uniforms");
 
 /// Where the volume pass reads a view's block of the shading
 /// uniforms.
@@ -550,23 +567,28 @@ VolumePass::ViewLayout VolumeLayout() {
                       sizeof(LightGpu) == 800,
                   "volume.slang's LightGpu must match");
     // It reads the views' uniforms 16 bytes at a time.
-    static_assert(
-        kShadingStride % 16 == 0 &&
-            offsetof(ShadingUniforms, invViewProj) % 16 == 0 &&
-            offsetof(ShadingUniforms, strip) % 16 == 0 &&
-            offsetof(ShadingUniforms, range) % 16 == 0 &&
-            offsetof(ShadingUniforms, size) % 16 == 0 &&
-            offsetof(ShadingUniforms, view) % 16 == 0 &&
-            offsetof(ShadingUniforms, lightShadow) % 16 == 0 &&
-            offsetof(ShadingUniforms, atmosphere) % 16 == 0,
-        "volume.slang reads the views' uniforms as uint4s");
+    static_assert(kShadingStride % 16 == 0 &&
+                      offsetof(ShadingView, invViewProj) % 16 == 0 &&
+                      offsetof(ShadingView, strip) % 16 == 0 &&
+                      offsetof(ShadingUniforms, range) % 16 == 0 &&
+                      offsetof(ShadingUniforms, size) % 16 == 0 &&
+                      offsetof(ShadingView, view) % 16 == 0 &&
+                      offsetof(ShadingUniforms, lightShadow) % 16 ==
+                          0 &&
+                      offsetof(ShadingUniforms, atmosphere) % 16 == 0,
+                  "volume.slang reads the views' uniforms as uint4s");
+    // A view's own fields in its block, after the shared uniforms;
+    // the shared ones from the start.
     return {
         static_cast<Offset>(kShadingStride),
-        static_cast<Offset>(offsetof(ShadingUniforms, invViewProj)),
-        static_cast<Offset>(offsetof(ShadingUniforms, strip)),
+        static_cast<Offset>(kShadingShared +
+                            offsetof(ShadingView, invViewProj)),
+        static_cast<Offset>(kShadingShared +
+                            offsetof(ShadingView, strip)),
         static_cast<Offset>(offsetof(ShadingUniforms, range)),
         static_cast<Offset>(offsetof(ShadingUniforms, size)),
-        static_cast<Offset>(offsetof(ShadingUniforms, view)),
+        static_cast<Offset>(kShadingShared +
+                            offsetof(ShadingView, view)),
         static_cast<Offset>(offsetof(ShadingUniforms, lightShadow)),
         static_cast<Offset>(offsetof(ShadingUniforms, atmosphere))};
 }
@@ -621,8 +643,9 @@ struct ShadingResources {
     std::uint32_t atmosphereRefraction;
     std::uint32_t volumeShadows;
     std::uint32_t volumeShadowSize;
-    // The uniform block's size is a multiple of 16 bytes.
-    std::uint32_t padding[2];
+    /// Each view's own uniforms (`ShadingView`), after the shared
+    /// ones at `views`.
+    VkDeviceAddress viewBlocks;
 };
 static_assert(sizeof(ShadingResources) == 160 &&
                   offsetof(ShadingResources, sigmoidTable) == 96 &&
@@ -1359,8 +1382,8 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
                                 VK_SAMPLER_MIPMAP_MODE_NEAREST,
                                 VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
                                 1.0f, false}),
-      shadingUniforms_(context, kShadingStride, kViewUniformUsage,
-                       BufferMemory::Device),
+      shadingUniforms_(context, kShadingShared + kShadingStride,
+                       kViewUniformUsage, BufferMemory::Device),
       sensorUniforms_(context, kSensorShared + kSensorStride,
                       kViewUniformUsage, BufferMemory::Device),
       lightTable_(
@@ -3786,10 +3809,19 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
         shading.poisson[2 * i] = poisson_[i].x;
         shading.poisson[2 * i + 1] = poisson_[i].y;
     }
-    // Every view's in one upload, `kShadingStride` apart.
-    std::vector<ShadingUniforms> viewShading;
-    viewShading.reserve(views_);
+    // The camera's aperture diameter (m), which sizes lasers'
+    // speckle: its lens's f-number, or the exposure's for a pinhole.
+    const double fNumber = params.camera.lensFStop > 0.0
+                               ? params.camera.lensFStop
+                               : params.camera.fStop;
+    const auto aperture = std::bit_cast<std::uint32_t>(
+        static_cast<float>(params.camera.focalLengthMm * 1e-3 /
+                           std::max(fNumber, 1e-3)));
+    // The uniforms every view shares, then each view's own block, in
+    // one upload.
+    std::vector<ShadingView> views(views_);
     for (std::uint32_t v = 0; v < views_; ++v) {
+        ShadingView& block = views[v];
         // With the poses on the GPU, it writes the camera
         // (`RecordViewPoses`).
         if (!posesOnGpu_) {
@@ -3798,50 +3830,43 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
                 // Its pixels' rays come from its strip
                 // (projection_pushbroom.slang).
                 const PushbroomStrip strip = params.Strip(v);
-                CopyMatrix(shading.invViewProj, strip.Packed());
+                CopyMatrix(block.invViewProj, strip.Packed());
                 const glm::vec4 intrinsics = strip.Intrinsics();
-                std::memcpy(shading.strip, glm::value_ptr(intrinsics),
-                            sizeof(shading.strip));
+                std::memcpy(block.strip, glm::value_ptr(intrinsics),
+                            sizeof(block.strip));
             } else {
-                CopyMatrix(shading.invViewProj,
+                CopyMatrix(block.invViewProj,
                            glm::inverse(view.ViewProjection()));
             }
-            shading.eye[0] = view.eye.x;
-            shading.eye[1] = view.eye.y;
-            shading.eye[2] = view.eye.z;
+            block.eye[0] = view.eye.x;
+            block.eye[1] = view.eye.y;
+            block.eye[2] = view.eye.z;
         }
         // The lights the view sees: the shared ones and its world's,
         // or all for every world.
         const std::int32_t world = params.ViewWorld(v);
-        shading.view[0] = 0;
         for (std::size_t k = 0; k < params.lights.size(); ++k) {
             const std::int32_t of = params.lights[k].world;
             if (of == -1 || world == -1 || of == world) {
-                shading.view[0] |= 1u << k;
+                block.view[0] |= 1u << k;
             }
         }
         // Its world's slot among the distant lights' per-world maps.
         const auto slot = worldSlots_.find(world);
-        shading.view[1] =
-            slot != worldSlots_.end() ? slot->second : 0;
+        block.view[1] = slot != worldSlots_.end() ? slot->second : 0;
         // Its sub-frame's lights, when they move between sub-frames
         // (`SubframeLights`).
         const std::size_t subframe = v / (outputViews_ * faces_);
-        shading.view[2] = static_cast<std::uint32_t>(
+        block.view[2] = static_cast<std::uint32_t>(
             lightSubframes_ ? subframe * kMaxLights : 0);
-        // The camera's aperture diameter (m), which sizes lasers'
-        // speckle: its lens's f-number, or the exposure's for a
-        // pinhole.
-        const double fNumber = params.camera.lensFStop > 0.0
-                                   ? params.camera.lensFStop
-                                   : params.camera.fStop;
-        shading.view[3] = std::bit_cast<std::uint32_t>(
-            static_cast<float>(params.camera.focalLengthMm * 1e-3 /
-                               std::max(fNumber, 1e-3)));
-        viewShading.push_back(shading);
+        block.view[3] = aperture;
     }
-    uploads_.Write(shadingUniforms_,
-                   std::as_bytes(std::span(viewShading)));
+    std::vector<std::byte> bytes(kShadingShared +
+                                 views.size() * kShadingStride);
+    std::memcpy(bytes.data(), &shading, kShadingShared);
+    std::memcpy(bytes.data() + kShadingShared, views.data(),
+                views.size() * kShadingStride);
+    uploads_.Write(shadingUniforms_, bytes);
 }
 
 void RasterRenderer::WriteSensor(const FrameParams& params,
@@ -4259,8 +4284,8 @@ void RasterRenderer::EnsureViewBuffers(std::uint32_t views) {
     uniforms_ = GpuBuffer(context_, views * kUniformsStride,
                           kViewUniformUsage, BufferMemory::Device);
     shadingUniforms_ =
-        GpuBuffer(context_, views * kShadingStride, kViewUniformUsage,
-                  BufferMemory::Device);
+        GpuBuffer(context_, kShadingShared + views * kShadingStride,
+                  kViewUniformUsage, BufferMemory::Device);
     sensorUniforms_ =
         GpuBuffer(context_, kSensorShared + views * kSensorStride,
                   kViewUniformUsage, BufferMemory::Device);
@@ -4812,7 +4837,7 @@ void RasterRenderer::RecordMinimal(
             holds,
             static_cast<std::uint32_t>(kUniformsStride),
             static_cast<std::uint32_t>(kShadingStride),
-            0u};
+            static_cast<std::uint32_t>(kShadingShared)};
         resolveLayout_.PushConstants(commands, constants,
                                      sizeof(constants));
         vkCmdDispatch(commands, Groups(extent_.width),
@@ -5392,10 +5417,10 @@ void RasterRenderer::RecordViewPoses(
     PatchViews(commands, uniforms_, 0, kUniformsStride, frame);
     ViewFields shading;
     shading.inverseViewProjection =
-        offsetof(ShadingUniforms, invViewProj);
-    shading.eye = offsetof(ShadingUniforms, eye);
-    PatchViews(commands, shadingUniforms_, 0, kShadingStride,
-               shading);
+        offsetof(ShadingView, invViewProj);
+    shading.eye = offsetof(ShadingView, eye);
+    PatchViews(commands, shadingUniforms_, kShadingShared,
+               kShadingStride, shading);
     ViewFields sensor;
     sensor.inverseViewProjection = offsetof(SensorView, invViewProj);
     sensor.eye = offsetof(SensorView, eye);
@@ -5501,6 +5526,8 @@ void RasterRenderer::WriteShadingResources(
     };
     ShadingResources resources{};
     resources.views = shadingUniforms_.Address();
+    resources.viewBlocks =
+        shadingUniforms_.Address() + kShadingShared;
     resources.materials = materialTable_->Address();
     resources.lights = lightTable_.Address();
     resources.lightViews = lightViewMatrices_->Address();

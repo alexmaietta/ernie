@@ -123,19 +123,19 @@ struct VolumeConstants {
     // x: the first view's block, y: the block stride in bytes, z: the most steps per volume, w:
     // the frame's seed.
     uint4 layout;
-    // Byte offsets in a block: the inverse view-projection, a pushbroom's strip, the bands
-    // (`range`) and the image size.
+    // Byte offsets: in a view's block, the inverse view-projection and a pushbroom's strip; from
+    // the start (every view's), the bands (`range`) and the image size.
     uint4 offsets;
     // x: 1 when the background holds radiance (a sky); without one, this pass writes the
     // background's, no radiance but what volumes emit, and the sensor reads it as held. y: the
     // layers from a radiance layer to its Stokes Q, and on to U, with a polarizer (0 without
     // them). z: the render settings' steps and octaves (`shadowSteps` and on). w unused.
     uint4 flags;
-    // Byte offsets in a block: x `view` (the lights it sees, a bit each; its world's slot in a
-    // batch's distant light maps; its first light), y `lightShadow` (z the maps' texels across), z
-    // `atmosphere` (two float4s: the planet's centre in km relative to the frame's origin and its
-    // radius; the atmosphere's top radius and 1 with one); w unused. Its `size.w` is the light
-    // count.
+    // Byte offsets: in a view's block, x `view` (the lights it sees, a bit each; its world's slot
+    // in a batch's distant light maps; its first light); from the start (every view's), y
+    // `lightShadow` (z the maps' texels across), z `atmosphere` (two float4s: the planet's centre
+    // in km relative to the frame's origin and its radius; the atmosphere's top radius and 1 with
+    // one); w unused. The shared `size.w` is the light count.
     uint4 lights;
 }
 
@@ -757,12 +757,14 @@ SkyLights skyLightsOf(uint4 viewLights, uint lightCount, uint g) {
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void volumeMain(uint3 id : SV_DispatchThreadID) {
+    // The view's own fields at their offsets in its block; those every view shares (the bands,
+    // size, shadow maps and air) at theirs from the start.
     let block = (constants.layout.x + id.z) * constants.layout.y;
-    let size = viewLoad(block + constants.offsets.w);
+    let size = viewLoad(constants.offsets.w);
     if (id.x >= size.x || id.y >= size.y) {
         return;
     }
-    let range = asfloat(viewLoad(block + constants.offsets.z));
+    let range = asfloat(viewLoad(constants.offsets.z));
     let bands = uint(range.z);
     let groups = (bands + 3) / 4;
     let pixel = int4(id.xyz, 0);
@@ -844,10 +846,10 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
     let view = constants.layout.x + id.z;
     let viewLights = viewLoad(block + constants.lights.x);
     let lightCount = min(size.w, kMaxLights);
-    let mapTexels = asfloat(viewLoad(block + constants.lights.y)).z;
+    let mapTexels = asfloat(viewLoad(constants.lights.y)).z;
     float4 air[2];
-    air[0] = asfloat(viewLoad(block + constants.lights.z));
-    air[1] = asfloat(viewLoad(block + constants.lights.z + 16));
+    air[0] = asfloat(viewLoad(constants.lights.z));
+    air[1] = asfloat(viewLoad(constants.lights.z + 16));
     // The pixel's extent per unit distance along the ray, to its neighbours' rays.
     float3 neighbour;
     float3 toNeighbour;

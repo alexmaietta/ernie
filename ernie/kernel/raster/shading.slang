@@ -110,6 +110,16 @@ struct ShadingUniforms {
     float4 bodyAlbedo[4];
 }
 
+// A view's own uniforms (renderer.cpp's ShadingView), after the ShadingUniforms every view shares
+// (`sh`), whose `invViewProj`, `eye`, `view` and `strip` go unused: those are each view's (`shv`).
+struct ShadingView {
+    float4x4 invViewProj;
+    float4 eye;
+    uint4 view;
+    float4 strip;
+    float4 padding;
+}
+
 // What `skyMain` draws behind the scene.
 static const uint kSkyDome = 1;   // the dome's radiance
 static const uint kSkyMap = 2;    // times its map
@@ -210,7 +220,7 @@ struct ShadingConstants {
 // The pass's buffers, read through their addresses, and its textures and samplers, by their
 // indices in the bindless heap (the renderer's `ShadingResources`).
 struct ShadingResources {
-    // Every view's ShadingUniforms.
+    // The ShadingUniforms every view shares (`viewBlocks` holds each view's own fields).
     ShadingUniforms* views;
     MaterialGpu* materials;
     LightGpu* lights;
@@ -263,6 +273,8 @@ struct ShadingResources {
     // without volumes) and their texels across.
     uint volumeShadows;
     uint volumeShadowSize;
+    // Each view's own uniforms (`ShadingView`), after the shared ones.
+    ShadingView* viewBlocks;
 }
 
 [[vk::binding(0, 0)]] ConstantBuffer<ShadingResources> resources;
@@ -323,9 +335,10 @@ float lightProfile(LightGpu light, float3 direction) {
     return lerp(lerp(lightProfiles[row0 + c0], lightProfiles[row0 + c1], tc),
                 lerp(lightProfiles[row1 + c0], lightProfiles[row1 + c1], tc), tr);
 }
-// The uniforms of the view this thread shades (`shadeMain` sets it).
+// The view this thread shades (`shadeMain` sets it): the uniforms every view shares, and its own.
 static uint shadedView;
-#define sh shadingViews[shadedView]
+#define sh shadingViews[0]
+#define shv (resources.viewBlocks[shadedView])
 
 float bandValue(float4 values[16], uint band) {
     return values[band / 4][band % 4];
@@ -464,7 +477,7 @@ uint lightView(LightGpu light, float3 world) {
     let count = uint(light.cone.w);
     if (light.map.y != 0.0) {
         // A batch's distant light: the map of the view's world.
-        return first + min(sh.view.y, count - 1);
+        return first + min(shv.view.y, count - 1);
     }
     if (light.position.w == 0.0 && count > 1) {
         for (uint c = 0; c + 1 < count; ++c) {
@@ -854,7 +867,7 @@ bool gbufferPoint(int2 pixel, uint layer, out float3 world) {
     }
     let ndc = float2((float(pixel.x) + 0.5) / float(size.x) * 2.0 - 1.0,
                      1.0 - (float(pixel.y) + 0.5) / float(size.y) * 2.0);
-    world = cameraPoint(sh.invViewProj, sh.strip, ndc, depth);
+    world = cameraPoint(shv.invViewProj, shv.strip, ndc, depth);
     return true;
 }
 
@@ -1019,7 +1032,7 @@ float speckleIntensity(float3 p, uint seed) {
 }
 
 // The factor laser `light` (slot `slot`) is scaled by at `world` for speckle, 1 without it
-// (`LightGpu::map.z`): subjective speckle, the field the camera's aperture (D, `sh.view.w`)
+// (`LightGpu::map.z`): subjective speckle, the field the camera's aperture (D, `shv.view.w`)
 // resolves, fixed to the scene. Its grain on a surface at distance z is lambda z / D across; its
 // contrast is 1 / sqrt(M) for M independent patterns summed in the pixel: the pixel's area over
 // the grain's correlation area plus 1, the two polarizations a depolarizing surface (`retention`
@@ -1033,12 +1046,12 @@ float speckleIntensity(float3 p, uint seed) {
 // - M. Jarzynski and M. Olano, "Hash Functions for GPU Rendering", JCGT 9(3), 2020.
 float laserSpeckle(LightGpu light, uint slot, float3 world, float3 v, float3 toLight,
                    float3x2 footprint, float retention) {
-    let aperture = asfloat(sh.view.w);
+    let aperture = asfloat(shv.view.w);
     if (light.map.z < 0.5 || !(aperture > 0.0)) {
         return 1.0;
     }
     let lambda = light.pattern.y * 1e-9;
-    let cell = kSpeckleCell * lambda * length(world - sh.eye.xyz) / aperture;
+    let cell = kSpeckleCell * lambda * length(world - shv.eye.xyz) / aperture;
     let stepX = float3(footprint[0].x, footprint[1].x, footprint[2].x);
     let stepY = float3(footprint[0].y, footprint[1].y, footprint[2].y);
     let spatial = 1.0 + length(cross(stepX, stepY)) / (kSpeckleCorrelation * cell * cell);
@@ -1075,7 +1088,7 @@ float4 domeOcclusion(int2 pixel, uint layer, float3 world, float depth, float3 n
                      1.0 - (float(pixel.y) + 0.5) / size.y * 2.0);
     // The radius in pixels, from the world size of a pixel at this depth.
     let pixelWorld =
-        length(cameraPoint(sh.invViewProj, sh.strip, ndc + float2(2.0 / size.x, 0.0), depth) -
+        length(cameraPoint(shv.invViewProj, shv.strip, ndc + float2(2.0 / size.x, 0.0), depth) -
                world);
     let pixels = min(radius / max(pixelWorld, 1e-12), sh.domeLighting.w);
     if (pixels < 1.0) {
@@ -1089,7 +1102,7 @@ float4 domeOcclusion(int2 pixel, uint layer, float3 world, float depth, float3 n
         let direction = float2(cos(angle), sin(angle));
         // The slice through the view direction along this screen direction (pixel y runs down,
         // ndc y up), and the normal's projection into it.
-        let along = cameraPoint(sh.invViewProj, sh.strip,
+        let along = cameraPoint(shv.invViewProj, shv.strip,
                                 ndc + float2(direction.x, -direction.y) * 2.0 / size, depth) -
                     world;
         let tangent = normalize(along - dot(along, v) * v);
@@ -1252,7 +1265,7 @@ bool anyBodies() {
 // Whether `lights[k]` is a distant light this view sees, not a dome's direction.
 bool isSkyLight(uint k) {
     let light = lights[k];
-    return ((sh.view.x >> k) & 1u) != 0 && light.position.w == 0.0 && light.shadow.y < 0.5;
+    return ((shv.view.x >> k) & 1u) != 0 && light.position.w == 0.0 && light.shadow.y < 0.5;
 }
 
 // The distant lights the atmosphere carries (`SkyLights`), with their irradiance in band group
@@ -1269,7 +1282,7 @@ SkyLights skyLights(uint group) {
         }
         let tangent = lights[k].extentY.w;
         // Towards it as the view's sub-frame has it, where lights move across the shutter.
-        sky.towards[sky.count] = float4(lights[sh.view.z + k].position.xyz,
+        sky.towards[sky.count] = float4(lights[shv.view.z + k].position.xyz,
                                         tangent * rsqrt(1.0 + tangent * tangent));
         sky.irradiance[sky.count] = lights[k].spectrum[group] + lights[k].tinted[group];
         ++sky.count;
@@ -1468,11 +1481,11 @@ void aerialPerspective(float3 world, float2 ndc, out float transmittance[kMaxBan
     float3 eye;
     if (kPushbroomCamera) {
         float3 ray;
-        cameraRayThrough(sh.invViewProj, sh.strip, ndc, eye, ray);
+        cameraRayThrough(shv.invViewProj, shv.strip, ndc, eye, ray);
     } else if (sh.range.w != 0.0) {
-        eye = cameraPoint(sh.invViewProj, sh.strip, ndc, 1.0);
+        eye = cameraPoint(shv.invViewProj, shv.strip, ndc, 1.0);
     } else {
-        eye = sh.eye.xyz;
+        eye = shv.eye.xyz;
     }
     let toSurface = (world - eye) * 1e-3;
     let span = length(toSurface);
@@ -1683,7 +1696,7 @@ float distantLightThrough(uint k, float3 world, float3 apparent, uint band) {
     }
     if (anyBodies()) {
         through *= eclipseVisibility(bodiesEclipse(band / 4, float3(0.0)), world * 1e-3,
-                                     lights[sh.view.z + k].position.xyz, sine)[band % 4];
+                                     lights[shv.view.z + k].position.xyz, sine)[band % 4];
     }
     return through;
 }
@@ -1782,9 +1795,9 @@ float4 terrainOcclusion(float3 world, float3 n, float above, bool onTerrain) {
 // The view vector at world point `world` of a pixel at `ndc`: back along its ray, towards the eye,
 // along the view when orthographic, towards the row's pose for a pushbroom.
 float3 viewVector(float2 ndc, float3 world) {
-    return kPushbroomCamera ? -cameraRay(sh.invViewProj, sh.strip, ndc)
+    return kPushbroomCamera ? -cameraRay(shv.invViewProj, shv.strip, ndc)
            : sh.range.w != 0.0 ? -normalize(rayThrough(ndc))
-                               : normalize(sh.eye.xyz - world);
+                               : normalize(shv.eye.xyz - world);
 }
 
 // Dome occlusion per pixel: bent normal (xyz) and visibility (w), as the occlusion pass computes
@@ -1807,7 +1820,7 @@ void occlusionMain(uint3 id : SV_DispatchThreadID) {
     }
     let ndc = float3((float(id.x) + 0.5) / float(sh.size.x) * 2.0 - 1.0,
                      1.0 - (float(id.y) + 0.5) / float(sh.size.y) * 2.0, gDepth.Load(pixel));
-    let world = cameraPoint(sh.invViewProj, sh.strip, ndc.xy, ndc.z);
+    let world = cameraPoint(shv.invViewProj, shv.strip, ndc.xy, ndc.z);
     let v = viewVector(ndc.xy, world);
     let n = facingNormal(normalize(gNormal.Load(pixel).xyz), v);
     var occlusion = domeOcclusion(int2(id.xy), id.z, world, ndc.z, n, v);
@@ -1845,7 +1858,7 @@ void occlusionFilterMain(uint3 id : SV_DispatchThreadID) {
         return;
     }
     let n = normalize(gNormal.Load(int4(id.xyz, 0)).xyz);
-    let scale = max(0.01 * length(world - sh.eye.xyz), 1e-4);
+    let scale = max(0.01 * length(world - shv.eye.xyz), 1e-4);
     var sum = float4(0.0);
     var weights = 0.0;
     for (int dy = -2; dy <= 2; ++dy) {
@@ -1904,7 +1917,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     }
     let ndc = float3((float(id.x) + 0.5) / float(sh.size.x) * 2.0 - 1.0,
                      1.0 - (float(id.y) + 0.5) / float(sh.size.y) * 2.0, gDepth.Load(pixel));
-    let world = cameraPoint(sh.invViewProj, sh.strip, ndc.xy, ndc.z);
+    let world = cameraPoint(shv.invViewProj, shv.strip, ndc.xy, ndc.z);
     // Back along the pixel's ray: towards the eye, along the view when orthographic, towards the
     // row's pose for a pushbroom.
     let v = viewVector(ndc.xy, world);
@@ -2000,14 +2013,14 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     for (uint k = 0; k < lightCount; ++k) {
         lightFocus[k] = 1.0;
         lightStokes[k] = float2(0.0);
-        if (((sh.view.x >> k) & 1u) == 0 ||
-            ((lights[sh.view.z + k].links.x >> linkGroup) & 1u) == 0) {
+        if (((shv.view.x >> k) & 1u) == 0 ||
+            ((lights[shv.view.z + k].links.x >> linkGroup) & 1u) == 0) {
             lightDirections[k] = float3(0.0);
             lightScales[k] = 0.0;
             continue;
         }
         // The view's sub-frame's copy, where lights move across the shutter.
-        let light = lights[sh.view.z + k];
+        let light = lights[shv.view.z + k];
         var shadowPoint = world;  // where its shadow map is read
         var toLight = light.position.xyz;
         var scale = 1.0;
@@ -2121,7 +2134,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     float3 apparentLights[kMaxLights];
     for (uint k = 0; k < lightCount; ++k) {
         apparentLights[k] = throughAir && lightScales[k] > 0.0 && isSkyLight(k)
-                                ? apparentDirection(world, lights[sh.view.z + k].position.xyz)
+                                ? apparentDirection(world, lights[shv.view.z + k].position.xyz)
                                 : float3(0.0);
     }
     for (uint first = 0; first < bands; first += 3) {
@@ -2211,7 +2224,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                         specularOf(n, lightDirections[k], v, bandAlbedo, slopeVariance, params);
                     specular = min(lightScales[k] * lightSpectrum / PI * facets.factor, reflected);
                     if (any(specular > 0.0)) {
-                        let polarization = lights[sh.view.z + k].polarization;
+                        let polarization = lights[shv.view.z + k].polarization;
                         specularPart = specularStokes(lightDirections[k], v, polarization.w,
                                                       polarization.xyz, facets.ior, frameX,
                                                       frameY);
@@ -2258,8 +2271,8 @@ float planckRatio(float wavelength, float kelvin) {
 float3 rayThrough(float2 ndc) {
     // Reverse-Z: from the near plane (depth 1) to twice its distance (1/2), which an infinite far
     // plane, with no point at depth 0, still has.
-    let near = mul(sh.invViewProj, float4(ndc, 1.0, 1.0));
-    let beyond = mul(sh.invViewProj, float4(ndc, 0.5, 1.0));
+    let near = mul(shv.invViewProj, float4(ndc, 1.0, 1.0));
+    let beyond = mul(shv.invViewProj, float4(ndc, 0.5, 1.0));
     return beyond.xyz / beyond.w - near.xyz / near.w;
 }
 
@@ -2447,22 +2460,22 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
     if (kPushbroomCamera) {
         // Its pixels look along their rows' rays, each row from its own pose: the row's camera
         // axes from its rays, which run (x, line, -1) in them, x across the line.
-        let line = sh.strip.z;
-        let x = (ndc.x - sh.strip.y) / sh.strip.x;
+        let line = shv.strip.z;
+        let x = (ndc.x - shv.strip.y) / shv.strip.x;
         float3 origin;
         float3 ray;
-        cameraRayThrough(sh.invViewProj, sh.strip, ndc, origin, ray);
+        cameraRayThrough(shv.invViewProj, shv.strip, ndc, origin, ray);
         float3 next;
-        cameraRayThrough(sh.invViewProj, sh.strip, ndc + float2(1.0, 0.0), origin, next);
+        cameraRayThrough(shv.invViewProj, shv.strip, ndc + float2(1.0, 0.0), origin, next);
         StarFrame frame;
-        frame.x = normalize((next - ray) * sh.strip.x);
+        frame.x = normalize((next - ray) * shv.strip.x);
         // v = line y - z and x cross v = y + line z.
         let v = ray - x * frame.x;
         let w = cross(frame.x, v);
         frame.y = normalize(line * v + w);
         frame.z = normalize(line * w - v);
         frame.point = float2(x, line);
-        frame.focal = 0.5 * sh.strip.x * size.x;
+        frame.focal = 0.5 * shv.strip.x * size.x;
         let d = normalize(ray);
         if (part == kSkyPartDome && (sh.sky.x & kSkyDome) != 0) {
             let rgb = (sh.sky.x & kSkyMap) != 0 ? max(domeMapAt(d, 0.0), float3(0.0))
@@ -2512,7 +2525,7 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
         }
         // Each pixel's ray starts on the near plane.
         if (part == kSkyPartAtmosphere) {
-            atmosphereSky(radiance, cameraPoint(sh.invViewProj, sh.strip, ndc, 1.0), d, 0.0);
+            atmosphereSky(radiance, cameraPoint(shv.invViewProj, shv.strip, ndc, 1.0), d, 0.0);
         }
         writeSky(id, radiance, ndc, d);
         return;
@@ -2546,13 +2559,13 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
         frame.b = b;
         frame.c = c;
         frame.pixel = pixel;
-        addStars(radiance, sh.eye.xyz, d, frame, pixelAngle, solidAngle);
+        addStars(radiance, shv.eye.xyz, d, frame, pixelAngle, solidAngle);
     }
     if (part == kSkyPartBodies) {
-        bodiesSky(radiance, sh.eye.xyz, d, 0.5 * pixelAngle);
+        bodiesSky(radiance, shv.eye.xyz, d, 0.5 * pixelAngle);
     }
     if (part == kSkyPartAtmosphere) {
-        atmosphereSky(radiance, sh.eye.xyz, d, solidAngle);
+        atmosphereSky(radiance, shv.eye.xyz, d, solidAngle);
     }
     writeSky(id, radiance, ndc, d);
 }
@@ -2591,9 +2604,9 @@ void writeSky(uint3 id, float radiance[kMaxBands], float2 ndc, float3 d) {
 // `ndc`.
 void pixelFrame(float2 ndc, float depth, float3 d, out float3 frameX, out float3 frameY) {
     let step = 2.0 / float2(sh.size.xy);
-    let here = cameraPoint(sh.invViewProj, sh.strip, ndc, depth);
-    let across = cameraPoint(sh.invViewProj, sh.strip, ndc + float2(step.x, 0.0), depth) - here;
-    let up = cameraPoint(sh.invViewProj, sh.strip, ndc + float2(0.0, step.y), depth) - here;
+    let here = cameraPoint(shv.invViewProj, shv.strip, ndc, depth);
+    let across = cameraPoint(shv.invViewProj, shv.strip, ndc + float2(step.x, 0.0), depth) - here;
+    let up = cameraPoint(shv.invViewProj, shv.strip, ndc + float2(0.0, step.y), depth) - here;
     frameX = normalize(across - dot(across, d) * d + 1e-12 * float3(1.0, 0.0, 0.0));
     let upAcross = up - dot(up, d) * d - dot(up, frameX) * frameX;
     frameY = normalize(upAcross + 1e-12 * cross(d, frameX));

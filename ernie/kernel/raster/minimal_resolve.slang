@@ -12,7 +12,10 @@
 
 struct ResolveConstants {
     uint4 size;    // width, height, the chunk's views, its first view
-    uint4 layout;  // held vars (bits in binding order from 5), Uniforms and ShadingUniforms strides
+    // Held vars (bits in binding order from 5), the Uniforms' stride, the shading views' blocks'
+    // (shading.slang's ShadingView, each starting with its inverse view-projection) and where they
+    // start, after the shared ShadingUniforms.
+    uint4 layout;
 }
 
 [[vk::binding(0, 0)]] Texture2DArray<float4> color;
@@ -36,7 +39,7 @@ static const uint kHoldsNormal = 1u << 3;
 static const uint kHoldsPrimId = 1u << 4;
 static const uint kHoldsInstanceId = 1u << 5;
 
-// Byte offsets: Uniforms' forward, eye and flags; ShadingUniforms' inverse view-projection.
+// Byte offsets: Uniforms' forward, eye and flags.
 static const uint kForward = 64;
 static const uint kEye = 80;
 static const uint kFlags = 96;
@@ -93,7 +96,8 @@ void resolveMain(uint3 id : SV_DispatchThreadID) {
             let u = view * constants.layout.y;
             let ndc = float3((float(id.x) + 0.5) / float(width) * 2.0 - 1.0,
                              1.0 - (float(id.y) + 0.5) / float(height) * 2.0, depth.Load(texel));
-            let clip = mul(inverseViewProj(view * constants.layout.z), float4(ndc, 1.0));
+            let clip = mul(inverseViewProj(constants.layout.w + view * constants.layout.z),
+                           float4(ndc, 1.0));
             let world = clip.xyz / clip.w;
             let eye = load3(uniforms, u + kEye);
             imagePlane = dot(world - eye, load3(uniforms, u + kForward));
