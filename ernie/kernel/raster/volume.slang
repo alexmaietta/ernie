@@ -55,6 +55,7 @@ import atmosphere;
 import virtual_shadow;
 import light_pattern;
 import light_patterns;
+import laser_beams;
 
 static const uint kNoGrid = 0xFFFFFFFFu;
 static const uint kMaxIntervals = 8;
@@ -713,17 +714,9 @@ float laserIrradiance(LightGpu light, uint slot, float3 world, float3x2 footprin
     return irradiance / (along * along);
 }
 
-// Lasers' beams integrated across a pixel's ray exactly (`LightGpu::patternExtent.z`, 1 for a
-// spot, 2 for a grid of beamlets, 3 for a line's sheet, `addSheet`): each beamlet a Gaussian beam
-// from the aperture, of power p and 1/e^2 radius w across the common normal of the ray and its
-// axis there, whose light along the ray, closest d to the axis at angle a, is
-// p sqrt(2 / pi) exp(-2 d^2 / w^2) / (w sin a), averaged over the pixel's width across that
-// normal. A beam millimetres thick then lights the medium
-// once per crossing, at the step holding it, not by the chance of a step landing in it.
-//
-// Reference: A. E. Siegman, Lasers, University Science Books, 1986, ch. 17 (the Gaussian beam).
+// Lasers' beams integrated across a pixel's ray exactly (laser_beams.slang), up to
+// `kMaxBeamCrossings` of them, added at the march's steps holding them.
 static const uint kMaxBeamCrossings = 16;
-static const uint kMaxBeamlets = 64;
 
 struct BeamCrossings {
     uint count;
@@ -740,114 +733,41 @@ bool analyticBeams(LightGpu light) {
     return uint(light.position.w) == kLaser && light.patternExtent.z > 0.5;
 }
 
-// Adds to `crossings` (sorted by distance) where the ray from `origin` along unit `direction`
-// crosses beamlet `centre` (on the tangent plane) of laser `light` (slot `slot`), carrying
-// `share` of its power, the pixel `footprintX` and `footprintY` across per unit distance.
-void addBeamlet(inout BeamCrossings crossings, LightGpu light, uint slot, float2 centre,
-                float share, float3 origin, float3 direction, float3 footprintX,
-                float3 footprintY) {
-    let x = normalize(light.extentX.xyz);
-    let y = cross(x, light.axis.xyz);
-    let u = normalize(x * centre.x + y * centre.y + light.axis.xyz);
-    // The closest points of the ray and the beamlet's axis.
-    let w0 = origin - light.position.xyz;
-    let b = dot(direction, u);
-    let denom = 1.0 - b * b;
-    if (denom < 1e-6) {
-        return;
-    }
-    let s = (b * dot(u, w0) - dot(direction, w0)) / denom;
-    let z = (dot(u, w0) - b * dot(direction, w0)) / denom;
-    if (s <= 0.0 || z <= 0.0) {
-        return;
-    }
-    let normal = normalize(cross(direction, u));
-    let offset = dot((origin + direction * s) - (light.position.xyz + u * z), normal);
-    // The beam's radii there, from its waist along the axis.
-    let along = z * dot(u, light.axis.xyz) - light.beamExtra.x;
-    let zr = max(light.beam.zw, float2(1e-12));
-    let w = light.beam.xy * sqrt(1.0 + (along / zr) * (along / zr));
-    let radius = length(float2(w.x * dot(normal, x), w.y * dot(normal, y)));
-    let width = abs(dot(footprintX, normal)) * s + abs(dot(footprintY, normal)) * s;
-    if (abs(offset) > 3.0 * radius + width) {
-        return;
-    }
-    insertCrossing(crossings, s, share * beamAverage(offset, radius, width) / sqrt(denom), slot,
-                   float4(-u, z));
+// Laser `light`'s beam (shading.slang's `beamOf`).
+Beam beamOf(LightGpu light) {
+    Beam beam;
+    beam.position = light.position.xyz;
+    beam.axis = light.axis.xyz;
+    beam.x = normalize(light.extentX.xyz);
+    beam.beam = light.beam;
+    beam.waistAt = light.beamExtra.x;
+    beam.kind = light.patternExtent.z;
+    beam.params = light.patternParams[0];
+    return beam;
 }
 
-// Adds a crossing to `crossings`, kept by distance `s` along the ray: of light `value`, laser
-// slot `slot`, `towards` the laser (xyz) and how far (w).
-void insertCrossing(inout BeamCrossings crossings, float s, float value, uint slot,
-                    float4 towards) {
-    if (!(value > 0.0) || crossings.count == kMaxBeamCrossings) {
+// Adds `crossing` of laser slot `slot` to `crossings`, kept by distance along the ray.
+void insertCrossing(inout BeamCrossings crossings, BeamCrossing crossing, uint slot) {
+    if (!(crossing.value > 0.0) || crossings.count == kMaxBeamCrossings) {
         return;
     }
     var at = crossings.count;
-    while (at > 0 && crossings.t[at - 1] > s) {
+    while (at > 0 && crossings.t[at - 1] > crossing.t) {
         crossings.t[at] = crossings.t[at - 1];
         crossings.value[at] = crossings.value[at - 1];
         crossings.slot[at] = crossings.slot[at - 1];
         crossings.towards[at] = crossings.towards[at - 1];
         --at;
     }
-    crossings.t[at] = s;
-    crossings.value[at] = value;
+    crossings.t[at] = crossing.t;
+    crossings.value[at] = crossing.value;
     crossings.slot[at] = slot;
-    crossings.towards[at] = towards;
+    crossings.towards[at] = crossing.towards;
     ++crossings.count;
 }
 
-// Adds to `crossings` where the ray from `origin` along unit `direction` crosses line laser
-// `light`'s sheet (slot `slot`, `share` of its power; light_pattern.cpp's LaserLine: fanned along
-// x, half fan angle p0, flat or Gaussian for p1 = 1, the beam's Gaussian across it). Every ray
-// crosses the sheet's plane once; at fan angle a and distance r from the aperture the sheet
-// carries the fan's power per radian over r per unit length, Gaussian across its thickness, so
-// along a ray at cosine c to its normal it gives that over |c|, whatever its thickness.
-void addSheet(inout BeamCrossings crossings, LightGpu light, uint slot, float share,
-              float3 origin, float3 direction, float3 footprintX, float3 footprintY) {
-    let x = normalize(light.extentX.xyz);
-    let y = cross(x, light.axis.xyz);
-    let crossing = dot(direction, y);
-    if (abs(crossing) < 1e-4) {
-        return;
-    }
-    let s = dot(light.position.xyz - origin, y) / crossing;
-    if (s <= 0.0) {
-        return;
-    }
-    let offset = origin + direction * s - light.position.xyz;
-    let along = dot(offset, light.axis.xyz);
-    if (along <= 0.0) {
-        return;
-    }
-    let r = length(offset);
-    let a = atan(dot(offset, x) / along);
-    // The fan's density per radian, its edges softened by the beam's own width and the pixel's
-    // angle from the aperture (as LaserLine's).
-    let z = along - light.beamExtra.x;
-    let zr = max(light.beam.z, 1e-12);
-    let w = light.beam.x * sqrt(1.0 + (z / zr) * (z / zr));
-    let pixel = 0.5 * (length(footprintX) + length(footprintY)) * s / r;
-    let sigma2 = 0.25 * (w / along) * (w / along) + pixel * pixel / 12.0;
-    let halfFan = light.patternParams[0].x;
-    var density = 0.0;
-    if (light.patternParams[0].y > 0.5) {
-        let spread = sqrt(0.25 * halfFan * halfFan + sigma2);
-        density = exp(-0.5 * a * a / (spread * spread)) / (sqrt(2.0 * PI) * spread);
-    } else {
-        let spread = sqrt(max(sigma2, 1e-20));
-        density = (normalBelow((a + halfFan) / spread) - normalBelow((a - halfFan) / spread)) /
-                  (2.0 * halfFan);
-    }
-    // Looking along the sheet, its thickness bounds the path: at most a hundredth's cosine.
-    insertCrossing(crossings, s, share * density / (r * max(abs(crossing), 0.01)), slot,
-                   float4(-offset / r, r));
-}
-
-// The crossings of the pixel's ray with the beams of the view's lasers integrated across rays:
-// a spot's beam, a grid's beamlets (each its share of the efficiency) and their zero order, at
-// the light the laser shows over the view's span of time.
+// The crossings of the pixel's ray with the beams of the view's lasers integrated across rays,
+// at the light each laser shows over the view's span of time.
 BeamCrossings beamCrossingsOf(uint4 viewLights, uint lightCount, uint view, float3 origin,
                               float3 direction, float3 footprintX, float3 footprintY) {
     BeamCrossings crossings;
@@ -866,32 +786,13 @@ BeamCrossings beamCrossingsOf(uint4 viewLights, uint lightCount, uint view, floa
         }
         let norm = patternNorms[k];
         let efficiency = norm > 0.0 ? light.beamExtra.z / norm : 0.0;
-        if (light.patternExtent.z < 1.5) {
-            addBeamlet(crossings, light, k, float2(0.0), shown * (light.beamExtra.w + efficiency),
-                       origin, direction, footprintX, footprintY);
-            continue;
-        }
-        if (light.patternExtent.z > 2.5) {
-            // A line's sheet, and its zero order.
-            addBeamlet(crossings, light, k, float2(0.0), shown * light.beamExtra.w, origin,
-                       direction, footprintX, footprintY);
-            addSheet(crossings, light, k, shown * efficiency, origin, direction, footprintX,
-                     footprintY);
-            continue;
-        }
-        // A grid: p0 x p1 beamlets p2 and p3 radians apart (light_pattern.cpp's LaserGrid).
-        addBeamlet(crossings, light, k, float2(0.0), shown * light.beamExtra.w, origin, direction,
-                   footprintX, footprintY);
-        let cells = uint2(light.patternParams[0].xy);
-        let pitch = light.patternParams[0].zw;
-        let share = shown * efficiency / float(max(cells.x * cells.y, 1u));
-        for (uint column = 0; column < cells.x; ++column) {
-            for (uint row = 0; row < cells.y; ++row) {
-                let centre =
-                    tan((float2(column, row) - 0.5 * (float2(cells) - 1.0)) * pitch);
-                addBeamlet(crossings, light, k, centre, share, origin, direction, footprintX,
-                           footprintY);
-            }
+        let beam = beamOf(light);
+        let pieces = beamPieces(beam);
+        for (uint i = 0; i < pieces; ++i) {
+            insertCrossing(crossings,
+                           beamPiece(beam, i, shown * light.beamExtra.w, shown * efficiency,
+                                     origin, direction, footprintX, footprintY),
+                           k);
         }
     }
     return crossings;
@@ -927,9 +828,11 @@ void addBeamCrossings(inout float4 emitted[kMaxGroups], inout uint next,
                         ? cachedDepth(volume, lightSlot, local)
                         : volumesDepth(shadowRun, at, towards, crossings.towards[c].w,
                                        light.links.y, shadowSteps());
+        // Its geometry's shadow on the beam's own axis there, which its map, as narrow, sees.
+        let axis = light.position.xyz - towards * crossings.towards[c].w;
         let lit = transmittance * sigma * octavesOf(material, dot(towards, -direction), depth) *
                   crossings.value[c] *
-                  geometryShadow(light, slot, at, origin, viewLights.y, mapTexels);
+                  geometryShadow(light, slot, axis, origin, viewLights.y, mapTexels);
         if (lit <= 0.0) {
             continue;
         }

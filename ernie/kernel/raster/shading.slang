@@ -48,6 +48,7 @@ import atmosphere;
 import virtual_shadow;
 import light_pattern;
 import light_patterns;
+import laser_beams;
 // The camera's projection: a frame camera's matrices, or a pushbroom's strip
 // (projection_pinhole.slang, projection_pushbroom.slang).
 import projection;
@@ -1688,6 +1689,120 @@ void aerialPerspective(float3 world, float2 ndc, out float transmittance[kMaxBan
     }
 }
 
+// Laser `light`'s beam (laser_beams.slang).
+Beam beamOf(LightGpu light) {
+    Beam beam;
+    beam.position = light.position.xyz;
+    beam.axis = light.axis.xyz;
+    beam.x = normalize(light.extentX.xyz);
+    beam.beam = light.beam;
+    beam.waistAt = light.beamExtra.x;
+    beam.kind = light.patternExtent.z;
+    beam.params = light.patternParams[0];
+    return beam;
+}
+
+// The fraction of laser `light`'s beam reaching `point` in the air past its shadow map: one
+// comparison, the point lying on the beam rather than on a surface.
+float beamShadow(LightGpu light, float3 point) {
+    if (light.cone.w <= 0.0) {
+        return 1.0;
+    }
+    let tap = lightTap(light, point);
+    if (!tap.inside) {
+        return 1.0;
+    }
+    return lightShadowMaps.SampleCmpLevelZero(lightShadowSampler, float3(tap.uv, float(tap.view)),
+                                              tap.depth);
+}
+
+// Lasers' beams in the air: the light the atmosphere scatters towards the eye where the ray of
+// pixel `id` (through `ndc`) crosses the view's lasers' beams short of its surface at `surface`
+// (with `hit`; else all along), added to its radiance (laser_beams.slang). At each crossing, the light the beam
+// gathers there times the air's scattering at the angle between the beam and the ray (each
+// constituent's coefficient and phase function: Rayleigh's for the gas, the haze's or dust's
+// forward peak), dimmed through the air from the laser and on to the eye, and by the laser's
+// shadow map. The air's light is unpolarized here, as Stokes Q and U are left as they are. Only
+// in variants with air and lasers.
+//
+// Reference: C. F. Bohren and D. R. Huffman, "Absorption and Scattering of Light by Small
+// Particles", Wiley, 1983 (a beam seen side-on by the light its path scatters).
+void addAirBeams(uint3 id, float2 ndc, float3 surface, bool hit) {
+    if (!(kShadeAir && kShadeLasers) || sh.atmosphere[1].y == 0.0) {
+        return;
+    }
+    float3 origin;
+    float3 ray;
+    cameraRayThrough(shv.invViewProj, shv.strip, ndc, origin, ray);
+    let direction = normalize(ray);
+    let far = hit ? dot(surface - origin, direction) : 1e30;
+    // The pixel's extent per unit distance along the ray, to its neighbours' rays.
+    float3 neighbour;
+    float3 toNeighbour;
+    cameraRayThrough(shv.invViewProj, shv.strip, ndc + float2(2.0 / float(sh.size.x), 0.0),
+                     neighbour, toNeighbour);
+    let footprintX = normalize(toNeighbour) - direction;
+    cameraRayThrough(shv.invViewProj, shv.strip, ndc - float2(0.0, 2.0 / float(sh.size.y)),
+                     neighbour, toNeighbour);
+    let footprintY = normalize(toNeighbour) - direction;
+    let bands = uint(sh.range.z);
+    let centre = sh.atmosphere[0].xyz;
+    let bottom = sh.atmosphere[0].w;
+    let eye = aboveGround(origin * 1e-3 - centre, bottom);
+    let lightCount = min(sh.size.w, kShadeLights);
+    for (uint k = 0; k < lightCount; ++k) {
+        if (((shv.view.x >> k) & 1u) == 0) {
+            continue;
+        }
+        let light = lights[shv.view.z + k];
+        if (uint(light.position.w) != 5 || light.patternExtent.z < 0.5) {
+            continue;
+        }
+        var shown = 0.0;
+        for (uint s = 0; s < kMaxLit; ++s) {
+            shown += lightTiming[(shadedView * kMaxLights + k) * kMaxLit + s].y;
+        }
+        let norm = patternNorms[k];
+        let efficiency = norm > 0.0 ? light.beamExtra.z / norm : 0.0;
+        let beam = beamOf(light);
+        let aperture = aboveGround(light.position.xyz * 1e-3 - centre, bottom);
+        let pieces = beamPieces(beam);
+        for (uint i = 0; i < pieces; ++i) {
+            let crossing = beamPiece(beam, i, shown * light.beamExtra.w, shown * efficiency,
+                                     origin, direction, footprintX, footprintY);
+            if (!(crossing.value > 0.0) || crossing.t >= far) {
+                continue;
+            }
+            let at = origin + direction * crossing.t;
+            // Its shadow on the beam's own axis there, which its map, as narrow, sees.
+            let lit = crossing.value *
+                      beamShadow(light, light.position.xyz -
+                                            crossing.towards.xyz * crossing.towards.w);
+            if (lit <= 0.0) {
+                continue;
+            }
+            let point = aboveGround(at * 1e-3 - centre, bottom);
+            let nu = dot(direction, crossing.towards.xyz);
+            for (uint group = 0; group * 4 < bands; ++group) {
+                // The air's coefficients are per kilometre.
+                let scattered =
+                    1e-3 * lit *
+                    scatteringAt(atmosphereMedium, atmosphereDensities, atmospherePhases,
+                                 length(point) - bottom, group, nu) *
+                    transmittanceBetween(atmosphereMedium, atmosphereDensities, eye, point, group,
+                                         4) *
+                    transmittanceBetween(atmosphereMedium, atmosphereDensities, aperture, point,
+                                         group, 4) *
+                    (light.spectrum[group] + light.tinted[group]);
+                for (uint b = 0; b < 4 && group * 4 + b < bands; ++b) {
+                    let layer = int3(id.xy, id.z * bands + group * 4 + b);
+                    spectral[layer] = spectral[layer] + scattered[b] * radianceScale();
+                }
+            }
+        }
+    }
+}
+
 // The atmosphere between the eye at `origin` (relative to the frame's origin, metres) and the
 // dome and stars along `d`: their light dims by its transmittance and the light of the sky's
 // distant lights (`skyLights`) it scatters adds; their discs, of `pixelSolidAngle` or larger,
@@ -2434,6 +2549,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             }
         }
     }
+    addAirBeams(id, ndc.xy, world, true);
 }
 
 static const uint kMaxBands = 64;
@@ -2687,6 +2803,9 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
                           detector * detector * offAxis * offAxis * offAxis);
         }
         writeSky(id, radiance, ndc, d);
+        if (part == kSkyPartAtmosphere) {
+            addAirBeams(id, ndc, float3(0.0), false);
+        }
         return;
     }
     if (sh.range.w != 0.0) {
@@ -2709,6 +2828,9 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
             atmosphereSky(radiance, cameraPoint(shv.invViewProj, shv.strip, ndc, 1.0), d, 0.0);
         }
         writeSky(id, radiance, ndc, d);
+        if (part == kSkyPartAtmosphere) {
+            addAirBeams(id, ndc, float3(0.0), false);
+        }
         return;
     }
     let ray = c + ndc.x * a + ndc.y * b;
@@ -2749,6 +2871,9 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
         atmosphereSky(radiance, shv.eye.xyz, d, solidAngle);
     }
     writeSky(id, radiance, ndc, d);
+    if (part == kSkyPartAtmosphere) {
+        addAirBeams(id, ndc, float3(0.0), false);
+    }
 }
 
 // Writes the sky's radiance per band to pixel `id`, at `ndc` looking along `d`, and with a

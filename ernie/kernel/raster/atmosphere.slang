@@ -321,6 +321,45 @@ float phaseAt(float4* medium, float* phases, uint c, uint band,
     return lerp(phases[base + i], phases[base + i + 1], x - float(i));
 }
 
+// The light the air at `altitude` (km) scatters at cosine `nu` per unit of the light crossing it
+// and per unit length (km^-1 sr^-1), in band group `group`: each constituent's scattering
+// coefficient times its phase function there.
+public float4 scatteringAt(float4* medium, float* densities, float* phases, float altitude,
+                           uint group, float nu) {
+    let constituents = uint(medium[0].z);
+    let groups = uint(medium[1].x);
+    var phased = float4(0.0);
+    for (uint c = 0; c < constituents; ++c) {
+        let coefficient =
+            densityAt(medium, densities, c, altitude) * medium[2 + c * 2 * groups + group];
+        float4 phase;
+        for (uint k = 0; k < 4; ++k) {
+            phase[k] = phaseAt(medium, phases, c, group * 4 + k, nu);
+        }
+        phased += coefficient * phase;
+    }
+    return phased;
+}
+
+// The transmittance of the air between `a` and `b` (km from the planet's centre) in band group
+// `group`, marched in `steps` midpoint steps: for paths of a few kilometres up to the whole air,
+// as long as the air's density changes smoothly along them.
+public float4 transmittanceBetween(float4* medium, float* densities, float3 a, float3 b,
+                                   uint group, uint steps) {
+    let bottom = atmosphereBottom(medium);
+    let step = (b - a) / float(steps);
+    let span = length(step);
+    var depth = float4(0.0);
+    for (uint s = 0; s < steps; ++s) {
+        float4 scattering;
+        float4 extinction;
+        mediumAt(medium, densities, length(a + (float(s) + 0.5) * step) - bottom, group,
+                 scattering, extinction);
+        depth += extinction * span;
+    }
+    return exp(-depth);
+}
+
 // Where a ray from `p` (km from the planet's centre) along unit `d` crosses the atmosphere: from
 // `start` to `end`, the ground or the top, and whether it ends on the ground; false if it misses
 // the atmosphere. A point below the ground starts on it.
