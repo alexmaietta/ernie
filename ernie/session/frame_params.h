@@ -521,6 +521,10 @@ struct VolumeParams {
     std::string prim;           ///< Its path, for messages.
     glm::dmat4 transform{1.0};  ///< Local to world.
     std::int32_t world = -1;
+    /// Its light linking group (`LinkGroups`): the lights whose
+    /// masks hold it light it, and its shadows fall on the medium for
+    /// those whose shadow masks do.
+    std::uint32_t linkGroup = 0;
     VolumeMaterialParams material;
     std::optional<VolumeFieldParams> density;
     std::optional<VolumeFieldParams> temperature;

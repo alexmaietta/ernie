@@ -373,3 +373,44 @@ TEST_F(RasterDelegateTest, ALaserBeamShowsInAVolume) {
     EXPECT_GT(through, 0.0);
     EXPECT_EQ(away, 0.0);
 }
+
+TEST_F(RasterDelegateTest, LightLinksHoldForVolumes) {
+    RasterDelegate delegate(*context_);
+    Scene scene = SideScene(1.0);
+    const std::vector<double> sun = CentreSpectrum(delegate, scene);
+    // A second sun overhead, as bright: twice the light, unless its
+    // light link leaves the volume out.
+    ernie::DistantLight::Define(scene, "/World/Moon")
+        .SetShadowEnable(false);
+    scene.Set("/World/Moon", tokens::kTransform,
+              ernie::DistantLightTransform({0.0, 0.0, 1.0}));
+    const std::vector<double> both = CentreSpectrum(delegate, scene);
+    scene.Set("/World/Moon", tokens::kLightLinkIncludeRoot, false);
+    const std::vector<double> unlinked =
+        CentreSpectrum(delegate, scene);
+    for (std::size_t b = 0; b < sun.size(); ++b) {
+        EXPECT_NEAR(both[b] / sun[b], 2.0, 0.02) << "band " << b;
+        EXPECT_NEAR(unlinked[b] / sun[b], 1.0, 0.02) << "band " << b;
+    }
+
+    // A volume the sun's shadow link leaves out shadows nothing.
+    scene.Remove("/World/Moon");
+    ernie::Volume upper =
+        ernie::Volume::Define(scene, "/World/Upper");
+    upper.GetPrim().SetXform({.translate = glm::dvec3(0.0, 0.0, 3.5),
+                              .scale = glm::dvec3(2.0, 2.0, 1.0)});
+    ernie::OpenVDBAsset::Define(scene, "/World/Upper/Density")
+        .SetFilePath(CubeFile());
+    upper.SetField("density", "/World/Upper/Density");
+    const std::vector<double> shadowed =
+        CentreSpectrum(delegate, scene);
+    scene.Set("/World/Sun", tokens::kShadowLinkExcludes,
+              std::vector<Path>{"/World/Upper"});
+    const std::vector<double> unshadowed =
+        CentreSpectrum(delegate, scene);
+    for (std::size_t b = 0; b < sun.size(); ++b) {
+        EXPECT_LT(shadowed[b], 0.5 * sun[b]) << "band " << b;
+        EXPECT_NEAR(unshadowed[b] / sun[b], 1.0, 0.02)
+            << "band " << b;
+    }
+}

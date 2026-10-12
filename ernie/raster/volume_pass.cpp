@@ -434,6 +434,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
             placed.params[3] = static_cast<float>(
                 std::max(voxel, 1e-9) / kStepsPerVoxel);
             placed.info[1] = static_cast<std::uint32_t>(world);
+            placed.info[2] = volume.linkGroup;
             instances.push_back(placed);
             worlds.push_back(world);
             glm::dvec3 min = lo;

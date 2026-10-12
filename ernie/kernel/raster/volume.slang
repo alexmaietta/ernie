@@ -11,8 +11,10 @@
 // beside their distance), and lasers by their beams and patterns, so beams show in the medium.
 // It is shadowed by geometry (one comparison in the light's shadow map, which the jitter between
 // pixels and frames softens) and by every volume the view sees between the step and the light (a
-// short march towards it). Each step integrates its emission exactly for constant coefficients,
-// (1 - exp(-sigma_t dt)) / sigma_t.
+// short march towards it). Light linking holds for volumes as for surfaces: a light lights a volume
+// only when its light mask holds the volume's group, which skips its shadow march too, and a
+// volume shadows the medium from a light only when the light's shadow mask holds it. Each step
+// integrates its emission exactly for constant coefficients, (1 - exp(-sigma_t dt)) / sigma_t.
 //
 // The phase functions take the phase angle g, between the directions to the light and to the eye,
 // as the BRDFs' do (brdf.slang): Henyey-Greenstein, Hapke's double Henyey-Greenstein (the same b
@@ -97,7 +99,7 @@ struct VolumeGpu {
     // x: the density scale (to sigma_t, 1/world unit); y: the temperature without a field
     // (kelvin), z: the temperature field's scale; w: the march's step, world units.
     float4 params;
-    // x: its material, y: its world; zw unused.
+    // x: its material, y: its world, z: its light linking group (`LinkGroups`); w unused.
     uint4 info;
 }
 
@@ -282,13 +284,13 @@ float phaseOf(VolumeMaterialGpu material, float cosG) {
 }
 
 // The transmittance from world point `world` towards a light along unit `towards`, up to world
-// distance `far`, through every volume of the view's run `run` (`kShadowSteps` through each one
-// the segment crosses).
-float volumesShadow(uint2 run, float3 world, float3 towards, float far) {
+// distance `far`, through every volume of the view's run `run` whose link group the light's shadow
+// mask `casters` holds (`kShadowSteps` through each one the segment crosses).
+float volumesShadow(uint2 run, float3 world, float3 towards, float far, uint casters) {
     float depth = 0.0;
     for (uint k = 0; k < run.y; ++k) {
         let volume = volumes[viewVolumes[run.x + k]];
-        if (volume.density.grid.x == kNoGrid) {
+        if (volume.density.grid.x == kNoGrid || ((casters >> volume.info.z) & 1u) == 0) {
             continue;
         }
         let o = float3(dot(volume.toLocal[0], float4(world, 1.0)),
@@ -665,6 +667,10 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
                         continue;
                     }
                     let light = lights[viewLights.z + k];
+                    // Light linking: only the lights whose links hold the volume light it.
+                    if (((light.links.x >> volume.info.z) & 1u) == 0) {
+                        continue;
+                    }
                     let reach = reachOf(light, k, view, world, footprint);
                     if (reach.scale <= 0.0) {
                         continue;
@@ -672,7 +678,8 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
                     let lit = weight * sigma *
                               phaseOf(material, dot(reach.towards, -direction)) * reach.scale *
                               geometryShadow(light, world, viewLights.y, mapTexels) *
-                              volumesShadow(shadowRun, world, reach.towards, reach.far);
+                              volumesShadow(shadowRun, world, reach.towards, reach.far,
+                                            light.links.y);
                     if (lit <= 0.0) {
                         continue;
                     }

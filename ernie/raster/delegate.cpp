@@ -2152,6 +2152,11 @@ void RasterDelegate::SyncLinks(const Scene& scene) {
             geometry.push_back(path);
         }
     }
+    // Volumes too: a light lights a volume and its shadows fall
+    // through it only when its links hold it.
+    for (const Path& path : scene.Prims(tokens::kVolume)) {
+        geometry.push_back(path);
+    }
     links_ = LinkGroupsOf(scene, prims.lights, geometry);
 }
 
@@ -2515,6 +2520,9 @@ void RasterDelegate::UpdatePrims(
             links_.LightMask(prims_.lights[i]);
         frame.lights[i].shadowMask =
             links_.ShadowMask(prims_.lights[i]);
+    }
+    for (VolumeParams& volume : frame.volumes) {
+        volume.linkGroup = links_.GroupOf(Path(volume.prim));
     }
     // The lights' poses at the last frame of `stateKey`, for motion
     // blur: none for a light's first frame or one posed on the GPU.
