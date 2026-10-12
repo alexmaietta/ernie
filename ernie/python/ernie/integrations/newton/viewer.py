@@ -27,7 +27,7 @@ import gc
 import re
 import weakref
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast, no_type_check
 
 import newton
 import numpy as np
@@ -72,11 +72,21 @@ def _sky_gradient(rows: int = 64, columns: int = 8) -> np.ndarray:
     )
 
 
+def _on_cuda(array: Any) -> bool:
+    """Whether `array` is a Warp array on a CUDA device."""
+    return (
+        isinstance(array, wp.array)
+        and array.device is not None
+        and array.device.is_cuda
+    )
+
+
 @wp.kernel(enable_backward=False)
+@no_type_check
 def _split_transforms(
-    xforms: wp.array(dtype=wp.transform),
-    positions: wp.array(dtype=wp.vec3),
-    orientations: wp.array(dtype=wp.vec4),
+    xforms: wp.array[wp.transform],
+    positions: wp.array[wp.vec3],
+    orientations: wp.array[wp.vec4],
 ):
     i = wp.tid()
     xform = xforms[i]
@@ -86,9 +96,10 @@ def _split_transforms(
 
 
 @wp.kernel(enable_backward=False)
+@no_type_check
 def _linear_colors(
-    srgb: wp.array(dtype=wp.vec3),
-    linear: wp.array(dtype=wp.vec3),
+    srgb: wp.array[wp.vec3],
+    linear: wp.array[wp.vec3],
 ):
     # Newton's sRGB colours in linear RGB, as its shader takes them;
     # one colour for all broadcasts.
@@ -100,19 +111,21 @@ def _linear_colors(
 
 
 @wp.kernel(enable_backward=False)
+@no_type_check
 def _rotate_points(
-    points: wp.array(dtype=wp.vec3),
+    points: wp.array[wp.vec3],
     rotation: wp.mat33,
-    turned: wp.array(dtype=wp.vec3),
+    turned: wp.array[wp.vec3],
 ):
     i = wp.tid()
     turned[i] = rotation * points[i]
 
 
 @wp.kernel(enable_backward=False)
+@no_type_check
 def _diameters(
-    radii: wp.array(dtype=wp.float32),
-    widths: wp.array(dtype=wp.float32),
+    radii: wp.array[wp.float32],
+    widths: wp.array[wp.float32],
 ):
     i = wp.tid()
     widths[i] = 2.0 * radii[i]
@@ -435,18 +448,20 @@ class ViewerErnie(ViewerGL):
             return
         self._ernie_ready = False
         self._pending = self._shown = None
-        self.ernie_renderer = None
+        # Dropped: nothing renders once released.
+        self.ernie_renderer = None  # type: ignore[assignment]
         for name in self._overlays:
             self.ernie_scene.remove_overlay(name)
-        if self.ernie_scene.has(self.root):
-            self.ernie_scene.remove(self.root)
+        root = ernie.Path(self.root)
+        if self.ernie_scene.has(root):
+            self.ernie_scene.remove(root)
         self._meshes.clear()
         self._surfaces.clear()
         self._batches.clear()
         self._points.clear()
         self._wireframes.clear()
         if self._own_scene:
-            self.ernie_scene = None
+            self.ernie_scene = None  # type: ignore[assignment]
         gc.collect()
 
     def _define_view(self, lit: bool, bands: int, sky: str) -> None:
@@ -550,7 +565,7 @@ class ViewerErnie(ViewerGL):
         image = frame.render_vars[f"{path}/LdrColor"].map(
             device=ernie.Device.CUDA, sync_stream=self._stream
         )
-        return wp.from_dlpack(image)
+        return cast(wp.array, wp.from_dlpack(image))
 
     def _aim_view(self) -> None:
         """The view's camera on Newton's, at its window's size times
@@ -617,8 +632,15 @@ class ViewerErnie(ViewerGL):
 
     # Geometry, logged to ViewerGL and mirrored in the Ernie scene.
 
+    def _qualified(self, name: str) -> str:
+        """Newton's qualified name of `name` (`ViewerBase._qualify`),
+        which a name given always has."""
+        qualified = self._qualify(name)
+        assert qualified is not None
+        return qualified
+
     def _write(self, prim: Any, attribute: str, array: Any) -> None:
-        cuda = isinstance(array, wp.array) and array.device.is_cuda
+        cuda = _on_cuda(array)
         self.ernie_scene.write(
             prim.path,
             attribute,
@@ -692,14 +714,14 @@ class ViewerErnie(ViewerGL):
                 used=(len(points), len(indices)),
             )
             return
-        if self._qualify(name) in self._surfaces:
+        if self._qualified(name) in self._surfaces:
             # Logged empty, as examples do when it has no triangles.
             self._show(
-                self._surfaces[self._qualify(name)].prim, False
+                self._surfaces[self._qualified(name)].prim, False
             )
             if hidden:
                 return
-        name = self._qualify(name)
+        name = self._qualified(name)
         mesh = self._meshes.setdefault(name, _Mesh())
         # Triangles written as Newton's array, without counts on the
         # GPU; again when its buffer changes, or every time for
@@ -711,7 +733,7 @@ class ViewerErnie(ViewerGL):
             mesh.indices = indices.flatten()
             mesh.counts = (
                 None
-                if indices.device.is_cuda
+                if _on_cuda(indices)
                 else np.full(len(mesh.indices) // 3, 3, np.int32)
             )
         mesh.points, mesh.normals = points, normals
@@ -764,7 +786,7 @@ class ViewerErnie(ViewerGL):
                 "log_particle_surface needs a surface extracted into "
                 "preallocated buffers (ParticleSurface(max_grid_cells=...))"
             )
-        name = self._qualify(name)
+        name = self._qualified(name)
         state = self._surfaces.get(name)
         if state is None:
             prim = self.ernie_scene.define(
@@ -781,7 +803,7 @@ class ViewerErnie(ViewerGL):
         state.surface = surface
         if used is not None:
             state.fit(*used, surface)
-        elif counts.device.is_cuda:
+        elif _on_cuda(counts):
             if state.points == 0:
                 # Its size, once, before any counts come back.
                 host = counts.numpy()
@@ -830,8 +852,8 @@ class ViewerErnie(ViewerGL):
         )
         if self._ernie_ready:
             self._mirror_instances(
-                self._qualify(name),
-                self._qualify(mesh),
+                self._qualified(name),
+                self._qualified(mesh),
                 xforms,
                 scales,
                 colors,
@@ -850,7 +872,7 @@ class ViewerErnie(ViewerGL):
             return
         hidden_layer = self._layer_force_hidden()
         for shapes in self._shape_instances.values():
-            name = self._qualify(shapes.name)
+            name = self._qualified(shapes.name)
             # Capsules are cylinders and caps, through log_instances.
             if (
                 name in self._mirrored
@@ -874,7 +896,7 @@ class ViewerErnie(ViewerGL):
             )
             self._mirror_instances(
                 name,
-                self._qualify(shapes.mesh),
+                self._qualified(shapes.mesh),
                 shapes.world_xforms,
                 shapes.scales,
                 shapes.colors if changed or new else None,
@@ -910,6 +932,7 @@ class ViewerErnie(ViewerGL):
         self._show(batch.instancer, not hidden and count > 0)
         if count == 0:
             return
+        assert xforms is not None  # with any instances
         device = xforms.device
         if batch.positions is None or len(batch.positions) != count:
             batch.positions = wp.empty(count, wp.vec3, device=device)
@@ -964,13 +987,13 @@ class ViewerErnie(ViewerGL):
             batch.prototype = self.ernie_scene.define(
                 f"{batch.instancer.path}/Prototype", ernie.Mesh
             )
-            batch.instancer.prototypes = [batch.prototype]
+            batch.instancer.prototypes = [batch.prototype.path]
         self._write_mesh(self._meshes[batch.mesh], batch.prototype)
 
     def _plane_batches(self) -> set[str]:
         """The qualified names of the model's batches of planes."""
         return {
-            self._qualify(shapes.name)
+            self._qualified(shapes.name)
             for shapes in self._shape_instances.values()
             if shapes.geo_type == newton.GeoType.PLANE
         }
@@ -1016,9 +1039,8 @@ class ViewerErnie(ViewerGL):
             # Newton's ground colour as albedo, not linearised: about
             # 1% albedo otherwise, near black under sunlight, where
             # ViewerGL shows it mid grey.
-            colour = tuple(
-                float(c) for c in rgb[min(i, len(rgb) - 1)]
-            )
+            r, g, b = (float(c) for c in rgb[min(i, len(rgb) - 1)])
+            colour = (r, g, b)
             darken = (
                 _CHECKER_DARKEN
                 if checker[min(i, len(checker) - 1)]
@@ -1026,7 +1048,11 @@ class ViewerErnie(ViewerGL):
             )
             plane.checker = True  # its colours are the plane's albedo
             plane.checker_color0 = colour
-            plane.checker_color1 = tuple(darken * c for c in colour)
+            plane.checker_color1 = (
+                darken * r,
+                darken * g,
+                darken * b,
+            )
             self._show(plane, not hidden)
 
     def log_lines(
@@ -1101,7 +1127,7 @@ class ViewerErnie(ViewerGL):
             starts,
             ends,
             colors=rgb,
-            stream=self._stream if starts.device.is_cuda else None,
+            stream=self._stream if _on_cuda(starts) else None,
             **style,
         )
 
@@ -1122,7 +1148,7 @@ class ViewerErnie(ViewerGL):
 
     def _overlay(self, name: str) -> Any:
         """The scene overlay of a Newton batch of lines, emptied."""
-        overlay_name = "newton" + self._qualify(name)
+        overlay_name = "newton" + self._qualified(name)
         self._overlays.add(overlay_name)
         return self.ernie_scene.overlay(overlay_name).clear()
 
@@ -1141,7 +1167,7 @@ class ViewerErnie(ViewerGL):
         )
         if not self._ernie_ready:
             return
-        name = self._qualify(name)
+        name = self._qualified(name)
         last = self._wireframes.get(name, (None, np.eye(4)))
         data = vertex_data if vertex_data is not None else last[0]
         matrix = (
@@ -1172,7 +1198,7 @@ class ViewerErnie(ViewerGL):
         super().log_points(name, points, radii, colors, hidden)
         if not self._ernie_ready:
             return
-        name = self._qualify(name)
+        name = self._qualified(name)
         entry = self._points.get(name)
         if entry is None:
             prim = self.ernie_scene.define(
