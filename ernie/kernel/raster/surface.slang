@@ -280,12 +280,13 @@ float srgbEncode(float c) {
     return c <= 0.0031308 ? 12.92 * c : 1.055 * pow(c, 1.0 / 2.4) - 0.055;
 }
 
-// Minimal shading of what a G-buffer pass wrote: Lambert under the distant lights, unshadowed
-// (`u.minimalLights`), plus the scene's ambient light (`u.motion.yzw`), each as a share of what
-// the brightest gives a white surface facing it, of the constant colour or of the material's linear
-// colour scaled to the albedo (an albedo map's) and modulated (textures, vertex colours, tints);
-// unlit surfaces show that colour as it is. Exposed, clamped and encoded as sRGB.
-public Minimal minimalShade(GBuffer g) {
+// Minimal shading of what a G-buffer pass wrote at `world`: Lambert under the distant lights
+// (`u.minimalLights`), the brightest shadowed (`minimalShadow`) and the others not, plus the
+// scene's ambient light (`u.motion.yzw`), each as a share of what the brightest gives a white
+// surface facing it, of the constant colour or of the material's linear colour scaled to the
+// albedo (an albedo map's) and modulated (textures, vertex colours, tints); unlit surfaces show
+// that colour as it is. Exposed, clamped and encoded as sRGB.
+public Minimal minimalShade(GBuffer g, float3 world) {
     Minimal out;
     out.ids = uint4(g.ids.y, g.ids.z, packOctahedral(normalize(g.normal.xyz)), g.ids.w);
     let mode = uint(u.minimal.w);
@@ -302,6 +303,11 @@ public Minimal minimalShade(GBuffer g) {
             for (uint i = 0; i < 4; ++i) {
                 let light = u.minimalLights[i];
                 lit += light.w * max(dot(g.normal.xyz, light.xyz), 0.0);
+            }
+            let main = u.minimalLights[0];
+            if (main.w > 0.0) {
+                let facing = main.w * max(dot(g.normal.xyz, main.xyz), 0.0);
+                lit -= facing * (1.0 - minimalShadow(world, normalize(g.normal.xyz)));
             }
             color = base * (lit + u.motion.yzw);
         }

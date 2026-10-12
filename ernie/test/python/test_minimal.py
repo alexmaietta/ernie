@@ -168,6 +168,25 @@ def test_textured_diffuse_shows_display_colours(renderer):
     assert dominant == {0, 1, 2}, "a red, a green and a blue box"
 
 
+def test_the_brightest_distant_light_casts_shadows(renderer):
+    # The boxes shadow the ground under the sun; without the sun's
+    # shadows nothing does, and shadows only darken.
+    def colour(shadows):
+        scene = boxes_scene(tokens.CONSTANT_DIFFUSE)
+        ernie.DistantLight.at(
+            scene, "/World/Sun"
+        ).shadow_enable = shadows
+        out = outputs(renderer, scene)
+        return out["LdrColor"][..., 0].astype(np.int32), out["PrimId"]
+
+    shadowed, ids = colour(True)
+    lit, _ = colour(False)
+    hit = ids != 0
+    darker = (shadowed < lit - 20) & hit
+    assert darker.sum() > 0.02 * hit.sum(), "the boxes' shadows"
+    assert (shadowed <= lit + 2)[hit].all(), "shadows only darken"
+
+
 def test_a_batch_maps_to_cuda_without_copies(renderer):
     if not renderer.cuda_available:
         pytest.skip("No CUDA interop on this machine")

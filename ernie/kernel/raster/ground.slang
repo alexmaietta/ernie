@@ -75,21 +75,27 @@ float filteredChecker(float2 p) {
     return 0.5 - 0.5 * i.x * i.y;
 }
 
+// The point where a pixel's camera ray meets the plane, and how far along the ray (`t`, negative
+// when it misses).
+float3 groundPoint(VertexOutput in, out float t, out float3 origin, out float3 direction) {
+    let uv = in.position.xy / g.viewport.xy;
+    let ndc = float2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+    // A pushbroom's strip is in the frame's uniforms (and its pixels' rays from different poses).
+    cameraRayThrough(kPushbroomCamera ? u.viewProj : g.invViewProj, u.strip, ndc, origin,
+                     direction);
+    let valid = abs(direction.z) > 1e-12;
+    t = valid ? (g.plane.x - origin.z) / direction.z : -1.0;
+    return origin + direction * max(t, 0.0);
+}
+
 // The plane where a pixel's camera ray meets it, as the G-buffer's fragment writes it; shared by
 // `fragmentMain` and `minimalFragmentMain`, since an entry point calling another hangs Slang's
 // entry-point parameter lowering (translateEntryPointInParamToBorrow, Slang 2026.19).
 GroundOutput shadeGround(VertexOutput in) {
-    let uv = in.position.xy / g.viewport.xy;
-    let ndc = float2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
-    // A pushbroom's strip is in the frame's uniforms (and its pixels' rays from different poses).
+    float t;
     float3 origin;
     float3 direction;
-    cameraRayThrough(kPushbroomCamera ? u.viewProj : g.invViewProj, u.strip, ndc, origin,
-                     direction);
-    let height = g.plane.x;
-    let valid = abs(direction.z) > 1e-12;
-    let t = valid ? (height - origin.z) / direction.z : -1.0;
-    let world = origin + direction * max(t, 0.0);
+    let world = groundPoint(in, t, origin, direction);
 
     // Everything that takes screen-space derivatives runs before the discard.
     let detail = sampleDetail(detailCoords(world.xy, kProjectXy));
@@ -152,7 +158,10 @@ GroundMinimalOutput minimalFragmentMain(VertexOutput in) {
     g.normal = ground.normal;
     g.albedo = ground.albedo;
     g.ids = ground.ids;
-    let shaded = minimalShade(g);
+    float t;
+    float3 origin;
+    float3 direction;
+    let shaded = minimalShade(g, groundPoint(in, t, origin, direction));
     GroundMinimalOutput out;
     out.color = shaded.color;
     out.ids = shaded.ids;

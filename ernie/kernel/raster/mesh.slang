@@ -443,12 +443,12 @@ Minimal meshIdsCutoutFragmentMain(VertexOutput in) {
 // Minimal shading (`minimalShade`) of what `meshFragmentMain` writes, and of its cutout variant.
 [shader("fragment")]
 Minimal meshMinimalFragmentMain(VertexOutput in) {
-    return minimalShade(meshGBuffer(in));
+    return minimalShade(meshGBuffer(in), in.world);
 }
 
 [shader("fragment")]
 Minimal meshMinimalCutoutFragmentMain(VertexOutput in) {
-    let out = minimalShade(meshGBuffer(in));
+    let out = minimalShade(meshGBuffer(in), in.world);
     if (surfaceOpacity(in.uv) < surface.opacity.y) {
         discard;
     }

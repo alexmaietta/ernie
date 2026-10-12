@@ -35,7 +35,11 @@ public struct Uniforms {
     public float4 strip;
     // Minimal shading (`minimalShade`): rgb the constant colour, w the mode (kMinimal*).
     public float4 minimal;
-    float4 padding[2];
+    // Minimal shading's shadow of `minimalLights[0]` (`Shadows::minimal`) in this view: [0] xy
+    // scale and zw offset of its map's x and y clip coordinates, [1] x scale and y offset of its
+    // depth, z the slot of its world's map past the first (a batch's), w 1 when it shadows the
+    // view.
+    public float4 minimalShadow[2];
 }
 
 // Clip coordinates of world point `world` in the view.
@@ -95,6 +99,10 @@ public struct DrawConstants {
     uint padding0;
 }
 
+// A shadow pass's light view (`lightViewProj[0]`, `DrawConstants::shadowFromFrame`); for the
+// G-buffer and minimal passes, the view's cascade splits and minimal shading's main light's maps
+// (its cascades over a single view, or a batch's shared map, which each view's world's places
+// with `Uniforms::minimalShadow`).
 public struct Shadows {
     public float4x4 lightViewProj[4];
     // Far view depth of each cascade.
@@ -105,8 +113,10 @@ public struct Shadows {
     public float4 depthWorld;
     // Filter radius (texels), normal offset (texels), cascade count, enabled.
     public float4 params;
-    // x: tangent of the sun's angular radius.
-    public float4 sun;
+    // Minimal shading's main light's maps in `shadowMap`: x the first one's layer, y the share of a
+    // layer's width they take (in its corner), z how many (its cascades; 1 for one map), w 1 with
+    // maps.
+    public float4 minimal;
     // x: tint cascades.
     public uint4 debug;
     // 16 Poisson disk samples in the unit disk, two per float4.
@@ -176,6 +186,47 @@ public float3 cascadeTint(float3 color, float3 world) {
         return color * tints[cascadeIndex(viewDepth(world))];
     }
     return color;
+}
+
+// The fraction of minimal shading's main light (`Uniforms::minimalLights[0]`) reaching `world`,
+// whose geometric normal is `normal`: its map (the cascade holding the point, or the view's
+// world's), offset along the normal against acne, compared in four hardware 2x2 taps half a texel
+// apart; 1 off the map or without one. No soft shadows: minimal shading is for throughput.
+//
+// Reference: D. Holbert, "Saying 'Goodbye' to Shadow Acne", GDC 2011 poster (normal offset).
+public float minimalShadow(float3 world, float3 normal) {
+    if (u.minimalShadow[1].w == 0.0 || s.minimal.w == 0.0) {
+        return 1.0;
+    }
+    let count = uint(s.minimal.z);
+    let cascade = count > 1 ? min(cascadeIndex(viewDepth(world)), count - 1) : 0;
+    let nDotL = saturate(dot(normal, u.minimalLights[0].xyz));
+    let offset = normal * s.params.y * s.texelWorld[cascade] * max(1.0 - nDotL, 0.25);
+    let clip = mul(s.lightViewProj[cascade], float4(world + offset, 1.0));
+    // A batch view's world's map: the shared one's clip space, scaled and offset.
+    let place = u.minimalShadow[0];
+    let ndc = clip.xy / clip.w * place.xy + place.zw;
+    let depth = min(clip.z / clip.w * u.minimalShadow[1].x + u.minimalShadow[1].y, 0.99999994);
+    let uv = float2(0.5 * ndc.x + 0.5, 0.5 - 0.5 * ndc.y);
+    if (any(uv < float2(0.0)) || any(uv > float2(1.0))) {
+        return 1.0;
+    }
+    uint width;
+    uint height;
+    uint layers;
+    shadowMap.GetDimensions(width, height, layers);
+    let texel = 1.0 / float(width);
+    let corner = s.minimal.y;
+    let at = uv * corner;
+    let layer = s.minimal.x + float(cascade) + u.minimalShadow[1].z;
+    var lit = 0.0;
+    for (uint i = 0; i < 4; ++i) {
+        let tap = float2((i & 1u) != 0 ? 0.5 : -0.5, (i & 2u) != 0 ? 0.5 : -0.5) * texel;
+        lit += shadowMap.SampleCmpLevelZero(
+            shadowSampler,
+            float3(clamp(at + tap, float2(0.0), float2(corner - 0.5 * texel)), layer), depth);
+    }
+    return lit * 0.25;
 }
 
 // What raster passes write for the spectral shading pass (see `RenderTargets`):

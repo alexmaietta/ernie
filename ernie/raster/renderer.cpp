@@ -40,7 +40,11 @@ struct Uniforms {
                       ///< (`PushbroomStrip::Intrinsics`).
     float
         minimal[4];  ///< Minimal shading's constant colour and mode.
-    float padding[8];
+    /// Minimal shading's shadow of its main light in this view: its
+    /// world's map's place in the shared one's clip space (x and y
+    /// scale and offset; depth scale and offset), the world's slot,
+    /// and 1 when it shadows the view.
+    float minimalShadow[2][4];
 };
 static_assert(sizeof(Uniforms) == 256,
               "Uniforms must match frame.slang");
@@ -55,7 +59,9 @@ struct ShadowUniforms {
     float texelWorld[4];
     float depthWorld[4];
     float params[4];
-    float sun[4];
+    /// Minimal shading's main light's maps: the first's layer, the
+    /// share of a layer they take, how many, and 1 with maps.
+    float minimal[4];
     std::uint32_t debug[4];
     float poisson[32];
 };
@@ -1131,8 +1137,8 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
         kDefaultMaterial,
         std::make_unique<RasterMaterial>(context_, uploads_));
     SetMaterial(kDefaultMaterial, defaults);
-    // A texel for the G-buffer passes' shadow map binding, which none
-    // reads: the lights' shadows are the shading pass's.
+    // A texel for the shadow passes' shadow map binding, in place of
+    // the light shadow maps they draw into.
     shadowMaps_ = std::make_unique<GpuImage>(
         context_,
         ImageDesc{1, 1, 1, 1, VK_FORMAT_D32_SFLOAT,
@@ -2174,6 +2180,21 @@ void RasterRenderer::WriteLights(
             entry.map[1] = 1.0f;
         }
     }
+    // Minimal shading's main light, the brightest distant light, and
+    // its maps, which it shadows with.
+    minimalKey_.reset();
+    if (const LightParams* brightest =
+            BrightestDistant(params, params.camera.bands)) {
+        const auto i = static_cast<std::size_t>(brightest -
+                                                params.lights.data());
+        const LightGpu& entry = table[i];
+        if (entry.cone[3] > 0.0f) {
+            minimalKey_ = MinimalKey{
+                i, static_cast<std::uint32_t>(entry.cone[2]),
+                static_cast<std::uint32_t>(entry.cone[3]),
+                entry.map[1] != 0.0f};
+        }
+    }
     if (!table.empty()) {
         uploads_.Write(lightTable_, std::as_bytes(std::span(table)));
     }
@@ -2524,6 +2545,9 @@ void RasterRenderer::Update(
             worldMaps_ = std::move(maps);
         }
     }
+    // The lights first: the views' uniforms take minimal shading's
+    // main light's maps, and shading the size of the maps they make.
+    WriteLights(params, bounds);
     // A metering frame counts its luminance for later frames; this
     // slot's last one has finished.
     ReadMeter(uploads_.Slot());
@@ -2594,42 +2618,70 @@ void RasterRenderer::Update(
                           frame.camera.SubframeTime(static_cast<int>(
                               v / (outputViews_ * faces_))))
                     : 1.0f;
-            // Minimal shading's light: the first distant lights the
-            // view's world sees, each as a share of the brightest's,
-            // and the ambient light, per channel.
+            // Minimal shading's light: the brightest distant light
+            // the view's world sees, then the next three, each as a
+            // share of the brightest's, and the ambient light, per
+            // channel.
+            const SpectralBands& bands = params.camera.bands;
             const std::int32_t world = raster.ViewWorld(v);
             const glm::vec3 ambient =
-                MinimalAmbient(params, bands_, world);
+                MinimalAmbient(params, bands, world);
             uniforms.motion[1] = ambient.r;
             uniforms.motion[2] = ambient.g;
             uniforms.motion[3] = ambient.b;
             if (const LightParams* brightest =
-                    BrightestDistant(params, bands_, world)) {
-                const double unit =
-                    WhiteLuminance(*brightest, bands_);
-                std::size_t count = 0;
+                    BrightestDistant(params, bands, world)) {
+                const double unit = WhiteLuminance(*brightest, bands);
+                std::vector<const LightParams*> order{brightest};
                 for (const LightParams& light : params.lights) {
-                    if (count == 4) {
-                        break;
+                    if (order.size() < 4 && &light != brightest &&
+                        light.type == LightType::Distant &&
+                        !light.domeDiffuse &&
+                        (light.world == -1 || world == -1 ||
+                         light.world == world)) {
+                        order.push_back(&light);
                     }
-                    if (light.type != LightType::Distant ||
-                        light.domeDiffuse ||
-                        !(light.world == -1 || world == -1 ||
-                          light.world == world)) {
-                        continue;
-                    }
+                }
+                for (std::size_t i = 0; i < order.size(); ++i) {
                     const glm::vec3 towards =
-                        glm::normalize(light.direction);
-                    float* entry = uniforms.minimalLights[count++];
+                        glm::normalize(order[i]->direction);
+                    float* entry = uniforms.minimalLights[i];
                     entry[0] = towards.x;
                     entry[1] = towards.y;
                     entry[2] = towards.z;
                     entry[3] =
                         unit > 0.0
                             ? static_cast<float>(
-                                  WhiteLuminance(light, bands_) /
+                                  WhiteLuminance(*order[i], bands) /
                                   unit)
                             : 0.0f;
+                }
+                // Its shadow, when it is the frame's main light with
+                // maps: in a batch, the view's world's map, placed in
+                // the shared one's clip space.
+                if (minimalKey_ &&
+                    brightest == &params.lights[minimalKey_->light]) {
+                    std::uint32_t slot = 0;
+                    if (minimalKey_->perWorld) {
+                        const auto found = worldSlots_.find(world);
+                        slot = found != worldSlots_.end()
+                                   ? found->second
+                                   : 0;
+                    }
+                    const glm::mat4 place =
+                        lightViews_[minimalKey_->first + slot]
+                            .lightViewProjection *
+                        glm::inverse(lightViews_[minimalKey_->first]
+                                         .lightViewProjection);
+                    uniforms.minimalShadow[0][0] = place[0][0];
+                    uniforms.minimalShadow[0][1] = place[1][1];
+                    uniforms.minimalShadow[0][2] = place[3][0];
+                    uniforms.minimalShadow[0][3] = place[3][1];
+                    uniforms.minimalShadow[1][0] = place[2][2];
+                    uniforms.minimalShadow[1][1] = place[3][2];
+                    uniforms.minimalShadow[1][2] =
+                        static_cast<float>(slot);
+                    uniforms.minimalShadow[1][3] = 1.0f;
                 }
             }
             // Minimal shading's colour and mode (surface.slang's
@@ -2659,6 +2711,31 @@ void RasterRenderer::Update(
         for (std::size_t c = 0; c < splits; ++c) {
             shadowUniforms.splits[c] = cascades[c].splitFar;
         }
+    }
+    // Minimal shading's main light's maps: its cascades over a single
+    // view, or a batch's shared map, which each view's world's
+    // places.
+    if (minimalKey_) {
+        const std::uint32_t maps =
+            minimalKey_->perWorld
+                ? 1u
+                : std::min<std::uint32_t>(minimalKey_->count,
+                                          kMaxCascades);
+        for (std::uint32_t c = 0; c < maps; ++c) {
+            const ShadowCascade& map =
+                lightViews_[minimalKey_->first + c];
+            std::memcpy(shadowUniforms.lightViewProjection[c],
+                        glm::value_ptr(map.lightViewProjection), 64);
+            shadowUniforms.texelWorld[c] = map.texelWorldSize;
+        }
+        const ShadowCascade& first = lightViews_[minimalKey_->first];
+        shadowUniforms.minimal[0] =
+            static_cast<float>(minimalKey_->first);
+        shadowUniforms.minimal[1] =
+            static_cast<float>(first.resolution) /
+            static_cast<float>(lightResolution_);
+        shadowUniforms.minimal[2] = static_cast<float>(maps);
+        shadowUniforms.minimal[3] = 1.0f;
     }
     shadowUniforms.params[0] = shadows.softness;
     shadowUniforms.params[1] = shadows.normalOffset;
@@ -2813,9 +2890,6 @@ void RasterRenderer::Update(
     const LightParams* brightest = BrightestDistant(params, bands_);
     atmosphere_->Set(params.atmosphere, bands_,
                      brightest != nullptr ? brightest->angle : 0.53f);
-    // The lights first: shading reads the size of the light shadow
-    // maps they make.
-    WriteLights(params, bounds);
     WriteLightTiming(frame, params,
                      static_cast<std::uint32_t>(raster.Views()));
     WriteShading(raster);
@@ -3535,10 +3609,13 @@ void RasterRenderer::EnsureViewBuffers(std::uint32_t views) {
 }
 
 RasterFrame RasterRenderer::Frame(std::uint32_t view) const {
+    // The light shadow maps, which minimal shading reads; shadow
+    // passes, which draw into them, bind a placeholder instead
+    // (`RecordShadowMaps`).
     return {DescriptorResource::Of(uniforms_),
             view,
             DescriptorResource::Of(shadowUniforms_),
-            DescriptorResource::Of(shadowMaps_->View()),
+            DescriptorResource::Of(lightShadowMaps_->View()),
             DescriptorResource::Of(shadowSampler_),
             DescriptorResource::Of(clampSampler_)};
 }
@@ -3662,7 +3739,11 @@ void RasterRenderer::RecordShadows(
 void RasterRenderer::RecordShadowMaps(
     VkCommandBuffer commands,
     std::span<const RasterDrawable* const> drawables,
-    const RasterFrame& frame) const {
+    const RasterFrame& given) const {
+    // Drawing into the light shadow maps, the passes bind a texel in
+    // their place.
+    RasterFrame frame = given;
+    frame.shadowMap = DescriptorResource::Of(shadowMaps_->View());
     if (!lightViews_.empty()) {
         ERNIE_GPU_ZONE(context_, commands, "Light shadows");
         lightShadowMaps_->Transition(

@@ -835,8 +835,8 @@ class RasterRenderer {
     GpuBuffer shadowUniforms_;
     Sampler clampSampler_;
     Sampler shadowSampler_;
-    /// A texel at the G-buffer passes' shadow map binding, which none
-    /// reads.
+    /// A texel at the shadow passes' shadow map binding, in place of
+    /// the light shadow maps they draw into.
     std::unique_ptr<GpuImage> shadowMaps_;
     /// What a single view's cascades fit to this frame: its view, a
     /// cube camera's face extent (0 for others), the casters' box
@@ -931,6 +931,18 @@ class RasterRenderer {
         bool fromBase = false;
     };
     std::vector<LayeredPass> layeredPasses_;
+    /// Minimal shading's main light, the frame's brightest distant
+    /// light, when it has shadow maps: its index in the frame's
+    /// lights, its first map in `lightViews_`, how many (its cascades,
+    /// or a batch's shared map and one per world), and whether per
+    /// world.
+    struct MinimalKey {
+        std::size_t light = 0;
+        std::uint32_t first = 0;
+        std::uint32_t count = 0;
+        bool perWorld = false;
+    };
+    std::optional<MinimalKey> minimalKey_;
     std::vector<std::string_view>
         requiredVars_;  ///< The vars the last `Update`'s frame needs.
 
