@@ -52,6 +52,7 @@ import projection;
 import brdf;
 import bindless;
 import atmosphere;
+import virtual_shadow;
 import light_pattern;
 import light_patterns;
 
@@ -203,6 +204,12 @@ struct ShadingResources {
     uint atmosphereRefraction;
     uint volumeShadows;
     uint volumeShadowSize;
+    // Each view's own uniforms, not read here.
+    uint2 viewBlocks;
+    // The virtual shadow map (virtual_shadow.slang) and the light slot it shadows, ~0 for none.
+    VirtualShadow* virtualShadow;
+    uint virtualLight;
+    uint virtualDebug;
 }
 
 // The pass's own buffers (`VolumePass`): the volumes, their materials, each view's runs of
@@ -605,9 +612,35 @@ uint lightViewOf(LightGpu light, float3 world, uint worldSlot) {
     return first + (d.z >= 0.0 ? 4 : 5);
 }
 
-// Whether geometry hides `light` from `world`: one comparison in its shadow map, lit off the map
-// or without one. The maps hold standard depth, near 0.
-float geometryShadow(LightGpu light, float3 world, uint worldSlot, float mapTexels) {
+// Whether geometry hides the virtual shadow map's light from `world`, seen from a camera at
+// `eye`: one comparison in the level for its distance (shading.slang's `virtualVisibility`), or a
+// coarser one where that page is not backed, a texel and a half of it as bias; lit past the last
+// level or off every backed page.
+float virtualGeometryShadow(float3 world, float3 eye) {
+    let map = shading.virtualShadow;
+    let level = virtualLevelFor(length(world - eye), map.bias) - map.firstLevel;
+    if (level >= int(map.levelCount)) {
+        return 1.0;
+    }
+    float stored;
+    float depth;
+    uint used;
+    if (!virtualShadowDepth(map, uint(max(level, 0)), world, stored, depth, used)) {
+        return 1.0;
+    }
+    let texel = map.levels[used].info.x;
+    let perWorld = 0.5 / (1000.0 * map.levels[used].info.y);
+    return stored > depth + 1.5 * texel * perWorld ? 0.0 : 1.0;
+}
+
+// Whether geometry hides `light` (slot `slot`) from `world`, seen from a camera at `eye`: one
+// comparison in its shadow map, lit off the map or without one; the virtual shadow map's light
+// through its pages (`virtualGeometryShadow`). The maps hold standard depth, near 0.
+float geometryShadow(LightGpu light, uint slot, float3 world, float3 eye, uint worldSlot,
+                     float mapTexels) {
+    if (slot == shading.virtualLight) {
+        return virtualGeometryShadow(world, eye);
+    }
     if (light.cone.w <= 0.0) {
         return 1.0;
     }
@@ -1074,7 +1107,8 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
                                                    light.links.y, shadowSteps());
                     let lit = weight * sigma *
                               octavesOf(material, dot(reach.towards, -direction), depth) *
-                              reach.scale * geometryShadow(light, world, viewLights.y, mapTexels);
+                              reach.scale *
+                              geometryShadow(light, k, world, origin, viewLights.y, mapTexels);
                     if (lit <= 0.0) {
                         continue;
                     }

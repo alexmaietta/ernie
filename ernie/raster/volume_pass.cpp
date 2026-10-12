@@ -300,6 +300,7 @@ VolumeModules(const LightPatternRegistry& patterns, bool pushbroom,
          {"brdf", shaders::kBrdfSlang},
          {"bindless", shaders::kBindlessSlang},
          {"atmosphere", shaders::kAtmosphereSlang},
+         {"virtual_shadow", shaders::kVirtualShadowSlang},
          {"volume", (groups > 0 ? "#define VOLUME_GROUPS " +
                                       std::to_string(groups) + "\n"
                                 : std::string()) +
