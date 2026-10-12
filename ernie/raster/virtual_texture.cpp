@@ -33,32 +33,53 @@ VirtualTexture::VirtualTexture(
         throw std::invalid_argument(
             "A virtual texture needs every mip down to 1 x 1");
     }
+    const SparseImageDesc desc{source_->width, source_->height,
+                               source_->mips, format, components};
+    // A sparse image where the device has sparse residency and the
+    // texture fits its images; else pages, of which the budget holds
+    // as many as the device's image layers allow.
     const std::uint32_t maxSide =
         context.Limits().maxImageDimension2D;
-    if (source_->width > maxSide || source_->height > maxSide) {
-        throw std::invalid_argument("Virtual texture exceeds the "
-                                    "device's maximum image size (" +
-                                    std::to_string(maxSide) + ")");
+    if (context.SupportsSparseResidency() &&
+        source_->width <= maxSide && source_->height <= maxSide) {
+        try {
+            auto sparse =
+                std::make_unique<SparseImage>(context, desc);
+            sparse_ = sparse.get();
+            store_ = std::move(sparse);
+        } catch (const std::runtime_error&) {
+            // A format the device cannot make sparse: pages instead.
+        }
     }
-    image_ = std::make_unique<SparseImage>(
-        context, SparseImageDesc{source_->width, source_->height,
-                                 source_->mips, format, components});
+    if (store_ == nullptr) {
+        const VkDeviceSize page = GpuImage::MipBytes(
+            format, PagePool::kPageTexels, PagePool::kPageTexels);
+        auto pool = std::make_unique<PagePool>(
+            context, desc,
+            static_cast<std::uint32_t>(std::clamp<VkDeviceSize>(
+                budget / page, 1, VkDeviceSize{UINT32_MAX})));
+        pool_ = pool.get();
+        store_ = std::move(pool);
+    }
     std::vector<std::span<const std::byte>> tail;
-    for (std::uint32_t mip = image_->TailMip(); mip < source_->mips;
+    for (std::uint32_t mip = store_->TailMip(); mip < source_->mips;
          ++mip) {
         tail.push_back(source_->Mip(0, mip));
     }
-    image_->WriteTail(tail);
+    store_->WriteTail(tail);
 
     std::size_t flags = 0;
-    for (std::uint32_t mip = 0; mip < image_->TailMip(); ++mip) {
+    for (std::uint32_t mip = 0; mip < store_->TailMip(); ++mip) {
         mipFlags_.push_back(flags);
-        const VkExtent2D count = image_->TileCount(mip);
+        const VkExtent2D count = store_->TileCount(mip);
         flags += std::size_t{count.width} * count.height;
     }
     mipFlags_.push_back(flags);
+    // Pages' tables follow the flags in the same buffers.
     const std::vector<std::uint32_t> zeros(
-        std::max<std::size_t>(flags, 1), 0);
+        std::max<std::size_t>(flags, 1) *
+            (store_->TileBorder() > 0 ? 2 : 1),
+        0);
     for (auto& requests : requests_) {
         requests = std::make_unique<GpuBuffer>(
             context, zeros.size() * sizeof(std::uint32_t),
@@ -69,9 +90,17 @@ VirtualTexture::VirtualTexture(
     }
     maxTiles_ = std::max<std::size_t>(
         1,
-        static_cast<std::size_t>(budget / image_->TileMemoryBytes()));
-    const VkExtent2D count = image_->TailMip() > 0
-                                 ? image_->TileCount(0)
+        static_cast<std::size_t>(budget / store_->TileMemoryBytes()));
+    if (pool_ != nullptr) {
+        maxTiles_ = std::min<std::size_t>(maxTiles_, pool_->Pages());
+        for (std::uint32_t slot = 0; slot < FrameUploads::kSlots;
+             ++slot) {
+            WritePageTable(slot);
+        }
+        return;
+    }
+    const VkExtent2D count = store_->TailMip() > 0
+                                 ? store_->TileCount(0)
                                  : VkExtent2D{1, 1};
     for (std::uint32_t slot = 0; slot < FrameUploads::kSlots;
          ++slot) {
@@ -88,13 +117,13 @@ VirtualTexture::VirtualTexture(
 }
 
 std::size_t VirtualTexture::FlagIndex(const SparseTile& tile) const {
-    const VkExtent2D count = image_->TileCount(tile.mip);
+    const VkExtent2D count = store_->TileCount(tile.mip);
     return mipFlags_[tile.mip] + std::size_t{tile.y} * count.width +
            tile.x;
 }
 
 void VirtualTexture::Want(const SparseTile& tile) {
-    for (std::uint32_t mip = tile.mip; mip < image_->TailMip();
+    for (std::uint32_t mip = tile.mip; mip < store_->TailMip();
          ++mip) {
         const std::uint32_t shift = mip - tile.mip;
         wanted_.insert({mip, tile.x >> shift, tile.y >> shift});
@@ -102,38 +131,62 @@ void VirtualTexture::Want(const SparseTile& tile) {
 }
 
 void VirtualTexture::Request(const SparseTile& tile) {
-    image_->TileExtent(tile);  // Throws for a tile the image lacks.
+    store_->TileExtent(tile);  // Throws for a tile the image lacks.
     Want(tile);
 }
 
 std::vector<std::byte>
 VirtualTexture::TileData(const SparseTile& tile) const {
     const TextureFormatInfo info = InfoOf(source_->format);
-    const VkExtent2D texels = image_->TileTexels();
-    const VkExtent2D extent = image_->TileExtent(tile);
+    const VkExtent2D texels = store_->TileTexels();
+    const std::uint32_t border = store_->TileBorder();
     const std::uint32_t mipWidth =
         std::max(1u, source_->width >> tile.mip);
-    const std::size_t blocksAcrossMip =
-        (mipWidth + info.blockSize - 1) / info.blockSize;
-    const std::size_t across =
-        (extent.width + info.blockSize - 1) / info.blockSize;
-    const std::size_t down =
-        (extent.height + info.blockSize - 1) / info.blockSize;
-    // Tile origins fall on whole blocks: tiles span whole blocks.
-    const std::size_t firstColumn =
-        tile.x * texels.width / info.blockSize;
-    const std::size_t firstRow =
-        tile.y * texels.height / info.blockSize;
+    const std::uint32_t mipHeight =
+        std::max(1u, source_->height >> tile.mip);
+    const auto blocks = [&](std::uint32_t texels) {
+        return (texels + info.blockSize - 1) / info.blockSize;
+    };
+    const std::uint32_t blocksAcrossMip = blocks(mipWidth);
+    const std::uint32_t blocksDownMip = blocks(mipHeight);
+    // A bordered page is whole; a sparse tile is cut at the mip's
+    // edge. Tile origins and borders fall on whole blocks.
+    const VkExtent2D extent =
+        border > 0 ? VkExtent2D{texels.width + 2 * border,
+                                texels.height + 2 * border}
+                   : store_->TileExtent(tile);
+    const std::uint32_t across = blocks(extent.width);
+    const std::uint32_t down = blocks(extent.height);
+    const auto firstColumn =
+        static_cast<std::int64_t>(tile.x * texels.width /
+                                  info.blockSize) -
+        static_cast<std::int64_t>(border / info.blockSize);
+    const auto firstRow =
+        static_cast<std::int64_t>(tile.y * texels.height /
+                                  info.blockSize) -
+        static_cast<std::int64_t>(border / info.blockSize);
     const std::span<const std::byte> mip = source_->Mip(0, tile.mip);
-    std::vector<std::byte> data(across * down * info.blockBytes);
-    for (std::size_t row = 0; row < down; ++row) {
-        std::memcpy(data.data() + row * across * info.blockBytes,
-                    mip.data() + ((firstRow + row) * blocksAcrossMip +
-                                  firstColumn) *
-                                     info.blockBytes,
-                    across * info.blockBytes);
+    std::vector<std::byte> cut(std::size_t{across} * down *
+                               info.blockBytes);
+    for (std::uint32_t row = 0; row < down; ++row) {
+        // Blocks past the mip's edges repeat its last ones.
+        const auto sourceRow =
+            static_cast<std::size_t>(std::clamp<std::int64_t>(
+                firstRow + row, 0, blocksDownMip - 1));
+        for (std::uint32_t column = 0; column < across; ++column) {
+            const auto sourceColumn =
+                static_cast<std::size_t>(std::clamp<std::int64_t>(
+                    firstColumn + column, 0, blocksAcrossMip - 1));
+            std::memcpy(
+                cut.data() + (std::size_t{row} * across + column) *
+                                 info.blockBytes,
+                mip.data() +
+                    (sourceRow * blocksAcrossMip + sourceColumn) *
+                        info.blockBytes,
+                info.blockBytes);
+        }
     }
-    return data;
+    return cut;
 }
 
 void VirtualTexture::BeginFrame(std::uint32_t slot,
@@ -159,7 +212,7 @@ void VirtualTexture::BeginFrame(std::uint32_t slot,
         const auto mip =
             static_cast<std::uint32_t>(next - mipFlags_.begin() - 1);
         const std::size_t index = i - mipFlags_[mip];
-        const std::uint32_t across = image_->TileCount(mip).width;
+        const std::uint32_t across = store_->TileCount(mip).width;
         Want({mip, static_cast<std::uint32_t>(index % across),
               static_cast<std::uint32_t>(index / across)});
     }
@@ -181,7 +234,7 @@ void VirtualTexture::BeginFrame(std::uint32_t slot,
             ++it;
         }
     }
-    image_->Release(unbind);
+    store_->Release(unbind);
 
     // Wanted tiles not resident, coarsest first so detail sharpens in
     // order; the rest wait for later frames. Evicted tiles wanted
@@ -191,7 +244,7 @@ void VirtualTexture::BeginFrame(std::uint32_t slot,
         lastWanted_[tile] = frame;
         if (retiring_.erase(tile) > 0) {
             changed = true;
-        } else if (!image_->Bound(tile)) {
+        } else if (!store_->Bound(tile)) {
             load.push_back(tile);
         }
     }
@@ -205,7 +258,7 @@ void VirtualTexture::BeginFrame(std::uint32_t slot,
     // Past the budget, the least recently wanted resident tiles go,
     // finest first; never those wanted this frame.
     std::vector<SparseTile> evict;
-    const std::size_t resident = image_->BoundTiles();
+    const std::size_t resident = store_->BoundTiles();
     if (resident + load.size() > maxTiles_) {
         std::vector<std::pair<std::uint64_t, SparseTile>> candidates;
         for (const auto& [tile, last] : lastWanted_) {
@@ -252,7 +305,7 @@ void VirtualTexture::BeginFrame(std::uint32_t slot,
         for (const auto& bytes : data) {
             spans.push_back(bytes);
         }
-        image_->Write(load, spans);
+        store_->Write(load, spans);
         changed = true;
     }
     if (changed) {
@@ -260,8 +313,33 @@ void VirtualTexture::BeginFrame(std::uint32_t slot,
     }
     // This slot's map, if it shows an older residency.
     if (mapVersions_[slot] != version_) {
-        WriteMinLod(slot);
+        if (pool_ != nullptr) {
+            WritePageTable(slot);
+        } else {
+            WriteMinLod(slot);
+        }
     }
+}
+
+void VirtualTexture::WritePageTable(std::uint32_t slot) {
+    std::vector<std::uint32_t> table(
+        std::max<std::size_t>(mipFlags_.back(), 1), 0);
+    for (std::uint32_t mip = 0; mip < store_->TailMip(); ++mip) {
+        const VkExtent2D count = store_->TileCount(mip);
+        for (std::uint32_t y = 0; y < count.height; ++y) {
+            for (std::uint32_t x = 0; x < count.width; ++x) {
+                const SparseTile tile{mip, x, y};
+                if (Resident(tile)) {
+                    table[FlagIndex(tile)] = pool_->PageOf(tile) + 1;
+                }
+            }
+        }
+    }
+    requests_[slot]->Write(
+        std::as_bytes(std::span(table)),
+        std::max<std::size_t>(mipFlags_.back(), 1) *
+            sizeof(std::uint32_t));
+    mapVersions_[slot] = version_;
 }
 
 VirtualTexture::~VirtualTexture() {
@@ -271,13 +349,13 @@ VirtualTexture::~VirtualTexture() {
 }
 
 bool VirtualTexture::Resident(const SparseTile& tile) const {
-    return image_->Bound(tile) && !retiring_.contains(tile);
+    return store_->Bound(tile) && !retiring_.contains(tile);
 }
 
 std::uint32_t VirtualTexture::FinestResident(std::uint32_t x,
                                              std::uint32_t y) const {
-    std::uint32_t finest = image_->TailMip();
-    for (std::uint32_t mip = image_->TailMip(); mip-- > 0;) {
+    std::uint32_t finest = store_->TailMip();
+    for (std::uint32_t mip = store_->TailMip(); mip-- > 0;) {
         if (!Resident({mip, x >> mip, y >> mip})) {
             break;
         }
@@ -287,8 +365,8 @@ std::uint32_t VirtualTexture::FinestResident(std::uint32_t x,
 }
 
 void VirtualTexture::WriteMinLod(std::uint32_t slot) {
-    const VkExtent2D count = image_->TailMip() > 0
-                                 ? image_->TileCount(0)
+    const VkExtent2D count = store_->TailMip() > 0
+                                 ? store_->TileCount(0)
                                  : VkExtent2D{1, 1};
     std::vector<float> finest(std::size_t{count.width} *
                               count.height);
@@ -296,7 +374,7 @@ void VirtualTexture::WriteMinLod(std::uint32_t slot) {
         for (std::uint32_t x = 0; x < count.width; ++x) {
             finest[std::size_t{y} * count.width + x] =
                 static_cast<float>(
-                    image_->TailMip() > 0 ? FinestResident(x, y) : 0);
+                    store_->TailMip() > 0 ? FinestResident(x, y) : 0);
         }
     }
     // A filter's footprint reaches into the neighbouring tiles,
@@ -349,9 +427,9 @@ void VirtualTexture::WriteMinLod(std::uint32_t slot) {
 }
 
 VkDeviceSize VirtualTexture::Bytes() const {
-    VkDeviceSize bytes = image_->Bytes();
+    VkDeviceSize bytes = store_->Bytes();
     for (const auto& map : minLods_) {
-        bytes += map->Bytes();
+        bytes += map != nullptr ? map->Bytes() : 0;
     }
     for (const auto& requests : requests_) {
         bytes += requests->Size();

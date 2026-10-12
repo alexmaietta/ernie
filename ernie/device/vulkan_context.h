@@ -59,6 +59,10 @@ struct VulkanContextOptions {
     std::vector<std::string> instanceExtensions;
     /// Extra device extensions, e.g. `VK_KHR_swapchain`.
     std::vector<std::string> deviceExtensions;
+    /// Leave sparse residency off even where the device has it, so
+    /// virtual textures page in software as they do on devices
+    /// without it (`SupportsSparseResidency`).
+    bool disableSparseResidency = false;
 };
 
 /// A wait for or a signal of a timeline semaphore value in a
@@ -178,9 +182,8 @@ class VulkanContext {
     }
 
     /// Whether 2D images can be sparse, their memory bound tile by
-    /// tile on the queue, and shaders clamp sampling to a minimum
-    /// level of detail (`SparseImage`): virtual textures filtered in
-    /// hardware; without it they page in software.
+    /// tile on the queue (`SparseImage`): virtual textures filtered
+    /// in hardware; without it they page in software.
     bool SupportsSparseResidency() const {
         return sparseResidency_;
     }

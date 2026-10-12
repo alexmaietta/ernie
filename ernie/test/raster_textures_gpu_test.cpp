@@ -645,41 +645,38 @@ TEST_F(RasterDelegateTest,
     }
 }
 
-TEST_F(RasterDelegateTest, VirtualAlbedoTexturesLoadTheTilesInView) {
-    // A 1024 x 1024 quadrant texture with every mip, forced virtual:
-    // the first frames sample the mip tail, the tiles the view asks
-    // for load over the next ones (GPU memory grows), and the picture
-    // ends as the texture uploaded whole draws it.
-    if (!context_->SupportsSparseResidency()) {
-        GTEST_SKIP() << "no sparse image residency";
-    }
+namespace {
+
+/// A 1024 x 1024 texture with every mip, forced virtual: the first
+/// frames sample the mip tail, the tiles the view asks for load over
+/// the next ones, and the picture is the one the texture uploaded
+/// whole draws, far and close.
+void ExpectVirtualAlbedoLoadsTheTilesInView(
+    const ernie::VulkanContext& context) {
+    // The quadrants as 32-texel checks of their colour and black, so
+    // fine and coarse mips differ; each mip the 2 x 2 average of the
+    // one before.
     constexpr std::uint32_t kSide = 1024;
-    std::vector<std::uint8_t> texels;
-    std::uint32_t mips = 0;
-    for (std::uint32_t side = kSide; side >= 1; side /= 2, ++mips) {
-        for (std::uint32_t y = 0; y < side; ++y) {
-            for (std::uint32_t x = 0; x < side; ++x) {
-                const bool right = side > 1 && x >= side / 2;
-                const bool bottom = side > 1 && y >= side / 2;
-                const std::array<std::uint8_t, 4> colour =
-                    side == 1 ? std::array<std::uint8_t, 4>{128, 128,
-                                                            128, 255}
-                    : !bottom
-                        ? (right
-                               ? std::array<std::uint8_t, 4>{0, 255,
-                                                             0, 255}
-                               : std::array<std::uint8_t, 4>{255, 0,
-                                                             0, 255})
-                        : (right
-                               ? std::array<std::uint8_t, 4>{255, 255,
-                                                             255, 255}
-                               : std::array<std::uint8_t, 4>{
-                                     0, 0, 255, 255});
-                texels.insert(texels.end(), colour.begin(),
-                              colour.end());
-            }
+    std::vector<ernie::Image> levels{ernie::Image(kSide, kSide)};
+    const glm::vec4 kQuadrants[2][2] = {
+        {glm::vec4(1, 0, 0, 1), glm::vec4(0, 1, 0, 1)},
+        {glm::vec4(0, 0, 1, 1), glm::vec4(1, 1, 1, 1)}};
+    for (std::uint32_t y = 0; y < kSide; ++y) {
+        for (std::uint32_t x = 0; x < kSide; ++x) {
+            const bool lit = (x / 32 + y / 32) % 2 == 0;
+            levels[0].At(x, y) =
+                lit ? kQuadrants[y / (kSide / 2)][x / (kSide / 2)]
+                    : glm::vec4(0, 0, 0, 1);
         }
     }
+    levels = ernie::MipChain(levels[0], ernie::MipFilter::Average);
+    std::vector<std::uint8_t> texels;
+    for (const ernie::Image& level : levels) {
+        const std::vector<std::uint8_t> bytes =
+            ernie::ToRgba8(level, ernie::ImageEncoding::Linear);
+        texels.insert(texels.end(), bytes.begin(), bytes.end());
+    }
+    const auto mips = static_cast<std::uint32_t>(levels.size());
     const std::string file = WriteDds("virtual_quadrants.dds", kSide,
                                       kSide, "", texels, mips);
     Scene scene = TexturedScene();
@@ -689,14 +686,14 @@ TEST_F(RasterDelegateTest, VirtualAlbedoTexturesLoadTheTilesInView) {
         .SetWrapS("clamp")
         .SetWrapT("clamp")
         .SetFile(file);
-    RasterDelegate whole(*context_);
+    RasterDelegate whole(context);
     scene.Set("/Looks/M/Tex", tokens::kVirtualTexture,
               std::string("off"));
     const std::vector<float> reference = Quadrants(whole, scene);
 
     scene.Set("/Looks/M/Tex", tokens::kVirtualTexture,
               std::string("on"));
-    RasterDelegate delegate(*context_);
+    RasterDelegate delegate(context);
     std::vector<float> last;
     for (int frame = 0; frame < 3; ++frame) {
         last = Quadrants(delegate, scene);
@@ -722,8 +719,59 @@ TEST_F(RasterDelegateTest, VirtualAlbedoTexturesLoadTheTilesInView) {
     for (int frame = 0; frame < 4; ++frame) {
         Render(delegate, scene, "HdrColor");
     }
-    EXPECT_GT(delegate.Stats().gpuBytes, before)
-        << "tiles were loaded";
+    // Sparse images grow as tiles bind; pages are allocated up front.
+    if (context.SupportsSparseResidency()) {
+        EXPECT_GT(delegate.Stats().gpuBytes, before)
+            << "tiles were loaded";
+    }
+
+    // Close up the picture is the whole texture's, but for filtering
+    // differences at the quadrants' edges (the paged path filters
+    // isotropically).
+    const Tensor close = Render(delegate, scene, "HdrColor");
+    scene.Set("/Looks/M/Tex", tokens::kVirtualTexture,
+              std::string("off"));
+    const Tensor full = Render(whole, scene, "HdrColor");
+    double difference = 0.0;
+    double total = 0.0;
+    for (std::int64_t i = 0; i < close.Elements(); ++i) {
+        difference +=
+            std::abs(close.As<float>()[i] - full.As<float>()[i]);
+        total += std::abs(full.As<float>()[i]);
+    }
+    EXPECT_LT(difference, 0.02 * total);
+}
+
+}  // namespace
+
+TEST_F(RasterDelegateTest, VirtualAlbedoTexturesLoadTheTilesInView) {
+    // On a sparse image.
+    if (!context_->SupportsSparseResidency()) {
+        GTEST_SKIP() << "no sparse image residency";
+    }
+    ExpectVirtualAlbedoLoadsTheTilesInView(*context_);
+}
+
+namespace {
+
+/// As `RasterDelegateTest`, with sparse residency off: virtual
+/// textures page in software.
+class PagedRasterDelegateTest : public RasterDelegateTest {
+  protected:
+    ernie::VulkanContextOptions Options() const override {
+        ernie::VulkanContextOptions options =
+            RasterDelegateTest::Options();
+        options.disableSparseResidency = true;
+        return options;
+    }
+};
+
+}  // namespace
+
+TEST_F(PagedRasterDelegateTest,
+       VirtualAlbedoTexturesLoadTheTilesInView) {
+    // In pages, filtered by the shader.
+    ExpectVirtualAlbedoLoadsTheTilesInView(*context_);
 }
 
 TEST_F(RasterDelegateTest, BakedTexturesRenderAsTheirSources) {

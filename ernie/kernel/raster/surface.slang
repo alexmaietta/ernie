@@ -29,8 +29,9 @@ public struct Surface {
     public float4 hexPhaseXz;
     // Textures through mesh texture coordinates (mesh.slang): the albedo texture's scale and
     // bias, each texture's coordinate transform (UsdTransform2d) as the rows of a 2 x 3 matrix in
-    // xyz, and whether there is an albedo texture (x), a normal map (y, its encoding: see
-    // mesh.slang's `normalTexture`), a roughness texture (z) and a metallic texture (w).
+    // xyz, and whether there is an albedo texture (x: 1, or virtual, 2 on a sparse image and 3 in
+    // pages), a normal map (y, its encoding: see mesh.slang's `normalTexture`), a roughness
+    // texture (z) and a metallic texture (w).
     public float4 albedoTextureScale;
     public float4 albedoTextureBias;
     public float4 albedoUv[2];
@@ -52,7 +53,7 @@ public struct Surface {
     // Slots in the bindless heap (`surfaceSlot`): 0 the albedo map, 1 the detail albedo and 2
     // the detail normal textures (`heapTextures`), 3 the detail sampler (`heapSamplers`); 4 to 8
     // the mesh textures' images and 9 to 13 their samplers, by `MaterialTextureSlot`; 14 a virtual
-    // albedo texture's min-LOD map.
+    // albedo texture's min-LOD map, or its pages (`heapTextureArrays`, slot 4 then its tail).
     public uint4 heap[4];
     // A virtual albedo texture (`VirtualTexture`, `virtualTexture`): its first tail mip, mips (0
     // for none), width and height; texels across and down a tile; this frame slot's request
@@ -90,34 +91,94 @@ uint2 virtualTiles(uint2 size, uint mip) {
     return (max(size >> mip, uint2(1)) + tile - 1) / tile;
 }
 
-// The virtual albedo texture at `uv`: marks the tile its footprint's mip wants in the request
-// flags (`VirtualTexture::BeginFrame` loads it, with its coarser tiles, for later frames), then
-// samples no finer than the min-LOD map says is resident around it, so filtering spans tiles in
-// hardware and never reads an unbound one.
+// The first flag (and page table entry) of mip `mip`'s tiles: those of the mips before it.
+uint virtualFirstTile(uint2 size, uint mip) {
+    uint first = 0;
+    for (uint m = 0; m < mip; ++m) {
+        let tiles = virtualTiles(size, m);
+        first += tiles.x * tiles.y;
+    }
+    return first;
+}
+
+// Mip `mip`'s tile under `wrapped` (texture coordinates in [0, 1)), and where in it, in texels.
+uint2 virtualTileAt(uint2 size, uint mip, float2 wrapped, out float2 texel) {
+    texel = wrapped * float2(max(size >> mip, uint2(1)));
+    return min(uint2(texel) / surface.virtualTile, virtualTiles(size, mip) - 1);
+}
+
+// Marks the tile a footprint of level of detail `lod` wants in the request flags
+// (`VirtualTexture::BeginFrame` loads it, with its coarser tiles, for later frames).
+void virtualRequest(uint2 size, float lod, float2 wrapped) {
+    let mip = uint(clamp(floor(lod), 0.0, 31.0));
+    if (mip >= surface.virtualAlbedo.x) {
+        return;
+    }
+    float2 texel;
+    let tile = virtualTileAt(size, mip, wrapped, texel);
+    let flag = surface.virtualRequests + virtualFirstTile(size, mip) +
+               tile.y * virtualTiles(size, mip).x + tile.x;
+    if (*flag == 0) {
+        *flag = 1;
+    }
+}
+
+// The virtual albedo texture on a sparse image (`textures.x` 2) at `uv`: requests its
+// footprint's tile, then samples no finer than the min-LOD map says is resident around it, so
+// filtering spans tiles in hardware and never reads an unbound one.
 float4 virtualTexture(Texture2D<float4> texture, SamplerState filter, float2 uv) {
-    let tail = surface.virtualAlbedo.x;
     let size = surface.virtualAlbedo.zw;
     let wrapped = uv - floor(uv);
     let lod = texture.CalculateLevelOfDetailUnclamped(filter, uv);
-    let mip = uint(clamp(floor(lod), 0.0, 31.0));
-    if (mip < tail) {
-        uint first = 0;
-        for (uint m = 0; m < mip; ++m) {
-            let tiles = virtualTiles(size, m);
-            first += tiles.x * tiles.y;
-        }
-        let tiles = virtualTiles(size, mip);
-        let tile = min(uint2(wrapped * float2(max(size >> mip, uint2(1)))) / surface.virtualTile,
-                       tiles - 1);
-        let flag = surface.virtualRequests + first + tile.y * tiles.x + tile.x;
-        if (*flag == 0) {
-            *flag = 1;
+    virtualRequest(size, lod, wrapped);
+    float2 texel;
+    let tile0 = virtualTileAt(size, 0, wrapped, texel);
+    let minLod = heapTextures[surfaceSlot(14)].Load(int3(int2(tile0), 0)).r;
+    // Gradients scaled up by 2^(minLod - lod) raise the level of detail to minLod and no further,
+    // keeping anisotropic filtering, without the MinLod capability devices may lack.
+    let scale = exp2(max(minLod - lod, 0.0));
+    return texture.SampleGrad(filter, uv, ddx(uv) * scale, ddy(uv) * scale);
+}
+
+// Pages are this many texels square: a tile and a border of `kPageBorder` on each side
+// (`PagePool`).
+static const float kPageTexels = 128.0;
+static const float kPageBorder = 4.0;
+
+// Mip `mip` of the paged virtual albedo texture at `wrapped`, bilinear: from the page of its
+// tile there, or of the nearest coarser resident tile (`VirtualTexture`'s page table, after the
+// request flags), else from the tail image (heap slot 4) with `filter`.
+float4 virtualPageSample(uint2 size, uint mip, float2 wrapped, SamplerState filter) {
+    let tail = surface.virtualAlbedo.x;
+    let table = surface.virtualRequests + max(virtualFirstTile(size, tail), 1u);
+    for (uint m = mip; m < tail; ++m) {
+        float2 texel;
+        let tile = virtualTileAt(size, m, wrapped, texel);
+        let page = table[virtualFirstTile(size, m) + tile.y * virtualTiles(size, m).x + tile.x];
+        if (page != 0) {
+            let local = texel - float2(tile * surface.virtualTile) + kPageBorder;
+            return heapTextureArrays[surfaceSlot(14)].SampleLevel(
+                clampSampler(), float3(local / kPageTexels, float(page - 1)), 0.0);
         }
     }
-    let tiles0 = virtualTiles(size, 0);
-    let tile0 = min(uint2(wrapped * float2(size)) / surface.virtualTile, tiles0 - 1);
-    let minLod = heapTextures[surfaceSlot(14)].Load(int3(int2(tile0), 0)).r;
-    return texture.Sample(filter, uv, int2(0, 0), minLod);
+    return heapTextures[surfaceSlot(4)].SampleLevel(filter, wrapped,
+                                                    float(max(mip, tail) - tail));
+}
+
+// The virtual albedo texture in pages (`textures.x` 3) at `uv`: requests its footprint's tile,
+// then blends the two mips around the footprint's level of detail (trilinear, isotropic), each
+// from the finest resident page.
+float4 virtualPagedTexture(SamplerState filter, float2 uv) {
+    let size = surface.virtualAlbedo.zw;
+    let wrapped = uv - floor(uv);
+    let dx = ddx(uv) * float2(size);
+    let dy = ddy(uv) * float2(size);
+    let lod = max(0.5 * log2(max(max(dot(dx, dx), dot(dy, dy)), 1e-12)), 0.0);
+    virtualRequest(size, lod, wrapped);
+    let mip = min(uint(floor(lod)), surface.virtualAlbedo.y - 1);
+    let next = min(mip + 1, surface.virtualAlbedo.y - 1);
+    return lerp(virtualPageSample(size, mip, wrapped, filter),
+                virtualPageSample(size, next, wrapped, filter), frac(lod));
 }
 
 // Mesh texture `slot` (0 albedo, 1 normal, 2 roughness, 3 metallic, 4 opacity) at `uv`, with its
@@ -125,7 +186,10 @@ float4 virtualTexture(Texture2D<float4> texture, SamplerState filter, float2 uv)
 public float4 materialTexture(uint slot, float2 uv) {
     let texture = heapTextures[surfaceSlot(4 + slot)];
     let filter = heapSamplers[surfaceSlot(9 + slot)];
-    if (slot == 0 && surface.virtualAlbedo.y > 0) {
+    if (slot == 0 && surface.textures.x > 2.5) {
+        return virtualPagedTexture(filter, uv);
+    }
+    if (slot == 0 && surface.textures.x > 1.5) {
         return virtualTexture(texture, filter, uv);
     }
     return texture.Sample(filter, uv);

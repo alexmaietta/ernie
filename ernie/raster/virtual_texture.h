@@ -4,7 +4,9 @@
 #include "ernie/device/buffer.h"
 #include "ernie/device/frame_uploads.h"
 #include "ernie/device/image.h"
+#include "ernie/device/page_pool.h"
 #include "ernie/device/sparse_image.h"
+#include "ernie/device/tile_store.h"
 #include "ernie/util/texture_file.h"
 
 #include <array>
@@ -18,8 +20,10 @@
 namespace ernie {
 
 /// A texture far larger than device memory, of which only the tiles
-/// in view are resident: the hardware path of virtual texturing, on a
-/// `SparseImage`, so filtering spans tiles in hardware.
+/// in view are resident. Its tiles live in a `SparseImage`, filtered
+/// in hardware, where the device has sparse residency and the texture
+/// fits its images; else in a `PagePool`, found through a page table
+/// and filtered by the shader.
 ///
 /// Each frame, shaders sampling it mark the tiles they want, at the
 /// mip their footprint asks for, in a request buffer (one flag per
@@ -27,10 +31,14 @@ namespace ernie {
 /// bottom); `BeginFrame` reads the flags its frame slot's last frame
 /// wrote, loads the wanted tiles from the source coarsest first (each
 /// with its coarser ancestors), evicts the least recently wanted past
-/// the budget, and rewrites the slot's min-LOD map: per mip-0 tile,
-/// the finest mip resident there and around it (one tile of margin,
-/// wrapping), which shaders clamp the level of detail to, so no
-/// sample reaches an unbound tile. The mip tail is always resident.
+/// the budget, and rewrites the slot's map of what is resident. For a
+/// sparse image that is the min-LOD map: per mip-0 tile, the finest
+/// mip resident there and around it (one tile of margin, wrapping),
+/// which shaders clamp the level of detail to, so no sample reaches
+/// an unbound tile. For a page pool it is the page table: per tile
+/// (in the request flags' order), its page plus one, 0 where it is
+/// not resident, shaders falling back to the nearest resident
+/// ancestor. The mip tail is always resident.
 ///
 /// Nothing waits for the device: new tiles are bound before any frame
 /// that maps them, their texels and each slot's map copied in queue
@@ -55,10 +63,7 @@ class VirtualTexture {
     /// stored in `format` (`source`'s, or its sRGB or plain variant)
     /// and viewed through `components`, holding at most `budget`
     /// bytes of tiles.
-    /// @throws std::runtime_error without sparse residency, or for a
-    /// format the device cannot make sparse; std::invalid_argument
-    /// for a source without every mip, or larger than the device's
-    /// images.
+    /// @throws std::invalid_argument for a source without every mip.
     VirtualTexture(const VulkanContext& context,
                    std::shared_ptr<const TextureData> source,
                    VkFormat format,
@@ -80,16 +85,40 @@ class VirtualTexture {
     /// request would; served by the next `BeginFrame`.
     void Request(const SparseTile& tile);
 
-    const SparseImage& Image() const {
-        return *image_;
+    /// Where the tiles live.
+    const TileStore& Store() const {
+        return *store_;
     }
 
-    /// Frame slot `slot`'s min-LOD map: one R32 float per mip-0 tile.
+    std::uint32_t Width() const {
+        return source_->width;
+    }
+    std::uint32_t Height() const {
+        return source_->height;
+    }
+    std::uint32_t Mips() const {
+        return source_->mips;
+    }
+
+    /// The sparse image, null on the software path.
+    const SparseImage* Sparse() const {
+        return sparse_;
+    }
+
+    /// The page pool, null on the hardware path.
+    const PagePool* Pool() const {
+        return pool_;
+    }
+
+    /// Frame slot `slot`'s min-LOD map, one R32 float per mip-0 tile;
+    /// on the hardware path.
     const GpuImage& MinLodMap(std::uint32_t slot) const {
         return *minLods_[slot];
     }
 
-    /// The address of slot `slot`'s request flags.
+    /// The address of slot `slot`'s request flags; on the software
+    /// path its page table follows them (as many uints, at least
+    /// one).
     VkDeviceAddress RequestAddress(std::uint32_t slot) const {
         return requests_[slot]->Address();
     }
@@ -97,7 +126,7 @@ class VirtualTexture {
     /// Tiles resident now, the tail's and those evicted but still
     /// bound not counted.
     std::size_t ResidentTiles() const {
-        return image_->BoundTiles() - retiring_.size();
+        return store_->BoundTiles() - retiring_.size();
     }
 
     /// The finest mip resident at mip-0 tile (`x`, `y`), before the
@@ -106,24 +135,32 @@ class VirtualTexture {
     std::uint32_t FinestResident(std::uint32_t x,
                                  std::uint32_t y) const;
 
-    /// Device memory held: the sparse image's, the map's and the
-    /// request buffers'.
+    /// Device memory held: the tiles', the maps' and the request
+    /// buffers'.
     VkDeviceSize Bytes() const;
 
   private:
     /// Where `tile`'s flag sits in the request buffers.
     std::size_t FlagIndex(const SparseTile& tile) const;
-    /// `tile`'s blocks cut from the source, rows top to bottom.
+    /// `tile`'s blocks cut from the source, rows top to bottom, with
+    /// the store's border of its neighbours' (clamped at the mip's
+    /// edges).
     std::vector<std::byte> TileData(const SparseTile& tile) const;
     void Want(const SparseTile& tile);
     /// Whether `tile` is bound and not on its way out.
     bool Resident(const SparseTile& tile) const;
     /// Rewrites slot `slot`'s min-LOD map, copied ahead of its frame.
     void WriteMinLod(std::uint32_t slot);
+    /// Rewrites slot `slot`'s page table, after its request flags,
+    /// which no frame in flight reads.
+    void WritePageTable(std::uint32_t slot);
 
     const VulkanContext& context_;
     std::shared_ptr<const TextureData> source_;
-    std::unique_ptr<SparseImage> image_;
+    std::unique_ptr<TileStore> store_;
+    SparseImage* sparse_ = nullptr;
+    PagePool* pool_ = nullptr;
+
     std::array<std::unique_ptr<GpuImage>, FrameUploads::kSlots>
         minLods_;
     std::array<std::unique_ptr<GpuBuffer>, FrameUploads::kSlots>

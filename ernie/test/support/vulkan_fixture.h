@@ -27,11 +27,17 @@ inline bool RequireValidation() {
 /// fails it on any validation message.
 class VulkanTest : public ::testing::Test {
   protected:
+    /// The context's options: validation on; fixtures may change
+    /// others.
+    virtual VulkanContextOptions Options() const {
+        VulkanContextOptions options;
+        options.validation = true;
+        return options;
+    }
+
     void SetUp() override {
         try {
-            VulkanContextOptions options;
-            options.validation = true;
-            context_ = VulkanContext::Create(options);
+            context_ = VulkanContext::Create(Options());
         } catch (const std::runtime_error& error) {
             if (RequireValidation()) {
                 FAIL() << "No Vulkan device: " << error.what();

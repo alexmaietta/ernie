@@ -11,6 +11,7 @@ ernie_add_library(
     image.cpp
     memory_stats.cpp
     offscreen_target.cpp
+    page_pool.cpp
     pipeline.cpp
     shader_compiler.cpp
     sparse_image.cpp

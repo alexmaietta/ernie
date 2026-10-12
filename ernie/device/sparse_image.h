@@ -2,6 +2,7 @@
 #pragma once
 
 #include "ernie/device/buffer.h"
+#include "ernie/device/tile_store.h"
 #include "ernie/device/vulkan_context.h"
 
 #include <compare>
@@ -14,16 +15,6 @@
 #include <vector>
 
 namespace ernie {
-
-/// A tile of a `SparseImage`: mip `mip`'s tile at (`x`, `y`), counted
-/// in tiles from the top left.
-struct SparseTile {
-    std::uint32_t mip = 0;
-    std::uint32_t x = 0;
-    std::uint32_t y = 0;
-
-    auto operator<=>(const SparseTile&) const = default;
-};
 
 /// Description of a `SparseImage`: one 2D layer, sampled.
 struct SparseImageDesc {
@@ -39,8 +30,8 @@ struct SparseImageDesc {
 /// residency), the hardware path of virtual textures: a texture far
 /// larger than device memory holds only the tiles in view, and
 /// filtering spans tiles in hardware. Shaders keep their samples to
-/// bound tiles by clamping the level of detail (`minLod`) to the
-/// finest mip resident there.
+/// bound tiles by sampling no finer than the finest mip resident
+/// there (`VirtualTexture`'s min-LOD map).
 ///
 /// Tiles have the format's standard block shape (64 KiB each: 128 x
 /// 128 texels of 32-bit texels, 256 x 256 of BC7). Mips smaller than
@@ -56,13 +47,13 @@ struct SparseImageDesc {
 /// Reference: Khronos, "Sparse Resources", Vulkan specification,
 /// chapter 33.
 /// https://docs.vulkan.org/spec/latest/chapters/sparsemem.html
-class SparseImage {
+class SparseImage : public TileStore {
   public:
     /// @throws std::runtime_error without sparse residency, or for a
     /// format the device cannot make sparse.
     SparseImage(const VulkanContext& context,
                 const SparseImageDesc& desc);
-    ~SparseImage();
+    ~SparseImage() override;
     SparseImage(const SparseImage&) = delete;
     SparseImage& operator=(const SparseImage&) = delete;
 
@@ -81,30 +72,35 @@ class SparseImage {
     }
 
     /// Texels along a tile's sides.
-    VkExtent2D TileTexels() const {
+    VkExtent2D TileTexels() const override {
         return tileTexels_;
+    }
+
+    /// None: hardware filtering spans tiles.
+    std::uint32_t TileBorder() const override {
+        return 0;
     }
 
     /// The first mip in the mip tail; `Desc().mips` when there is
     /// none.
-    std::uint32_t TailMip() const {
+    std::uint32_t TailMip() const override {
         return tailMip_;
     }
 
     /// Tiles across and down mip `mip` (below `TailMip`).
     /// @throws std::out_of_range for a mip in the tail or beyond.
-    VkExtent2D TileCount(std::uint32_t mip) const;
+    VkExtent2D TileCount(std::uint32_t mip) const override;
 
     /// Texels across and down `tile`, a whole tile but where it
     /// overhangs its mip's right or bottom edge.
     /// @throws std::out_of_range for a tile the image does not have.
-    VkExtent2D TileExtent(const SparseTile& tile) const;
+    VkExtent2D TileExtent(const SparseTile& tile) const override;
 
     /// Bytes of tightly packed texels (or blocks) of `tile`.
-    VkDeviceSize TileDataBytes(const SparseTile& tile) const;
+    VkDeviceSize TileDataBytes(const SparseTile& tile) const override;
 
     /// Device memory a tile takes.
-    VkDeviceSize TileMemoryBytes() const {
+    VkDeviceSize TileMemoryBytes() const override {
         return tileMemory_;
     }
 
@@ -113,29 +109,31 @@ class SparseImage {
     /// to bottom) into tile `i`, for work submitted after it to read.
     /// @throws std::invalid_argument for a tile the image does not
     /// have, or data of the wrong size.
-    void Write(std::span<const SparseTile> tiles,
-               std::span<const std::span<const std::byte>> texels);
+    void Write(
+        std::span<const SparseTile> tiles,
+        std::span<const std::span<const std::byte>> texels) override;
 
     /// Writes the mip tail: `mips[i]` holds mip `TailMip() + i`,
     /// tightly packed, for work submitted after it to read.
     /// @throws std::invalid_argument for the wrong number of mips or
     /// a mip of the wrong size.
-    void WriteTail(std::span<const std::span<const std::byte>> mips);
+    void WriteTail(
+        std::span<const std::span<const std::byte>> mips) override;
 
     /// Unbinds `tiles` and frees their memory now; no work in flight
     /// may read them. Tiles not bound are skipped.
-    void Release(std::span<const SparseTile> tiles);
+    void Release(std::span<const SparseTile> tiles) override;
 
-    bool Bound(const SparseTile& tile) const {
+    bool Bound(const SparseTile& tile) const override {
         return tiles_.contains(tile);
     }
 
-    std::size_t BoundTiles() const {
+    std::size_t BoundTiles() const override {
         return tiles_.size();
     }
 
     /// Device memory bound: the mip tail and every bound tile.
-    VkDeviceSize Bytes() const;
+    VkDeviceSize Bytes() const override;
 
   private:
     void Check(const SparseTile& tile) const;

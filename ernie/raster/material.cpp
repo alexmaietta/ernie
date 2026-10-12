@@ -718,23 +718,37 @@ void RasterMaterial::WriteUniform() {
                                      : fallbacks_[slot].get());
         u.heap[9 + slot] = sampler(samplers_[slot].get());
     }
-    // A virtual albedo texture: its sparse image, min-LOD map (slot
-    // 14) and this frame slot's request flags.
+    // A virtual albedo texture (`textures.x` 2 on a sparse image, 3
+    // in pages): the sparse image and its min-LOD map (slot 14), or
+    // the tail image and the pages (slot 14, an array); this frame
+    // slot's request flags, which the page table follows.
     const MaterialTexture* albedoTexture = textures_[0].get();
-    if (albedoTexture != nullptr && albedoTexture->virtualTexture) {
+    if (albedoTexture != nullptr && albedoTexture->virtualTexture &&
+        u.textures[0] > 0.0f) {
         const VirtualTexture& texture =
             *albedoTexture->virtualTexture;
-        const SparseImage& sparse = texture.Image();
-        heapSlots_.push_back(heap.AddImage(
-            BindlessHeap::Kind::Texture2D, sparse.View()));
-        u.heap[4] = heapSlots_.back().Index();
-        u.heap[14] = image(&texture.MinLodMap(frameSlot_));
-        u.virtualAlbedo[0] = sparse.TailMip();
-        u.virtualAlbedo[1] = sparse.Desc().mips;
-        u.virtualAlbedo[2] = sparse.Desc().width;
-        u.virtualAlbedo[3] = sparse.Desc().height;
-        u.virtualTile[0] = sparse.TileTexels().width;
-        u.virtualTile[1] = sparse.TileTexels().height;
+        const TileStore& store = texture.Store();
+        if (const SparseImage* sparse = texture.Sparse()) {
+            heapSlots_.push_back(heap.AddImage(
+                BindlessHeap::Kind::Texture2D, sparse->View()));
+            u.heap[4] = heapSlots_.back().Index();
+            u.heap[14] = image(&texture.MinLodMap(frameSlot_));
+            u.textures[0] = 2.0f;
+        } else {
+            const PagePool& pool = *texture.Pool();
+            u.heap[4] = image(&pool.TailImage());
+            heapSlots_.push_back(
+                heap.AddImage(BindlessHeap::Kind::Texture2DArray,
+                              pool.PageImage().View()));
+            u.heap[14] = heapSlots_.back().Index();
+            u.textures[0] = 3.0f;
+        }
+        u.virtualAlbedo[0] = store.TailMip();
+        u.virtualAlbedo[1] = texture.Mips();
+        u.virtualAlbedo[2] = texture.Width();
+        u.virtualAlbedo[3] = texture.Height();
+        u.virtualTile[0] = store.TileTexels().width;
+        u.virtualTile[1] = store.TileTexels().height;
         u.virtualRequests = texture.RequestAddress(frameSlot_);
     }
     uploads_.Write(uniform_, std::as_bytes(std::span(&u, 1)));

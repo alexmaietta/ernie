@@ -67,7 +67,7 @@ class VirtualTextureTest : public ernie::testing::VulkanTest {
     std::uint32_t TexelOf(const VirtualTexture& texture,
                           const SparseTile& tile, std::uint32_t x,
                           std::uint32_t y) const {
-        const ernie::SparseImage& image = texture.Image();
+        const ernie::SparseImage& image = *texture.Sparse();
         GpuBuffer texel(*context_, 4,
                         VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                         BufferMemory::Readback);
@@ -112,7 +112,8 @@ std::uint32_t Pack(std::uint32_t x, std::uint32_t y,
 TEST_F(VirtualTextureTest, RequestsLoadTilesWithTheirAncestors) {
     VirtualTexture texture(*context_, Labelled(2048, 1024),
                            VK_FORMAT_R8G8B8A8_UNORM);
-    const ernie::SparseImage& image = texture.Image();
+    ASSERT_NE(texture.Sparse(), nullptr) << "a sparse image";
+    const ernie::SparseImage& image = *texture.Sparse();
     const std::uint32_t tail = image.TailMip();
     ASSERT_GE(tail, 2u) << "tiles in mips 0 and 1 at least";
     EXPECT_EQ(texture.ResidentTiles(), 0u) << "only the tail";
@@ -155,11 +156,11 @@ TEST_F(VirtualTextureTest, TheBudgetEvictsTheLeastRecentlyWanted) {
     {
         VirtualTexture probe(*context_, source,
                              VK_FORMAT_R8G8B8A8_UNORM);
-        tile = probe.Image().TileMemoryBytes();
+        tile = probe.Store().TileMemoryBytes();
     }
     VirtualTexture texture(*context_, source,
                            VK_FORMAT_R8G8B8A8_UNORM, {}, 3 * tile);
-    const ernie::SparseImage& image = texture.Image();
+    const ernie::TileStore& image = texture.Store();
     const std::uint32_t mip = image.TailMip() - 2;
     ASSERT_EQ(image.TileCount(mip).width, 2u);
     texture.Request({mip, 0, 0});
@@ -189,4 +190,106 @@ TEST_F(VirtualTextureTest, TheBudgetEvictsTheLeastRecentlyWanted) {
     EXPECT_TRUE(image.Bound({mip, 0, 1}));
     EXPECT_TRUE(image.Bound({mip + 1, 0, 0}))
         << "wanted by every request";
+}
+
+namespace {
+
+/// As `VirtualTextureTest`, with sparse residency off: virtual
+/// textures page in software.
+class PagedVirtualTextureTest : public ernie::testing::VulkanTest {
+  protected:
+    ernie::VulkanContextOptions Options() const override {
+        ernie::VulkanContextOptions options = VulkanTest::Options();
+        options.disableSparseResidency = true;
+        return options;
+    }
+};
+
+}  // namespace
+
+TEST_F(PagedVirtualTextureTest, TilesLoadIntoBorderedPages) {
+    // 1000 x 600: 120-texel tiles, mips down to one tile in the tail.
+    VirtualTexture texture(*context_, Labelled(1000, 600),
+                           VK_FORMAT_R8G8B8A8_UNORM);
+    ASSERT_EQ(texture.Sparse(), nullptr);
+    ASSERT_NE(texture.Pool(), nullptr);
+    const ernie::PagePool& pool = *texture.Pool();
+    EXPECT_EQ(pool.TileTexels().width, 120u);
+    EXPECT_EQ(pool.TileCount(0).width, 9u);
+    EXPECT_EQ(pool.TileCount(0).height, 5u);
+    // Mip 3 (125 x 75) is still wider than a tile; mip 4 fits one.
+    EXPECT_EQ(pool.TailMip(), 4u);
+
+    const SparseTile tile{0, 2, 1};
+    texture.Request(tile);
+    texture.BeginFrame(0, 1);
+    EXPECT_EQ(texture.ResidentTiles(), pool.TailMip())
+        << "the tile and an ancestor in each coarser tiled mip";
+    EXPECT_TRUE(pool.Bound(tile));
+    EXPECT_EQ(texture.FinestResident(2, 1), 0u);
+    EXPECT_LT(pool.PageOf(tile), pool.Pages());
+    EXPECT_NE(pool.PageOf(tile), pool.PageOf({1, 1, 0}));
+
+    // The page holds the tile's texels inside a border of its
+    // neighbours': page texel (4 + 5, 4 + 7) is the tile's (5, 7),
+    // and page texel (0, 0) lies 4 texels up and left of the tile.
+    const auto page = [&](std::uint32_t x, std::uint32_t y) {
+        GpuBuffer texel(*context_, 4,
+                        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                        BufferMemory::Readback);
+        const ernie::GpuImage& pages = pool.PageImage();
+        context_->Submit([&](VkCommandBuffer commands) {
+            ernie::TransitionImage(
+                commands, pages.Handle(), VK_IMAGE_ASPECT_COLOR_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+            VkBufferImageCopy region{};
+            region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0,
+                                       pool.PageOf(tile), 1};
+            region.imageOffset = {static_cast<std::int32_t>(x),
+                                  static_cast<std::int32_t>(y), 0};
+            region.imageExtent = {1, 1, 1};
+            vkCmdCopyImageToBuffer(
+                commands, pages.Handle(),
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, texel.Handle(),
+                1, &region);
+            ernie::TransitionImage(
+                commands, pages.Handle(), VK_IMAGE_ASPECT_COLOR_BIT,
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        });
+        std::uint32_t value = 0;
+        texel.Read(std::as_writable_bytes(std::span(&value, 1)));
+        return value;
+    };
+    EXPECT_EQ(page(9, 11), Pack(2 * 120 + 5, 1 * 120 + 7, 0));
+    EXPECT_EQ(page(0, 0), Pack(2 * 120 - 4, 1 * 120 - 4, 0));
+}
+
+TEST_F(PagedVirtualTextureTest,
+       TexturesPastTheDevicesImagesArePaged) {
+    // Wider than any image the device makes, as global mosaics are:
+    // only its pages and tail take device memory. One row of texels
+    // with every mip keeps the test small.
+    const std::uint32_t wide =
+        context_->Limits().maxImageDimension2D * 2;
+    auto source = std::make_shared<TextureData>();
+    source->format = TextureFormat::R8;
+    source->width = wide;
+    source->height = 1;
+    std::uint32_t mips = 1;
+    for (std::uint32_t side = wide; side > 1; side >>= 1) {
+        ++mips;
+    }
+    source->mips = mips;
+    for (std::uint32_t mip = 0; mip < mips; ++mip) {
+        source->offsets.push_back(source->bytes.size());
+        source->bytes.resize(source->bytes.size() +
+                             std::max(1u, wide >> mip));
+    }
+    VirtualTexture texture(*context_, source, VK_FORMAT_R8_UNORM);
+    ASSERT_NE(texture.Pool(), nullptr);
+    texture.Request({0, texture.Store().TileCount(0).width - 1, 0});
+    texture.BeginFrame(0, 1);
+    EXPECT_GT(texture.ResidentTiles(), 0u);
 }
