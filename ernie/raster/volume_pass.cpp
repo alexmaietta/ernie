@@ -23,24 +23,15 @@ namespace {
 constexpr VkShaderStageFlags kCompute = VK_SHADER_STAGE_COMPUTE_BIT;
 
 constexpr DescriptorBinding kBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    // The shading pass's resources (ShadingResources).
+    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kCompute},
     {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    // The grids, which PNanoVDB reads as a StructuredBuffer<uint>.
     {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {9, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {10, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
-    {11, VK_DESCRIPTOR_TYPE_SAMPLER, kCompute},
-    {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {13, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
-    {14, VK_DESCRIPTOR_TYPE_SAMPLER, kCompute},
-    {15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    // The pass's own buffers (VolumeResources).
+    {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kCompute},
     // light_pattern's pattern data.
     {29, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
@@ -224,6 +215,9 @@ VolumePass::VolumePass(const VulkanContext& context,
     : context_(context), compiler_(compiler),
       layout_(context, kBindings, sizeof(VolumeConstants)) {
     pool_ = Grow(context_, nullptr, kGridAlignment);
+    resources_ = std::make_unique<GpuBuffer>(
+        context_, 4 * sizeof(VkDeviceAddress),
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, BufferMemory::Device);
 }
 
 const VolumePass::LoadedGrid*
@@ -497,12 +491,16 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     upload(materials_, std::as_bytes(std::span(materials)));
     upload(runs_, std::as_bytes(std::span(runs)));
     upload(lists_, std::as_bytes(std::span(lists)));
+    // The march reads them by address (VolumeResources).
+    const std::array<VkDeviceAddress, 4> addresses{
+        volumes_->Address(), materials_->Address(), runs_->Address(),
+        lists_->Address()};
+    uploads.Write(*resources_, std::as_bytes(std::span(addresses)));
 }
 
 void VolumePass::Record(VkCommandBuffer commands,
                         RenderTargets& targets,
-                        const GpuBuffer& shadingUniforms,
-                        const Lights& lights,
+                        const Shading& shading,
                         const ViewLayout& layout,
                         std::uint32_t firstView, std::uint32_t width,
                         std::uint32_t height, bool pushbroom,
@@ -513,18 +511,19 @@ void VolumePass::Record(VkCommandBuffer commands,
     ERNIE_GPU_ZONE(context_, commands, "Volumes");
     const std::size_t slot = pushbroom ? 1 : 0;
     std::unique_ptr<ComputePipeline>& pipeline = pipelines_[slot];
-    const std::size_t patterns = lights.patterns->Models().size();
+    const std::size_t patterns = shading.patterns->Models().size();
     if (pipeline == nullptr || pipelinePatterns_[slot] != patterns) {
         // The light patterns as shading takes them (`lightPattern`),
         // for lasers' beams in the medium.
         std::vector<ShaderModuleSource> modules =
-            LightPatternModules(*lights.patterns);
+            LightPatternModules(*shading.patterns);
         modules.insert(
             modules.end(),
             {{"projection", pushbroom
                                 ? shaders::kProjectionPushbroomSlang
                                 : shaders::kProjectionPinholeSlang},
              {"brdf", shaders::kBrdfSlang},
+             {"bindless", shaders::kBindlessSlang},
              {"atmosphere", shaders::kAtmosphereSlang},
              {"volume", std::string(shaders::kPNanoVdbPreludeSlang) +
                             shaders::kPNanoVdbHeader + "\n" +
@@ -542,26 +541,14 @@ void VolumePass::Record(VkCommandBuffer commands,
             image.View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     };
     const DescriptorResource resources[] = {
-        DescriptorResource::Of(shadingUniforms),
+        DescriptorResource::Of(*shading.resources),
         sampled(targets.Depth()),
         sampled(targets.GBuffer(2)),
         DescriptorResource::Of(targets.RasterRadiance().View(),
                                VK_IMAGE_LAYOUT_GENERAL),
         DescriptorResource::Of(*pool_),
-        DescriptorResource::Of(*volumes_),
-        DescriptorResource::Of(*materials_),
-        DescriptorResource::Of(*runs_),
-        DescriptorResource::Of(*lists_),
-        DescriptorResource::Of(*lights.table),
-        DescriptorResource::Of(lights.shadowMaps->View()),
-        DescriptorResource::Of(*lights.shadowSampler),
-        DescriptorResource::Of(*lights.shadowViews),
-        sampled(*lights.transmittance),
-        DescriptorResource::Of(*lights.tableSampler),
-        DescriptorResource::Of(*lights.patternNorms),
-        DescriptorResource::Of(*lights.timing),
-        DescriptorResource::Of(*lights.profiles),
-        DescriptorResource::Of(*lights.patternData)};
+        DescriptorResource::Of(*resources_),
+        DescriptorResource::Of(*shading.patternData)};
     VolumeConstants constants{};
     constants.layout[0] = firstView;
     constants.layout[1] = layout.stride;

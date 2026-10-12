@@ -53,18 +53,13 @@ class VolumePass {
         std::uint32_t atmosphere = 0;   ///< Two float4s.
     };
 
-    /// The shading pass's lights and what lights the medium with
-    /// them (volume.slang's bindings 9 to 17 and 29).
-    struct Lights {
-        const GpuBuffer* table = nullptr;
-        const GpuImage* shadowMaps = nullptr;
-        const Sampler* shadowSampler = nullptr;
-        const GpuBuffer* shadowViews = nullptr;
-        const GpuImage* transmittance = nullptr;
-        const Sampler* tableSampler = nullptr;
-        const GpuBuffer* patternNorms = nullptr;
-        const GpuBuffer* timing = nullptr;
-        const GpuBuffer* profiles = nullptr;  ///< IES profiles.
+    /// What the march takes from the shading pass: its resources as
+    /// it recorded them (shading.slang's ShadingResources: the views'
+    /// uniforms, the lights, their shadow maps and the atmosphere's
+    /// transmittance, by address and heap index), and the light
+    /// patterns lasers draw with (light_pattern's data and registry).
+    struct Shading {
+        const GpuBuffer* resources = nullptr;
         const GpuBuffer* patternData = nullptr;
         const LightPatternRegistry* patterns = nullptr;
     };
@@ -102,8 +97,7 @@ class VolumePass {
     /// Its pipelines compile again when light patterns are added.
     /// The caller adds the barrier after it.
     void Record(VkCommandBuffer commands, RenderTargets& targets,
-                const GpuBuffer& shadingUniforms,
-                const Lights& lights, const ViewLayout& layout,
+                const Shading& shading, const ViewLayout& layout,
                 std::uint32_t firstView, std::uint32_t width,
                 std::uint32_t height, bool pushbroom, bool sky) const;
 
@@ -147,6 +141,8 @@ class VolumePass {
     std::unique_ptr<GpuBuffer> materials_;
     std::unique_ptr<GpuBuffer> runs_;
     std::unique_ptr<GpuBuffer> lists_;
+    /// volume.slang's VolumeResources: the buffers above by address.
+    std::unique_ptr<GpuBuffer> resources_;
     std::uint32_t views_ = 0;
     std::uint32_t seed_ = 0;
     bool active_ = false;

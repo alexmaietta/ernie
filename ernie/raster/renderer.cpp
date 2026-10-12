@@ -493,6 +493,17 @@ VolumePass::ViewLayout VolumeLayout() {
                       offsetof(LightGpu, polarization) == 784 &&
                       sizeof(LightGpu) == 800,
                   "volume.slang's LightGpu must match");
+    // It reads the views' uniforms 16 bytes at a time.
+    static_assert(
+        kShadingStride % 16 == 0 &&
+            offsetof(ShadingUniforms, invViewProj) % 16 == 0 &&
+            offsetof(ShadingUniforms, strip) % 16 == 0 &&
+            offsetof(ShadingUniforms, range) % 16 == 0 &&
+            offsetof(ShadingUniforms, size) % 16 == 0 &&
+            offsetof(ShadingUniforms, view) % 16 == 0 &&
+            offsetof(ShadingUniforms, lightShadow) % 16 == 0 &&
+            offsetof(ShadingUniforms, atmosphere) % 16 == 0,
+        "volume.slang reads the views' uniforms as uint4s");
     return {
         static_cast<Offset>(kShadingStride),
         static_cast<Offset>(offsetof(ShadingUniforms, invViewProj)),
@@ -555,7 +566,8 @@ struct ShadingResources {
 };
 static_assert(sizeof(ShadingResources) == 144 &&
                   offsetof(ShadingResources, sigmoidTable) == 96,
-              "ShadingResources must match shading.slang");
+              "ShadingResources must match shading.slang and "
+              "volume.slang");
 
 /// shading.slang's ShadingConstants: the dispatch's model and first
 /// view, and the terrain horizon the dome occlusion reads
@@ -4227,22 +4239,14 @@ void RasterRenderer::RecordViews(
         }
         Shade(commands, targets, first);
         if (volumes_->Active()) {
-            VolumePass::Lights lights;
-            lights.table = &lightTable_;
-            lights.shadowMaps = lightShadowMaps_.get();
-            lights.shadowSampler = &shadowSampler_;
-            lights.shadowViews = lightViewMatrices_.get();
-            lights.transmittance = &atmosphere_->Transmittance();
-            lights.tableSampler = &tableSampler_;
-            lights.patternNorms = &patternNorms_;
-            lights.timing = lightTiming_.get();
-            lights.profiles = &lightProfiles_;
-            lights.patternData = patternData_.get();
-            lights.patterns = &lightPatterns_;
-            volumes_->Record(commands, targets, shadingUniforms_,
-                             lights, VolumeLayout(), first,
-                             extent_.width, extent_.height,
-                             pushbroom_, sky_ != 0);
+            // Shading's resources as Shade wrote them just before.
+            VolumePass::Shading shading;
+            shading.resources = shadingResources_.get();
+            shading.patternData = patternData_.get();
+            shading.patterns = &lightPatterns_;
+            volumes_->Record(commands, targets, shading,
+                             VolumeLayout(), first, extent_.width,
+                             extent_.height, pushbroom_, sky_ != 0);
             ShaderBarrier(commands);
         }
         if (subframes_ > 1) {

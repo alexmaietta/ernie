@@ -26,14 +26,12 @@
 // frame to their grid's index space, where values sit at integer coordinates (trilinear between
 // them).
 //
-// Bindings: 0 the shading uniforms (read at the byte offsets in `constants`, a block per view), 1
-// depth and 2 ids of the G-buffer, 3 the spectral radiance (a layer per view and band), 4 the
-// grids, 5 the volumes, 6 their materials, 7 each view's runs of `viewVolumes` (offset and count
-// of those it marches, then of those that shadow them), 8 the volumes each view sees; then the
-// shading pass's: 9 the lights, 10 their shadow maps, 11 the
-// comparison sampler, 12 their shadow views, 13 the atmosphere's transmittance table, 14 its
-// sampler, 15 the light patterns' norms, 16 the lasers' timing, 17 the IES profiles, 29 the
-// patterns' data (light_pattern's binding).
+// Bindings: 0 the shading pass's resources (shading.slang's ShadingResources, as it recorded them:
+// the views' uniforms, read at the byte offsets in `constants`, the lights, their shadow maps and
+// views, profiles, patterns' norms and timing, the atmosphere's transmittance), 1 depth and 2 ids
+// of the G-buffer, 3 the spectral radiance (a layer per view and band), 4 the grids, 5 the pass's
+// own buffers (`VolumeResources`), 29 the light patterns' data (light_pattern's). Textures and
+// samplers come from the bindless heap (bindless.slang), buffers through their addresses.
 //
 // References:
 // - K. Museth, "NanoVDB: A GPU-Friendly and Portable VDB Data Structure For Real-Time Rendering
@@ -52,6 +50,7 @@
 
 import projection;
 import brdf;
+import bindless;
 import atmosphere;
 import light_pattern;
 import light_patterns;
@@ -159,34 +158,80 @@ struct LightGpu {
     float4 polarization;
 }
 
-[[vk::binding(0, 0)]] ByteAddressBuffer shadingBlocks;
+// The shading pass's resources (shading.slang's ShadingResources, which the renderer checks this
+// against): the buffers this pass reads, typed, the rest only for their place.
+struct ShadingResources {
+    // Every view's uniforms, read in 16-byte pieces at byte offsets (`viewLoad`).
+    uint4* views;
+    uint* materials;
+    LightGpu* lights;
+    float4x4* lightViews;
+    float* lightProfiles;
+    float* patternNorms;
+    float2* lightTiming;
+    uint* stars;
+    uint* starCells;
+    uint* atmosphereMedium;
+    uint* atmosphereDensities;
+    uint* atmospherePhases;
+    uint sigmoidTable;
+    uint tableSampler;
+    uint lightShadowMaps;
+    uint lightShadowSampler;
+    uint domeMap;
+    uint domeLighting;
+    uint horizonMap;
+    uint terrainHeights;
+    uint atmosphereTransmittance;
+    uint atmosphereMultiple;
+    uint atmosphereSkyIrradiance;
+    uint atmosphereRefraction;
+}
+
+// The pass's own buffers (`VolumePass`): the volumes, their materials, each view's runs of
+// `viewVolumes` (offset and count of those it marches, then of those that shadow them), and the
+// volumes each view sees.
+struct VolumeResources {
+    VolumeGpu* volumes;
+    VolumeMaterialGpu* materials;
+    uint4* runs;
+    uint* lists;
+}
+
+[[vk::binding(0, 0)]] ConstantBuffer<ShadingResources> shading;
 [[vk::binding(1, 0)]] Texture2DArray<float> gDepth;
 [[vk::binding(2, 0)]] Texture2DArray<uint4> gIds;
 [[vk::binding(3, 0)]] RWTexture2DArray<float> spectral;
 [[vk::binding(4, 0)]] StructuredBuffer<uint> grids;
-[[vk::binding(5, 0)]] StructuredBuffer<VolumeGpu> volumes;
-[[vk::binding(6, 0)]] StructuredBuffer<VolumeMaterialGpu> volumeMaterials;
-[[vk::binding(7, 0)]] StructuredBuffer<uint4> viewRuns;
-[[vk::binding(8, 0)]] StructuredBuffer<uint> viewVolumes;
-[[vk::binding(9, 0)]] StructuredBuffer<LightGpu> lights;
-[[vk::binding(10, 0)]] Texture2DArray<float> lightShadowMaps;
-[[vk::binding(11, 0)]] SamplerComparisonState lightShadowSampler;
-[[vk::binding(12, 0)]] StructuredBuffer<float4x4> lightViews;
-[[vk::binding(13, 0)]] Texture2DArray<float4> atmosphereTransmittance;
-[[vk::binding(14, 0)]] SamplerState tableSampler;
-[[vk::binding(15, 0)]] StructuredBuffer<float> patternNorms;
-[[vk::binding(16, 0)]] StructuredBuffer<float2> lightTiming;
-[[vk::binding(17, 0)]] StructuredBuffer<float> lightProfiles;
+[[vk::binding(5, 0)]] ConstantBuffer<VolumeResources> pass;
 [[vk::push_constant]] ConstantBuffer<VolumeConstants> constants;
+
+#define volumes (pass.volumes)
+#define volumeMaterials (pass.materials)
+#define viewRuns (pass.runs)
+#define viewVolumes (pass.lists)
+#define lightViews (shading.lightViews)
+#define lightProfiles (shading.lightProfiles)
+#define patternNorms (shading.patternNorms)
+#define lightTiming (shading.lightTiming)
+#define lightShadowMaps (heapTextureArrays[shading.lightShadowMaps])
+#define lightShadowSampler (heapComparisonSamplers[shading.lightShadowSampler])
+#define atmosphereTransmittance (heapTextureArrays[shading.atmosphereTransmittance])
+#define tableSampler (heapSamplers[shading.tableSampler])
+
+// 16 bytes of the views' uniforms at byte offset `offset` (a multiple of 16).
+uint4 viewLoad(uint offset) {
+    return shading.views[offset / 16];
+}
 
 static const uint kBackground = 0xFFFFFFFF;
 
 float4x4 loadMatrix(uint offset) {
     // glm's column-major order: four columns.
-    let c0 = asfloat(shadingBlocks.Load4(offset));
-    let c1 = asfloat(shadingBlocks.Load4(offset + 16));
-    let c2 = asfloat(shadingBlocks.Load4(offset + 32));
-    let c3 = asfloat(shadingBlocks.Load4(offset + 48));
+    let c0 = asfloat(viewLoad(offset));
+    let c1 = asfloat(viewLoad(offset + 16));
+    let c2 = asfloat(viewLoad(offset + 32));
+    let c3 = asfloat(viewLoad(offset + 48));
     return transpose(float4x4(c0, c1, c2, c3));
 }
 
@@ -524,11 +569,11 @@ LightReach reachOf(LightGpu light, uint slot, uint view, float3 world, float3x2 
 [numthreads(8, 8, 1)]
 void volumeMain(uint3 id : SV_DispatchThreadID) {
     let block = (constants.layout.x + id.z) * constants.layout.y;
-    let size = shadingBlocks.Load4(block + constants.offsets.w);
+    let size = viewLoad(block + constants.offsets.w);
     if (id.x >= size.x || id.y >= size.y) {
         return;
     }
-    let range = asfloat(shadingBlocks.Load4(block + constants.offsets.z));
+    let range = asfloat(viewLoad(block + constants.offsets.z));
     let bands = uint(range.z);
     let groups = (bands + 3) / 4;
     let pixel = int4(id.xyz, 0);
@@ -547,7 +592,7 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
         return;
     }
     let invViewProj = loadMatrix(block + constants.offsets.x);
-    let strip = asfloat(shadingBlocks.Load4(block + constants.offsets.y));
+    let strip = asfloat(viewLoad(block + constants.offsets.y));
 
     let ndc = float2((float(id.x) + 0.5) / float(size.x) * 2.0 - 1.0,
                      1.0 - (float(id.y) + 0.5) / float(size.y) * 2.0);
@@ -608,12 +653,12 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
     // The view's lights: those of its world (a bit each) from its first; its shadow maps' size;
     // the atmosphere.
     let view = constants.layout.x + id.z;
-    let viewLights = shadingBlocks.Load4(block + constants.lights.x);
+    let viewLights = viewLoad(block + constants.lights.x);
     let lightCount = min(size.w, kMaxLights);
-    let mapTexels = asfloat(shadingBlocks.Load4(block + constants.lights.y)).z;
+    let mapTexels = asfloat(viewLoad(block + constants.lights.y)).z;
     float4 air[2];
-    air[0] = asfloat(shadingBlocks.Load4(block + constants.lights.z));
-    air[1] = asfloat(shadingBlocks.Load4(block + constants.lights.z + 16));
+    air[0] = asfloat(viewLoad(block + constants.lights.z));
+    air[1] = asfloat(viewLoad(block + constants.lights.z + 16));
     // The pixel's extent per unit distance along the ray, to its neighbours' rays.
     float3 neighbour;
     float3 toNeighbour;
@@ -697,7 +742,7 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
                     if ((viewLights.x & (1u << k)) == 0) {
                         continue;
                     }
-                    let light = lights[viewLights.z + k];
+                    let light = shading.lights[viewLights.z + k];
                     // Light linking: only the lights whose links hold the volume light it.
                     if (((light.links.x >> volume.info.z) & 1u) == 0) {
                         continue;
