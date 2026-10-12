@@ -6942,6 +6942,31 @@ void RasterRenderer::SetOverlayComputeInterop(
     overlays_->SetComputeInterop(compute);
 }
 
+std::optional<OverlayPass::Picked>
+RasterRenderer::PickOverlay(RenderTargets& targets, std::uint32_t x,
+                            std::uint32_t y) {
+    if (overlays_->Empty() || faces_ > 1 || x >= extent_.width ||
+        y >= extent_.height) {
+        return std::nullopt;
+    }
+    // The caller's frames are submitted outside the context's
+    // tracking.
+    vkDeviceWaitIdle(context_.Device());
+    GpuBuffer readback(context_, 4 * sizeof(std::uint32_t),
+                       VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                       BufferMemory::Readback);
+    context_.Submit([&](VkCommandBuffer commands) {
+        targets.Depth().Transition(
+            commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        overlays_->RecordPick(
+            commands, OverlayTarget(targets, LastSubframeView(0), 0),
+            x, y, readback);
+    });
+    std::array<std::uint32_t, 4> words{};
+    readback.Read(std::as_writable_bytes(std::span(words)));
+    return overlays_->DecodePick(words);
+}
+
 void RasterRenderer::SetVolumeComputeInterop(
     ComputeInterop* compute) {
     volumes_->SetComputeInterop(compute);

@@ -475,6 +475,13 @@ class RasterRenderer {
     /// Connects the compute device overlay batches' GPU arrays are
     /// copied from (`OverlayPass::SetComputeInterop`).
     void SetOverlayComputeInterop(ComputeInterop* compute);
+    /// The overlay item drawn at pixel (`x`, `y`) of the last frame's
+    /// first view in `targets` (`OverlayPass::RecordPick`), waiting
+    /// for it; none off the image, where none is, or for a camera on
+    /// cube faces.
+    std::optional<OverlayPass::Picked>
+    PickOverlay(RenderTargets& targets, std::uint32_t x,
+                std::uint32_t y);
     /// The overlays' pass, to pose their anchors and map their
     /// batches' arrays.
     OverlayPass& Overlays() {

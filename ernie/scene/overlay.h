@@ -16,6 +16,8 @@
 
 namespace ernie {
 
+class Scene;
+
 /// How an overlay item meets the scene's surfaces.
 enum class OverlayDepth : std::uint8_t {
     Test,    ///< Hidden behind surfaces, like scene geometry.
@@ -50,6 +52,10 @@ struct OverlayStyle {
     glm::vec4 background{
         0.0f, 0.0f, 0.0f,
         0.55f};  ///< Labels' backing box; alpha 0 for none.
+    /// Text's halo: an outline this many pixels wide around each
+    /// character in `background`'s colour, in place of the backing
+    /// box, up to a fifth of `size`; 0 for the box.
+    float halo = 0.0f;
     /// The prim the items are posed under: their coordinates are in
     /// its space, and they follow it as it moves, on the GPU too
     /// (a prim posed there). Empty for world coordinates.
@@ -61,6 +67,10 @@ struct OverlayStyle {
     /// The colour items with `id` take while it is hovered
     /// (`Overlay::SetHovered`); none keeps their colour.
     std::optional<glm::vec4> hover;
+    /// Markers' and text's `size` in metres rather than pixels: in
+    /// the world they grow and shrink with distance as things there
+    /// do, still facing the view.
+    bool metric = false;
 };
 
 /// Where a screen item (`Overlay::Text`, `Overlay::Rect`) sits on
@@ -100,6 +110,7 @@ struct OverlayItem {
     std::uint32_t anchor = 0;
     std::uint32_t id = 0;            ///< `OverlayStyle::id`.
     std::optional<glm::vec4> hover;  ///< `OverlayStyle::hover`.
+    bool metric = false;             ///< `OverlayStyle::metric`.
 };
 
 /// A line segment of `width` pixels, dashed every `dash` pixels
@@ -110,6 +121,9 @@ struct OverlaySegment {
     float width = 2.0f;
     OverlayItem item;
     float dash = 0.0f;
+    /// The colour at `b`, blended from `item.color` at `a`; none for
+    /// one colour.
+    std::optional<glm::vec4> endColor;
 };
 
 /// A filled triangle.
@@ -128,31 +142,73 @@ struct OverlaySprite {
     glm::vec4 rect{0.0f};
     MarkerShape shape = MarkerShape::Square;
     OverlayItem item;
-    /// A character of text (ASCII, `OverlayGlyphs`) filling `rect`
-    /// in place of the shape, or 0.
-    char glyph = 0;
+    /// A character of text (a Latin-1 code, `OverlayTextFont`)
+    /// filling `rect` in place of the shape, or 0.
+    std::uint8_t glyph = 0;
     bool screen = false;
+    /// A character's halo (`OverlayStyle::halo`): pixels wide, and
+    /// its colour.
+    float halo = 0.0f;
+    glm::vec4 haloColor{0.0f};
 };
 
-/// The font overlay text is drawn in, stb_easy_font's: each printable
-/// ASCII character's pixels on a grid of `kOverlayGlyphCell` units, a
-/// line `kOverlayLineHeight` units tall, scaled so a line is the
-/// style's `size` pixels.
-inline constexpr int kOverlayGlyphCell = 16;
+/// The font overlay text is drawn in, Inter, baked into signed
+/// distance fields, so it stays sharp at any size and can take a
+/// halo. Text is Latin-1 (given as UTF-8, anything else drawn as
+/// '?'), laid out on a grid of which a line is `kOverlayLineHeight`
+/// units, y down from the top of its capitals, and scaled so a line
+/// is the style's `size` pixels.
 inline constexpr float kOverlayLineHeight = 12.0f;
+/// A field's texels per unit (40 a line); how far it reaches past
+/// the outlines, in texels; and its levels per texel of distance, 128
+/// on the outline and more inside.
+inline constexpr float kOverlayFieldTexels =
+    40.0f / kOverlayLineHeight;
+inline constexpr int kOverlayFieldPadding = 8;
+inline constexpr float kOverlayFieldLevels = 16.0f;
 
-/// One character of the font (`OverlayGlyphs`): rows of
-/// `kOverlayGlyphCell` bits, bit x of row y covering the unit square
-/// at (x, y) from the pen, y down; the box its bits fill (x0, y0, x1,
-/// y1, exclusive), and how far it moves the pen.
+/// One character of the font (`OverlayTextFont`).
 struct OverlayGlyph {
-    std::array<std::uint16_t, kOverlayGlyphCell> rows{};
-    std::array<std::uint8_t, 4> box{};
-    std::uint8_t advance = 0;
+    /// The box its field covers, in units from the pen: x0, y0, x1,
+    /// y1, y down.
+    glm::vec4 box{0.0f};
+    /// How far it moves the pen, in units.
+    float advance = 0.0f;
+    /// Its field's first texel in `OverlayFont::field`, and its
+    /// texels across and down; 0 for a character with no outline,
+    /// such as a space.
+    std::uint32_t texel = 0;
+    std::uint16_t width = 0;
+    std::uint16_t height = 0;
 };
 
-/// The font's characters from ' ' (32) to '~' (126), in order.
-std::span<const OverlayGlyph> OverlayGlyphs();
+/// First and number of codes the font's kerning covers, ' ' to 'ÿ'.
+inline constexpr std::uint32_t kOverlayKernFirst = 32;
+inline constexpr std::uint32_t kOverlayKernCodes = 224;
+
+struct OverlayFont {
+    /// By Latin-1 code; codes the font lacks are '?'.
+    std::array<OverlayGlyph, 256> glyphs{};
+    /// The pen's move between codes a and b besides a's advance,
+    /// in sixteenths of a unit, at (a - kOverlayKernFirst) *
+    /// kOverlayKernCodes + b - kOverlayKernFirst.
+    std::vector<std::int8_t> kerning;
+    /// Every glyph's distance field, row by row from its top.
+    std::vector<std::uint8_t> field;
+    /// A line's text from the top of its capitals to the bottom of
+    /// its descenders, in units.
+    float textHeight = 0.0f;
+
+    /// The kerning between codes `a` and `b`, in units.
+    float Kerning(std::uint8_t a, std::uint8_t b) const;
+};
+
+/// The font, baked on first use.
+const OverlayFont& OverlayTextFont();
+
+/// `text` (UTF-8) as the font's Latin-1 codes, '\n' kept, '?' for
+/// what it lacks.
+std::vector<std::uint8_t> OverlayCodes(std::string_view text);
 
 /// Width and height in pixels of `text` (lines split at '\n') in the
 /// font at `size` pixels a line.
@@ -182,6 +238,10 @@ enum class OverlayBatchKind : std::uint8_t {
                ///< hemispheres.
     Texts,     ///< Each row of `chars` as text, at `points` as
                ///< labels' or on the screen as `Numbers`'.
+    Image,     ///< `image` on a quad: in the world between the four
+               ///< `points` (its top left, top right, bottom right
+               ///< and bottom left corners), or on the screen at
+               ///< `placement`, `imageSize` pixels.
 };
 
 /// How a `Numbers` batch prints each of its values: `prefix`, the
@@ -252,6 +312,13 @@ struct OverlayBatch {
     /// (n, k) int32: texts' character codes (printable ASCII), each
     /// row up to its first 0; their number when they have no points.
     Tensor chars;
+    /// (rows, cols, 3 or 4) uint8: an image's display (sRGB-encoded)
+    /// colours and opacity, row 0 at its top, such as another
+    /// camera's LdrColor; filtered between texels, times the style's
+    /// colour.
+    Tensor image;
+    /// A screen image's size in pixels; its own when 0.
+    glm::vec2 imageSize{0.0f};
     OverlayNumberFormat format;  ///< Numbers'.
     /// Numbers drawn on the image rather than in the world, over
     /// everything.
@@ -328,10 +395,14 @@ class Overlay {
                   const OverlayStyle& style = {});
 
     /// Segments through `points` in order, back to the first with
-    /// `closed`.
+    /// `closed`; with `colors` (one per point), each blending from
+    /// its start's to its end's, such as a trail coloured by speed.
+    /// @throws std::invalid_argument for a colour count that differs
+    /// from the point count.
     Overlay& Polyline(std::span<const glm::dvec3> points,
                       const OverlayStyle& style = {},
-                      bool closed = false);
+                      bool closed = false,
+                      std::span<const glm::vec4> colors = {});
 
     /// Many segments at once: `endpoints` in pairs, each segment
     /// coloured by `colors` when given (one per segment), else by the
@@ -418,6 +489,22 @@ class Overlay {
     Overlay& Rect(const ScreenPlacement& placement,
                   const glm::vec2& size,
                   const OverlayStyle& style = {});
+
+    /// `image` (`OverlayBatch::image`) on the quad between `corners`
+    /// in the world: its top left, top right, bottom right and bottom
+    /// left, in the space of the style's `anchor` if it has one. A
+    /// GPU image is read again every frame, such as another camera's
+    /// output written in place.
+    /// @throws std::invalid_argument as `Batch`.
+    Overlay& Image(std::span<const glm::dvec3, 4> corners,
+                   Tensor image, const OverlayStyle& style = {});
+
+    /// `image` on the screen, as `Rect`, `size` pixels (its own size
+    /// when 0): a picture in the picture.
+    /// @throws std::invalid_argument as `Batch`.
+    Overlay& ScreenImage(const ScreenPlacement& placement,
+                         Tensor image, const OverlayStyle& style = {},
+                         const glm::vec2& size = glm::vec2(0.0f));
 
     /// A button on the image, as `Text`: a box of `size` pixels (or
     /// fitted around `label` when 0) in the style's `background`, or
@@ -538,6 +625,27 @@ class Overlay {
     bool visible_ = true;
     std::uint64_t version_ = 0;
 };
+
+/// What a pick of a rendered image found at a pixel
+/// (`RenderDelegate::PickOverlay`): the overlay drawing it, and in it
+/// a batch's item (`batch` the batch, `item` its index) or a host
+/// item (`batch` -1, `item` its `OverlayStyle::id`).
+struct OverlayHit {
+    std::string overlay;
+    std::int32_t batch = -1;
+    std::uint32_t item = 0;
+};
+
+/// The corners of the image of the Camera at `camera`, `distance`
+/// metres in front of it: its frustum's section there, from its focal
+/// length and apertures, in the world, top left first as
+/// `Overlay::Image` takes them. Its image drawn there sits where it
+/// was seen from.
+/// @throws std::invalid_argument for a prim that is no Camera or a
+/// distance not above 0.
+std::array<glm::dvec3, 4> CameraImageCorners(const Scene& scene,
+                                             const Path& camera,
+                                             double distance);
 
 /// The overlay names `spec` selects among `available`: "*" every one,
 /// else the names it lists, separated by commas or spaces, in the

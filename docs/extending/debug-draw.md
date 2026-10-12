@@ -30,19 +30,32 @@ In C++ the same layer is `scene.GetOverlay("debug")`, with `Line`, `Label`, `Cle
 | `axes` | A transform's x, y and z axes in red, green and blue |
 | `wire_mesh`, `triangles` | A mesh's edges, or its filled triangles |
 | `marker`, `markers` | Circles, rings, squares, diamonds, crosses or pluses of `size` pixels |
-| `label` | Text beside a point, over a backing box |
+| `label` | Text beside a point, over a backing box or with a halo |
 
 Every method takes style keywords:
 
 - `color`: RGB or RGBA display colour; alpha blends over the image.
 - `width`: line width in pixels. `dash`: dashes and gaps this many pixels long, 0 for solid.
 - `size`: marker diameter, or text height in pixels.
+- `metric=True`: markers' and text's `size` in metres instead, so in the world they shrink with distance like the things they mark, still facing the camera.
 - `depth`: how items meet the scene's surfaces. `"test"` hides them behind surfaces, `"xray"` draws them faded where surfaces hide them, `"always"` draws them over everything.
 - `world`: the world whose views show the item in a batched camera, -1 for every view.
 - `background`: the backing box of labels and text; alpha 0 for none.
+- `halo`: text's outline, this many pixels of `background`'s colour around each character, in place of the box.
 - `anchor`: a prim the item's coordinates are relative to (see below).
+- `id` and `hover`: a number that hit tests and picks report, and the colour items with that id take while hovered (see below).
 
-Lines and markers keep their size in pixels at any distance, and markers and text always face the camera.
+Lines and markers keep their size in pixels at any distance, and markers and text always face the camera. `polyline(points, colors=...)` blends a colour per point along the line, and joined segments meet with round ends.
+
+## Text
+
+Text is drawn in [Inter](https://rsms.me/inter/), baked once into signed distance fields, so it stays sharp at any size, scale or angle. It is kerned, and covers Latin-1: strings are UTF-8, and anything outside Latin-1 draws as `?`. A halo outlines each character instead of putting a box behind the text, which keeps labels legible over busy ground without hiding it:
+
+```python
+names.label(position, "Mare Tranquillitatis", size=14, background=(0, 0, 0, 0.8), halo=1.5)
+```
+
+A halo can be up to a fifth of the text's size.
 
 ## Text on the image
 
@@ -57,6 +70,22 @@ hud.rect((240 * share, 14), at=(0.5, 1), offset=(-120, -16), align=(0, 1), color
 ```
 
 On a camera rendered through cube faces (a fisheye), screen items are drawn after the lens, so it bends the world's items but not the HUD.
+
+## Buttons and picking
+
+`button` draws a box with a centred label on the image. Items with an `id` can be hit: `screen_item_at(pixel, extent)` returns the id of the top screen item at a pixel, and items with a `hover` colour take it while `hovered` is their id. The viewer handles both: under the pointer it sets `hovered`, and `viewer.add_overlay_click_handler(clicked)` calls `clicked(viewer, overlay, id)` when a click lands on one, in place of picking the scene. Any other pointer, such as a VR controller's ray, can do the same through `screen_item_at` and `hovered`.
+
+```python
+menu = scene.overlay("menu")
+menu.button("Pause", at=(0, 1), offset=(12, -12), id=1, background=(0.2, 0.2, 0.2, 0.8), hover=(0.3, 0.5, 0.9, 0.9))
+viewer.add_overlay_click_handler(lambda viewer, overlay, id: toggle_pause())
+```
+
+Items in the world are picked on the GPU: `renderer.pick_overlay(scene, x, y)` draws the overlays once more into a single pixel and returns an `OverlayHit`, with the layer's name, and either the batch and its item index or, for an item drawn one at a time, its `id`. `viewer.add_overlay_pick_handler(picked)` calls `picked(viewer, hit)` for clicks on them.
+
+## Images
+
+`image(corners, image)` draws a (rows, cols, 3 or 4) uint8 image on a quad between four world points (top left, top right, bottom right, bottom left), with perspective-correct filtering. `screen_image(image, at=..., size=...)` places one on the screen instead, like `rect`. The image can be another camera's LdrColor, mapped on the GPU each step: `ernie.camera_image_corners(scene, camera, distance)` gives the corners of a camera's image plane `distance` metres in front of it, so its picture sits in its frustum where it was taken.
 
 ## Following prims
 
@@ -116,4 +145,7 @@ scene.overlay("names").texts(body_names, points=label_offsets, poses=body_q, pos
 
 - `demo_overlays_hud`: screen text and an energy bar redrawn each step, labels following bouncing balls, heights formatted on the GPU.
 - `demo_overlays_physics`: every line style, colour scheme and depth mode over a small simulation: trails coloured by speed, dashed predictions in x-ray, force arrows, fading contacts, bounds, springs coloured by strain, frames, arcs and curves, and a legend.
+- `demo_overlays_menu`: a menu of buttons with hover colours, handled by click handlers.
+- `demo_overlays_camera_billboard`: a drone camera's picture on its image plane in the world and as a picture in picture, with its frustum.
+- `demo_overlays_moon_names`: the IAU's lunar feature names, fetched in the background, with halos, chosen each frame by a level of detail (how many, how small, how far).
 - `demo_interop_physics_debug`: a Warp simulation whose trails, velocities, frames, bounds, contacts, swept capsules and HUD are all read from its GPU arrays.

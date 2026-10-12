@@ -310,6 +310,159 @@ TEST_F(RasterDelegateTest,
     }
 }
 
+TEST_F(RasterDelegateTest, PicksFindOverlayItemsInTheWorld) {
+    // A host marker with an id and a batch of two markers, picked
+    // where the view draws them, as the viewer's clicks do.
+    RasterDelegate delegate(*context_);
+    Scene scene = OverlayScene();
+    OverlayStyle host;
+    host.id = 5;
+    host.size = 8.0f;
+    host.depth = OverlayDepth::Always;
+    scene.GetOverlay("debug").Marker({0.0, 15.0, 0.0}, host,
+                                     MarkerShape::Square);
+    ernie::OverlayBatch markers;
+    markers.kind = ernie::OverlayBatchKind::Markers;
+    markers.points = Tensor::Copy<float>(
+        std::vector<float>{-15.0f, -15.0f, 0.0f, 15.0f, -15.0f, 0.0f},
+        {2, 3});
+    markers.shape = MarkerShape::Square;
+    markers.style.size = 8.0f;
+    markers.style.depth = OverlayDepth::Always;
+    scene.GetOverlay("contacts").Batch(markers);
+    // Drawn into the viewer's own targets, which picks read.
+    delegate.Update(scene, "/Render/Settings", {kSize, kSize});
+    ernie::OffscreenTarget target(*context_, kSize, kSize,
+                                  VK_FORMAT_R8G8B8A8_UNORM);
+    context_->Submit([&](VkCommandBuffer commands) {
+        delegate.Record(commands, target.Prepare(commands),
+                        ernie::render_vars::kLdrColor);
+    });
+    const Tensor image = delegate.Render(scene);
+    const auto pixel = [&](glm::vec3 p) {
+        const auto at = static_cast<std::size_t>(
+            (TexelAt(scene, image, p) -
+             static_cast<const std::uint8_t*>(image.Data())) /
+            4);
+        return std::pair<std::uint32_t, std::uint32_t>(
+            static_cast<std::uint32_t>(at % kSize),
+            static_cast<std::uint32_t>(at / kSize));
+    };
+    const auto pick = [&](glm::vec3 p) {
+        const auto [x, y] = pixel(p);
+        return delegate.PickOverlay(scene, x, y);
+    };
+    const std::optional<ernie::OverlayHit> marker =
+        pick({0.0f, 15.0f, 0.0f});
+    ASSERT_TRUE(marker.has_value());
+    EXPECT_EQ(marker->overlay, "debug");
+    EXPECT_EQ(marker->batch, -1);
+    EXPECT_EQ(marker->item, 5u);
+    const std::optional<ernie::OverlayHit> second =
+        pick({15.0f, -15.0f, 0.0f});
+    ASSERT_TRUE(second.has_value());
+    EXPECT_EQ(second->overlay, "contacts");
+    EXPECT_EQ(second->batch, 0);
+    EXPECT_EQ(second->item, 1u);
+    EXPECT_FALSE(pick({0.0f, -5.0f, 0.0f}).has_value())
+        << "between them";
+}
+
+TEST_F(RasterDelegateTest, ImagesDrawOnQuadsAndTheScreen) {
+    // A 2 x 2 image of red, green, blue and white texels, on the
+    // screen at its corners' pixels, and on a quad in the world.
+    RasterDelegate delegate(*context_);
+    Scene scene = OverlayScene();
+    const std::vector<std::uint8_t> texels{
+        255, 0, 0,   255, 0,   255, 0,   255,
+        0,   0, 255, 255, 255, 255, 255, 255};
+    const Tensor image =
+        Tensor::Copy<std::uint8_t>(texels, {2, 2, 4});
+    ernie::ScreenPlacement at;
+    at.offset = {0.0f, 0.0f};
+    scene.GetOverlay("pictures")
+        .ScreenImage(at, image, {}, {20.0f, 20.0f});
+    const std::array<glm::dvec3, 4> corners{
+        glm::dvec3(5, 20, 0), glm::dvec3(25, 20, 0),
+        glm::dvec3(25, 0, 0), glm::dvec3(5, 0, 0)};
+    OverlayStyle world;
+    world.depth = OverlayDepth::Always;
+    scene.GetOverlay("pictures").Image(corners, image, world);
+    const std::vector<std::uint8_t> rendered =
+        Bytes(delegate.Render(scene));
+    const auto rgb = [&](std::size_t x, std::size_t y) {
+        const std::size_t texel = 4 * (y * kSize + x);
+        return glm::ivec3(rendered[texel], rendered[texel + 1],
+                          rendered[texel + 2]);
+    };
+    // Each quarter of the screen image near its own texel's colour.
+    EXPECT_EQ(rgb(1, 1), glm::ivec3(255, 0, 0));
+    EXPECT_EQ(rgb(18, 1), glm::ivec3(0, 255, 0));
+    EXPECT_EQ(rgb(1, 18), glm::ivec3(0, 0, 255));
+    EXPECT_EQ(rgb(18, 18), glm::ivec3(255, 255, 255));
+    // The world quad's top left quarter red, its bottom right white.
+    const Tensor again = delegate.Render(scene);
+    EXPECT_EQ(Rgb(scene, again, {6.5f, 18.5f, 0.0f}),
+              glm::ivec3(255, 0, 0));
+    EXPECT_EQ(Rgb(scene, again, {23.5f, 1.5f, 0.0f}),
+              glm::ivec3(255, 255, 255));
+}
+
+TEST_F(RasterDelegateTest, PolylinesBlendTheirPointsColours) {
+    RasterDelegate delegate(*context_);
+    Scene scene = OverlayScene();
+    OverlayStyle style;
+    style.width = 4.0f;
+    style.depth = OverlayDepth::Always;
+    const std::vector<glm::dvec3> points{{-20.0, -15.0, 0.0},
+                                         {20.0, -15.0, 0.0}};
+    const std::vector<glm::vec4> colors{{1.0f, 0.0f, 0.0f, 1.0f},
+                                        {0.0f, 0.0f, 1.0f, 1.0f}};
+    scene.GetOverlay("debug").Polyline(points, style, false, colors);
+    const Tensor image = delegate.Render(scene);
+    const glm::ivec3 start =
+        Rgb(scene, image, {-18.0f, -15.0f, 0.0f});
+    const glm::ivec3 end = Rgb(scene, image, {18.0f, -15.0f, 0.0f});
+    EXPECT_GT(start.r, 200);
+    EXPECT_LT(start.b, 60);
+    EXPECT_GT(end.b, 200);
+    EXPECT_LT(end.r, 60);
+}
+
+TEST_F(RasterDelegateTest, MetricMarkersKeepTheirSizeInTheWorld) {
+    // A marker 16 m across and one 16 pixels across, probed between
+    // their half widths in metres: only the larger covers the probe.
+    RasterDelegate delegate(*context_);
+    const Scene plain = OverlayScene();
+    const Tensor reference = delegate.Render(plain);
+    const auto column = [&](float x) {
+        return (TexelAt(plain, reference, {x, 15.0f, 0.0f}) -
+                static_cast<const std::uint8_t*>(reference.Data())) /
+               4 % static_cast<std::ptrdiff_t>(kSize);
+    };
+    const double pixelsPerMetre =
+        static_cast<double>(column(10.0f) - column(0.0f)) / 10.0;
+    ASSERT_GT(pixelsPerMetre, 0.0);
+    const double metricHalf = 8.0;                  // metres
+    const double pixelHalf = 8.0 / pixelsPerMetre;  // metres
+    const double probe = 0.5 * (metricHalf + pixelHalf);
+    for (const bool metric : {true, false}) {
+        Scene scene = OverlayScene();
+        OverlayStyle style;
+        style.size = 16.0f;
+        style.metric = metric;
+        style.depth = OverlayDepth::Always;
+        style.color = {0.0f, 1.0f, 0.0f, 1.0f};
+        scene.GetOverlay("debug").Marker({0.0, 15.0, 0.0}, style,
+                                         MarkerShape::Square);
+        const Tensor image = delegate.Render(scene);
+        const glm::ivec3 rim = Rgb(
+            scene, image, {static_cast<float>(probe), 15.0f, 0.0f});
+        const bool covers = (metric ? metricHalf : pixelHalf) > probe;
+        EXPECT_EQ(rim == glm::ivec3(0, 255, 0), covers) << metric;
+    }
+}
+
 TEST_F(RasterDelegateTest, HoveredButtonsTakeTheirHoverColour) {
     RasterDelegate delegate(*context_);
     Scene scene = OverlayScene();

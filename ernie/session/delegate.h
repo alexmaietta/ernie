@@ -369,6 +369,19 @@ class RenderDelegate {
         return {};
     }
 
+    /// The overlay item the view's last frame drew at pixel (`x`,
+    /// `y`), among `scene`'s overlays (`OverlayHit`): a marker, a
+    /// line, a contact of a batch. None where none is, or for a
+    /// backend that cannot tell. Waits for the device, as `Pick`.
+    virtual std::optional<OverlayHit> PickOverlay(const Scene& scene,
+                                                  std::uint32_t x,
+                                                  std::uint32_t y) {
+        static_cast<void>(scene);
+        static_cast<void>(x);
+        static_cast<void>(y);
+        return std::nullopt;
+    }
+
     virtual RenderStats Stats() const = 0;
 
     /// World bounds of what the delegate draws as of its last `Sync`

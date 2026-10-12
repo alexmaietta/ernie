@@ -40,10 +40,16 @@ float4 project(float3 world) {
 // low byte, marker shape (kShape*) in the next, a sprite's character (or 0) in the third and 1 for
 // a screen sprite in the fourth, z the world whose views show it (-1 all), w 1 + its anchor in the
 // anchor table (0 for none).
+// Every item's `extra`: x a segment's colour at `b` (packed as `info.x`), y the item's id
+// (`OverlayStyle::id`, for picks), z kExtra* flags.
+static const uint kExtraEndColor = 1;  // x holds the segment's colour at its end
+static const uint kExtraHalo = 2;      // a character's halo: x its colour, w its width in pixels
+
 struct Segment {
     float4 a;  // xyz relative to the frame's origin, w width in pixels.
     float4 b;  // w the dashes' and gaps' length in pixels, 0 for a solid line.
     uint4 info;
+    uint4 extra;
 }
 
 struct Triangle {
@@ -51,14 +57,21 @@ struct Triangle {
     float4 p1;
     float4 p2;
     uint4 info;
+    uint4 extra;
 }
 
 struct Sprite {
     float4 anchor;  // xyz relative to the frame's origin; a screen sprite's xy fractions of the
                     // image from its top left.
-    float4 rect;    // x0, y0, x1, y1 pixels from the anchor's projection, y down.
+    float4 rect;    // x0, y0, x1, y1 pixels from the anchor's projection, y down; metres with
+                    // kInfoMetric.
     uint4 info;
+    uint4 extra;
 }
+
+// `info.y` above its depth mode, marker shape and character: 1 << 24 a screen sprite, 1 << 25 a
+// sprite sized in metres (`OverlayStyle::metric`).
+static const uint kInfoMetric = 1u << 25;
 
 struct OverlayConstants {
     // x: the view's world, y: its layer of the depth, z: 1 when the attachment has an sRGB format,
@@ -71,9 +84,13 @@ struct OverlayConstants {
     // (`sortedItems`): z the slot, w the batch's slots.
     uint4 batch;
     // x: the first row in the anchor table of the drawn layer's anchors, which its items' count
-    // from (0 for batches, whose items' are rows of the table).
+    // from (0 for batches, whose items' are rows of the table); yz: for a pick, the picked pixel,
+    // which the viewport moves to the 1 x 1 target's; w: what a pick reports drew the item (1 +
+    // the layer, or kPickBatch | the batch).
     uint4 layer;
 }
+
+static const uint kPickBatch = 0x80000000u;
 
 // Many items of one kind read from arrays in `batchData` (`OverlayBatch`), expanded here into
 // segments, triangles or sprites: lines and arrow shafts, box edges, sphere circles and frame axes
@@ -119,6 +136,7 @@ static const uint kBatchNumbers = 6;
 static const uint kBatchTrails = 7;
 static const uint kBatchCapsules = 8;
 static const uint kBatchTexts = 9;
+static const uint kBatchImage = 10;
 
 static const uint kBatchHasColors = 1;
 static const uint kBatchHasAlpha = 2;  // colours with opacity, 4 floats each
@@ -132,10 +150,23 @@ static const uint kBatchHasHeads = 256;
 static const uint kBatchFade = 512;
 static const uint kBatchDirections = 1024;  // ends are vectors from the points, times params.y
 static const uint kBatchPointColors = 2048;  // a trail's colours one per point
+static const uint kBatchEndColors = 4096;    // lines' and arrows' colours one per end
 
-// The font (`OverlayGlyphs`): from ' ', per character its sixteen rows of sixteen bits two to a
-// word, its box (x0, y0, x1, y1 a byte each) and its advance, on a grid of which a line is 12.
-static const uint kGlyphWords = 10;
+// The font (`OverlayTextFont`), on a grid of which a line is 12 units, y down from the top of its
+// capitals: per Latin-1 code kGlyphWords words, its field's box (x0, y0, x1, y1 floats, units
+// from the pen), its advance (a float), its field's first texel, and its texels across and down
+// (16 bits each); then kFontWords of the whole font's (x the text's height in a line, from the top
+// of its capitals to the bottom of its descenders); then its kerning between codes 32 to 255, a
+// signed byte of sixteenths of a unit per pair, four to a word; then its distance fields, a byte
+// per texel, four to a word: 128 on an outline, kFieldLevels more per texel inside.
+static const uint kGlyphWords = 8;
+static const uint kFontWords = 4;
+static const uint kKernFirst = 32;
+static const uint kKernCodes = 224;
+static const uint kFontBase = 256 * kGlyphWords;
+static const uint kKernBase = kFontBase + kFontWords;
+static const uint kFieldBase = kKernBase + kKernCodes * kKernCodes / 4;
+static const float kFieldLevels = 16.0;
 static const float kLineHeight = 12.0;
 
 // Segments of each of a sphere's circles, and triangles of an arrow head's cone (its side, then its
@@ -159,6 +190,7 @@ static const uint kShapePlus = 5;
 static const uint kKindSegment = 0;
 static const uint kKindTriangle = 1;
 static const uint kKindSprite = 2;
+static const uint kKindImage = 3;  // a batch's image, read in the fragment shader
 
 [[vk::binding(0, 0)]] ConstantBuffer<ViewUniforms> u;
 [[vk::binding(1, 0)]] Texture2DArray<float> sceneDepth;
@@ -178,10 +210,16 @@ struct VertexOutput {
     float4 color : COLOR;
     // Segments: x pixels across the line from its centre, y half its width, z pixels along it
     // from its start, w its dashes' length (0 solid). Sprites: xy the
-    // position in the rectangle in [-1, 1], zw its half size in pixels.
+    // position in the rectangle in [-1, 1], zw its half size in pixels; a character's z its
+    // halo's width in pixels instead.
     noperspective float4 shape : SHAPE;
-    // x kind (kKind*), y depth mode, z marker shape, w the character drawn (or 0).
+    // x kind (kKind*), y depth mode, z marker shape and, above it, the character drawn (or 0), w
+    // what a pick reports of the item (`extra.y`): a host item's id, a batch item's index. The
+    // colour pass reads all of `info`, so the pick needs no output of its own that it would not
+    // read.
     nointerpolation uint4 info : INFO;
+    // Segments: x their length in pixels, for round ends. Characters: their halo's colour.
+    noperspective float4 span : SPAN;
 }
 
 // Point `p` of an item with `info`, in its anchor's space if it has one, relative to the frame's
@@ -227,7 +265,21 @@ VertexOutput culled() {
     out.color = float4(0.0);
     out.shape = float4(0.0);
     out.info = uint4(0);
+    out.span = float4(0.0);
     return out;
+}
+
+// Pixels a metre spans across the view at `p` (relative to the frame's origin), for items sized
+// in metres.
+float pixelsPerMetre(float3 p) {
+    let forward = u.forward.xyz;
+    let side = normalize(cross(forward, abs(forward.z) < 0.9 ? float3(0, 0, 1) : float3(1, 0, 0)));
+    let a = project(p);
+    let b = project(p + side);
+    if (a.w <= 0.0 || b.w <= 0.0) {
+        return 0.0;
+    }
+    return length((b.xy / b.w - a.xy / a.w) * pixelScale());
 }
 
 // Pixels per unit of normalized device coordinates, along x and y (y pointing down the image).
@@ -281,10 +333,13 @@ VertexOutput segmentCorner(Segment segment, uint vertexIndex) {
     let offset = (across * side * extent + along * end * extent) / scale;
     VertexOutput out;
     out.position = float4(p.xy + offset * p.w, p.z, p.w);
-    out.color = unpackColor(segment.info.x);
+    // Its colour, blending to its end's if it has one.
+    let ended = corner.x != 0 && (segment.extra.z & kExtraEndColor) != 0;
+    out.color = unpackColor(ended ? segment.extra.x : segment.info.x);
     out.shape = float4(side * extent, halfWidth, corner.x == 0 ? -extent : span + extent,
                        segment.b.w);
-    out.info = uint4(kKindSegment, segment.info.y & 0xff, 0, 0);
+    out.info = uint4(kKindSegment, segment.info.y & 0xff, 0, segment.extra.y);
+    out.span = float4(span, 0.0, 0.0, 0.0);
     return out;
 }
 
@@ -304,7 +359,8 @@ VertexOutput triangleCorner(Triangle triangle, uint vertexIndex) {
     out.position = project(anchored(triangle.info, p.xyz));
     out.color = unpackColor(triangle.info.x);
     out.shape = float4(0.0);
-    out.info = uint4(kKindTriangle, triangle.info.y & 0xff, 0, 0);
+    out.info = uint4(kKindTriangle, triangle.info.y & 0xff, 0, triangle.extra.y);
+    out.span = float4(0.0);
     return out;
 }
 
@@ -316,23 +372,35 @@ VertexOutput spriteVertex(uint vertexIndex : SV_VertexID) {
 // Corner `vertexIndex % 6` of a sprite's rectangle.
 VertexOutput spriteCorner(Sprite sprite, uint vertexIndex) {
     // A screen sprite's point of the image, y down, in clip coordinates (y up).
+    let world = anchored(sprite.info, sprite.anchor.xyz);
     let anchor = onScreen(sprite.info)
                      ? float4(sprite.anchor.x * 2.0 - 1.0, 1.0 - sprite.anchor.y * 2.0, 0.5, 1.0)
-                     : project(anchored(sprite.info, sprite.anchor.xyz));
+                     : project(world);
     if (!inWorld(sprite.info) || anchor.w <= 0.0) {
         return culled();
+    }
+    // A rectangle in metres, as many pixels as it spans where it is.
+    var rect = sprite.rect;
+    if ((sprite.info.y & kInfoMetric) != 0 && !onScreen(sprite.info)) {
+        rect *= pixelsPerMetre(world);
     }
     static const float2 kCorners[6] = { float2(0, 0), float2(1, 0), float2(1, 1),
                                         float2(0, 0), float2(1, 1), float2(0, 1) };
     let t = kCorners[vertexIndex % 6];
-    let pixel = lerp(sprite.rect.xy, sprite.rect.zw, t);
+    let pixel = lerp(rect.xy, rect.zw, t);
     let offset = pixel / pixelScale();
     VertexOutput out;
     out.position = float4(anchor.xy + offset * anchor.w, anchor.z, anchor.w);
     out.color = unpackColor(sprite.info.x);
-    out.shape = float4(t * 2.0 - 1.0, 0.5 * abs(sprite.rect.zw - sprite.rect.xy));
-    out.info = uint4(kKindSprite, sprite.info.y & 0xff, (sprite.info.y >> 8) & 0xff,
-                     (sprite.info.y >> 16) & 0xff);
+    out.shape = float4(t * 2.0 - 1.0, 0.5 * abs(rect.zw - rect.xy));
+    out.info = uint4(kKindSprite, sprite.info.y & 0xff,
+                     ((sprite.info.y >> 8) & 0xff) | (((sprite.info.y >> 16) & 0xff) << 8),
+                     sprite.extra.y);
+    out.span = float4(0.0);
+    if ((sprite.extra.z & kExtraHalo) != 0) {
+        out.shape.z = asfloat(sprite.extra.w);
+        out.span = unpackColor(sprite.extra.x);
+    }
     return out;
 }
 
@@ -370,6 +438,14 @@ uint packColor(float4 color) {
 
 // Item `i`'s `info`: its colour or the style's, the style's depth mode and marker shape, its
 // world or the style's, and its anchor.
+// Row `row` of a batch's colours, packed, its opacity the style's without its own.
+uint batchColorAt(Batch b, uint row) {
+    let alpha = (b.shape.w & kBatchHasAlpha) != 0;
+    let at = b.arrays.w + (alpha ? 4 : 3) * row;
+    return packColor(float4(batchData[at], batchData[at + 1], batchData[at + 2],
+                            alpha ? batchData[at + 3] : unpackColor(b.style.x).a));
+}
+
 uint4 batchInfo(Batch b, uint i) {
     var color = b.style.x;
     if ((b.shape.w & kBatchHasColors) != 0) {
@@ -477,8 +553,15 @@ VertexOutput batchSegmentVertex(uint vertexIndex : SV_VertexID) {
     let p = batchPoint(b, b.arrays.x, i);
     Segment s;
     s.info = batchInfo(b, i);
+    s.extra = uint4(0, i, 0, 0);
     s.a = float4(p, batchSize(b, i));
     s.b = float4(p, b.params.z);
+    // Lines' and arrows' colours at both ends, rows 2i and 2i + 1.
+    if ((b.shape.w & kBatchEndColors) != 0) {
+        s.info.x = batchColorAt(b, 2 * i);
+        s.extra.x = batchColorAt(b, 2 * i + 1);
+        s.extra.z = kExtraEndColor;
+    }
     switch (b.shape.x) {
     case kBatchLines:
         s.b.xyz = batchEnd(b, i, p);
@@ -504,17 +587,21 @@ VertexOutput batchSegmentVertex(uint vertexIndex : SV_VertexID) {
         }
         s.a.xyz = a + b.origin.xyz;
         s.b.xyz = c + b.origin.xyz;
+        // Its points' colours, blended between them, or the item's at both.
+        s.extra.x = s.info.x;
+        s.extra.z = kExtraEndColor;
         if ((b.shape.w & kBatchPointColors) != 0) {
-            // The newer point's colour.
-            let alpha = (b.shape.w & kBatchHasAlpha) != 0;
-            let at = b.arrays.w + (alpha ? 4 : 3) * (i * length + newer);
-            s.info.x = packColor(float4(batchData[at], batchData[at + 1], batchData[at + 2],
-                                        alpha ? batchData[at + 3] : unpackColor(b.style.x).a));
+            s.info.x = batchColorAt(b, i * length + newer);
+            s.extra.x = batchColorAt(b, i * length + older);
         }
         if ((b.shape.w & kBatchFade) != 0) {
-            var color = unpackColor(s.info.x);
-            color.a *= 1.0 - float(k) / float(max(length - 1, 1));
-            s.info.x = packColor(color);
+            let span = float(max(length - 1, 1));
+            var newest = unpackColor(s.info.x);
+            newest.a *= 1.0 - float(k) / span;
+            s.info.x = packColor(newest);
+            var oldest = unpackColor(s.extra.x);
+            oldest.a *= 1.0 - float(k + 1) / span;
+            s.extra.x = packColor(oldest);
         }
         break;
     }
@@ -601,6 +688,11 @@ VertexOutput batchTriangleVertex(uint vertexIndex : SV_VertexID) {
     let p1 = base + radius * (cos(a1) * u + sin(a1) * v);
     Triangle t;
     t.info = batchInfo(b, i);
+    t.extra = uint4(0, i, 0, 0);
+    // An arrow's head in its end's colour.
+    if ((b.shape.w & kBatchEndColors) != 0) {
+        t.info.x = batchColorAt(b, 2 * i + 1);
+    }
     if (k < kConeSides) {
         t.p0 = float4(end, 0.0);
         t.p1 = float4(p0, 0.0);
@@ -623,27 +715,45 @@ VertexOutput batchSpriteVertex(uint vertexIndex : SV_VertexID) {
     }
     let half = 0.5 * batchSize(b, i);
     Sprite s;
+    s.extra = uint4(0, i, 0, 0);
     s.anchor = float4(batchPoint(b, b.arrays.x, i), 0.0);
     s.rect = float4(-half, -half, half, half);
     s.info = batchInfo(b, i);
     return spriteCorner(s, vertexIndex);
 }
 
-// The font's words of character `c` (printable ASCII, else '?').
+// The font's words of character `c` (a Latin-1 code; the font's '?' stands in for what it lacks).
 uint glyphBase(uint c) {
-    return kGlyphWords * ((c >= 32 && c < 127 ? c : 63) - 32);
+    return kGlyphWords * min(c, 255u);
 }
 
-// How far character `c` moves the pen, in font units.
+// How far character `c` moves the pen, in units.
 float glyphAdvance(uint c) {
-    return float(glyphs[glyphBase(c) + 9]);
+    return asfloat(glyphs[glyphBase(c) + 4]);
 }
 
-// The box character `c`'s pixels fill: x0, y0, x1, y1 in font units from the pen.
+// The pen's move between characters `a` and `b` besides `a`'s advance, in units.
+float glyphKerning(uint a, uint b) {
+    if (a < kKernFirst || b < kKernFirst || a > 255 || b > 255) {
+        return 0.0;
+    }
+    let pair = (a - kKernFirst) * kKernCodes + (b - kKernFirst);
+    let byte = (glyphs[kKernBase + pair / 4] >> (8 * (pair % 4))) & 0xff;
+    return float(int(byte << 24) >> 24) / 16.0;
+}
+
+// The text's height in a line, in units: from the top of its capitals to the bottom of its
+// descenders.
+float textHeight() {
+    return asfloat(glyphs[kFontBase]);
+}
+
+// The box character `c`'s field covers: x0, y0, x1, y1 in units from the pen; empty for one with
+// no outline, such as a space.
 float4 glyphBox(uint c) {
-    let box = glyphs[glyphBase(c) + 8];
-    return float4(float(box & 0xff), float((box >> 8) & 0xff), float((box >> 16) & 0xff),
-                  float(box >> 24));
+    let base = glyphBase(c);
+    return float4(asfloat(glyphs[base]), asfloat(glyphs[base + 1]), asfloat(glyphs[base + 2]),
+                  asfloat(glyphs[base + 3]));
 }
 
 // Numbers' longest number but its decimals: a sign, ten digits and the point.
@@ -757,20 +867,29 @@ VertexOutput batchNumberVertex(uint vertexIndex : SV_VertexID) {
     let scale = size / kLineHeight;
     var width = 0.0;
     var pen = 0.0;
+    var next = t.length > 0 ? numberChar(b, t, 0) : 0;
     for (uint c = 0; c < t.length; ++c) {
-        let advance = glyphAdvance(numberChar(b, t, c));
+        let code = next;
+        next = c + 1 < t.length ? numberChar(b, t, c + 1) : 0;
+        var advance = glyphAdvance(code);
+        if (c + 1 < t.length) {
+            advance += glyphKerning(code, next);
+        }
         if (c + 1 < k) {
             pen += advance;
         }
         width += advance;
     }
-    let box = float2(width, kLineHeight - 3.0) * scale;
+    let box = float2(width, textHeight()) * scale;
     let backing = b.style.w;
-    let pad = unpackColor(backing).a > 0.0 ? 0.25 * size : 0.0;
+    // A halo (`params.x` pixels) in the backing colour around each character in place of the box.
+    let halo = unpackColor(backing).a > 0.0 ? b.params.x : 0.0;
+    let pad = unpackColor(backing).a > 0.0 && halo <= 0.0 ? 0.25 * size : 0.0;
     let screen = (b.shape.w & kBatchScreen) != 0;
     let points = (b.shape.w & kBatchHasPoints) != 0;
     Sprite s;
     s.info = batchInfo(b, i);
+    s.extra = uint4(0, i, 0, 0);
     float2 corner;
     if (screen) {
         let at = points ? batchPoint(b, b.arrays.x, i).xy : b.place.xy;
@@ -783,7 +902,7 @@ VertexOutput batchNumberVertex(uint vertexIndex : SV_VertexID) {
     } else {
         corner = float2(0.5 * size, -box.y - 3.0 * scale - 0.25 * size);
         s.anchor = float4(batchPoint(b, b.arrays.x, i), 0.0);
-        s.info.y &= 0xffff;
+        s.info.y &= 0xffffu | kInfoMetric;
     }
     if (k == 0) {
         if (pad == 0.0) {
@@ -805,25 +924,112 @@ VertexOutput batchNumberVertex(uint vertexIndex : SV_VertexID) {
     s.rect = float4(corner + (float2(pen, 0.0) + glyph.xy) * scale,
                     corner + (float2(pen, 0.0) + glyph.zw) * scale);
     s.info.y |= c << 16;
+    if (halo > 0.0) {
+        s.extra = uint4(backing, i, kExtraHalo, asuint(halo));
+    }
     return spriteCorner(s, vertexIndex);
 }
 
-// Coverage of character `c` at `p` (in [-1, 1] over the sprite, which spans its box): its pixels'
-// share of four taps across the fragment's footprint on the font's grid.
-float glyphCoverage(uint c, float2 p) {
+// An image (`OverlayBatch::image`) on its quad: in the world between its four corners, the rows of
+// its points (top left, top right, bottom right, bottom left), or on the screen at its place
+// (`place` xy, offset zw), `params.xy` pixels (its own size when 0), its point `params.zw` there.
+// Two triangles; the fragment shader reads the image at `shape.xy`.
+[shader("vertex")]
+VertexOutput batchImageVertex(uint vertexIndex : SV_VertexID) {
+    let b = batches[constants.batch.x];
+    if (!batchInUse(b, 0)) {
+        return culled();
+    }
+    static const uint kQuad[6] = { 0, 1, 2, 0, 2, 3 };
+    static const float2 kUv[4] = { float2(0, 0), float2(1, 0), float2(1, 1), float2(0, 1) };
+    let corner = kQuad[vertexIndex % 6];
+    let uv = kUv[corner];
+    let info = batchInfo(b, 0);
+    if (!inWorld(info)) {
+        return culled();
+    }
+    VertexOutput out;
+    if ((b.shape.w & kBatchScreen) != 0) {
+        let size = b.params.x > 0.0 && b.params.y > 0.0 ? b.params.xy
+                                                        : float2(float(b.text.y), float(b.text.z));
+        let pixel = b.place.zw - b.params.zw * size + uv * size;
+        let at = float2(b.place.x * 2.0 - 1.0, 1.0 - b.place.y * 2.0);
+        out.position = float4(at + pixel / pixelScale(), 0.5, 1.0);
+        out.info = uint4(kKindImage, kDepthAlways, 0, 0);
+    } else {
+        out.position = project(anchored(info, batchVector(b.arrays.x, corner) + b.origin.xyz));
+        out.info = uint4(kKindImage, info.y & 0xff, 0, 0);
+    }
+    out.color = unpackColor(info.x);
+    // uv / w and 1 / w, which vary linearly across the image (`shape` is noperspective): the
+    // fragment shader divides them out for the perspective-correct uv.
+    out.shape = float4(uv / out.position.w, 1.0 / out.position.w, 0.0);
+    out.span = float4(0.0);
+    return out;
+}
+
+// Byte `index` of the bytes from word `first` of `batchData`, little-endian.
+uint batchByte(uint first, uint index) {
+    return (asuint(batchData[first + index / 4]) >> (8 * (index % 4))) & 0xff;
+}
+
+// Texel (x, y) of a batch's image (`text`: x its first word, y width, z height, w channels), as
+// display colour and opacity in [0, 1].
+float4 imageTexel(Batch b, int2 texel) {
+    let at = uint2(clamp(texel, int2(0), int2(int(b.text.y) - 1, int(b.text.z) - 1)));
+    let first = (at.y * b.text.y + at.x) * b.text.w;
+    return float4(float(batchByte(b.text.x, first)), float(batchByte(b.text.x, first + 1)),
+                  float(batchByte(b.text.x, first + 2)),
+                  b.text.w == 4 ? float(batchByte(b.text.x, first + 3)) : 255.0) / 255.0;
+}
+
+// A batch's image at `uv` ([0, 1] from its top left), filtered between its four nearest texels.
+float4 sampleImage(Batch b, float2 uv) {
+    let p = uv * float2(float(b.text.y), float(b.text.z)) - 0.5;
+    let low = int2(floor(p));
+    let f = p - floor(p);
+    let top = lerp(imageTexel(b, low), imageTexel(b, low + int2(1, 0)), f.x);
+    let bottom = lerp(imageTexel(b, low + int2(0, 1)), imageTexel(b, low + int2(1, 1)), f.x);
+    return lerp(top, bottom, f.y);
+}
+
+// Texel (x, y) of character `c`'s distance field, in [0, 1]; 0 (far outside) past its edges.
+float fieldTexel(uint first, uint2 size, int2 texel) {
+    if (any(texel < int2(0)) || any(texel >= int2(size))) {
+        return 0.0;
+    }
+    let at = first + uint(texel.y) * size.x + uint(texel.x);
+    return float((glyphs[kFieldBase + at / 4] >> (8 * (at % 4))) & 0xff) / 255.0;
+}
+
+// Character `c`'s distance field at `q` (texels from its top left), between its four nearest
+// texels, in texels from its outline: positive inside.
+float fieldDistance(uint first, uint2 size, float2 q) {
+    let p = q - 0.5;
+    let low = int2(floor(p));
+    let f = p - floor(p);
+    let top = lerp(fieldTexel(first, size, low), fieldTexel(first, size, low + int2(1, 0)), f.x);
+    let bottom = lerp(fieldTexel(first, size, low + int2(0, 1)),
+                      fieldTexel(first, size, low + int2(1, 1)), f.x);
+    return (lerp(top, bottom, f.y) * 255.0 - 128.0) / kFieldLevels;
+}
+
+// Coverage of character `c` at `p` (in [-1, 1] over the sprite, which spans its field's box), and
+// of its halo `halo` pixels wide: the field's distance in pixels at four taps across the
+// fragment's footprint, each covered within half a pixel of the outline.
+float2 glyphCoverage(uint c, float2 p, float halo) {
     let base = glyphBase(c);
-    let box = glyphBox(c);
-    let g = lerp(box.xy, box.zw, p * 0.5 + 0.5);
-    let footprint = fwidth(g);
-    var covered = 0.0;
+    let first = glyphs[base + 5];
+    let size = uint2(glyphs[base + 6] & 0xffff, glyphs[base + 6] >> 16);
+    let q = (p * 0.5 + 0.5) * float2(size);
+    let footprint = fwidth(q);
+    // Pixels per texel: the field's distances are in texels.
+    let pixels = 1.0 / max(0.5 * (footprint.x + footprint.y), 1e-6);
+    var covered = float2(0.0);
     for (uint tap = 0; tap < 4; ++tap) {
-        let q = g + (float2(float(tap & 1), float(tap >> 1)) - 0.5) * 0.5 * footprint;
-        let cell = int2(floor(q));
-        if (all(cell >= int2(box.xy)) && all(cell < int2(box.zw)) && all(cell < 16)) {
-            let word = glyphs[base + uint(cell.y) / 2];
-            let row = (word >> (16 * (uint(cell.y) & 1))) & 0xffff;
-            covered += float((row >> uint(cell.x)) & 1);
-        }
+        let at = q + (float2(float(tap & 1), float(tap >> 1)) - 0.5) * 0.5 * footprint;
+        let d = fieldDistance(first, size, at) * pixels;
+        covered += saturate(float2(d, d + halo) + 0.5);
     }
     return 0.25 * covered;
 }
@@ -872,36 +1078,71 @@ float decodeSrgb(float encoded) {
 
 [shader("fragment")]
 float4 overlayFragment(VertexOutput in) : SV_Target {
+    var color = shade(in);
+    if (color.a <= 0.0) {
+        discard;
+    }
+    if (constants.view.z == 1) {
+        color.rgb = float3(decodeSrgb(color.r), decodeSrgb(color.g), decodeSrgb(color.b));
+    }
+    return color;
+}
+
+// What a pick finds at its pixel: the item drawn last there with a third or more of its opacity,
+// as x what drew it (`constants.layer.w`), y its id (a host item's `OverlayStyle::id`, a batch
+// item's index), z 1; all 0 where nothing is.
+[shader("fragment")]
+uint4 overlayPickFragment(VertexOutput in) : SV_Target {
+    if (shade(in).a < 0.3 * in.color.a) {
+        discard;
+    }
+    return uint4(constants.layer.w, in.info.w, 1, 0);
+}
+
+// An item's colour and opacity at a fragment: its coverage, and how its depth mode meets the
+// view's surfaces.
+float4 shade(VertexOutput in) {
     var color = in.color;
     if (in.info.x == kKindSegment) {
-        color.a *= saturate(in.shape.y + 0.5 - abs(in.shape.x));
+        // Round ends: the distance to the segment from its start to its end, so joined segments
+        // meet without notches.
+        let past = max(0.0, max(-in.shape.z, in.shape.z - in.span.x));
+        color.a *= saturate(in.shape.y + 0.5 - length(float2(past, in.shape.x)));
         // Dashes from the segment's start, each as long as the gap after it.
         if (in.shape.w > 0.0) {
             let phase = in.shape.z - floor(in.shape.z / (2.0 * in.shape.w)) * 2.0 * in.shape.w;
             color.a *= saturate(min(phase, in.shape.w - phase) + 0.5);
         }
     } else if (in.info.x == kKindSprite) {
-        color.a *= in.info.w != 0 ? glyphCoverage(in.info.w, in.shape.xy)
-                                  : markerCoverage(in.info.z, in.shape.xy, in.shape.zw);
+        let character = in.info.z >> 8;
+        if (character != 0) {
+            // The character over its halo, if it has one (`span` its colour).
+            let covered = glyphCoverage(character, in.shape.xy, in.shape.z);
+            let fill = color.a * covered.x;
+            let halo = in.span.a * (in.span.a > 0.0 ? covered.y : 0.0) * (1.0 - fill);
+            let alpha = fill + halo;
+            color = float4(alpha > 0.0 ? (color.rgb * fill + in.span.rgb * halo) / alpha
+                                       : color.rgb,
+                           alpha);
+        } else {
+            color.a *= markerCoverage(in.info.z & 0xff, in.shape.xy, in.shape.zw);
+        }
+    } else if (in.info.x == kKindImage) {
+        color *= sampleImage(batches[constants.batch.x], in.shape.xy / in.shape.z);
     }
     let mode = in.info.y;
     if (mode != kDepthAlways) {
-        let pixel = int2(in.position.xy);
+        // The view's pixel: a pick's, moved to the target's first.
+        let pixel = int2(in.position.xy) + int2(constants.layer.yz);
         let surface = linearDepth(sceneDepth.Load(int4(pixel, constants.view.y, 0)));
         let depth = linearDepth(in.position.z);
         // A little slack, so lines drawn on surfaces stay in front of them.
         if (depth > surface * 1.003 + 1e-4) {
             if (mode == kDepthTest) {
-                discard;
+                return float4(0.0);
             }
             color.a *= 0.3;
         }
-    }
-    if (color.a <= 0.0) {
-        discard;
-    }
-    if (constants.view.z == 1) {
-        color.rgb = float3(decodeSrgb(color.r), decodeSrgb(color.g), decodeSrgb(color.b));
     }
     return color;
 }

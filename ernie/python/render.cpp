@@ -867,6 +867,16 @@ void BindRender(nb::module_& m) {
             },
             nb::arg("array"), "A host copy of a CUDA array.")
         .def(
+            "pick_overlay",
+            [](Renderer& r, const Scene& scene, std::uint32_t x,
+               std::uint32_t y) {
+                return r.Delegate().PickOverlay(scene, x, y);
+            },
+            nb::arg("scene"), nb::arg("x"), nb::arg("y"),
+            "The overlay item the viewer's last frame drew at pixel "
+            "(`x`, `y`) (an `OverlayHit`), or None. Waits for the "
+            "device, so for clicks rather than every frame.")
+        .def(
             "prim_path",
             [](Renderer& r, std::uint32_t id) {
                 return r.Delegate().PrimPath(id);

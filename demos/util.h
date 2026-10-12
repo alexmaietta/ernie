@@ -12,10 +12,13 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <functional>
+#include <mutex>
 #include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -60,11 +63,45 @@ std::filesystem::path CacheDir();
 bool CanDownload();
 
 /// Downloads `url` to `path`, its directory made as needed, through
-/// `path` + ".part", renamed when complete.
+/// `path` + ".part", renamed when complete; failed attempts that are
+/// tried again go to `report`, else are printed.
 /// @throws std::runtime_error if it cannot (`CanDownload`), or on a
 /// failed request.
-void Download(const std::string& url,
-              const std::filesystem::path& path);
+void Download(
+    const std::string& url, const std::filesystem::path& path,
+    const std::function<void(const std::string&)>& report = {});
+
+/// `Download` on a thread of its own, so a demo runs while its data
+/// comes: its progress and outcome are messages for the demo to show
+/// as it steps (`TakeMessages`, such as into the viewer's log).
+class AsyncDownload {
+  public:
+    /// A message, and whether it is an error.
+    struct Message {
+        std::string text;
+        bool error = false;
+    };
+
+    /// Starts fetching `url` to `path`.
+    AsyncDownload(std::string url, std::filesystem::path path);
+    /// Waits for the download to end.
+    ~AsyncDownload();
+    AsyncDownload(const AsyncDownload&) = delete;
+    AsyncDownload& operator=(const AsyncDownload&) = delete;
+
+    /// The messages since the last call.
+    std::vector<Message> TakeMessages();
+    /// Whether it has ended, and if so whether `path` holds the data.
+    bool Done() const;
+    bool Succeeded() const;
+
+  private:
+    mutable std::mutex mutex_;
+    std::vector<Message> messages_;
+    bool done_ = false;
+    bool succeeded_ = false;
+    std::thread thread_;
+};
 
 /// The bytes of `ranges` of `url`, each [first, last] inclusive, in
 /// one request (HTTP range requests; several come back as

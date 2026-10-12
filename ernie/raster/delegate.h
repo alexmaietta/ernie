@@ -179,6 +179,9 @@ class RasterDelegate : public RenderDelegate {
 
     Path PrimPath(std::uint32_t id) const override;
     Path Pick(std::uint32_t x, std::uint32_t y) override;
+    std::optional<OverlayHit> PickOverlay(const Scene& scene,
+                                          std::uint32_t x,
+                                          std::uint32_t y) override;
 
     void SetViewBand(int band) override {
         renderer_.SetPresentBand(band);

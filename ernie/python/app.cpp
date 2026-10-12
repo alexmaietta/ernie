@@ -774,6 +774,21 @@ void BindApp(nb::module_& parent) {
             "changed(viewer, shown) is told when the user switches "
             "it. Returns an id.")
         .def(
+            "add_overlay_pick_handler",
+            [](Viewer& viewer, nb::callable picked) {
+                const Callable call(std::move(picked));
+                return viewer.AddOverlayPickHandler(
+                    [call](Viewer& v, const OverlayHit& hit) {
+                        call(v, hit);
+                    });
+            },
+            nb::arg("picked"),
+            "Calls picked(viewer, hit) when a click in the viewport "
+            "lands on an overlay item in the world (an `OverlayHit`: "
+            "a marker, a line, a batch's item), in place of picking "
+            "the scene there. Returns an id for "
+            "`remove_viewport_item`.")
+        .def(
             "add_overlay_click_handler",
             [](Viewer& viewer, nb::callable clicked) {
                 const Callable call(std::move(clicked));

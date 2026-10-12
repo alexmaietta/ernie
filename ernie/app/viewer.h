@@ -654,9 +654,19 @@ class Viewer {
                            std::uint32_t)>
             clicked);
 
+    /// Calls `picked` when a click in the viewport lands on an
+    /// overlay item in the world (a marker, a line, a batch's item;
+    /// `OverlayHit`), as the renderer picks it, in place of picking
+    /// the scene there. Picks wait for the device, so only clicks
+    /// pick, and only while a handler is added. Returns an id for
+    /// `RemoveViewportItem`.
+    /// @throws std::invalid_argument for no `picked`.
+    std::uint64_t AddOverlayPickHandler(
+        std::function<void(Viewer&, const OverlayHit&)> picked);
+
     /// Removes the viewport toggle, heads-up display item, viewport
-    /// menu item or overlay click handler with id `id`; unknown ids
-    /// are ignored.
+    /// menu item or overlay click or pick handler with id `id`;
+    /// unknown ids are ignored.
     void RemoveViewportItem(std::uint64_t id);
 
     /// The RenderSettings prim the viewport renders with: the scene's

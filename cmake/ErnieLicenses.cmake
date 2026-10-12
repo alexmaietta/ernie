@@ -58,6 +58,8 @@ function(ernie_install_licenses destination component)
     license(slang "${slang_SOURCE_DIR}/LICENSE")
     license(vulkan-headers "${vulkan_headers_SOURCE_DIR}/LICENSE.md")
     license(volk "${volk_SOURCE_DIR}/LICENSE.md")
+    license(inter-font
+            "${ernie_font_inter_license_SOURCE_DIR}/LICENSE.txt")
     license(vulkan-memory-allocator "${vma_SOURCE_DIR}/LICENSE.txt")
     license(glm "${glm_SOURCE_DIR}/copying.txt")
     license(dlpack "${PROJECT_SOURCE_DIR}/third_party/dlpack/LICENSE")
@@ -102,8 +104,6 @@ function(ernie_install_licenses destination component)
         license(dear-imgui "${dear_imgui_SOURCE_DIR}/LICENSE.txt")
         license(implot "${implot_SOURCE_DIR}/LICENSE")
         license(imguizmo "${imguizmo_SOURCE_DIR}/LICENSE")
-        license(inter-font
-                "${ernie_font_inter_license_SOURCE_DIR}/LICENSE.txt")
         license(lucide-font
                 "${ernie_font_lucide_license_SOURCE_DIR}/LICENSE")
         # A system GLFW is a dependency rather than built in.

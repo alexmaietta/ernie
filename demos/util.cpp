@@ -87,8 +87,11 @@ Response GetOnce(const std::string& url, const std::string& range) {
 }
 
 /// `GetOnce`, tried up to three times: servers drop connections
-/// mid-transfer now and then.
-Response Get(const std::string& url, const std::string& range) {
+/// mid-transfer now and then. Failed attempts go to `report`, else
+/// are printed.
+Response
+Get(const std::string& url, const std::string& range,
+    const std::function<void(const std::string&)>& report = {}) {
     for (int attempt = 1;; ++attempt) {
         try {
             return GetOnce(url, range);
@@ -96,7 +99,13 @@ Response Get(const std::string& url, const std::string& range) {
             if (attempt == 3) {
                 throw;
             }
-            std::printf("%s; trying again\n", error.what());
+            const std::string message =
+                std::string(error.what()) + "; trying again";
+            if (report) {
+                report(message);
+            } else {
+                std::printf("%s\n", message.c_str());
+            }
         }
     }
 }
@@ -257,10 +266,11 @@ bool CanDownload() {
 }
 
 void Download(const std::string& url,
-              const std::filesystem::path& path) {
+              const std::filesystem::path& path,
+              const std::function<void(const std::string&)>& report) {
     RequireDownloads();
 #ifdef ERNIE_DEMO_DOWNLOADS
-    const Response response = Get(url, "");
+    const Response response = Get(url, "", report);
     std::filesystem::create_directories(path.parent_path());
     std::filesystem::path part = path;
     part += ".part";
@@ -277,7 +287,54 @@ void Download(const std::string& url,
 #else
     static_cast<void>(url);
     static_cast<void>(path);
+    static_cast<void>(report);
 #endif
+}
+
+AsyncDownload::AsyncDownload(std::string url,
+                             std::filesystem::path path) {
+    messages_.push_back({"Fetching " + url});
+    thread_ = std::thread(
+        [this, url = std::move(url), path = std::move(path)] {
+            const auto post = [this](std::string text, bool error) {
+                const std::lock_guard lock(mutex_);
+                messages_.push_back({std::move(text), error});
+            };
+            bool succeeded = false;
+            try {
+                Download(url, path, [&](const std::string& text) {
+                    post(text, false);
+                });
+                post("Fetched " + path.filename().string(), false);
+                succeeded = true;
+            } catch (const std::exception& error) {
+                post(error.what(), true);
+            }
+            const std::lock_guard lock(mutex_);
+            done_ = true;
+            succeeded_ = succeeded;
+        });
+}
+
+AsyncDownload::~AsyncDownload() {
+    if (thread_.joinable()) {
+        thread_.join();
+    }
+}
+
+std::vector<AsyncDownload::Message> AsyncDownload::TakeMessages() {
+    const std::lock_guard lock(mutex_);
+    return std::exchange(messages_, {});
+}
+
+bool AsyncDownload::Done() const {
+    const std::lock_guard lock(mutex_);
+    return done_;
+}
+
+bool AsyncDownload::Succeeded() const {
+    const std::lock_guard lock(mutex_);
+    return succeeded_;
 }
 
 std::vector<std::string> FetchRanges(

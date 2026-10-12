@@ -4,6 +4,7 @@
 #include "ernie/device/buffer.h"
 #include "ernie/device/compute_interop.h"
 #include "ernie/device/frame_uploads.h"
+#include "ernie/device/image.h"
 #include "ernie/device/pipeline.h"
 #include "ernie/device/shader_compiler.h"
 #include "ernie/device/vulkan_context.h"
@@ -17,6 +18,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <unordered_map>
@@ -166,6 +168,28 @@ class OverlayPass {
     void Record(VkCommandBuffer commands, const Target& target,
                 Layer layer = Layer::All) const;
 
+    /// What a pick found: the overlay, and a batch's item (`batch`
+    /// the batch, `item` its index) or a host item (`batch` -1,
+    /// `item` its `OverlayStyle::id`).
+    struct Picked {
+        const Overlay* overlay = nullptr;
+        std::int32_t batch = -1;
+        std::uint32_t item = 0;
+    };
+
+    /// Records drawing the prepared items under pixel (`x`, `y`) of
+    /// `target`, as `Record` after it this frame, into a 1 x 1 target
+    /// of what drew them, and copying its 16 bytes to `readback`
+    /// (`DecodePick`): the topmost item with a third of its opacity
+    /// there, hidden by surfaces as it is drawn.
+    void RecordPick(VkCommandBuffer commands, const Target& target,
+                    std::uint32_t x, std::uint32_t y,
+                    const GpuBuffer& readback) const;
+
+    /// The item a pick's 4 words found, if any.
+    std::optional<Picked>
+    DecodePick(std::span<const std::uint32_t, 4> words) const;
+
     std::uint64_t GpuBytes() const;
 
   private:
@@ -206,9 +230,9 @@ class OverlayPass {
     PipelineLayout layout_;
     /// Per attachment format and whether for a pushbroom: the
     /// segment, triangle and sprite pipelines, then the batches',
-    /// then the numbers'.
+    /// then the numbers' and texts', then the images'.
     std::map<std::pair<VkFormat, bool>,
-             std::array<std::unique_ptr<GraphicsPipeline>, 7>>
+             std::array<std::unique_ptr<GraphicsPipeline>, 8>>
         pipelines_;
     /// Host items of one primitive (0 segments, 1 triangles, 2
     /// sprites) of one world (-1 shared) on the screen or not: a run
@@ -242,9 +266,9 @@ class OverlayPass {
     /// `origin`, and uploads them.
     void BuildLayer(HostLayer& layer, const glm::dvec3& origin);
     /// One draw of a batch: the batch, its primitive (0 segments, 1
-    /// triangles, 2 sprites, 3 numbers) and vertex count; for a batch
-    /// sorted by world, its draw arguments for the shared items (each
-    /// world's follow, 2 apart).
+    /// triangles, 2 sprites, 3 numbers and texts, 4 images) and
+    /// vertex count; for a batch sorted by world, its draw arguments
+    /// for the shared items (each world's follow, 2 apart).
     struct BatchDraw {
         std::uint32_t batch = 0;
         std::size_t primitive = 0;
@@ -353,6 +377,22 @@ class OverlayPass {
     mutable bool anchorsPending_ = false;
     OverlayAnchorResolver resolve_;
     const MeshDrawable* meshes_ = nullptr;
+    /// Each batch record's overlay and index there, for picks.
+    std::vector<std::pair<const Overlay*, std::size_t>> batchOwners_;
+    /// Picks' pipelines (as `pipelines_`, writing what drew each
+    /// item) and 1 x 1 target, made on the first pick.
+    mutable std::array<std::unique_ptr<GraphicsPipeline>, 8>
+        pickPipelines_;
+    mutable std::unique_ptr<GpuImage> pickImage_;
+
+    /// Draws the prepared items of `layer` through `pipelines` inside
+    /// rendering begun on `target`: for a pick, of `pick`, the pixel
+    /// its viewport moves to the target's first.
+    void DrawItems(VkCommandBuffer commands, const Target& target,
+                   Layer layer,
+                   const std::array<std::unique_ptr<GraphicsPipeline>,
+                                    8>& pipelines,
+                   const glm::uvec2* pick) const;
     /// What the buffers hold: each overlay and its version, and the
     /// origin.
     std::vector<std::pair<const Overlay*, std::uint64_t>> prepared_;

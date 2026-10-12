@@ -714,3 +714,160 @@ def test_overlay_items_take_their_anchors_worlds(renderer):
         ]
         assert shown[view] > 40, "both markers of the view's world"
         assert sum(shown) == shown[view], (view, shown)
+
+
+def count_near(image, color, tolerance=60):
+    """Pixels within `tolerance` of display colour `color` (0 to 1)."""
+    rgb = np.int32(image[..., :3])
+    return int(
+        (
+            np.abs(rgb - 255 * np.float32(color)).max(-1) < tolerance
+        ).sum()
+    )
+
+
+def test_overlay_text_takes_halos_and_utf8(renderer):
+    # A red halo outlines white characters in place of a red box: some
+    # red, less than the box's, and the text the same width.
+    style = dict(size=16, color=(1, 1, 1), background=(1, 0, 0, 1))
+    boxed = render_overlay(
+        renderer, lambda o: o.text("Hi", offset=(4, 4), **style)
+    )
+    haloed = render_overlay(
+        renderer,
+        lambda o: o.text("Hi", offset=(4, 4), halo=2, **style),
+    )
+    assert (
+        0
+        < count_near(haloed, (1, 0, 0))
+        < count_near(boxed, (1, 0, 0))
+    )
+    assert count_near(haloed, (1, 1, 1)) > 5
+    # Latin-1 draws; the rest is '?'.
+    accented = render_overlay(
+        renderer, lambda o: o.text("é€", offset=(4, 4), **style)
+    )
+    assert count_near(accented, (1, 1, 1)) > 5
+    assert renderer.take_validation_messages() == []
+
+
+def test_overlay_images_draw_on_quads_and_the_screen(renderer):
+    green = np.zeros((4, 4, 3), np.uint8)
+    green[..., 1] = 255
+    screen = render_overlay(
+        renderer,
+        lambda o: o.screen_image(green, offset=(4, 4), size=(16, 16)),
+    )
+    assert count_near(screen, (0, 1, 0), 10) >= 14 * 14
+    corners = np.float32(
+        [[-20, 20, 0], [20, 20, 0], [20, -20, 0], [-20, -20, 0]]
+    )
+    world = render_overlay(
+        renderer, lambda o: o.image(corners, green, depth="always")
+    )
+    assert count_near(world, (0, 1, 0), 10) > 30
+    assert renderer.take_validation_messages() == []
+
+
+def test_camera_image_corners_frame_the_view():
+    scene = make_terrain_scene()
+    corners = np.array(
+        ernie.camera_image_corners(scene, "/World/Camera", 2.0)
+    )
+    assert corners.shape == (4, 3)
+    pose = np.array(scene.world_transform("/World/Camera"))
+    eye, forward = pose[:3, 3], -pose[:3, 2]
+    np.testing.assert_allclose(
+        corners.mean(0), eye + 2.0 * forward, atol=1e-9
+    )
+    # Top left to the left of and above the bottom right.
+    right, up = pose[:3, 0], pose[:3, 1]
+    assert (corners[0] - corners[2]) @ right < 0
+    assert (corners[0] - corners[2]) @ up > 0
+    with pytest.raises(ValueError):
+        ernie.camera_image_corners(scene, "/World/Terrain", 2.0)
+
+
+def test_overlay_picks_report_what_was_drawn(renderer):
+    scene = batch_scene()
+    overlay = scene.overlay("debug")
+    overlay.points(
+        np.float32([[0, 0, 0]]),
+        shape="square",
+        size=12,
+        color=(1, 0, 1),
+        depth="always",
+    )
+    overlay.marker(
+        (30, 0, 0),
+        shape="square",
+        size=12,
+        color=(1, 1, 0),
+        depth="always",
+        id=7,
+    )
+    image = np.array(renderer.render(scene))
+
+    def centre(color):
+        rows, cols = np.nonzero(
+            (
+                np.abs(
+                    np.int32(image[..., :3]) - 255 * np.int32(color)
+                )
+            ).max(-1)
+            < 10
+        )
+        assert len(rows) > 0, color
+        return int(cols.mean()), int(rows.mean())
+
+    hit = renderer.pick_overlay(scene, *centre((1, 0, 1)))
+    assert hit is not None
+    assert (hit.overlay, hit.batch, hit.item) == ("debug", 0, 0)
+    hit = renderer.pick_overlay(scene, *centre((1, 1, 0)))
+    assert hit is not None
+    assert (hit.overlay, hit.batch, hit.item) == ("debug", -1, 7)
+    assert renderer.pick_overlay(scene, 0, 0) is None
+    assert renderer.take_validation_messages() == []
+
+
+def test_overlay_polylines_blend_their_points_colours(renderer):
+    image = render_overlay(
+        renderer,
+        lambda o: o.polyline(
+            [(-40, 0, 0), (40, 0, 0)],
+            colors=[(1, 0, 0), (0, 1, 0)],
+            width=4,
+            depth="always",
+        ),
+    )
+    rgb = np.int32(image[..., :3])
+    blended = (
+        (rgb[..., 0] > 70) & (rgb[..., 1] > 70) & (rgb[..., 2] < 60)
+    )
+    assert blended.sum() > 2, "between red and green along the line"
+    assert count_near(image, (1, 0, 0), 30) > 0
+    assert count_near(image, (0, 1, 0), 30) > 0
+
+
+def test_overlay_metric_sizes_are_metres(renderer):
+    # 40 pixels across, or 40 m some 250 m away: a few pixels.
+    def square(**metric):
+        return count_near(
+            render_overlay(
+                renderer,
+                lambda o: o.marker(
+                    (0, 0, 0),
+                    shape="square",
+                    size=40,
+                    color=(1, 0, 1),
+                    depth="always",
+                    **metric,
+                ),
+            ),
+            (1, 0, 1),
+            10,
+        )
+
+    pixels = square()
+    metres = square(metric=True)
+    assert 0 < metres < pixels / 4

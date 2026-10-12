@@ -10,6 +10,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstring>
 #include <stdexcept>
@@ -19,28 +20,41 @@ namespace ernie {
 
 namespace {
 
+// Every item's `extra` (overlay.slang): a segment's end colour, the
+// item's id, kExtra* flags.
 struct GpuSegment {
     float a[4];
     float b[4];
     std::uint32_t info[4];
+    std::uint32_t extra[4];
 };
-static_assert(sizeof(GpuSegment) == 48,
+static_assert(sizeof(GpuSegment) == 64,
               "GpuSegment must match overlay.slang");
 
 struct GpuTriangle {
     float p[3][4];
     std::uint32_t info[4];
+    std::uint32_t extra[4];
 };
-static_assert(sizeof(GpuTriangle) == 64,
+static_assert(sizeof(GpuTriangle) == 80,
               "GpuTriangle must match overlay.slang");
 
 struct GpuSprite {
     float anchor[4];
     float rect[4];
     std::uint32_t info[4];
+    std::uint32_t extra[4];
 };
-static_assert(sizeof(GpuSprite) == 48,
+static_assert(sizeof(GpuSprite) == 64,
               "GpuSprite must match overlay.slang");
+
+// overlay.slang's kExtra* flags and kInfoMetric.
+constexpr std::uint32_t kExtraEndColor = 1;
+constexpr std::uint32_t kExtraHalo = 2;
+constexpr std::uint32_t kInfoMetric = 1u << 25;
+/// overlay.slang's kPickBatch, and the format picks draw into.
+constexpr std::uint32_t kPickBatch = 0x80000000u;
+constexpr VkFormat kPickFormat = VK_FORMAT_R32G32B32A32_UINT;
 
 struct OverlayConstants {
     std::int32_t view[4];
@@ -110,6 +124,7 @@ constexpr std::uint32_t kBatchHasHeads = 256;
 constexpr std::uint32_t kBatchFade = 512;
 constexpr std::uint32_t kBatchDirections = 1024;
 constexpr std::uint32_t kBatchPointColors = 2048;
+constexpr std::uint32_t kBatchEndColors = 4096;
 constexpr std::uint32_t kCircleSegments = 48;
 constexpr std::uint32_t kConeSides = 8;
 /// Segments of a capsule (overlay.slang's `capsuleSegment`): two
@@ -118,8 +133,10 @@ constexpr std::uint32_t kCapsuleSegments = 2 * 24 + 4 + 4 * 12;
 /// Characters of the longest number a `Numbers` item prints but its
 /// decimals: a sign, ten digits and the point.
 constexpr std::uint32_t kNumberChars = 12;
-/// The words of each glyph in overlay.slang's `glyphs`.
-constexpr std::size_t kGlyphWords = 10;
+/// overlay.slang's `glyphs`: the words of each glyph, then of the
+/// whole font's.
+constexpr std::size_t kGlyphWords = 8;
+constexpr std::size_t kFontWords = 4;
 
 /// Segments each item of a batch of `kind` draws.
 std::uint32_t SegmentsPerItem(OverlayBatchKind kind) {
@@ -178,17 +195,26 @@ std::uint32_t PackColor(const glm::vec4& color) {
 /// overlay.slang's `info` of an item: its anchor (1 + its index in
 /// the anchor table, 0 for none) in place of the overlay's own.
 void Info(std::uint32_t (&info)[4], const OverlayItem& item,
-          MarkerShape shape, std::uint32_t anchor = 0, char glyph = 0,
-          bool screen = false) {
+          MarkerShape shape, std::uint32_t anchor = 0,
+          std::uint8_t glyph = 0, bool screen = false) {
     info[0] = PackColor(item.color);
-    info[1] =
-        static_cast<std::uint32_t>(item.depth) |
-        (static_cast<std::uint32_t>(shape) << 8) |
-        (static_cast<std::uint32_t>(static_cast<unsigned char>(glyph))
-         << 16) |
-        (screen ? 1u << 24 : 0u);
+    info[1] = static_cast<std::uint32_t>(item.depth) |
+              (static_cast<std::uint32_t>(shape) << 8) |
+              (std::uint32_t{glyph} << 16) |
+              (screen ? 1u << 24 : 0u) |
+              (item.metric ? kInfoMetric : 0u);
     info[2] = static_cast<std::uint32_t>(item.world);
     info[3] = anchor;
+}
+
+/// overlay.slang's `extra` of an item: its id, and a segment's end
+/// colour.
+void Extra(std::uint32_t (&extra)[4], const OverlayItem& item,
+           const std::optional<glm::vec4>& end = {}) {
+    extra[0] = end ? PackColor(*end) : 0u;
+    extra[1] = item.id;
+    extra[2] = end ? kExtraEndColor : 0u;
+    extra[3] = 0;
 }
 
 void Relative(float (&out)[4], const glm::dvec3& p,
@@ -200,20 +226,43 @@ void Relative(float (&out)[4], const glm::dvec3& p,
     out[3] = w;
 }
 
-/// The font as overlay.slang's `glyphs` reads it: per character its
-/// sixteen rows two to a word, its box and its advance.
-std::vector<std::uint32_t> GlyphWords() {
-    std::vector<std::uint32_t> words;
-    for (const OverlayGlyph& glyph : OverlayGlyphs()) {
-        for (std::size_t r = 0; r < glyph.rows.size(); r += 2) {
-            words.push_back(glyph.rows[r] |
-                            (std::uint32_t{glyph.rows[r + 1]} << 16));
-        }
-        words.push_back(glyph.box[0] | (glyph.box[1] << 8) |
-                        (glyph.box[2] << 16) |
-                        (std::uint32_t{glyph.box[3]} << 24));
-        words.push_back(glyph.advance);
+/// Bytes as words, four to one, little-endian, the last padded with
+/// 0s.
+void AppendBytes(std::vector<std::uint32_t>& words,
+                 std::span<const std::uint8_t> bytes) {
+    const std::size_t first = words.size();
+    words.resize(first + (bytes.size() + 3) / 4, 0u);
+    for (std::size_t i = 0; i < bytes.size(); ++i) {
+        words[first + i / 4] |= std::uint32_t{bytes[i]}
+                                << (8 * (i % 4));
     }
+}
+
+/// The font as overlay.slang's `glyphs` reads it: per Latin-1 code
+/// its field's box, its advance, its field's first texel and size;
+/// the text's height; the kerning; the fields.
+std::vector<std::uint32_t> GlyphWords() {
+    const OverlayFont& font = OverlayTextFont();
+    std::vector<std::uint32_t> words;
+    for (const OverlayGlyph& glyph : font.glyphs) {
+        for (int k = 0; k < 4; ++k) {
+            words.push_back(
+                std::bit_cast<std::uint32_t>(glyph.box[k]));
+        }
+        words.push_back(std::bit_cast<std::uint32_t>(glyph.advance));
+        words.push_back(glyph.texel);
+        words.push_back(glyph.width |
+                        (std::uint32_t{glyph.height} << 16));
+        words.push_back(0u);
+    }
+    static_assert(kGlyphWords == 8);
+    words.push_back(std::bit_cast<std::uint32_t>(font.textHeight));
+    words.resize(words.size() + kFontWords - 1, 0u);
+    AppendBytes(words,
+                std::span(reinterpret_cast<const std::uint8_t*>(
+                              font.kerning.data()),
+                          font.kerning.size()));
+    AppendBytes(words, font.field);
     return words;
 }
 
@@ -317,19 +366,20 @@ void OverlayPass::CreatePipelines(bool pushbroom) {
         {"overlay", shaders::kOverlaySlang}};
     const std::vector<std::uint32_t> fragment =
         compiler_.CompileSpirv(modules, "overlayFragment");
-    const std::array<std::vector<std::uint32_t>, 7> vertices{
+    const std::array<std::vector<std::uint32_t>, 8> vertices{
         compiler_.CompileSpirv(modules, "segmentVertex"),
         compiler_.CompileSpirv(modules, "triangleVertex"),
         compiler_.CompileSpirv(modules, "spriteVertex"),
         compiler_.CompileSpirv(modules, "batchSegmentVertex"),
         compiler_.CompileSpirv(modules, "batchTriangleVertex"),
         compiler_.CompileSpirv(modules, "batchSpriteVertex"),
-        compiler_.CompileSpirv(modules, "batchNumberVertex")};
+        compiler_.CompileSpirv(modules, "batchNumberVertex"),
+        compiler_.CompileSpirv(modules, "batchImageVertex")};
     for (const VkFormat format : {kLdrFormat, presentFormat_}) {
         if (pipelines_.contains({format, pushbroom})) {
             continue;
         }
-        std::array<std::unique_ptr<GraphicsPipeline>, 7>& pipelines =
+        std::array<std::unique_ptr<GraphicsPipeline>, 8>& pipelines =
             pipelines_[{format, pushbroom}];
         for (std::size_t kind = 0; kind < vertices.size(); ++kind) {
             GraphicsPipelineDesc desc;
@@ -473,6 +523,7 @@ void OverlayPass::BuildLayer(HostLayer& layer,
         Relative(gpu.b, segment.b, from, segment.dash);
         Info(gpu.info, shown(segment.item), MarkerShape::Square,
              segment.item.anchor);
+        Extra(gpu.extra, segment.item, segment.endColor);
         segments.emplace_back(GroupKey{false, segment.item.world},
                               gpu);
     }
@@ -486,6 +537,7 @@ void OverlayPass::BuildLayer(HostLayer& layer,
         }
         Info(gpu.info, shown(triangle.item), MarkerShape::Square,
              triangle.item.anchor);
+        Extra(gpu.extra, triangle.item);
         triangles.emplace_back(GroupKey{false, triangle.item.world},
                                gpu);
     }
@@ -498,6 +550,12 @@ void OverlayPass::BuildLayer(HostLayer& layer,
         Info(gpu.info, shown(sprite.item), sprite.shape,
              sprite.screen ? 0u : sprite.item.anchor, sprite.glyph,
              sprite.screen);
+        Extra(gpu.extra, sprite.item);
+        if (sprite.halo > 0.0f) {
+            gpu.extra[0] = PackColor(sprite.haloColor);
+            gpu.extra[2] |= kExtraHalo;
+            gpu.extra[3] = std::bit_cast<std::uint32_t>(sprite.halo);
+        }
         sprites.emplace_back(
             GroupKey{sprite.screen, sprite.item.world}, gpu);
     }
@@ -525,6 +583,7 @@ void OverlayPass::BuildLayer(HostLayer& layer,
 
 void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
     batchDraws_.clear();
+    batchOwners_.clear();
     sortJobs_.clear();
     countJobs_.clear();
     poseJobs_.clear();
@@ -544,8 +603,13 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
         if (array.Empty()) {
             return 0;
         }
+        // In words of 4 bytes: an image's bytes four to a word.
         p.first = total;
-        total += static_cast<std::uint32_t>(array.Elements());
+        total += static_cast<std::uint32_t>(
+            (static_cast<std::size_t>(array.Elements()) *
+                 SizeOf(array.Type()) +
+             3) /
+            4);
         placed.push_back(std::move(p));
         return placed.back().first;
     };
@@ -555,6 +619,7 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
             const auto count =
                 static_cast<std::uint32_t>(batch.Count());
             GpuBatch& gpu = records.emplace_back();
+            batchOwners_.emplace_back(overlay, b);
             const std::uintptr_t stream = batch.stream;
             const auto array = [&](std::string_view name,
                                    const Tensor& values) {
@@ -598,6 +663,15 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
                              batch.colors.Elements()) ==
                              count * trail * (alpha ? 4u : 3u)
                      ? kBatchPointColors
+                     : 0) |
+                // Lines' and arrows' colours a row per end.
+                ((batch.kind == OverlayBatchKind::Lines ||
+                  batch.kind == OverlayBatchKind::Arrows) &&
+                         !batch.colors.Empty() &&
+                         static_cast<std::uint32_t>(
+                             batch.colors.Elements()) ==
+                             2 * count * (alpha ? 4u : 3u)
+                     ? kBatchEndColors
                      : 0);
             gpu.arrays[0] = array("points", batch.points);
             gpu.arrays[1] =
@@ -652,9 +726,9 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
                                     batch.anchors.begin(),
                                     batch.anchors.end());
             }
-            const OverlayItem item{batch.style.color,
-                                   batch.style.depth,
-                                   batch.style.world};
+            OverlayItem item{batch.style.color, batch.style.depth,
+                             batch.style.world};
+            item.metric = batch.style.metric;
             Info(gpu.style, item, batch.shape);
             gpu.style[3] = PackColor(batch.style.background);
             // Arrays in anchors' space are not moved to the frame's
@@ -678,11 +752,34 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
                 gpu.place[1] = batch.placement.at.y;
                 gpu.place[2] = batch.placement.offset.x;
                 gpu.place[3] = batch.placement.offset.y;
+                // Its characters' halo in place of their box.
+                gpu.params[0] = batch.style.halo;
                 if (batch.screen) {
                     const glm::vec2 align = batch.placement.Align();
                     gpu.params[2] = align.x;
                     gpu.params[3] = align.y;
                 }
+            }
+            if (batch.kind == OverlayBatchKind::Image) {
+                // Its texels, a word each but for 3 channels, its
+                // size and channels; on the screen, its place and
+                // size.
+                gpu.text[0] = array("image", batch.image);
+                gpu.text[1] = static_cast<std::uint32_t>(
+                    batch.image.Shape()[1]);
+                gpu.text[2] = static_cast<std::uint32_t>(
+                    batch.image.Shape()[0]);
+                gpu.text[3] = static_cast<std::uint32_t>(
+                    batch.image.Shape()[2]);
+                gpu.place[0] = batch.placement.at.x;
+                gpu.place[1] = batch.placement.at.y;
+                gpu.place[2] = batch.placement.offset.x;
+                gpu.place[3] = batch.placement.offset.y;
+                gpu.params[0] = batch.imageSize.x;
+                gpu.params[1] = batch.imageSize.y;
+                const glm::vec2 align = batch.placement.Align();
+                gpu.params[2] = align.x;
+                gpu.params[3] = align.y;
             }
             if (batch.kind == OverlayBatchKind::Texts) {
                 // Each row of codes, its length the most characters.
@@ -695,11 +792,16 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
             if (numbers) {
                 // The text's characters, prefix then suffix, as
                 // floats among the arrays.
+                const std::vector<std::uint8_t> prefix =
+                    OverlayCodes(batch.format.prefix);
+                const std::vector<std::uint8_t> suffix =
+                    OverlayCodes(batch.format.suffix);
                 std::vector<float> affixes;
-                for (const char c :
-                     batch.format.prefix + batch.format.suffix) {
-                    affixes.push_back(static_cast<float>(
-                        c >= 32 && c < 127 ? c : '?'));
+                for (const std::uint8_t c : prefix) {
+                    affixes.push_back(static_cast<float>(c));
+                }
+                for (const std::uint8_t c : suffix) {
+                    affixes.push_back(static_cast<float>(c));
                 }
                 gpu.text[0] =
                     affixes.empty()
@@ -710,10 +812,10 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
                                      {static_cast<std::int64_t>(
                                          affixes.size())}),
                                  stream});
-                gpu.text[1] = static_cast<std::uint32_t>(
-                    batch.format.prefix.size());
-                gpu.text[2] = static_cast<std::uint32_t>(
-                    batch.format.suffix.size());
+                gpu.text[1] =
+                    static_cast<std::uint32_t>(prefix.size());
+                gpu.text[2] =
+                    static_cast<std::uint32_t>(suffix.size());
                 gpu.text[3] =
                     static_cast<std::uint32_t>(batch.format.decimals);
                 chars = static_cast<std::uint32_t>(affixes.size()) +
@@ -733,6 +835,9 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
                 batchDraws_.push_back({index, 3,
                                        count * gpu.shape[2] * 6,
                                        false, 0, batch.screen});
+            } else if (batch.kind == OverlayBatchKind::Image) {
+                batchDraws_.push_back(
+                    {index, 4, count * 6, false, 0, batch.screen});
             } else if (batch.kind == OverlayBatchKind::Markers) {
                 batchDraws_.push_back({index, 2, count * 6});
             } else {
@@ -847,7 +952,7 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
             *batchData_,
             std::span(static_cast<const std::byte*>(source.Data()),
                       static_cast<std::size_t>(source.Elements()) *
-                          sizeof(float)),
+                          SizeOf(source.Type())),
             VkDeviceSize{p.first} * sizeof(float));
     }
     CopyGpuArrays();
@@ -1138,15 +1243,23 @@ void OverlayPass::Record(VkCommandBuffer commands,
     if (sortPending_) {
         RecordSort(commands);
     }
-    const auto drawn = [layer](bool screen) {
-        return layer == Layer::All ||
-               (layer == Layer::Screen) == screen;
-    };
     RenderingTarget rendering;
     rendering.color = target.color;
     rendering.extent = target.extent;
     rendering.loadColor = true;
     BeginRendering(commands, rendering);
+    DrawItems(commands, target, layer, found->second, nullptr);
+    vkCmdEndRendering(commands);
+}
+
+void OverlayPass::DrawItems(
+    VkCommandBuffer commands, const Target& target, Layer layer,
+    const std::array<std::unique_ptr<GraphicsPipeline>, 8>& pipelines,
+    const glm::uvec2* pick) const {
+    const auto drawn = [layer](bool screen) {
+        return layer == Layer::All ||
+               (layer == Layer::Screen) == screen;
+    };
     // The bindings with a layer's items (or none).
     const auto bind = [&](const HostLayer* items) {
         const auto of = [&](std::size_t k) {
@@ -1177,16 +1290,19 @@ void OverlayPass::Record(VkCommandBuffer commands,
          static_cast<float>(target.extent.height), target.nearPlane,
          target.farPlane},
         {0, 0, 0, 0},
-        {0, 0, 0, 0}};
+        {0, pick != nullptr ? pick->x : 0u,
+         pick != nullptr ? pick->y : 0u, 0}};
     // Each layer's host items: of a view of one world, the shared
     // groups and its world's, their anchors from the layer's base.
     constexpr std::array<std::uint32_t, 3> kVertices{6, 3, 6};
-    for (const HostLayer& items : layers_) {
+    for (std::size_t l = 0; l < layers_.size(); ++l) {
+        const HostLayer& items = layers_[l];
         if (items.groups.empty()) {
             continue;
         }
         bind(&items);
         constants.layer[0] = items.anchorBase;
+        constants.layer[3] = static_cast<std::uint32_t>(l) + 1;
         std::size_t bound = 3;
         for (const Group& group : items.groups) {
             if (!drawn(group.screen) ||
@@ -1197,7 +1313,7 @@ void OverlayPass::Record(VkCommandBuffer commands,
             if (bound != group.primitive) {
                 vkCmdBindPipeline(
                     commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    found->second[group.primitive]->Handle());
+                    pipelines[group.primitive]->Handle());
                 bound = group.primitive;
             }
             constants.batch[0] = group.first;
@@ -1225,9 +1341,9 @@ void OverlayPass::Record(VkCommandBuffer commands,
         constants.batch[0] = draw.batch;
         constants.batch[1] = sorted ? 1u : 0u;
         constants.batch[3] = worlds_ + 2;  // the batch's slots
-        vkCmdBindPipeline(
-            commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
-            found->second[3 + draw.primitive]->Handle());
+        constants.layer[3] = kPickBatch | draw.batch;
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          pipelines[3 + draw.primitive]->Handle());
         if (!sorted) {
             constants.batch[1] = 0;
             layout_.PushConstants(commands, &constants,
@@ -1255,7 +1371,92 @@ void OverlayPass::Record(VkCommandBuffer commands,
                               1, sizeof(VkDrawIndirectCommand));
         }
     }
+}
+
+void OverlayPass::RecordPick(VkCommandBuffer commands,
+                             const Target& target, std::uint32_t x,
+                             std::uint32_t y,
+                             const GpuBuffer& readback) const {
+    // The pipelines writing what drew each item, made on first use.
+    if (pickPipelines_[0] == nullptr) {
+        const std::vector<ShaderModuleSource> modules{
+            ProjectionModule(target.pushbroom),
+            {"overlay", shaders::kOverlaySlang}};
+        const std::vector<std::uint32_t> fragment =
+            compiler_.CompileSpirv(modules, "overlayPickFragment");
+        constexpr const char* kEntries[] = {
+            "segmentVertex",       "triangleVertex",
+            "spriteVertex",        "batchSegmentVertex",
+            "batchTriangleVertex", "batchSpriteVertex",
+            "batchNumberVertex",   "batchImageVertex"};
+        for (std::size_t k = 0; k < pickPipelines_.size(); ++k) {
+            GraphicsPipelineDesc desc;
+            desc.vertexSpirv =
+                compiler_.CompileSpirv(modules, kEntries[k]);
+            desc.fragmentSpirv = fragment;
+            desc.colorFormat = kPickFormat;
+            desc.depthFormat = VK_FORMAT_UNDEFINED;
+            pickPipelines_[k] = std::make_unique<GraphicsPipeline>(
+                context_, layout_, desc);
+        }
+        pickImage_ = std::make_unique<GpuImage>(
+            context_, ImageDesc{1, 1, 1, 1, kPickFormat,
+                                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                                    VK_IMAGE_USAGE_TRANSFER_SRC_BIT});
+    }
+    pickImage_->Transition(commands,
+                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    RenderingTarget rendering;
+    rendering.color = pickImage_->View();
+    rendering.extent = {1, 1};
+    BeginRendering(commands, rendering);
+    // The view's viewport moved so pixel (x, y) lands on the target's
+    // only one, flipped as BeginRendering's.
+    const auto width = static_cast<float>(target.extent.width);
+    const auto height = static_cast<float>(target.extent.height);
+    const VkViewport viewport{-static_cast<float>(x),
+                              height - static_cast<float>(y),
+                              width,
+                              -height,
+                              0.0f,
+                              1.0f};
+    vkCmdSetViewport(commands, 0, 1, &viewport);
+    const glm::uvec2 pixel(x, y);
+    DrawItems(commands, target, Layer::All, pickPipelines_, &pixel);
     vkCmdEndRendering(commands);
+    pickImage_->Transition(commands,
+                           VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    VkBufferImageCopy region{};
+    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    region.imageExtent = {1, 1, 1};
+    vkCmdCopyImageToBuffer(commands, pickImage_->Handle(),
+                           VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                           readback.Handle(), 1, &region);
+}
+
+std::optional<OverlayPass::Picked> OverlayPass::DecodePick(
+    std::span<const std::uint32_t, 4> words) const {
+    if (words[2] == 0) {
+        return std::nullopt;
+    }
+    Picked picked;
+    picked.item = words[1];
+    if ((words[0] & kPickBatch) != 0) {
+        // A batch's record: its overlay and its index there.
+        const std::uint32_t batch = words[0] & ~kPickBatch;
+        if (batch >= batchOwners_.size()) {
+            return std::nullopt;
+        }
+        picked.overlay = batchOwners_[batch].first;
+        picked.batch =
+            static_cast<std::int32_t>(batchOwners_[batch].second);
+        return picked;
+    }
+    if (words[0] == 0 || words[0] > layers_.size()) {
+        return std::nullopt;
+    }
+    picked.overlay = layers_[words[0] - 1].overlay;
+    return picked;
 }
 
 std::uint64_t OverlayPass::GpuBytes() const {

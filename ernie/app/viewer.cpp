@@ -651,6 +651,12 @@ struct Viewer::State {
     std::vector<HudItem> hudItems;
     std::vector<ViewportMenuItem> viewportMenuItems;
     std::vector<OverlayClick> overlayClicks;
+    struct OverlayPick {
+        std::uint64_t id;
+        std::function<void(Viewer&, const OverlayHit&)> picked;
+        std::uint64_t scope = 0;
+    };
+    std::vector<OverlayPick> overlayPicks;
     /// The overlay whose screen item the pointer is over, if any.
     std::string hoveredOverlay;
 
@@ -1511,8 +1517,25 @@ struct Viewer::State {
                     }
                 } else if (pixel.x >= 0.0f && pixel.y >= 0.0f &&
                            pixel.x < extent.x && pixel.y < extent.y) {
-                    // Off the image picks none.
-                    PickAt(pixel.x, pixel.y, io.KeyCtrl);
+                    // An overlay item in the world, for those who
+                    // asked, else the scene there; off the image
+                    // picks none.
+                    const auto x =
+                        static_cast<std::uint32_t>(pixel.x);
+                    const auto y =
+                        static_cast<std::uint32_t>(pixel.y);
+                    const std::optional<OverlayHit> hit =
+                        overlayPicks.empty()
+                            ? std::nullopt
+                            : delegate->PickOverlay(scene, x, y);
+                    if (hit) {
+                        const auto handlers = overlayPicks;
+                        for (const OverlayPick& handler : handlers) {
+                            handler.picked(self, *hit);
+                        }
+                    } else {
+                        PickAt(pixel.x, pixel.y, io.KeyCtrl);
+                    }
                 }
             }
         }
@@ -3872,6 +3895,7 @@ void Viewer::RemoveScope(std::uint64_t scope) {
     std::erase_if(s.hudItems, in);
     std::erase_if(s.viewportMenuItems, in);
     std::erase_if(s.overlayClicks, in);
+    std::erase_if(s.overlayPicks, in);
     s.logs->RemoveScope(scope);
     s.hudTime = -kHudRefresh;
     std::vector<std::string> titles;
@@ -4737,6 +4761,18 @@ std::uint64_t Viewer::AddViewportMenuItem(
     return id;
 }
 
+std::uint64_t Viewer::AddOverlayPickHandler(
+    std::function<void(Viewer&, const OverlayHit&)> picked) {
+    if (!picked) {
+        throw std::invalid_argument(
+            "Overlay pick handlers need a function");
+    }
+    State& s = *state_;
+    const std::uint64_t id = s.nextCallback++;
+    s.overlayPicks.push_back({id, std::move(picked), s.scope});
+    return id;
+}
+
 std::uint64_t Viewer::AddOverlayClickHandler(
     std::function<void(Viewer&, const std::string&, std::uint32_t)>
         clicked) {
@@ -4759,6 +4795,7 @@ void Viewer::RemoveViewportItem(std::uint64_t id) {
     std::erase_if(s.hudItems, matches);
     std::erase_if(s.viewportMenuItems, matches);
     std::erase_if(s.overlayClicks, matches);
+    std::erase_if(s.overlayPicks, matches);
     s.hudTime = -kHudRefresh;
 }
 

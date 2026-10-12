@@ -2936,6 +2936,26 @@ Path RasterDelegate::Pick(std::uint32_t x, std::uint32_t y) {
     return PrimPath(id);
 }
 
+std::optional<OverlayHit>
+RasterDelegate::PickOverlay(const Scene& scene, std::uint32_t x,
+                            std::uint32_t y) {
+    if (viewTargets_ == nullptr) {
+        return std::nullopt;
+    }
+    const std::optional<OverlayPass::Picked> picked =
+        renderer_.PickOverlay(*viewTargets_, x, y);
+    if (!picked) {
+        return std::nullopt;
+    }
+    // The overlay by name, as the scene holds it.
+    for (const std::string& name : scene.OverlayNames()) {
+        if (scene.FindOverlay(name) == picked->overlay) {
+            return OverlayHit{name, picked->batch, picked->item};
+        }
+    }
+    return std::nullopt;
+}
+
 std::vector<TimelinePoint> RasterDelegate::SubmitWaits() const {
     if (compute_ == nullptr ||
         compute_->VulkanWait().semaphore == VK_NULL_HANDLE) {

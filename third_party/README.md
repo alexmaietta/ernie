@@ -8,7 +8,7 @@ implementation. Build glue is in `cmake/third_party/<name>.cmake`.
 
 | Library | Version | Files | License | Used for |
 | --- | --- | --- | --- | --- |
-| [stb](https://github.com/nothings/stb) | commit `2c980bb59875b0d32144a71867fbdebb2f77cd20` | `stb_image.h`, `stb_image_write.h` | MIT or public domain | Reading PNG (8/16-bit) and JPEG textures |
+| [stb](https://github.com/nothings/stb) | commit `2c980bb59875b0d32144a71867fbdebb2f77cd20` | `stb_image.h`, `stb_image_write.h`, `stb_truetype.h` | MIT or public domain | Reading PNG (8/16-bit) and JPEG textures; baking overlay text's font to distance fields |
 | [NanoVDB](https://github.com/AcademySoftwareFoundation/openvdb/tree/master/nanovdb) (OpenVDB) | `v13.0.0` (NanoVDB 32.9) | `PNanoVDB.h` | Apache-2.0 | Reading .nvdb grids, and sampling them in the volume shaders |
 | [DLPack](https://github.com/dmlc/dlpack) | `v1.3` | `include/dlpack/dlpack.h` | Apache-2.0 | Tensor exchange with NumPy, PyTorch, JAX and Warp |
 
@@ -45,7 +45,7 @@ Everything else is fetched at configure time (`cmake/third_party/<name>.cmake`, 
 | [ImPlot](https://github.com/epezent/implot) | `v1.0` | MIT | The viewer's plots (app only) |
 | [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo) | `1.10` | MIT | The viewer's gizmos (app only) |
 | [GLFW](https://github.com/glfw/glfw) | `3.4` | Zlib | Windows and input (app only; a system GLFW 3.4 when found) |
-| [Inter](https://github.com/rsms/inter) | `v4.1` | OFL-1.1 | The viewer's typeface (app only) |
+| [Inter](https://github.com/rsms/inter) | `v4.1` | OFL-1.1 | Overlay text, and the viewer's typeface |
 | [Lucide](https://github.com/lucide-icons/lucide) | `1.52.0` | ISC | The viewer's icons (app only) |
 | [MoltenVK](https://github.com/KhronosGroup/MoltenVK) | `v1.4.2` | Apache-2.0 | Vulkan on macOS (macOS only) |
 | [nanobind](https://github.com/wjakob/nanobind) | `v3.1.0` when not installed | BSD-3-Clause | The Python module (Python only) |

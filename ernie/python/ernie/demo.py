@@ -3,9 +3,11 @@
 import argparse
 import importlib.util
 import os
+import queue
 import re
 import struct
 import sys
+import threading
 import urllib.request
 import zlib
 
@@ -422,9 +424,10 @@ def can_download():
     return not os.environ.get("ERNIE_OFFLINE")
 
 
-def _open(request):
+def _open(request, report=print):
     """`urlopen(request)`'s status, headers and body, tried up to three
-    times: servers drop connections mid-transfer now and then."""
+    times: servers drop connections mid-transfer now and then. Failed
+    attempts go to `report`."""
     for attempt in range(3):
         try:
             with urllib.request.urlopen(
@@ -438,7 +441,7 @@ def _open(request):
         except OSError as error:
             if attempt == 2:
                 raise
-            print(
+            report(
                 f"Fetching {request.full_url} failed: {error}; trying again"
             )
 
@@ -450,18 +453,57 @@ def _require_downloads():
         )
 
 
-def download(url, path):
+def download(url, path, report=print):
     """Downloads `url` to `path`, its directory made as needed,
-    through `path` + ".part", renamed when complete."""
+    through `path` + ".part", renamed when complete; failed attempts
+    that are tried again go to `report`."""
     _require_downloads()
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     request = urllib.request.Request(
         url, headers={"User-Agent": "ernie-demos"}
     )
-    _, _, body = _open(request)
+    _, _, body = _open(request, report)
     with open(path + ".part", "wb") as f:
         f.write(body)
     os.replace(path + ".part", path)
+
+
+class AsyncDownload:
+    """`download` on a thread of its own, so a demo runs while its
+    data comes: its progress and outcome are messages for the demo to
+    show as it steps (`take_messages`, such as into the viewer's
+    log)."""
+
+    def __init__(self, url, path):
+        self._messages = queue.Queue()
+        self._messages.put((f"Fetching {url}", False))
+        self.done = False
+        self.succeeded = False
+
+        def run():
+            try:
+                download(
+                    url,
+                    path,
+                    lambda text: self._messages.put((text, False)),
+                )
+                self._messages.put(
+                    (f"Fetched {os.path.basename(path)}", False)
+                )
+                self.succeeded = True
+            except (OSError, RuntimeError) as error:
+                self._messages.put((str(error), True))
+            self.done = True
+
+        self._thread = threading.Thread(target=run, daemon=True)
+        self._thread.start()
+
+    def take_messages(self):
+        """The (text, is_error) messages since the last call."""
+        messages = []
+        while not self._messages.empty():
+            messages.append(self._messages.get_nowait())
+        return messages
 
 
 def fetch_ranges(url, ranges):

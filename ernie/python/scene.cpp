@@ -232,6 +232,10 @@ OverlayStyle StyleFromPython(const nb::kwargs& kwargs) {
                 value.is_none() ? Path() : PathFromPython(value);
         } else if (name == "dash") {
             style.dash = nb::cast<float>(value);
+        } else if (name == "metric") {
+            style.metric = nb::cast<bool>(value);
+        } else if (name == "halo") {
+            style.halo = nb::cast<float>(value);
         } else if (name == "id") {
             style.id = nb::cast<std::uint32_t>(value);
         } else if (name == "hover") {
@@ -241,8 +245,8 @@ OverlayStyle StyleFromPython(const nb::kwargs& kwargs) {
         } else {
             throw nb::type_error(("unknown overlay style '" + name +
                                   "'; expected color, width, dash, "
-                                  "size, depth, world, "
-                                  "background, anchor, id or hover")
+                                  "size, depth, world, background, "
+                                  "halo, anchor, metric, id or hover")
                                      .c_str());
         }
     }
@@ -253,9 +257,12 @@ constexpr const char* kStyleDoc =
     " Style keywords: color (RGB or RGBA display colour), width "
     "(line pixels), dash (dashes' and gaps' pixels, 0 solid), size "
     "(marker or "
-    "text pixels), depth (\"test\", \"xray\" or \"always\"), world "
+    "text pixels, or metres with metric=True), depth (\"test\", "
+    "\"xray\" or \"always\"), world "
     "(-1 for every view), "
-    "background (labels' backing colour) and anchor (a prim the "
+    "background (labels' backing colour), halo (pixels of "
+    "background's colour outlining text's characters in place of "
+    "its box), anchor (a prim the "
     "coordinates are in the space of, followed as it moves, on the "
     "GPU too), id (a number hit tests report, such as a button's) "
     "and "
@@ -393,6 +400,38 @@ constexpr const char* kBatchDoc =
     "the starts times `scale` (velocities, forces).";
 
 void BindOverlay(nb::module_& m) {
+    nb::class_<OverlayHit>(
+        m, "OverlayHit",
+        "What a pick of a rendered image found "
+        "(`Renderer.pick_overlay`): the overlay drawing it, and a "
+        "batch's item (`batch` the batch, `item` its index) or a "
+        "host item (`batch` -1, `item` its style's `id`).")
+        .def_ro("overlay", &OverlayHit::overlay)
+        .def_ro("batch", &OverlayHit::batch)
+        .def_ro("item", &OverlayHit::item)
+        .def("__repr__", [](const OverlayHit& hit) {
+            return "OverlayHit(" + hit.overlay +
+                   ", batch=" + std::to_string(hit.batch) +
+                   ", item=" + std::to_string(hit.item) + ")";
+        });
+    m.def(
+        "camera_image_corners",
+        [](const Scene& scene, nb::handle camera, double distance) {
+            const std::array<glm::dvec3, 4> corners =
+                CameraImageCorners(scene, PathFromPython(camera),
+                                   distance);
+            nb::list rows;
+            for (const glm::dvec3& corner : corners) {
+                rows.append(
+                    nb::make_tuple(corner.x, corner.y, corner.z));
+            }
+            return rows;
+        },
+        nb::arg("scene"), nb::arg("camera"), nb::arg("distance"),
+        "The corners of the Camera at `camera`'s image `distance` "
+        "metres in front of it, in the world, top left first as "
+        "`Overlay.image` takes them: its image drawn there sits "
+        "where it was seen from.");
     nb::class_<Overlay>(
         m, "Overlay",
         "A named layer of debug drawing in world coordinates "
@@ -444,14 +483,19 @@ void BindOverlay(nb::module_& m) {
         .def(
             "polyline",
             [](Overlay& o, nb::handle points, bool closed,
+               nb::handle colors,
                const nb::kwargs& style) -> Overlay& {
                 return o.Polyline(PointsFromPython(points),
-                                  StyleFromPython(style), closed);
+                                  StyleFromPython(style), closed,
+                                  ColorsFromPython(colors));
             },
             nb::arg("points"), nb::arg("closed") = false,
-            nb::arg("style"), nb::rv_policy::reference_internal,
+            nb::arg("colors") = nb::none(), nb::arg("style"),
+            nb::rv_policy::reference_internal,
             (std::string("Segments through (N, 3) `points`, back to "
-                         "the first when `closed`.") +
+                         "the first when `closed`; with (N, 3 or 4) "
+                         "`colors`, one per point, each segment "
+                         "blending between its ends' (a gradient).") +
              kStyleDoc)
                 .c_str())
         .def(
@@ -940,6 +984,66 @@ void BindOverlay(nb::module_& m) {
              kBatchDoc + kStyleDoc)
                 .c_str())
         .def(
+            "image",
+            [](Overlay& o, nb::handle corners, nb::handle image,
+               nb::handle stream,
+               const nb::kwargs& style) -> Overlay& {
+                OverlayBatch batch;
+                batch.kind = OverlayBatchKind::Image;
+                batch.points = BatchArray(corners, "float32");
+                batch.image = BatchArray(image, "uint8");
+                return AddBatch(o, std::move(batch),
+                                {nb::none(), nb::none(), nb::none(),
+                                 nb::none(), stream},
+                                style);
+            },
+            nb::arg("corners"), nb::arg("image"),
+            nb::arg("stream") = nb::none(), nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string(
+                 "A (rows, cols, 3 or 4) uint8 `image` (display "
+                 "colours, row 0 at its top) on the quad between "
+                 "four world `corners`, top left, top right, bottom "
+                 "right, bottom left (`camera_image_corners` gives a "
+                 "camera's): such as another camera's LdrColor, a "
+                 "CUDA array read again every frame. Filtered "
+                 "between texels, times the style's colour; it may "
+                 "follow an "
+                 "`anchor` or `poses`.") +
+             kStyleDoc)
+                .c_str())
+        .def(
+            "screen_image",
+            [](Overlay& o, nb::handle image, nb::handle at,
+               nb::handle offset, nb::handle align, nb::handle size,
+               nb::handle stream,
+               const nb::kwargs& style) -> Overlay& {
+                OverlayBatch batch;
+                batch.kind = OverlayBatchKind::Image;
+                batch.screen = true;
+                batch.placement =
+                    PlacementFromPython(at, offset, align);
+                if (!size.is_none()) {
+                    batch.imageSize = Vec2FromPython(size);
+                }
+                batch.image = BatchArray(image, "uint8");
+                return AddBatch(o, std::move(batch),
+                                {nb::none(), nb::none(), nb::none(),
+                                 nb::none(), stream},
+                                style);
+            },
+            nb::arg("image"), nb::arg("at") = nb::make_tuple(0, 0),
+            nb::arg("offset") = nb::make_tuple(0, 0),
+            nb::arg("align") = nb::none(),
+            nb::arg("size") = nb::none(),
+            nb::arg("stream") = nb::none(), nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string("`image` on the screen, `size` (width, "
+                         "height) pixels (its own when None): a "
+                         "picture in the picture.") +
+             kPlacementDoc + kStyleDoc)
+                .c_str())
+        .def(
             "texts",
             [](Overlay& o, nb::handle texts, nb::handle points,
                bool screen, nb::handle at, nb::handle offset,
@@ -952,10 +1056,12 @@ void BindOverlay(nb::module_& m) {
                 // Strings become rows of codes, padded with 0s.
                 if (nb::isinstance<nb::list>(texts) ||
                     nb::isinstance<nb::tuple>(texts)) {
-                    std::vector<std::string> rows;
+                    // Latin-1 codes, '?' for what the font lacks.
+                    std::vector<std::vector<std::uint8_t>> rows;
                     std::size_t longest = 1;
                     for (nb::handle text : texts) {
-                        rows.push_back(nb::cast<std::string>(text));
+                        rows.push_back(OverlayCodes(
+                            nb::cast<std::string>(text)));
                         longest =
                             std::max(longest, rows.back().size());
                     }
@@ -964,9 +1070,7 @@ void BindOverlay(nb::module_& m) {
                     for (std::size_t r = 0; r < rows.size(); ++r) {
                         for (std::size_t c = 0; c < rows[r].size();
                              ++c) {
-                            codes[r * longest + c] =
-                                static_cast<unsigned char>(
-                                    rows[r][c]);
+                            codes[r * longest + c] = rows[r][c];
                         }
                     }
                     batch.chars = Tensor::Copy<std::int32_t>(

@@ -110,7 +110,7 @@ TEST(Overlay, LabelsBecomeACharacterEachOverABackingBox) {
     EXPECT_EQ(overlay.Sprites()[1].glyph, 'H');
     EXPECT_EQ(overlay.Sprites()[2].glyph, 'i');
     EXPECT_GT(overlay.Sprites()[2].rect.x,
-              overlay.Sprites()[1].rect.z)
+              overlay.Sprites()[1].rect.x)
         << "left to right";
     for (const auto& sprite : overlay.Sprites()) {
         EXPECT_GT(sprite.rect.x, 0.0f) << "right of the point";
@@ -159,29 +159,57 @@ TEST(Overlay, ArcsAndCurvesBecomeSegmentsOrSectors) {
                 0.0, 1e-12);
 }
 
-TEST(Overlay, TheFontCoversPrintableAscii) {
-    const auto glyphs = ernie::OverlayGlyphs();
-    ASSERT_EQ(glyphs.size(), 95u);
-    const ernie::OverlayGlyph& space = glyphs[0];
-    EXPECT_EQ(space.box[2], space.box[0]) << "nothing to draw";
-    EXPECT_GT(space.advance, 0);
-    const ernie::OverlayGlyph& a = glyphs['A' - 32];
-    EXPECT_GT(a.box[2], a.box[0]);
-    EXPECT_GT(a.box[3], a.box[1]);
-    // The box holds every bit set, and the bits fill it.
-    std::uint16_t any = 0;
-    for (int y = 0; y < ernie::kOverlayGlyphCell; ++y) {
-        if (y < a.box[1] || y >= a.box[3]) {
-            EXPECT_EQ(a.rows[y], 0) << y;
-        }
-        any |= a.rows[y];
-    }
-    EXPECT_EQ(any & ((1u << a.box[0]) - 1u), 0u);
-    EXPECT_EQ(any >> a.box[2], 0);
+TEST(Overlay, TheFontCoversLatin1InDistanceFields) {
+    const ernie::OverlayFont& font = ernie::OverlayTextFont();
+    const ernie::OverlayGlyph& space = font.glyphs[' '];
+    EXPECT_EQ(space.width, 0) << "nothing to draw";
+    EXPECT_GT(space.advance, 0.0f);
+    // 'I' fills its field's middle and not its corner, its box as
+    // many units as it has texels.
+    const ernie::OverlayGlyph& i = font.glyphs['I'];
+    ASSERT_GT(i.width, 0);
+    ASSERT_LE(i.texel + std::size_t{i.width} * i.height,
+              font.field.size());
+    EXPECT_NEAR(i.box.z - i.box.x,
+                i.width / ernie::kOverlayFieldTexels, 1e-4f);
+    EXPECT_NEAR(i.box.w - i.box.y,
+                i.height / ernie::kOverlayFieldTexels, 1e-4f);
+    const auto texel = [&](int x, int y) {
+        return font.field[i.texel + std::size_t(y) * i.width +
+                          std::size_t(x)];
+    };
+    EXPECT_GT(texel(i.width / 2, i.height / 2), 128) << "inside";
+    EXPECT_LT(texel(0, 0), 128) << "outside";
+    EXPECT_GT(font.glyphs[0xE9].width, 0) << "é";
+    EXPECT_EQ(font.glyphs[1].texel, font.glyphs['?'].texel)
+        << "'?' for what it lacks";
+    // UTF-8 in, Latin-1 out.
+    EXPECT_EQ(ernie::OverlayCodes("Caf\xc3\xa9 \xe2\x82\xac\n"),
+              (std::vector<std::uint8_t>{'C', 'a', 'f', 0xE9, ' ',
+                                         '?', '\n'}));
+    // Kerned: "AV" narrower than its advances.
+    EXPECT_LT(font.Kerning('A', 'V'), 0.0f);
+    EXPECT_LT(
+        ernie::OverlayTextSize("AV", ernie::kOverlayLineHeight).x,
+        font.glyphs['A'].advance + font.glyphs['V'].advance);
     const glm::vec2 size = ernie::OverlayTextSize("ab\ncd", 24.0f);
-    EXPECT_FLOAT_EQ(size.y, 2.0f * (24.0f - 6.0f) + 6.0f)
+    EXPECT_FLOAT_EQ(size.y, 2.0f * (12.0f + font.textHeight))
         << "two lines but the last's spacing";
     EXPECT_GT(size.x, 0.0f);
+}
+
+TEST(Overlay, HalosOutlineCharactersInPlaceOfTheBox) {
+    Overlay overlay;
+    OverlayStyle style;
+    style.halo = 2.0f;
+    style.background = {0.0f, 0.0f, 0.0f, 0.8f};
+    overlay.Label({0, 0, 0}, "Hi", style);
+    ASSERT_EQ(overlay.Sprites().size(), 2u) << "no backing box";
+    for (const auto& sprite : overlay.Sprites()) {
+        EXPECT_NE(sprite.glyph, 0);
+        EXPECT_EQ(sprite.halo, 2.0f);
+        EXPECT_EQ(sprite.haloColor, style.background);
+    }
 }
 
 TEST(Overlay, ScreenTextSitsByItsPlacement) {
@@ -196,18 +224,24 @@ TEST(Overlay, ScreenTextSitsByItsPlacement) {
     ASSERT_FALSE(overlay.Sprites().empty());
     const glm::vec2 size =
         ernie::OverlayTextSize("t = 1.50 s", 12.0f);
+    // Characters' boxes reach past their outlines by the fields'
+    // padding, and the outlines a little past the advances.
+    const float pad = ernie::kOverlayFieldPadding /
+                          ernie::kOverlayFieldTexels * style.size /
+                          ernie::kOverlayLineHeight +
+                      1.0f;
     float right = -1e9f;
     float top = 1e9f;
     for (const auto& sprite : overlay.Sprites()) {
         EXPECT_TRUE(sprite.screen);
         EXPECT_EQ(sprite.anchor, glm::dvec3(1.0, 0.0, 0.0));
         EXPECT_EQ(sprite.item.depth, OverlayDepth::Always);
-        EXPECT_GE(sprite.rect.x, -10.0f - size.x - 1e-3f);
+        EXPECT_GE(sprite.rect.x, -10.0f - size.x - pad);
         right = std::max(right, sprite.rect.z);
         top = std::min(top, sprite.rect.y);
     }
-    EXPECT_LE(right, -10.0f + 1e-3f) << "inside the right edge";
-    EXPECT_GE(top, 10.0f - 1e-3f) << "below the top";
+    EXPECT_LE(right, -10.0f + pad) << "inside the right edge";
+    EXPECT_GE(top, 10.0f - pad) << "below the top";
     // Without an alignment, a point off the edges keeps its corner on
     // the side away from the nearer edge.
     ernie::ScreenPlacement side;

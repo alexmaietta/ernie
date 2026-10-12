@@ -16,6 +16,7 @@ ernie_add_library(
     material_schemas.cpp
     orbit_controller.cpp
     overlay.cpp
+    overlay_font.cpp
     path.cpp
     prim_type.cpp
     render_schemas.cpp
@@ -33,4 +34,5 @@ ernie_add_library(
     PRIVATE
     ernie_kernel
     ernie_json
-    ernie_stb)
+    ernie_stb
+    ernie_font_inter)
