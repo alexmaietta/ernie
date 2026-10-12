@@ -5259,6 +5259,8 @@ void RasterRenderer::Filter(VkCommandBuffer commands,
             resources.push_back(
                 general(targets.Bound(render_vars::kMotionVector)));
             resources.push_back(general(raster));
+            // Each kernel's own time, in the order they run.
+            ERNIE_GPU_ZONE(context_, commands, "Sensor kernel");
             vkCmdBindPipeline(
                 commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                 sensorPipelines_.at(SensorKernelKey(plan, segment))

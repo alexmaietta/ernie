@@ -50,7 +50,10 @@ static const uint kBackground = 0xFFFFFFFF;
 // Distant lights whose stray light the sensor adds, such as the sun (renderer.cpp's).
 public static const uint kStraySources = 4;
 
-public struct SensorUniforms {
+// The uniforms every view shares, as binding 0 holds them (renderer.cpp's SensorUniforms); its
+// per-view fields are unused. Read in place (`sensorShared`): a copy whose arrays are indexed at
+// run time stays whole in each thread's memory.
+public struct SensorShared {
     public float4x4 invViewProj;
     // xyz: camera position.
     public float4 eye;
@@ -118,9 +121,33 @@ public struct SensorUniforms {
     public float4 sourceRadiance[16 * kStraySources];
 }
 
+// A view's uniforms, as the filters take them: `SensorShared`'s fields without its per-band
+// arrays (read those from `sensorShared`), and the view's own camera and frame seed. Small
+// enough to keep in registers.
+public struct SensorUniforms {
+    public float4x4 invViewProj;
+    public float4 eye;
+    public float4 forward;
+    public float4 intrinsics;
+    public uint4 size;
+    public float4 distortion;
+    public float4 lens;
+    public float4 sensor;
+    public float4 adc;
+    public uint4 noise;
+    public float4 clear;
+    public float4 range;
+    public float4 optics;
+    public float4x4 faceInvProj;
+    public float4 faces;
+    public float4 pushbroom;
+    public float4 polarizer;
+}
+
 // Band `band`'s image scale (x) and focal length shift in millimetres (y) through `cam`'s lens.
 public float2 chromaticOf(SensorUniforms cam, uint band) {
-    let pair = cam.chromatic[band / 2];
+    // From the buffer: indexing a copy's array would keep the copy in memory.
+    let pair = sensorShared[0].chromatic[band / 2];
     return (band & 1u) == 0u ? pair.xy : pair.zw;
 }
 
@@ -141,12 +168,13 @@ public struct SensorConstants {
 // camera-to-world pose (glm's column-major order), eye, forward, distortion (a pushbroom's line
 // differs per view) and frame seed (x).
 [[vk::binding(0, 0)]] ByteAddressBuffer sensorData;
+// The same buffer, its shared uniforms as element 0: reading a field through it reads that field
+// alone.
+[[vk::binding(0, 0)]] StructuredBuffer<SensorShared> sensorShared;
 [[vk::push_constant]] ConstantBuffer<SensorConstants> pass;
 
 static const uint kSensorSharedBytes = 4352;
 static const uint kSensorViewBytes = 192;
-// `faceInvProj`'s offset in the shared uniforms.
-static const uint kFaceInvProjOffset = 2560;
 
 // The column-major matrix at `address` of the sensor's buffer.
 float4x4 loadMatrix(uint address) {
@@ -158,29 +186,44 @@ float4x4 loadMatrix(uint address) {
 
 // The uniforms every view shares.
 SensorUniforms sharedUniforms() {
-    var cam = sensorData.Load<SensorUniforms>(0);
-    cam.faceInvProj = loadMatrix(kFaceInvProjOffset);
+    SensorUniforms cam;
+    cam.invViewProj = sensorShared[0].invViewProj;
+    cam.eye = sensorShared[0].eye;
+    cam.forward = sensorShared[0].forward;
+    cam.intrinsics = sensorShared[0].intrinsics;
+    cam.size = sensorShared[0].size;
+    cam.distortion = sensorShared[0].distortion;
+    cam.lens = sensorShared[0].lens;
+    cam.sensor = sensorShared[0].sensor;
+    cam.adc = sensorShared[0].adc;
+    cam.noise = sensorShared[0].noise;
+    cam.clear = sensorShared[0].clear;
+    cam.range = sensorShared[0].range;
+    cam.optics = sensorShared[0].optics;
+    cam.faceInvProj = sensorShared[0].faceInvProj;
+    cam.faces = sensorShared[0].faces;
+    cam.pushbroom = sensorShared[0].pushbroom;
+    cam.polarizer = sensorShared[0].polarizer;
     return cam;
 }
 
-// View `view`'s uniforms: the shared ones with its own camera, frame seed and stray light
-// sources (turned into its camera's frame).
+// The byte address of view `view`'s block.
+uint viewBlock(uint view) {
+    return kSensorSharedBytes + view * kSensorViewBytes;
+}
+
+// View `view`'s uniforms: the shared ones with its own camera and frame seed. Its stray light
+// sources stay in the world's frame (`PixelContext.sourceInCamera` turns them). Nothing may
+// index an array of the copy at run time, or the whole copy stays in memory: read those from
+// `sensorShared`.
 SensorUniforms viewUniforms(uint view) {
     var cam = sharedUniforms();
-    let base = kSensorSharedBytes + view * kSensorViewBytes;
+    let base = viewBlock(view);
     cam.invViewProj = loadMatrix(base);
-    let pose = loadMatrix(base + 64);
     cam.eye = asfloat(sensorData.Load4(base + 128));
     cam.forward = asfloat(sensorData.Load4(base + 144));
     cam.distortion = asfloat(sensorData.Load4(base + 160));
     cam.noise.z = sensorData.Load(base + 176);
-    // World to camera is the pose's rotation transposed.
-    let toCamera = transpose(float3x3(pose[0].xyz, pose[1].xyz, pose[2].xyz));
-    for (uint s = 0; s < kStraySources; ++s) {
-        let source = mul(toCamera, cam.sources[s].xyz);
-        let unit = length(source) > 0.0 ? normalize(source) : source;
-        cam.sources[s] = float4(unit, cam.sources[s].w);
-    }
     return cam;
 }
 [[vk::binding(1, 0)]] Texture2DArray<float> rasterRadiance;
@@ -268,17 +311,17 @@ public struct PixelContext {
     }
 
     public uint bands() {
-        return sharedUniforms().size.z;
+        return sensorShared[0].size.z;
     }
 
     // Layer `band` of this view's group in the spectral images.
     public int slice(uint band) {
-        return int(id.z * sharedUniforms().size.z + band);
+        return int(id.z * sensorShared[0].size.z + band);
     }
 
     // The centre of band `band`, in nanometres.
     public float wavelength(uint band) {
-        let range = sharedUniforms().range;
+        let range = sensorShared[0].range;
         return range.x + (float(band) + 0.5) * range.y;
     }
 
@@ -287,19 +330,19 @@ public struct PixelContext {
     // micrometres, the focal length in millimetres and the focus distance in scene units (0:
     // infinity).
     public float diffractionFNumber() {
-        return sharedUniforms().optics.x;
+        return sensorShared[0].optics.x;
     }
     public float lensFNumber() {
-        return sharedUniforms().range.z;
+        return sensorShared[0].range.z;
     }
     public float pixelPitchMicrons() {
-        return sharedUniforms().optics.y;
+        return sensorShared[0].optics.y;
     }
     public float focalLengthMm() {
-        return sharedUniforms().optics.z;
+        return sensorShared[0].optics.z;
     }
     public float focusDistance() {
-        return sharedUniforms().optics.w;
+        return sensorShared[0].optics.w;
     }
 
     // Distant light `source` (below `kStraySources`), for stray light: the unit direction towards
@@ -308,38 +351,45 @@ public struct PixelContext {
     // the focal plane (through the camera equation E = pi T L / (4 N^2) on axis), so a share k of
     // that irradiance reaching the sensor reads as k times this radiance.
     public float4 sourceInCamera(uint source) {
-        return viewUniforms(view).sources[source];
+        // From the world's frame through the view's pose: world to camera is its rotation
+        // transposed.
+        let pose = loadMatrix(viewBlock(view) + 64);
+        let toCamera = transpose(float3x3(pose[0].xyz, pose[1].xyz, pose[2].xyz));
+        let world = sensorShared[0].sources[source];
+        let direction = mul(toCamera, world.xyz);
+        let unit = length(direction) > 0.0 ? normalize(direction) : direction;
+        return float4(unit, world.w);
     }
     public float sourceFocalRadiance(uint source, uint band) {
-        return sharedUniforms().sourceRadiance[16 * source + band / 4][band % 4];
+        return sensorShared[0].sourceRadiance[16 * source + band / 4][band % 4];
     }
 
     // Photons collected over the exposure per unit spectral radiance in band `band` (the camera
     // equation, before quantum efficiency), for integrators with their own QE; and the dark
     // current's electrons over the exposure.
     public float photonsPerRadiance(uint band) {
-        return sharedUniforms().photons[band / 4][band % 4];
+        return sensorShared[0].photons[band / 4][band % 4];
     }
     public float darkElectrons() {
-        return sharedUniforms().sensor.z * sharedUniforms().lens.w;
+        return sensorShared[0].sensor.z * sensorShared[0].lens.w;
     }
     // The sensor's channel count (1 mono, 3 RGB, 4 RGB-NIR).
     public uint channels() {
-        return sharedUniforms().size.w;
+        return sensorShared[0].size.w;
     }
 
     // The frame's number and the exposure time in seconds, for temporal filters.
     public uint frame() {
-        return sharedUniforms().noise.w;
+        return sensorShared[0].noise.w;
     }
     public float exposureTime() {
-        return sharedUniforms().lens.w;
+        return sensorShared[0].lens.w;
     }
 
     // A uniform number in (0, 1] for this pixel and `salt`, the same every frame (from the
     // sensor's seed alone): for fixed patterns, such as hot pixels.
     public float fixedRandom(uint salt) {
-        let seed = sharedUniforms().noise.y;
+        let seed = sensorShared[0].noise.y;
         return uniform01(pcg3d(uint3(id.x, id.y, seed * 4u + salt * 2654435761u)).x);
     }
 
@@ -347,7 +397,7 @@ public struct PixelContext {
     // alone), shared by every pixel with that key: for patterns of parts of the sensor, such as
     // a key of (column, 0) for each detector of a line scanner.
     public float fixedNormal(uint2 key, uint salt) {
-        let seed = sharedUniforms().noise.y;
+        let seed = sensorShared[0].noise.y;
         let bits = pcg3d(uint3(key.x * 7919u + 13u, key.y * 104729u + 7u,
                                seed * 4u + salt * 2654435761u + 1u));
         return gaussian(bits.xy);
@@ -356,7 +406,7 @@ public struct PixelContext {
     // A uniform number in (0, 1] for this pixel and `salt`, new every frame (from the frame
     // seed, which also differs per view): for temporal noise.
     public float random(uint salt) {
-        let frame = sensorData.Load(kSensorSharedBytes + view * kSensorViewBytes + 176);
+        let frame = sensorData.Load(viewBlock(view) + 176);
         return uniform01(
             pcg3d(uint3(id.x ^ (frame * 9781u), id.y + frame * 6271u, salt * 2654435761u + 977u))
                 .x);
@@ -370,7 +420,7 @@ public bool beginPixel(uint3 id, out PixelContext pixel) {
     pixel.outputBase = 0;
     pixel.heldOutputs = pass.view.y;
     pixel.stateBase = 0;
-    let size = sharedUniforms().size;
+    let size = sensorShared[0].size;
     return id.x < size.x && id.y < size.y;
 }
 
@@ -429,7 +479,7 @@ public struct SpatialImage {
 
     // The sensor image's width and height.
     public int2 size(PixelContext pixel) {
-        return int2(sharedUniforms().size.xy);
+        return int2(sensorShared[0].size.xy);
     }
 
     // Band `band` of the spectrum at sensor pixel `at`.
@@ -862,7 +912,7 @@ public struct Lens : ISpatialSource {
     //
     // Reference: E. Collett, "Field Guide to Polarization", SPIE FG05, 2005.
     static float analysed(float intensity, float q, float u, PixelContext pixel) {
-        let polarizer = sharedUniforms().polarizer;
+        let polarizer = sensorShared[0].polarizer;
         let t = polarizerAngle(pixel);
         return 0.5 * ((polarizer.z + polarizer.w) * intensity +
                       (polarizer.z - polarizer.w) * (q * cos(2.0 * t) + u * sin(2.0 * t)));
@@ -871,7 +921,7 @@ public struct Lens : ISpatialSource {
     // The polarizer's angle at the pixel: its own, or a mosaic's for its place in its 2 x 2 cell,
     // 90, 45 degrees over 135, 0 (Sony's IMX250MZR).
     static float polarizerAngle(PixelContext pixel) {
-        let polarizer = sharedUniforms().polarizer;
+        let polarizer = sensorShared[0].polarizer;
         if (polarizer.y < 0.5) {
             return polarizer.x;
         }
@@ -1053,7 +1103,7 @@ public void writeSpectral(PixelContext pixel, uint band, float radiance) {
 public struct Qe : IIntegrator {
     public static void accumulate(inout SensorPixel value, uint band, float radiance,
                                   PixelContext pixel) {
-        value.electrons += radiance * sharedUniforms().qe[band];
+        value.electrons += radiance * sensorShared[0].qe[band];
     }
 
     public static void finish(inout SensorPixel value, PixelContext pixel) {
@@ -1164,7 +1214,7 @@ public struct Adc {
 public struct Cie : IIntegrator {
     public static void accumulate(inout SensorPixel value, uint band, float radiance,
                                   PixelContext pixel) {
-        value.rgb += radiance * sharedUniforms().colour[band].xyz;
+        value.rgb += radiance * sensorShared[0].colour[band].xyz;
     }
 
     public static void finish(inout SensorPixel value, PixelContext pixel) {}
