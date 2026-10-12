@@ -64,6 +64,10 @@ Scene VolumeScene(double sigma, double emission) {
     ernie::Material::Define(scene, "/Looks/Gas")
         .SetDensity(sigma)
         .SetEmissionStrength(emission);
+    // Small volume shadow maps: only one test reads them, and CPU
+    // Vulkan (lavapipe in CI) pays for every texel.
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetVolumeShadowResolution(32);
     return scene;
 }
 
@@ -503,6 +507,8 @@ TEST_F(RasterDelegateTest, AVolumeShadowsTheGroundBelowIt) {
     constexpr double kSigma = 0.8;
     RasterDelegate delegate(*context_);
     Scene scene = VolumeScene(kSigma, 0.0);
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetVolumeShadowResolution(128);
     ernie::DistantLight(scene, "/World/Sun").SetShadowEnable(true);
     scene.GetPrim("/World/Cube")
         .SetXform({.translate = glm::dvec3(0.0, 0.0, 3.0)});
@@ -522,12 +528,11 @@ TEST_F(RasterDelegateTest, AVolumeShadowsTheGroundBelowIt) {
     }
 }
 
-TEST_F(RasterDelegateTest,
-       EachWorldOfABatchShadowsWithItsOwnVolumes) {
+TEST_F(RasterDelegateTest, EachWorldOfABatchShadowsWithItsOwnVolumes) {
     // Three views from above of a shared floor, of world 0, world 1
-    // and every world, under a sun 45 degrees up towards +x: world
-    // 0's dense cube 10 m up at x = 10 shades the floor's centre only
-    // in the views that see world 0.
+    // and every world, under a sun 45 degrees up towards +x: world 0's
+    // dense cube 10 m up at x = 10 shades the floor's centre only in
+    // the views that see world 0.
     Scene scene;
     const glm::dmat4 above = ernie::LookAtTransform(
         {0.0, 0.0, 60.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
@@ -551,9 +556,8 @@ TEST_F(RasterDelegateTest,
     ernie::Xform::Define(scene, "/Envs/Env0").SetWorld(0);
     ernie::Volume volume =
         ernie::Volume::Define(scene, "/Envs/Env0/Smoke");
-    volume.GetPrim().SetXform(
-        {.translate = glm::dvec3(10.0, 0.0, 10.0),
-         .scale = glm::dvec3(3.0)});
+    volume.GetPrim().SetXform({.translate = glm::dvec3(10.0, 0.0, 10.0),
+                               .scale = glm::dvec3(3.0)});
     ernie::OpenVDBAsset::Define(scene, "/Envs/Env0/Smoke/Density")
         .SetFilePath(CubeFile());
     volume.SetField("density", "/Envs/Env0/Smoke/Density")
@@ -587,8 +591,7 @@ TEST_F(RasterDelegateTest,
         << "world 1 has no smoke, so its floor is lit";
 }
 
-TEST_F(RasterDelegateTest,
-       APointInstancerPlacesVolumesInTheirWorlds) {
+TEST_F(RasterDelegateTest, APointInstancerPlacesVolumesInTheirWorlds) {
     // The cube as an instancer's prototype, two instances where it
     // stood, in worlds 1 and 0: the camera's world 0 sees one of
     // them, and the prototype shows only through its instances.
@@ -607,10 +610,9 @@ TEST_F(RasterDelegateTest,
     scene.Set("/World/Smoke", tokens::kPrototypes,
               std::vector<Path>{"/World/Cube"});
     const auto worlds = [&](std::int32_t first, std::int32_t second) {
-        scene.Write(
-            "/World/Smoke", tokens::kWorlds,
-            Tensor::Copy<std::int32_t>(
-                std::vector<std::int32_t>{first, second}, {2}));
+        scene.Write("/World/Smoke", tokens::kWorlds,
+                    Tensor::Copy<std::int32_t>(
+                        std::vector<std::int32_t>{first, second}, {2}));
         return CentreSpectrum(delegate, scene);
     };
     const std::vector<double> one = worlds(1, 0);
@@ -648,10 +650,9 @@ TEST_F(RasterDelegateTest, AVolumeReadsItsGridFromAnArray) {
             << "band " << b;
     }
     // Only the field's prim names it, so a new array replaces it.
-    scene.Write(
-        "/World/Cube/Grids", tokens::kNanoVdbBuffer,
-        Tensor::Copy<std::uint8_t>(
-            bytes, {static_cast<std::int64_t>(bytes.size())}));
+    scene.Write("/World/Cube/Grids", tokens::kNanoVdbBuffer,
+                Tensor::Copy<std::uint8_t>(
+                    bytes, {static_cast<std::int64_t>(bytes.size())}));
     const std::vector<double> again = CentreSpectrum(delegate, scene);
     EXPECT_EQ(delegate.Renderer().Volumes().GridCount(), 1u);
     EXPECT_NEAR(again[0], fromArray[0], 1e-4 * fromArray[0]);
