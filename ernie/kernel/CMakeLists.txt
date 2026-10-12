@@ -31,6 +31,9 @@ set(ernie_shaders
     film/filter_readout_taps.slang=kFilterReadoutTapsSlang
     film/filter_readout_table.slang=kFilterReadoutTableSlang
     film/filter_smear.slang=kFilterSmearSlang
+    film/filter_radiation.slang=kFilterRadiationSlang
+    film/filter_comms_errors.slang=kFilterCommsErrorsSlang
+    film/filter_gaussian_psf.slang=kFilterGaussianPsfSlang
     film/filter_spectral_transmission.slang=kFilterSpectralTransmissionSlang
     film/filter_stray_light.slang=kFilterStrayLightSlang
     film/filter_tdi.slang=kFilterTdiSlang

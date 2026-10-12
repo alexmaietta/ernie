@@ -325,7 +325,17 @@ class SensorFilterRegistry {
 /// - `lag` (pixel, electrons; temporal): a `fraction` of each frame's
 ///   charge read out with the next.
 /// - `temporalAverage` (pixel, rgb; temporal): an exponential moving
-///   average, `alpha` the new frame's weight. Each file's header
+///   average, `alpha` the new frame's weight.
+/// - `smear` (spatial, electrons): a frame-transfer CCD's readout
+///   smear (`transferTime`) and reset smear (`resetTime`), on either
+///   side of bright sources; before `noise`.
+/// - `radiation` (pixel, electrons): particle hits, `flux` per cm^2
+///   per second, each a track of charge; before `noise`. AOV
+///   `deposited`: their electrons.
+/// - `commsErrors` (spatial, digital): lost packets, line slips and
+///   bit errors of a downlink; after `adc`. AOV `errors`: where.
+/// - `gaussianPsf` (spatial, electrons; pyramid): scattered light as
+///   a weighted sum of Gaussians; before `noise`. Each file's header
 ///   cites its references.
 std::vector<SensorFilterModel> StandardSensorFilters();
 

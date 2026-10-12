@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <iterator>
@@ -264,7 +265,8 @@ TEST_F(RasterDelegateTest, TheStandardSensorFiltersAreRegistered) {
     for (const char* id :
          {"psf", "defocus", "bayer", "demosaic", "whiteBalance",
           "colorMatrix", "compand", "detectorPattern", "readoutTaps",
-          "tdi", "defectPixels", "smear", "darkCurrent", "jpeg"}) {
+          "tdi", "defectPixels", "smear", "darkCurrent", "jpeg",
+          "radiation", "commsErrors", "gaussianPsf"}) {
         EXPECT_NE(delegate.SensorFilters().Find(id), nullptr) << id;
     }
 }
@@ -1422,7 +1424,7 @@ TEST_F(RasterDelegateTest, DefectPixelsAreDeadOrHotAndStayPut) {
 }
 
 TEST_F(RasterDelegateTest,
-       SmearAddsEachColumnsMeanForTheTransferTime) {
+       SmearAddsTheRowsOnEachSideForTheReadoutAndReset) {
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();
     ernie::Camera(scene, "/World/Camera")
@@ -1432,23 +1434,222 @@ TEST_F(RasterDelegateTest,
     };
     const auto base =
         VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
-    // A transfer as long as half the exposure: half each column's
-    // mean on every pixel of it.
-    const auto smeared = VarThrough(
-        delegate, scene, "Electrons",
-        {{"qe", kNone}, {"smear", {{"transferTime", 0.5e-6f}}}});
+    // Shifts half as long as the exposure: half the mean of the rows
+    // a pixel's well passes under.
+    const auto smearOf = [&](float readout, float reset,
+                             float towards) {
+        return VarThrough(delegate, scene, "Electrons",
+                          {{"qe", kNone},
+                           {"smear",
+                            {{"transferTime", readout},
+                             {"resetTime", reset},
+                             {"towards", towards}}}});
+    };
+    const auto readoutDown = smearOf(0.5e-6f, 0.0f, 0.0f);
+    const auto resetDown = smearOf(0.0f, 0.5e-6f, 0.0f);
+    const auto readoutUp = smearOf(0.5e-6f, 0.0f, 1.0f);
     for (std::size_t x = 0; x < kSize; ++x) {
-        double column = 0.0;
         for (std::size_t y = 0; y < kSize; ++y) {
-            column += base[at(x, y)];
+            double above = 0.0;
+            double below = 0.0;
+            for (std::size_t i = 0; i < kSize; ++i) {
+                (i < y ? above : below) +=
+                    i == y ? 0.0 : base[at(x, i)];
+            }
+            const double own = base[at(x, y)];
+            const auto expect = [&](const std::vector<float>& image,
+                                    double sum) {
+                const double value = own + 0.5 * sum / kSize;
+                EXPECT_NEAR(image[at(x, y)], value,
+                            1e-3 * value + 1e-3)
+                    << x << ", " << y;
+            };
+            // Storage at the bottom: the readout passes the rows
+            // below, the reset brings the well past those above.
+            expect(readoutDown, below);
+            expect(resetDown, above);
+            expect(readoutUp, above);
         }
-        const double added = 0.5 * column / kSize;
-        for (std::size_t y = 0; y < kSize; ++y) {
-            EXPECT_NEAR(smeared[at(x, y)], base[at(x, y)] + added,
-                        1e-3 * (base[at(x, y)] + added) + 1e-3)
+    }
+}
+
+TEST_F(RasterDelegateTest,
+       RadiationLeavesTracksAtItsFluxNewEveryFrame) {
+    RasterDelegate delegate(*context_);
+    Scene scene = FlatScene();
+    constexpr double kTime = 1e-6;
+    ernie::Camera(scene, "/World/Camera").SetExposureTime(kTime);
+    const ernie::CameraParams params =
+        ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize);
+    const double sideCm = params.verticalApertureMm * 0.1;
+    // About 400 hits over the image, each 80 e/um over a mean path of
+    // twice the layer's thickness (1 / cos(theta) for an isotropic
+    // flux through a plane).
+    constexpr double kHits = 400.0;
+    const float flux =
+        static_cast<float>(kHits / (sideCm * sideCm * kTime));
+    const std::map<std::string, float> radiation{
+        {"flux", flux},       {"thickness", 15.0f},
+        {"straggling", 0.3f}, {"electronsPerMicron", 80.0f},
+        {"spread", 0.5f},     {"maxLength", 32.0f}};
+    const auto base =
+        VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
+    const std::vector<std::string> vars{"Electrons", "aov:deposited"};
+    const auto first =
+        VarsThrough(delegate, scene, vars,
+                    {{"qe", kNone}, {"radiation", radiation}});
+    const auto second =
+        VarsThrough(delegate, scene, vars,
+                    {{"qe", kNone}, {"radiation", radiation}});
+    const auto& deposited = first.at("aov:deposited");
+    EXPECT_NEAR(Sum(deposited, 0), kHits * 80.0 * 15.0 * 2.0,
+                0.25 * kHits * 80.0 * 15.0 * 2.0);
+    const auto fullWell =
+        static_cast<float>(params.sensor.fullWellElectrons);
+    for (std::size_t i = 1; i < base.size(); i += 4) {
+        ASSERT_GE(deposited[i], 0.0f);
+        if (base[i] + deposited[i] < fullWell) {
+            EXPECT_NEAR(first.at("Electrons")[i],
+                        base[i] + deposited[i],
+                        1e-3f * (base[i] + deposited[i]) + 1e-2f);
+        }
+    }
+    EXPECT_NE(deposited, second.at("aov:deposited"))
+        << "new hits every frame";
+    const auto none =
+        VarThrough(delegate, scene, "Electrons",
+                   {{"qe", kNone}, {"radiation", {{"flux", 0.0f}}}});
+    EXPECT_EQ(none, base);
+}
+
+TEST_F(RasterDelegateTest,
+       CommsErrorsLosePacketsSlipLinesAndFlipBits) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    ernie::Camera(scene, "/World/Camera").SetExposureTime(1e-6);
+    const auto base = VarThrough(delegate, scene, "RawDN",
+                                 {{"qe", kNone}, {"adc", kNone}});
+    const auto through = [&](std::map<std::string, float> inputs) {
+        inputs.emplace("packetLoss", 0.0f);
+        inputs.emplace("slips", 0.0f);
+        inputs.emplace("bitErrorRate", 0.0f);
+        return VarsThrough(
+            delegate, scene, {"RawDN", "aov:errors"},
+            {{"qe", kNone}, {"adc", kNone}, {"commsErrors", inputs}});
+    };
+    EXPECT_EQ(through({}).at("RawDN"), base);
+    const auto lost = through({{"packetLoss", 1.0f}, {"fill", 7.0f}});
+    for (std::size_t i = 0; i < base.size(); ++i) {
+        EXPECT_EQ(lost.at("RawDN")[i], i % 4 < 3 ? 7.0f : 0.0f);
+        EXPECT_EQ(lost.at("aov:errors")[i], 1.0f);
+    }
+    // A packet per line, each slipping it one pixel left or right.
+    const auto slipped =
+        through({{"packetPixels", static_cast<float>(kSize)},
+                 {"slips", 1.0f},
+                 {"maxSlip", 1.0f},
+                 {"fill", 0.0f}});
+    const auto& dn = slipped.at("RawDN");
+    const auto at = [](std::size_t x, std::size_t y) {
+        return (y * kSize + x) * 4 + 1;
+    };
+    const auto rowShiftedBy = [&](std::size_t y, std::ptrdiff_t by) {
+        for (std::size_t x = 0; x < kSize; ++x) {
+            const std::ptrdiff_t source =
+                static_cast<std::ptrdiff_t>(x) + by;
+            const float expected =
+                source < 0 ||
+                        source >= static_cast<std::ptrdiff_t>(kSize)
+                    ? 0.0f
+                    : base[at(static_cast<std::size_t>(source), y)];
+            if (dn[at(x, y)] != expected) {
+                return false;
+            }
+        }
+        return true;
+    };
+    for (std::size_t y = 0; y < kSize; ++y) {
+        EXPECT_TRUE(rowShiftedBy(y, 1) || rowShiftedBy(y, -1)) << y;
+        for (std::size_t x = 0; x < kSize; ++x) {
+            EXPECT_EQ(slipped.at("aov:errors")[at(x, y)], 2.0f);
+        }
+    }
+    // One flip per pixel at about 12 bits times the rate.
+    const auto flipped = through({{"bitErrorRate", 0.01f}});
+    int flips = 0;
+    for (std::size_t p = 0; p < kSize * kSize; ++p) {
+        int changed = 0;
+        for (std::size_t c = 0; c < 3; ++c) {
+            const auto a =
+                static_cast<std::uint32_t>(base[p * 4 + c]);
+            const auto b = static_cast<std::uint32_t>(
+                flipped.at("RawDN")[p * 4 + c]);
+            if (a != b) {
+                ++changed;
+                EXPECT_EQ(std::popcount(a ^ b), 1);
+            }
+        }
+        EXPECT_LE(changed, 1);
+        EXPECT_EQ(flipped.at("aov:errors")[p * 4] == 4.0f,
+                  changed == 1);
+        flips += changed;
+    }
+    const int pixels = static_cast<int>(kSize * kSize);
+    EXPECT_NEAR(flips, 0.12 * pixels, 0.04 * pixels);
+}
+
+TEST_F(RasterDelegateTest, GaussianPsfBlursByItsTermsAndKeepsLight) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    ernie::Camera(scene, "/World/Camera").SetExposureTime(1e-6);
+    const auto base =
+        VarThrough(delegate, scene, "Electrons", {{"qe", kNone}});
+    // Arrays resample to the parameter's eight values: pad them.
+    const auto psf = [&](std::vector<float> weights,
+                         std::vector<float> sigmas) {
+        const float terms = static_cast<float>(weights.size());
+        weights.resize(8, 0.0f);
+        sigmas.resize(8, 0.0f);
+        return VarsThrough(
+                   delegate, scene, {"Electrons"},
+                   {{"qe", kNone},
+                    {"gaussianPsf", {{"terms", terms}}}},
+                   {{1, {{"weights", weights}, {"sigmas", sigmas}}}})
+            .at("Electrons");
+    };
+    EXPECT_EQ(psf({1.0f}, {0.0f}), base);
+    // One Gaussian of a pixel: a 7 x 7 kernel on the image itself,
+    // edges clamped.
+    const auto one = psf({1.0f}, {1.0f});
+    const auto clampAt = [](std::ptrdiff_t v) {
+        return static_cast<std::size_t>(std::clamp<std::ptrdiff_t>(
+            v, 0, static_cast<std::ptrdiff_t>(kSize) - 1));
+    };
+    for (std::size_t y = 0; y < kSize; ++y) {
+        for (std::size_t x = 0; x < kSize; ++x) {
+            double sum = 0.0;
+            double weights = 0.0;
+            for (int j = -3; j <= 3; ++j) {
+                for (int i = -3; i <= 3; ++i) {
+                    const double g = std::exp(-(i * i + j * j) / 2.0);
+                    const std::size_t sx =
+                        clampAt(static_cast<std::ptrdiff_t>(x) + i);
+                    const std::size_t sy =
+                        clampAt(static_cast<std::ptrdiff_t>(y) + j);
+                    sum += g * base[(sy * kSize + sx) * 4 + 1];
+                    weights += g;
+                }
+            }
+            const double expected = sum / weights;
+            EXPECT_NEAR(one[(y * kSize + x) * 4 + 1], expected,
+                        1e-3 * expected + 1e-3)
                 << x << ", " << y;
         }
     }
+    // The default core and halos: smoother, with the light kept.
+    const auto halo = psf({0.9f, 0.08f, 0.02f}, {0.0f, 4.0f, 32.0f});
+    EXPECT_NEAR(Sum(halo, 1), Sum(base, 1), 0.05 * Sum(base, 1));
+    EXPECT_LT(Variation(halo, 1), Variation(base, 1));
 }
 
 TEST_F(RasterDelegateTest, DarkCurrentDoublesWithTemperature) {

@@ -753,20 +753,104 @@ std::vector<SensorFilterModel> StandardSensorFilters() {
         {"smear",
          "Frame-transfer smear",
          "Light collected while a shutterless frame-transfer CCD "
-         "shifts its image into storage: "
-         "each pixel gains its column's mean signal times the "
-         "transfer time over the exposure. "
-         "Before noise.",
+         "shifts its charge: readout smear from the rows between a "
+         "pixel and the storage area as the image moves into it, "
+         "reset smear from the rows before it as the flush before "
+         "the exposure moves the empty wells in. Before noise.",
          {"J. R. Janesick, \"Scientific Charge-Coupled Devices\", "
-          "SPIE Press, 2001"},
+          "SPIE Press, 2001",
+          "STAR-Dundee, \"PANGU v7 Datasheet\", 2024"},
          Kind::Spatial,
          Domain::Electrons,
          {{"transferTime", 1e-3f,
-           "Seconds to shift the whole frame into storage"},
+           "Seconds to shift the whole frame into storage after the "
+           "exposure (readout smear)"},
           {"axis", 0.0f,
-           "0: charge moves along columns, 1: along rows"}},
+           "0: charge moves along columns, 1: along rows"},
+          {"resetTime", 1e-3f,
+           "Seconds to flush the whole frame before the exposure "
+           "(reset smear)"},
+          {"towards", 0.0f,
+           "0: storage at the bottom (right), 1: at the top (left)"}},
          "Smear",
          shaders::kFilterSmearSlang},
+        {"radiation",
+         "Radiation events",
+         "Particle hits (cosmic rays, protons, electrons) new every "
+         "frame, each a track of charge from its angle through the "
+         "sensitive layer, with Landau-like straggling and "
+         "diffusion. After qe, before noise.",
+         {"J. R. Janesick, \"Scientific Charge-Coupled Devices\", "
+          "SPIE Press, 2001",
+          "Particle Data Group, \"Review of Particle Physics\", "
+          "Passage of particles through matter",
+          "STAR-Dundee, \"PANGU v7 Datasheet\", 2024"},
+         Kind::Pixel,
+         Domain::Electrons,
+         {{"flux", 4.0f,
+           "Particles per square centimetre per second (about 4 for "
+           "galactic cosmic rays near 1 AU)"},
+          {"thickness", 15.0f, "The sensitive layer, micrometres"},
+          {"electronsPerMicron", 80.0f,
+           "Charge deposited per micrometre of path"},
+          {"straggling", 0.3f,
+           "Log-normal sigma of each hit's charge"},
+          {"spread", 0.5f,
+           "Gaussian sigma of the charge across the track, pixels"},
+          {"maxLength", 32.0f,
+           "The longest track across the focal plane, pixels"}},
+         "Radiation",
+         shaders::kFilterRadiationSlang,
+         {{"deposited", "Electrons the hits left"}}},
+        {"commsErrors",
+         "Communication errors",
+         "The image as received over a noisy downlink, in packets in "
+         "raster order: lost packets, slips that move the rest of "
+         "a line, and flipped bits; new every frame. After adc.",
+         {"CCSDS 133.0-B-2, \"Space Packet Protocol\", 2020",
+          "CCSDS 131.0-B-3, \"TM Synchronization and Channel "
+          "Coding\", 2017",
+          "STAR-Dundee, \"PANGU v7 Datasheet\", 2024"},
+         Kind::Spatial,
+         Domain::Digital,
+         {{"packetPixels", 1024.0f, "Pixels per packet"},
+          {"packetLoss", 1e-3f, "Chance a packet is lost"},
+          {"slips", 1e-3f,
+           "Chance a packet slips the rest of its line"},
+          {"maxSlip", 8.0f, "The largest slip, pixels"},
+          {"bitErrorRate", 1e-6f, "Chance each bit flips"},
+          {"fill", 0.0f, "DN of pixels without data"}},
+         "CommsErrors",
+         shaders::kFilterCommsErrorsSlang,
+         {{"errors",
+           "1 where a packet was lost, 2 where the line slipped, 4 "
+           "where a bit flipped, summed"}}},
+        {"gaussianPsf",
+         "Multi-Gaussian point spread",
+         "Scattered light as a weighted sum of Gaussians, a narrow "
+         "core and wide halos (a sigma below a quarter pixel is the "
+         "unscattered image), from the image's pyramid; light is "
+         "kept. Arrays take one value per term. After qe, before "
+         "noise.",
+         {"STAR-Dundee, \"PANGU v7 Datasheet\", 2024"},
+         Kind::Spatial,
+         Domain::Electrons,
+         {{"terms", 3.0f, "Gaussians used, 1 to 8"},
+          {"weights",
+           0.0f,
+           "Each Gaussian's share of the light",
+           8,
+           {0.9f, 0.08f, 0.02f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}},
+          {"sigmas",
+           0.0f,
+           "Each Gaussian's sigma, pixels",
+           8,
+           {0.0f, 4.0f, 32.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}}},
+         "GaussianPsf",
+         shaders::kFilterGaussianPsfSlang,
+         {},
+         0,
+         true},
         {"darkCurrent",
          "Thermal dark current",
          "Dark current doubling every few degrees with the sensor's "
