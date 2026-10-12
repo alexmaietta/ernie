@@ -647,13 +647,14 @@ float virtualVisibility(LightGpu light, float3 world, float3 n, float nDotL, flo
     let rotation = float2(cos(angle), sin(angle));
     let softness = sh.lightShadow.x;
     // The receiver's plane across the light: at offset `o` from the receiver it lies
-    // -dot(n, o) / dot(n, L) towards the light (`rise`), which each tap compares against, signed,
-    // so the plane falling away on one side does not hide blockers a little above it.
+    // -dot(n, o) / dot(n, L) towards the light, which each tap compares against at the centre of
+    // the texel it reads (`virtualTexelCentreStep`), where its casters were drawn, signed, so the
+    // plane needs no slack for its tilt across a texel, and blockers a little above it shadow it:
+    // a sphere's on the ground about where it rests.
     let cosine = clamp(nDotL, 0.05, 1.0);
-    let tilt = min(sqrt(1.0 - cosine * cosine) / cosine, 10.0);
     // The comparisons' slack, per texel of the level a tap's depth comes from (a coarser one where
-    // its page is not backed): a texel and a half, and more as the receiver's plane tilts.
-    let slackTexels = 1.5 + 1.5 * tilt;
+    // its page is not backed): float depth's rounding, about half a texel at any level, twice.
+    let slackTexels = 1.0;
     var filterIndex = index;
     var filterTexels = softness;
     let tanRadius = light.extentY.w;
@@ -674,22 +675,24 @@ float virtualVisibility(LightGpu light, float3 world, float3 n, float nDotL, flo
             if (!virtualShadowDepth(map, searchIndex, receiver + tap, stored, depth, used)) {
                 continue;
             }
-            // Metres towards the light above the receiver's plane there.
+            // Metres towards the light above the receiver's plane at the texel's centre.
             let perWorld = 0.5 / (1000.0 * map.levels[used].info.y);
-            let height = (stored - depth) / perWorld + dot(n, tap) / cosine;
+            let step = tap + virtualTexelCentreStep(map, used, receiver + tap);
+            let height = (stored - depth) / perWorld + dot(n, step) / cosine;
             if (height > slackTexels * map.levels[used].info.x) {
                 blockers += 1.0;
                 blockerSum += height;
             }
         }
-        if (blockers == 0.0) {
-            return 1.0;
+        // The penumbra filtered in a level coarse enough to span it likewise. The search only sizes
+        // the filter: where it finds no blockers the filter still runs at its least, so its taps,
+        // not the search's sparser ones, decide what is shadowed.
+        if (blockers > 0.0) {
+            let penumbra = blockerSum / blockers * tanRadius;
+            filterIndex = virtualCoarserFor(map, index, penumbra / texelWorld);
+            filterTexels = clamp(penumbra / map.levels[filterIndex].info.x, softness,
+                                 kMaxLightFilterTexels);
         }
-        // The penumbra filtered in a level coarse enough to span it likewise.
-        let penumbra = blockerSum / blockers * tanRadius;
-        filterIndex = virtualCoarserFor(map, index, penumbra / texelWorld);
-        filterTexels = clamp(penumbra / map.levels[filterIndex].info.x, softness,
-                             kMaxLightFilterTexels);
     }
     let filterTexel = map.levels[filterIndex].info.x;
     // Taps off every backed page count for nothing, rather than as lit, so a filter reaching past
@@ -704,9 +707,10 @@ float virtualVisibility(LightGpu light, float3 world, float3 n, float nDotL, flo
         if (!virtualShadowDepth(map, filterIndex, receiver + tap, stored, depth, used)) {
             continue;
         }
-        // Compared at the receiver's plane there, with the slack.
+        // Compared at the receiver's plane at the texel's centre, with the slack.
         let perWorld = 0.5 / (1000.0 * map.levels[used].info.y);
-        let rise = -dot(n, tap) / cosine;
+        let step = tap + virtualTexelCentreStep(map, used, receiver + tap);
+        let rise = -dot(n, step) / cosine;
         let slack = slackTexels * map.levels[used].info.x;
         lit += stored <= depth + (rise + slack) * perWorld ? 1.0 : 0.0;
         taps += 1.0;

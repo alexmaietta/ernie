@@ -131,6 +131,22 @@ public bool virtualShadowDepth(VirtualShadow* map, uint levelIndex, float3 world
     return false;
 }
 
+// The step across the light from `world` to the centre of the texel holding it in level
+// `levelIndex`, where the casters' depth was rasterized: a receiver's plane compared there rather
+// than at `world` needs no bias for the texel's width (the receiver plane depth bias of Unreal's
+// virtual shadow maps, `ComputeVirtualShadowMapOptimalSlopeBias`).
+public float3 virtualTexelCentreStep(VirtualShadow* map, uint levelIndex, float3 world) {
+    let m = map.levels[levelIndex].viewProjection;
+    let clip = mul(m, float4(world, 1.0));
+    let texel = floor(virtualTexelAt(clip.xy)) + 0.5;
+    let centre = float2(texel.x / float(kVirtualTexels) * 2.0 - 1.0,
+                        1.0 - texel.y / float(kVirtualTexels) * 2.0);
+    // Clip x and y are the light's x and y axes over the level, rows 0 and 1, orthogonal.
+    let x = m[0].xyz;
+    let y = m[1].xyz;
+    return (centre.x - clip.x) * x / dot(x, x) + (centre.y - clip.y) * y / dot(y, y);
+}
+
 struct VirtualConstants {
     // Clip space to origin-relative world (marking).
     float4x4 inverseViewProjection;
