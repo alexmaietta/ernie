@@ -7,6 +7,7 @@ ernie_add_library(
     ies.cpp
     image.cpp
     nanovdb.cpp
+    noise.cpp
     profile_report.cpp
     profiler.cpp
     reflectance_library.cpp

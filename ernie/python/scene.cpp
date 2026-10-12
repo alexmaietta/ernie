@@ -11,6 +11,7 @@
 #include "ernie/util/astronomy.h"
 #include "ernie/util/image.h"
 #include "ernie/util/nanovdb.h"
+#include "ernie/util/noise.h"
 #include "ernie/util/reflectance_library.h"
 #include "ernie/util/tensor.h"
 
@@ -2141,6 +2142,30 @@ void BindScene(nb::module_& m) {
         "cols, 4) array: PNG and JPEG "
         "values decode as sRGB (srgb) or as linear data such as "
         "normal maps; EXR is linear.");
+    m.def(
+        "fbm_noise",
+        [](nb::ndarray<const double, nb::shape<-1, 3>, nb::c_contig,
+                       nb::device::cpu>
+               points,
+           int octaves, double lacunarity, double gain,
+           std::uint32_t seed) {
+            const GradientNoise noise(seed);
+            const auto count = static_cast<std::int64_t>(points.shape(0));
+            Tensor values = Tensor::Zeros(DType::Float64, {count});
+            double* out = values.As<double>();
+            for (std::int64_t i = 0; i < count; ++i) {
+                const double* p = points.data() + 3 * i;
+                out[i] = noise.Fbm(glm::dvec3(p[0], p[1], p[2]), octaves,
+                                   lacunarity, gain);
+            }
+            return ArrayFromTensor(values);
+        },
+        nb::arg("points"), nb::arg("octaves") = 5,
+        nb::arg("lacunarity") = 2.0, nb::arg("gain") = 0.5,
+        nb::arg("seed") = 0,
+        "Perlin's improved gradient noise summed over octaves "
+        "(fractional Brownian motion) at each of the float64 (n, 3) "
+        "points: as C++ GradientNoise::Fbm, within about [-1, 1].");
     m.def(
         "dense_nanovdb_grid",
         [](nb::ndarray<const float, nb::ndim<3>, nb::c_contig,
