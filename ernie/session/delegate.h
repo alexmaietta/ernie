@@ -7,6 +7,7 @@
 #include "ernie/scene/brdf.h"
 #include "ernie/scene/light_pattern.h"
 #include "ernie/scene/scene.h"
+#include "ernie/scene/temperature_model.h"
 #include "ernie/session/frame_params.h"
 #include "ernie/session/outputs.h"
 #include "ernie/util/tensor.h"
@@ -153,6 +154,16 @@ class RenderDelegate {
     /// Whether light pattern `id` is registered, built in or added.
     virtual bool HasLightPattern(std::string_view id) const {
         return false;
+    }
+
+    /// Registers custom temperature model `model` for materials to
+    /// name in `ernie:thermal:model`.
+    /// @throws std::invalid_argument if the model is invalid or fails
+    /// to compile, or the backend runs no custom models (the default).
+    virtual void AddTemperatureModel(TemperatureModel model) {
+        throw std::invalid_argument(
+            "This renderer runs no custom temperature models: " +
+            model.id);
     }
 
     /// The custom sensor filters registered so far.

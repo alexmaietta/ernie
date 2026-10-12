@@ -250,6 +250,10 @@ struct LightParams {
     /// the cone. Rect and disk: spectral radiance of the emitting
     /// face, W m^-2 sr^-1 nm^-1.
     std::vector<float> spectrum;
+    /// Distant: its irradiance over all wavelengths at normal
+    /// incidence, W/m^2, as temperature models absorb it
+    /// (`TemperatureModel`); 0 for other lights.
+    float totalIrradiance = 0.0f;
     /// Sphere radius (irradiance follows the inverse square law
     /// outside it and is capped at its surface value inside), or disk
     /// radius.

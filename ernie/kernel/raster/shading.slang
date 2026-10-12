@@ -47,6 +47,9 @@ import bindless;
 import atmosphere;
 import light_pattern;
 import light_patterns;
+// Materials' temperature models (ernie/scene/temperature_model.h).
+import temperature_model;
+import temperature_models;
 import laser_beams;
 import gbuffer;
 // The camera's projection: a frame camera's matrices, or a pushbroom's strip
@@ -167,7 +170,8 @@ struct LightGpu {
     // aperture (1), the efficiency into it and its zero order. pattern: its pattern's index
     // (`lightPattern`), the laser's wavelength (nm) and the time (s); patternExtent xy: its
     // tangent-plane half extents (0 unbounded), z how volumes light by its beams (volume.slang's
-    // `BeamCrossings`); patternLayout: its data and image
+    // `BeamCrossings`), w a distant light's irradiance over all wavelengths (W/m^2, for
+    // temperature models); patternLayout: its data and image
     // (LightPatternParams); its parameters.
     float4 pattern;
     float4 patternExtent;
@@ -225,6 +229,19 @@ struct ShadingConstants {
     uint4 heightsSize;
     // The heights above the ground the horizon map's levels see from, in height units.
     float4 horizonLevels;
+}
+
+// A material's temperature model (the renderer's `TemperatureMaterialGpu`): its index in the
+// registry plus 1 (0 for none), its data's count and address, its solar absorptivity and thermal
+// emissivity, and its parameters.
+struct TemperatureMaterial {
+    uint model;
+    uint dataCount;
+    float absorptivity;
+    float emissivity;
+    float* data;
+    uint2 padding;
+    float params[16];
 }
 
 // The pass's buffers, read through their addresses, and its textures and samplers, by their
@@ -285,6 +302,8 @@ struct ShadingResources {
     uint volumeShadowSize;
     // Each view's own uniforms (`ShadingView`), after the shared ones.
     ShadingView* viewBlocks;
+    // Each material's temperature model (`TemperatureMaterial`).
+    TemperatureMaterial* temperatureMaterials;
 }
 
 [[vk::binding(0, 0)]] ConstantBuffer<ShadingResources> resources;
@@ -299,6 +318,9 @@ struct ShadingResources {
 #define ERNIE_RADIANCE_FORMAT "r32f"
 #endif
 [[vk::image_format(ERNIE_RADIANCE_FORMAT)]] [[vk::binding(8, 0)]] RWTexture2DArray<float> spectral;
+// The G-buffer's normals, which the temperature models' pass writes its temperatures into
+// (`temperatureMain`).
+[[vk::image_format("rgba16f")]] [[vk::binding(19, 0)]] RWTexture2DArray<float4> gNormalWrite;
 
 // The resources under the names the pass reads them by: buffers as arrays, textures as the
 // heap's (float4; one-channel ones read as `.x`).
@@ -2229,6 +2251,76 @@ float3 viewVector(float2 ndc, float3 world) {
     return kPushbroomCamera ? -cameraRay(shv.invViewProj, shv.strip, ndc)
            : sh.range.w != 0.0 ? -normalize(rayThrough(ndc))
                                : normalize(shv.eye.xyz - world);
+}
+
+// The temperature of each pixel whose material has a temperature model, written into the
+// G-buffer's normals for shading, the Temperature var and the sensor: the model's at the pixel,
+// given the sunlight on it from the distant lights past their shadows (not through air or
+// volumes: the models are airless bodies'), in place of the material's own. A temperature the
+// G-buffer has already (a solver's, a prim's or a texture's) stays. `pass.model.w` holds the
+// frame's time as float bits.
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void temperatureMain(uint3 id : SV_DispatchThreadID) {
+    shadedView = pass.model.y + id.z;
+    if (id.x >= sh.size.x || id.y >= sh.size.y) {
+        return;
+    }
+    let pixel = int4(id.xyz, 0);
+    let ids = gIds.Load(pixel);
+    if (ids.x == kBackground || (ids.w & kUnlit) != 0) {
+        return;
+    }
+    let record = resources.temperatureMaterials[ids.x];
+    let packed = gNormalWrite[id];
+    if (record.model == 0 || unpackTemperature(packed) > 0.0) {
+        return;
+    }
+    let ndc = float3((float(id.x) + 0.5) / float(sh.size.x) * 2.0 - 1.0,
+                     1.0 - (float(id.y) + 0.5) / float(sh.size.y) * 2.0, gDepth.Load(pixel));
+    let world = cameraPoint(shv.invViewProj, shv.strip, ndc.xy, ndc.z);
+    let n = unpackNormal(packed);
+    TemperatureInput input;
+    input.position = world;
+    input.normal = n;
+    input.sunDirection = float3(0.0);
+    input.sunIrradiance = 0.0;
+    input.sunVisibility = 0.0;
+    input.irradiance = 0.0;
+    input.absorptivity = record.absorptivity;
+    input.emissivity = record.emissivity;
+    input.kelvin = materials[ids.x].surface.y;
+    input.time = asfloat(pass.model.w);
+    let lightCount = min(sh.size.w, kShadeLights);
+    for (uint k = 0; k < lightCount; ++k) {
+        let light = lights[shv.view.z + k];
+        let irradiance = light.patternExtent.w;
+        if (((shv.view.x >> k) & 1u) == 0 || uint(light.position.w) != 0 || irradiance <= 0.0) {
+            continue;
+        }
+        let toLight = light.position.xyz;
+        let nDotL = dot(n, toLight);
+        var visibility = 0.0;
+        if (nDotL > 0.0) {
+            visibility = lightVisibility(light, world, n, nDotL, float2(id.xy));
+            input.irradiance += irradiance * nDotL * visibility;
+        }
+        if (irradiance > input.sunIrradiance) {
+            input.sunDirection = toLight;
+            input.sunIrradiance = irradiance;
+            input.sunVisibility = visibility;
+        }
+    }
+    TemperatureParams p;
+    for (uint i = 0; i < 16; ++i) {
+        p.values[i] = record.params[i];
+    }
+    p.table = record.data;
+    p.count = record.dataCount;
+    let kelvin = temperatureModel(record.model - 1, input, p);
+    if (kelvin > 0.0 && isfinite(kelvin)) {
+        gNormalWrite[id] = float4(packed.xy, packNormal(n, kelvin).zw);
+    }
 }
 
 // Dome occlusion per pixel: bent normal (xyz) and visibility (w), as the occlusion pass computes

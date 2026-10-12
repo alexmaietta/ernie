@@ -377,6 +377,6 @@ class ThermalPlumeDemo : public app::Demo {
 }  // namespace
 
 ERNIE_REGISTER_DEMO(
-    ThermalPlumeDemo, "volumes", "thermal_plume",
+    ThermalPlumeDemo, "thermal", "plume",
     "An engine firing on a test stand: its glowing exhaust and hot "
     "metal through visible, 3 to 5 um and Temperature views.");

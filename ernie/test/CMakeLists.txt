@@ -36,6 +36,7 @@ ernie_add_test_suite(
     scene_schema_test.cpp
     scene_sensor_filters_test.cpp
     scene_stage_test.cpp
+    scene_temperature_model_test.cpp
     scene_terrain_schemas_test.cpp
     scene_volume_schemas_test.cpp
     scene_wide_view_test.cpp
@@ -58,6 +59,7 @@ ernie_add_test_suite(
     util_profile_report_test.cpp
     util_astronomy_test.cpp
     util_atmosphere_test.cpp
+    util_regolith_test.cpp
     util_scattering_test.cpp
     util_solar_test.cpp
     util_spectrum_test.cpp

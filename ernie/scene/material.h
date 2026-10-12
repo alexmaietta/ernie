@@ -124,6 +124,12 @@ struct MaterialSettings {
     /// Its emissivity (`tokens::kThermalEmissivity`); empty, 1 minus
     /// its reflectance by Kirchhoff's law.
     Spectrum emissivity;
+    /// Its temperature model (`tokens::kThermalModel`), an id in the
+    /// renderer's `TemperatureModelRegistry`, empty for none; its
+    /// parameters and data.
+    std::string temperatureModel;
+    std::vector<float> temperatureModelParams;
+    std::vector<float> temperatureModelData;
     /// How much of incident polarization its diffuse reflection
     /// keeps (`tokens::kPolarizationRetention`), 0 to 1.
     float polarizationRetention = 0.0f;

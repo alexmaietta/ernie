@@ -16,6 +16,7 @@
 #include "ernie/raster/volume_pass.h"
 #include "ernie/scene/brdf.h"
 #include "ernie/scene/light_pattern.h"
+#include "ernie/scene/temperature_model.h"
 
 #include <glm/glm.hpp>
 
@@ -197,6 +198,19 @@ class RasterRenderer {
 
     const LightPatternRegistry& LightPatterns() const {
         return lightPatterns_;
+    }
+
+    /// Registers temperature model `model` after checking that its
+    /// Slang module compiles against `ITemperatureModel`, so materials
+    /// can name it in `ernie:thermal:model`; the shading passes
+    /// recompile with it.
+    /// @throws std::invalid_argument if the registry rejects the model
+    /// (`TemperatureModelRegistry::Add`) or its module fails to
+    /// compile; the message includes the compiler's diagnostics.
+    void AddTemperatureModel(TemperatureModel model);
+
+    const TemperatureModelRegistry& TemperatureModels() const {
+        return temperatureModels_;
     }
 
     const SensorFilterRegistry& SensorFilters() const {
@@ -756,6 +770,8 @@ class RasterRenderer {
         std::span<const RasterDrawable* const> drawables) const;
     void WriteLights(const FrameParams& params,
                      const std::optional<Bounds3>& bounds);
+    /// The temperature models' pass's pipeline, made on first use.
+    const ComputePipeline& TemperaturePipeline(bool pushbroom);
     const ComputePipeline& ShadingPipeline(std::size_t model,
                                            bool pushbroom = false);
     /// Sensor.slang's entry point `entry`, which reads only its lens,
@@ -940,6 +956,8 @@ class RasterRenderer {
     BrdfRegistry brdfs_;
     LightPatternRegistry lightPatterns_ =
         LightPatternRegistry::WithBuiltins();
+    TemperatureModelRegistry temperatureModels_ =
+        TemperatureModelRegistry::WithBuiltins();
     /// Recorded by the const `Record*` calls, so mutable.
     mutable FrameUploads uploads_;
     std::map<std::uint32_t, std::unique_ptr<RasterMaterial>>
@@ -1098,6 +1116,12 @@ class RasterRenderer {
         shadingPipelines_;
     /// The last `Update`'s shading variant.
     std::uint32_t shadingVariant_ = 0;
+    /// The temperature models' pass (shading.slang's
+    /// `temperatureMain`): shading's bindings and the G-buffer's
+    /// normals to write, its pipeline for frame cameras and
+    /// pushbrooms.
+    PipelineLayout temperatureLayout_;
+    std::array<std::unique_ptr<ComputePipeline>, 2> temperaturePipelines_;
     PipelineLayout filterLayout_;
     /// The fused sensor kernel of each plan used so far, by
     /// `SensorPlan::Key`.
@@ -1289,6 +1313,18 @@ class RasterRenderer {
     /// Each material's temperature in kelvin, by material id, for the
     /// Temperature var (`WriteMaterialTable`).
     std::unique_ptr<GpuBuffer> materialTemperatures_;
+    /// Each material's temperature model, by material id
+    /// (shading.slang's `TemperatureMaterial`), and the models' data;
+    /// whether any material has one with thermal emission on, which
+    /// runs their pass.
+    std::unique_ptr<GpuBuffer> temperatureMaterials_;
+    std::unique_ptr<GpuBuffer> temperatureData_;
+    bool temperatureModelsInUse_ = false;
+    /// Models' default data by id, made when first needed.
+    std::map<std::string, std::vector<float>> temperatureDefaults_;
+    /// The frame's time on the sensor clock, s, for temperature
+    /// models.
+    double frameTime_ = 0.0;
     /// The automatic gain control range of passes without their own
     /// (`SetSensorAgc`), made by the first `Filter` that needs it.
     mutable std::unique_ptr<GpuBuffer> agcFallback_;

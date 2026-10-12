@@ -1512,6 +1512,7 @@ void MeshDrawable::CopyDeviceAttributes(Mesh& mesh, bool all) {
     }
     if (!mesh.deviceTemperatures.Empty() &&
         (all || mesh.temperaturesDirty)) {
+        ERNIE_ZONE("Mesh thermal device copy");
         compute_->CopyToBuffer(mesh.deviceTemperatures, *temperatures_,
                                VkDeviceSize{mesh.firstVertex} *
                                    sizeof(float),
@@ -1520,6 +1521,7 @@ void MeshDrawable::CopyDeviceAttributes(Mesh& mesh, bool all) {
     }
     if (!mesh.deviceNodeTemperatures.Empty() &&
         (all || mesh.nodeTemperaturesDirty)) {
+        ERNIE_ZONE("Mesh thermal node device copy");
         compute_->CopyToBuffer(mesh.deviceNodeTemperatures,
                                *nodeTemperatures_,
                                VkDeviceSize{mesh.firstNode} *
@@ -2619,6 +2621,7 @@ void MeshDrawable::Prepare(const FrameParams& params,
             }
             // Host temperatures, only this mesh's range.
             if (mesh.temperaturesDirty && !mesh.temperatures.empty()) {
+                ERNIE_ZONE("Mesh thermal upload");
                 renderer_.Uploads().Write(
                     *temperatures_,
                     std::as_bytes(std::span(mesh.temperatures)),
@@ -2627,6 +2630,7 @@ void MeshDrawable::Prepare(const FrameParams& params,
             }
             if (mesh.nodeTemperaturesDirty &&
                 !mesh.nodeTemperatures.empty()) {
+                ERNIE_ZONE("Mesh thermal node upload");
                 renderer_.Uploads().Write(
                     *nodeTemperatures_,
                     std::as_bytes(std::span(mesh.nodeTemperatures)),

@@ -71,7 +71,11 @@ RenderTargets::RenderTargets(const VulkanContext& context,
             context, ImageDesc{extent.width, extent.height, layers, 1,
                                kGBufferFormats[i],
                                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                                   VK_IMAGE_USAGE_SAMPLED_BIT,
+                                   VK_IMAGE_USAGE_SAMPLED_BIT |
+                                   // Temperature models write the
+                                   // normals' temperatures.
+                                   (i == 0 ? VK_IMAGE_USAGE_STORAGE_BIT
+                                           : 0u),
                                false, true});
     }
     // An array even for one view, so a depth pyramid builds from

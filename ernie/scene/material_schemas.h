@@ -105,6 +105,25 @@
                                      "mesh texture coordinates, row 0 at the top, in place of "    \
                                      "the temperature; 0 or below there for the temperature.",     \
                               .group = "Thermal"}))                                                \
+    X(std::string, ThermalModel, ::ernie::tokens::kThermalModel, "",                               \
+      (::ernie::AttributeMeta{.label = "Temperature model",                                        \
+                              .doc = "A temperature model computing its pixels' temperature as "   \
+                                     "they render: balance (zero-capacitance, spacecraft), "       \
+                                     "diurnal (a latitude and local time table, the Moon's by "    \
+                                     "default) or a registered one; empty for none.",              \
+                              .group = "Thermal"}))                                                \
+    X(std::vector<float>, ThermalModelParams, ::ernie::tokens::kThermalModelParams,                \
+      std::vector<float>{},                                                                        \
+      (::ernie::AttributeMeta{.label = "Model parameters",                                         \
+                              .doc = "The temperature model's parameters in its order; missing "   \
+                                     "ones its defaults.",                                         \
+                              .group = "Thermal"}))                                                \
+    X(std::vector<float>, ThermalModelData, ::ernie::tokens::kThermalModelData,                    \
+      std::vector<float>{},                                                                        \
+      (::ernie::AttributeMeta{.label = "Model data",                                               \
+                              .doc = "Floats the temperature model reads, such as a diurnal "      \
+                                     "table: latitudes, local times, then kelvin row by row.",     \
+                              .group = "Thermal"}))                                                \
     X(::ernie::Tensor, DetailAlbedo, ::ernie::tokens::kDetailAlbedo, nullptr,                      \
       (::ernie::AttributeMeta{.doc = "float32 linear or uint8 sRGB (rows, cols, 1, 3 or 4) albedo " \
                                      "tiled over the surface.",                                    \

@@ -625,6 +625,37 @@ constexpr DescriptorBinding kShadingBindings[] = {
     {29, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
+// The temperature models' pass: shading's, and the G-buffer's normals
+// to write the temperatures into.
+constexpr DescriptorBinding kTemperatureBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kCompute},
+    {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {3, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {4, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {8, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {17, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {18, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {29, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {19, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+};
+
+/// shading.slang's TemperatureMaterial: a material's temperature
+/// model (its index plus 1, 0 for none), its data's count and
+/// address, its solar absorptivity and thermal emissivity, and its
+/// parameters.
+struct TemperatureMaterialGpu {
+    std::uint32_t model;
+    std::uint32_t dataCount;
+    float absorptivity;
+    float emissivity;
+    VkDeviceAddress data;
+    std::uint32_t padding[2];
+    float params[TemperatureModelRegistry::kMaxParams];
+};
+static_assert(sizeof(TemperatureMaterialGpu) == 96,
+              "TemperatureMaterialGpu must match shading.slang");
+
 /// frame.slang's FrameResources, every drawable's binding 0: the
 /// views' uniforms' address, and the shadow maps' and samplers'
 /// bindless heap slots.
@@ -667,11 +698,13 @@ struct ShadingResources {
     std::uint32_t atmosphereRefraction;
     std::uint32_t volumeShadows;
     std::uint32_t volumeShadowSize;
-    /// Each view's own uniforms (`ShadingView`), after the shared
-    /// ones at `views`.
+    /// Each view's own uniforms (`ShadingView`), after the shared ones
+    /// at `views`.
     VkDeviceAddress viewBlocks;
+    /// Each material's temperature model (`TemperatureMaterialGpu`).
+    VkDeviceAddress temperatureMaterials;
 };
-static_assert(sizeof(ShadingResources) == 160 &&
+static_assert(sizeof(ShadingResources) == 168 &&
                   offsetof(ShadingResources, sigmoidTable) == 96 &&
                   offsetof(ShadingResources, volumeShadows) == 144,
               "ShadingResources must match shading.slang and "
@@ -933,15 +966,20 @@ std::uint32_t ShadingVariantOf(const FrameParams& params, bool stokes,
 }
 
 /// The modules of the shading and sky passes with `brdf` as the
-/// active model and `patterns`' light patterns, for a frame camera's
-/// views or a pushbroom's, shading.slang compiled as shading variant
-/// `variant`.
+/// active model, `patterns`' light patterns and `temperatures`'
+/// temperature models, for a frame camera's views or a pushbroom's,
+/// shading.slang compiled as shading variant `variant`.
 std::vector<ShaderModuleSource>
 ShadingModules(const BrdfModel& brdf,
-               const LightPatternRegistry& patterns, bool pushbroom,
-               std::uint32_t variant = kFullShading) {
+               const LightPatternRegistry& patterns,
+               const TemperatureModelRegistry& temperatures,
+               bool pushbroom, std::uint32_t variant = kFullShading) {
     std::vector<ShaderModuleSource> modules =
         LightPatternModules(patterns);
+    for (ShaderModuleSource& module :
+         TemperatureModelModules(temperatures)) {
+        modules.push_back(std::move(module));
+    }
     modules.insert(modules.end(),
                    {{"brdf", std::string(BrdfSlang())},
                     {BrdfModuleName(brdf), brdf.slang},
@@ -1594,6 +1632,8 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
       poisson_(PoissonDisk(16)),
       shadingLayout_(context, kShadingBindings,
                      sizeof(ShadingConstants)),
+      temperatureLayout_(context, kTemperatureBindings,
+                         sizeof(ShadingConstants)),
       filterLayout_(context, kFilterBindings,
                     sizeof(SensorConstants)),
       presentLayout_(context, kPresentBindings, 48),
@@ -1899,6 +1939,39 @@ void RasterRenderer::AddLightPattern(LightPatternModel model) {
         context_, patternLayout_, spirv);
     shadingPipelines_.clear();
     skyPipelines_ = {};
+    temperaturePipelines_ = {};
+    occlusionPipeline_.reset();
+    occlusionFilterPipeline_.reset();
+}
+
+void RasterRenderer::AddTemperatureModel(TemperatureModel model) {
+    TemperatureModelRegistry candidate = temperatureModels_;
+    candidate.Add(model);
+    // Its module compiles, called as the temperature pass calls it.
+    std::vector<ShaderModuleSource> modules =
+        TemperatureModelModules(candidate);
+    modules.push_back(
+        {"temperature_probe",
+         "import temperature_model;\nimport temperature_models;\n"
+         "[[vk::binding(0, 0)]] RWStructuredBuffer<float> probe;\n"
+         "[shader(\"compute\")]\n[numthreads(1, 1, 1)]\n"
+         "void temperatureProbeMain(uint3 id : SV_DispatchThreadID) {\n"
+         "    TemperatureInput input = {};\n"
+         "    TemperatureParams p = {};\n"
+         "    probe[0] = temperatureModel(id.x, input, p);\n}\n"});
+    try {
+        compiler_.CompileSpirv(modules, "temperatureProbeMain");
+    } catch (const std::invalid_argument& error) {
+        throw std::invalid_argument(
+            "Temperature model " + model.id +
+            " failed to compile: " + error.what());
+    }
+    // The passes that link the models compile again with it.
+    vkDeviceWaitIdle(context_.Device());
+    temperatureModels_ = std::move(candidate);
+    shadingPipelines_.clear();
+    skyPipelines_ = {};
+    temperaturePipelines_ = {};
     occlusionPipeline_.reset();
     occlusionFilterPipeline_.reset();
 }
@@ -2501,6 +2574,9 @@ void RasterRenderer::WriteLights(
         entry.extentY[3] =
             distant ? std::tan(0.5f * glm::radians(light.angle))
                     : 0.0f;
+        // A distant light's irradiance over all wavelengths, for
+        // temperature models.
+        entry.patternExtent[3] = distant ? light.totalIrradiance : 0.0f;
         const bool cone = !distant && light.coneAngle < 180.0f;
         const float softness =
             std::clamp(light.coneSoftness, 0.0f, 1.0f);
@@ -3822,6 +3898,7 @@ void RasterRenderer::Update(
     filters_ = sensorPasses_.front().plan.filters;
     bands_ = params.camera.bands;
     thermal_ = params.thermal;
+    frameTime_ = params.time;
     extent_ = {params.camera.width, params.camera.height};
     // Overlay batches with worlds sort by the views' worlds.
     std::uint32_t overlayWorlds = 0;
@@ -3908,10 +3985,12 @@ void RasterRenderer::Update(
         skyVariant_ = skyVariant;
         skyPipelines_ = {};
     }
-    shadingVariant_ =
-        ShadingVariantOf(params, stokes_, halfRadiance_);
+    shadingVariant_ = ShadingVariantOf(params, stokes_, halfRadiance_);
     for (const std::size_t model : modelsInUse_) {
         ShadingPipeline(model, pushbroom_);
+    }
+    if (temperatureModelsInUse_) {
+        TemperaturePipeline(pushbroom_);
     }
     sky_ = 0;
     if (params.dome && params.dome->visible) {
@@ -4052,8 +4131,8 @@ RasterRenderer::ShadingPipeline(std::size_t model, bool pushbroom) {
     const BrdfModel& brdf = brdfs_.Models()[model];
     try {
         spirv = compiler_.CompileSpirv(
-            ShadingModules(brdf, lightPatterns_, pushbroom,
-                           shadingVariant_),
+            ShadingModules(brdf, lightPatterns_, temperatureModels_,
+                           pushbroom, shadingVariant_),
             "shadeMain");
     } catch (const std::invalid_argument& error) {
         throw std::invalid_argument(
@@ -4075,12 +4154,30 @@ void RasterRenderer::SkyPipeline(bool pushbroom, bool domeOnly) {
         sky = std::make_unique<ComputePipeline>(
             context_, shadingLayout_,
             compiler_.CompileSpirv(
-                ShadingModules(brdfs_.Models().front(),
-                               lightPatterns_, pushbroom,
-                               skyVariant_ |
-                                   (domeOnly ? kSkyDomeOnly : 0u)),
+                ShadingModules(
+                    brdfs_.Models().front(), lightPatterns_,
+                    temperatureModels_, pushbroom,
+                    skyVariant_ | (domeOnly ? kSkyDomeOnly : 0u)),
                 "skyMain"));
     }
+}
+
+const ComputePipeline&
+RasterRenderer::TemperaturePipeline(bool pushbroom) {
+    std::unique_ptr<ComputePipeline>& pipeline =
+        temperaturePipelines_[pushbroom ? 1 : 0];
+    if (pipeline == nullptr) {
+        // Shading's module, composed with the first model, which it
+        // ignores, and the leanest variant: it shades nothing.
+        pipeline = std::make_unique<ComputePipeline>(
+            context_, temperatureLayout_,
+            compiler_.CompileSpirv(
+                ShadingModules(brdfs_.Models().front(), lightPatterns_,
+                               temperatureModels_, pushbroom,
+                               16u << kShadeLightsShift),
+                "temperatureMain"));
+    }
+    return *pipeline;
 }
 
 void RasterRenderer::MotionPipeline() {
@@ -4100,6 +4197,10 @@ void RasterRenderer::WriteMaterialTable() {
     // Each material's temperature for the Temperature var: 0 with
     // thermal emission off.
     std::vector<float> temperatures(count, 0.0f);
+    // Their temperature models, and the models' data.
+    std::vector<TemperatureMaterialGpu> temperatureTable(
+        count, TemperatureMaterialGpu{});
+    std::vector<float> temperatureData;
     std::set<std::size_t> models;
     const std::span<const BrdfModel> registered = brdfs_.Models();
     for (const auto& [id, material] : materials_) {
@@ -4196,9 +4297,96 @@ void RasterRenderer::WriteMaterialTable() {
                         : static_cast<float>(emissivity(
                               bands_.Lower(b) + 0.5 * bands_.Width()));
             }
+            // Its temperature model: its index plus 1, its parameters
+            // over the model's defaults, its data (or the model's),
+            // and the sunlight it absorbs and how well it radiates.
+            if (!settings.temperatureModel.empty()) {
+                ERNIE_ZONE("Temperature model table");
+                const int index =
+                    temperatureModels_.IndexOf(settings.temperatureModel);
+                if (index < 0) {
+                    throw std::invalid_argument(
+                        "A material names temperature model '" +
+                        settings.temperatureModel +
+                        "', which the renderer has not registered");
+                }
+                const TemperatureModel& model =
+                    temperatureModels_.Models()[static_cast<std::size_t>(
+                        index)];
+                TemperatureMaterialGpu& record = temperatureTable[id];
+                record.model = static_cast<std::uint32_t>(index) + 1;
+                std::vector<float> values = model.Defaults();
+                const std::vector<float>& given =
+                    settings.temperatureModelParams;
+                for (std::size_t i = 0;
+                     i < std::min(given.size(), values.size()); ++i) {
+                    values[i] = given[i];
+                }
+                std::copy_n(values.begin(),
+                            std::min<std::size_t>(
+                                values.size(),
+                                TemperatureModelRegistry::kMaxParams),
+                            record.params);
+                const std::vector<float>* data =
+                    &settings.temperatureModelData;
+                if (data->empty() && model.defaultData) {
+                    auto [found, added] =
+                        temperatureDefaults_.try_emplace(model.id);
+                    if (added) {
+                        ERNIE_ZONE("Temperature model default data");
+                        found->second = model.defaultData();
+                    }
+                    data = &found->second;
+                }
+                // Its address once the buffer is made.
+                record.data = temperatureData.size();
+                record.dataCount = static_cast<std::uint32_t>(data->size());
+                temperatureData.insert(temperatureData.end(),
+                                       data->begin(), data->end());
+                record.absorptivity =
+                    static_cast<float>(SolarAbsorptivity(reflectance));
+                record.emissivity =
+                    static_cast<float>(ThermalEmissivity(emissivity, 300.0));
+            }
         }
     }
     modelsInUse_.assign(models.begin(), models.end());
+    // The temperature models' table and data, when any material has
+    // one, the records' data offsets made addresses.
+    temperatureModelsInUse_ =
+        std::any_of(temperatureTable.begin(), temperatureTable.end(),
+                    [](const TemperatureMaterialGpu& record) {
+                        return record.model != 0;
+                    });
+    if (temperatureModelsInUse_) {
+        temperatureData.push_back(0.0f);  // never empty
+        const VkDeviceSize dataBytes =
+            temperatureData.size() * sizeof(float);
+        if (temperatureData_ == nullptr ||
+            temperatureData_->Size() < dataBytes) {
+            vkDeviceWaitIdle(context_.Device());
+            temperatureData_ = std::make_unique<GpuBuffer>(
+                context_, dataBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                BufferMemory::Device);
+        }
+        uploads_.Write(*temperatureData_,
+                       std::as_bytes(std::span(temperatureData)));
+        for (TemperatureMaterialGpu& record : temperatureTable) {
+            record.data = temperatureData_->Address() +
+                          record.data * sizeof(float);
+        }
+    }
+    const VkDeviceSize modelBytes =
+        temperatureTable.size() * sizeof(TemperatureMaterialGpu);
+    if (temperatureMaterials_ == nullptr ||
+        temperatureMaterials_->Size() < modelBytes) {
+        vkDeviceWaitIdle(context_.Device());
+        temperatureMaterials_ = std::make_unique<GpuBuffer>(
+            context_, modelBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            BufferMemory::Device);
+    }
+    uploads_.Write(*temperatureMaterials_,
+                   std::as_bytes(std::span(temperatureTable)));
     const VkDeviceSize bytes = table.size() * sizeof(MaterialGpu);
     if (materialTable_ == nullptr || materialTable_->Size() < bytes) {
         vkDeviceWaitIdle(context_.Device());
@@ -4307,8 +4495,9 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
     if (domeShadowed && occlusionPipeline_ == nullptr) {
         // The occlusion passes share shading's module, composed with
         // the first model, which they ignore.
-        const auto modules = ShadingModules(brdfs_.Models().front(),
-                                            lightPatterns_, false);
+        const auto modules =
+            ShadingModules(brdfs_.Models().front(), lightPatterns_,
+                           temperatureModels_, false);
         occlusionPipeline_ = std::make_unique<ComputePipeline>(
             context_, shadingLayout_,
             compiler_.CompileSpirv(modules, "occlusionMain"));
@@ -6340,6 +6529,7 @@ void RasterRenderer::WriteShadingResources(
     resources.viewBlocks =
         shadingUniforms_.Address() + kShadingShared;
     resources.materials = materialTable_->Address();
+    resources.temperatureMaterials = temperatureMaterials_->Address();
     resources.lights = lightTable_.Address();
     resources.lightViews = lightViewMatrices_->Address();
     resources.lightProfiles = lightProfiles_.Address();
@@ -6494,6 +6684,32 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
             }
             return constants;
         };
+        // Materials' temperature models, before anything reads the
+        // G-buffer's temperatures: their pass writes them into its
+        // normals' target (`temperatureMain`), then returns it to
+        // shading's reading.
+        if (temperatureModelsInUse_) {
+            ERNIE_GPU_ZONE(context_, commands, "Temperature models");
+            GpuImage& normals = targets.GBuffer(0);
+            normals.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+            const DescriptorResource bound[] = {
+                shading[0], general(normals), shading[2], shading[3],
+                shading[4], shading[5], shading[6], shading[7],
+                shading[8], general(normals)};
+            vkCmdBindPipeline(
+                commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                temperaturePipelines_[pushbroom_ ? 1 : 0]->Handle());
+            temperatureLayout_.Push(
+                commands, VK_PIPELINE_BIND_POINT_COMPUTE, bound);
+            ShadingConstants constants = constantsFor(0);
+            constants.model[3] =
+                std::bit_cast<std::uint32_t>(static_cast<float>(frameTime_));
+            temperatureLayout_.PushConstants(commands, &constants,
+                                             sizeof(constants));
+            vkCmdDispatch(commands, groupsX, groupsY, views);
+            normals.Transition(commands,
+                               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
         // Dome occlusion for the full dome lighting mode: per pixel,
         // then filtered, before shading reads it.
         if (domeShadowed_ && occlusionPipeline_ != nullptr) {

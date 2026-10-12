@@ -1420,6 +1420,7 @@ void RasterDelegate::SetMeshAttributes(const Scene& scene,
 void RasterDelegate::SetMeshTemperatures(const Scene& scene,
                                          const Path& path,
                                          std::uint32_t handle) {
+    ERNIE_ZONE("Thermal point temperatures");
     const Tensor* kelvin =
         scene.Read(path, tokens::kThermalTemperatures);
     if (kelvin == nullptr || kelvin->Empty()) {
@@ -1447,6 +1448,7 @@ void RasterDelegate::SetMeshTemperatures(const Scene& scene,
 void RasterDelegate::SetMeshNodes(const Scene& scene,
                                   const Path& path,
                                   std::uint32_t handle, bool ids) {
+    ERNIE_ZONE("Thermal nodes");
     using tokens::kThermalNodeIds;
     using tokens::kThermalNodeTemperatures;
     if (ids) {

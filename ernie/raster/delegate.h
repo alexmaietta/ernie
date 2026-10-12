@@ -110,6 +110,9 @@ class RasterDelegate : public RenderDelegate {
     bool HasLightPattern(std::string_view id) const override {
         return renderer_.LightPatterns().Find(id) != nullptr;
     }
+    void AddTemperatureModel(TemperatureModel model) override {
+        renderer_.AddTemperatureModel(std::move(model));
+    }
     const SensorFilterRegistry& SensorFilters() const override {
         return renderer_.SensorFilters();
     }

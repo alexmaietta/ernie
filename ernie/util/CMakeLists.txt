@@ -15,6 +15,7 @@ ernie_add_library(
     profile_report.cpp
     profiler.cpp
     reflectance_library.cpp
+    regolith.cpp
     scattering.cpp
     solar.cpp
     spectrum.cpp

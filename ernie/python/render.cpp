@@ -197,6 +197,31 @@ LightPatternModel LightPatternFromPython(
     return model;
 }
 
+namespace {
+
+/// A temperature model from `add_temperature_model`'s arguments, its
+/// parameters as `LightPatternFromPython` reads them.
+TemperatureModel TemperatureModelFromPython(
+    const std::string& id, const std::string& typeName,
+    const std::string& slang, nb::handle params, const std::string& name,
+    const std::string& description) {
+    const LightPatternModel pattern = LightPatternFromPython(
+        id, typeName, slang, params, 1.0, false, name, description);
+    TemperatureModel model;
+    model.id = id;
+    model.typeName = typeName;
+    model.slang = slang;
+    model.name = pattern.name;
+    model.description = description;
+    for (const LightPatternParam& param : pattern.params) {
+        model.params.push_back(
+            {param.name, param.defaultValue, param.description});
+    }
+    return model;
+}
+
+}  // namespace
+
 void BindRender(nb::module_& m) {
     nb::class_<CudaArray>(
         m, "CudaArray",
@@ -593,6 +618,35 @@ void BindRender(nb::module_& m) {
             "footprint). Raises ValueError for an invalid pattern or "
             "one that fails to compile, with the compiler's "
             "diagnostics.")
+        .def(
+            "add_temperature_model",
+            [](Renderer& r, const std::string& id,
+               const std::string& typeName, const std::string& slang,
+               nb::object params, const std::string& name,
+               const std::string& description) {
+                TemperatureModel model = TemperatureModelFromPython(
+                    id, typeName, slang, params, name, description);
+                nb::gil_scoped_release release;
+                r.Delegate().AddTemperatureModel(std::move(model));
+            },
+            nb::arg("id"), nb::arg("type_name"), nb::arg("slang"),
+            nb::arg("params").none() = nb::none(),
+            nb::arg("name") = "", nb::arg("description") = "",
+            "Registers a temperature model written in Slang, for "
+            "materials to name in ernie:thermal:model: struct "
+            "`type_name` in module `slang` (which may `import "
+            "temperature_model;`) implementing ITemperatureModel, "
+            "whose `float kelvin(TemperatureInput input, "
+            "TemperatureParams p)` gives a pixel's temperature from "
+            "its point and normal, the sunlight on it, the "
+            "material's absorptivity, emissivity and own temperature, "
+            "and the time. `params` is {name: default} in order, or "
+            "a list of {\"name\", \"default\", \"description\"}; "
+            "materials set them in ernie:thermal:model:params, read "
+            "with p.get(i), and ernie:thermal:model:data is "
+            "p.data(i). Built in: \"balance\" and \"diurnal\". Raises "
+            "ValueError for an invalid model or one that fails to "
+            "compile, with the compiler's diagnostics.")
         .def_prop_ro(
             "sensor_filters",
             [](const Renderer& r) {

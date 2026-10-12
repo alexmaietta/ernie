@@ -1809,6 +1809,13 @@ LightParams LightParamsOf(const Scene& scene, const Path& path,
         light.direction =
             glm::vec3(glm::normalize(glm::dvec3(world[2])));
         light.spectrum = SunIrradianceOf(scene, path, bands);
+        // Its irradiance over sunlight's wavelengths, 250 to 4000 nm.
+        const SpectralBands broad{250.0, 4000.0, SpectralBands::kMaxBands};
+        double total = 0.0;
+        for (const float value : SunIrradianceOf(scene, path, broad)) {
+            total += static_cast<double>(value) * broad.Width();
+        }
+        light.totalIrradiance = static_cast<float>(total);
         // Its light travels along its -z.
         const glm::dvec3 travel = -glm::dvec3(light.direction);
         const glm::dvec3 xAxis(world[0]);
@@ -3454,6 +3461,9 @@ MaterialSettings MaterialSettingsOf(const Scene& scene,
             }
         }
     }
+    settings.temperatureModel = view.GetThermalModel();
+    settings.temperatureModelParams = view.GetThermalModelParams();
+    settings.temperatureModelData = view.GetThermalModelData();
     settings.polarizationRetention = static_cast<float>(
         std::clamp(view.GetPolarizationRetention(), 0.0, 1.0));
     settings.speckleRoughness =

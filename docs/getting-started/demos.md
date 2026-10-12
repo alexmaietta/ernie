@@ -1,6 +1,6 @@
 # Demos
 
-Ernie's demos show its features one at a time: lighting in physical units, real orbital cameras, terrain and planets, GPU interop, batched rendering for reinforcement learning. They live in `demos/<category>/`, each a pair, `demo_<category>_<name>.cpp` and `demo_<category>_<name>.py`: the same scene and checks in each language, rendering the same image. Only `demos/interop/`, which shows Python's GPU interop (Warp, DLPack, CUDA streams), is Python alone. A demo is named as its files, `demo_<category>_<name>`, such as `demo_lighting_illuminants`, wherever it runs: `--demo`, `python -m ernie.demos` and its own program. They run the same way, after Newton's examples.
+Ernie's demos show its features one at a time: lighting in physical units, real orbital cameras, terrain and planets, thermal infrared, GPU interop, batched rendering for reinforcement learning. They live in `demos/<category>/`, each a pair, `demo_<category>_<name>.cpp` and `demo_<category>_<name>.py`: the same scene and checks in each language, rendering the same image. Only `demos/interop/`, which shows Python's GPU interop (Warp, DLPack, CUDA streams), is Python alone, as is `demo_thermal_solver`, a thermal solver stepped in Warp. A demo is named as its files, `demo_<category>_<name>`, such as `demo_lighting_illuminants`, wherever it runs: `--demo`, `python -m ernie.demos` and its own program. They run the same way, after Newton's examples.
 
 ## Running a demo
 

@@ -1017,6 +1017,16 @@ inline constexpr std::string_view kThermalEmissivity =
 /// the top; 0 or below for the material's own temperature.
 inline constexpr std::string_view kThermalTemperatureTexture =
     "ernie:thermal:temperatureTexture";
+/// A material's temperature model (Ernie): the id of one in the
+/// renderer's `TemperatureModelRegistry` ("balance", "diurnal" or a
+/// registered one), its pixels' temperature computed as they render;
+/// empty for none. Its float parameters in the model's order (missing
+/// ones its defaults), and float data it reads (a diurnal table).
+inline constexpr std::string_view kThermalModel = "ernie:thermal:model";
+inline constexpr std::string_view kThermalModelParams =
+    "ernie:thermal:model:params";
+inline constexpr std::string_view kThermalModelData =
+    "ernie:thermal:model:data";
 /// A mesh's temperatures (Ernie): float32 (n,) kelvin per point, a
 /// thermal solver's write-back, from the CPU or a CUDA device.
 inline constexpr std::string_view kThermalTemperatures =

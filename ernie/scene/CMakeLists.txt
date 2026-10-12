@@ -25,6 +25,7 @@ ernie_add_library(
     schema.cpp
     sensor_filters.cpp
     stage_schemas.cpp
+    temperature_model.cpp
     terrain_schemas.cpp
     volume_schemas.cpp
     wide_view.cpp

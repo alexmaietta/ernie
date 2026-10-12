@@ -414,7 +414,7 @@ class ThermalDemo : public app::Demo {
 }  // namespace
 
 ERNIE_REGISTER_DEMO(
-    ThermalDemo, "cameras", "thermal",
+    ThermalDemo, "thermal", "camera",
     "Paints and metals at one temperature and spheres from 270 to "
     "370 K through visible and 8 to 14 um cameras, and the "
     "Temperature var.");

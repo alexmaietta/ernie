@@ -19,6 +19,9 @@ DEMOS = os.path.normpath(
 
 #: Categories with Python demos only, which show Python's GPU interop.
 PYTHON_ONLY = {"interop"}
+#: Python demos only elsewhere, for the same reason: a thermal solver
+#: stepped in Warp beside NumPy.
+PYTHON_ONLY_DEMOS = {"demo_thermal_solver"}
 
 #: Python demos whose C++ twin is still to be written; empty once the
 #: demos are all ported.
@@ -158,6 +161,7 @@ def test_every_demo_has_a_twin_in_the_other_language():
         entry.id
         for entry in python_demos()
         if entry.category not in PYTHON_ONLY
+        and entry.id not in PYTHON_ONLY_DEMOS
         and entry.id not in AWAITING_TWINS
     }
     cpp = set(cpp_demos())

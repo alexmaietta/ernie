@@ -9,6 +9,7 @@
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/util/regolith.h"
 #include "ernie/util/texture_bake.h"
 #include "support/delegate_scenes.h"
 #include "support/vulkan_fixture.h"
@@ -1195,4 +1196,98 @@ TEST_F(RasterDelegateTest, ThermalNetworkNodesMapOntoTheirPoints) {
     scene.Write("/World/Quad", tokens::kThermalNodeTemperatures,
                 cuda->Upload(Tensor::Copy<float>(next, {2})));
     EXPECT_NEAR(at(0.0f), 820.0f, 0.01f);
+}
+
+TEST_F(RasterDelegateTest, TemperatureModelsFollowTheSunlight) {
+    // The quad lit by the Sun's 1361 W/m^2 (about 1347 of it from 250
+    // to 4000 nm): zero-capacitance balance, black, at (E cos i /
+    // sigma)^(1/4), 393 K facing it and 330 K at 60 degrees; the grey
+    // material's own absorptivity and emissivity, alike, the same; two
+    // faces radiating, 2^(1/4) colder; the prim's own temperature
+    // first. Then the Moon's diurnal table at noon and 3 pm.
+    Scene scene = TexturedScene();
+    const Path var("/Render/Vars/Temperature");
+    ernie::RenderVar::Define(scene, var).SetSourceName("Temperature");
+    scene.Set("/Render/Out", tokens::kOrderedVars,
+              std::vector<Path>{var});
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetThermalEnable(true);
+    ernie::DistantLight(scene, "/World/Sun")
+        .SetIrradiance(1361.0)
+        .SetPhysicalIlluminant(std::string(tokens::kSun));
+    ernie::Material material(scene, "/Looks/M");
+    material.SetThermalTemperature(250.0)
+        .SetThermalModel("balance")
+        .SetThermalModelParams({1.0f, 1.0f});
+    RasterDelegate delegate(*context_);
+    const auto centre = [&] {
+        const Tensor kelvin = Render(delegate, scene, "Temperature");
+        return kelvin.As<float>()[(kSize / 2) * kSize + kSize / 2];
+    };
+    const auto sun = [&](glm::dvec3 towards) {
+        scene.Set("/World/Sun", tokens::kTransform,
+                  ernie::DistantLightTransform(glm::normalize(towards)));
+    };
+    // Nearly overhead (exactly, the light's cascades lose it).
+    const glm::dvec3 overhead{0.0, 0.05, 1.0};
+    sun(overhead);
+    EXPECT_NEAR(centre(), 393.0f, 3.0f);
+    sun({std::sqrt(3.0), 0.0, 1.0});
+    EXPECT_NEAR(centre(), 330.0f, 3.0f) << "at 60 degrees";
+    sun({0.0, 0.0, -1.0});
+    EXPECT_NEAR(centre(), 3.0f, 0.5f) << "behind it, the sink's";
+    sun(overhead);
+    material.SetThermalModelParams({});
+    EXPECT_NEAR(centre(), 393.0f, 6.0f)
+        << "grey absorbs and emits alike";
+    material.SetThermalModelParams({1.0f, 1.0f, 3.0f, 0.0f, 2.0f});
+    EXPECT_NEAR(centre(), 393.0f / std::pow(2.0f, 0.25f), 3.0f);
+    ernie::Mesh(scene, "/World/Quad").SetThermalTemperature(500.0);
+    EXPECT_EQ(centre(), 500.0f) << "the prim's own first";
+    scene.Set("/World/Quad", tokens::kThermalTemperature, 0.0);
+
+    // The quad on the Moon's equator, its pole along y and its east
+    // +x: noon with the sun overhead, 3 pm with it 45 degrees west.
+    material.SetThermalModel("diurnal").SetThermalModelParams(
+        {0.0f, 1.0f, 0.0f});
+    const ernie::DiurnalTable& moon = ernie::LunarDiurnalTable();
+    EXPECT_NEAR(centre(), moon.kelvin[48], 1.0f);
+    sun({-1.0, 0.0, 1.0});
+    EXPECT_NEAR(centre(), moon.kelvin[60], 1.0f);
+    material.SetThermalModel("none");
+    EXPECT_THROW(Render(delegate, scene, "Temperature"),
+                 std::invalid_argument);
+}
+
+TEST_F(RasterDelegateTest, CustomTemperatureModelsRegisterAndRun) {
+    Scene scene = TexturedScene();
+    const Path var("/Render/Vars/Temperature");
+    ernie::RenderVar::Define(scene, var).SetSourceName("Temperature");
+    scene.Set("/Render/Out", tokens::kOrderedVars,
+              std::vector<Path>{var});
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetThermalEnable(true);
+    ernie::Material(scene, "/Looks/M")
+        .SetThermalModel("warm")
+        .SetThermalModelParams({200.0f})
+        .SetThermalModelData({7.0f});
+    RasterDelegate delegate(*context_);
+    ernie::TemperatureModel warm;
+    warm.id = "warm";
+    warm.params = {{"base", 100.0f, "K"}};
+    warm.typeName = "Warm";
+    warm.slang = R"(
+import temperature_model;
+public struct Warm : ITemperatureModel {
+    public float kelvin(TemperatureInput input, TemperatureParams p) {
+        return p.get(0) + p.data(0) * float(p.dataCount());
+    }
+}
+)";
+    delegate.AddTemperatureModel(warm);
+    const Tensor kelvin = Render(delegate, scene, "Temperature");
+    EXPECT_EQ(kelvin.As<float>()[(kSize / 2) * kSize + kSize / 2], 207.0f);
+    warm.id = "broken";
+    warm.slang = "import temperature_model;\nstruct Warm { oops }";
+    EXPECT_THROW(delegate.AddTemperatureModel(warm), std::invalid_argument);
 }
