@@ -443,7 +443,7 @@ TEST_F(ViewerTest, PanelsDockWhereTheyAsk) {
     int draws = 0;
     // Alone in its dock, as tabs hidden behind the built-in bottom
     // panels would not draw.
-    for (const char* title : {"Log", "Info", "Overlays"}) {
+    for (const char* title : {"Log", "Info", "Overlays", "Capture"}) {
         viewer_->RemovePanel(title);
     }
     CountingPanel& left = viewer_->AddPanel<CountingPanel>(
@@ -1007,6 +1007,69 @@ TEST_F(ViewerTest, PlaysTheTimelineBeforeTheFrameCallbacks) {
     timeline.Stop(scene_);
     EXPECT_TRUE(viewer_->Step());
     EXPECT_EQ(Stage(scene_).GetTimeCode(), 0.0);
+}
+
+TEST_F(ViewerTest, ScreenshotsAndSequencesLandInTheCaptureFolder) {
+    const std::filesystem::path dir = TempFile("captures");
+    std::filesystem::remove_all(dir);
+    viewer_->GetCaptureOptions().folder = dir;
+    viewer_->GetCaptureOptions().name = "shot";
+    const std::filesystem::path shot = viewer_->Screenshot();
+    EXPECT_EQ(shot, dir / "shot.png");
+    EXPECT_TRUE(viewer_->Step());
+    EXPECT_TRUE(std::filesystem::exists(shot))
+        << "the folder is made";
+    ASSERT_FALSE(viewer_->RecentCaptures().empty());
+    EXPECT_EQ(viewer_->RecentCaptures().back(), shot);
+    EXPECT_EQ(viewer_->Screenshot(), dir / "shot_1.png")
+        << "never over another";
+    EXPECT_TRUE(viewer_->Step());
+
+    // Every other frame of 0 to 4: a frame a step at 0, 2 and 4.
+    Stage(scene_).SetStartTimeCode(0.0).SetEndTimeCode(4.0);
+    std::vector<double> recorded;
+    viewer_->OnFrame(
+        [&recorded](Viewer& viewer, const FrameInfo& info) {
+            if (viewer.Recording()) {
+                recorded.push_back(info.timeCode);
+            }
+        });
+    SequenceOptions sequence;
+    sequence.every = 2;
+    sequence.video = VideoFormat::None;
+    viewer_->RecordSequence(sequence);
+    EXPECT_EQ(viewer_->RecordingProgress().second, 3);
+    for (int i = 0; i < 10 && viewer_->Recording(); ++i) {
+        EXPECT_TRUE(viewer_->Step());
+    }
+    EXPECT_FALSE(viewer_->Recording());
+    EXPECT_EQ(recorded, (std::vector<double>{0.0, 2.0, 4.0}));
+    for (const char* frame :
+         {"shot_0000.png", "shot_0001.png", "shot_0002.png"}) {
+        EXPECT_TRUE(std::filesystem::exists(dir / "shot" / frame))
+            << frame;
+    }
+    EXPECT_FALSE(
+        std::filesystem::exists(dir / "shot" / "shot_0003.png"));
+
+    if (!FindFfmpeg().empty()) {
+        // Into an MP4, without its frames.
+        sequence.every = 1;
+        sequence.video = VideoFormat::Mp4;
+        sequence.keepFrames = false;
+        viewer_->RecordSequence(sequence);
+        for (int i = 0; i < 2000 &&
+                        (viewer_->Recording() || viewer_->Encoding());
+             ++i) {
+            EXPECT_TRUE(viewer_->Step());
+        }
+        EXPECT_TRUE(std::filesystem::exists(dir / "shot_1.mp4"));
+        EXPECT_FALSE(std::filesystem::exists(dir / "shot_1"))
+            << "its frames removed";
+        EXPECT_EQ(viewer_->RecentCaptures().back(),
+                  dir / "shot_1.mp4");
+    }
+    std::filesystem::remove_all(dir);
 }
 
 TEST_F(ViewerTest, HidesItsViewportUi) {

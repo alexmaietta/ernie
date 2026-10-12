@@ -46,4 +46,9 @@ std::unique_ptr<Panel> MakeProfilerPanel();
 /// and a menu of the frame rate and playing every frame.
 std::unique_ptr<Panel> MakeTimelinePanel();
 
+/// The Capture panel: where captures go and how they are named, a
+/// screenshot (F10), recording a sequence of the timeline's frames
+/// (optionally into a video with ffmpeg), and the recent captures.
+std::unique_ptr<Panel> MakeCapturePanel();
+
 }  // namespace ernie::app

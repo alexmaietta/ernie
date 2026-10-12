@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include "ernie/app/capture.h"
 #include "ernie/app/file_dialog.h"
 #include "ernie/app/panel.h"
 #include "ernie/app/theme.h"
@@ -22,6 +23,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace ernie::app {
@@ -125,6 +127,25 @@ struct ViewportDisplay {
     bool ui = true;
 
     bool operator==(const ViewportDisplay&) const = default;
+};
+
+/// Where the viewer's captures go (`Viewer::GetCaptureOptions`).
+struct CaptureOptions {
+    std::filesystem::path folder =
+        DefaultCaptureFolder();  ///< Made when first written to.
+    /// File names without extension (`ExpandCaptureName`); a
+    /// sequence's frames add `_{frame}` in a folder of this name.
+    std::string name = "{scene}_{date}_{time}";
+};
+
+/// A sequence to record (`Viewer::RecordSequence`).
+struct SequenceOptions {
+    /// The time codes it spans; the timeline's range by default.
+    std::optional<double> start;
+    std::optional<double> end;
+    int every = 1;  ///< Records every so many frames.
+    VideoFormat video = VideoFormat::Mp4;
+    bool keepFrames = true;  ///< Keeps the PNGs a video is made of.
 };
 
 /// How serious a log message is.
@@ -706,6 +727,34 @@ class Viewer {
     /// @throws std::invalid_argument as `SetViewVar`.
     void Capture(const std::filesystem::path& path,
                  std::string var = {});
+
+    /// Where screenshots and sequences go (the Capture panel).
+    CaptureOptions& GetCaptureOptions();
+
+    /// Saves the next viewport frame as PNG in the capture folder,
+    /// named by its pattern (the F10 key and the viewport's camera
+    /// button): the image with the scene's overlays, without the
+    /// viewer's own UI, at the viewport's render resolution. Returns
+    /// the file it writes.
+    std::filesystem::path Screenshot();
+
+    /// Records the timeline's frames from `start` to `end` as PNGs in
+    /// a folder of the capture folder, one rendered and written each
+    /// step whatever it takes (the timeline paused meanwhile), the
+    /// sensor clock a frame's seconds a frame; then, unless `video`
+    /// is `None`, encodes them with ffmpeg in the background.
+    /// @throws std::invalid_argument if `every` is below 1, the range
+    /// is empty, or a video is asked for without ffmpeg.
+    void RecordSequence(const SequenceOptions& options);
+    /// Whether a sequence is recording, and its frames written and
+    /// all; `StopRecording` ends it early, encoding what it wrote.
+    bool Recording() const;
+    std::pair<std::int64_t, std::int64_t> RecordingProgress() const;
+    void StopRecording();
+    /// Whether a recorded sequence's video is still encoding.
+    bool Encoding() const;
+    /// The files captured since the viewer opened, latest last.
+    const std::vector<std::filesystem::path>& RecentCaptures() const;
 
     /// Writes the whole window as last drawn, UI and all, to `path`
     /// as PNG: for screenshot tests of the interface. Only a hidden

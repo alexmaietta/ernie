@@ -6,6 +6,7 @@
 #include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/function.h>
 #include <nanobind/stl/optional.h>
+#include <nanobind/stl/pair.h>
 #include <nanobind/stl/set.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
@@ -28,8 +29,10 @@ using app::FrameInfo;
 using app::Lighting;
 using app::LogEntry;
 using app::LogLevel;
+using app::SequenceOptions;
 using app::Theme;
 using app::Timeline;
+using app::VideoFormat;
 using app::Viewer;
 using app::ViewerOptions;
 using app::WidgetPanel;
@@ -715,8 +718,69 @@ void BindApp(nb::module_& parent) {
             },
             nb::arg("frames") = 1,
             "Pauses the timeline and moves it `frames` frames on "
-            "(back "
-            "for negative), within its range.")
+            "(back for negative), within its range.")
+        .def_prop_rw(
+            "capture_folder",
+            [](Viewer& v) { return v.GetCaptureOptions().folder; },
+            [](Viewer& v, const std::filesystem::path& folder) {
+                v.GetCaptureOptions().folder = folder;
+            },
+            "Where screenshots and sequences go; made when first "
+            "written to.")
+        .def_prop_rw(
+            "capture_name",
+            [](Viewer& v) { return v.GetCaptureOptions().name; },
+            [](Viewer& v, std::string name) {
+                v.GetCaptureOptions().name = std::move(name);
+            },
+            "Capture file names without extension: {scene}, "
+            "{camera}, {date} and {time} fill in.")
+        .def("screenshot", &Viewer::Screenshot,
+             "Saves the next viewport frame as PNG in the capture "
+             "folder (as F10 does): the image with the scene's "
+             "overlays, without the viewer's UI. Returns its path.")
+        .def(
+            "record_sequence",
+            [](Viewer& v, std::optional<double> start,
+               std::optional<double> end, int every,
+               const std::string& video, bool keepFrames) {
+                SequenceOptions options;
+                options.start = start;
+                options.end = end;
+                options.every = every;
+                options.keepFrames = keepFrames;
+                if (video == "mp4") {
+                    options.video = VideoFormat::Mp4;
+                } else if (video == "prores") {
+                    options.video = VideoFormat::ProRes;
+                } else if (video == "none") {
+                    options.video = VideoFormat::None;
+                } else {
+                    throw nb::value_error("video must be \"mp4\", "
+                                          "\"prores\" or \"none\"");
+                }
+                v.RecordSequence(options);
+            },
+            nb::arg("start") = nb::none(),
+            nb::arg("end") = nb::none(), nb::arg("every") = 1,
+            nb::arg("video") = "mp4", nb::arg("keep_frames") = true,
+            "Records the timeline's frames from `start` to `end` "
+            "(its range by default), every `every` frames, a frame a "
+            "step, as PNGs in a folder of the capture folder; then "
+            "encodes them with ffmpeg into `video` (\"mp4\", "
+            "\"prores\" or \"none\") in the background.")
+        .def_prop_ro("recording", &Viewer::Recording,
+                     "Whether a sequence is recording.")
+        .def_prop_ro("recording_progress", &Viewer::RecordingProgress,
+                     "A recording sequence's frames written and all.")
+        .def("stop_recording", &Viewer::StopRecording,
+             "Ends the recording, encoding what it wrote.")
+        .def_prop_ro("encoding", &Viewer::Encoding,
+                     "Whether a sequence's video is still encoding.")
+        .def_prop_ro(
+            "recent_captures", &Viewer::RecentCaptures,
+            "The files captured since the viewer opened, latest "
+            "last.")
         .def_prop_rw("exposure", &Viewer::GetExposure,
                      &Viewer::SetExposure)
         .def_prop_rw("exposure_compensation",

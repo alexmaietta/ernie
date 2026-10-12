@@ -200,6 +200,7 @@ if(TARGET ernie_app)
     ernie_add_test_suite(
         app
         SOURCES
+        app_capture_test.cpp
         app_demo_test.cpp
         app_file_dialog_test.cpp
         app_panel_test.cpp

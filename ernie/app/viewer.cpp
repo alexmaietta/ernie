@@ -23,6 +23,7 @@
 #include "ernie/scene/scene_json.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/sensor_filters.h"
+#include "ernie/scene/stage_schemas.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/xform.h"
 #include "ernie/session/delegate.h"
@@ -50,6 +51,7 @@
 #include <cstdio>
 #include <deque>
 #include <fstream>
+#include <future>
 #include <iterator>
 #include <limits>
 #include <map>
@@ -761,8 +763,36 @@ struct Viewer::State {
         std::string
             var;  ///< The var to write; empty for the shown one.
         bool rendered = false;
+        bool screenshot =
+            false;  ///< Listed and announced once written.
     };
     std::optional<CaptureRequest> capture;
+
+    CaptureOptions captureOptions;
+    std::vector<std::filesystem::path> recentCaptures;
+    /// A sequence being recorded: its range, the next time code and
+    /// frame, and where its frames go.
+    struct SequenceRecording {
+        SequenceOptions options;
+        double start = 0.0;
+        double end = 0.0;
+        double next = 0.0;
+        std::int64_t index = 0;
+        std::int64_t total = 0;
+        double fps = 24.0;
+        std::filesystem::path folder;
+        std::string stem;
+    };
+    std::optional<SequenceRecording> recording;
+    /// A recorded sequence's video, encoding in the background, and
+    /// the frames to remove once it is made.
+    std::future<int> encoding;
+    std::filesystem::path encodingVideo;
+    std::vector<std::filesystem::path> encodingFrames;
+    /// A short message at the bottom of the viewport ("Saved ..."),
+    /// until `toastUntil` (`FrameInfo::time`).
+    std::string toast;
+    double toastUntil = 0.0;
 
     int framebufferWidth = 0;
     int framebufferHeight = 0;
@@ -1562,6 +1592,7 @@ struct Viewer::State {
             DrawToolbar(origin, size);
             DrawToolStrip(origin);
             DrawAxisIndicator(origin, size);
+            DrawToast(origin, size);
         }
         if (!renderError.empty()) {
             // At the bottom left, beside the axis indicator.
@@ -2103,6 +2134,10 @@ struct Viewer::State {
         if (!io.WantTextInput &&
             ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
             open = false;
+        }
+        // Kit's Capture Screenshot, wherever the focus is.
+        if (ImGui::IsKeyPressed(ImGuiKey_F10, false)) {
+            self.Screenshot();
         }
     }
 
@@ -3089,10 +3124,8 @@ struct Viewer::State {
             std::string(icons::kSun) + "  " + LightingName(lighting);
         const float right = origin.x + size.x - pad;
         DrawHud(ImVec2(right, origin.y + pad +
-                                  (display.toolbarLighting
-                                       ? ImGui::GetFrameHeight() +
-                                             style.ItemSpacing.y
-                                       : 0.0f)));
+                                  ImGui::GetFrameHeight() +
+                                  style.ItemSpacing.y));
         ImGui::SetCursorScreenPos(
             ImVec2(right - ImGui::CalcTextSize(lightLabel.c_str()).x -
                        2.0f * style.FramePadding.x,
@@ -3108,6 +3141,26 @@ struct Viewer::State {
                 }
             }
             ImGui::EndCombo();
+        }
+        // The screenshot button, left of the lighting.
+        const float lightWidth =
+            display.toolbarLighting
+                ? ImGui::CalcTextSize(lightLabel.c_str()).x +
+                      2.0f * style.FramePadding.x +
+                      style.ItemSpacing.x
+                : 0.0f;
+        const float shotWidth =
+            ImGui::CalcTextSize(icons::kCamera).x +
+            2.0f * style.FramePadding.x;
+        ImGui::SetCursorScreenPos(
+            ImVec2(right - lightWidth - shotWidth, origin.y + pad));
+        if (ImGui::Button(
+                (std::string(icons::kCamera) + "##screenshot")
+                    .c_str())) {
+            self.Screenshot();
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Capture a screenshot (F10)");
         }
         ImGui::PopStyleVar(4);
         ImGui::PopStyleColor(5);
@@ -3140,6 +3193,7 @@ struct Viewer::State {
                         {"H", "Hide or show the viewport's toolbar, "
                               "menus, heads-up display and gizmos"},
                         {"Space", "Play or pause the timeline"},
+                        {"F10", "Capture a screenshot"},
                         {"Del", "Delete the selection"},
                         {"Ctrl+D", "Duplicate the selection"},
                         {"F2", "Rename the selected prim (Stage)"},
@@ -3321,10 +3375,12 @@ struct Viewer::State {
                                      : viewVar);
             // The sensor clock runs with the viewer, a frame's
             // seconds a frame, unless paused, plus any step asked
-            // for; with the timeline playing every frame, its frame's
-            // seconds, so sensors keep pace with the animation.
+            // for; with the timeline playing every frame, or a
+            // sequence recording, its frame's seconds, so sensors
+            // keep pace with the animation.
             const double seconds =
-                timeline.PlaysEveryFrame() && frameInfo.timeStep > 0.0
+                recording || (timeline.PlaysEveryFrame() &&
+                              frameInfo.timeStep > 0.0)
                     ? frameInfo.timeStep
                     : std::max(frameInfo.delta, 0.0);
             delegate->AdvanceTime((clockPaused ? 0.0 : seconds) +
@@ -3451,13 +3507,180 @@ struct Viewer::State {
             viewport->ReadColor();
         const VkExtent2D extent = viewport->Extent();
         const std::filesystem::path path = capture->path;
+        const bool screenshot = capture->screenshot;
         capture.reset();
+        if (path.has_parent_path()) {
+            std::error_code error;
+            std::filesystem::create_directories(path.parent_path(),
+                                                error);
+        }
         if (stbi_write_png(
                 path.string().c_str(), static_cast<int>(extent.width),
                 static_cast<int>(extent.height), 4, texels.data(),
                 static_cast<int>(extent.width * 4)) == 0) {
+            if (screenshot || recording) {
+                // From the GUI: said in the log rather than thrown.
+                recording.reset();
+                self.Log(LogLevel::Error,
+                         "Cannot write " + path.string());
+                Toast("Cannot write " + path.filename().string());
+                return;
+            }
             throw std::runtime_error("Cannot write " + path.string());
         }
+        if (screenshot) {
+            recentCaptures.push_back(path);
+            self.Log(LogLevel::Info, "Saved " + path.string());
+            Toast("Saved " + path.filename().string());
+        }
+    }
+
+    /// The toast, or a recording's progress, centred at the bottom of
+    /// the viewport in a pill like the toolbar's.
+    void DrawToast(const ImVec2& origin, const ImVec2& size) {
+        std::string text;
+        if (recording) {
+            text = "Recording frame " +
+                   std::to_string(recording->index + 1) + " of " +
+                   std::to_string(recording->total);
+        } else if (encoding.valid()) {
+            text = "Encoding " + encodingVideo.filename().string() +
+                   "...";
+        } else if (frameInfo.time < toastUntil) {
+            text = toast;
+        }
+        if (text.empty()) {
+            return;
+        }
+        const float pad = 8.0f * contentScale;
+        const ImVec2 extent = ImGui::CalcTextSize(text.c_str());
+        const ImVec2 low(origin.x + 0.5f * (size.x - extent.x) - pad,
+                         origin.y + size.y - extent.y - 4.0f * pad);
+        const ImVec2 high(low.x + extent.x + 2.0f * pad,
+                          low.y + extent.y + pad);
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        ImVec4 box = ToImVec4(theme.overlay);
+        box.w *= 0.9f;
+        draw->AddRectFilled(low, high, ImGui::GetColorU32(box),
+                            theme.pillRounding * contentScale);
+        draw->AddText(ImVec2(low.x + pad, low.y + 0.5f * pad),
+                      ImGui::GetColorU32(ToImVec4(theme.text)),
+                      text.c_str());
+    }
+
+    /// Shows `text` at the bottom of the viewport for a few seconds.
+    void Toast(std::string text) {
+        toast = std::move(text);
+        toastUntil = frameInfo.time + 3.0;
+    }
+
+    /// The fields capture names may name.
+    CaptureNameFields CaptureFields() const {
+        CaptureNameFields fields;
+        if (!scenePath.empty()) {
+            fields.scene = scenePath.stem().string();
+        }
+        fields.camera = std::string(activeCamera.Name());
+        return fields;
+    }
+
+    /// Before a step renders: while recording, the timeline at the
+    /// sequence's next time code, held there, and that frame's
+    /// capture asked for. Returns the seconds of animation since the
+    /// last frame recorded, 0 for the first.
+    double StepRecording() {
+        SequenceRecording& r = *recording;
+        timeline.Pause();
+        timeline.Seek(scene, r.next);
+        capture = CaptureRequest{
+            r.folder /
+                (r.stem + "_" +
+                 ExpandCaptureName("{frame}", {.frame = r.index}) +
+                 ".png"),
+            "", false, false};
+        return r.index == 0 ? 0.0 : r.options.every / r.fps;
+    }
+
+    /// After a recorded frame is written: on to the next, or, past
+    /// the end, done.
+    void AdvanceRecording() {
+        SequenceRecording& r = *recording;
+        ++r.index;
+        r.next =
+            r.start + static_cast<double>(r.index * r.options.every) *
+                          Timeline::FrameTimeCodes(scene);
+        if (r.index >= r.total) {
+            FinishRecording();
+        }
+    }
+
+    /// Ends the recording: its frames listed, and its video encoding
+    /// in the background when one is asked for.
+    void FinishRecording() {
+        if (!recording) {
+            return;
+        }
+        const SequenceRecording r = *recording;
+        recording.reset();
+        recentCaptures.push_back(r.folder);
+        if (r.options.video == VideoFormat::None || r.index == 0) {
+            Toast("Saved " + std::to_string(r.index) + " frames");
+            return;
+        }
+        if (encoding.valid()) {
+            encoding.wait();
+        }
+        encodingVideo =
+            UniquePath(r.folder.parent_path() /
+                       (r.stem + VideoExtension(r.options.video)));
+        encodingFrames.clear();
+        if (!r.options.keepFrames) {
+            for (std::int64_t i = 0; i < r.index; ++i) {
+                encodingFrames.push_back(
+                    r.folder /
+                    (r.stem + "_" +
+                     ExpandCaptureName("{frame}", {.frame = i}) +
+                     ".png"));
+            }
+        }
+        const std::vector<std::string> command = EncodeCommand(
+            FindFfmpeg(), r.folder / (r.stem + "_%04d.png"),
+            r.fps / r.options.every, encodingVideo, r.options.video);
+        encoding = std::async(std::launch::async, [command] {
+            return RunProcess(command);
+        });
+        Toast("Encoding " + encodingVideo.filename().string() +
+              "...");
+    }
+
+    /// A finished encoding's video listed, or its failure logged.
+    void CheckEncoding() {
+        if (!encoding.valid() ||
+            encoding.wait_for(std::chrono::seconds(0)) !=
+                std::future_status::ready) {
+            return;
+        }
+        const int status = encoding.get();
+        if (status != 0) {
+            self.Log(LogLevel::Error,
+                     "ffmpeg failed (" + std::to_string(status) +
+                         ") encoding " + encodingVideo.string());
+            Toast("Encoding failed: see the Log");
+            return;
+        }
+        std::error_code error;
+        for (const std::filesystem::path& frame : encodingFrames) {
+            std::filesystem::remove(frame, error);
+        }
+        if (!encodingFrames.empty()) {
+            std::filesystem::remove(
+                encodingFrames.front().parent_path(), error);
+            std::erase(recentCaptures,
+                       encodingFrames.front().parent_path());
+        }
+        recentCaptures.push_back(encodingVideo);
+        self.Log(LogLevel::Info, "Saved " + encodingVideo.string());
+        Toast("Saved " + encodingVideo.filename().string());
     }
 
     /// Runs the callbacks of `stage` on a copy of the list, so
@@ -3637,6 +3860,10 @@ bool Viewer::State::Step() {
         frame->Wait();
     }
     ResizeViewport();
+    // A recorded sequence's frame: its time code, and its capture
+    // this step.
+    const std::optional<double> recordedStep =
+        recording ? std::optional(StepRecording()) : std::nullopt;
     if (capture) {
         capture->rendered = true;
     }
@@ -3648,7 +3875,9 @@ bool Viewer::State::Step() {
     info.delta = std::chrono::duration<double>(now - last).count();
     last = now;
     // The animation moves on before the callbacks see the frame.
-    info.timeStep = timeline.Advance(scene, info.delta);
+    info.timeStep = recordedStep
+                        ? *recordedStep
+                        : timeline.Advance(scene, info.delta);
     info.timeCode = Timeline::TimeCode(scene);
     frameInfo = info;
     RunCallbacks(Stage::Frame, info);
@@ -3737,7 +3966,11 @@ bool Viewer::State::Step() {
     }
     if (capture && capture->rendered) {
         WriteCapture();
+        if (recordedStep && recording) {
+            AdvanceRecording();
+        }
     }
+    CheckEncoding();
     frameSlot = (frameSlot + 1) % frameResources.size();
     frame = &*frameResources[frameSlot];
     RunCallbacks(Stage::PostRender, info);
@@ -3767,6 +4000,7 @@ Viewer::Viewer(Scene& scene, const ViewerOptions& options)
     s.panels.push_back(std::make_unique<InfoPanel>());
     s.panels.push_back(std::make_unique<OverlaysPanel>());
     s.panels.push_back(MakeTimelinePanel());
+    s.panels.push_back(MakeCapturePanel());
     s.panels.push_back(MakeProfilerPanel());
     s.profilerPanel = s.panels.back().get();
     s.builtInPanels = s.panels.size();
@@ -4536,6 +4770,82 @@ Timeline& Viewer::GetTimeline() {
 
 const Timeline& Viewer::GetTimeline() const {
     return state_->timeline;
+}
+
+CaptureOptions& Viewer::GetCaptureOptions() {
+    return state_->captureOptions;
+}
+
+std::filesystem::path Viewer::Screenshot() {
+    State& s = *state_;
+    const std::filesystem::path path = UniquePath(
+        s.captureOptions.folder /
+        (ExpandCaptureName(s.captureOptions.name, s.CaptureFields()) +
+         ".png"));
+    s.capture = State::CaptureRequest{path, "", false, true};
+    return path;
+}
+
+void Viewer::RecordSequence(const SequenceOptions& options) {
+    State& s = *state_;
+    const auto [first, last] = Timeline::Range(s.scene);
+    const double start = options.start.value_or(first);
+    const double end = options.end.value_or(last);
+    if (options.every < 1) {
+        throw std::invalid_argument(
+            "A sequence records every 1 or more frames");
+    }
+    if (!(end >= start)) {
+        throw std::invalid_argument(
+            "A sequence's end comes before its start");
+    }
+    if (options.video != VideoFormat::None && FindFfmpeg().empty()) {
+        throw std::invalid_argument(
+            "Encoding a video needs ffmpeg on the PATH");
+    }
+    State::SequenceRecording r;
+    r.options = options;
+    r.start = start;
+    r.end = end;
+    r.next = start;
+    const double step =
+        Timeline::FrameTimeCodes(s.scene) * options.every;
+    r.total = static_cast<std::int64_t>(
+                  std::floor((end - start) / step + 1e-9)) +
+              1;
+    r.fps = Stage(s.scene).GetFramesPerSecond();
+    // A folder of the frames, named as a screenshot would be.
+    r.folder = UniquePath(
+        s.captureOptions.folder /
+        ExpandCaptureName(s.captureOptions.name, s.CaptureFields()));
+    r.stem = r.folder.filename().string();
+    s.recording = std::move(r);
+    s.Toast("Recording " + std::to_string(s.recording->total) +
+            " frames");
+}
+
+bool Viewer::Recording() const {
+    return state_->recording.has_value();
+}
+
+std::pair<std::int64_t, std::int64_t>
+Viewer::RecordingProgress() const {
+    const auto& r = state_->recording;
+    return r ? std::pair{r->index, r->total}
+             : std::pair<std::int64_t, std::int64_t>{0, 0};
+}
+
+void Viewer::StopRecording() {
+    state_->FinishRecording();
+}
+
+bool Viewer::Encoding() const {
+    return state_->encoding.valid();
+}
+
+const std::vector<std::filesystem::path>&
+Viewer::RecentCaptures() const {
+    return state_->recentCaptures;
 }
 
 std::optional<Wireframe> Viewer::GetWireframe() const {
