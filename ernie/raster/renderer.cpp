@@ -563,9 +563,14 @@ struct ShadingResources {
     std::uint32_t atmosphereMultiple;
     std::uint32_t atmosphereSkyIrradiance;
     std::uint32_t atmosphereRefraction;
+    std::uint32_t volumeShadows;
+    std::uint32_t volumeShadowSize;
+    // The uniform block's size is a multiple of 16 bytes.
+    std::uint32_t padding[2];
 };
-static_assert(sizeof(ShadingResources) == 144 &&
-                  offsetof(ShadingResources, sigmoidTable) == 96,
+static_assert(sizeof(ShadingResources) == 160 &&
+                  offsetof(ShadingResources, sigmoidTable) == 96 &&
+                  offsetof(ShadingResources, volumeShadows) == 144,
               "ShadingResources must match shading.slang and "
               "volume.slang");
 
@@ -3315,6 +3320,7 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
     shading.size[2] = kTableResolution;
     shading.size[3] =
         static_cast<std::uint32_t>(params.lights.size());
+    lightCount_ = shading.size[3];
     // Unlit surfaces show their colour as a white one facing the
     // brightest distant light, or in relative units without one.
     const LightParams* brightest = BrightestDistant(params, bands_);
@@ -5067,6 +5073,14 @@ void RasterRenderer::WriteShadingResources(
         texture(Kind::Texture2DArray, atmosphere_->SkyIrradiance());
     resources.atmosphereRefraction =
         texture(Kind::Texture2DArray, atmosphere_->Refraction());
+    // The volumes' shadow maps, which the lights' shadow views see
+    // through (`VolumePass::Prepare`).
+    const GpuImage* volumeShadows = volumes_->ShadowMap();
+    resources.volumeShadows =
+        volumeShadows != nullptr
+            ? texture(Kind::Texture2DArray, *volumeShadows)
+            : 0xFFFFFFFFu;
+    resources.volumeShadowSize = VolumePass::kShadowSize;
 
     // In the command stream, after the dispatches reading the last
     // and before those reading this.

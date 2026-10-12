@@ -489,3 +489,29 @@ TILT=NONE
     std::filesystem::remove(files[0]);
     std::filesystem::remove(files[1]);
 }
+
+TEST_F(RasterDelegateTest, AVolumeShadowsTheGroundBelowIt) {
+    // The cube 3 m up, absorbing, over the ground the camera sees
+    // from low beside it (its view clear of the cube): the overhead
+    // sun reaches the ground below through the cube's whole column.
+    constexpr double kSigma = 0.8;
+    RasterDelegate delegate(*context_);
+    Scene scene = VolumeScene(kSigma, 0.0);
+    ernie::DistantLight(scene, "/World/Sun").SetShadowEnable(true);
+    scene.GetPrim("/World/Cube")
+        .SetXform({.translate = glm::dvec3(0.0, 0.0, 3.0)});
+    scene.Set("/World/Camera", tokens::kTransform,
+              ernie::LookAtTransform({4.0, 0.0, 0.5}, {0.0, 0.0, 0.0},
+                                     {0.0, 0.0, 1.0}));
+    const std::vector<double> shaded =
+        CentreSpectrum(delegate, scene);
+    scene.Set("/World/Cube", tokens::kVisibility,
+              std::string(tokens::kInvisible));
+    const std::vector<double> lit = CentreSpectrum(delegate, scene);
+    const double expected = std::exp(-kSigma * kDepth);
+    for (std::size_t b = 0; b < lit.size(); ++b) {
+        ASSERT_GT(lit[b], 0.0) << "band " << b;
+        EXPECT_NEAR(shaded[b] / lit[b], expected, 0.05 * expected)
+            << "band " << b;
+    }
+}

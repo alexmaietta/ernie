@@ -257,6 +257,10 @@ struct ShadingResources {
     uint atmosphereMultiple;
     uint atmosphereSkyIrradiance;
     uint atmosphereRefraction;
+    // The volumes' shadow maps (volume.slang's `volumeShadowMain`, an array; kNoVolumeShadows
+    // without volumes) and their texels across.
+    uint volumeShadows;
+    uint volumeShadowSize;
 }
 
 [[vk::binding(0, 0)]] ConstantBuffer<ShadingResources> resources;
@@ -664,6 +668,54 @@ float lightVisibility(LightGpu light, float3 world, float3 n, float nDotL, float
                                                   float3(tap.uv, float(tap.view)), depth);
     }
     return lit / 16.0;
+}
+
+static const uint kNoVolumeShadows = 0xFFFFFFFFu;
+
+// The transmittance of a light's volume shadow map (volume.slang's `volumeShadowMain`) at texel
+// `texel` of shadow view `view`, at the view's depth `depth`: 1 before the volumes begin, their
+// slices' transmittance, linear between them, within, and the last beyond.
+float volumeShadowAt(int2 texel, uint view, float depth) {
+    let maps = heapTextureArrays[resources.volumeShadows];
+    let span = maps.Load(int4(texel, int(3 * view), 0));
+    if (span.x >= span.y || depth <= span.x) {
+        return 1.0;
+    }
+    let a = maps.Load(int4(texel, int(3 * view + 1), 0));
+    let b = maps.Load(int4(texel, int(3 * view + 2), 0));
+    let slices = float[9](1.0, a.x, a.y, a.z, a.w, b.x, b.y, b.z, b.w);
+    let x = saturate((depth - span.x) / (span.y - span.x)) * 8.0;
+    let i = min(uint(x), 7u);
+    return lerp(slices[i], slices[i + 1], x - float(i));
+}
+
+// How much of a light the volumes let through to `world`: its volume shadow map in the shadow
+// view shading reads its geometry's shadows from (`lightView`), bilinear between texels. 1 for a
+// light without shadow maps, or without volumes.
+float volumeTransmittance(LightGpu light, float3 world) {
+    if (resources.volumeShadows == kNoVolumeShadows || light.cone.w <= 0.0) {
+        return 1.0;
+    }
+    let view = lightView(light, world);
+    let clip = mul(lightViews[view], float4(world, 1.0));
+    if (clip.w <= 0.0) {
+        return 1.0;
+    }
+    let ndc = clip.xyz / clip.w;
+    let uv = float2(0.5 * ndc.x + 0.5, 0.5 - 0.5 * ndc.y);
+    if (any(uv < float2(0.0)) || any(uv > float2(1.0))) {
+        return 1.0;
+    }
+    let size = int(resources.volumeShadowSize);
+    let p = uv * float(size) - 0.5;
+    let base = int2(floor(p));
+    let f = p - floor(p);
+    float t[4];
+    for (int c = 0; c < 4; ++c) {
+        let texel = clamp(base + int2(c & 1, c >> 1), int2(0), int2(size - 1));
+        t[c] = volumeShadowAt(texel, view, ndc.z);
+    }
+    return lerp(lerp(t[0], t[1], f.x), lerp(t[2], t[3], f.x), f.y);
 }
 
 // Cosine to the viewer below which a shading normal is bent towards it.
@@ -1944,7 +1996,8 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         if (nDotL <= 0.0 || scale <= 0.0) {
             scale = 0.0;
         } else {
-            scale *= lightVisibility(light, shadowPoint, n, nDotL, float2(id.xy));
+            scale *= lightVisibility(light, shadowPoint, n, nDotL, float2(id.xy)) *
+                     volumeTransmittance(light, shadowPoint);
         }
         lightDirections[k] = toLight;
         lightScales[k] = scale;

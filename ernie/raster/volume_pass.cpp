@@ -36,6 +36,31 @@ constexpr DescriptorBinding kBindings[] = {
     {29, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
+// The volumes' shadow maps' pass (volume.slang's `volumeShadowMain`):
+// the grids, the pass's buffers and the maps it writes.
+constexpr DescriptorBinding kShadowBindings[] = {
+    {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kCompute},
+    {6, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {29, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+};
+
+// volume.slang's VolumeResources.
+struct VolumeResources {
+    VkDeviceAddress volumes;
+    VkDeviceAddress materials;
+    VkDeviceAddress runs;
+    VkDeviceAddress lists;
+    VkDeviceAddress lights;
+    VkDeviceAddress lightViews;
+    std::uint32_t volumeCount;
+    std::uint32_t shadowSize;
+    std::uint32_t lightCount;
+    std::uint32_t unused;
+};
+static_assert(sizeof(VolumeResources) == 64,
+              "VolumeResources must match volume.slang");
+
 constexpr std::uint32_t kNoGrid = 0xFFFFFFFFu;
 // NanoVDB grids start 32-byte aligned.
 constexpr std::uint64_t kGridAlignment = 32;
@@ -213,10 +238,11 @@ std::unique_ptr<GpuBuffer> Grow(const VulkanContext& context,
 VolumePass::VolumePass(const VulkanContext& context,
                        const ShaderCompiler& compiler)
     : context_(context), compiler_(compiler),
-      layout_(context, kBindings, sizeof(VolumeConstants)) {
+      layout_(context, kBindings, sizeof(VolumeConstants)),
+      shadowLayout_(context, kShadowBindings) {
     pool_ = Grow(context_, nullptr, kGridAlignment);
     resources_ = std::make_unique<GpuBuffer>(
-        context_, 4 * sizeof(VkDeviceAddress),
+        context_, sizeof(VolumeResources),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, BufferMemory::Device);
 }
 
@@ -491,11 +517,107 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     upload(materials_, std::as_bytes(std::span(materials)));
     upload(runs_, std::as_bytes(std::span(runs)));
     upload(lists_, std::as_bytes(std::span(lists)));
-    // The march reads them by address (VolumeResources).
-    const std::array<VkDeviceAddress, 4> addresses{
-        volumes_->Address(), materials_->Address(), runs_->Address(),
-        lists_->Address()};
-    uploads.Write(*resources_, std::as_bytes(std::span(addresses)));
+    // The passes read them by address (VolumeResources, `Prepare`).
+    addresses_ = {volumes_->Address(), materials_->Address(),
+                  runs_->Address(), lists_->Address()};
+    volumeCount_ = static_cast<std::uint32_t>(instances.size());
+}
+
+void VolumePass::Prepare(VkCommandBuffer commands,
+                         const GpuBuffer& lights,
+                         const GpuBuffer& lightViews,
+                         std::uint32_t lightCount,
+                         const LightPatternRegistry& patterns,
+                         const GpuBuffer& patternData,
+                         std::uint32_t shadowViews) const {
+    if (!active_) {
+        return;
+    }
+    ERNIE_GPU_ZONE(context_, commands, "Volume shadows");
+    VolumeResources resources{};
+    resources.volumes = addresses_[0];
+    resources.materials = addresses_[1];
+    resources.runs = addresses_[2];
+    resources.lists = addresses_[3];
+    resources.lights = lights.Address();
+    resources.lightViews = lightViews.Address();
+    resources.volumeCount = volumeCount_;
+    resources.shadowSize = kShadowSize;
+    resources.lightCount = lightCount;
+    // After whatever read the last frame's, before the passes reading
+    // these.
+    VkMemoryBarrier2 before{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+    before.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    before.srcAccessMask = VK_ACCESS_2_UNIFORM_READ_BIT;
+    before.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    before.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    VkDependencyInfo dependency{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    dependency.memoryBarrierCount = 1;
+    dependency.pMemoryBarriers = &before;
+    vkCmdPipelineBarrier2(commands, &dependency);
+    vkCmdUpdateBuffer(commands, resources_->Handle(), 0,
+                      sizeof(resources), &resources);
+    VkMemoryBarrier2 after{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+    after.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    after.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    after.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    after.dstAccessMask = VK_ACCESS_2_UNIFORM_READ_BIT;
+    dependency.pMemoryBarriers = &after;
+    vkCmdPipelineBarrier2(commands, &dependency);
+
+    shadowViews_ = shadowViews;
+    if (shadowViews == 0) {
+        return;
+    }
+    if (shadowMap_ == nullptr ||
+        shadowMap_->Desc().layers != 3 * shadowViews) {
+        if (shadowMap_ != nullptr) {
+            vkDeviceWaitIdle(context_.Device());
+        }
+        shadowMap_ = std::make_unique<GpuImage>(
+            context_,
+            ImageDesc{kShadowSize, kShadowSize, 3 * shadowViews, 1,
+                      VK_FORMAT_R32G32B32A32_SFLOAT,
+                      VK_IMAGE_USAGE_STORAGE_BIT |
+                          VK_IMAGE_USAGE_SAMPLED_BIT,
+                      false, true});
+    }
+    if (shadowPipeline_ == nullptr ||
+        shadowPipelinePatterns_ != patterns.Models().size()) {
+        std::vector<ShaderModuleSource> modules =
+            LightPatternModules(patterns);
+        modules.insert(
+            modules.end(),
+            {{"projection", shaders::kProjectionPinholeSlang},
+             {"brdf", shaders::kBrdfSlang},
+             {"bindless", shaders::kBindlessSlang},
+             {"atmosphere", shaders::kAtmosphereSlang},
+             {"volume", std::string(shaders::kPNanoVdbPreludeSlang) +
+                            shaders::kPNanoVdbHeader + "\n" +
+                            shaders::kVolumeSlang}});
+        if (shadowPipeline_ != nullptr) {
+            vkDeviceWaitIdle(context_.Device());
+        }
+        shadowPipeline_ = std::make_unique<ComputePipeline>(
+            context_, shadowLayout_,
+            compiler_.CompileSpirv(modules, "volumeShadowMain"));
+        shadowPipelinePatterns_ = patterns.Models().size();
+    }
+    shadowMap_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    const DescriptorResource resourcesOf[] = {
+        DescriptorResource::Of(*pool_),
+        DescriptorResource::Of(*resources_),
+        DescriptorResource::Of(shadowMap_->View(),
+                               VK_IMAGE_LAYOUT_GENERAL),
+        DescriptorResource::Of(patternData)};
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                      shadowPipeline_->Handle());
+    shadowLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                       resourcesOf);
+    vkCmdDispatch(commands, Groups(kShadowSize), Groups(kShadowSize),
+                  shadowViews);
+    shadowMap_->Transition(commands,
+                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 void VolumePass::Record(VkCommandBuffer commands,

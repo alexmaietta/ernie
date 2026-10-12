@@ -12,6 +12,7 @@
 
 #include <glm/glm.hpp>
 
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <map>
@@ -91,6 +92,32 @@ class VolumePass {
         return active_;
     }
 
+    /// Texels across a light shadow view's volume shadow map.
+    static constexpr std::uint32_t kShadowSize = 256;
+
+    /// Records what the march and shading read of the volumes before
+    /// the views draw, once the light shadow views are known: the
+    /// pass's buffers' addresses, then the volumes' shadow maps
+    /// (volume.slang's `volumeShadowMain`), one per light shadow view
+    /// of `shadowViews`, from the first `lightCount` lights of
+    /// `lights` and their views' view-projections `lightViews` (with
+    /// the light patterns its pipeline compiles with, as the
+    /// march's).
+    void Prepare(VkCommandBuffer commands, const GpuBuffer& lights,
+                 const GpuBuffer& lightViews,
+                 std::uint32_t lightCount,
+                 const LightPatternRegistry& patterns,
+                 const GpuBuffer& patternData,
+                 std::uint32_t shadowViews) const;
+
+    /// The volumes' shadow maps of the last `Prepare` (three layers
+    /// per light shadow view), ready to sample; null without volumes
+    /// or shadow views.
+    const GpuImage* ShadowMap() const {
+        return active_ && shadowViews_ > 0 ? shadowMap_.get()
+                                           : nullptr;
+    }
+
     /// Records the march over every view of `targets` (views
     /// `firstView` on in the shading uniforms), for a pinhole or a
     /// pushbroom camera; `sky` when the background holds radiance.
@@ -143,6 +170,15 @@ class VolumePass {
     std::unique_ptr<GpuBuffer> lists_;
     /// volume.slang's VolumeResources: the buffers above by address.
     std::unique_ptr<GpuBuffer> resources_;
+    /// What `Set` gives `Prepare` to write into `resources_`: the
+    /// buffers' addresses and the volumes' count.
+    std::array<VkDeviceAddress, 4> addresses_{};
+    std::uint32_t volumeCount_ = 0;
+    PipelineLayout shadowLayout_;
+    mutable std::unique_ptr<ComputePipeline> shadowPipeline_;
+    mutable std::size_t shadowPipelinePatterns_ = 0;
+    mutable std::unique_ptr<GpuImage> shadowMap_;
+    mutable std::uint32_t shadowViews_ = 0;
     std::uint32_t views_ = 0;
     std::uint32_t seed_ = 0;
     bool active_ = false;

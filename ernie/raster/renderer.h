@@ -1045,6 +1045,8 @@ class RasterRenderer {
     BindlessHeap::Slot tableSamplerSlot_;
     BindlessHeap::Slot shadowSamplerSlot_;
     mutable std::vector<BindlessHeap::Slot> shadingSlots_;
+    /// The lights in `lightTable_`'s first copy (`WriteShading`).
+    std::uint32_t lightCount_ = 0;
     /// shading.slang's ShadingResources, written as each recording
     /// shades.
     std::unique_ptr<GpuBuffer> shadingResources_;

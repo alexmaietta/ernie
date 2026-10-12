@@ -186,16 +186,25 @@ struct ShadingResources {
     uint atmosphereMultiple;
     uint atmosphereSkyIrradiance;
     uint atmosphereRefraction;
+    uint volumeShadows;
+    uint volumeShadowSize;
 }
 
 // The pass's own buffers (`VolumePass`): the volumes, their materials, each view's runs of
 // `viewVolumes` (offset and count of those it marches, then of those that shadow them), and the
-// volumes each view sees.
+// volumes each view sees; for the volumes' shadow maps (`volumeShadowMain`), the lights and their
+// shadow views' view-projections, and how many volumes, texels across a map and lights there are.
 struct VolumeResources {
     VolumeGpu* volumes;
     VolumeMaterialGpu* materials;
     uint4* runs;
     uint* lists;
+    LightGpu* shadowLights;
+    float4x4* shadowViews;
+    uint volumeCount;
+    uint shadowSize;
+    uint lightCount;
+    uint unused;
 }
 
 [[vk::binding(0, 0)]] ConstantBuffer<ShadingResources> shading;
@@ -204,6 +213,8 @@ struct VolumeResources {
 [[vk::binding(3, 0)]] RWTexture2DArray<float> spectral;
 [[vk::binding(4, 0)]] StructuredBuffer<uint> grids;
 [[vk::binding(5, 0)]] ConstantBuffer<VolumeResources> pass;
+// The volumes' shadow maps (`volumeShadowMain`'s output, its own pipeline's).
+[[vk::image_format("rgba32f")]] [[vk::binding(6, 0)]] RWTexture2DArray<float4> volumeShadowsOut;
 [[vk::push_constant]] ConstantBuffer<VolumeConstants> constants;
 
 #define volumes (pass.volumes)
@@ -368,6 +379,61 @@ float volumesShadow(uint2 run, float3 world, float3 towards, float far, uint cas
         depth += sum * volume.params.x * dt;
     }
     return exp(-depth);
+}
+
+// The inverse of `matrix` by cofactors, 0 for a singular one (views.slang's `invert`).
+//
+// Reference: MESA GLU, `__gluInvertMatrixd` (cofactor inverse of a 4x4 matrix).
+//   https://gitlab.freedesktop.org/mesa/glu/-/blob/master/src/libutil/project.c
+float4x4 invert(float4x4 matrix) {
+    float m[16];
+    for (int r = 0; r < 4; ++r) {
+        for (int c = 0; c < 4; ++c) {
+            m[r * 4 + c] = matrix[r][c];
+        }
+    }
+    float inv[16];
+    inv[0] = m[5] * m[10] * m[15] - m[5] * m[11] * m[14] - m[9] * m[6] * m[15] +
+             m[9] * m[7] * m[14] + m[13] * m[6] * m[11] - m[13] * m[7] * m[10];
+    inv[4] = -m[4] * m[10] * m[15] + m[4] * m[11] * m[14] + m[8] * m[6] * m[15] -
+             m[8] * m[7] * m[14] - m[12] * m[6] * m[11] + m[12] * m[7] * m[10];
+    inv[8] = m[4] * m[9] * m[15] - m[4] * m[11] * m[13] - m[8] * m[5] * m[15] +
+             m[8] * m[7] * m[13] + m[12] * m[5] * m[11] - m[12] * m[7] * m[9];
+    inv[12] = -m[4] * m[9] * m[14] + m[4] * m[10] * m[13] + m[8] * m[5] * m[14] -
+              m[8] * m[6] * m[13] - m[12] * m[5] * m[10] + m[12] * m[6] * m[9];
+    inv[1] = -m[1] * m[10] * m[15] + m[1] * m[11] * m[14] + m[9] * m[2] * m[15] -
+             m[9] * m[3] * m[14] - m[13] * m[2] * m[11] + m[13] * m[3] * m[10];
+    inv[5] = m[0] * m[10] * m[15] - m[0] * m[11] * m[14] - m[8] * m[2] * m[15] +
+             m[8] * m[3] * m[14] + m[12] * m[2] * m[11] - m[12] * m[3] * m[10];
+    inv[9] = -m[0] * m[9] * m[15] + m[0] * m[11] * m[13] + m[8] * m[1] * m[15] -
+             m[8] * m[3] * m[13] - m[12] * m[1] * m[11] + m[12] * m[3] * m[9];
+    inv[13] = m[0] * m[9] * m[14] - m[0] * m[10] * m[13] - m[8] * m[1] * m[14] +
+              m[8] * m[2] * m[13] + m[12] * m[1] * m[10] - m[12] * m[2] * m[9];
+    inv[2] = m[1] * m[6] * m[15] - m[1] * m[7] * m[14] - m[5] * m[2] * m[15] +
+             m[5] * m[3] * m[14] + m[13] * m[2] * m[7] - m[13] * m[3] * m[6];
+    inv[6] = -m[0] * m[6] * m[15] + m[0] * m[7] * m[14] + m[4] * m[2] * m[15] -
+             m[4] * m[3] * m[14] - m[12] * m[2] * m[7] + m[12] * m[3] * m[6];
+    inv[10] = m[0] * m[5] * m[15] - m[0] * m[7] * m[13] - m[4] * m[1] * m[15] +
+              m[4] * m[3] * m[13] + m[12] * m[1] * m[7] - m[12] * m[3] * m[5];
+    inv[14] = -m[0] * m[5] * m[14] + m[0] * m[6] * m[13] + m[4] * m[1] * m[14] -
+              m[4] * m[2] * m[13] - m[12] * m[1] * m[6] + m[12] * m[2] * m[5];
+    inv[3] = -m[1] * m[6] * m[11] + m[1] * m[7] * m[10] + m[5] * m[2] * m[11] -
+             m[5] * m[3] * m[10] - m[9] * m[2] * m[7] + m[9] * m[3] * m[6];
+    inv[7] = m[0] * m[6] * m[11] - m[0] * m[7] * m[10] - m[4] * m[2] * m[11] +
+             m[4] * m[3] * m[10] + m[8] * m[2] * m[7] - m[8] * m[3] * m[6];
+    inv[11] = -m[0] * m[5] * m[11] + m[0] * m[7] * m[9] + m[4] * m[1] * m[11] -
+              m[4] * m[3] * m[9] - m[8] * m[1] * m[7] + m[8] * m[3] * m[5];
+    inv[15] = m[0] * m[5] * m[10] - m[0] * m[6] * m[9] - m[4] * m[1] * m[10] +
+              m[4] * m[2] * m[9] + m[8] * m[1] * m[6] - m[8] * m[2] * m[5];
+    let det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
+    let scale = det != 0.0 ? 1.0 / det : 0.0;
+    float4x4 result;
+    for (int r = 0; r < 4; ++r) {
+        for (int c = 0; c < 4; ++c) {
+            result[r][c] = inv[r * 4 + c] * scale;
+        }
+    }
+    return result;
 }
 
 // The shadow view of `light`'s maps that sees `world`, as shading picks it (shading.slang's
@@ -806,4 +872,129 @@ void writeNoRadiance(uint3 id, uint layer) {
         spectral[int3(id.xy, stokes + layer)] = 0.0;
         spectral[int3(id.xy, 2 * stokes + layer)] = 0.0;
     }
+}
+
+// The volumes' shadow maps, which shading reads (shading.slang's `volumeTransmittance`): per light
+// shadow view `id.z` and texel, along the view's ray through the texel, the depths (the view's
+// NDC z, standard depth) where the volumes whose group the view's light's shadow mask holds begin
+// and end (layer 3 z, xy; begin past end where there are none), and the transmittance at
+// `kShadowSlices` depths evenly between them (layers 3 z + 1 and 3 z + 2), each marched in
+// `kShadowSubsteps` steps from the one before.
+static const uint kShadowSlices = 8;
+static const uint kShadowSubsteps = 4;
+
+// The extinction coefficient at world point `world` of every volume whose group `casters` holds.
+float extinctionAt(float3 world, uint casters) {
+    float sigma = 0.0;
+    for (uint i = 0; i < pass.volumeCount; ++i) {
+        let volume = volumes[i];
+        if (volume.density.grid.x == kNoGrid || ((casters >> volume.info.z) & 1u) == 0) {
+            continue;
+        }
+        let local = float3(dot(volume.toLocal[0], float4(world, 1.0)),
+                           dot(volume.toLocal[1], float4(world, 1.0)),
+                           dot(volume.toLocal[2], float4(world, 1.0)));
+        if (any(local < volume.boundsMin.xyz) || any(local > volume.boundsMax.xyz)) {
+            continue;
+        }
+        var accessor = accessorOf(volume.density);
+        sigma += max(sampleField(volume.density, local, accessor), 0.0) * volume.params.x;
+    }
+    return sigma;
+}
+
+float3 unproject(float4x4 inverseViewProj, float2 ndc, float depth) {
+    let p = mul(inverseViewProj, float4(ndc, depth, 1.0));
+    return p.xyz / p.w;
+}
+
+// World point `world`'s NDC depth in `viewProj`.
+float depthIn(float4x4 viewProj, float3 world) {
+    let clip = mul(viewProj, float4(world, 1.0));
+    return clip.z / clip.w;
+}
+
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void volumeShadowMain(uint3 id : SV_DispatchThreadID) {
+    let size = pass.shadowSize;
+    if (id.x >= size || id.y >= size) {
+        return;
+    }
+    let view = id.z;
+    let none = float4(1.0, 0.0, 0.0, 0.0);
+    volumeShadowsOut[int3(id.xy, 3 * view)] = none;
+    volumeShadowsOut[int3(id.xy, 3 * view + 1)] = float4(1.0);
+    volumeShadowsOut[int3(id.xy, 3 * view + 2)] = float4(1.0);
+    // The light whose maps hold this view, when it casts shadows.
+    uint casters = 0;
+    for (uint k = 0; k < pass.lightCount; ++k) {
+        let light = pass.shadowLights[k];
+        let first = uint(light.cone.z);
+        if (light.cone.w > 0.0 && view >= first && view < first + uint(light.cone.w) &&
+            light.links.z != 0) {
+            casters = light.links.y;
+        }
+    }
+    if (casters == 0) {
+        return;
+    }
+    let viewProj = pass.shadowViews[view];
+    let inverseViewProj = invert(viewProj);
+    let uv = (float2(id.xy) + 0.5) / float(size);
+    let ndc = float2(2.0 * uv.x - 1.0, 1.0 - 2.0 * uv.y);
+    let start = unproject(inverseViewProj, ndc, 0.0);
+    let ray = unproject(inverseViewProj, ndc, 1.0) - start;
+    // Where the ray (fraction s of the way from the near plane to the far) is in any caster. An
+    // orthographic view's (a distant light's cascade) runs on back towards the light past its near
+    // plane, which fits the geometry that casts shadows, not volumes above it; depths there are
+    // below 0.
+    let orthographic = all(abs(viewProj[3].xyz) < float3(1e-7));
+    let back = orthographic ? -1e6 : 0.0;
+    float near = 1.0;
+    float far = back;
+    for (uint i = 0; i < pass.volumeCount; ++i) {
+        let volume = volumes[i];
+        if (volume.density.grid.x == kNoGrid || ((casters >> volume.info.z) & 1u) == 0) {
+            continue;
+        }
+        let o = float3(dot(volume.toLocal[0], float4(start, 1.0)),
+                       dot(volume.toLocal[1], float4(start, 1.0)),
+                       dot(volume.toLocal[2], float4(start, 1.0)));
+        let d = float3(dot(volume.toLocal[0].xyz, ray), dot(volume.toLocal[1].xyz, ray),
+                       dot(volume.toLocal[2].xyz, ray));
+        let inverse = 1.0 / d;
+        let t0 = (volume.boundsMin.xyz - o) * inverse;
+        let t1 = (volume.boundsMax.xyz - o) * inverse;
+        let enter = max(max(min(t0.x, t1.x), min(t0.y, t1.y)), max(min(t0.z, t1.z), back));
+        let exit = min(min(max(t0.x, t1.x), max(t0.y, t1.y)), min(max(t0.z, t1.z), 1.0));
+        if (enter < exit) {
+            near = min(near, enter);
+            far = max(far, exit);
+        }
+    }
+    if (near >= far) {
+        return;
+    }
+    let nearDepth = depthIn(viewProj, start + ray * near);
+    let farDepth = depthIn(viewProj, start + ray * far);
+    volumeShadowsOut[int3(id.xy, 3 * view)] = float4(nearDepth, farDepth, 0.0, 0.0);
+    float slices[kShadowSlices];
+    float opticalDepth = 0.0;
+    var from = unproject(inverseViewProj, ndc, nearDepth);
+    for (uint i = 0; i < kShadowSlices; ++i) {
+        let to = unproject(inverseViewProj, ndc,
+                           lerp(nearDepth, farDepth, float(i + 1) / float(kShadowSlices)));
+        let step = (to - from) / float(kShadowSubsteps);
+        let length = length(step);
+        for (uint j = 0; j < kShadowSubsteps; ++j) {
+            opticalDepth += extinctionAt(from + step * (float(j) + 0.5), casters) * length;
+        }
+        slices[i] = exp(-opticalDepth);
+        from = to;
+    }
+    volumeShadowsOut[int3(id.xy, 3 * view + 1)] =
+        float4(slices[0], slices[1], slices[2], slices[3]);
+    volumeShadowsOut[int3(id.xy, 3 * view + 2)] =
+        float4(slices[4], slices[5], slices[6], slices[7]);
 }
